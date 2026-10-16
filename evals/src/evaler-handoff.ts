@@ -101,7 +101,7 @@ export function evaluateHandoff(value: unknown): HandoffDecision {
     return blockReport(state, input.event, "evidence/cleanup unconfirmed or infrastructure ERROR")
   if (!evidence.attachment_id || !/^[a-f0-9]{64}$/.test(evidence.manifest_sha256)) {
     if (evidence.product === "ERROR" || input.event.phase !== "rich" || state.delivery_sha)
-      return blockReport(state, input.event, "OWNER_ACTION_REQUIRED: incomplete delivery")
+      return blockReport(state, input.event, "EVALER_DECISION_REQUIRED: incomplete delivery")
     return { action: "ready_to_dispatch", target: "Rich", reason: "DELIVERABLES_REQUIRED: upload existing evidence; no new quality attempt",
       state: { ...state, delivery_sha: input.event.actual_sha, last_dispatch: null, processed_report_ids: [...state.processed_report_ids, input.event.id] } }
   }

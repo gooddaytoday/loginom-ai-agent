@@ -242,7 +242,7 @@ test("delivery completion never loops or masks unknown cleanup", () => {
   const current = evaluateHandoff({ state: proposed, event: { kind: "receipt", dispatch_id: "completion", outcome: "queued", task_id: "completion-task" }, pending_tasks: [] }).state
   const incomplete = evaluateHandoff({ state: current, event: { ...report, id: "missing-again", task_id: "completion-task", evidence: { ...report.evidence, attachment_id: "" } }, pending_tasks: [] })
   expect(incomplete.action).toBe("blocked")
-  expect(incomplete.reason).toContain("OWNER_ACTION_REQUIRED")
+  expect(incomplete.reason).toContain("EVALER_DECISION_REQUIRED")
   expect(incomplete.state.reject_count).toBe(0)
   expect(incomplete.state.review_cycle).toBe(0)
   const cleanup = evaluateHandoff({ state, event: { ...report, evidence: { ...report.evidence, attachment_id: "", cleanup: "unknown" } }, pending_tasks: [] })
