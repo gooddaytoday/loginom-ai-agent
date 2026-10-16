@@ -1472,3 +1472,20 @@ remain unproven. The30s guard was retained; public factory resumed this same
 configured research pair without restart and disposed it (4 released factory
 claims,3 IDs and bpTCqq root absent). Original FAIL/report and unlocated history
 were preserved. This setup refusal is separate from the passing finalizer checks.
+
+
+Active A/B kernel control (2026-10-16): native607f0ea7…1/103 PASS94.56s;
+independent auditbec18a5b…123 checks/38 sources+13 pins. Both active native
+packages hold PID1 sidecar FLOCK on distinct inodes. Exact close A releases
+its FD/lock while B retains the same sidecar inode, native session/package ID
+and active Progress. B completes successfully9458ms after A close; its canary
+SHA stays unchanged. Separate close B releases both own-root FDs and original
+lock tuples, with the same daemon birth/epoch throughout. Both drivers and the
+observer have native transport ACKs/continuous process closure; exact own pair,
+network and root are absent. Twelve repo source snapshots and the pinned
+candidate are retained. This test-only qualification passed existing runtime;
+no artificial RED or runtime fix is claimed. Typecheck/diff PASS. Two duplicate
+temporary files were removed after retained SHA read-back. Autosave no-regrowth,
+general operation coverage, SessionBackup and cleanup/release/unpause remain
+open; operationsQualified, storageDeletionAllowed and nextAdmissionAllowed
+remain false.
