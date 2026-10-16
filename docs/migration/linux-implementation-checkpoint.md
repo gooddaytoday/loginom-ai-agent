@@ -1,6 +1,6 @@
 # Linux: завершение реализации — 2026-09-16
 
-## 2026-10-16 — выпуск v0.2.1 заблокирован Windows proxy gate
+## 2026-10-16 — v0.2.1: CI fix подготовлен, тег ожидает решения
 
 Ветка `loginom`, база `b33555fee8`, изменение настройки `5ea6daf224`.
 Новые установки включают «Выбор агента»; сохранённый выбор не сбрасывается.
@@ -9,11 +9,13 @@ Root/Desktop manifests и lock:0.2.1; frozen install PASS.
 Packaging/static/notes:14 PASS,2 native macOS SKIP; pinned Node hash PASS.
 Release SHA:`aae2c5d35b87d4ce30a903b9101fe252ae0bbb66`;tag v0.2.1 и ветка pushed.
 CI38862534170:три build,unit/HttpApi,typecheck,e2e PASS;Linux matrix5/5 PASS.
-Windows:попытка1 LoginForm timeout15s;попытки2/3 CRL Microsoft в proxy trap.
+Windows:попытка1 LoginForm timeout15s;попытки2/3/4 CRL Microsoft в proxy trap.
 Diagnostic91369bfab2/run38866284961 подтвердил CryptSvc/svchost,CryptoAPI UA.
-Gate считает системные CRL продуктовым трафиком;исключения не добавлялись.
+CI fix:`46a1821ae949e34e98f9d9e09e10bcdfe506f268`;2 unit tests PASS.
+Эквивалентный ecfdb5267b/run38867058084:Windows3×16 PASS,CRL не возникали.
+Нативная положительная ветка нового фильтра не покрыта;runtime не менялся.
 Draft/release не создан;логи/snapshots сохранены в storage/tmp/release-v0.2.1.
-Следующий шаг:согласовать уточнение gate и замену неопубликованного тега0.2.1,
+Следующий шаг:разрешение заменить неопубликованный тег0.2.1 (runbook запрещает),
 затем проверка исправления,полный CI,сверка assets и публикация.
 Installed GUI/live приёмка не выполнялась; пользовательская установка не меняется.
 [Отчёт](../testing/loginom-ai-agent/reports/2026-10-16-v0.2.1-release.md).
