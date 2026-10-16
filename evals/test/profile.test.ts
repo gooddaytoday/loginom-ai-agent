@@ -5,7 +5,7 @@ import os from "node:os"
 import { spawn } from "node:child_process"
 import { loadConfig, repoRoot } from "../src/config"
 import { agentCommand } from "../src/cli"
-import { agentConfigJson, archiveProfileHistory, assertProfileClean, assertAuth, ensureProfile, management, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "../src/profile"
+import { agentConfigJson, archiveProfileHistory, assertProfileClean, assertAuth, ensureProfile, management, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, verifyProfile, waitProfileIdle } from "../src/profile"
 import { EvalFailure } from "../src/fail"
 import { writerIdentity } from "../src/process-supervisor"
 import { Database } from "bun:sqlite"
@@ -508,6 +508,26 @@ test("ensureProfile v2: matching ready profile is reused without setup or genera
     expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
     expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "status"])
   } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test("verifyProfile checks readiness and saved configuration without setup or replacement", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),
+    loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json"), settings = path.join(context.profileDir, "config/loginom-ai-agent.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state } }
+  const saved = JSON.stringify(agentConfigJson(config), null, 2)
+  try {
+    await Bun.write(settings, saved)
+    await Bun.write(state, JSON.stringify({ state: "unconfigured", hasApiKey: false }))
+    await expect(verifyProfile(config, command)).rejects.toThrow("PROFILE_NOT_PREPARED")
+    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }))
+    expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
+    await Bun.write(settings, '{"permission":{"*":"allow"}}')
+    await expect(verifyProfile(config, command)).rejects.toThrow("PROFILE_CONFIGURATION_DRIFT")
+    expect(await Bun.file(settings).text()).toBe('{"permission":{"*":"allow"}}')
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+  } finally { await rm(context.profileDir, { recursive: true }) }
 })
 
 test("ensureProfile v2: failed status cannot admit a matching ready profile", async () => {

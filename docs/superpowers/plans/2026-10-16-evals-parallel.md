@@ -76,8 +76,14 @@
 - [ ] GREEN: переиспользовать рабочие lease/preparation primitives; исключить user
   lock из нового пути. Одна повторяемая startup-процедура сверяет остатки прошлого
   run; неизвестность сохраняет карантин. Не расширять recovery/epoch API.
-- [ ] Проверить `bun run test test/slots.test.ts test/lease.test.ts test/parallel-env.test.ts`
+- [x] Реализовать prepare/verify без process inventories/старого финализатора:
+  недостающий пользователь настраивается и активируется, готовый только проверяется;
+  Pool=0 до работы пользователя, backup read-only, профиль проверяется без setup.
+  История сохраняется, собственные сессии закрываются с readback, чистые guards
+  освобождаются после admin.dispose. Живой readiness ещё не подтверждён.
+- [x] Проверить `bun run test test/slots.test.ts test/lease.test.ts test/parallel-env.test.ts`
   и `bun typecheck` из `evals/`; коммит `refactor(evals): simplify run ownership and preparation`.
+  68/264 PASS41.65s; verifyProfile RED→GREEN1/5 PASS2.19s, diff PASS.
 
 ## 3. Рабочий admin и безопасное завершение слота
 
