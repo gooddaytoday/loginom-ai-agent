@@ -1,10 +1,10 @@
 # Операторские команды Evaler, Rich и Ben
 
-Команды запускаются из `evals/` собственного checkout, содержащего принимаемый код. Установка и воспроизводимость runtime описаны в [runbook](../2026-10-07-eval-tests-runtime.md); эта инструкция не назначает новую модельную попытку. Несекретный конфигурационный файл установлен оператором: `/home/user/.local/share/loginom-evals-runtime/operations/node-eval-ops.json`.
+Команды запускаются из `evals/` собственного checkout, содержащего принимаемый код. Действующий порядок — [общий контракт](../evaler-orchestration.md). Эта инструкция не назначает модельную попытку. Точные checkout, установленный helper и config берутся из активного runbook серии; для импорта — [этот блок](../2026-10-16-text-import-integration.md#действующий-маршрут). Документы/handoff читать из назначенного checkout, операторские команды выполнять установленным helper. Общего fallback support/config здесь нет.
 
 ## Shared stand lease
 
-Конфигурация v1 фиксирует runtimeRoot, endpoint, точные container name/ID/storageDir, cliBin и отдельные rich/ben checkout, referenceProfile, evalProfile, workRoots, resultsRoot. Optional offline задаёт только checkout/workRoots/resultsRoot Evaler для чтения доставленных evidence; CLI-профилей у него нет. Helper проверяет канонические непересекающиеся пути и фиксирует digest конфигурации в lease. Несуществующий path, symlink или профиль внутри checkout/CLI-installation не исправлять автоматическим fallback. Несогласованный container ID не заменять текущим самостоятельно.
+Конфигурация фиксирует runtimeRoot, endpoint, точные container name/ID/storageDir, cliBin и отдельные rich/ben checkout, referenceProfile, evalProfile, workRoots, resultsRoot. Optional offline задаёт только checkout/workRoots/resultsRoot Evaler для чтения доставленных evidence; CLI-профилей у него нет. В актуальной v3 проверяются также отдельные eval-only роли; это не разрешает действия с другой серией. Helper проверяет канонические непересекающиеся пути и фиксирует digest конфигурации в lease. Несуществующий path, symlink или профиль внутри checkout/CLI-installation не исправлять автоматическим fallback. Несогласованный container ID не заменять текущим самостоятельно.
 
 Созданные исполнителем private receipts/sidecars хранятся в **собственном настроенном workRoots/resultsRoot**, вне checkout и профиля, с правами 0600. Внутренние completion/admission/recovery proofs helper создаёт в закрытом `R/operations/stand.lease/`. Receipt содержит секретный lease token: он не прикладывается к карточке или evidence archive. В комментарий допустимы owner/phase/SHA/acquiredAt и безопасный статус; путь private receipt служит recovery locator, не доказательством передачи результатов.
 
@@ -12,27 +12,29 @@
 
 ```sh
 R=/home/user/.local/share/loginom-evals-runtime
-CFG="$R/operations/node-eval-ops.json"
+CFG='<absolute config path from the active series runbook>'
+OPS_SCRIPT='<absolute installed helper entrypoint from that runbook>'
+CHECKOUT='<assigned checkout from that config>'
 ROLE=rich
 ISSUE='<current issue UUID>'
 TASK='<current worker task UUID>'
 SHA='<full clean SHA at stage admission>'
 WORK='<own allowlisted private work directory>'
 LEASE="$WORK/stand-lease.json"
-cd "$R/checkouts/$ROLE/loginom-ai-agent/evals"
+cd "$CHECKOUT/evals"
 
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/bun" \
-  script/node-eval-ops.ts status --config "$CFG"
+  "$OPS_SCRIPT" status --config "$CFG"
 
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/bun" \
-  script/node-eval-ops.ts acquire --config "$CFG" \
+  "$OPS_SCRIPT" acquire --config "$CFG" \
   --issue "$ISSUE" --task "$TASK" --role "$ROLE" --phase eval --sha "$SHA" --receipt "$LEASE"
 
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/with-env" "$R/roles/$ROLE/eval.env" "$R/bin/bun" \
-  script/node-eval-ops.ts preflight --config "$CFG" --lease "$LEASE"
+  "$OPS_SCRIPT" preflight --config "$CFG" --lease "$LEASE"
 
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/bun" \
-  script/node-eval-ops.ts unit --config "$CFG" --lease "$LEASE"
+  "$OPS_SCRIPT" unit --config "$CFG" --lease "$LEASE"
 ```
 
 `--phase eval` охватывает весь этап исполнителя: unit → reference → cold → live → cleanup. Owner.sha остаётся первоначальным SHA при приобретении lease. Rich может изменить/закоммитить checkout; финальный runSha/READY SHA фиксируется отдельно и не подменяет identity lease. Ben работает на неизменном frozen SHA. Unit выполняет supervised `bun test` и `bun typecheck` в фиксированном checkout/evals, возвращает private completion proof и использует очищенное окружение. Пропускаются только PATH/HOME/locale/TMPDIR, proxy/Node proxy и явный fixture `EVAL_TEST_LOGINOM_IMAGE`; role EVAL defaults, LOGINOM/auth/Codex keys не наследуются. Role eval.env для unit не загружается. Unit не запускается одновременно с браузером/CLI/live. Сначала закрыть author browser, затем fresh node runner.
@@ -41,7 +43,7 @@ cd "$R/checkouts/$ROLE/loginom-ai-agent/evals"
 
 `status` только читает общую блокировку. FREE не означает готовый Loginom. `preflight` выполняет штатный допуск и реальный `loginom check` установленного CLI внутри bubblewrap с Chromium, собственным lease и role env. Проверяется ready/`LOGINOM_CONNECTION_VALID`, credentials/WebSocket/лицензия и прежний container ID; модели не вызываются. Затем helper подтверждает завершение процессов и архивирует короткую проверочную историю/диагностику в приватные каталоги. Preflight не является статическим HTTP-check и не назначает paid smoke/reference. Если acquire/preflight/unit отклонены, сохранять безопасную причину; для занятого ресурса нет blocking wait, expiry или удаления lease по PID.
 
-При полном `bun test` вложенные процессные fixtures могут пройти проверки, а внешний supervisor — не подтвердить наблюдение за быстро меняющимся процессом. Успешные тесты и нулевые остатки не заменяют подтверждённый process proof: такая попытка сохраняется как инфраструктурный ERROR с занятым lease. После диагностики допускается одна явно зафиксированная немодельная проверка того же этапа; повторная ошибка требует действия владельца. Не ослаблять supervisor, не признавать неизвестный PID безопасным и не добавлять внешний цикл повторов. Проверка нового SHA после исправления реализации владельцем является проверкой кода; она не разрешает Evaler повторять старые продуктовые попытки или сбрасывать recovery budget.
+При полном `bun test` вложенные процессные fixtures могут пройти проверки, а внешний supervisor — не подтвердить наблюдение за быстро меняющимся процессом. Успешные тесты и нулевые остатки не заменяют подтверждённый process proof: такая попытка сохраняется как инфраструктурный ERROR с занятым lease. Новая немодельная проверка требует новой проверяемой гипотезы, а не старого числового потолка; при отсутствии гипотезы — BLOCKED Evaler. Это не даёт второй recovery на тот же захват. Не ослаблять supervisor, не признавать неизвестный PID безопасным и не добавлять внешний цикл повторов. Проверка нового SHA после исправления реализации владельцем является проверкой кода; она не разрешает Evaler повторять старые продуктовые попытки или сбрасывать recovery budget.
 
 Приобретение в фазе unit/reference/cold допустимо для отдельного назначенного операторского этапа. После него нужен соответствующий completion proof и фактические cleanup gates. Переход между инструментами не создаёт нового владельца или нового lease.
 
@@ -51,7 +53,7 @@ cd "$R/checkouts/$ROLE/loginom-ai-agent/evals"
 
 ```sh
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/bun" \
-  script/node-eval-ops.ts release --config "$CFG" --lease "$LEASE" \
+  "$OPS_SCRIPT" release --config "$CFG" --lease "$LEASE" \
   --run '<own fresh run directory>' --ids '<assigned IDs comma separated>' \
   --run-sha '<full clean frozen SHA used by run>'
 ```
@@ -81,14 +83,14 @@ Nested paths остаются в своих workRoots/resultsRoot, а historyArc
 
 ```sh
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/with-env" "$R/roles/$ROLE/eval.env" "$R/bin/bun" \
-  script/node-eval-ops.ts release --config "$CFG" --lease "$LEASE" --evidence "$WORK/completion.json"
+  "$OPS_SCRIPT" release --config "$CFG" --lease "$LEASE" --evidence "$WORK/completion.json"
 ```
 
 Неуспешный release сохраняет lease. Crash, завершённая задача Multica или мёртвый PID не являются разрешением его удалить. Evaler получает BLOCKED со связью issue/task/lease owner/incident/evidence, а не ложный READY.
 
-По отдельному поручению Evaler **тот же worker owner** может выполнить один немодельный recovery на устойчивый incident ID. Input sidecar `NodeStandRecovery` содержит version=1, исходные owner/acquiredAt, profile=`reference|eval`, настоящий processEvidence и optional storageLedger собственных файлов. Evidence должно доказывать принадлежность процессов/profile/writer/files именно этому lease и успешный чистый допуск до исходной работы. Бюджет привязан к исходному immutable lease: резервируется до recovery; crash/ошибка, новое имя incident или новый follow-up task не дают второй попытки. Новый follow-up Multica task того же агента записывается отдельно в report; original owner.task внутри lease остаётся прежним. Нельзя сменить identity lease, украсть его, очистить чужой профиль или бесконтрольно повторить CLI/model run.
+В пределах утверждённого назначения **тот же worker owner** самостоятельно выполняет один немодельный recovery на устойчивый incident ID. Input sidecar `NodeStandRecovery` содержит version=1, исходные owner/acquiredAt, profile=`reference|eval`, настоящий processEvidence и optional storageLedger собственных файлов. Evidence должно доказывать принадлежность процессов/profile/writer/files именно этому lease и успешный чистый допуск до исходной работы. Бюджет привязан к исходному immutable lease: резервируется до recovery; crash/ошибка, новое имя incident или новый follow-up task не дают второй попытки. Новый follow-up Multica task того же агента записывается отдельно в report; original owner.task внутри lease остаётся прежним. Нельзя сменить identity lease, украсть его, очистить чужой профиль или бесконтрольно повторить CLI/model run.
 
-Операторское исключение `LAB-31-writer-release-race-v1`: для единственного error `Writer owner unavailable` при штатном unlink(owner) → rmdir(.writer) разрешён отдельный немодельный сбор process settlement. Сам `writerIdentity` повторяет только ENOENT не более 100ms и возвращает null лишь после двух наблюдений исчезнувшего исходного каталога; устойчиво отсутствующий owner, доступы, symlinks и смена identity остаются ошибкой. Source cleanup/summary/code-verdict не изменяются.
+Штатное подтверждение прекращения writer: для единственного error `Writer owner unavailable` при штатном unlink(owner) → rmdir(.writer) разрешён отдельный немодельный сбор process settlement. Сам `writerIdentity` повторяет только ENOENT не более 100ms и возвращает null лишь после двух наблюдений исчезнувшего исходного каталога; устойчиво отсутствующий owner, доступы, symlinks и смена identity остаются ошибкой. Source cleanup/summary/code-verdict не изменяются.
 
 ```sh
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/bun" script/node-eval-ops.ts settle-writer-release \
@@ -101,30 +103,20 @@ Helper сверяет исходный admission/config/container/CLI/profile, e
 
 При таком attested settlement адресный storage ledger может включать `kind=package_lock`, `package_path` из неизменного исходного result, имя строго `.<original-package>.lgp.lck` и SHA256 пустого файла. Общий safeName не изменяется; другие dot-prefixed файлы и чужой lock запрещены. CSV по-прежнему требует собственный доказанный ledger/hash. `PROCESS_SETTLED` не освобождает lease и не меняет ERROR: далее выполнить единственный назначенный recovery штатным helper. После SETTLED и чистых profiles/storage допустим назначенный supervised unit, последовательно с CLI/UI; release использует настоящий recovery completion. Новой модельной попытки этот путь не разрешает.
 
-Закрытое исключение `LAB-31-owned-registration-v1-admission` (оператор `01a11b8e-be80-7481-8254-bc2bd014aac1`) продолжает ровно исходный ATTEMPTED incident. Исторический exception остаётся UNKNOWN: доказательство no-dispatch — фактический role profile/source, доминирующий open(wx), непрерывная исходная registration и отсутствие profile/history/storage mutations. Закреплённый admission SHA256 `c79db297982c257c41c5a60dff46fb7311a87c539f260b5106bba6c927f237e5` проверяется вместе с исходным clean admission/config/container/CLI и immutable owner/acquiredAt. Это не общий retry/resume API.
-
-```sh
-"$R/bin/with-env" "$R/runtime.env" "$R/bin/with-env" "$R/roles/rich/eval.env" "$R/bin/bun" script/node-eval-ops.ts lab31-owned-registration \
-  --config "$OPS" --lease "$LEASE" --evidence "$ORIGINAL_RECOVERY" \
-  --admission "$PRIVATE_ADMISSION_COPY" --followup-task "$FOLLOWUP_TASK"
-```
-
-До адресной мутации выполняются свежий полный ancestry/absence settlement и сверка canonical profile/parent, private regular registration, uid/mode/device/inode/bytes/mtime/ctime, PID с исходным launcher и birth identity. Непосредственно перед unlink эти проверки повторяются; live/reused PID, unknown cleanup, symlink или замена файла запрещают удаление. Обычный отсутствующий writer registration не удаляет. Private `owned-registration-once.json` записывается wx/0600 со статусом CONSUMED_BEFORE_MUTATION, исходным ATTEMPTED hash и новым clean SHA до unlink; ошибка/crash не восстанавливают once. Исходный ATTEMPTED receipt и ERROR остаются неизменными. Штатная общая немодельная recovery-цепочка пишет отдельный `owned-registration-settled.json` и настоящий completion, который принимает стандартный release после проверки once/source hashes. После SETTLED — один supervised unit/typecheck под удержанным lease, затем release. Второго continuation и новых model/product запусков нет.
-
 ```sh
 "$R/bin/with-env" "$R/runtime.env" "$R/bin/with-env" "$R/roles/$ROLE/eval.env" "$R/bin/bun" \
-  script/node-eval-ops.ts recover --config "$CFG" --lease "$LEASE" \
+  "$OPS_SCRIPT" recover --config "$CFG" --lease "$LEASE" \
   --incident '<stable issue/task/failed-stage incident ID>' --evidence "$WORK/recovery-evidence.json"
 ```
 
-После SETTLED использовать возвращённый helper путь `evidence` с private completion `kind=recovery` для отдельного `release --lease … --evidence …`; вручную такой completion не синтезировать. Так подтверждённая очистка освобождает стенд, не переписывая прежний ERROR в PASS. Release атомарно переносит исходный lease и внутренние proofs в закрытый `R/operations/completed/<receipt>/`; этот архив содержит private token/history/diagnostics, его нельзя публиковать или прикладывать целиком. Для карточки подготовить только обезличенный receipt/result. Изменения installation/model/auth/VPN/system/общих критериев, неизвестная ownership/cleanup или исчерпанный recovery — владельцу-человеку. Старые summary/verdict остаются результатом состоявшейся попытки; recovery не разрешает новый quality run автоматически.
+После SETTLED использовать возвращённый helper путь `evidence` с private completion `kind=recovery` для отдельного `release --lease … --evidence …`; вручную такой completion не синтезировать. Так подтверждённая очистка освобождает стенд, не переписывая прежний ERROR в PASS. Release атомарно переносит исходный lease и внутренние proofs в закрытый `R/operations/completed/<receipt>/`; этот архив содержит private token/history/diagnostics, его нельзя публиковать или прикладывать целиком. Для карточки подготовить только обезличенный receipt/result. Недоступные права, изменение общих защитных механизмов, неизвестная ownership/cleanup или исчерпанный recovery — BLOCKED Evaler; границы дальнейшей эскалации и сброса задаёт общий контракт. Старые summary/verdict остаются результатом состоявшейся попытки; recovery не разрешает новый quality run автоматически.
 
 ## Offline product и handoff gates
 
 Evaler проверяет доставленный archive и manifest по bytes, exact SHA, список кейсов, cleanup и models. Затем использует существующий валидатор на полученных evidence — без новых sessions и без перезаписи исходных результатов:
 
 ```sh
-bun script/node-eval-ops.ts check-run --config "$CFG" \
+"$R/bin/bun" "$OPS_SCRIPT" check-run --config "$CFG" \
   --run '<verified delivered run directory>' --ids '<assigned IDs comma separated>' \
   --tasks '<exact frozen checkout>/evals/tasks/node-evals'
 
@@ -142,7 +134,7 @@ bun script/evaler-handoff.ts '<private observed-handoff-input.json>'
 
 State/phase/frozen SHA берутся из metadata `evaler.state` и actual comments/tasks. Пишет metadata только Evaler. `last_dispatch.id` — стабильный intent ID, известный до публикации; `root_trigger` — фактический incoming comment ID либо null для assignment без комментария. Parent в таком случае также опускается, фиктивный UUID не создаётся. До публикации сохранить ambiguous intent в metadata. После CLI отправки receipt связывает `dispatch_id` с intent, outcome queued/coalesced/deferred/ambiguous/not_queued и реальным worker task_id. Actual outgoing comment UUID сохраняется как native receipt рядом с state в том же metadata value, отдельно от intent ID. Private file — только cache; он не заменяет карточку.
 
-Штатный read: `multica issue metadata get <issue> --key evaler.state --output json`. Для записи `multica issue metadata set <issue> --key evaler.state --value <JSON>` передавать JSON отдельным argv, не интерполировать его в shell. Например, после проверки receipt:
+Штатный read: `multica issue metadata get <issue> --key evaler.state --output json`. Для записи `multica issue metadata set <issue> --key evaler.state --type string --value <JSON>` передавать JSON отдельным argv, не интерполировать его в shell. Например, после проверки receipt:
 
 ```python
 import json
@@ -151,7 +143,7 @@ import subprocess
 # issue_id и checked_metadata берутся из verified текущего task/card readback.
 subprocess.run([
     "multica", "issue", "metadata", "set", issue_id,
-    "--key", "evaler.state", "--value", json.dumps(checked_metadata),
+    "--key", "evaler.state", "--type", "string", "--value", json.dumps(checked_metadata),
 ], check=True)
 ```
 
@@ -161,11 +153,13 @@ Report имеет native comment ID, issue/task, phase rich|ben, actual full SHA
 
 Наблюдаемые pending_tasks включают реальные issue/worker-phase/SHA/task ID; нельзя передать пустой список лишь потому, что нет локального cache. `dispatch` предлагается только после допуска; вывод gate включается в единственный routed comment, receipt записывается после actual CLI response без второго comment. При ambiguous — readback, без автоматического repost. `no_action` заканчивает повторный ход; успешный Multica squad activity no_action исключает любые дальнейшие comments.
 
-## Внедрение supplement
+## Документальный пакет A и дальнейшие этапы
 
-Personal templates `evaler.md`, `rich.md`, `ben.md` публикуются как полные активные инструкции; `squad.md` — leader-only briefing. Вместе с контрактом/операторской инструкцией они входят в отдельный новый nonsecret immutable operational supplement с SHA256 manifest. Это заменяет старые route/status/runtime override правила, а не редактирует прежний archive. Дополнительные reference/eval env и auth Evaler не создаются.
+Личные инструкции находятся в evaler.md/rich.md/ben.md, briefing лидеру — в squad.md; они согласованы с Multica. Изменение текстов не требует новой доставки support. Установленный helper и его integrity проверяются отдельно от документов. Агенты, модели, окружение и профили этим этапом не меняются.
 
-Перед переключением read-only проверить очередь/процессы/stand и отсутствие pending cleanup. Обновить настройки без запуска; readback whitelist model/thinking/concurrency/runtime/leader/members/instruction hash. Не печатать raw MCP env. До следующего user-prepared node pilot корректная формулировка — «настроено и проверено статически». LAB-16, аналитический baseline и model smoke автоматически не запускаются.
+Перед применением A проверить очередь; инструкции и карточки обновлять без запуска и сверять побайтно. До следующих живых работ выполнить отдельные C/B и защиту одного физического вызова по плану. Из blocked нынешний код не продолжает; временная ручная правка фазы запрещена. Новые поля будущего handoff не включаются лишь записью metadata.
+
+Перед карточкой status → acquire → preflight идут на том же захвате, что первый этап Rich. Preflight не выдаёт completion для отдельного release. Каждый очищает свои запуски; Ben отвечает за окончательную готовность. После обычной очистки и одного recovery — только будущий проверенный сброс C с архивом и допуском, не новые разовые программы. Пока C не проверен, состояние остаётся BLOCKED.
 
 ## Допуск после устранённого авторского инцидента
 
@@ -187,8 +181,8 @@ Helper атомарно создаёт закрытую запись `<attempt_s
 
 Product и reference runner получают `EVAL_NODE_OPS_CONFIG=<private config>` и `EVAL_NODE_STAND_LEASE=<private lease handle>`. До dispatch helper проверяет исходный admission/owner и точный профиль, создаёт закрытые harness receipt + `.stand` attestation внутри lease. Не передавать эти пути/receipt/owner bytes в product prompt, sandbox или evidence delivery; публикуются безопасные hashes и операторские итоги.
 
-Обычный `recover` при attested writer-release settlement допускает собственную остаточную `.process-group` только после `registrationIdentity`/`verifyOwnedRegistration` до расходования единственной reservation; затем повторно проверяет identity при удалении. Он архивирует историю, проверяет storage, адресно retire-ит attested harness guard и оставляет общий stand guard до `release`. Старый harness guard без receipt не принимается. Чужой owner/identity, живые или неизвестные процессы и unknown cleanup сохраняют блокировки. `lab31-owned-registration` остаётся закрытым историческим исключением, не повторным recovery API.
+Обычный `recover` при attested writer-release settlement допускает собственную остаточную `.process-group` только после `registrationIdentity`/`verifyOwnedRegistration` до расходования единственной reservation; затем повторно проверяет identity при удалении. Он архивирует историю, проверяет storage, адресно retire-ит attested harness guard и оставляет общий stand guard до `release`. Старый harness guard без receipt не принимается. Чужой owner/identity, живые или неизвестные процессы и unknown cleanup сохраняют блокировки. Закрытые исторические исключения не входят в маршрут будущих карточек.
 
 `--diagnostic <new-private-file>` сохраняет operation/stage/reason/dispatch `not_started|started|unknown`, включая отказ до management. По умолчанию receipt находится внутри owned lease/archive. `unknown` нельзя считать разрешением повторить dispatch. Секреты, raw env и raw exception text не включаются. После неоднозначного ответа сначала readback.
 
-Skill 1.0.6 и соответствующие CLI/harness pins переключаются только в новых назначениях после проверки нового комплекта и освобождения стенда. Staged комплект 1.0.5, LAB-55 и принятые исторические результаты сохраняют прежние pins.
+Версия методики определяется её SKILL.md на SHA назначения; активные CLI/helper/config — runbook серии. Исторические результаты и их pins сохраняются.

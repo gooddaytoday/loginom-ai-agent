@@ -1,20 +1,8 @@
-# Кросс-таблица: code-only eval
+# Node evals: кодовая проверка
 
-LAB-16 содержит ровно три кейса: `crosstable-fixed-sum`, `crosstable-sliding-average`, `crosstable-reconfigure`. Каждый получает только prompt и `data/sales.csv` и сам создаёт импорт. Oracle, SPEC и `reference.lgp` остаются у проверяющего. Task-контракт, parseEvents и generic summary сохранены. После BLOCKED первой приёмки пользователь разрешил узкое исправление общего harness: очистку собственного CSV при отсутствии пакета. После review усилено доказательство создания и перенастройки узла. Текущий checkpoint — `docs/LAB-16-proof-checkpoint.md`; `docs/LAB-16-cleanup-checkpoint.md` и исходный `docs/LAB-16-checkpoint.md` сохраняют историю предыдущих заморозок.
+Общий рабочий порядок — [runbook](evaler-orchestration.md), текущее назначение — шапка карточки. Модели, CLI/helper/config и checkout определяет активный runbook серии; общих продуктовых пинов в этой инструкции нет. Методика — из назначенного checkout. Для импорта использовать её `references/text-import.md` и проверку text-import, для Кросс-таблицы — описанные ниже проверки.
 
-Из `evals/`, с назначенным приватным role env, выполнить:
-
-```sh
-bun install --frozen-lockfile
-bun test
-bun typecheck
-with-env <role/eval.env> bun script/check-orphan-cleanup.ts <own-evidence>/storage
-with-env <role/eval.env> bun script/run-node-evals.ts --tasks ./tasks/node-evals --label lab-16-ben
-```
-
-`with-env` — подготовленный task-local loader из role runtime.md. Для отдельного кейса добавить `--only crosstable-fixed-sum` (аналогично остальные ID). Runner всегда передаёт `--skip-judge` и `--repeat 1`, запрещает calibrate/judge-only/dry-run/keep-storage/reset-profile. Env и profiles не включать в репозиторий или evidence. Использовать отдельные Ben checkout/profile/WORK_ROOT/results; авторизацию не импортировать и writer автора не снимать.
-
-Тестируемая модель берётся из `EVAL_AGENT_MODEL/EVAL_AGENT_VARIANT`; здесь назначена `openai/gpt-6-sol/default`. Builder отдельно `openai/gpt-6.1-sol/xhigh`, подтверждён по БД каждой reference session. Rich/Ben — `gpt-6.1-sol/xhigh`. LLM-судьи, калибровки и порогов нет. Повтор качества ради PASS запрещён; штатный infra retry harness сохраняется.
+Из `evals/` собственного checkout выполняются необходимые unit/typecheck и существующие offline checkers. Модельные команды разрешены только назначением, в собственном role env, профиле и захвате стенда. `script/run-node-evals.ts --tasks <collection> --only <assigned-ids>` принудительно задаёт skip-judge/repeat=1; общий main пока допускает infra retry. При бюджете одного физического вызова нужна отдельная правка до запуска серии, см. [план ускорения](2026-10-16-node-evals-speedup-proposal.md). Повторы ради PASS и резервные кейсы запрещены.
 
 ## Кодовый verdict
 
@@ -24,7 +12,7 @@ Generic `summary.json` при skip-judge имеет null pass/score/oracle_pass.
 
 Unit и live выполнять последовательно: process-supervisor tests создают временные fake chrome в общем /proc и могут нарушить параллельное live cleanup. Сначала дождаться завершения bun test и fixture cleanup, затем выполнять live.
 
-LAB-16 вызывает общий `main()` и получает ту же обязательную Linux bubblewrap
+Node runner вызывает общий `main()` и получает ту же обязательную Linux bubblewrap
 изоляцию binary CLI, проверку внешних debugger и чистого Loginom, что аналитические
 evals. Нужен эксклюзивный endpoint: параллельные live-приёмки на нём недопустимы.
 История каждой попытки, включая infra retry, переносится в закрытый sibling
@@ -33,7 +21,7 @@ evals. Нужен эксклюзивный endpoint: параллельные li
 `data/loginom-ai-agent.db` вместе с сохранёнными WAL/SHM, выбирая соответствующую
 session ID из попытки. БД сохраняется, а следующему агенту она недоступна. Приватный
 архив не публиковать в evidence. Адресная очистка на других storage sources
-сохраняет прежний контракт; широкое удаление пользовательского хранилища запрещено.
+сохраняет прежний контракт; широкая очистка допускается только при выполнении всех условий из `evals/AGENTS.md`.
 
 ## CSV без пакета и storage cleanup
 
@@ -53,7 +41,7 @@ Native доказательство первичной настройки вкл
 
 ## Независимая приёмка Ben
 
-Сначала сохранить свой воспроизводимый расчёт по prompt/CSV, до открытия author oracle/results. Затем проверить точный frozen SHA из READY_FOR_BEN в detached checkout. Author evidence — вложение этой же карточки с внешним SHA256 и внутренним manifest; runtime-local путь не является доставкой.
+Сначала сохранить свой воспроизводимый расчёт по prompt/CSV, до открытия author oracle/results и до любой живой работы по карточке. Затем проверить точный frozen SHA из READY_FOR_BEN в detached checkout. Author evidence — вложение этой же карточки с внешним SHA256 и внутренним manifest; runtime-local путь не является доставкой.
 
 Проверки sensitivity без модели/судьи:
 
@@ -71,7 +59,7 @@ bun script/check-node-artifacts.ts ./tasks/node-evals/crosstable-reconfigure <ev
 
 `reference.lgp` каждого кейса совпадает с artifact/package.lgp в evidence по SHA256. Provenance содержит modelConfirmed, реальные input bytes, CLI check, cold rerun и finalize gates. Для независимого холодного выполнения открыть сохранённый reference через Playwright MCP в своём контексте Loginom, предварительно убедиться, что input FileName доступен и соответствует dataset; выполнить весь граф, проверить вновь созданный CSV со своим расчётом. Не менять shared author reference, его input или чужой writer. Если путь/стенд недоступен, указать конкретный BLOCKED; не засчитывать static XML вместо выполнения.
 
-В одном live вызове runner Ben выполнит по одной попытке каждого кейса и сохранит свой runDir. Повторно прочитать его кодовый verdict можно без новых модельных попыток:
+Ben выполняет только первоначально разрешённый продуктовый вызов каждого кейса и сохраняет свой runDir; repeat=1 сам по себе не доказывает отсутствие внутреннего инфраструктурного повтора. Повторно прочитать его кодовый verdict можно без новых модельных попыток:
 
 ```sh
 bun script/check-node-run.ts <runDir> crosstable-fixed-sum,crosstable-reconfigure,crosstable-sliding-average
