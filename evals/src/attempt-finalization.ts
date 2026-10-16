@@ -7,7 +7,8 @@ import { readAgentInvocationArchive, type AgentSessionSource } from "./agent-ses
 import { collectSlotSessions } from "./management-sessions"
 import { sealManagementProcessInventory } from "./management-process-evidence"
 import { readAdminSessionInventory, type AdminConnection } from "./loginom-admin"
-import { verifyParallelPair } from "./parallel-pair"
+import { inspectUserStorage, verifyParallelPair } from "./parallel-pair"
+import { readUserPreparation } from "./user-environment"
 import { archiveProfileEvidence } from "./profile-archive"
 import { releaseStaleWriter } from "./profile"
 import { captureServerFiles, readServerFiles } from "./server-files"
@@ -106,6 +107,7 @@ export async function finalizeSlotAttempt(file: SlotFile, server: Awaited<Return
   const root = `${file.server.storageRoot}/${lease.slot.username}`
   if (files.snapshot.files.some(entry => entry.target === root || entry.target.startsWith(root + "/")))
     throw new EvalFailure("ATTEMPT_SERVER_FILES_ACTIVE", 2)
+  await inspectUserStorage(file, lease.identity, lease.slot, (await readUserPreparation(file, lease, secretFile)).nonce)
   const receipt = { version: 2, kind: "slot-attempt-finalization", status: "sessions_closed" as const, identity: lease.identity,
     slotId: lease.slot.id, leaseToken: lease.token, boundary, intent: await reference(intentFile), archived, archives, sessions,
     after: finalAfter.source, serverFiles: files.source, storageDeletionAllowed: false, nextAdmissionAllowed: false }

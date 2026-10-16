@@ -48,7 +48,7 @@ for (const finalizer of [false, true, "interrupted", "killed"] as const) for (co
     console.error(`native agent replay evidence: ${evidence}`)
     const sources = await Promise.all(["native-agent-run-integration.test.ts", "helpers/loginom-replay-provider.ts", "../src/cli.ts",
       "../src/attempt-finalization.ts", "../src/server-files.ts", "../fixtures/server-files.sh", "../src/agent-process-evidence.ts", "../src/agent-sessions.ts", "../src/management-sessions.ts", "../src/management-process-evidence.ts", "../src/profile-archive.ts", "../src/process-supervisor.ts", "../src/profile.ts", "../src/sandbox.ts", "../src/loginom-admin.ts",
-      "../script/loginom-admin-driver.mjs", "../src/parallel-pair.ts", "../fixtures/interrupt-probe.lgp", "../fixtures/interrupt-probe.js", process.env.EVAL_CLI_BIN!].map(async file => {
+      "../script/loginom-admin-driver.mjs", "../src/parallel-pair.ts", "../fixtures/interrupt-probe.lgp", "../fixtures/interrupt-probe.js", "../src/user-environment.ts", process.env.EVAL_CLI_BIN!].map(async file => {
       const source = path.resolve(import.meta.dir, file)
       return { path: source, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(source).bytes()).digest("hex") }
     }))
@@ -232,6 +232,25 @@ for (const finalizer of [false, true, "interrupted", "killed"] as const) for (co
               expect(released.complete).toBe(true)
               expect(released.files.some(entry => entry.target === target)).toBe(false)
             }
+          }
+          if (!browser) {
+            const names = ["white space", "tab\tfile", "line\nfile", "Юникод", "-leading", ".hidden", "draft.lgp.autosave", "nested/ordinary"]
+            await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sh -c ${'mkdir -- "$1/nested" /workdir/UserStorage/eval-b; printf B > /workdir/UserStorage/eval-b/control; root=$1; shift; for name do printf A > "$root/$name"; done; ln -s ../eval-b "$root/neighbor"; ln /workdir/UserStorage/eval-b/control "$root/hardlink"'} storage-control ${storage.root} ${names}`.quiet()
+            const raw = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find -P ${storage.root} -mindepth 1 -printf ${"%P\\0%y\\0%n\\0%D\\0%i\\0"}`.quiet()).text()
+            const neighbor = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum /workdir/UserStorage/eval-b/control`.quiet()).text()
+            try {
+              const attempted = await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)
+                .then(completed => ({ completed, error: null }), (error: Error) => ({ completed: null, error: error.message }))
+              const after = (await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} find -P ${storage.root} -mindepth 1 -printf ${"%P\\0%y\\0%n\\0%D\\0%i\\0"}`.quiet()).text()
+              await writeLeaseReceipt(path.join(evidence, "finalization-storage-topology.json"), { names, raw, after, attempted, neighbor,
+                storageDeletionAllowed: false, nextAdmissionAllowed: false })
+              expect(attempted.error).toBe("USER_STORAGE_TOPOLOGY")
+              expect(after).toBe(raw)
+              expect(await Bun.file(path.join(file.controller.stateDir, `agent-finalization-${entry.entrySource.id}.json`)).exists()).toBe(false)
+            } finally {
+              await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} rm -- ${`${storage.root}/hardlink`}`.quiet()
+            }
+            expect((await Bun.$`docker --host unix:///var/run/docker.sock exec ${pair.identity.containerId} sha256sum /workdir/UserStorage/eval-b/control`.quiet()).text()).toBe(neighbor)
           }
           const completed = await finalizeSlotAttempt(file, environment.server, lease, inputs, admin)
           expect(completed.sessions).toHaveLength(browser ? 2 : 1)
