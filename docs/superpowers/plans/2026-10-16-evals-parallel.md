@@ -179,6 +179,9 @@
   dispatch N=1/N=2 и останавливает/дожидается его в finally; out — private JSONL
   плюс существующая summary, interval=1000ms. Unit проверяет start/stop при успехе,
   отказе и SIGINT. Процессные пробы не влияют на исход, обязательные пробы влияют.
+  Helper RED→GREEN3/11 unit PASS1.63s +typecheck/diff: fresh output/первая проба,
+  idempotent stop с supervisor и summary, env allowlist, проверка MemAvailable
+  против заданного budget. Вызов helper из настоящего run ещё не подключён.
 - [ ] Проверить `bun run test test/parallel-run.test.ts test/scheduler.test.ts test/parallel-users-acceptance.test.ts`
   и `bun typecheck`; логические изменения сохранять отдельными коммитами
   `feat(evals): execute prepared user slots` / `refactor(evals): bound run resource acceptance`.
@@ -257,5 +260,5 @@ private config/budget/results вне Git; операторские команд�
 16. Exact-name close:53/221 unit PASS29.31s +typecheck/diff; native A/B ещё не выполнен.
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
-19. Slot storage guards4/29 unit PASS +typecheck/diff; native cleanup ещё не проверен.
-20. Следующий шаг: новый prepare/verify/cleanup/queue без inventories.
+19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
+20. Следующий шаг: подключить новый prepare/cleanup/resource helpers к настоящей queue без inventories.
