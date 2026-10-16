@@ -33,3 +33,10 @@ supervisor starts; existing deadlines and ownership/pending-disconnect guards
 are unchanged. Timing uses browser/controller observations; native StartTime
 remains unmodified. This does not qualify backend file descriptors, locks,
 all component kinds, or evaluated-attempt cleanup.
+
+The two-user active-peer control sets B to exact `peer-probe.js` (ten seconds)
+and keeps its context until the work item successfully completes. A uses the
+detached twenty-second source. Both packages must have Progress concurrently;
+after A closes, B's same package stays active and completes successfully, its
+file-canary hash remains unchanged, and B is then closed by its own binding.
+This remains a Native API control rather than a CLI-crash or file-lock proof.

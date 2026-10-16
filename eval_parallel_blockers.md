@@ -698,3 +698,14 @@ full replies, both admin closures/ACKs, exact own pair/network/root absence and
 input. No ownership/pending guard or deadline changed. Actual CLI crash, B-active
 continuation, FD/locks, backup/storage/no-regrowth and durable cleanup consumption
 remain open; this component evidence keeps operation/cleanup authority false.
+
+Concurrent active-user follow-up (2026-10-16): native A/B JS operations now have
+a positive independence control. A20s is stopped while both packages show
+Progress; B's same package remains active, completes successfully8108ms after
+A closure, and preserves its canary hash. Native1/75 PASS83.41s, related50/162
+PASS21.52s, typecheck/syntax/diff PASS. Privateb36aa5a7… auditf175c946…69/33+11pins
+verifies full sources, three admin closures/ACKs and exact own pair/root absence.
+Failed011628b4… was safely settled from actual closure/transport proofs after
+fixing the fixture's object-vs-boolean check; original failure remains.
+Actual CLI crash, FD/locks/no-regrowth, backup/storage and full cleanup/runtime
+admission still require qualification.

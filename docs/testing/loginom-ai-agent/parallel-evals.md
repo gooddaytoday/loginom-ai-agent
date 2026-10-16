@@ -1337,3 +1337,13 @@ Private05c609b2… audit48d6b749…64/25 and0ff79e61…192a52d3…184/73 verify 
 admin closures/ACKs, exact own pair/network/root absence and retained sources/input.
 This preserves existing close guards/deadlines and grants no general operation,
 lock or storage cleanup authority. CLI crash and B-active lifecycle remain open.
+
+`native active peer: stopping A preserves B execution and file` observes A/B
+Progress concurrently, closes detached A20s, retains the same active B package,
+then gets B's successful10s completion after A close and unchanged canary hash.
+B closes separately afterward. Native1/75 PASS83.41s; related50/162
+PASS21.52s, typecheck/syntax/diff PASS. Privateb36aa5a7… auditf175c946…69/33+11pins
+verifies three continuous admin closures/ACKs and exact own pair/network/root
+absence. The missing-phase RED011628b4… is retained and safely settled;
+qualifier-object assertion is fixed and unknown peer teardown preserves fixtures.
+This does not qualify a CLI crash, backend locks or evaluated-attempt cleanup.
