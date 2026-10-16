@@ -20,6 +20,16 @@ test("main: unfinished v2 admission cannot fall through to legacy dispatch", asy
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("main: real slots require a recorded resource budget before reading private config or dispatch", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-slot-budget-admission-"))
+  try {
+    await expect(main([], { EVAL_SLOTS_FILE: path.join(root, "slots.json"), EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/pinned/cli",
+      EVAL_AGENT_MODEL: "openai/gpt-6-luna", JUDGE_MODEL: "gpt-6-sol", LOGINOM_DOCK_API_KEY: "canary" }))
+      .rejects.toThrow("RESOURCE_BUDGET_REQUIRED")
+    expect(await readdir(root)).toEqual([])
+  } finally { await rm(root, { recursive: true }) }
+})
+
 test("runAttempt: live binary без выделенного Loginom останавливается до агента и судьи", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "evals-storage-admission-run-"))
   try {
