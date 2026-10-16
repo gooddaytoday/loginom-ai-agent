@@ -1,0 +1,21 @@
+{
+  "decision": "SOURCE_ACCEPT",
+  "source": "d3ec74aa89afaf412fd14143d4f9b6ed0ddb6fdc",
+  "exactArchiveVerified": true,
+  "executableRebuildByteEqual": true,
+  "comment": "01a14060-a6e7-75dd-9bad-1332ff410e44",
+  "attachment": "01a14060-a6c0-700e-aa74-d1b0a73dc406",
+  "canonicalSha256": "bb83f880f770c6edbc9214dfd1bc9b17690e682eca7ab033497990c197d6ecd2",
+  "archiveSha256": "0b161cc3cfd1c6ff219942e953c2af514294e464e77000c642ddf19098658bf2",
+  "payloads": 67,
+  "captures": {
+    "addressed": 2,
+    "typecheck": 3,
+    "build": 2
+  },
+  "localInspectorCorrection": "Initial own projection expected archiveSha256; actual input package field zipSha256. Corrected read-only, no effect/retry.",
+  "readAt": "2026-10-15T16:29:08Z",
+  "serverRevision": 542,
+  "active": [],
+  "effects": "SH1SOURCE independently accepted;938source install and source-boundreadonlyhelper completed;privateRootadmission prepared. Foreground local88446 nowrunning; actualRootFinal consumption/outcome not inferred. Prior9once preserved."
+}

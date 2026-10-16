@@ -1,0 +1,175 @@
+{
+  "status": "ACTUAL_NATIVE_LOGIN_THEN_READONLY_FD_REFUSAL_NOT_CLEANUP",
+  "source": "f28ec2b48c4b83edc524b90ef44a4e5c4927e76d",
+  "foreground": {
+    "exit": 2,
+    "pid": 2365156,
+    "birth": "113781310",
+    "startedAt": "2026-10-15T15:34:55.907287+00:00",
+    "finishedAt": "2026-10-15T15:37:04.359295+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "addressedFinishOncePresent": true,
+    "priorControlConsumed": 1,
+    "priorKernelConsumed": 1,
+    "priorAbiContinuationConsumed": 1,
+    "priorFdContinuationConsumed": 1,
+    "priorObserverRepairConsumed": 1,
+    "sandboxRepairConsumed": 1,
+    "priorContinuationConsumed": 1,
+    "originalRecoveryConsumed": 1,
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": true,
+    "routeRootPresent": true,
+    "controllerStillPresent": false
+  },
+  "once": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-finish.once.json",
+    "device": 64512,
+    "inode": 17858360,
+    "bytes": 6512,
+    "mode": 384,
+    "mtimeNs": "1792078519359077903",
+    "ctimeNs": "1792078519359077903",
+    "sha256": "8ddd72466c977ce9240a08c7e7cb6f16f87f10b40685d1aedcbbc25943c56a91"
+  },
+  "owner": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/owner.json",
+    "device": 64512,
+    "inode": 17837097,
+    "bytes": 500,
+    "mode": 384,
+    "mtimeNs": "1791930497229073348",
+    "ctimeNs": "1791930497229073348",
+    "sha256": "7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64"
+  },
+  "native": {
+    "exit": 2,
+    "status": "confirmed",
+    "mode": "continuous",
+    "complete": true,
+    "error": null,
+    "unknown": [],
+    "processes": 98,
+    "verification": [
+      {
+        "observed_at": "2026-10-15T15:36:58.683Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-15T15:36:58.786Z",
+        "owned_remaining": 0
+      }
+    ],
+    "stdoutBytes": 0,
+    "stderrBytes": 103,
+    "captureFiles": [
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-finish/native-capture/stderr.txt",
+        "device": 64512,
+        "inode": 18635967,
+        "bytes": 103,
+        "mode": 384,
+        "mtimeNs": "1792078618207586036",
+        "ctimeNs": "1792078618207586036",
+        "sha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-finish/native-capture/process-cleanup.json",
+        "device": 64512,
+        "inode": 18637326,
+        "bytes": 58482,
+        "mode": 384,
+        "mtimeNs": "1792078618822607863",
+        "ctimeNs": "1792078624034792845",
+        "sha256": "1fc5a1dcb186f29cfa2e40c4600ae6288fa9d685c32f231202e9ad343886675c"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-finish/native-capture/events.jsonl",
+        "device": 64512,
+        "inode": 18635966,
+        "bytes": 0,
+        "mode": 384,
+        "mtimeNs": "1792078540763837555",
+        "ctimeNs": "1792078540763837555",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "confirmedNativeResponses": [
+    "OWN_PAGE_NAVIGATED",
+    "OWN_LOGIN_FIELDS_SET",
+    "OWN_LOGIN_OBSERVED"
+  ],
+  "ownBrowserTransport": {
+    "browserTransportClosed": true,
+    "browserProcessTerminated": true
+  },
+  "absentProofs": "No diagnostic-owner/original-binding/dispatcher-before/after/cessation or original-close once/history/guard/CSV/completion. Source failed at first dispatcher observation gate before its tool call; original scope untouched, own admin server-session identity/cessation UNKNOWN. Do not infer server cessation from local98zero.",
+  "fdRefusal": [
+    {
+      "file": "command-private-b2b1c7cd-39a1-4f0f-b81c-8ed51b6c4963.json",
+      "refusal": {
+        "name": "ObserverRefused",
+        "code": null,
+        "gate": "TWO_PASS_COHERENCE_CHANGED",
+        "coherenceDifferences": {
+          "beforeSha256": "e8e9bded1fdd4dc10fbb9afdfbe2b558894d42ad50790e225f2d7b015ba710ed",
+          "afterSha256": "71b4dce21bebd66c5aabaf6fc3abed01edb691786a115fb63f22f797e89d010d",
+          "changes": [
+            {
+              "before": {
+                "pid": 33814,
+                "parent": 1,
+                "birth": "42327045",
+                "uid": 0,
+                "fdCount": 24,
+                "fdDigest": "4e4b105fff7839799d84797ee2a89d3b625894e05bfd60e51642aab3839fdb07",
+                "nativeComm": null,
+                "kernelThread": false
+              },
+              "after": {
+                "pid": 33814,
+                "parent": 1,
+                "birth": "42327045",
+                "uid": 0,
+                "fdCount": 22,
+                "fdDigest": "6fe02a910cb69924cb0576f684d13593c369b7f1b44b7df938e2f541b6265ad2",
+                "nativeComm": null,
+                "kernelThread": false
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "service": {
+    "pid": 33814,
+    "birth": "42327045",
+    "parent": 1,
+    "uid": 0,
+    "comm": "containerd-shim",
+    "exe": "/usr/bin/containerd-shim-runc-v2",
+    "device": 64512,
+    "inode": 6033252,
+    "bytes": 8335288,
+    "sha256": "3f8421d593aedcf3c96a3ebf73353fe3e012ae7205ca5d5cdc7904fd0aa4f917",
+    "operation": "READ_ONLY_NO_PROCESS_ACTION"
+  },
+  "serviceContainerBinding": {
+    "pid": 33814,
+    "originalContainerBound": true,
+    "namespace": [
+      "moby"
+    ],
+    "commandSha256": "f0452e889c5af73e77d2bde478e4734413407ef6212d80885bd416395cd9ba21",
+    "argumentCount": 7,
+    "rawCommandExcluded": true
+  },
+  "oldCounters": "all9spent; addressedfinish1/1, control1/1, originalrecovery1/1; no reset",
+  "remaining": "Authoritative original/prioradmin session observation/cessation + own genuine logout + official77history + exactguard/CSV + completion/SETTLED/ordinaryRELEASED/FREE + BenfinalACCEPT",
+  "science": "OriginalBenERROR/all6qualityEXCLUDED/6productspent unchanged, new model/ref/product/cold0",
+  "automation": "OFF"
+}

@@ -1,0 +1,12 @@
+{
+  "source": "f057960e0a84c7134601f6843385359c27d93438",
+  "status": "PRIVATE_ROOT_ADMISSION_AFTER_INDEPENDENT_SOURCE",
+  "originalOwnerUnchanged": true,
+  "originalRecoveryEffects": 0,
+  "credentialsRepublished": false,
+  "operator": "Root explicitlyauthorized;Benfinalindependentonly",
+  "effect": "exactadmittedimmutable950source+sourceboundhelper/privateRootadmission DONE;personalforeground93431 invokedONCE;actualnewonce/effectUNKNOWNuntilterminal",
+  "noParallel": "fresh ownissueactive[];no cleanupworker;noextraSSH/APIwhileforeground",
+  "all12SpentPreserved": true,
+  "newModelReferenceProductCold": 0
+}

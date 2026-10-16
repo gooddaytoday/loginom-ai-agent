@@ -1,0 +1,154 @@
+{
+  "format": "LAB57-MAS-SOURCE-OPERATOR-OWNER-HANDOFF-v1",
+  "checked_utc": "2026-10-14T07:53:52.118431+00:00",
+  "owner_comment_id": "01a13966-2ab1-7dc6-ac18-29f6adcd27c2",
+  "parent_id": "01a13961-f7bb-77a3-8a06-246de54634ad",
+  "marker": "LAB57-MAS-SOURCE-OPERATOR-ADMITTED-20261014-9642b2aa",
+  "one_routed_Evaler_mention": true,
+  "body_bytes": 7327,
+  "body_sha256": "4a2c0344e21a775bb846cd6fdb1b39608b1238b8a77f7478f06b00ada9c1e1fc",
+  "body_parent_and_mention_server_readback_verified": true,
+  "attachment": {
+    "id": "01a13966-2955-7a9b-a94d-02acb49e5960",
+    "bytes": 16483,
+    "sha256": "b513e228e1db4e9f0b863f94d5c04790c5615a8aaec0b64364047c297267a463",
+    "exact_server_download_bytes_equal": true,
+    "canonical_file": "evals/docs/2026-10-14-text-import-mas-queue-source-verification.json",
+    "published_in": "92b5c13f2b"
+  },
+  "existing_Rich_source_review": {
+    "task": "01a13961-f7db-71bb-a6ec-6172b00ae98b",
+    "comment": "01a13961-f7bb-77a3-8a06-246de54634ad",
+    "scope_attachment": "01a13961-f77d-7b93-a0e0-02ec5884d09b",
+    "archive_bytes": 6415,
+    "archive_sha256": "3d120196a79500f255d93fbe173cb961a7a7b38f4909e5d12f0cdaba7a3af22c",
+    "manifest_sha256": "a68fd10fd0726912adebd772de15eb2d29cc5ff9a8b6022bbd548a6c37388ceb",
+    "scope_sha256": "1509ab01a2258c9e1dbcc79725eb0c1674123100cd82ce08486461d02ab0b1c7",
+    "three_payload_CRC_paths_regular_types_hashes_verified": true,
+    "technical_SOURCE_review_same_cycle2_not_third_case_review": true,
+    "existing_running_review_not_interrupted_or_duplicated": true
+  },
+  "operator_coordination": {
+    "task": "01a13966-2acb-7dc1-8ff3-9fc5bc9b3c2c",
+    "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+    "status": "queued",
+    "purpose": "Reconcile current existing Rich source review, coordinate private admission and exactly one original-owned nonmodel Ben cleanup after all technical guards; no new source reviewer"
+  },
+  "fresh_cards": [
+    {
+      "identifier": "LAB-56",
+      "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+      "status": "done",
+      "revision": 72,
+      "phase": "in_review",
+      "frozen_sha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+      "review_cycle": 2,
+      "reject_count": 0,
+      "metadata_sha256": "5c14bb016bc2ccca6f61f38f5b8a4b1857ddf9f849dd1955e75e4bf416e152bb",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-57",
+      "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "status": "in_progress",
+      "revision": 356,
+      "phase": "ben",
+      "frozen_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+      "review_cycle": 2,
+      "reject_count": 1,
+      "metadata_sha256": "067efb1ab4ca6aa9dabfbc86fa50660e2fe1096fe8a5efd2769b84917bac19d1",
+      "active_queued": [
+        {
+          "id": "01a13966-2acb-7dc1-8ff3-9fc5bc9b3c2c",
+          "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+          "status": "queued",
+          "started_at": null
+        },
+        {
+          "id": "01a13961-f7db-71bb-a6ec-6172b00ae98b",
+          "agent_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+          "status": "running",
+          "started_at": "2026-10-14T10:48:15+03:00"
+        }
+      ]
+    },
+    {
+      "identifier": "LAB-58",
+      "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+      "status": "backlog",
+      "revision": 10,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "metadata_sha256": "28d5c9fcd8e4fd89023c25be641973b4ab33ac49a3bef284c268076b32e58700",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-59",
+      "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+      "status": "backlog",
+      "revision": 10,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "metadata_sha256": "2c4636ca31ed4fa15913cb80edc5f89ad79dff8aa3c37b873d8f85fe3699a3fb",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-60",
+      "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+      "status": "backlog",
+      "revision": 10,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "metadata_sha256": "cafa51924f5d94c6bb69b175770dc57c95142ffa427c040300a7b2f922224c43",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-61",
+      "id": "01a1214b-4adc-75df-97df-2917732a449a",
+      "status": "backlog",
+      "revision": 10,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "metadata_sha256": "5ea0821ee3bc8975f78524cc495a9316a54abb3d9e39634d975b9cb99937793f",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-62",
+      "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+      "status": "backlog",
+      "revision": 10,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "metadata_sha256": "bf4a982fdd1ef783c7c392d049a0d6703378cc7289153c9a9207cb1171ab17ed",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-63",
+      "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+      "status": "backlog",
+      "revision": 10,
+      "phase": "admission",
+      "frozen_sha": null,
+      "review_cycle": 0,
+      "reject_count": 0,
+      "metadata_sha256": "b25b2b9bf8f832d8f7ed743a56f1dd76be9bd0c7a0479ab553f5cb574b603d1f",
+      "active_queued": []
+    }
+  ],
+  "decision": "Exact964 SOURCE accepted independently by coordinator; subsequent original-owned nonmodel route authorized after current review reconciliation and fresh actual technical admission. Evaler explicitly may prepare private credential/admission files under this owner decision; no extra human or ROOT-only paperwork gate. Actual install/native/recovery not implied by this comment.",
+  "original_history_budgets_identity_once_and_acceptance": "UNCHANGED; no model/product/reference/cold repeats; originalwholeERROR/code2/all6BenqualityEXCLUDED/recovery0/1 lastproved",
+  "actual_cleanup_ordinary_RELEASED_FREE_case_ACCEPT": "ABSENT",
+  "new_coordinator_comments_this_source_adoption": 1,
+  "root_source_native_resource_profile_stand_mutations": 0,
+  "automation": "DELETED_BY_USER; not recreated"
+}

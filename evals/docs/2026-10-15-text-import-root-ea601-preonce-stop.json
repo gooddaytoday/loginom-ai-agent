@@ -1,0 +1,168 @@
+{
+  "status": "ACTUAL_EA601_PREONCE_PENDING_GUARD_STOP_NO_NATIVE",
+  "source": "ea601e3d9e35adb36ec79b74cafa903df4f3ab6a",
+  "execution": {
+    "exit": 2,
+    "pid": 2347551,
+    "birth": "113297212",
+    "startedAt": "2026-10-15T14:14:14.953929+00:00",
+    "finishedAt": "2026-10-15T14:14:48.787480+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "controlTransportOncePresent": false,
+    "priorKernelConsumed": 1,
+    "priorAbiContinuationConsumed": 1,
+    "priorFdContinuationConsumed": 1,
+    "priorObserverRepairConsumed": 1,
+    "sandboxRepairConsumed": 1,
+    "priorContinuationConsumed": 1,
+    "originalRecoveryConsumed": 1,
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": false,
+    "routeRootPresent": false,
+    "controllerStillPresent": false
+  },
+  "privateRefusal": {
+    "at": "2026-10-15T14:15:35.274011+00:00",
+    "files": [
+      "stage-0003.json",
+      "stage-0002.json",
+      "command-private-74c2d573-0538-4366-9f84-0ffc2d025698.json",
+      "retained-snapshot-verified.json",
+      "stage-0001.json",
+      "start.json",
+      "command-cause-6fb2974f-b078-4162-ab9e-5b0b0c1c7028.json",
+      "refusal.json"
+    ],
+    "stages": [
+      {
+        "stage": "continuation-admission",
+        "at": "2026-10-15T14:14:15.094Z",
+        "status": "ENTERED_NOT_COMPLETED"
+      },
+      {
+        "stage": "retained-history-verification",
+        "at": "2026-10-15T14:14:16.976Z",
+        "status": "ENTERED_NOT_COMPLETED"
+      },
+      {
+        "stage": "fresh-continuation-guard",
+        "at": "2026-10-15T14:14:32.153Z",
+        "status": "ENTERED_NOT_COMPLETED"
+      }
+    ],
+    "refusal": {
+      "version": 1,
+      "binding": {
+        "operation": "LAB57-control-transport-one-shot",
+        "originalOnce": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269",
+        "originalRecovery": 1
+      },
+      "stage": "fresh-continuation-guard",
+      "status": "BLOCKED",
+      "exception": {
+        "name": "Error",
+        "code": null,
+        "reason": "OWNED_COMMAND_FAILED",
+        "signal": null,
+        "killed": false,
+        "cause": {
+          "name": "AssertionError",
+          "code": null,
+          "reason": "REDACTED_MESSAGE",
+          "signal": null,
+          "killed": false,
+          "cause": {
+            "name": "Error",
+            "code": 1,
+            "reason": "REDACTED_MESSAGE",
+            "signal": null,
+            "killed": false
+          }
+        }
+      },
+      "originalOutcome": "ERROR",
+      "cleanup": "UNCONFIRMED",
+      "at": "2026-10-15T14:14:48.679Z"
+    },
+    "commands": [
+      {
+        "file": "command-private-74c2d573-0538-4366-9f84-0ffc2d025698.json",
+        "sha256": "2de8d2c8f08730f774924195f701d565107cb9ebbe00f818a05feaa1ebede0c0",
+        "command": "python3",
+        "stderrBytes": 1483,
+        "stdoutBytes": 0,
+        "frames": [
+          {
+            "file": "lab57-readonly-window.py",
+            "line": 12
+          },
+          {
+            "file": "lab57-route-inspect.py",
+            "line": 74
+          },
+          {
+            "file": "lab57-route-inspect.py",
+            "line": 82
+          },
+          {
+            "file": "lab57-readonly-window.py",
+            "line": 22
+          }
+        ],
+        "classes": [
+          "AssertionError",
+          "READONLY_COLLECTION_PARTIAL"
+        ],
+        "observations": [
+          {
+            "attempt": 1,
+            "result": "INCOMPLETE_REFUSED",
+            "elapsedMs": 13509.951286949217
+          }
+        ],
+        "fdRefusal": null
+      }
+    ]
+  },
+  "after": {
+    "at": "2026-10-15T14:25:35.818019+00:00",
+    "originalOwnerSha256": "7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64",
+    "rawConfigSha256": "ffbc373a557e0156a4726874d424a330922286545310bb0e0cd9b12863646b35",
+    "spentOnces": {
+      "lab57-closed": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269",
+      "lab57-continuation": "f28e8821cd1ede51ebe1f35716f3a19213b27436aab3d55e4b15ae9a65870a14",
+      "lab57-sandbox-repair": "26dde29c221c4082a3e84e135d7a99926e0f292bb9591ba5d4ef9b88871d3310",
+      "lab57-observer-repair": "8359c09485888676a95f35c4fd4782879698e65f4033d768c8556d5987dcbdd2",
+      "lab57-fd-continuation": "1c1648c08d0c905801d970e64d401147619d12262e20d6718c5a4120ac27bdb4",
+      "lab57-dispatcher-continuation": "2b1b08f033a8421ae2995380c55a510bc44cd27a864e45e508b7f92f85d3d7f1",
+      "lab57-kernel-continuation": "13699c77cc3a7cb7262f292cda6f78ae7303275e66a40e664cb444356baf0905"
+    },
+    "controlOncePresent": false,
+    "controlRootPresent": false,
+    "operationPresent": false,
+    "rootPidPresent": false,
+    "profileEffects": "No new diagnostic/native root created; no claim of final cleanup or server cessation",
+    "nativeModelReferenceProductCold": 0
+  },
+  "limit": "control0/1 unspent; all7spent unchanged",
+  "cause": "Exact producer line74 combined marker/pending guard; markers already rejected at45, hence pendingWorkers nonempty. Original blocked task IDs NOT captured by this producer and not reconstructed from later snapshot.",
+  "laterDiagnostic": "Top5 NOT complete admission: EvalRunner5218 runtime9f task01a13fe6-3da9 LAB77 running; MAS pending alreadyexempt. No original culprit UUID inferred.",
+  "diagnosticErrorsRetained": [
+    "First full queue diagnostic exited1/stderr624; raw details not captured, lower classUNKNOWN",
+    "Instrumented second fullqueue read typed MulticaReadTimeout, private564byte stderrSHAf3520134544286a2525998d5fe364e51b72d76f6ef78105095a725a9665f5908; not used as FREE",
+    "First task/agent metadata endpoint diagnostic failed; issue-only instrumentation had literal-newline syntax error397bytes beforeGET, repaired/compiled then knownissueGET succeeded"
+  ],
+  "notProven": [
+    "genuine server cessation",
+    "official history finalization",
+    "cleanup",
+    "completion",
+    "RELEASED",
+    "FREE",
+    "BenACCEPT"
+  ],
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "OFF"
+}

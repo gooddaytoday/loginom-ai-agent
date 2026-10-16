@@ -1,0 +1,92 @@
+{
+  "checked_utc": "2026-10-12T18:06:06Z",
+  "issue": "LAB-57",
+  "report_id": "01a13138-6ee4-7a6d-aea5-f798eea0bb9f",
+  "issue_status": "blocked",
+  "issue_revision": 139,
+  "source_sha": "49522d83318bac29779e497798becb2f799bc84e",
+  "archive_sha256": "695987e70f4ad16b8e5140fdbef5e38526c844854e16b052f2c6ffc76836ddac",
+  "manifest_sha256": "418e4fe13db9a1baaefd545f36e4d70438f1e9aae9db6c3f09aa61b728f50d46",
+  "parts_bytes_hash_verified": 3,
+  "files_bytes_hash_verified": 306,
+  "CP1251_native_journal": {
+    "owner_observed": true,
+    "one_begin_wizard_gesture": true,
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "document_workflow_node_continuity_verified": true,
+    "delivered_full_cold_verdict": "PASS",
+    "monitor_private_journal_full_replay": false
+  },
+  "warm_cold_case_progress": "5/6 PASS in author report; UTF16LE startup failed",
+  "new_blocker": "PINNED_CLI_PROVIDER_INPUT_SERIALIZATION_UNSUPPORTED_TSV",
+  "pinned_message_source_git_bytes_exact": true,
+  "UTF16_input": {
+    "bytes": 302,
+    "BOM": "fffe",
+    "sha256": "9cd38e66c97356d2b768f7d212a9772c720e0365f83375dba7a37ba58e795a04",
+    "events_empty": true,
+    "native_tool_calls": 0,
+    "provider_request_completion": "NOT_CONFIRMED"
+  },
+  "actual_model_public_proofs": "77 primary assistant rows, including one UTF16 failed request; no completed response for UTF16",
+  "private_DB_reopened_by_monitor": false,
+  "recorded_cost_is_not_billing_cost": true,
+  "release": {
+    "kind": "reference",
+    "status": "RELEASED",
+    "stand": "FREE at stage close",
+    "owner_acquisition_match": true,
+    "raw_completion_sha256": "0c9fafaf5f938db5d0c4b53fabbda15eabfa25c35559821c00e9233958fcc074",
+    "private_owner_token_excluded": true
+  },
+  "latest_report_ledger": {
+    "marker": "LAB57-RICH-AUTONOMY-20261012",
+    "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+    "task": "01a130ff-f583-7158-a212-250ff18600cf",
+    "deadline_utc": "2026-10-12T22:40:20Z",
+    "reference_consumed": {
+      "txt-comma-utf8": 1,
+      "csv-comma-utf8": 1,
+      "txt-semicolon-cp1251-decimal": 2,
+      "csv-pipe-multiline": 1,
+      "tsv-utf8": 1,
+      "tsv-utf16le": 1
+    },
+    "product_consumed": {
+      "txt-comma-utf8": 0,
+      "csv-comma-utf8": 0,
+      "txt-semicolon-cp1251-decimal": 0,
+      "csv-pipe-multiline": 0,
+      "tsv-utf8": 0,
+      "tsv-utf16le": 0
+    },
+    "repeats_consumed": 2,
+    "repeat_limit": 10,
+    "cold_reader_calls": 8,
+    "cold_launches": 7,
+    "cold_completed": 5,
+    "normal_cleanup_browser_continuations": 2,
+    "helper_recovery": 0,
+    "admission_consumed": 3,
+    "wrapper_consumed": 1
+  },
+  "proposal": {
+    "path": "evals/docs/proposals/2026-10-12-tsv-provider-shim.patch",
+    "sha256": "7f7a0153a331a6fd9af7caa82391d5ac165fb99c80744b99ac0e8a2353931465",
+    "basis_pin": "5cd74d8ee5d6125692d953eb327b4d4f833c27a1",
+    "applies_cleanly_to_exact_pin_copy": true,
+    "TypeScript_syntax": "PASS",
+    "new_regressions": "real 302-byte UTF16LE fixture/BOM/SHA, uppercase TSV; six negative MIME/suffix/URL/absent-filename cases",
+    "functional_tests": "NOT_RUN: missing @opentui/solid/preload dependency in isolated copy; failure before test body",
+    "typecheck": "NOT_RUN: dependency environment unavailable",
+    "installed_or_shared_CLI_changed": false,
+    "new_CLI_pin_admitted": false,
+    "owner_authorization_required": "Owner command 01a130f3 point6 and heartbeat prohibit changing pinned CLI without separate owner decision"
+  },
+  "models_inputs_oracle_criteria_budgets_changed_by_monitor": false,
+  "monitor_model_native_browser_lease_actions": false,
+  "all_eight_done": false
+}

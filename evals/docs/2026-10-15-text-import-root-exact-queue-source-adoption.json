@@ -1,0 +1,41 @@
+{
+  "decision": "SOURCE_ACCEPT",
+  "source": "7082a865790de7d19780fc93ce00b7b0ede8031f",
+  "readAt": "2026-10-15T14:54:44.353988+00:00",
+  "comment": "01a14008-43ef-7bea-a65a-32b6cdc9132b",
+  "parent": "01a13ffe-3bcb-7931-99dc-166e77fffabf",
+  "attachment": "01a14008-4205-7247-8bed-adf2538e2fac",
+  "archiveSha256": "b4ad7b378c2962246b1a6eed2117364b7d4c7a9c8288d41374fa2dbe01d2fbbb",
+  "manifestSha256": "2269b3dafabd691bb402b4bf0834488d6e956db30bcd06068371927d87ef1026",
+  "admissionSha256": "ad181fe0548c751924f9f3f778c31cb315429d3794375fb20dbc93cce9729146",
+  "payloads": 97,
+  "exactArchiveVerified": true,
+  "executableRebuildByteEqual": true,
+  "independentTests": "125PASS/0FAIL/306expects/4files:15 new independent tests plus new exact-scope and affected MAS/original queue regressions. 13 additional malformed/conflicting/duplicate/latepage/status mutants refuse both direct production TS and exact bundled Node; one full-ledger positive and one Ben-mode refusal. Concrete synthetic CLI pagination, issue provenance, Python/Node agreement and partial-page blocker precedence PASS.",
+  "typecheck": "PASS",
+  "captures": [
+    {
+      "file": "own-proofs/addressed/process-cleanup.json",
+      "processes": 170,
+      "mode": "continuous"
+    },
+    {
+      "file": "own-proofs/build/process-cleanup.json",
+      "processes": 2,
+      "mode": "continuous"
+    },
+    {
+      "file": "own-proofs/typecheck/process-cleanup.json",
+      "processes": 3,
+      "mode": "continuous"
+    },
+    {
+      "file": "author-evidence/proofs/evalrun-scope-supervised156/capture/process-cleanup.json",
+      "processes": 160,
+      "mode": "continuous"
+    }
+  ],
+  "resourceReviewLimit": "Document hashes match supplied pinned projection. The 0afc Git object is not in local reviewer bundle; no independent foreign-host audit or full LAB77 description rehash is claimed. This source gate uses current owner resource attestation and validates its exact implemented scope; future actual placement inventory must satisfy production gates. No connection or action on foreign stand/task/chat.",
+  "sourceOnlyNotCleanupOrCaseAccept": true,
+  "newNativeEffects": 0
+}

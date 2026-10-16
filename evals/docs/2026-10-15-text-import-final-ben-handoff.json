@@ -1,0 +1,48 @@
+{
+  "at": "2026-10-15T21:21:18.467555+00:00",
+  "comment": "01a1416f-813a-7097-bf28-8fe72675e28e",
+  "parent": "01a140b5-2b78-7047-9df3-d5d2d0fc3037",
+  "bodySha256": "bafbbee7e65ed337c365989292efcfbf5b42b701e9a4a9a475fa84cf0ffd48f0",
+  "oneRoutedEvalerMention": true,
+  "attachment": "01a1416f-7ae3-79a5-a2f7-10fdf3b1acfe",
+  "zipBytes": 2647947,
+  "zipSha256": "da6ae68714a13b7190e4bfa8a107041fe0d7f9f6d00aaceb61fa05bd5e29985d",
+  "manifestSha256": "819ea9e3283c10280c51392ab22bd06264a565312fd14340ae407b380527cfed",
+  "payloads": 330,
+  "uploadByteEqual": true,
+  "readbackVerified": true,
+  "server": {
+    "status": "in_progress",
+    "revision": 556,
+    "active": [
+      {
+        "id": "01a1416f-8155-7824-99f8-5af9d8857c4e",
+        "agent": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+        "runtime": "a5fa993f-2903-4997-a832-955ffbb1203c",
+        "status": "running",
+        "trigger": "01a1416f-813a-7097-bf28-8fe72675e28e"
+      }
+    ]
+  },
+  "actualCleanup": "Already complete+RELEASED+FREE; never repeat",
+  "independentBenAccept": "pending; no DONE yet",
+  "scope": "existingcycle2/reject1; only final readonly cases+validators+attestation+cleanup; no new cleanupexecution/model/native/reference/product/cold/thirdcycle; MASforeignuntouched/automationOFF",
+  "firstFollowupReadError": "POST succeeded and posted UUID/body/parent/one mention preserved; initial active CLIexit2/stderr465 lowercause UNKNOWN, never reposted; later GETbody+activeCLI0 verified",
+  "EvalerFinalDispatch": {
+    "comment": "01a14174-a7a2-742b-ad72-fb74a8a0c92c",
+    "parent": "01a1416f-813a-7097-bf28-8fe72675e28e",
+    "attachment": "01a14174-a764-7d8f-81cb-a19e549bc6c6",
+    "sha256": "99118c6268b80e2cb9aa3721296616bbd0cd2ecfcc7b3854a86c1d27879fe919",
+    "bytes": 2657120,
+    "entries": 18,
+    "manifestPayloads": 17,
+    "nestedOriginalByteEqual": true,
+    "operatorSourceManifestByteEqual": true,
+    "BenTask": {
+      "id": "01a14174-a7c9-75ad-bfcb-9a0246c9bca5",
+      "agent": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+      "runtime": "a5fa993f-2903-4997-a832-955ffbb1203c",
+      "status": "running"
+    }
+  }
+}

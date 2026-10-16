@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "decision": "ROOT_OBSERVER_REPAIR_ONE_SHOT_SOURCE_FIRST",
+  "scope": "LAB-57 original remaining cleanup on dedicated eval-tests only",
+  "operator": "Root main coordinator personally; Ben independent final cases/validators/attestation only",
+  "basis": {
+    "actualStopReceiptSha256": "2c2a5df321b4ee77f3156a24bc8cb8b0ce9fe91ffeea9f776b25209f0a3c345a",
+    "resolved": "Existing dedicated bwrap allowed actual page navigation and account admin login; no AppArmor/resource/default mutation",
+    "newRefusal": "DISPATCHER_OBSERVATION_UNCONFIRMED; lower cause UNKNOWN because first raw observer response was not persisted",
+    "capture": "454 complete but FAILED/13unknown/browserBindings0; unchanged; twozero not cleanup proof",
+    "freshLimitedObservation": "08:15:51UTC all467 recorded/controller/unknown PIDs absent/currentNative0; signals0; not server cessation or old capture correction",
+    "isolatedReproduction": "Actual superviseProcess on a compiled private C wrapper: BEFORE samePID/group22/session22 then AFTER samePID/groupPID/sessionPID. Old code falsely records Process identity changed; new opt-in mode waits BEFORE first admission. Post-admission identity changes still fail. This reproduces a mechanism, not a recovered missing original transition trace.",
+    "tests": "102PASS0FAIL257expects4affectedfiles; package typecheckPASS; raw-response/cause RED→GREEN; nested-wrapper RED→GREEN; no unchanged full suites"
+  },
+  "preserve": {
+    "originalRecovery": "1/1 ATTEMPTED",
+    "technicalContinuation": "1/1 CONSUMED",
+    "sandboxRepair": "1/1 CONSUMED",
+    "originalOnce": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269",
+    "continuationOnce": "f28e8821cd1ede51ebe1f35716f3a19213b27436aab3d55e4b15ae9a65870a14",
+    "sandboxRepairOnce": "26dde29c221c4082a3e84e135d7a99926e0f292bb9591ba5d4ef9b88871d3310",
+    "originalBenOwnerTaskLeaseConfigAcquiredAt": true,
+    "originalERRORAll6BenQualityExcludedProduct6of6NoRetry": true,
+    "allRawFailuresCapturesUnknownsProtectedHistoryAndRegistration": true,
+    "noOriginalCapturePromotion": "FAILED_CAPTURE_RETAINED_NOT_CLEAN"
+  },
+  "newTechnicalAllowance": {
+    "name": "observer-repair",
+    "limit": 1,
+    "consumed": 0,
+    "entry": "observe-repair",
+    "proofRoot": "lab57-observer-repair",
+    "once": "lab57-observer-repair.once.json",
+    "scientificAllowance": false,
+    "reacquireReserveReplayResetRebind": false,
+    "automaticResumeAfterErrorUncertainty": false
+  },
+  "requiredFinalSource": [
+    "Explicit new actor/controller/operation guard/admission/owner decision/durable wx0600 once+file-parent fsync before remaining effects; exact original reservation reused, no re-reserve or registration archive replay",
+    "Bind all three prior onces/controllers/admissions/raw results/failures/captures/registration/snapshot by bytes+device/inode/mode/times; retain failed third capture as FAILED and require fresh actual absence for all900 prior PIDs, no alias or synthetic admission",
+    "Every fresh signed full two-pass ALLPID/ALLUID/ALLFD producer also checks the three prior Root diagnostic profile paths, plus all6 actual CFG profiles and all original pins/container/storage/queues; no foreign scope exemption beyond existing owner decisions",
+    "Production nested wrapper mode only exact existing dedicated root-owned bwrap and exact d6 Node/private Root proof profile. Initial own namespace reaper waits for settled new session; no after-admission identity refresh or unknown/browser binding relaxation. Other callers and original signals/common lifecycle remain strict",
+    "Persist actual first and subsequent observer raw responses and lower refusal before parsing/validation in private0600 records; preserve existing inventory/role/original-scope/foreign/once/effect uncertainty gates",
+    "Prior authenticated diagnostic admin scope must be authoritatively absent from complete stable fresh inventories apart from current bound self; never close unknown or foreign admin peers. Genuine own logout still requires bound unique empty observer/native session, not process absence or a client UUID",
+    "Genuine original-scope cessation, own logout/transport/continuous complete native cleanup, official77-row normal-WAL/SHM private-copy history, whole legacyguard/exactCSV, attestation/completion/original reservation SETTLED/ordinaryRELEASED/FREE and independent final ACCEPT remain mandatory"
+  ],
+  "admission": "New clean exact full executable source/plan/TDD/negatives/process/build actual independent review/admission by Evaler BEFORE install/helper/native/profile/resource effects. Author PASS is not admission or case ACCEPT. No new cleanup worker/third Ben review.",
+  "newCalls": {
+    "model": 0,
+    "reference": 0,
+    "product": 0,
+    "cold": 0
+  },
+  "sameCauseLedger": "3/10 remaining7, no reset/precharge; no confirmed same-cause repeat charge inferred",
+  "localTemporaryData": "/home/kiselev/storage/tmp/; remote operation-owned evidence stays in dedicated private runtime paths; namespace tmpfs does not expose host tmp",
+  "mas": "FOREIGN/NO_INTERVENTION",
+  "automation": "DELETED/OFF",
+  "humanOrManagementTimeGate": false
+}

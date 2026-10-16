@@ -1,0 +1,166 @@
+{
+  "status": "ROOT_OPERATOR_ADOPTION_AFTER_EXACT_SOURCE_ACCEPT_BEFORE_NATIVE",
+  "source": "de285aa4fe659b8e0277fe5bb8bc772d4fc82452",
+  "independentAdmission": {
+    "decision": "SOURCE_ACCEPT",
+    "source": "de285aa4fe659b8e0277fe5bb8bc772d4fc82452",
+    "comment": "01a13f59-bead-7e18-917f-629b9ca8e2c6",
+    "attachment": "01a13f59-be7b-7037-83dc-b03eaa1a3c44",
+    "archiveSha256": "510575898c54f8adeab224077d1f46d5b77f2a9452e75beed31ffc6dafdea335",
+    "manifestSha256": "dcd8aa019ca36997f453d73521cf02e9a97813157a931fb2c472500c5c01b447",
+    "admissionSha256": "2436f3e3e984eb34e16842ddc03832e07bca467fbfa05d9938bb5da84c160888",
+    "payloads": 80,
+    "exactArchiveVerified": true,
+    "executableRebuildByteEqual": true,
+    "independentTests": "58PASS0FAIL72expects/21original+10newcurrent+27targeted/actuald6Node2positive+4missingbitnegatives",
+    "ownCaptures": "3confirmedcaptures5/3/2complete/errornull/twozero; initialbuildhashscriptArrayBuffererrorretained",
+    "sourceOnlyNotCaseAcceptOrCleanup": true
+  },
+  "installation": {
+    "status": "SOURCE_INSTALLED_ONLY",
+    "source": "de285aa4fe659b8e0277fe5bb8bc772d4fc82452",
+    "filesVerified": 908,
+    "noReplace": true,
+    "nativeReady": false
+  },
+  "helper": {
+    "status": "NARROW_READ_ONLY_HELPER_PROVISIONED_NOT_NATIVE_READY",
+    "source": "de285aa4fe659b8e0277fe5bb8bc772d4fc82452",
+    "attempt": {
+      "path": "/root/lab57-root-kernel-k1-de285aa4f-provision-manifest-path.once.json",
+      "device": 64512,
+      "inode": 5545377,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o600",
+      "bytes": 1654,
+      "sha256": "bbd1b60918632e94ff079ac53fa006bf39b94616939429cdc3a7ee37c6021df4"
+    },
+    "helperDirectory": {
+      "path": "/var/lib/loginom-evals/fd-observer/de285aa4fe659b8e0277fe5bb8bc772d4fc82452",
+      "device": 64512,
+      "inode": 1179905,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o755",
+      "bytes": 4096,
+      "sha256": null
+    },
+    "script": {
+      "path": "/var/lib/loginom-evals/fd-observer/de285aa4fe659b8e0277fe5bb8bc772d4fc82452/lab57-fd-observer.py",
+      "device": 64512,
+      "inode": 1179906,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o555",
+      "bytes": 19950,
+      "sha256": "c698f307155154c7b8d1d7390a68e09f6eaf3d841f24d34fca1ec41e4cecffec"
+    },
+    "binding": {
+      "path": "/var/lib/loginom-evals/fd-observer/de285aa4fe659b8e0277fe5bb8bc772d4fc82452/binding.json",
+      "device": 64512,
+      "inode": 1179908,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o444",
+      "bytes": 29909,
+      "sha256": "16f5329351aeab8054d4d2656668dcd84bd4c969cb212061a4fde192c6cf309b"
+    },
+    "policy": {
+      "path": "/etc/sudoers.d/loginom-lab57-fd-de285aa4f",
+      "device": 64512,
+      "inode": 1574757,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o440",
+      "bytes": 159,
+      "sha256": "8d0a9898ddbd4f7a656e799cbefdfdebd20b9a68cf1c8a5d1480fd05c7ea6d0c"
+    },
+    "otherPoliciesByteUnchanged": true,
+    "fullVisudoExit": 0,
+    "originalOwnerConfigPreserved": true,
+    "originalNativeProfileRecoveryEffects": 0
+  },
+  "firstProvisionFailure": {
+    "stage": "provision_observer.py",
+    "exit": 1,
+    "stdoutBytes": 0,
+    "stderrBytes": 1027,
+    "stderrSha256": "da31ee39b5871ee6e329a65cc013ff0857a95034f25eba06fb7ffb6d96aeabba",
+    "unknownMutation": "Reconcile own durable attempt/completed records; never blindly rerun"
+  },
+  "readonlyFailureDiagnosis": {
+    "existingOwnTargets": {
+      "helper": false,
+      "stage": false,
+      "policy": false,
+      "attempt": false,
+      "completed": false
+    },
+    "wrongPathExists": false,
+    "manifestedPath": {
+      "path": "evals/docs/evaler/lab57-root-kernel-observation-pids.json",
+      "bytes": 23103,
+      "sha256": "b711bf5527e1d7b4c4830ed35a0ecd42fabebf66ec1c2c9ea73bf2ce6c74c82f"
+    },
+    "actualPids": 2100,
+    "presentPids": [],
+    "kernelOncePresent": false,
+    "sourceManifestSha256": "f708e9d105d28f9e7b5beecf5b0d8b1ae7317b7ec2dcaf33a7c740f401840561",
+    "signals": 0,
+    "mutations": 0
+  },
+  "verifiedOperatorInputFix": {
+    "status": "PREMUTATION_FILENAME_DEFECT_DIAGNOSED_AND_CORRECTED_INPUT_NOT_APPLIED",
+    "originalScriptSha256": "6a1e980c5d9692ddaf6c6584e8f36c533720b598d3b6ef25b185eb87b8f98dbf",
+    "correctedScriptSha256": "03951cf45c041a5d54c1dcd6c36912f800f318fd7ecbc615cbacd799fa836b17",
+    "changedLines": 3,
+    "changes": [
+      "Wrong absent PID filename replaced by exact independently admitted manifested path",
+      "Distinct helper-only durable attempted/completed receipt names; old absent attempt left absent"
+    ],
+    "readonlyPrefix": {
+      "status": "ALL_READONLY_PREFIX_GUARDS_PASSED",
+      "scriptSha256": "c698f307155154c7b8d1d7390a68e09f6eaf3d841f24d34fca1ec41e4cecffec",
+      "pids": 2100,
+      "helperPolicyMutation": false,
+      "attemptExists": false,
+      "sourceManifestSha256": "f708e9d105d28f9e7b5beecf5b0d8b1ae7317b7ec2dcaf33a7c740f401840561"
+    },
+    "sourceUnchanged": "de285aa4fe659b8e0277fe5bb8bc772d4fc82452 SOURCE_ACCEPT2436f3e3",
+    "noAuthorityOrScopeChange": true,
+    "kernelAllowance": "0/1UNSPENT/all6spentunchanged",
+    "mutations": 0
+  },
+  "repairScope": "Operator input filename matched exact accepted source manifest. Failed program had no helper/stage/policy/attempt/completed; no native once consumed. Corrected distinct program/attempt receipts, allguardsreadonly verified before mutation. Accepted executable source/authority/scope unchanged. Original failed program/exit retained; no unchanged replay.",
+  "privateAdmission": {
+    "admissionPath": "/home/user/.local/share/loginom-evals-runtime/operators/lab57-root-kernel-k1-365b4939c556/final-root-operator-admission.json",
+    "admissionSha256": "4f0307b16898b92cbe4d79edf6c83076bb03e5f72add46df23b0ad0997eb33ac",
+    "preonceDirectory": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-kernel-k1-289128fb0b8a",
+    "status": "PRIVATE_ROOT_ADMISSION_AFTER_INDEPENDENT_SOURCE",
+    "originalOwnerUnchanged": true,
+    "source": "de285aa4fe659b8e0277fe5bb8bc772d4fc82452",
+    "originalRecoveryEffects": 0,
+    "credentialsRepublished": false
+  },
+  "accountingBeforeForeground": {
+    "originalRecovery": "1/1ATTEMPTED",
+    "technicalContinuation": "1/1CONSUMED",
+    "sandboxRepair": "1/1CONSUMED",
+    "observerRepair": "1/1CONSUMED",
+    "fdStability": "1/1CONSUMED",
+    "dispatcherAbi": "1/1CONSUMED",
+    "kernelObservation": "0/1SOURCE only",
+    "modelReferenceProductCold": 0,
+    "BenProduct": "6/6/originalERROR/all6qualityEXCLUDED/no retry",
+    "Rich": "4PASS2qualityFAIL/refs1/1/2/1/1/3/cold11/10/8",
+    "BenCold": "9/9/8+oldERROR1",
+    "repeats": "3/10remaining7/noreset/precharge",
+    "admission": "3/3",
+    "wrapper": "1/1"
+  },
+  "nativeModelReferenceProductColdEffectsBeforeForeground": 0,
+  "next": "Root one foreground kernel-continue with immediately fresh native/resource/owner/history/once checks; genuine cessation/history/guardCSV/completion/SETTLED/ordinaryreleaseFREE then BenfinalindependentACCEPT",
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "OFF"
+}

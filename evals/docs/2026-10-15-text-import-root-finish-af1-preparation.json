@@ -1,0 +1,37 @@
+{
+  "status": "EXACT_AF1_ACCEPTED_SOURCE_INSTALLED_ROOT_ADMISSION_PREPARED",
+  "source": "f28ec2b48c4b83edc524b90ef44a4e5c4927e76d",
+  "sourceAdmission": {
+    "comment": "01a1402f-def9-7221-af0e-0658f323a34c",
+    "sha256": "09fba068e0f05e653b9c0239b24db8e81f955bc4c656d848a6ea4ea7e8662c17"
+  },
+  "install": {
+    "status": "SOURCE_INSTALLED_ONLY",
+    "source": "f28ec2b48c4b83edc524b90ef44a4e5c4927e76d",
+    "filesVerified": 932,
+    "noReplace": true,
+    "nativeReady": false
+  },
+  "observer": {
+    "status": "NARROW_READ_ONLY_HELPER_PROVISIONED_NOT_NATIVE_READY",
+    "source": "f28ec2b48c4b83edc524b90ef44a4e5c4927e76d",
+    "attemptSha256": "59685623443fcccd75c42af5e3407d961273e0eb67b8280f2e9dcae3f0f8ce64",
+    "scriptSha256": "843085b8bdc1da86645848da19390031f3e635255330c73660192705d824e387",
+    "bindingSha256": "b6d844e25dc5f1c40dd6375fc2e5d0907497ea1c094e4db1c1277d958a94b6d5",
+    "policySha256": "8377481a552971b500ff4dce1bc1e76f5dd3ad49e14e14af5a587a662fc03e97",
+    "otherPoliciesByteUnchanged": true,
+    "fullVisudoExit": 0,
+    "privateKeyMaterialDisclosed": false,
+    "originalOwnerConfigPreserved": true
+  },
+  "privateAdmission": {
+    "status": "PRIVATE_ROOT_ADMISSION_AFTER_INDEPENDENT_SOURCE",
+    "sha256": "2e6401cdb3d1a588130a16ddff8f093e481eb6279cfd4fca1218f291b0baa561",
+    "originalRecoveryEffects": 0,
+    "credentialsRepublished": false
+  },
+  "execution": "Root personally launched localforeground67558, terminal result not yet read; no consumption/cleanup result inferred from running",
+  "preserved": "Original owner/task/lease/acquiredAt/config/all8spent immutable; addressedfinish same0/1 allowance, no reset; rejected394343 neverinstalled",
+  "science": "No model/reference/product/cold; oldERROR/all6BenqualityEXCLUDED preserved",
+  "automation": "OFF"
+}

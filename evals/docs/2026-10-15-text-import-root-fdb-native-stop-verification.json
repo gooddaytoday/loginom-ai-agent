@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "status": "ACTUAL_ROOT_FDB_STOP_NOT_CLEANUP",
+  "source": "fdbfae6d7a94c06b1343872b7465f6e289f58b08",
+  "operator": "Root personally",
+  "foreground": {
+    "exit": 2,
+    "pid": 2280408,
+    "birth": "111559419",
+    "startedAt": "2026-10-15T09:24:37.018376+00:00",
+    "finishedAt": "2026-10-15T09:28:00.009474+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "observerRepairOncePresent": true,
+    "sandboxRepairConsumed": 1,
+    "priorContinuationConsumed": 1,
+    "originalRecoveryConsumed": 1,
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": true,
+    "controllerStillPresent": false
+  },
+  "observerRepairOnce": {
+    "sha256": "8359c09485888676a95f35c4fd4782879698e65f4033d768c8556d5987dcbdd2",
+    "identity": {
+      "device": 64512,
+      "inode": 17856556
+    }
+  },
+  "capture": {
+    "status": "confirmed",
+    "error": null,
+    "complete": true,
+    "unknown": 0,
+    "browser": 1,
+    "wrapperStartupCount": 1,
+    "unresolvedStartups": 0,
+    "zeroPasses": [
+      {
+        "observed_at": "2026-10-15T09:27:48.792Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-15T09:27:48.897Z",
+        "owned_remaining": 0
+      }
+    ]
+  },
+  "ownTransport": {
+    "browserTransportClosed": true,
+    "browserProcessTerminated": true
+  },
+  "actualPartialNative": [
+    "OWN_PAGE_NAVIGATED09:27:09.383Z",
+    "OWN_LOGIN_FIELDS_SET09:27:29.202Z"
+  ],
+  "actualRefusal": {
+    "at": "2026-10-15T09:27:38.416705Z",
+    "gate": "TWO_PASS_COHERENCE_CHANGED",
+    "phase": "fresh signed FD guard BEFORE third login gesture/tool dispatch",
+    "priorReadOnlyRestart": {
+      "attempt": 1,
+      "reason": "PROC_LIFETIME_UNCERTAIN",
+      "pid": 2282314,
+      "fd": 17,
+      "errno": 2
+    },
+    "knownOriginFromIndependentEarlierSignedPasses": {
+      "pid": 2282314,
+      "uid": 1000,
+      "parent": 2280408,
+      "birth": "111565289",
+      "rootController": 2280408,
+      "fdCountBefore": 16,
+      "nativeComm": null
+    },
+    "limits": "The failed final pair/delta was not persisted, so exact identity/FD change that caused TWO_PASS remains UNKNOWN. Initial lifetime PID is proven Root child; not in worker-descendant capture because supervisor helper is its ancestor. Do not infer final cause or blame progress SSH; last such read09:26:04 precedes failure09:27:38."
+  },
+  "notReached": [
+    "third login gesture",
+    "OWN_LOGIN_OBSERVED",
+    "first Dispatcher observation",
+    "diagnostic-owner/logout",
+    "original server cessation",
+    "official pending history archival",
+    "guard/CSV cleanup",
+    "completion",
+    "RELEASED",
+    "FREE",
+    "Ben final ACCEPT"
+  ],
+  "limitedFreshPostStop": {
+    "at": "2026-10-15T09:35:22.141594+00:00",
+    "all1269PriorPidsAbsent": true,
+    "diagnosticRegistrationPresent": false,
+    "operationPresent": false,
+    "signalsSent": 0,
+    "serverCessationClaim": false
+  },
+  "preserved": {
+    "originalRecovery": "1/1 ATTEMPTED/e704",
+    "technicalContinuation": "1/1 CONSUMED/f28",
+    "sandboxRepair": "1/1 CONSUMED/26dde29",
+    "observerRepair": "1/1 CONSUMED/8359",
+    "BenOwnerTaskLeaseConfigAcquiredAt": "UNCHANGED/BUSY",
+    "BenProduct": "6/6/originalwholeERROR/all6qualityEXCLUDED/no retries",
+    "Rich": "4PASS2qualityFAIL/refs1/1/2/1/1/3/cold11/10/8",
+    "BenCold": "9/9/8+oldERROR1",
+    "repeatLedger": "3/10remain7/noreset/precharge",
+    "admission": "3/3",
+    "wrapper": "1/1",
+    "modelReferenceProductColdThisStage": 0,
+    "oldD1Capture": "FAILED454/13unknown/browser0 unchanged",
+    "history77": "5archives+1pending/billedUNKNOWN/oldSHMSTOP retained"
+  },
+  "next": "Offline targeted TDD for durable two-pass delta diagnostics and bounded full read-only re-observation ONLY for proven same-birth Root-owned FD activity, with final strict coherent two-pass proof unchanged. Unknown/foreign/reused/denied/protected references STOP immediately. Any further native effects need separate explicit technical allowance and independent exact source gate; no replay of consumed route.",
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "OFF"
+}

@@ -1,0 +1,26 @@
+{
+  "status": "ROUTED_EXACT_SOURCE_REVIEW_RUNNING_NOT_CLEANUP",
+  "source": "e0c47ade7f5a331eec810768afabfa128bd1c5ef",
+  "comment": "01a13fcf-2f3d-7162-b951-4c3ad1fcb901",
+  "parent": "01a13f8e-7e94-77f2-bf82-b1edd851b0d2",
+  "attachment": "01a13fcf-174e-7a2f-bdcd-9bdc62c5ca7d",
+  "marker": "LAB57-ROOT-CONTROL-TRANSPORT-SOURCE-20261015-e0c47ade",
+  "bodySha256": "645c1ef16a9345f9bdee1cf2ebe8959c3faa33c483ccc7212f3873f5ed8799b5",
+  "oneEvalerMention": true,
+  "zipSha256": "fa689b6842ef9bea6f3d3529abd7b81b8d692467fa5457d6521aa602f205d9b6",
+  "bodyParentAndAttachmentReadbackVerified": true,
+  "freshServerStatus": "in_progress",
+  "revision": 501,
+  "active": [
+    {
+      "id": "01a13fcf-2f5b-792f-a7e8-627011b4733c",
+      "status": "running"
+    }
+  ],
+  "newSourceInstalled": false,
+  "newControlAllowance": "0/1 NOT_APPLIED",
+  "cleanupOperator": "Codex Root",
+  "Ben": "Final independent cases/validators/attestation only",
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "OFF"
+}

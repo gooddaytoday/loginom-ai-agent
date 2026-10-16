@@ -1,0 +1,100 @@
+{
+  "status": "READY_SOURCE_FOR_INDEPENDENT_REVIEW_NOT_APPLIED",
+  "source": "53d823f3e7538e278a786e8265540c4c65201b96",
+  "base": "f89f674e3c614e711123685415211fd864fa8d12",
+  "ownerDecisionSha256": "91af777a45c847cc2f8253b971e5919cf871024893e285bc3cb0eca62c8f5edb",
+  "actualStopReceiptSha256": "7227e601096df04e4f6cac68218859fc01d562a9b2efc3d6851504726baec00b",
+  "sourceChanges": [
+    "Actual /proc flags PF_KTHREAD captured into signed inventory; changed/malformed flag refuses; historical optional fields preserved",
+    "At most3 complete readonly attempts may restart only kernel-only arrival/exit from complete clean passes: captured PF_KTHREAD true,parent2,UID0,zeroFD+emptydigest,nonnative,unprotected,unique single-sided rows; final full pair must still be exact everyPID/everyFD/bit match. Unknown/userspace/native/FD-bearing/protected/reused/partial/denied/unstable/exhausted STOP",
+    "Distinct kernel-continue/newroot/once/privateadmission, all6 prior spent sources/controllers/onces/errors/captures/admissions/raw/snapshot/history/reservation immutable; all2100 oldPID absence/sixCFG+sixprior diagnostics",
+    "Previously accepted nativeABI/supervisor/Node/bwrap/FD final strict pair/original owner/cessation/history/cleanup/attestation/release/Ben independent gates unchanged"
+  ],
+  "tests": {
+    "affected": "45PASS/0FAIL/198expects/7files",
+    "newKernel": "2kernel+6newentry+1signedfinalschema tests incl actual Python arrival/exit/negative/exhaustion scenarios; included in affected",
+    "typecheck": "PASS",
+    "build": "2 clean exact Git exports byte-equal",
+    "process": {
+      "mode": "continuous",
+      "complete": true,
+      "status": "confirmed",
+      "error": null,
+      "processes": 4,
+      "verification": [
+        {
+          "observed_at": "2026-10-15T11:06:31.631Z",
+          "owned_remaining": 0
+        },
+        {
+          "observed_at": "2026-10-15T11:06:31.732Z",
+          "owned_remaining": 0
+        }
+      ]
+    },
+    "failures": "All new RED/errors retained; actual f89 STOP/complete-pair delta retained, PF_KTHREAD confirmed by later samebirth readonly read not synthesized into old inventory. First unprivileged FD read refusal701stderrbytes preserved; privileged readonly read succeeded. Saved actual368 structural+wrapper verified only as own-process cleanup. ABI/supervisor/unchanged full suites not repeated."
+  },
+  "package": {
+    "sourceEntries": 908,
+    "gitBlobs": 907,
+    "unchangedBaseBlobs": 890,
+    "changedPaths": [
+      "evals/docs/evaler/lab57-root-kernel-observation-decision.json",
+      "evals/docs/evaler/lab57-root-kernel-observation-pids.json",
+      "evals/docs/evaler/lab57-root-kernel-observation-pins.json",
+      "evals/docs/evaler/lab57-root-kernel-observation-plan.md",
+      "evals/script/lab57-fd-observer.py",
+      "evals/script/lab57-owned-route.ts",
+      "evals/script/lab57-route-inspect.py",
+      "evals/script/lab57_history_audit_scope.py",
+      "evals/src/lab57-closed-route.ts",
+      "evals/src/lab57-continuation.ts",
+      "evals/src/lab57-fd-observer.ts",
+      "evals/src/lab57-kernel-continuation.ts",
+      "evals/src/lab57-recovery-attestation.ts",
+      "evals/src/lab57-route-host.ts",
+      "evals/test/lab57-fd-observer.test.ts",
+      "evals/test/lab57-kernel-continuation.test.ts",
+      "evals/test/lab57-kernel-observation.test.ts"
+    ],
+    "sourceManifestSha256": "e1864c00d062a32dfab13688f1445a99a628ec7cfacd72232cdcd17e6933a12c",
+    "executableSha256": "8f2979db842136a03e4f4052a3064cb7af0fda8c0b6eb498958e6b11de19baf3",
+    "zipSha256": "f984e9a2b4d84911c056590de4c4093ac100cda5976d38caf87da3611a21b946",
+    "deliveryManifestSha256": "794bed41a958c3a548a27159fa80b6df430c29dc3167c99c6eb07135a4eee178",
+    "payloads": 972,
+    "allCRCPathsTypesHashesGitBlobsVerified": true
+  },
+  "accounting": {
+    "originalRecovery": "1/1ATTEMPTED",
+    "technicalContinuation": "1/1CONSUMED",
+    "sandboxRepair": "1/1CONSUMED",
+    "observerRepair": "1/1CONSUMED",
+    "fdStability": "1/1CONSUMED",
+    "dispatcherAbi": "1/1CONSUMED",
+    "kernelObservation": "0/1SOURCE only",
+    "modelReferenceProductCold": 0,
+    "BenProduct": "6/6/originalERROR/all6qualityEXCLUDED/no retry",
+    "Rich": "4PASS2qualityFAIL/refs1/1/2/1/1/3/cold11/10/8",
+    "BenCold": "9/9/8+oldERROR1",
+    "repeats": "3/10remaining7/noreset/precharge",
+    "admission": "3/3",
+    "wrapper": "1/1"
+  },
+  "currentActual": "OriginalBenBUSY/noRELEASED/FREE/ACCEPT; actualf89EXIT2/ABI1of1 consumed; newKernel0of1SOURCEonly",
+  "operator": "Root personally; Ben final independent cases/validators/attestation acceptance only",
+  "notProven": [
+    "installation",
+    "native READY",
+    "prior admin diagnostic cessation",
+    "original server cessation",
+    "official history archival",
+    "cleanup",
+    "completion",
+    "RELEASED",
+    "FREE",
+    "Ben ACCEPT"
+  ],
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "DELETED_OFF",
+  "next": "One routed Evaler independent exact SOURCE review in existing incident/review2/reject1; no cleanup worker. Root operator only after exact admission and terminal coordination."
+}

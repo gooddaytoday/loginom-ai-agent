@@ -1,0 +1,71 @@
+{
+  "status": "ADDRESSED_SOURCE_REVIEW_PENDING_NOT_INSTALLED",
+  "readAt": "2026-10-15T14:40:33.501351+00:00",
+  "issue": "LAB-57",
+  "source": "7082a865790de7d19780fc93ce00b7b0ede8031f",
+  "base": "ea601e3d9e35adb36ec79b74cafa903df4f3ab6a",
+  "actualPreviousAttempt": {
+    "canonical": "2026-10-15-text-import-root-ea601-preonce-stop.json",
+    "exit": 2,
+    "phase": "fresh guard before controlonce/native",
+    "originalCauseIds": "Not saved in original failed snapshot; do not reconstruct from later read",
+    "controlAllowance": "0/1 UNSPENT",
+    "all7SpentPreserved": true
+  },
+  "delta": "One exact current task01a13fe6-3da9+LAB77+agent5218+runtime9f+fresh original/foreign placement binding excluded for Root cleanup only. Every other unknown/Ben-task remains blocked; all rows/pages/hash/ledger preserved, issue_id provenance included. Known preonceRoot2347551 absence added2105. Native/history/settlement/cleanup accepted components unchanged.",
+  "resourceDecisionSha256": "a9232d851c09a086b73e3089cccfc101ce169d674514e4a3b96aeaf147630599",
+  "sourceManifestSha256": "b14459171ab46e65b8383ade7c052ad73c29e9eec11571d0bba418599a796cc9",
+  "executableSha256": "ee923996718e906fed86e9b55c2703062dcf223429a9d5162ed88c80a6c1e2e3",
+  "sourceEntries": 927,
+  "changedPaths": [
+    "evals/docs/evaler/lab57-root-control-transport-pids.json",
+    "evals/docs/evaler/lab57-root-evalrun-resource-decision.json",
+    "evals/docs/evaler/lab57-root-evalrun-scope-plan.md",
+    "evals/script/lab57-queue-pages.py",
+    "evals/src/lab57-control-transport-continuation.ts",
+    "evals/src/lab57-evalrun-resource-extension.json",
+    "evals/src/lab57-queue-scope.ts",
+    "evals/test/fixtures/lab57-evalrun-replay.ts",
+    "evals/test/lab57-control-transport.test.ts",
+    "evals/test/lab57-evalrun-scope.test.ts"
+  ],
+  "archive": {
+    "bytes": 2860081,
+    "sha256": "42bfd0c10db6c632750a73595bb2770c21b9201b71e65f8063b61c2954c5b718",
+    "manifestSha256": "9dceeef9121bab01b75ac4aab856e970bc9f1fe891c22c531a56f7b77b43c699",
+    "payloads": 1064,
+    "crcPathsTypesHashesVerified": true
+  },
+  "addressedChecks": {
+    "affected": [
+      "",
+      " 119 pass",
+      " 0 fail",
+      " 327 expect() calls",
+      "Ran 119 tests across 4 files. [35.57s]",
+      ""
+    ],
+    "typecheck": "PASS",
+    "captureProcesses": 160,
+    "capture": "continuous/complete/confirmed/errornull/unknown[]/twozero",
+    "builds": "2clean byte-equal",
+    "errorsRetained": [
+      "RED152 missing scope/PID/provenance; GREEN153",
+      "Node fixture154 used Bun.file underNode andrefused; actualNode fs API fixed in fixture only, GREEN155; production unaffected"
+    ]
+  },
+  "handoff": {
+    "comment": "01a13ffe-3bcb-7931-99dc-166e77fffabf",
+    "parent": "01a13fe6-2843-7701-9a40-880872b472c3",
+    "attachment": "01a13ffe-3546-70b4-ad50-81f1307d61ea",
+    "bodyParentOneMentionReadbackVerified": true,
+    "reviewTask": "01a13ffe-3bfe-778e-b482-5437fab69500",
+    "cleanupWorkerDispatch": false
+  },
+  "operatorPreparation": "Local offline script substitutions only, new own paths; no setup/install/native effects before independent exact admission",
+  "remaining": "Genuine servercessation/ownlogout/official77history/wholeguardCSV/completion/SETTLED/ordinaryRELEASED/FREE thenBenACCEPT; existingacceptedcomponents reused.",
+  "science": "Ben6/6 consumed original ERROR/all6qualityEXCLUDED; old attempts/model histories/counters unchanged; no newmodel/reference/product/cold",
+  "automation": "OFF; never restore",
+  "foreignResources": "No connection/workload changes to MAS or evalrun; exact read-only control-plane scope diagnosis only",
+  "localInspectorErrorPreserved": "Initial safe-projection expected parent_comment_id; observed API parent_id, corrected before any file write/post/effect"
+}

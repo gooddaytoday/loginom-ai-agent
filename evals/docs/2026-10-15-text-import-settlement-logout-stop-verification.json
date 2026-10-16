@@ -1,0 +1,101 @@
+{
+  "source": "ca99158ba93928eb24151390ee94fe0ad31fd371",
+  "result": {
+    "exit": 2,
+    "pid": 2390942,
+    "birth": "114682645",
+    "startedAt": "2026-10-15T18:05:09.276578+00:00",
+    "finishedAt": "2026-10-15T18:07:58.769894+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "settlementContinuationOncePresent": true,
+    "previousRootFinalConsumed": 1,
+    "previousAddressedFinishConsumed": 1,
+    "priorControlConsumed": 1,
+    "priorKernelConsumed": 1,
+    "priorAbiContinuationConsumed": 1,
+    "priorFdContinuationConsumed": 1,
+    "priorObserverRepairConsumed": 1,
+    "sandboxRepairConsumed": 1,
+    "priorContinuationConsumed": 1,
+    "originalRecoveryConsumed": 1,
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": true,
+    "routeRootPresent": true,
+    "controllerStillPresent": false
+  },
+  "at": "2026-10-15T18:08:14.209666+00:00",
+  "once": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-settlement.once.json",
+    "device": 64512,
+    "inode": 17858366,
+    "bytes": 6591,
+    "mode": 384,
+    "sha256": "2cb898fd29890304a49c7458f00cb44b98a25994d4dc47d9d77e19270d3005aa",
+    "mtimeNs": "1792087528319474880",
+    "ctimeNs": "1792087528319474880"
+  },
+  "owner": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/owner.json",
+    "device": 64512,
+    "inode": 17837097,
+    "bytes": 500,
+    "mode": 384,
+    "sha256": "7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64",
+    "mtimeNs": "1791930497229073348",
+    "ctimeNs": "1791930497229073348"
+  },
+  "records": {
+    "dispatcher-cessation.json": {
+      "status": "SERVER_OWNERSHIP_SCOPE_CEASED",
+      "originalOutcome": "ERROR",
+      "cleanup": "UNCONFIRMED"
+    },
+    "diagnostic-owner.json": {
+      "emptyPackages": true
+    },
+    "diagnostic-transport.json": {
+      "browserTransportClosed": true,
+      "browserProcessTerminated": true
+    }
+  },
+  "native": {
+    "exit": 2,
+    "status": "confirmed",
+    "complete": true,
+    "mode": "continuous",
+    "error": null,
+    "unknown": [],
+    "count": 124,
+    "verification": [
+      {
+        "observed_at": "2026-10-15T18:07:54.141Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-15T18:07:54.244Z",
+        "owned_remaining": 0
+      }
+    ],
+    "captureRawEqual": true
+  },
+  "failures": [
+    {
+      "file": "logout-failure-63bec80a-717c-4fcc-9488-b4b05a0b9e58.json",
+      "sha256": "59465d483975c3fa949002cafe3ca79df20e46e68efb0ea29a26286a606f05ab",
+      "cause": "Error: OWNED_COMMAND_FAILED"
+    }
+  ],
+  "diagnosis": "Original server scope cessation genuinely observed. Logout pre-effect FD observer refused PROCESS_ROSTER_OR_IDENTITY_RACE; exact delta not preserved by original producer.124process continuous confirmed does not prove native success/logout. No history/guardCSV/completion/release reached. Existing once is11th spent; no replay.",
+  "readOnlyFollowup": "One fresh traced allUID/allFD diagnostic completed with272processes/no originalPIDs/foreignnative/listeners/profileFD; no state effects. Does not reconstruct old unknown delta or prove current serverlogout.",
+  "remaining": [
+    "own diagnostic server absence or actual logout",
+    "official77row history archive",
+    "whole exact legacyguard and150byteCSV",
+    "genuine completion/SETTLED/ordinaryRELEASED/FREE",
+    "Ben final independent ACCEPT"
+  ],
+  "scientificCounters": "UNCHANGED;Ben6/6consumedwholeERROR/all6qualityEXCLUDED/no repeats;Rich4PASS2qualityFAIL;repeats3/10;no model/reference/product/cold",
+  "foreign": "MAS/evalrun untouched;automationOFF"
+}

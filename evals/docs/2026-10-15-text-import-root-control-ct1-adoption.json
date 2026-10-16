@@ -1,0 +1,64 @@
+{
+  "decision": "ROOT_ADOPTS_EXACT_INDEPENDENTLY_ACCEPTED_CT1_SOURCE_FOR_PERSONAL_CONTROL_CONTINUATION",
+  "source": "ea601e3d9e35adb36ec79b74cafa903df4f3ab6a",
+  "sourceManifestSha256": "231d33570e8b8b5a8b567ea5ca3aafeaefd89cb5510f9c21e7be9fae2b874174",
+  "executableSha256": "769db257cacaef990211901fd7896140f20ad7601db5bde9edae3e4067686ee2",
+  "independentAdmission": {
+    "decision": "SOURCE_ACCEPT",
+    "source": "ea601e3d9e35adb36ec79b74cafa903df4f3ab6a",
+    "comment": "01a13fe6-2843-7701-9a40-880872b472c3",
+    "attachment": "01a13fe6-2806-7a08-a420-72daf288a03c",
+    "archiveSha256": "ce506317b0cc68df4977b2b8ec880f2984e2d1933b835de9405e052139c2c774",
+    "manifestSha256": "1ee2b7f5dbe8b24b2a01dbe9b018e6b9cc7b092c512327edaab5b27610e83b38",
+    "admissionSha256": "1e27f0e34c05ddaee5f9b94983d35aa5c2da91dddd089a04837baea38e2c44bf",
+    "payloads": 68,
+    "exactArchiveVerified": true,
+    "executableRebuildByteEqual": true,
+    "independentTests": "19PASS/0FAIL/85expects/3files:15affected(4newprofile+11wholewindow) plus4original independent repro controls. .writer/runtime timeout, other-profile sibling .harness-lease/runtime timeout, .writer/agent timeout each0GET/AssertionError with actual marker list. Clean no-marker control retains2GET and exact subsequent PermissionError.",
+    "typecheck": "PASS",
+    "captures": [
+      {
+        "file": "own-proofs/addressed/process-cleanup.json",
+        "processes": 8,
+        "mode": "continuous"
+      },
+      {
+        "file": "own-proofs/build/process-cleanup.json",
+        "processes": 2,
+        "mode": "continuous"
+      },
+      {
+        "file": "own-proofs/typecheck/process-cleanup.json",
+        "processes": 3,
+        "mode": "continuous"
+      },
+      {
+        "file": "author-evidence/proofs/control-ct1-green148/capture/process-cleanup.json",
+        "processes": 8,
+        "mode": "continuous"
+      }
+    ],
+    "sourceOnlyNotCleanupOrCaseAccept": true,
+    "rootInspectorCorrection": "Initial expected only3own captures but archive also embeds genuine author8process capture; actual4 allverified. Original local AssertionError retained; no source/test/native/review repeated."
+  },
+  "authorization": "Owner policy743f98ac and direct Root personal operator takeover; existing decision5b6c7ee8 binds distinct control-continue0/1; no human/time gate",
+  "operator": "Codex root coordinator personally; original Ben owner/task/lease/config/acquiredAt unchanged",
+  "rejectedSourceE0": "MUST_NOT_INSTALL; never installed; evidence retained",
+  "guard": "Exact no-replace source-bound helper/admission, immediately fresh queues/sixCFG/sevenretaineddiagnostics/2104oldPIDabsence/fullFD+kernel pair/exactNode+dedicatedbwrap/container/storage/history/rawowner; durable private distinct once before effects",
+  "accounting": "Seven previous attempts spent and immutable; original recovery1/1; control0/1 before actual invocation; no model/reference/product/cold",
+  "completion": "Genuine original/prioradmin server cessation+ownlogout/processcleanup+official77rowhistory beforewholelegacyguard/exactCSV, genuineattestation/completion/originalreservationSETTLED→ordinaryRELEASED/FREE→Benindependentcases/validators/attestationACCEPT",
+  "notClaimed": [
+    "actual source installation before separate install receipt",
+    "native READY",
+    "control execution",
+    "server cessation",
+    "final history",
+    "cleanup",
+    "completion",
+    "RELEASED",
+    "FREE",
+    "Ben ACCEPT"
+  ],
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "OFF"
+}

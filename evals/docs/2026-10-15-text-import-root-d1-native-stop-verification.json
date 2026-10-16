@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "recordedAt": "2026-10-15T08:16:52.704188+00:00",
+  "issue": "LAB-57",
+  "source": "d1d38f63fcea1e6f3647f28ed9d453454ee29f6f",
+  "result": "BLOCKED_NOT_RELEASED",
+  "actualForeground": {
+    "exit": 2,
+    "pid": 2266169,
+    "birth": "111090777",
+    "startedAt": "2026-10-15T08:06:30.589478+00:00",
+    "finishedAt": "2026-10-15T08:10:09.355078+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "sandboxRepairOncePresent": true,
+    "priorContinuationConsumed": 1,
+    "originalRecoveryConsumed": 1,
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": true,
+    "controllerStillPresent": false
+  },
+  "onces": {
+    "lab57-closed.once.json": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269",
+    "lab57-continuation.once.json": "f28e8821cd1ede51ebe1f35716f3a19213b27436aab3d55e4b15ae9a65870a14",
+    "lab57-sandbox-repair.once.json": "26dde29c221c4082a3e84e135d7a99926e0f292bb9591ba5d4ef9b88871d3310"
+  },
+  "actualSteps": [
+    {
+      "file": "native-response-56979837-825a-4c63-9e35-55e3a950528e.json",
+      "codeSha256": "e6b1065d2b77e0889023f28730a8e0c21febcf86751d8fc4032555dbfd84aa68",
+      "statuses": [
+        "OWN_PAGE_NAVIGATED"
+      ]
+    },
+    {
+      "file": "native-response-bc382a40-81b2-46ba-b14b-65e7d7b80401.json",
+      "codeSha256": "161c0470197abf9af0140d84d28ce7093e7a33e591b28aa8422db7cda797822c",
+      "statuses": [
+        "OWN_LOGIN_OBSERVED"
+      ]
+    },
+    {
+      "file": "native-response-80dcd067-d8e9-4c99-bfef-e38dd4df44e9.json",
+      "codeSha256": "b9d0d1e72e32358e511e80f6cd16e0a975b5be30777469d187dead145f179b81",
+      "statuses": [
+        "OWN_LOGIN_FIELDS_SET"
+      ]
+    }
+  ],
+  "blockers": {
+    "dispatcher": {
+      "reason": "DISPATCHER_OBSERVATION_UNCONFIRMED",
+      "lowerCause": "UNKNOWN; initial observeDispatcher transport response was not recorded before parsing/refusal",
+      "noOriginalServerCessationOrOwnLogout": true
+    },
+    "capture": {
+      "status": "failed",
+      "complete": true,
+      "error": "Process identity changed PID 2271299",
+      "processes": 454,
+      "unknownProcesses": 13,
+      "browserBindings": 0,
+      "twoZeroOwnedPasses": "08:10:00.811/.915UTC; NOT sufficient for confirmed cleanup",
+      "originalRecordUnchanged": true,
+      "newHypothesis": "Nested bwrap namespace reaper may be tracked before --new-session settles; source-only reproduction required, not yet actual lower-cause proof"
+    }
+  },
+  "resolvedSandbox": {
+    "existingDedicatedBwrapUsed": true,
+    "ownPageNavigated": true,
+    "ownLoginFieldsSet": true,
+    "ownLoginObserved": true,
+    "originalAndResourcePoliciesUnchanged": true,
+    "noModelReferenceProductCold": true
+  },
+  "readOnlyPostStop": {
+    "at": "2026-10-15T08:15:51.307775+00:00",
+    "savedPidsChecked": 467,
+    "savedPidsPresent": [],
+    "currentNative": [],
+    "signalsSent": 0,
+    "oldCaptureRemainsFailed": true,
+    "serverCessationProven": false
+  },
+  "retained": {
+    "originalRecovery": "1/1 ATTEMPTED",
+    "technicalContinuation": "1/1 CONSUMED",
+    "sandboxRepair": "1/1 CONSUMED",
+    "allThreeOnceRetained": true,
+    "commonLeaseOwnerTaskConfigAcquiredAt": "UNCHANGED/BUSY",
+    "originalOutcome": "ERROR/code2",
+    "allSixBenQuality": "EXCLUDED",
+    "BenProduct": "6/6 spent/no retries",
+    "history": "original28972/snapshot77 Luna-high/5official+1pending protected",
+    "diagnosticRegistration": "retained; not manually unlinked",
+    "ownDiagnosticServerSession": "login observed, logout/cessation UNPROVEN; browser transport closed/process termination reported, capture remains failed"
+  },
+  "noSyntheticCompletionReleasedFreeAccept": true,
+  "mas": "FOREIGN/NO_INTERVENTION",
+  "automation": "OFF",
+  "next": "Root isolated diagnosis/TDD of observation persistence and nested-wrapper startup; concrete new source/independent exact admission before any further effects. No automatic retry or reset; no cleanup worker."
+}

@@ -1,0 +1,88 @@
+{
+  "authorized_at": "2026-10-12",
+  "user_statement": "Лимит в 10 запусков Rich на карточку должен расходоваться только одинаковыми блокерами. Каждый новый уникальный блокер не должен расходовать этот лимит.",
+  "scope": [
+    "LAB-56",
+    "LAB-57",
+    "LAB-58",
+    "LAB-59",
+    "LAB-60",
+    "LAB-61",
+    "LAB-62",
+    "LAB-63"
+  ],
+  "agent": "Rich",
+  "budget_kind": "REPEATED_SAME_BLOCKER_ATTEMPTS_PER_CARD",
+  "limit": 10,
+  "no_total_native_runs_limit": true,
+  "new_unique_blocker_charge": 0,
+  "first_attempt_for_new_blocker_charge": 0,
+  "successful_progress_charge": 0,
+  "counter_scope": "One repeat counter per card; unique blockers do not reset it",
+  "classification": "Confirmed same root cause/component from original evidence; different SHA, run ID, case ID or error wording alone does not establish uniqueness",
+  "charge_timing": "After confirmed repeated blocker; classify unknown failures before further retries",
+  "historical_LAB57_ledger": [
+    {
+      "blocker": "RICH_PINNED_MODEL_CAPACITY",
+      "run_id": "01a12ef8-63ec-770b-b5c6-9955890df0dd",
+      "classification": "FIRST_UNIQUE_BLOCKER",
+      "charge": 0,
+      "reason": "agent_error.model_not_found_or_unavailable",
+      "exact_error": "Selected model is at capacity. Please try a different model."
+    },
+    {
+      "blocker": "ADMITTED_INPUT_NAME_COMPATIBILITY",
+      "run_id": "01a12f01-84a3-74d5-87b8-fbe1d15a5a25",
+      "classification": "NEW_UNIQUE_BLOCKER",
+      "charge": 0,
+      "evidence_comment_id": "01a12f1f-fd9e-78ee-b002-c31786073d83"
+    },
+    {
+      "blocker": "RICH_PINNED_MODEL_CAPACITY",
+      "run_id": "01a12f45-6763-7cd4-ab17-e12d502dd8bc",
+      "classification": "REPEATED_SAME_BLOCKER",
+      "charge": 1,
+      "reason": "agent_error.model_not_found_or_unavailable",
+      "exact_error": "Selected model is at capacity. Please try a different model."
+    },
+    {
+      "blocker": "NATIVE_PUBLIC_OUTPUT_PROJECTION",
+      "classification": "NEW_UNIQUE_OFFLINE_DIAGNOSIS",
+      "charge": 0,
+      "evidence_comment_id": "01a12f59-547d-7d12-b5e9-830d520abd72"
+    },
+    {
+      "blocker": "PERSISTED_UNUSED_IMPORT_SOCKETS",
+      "classification": "NEW_UNIQUE_OFFLINE_DIAGNOSIS",
+      "charge": 0,
+      "evidence_comment_id": "01a12f88-61c3-762c-b4da-aa6100b9f35c"
+    }
+  ],
+  "historical_LAB57_charged_repeats": 1,
+  "historical_LAB57_remaining": 9,
+  "newer_runs_require_separate_classification": true,
+  "authorization_comment_id": "01a12f9e-6ca3-73d7-acbf-c0180d51fef5",
+  "parent_id": "01a12f95-f31c-7ba9-bc4e-1124d09ed7e9",
+  "trigger_outcomes": [
+    {
+      "reason_code": "queued",
+      "status": "queued",
+      "target_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "target_type": "agent"
+    }
+  ],
+  "comment_readback": "VERIFIED_EXCEPT_TRIMMED_TERMINAL_NEWLINE",
+  "automation_id": "lab-56-lab-63-30",
+  "automation_prompt_readback": "VERIFIED",
+  "automation_status": "ACTIVE",
+  "cadence_minutes": 30,
+  "unchanged": [
+    "models",
+    "CLI/skill/oracle/criteria",
+    "scenario reference/product/cold budgets",
+    "model-admission/recovery/probes",
+    "Ben/Evaler limits",
+    "independent ACCEPT/cleanup dependencies"
+  ],
+  "observed_at": "2026-10-12T10:19:06.426560+00:00"
+}

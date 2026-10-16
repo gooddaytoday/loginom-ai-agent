@@ -1,0 +1,540 @@
+{
+  "version": 1,
+  "operation": "LAB57-addressed-closeout",
+  "operator": "Root;Ben final independent only",
+  "priorSource": "1056c10652f7b48a1d8a20c4bf9c656e376137b1",
+  "priorOnce": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion.once.json",
+    "device": 64512,
+    "inode": 17858369,
+    "bytes": 6628,
+    "mode": 384,
+    "sha256": "c323c7f779dacf5f3d0a729beb7761e389ea6b44b4c6d5c6caa546c0eb36b534",
+    "mtimeNs": "1792088818535275909",
+    "ctimeNs": "1792088818535275909"
+  },
+  "priorRootFiles": [
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-08ca3b2b-ab40-4389-9bb2-51356d7799bf.json",
+      "device": 64512,
+      "inode": 18744209,
+      "bytes": 427671,
+      "mode": 384,
+      "sha256": "31f201bfc5bb8fe10a316222d9057323ca5b01fa51ce72929768394e71b7b030",
+      "mtimeNs": "1792088841970108389",
+      "ctimeNs": "1792088841970108389"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-196c4eae-1c5e-4832-a4e7-680f3f76d2eb.json",
+      "device": 64512,
+      "inode": 18744236,
+      "bytes": 426357,
+      "mode": 384,
+      "sha256": "8aa2b01c08e8852aa06bb0819db36ae07c01382ec3cf549e5e3866ada996f506",
+      "mtimeNs": "1792088863037856782",
+      "ctimeNs": "1792088863037856782"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-1e9cfc87-9999-4c0c-ac26-61e604304d40.json",
+      "device": 64512,
+      "inode": 18744217,
+      "bytes": 427724,
+      "mode": 384,
+      "sha256": "e96ac624218401526c2bf7242d4d17f063ed39045de46af2e934e6c62c169125",
+      "mtimeNs": "1792088851267438660",
+      "ctimeNs": "1792088851267438660"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-48e0654d-2cdc-4595-973b-9677ab922863.json",
+      "device": 64512,
+      "inode": 18744251,
+      "bytes": 430548,
+      "mode": 384,
+      "sha256": "aba9ff65bbb026e6b4d9681e6da4e7e3698e0bd7b78b7fb9ab8d77a0d8bb26f6",
+      "mtimeNs": "1792088879741450149",
+      "ctimeNs": "1792088879741450149"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-4cdf7239-100a-49e8-b813-a777e34e68cd.json",
+      "device": 64512,
+      "inode": 18744248,
+      "bytes": 430549,
+      "mode": 384,
+      "sha256": "d2141fbf1330ab8a448034c14f3d5865283ba74302ecb4750c3d32e2be38a3ac",
+      "mtimeNs": "1792088874857276649",
+      "ctimeNs": "1792088874857276649"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-4edf1b2b-89d9-4fa5-acb4-933d943c7738.json",
+      "device": 64512,
+      "inode": 18745446,
+      "bytes": 447520,
+      "mode": 384,
+      "sha256": "40bc2575340af2b28e84c0c3c01cb07ce6d82e994855455a5513c3f9bd7aed3c",
+      "mtimeNs": "1792088888429758781",
+      "ctimeNs": "1792088888429758781"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-547ac3f4-4231-4027-b9dc-cd881c9c4abf.json",
+      "device": 64512,
+      "inode": 18744215,
+      "bytes": 428246,
+      "mode": 384,
+      "sha256": "61c620791224e5e61e2efac7f24b5ab3819fda01b2313678a632faf56d65992e",
+      "mtimeNs": "1792088846758278483",
+      "ctimeNs": "1792088846758278483"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-6085e87b-c581-460b-bc97-79f2e6865892.json",
+      "device": 64512,
+      "inode": 18744241,
+      "bytes": 426355,
+      "mode": 384,
+      "sha256": "2bf3320ea268e903ca50fcd18ca0a3ce036444c3ca3155d2a3578438a5cbd9a7",
+      "mtimeNs": "1792088867995032878",
+      "ctimeNs": "1792088867995032878"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-8268fb02-1a0e-4bab-aee8-a0b27e5fc326.json",
+      "device": 64512,
+      "inode": 18744207,
+      "bytes": 427672,
+      "mode": 384,
+      "sha256": "79b2d2cef5457c762a6f313f9ba2864488937d9b34ab2a0691f44306c164690a",
+      "mtimeNs": "1792088837590952827",
+      "ctimeNs": "1792088837590952827"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-9a3139a0-d52a-4b9d-aa2a-32535957ac71.json",
+      "device": 64512,
+      "inode": 18745475,
+      "bytes": 427679,
+      "mode": 384,
+      "sha256": "310017181d6fcdac53b3080e4a39e5d9572597b20a70094a3b6bd90e4c97fc54",
+      "mtimeNs": "1792088915944736204",
+      "ctimeNs": "1792088915944736204"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-a03bff77-7073-4628-b997-7eee368cb3ba.json",
+      "device": 64512,
+      "inode": 18744232,
+      "bytes": 426356,
+      "mode": 384,
+      "sha256": "9c66aaa17123d7514ffe6ae8131e8b7124f079ee5407d2b2c5f9b2b72914b717",
+      "mtimeNs": "1792088856356619445",
+      "ctimeNs": "1792088856356619445"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-c9dda4db-613e-4fa3-982f-eae94df8c24c.json",
+      "device": 64512,
+      "inode": 18745454,
+      "bytes": 447520,
+      "mode": 384,
+      "sha256": "2635dfb3756b8d231e1467272c21abc92f8a20e28d8d27d4b20448c91c1a9bc9",
+      "mtimeNs": "1792088896209035129",
+      "ctimeNs": "1792088896209035129"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-d6a86e30-f653-48e5-a549-2bfdf9ff129b.json",
+      "device": 64512,
+      "inode": 18744205,
+      "bytes": 424879,
+      "mode": 384,
+      "sha256": "e6221de3e2eccd34fb1eec5b368af4639cbdf18f5c87f36bd5b1554855cd8d15",
+      "mtimeNs": "1792088832937787532",
+      "ctimeNs": "1792088832937787532"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-e4183c2f-2024-4141-a3e6-884bf4e79a7b.json",
+      "device": 64512,
+      "inode": 18745460,
+      "bytes": 448868,
+      "mode": 384,
+      "sha256": "adc01234a8dcf7e1a657232f7672cb49c4a1cc783c15672267394f0c34f77fe2",
+      "mtimeNs": "1792088901526224012",
+      "ctimeNs": "1792088901526224012"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-e997fc20-4037-45bc-86da-36a37613ebb3.json",
+      "device": 64512,
+      "inode": 18744202,
+      "bytes": 424893,
+      "mode": 384,
+      "sha256": "0b02a9b5b077f1ac99782978fe6eaf1860fa98ac14a3f727403c1af2cffca630",
+      "mtimeNs": "1792088828528630904",
+      "ctimeNs": "1792088828528630904"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/admission-f2f8992d-90a6-402f-917c-168b4df9a163.json",
+      "device": 64512,
+      "inode": 18745469,
+      "bytes": 448868,
+      "mode": 384,
+      "sha256": "b0876961ff25bc72102029788eb5671fcc5c8103e688dc6818b387580ec094f0",
+      "mtimeNs": "1792088910947558688",
+      "ctimeNs": "1792088910947558688"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/archive-registration.json",
+      "device": 64512,
+      "inode": 18744200,
+      "bytes": 1281,
+      "mode": 384,
+      "sha256": "fc7f6668084126a68c61c9083c130b410ce6ee526c039cc442e253686d186d77",
+      "mtimeNs": "1792088824152475449",
+      "ctimeNs": "1792088824152475449"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/command-cause-1bc3eeae-fd99-4848-b7c2-103cf9ced18f.json",
+      "device": 64512,
+      "inode": 18745463,
+      "bytes": 490,
+      "mode": 384,
+      "sha256": "7ccccb1aaa0a2bdf240b1961f502088ece60717fcb7bdaa57b59fa6bb793c13f",
+      "mtimeNs": "1792088906271392574",
+      "ctimeNs": "1792088906271392574"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/command-cause-a0640a4b-cffc-485f-b969-066e4db1fce6.json",
+      "device": 64512,
+      "inode": 18745477,
+      "bytes": 155,
+      "mode": 384,
+      "sha256": "a2b0155c2bd2a5ef000a904112f85bc360accae05fa84eb0a391fb40d3ac7caf",
+      "mtimeNs": "1792088916269747749",
+      "ctimeNs": "1792088916269747749"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/command-private-9a5aab68-1f71-4a87-835b-65e4aa34163a.json",
+      "device": 64512,
+      "inode": 18745462,
+      "bytes": 4508,
+      "mode": 384,
+      "sha256": "c9646adf3f30916e153d1b9af96fdf04d5054721b33e54eedd3f381eb61e438d",
+      "mtimeNs": "1792088906227391012",
+      "ctimeNs": "1792088906227391012"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/command-private-bff30fcb-4640-4a46-a5ee-bfb2684c701f.json",
+      "device": 64512,
+      "inode": 18745476,
+      "bytes": 1417,
+      "mode": 384,
+      "sha256": "1a3d23a0021158a9d559b88a06e84a02084d5f14d2ccc5e4083fc05a6f79d961",
+      "mtimeNs": "1792088916228746292",
+      "ctimeNs": "1792088916228746292"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/diagnostic-transport.json",
+      "device": 64512,
+      "inode": 18745472,
+      "bytes": 73,
+      "mode": 384,
+      "sha256": "78b4be3094f6e844b3ae32dcf5f74950ad9e7bd034fb470bc009f39059f5d22d",
+      "mtimeNs": "1792088911341572684",
+      "ctimeNs": "1792088911341572684"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-1724fcc3-8642-41c7-93a2-c0d5d470c003.json",
+      "device": 64512,
+      "inode": 18744204,
+      "bytes": 424356,
+      "mode": 384,
+      "sha256": "efc29050b721f6d949f796023d7a3a16660658797d9a2c5a25c9caa57275e08b",
+      "mtimeNs": "1792088832720779823",
+      "ctimeNs": "1792088832720779823"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-1b937fb8-53c7-49ad-ac2c-a4b3b7df1593.json",
+      "device": 64512,
+      "inode": 18745459,
+      "bytes": 448345,
+      "mode": 384,
+      "sha256": "e120c81e7d079a17c11c16382c046a986d5cdd72adc7d163bc56890604e98fe7",
+      "mtimeNs": "1792088901292215700",
+      "ctimeNs": "1792088901292215700"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-21899aaf-aa36-4a43-97c5-9fcf24bc5ed4.json",
+      "device": 64512,
+      "inode": 18744201,
+      "bytes": 424370,
+      "mode": 384,
+      "sha256": "a04a6f185db61d3d9ab7e03a1352c395d904e384f041c76392aabd5c729bb4e4",
+      "mtimeNs": "1792088828315623337",
+      "ctimeNs": "1792088828315623337"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-2ddd56b1-cc03-4455-9b5c-49160b04c482.json",
+      "device": 64512,
+      "inode": 18744235,
+      "bytes": 425834,
+      "mode": 384,
+      "sha256": "a65bf25afface8f18f0911b7997d77088b465811be8c43cae2da9d55fc8d39ec",
+      "mtimeNs": "1792088862805848541",
+      "ctimeNs": "1792088862805848541"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-441328fb-fd00-4207-a7c4-60ba00feed2a.json",
+      "device": 64512,
+      "inode": 18744214,
+      "bytes": 427723,
+      "mode": 384,
+      "sha256": "909cc31eb6cdc7ebb0c63163f4879528c6a1865d25108733c314ea030b890227",
+      "mtimeNs": "1792088846483268714",
+      "ctimeNs": "1792088846483268714"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-4fe189b4-4d74-4e59-91cb-0a520a36edb2.json",
+      "device": 64512,
+      "inode": 18744216,
+      "bytes": 427201,
+      "mode": 384,
+      "sha256": "b2414f2acddb954c60ffe1c3795460e287fcafe98da9d4c8391d9c0ca4c281bd",
+      "mtimeNs": "1792088851034430383",
+      "ctimeNs": "1792088851034430383"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-609fed5a-4535-4e7b-8a95-029094c4401b.json",
+      "device": 64512,
+      "inode": 18745453,
+      "bytes": 446997,
+      "mode": 384,
+      "sha256": "8fb76695ce6d0c98955b2ebf27247e506d63e9f5d530b02b85b6d2836d2173c0",
+      "mtimeNs": "1792088895970026639",
+      "ctimeNs": "1792088895970026639"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-66c00034-32dc-43c4-bbd5-da5d743b5826.json",
+      "device": 64512,
+      "inode": 18744240,
+      "bytes": 425832,
+      "mode": 384,
+      "sha256": "ecc7e062e7221e4f42e81e38e413c8e9e34b0ad435f6a4a17437c0230ebd2feb",
+      "mtimeNs": "1792088867749024139",
+      "ctimeNs": "1792088867749024139"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-74d9c0dd-04a7-44f4-b5df-5917d50dc1e0.json",
+      "device": 64512,
+      "inode": 18744206,
+      "bytes": 427149,
+      "mode": 384,
+      "sha256": "7718f98b3586f4b6c7629663c929b7be2c4397f7aa56004d706f14dd54c6e944",
+      "mtimeNs": "1792088837381945402",
+      "ctimeNs": "1792088837381945402"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-80b84a70-7de8-4a89-b8c1-4aa3701f893c.json",
+      "device": 64512,
+      "inode": 18744247,
+      "bytes": 430026,
+      "mode": 384,
+      "sha256": "af964865c511118fc646e71094f2963f6657d617ca5bab27f29380c92533b99c",
+      "mtimeNs": "1792088874604267662",
+      "ctimeNs": "1792088874604267662"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-8b331491-bdfb-43f2-8ddd-0403e45c92b9.json",
+      "device": 64512,
+      "inode": 18744250,
+      "bytes": 430025,
+      "mode": 384,
+      "sha256": "5b5a2016b799143ddc67d1ece0294e2bfad42e6a92aa1a741c1914cf4aa04416",
+      "mtimeNs": "1792088879488441161",
+      "ctimeNs": "1792088879488441161"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-ac161dcb-decb-4565-ba1c-c82e3e15a3b6.json",
+      "device": 64512,
+      "inode": 18745445,
+      "bytes": 446997,
+      "mode": 384,
+      "sha256": "124bd36c1646293d900e4bc7624eb9cb567d3a48cb43cbee68ce5d0a8c6a2cba",
+      "mtimeNs": "1792088888195750469",
+      "ctimeNs": "1792088888195750469"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-ae1589f5-150b-4728-9e02-8adb4ec86038.json",
+      "device": 64512,
+      "inode": 18744298,
+      "bytes": 448345,
+      "mode": 384,
+      "sha256": "e8596b672a1b7a6b6e21d7bd12b68b43a037b80df4cadd50532aaf7592f64fc1",
+      "mtimeNs": "1792088910701549950",
+      "ctimeNs": "1792088910701549950"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-d317d9af-41f9-4cb6-9e0f-4f7b1849bfed.json",
+      "device": 64512,
+      "inode": 18745474,
+      "bytes": 427156,
+      "mode": 384,
+      "sha256": "6cea27fcce09b5258fc866fb5ed49f0c2e8a14cbd3854be20d44210c33036c85",
+      "mtimeNs": "1792088915721728281",
+      "ctimeNs": "1792088915721728281"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-f6aa9e3f-d3aa-4f1a-bb88-d2183b42bb39.json",
+      "device": 64512,
+      "inode": 18744208,
+      "bytes": 427148,
+      "mode": 384,
+      "sha256": "16d29465bfece14d6db25914cc8a1e4a1b44b59990a43f25518d2ec164ba1a66",
+      "mtimeNs": "1792088841749100538",
+      "ctimeNs": "1792088841749100538"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/fresh-guard-f9a546ac-3429-4140-8abe-612e5106830d.json",
+      "device": 64512,
+      "inode": 18744231,
+      "bytes": 425833,
+      "mode": 384,
+      "sha256": "fe8ca93cfb93776e60e804e15c0ca15be53651614487e5d1a651b9e49e7f228e",
+      "mtimeNs": "1792088856104610493",
+      "ctimeNs": "1792088856104610493"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/history-before.json",
+      "device": 64512,
+      "inode": 18744199,
+      "bytes": 20410,
+      "mode": 384,
+      "sha256": "6c7e46ae8857f7762093c3d07c8d2b361bc3b846924337917167d9addc6b2d21",
+      "mtimeNs": "1792088824110473957",
+      "ctimeNs": "1792088824110473957"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/native-cause-05a8a1b3-19a4-4eef-b3d2-8f1df06f56dc.json",
+      "device": 64512,
+      "inode": 18745465,
+      "bytes": 45,
+      "mode": 384,
+      "sha256": "59465d483975c3fa949002cafe3ca79df20e46e68efb0ea29a26286a606f05ab",
+      "mtimeNs": "1792088906355395558",
+      "ctimeNs": "1792088906355395558"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/native-command.json",
+      "device": 64512,
+      "inode": 18744211,
+      "bytes": 55381,
+      "mode": 384,
+      "sha256": "c8f1baf3c4ecf560db17681521836039974c561c29275674c6e71a4a1a020707",
+      "mtimeNs": "1792088911927593498",
+      "ctimeNs": "1792088911927593498"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/native-failure-1015d331-7c95-4d10-913d-671641436462.json",
+      "device": 64512,
+      "inode": 18745466,
+      "bytes": 71,
+      "mode": 384,
+      "sha256": "b2d145d85cbba619eb728bf272e6ad82013a78dce1863d9aaf5228b0e4a4fa6b",
+      "mtimeNs": "1792088906397397050",
+      "ctimeNs": "1792088906397397050"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/native-response-2cd86b5d-60e3-4382-9681-0b1728475f3d.json",
+      "device": 64512,
+      "inode": 18745414,
+      "bytes": 668,
+      "mode": 384,
+      "sha256": "9b708dcc9eb14054e2fbaeedaa623f06bd7f431d3bb36eef78cc9804a7ec1996",
+      "mtimeNs": "1792088883901597925",
+      "ctimeNs": "1792088883901597925"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/native-response-6df75f5f-855b-4923-9465-4178eec791ad.json",
+      "device": 64512,
+      "inode": 18745458,
+      "bytes": 836,
+      "mode": 384,
+      "sha256": "d3e2e6cfb71cc6ef9d68810e16df8c2fddb0d156d773107bbea3ef438befdc63",
+      "mtimeNs": "1792088897037064541",
+      "ctimeNs": "1792088897037064541"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/retained-baseline.json",
+      "device": 64512,
+      "inode": 18744197,
+      "bytes": 3463,
+      "mode": 384,
+      "sha256": "abc5c6fe60525e27622e64e76adb8425fea3e13cd6171e1fd7d9d6e67d462332",
+      "mtimeNs": "1792088823960468626",
+      "ctimeNs": "1792088823960468626"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/snapshot.json",
+      "device": 64512,
+      "inode": 18744198,
+      "bytes": 14286051,
+      "mode": 384,
+      "sha256": "55d4b93e1a3694e450e4fe1065cf5f26d028e08003bfbbdd816793e8a856fdd0",
+      "mtimeNs": "1792088824006470262",
+      "ctimeNs": "1792088824007470298"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/source-admission.json",
+      "device": 64512,
+      "inode": 18744196,
+      "bytes": 2052,
+      "mode": 384,
+      "sha256": "3f98878e5fad1d647c99039d0652d6473c6dcc601a93f966c4df00ec37cafa99",
+      "mtimeNs": "1792088823923329874",
+      "ctimeNs": "1792088823923329874"
+    }
+  ],
+  "priorNativeCaptureFiles": [
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/native-capture/stderr.txt",
+      "device": 64512,
+      "inode": 18744213,
+      "bytes": 103,
+      "mode": 384,
+      "sha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/native-capture/process-cleanup.json",
+      "device": 64512,
+      "inode": 18745473,
+      "bytes": 50841,
+      "mode": 384,
+      "sha256": "39dbd7cd195ce016db5682ac16ec211d300bf8f31dbc96d2d007a5cf27da1d81"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion/native-capture/events.jsonl",
+      "device": 64512,
+      "inode": 18744212,
+      "bytes": 0,
+      "mode": 384,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "controller": {
+    "pid": 2396044,
+    "birth": "114811259"
+  },
+  "nativeCaptureProcesses": 84,
+  "actual": "Root3839 EXIT2 before nativecall confirmation;no current diagnostic-owner/originalbinding/cessation/logout/history/guardCSV/completion/release. Ownbrowsertransportclosed/processes84continuousconfirmedcompleteerrornullunknown[]twozero;oldca99authoritativecessation remains historical.",
+  "diagnosis": "Exact observer attempt1 eligibleownChromeFDchange;attempt2 rawmixedchanges ownChrome2398001 plus unrelatedUID0parent1daemons129707/129708. Comparison already normalizes irrelevantdaemonFDcounts; retryclassification incorrectly used rawchanges and rejected ownancestry ondaemon.",
+  "minimalFix": "Classify identical resource_inventory delta;retain originalraw terminalcoherenceDifferences. Existing3boundedreadonlyrestarts/freshcomplete2passes/strictidentity/protected/native/denied/resourcechecks remain. No blanketrosterretry/FDallowlistwidening.",
+  "retentionDecision": "Existing per-discarded-read metadata records only resource-relevant own activity; rawterminalerrors and rawfinalsignedfullpair retained. Do not claim rawall eachdiscardeddaemoncounterdelta. No new metadata protocol/framework;pastreceipts/ERROR/FAIL/onces untouched.",
+  "continuation": {
+    "limit": 1,
+    "consumed": 0,
+    "all12SpentPreserved": true,
+    "originalRecoveryConsumed": 1,
+    "newModelReferenceProductCold": 0
+  },
+  "remaining": [
+    "fresh authoritative original/prioradminabsence",
+    "actualownlogout/process",
+    "official77rowhistory",
+    "wholelegacyguard/exactCSV",
+    "genuinecompletion/SETTLED/ordinaryRELEASED/FREE",
+    "Ben finalindependentACCEPT"
+  ],
+  "owner": "OriginalBenowner/task/acquiredAt/config/lease unchanged;Root explicitoperator",
+  "scope": "dedicatedeval-tests only;MAS/evalrun untouched;automationOFF;nohuman/timegate"
+}

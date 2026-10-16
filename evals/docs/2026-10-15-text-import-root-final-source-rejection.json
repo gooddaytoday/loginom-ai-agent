@@ -1,0 +1,36 @@
+{
+  "status": "SOURCE_REJECT_MUST_NOT_INSTALL",
+  "source": "3e609eb58c7b816bc2ad08782636d04b21162056",
+  "comment": "01a14054-85b0-756a-94c5-19ec20728838",
+  "parent": "01a14049-8b4e-75cf-91d3-159247a90756",
+  "attachment": "01a14054-855a-7ca6-aeda-58631850540f",
+  "archiveSha256": "3ccf167ae99cdcc0885bd4bfc598c34cb8b72b67679f917c56215603fdaf49d5",
+  "canonicalSha256": "2b87415517375fe629e9a5a8817c5f72fa3d13828f5314283ea111396078761a",
+  "payloads": 99,
+  "crcPathsBytesHashesVerified": true,
+  "rebuildEqual": true,
+  "captures": [
+    {
+      "file": "own-proofs/addressed/process-cleanup.json",
+      "processes": 13
+    },
+    {
+      "file": "own-proofs/build/process-cleanup.json",
+      "processes": 2
+    },
+    {
+      "file": "own-proofs/typecheck/process-cleanup.json",
+      "processes": 3
+    },
+    {
+      "file": "author-evidence/proofs/root-final-supervised180/capture/process-cleanup.json",
+      "processes": 27
+    }
+  ],
+  "defect": "SH1 before/after FD digest missing typeofstring check; regex coerces one-element64hex array. Three full valid-RSA-signed synthetic fixtures admitted, independent27PASS3FAIL91expects. No live occurrence.",
+  "repair": "Only typeofrow.fdDigest===string before regex, preserve3signednegative reports; same RootFinal0/1/all9spent immutable. No live source installation or native effects.",
+  "installed": false,
+  "science": "OriginalERROR/all6BenqualityEXCLUDED and modelreferenceproductcold/counters unchanged",
+  "automation": "OFF",
+  "foreign": "MAS/evalrununtouched"
+}

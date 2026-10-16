@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "recordedAt": "2026-10-15T08:06:29.795132+00:00",
+  "source": "d1d38f63fcea1e6f3647f28ed9d453454ee29f6f",
+  "sourceManifestSha256": "50381207a12bb9d5f6d461b556fa1240f391eb7c637b589a5d3ffa2fb40e3e8e",
+  "executableSha256": "96c9e46133ef826a1ab65effb549ce35721ae55fbedea59b3d349353ef4344c2",
+  "decision": "SOURCE_INSTALLED_PRIVATE_ROOT_ADMISSION_PREPARED_NOT_NATIVE_READY",
+  "independent": {
+    "decision": "SOURCE_ACCEPT",
+    "source": "d1d38f63fcea1e6f3647f28ed9d453454ee29f6f",
+    "comment": "01a13e95-c37d-72b4-b482-dc1cc5e57d96",
+    "attachment": "01a13e95-c328-738b-a3ef-bd9bd8e255a2",
+    "zipSha256": "d2dcf11b0b11a4fd31d5567f6370e23d755be32d8cdf29ef37138bbe68270599",
+    "manifestSha256": "6107ec805cd645293fbc0e536a23a06aa96cab482415ca31bdc155cd1aba67c8",
+    "admissionSha256": "521cede776b427a0c9ebc2d72013eabaec960e5fd54a9d9e2fc6edc3d3160e74",
+    "payloads": 59,
+    "exactArchiveVerified": true,
+    "executableRebuildByteEqual": true,
+    "tests": "52PASS0FAIL138expects/5files +9 actual Python synthetic producer checks",
+    "captures": [
+      {
+        "label": "evaler-d1-addressed",
+        "processes": 2,
+        "capture": "complete/confirmed/errornull/twozero"
+      },
+      {
+        "label": "evaler-d1-build",
+        "processes": 2,
+        "capture": "complete/confirmed/errornull/twozero"
+      },
+      {
+        "label": "evaler-d1-producer",
+        "processes": 2,
+        "capture": "complete/confirmed/errornull/twozero"
+      },
+      {
+        "label": "evaler-d1-producer2",
+        "processes": 2,
+        "capture": "complete/confirmed/errornull/twozero"
+      }
+    ],
+    "caseAccept": false,
+    "nativeCleanupConfirmed": false
+  },
+  "supportInstall": {
+    "status": "SOURCE_INSTALLED_ONLY",
+    "source": "d1d38f63fcea1e6f3647f28ed9d453454ee29f6f",
+    "filesVerified": 878,
+    "noReplace": true,
+    "nativeReady": false
+  },
+  "readOnlyHelper": {
+    "status": "NARROW_READ_ONLY_HELPER_PROVISIONED_NOT_NATIVE_READY",
+    "source": "d1d38f63fcea1e6f3647f28ed9d453454ee29f6f",
+    "attempt": {
+      "path": "/root/lab57-root-sandbox-repair-d1d38f63f-provision.once.json",
+      "device": 64512,
+      "inode": 5545351,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o600",
+      "bytes": 1246,
+      "sha256": "f1be6dfd8f7f7d2c9d96d2f0c9750feb651122d91a8189bb4246b2a7e1a55631"
+    },
+    "helperDirectory": {
+      "path": "/var/lib/loginom-evals/fd-observer/d1d38f63fcea1e6f3647f28ed9d453454ee29f6f",
+      "device": 64512,
+      "inode": 1179885,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o755",
+      "bytes": 4096,
+      "sha256": null
+    },
+    "script": {
+      "path": "/var/lib/loginom-evals/fd-observer/d1d38f63fcea1e6f3647f28ed9d453454ee29f6f/lab57-fd-observer.py",
+      "device": 64512,
+      "inode": 1179886,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o555",
+      "bytes": 15428,
+      "sha256": "f19b4a8888dd19aeb63df87be9ba3fdac8a69236ca1316f619dddc72277807b0"
+    },
+    "binding": {
+      "path": "/var/lib/loginom-evals/fd-observer/d1d38f63fcea1e6f3647f28ed9d453454ee29f6f/binding.json",
+      "device": 64512,
+      "inode": 1179888,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o444",
+      "bytes": 2336,
+      "sha256": "b4f917ba12f342991c41d8b6734e755c2ea4d6d3196156cda84d5f347ca8dafe"
+    },
+    "privateKey": {
+      "uid": 0,
+      "mode": "0o600",
+      "singleLink": true,
+      "materialDisclosed": false
+    },
+    "policy": {
+      "path": "/etc/sudoers.d/loginom-lab57-fd-d1d38f63f",
+      "device": 64512,
+      "inode": 1574753,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o440",
+      "bytes": 159,
+      "sha256": "8f76a5e78d4c1c43fc5fc8cc595488c7f4ad3d371114df58576c58f2d167998a"
+    },
+    "beforeSudoers": {
+      "loginom-lab57-fd-9409bda38": "579f95441e7e10d75be0493c144e3e346441731c1924bafa9475ecdca56d4bb2",
+      "README": "5c108b32f7e4f0f33ed7a76e6e6aa1713358ccfc76ec0719b17a1b3a87b8e1ef",
+      "loginom-lab57-fd-49a8a1c04": "51b45fd3cde8c0f38314d6f9f18c62ab4871f264d44cfe7fc583ae7059fbf5fd",
+      "loginom-lab57-fd-377302ddf": "a0ef74529316d4f999e5fa144dcda3a0906a44be4ec861e6ec9985c02c753890",
+      "loginom-lab57-fd-e8815ae0e": "64c0b15c6c46b19f3a8e92a2f54f275c4034dd3ccd1e33bc628324ec317530b4"
+    },
+    "afterSudoers": {
+      "loginom-lab57-fd-9409bda38": "579f95441e7e10d75be0493c144e3e346441731c1924bafa9475ecdca56d4bb2",
+      "README": "5c108b32f7e4f0f33ed7a76e6e6aa1713358ccfc76ec0719b17a1b3a87b8e1ef",
+      "loginom-lab57-fd-d1d38f63f": "8f76a5e78d4c1c43fc5fc8cc595488c7f4ad3d371114df58576c58f2d167998a",
+      "loginom-lab57-fd-49a8a1c04": "51b45fd3cde8c0f38314d6f9f18c62ab4871f264d44cfe7fc583ae7059fbf5fd",
+      "loginom-lab57-fd-377302ddf": "a0ef74529316d4f999e5fa144dcda3a0906a44be4ec861e6ec9985c02c753890",
+      "loginom-lab57-fd-e8815ae0e": "64c0b15c6c46b19f3a8e92a2f54f275c4034dd3ccd1e33bc628324ec317530b4"
+    },
+    "otherPoliciesByteUnchanged": true,
+    "fullVisudoExit": 0,
+    "originalOwnerConfigPreserved": true,
+    "originalNativeProfileRecoveryEffects": 0
+  },
+  "privateAdmission": {
+    "admissionSha256": "171e3a0607780f05feb92a39bb7ce183ec4daa4e903b14e345994f63a5097ea2",
+    "status": "PRIVATE_ROOT_ADMISSION_AFTER_INDEPENDENT_SOURCE",
+    "originalOwnerUnchanged": true,
+    "source": "d1d38f63fcea1e6f3647f28ed9d453454ee29f6f",
+    "originalRecoveryEffects": 0,
+    "credentialsRepublished": false
+  },
+  "accountingBeforeForeground": {
+    "originalRecovery": "1/1 ATTEMPTED",
+    "technicalContinuation": "1/1 CONSUMED",
+    "sandboxRepair": "0/1",
+    "newModelReferenceProductCold": 0
+  },
+  "unchanged": {
+    "originalBenOwnerTaskLeaseAcquiredAtConfig": true,
+    "bothOldOnce": true,
+    "originalERRORAll6QualityExcluded": true,
+    "CLIResourcesAndAppArmor": "NO MUTATION",
+    "MAS": "FOREIGN/NO INTERVENTION",
+    "automation": "OFF"
+  },
+  "nativeCessationCleanupReleasedFreeAccept": false
+}

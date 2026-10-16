@@ -1,0 +1,11 @@
+{
+  "source": "ca99158ba93928eb24151390ee94fe0ad31fd371",
+  "status": "PRIVATE_ROOT_ADMISSION_AFTER_INDEPENDENT_SOURCE",
+  "originalOwnerUnchanged": true,
+  "originalRecoveryEffects": 0,
+  "credentialsRepublished": false,
+  "effect": "Installed exact admitted immutable source943entries/source-bound readonly helper;private Root admission;foreground72447 invoked once; actual cleanup/once outcome pending terminal receipt",
+  "nativeCallPolicy": "No additional SSH/API/processqueries duringforeground;poll same72447 only",
+  "allTenPriorOnces": "unchanged",
+  "newModelReferenceProductCold": 0
+}

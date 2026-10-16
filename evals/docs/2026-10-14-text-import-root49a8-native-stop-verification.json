@@ -1,0 +1,115 @@
+{
+  "readAt": "2026-10-14T13:38:56.940116+00:00",
+  "operator": "Root direct",
+  "source": "49a8a1c0421c1b36c8313e7fedc0a037442ca1d2",
+  "independentSourceAccept": "01a13a7f-271b-7548-b15b-755452c3d8cc",
+  "actualRootResult": {
+    "exit": 2,
+    "pid": 2227473,
+    "birth": "104246373",
+    "startedAt": "2026-10-14T13:05:46.549470+00:00",
+    "finishedAt": "2026-10-14T13:28:55.123697+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": true,
+    "controllerStillPresent": false
+  },
+  "actualOriginalOnceRecovery": {
+    "readAt": "2026-10-14T13:09:25.161829+00:00",
+    "source": "49a8a1c0421c1b36c8313e7fedc0a037442ca1d2",
+    "ownerTask": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+    "frozen": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+    "acquiredAt": "2026-10-13T22:28:17.228Z",
+    "operatorKind": "codex-coordinator",
+    "onceSha256": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269",
+    "reservationStatus": "ATTEMPTED",
+    "reservationRecordExists": true,
+    "reservationRecordSha256": "9db104868eadc99dd4bb567771cd04f39a57f1272c390b8f0ce9db880731ee52",
+    "reservationRecordMode": "0o600",
+    "reservationRecordKeys": [
+      "owner",
+      "acquiredAt",
+      "incident",
+      "status",
+      "at"
+    ],
+    "snapshotFilesCopied": 3938,
+    "snapshotDone": false,
+    "diagnosticTop": [
+      "admission-4cca97ca-d8eb-4316-8bba-4b9d0a4c1248.json",
+      "fresh-guard-ae79adc3-4152-468f-87c2-6374d3bd72e8.json",
+      "snapshot",
+      "source-admission.json"
+    ]
+  },
+  "snapshot": {
+    "historyKeys": [
+      "assistantRows",
+      "immutableUsed",
+      "model",
+      "normalWalShm",
+      "originalSqlOpened",
+      "rows"
+    ],
+    "historyAssistantRows": 77,
+    "snapshotStatus": "COHERENT_PRIVATE_SNAPSHOT",
+    "snapshotFileCount": 28972,
+    "snapshotRecordSha256": "55d4b93e1a3694e450e4fe1065cf5f26d028e08003bfbbdd816793e8a856fdd0",
+    "registrationArchiveStatus": "RECORD_ARCHIVED",
+    "registrationArchiveKeys": [
+      "status",
+      "destination",
+      "cleanup",
+      "reservation"
+    ],
+    "registrationReceiptSha256": "fc7f6668084126a68c61c9083c130b410ce6ee526c039cc442e253686d186d77"
+  },
+  "history": {
+    "readAt": "2026-10-14T13:29:55.189098+00:00",
+    "model": "openai/gpt-6-luna/high",
+    "normalWalShm": true,
+    "originalSqlOpened": false,
+    "immutableUsed": false,
+    "assistantRows": 77,
+    "nativeCaptureFiles": [
+      "stderr.txt",
+      "process-cleanup.json",
+      "events.jsonl"
+    ]
+  },
+  "nativeStop": {
+    "originalFailureSha256": "aa701034600e52688e0edbe81d91a56e64d38a6f8ec3eea341bb3a9f5831af9d",
+    "stage": "native/helper/first guarded native call",
+    "top": "OWNED_COMMAND_FAILED",
+    "lower": "FileNotFoundError/ENOENT from fixed read-only FD observer/UNCLASSIFIED; underlying PID/FD/path not captured, no causal claim yet",
+    "sourceControlFlow": "MCP connection created; first page.goto browser request gate failed before its callTool. No native-response/diagnostic-owner/closure records produced. No target close issued by known control flow; missing records alone are not a general server absence proof.",
+    "ownCapture": "144 processes/complete/confirmed/errornull/unknown[]/twozero13:28:54.747/.851UTC",
+    "noRepeat": true,
+    "rootCauseHypothesis": "Transient process/FD lifetime during own MCP startup is unconfirmed; diagnose with isolated TDD/read-only observations. Never exempt or hide unknown/PID/FD."
+  },
+  "after": {
+    "readAt": "2026-10-14T13:38:56.940116+00:00",
+    "ownerSha256": "7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64",
+    "configSha256": "ffbc373a557e0156a4726874d424a330922286545310bb0e0cd9b12863646b35",
+    "operationPresent": false,
+    "onceSha256": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269",
+    "oldRegistrationPresent": false,
+    "legacyGuardOwnerSha256": "f3d323b799d38e4a1ebe1ad901bf69a08e572479674cc94d6f1751642ea87106",
+    "ownDiagnosticMarkerPresent": false,
+    "ownRootControllerPresent": false,
+    "nativeResponseCount": 0,
+    "nativeFailureCount": 0,
+    "diagnosticOwnerPresent": false,
+    "serverCessationPresent": false,
+    "snapshotRecordSha256": "55d4b93e1a3694e450e4fe1065cf5f26d028e08003bfbbdd816793e8a856fdd0",
+    "historyBeforeSha256": "6c7e46ae8857f7762093c3d07c8d2b361bc3b846924337917167d9addc6b2d21",
+    "ordinaryReleaseOrFree": "NOT_PROVEN"
+  },
+  "gates": "Official current history archival/legacyguard/CSV/completion/ordinaryRELEASED/FREE/final Ben ACCEPT still absent. Registration whole archived/28972 coherent snapshot77Luna-high preserved. Original Ben owner/config/task/acquiredAt/error/all6qualityEXCLUDED unchanged.",
+  "accounting": "Recovery1of1 ATTEMPTED/overallonce CONSUMED_BEFORE_EFFECT; no reset/retry; Richrepeats3of10 unchanged/newsource first0/no Rich samecause confirmation. Ben product6of6/qualityEXCLUDED/no newmodel/ref/product/cold; Rich4PASS2FAIL and all scientific allowances unchanged.",
+  "next": "Root diagnoses/prepares exact bounded concrete continuation independently admitted before any new native/resource effect; Root stays operator/Ben final independent review only/no human or management time gate.",
+  "MAS": "Foreign stand/other project untouched; only local LAB57 scope affected",
+  "automation": "OFF"
+}

@@ -1,0 +1,40 @@
+{
+  "decision": "SOURCE_ACCEPT",
+  "source": "f28ec2b48c4b83edc524b90ef44a4e5c4927e76d",
+  "comment": "01a1402f-def9-7221-af0e-0658f323a34c",
+  "parent": "01a1402a-0d55-71d3-bad1-069eec6367c8",
+  "attachment": "01a1402f-dd6e-7d1c-890c-697d78d71630",
+  "archiveSha256": "484faa9bf1c8b433aa76cdc45eca6115e4e55dd2fac89193da9e342bc4ef78da",
+  "manifestSha256": "c9976f7174e948d5c8cc693b1ef5a3970175e4ad53b362be459bec04b0512646",
+  "admissionSha256": "09fba068e0f05e653b9c0239b24db8e81f955bc4c656d848a6ea4ea7e8662c17",
+  "payloads": 64,
+  "exactArchiveVerified": true,
+  "executableRebuildByteEqual": true,
+  "targetedIndependent": "14PASS0FAIL51expects; exact same AF1 repro now PASS; old42/native/full suites not repeated",
+  "typecheck": "PASS",
+  "captures": [
+    {
+      "file": "own-proofs/addressed/process-cleanup.json",
+      "processes": 5
+    },
+    {
+      "file": "own-proofs/build/process-cleanup.json",
+      "processes": 2
+    },
+    {
+      "file": "own-proofs/typecheck/process-cleanup.json",
+      "processes": 3
+    },
+    {
+      "file": "author-evidence/proofs/root-finish-af1-green169/capture/process-cleanup.json",
+      "processes": 4
+    }
+  ],
+  "addressedFinish": "same0/1 UNSPENT, all8spent/originalrecovery1/1 retained",
+  "historicalRejectedSource": "394343 MUST_NOT_INSTALL remains neverinstalled/executed",
+  "independentLocalNotes": [
+    "One guessed read-only proof filename absent; actual index path used.",
+    "Initial local artifact-validation assumption compared candidate supervisor to older0fd; candidate is byte-equal accepted7082/parent394 and retains earlier admitted startup repair. Corrected only artifact validation to compare accepted7082; independent captures intentionally use pinned0fd. No source/criteria changed and no test retry."
+  ],
+  "sourceOnlyNotCleanupOrCaseAccept": true
+}

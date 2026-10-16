@@ -1,0 +1,360 @@
+{
+  "kind": "ROOT_OPERATOR_PROVISION_AND_PREONCE_STOP",
+  "recordedAt": "2026-10-14T11:25:40.461799+00:00",
+  "source940IndependentAdmission": "9ead37bbc4aab16a83efafdb47c7b1efc40e5cdf8b7419e6e68bec44035eaf49",
+  "source940SupportInstallation": {
+    "status": "SOURCE_INSTALLED_ONLY",
+    "source": "9409bda38ab8ffb86ee0eb6d442ce34a1d00c9af",
+    "filesVerified": 852,
+    "noReplace": true,
+    "nativeReady": false
+  },
+  "privilegedObserverProvision": {
+    "status": "NARROW_READ_ONLY_HELPER_PROVISIONED_NOT_NATIVE_READY",
+    "source": "9409bda38ab8ffb86ee0eb6d442ce34a1d00c9af",
+    "attempt": {
+      "path": "/root/lab57-root940-provision.once.json",
+      "device": 64512,
+      "inode": 5545214,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o600",
+      "bytes": 838,
+      "sha256": "6b4e67cc78eb436f6f53e1f407c8af4de8cf3fde2391d7eb6b810fc2ddb03b4e"
+    },
+    "helperDirectory": {
+      "path": "/var/lib/loginom-evals/fd-observer/9409bda38ab8ffb86ee0eb6d442ce34a1d00c9af",
+      "device": 64512,
+      "inode": 1179824,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o755",
+      "bytes": 4096,
+      "sha256": null
+    },
+    "script": {
+      "path": "/var/lib/loginom-evals/fd-observer/9409bda38ab8ffb86ee0eb6d442ce34a1d00c9af/lab57-fd-observer.py",
+      "device": 64512,
+      "inode": 1179825,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o555",
+      "bytes": 11150,
+      "sha256": "cefac890f817a73a9da8b69bb01fcf19b0b8a8d151ab233d128f3b0f55608d02"
+    },
+    "binding": {
+      "path": "/var/lib/loginom-evals/fd-observer/9409bda38ab8ffb86ee0eb6d442ce34a1d00c9af/binding.json",
+      "device": 64512,
+      "inode": 1179827,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o444",
+      "bytes": 2303,
+      "sha256": "fdd9e517a567dabe58198bf164c510cfc88d934808c64797b7a808cb7459b91c"
+    },
+    "privateKey": {
+      "uid": 0,
+      "mode": "0o600",
+      "singleLink": true,
+      "materialDisclosed": false
+    },
+    "policy": {
+      "path": "/etc/sudoers.d/loginom-lab57-fd-9409bda38",
+      "device": 64512,
+      "inode": 1574594,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o440",
+      "bytes": 159,
+      "sha256": "579f95441e7e10d75be0493c144e3e346441731c1924bafa9475ecdca56d4bb2"
+    },
+    "beforeSudoers": {
+      "README": "5c108b32f7e4f0f33ed7a76e6e6aa1713358ccfc76ec0719b17a1b3a87b8e1ef"
+    },
+    "afterSudoers": {
+      "loginom-lab57-fd-9409bda38": "579f95441e7e10d75be0493c144e3e346441731c1924bafa9475ecdca56d4bb2",
+      "README": "5c108b32f7e4f0f33ed7a76e6e6aa1713358ccfc76ec0719b17a1b3a87b8e1ef"
+    },
+    "otherPoliciesByteUnchanged": true,
+    "fullVisudoExit": 0,
+    "originalOwnerConfigPreserved": true,
+    "originalNativeProfileRecoveryEffects": 0
+  },
+  "handoverEvalerACK": "01a13a12-4028-79d0-b198-7fc6937373fa",
+  "handoverPayload": "9a4f8d2bf798c521cfb4915fb10054a7869dc7395ac7eca64ef9b620b4e7ca38;15CRCpathsTypesBytesHashesverified",
+  "RootExecute": {
+    "exit": 2,
+    "pid": 2219171,
+    "birth": "103533917",
+    "startedAt": "2026-10-14T11:07:01.997693+00:00",
+    "finishedAt": "2026-10-14T11:07:11.618187+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "originalOverallOncePresent": false,
+    "operationPresent": false,
+    "diagnosticPresent": false,
+    "controllerStillPresent": false
+  },
+  "actualPreonceRefusal": {
+    "preonce": [
+      {
+        "name": "command-cause-e00573de-b358-47bc-92bc-560cb2d61c60.json",
+        "sha256": "df06bd9ebcccccee8c9e6dc7581916f5a2e35835c9490e17a47bffaa68913cd5",
+        "bytes": 495,
+        "value": {
+          "command": "python3",
+          "exception": {
+            "name": "RuntimeError",
+            "code": null,
+            "reason": "REDACTED_MESSAGE",
+            "signal": null,
+            "killed": false,
+            "cause": {
+              "name": "ObserverRefused",
+              "code": null,
+              "reason": "PROCESS_ROSTER_OR_IDENTITY_RACE",
+              "signal": null,
+              "killed": false,
+              "cause": {
+                "name": "Error",
+                "code": 1,
+                "reason": "REDACTED_MESSAGE",
+                "signal": null,
+                "killed": false
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "refusal.json",
+        "sha256": "71eb79c44bd3e32648198f426f6f0c98bc2659668797fbe127e77866a8b0b54c",
+        "bytes": 1073,
+        "value": {
+          "version": 1,
+          "binding": {
+            "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+            "sourceSha": "9409bda38ab8ffb86ee0eb6d442ce34a1d00c9af",
+            "ownerTask": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+            "controller": {
+              "pid": 2219171,
+              "birth": "103533917"
+            }
+          },
+          "stage": "fresh-guard",
+          "status": "BLOCKED",
+          "exception": {
+            "name": "Error",
+            "code": null,
+            "reason": "OWNED_COMMAND_FAILED",
+            "signal": null,
+            "killed": false,
+            "cause": {
+              "name": "RuntimeError",
+              "code": null,
+              "reason": "REDACTED_MESSAGE",
+              "signal": null,
+              "killed": false,
+              "cause": {
+                "name": "ObserverRefused",
+                "code": null,
+                "reason": "PROCESS_ROSTER_OR_IDENTITY_RACE",
+                "signal": null,
+                "killed": false,
+                "cause": {
+                  "name": "Error",
+                  "code": 1,
+                  "reason": "REDACTED_MESSAGE",
+                  "signal": null,
+                  "killed": false
+                }
+              }
+            }
+          },
+          "originalOutcome": "ERROR",
+          "cleanup": "UNCONFIRMED",
+          "at": "2026-10-14T11:07:11.518Z"
+        }
+      },
+      {
+        "name": "stage-0001.json",
+        "sha256": "cca33f89b03779ef4117d8a267ebcba93965177496b0a20d459709c68760d994",
+        "bytes": 108,
+        "value": {
+          "stage": "private-admission",
+          "status": "ENTERED_NOT_COMPLETED"
+        }
+      },
+      {
+        "name": "stage-0002.json",
+        "sha256": "7b8c18fd2abb2f7a56568844c37c890b3f8f008b640736043bd5957052486dc1",
+        "bytes": 116,
+        "value": {
+          "stage": "sources-and-administrator",
+          "status": "ENTERED_NOT_COMPLETED"
+        }
+      },
+      {
+        "name": "stage-0003.json",
+        "sha256": "d3905df33ebfdf90f44444ad6123201c02289a5d983b70b304f0edb067d69fc0",
+        "bytes": 115,
+        "value": {
+          "stage": "original-operation-guard",
+          "status": "ENTERED_NOT_COMPLETED"
+        }
+      },
+      {
+        "name": "stage-0004.json",
+        "sha256": "0ba8736dbfb86833877b1e4c9f4a014c66dd6592a33a7229046f44620d5aeebc",
+        "bytes": 102,
+        "value": {
+          "stage": "fresh-guard",
+          "status": "ENTERED_NOT_COMPLETED"
+        }
+      },
+      {
+        "name": "start.json",
+        "sha256": "6a00c96de268cd56a36b20326eb8a1082b4af1202bcb185d6b5abfa00764b14c",
+        "bytes": 390,
+        "value": {
+          "stage": null,
+          "status": "STARTED_NOT_ADMITTED"
+        }
+      }
+    ],
+    "ownerSha256": "7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64",
+    "oncePresent": false,
+    "operationPresent": false,
+    "standEntries": [
+      "admission-complete.json",
+      "admission.json",
+      "capture-native-check-77b9e75c-5424-4ab7-ad25-18fcf711fa23",
+      "capture-unit-test-75984e3e-409c-4ef1-bdb9-7216e2e2fe69",
+      "capture-unit-typecheck-25fccf53-c2c1-4c95-b402-b82f6ac28dd4",
+      "owner.json",
+      "preflight-attempt-xmAmUh",
+      "unit-327a7354-2459-4bdb-a6b1-bd45faec8c74"
+    ]
+  },
+  "diagnosis": {
+    "scope": "READ_ONLY_DIAGNOSTIC; exact owned CSV hash unchanged; not native/controller admission",
+    "hypothesis": "read-only docker exec may return before ephemeral host processes fully cease",
+    "observations": [
+      {
+        "delaySeconds": 0,
+        "beforeCount": 270,
+        "afterCount": 270,
+        "created": [],
+        "removed": [],
+        "changed": [],
+        "errors": []
+      },
+      {
+        "delaySeconds": 0.15,
+        "beforeCount": 270,
+        "afterCount": 270,
+        "created": [],
+        "removed": [],
+        "changed": [],
+        "errors": []
+      },
+      {
+        "delaySeconds": 0,
+        "beforeCount": 270,
+        "afterCount": 270,
+        "created": [],
+        "removed": [],
+        "changed": [
+          {
+            "before": {
+              "pid": 2210096,
+              "parent": 2,
+              "birth": "103188200",
+              "uid": 0,
+              "comm": "kworker/2:0-events"
+            },
+            "after": {
+              "pid": 2210096,
+              "parent": 2,
+              "birth": "103188200",
+              "uid": 0,
+              "comm": "kworker/2:0+events"
+            }
+          }
+        ],
+        "errors": []
+      },
+      {
+        "delaySeconds": 0.15,
+        "beforeCount": 270,
+        "afterCount": 270,
+        "created": [],
+        "removed": [],
+        "changed": [
+          {
+            "before": {
+              "pid": 2209993,
+              "parent": 2,
+              "birth": "103170626",
+              "uid": 0,
+              "comm": "kworker/5:0-events"
+            },
+            "after": {
+              "pid": 2209993,
+              "parent": 2,
+              "birth": "103170626",
+              "uid": 0,
+              "comm": "kworker/5:0-events_freezable"
+            }
+          },
+          {
+            "before": {
+              "pid": 2210096,
+              "parent": 2,
+              "birth": "103188200",
+              "uid": 0,
+              "comm": "kworker/2:0+events"
+            },
+            "after": {
+              "pid": 2210096,
+              "parent": 2,
+              "birth": "103188200",
+              "uid": 0,
+              "comm": "kworker/2:0-events"
+            }
+          }
+        ],
+        "errors": []
+      }
+    ]
+  },
+  "diagnosisLimit": "Original failedproducer specificdifferingPID missing; newread-onlycomm-onlyidentitydefect reproduced separately, do not invent originaltrace",
+  "sourceCorrectionProposed": {
+    "source": "06cc38100c646ab726641f49e758033d044a7e2b",
+    "base940": true,
+    "diffPaths": 3,
+    "RootAuthor": true,
+    "independentReview": "PENDING Evaler exactgate beforeeffects",
+    "publicBranch": "lab57-proc-identity",
+    "deliveryZIP": "f669df2648df8f9f640a45921bfb75bab8f2fcb865bbf633295235d6b2ebd393",
+    "deliveryManifest": "c48516ffaccd8ed23861fde86525bcd423b79e92a3aa0ab37b721163bda727b7",
+    "payload": 891,
+    "sourceManifest": "767a7d64fdba548f0b05ff148c4e3277a7056a01d79e22c73ce3674454ff5005",
+    "exeSHA": "70d8cd646d05a71c4c59c614f8941e93ec88a87054cdecb83e12cdc8512c3c63",
+    "authorProof": "24PASS0FAIL47expects; RED+GREEN; exactNode correctedtypecheckPASS; unchangedcontinuouscapture7processes confirmed/twozero; twoexe equal70dparent",
+    "reviewComment": "01a13a28-2429-7927-ba15-680f6c3f89e2",
+    "reviewTask": "01a13a28-2451-7728-a0d6-bc226ad8be00"
+  },
+  "transportFailuresPreserved": {
+    "exclusiveSFTPfirstModeX": "Emptyprivateinputcreated/write-refused; actual0bytes verified; retainedunchanged, newuniqueWXupload; sourceinstallattempt1only",
+    "patchToolSyntax": "LocalapplypatchJS parsing failures beforewrites/remoteeffects; corrected",
+    "typecheckOldSystemNode": "Initialisolatedtypecheck selectedoldNode; mountexactNode24.19 correctedsourceunchanged",
+    "gitAbbrevAssumption": "local9→actual10headers; all851blobsverified"
+  },
+  "currentOriginalBen": "BUSY/owner task01a1375d/EB1/config/acquired/rawhash preserved; registration/guard/CSV/history retained",
+  "scientificCounters": "recovery0/1 actualunspent; onceabsent; Ben6/6originalERRORqualityEXCLUDED; Rich4PASS2FAIL0ERROR; otherreferenceproductcoldmodelledgers unchanged; confirmedRepeats3/10remaining7",
+  "actualCleanup_RELEASED_FREE_caseACCEPT": "ABSENT",
+  "noUnchangedExecuteOrUnknownEffectRetry": true,
+  "humanTimeGate": false,
+  "automation": "OFF; neverrestore"
+}

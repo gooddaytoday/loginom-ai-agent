@@ -1,0 +1,26 @@
+{
+  "checked_utc": "2026-10-12T22:53:33.573888+00:00",
+  "issue": "LAB-57",
+  "observation": "The last verified six-hour autonomous stage deadline has passed; current server state and any later owner authorization remain UNKNOWN due to TLS failure.",
+  "owner_command_id": "01a130f3-a16d-719a-a3b5-1930817d7cb4",
+  "stage_document_sha256": "9e8f46bcce665a2dabd4c7f6a45373e3b5b2d92acbc2403491b28c9353c500e8",
+  "started_utc": "2026-10-12T16:40:20.846510+00:00",
+  "deadline_utc": "2026-10-12T22:40:20.846510+00:00",
+  "wall_seconds": 21600,
+  "old_stage_reset_or_extension": false,
+  "evidence_sources": [
+    "evals/docs/2026-10-12-text-import-viewport-source-monitor-verification.json",
+    "evals/docs/2026-10-12-text-import-tsv-evaler-review-receipt.json"
+  ],
+  "last_verified_worker_status": "Rich task 01a130ff-f583-7158-a212-250ff18600cf completed; historical, not a current run query.",
+  "last_verified_cleanup": "RELEASED(reference)/FREE; completion SHA 0c9fafaf5f938db5d0c4b53fabbda15eabfa25c35559821c00e9233958fcc074; historical, not current stand state.",
+  "current_native_runs": "UNKNOWN",
+  "own_monitor_execution_or_lease_to_finish": false,
+  "own_temporary_browser_tab": "Absent from fresh browser inventory; local diagnostic tab cleanup observed.",
+  "owner_CLI_pin_decision": "Previously requested; no approval received in this chat; any new server decision UNKNOWN.",
+  "required_before_continuation": "Fresh server read-back, pin decision and an explicit new bounded stage assigned through Evaler; preserve cumulative attempts and evidence. Do not reuse or reset expired stage.",
+  "scenario_or_Rich_budget_charge": 0,
+  "last_verified_repeat_consumed": 2,
+  "last_verified_repeat_limit": 10,
+  "automation": "lab-56-lab-63-30 remains ACTIVE; all-eight completion not verified"
+}

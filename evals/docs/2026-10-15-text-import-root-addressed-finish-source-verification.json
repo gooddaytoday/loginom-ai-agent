@@ -1,0 +1,65 @@
+{
+  "status": "INDEPENDENT_ADDRESSED_SOURCE_REVIEW_PENDING_NOT_INSTALLED",
+  "source": "3943434b86766d4c47f0f75949417d2b5f942b2a",
+  "base": "7082a865790de7d19780fc93ce00b7b0ede8031f",
+  "operatorDecisionSha256": "b565a2500f6b2f7080bc6a1d850649a78a9ee1604d28ce5e3ff7f735fb31424d",
+  "sourceManifestSha256": "cd6769d2f9b761caff56a77b7cec313c23683552f8439f987450466415355336",
+  "executableSha256": "da60454261b9c8b63c0b4d0599a42a480cda01264312a5ed31e14a5884a88476",
+  "sourceEntries": 931,
+  "changedPaths": [
+    "evals/docs/evaler/lab57-root-addressed-finish-decision.json",
+    "evals/docs/evaler/lab57-root-control-transport-pids.json",
+    "evals/script/lab57-root-issue-runs.py",
+    "evals/script/lab57-route-inspect.py",
+    "evals/src/lab57-continuation.ts",
+    "evals/src/lab57-control-transport-continuation.ts",
+    "evals/src/lab57-recovery-attestation.ts",
+    "evals/src/lab57-root-finish.ts",
+    "evals/src/lab57-route-admission.ts",
+    "evals/src/lab57-route-host.ts",
+    "evals/test/fixtures/fake-multica-queues.py",
+    "evals/test/fixtures/lab57-profile-timeout.py",
+    "evals/test/lab57-control-transport.test.ts",
+    "evals/test/lab57-root-finish.test.ts"
+  ],
+  "archive": {
+    "zipBytes": 2817211,
+    "zipSha256": "81e6f816ae1365eef5b9c694e97ea4d64021ffa62a7424c8e735d116178faba4",
+    "manifestSha256": "805423dc5d03c4c8c996a44492f201daca9bb226fdb43dcc0720451186c5e14d",
+    "payloads": 1006
+  },
+  "delta": "One fixed Root incident finish, exact8spent baseline preserved; one separate private root/once. Only new declared Root finish uses complete exact LAB57 active issue-runs, not global foreign task history. No retry, profile marker beforeGET. Same exact owner/held operation/sixCFG/process/FD/container/storage/node/bwrap and source guards. Accepted native/history/guard/CSV/completion/release bodies unchanged; ordinary attestation adds exact root path only. Known old2354606 absence appended2106.",
+  "targetedChecks": {
+    "affected": [
+      "",
+      " 42 pass",
+      " 0 fail",
+      " 173 expect() calls",
+      "Ran 42 tests across 4 files. [631.00ms]",
+      ""
+    ],
+    "typecheck": "PASS165; original optionalQueueInventory TSerror162 retained/repaired guard before old branch",
+    "captureProcesses": 10,
+    "capture": "continuous/complete/confirmed/errornull/unknown[]/twozero",
+    "builds": "2clean byte-equal",
+    "redErrorsRetained": [
+      "RED1602PASS2FAIL oldqueue/rootpath; GREEN161/163",
+      "typecheck162 missing old queueInventory narrowing; fixed explicit guard165PASS"
+    ]
+  },
+  "handoff": {
+    "comment": "01a1401f-c0b5-7a22-9b71-abf16d60b4ae",
+    "parent": "01a14008-43ef-7bea-a65a-32b6cdc9132b",
+    "attachment": "01a1401f-1dd7-72c0-b111-1610f6c952e5",
+    "reviewTask": "01a1401f-c0ca-7553-8f84-e1d9f701dad1",
+    "bodyParentOneMentionReadback": true,
+    "cleanupDispatch": false
+  },
+  "scope": "Root personal addressed cleanup only; no general framework/newcleanupworker;Ben finalindependentACCEPT only",
+  "actual": "7082 installed/executed EXIT2 before diagnostic aftercontrolonce; all8spent preserved; no resource cleanup success claimed",
+  "allowance": "Control1/1 CONSUMED704894a1; all8spent/originalrecovery1/1 preserved. One explicitly owner-delegated addressed finish0/1, no reset/replay.",
+  "remaining": "Genuine servercessation/ownlogout/official77history/wholeguard/exactCSV/completion/SETTLED/ordinaryRELEASED/FREE thenBenfinalACCEPT; existingacceptedcomponents reused.",
+  "foreign": "MAS/evalrun untouched; addressed resource gate queries only LAB57 control-plane issue active runs",
+  "newScientificRuns": 0,
+  "automation": "OFF"
+}

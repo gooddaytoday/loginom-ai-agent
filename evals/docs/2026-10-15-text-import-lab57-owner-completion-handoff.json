@@ -1,0 +1,52 @@
+{
+  "checkedAt": "2026-10-15T21:52:14.355618+00:00",
+  "comment": "01a1418d-0d1a-70de-b305-2dd6b6ba2c57",
+  "parent": "01a14189-3cb4-7c28-b092-c6b91308debc",
+  "bodySha256": "0726d552a9606e70907206506446784ac609df1d36b3a370e4dbae7569f326db",
+  "oneRoutedEvalerMention": true,
+  "steerExistingTaskIds": [
+    "01a14189-3cd0-775b-8df3-176febe6535e"
+  ],
+  "attachment": "01a1418c-e976-747b-ae46-1be336b3fdc4",
+  "attachmentSha256": "d7b6bd505605db92c201c1cd497a43b75684085915974843bb301e1e6ea1e187",
+  "attachmentByteReadback": true,
+  "bodyAndParentReadback": true,
+  "server": {
+    "status": "done",
+    "revision": 566,
+    "active": [
+      {
+        "id": "01a14189-3cd0-775b-8df3-176febe6535e",
+        "agent": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+        "status": "running"
+      }
+    ]
+  },
+  "scope": "Owner completion and metadata sync only; no new cleanup/review/scenario/nextcard/product release; MASforeignuntouched; automationOFF",
+  "EvalerFinalAck": {
+    "readAt": "2026-10-15T21:56:21.543597+00:00",
+    "comment": "01a1418f-856f-7185-a67f-00f1fe8176a1",
+    "parent": "01a14189-3cb4-7c28-b092-c6b91308debc",
+    "bodySha256": "86b1f45a4ae51d903692cac06b4c95de78302673a34583dae0424f6e3f6cb0d9",
+    "author": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+    "attachment": "01a1418f-84fc-7696-950f-f4df5fb4677c",
+    "zipBytes": 99067,
+    "zipSha256": "a8479047c5d15837737fe774526276274ff4c9ac0768bf8ebdb53742d29f8246",
+    "manifestSha256": "a0c9f5353be94dff6ca67aa91fa877c16eff57cf1e18bda66d209b2bca4c3fc0",
+    "payloads": 9,
+    "CRCPathsTypesUniqueHashesSizesVerified": true,
+    "nestedBenArchiveAndOwnerReceiptByteEqual": true,
+    "serverStatus": "done",
+    "serverRevision": 569,
+    "activeAndQueued": [],
+    "ownerCompletion": {
+      "status": "done",
+      "receipt_attachment": "01a1418c-e976-747b-ae46-1be336b3fdc4",
+      "receipt_sha256": "d7b6bd505605db92c201c1cd497a43b75684085915974843bb301e1e6ea1e187",
+      "revision": 564,
+      "accept_comment": "01a14189-3cb4-7c28-b092-c6b91308debc"
+    },
+    "historicalWorkflowPhase": "in_review",
+    "phaseNote": "Historical internal in_review phase does not override explicit owner_completion.status=done and actual server done; no further review/worker assigned"
+  }
+}

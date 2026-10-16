@@ -1,0 +1,55 @@
+{
+  "checked_at": "2026-10-12T16:07:48+03:00",
+  "issue": "LAB-57",
+  "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "issue_revision": 86,
+  "source_report_id": "01a1301d-608a-7385-8a14-298f4142e610",
+  "archive_sha256": "12d9f444b7406747c13f3e1a6aea093a495c5cee90069c791502d3a889c94fdb",
+  "manifest_sha256": "783354c3572663d4d99c346fd7ad088ab9be7e24b8682f850db4652dd6a45cc7",
+  "verified_manifest_files": 305,
+  "diagnosis": {
+    "reader_browser_mode": "headed",
+    "window_server_available": false,
+    "lower_launch_exception": "unclassified",
+    "cold_completed": 0,
+    "cold_calls": 2,
+    "browser_launch_attempts": 1
+  },
+  "repair_status": "reviewed_plan_handed_to_evaler; implementation_pending",
+  "published_plan_sha": "f5c7fa2803ddd86887769f0bbe73a701bf8aaebf",
+  "spec_review": "ACCEPT after including provenance adaptation/current hash; preserve source/original SHA",
+  "handoff_comment_id": "01a13039-9c44-7b1c-86a0-7be703e618ba",
+  "handoff_parent_id": "01a1301d-608a-7385-8a14-298f4142e610",
+  "handoff_body_sha256": "f43ed896f75bab0b7d2d5b5eb15d6630970dab8a5dbe5efdd102ae7a0de56d89",
+  "readback_content_and_parent_verified": true,
+  "trigger_outcomes": [
+    {
+      "reason_code": "queued",
+      "status": "queued",
+      "target_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "target_type": "agent"
+    }
+  ],
+  "active_and_queued": [
+    {
+      "id": "01a13039-9c71-70ee-8bfc-7b843fb4226e",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "status": "queued"
+    },
+    {
+      "id": "01a1301d-60de-794c-9f13-1f9fcda9925b",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "status": "running"
+    }
+  ],
+  "rich_repeat_budget": {
+    "charged": 2,
+    "limit": 10,
+    "remaining": 8,
+    "charge_on_dispatch": false
+  },
+  "monitor_runtime_model_or_lease_actions": false,
+  "all_eight_done": false,
+  "automation_id": "lab-56-lab-63-30",
+  "automation_retained": true
+}

@@ -1,0 +1,100 @@
+{
+  "status": "READY_SOURCE_FOR_INDEPENDENT_REVIEW_NOT_APPLIED",
+  "source": "f89f674e3c614e711123685415211fd864fa8d12",
+  "base": "945a7acee2dfad39baf9e4d87c3564b4bd5f8cb9",
+  "ownerDecisionSha256": "dbc623862886da8610cbd25a42f4a7b1a0c8fd6055bc7feb704c84a39648906e",
+  "actualStopReceiptSha256": "fa2b9e0d21f8970fadc29303d11bce071bb5f193ccba2b9be35e532ba1e2b955",
+  "sourceChanges": [
+    "Await actual vendor cold QueryInterface before GetSessionsManager; native GetObjectId replaces selector descriptor; exact native ownlogout and final sameconnection guard",
+    "Distinct dispatcher-continue/newroot/once. All5 oldonces/controllers/admissions/source/pins/captures/rawerror/reservation remain immutable; original Benowner/task/lease/config/acquiredAt unchanged",
+    "All1728 oldnative/controller/signedRootchildPIDs absent and all6CFG+5retaineddiagnostics protected. Privileged request bounded65536 bytes before JSON parse, no truncation",
+    "All admitted945 exact Node/dedicatedbwrap/FD signed final pair/ownactivityreadonlylimit/source/supervisor/history/cessation/cleanup/attestation/release criteria preserved"
+  ],
+  "tests": {
+    "affected": "177PASS/0FAIL/442expects/10files",
+    "newABI": "5PASS/38expects; new continuation7PASS/55expects included in affected",
+    "typecheck": "PASS",
+    "build": "2 clean exact Git exports byte-equal",
+    "process": {
+      "mode": "continuous",
+      "complete": true,
+      "status": "confirmed",
+      "error": null,
+      "processes": 3,
+      "verification": [
+        {
+          "observed_at": "2026-10-15T10:38:35.863Z",
+          "owned_remaining": 0
+        },
+        {
+          "observed_at": "2026-10-15T10:38:35.964Z",
+          "owned_remaining": 0
+        }
+      ]
+    },
+    "failures": "All RED/errors retained. Prior actual945 raw TypeError retained; actual454 structure+wrapper verified only as own-process cleanup. Initial affected run164PASS8FAIL exposed old selector-descriptor fixture; updated fixture matches shipped native GetObjectId without relaxing native checks. Connection rebind RED then GREEN. No unchanged full suites/supervisor repeated."
+  },
+  "package": {
+    "sourceEntries": 901,
+    "gitBlobs": 900,
+    "unchangedBaseBlobs": 882,
+    "changedPaths": [
+      "evals/docs/evaler/lab57-root-dispatcher-abi-decision.json",
+      "evals/docs/evaler/lab57-root-dispatcher-abi-pids.json",
+      "evals/docs/evaler/lab57-root-dispatcher-abi-pins.json",
+      "evals/docs/evaler/lab57-root-dispatcher-abi-plan.md",
+      "evals/script/lab57-fd-observer.py",
+      "evals/script/lab57-owned-route.ts",
+      "evals/script/lab57-route-inspect.py",
+      "evals/script/lab57_history_audit_scope.py",
+      "evals/src/lab57-closed-route.ts",
+      "evals/src/lab57-continuation.ts",
+      "evals/src/lab57-dispatcher-browser.ts",
+      "evals/src/lab57-dispatcher-continuation.ts",
+      "evals/src/lab57-recovery-attestation.ts",
+      "evals/src/lab57-route-host.ts",
+      "evals/test/fixtures/lab57-vendor-cast-abi.json",
+      "evals/test/lab57-dispatcher-abi.test.ts",
+      "evals/test/lab57-dispatcher-continuation.test.ts",
+      "evals/test/lab57-dispatcher-transport.test.ts"
+    ],
+    "sourceManifestSha256": "e5976d4f9aa8c63c7d58ceda4372c8564a63ec4c7e12f6a3fee1e800073a174c",
+    "executableSha256": "36577d320537e0f1c0b223aac2064755ed7bdea6dd431b1f42b0bd3751cb2b86",
+    "zipSha256": "0539075929efe73dbadc7c2b7eb4070058f8245b9b75558c455eedec755d80e0",
+    "deliveryManifestSha256": "4a8f4538332b6b6981f026ae59db525441e459a2777521d873bcce5fbe39dcf7",
+    "payloads": 989,
+    "allCRCPathsTypesHashesGitBlobsVerified": true
+  },
+  "accounting": {
+    "originalRecovery": "1/1ATTEMPTED",
+    "technicalContinuation": "1/1CONSUMED",
+    "sandboxRepair": "1/1CONSUMED",
+    "observerRepair": "1/1CONSUMED",
+    "fdStability": "1/1CONSUMED",
+    "dispatcherAbi": "0/1SOURCE only",
+    "modelReferenceProductCold": 0,
+    "BenProduct": "6/6/originalERROR/all6qualityEXCLUDED/no retry",
+    "Rich": "4PASS2qualityFAIL/refs1/1/2/1/1/3/cold11/10/8",
+    "BenCold": "9/9/8+oldERROR1",
+    "repeats": "3/10remaining7/noreset/precharge",
+    "admission": "3/3",
+    "wrapper": "1/1"
+  },
+  "currentActual": "OriginalBenBUSY/noRELEASED/FREE/ACCEPT; actual945EXIT2/FD1of1 consumed; newABI0of1SOURCEonly",
+  "operator": "Root personally; Ben final independent cases/validators/attestation acceptance only",
+  "notProven": [
+    "installation",
+    "native READY",
+    "prior admin diagnostic cessation",
+    "original server cessation",
+    "official history archival",
+    "cleanup",
+    "completion",
+    "RELEASED",
+    "FREE",
+    "Ben ACCEPT"
+  ],
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "DELETED_OFF",
+  "next": "One routed Evaler independent exact SOURCE review in existing incident/review2/reject1; no cleanup worker. Root operator only after exact admission and terminal coordination."
+}

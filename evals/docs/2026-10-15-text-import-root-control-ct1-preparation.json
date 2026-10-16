@@ -1,0 +1,59 @@
+{
+  "status": "EXACT_SOURCE_INSTALLED_NARROW_HELPER_PRIVATE_ADMISSION_PREPARED_NOT_NATIVE_READY",
+  "source": "ea601e3d9e35adb36ec79b74cafa903df4f3ab6a",
+  "sourceFilesVerified": 922,
+  "installNoReplace": true,
+  "helperScript": {
+    "path": "/var/lib/loginom-evals/fd-observer/ea601e3d9e35adb36ec79b74cafa903df4f3ab6a/lab57-fd-observer.py",
+    "device": 64512,
+    "inode": 1179916,
+    "uid": 0,
+    "gid": 0,
+    "mode": "0o555",
+    "bytes": 20269,
+    "sha256": "843085b8bdc1da86645848da19390031f3e635255330c73660192705d824e387"
+  },
+  "helperBinding": {
+    "path": "/var/lib/loginom-evals/fd-observer/ea601e3d9e35adb36ec79b74cafa903df4f3ab6a/binding.json",
+    "device": 64512,
+    "inode": 1179918,
+    "uid": 0,
+    "gid": 0,
+    "mode": "0o444",
+    "bytes": 30075,
+    "sha256": "7696951f2689133dd3cce7c5e26cb77a5a1612a7ec5f9d41ad53f2dda36f0139"
+  },
+  "helperPolicy": {
+    "path": "/etc/sudoers.d/loginom-lab57-fd-ea601e3d9",
+    "device": 64512,
+    "inode": 1574759,
+    "uid": 0,
+    "gid": 0,
+    "mode": "0o440",
+    "bytes": 159,
+    "sha256": "b86446c0641d3198e1db568dab327e3538f5758dc2651d90dea3b319ae8b87aa"
+  },
+  "provisionAttempt": {
+    "path": "/root/lab57-root-control-ct1-ea601e3d9-provision-manifest-path.once.json",
+    "device": 64512,
+    "inode": 5545408,
+    "uid": 0,
+    "gid": 0,
+    "mode": "0o600",
+    "bytes": 1858,
+    "sha256": "7249007223c983f30a9f06d9c7156d0cce1d562cbc62a8309e6dba6393af80ee"
+  },
+  "privateKeyMaterialDisclosed": false,
+  "otherPoliciesByteUnchanged": true,
+  "originalOwnerConfigPreserved": true,
+  "privateRootAdmissionSha256": "3ab51ed946f22893038fa9ad1e49e62ec733d9b5011cd0936de2df2942c23a53",
+  "sourceGateComment": "01a13fe6-2843-7701-9a40-880872b472c3",
+  "sourceGateCanonicalSha256": "1e27f0e34c05ddaee5f9b94983d35aa5c2da91dddd089a04837baea38e2c44bf",
+  "newControlAllowance": "0/1 prior to foreground invocation; actual reservation must be read from execution receipts",
+  "allSevenSpent": "Immutable, kernel13699c77 retained",
+  "originalRecoveryEffectsDuringPreparation": 0,
+  "nativeModelReferenceProductCold": 0,
+  "next": "Single Root foreground control-continue under immediately fresh full guards; no extra SSH/progress probes while running",
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "OFF"
+}

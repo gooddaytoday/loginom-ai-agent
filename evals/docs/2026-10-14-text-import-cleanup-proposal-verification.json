@@ -1,0 +1,404 @@
+{
+  "format": "text-import-cleanup-prepared-source-verification/v1",
+  "checked_utc": "2026-10-14T00:48:45.877179+00:00",
+  "owner_policy_sha256": "743f98aca40dd362f3ac80c8a8d97308863ba83d3e32430533ae4101464096c0",
+  "cards": [
+    {
+      "identifier": "LAB-56",
+      "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+      "status": "done",
+      "revision": 70,
+      "phase": "in_review",
+      "metadata_sha256": "5c14bb016bc2ccca6f61f38f5b8a4b1857ddf9f849dd1955e75e4bf416e152bb",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-57",
+      "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "status": "blocked",
+      "revision": 287,
+      "phase": "blocked",
+      "metadata_sha256": "40da492f2697fe3cd7a8ab8294dcb0bd1c64da61787f4776528222a0d68be153",
+      "active_queued": [
+        {
+          "id": "01a137da-817d-752b-bad6-c745fabd4a23",
+          "agent_id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+          "status": "running",
+          "started_at": "2026-10-14T03:40:54+03:00"
+        }
+      ]
+    },
+    {
+      "identifier": "LAB-58",
+      "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "28d5c9fcd8e4fd89023c25be641973b4ab33ac49a3bef284c268076b32e58700",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-59",
+      "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "2c4636ca31ed4fa15913cb80edc5f89ad79dff8aa3c37b873d8f85fe3699a3fb",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-60",
+      "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "cafa51924f5d94c6bb69b175770dc57c95142ffa427c040300a7b2f922224c43",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-61",
+      "id": "01a1214b-4adc-75df-97df-2917732a449a",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "5ea0821ee3bc8975f78524cc495a9316a54abb3d9e39634d975b9cb99937793f",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-62",
+      "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "bf4a982fdd1ef783c7c392d049a0d6703378cc7289153c9a9207cb1171ab17ed",
+      "active_queued": []
+    },
+    {
+      "identifier": "LAB-63",
+      "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+      "status": "in_progress",
+      "revision": 9,
+      "phase": "admission",
+      "metadata_sha256": "b25b2b9bf8f832d8f7ed743a56f1dd76be9bd0c7a0479ab553f5cb574b603d1f",
+      "active_queued": []
+    }
+  ],
+  "runtime": {
+    "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+    "status": "online",
+    "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749",
+    "last_seen_at": "2026-10-14T03:48:18+03:00"
+  },
+  "worker_settings": {
+    "Rich": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+    },
+    "Ben": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+    },
+    "Evaler": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1,
+      "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+    }
+  },
+  "prepared_report": {
+    "id": "01a137c9-ca5d-7c73-8ad9-18dc3ea7f8b1",
+    "parent_id": "01a137ae-04be-7698-8962-7646d3acfafb",
+    "created_utc": "2026-10-14T00:22:13Z",
+    "status": "PREPARED / NOT_APPLIED",
+    "Ben_verdict": "BLOCKED",
+    "readiness": "NOT_READY for live operator",
+    "frozen_sha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+    "review_cycle": 2,
+    "reject_count": 1,
+    "source_commit": "f3c7fe7603c9ea7ff95f43731cfb884e7fe40e9b",
+    "support_base": "0fd20f7c7e36724ca78a58bb8f9085b78884a87b",
+    "live_entrypoint": "not connected; no apply switch or node-eval-ops command registered",
+    "original_missing_prerequisites": [
+      "LEGACY_GUARD_PARENT_BIRTH_UNCAPTURED",
+      "SERVER_CESSATION_UNPROVEN",
+      "FRESH_OPERATOR_GUARDS_REQUIRED"
+    ]
+  },
+  "delivery": {
+    "archive_bytes": 1898413,
+    "archive_sha256": "a4cb9a9220fca8f198acce3f620e6932f7f99659e141836147c4612886fa744d",
+    "manifest_sha256": "9d38647cb5ea6547422d0e02c13f2403beb766cd6de22363cb5946125efcb5ee",
+    "payload_files_verified": 165,
+    "paths_types_unique_safe": true,
+    "embedded_manifest_exact": true,
+    "source_manifest_sha256": "1bbd1f3017e7b856f085e30ef5ea03d1199ebf0b63502d266157522540460d37",
+    "patch_sha256": "c2ba9492ab1c994d1e36f912a6c5ff171d6e412954ff823e027798871aa7fb30",
+    "bundle_sha256": "aa84de99bd4fc9944ed892455aff6d628beb41d06dad369a8cfd96f3748d7ca9",
+    "archive_attachment_id": "01a137c9-c9d6-7b1c-b706-10ab9560e644",
+    "index_attachment_id": "01a137c9-ca08-71d1-b8b9-f11111053c7d",
+    "manifest_attachment_id": "01a137c9-ca2f-7a59-8d46-666e4df39079"
+  },
+  "Git_source_verification": {
+    "source_sha": "f3c7fe7603c9ea7ff95f43731cfb884e7fe40e9b",
+    "support_base_sha": "0fd20f7c7e36724ca78a58bb8f9085b78884a87b",
+    "source_manifest_files_Git_verified": 795,
+    "changed_added_only": 10,
+    "all_parent_files_byte_unchanged": 785,
+    "changed_source_blobs_verified": 10,
+    "bundle_prerequisites_and_base_ancestor_verified": true,
+    "immediate_parent": "e3f32d6777f2cb190edc8444a3111d050149b429",
+    "root_initial_inspector_error": "wrong immediate-parent equality assumption; support_parent denotes ancestor base of TDD commit series, not single immediate parent; corrected with actual ancestry+final diff and all blobs",
+    "paths": [
+      "evals/docs/evaler/lab57-ben-owned-cleanup-proposal.md",
+      "evals/script/lab57-archive-no-replace.py",
+      "evals/script/prepare-lab57-owned-cleanup.ts",
+      "evals/src/lab57-cleanup-proposal.ts",
+      "evals/src/lab57-record-archive.ts",
+      "evals/test/fixtures/lab57-cleanup-proposal/confirmed-captures.json",
+      "evals/test/fixtures/lab57-cleanup-proposal/input.json",
+      "evals/test/fixtures/lab57-cleanup-proposal/reserve-worker.ts",
+      "evals/test/lab57-cleanup-proposal.test.ts",
+      "evals/test/lab57-record-archive.test.ts"
+    ]
+  },
+  "targeted_TDD": {
+    "saved_targeted_tests": {
+      "PASS": 90,
+      "FAIL": 0,
+      "expect_calls": 159,
+      "typecheck": "PASS"
+    },
+    "saved_RED_stages": {
+      "red-1-adapter-corrected": 1,
+      "red-2": 1,
+      "red-3": 1,
+      "red-4": 1,
+      "red-5": 1,
+      "red-6": 1,
+      "red-7": 1,
+      "red-8": 1
+    },
+    "saved_supervisor_process_proofs": 20,
+    "saved_supervisor_mode": "genuine confirmed unit_after_exit on unchanged support0fd",
+    "all_saved_process_captures_complete_no_error_zero_remaining": true,
+    "root_independent_new_targeted_tests": {
+      "purpose": "root independent addressed tests of new f3 preparation policy and atomic archival primitives; synthetic diagnostic only",
+      "exit": 0,
+      "namespace": "unshare-all/no network/readonly source/clearenv/tmpfs TMPDIR; real profiles/storage/CLI/Docker/credentials not mounted",
+      "model_native_product_recovery_calls": 0,
+      "does_not_prove_live_cleanup_or_completion": true,
+      "PASS": 90,
+      "FAIL": 0,
+      "expect_calls": 159,
+      "files": 2
+    },
+    "coverage": [
+      "fixed original source/owner/config/container/registration/guard and missing admission",
+      "original 31-process ancestry/admissions and five historical confirmed positives",
+      "unknown/reused/live PID and foreign storage refusal",
+      "changed identity/hash/ctime/inode/PID/UID and symlink/path/hardlink refusal",
+      "durable once race/crash/owner-process change/failed-attempt nonresume",
+      "atomic no-replace entire file/guard archival and existing file/directory/symlink refusal"
+    ],
+    "limits": [
+      "offline preparation policy consumes snapshot declarations; genuine provenance/fresh guard collection required in the future closed live entrypoint",
+      "filesystem primitives return RECORD_ARCHIVED with cleanup UNCONFIRMED; no ownership/admission/stand release inferred",
+      "root test success is not genuine server cleanup, original completion or independent case ACCEPT"
+    ]
+  },
+  "source_and_record_inspection": {
+    "saved_171_original_hashes_and_registration_guard_guardbirth_CSV_identities": "before/after/final equal; delivered saved observations only",
+    "all_five_frozen_eb1_producer_sources_hashes_matched": true,
+    "original_product_command_sha256": "39c0fa95ec6bc3f9cf8a1f927d260a15e93f9a8a8d948b704fea4f4286e37b72",
+    "original_command_bytes_hash_matched": true,
+    "original_six_cleanup_bytes_parent_edges_and_launcher_birth_order": "root matched against previously verified unchanged product receipts",
+    "frozen_kernel_birth_producer": "exclusive acquireHarnessLease writes /proc PID birth with wx owner.json; acquireRunHarnessLease awaited before executeRun/model dispatch; no new retrospective receipt written",
+    "stand": "BUSY original Ben lease retained",
+    "registration": "exact sibling retained; no root archival",
+    "harness_guard": "original retained; separate original parent capture/admission absent",
+    "storage": "own exact CSV retained, historical empty lock now absent with UNKNOWN disappearance cause",
+    "original_product_ERROR": "unchanged; no synthetic completed cleanup or edited verdict"
+  },
+  "Evaler_equivalent_guard_provenance_decision": {
+    "id": "01a137da-8164-708a-b603-6f45fcad2820",
+    "parent_id": "01a137c9-ca5d-7c73-8ad9-18dc3ea7f8b1",
+    "method": "original private kernel-birth record from exclusive frozen acquire before model dispatch + six original captured outer-parent edges + preserved bytes/inode/ctime; boot-clock conversion only consistency evidence",
+    "guard_owner_sha256": "f3d323b799d38e4a1ebe1ad901bf69a08e572479674cc94d6f1751642ea87106",
+    "original_parent_PID": 2126565,
+    "original_parent_UID": 1000,
+    "original_private_record_birth": "99114278",
+    "original_guard_device_inode": [
+      64512,
+      3840909
+    ],
+    "original_guard_created_ns": "1791931825725205266",
+    "original_parent_capture": "NOT_PRESENT; not reconstructed",
+    "original_harness_admission": "NOT_PRESENT; never synthesized",
+    "scope": "alternative binding accepted only for fixed exception source preparation, with strict new negatives; no generic guard retirement permission",
+    "server_cessation": "UNPROVEN, must be genuinely produced within admitted owned recovery before guard/CSV cleanup",
+    "root_assessment": "existing authorized autonomous source continuation may proceed; no additional duplicate handoff or live pin decision needed before ready tested executable source"
+  },
+  "closed_route_handoff": {
+    "archive_sha256": "06be17558f948832797d8d9d01861470489a62d0a35afcb743e39cfc2732a292",
+    "manifest_sha256": "0c93fe1d192d115149874eb156a15ad231980c128e692aa65ab4c6207453742d",
+    "payload_files_verified": 8,
+    "CRC_paths_types_hashes_verified": true,
+    "all_six_original_cleanup_parent_edges_and_birth_order_matched": true,
+    "five_actual_eb1_frozen_producer_sources_hashes_matched": true,
+    "original_product_command_bytes_matched": true,
+    "scope_sha256": "26d03b3dfa982ea43f10bfb5505219b2d1d3d846d7b1750c597529eb82ea45f6",
+    "missing_original_parent_capture_and_admission_not_reconstructed": true,
+    "server_cessation": "UNPROVEN; to be generated genuinely inside adopted recovery",
+    "active_support_pin": "0fd remains; f3 is preparation source only",
+    "live_adoption_or_mutation_authorized_this_stage": false,
+    "id": "01a137da-8164-708a-b603-6f45fcad2820",
+    "parent_id": "01a137c9-ca5d-7c73-8ad9-18dc3ea7f8b1",
+    "attachment_id": "01a137da-8138-795d-a2db-63b11148d0fd",
+    "archive_bytes": 15274,
+    "intent_id": "LAB57-BEN-CLOSED-CLEANUP-ROUTE-01a137c9",
+    "task_id": "01a137da-817d-752b-bad6-c745fabd4a23",
+    "status": "running",
+    "started_at": "2026-10-14T03:40:54+03:00",
+    "next_deliverable": "READY_SOURCE_FOR_OPERATOR / NOT_APPLIED, new clean support SHA/full manifest/tested entrypoint/executable staged plan",
+    "Ben_safe_progress": {
+      "checked_utc": "2026-10-14T00:49:24.489137+00:00",
+      "task_id": "01a137da-817d-752b-bad6-c745fabd4a23",
+      "message_count": 80,
+      "last_seq": 80,
+      "type_counts": {
+        "text": 6,
+        "tool_use": 37,
+        "tool_result": 37
+      },
+      "safe_tail": [
+        {
+          "seq": 76,
+          "type": "tool_result",
+          "created_at": "2026-10-14T00:48:46.948884Z"
+        },
+        {
+          "seq": 77,
+          "type": "tool_use",
+          "created_at": "2026-10-14T00:49:09.446346Z"
+        },
+        {
+          "seq": 78,
+          "type": "tool_result",
+          "created_at": "2026-10-14T00:49:09.447717Z"
+        },
+        {
+          "seq": 79,
+          "type": "tool_use",
+          "created_at": "2026-10-14T00:49:09.495042Z"
+        },
+        {
+          "seq": 80,
+          "type": "tool_result",
+          "created_at": "2026-10-14T00:49:09.496847Z"
+        }
+      ],
+      "raw_contents_not_saved_or_printed": true
+    },
+    "required_phases": [
+      "original immutable bindings and full immediately fresh admission",
+      "original single recovery and distinct durable private operation once reserved before resource/native/profile mutations",
+      "exact entire no-replace registration archival as RECORD_ARCHIVED only",
+      "genuine supported nonmodel original server/session/account/package/document/execution cessation with owned observation/refusal/proof",
+      "coherent private pending original DB/WAL/SHM/runtime/session snapshot before profile mutation and official verified history archive",
+      "entire original guard archival and exact owned CSV cleanup only after genuine cessation/history",
+      "actual fresh settlement/process/profile/history/storage recovery completion, ordinary release and FREE"
+    ],
+    "new_source_stage_authorization": "isolated TDD/typecheck and necessary regressions only; no new actual pin/native/recovery/model/resource mutation",
+    "large_transition_owner": "delegated Codex coordinator after independent review of final code/evidence; no human approval gate"
+  },
+  "profile_coverage_correction": {
+    "old_preparation_inspector": "Rich ref/eval, Ben ref/eval, nonexistent Evaler ref/eval; not accepted as a complete six CFG profile audit",
+    "correct_real_CFG_profiles": [
+      "Rich reference",
+      "Rich eval",
+      "Ben reference",
+      "Ben eval",
+      "EvalBaseline eval",
+      "EvalRunner eval"
+    ],
+    "Evaler_real_CLI_profiles": 0,
+    "handoff_explicitly_requires_fix_and_fresh_actual_CFG_paths_before_operation": true,
+    "root_did_not_infer_actual_baseline_runner_cleanup_from_wrong_saved_list": true,
+    "previous_delivered_wrong_observation_preserved": true
+  },
+  "preserved_history_counters": {
+    "Ben_product_consumed": 6,
+    "Ben_product_limit": 6,
+    "Ben_product_verdict": "original ERROR, all six outcomes excluded from quality PASS/FAIL",
+    "Ben_product_repeats_or_internal_retries": 0,
+    "Ben_cold_calls_launches_completed_ERROR": [
+      9,
+      9,
+      8,
+      1
+    ],
+    "Rich_product": {
+      "PASS": 4,
+      "quality_FAIL": 2,
+      "ERROR": 0
+    },
+    "Rich_reference": [
+      1,
+      1,
+      2,
+      1,
+      1,
+      3
+    ],
+    "reference_limit_per_case": 3,
+    "Rich_cold_calls_launches_completed": [
+      11,
+      10,
+      8
+    ],
+    "Rich_cleanup_continuations": 2,
+    "same_cause_repeats": 3,
+    "repeat_limit": 10,
+    "remaining": 7,
+    "new_signature_first_charge": 0,
+    "admission": "3/3 exhausted",
+    "old_wrapper": "1/1 exhausted",
+    "recovery_consumed": 0,
+    "c26": "REJECT preserved",
+    "eb1": "frozen unchanged",
+    "Ben_actual_model_safe_projection_rows": 77,
+    "actual_model": "openai/gpt-6-luna/high",
+    "original_CP_official_history": "pending",
+    "reported_cost_zero_not_billed_free": true,
+    "billed_cost": "UNKNOWN",
+    "no_model_generations_for_cleanup_or_PASS": true
+  },
+  "root_actions": {
+    "archive_and_source_verification": true,
+    "independent_new_targeted_offline_tests": 90,
+    "new_model_native_reference_product_cold_probe_recovery_calls": 0,
+    "host_resource_mutations": 0,
+    "new_server_comments_dispatches_issue_mutations": 0,
+    "source_code_changes": 0,
+    "unchanged_full_suite_repeats": 0,
+    "private_diagnostics_credentials_or_tokens_written_to_Git": false,
+    "original_model_measurements_and_static_receipts_rewritten": false
+  },
+  "pending_gates": {
+    "independent_Ben_ACCEPT": "ABSENT",
+    "genuine_cleanup_release_FREE": "ABSENT",
+    "ready_final_closed_operator_source": "not yet delivered; current source task running",
+    "LAB57_owner_done_LAB58": "not admitted until independent ACCEPT/evidence/genuine cleanup",
+    "do_not_duplicate_current_Ben_Evaler_Rich": true
+  },
+  "all_eight_done": false,
+  "automation": {
+    "id": "lab-56-lab-63",
+    "status": "ACTIVE",
+    "every_minutes": 30
+  }
+}

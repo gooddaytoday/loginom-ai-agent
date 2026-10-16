@@ -1,0 +1,67 @@
+{
+  "decision": "SOURCE_ACCEPT",
+  "source": "f057960e0a84c7134601f6843385359c27d93438",
+  "parent": "1056c10652f7b48a1d8a20c4bf9c656e376137b1",
+  "operatorDecisionSha256": "648b6f00f58c22ce2f312b4bd946a82d51b283689cd3ad11dbf03467487dee92",
+  "createdUtc": "2026-10-15T18:40:39.659152+00:00",
+  "scope": "Exact LAB-57 mixed FD classification filter plus addressed closeout retention/binding/history-root/attestation-root delta and offline staging; source-only",
+  "exactArchiveVerified": true,
+  "executableRebuildByteEqual": true,
+  "artifact": {
+    "zipSha256": "3d57331546ee2248f1138b9a691539bef4cad6d247eeb36cc00ff14bc68b8055",
+    "manifestSha256": "bf0b2f5d09dbd5feeec69578cd072078fa649bf1e6f6190818e7da7c09484442",
+    "sourceManifestSha256": "6ea43bd2950e53e13e5d8ae302c96459f0c13e5b7e531bcdaa78a6ccdf00d0c8",
+    "executableSha256": "8b7e2942d33e332778da9487752d6634dde8e15766ed675412a13374de29096f",
+    "payloads": 1015,
+    "sourceEntries": 950,
+    "gitBlobs": 949,
+    "unchangedBaseBlobs": 937
+  },
+  "checks": {
+    "targetedTests": 9,
+    "mixedProducerNegativeExhaustionScenarios": 7,
+    "actualTsRefusalConsumer": "PASS",
+    "independentBoundaryChecks": 31,
+    "allFinalSupervisedRuns": "exit0/continuous/confirmed/captureComplete/errorNull/unknownEmpty/twoZeroRemaining",
+    "fdFilter": "Same resource_inventory projection used by comparison; only classification list changes; raw terminal coherenceDifferences and raw final pair remain",
+    "strictFdGates": "native/protected/identity/denied/profile-resource/exhaustion negatives PASS; limits and retry categories unchanged",
+    "retentionDecision": "Discarded metadata records only resource-relevant own activity; no claim of raw irrelevant-daemon deltas for every discarded read; no new metadata protocol",
+    "prior1056Binding": "exact oncec323c7f7 and47 terminal root pins;84process capture bound;owner/original-binding/cessation/logout absence required",
+    "all12SpentPreserved": "accepted retention chain unchanged plus exact previous completion check",
+    "protectedPids": 2523,
+    "retainedDiagnosticRoots": 11,
+    "nativeLogoutHistoryGuardCsvCompletionReleaseBodiesAndTsFdConsumerUnchanged": true,
+    "newRoot": "lab57-root-closeout",
+    "newOnceLimit": 1,
+    "newOnceConsumedBeforeEffects": 0,
+    "currentOldForeignBindingsAndRoots": "PASS",
+    "independentRebuildAndNodeSourceOnlyPlan": "PASS",
+    "offlineOperatorStaging": "PASS",
+    "sourceInstallZipSha256": "391decae48ef9908a16b77ffdda890ad6e7157471eae88148c997ba455192376",
+    "sourceBoundHelperSha256": "503f501fe96e6014d115d4417ea67e33f458048189a95d66a509f976a8f5becf",
+    "sourceCleanAfter": true,
+    "diffCheck": "PASS"
+  },
+  "evidence": {
+    "directory": "/home/kiselev/storage/tmp/lab57-root-diag-20261015/local-independent-closeout",
+    "manifest": "evidence.json",
+    "manifestSha256": "0f16f555623c60d5d1cc7f28e99a641c82f39454a3941d9d966c4f57e39123d7"
+  },
+  "reviewLocalErrors": {
+    "preservedRun": "independent-negatives232",
+    "correction": "independent-test-correction.json",
+    "cause": "Copied foreign-history negative used previous root fragment and therefore tested unchanged valid path; corrected only local test",
+    "sourceChanges": false,
+    "finalIndependentRun": "independent-negatives234 PASS31"
+  },
+  "findings": [],
+  "limitations": [
+    "SOURCE_ACCEPT only; no native READY, actual cleanup, completion/release/FREE or case ACCEPT is established.",
+    "No SSH, remote CLI, real Multica/MAS, native/model/reference/product/cold execution or real lease/profile/credential mutation was performed by this review.",
+    "Operator staging scripts were parsed/reviewed as text and exact source archives checked; provisioning and operator effects were not executed.",
+    "Historical retention checked against exact source and supplied local safe terminal snapshot; current remote state was not revalidated.",
+    "Original roster-delta UNKNOWN from the earlier ca99 incident remains unchanged; this fix addresses the separately captured mixed daemon/own-Chrome classification failure only.",
+    "Raw per-discarded-read irrelevant daemon deltas are not retained in successful retry metadata, as explicitly accepted in the owner decision; raw terminal error and final signed full pair remain.",
+    "Unchanged component suites/fullsuite were not repeated; author typecheck228 was not rerun."
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "comment": "01a1407c-a7d6-72cd-bc65-0c7be0cc8178",
+  "parent": "01a14060-a6e7-75dd-9bad-1332ff410e44",
+  "oneEvalerMention": true,
+  "bodyReadback": "EXACT",
+  "attachment": "01a14075-e8fc-7293-939c-b17e65857274",
+  "upload": {
+    "bytes": 2893544,
+    "sha256": "6ec79312013dcce0c0d81d13a26a5e3d37e2a3f60685822a4972570efb8e3ba3"
+  },
+  "source": "9c64a23fe2bc2f989d09862e1febae5afc2f996f",
+  "sourceManifestSha256": "67c8f091beeaa3e55bc118c88c121c7e2a1e11f91db1c1b4da8e61b3e1d7dcf8",
+  "executableSha256": "15d58adcb533f34f7bd175012ef315c4f426bb6e1ebae5d7904051cfcdd406da",
+  "operatorDecisionSha256": "e4b3b102124332643d61ac030074ca30ef8dcfda03f9adc5d4f0d871c0f139b8",
+  "state": "NOT_INSTALLED_NOT_APPLIED;sourcegatepending;Root personaloperator",
+  "priorFailure": "Pre-post snapshot timed out AFTER upload; no initial POST reached. Reused actual single upload after fresh metadata/comments/active[]+full byte readback;no duplicate upload/task."
+}

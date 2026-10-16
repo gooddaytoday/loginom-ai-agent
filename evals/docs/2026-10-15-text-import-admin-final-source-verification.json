@@ -1,0 +1,68 @@
+{
+  "status": "INDEPENDENT_SOURCE_ACCEPTED_INSTALLED_ROOT_FOREGROUND_RUNNING",
+  "source": "fec2874e24c9c201ddc0a57d6a4fba1ed47ab8b4",
+  "base": "8b9fdb3861cc0ac39d705c531efa2b1e0de0b506",
+  "operatorDecisionSha256": "c04005bb198080271669daa48421a8ba3bf707b68bbff2684784fc825b881220",
+  "targetDescriptorSha256": "921bc7030a2fa7ec2f682af06726ce24aa8caa70e90377c8d66cae807a89cbc2",
+  "archive": {
+    "zipBytes": 3737744,
+    "zipSha256": "a69dd5a013a22f4bda96b3b7544180f488a2c3727c89dd3f879e4e6fcab6c1fd",
+    "manifestSha256": "4fc0c58f202e46abdf9e610269882e4b11d0f88ad7780b3ac176880bbb52a56e",
+    "payloads": 1058
+  },
+  "sourceEntries": 968,
+  "sourceManifestSha256": "255722b11fa8d248eb9a14189a809cfeb95b0fb45501deaece304b0bf6f10881",
+  "executableSha256": "22345d6e7f0454dd1f7ab90844c8b9dffdc033c215bfe76b1fd987c0aac6c790",
+  "delta": "Incidentfixedhash admin1850pendingempty only CloseSession0, realonce fsync+fixedconnectorFULLfinalgate+sameprivatediagnosticpath+immutableoncesnapshotcheckimmediatelybeforeSDKcall;Node-safeSHA256primitive;freshpeerpreservingpostpair thenUNCHANGEDstandardpriorabsence/original/history/release. No genericadminallowlist. Newroot-admin/16spent73capture/2900PIDs15diagnostics.",
+  "tests": "newtargetRED273→GREEN274;onceraceRED275→GREEN280;actualNodeBunundefinedRED282/283→final28439PASS0FAIL161expects inclchangedhashprimitive;typecheck285PASS;builds286287byteequal;continuous9zero;private targetfixture NOTDELIVERED/public rawIDs excluded;no unchangedfullsuite",
+  "actualPrior": "Root57107 EXIT2;genuineown1851logout/transportclosed/all73zero;13ms fullpair originalscopeabsent butprior1850pendingempty. No laterhistory/guardCSV/completion/release.",
+  "oldAttempts": 16,
+  "newAddressedOperation": "0/1;Rootactualoperator/Benfinalonly",
+  "scope": "Fixed1850only ifexactpendingempty;allpeerspreserved/fullgate/lastconnectoroncecheck;privatefixture/credentials/rawtargetnotGit",
+  "remaining": "exact independent admission→Root real1850absence/closure→originalscope proof→history77/guardCSV/completion/SETTLED/RELEASED/FREE→oneBenfinalACCEPT→DONE57",
+  "automation": "OFF",
+  "MAS": "foreignuntouched",
+  "curation": "Same source/allowances/installation ZIP;final286287 build proofs added;old278279 explicitly candidatehistory only;old95af retained",
+  "independentReview": {
+    "receiptSha256": "8dc85995a5ba04488b9e587e4f6ff0797417c891f4ce00a556b81bd16d4b5c2b",
+    "evidenceSha256": "b372e3e88d29ade539ceebd07077dead8730751c9d3b2d67ea0babf839139af1",
+    "sourceOnly": true,
+    "curatedArchiveVerified": true,
+    "limitations": "Explicit delegated causal ownershipdecision;directorignal nativeID missingremainsmissing"
+  },
+  "current": "Rootfore72019 RUNNING;sameforegroundonlyuntilterminal/no extraSSH/API",
+  "actualTerminal": {
+    "startedAt": "2026-10-15T20:38:15.752886Z",
+    "finishedAt": "2026-10-15T20:42:46.817395Z",
+    "exit": 2,
+    "nativeExit": 0,
+    "processCount": 83,
+    "capture": "continuous/complete/confirmed/error-null/unknown-empty/two-zero",
+    "serverCessation": "SERVER_OWNERSHIP_SCOPE_CEASED",
+    "ownLogout": "OWN_DIAGNOSTIC_LOGGED_OUT",
+    "ownTransportClosed": true,
+    "outerHistoryCommand": "120000ms timeout SIGTERM; original failure preserved",
+    "actualHistoryEffect": {
+      "managementStatus": "ready",
+      "exit": 0,
+      "managementProcessesClosed": 16,
+      "historyArchiveFiles": 4215,
+      "historyArchiveBytes": 53497176,
+      "profilePersistentFiles": 7,
+      "processesReferencingOriginalProfileOrRoute": 0,
+      "pendingOrWriterOrRecovery": false,
+      "historyProof": "not yet completed"
+    },
+    "once": {
+      "device": 64512,
+      "inode": 17858384,
+      "bytes": 6798,
+      "sha256": "cbd6da6f55a3459c7d000c58849f50002649dbc8c8c491055cce309ea4b0d13f"
+    },
+    "originalRecovery": "1/1 consumed unchanged",
+    "guardCsv": "retained",
+    "completionReleasedFree": false,
+    "operator": "Root; Ben independent final only",
+    "noNewModelReferenceProductCold": true
+  }
+}

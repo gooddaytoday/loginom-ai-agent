@@ -1,0 +1,127 @@
+{
+  "observedAt": "2026-10-15T19:00:06.274871+00:00",
+  "source": "f057960e0a84c7134601f6843385359c27d93438",
+  "rootExecution": {
+    "exit": 2,
+    "pid": 2399478,
+    "birth": "114913448",
+    "startedAt": "2026-10-15T18:43:37.307422+00:00",
+    "finishedAt": "2026-10-15T18:59:26.996037+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "closeoutContinuationOncePresent": true,
+    "previousRootFinalConsumed": 1,
+    "previousAddressedFinishConsumed": 1,
+    "priorControlConsumed": 1,
+    "priorKernelConsumed": 1,
+    "priorAbiContinuationConsumed": 1,
+    "priorFdContinuationConsumed": 1,
+    "priorObserverRepairConsumed": 1,
+    "sandboxRepairConsumed": 1,
+    "priorContinuationConsumed": 1,
+    "originalRecoveryConsumed": 1,
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": true,
+    "routeRootPresent": true,
+    "controllerStillPresent": false
+  },
+  "once": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-closeout.once.json",
+    "device": 64512,
+    "inode": 17858372,
+    "bytes": 6665,
+    "mode": 384,
+    "sha256": "9b6daec064611a9bd411597da6212111547ee3871687fe57daacea8394bf5031",
+    "mtimeNs": "1792089839710554060",
+    "ctimeNs": "1792089839710554060"
+  },
+  "owner": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/owner.json",
+    "device": 64512,
+    "inode": 17837097,
+    "bytes": 500,
+    "mode": 384,
+    "sha256": "7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64",
+    "mtimeNs": "1791930497229073348",
+    "ctimeNs": "1791930497229073348"
+  },
+  "process": {
+    "nativeExit": 130,
+    "timedOut": true,
+    "status": "confirmed",
+    "captureComplete": true,
+    "count": 126,
+    "error": null,
+    "unknown": [],
+    "verification": [
+      {
+        "observed_at": "2026-10-15T18:59:22.104Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-15T18:59:22.207Z",
+        "owned_remaining": 0
+      }
+    ]
+  },
+  "actual": {
+    "originalServerScope": "SERVER_OWNERSHIP_SCOPE_CEASED",
+    "ownEmptyObserver": true,
+    "ownLogout": "ONE_DISPATCH_ERROR_OWN_LOGOUT_NOT_OBSERVED_EFFECT_UNKNOWN",
+    "transportClose": "PRE_EFFECT_FD_GATE_REFUSED; supervisor126closed",
+    "officialHistory": false,
+    "guardCsv": false,
+    "completionReleaseFree": false
+  },
+  "cause": {
+    "logout": "Vendor Dispose leaves FConnected true; exact six session/container fields cleared. Wrong stale connection postcheck.",
+    "transportGate": "Exact unrelated Codex679924/birth63560738/parent29211/uid1000 FD28to27; all resource target observations remain necessary.",
+    "publicSource": [
+      {
+        "path": "bg/app/Application.js",
+        "bytes": 45243,
+        "sha256": "1b922bfff58f5d71ab08bc25b3198da17ae2a4d2a7ce4c034265aca9de15bc78",
+        "status": 200
+      },
+      {
+        "path": "bg/app/ServerConnection.js",
+        "bytes": 16418,
+        "sha256": "4c8203aa04050c45f55f2dfec76ef65d93b056a9cbe092419a9bbea821e0c5a6",
+        "status": 200
+      }
+    ]
+  },
+  "preserved": {
+    "originalBenOwnerTaskAcquiredConfigLease": true,
+    "pastOncesSpent": 13,
+    "originalRecoverySpent": 1,
+    "BenProduct6of6WholeERRORQualityEXCLUDED": true,
+    "newModelReferenceProductCold": 0,
+    "MASForeignUntouched": true,
+    "automation": "OFF"
+  },
+  "next": "Minimal exact logoutABI/serviceFDcomparison TDD and independent exact source admission; new addressed Root continuation preserving all13onces, strict fresh prioradminabsence; genuine history77/guardCSV/completion/RELEASED/FREE then independent Ben ACCEPT.",
+  "privateEvidence": [
+    {
+      "file": "terminal-state.json",
+      "bytes": 36756,
+      "sha256": "479ad35d480d4f5b50ec9ca806243f985099d629ab9de5ad6bcd800cc2b5467e"
+    },
+    {
+      "file": "root-execute-result.json",
+      "bytes": 872,
+      "sha256": "bd27bf39d121ab4b6db39148b04e335a7d22207fed4c2cf4c4a46d1a06915da6"
+    },
+    {
+      "file": "capture-files.json",
+      "bytes": 912,
+      "sha256": "2b70f467c8ada188660602d2f9290998076c9ce4aaeb21fc27dafe339566199a"
+    },
+    {
+      "file": "logout-source-and-service.json",
+      "bytes": 870,
+      "sha256": "ef63b4bb7c8e0223d32789a434ea08a407c7cbbe533bbf5a429788be4e6348e5"
+    }
+  ]
+}

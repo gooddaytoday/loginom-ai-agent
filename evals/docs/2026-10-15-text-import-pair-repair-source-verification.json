@@ -1,0 +1,61 @@
+{
+  "status": "INDEPENDENT_SOURCE_ACCEPTED_ACTUAL_EXIT2_PRIOR_EMPTY_ADMIN",
+  "source": "8b9fdb3861cc0ac39d705c531efa2b1e0de0b506",
+  "base": "8be13377e6ee2b6b1442819094ed03d60d417996",
+  "archive": {
+    "zipBytes": 3203811,
+    "zipSha256": "00e2bbc0f775eb30feb438387dc731881a3fbf09faeb87c785ab8a1d211e4260",
+    "manifestSha256": "3620540186588c41de1d13ee4e2a7b0a6923df4e61f8b4f81b633f0d4e0f493f",
+    "payloads": 1005
+  },
+  "sourceEntries": 962,
+  "sourceManifestSha256": "396bd26ba5f34d7fdedf61fac8e11f638b8251ae15b14186dabe894c8393664b",
+  "executableSha256": "b65c7f2c12e54a1dc750a5eb4b53a1cfca75a97e3e47d3c1fc148ca4fde02d50",
+  "delta": "ONE productioncallbacktimer newPromise/setTimeout\u2192Page.waitForTimeout1;allaccepted strict15s/rawpair/permits/gates/history/release unchanged. Exactnewroot-pair/15spent69capture/2826PIDs14diagnostics bindings.",
+  "tests": "restrictedVMactualcallback RED2633fail\u2192GREEN2654pass;newroot RED4fail\u2192GREEN4pass;final26619PASS0FAIL52expects;typecheck267PASS;cleanbuild268269byteequal;sourcecontinuouscompleteconfirmederrornullunknown[]twozero;no unchangedfullsuite",
+  "actualPrior": "8be Root9244 EXIT2;ownloginack thenpair ReferenceError;all69closed/transportclosed;noowner/originalbinding/cessation/logout/history/guardCSV/completion/release.",
+  "remaining": "exactindependentgate\u2192Rootremainingactualhistory77/guardCSV/completion/RELEASED/FREE\u2192oneBenfinalACCEPT",
+  "operator": "Root directly;Ben final independent ACCEPT only",
+  "scientificCounters": "Unchanged originalERROR/all6BenqualityEXCLUDED/product6of6/all15oldonces+originalrecovery1of1 preserved;newdistinctaddress0of1",
+  "foreign": "MAS/evalrun no intervention;automationOFF",
+  "remainingResources": [
+    {
+      "resource": "Original Loginom run scope plus prior own admin observers",
+      "blocks": "Verified server cessation before history/guard cleanup",
+      "doneObservation": "Complete stable authoritative inventory excludes original scope and foreign ambiguity; current own observer logout and transport/process closure proved"
+    },
+    {
+      "resource": "Ben original profile pending CP history/DB/WAL/SHM",
+      "blocks": "Official complete history and77 row preservation",
+      "doneObservation": "Supported history archive, coherent private copies, original77 Luna/high rows unchanged"
+    },
+    {
+      "resource": "Original exact legacy harness guard",
+      "blocks": "Final original profile cleanup proof",
+      "doneObservation": "Whole no-replace archive with before/after identities and bytes, only after server cessation+history"
+    },
+    {
+      "resource": "Original150byte CP1251 input CSV",
+      "blocks": "Original run storage cleanup proof",
+      "doneObservation": "Exact path/inode/hash checked; owned file absent after checked removal"
+    },
+    {
+      "resource": "Original Ben common lease and recovery receipt",
+      "blocks": "LAB57 final cleanup/ACCEPT and dependency gate",
+      "doneObservation": "Genuine attestation/completion, original receipt SETTLED, ordinary RELEASED and fresh FREE; source owner/task/acquiredAt/config preserved"
+    }
+  ],
+  "independentReview": {
+    "receiptSha256": "46534327bbfde64f57d6669f0c86f86d8c9db505fde3b80ed080878c636b4829",
+    "evidenceSha256": "102702a9fedbaaa9ade52072f231496205575d078597f1ff1f2175ea6e5cacd6",
+    "sourceOnly": true,
+    "actualInstalledCallbackAbi": "Exact manifested MCP rawPage injection/Page\u2192Frame\u2192channel; no globaltimer required"
+  },
+  "current": "Foreground57107 terminalEXIT2;own73zero/genuineown1851logout/transportclosed;prior1850pendingempty blocks;no history/release",
+  "operatorActual": {
+    "canonical": "2026-10-15-text-import-prior-admin-stop-verification.json",
+    "ownLogoutConfirmed": true,
+    "all16SpentRetained": true,
+    "originalLease": "BUSY"
+  }
+}

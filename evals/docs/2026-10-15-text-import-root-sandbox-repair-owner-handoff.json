@@ -1,0 +1,30 @@
+{
+  "comment": "01a13e89-48df-7046-bccf-5dfec25abbfd",
+  "parent": "01a13e56-5d13-7ba6-8428-067e1c97e81e",
+  "bodyExact": true,
+  "oneEvalerMention": true,
+  "attachment": "01a13e89-4275-7c18-bb08-74dcb0c5ebdf",
+  "runs": [
+    {
+      "id": "01a13e89-48fa-7e7c-9e6d-6cc7088788d2",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "status": "running",
+      "trigger_comment_id": "01a13e89-48df-7046-bccf-5dfec25abbfd",
+      "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+    }
+  ],
+  "source": "d1d38f63fcea1e6f3647f28ed9d453454ee29f6f",
+  "zipSha256": "e507514392c69759992158652ca6022d8b78e461e97d88eb01ff44556de5d81c",
+  "independentSourceAdmission": "PENDING",
+  "RootNewSourceInstallNativeEffects": 0,
+  "cleanupWorkerDispatch": 0,
+  "BenRole": "independent final cases/validators/attestation only",
+  "mas": "FOREIGN/NO_INTERVENTION",
+  "automation": "OFF",
+  "attachmentRoundTrip": {
+    "attachment": "01a13e89-4275-7c18-bb08-74dcb0c5ebdf",
+    "bytes": 2528470,
+    "sha256": "e507514392c69759992158652ca6022d8b78e461e97d88eb01ff44556de5d81c",
+    "exact": true
+  }
+}

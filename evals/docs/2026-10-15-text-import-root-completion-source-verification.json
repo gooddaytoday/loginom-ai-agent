@@ -1,0 +1,32 @@
+{
+  "source": "1056c10652f7b48a1d8a20c4bf9c656e376137b1",
+  "parent": "ca99158ba93928eb24151390ee94fe0ad31fd371",
+  "decisionSha256": "af22d51ac54dab3e604fd64b45fea12f31a0fb888443f8b18e31e480d4529eb5",
+  "scope": "Only new addressed0/1 root+once and exact124process terminal/11spent/2438PIDs/10diagnostics retention; currentbindings/history/attestationroot. FD/native/logout/history/guardCSV/completion/release behavior unchanged.",
+  "package": {
+    "zipBytes": 2952890,
+    "zipSha256": "5ed4c3a4e529c9d02f3ec74ab264e63e107406261169d392d290a8c2dee526f3",
+    "manifestSha256": "37d9f53160ed5a7e2bb7f42489278ea91d34a4c560267ba22fc7e9fb1e2fceec",
+    "payloads": 1005
+  },
+  "sourceManifestSha256": "20b427ece5f9050339abcd87f6bbf009e58e61851a0a6e76e020ebf5155e268b",
+  "executableSha256": "d08dce8541963aa8ad51f22a7079c21bebd67e7472367dfd9125608819ea10f9",
+  "sourceEntries": 946,
+  "changedPaths": [
+    "evals/docs/evaler/lab57-root-completion-decision.json",
+    "evals/docs/evaler/lab57-root-completion-pids.json",
+    "evals/script/lab57-fd-observer.py",
+    "evals/script/lab57-root-issue-runs.py",
+    "evals/script/lab57-route-inspect.py",
+    "evals/script/lab57_history_audit_scope.py",
+    "evals/src/lab57-continuation.ts",
+    "evals/src/lab57-recovery-attestation.ts",
+    "evals/src/lab57-root-finish.ts",
+    "evals/src/lab57-route-host.ts",
+    "evals/test/lab57-root-completion.test.ts"
+  ],
+  "tests": "RED0PASS4FAIL→GREEN4;final8PASS0FAIL;typecheck212;2cleanbuilds;SOURCEcapturesconfirmedcompleteerrornullunknown[]twozero. Unchanged suites not repeated.",
+  "runtimeAdmission": "NOT_APPLIED;independent exact SOURCE gate pending;operator preparation OFFLINE only",
+  "actualPrior": "ca99original-serverceased/own124processclosed,logoutpre-effectrosterrefusal;11oncesconsumedimmutable;originalrecovery1/1;currentinstrumented10passescomplete/noblockers doesnotreconstructolddelta",
+  "remaining": "one distinct addressed continuation thenactualremainingcleanup/free/BenfinalACCEPT"
+}

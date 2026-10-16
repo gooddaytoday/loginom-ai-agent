@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "comment": "01a13ecf-e688-7dae-9a50-431edd23891a",
+  "parent": "01a13ea9-1e34-7f19-a84b-501dedde449e",
+  "attachment": "01a13ecf-e3cd-7cf3-8d5c-4e26f770a5fb",
+  "marker": "LAB57-ROOT-OBSERVER-REPAIR-SOURCE-20261015-fdbfae6d",
+  "source": "fdbfae6d7a94c06b1343872b7465f6e289f58b08",
+  "bodyParentSingleEvalerMentionReadbackVerified": true,
+  "packageSha256": "88160be5b5cbf4a1423a43d913796a75cf2a6d1ad9b0aba109d36a89db0b7f77",
+  "manifestSha256": "1b34052bb82c98b257e53b1649df885ca9a2b4df12766f2d32f4b9317db3067d",
+  "activeReviewTask": "01a13ecf-e696-7660-9597-bea32fe136e4",
+  "revision": 463,
+  "status": "SOURCE_REVIEW_ONLY_NOT_APPLIED",
+  "operator": "Root personally; Ben final independent verification only",
+  "automation": "OFF",
+  "MAS": "FOREIGN_NO_INTERVENTION"
+}

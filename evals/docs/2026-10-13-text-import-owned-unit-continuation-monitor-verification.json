@@ -1,0 +1,587 @@
+{
+  "checked_utc": "2026-10-13T10:38:45.160404+00:00",
+  "full_eight_card_reads_utc": "2026-10-13T10:31:45.107128+00:00",
+  "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "status": "in_progress",
+  "revision": 160,
+  "continuation_handoff": {
+    "comment_id": "01a134d6-c645-73f7-897b-f4c5670c4419",
+    "parent_id": "01a134b5-b560-7d3b-87be-968bfa3c4df6",
+    "author_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+    "created_at": "2026-10-13T13:37:33+03:00",
+    "single_routed_Rich_mention": true,
+    "task_id": "01a134d6-c65f-7976-92aa-353b9b6a6770",
+    "actual_task_status": "queued",
+    "actual_task_trigger_matches_comment": true,
+    "metadata_dispatch_outcome": "ambiguous",
+    "metadata_task_id": null,
+    "metadata_native_receipt": null,
+    "note": "Actual run API proves one queued Rich continuation despite in-flight ambiguous intent metadata; coordinator still running. Do not duplicate."
+  },
+  "archive": {
+    "attachment_id": "01a134d6-c610-7297-bd90-cd048464e5ff",
+    "filename": "lab57-capacity-oct13-continuation.zip",
+    "bytes": 14278,
+    "sha256": "a8bd055fc1f8280122d6133d0e40febad2d6d3e0f01d00c61f949da59c46db3d",
+    "CRC": "PASS",
+    "safe_member_paths": "PASS",
+    "regular_non_symlink_members": true,
+    "members": [
+      {
+        "path": "lab57-capacity-oct13-inspection.json",
+        "bytes": 3384,
+        "sha256": "f6ab42b185140fb5e3066ec3c03b9818397140084106169c498820dd2919a029"
+      },
+      {
+        "path": "lab57-capacity-oct13-ledger.json",
+        "bytes": 14514,
+        "sha256": "bc6b37e96d30089b01ad6384290e62d054021ece6a2b0cddf669f616e2916ae2"
+      },
+      {
+        "path": "lab57-capacity-oct13-history.json",
+        "bytes": 14712,
+        "sha256": "93330ed25ca42835c29f53cb40940fb710b37c91ac8d50fe06cb39065109ec41"
+      },
+      {
+        "path": "lab57-capacity-oct13-continuation.json",
+        "bytes": 4304,
+        "sha256": "5a9e68d8ef8735b22abc627bdf0334db0771fce75d4213dcb44a9f72a98a0479"
+      }
+    ]
+  },
+  "inspection": {
+    "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+    "failed_task_id": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+    "terminal_status": "failed",
+    "error": "Selected model is at capacity. Please try a different model.",
+    "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+    "native_messages": 181,
+    "tool_calls": 82,
+    "capacity_fingerprint": "multica-codex:gpt-6.1-sol:model-capacity",
+    "capacity_classification": "confirmed repeated",
+    "charge": 1,
+    "same_cause_consumed_after": 3,
+    "same_cause_remaining": 7,
+    "worker_work_started": true,
+    "worker_usage": [
+      {
+        "cache_read_tokens": 4542336,
+        "cache_write_tokens": 0,
+        "input_tokens": 502174,
+        "model": "gpt-6.1-sol",
+        "output_tokens": 17471,
+        "provider": "codex"
+      }
+    ],
+    "own_unit_lease": {
+      "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+      "task": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+      "role": "rich",
+      "phase": "unit",
+      "sha": "49522d83318bac29779e497798becb2f799bc84e",
+      "acquiredAt": "2026-10-13T09:49:32.777Z",
+      "containerId": "b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e",
+      "configSha256": "58435fbe4aca6ac2e40629800594526a7cec48af3d9306e02fa5b7163be96d71"
+    },
+    "canonical_task_config_matches_lease": true,
+    "private_receipt_locator": "/home/user/.local/share/loginom-evals-runtime/roles/rich/agent-work/lab57-autonomy/task-01a134a1-0f47-782c-8d67-9c843c2d25e3/stand-lease.json",
+    "private_config_locator": "/home/user/.local/share/loginom-evals-runtime/roles/rich/agent-work/lab57-autonomy/task-01a134a1-0f47-782c-8d67-9c843c2d25e3/ops-config.json",
+    "initial_preflight": {
+      "code": 2,
+      "status": "BLOCKED",
+      "reason": "OPERATION_FAILED"
+    },
+    "initial_preflight_root": "UNCLASSIFIED; generic signature does not prove equivalence to historical root; charge0",
+    "unit_state": "unfinished/unconfirmed: result0bytes and no completion/process-cleanup proof. Original invocation/process state must be checked on worker execution host; no absence claim from coordinator observation",
+    "unit_result_bytes": 0,
+    "unit_capture": {
+      "stdout_sha256": "c9e70d704e10ec4fbca35621d3f63acb2b2bf0a94134cbad56a4740e3b9d66f6",
+      "stderr_sha256": "9baeb6e0a73abd24f86fdbbb1aeac7b80b738269a2cae13e2072a661e1f148b3",
+      "process_cleanup_exists": false
+    },
+    "main_partial_sha": "49522d83318bac29779e497798becb2f799bc84e",
+    "main_checkout_clean": true,
+    "candidate_source_sha": "5cd74d8ee5d6125692d953eb327b4d4f833c27a1",
+    "candidate_source_dirty": [
+      "packages/agent/test/session/message-v2.test.ts"
+    ],
+    "candidate_status": "isolated dependency tree and RED regression staged; source production shim/build/admission not complete",
+    "new_reference_product_cold_attempts": 0,
+    "helper_recovery_used": 0,
+    "stage_deadline_utc": "2026-10-13T15:33:29.538616+00:00",
+    "secrets_published": false,
+    "held_operation_guard": {
+      "present": true,
+      "empty": true,
+      "device": 64512,
+      "inode": 12748661,
+      "uid": 1000,
+      "mode": "0o700",
+      "settlement_status": "UNCONFIRMED; do not delete or duplicate unit operation"
+    },
+    "ordinary_continuation_scope": "same Rich original owner/config/lease; diagnose or collect genuine original completion and normal release; no acquire/identity rewrite/manual guard or lease removal/new recovery allowance. If no supported ordinary path, report proven BLOCKED."
+  },
+  "full_blocker_ledger": {
+    "version": 8,
+    "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+    "authorization_comment_id": "01a12f9e-6ca3-73d7-acbf-c0180d51fef5",
+    "policy": "confirmed same-cause repeat only; unique/first work/success=0; unclassified deferred; never charge dispatch upfront or reset tally",
+    "confirmed_repeats": {
+      "limit": 10,
+      "consumed": 3,
+      "remaining": 7
+    },
+    "native_task_history": [
+      {
+        "task_id": "01a12ef8-63ec-770b-b5c6-9955890df0dd",
+        "status": "failed"
+      },
+      {
+        "task_id": "01a12f01-84a3-74d5-87b8-fbe1d15a5a25",
+        "status": "completed"
+      },
+      {
+        "task_id": "01a12f45-6763-7cd4-ab17-e12d502dd8bc",
+        "status": "failed"
+      },
+      {
+        "task_id": "01a12f9d-99bf-79a6-a978-026c32df932e",
+        "status": "completed"
+      },
+      {
+        "task_id": "01a12fcc-4e05-7d01-8fc5-d2d9618bd395",
+        "status": "completed"
+      },
+      {
+        "task_id": "01a12ff5-e467-7cd5-aa26-be6e4c02d061",
+        "status": "failed"
+      },
+      {
+        "task_id": "01a13004-e856-7bd2-9cc7-6f5c5b922c3d",
+        "status": "completed",
+        "quality": "BLOCKED cold before graph"
+      },
+      {
+        "task_id": "01a13042-dc9d-72d8-b324-60d52c04ebf8",
+        "status": "completed",
+        "quality": "BLOCKED CP1251 cold wizard owner; addressed cleanup RELEASED/FREE"
+      },
+      {
+        "task_id": "01a130cf-f462-77ae-925b-7883730d80b7",
+        "status": "completed",
+        "quality": "offline repair completed and verified; native GREEN not run",
+        "charge": 0
+      },
+      {
+        "task_id": "01a130ff-f583-7158-a212-250ff18600cf",
+        "status": "completed",
+        "report_id": "01a13138-6ee4-7a6d-aea5-f798eea0bb9f",
+        "quality": "5/6 warm+cold PASS; external pinned CLI TSV serialization blocker before UTF16 generation",
+        "charge": 0
+      },
+      {
+        "task_id": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+        "status": "failed",
+        "quality": "model capacity after partial work; original own unit lease/completion unresolved",
+        "charge": 1
+      }
+    ],
+    "blockers": [
+      {
+        "fingerprint": "multica-codex:gpt-6.1-sol:model-capacity",
+        "component": "worker model admission",
+        "first_evidence": "01a12efc-bca2-7a84-86ec-b3e1e239cc84",
+        "events": [
+          {
+            "task_id": "01a12ef8-63ec-770b-b5c6-9955890df0dd",
+            "classification": "unique",
+            "charge": 0,
+            "reason": "first exact model capacity failure"
+          },
+          {
+            "task_id": "01a12f45-6763-7cd4-ab17-e12d502dd8bc",
+            "classification": "repeated",
+            "charge": 1,
+            "reason": "same model, failure reason and exact original error"
+          },
+          {
+            "task_id": "01a12ff5-e467-7cd5-aa26-be6e4c02d061",
+            "classification": "repeated",
+            "charge": 1,
+            "reason": "same unchanged worker model/runtime, terminal failure kind and exact original task error",
+            "evidence_comment_id": "01a12ffb-158c-7b75-bd4c-3842d9d84fef"
+          },
+          {
+            "task_id": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+            "classification": "repeated",
+            "charge": 1,
+            "reason": "Same original task error, configured gpt-6.1-sol/xhigh and runtime; terminal failure independently verified; automatic text and platform notification are one failed task",
+            "platform_comment_id": "01a134b5-b560-7d3b-87be-968bfa3c4df6",
+            "automatic_comment_id": "01a134b5-be27-70f8-a6d7-ab772f57c745",
+            "work_started": true
+          }
+        ],
+        "error": "Selected model is at capacity. Please try a different model."
+      },
+      {
+        "fingerprint": "text-import:source-admission:inputStore-artifact-name",
+        "component": "check-text-import.py source bindings",
+        "first_evidence": "01a12f1f-fd9e-78ee-b002-c31786073d83",
+        "task_ids": [
+          "01a12f01-84a3-74d5-87b8-fbe1d15a5a25",
+          "01a12f45-6763-7cd4-ab17-e12d502dd8bc"
+        ],
+        "classification": "unique",
+        "charge": 0,
+        "reason": "first legacy-basename incompatibility; original reference FAIL retained; subsequent offline repair passed",
+        "resolved_partial_sha": "2c02eb9c5fde7eea2ff013ccd40c8a4417a1e9a7"
+      },
+      {
+        "fingerprint": "text-import:native-binding:compactNodeResult-projection",
+        "component": "native/public checkpoint equality",
+        "first_evidence_sha256": "4db62756a66ec3fbfb3273f8e32dd725614d804699ad251dfe697d3487209026",
+        "task_ids": [
+          "01a12f45-6763-7cd4-ab17-e12d502dd8bc",
+          "01a12f9d-99bf-79a6-a978-026c32df932e"
+        ],
+        "classification": "unique",
+        "charge": 0,
+        "reason": "distinct proven producer projection defect; repaired without new scenario run",
+        "resolved_partial_sha": "8e2bc4fc480d9037ab1a9b4f5fe269daa716e97b"
+      },
+      {
+        "fingerprint": "text-import:package-graph:unused-structural-input-ports",
+        "component": "persisted import graph admission",
+        "first_evidence_sha256": "0cb9dbdfdabf11bd79c4028037076148abb515003431700319f87218b205d82e",
+        "task_ids": [
+          "01a12f45-6763-7cd4-ab17-e12d502dd8bc",
+          "01a12f9d-99bf-79a6-a978-026c32df932e"
+        ],
+        "classification": "unique",
+        "charge": 0,
+        "reason": "distinct Connection/ControlVariables port representation with links=[]; RED/GREEN and independent full warm PASS",
+        "resolved_partial_sha": "8e2bc4fc480d9037ab1a9b4f5fe269daa716e97b"
+      },
+      {
+        "fingerprint": null,
+        "component": "pinned node-eval-ops native preflight before admission.json",
+        "observed_signature": "exit=2; OPERATION_FAILED; no admission or native browser-check capture",
+        "first_evidence": "01a12fb8-eb87-7749-9397-35fbf2a38024",
+        "task_ids": [
+          "01a12f9d-99bf-79a6-a978-026c32df932e"
+        ],
+        "classification": "unclassified",
+        "charge": 0,
+        "reason": "generic wrapper hides lower exception; no confirmed repetition and no cause fingerprint assigned"
+      },
+      {
+        "fingerprint": "cold:verifyResources:node-realpath-mismatch",
+        "component": "pinned resources.mjs verifyResources:28",
+        "first_evidence": "01a1301d-608a-7385-8a14-298f4142e610",
+        "task_ids": [
+          "01a13004-e856-7bd2-9cc7-6f5c5b922c3d"
+        ],
+        "classification": "unique",
+        "charge": 0,
+        "reason": "wrong separate Node realpath even with matching version/hash; corrected to manifest bin/node without modifying verifier",
+        "resolution": "command corrected, resource verification passed"
+      },
+      {
+        "fingerprint": null,
+        "component": "cold reader -> pinned loginBrowser launchPersistentContext",
+        "first_evidence": "01a1301d-608a-7385-8a14-298f4142e610",
+        "task_ids": [
+          "01a13004-e856-7bd2-9cc7-6f5c5b922c3d"
+        ],
+        "observed_signature": "LOGINOM_BROWSER_START_FAILED",
+        "classification": "unclassified",
+        "charge": 0,
+        "reason": "lower exception discarded; confirmed headful request/no admitted display is a prerequisite gap, not recovered exact root cause"
+      },
+      {
+        "fingerprint": "text-import:cp1251:source_name-Id-vs-Identifikator",
+        "component": "reference1 import column source selection",
+        "first_evidence": "01a130b1-248a-7537-b29d-8fc2d9b5c26f",
+        "task_ids": [
+          "01a13042-dc9d-72d8-b324-60d52c04ebf8"
+        ],
+        "classification": "unique",
+        "charge": 0,
+        "reason": "original two-Apply sequence failure retained; reference2 explicit source_name passed one-Apply warm gate; separate reference budget consumed"
+      },
+      {
+        "fingerprint": null,
+        "component": "exact node-wizard-open -> ui.act begin_wizard owner completion",
+        "first_evidence": "01a130b1-248a-7537-b29d-8fc2d9b5c26f",
+        "journal_sha256": "0c0a3678ac7c4d53006f9bc8044672b568bdc01c3c1f389d5eeaa15be00969cd",
+        "task_ids": [
+          "01a13042-dc9d-72d8-b324-60d52c04ebf8"
+        ],
+        "classification": "unclassified",
+        "charge": 0,
+        "reason": "one opening gesture effect_possible=true with owner_context unobserved; labels and missing visible wizard breadcrumb are observations, not proven lower cause",
+        "resolution": {
+          "task_id": "01a130ff-f583-7158-a212-250ff18600cf",
+          "report_id": "01a13138-6ee4-7a6d-aea5-f798eea0bb9f",
+          "partial_sha": "49522d83318bac29779e497798becb2f799bc84e",
+          "native_owner": "observed",
+          "one_gesture": true,
+          "full_cold_checker": "PASS",
+          "cleanup": "confirmed",
+          "historical_root": "UNCLASSIFIED; viewport repair works but exact overflow cause is not reconstructed"
+        }
+      },
+      {
+        "fingerprint": "pinned-cli:MessageV2.toModelMessages:csv-only-inline-shim:unsupported-tsv-file-part",
+        "component": "packages/agent/src/session/message-v2.ts; run.ts immutable snapshot; provider file serialization",
+        "first_evidence": "01a13138-6ee4-7a6d-aea5-f798eea0bb9f",
+        "task_ids": [
+          "01a130ff-f583-7158-a212-250ff18600cf"
+        ],
+        "classification": "unique",
+        "charge": 0,
+        "reason": "First proven CSV-only provider shim rejects original non-UTF8 TSV in SDK getArgs before generation; original bytes/BOM/SHA retained",
+        "pin": "5cd74d8ee5d6125692d953eb327b4d4f833c27a1",
+        "proposal_attachment_id": "01a13138-6bef-777d-83fc-f5a0c6a5b42a",
+        "proposal_sha256": "a5b4b73372a048dcb37b846d007f652f19c03327024f84097ef8ce620b742420",
+        "proposal_status": "NOT_APPLIED",
+        "decision_required": "Owner instruction 01a130f3 point 6: separately authorized/admitted CLI pin"
+      }
+    ],
+    "diagnostic_wrapper": {
+      "authorization_comment_id": "01a12fd4-7b9e-7dc6-a74f-162f70abc945",
+      "task_id": "01a12fcc-4e05-7d01-8fc5-d2d9618bd395",
+      "limit": 1,
+      "consumed": 1,
+      "report_id": "01a12fe8-badc-75f0-b6d1-d73d6233c83c"
+    },
+    "scenario_budgets": {
+      "reference_consumed": {
+        "txt-comma-utf8": 1,
+        "csv-comma-utf8": 1,
+        "txt-semicolon-cp1251-decimal": 2,
+        "csv-pipe-multiline": 1,
+        "tsv-utf8": 1,
+        "tsv-utf16le": 1
+      },
+      "reference_limit_per_case": 3,
+      "product": 0,
+      "cold": 5,
+      "LAB-56_admission": "3/3 PASS, exhausted",
+      "new_smoke_probes_generations": 0,
+      "recovery": 0,
+      "product_consumed": {
+        "txt-comma-utf8": 0,
+        "csv-comma-utf8": 0,
+        "txt-semicolon-cp1251-decimal": 0,
+        "csv-pipe-multiline": 0,
+        "tsv-utf8": 0,
+        "tsv-utf16le": 0
+      }
+    },
+    "successful_diagnostic": {
+      "task_id": "01a12fcc-4e05-7d01-8fc5-d2d9618bd395",
+      "result": "READY/cleanup independently verified",
+      "charge": 0,
+      "proof_attachment_id": "01a12ff5-e35b-7604-85ab-fcea6df41c63"
+    },
+    "cold_history": {
+      "reader_invocations": 8,
+      "launch_attempts": 7,
+      "completed": 5,
+      "historical_failures_preserved": true,
+      "normal_cleanup_browser_continuations": 2
+    },
+    "next_stage_charge": "deferred until actual confirmed repetition; source/SHA/task changes alone do not establish new cause",
+    "current_cleanup": {
+      "confirmed": false,
+      "owner_task": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+      "phase": "unit",
+      "status": "own lease/operation held; original completion/process cleanup absent",
+      "ordinary_continuation_only": true,
+      "helper_recovery": 0
+    },
+    "headless_resolution": {
+      "partial_sha": "1cdbc18ad6c87e3f6f584cdb7cfa1c52d4eaed8a",
+      "txt_cold": "PASS",
+      "csv_cold": "PASS",
+      "charge": 0,
+      "historical_lower_launch_cause": "UNCLASSIFIED; original failure unchanged"
+    },
+    "latest_verified_delivery": {
+      "report_id": "01a13138-6ee4-7a6d-aea5-f798eea0bb9f",
+      "partial_sha": "49522d83318bac29779e497798becb2f799bc84e",
+      "files_verified": 306,
+      "archive_sha256": "695987e70f4ad16b8e5140fdbef5e38526c844854e16b052f2c6ffc76836ddac",
+      "manifest_sha256": "418e4fe13db9a1baaefd545f36e4d70438f1e9aae9db6c3f09aa61b728f50d46",
+      "charge": 0
+    },
+    "autonomous_stage": {
+      "marker": "LAB57-RICH-AUTONOMY-20261012",
+      "started_utc": "2026-10-12T16:40:20.846510+00:00",
+      "deadline_utc": "2026-10-13T15:33:29.538616+00:00",
+      "status": "same authorized stage; owned resolution before further author execution",
+      "scenario_usage": {
+        "rows": 77,
+        "attempts": [
+          {
+            "case": "txt-comma-utf8",
+            "attempt": 1,
+            "assistant_rows": 13,
+            "actual": "openai/gpt-6-luna/high",
+            "failed_request": false
+          },
+          {
+            "case": "csv-comma-utf8",
+            "attempt": 1,
+            "assistant_rows": 12,
+            "actual": "openai/gpt-6-luna/high",
+            "failed_request": false
+          },
+          {
+            "case": "txt-semicolon-cp1251-decimal",
+            "attempt": 1,
+            "assistant_rows": 16,
+            "actual": "openai/gpt-6-luna/high",
+            "failed_request": false
+          },
+          {
+            "case": "txt-semicolon-cp1251-decimal",
+            "attempt": 2,
+            "assistant_rows": 12,
+            "actual": "openai/gpt-6-luna/high",
+            "failed_request": false
+          },
+          {
+            "case": "csv-pipe-multiline",
+            "attempt": 1,
+            "assistant_rows": 12,
+            "actual": "openai/gpt-6-luna/high",
+            "failed_request": false
+          },
+          {
+            "case": "tsv-utf8",
+            "attempt": 1,
+            "assistant_rows": 11,
+            "actual": "openai/gpt-6-luna/high",
+            "failed_request": false
+          },
+          {
+            "case": "tsv-utf16le",
+            "attempt": 1,
+            "assistant_rows": 1,
+            "actual": "openai/gpt-6-luna/high",
+            "failed_request": true
+          }
+        ],
+        "utf16_original_bytes_bom_sha": true,
+        "utf16_native_calls": 0,
+        "utf16_failed_request_not_generation": true,
+        "usage_matches_database": true,
+        "billing": "reported usage only; external billing unavailable"
+      },
+      "native_worker_usage": [
+        {
+          "cache_read_tokens": 21745280,
+          "cache_write_tokens": 0,
+          "input_tokens": 351295,
+          "model": "gpt-6.1-sol",
+          "output_tokens": 94627,
+          "provider": "codex"
+        }
+      ],
+      "external_billing": "unavailable; recorded values do not prove billing charge",
+      "same_cause_repeats": "2/10; remaining 8"
+    },
+    "owned_unfinished_execution": {
+      "first_evidence": "01a134b5-b560-7d3b-87be-968bfa3c4df6",
+      "owner_task": "01a134a1-0f47-782c-8d67-9c843c2d25e3",
+      "classification": "unclassified operation lifecycle; charge0",
+      "unit_completion": "missing",
+      "initial_preflight": "OPERATION_FAILED unclassified, charge0",
+      "no_dispatch_precharge": true
+    }
+  },
+  "prior_blocker_events_and_native_history_preserved": true,
+  "prior_ledger_sha256": "c18181e35692e0c14e8f3a98a96122bb3fbc7ca8fb590d7e86c5773288387ebf",
+  "prior_ledger_source": "verified dc22e99ea30366f700ac7b6006731acbb98a401a6d8fbc27097e6e9ef223e4c7 archive member",
+  "ledger_byte_hash_matches_server_metadata": true,
+  "original_stage_deadline_utc": "2026-10-13T15:33:29.538616+00:00",
+  "original_stage_document_sha256": "6121a38a7ba0ca593494b1066ca652986d2ab5747d589904d74510e161dd8147",
+  "time_and_scenario_budgets_reset": false,
+  "current_scenario_budgets": {
+    "reference_consumed": {
+      "txt-comma-utf8": 1,
+      "csv-comma-utf8": 1,
+      "txt-semicolon-cp1251-decimal": 2,
+      "csv-pipe-multiline": 1,
+      "tsv-utf8": 1,
+      "tsv-utf16le": 1
+    },
+    "reference_limit_per_case": 3,
+    "product": 0,
+    "cold": 5,
+    "LAB-56_admission": "3/3 PASS, exhausted",
+    "new_smoke_probes_generations": 0,
+    "recovery": 0,
+    "cold_reader_invocations": 8,
+    "cold_browser_launch_attempts": 7,
+    "normal_cleanup_browser_continuations": 2
+  },
+  "current_cli_pin": "5cd74d8ee5d6125692d953eb327b4d4f833c27a1",
+  "new_CLI_build_admission_frozen_SHA_Ben_ACCEPT_verified": false,
+  "owned_unit_scope": {
+    "original_owner_config_lease_preserved": true,
+    "completion_and_cleanup": "UNCONFIRMED",
+    "physical_process_state": "Not established by monitor; Rich must inspect original invocation on execution host",
+    "new_acquire_duplicate_unit_guard_deletion_owner_rebind_synthetic_proofs": "FORBIDDEN",
+    "initial_preflight": "OPERATION_FAILED; root UNCLASSIFIED, charge0, not presumed unique",
+    "no_supported_ordinary_path": "One proven external BLOCKED; no pinned helper bypass or new recovery allowance"
+  },
+  "active_tasks": [
+    {
+      "id": "01a134d6-c65f-7976-92aa-353b9b6a6770",
+      "agent_id": "edc52e36-a965-4f93-9118-6fa5640840b4",
+      "status": "queued",
+      "started_at": null,
+      "trigger_comment_id": "01a134d6-c645-73f7-897b-f4c5670c4419"
+    },
+    {
+      "id": "01a134b5-be18-7d51-9dea-1da404125e2a",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "status": "running",
+      "started_at": "2026-10-13T13:01:28+03:00",
+      "trigger_comment_id": "01a134b5-b560-7d3b-87be-968bfa3c4df6"
+    }
+  ],
+  "runtime": {
+    "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+    "name": "Codex (eval-tests)",
+    "status": "online",
+    "last_seen_at": "2026-10-13T13:38:18+03:00",
+    "updated_at": "2026-10-13T12:22:43+03:00",
+    "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749"
+  },
+  "models": {
+    "Rich": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1
+    },
+    "Ben": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1
+    },
+    "Evaler": {
+      "model": "gpt-6.1-sol",
+      "thinking_level": "xhigh",
+      "max_concurrent_tasks": 1
+    }
+  },
+  "monitor_native_model_reference_product_cold_recovery_or_system_mutations": 0,
+  "monitor_routed_comments_or_new_dispatches": 0,
+  "all_eight_done_verified": false,
+  "automation": "lab-56-lab-63 ACTIVE; unchanged30minute heartbeat",
+  "next_step": "Rich continuation first resolves original owned unit; Evaler reconciles delivery receipt without duplicate; then approved TSV stage within original deadline/budgets. Independent Ben ACCEPT still required."
+}

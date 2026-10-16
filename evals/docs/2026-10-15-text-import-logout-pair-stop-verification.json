@@ -1,0 +1,102 @@
+{
+  "observedAt": "2026-10-15T19:27:34.571155+00:00",
+  "source": "931e27590f208b96cad986aa901fbd9a9010ed76",
+  "execution": {
+    "exit": 2,
+    "pid": 2405037,
+    "birth": "115155209",
+    "startedAt": "2026-10-15T19:23:54.912765+00:00",
+    "finishedAt": "2026-10-15T19:26:36.591775+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "logoutContinuationOncePresent": true,
+    "previousRootFinalConsumed": 1,
+    "previousAddressedFinishConsumed": 1,
+    "priorControlConsumed": 1,
+    "priorKernelConsumed": 1,
+    "priorAbiContinuationConsumed": 1,
+    "priorFdContinuationConsumed": 1,
+    "priorObserverRepairConsumed": 1,
+    "sandboxRepairConsumed": 1,
+    "priorContinuationConsumed": 1,
+    "originalRecoveryConsumed": 1,
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": true,
+    "routeRootPresent": true,
+    "controllerStillPresent": false
+  },
+  "once": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-logout.once.json",
+    "device": 64512,
+    "inode": 17858375,
+    "bytes": 6700,
+    "mode": 384,
+    "sha256": "60b5f7ee17633d091da81cbe7dd891a55741c84025397f5032b1df5bb946b216",
+    "mtimeNs": "1792092258660550093",
+    "ctimeNs": "1792092258660550093"
+  },
+  "owner": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/owner.json",
+    "device": 64512,
+    "inode": 17837097,
+    "bytes": 500,
+    "mode": 384,
+    "sha256": "7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64",
+    "mtimeNs": "1791930497229073348",
+    "ctimeNs": "1791930497229073348"
+  },
+  "native": {
+    "exit": 2,
+    "status": "confirmed",
+    "complete": true,
+    "mode": "continuous",
+    "error": null,
+    "unknown": [],
+    "count": 105,
+    "verification": [
+      {
+        "observed_at": "2026-10-15T19:26:31.581Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-15T19:26:31.684Z",
+        "owned_remaining": 0
+      }
+    ],
+    "captureRawEqual": true
+  },
+  "actual": {
+    "priorAdmin": "ABSENT in two saved authoritative inventories",
+    "ownCurrentObserver": "admin1849/empty",
+    "pools": "empty shared2/pool3 only",
+    "oldLogout": "UNKNOWN remains; no synthetic success",
+    "currentLogout": "PRE_EFFECT_GATE_REFUSED",
+    "currentTransport": "CLOSED/105continuouszero",
+    "historyGuardCsvCompletionRelease": "NOT_REACHED"
+  },
+  "exactCause": {
+    "firstCollectedAt": 1792092357523,
+    "secondCollectedAt": 1792092372740,
+    "gapMs": 15217,
+    "strictAgeLimitMs": 15000,
+    "duplicateOuterPlusInnerFullGates": true,
+    "logoutRosterRace": "UNCLASSIFIED; raw PID delta NOT_CAPTURED; no safe retry inferred"
+  },
+  "resolution": "Same-callback two complete inventories; remove duplicateoutergates; exact owncleanup purpose only fixed ownlogout/capturedtransport, source/actor/owner/op/once/controller/image/ancestry/dir remain strict. Original/resource mutations fullgated. Freeze tokens/currentflags and recheckdir AFTER issuer; independent findings repaired beforeeffects.",
+  "scope": "Root soleoperator;Ben finalonly. All14spent/recovery1/1/oldERRORFAIL preserved;Ben6of6/all6qualityEXCLUDED;newmodelrefproductcold0;MASforeignuntouched;automationOFF.",
+  "privateEvidence": [
+    {
+      "file": "terminal-state.json",
+      "sha256": "708b4fd7bd98e79af3adc553b685563fabd48205ddc6b264842e4231a44504a0"
+    },
+    {
+      "file": "root-execute-result.json",
+      "sha256": "6221eda9d8e1e3d2aadcef6f687dff714de0667f3876c1a7602620a1aadfa324"
+    },
+    {
+      "file": "capture-files.json",
+      "sha256": "be6e1f64156669eb21538dfc7c771c8df49dbcea0b0bd3040842ec95278f1ff4"
+    }
+  ]
+}

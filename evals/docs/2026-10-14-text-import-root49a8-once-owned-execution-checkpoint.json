@@ -1,0 +1,30 @@
+{
+  "readAt": "2026-10-14T13:09:25.161829+00:00",
+  "operator": "Root direct/foreground PID2227473 birth104246373",
+  "source": "49a8a1c0421c1b36c8313e7fedc0a037442ca1d2",
+  "independentSourceAccepted": "01a13a7f-271b-7548-b15b-755452c3d8cc/23payload verified",
+  "originalOwnerTask": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+  "frozen": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+  "acquiredAt": "2026-10-13T22:28:17.228Z",
+  "once": {
+    "status": "CONSUMED_BEFORE_EFFECT",
+    "sha256": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269"
+  },
+  "originalRecovery": {
+    "consumed": 1,
+    "limit": 1,
+    "actualStatus": "ATTEMPTED",
+    "receiptExists": true,
+    "receiptSha256": "9db104868eadc99dd4bb567771cd04f39a57f1272c390b8f0ce9db880731ee52",
+    "mode": "0o600"
+  },
+  "stage": "Coherent private snapshot COPYING; 3938of28972 observed, final coherence/77rows not yet proven",
+  "originalProfileDBSQLOpenedByRoot": false,
+  "completionReleaseFreeAccept": "NOT_YET_PROVEN; no retry/no uncertain repeat",
+  "newModelReferenceProductCold": 0,
+  "originalBenOutcome": "ERROR/all6qualityEXCLUDED/product6of6 consumed/no retry",
+  "historyCounters": "Rich4PASS2qualityFAIL/refs1,1,2,1,1,3/cold11,10,8; Ben cold9,9,8+ERROR1; repeats3of10remaining7/admission3of3/wrapper1of1 preserved",
+  "MAS": "Foreign stand/other project untouched",
+  "automation": "OFF",
+  "next": "Let owned foreground route reach actual result; inspect durable receipts; no parallel cleanup or once reset. Then independent Ben final acceptance only after genuine completion/RELEASED/FREE."
+}

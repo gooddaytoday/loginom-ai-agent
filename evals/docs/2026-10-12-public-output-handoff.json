@@ -1,0 +1,36 @@
+{
+  "issue": "LAB-57",
+  "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "comment_id": "01a12f7e-870a-7c28-b0f1-2af179c3e4bd",
+  "parent_id": "01a12f59-547d-7d12-b5e9-830d520abd72",
+  "created_at": "2026-10-12T12:43:03+03:00",
+  "harness_patch_sha": "a01125ba40ef4e6df5422a6ad14a37da525c9569",
+  "patch_base_sha": "2c02eb9c5fde7eea2ff013ccd40c8a4417a1e9a7",
+  "attachment_id": "01a12f7e-85fa-72c8-95d2-6bf6a4b82d94",
+  "archive_sha256": "5b6aed2765a9da7be7ffe9ce521a9a7d0d2ed06e5055bcee8deda56b134bcde1",
+  "manifest_sha256": "306de7a194e41f6144c48b990083f3b865c192598fbc992025c02723b415fdc1",
+  "patch_sha256": "3d74b9f8bee9fcc4946bfa30875c199a7b653a39bdd36a9a5f59e3974cc5e66b",
+  "server_bytes": "VERIFIED",
+  "trigger_outcomes": [
+    {
+      "reason_code": "queued",
+      "status": "queued",
+      "target_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "target_type": "agent"
+    }
+  ],
+  "active_runs": [
+    {
+      "id": "01a12f7e-8744-7bac-968d-4e02a606ea18",
+      "status": "running",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "started_at": "2026-10-12T12:43:04+03:00"
+    }
+  ],
+  "issue_status": "blocked",
+  "issue_revision": 43,
+  "handoff_scope": "EVALER_INDEPENDENT_OFFLINE_VERIFICATION_ONLY",
+  "rich_native_continuation": "NOT_AUTHORIZED_BY_THIS_HANDOFF; current limit 1/1 consumed",
+  "full_warm_cold_reference_acceptance": "NOT_CONFIRMED",
+  "user_authorization": "User explicitly authorized coordination through Evaler on 2026-10-12"
+}

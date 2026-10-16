@@ -1,0 +1,150 @@
+{
+  "at": "2026-10-15T16:36:07.739929+00:00",
+  "source": "d3ec74aa89afaf412fd14143d4f9b6ed0ddb6fdc",
+  "operator": "Codex root coordinator; original Ben lease unchanged",
+  "foreground": {
+    "exit": 2,
+    "pid": 2377482,
+    "birth": "114131893",
+    "startedAt": "2026-10-15T16:33:21.751345+00:00",
+    "finishedAt": "2026-10-15T16:35:51.779069+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "finalContinuationOncePresent": true,
+    "previousAddressedFinishConsumed": 1,
+    "priorControlConsumed": 1,
+    "priorKernelConsumed": 1,
+    "priorAbiContinuationConsumed": 1,
+    "priorFdContinuationConsumed": 1,
+    "priorObserverRepairConsumed": 1,
+    "sandboxRepairConsumed": 1,
+    "priorContinuationConsumed": 1,
+    "originalRecoveryConsumed": 1,
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": true,
+    "routeRootPresent": true,
+    "controllerStillPresent": false
+  },
+  "once": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-final.once.json",
+    "device": 64512,
+    "inode": 17858363,
+    "bytes": 6554,
+    "mode": 384,
+    "mtimeNs": "1792082024573868280",
+    "ctimeNs": "1792082024573868280",
+    "sha256": "dea4c62af1502a43c1869aad91b43e73358fed51bd3bdab1fe45a170118458ec"
+  },
+  "owner": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/owner.json",
+    "device": 64512,
+    "inode": 17837097,
+    "bytes": 500,
+    "mode": 384,
+    "mtimeNs": "1791930497229073348",
+    "ctimeNs": "1791930497229073348",
+    "sha256": "7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64"
+  },
+  "native": {
+    "exit": 2,
+    "status": "confirmed",
+    "mode": "continuous",
+    "complete": true,
+    "error": null,
+    "unknown": [],
+    "processes": 107,
+    "verification": [
+      {
+        "observed_at": "2026-10-15T16:35:47.216Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-15T16:35:47.320Z",
+        "owned_remaining": 0
+      }
+    ],
+    "stdoutBytes": 0,
+    "stderrBytes": 103,
+    "captureFiles": [
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-final/native-capture/stderr.txt",
+        "device": 64512,
+        "inode": 18642980,
+        "bytes": 103,
+        "mode": 384,
+        "mtimeNs": "1792082146770163914",
+        "ctimeNs": "1792082146770163914",
+        "sha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-final/native-capture/process-cleanup.json",
+        "device": 64512,
+        "inode": 18644360,
+        "bytes": 63430,
+        "mode": 384,
+        "mtimeNs": "1792082147361184691",
+        "ctimeNs": "1792082151475329318",
+        "sha256": "a82732af6f2e66c5b7cc526f1cb233a72418acff6ca8b941c08983a7fc6fa70d"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-final/native-capture/events.jsonl",
+        "device": 64512,
+        "inode": 18642979,
+        "bytes": 0,
+        "mode": 384,
+        "mtimeNs": "1792082046923653954",
+        "ctimeNs": "1792082046923653954",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "transport": {
+    "browserTransportClosed": true,
+    "browserProcessTerminated": true
+  },
+  "serverObservation": {
+    "twoCompleteInventories": 2,
+    "clarification": "Two inventories each3 sessions: selfadmin empty/shared empty/pool empty; no original/prioradmin. Only self.last changed. Existing comparator rejected. Own session logout subsequently blocked pre-effect; final cessation/cleanup remains UNCONFIRMED.",
+    "rawObservationPins": [
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-final/dispatcher-observation-6acefd20-3dec-44ab-bcd7-62c9e810a264.json",
+        "device": 64512,
+        "inode": 18644343,
+        "bytes": 6621,
+        "mode": 384,
+        "mtimeNs": "1792082133063682081",
+        "ctimeNs": "1792082133063682081",
+        "sha256": "20d264febe37257a619bb0f62357ee4d8cc8c98fe99a9dd629fa13ed01e2cce9"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-final/dispatcher-observation-f1d80675-0c4b-4324-b9ec-2cad13782f49.json",
+        "device": 64512,
+        "inode": 18644333,
+        "bytes": 6621,
+        "mode": 384,
+        "mtimeNs": "1792082121562277767",
+        "ctimeNs": "1792082121562277767",
+        "sha256": "0673629e4017f0df020625731fb852b48a4b77e61028bbab00074ab4442a001b"
+      }
+    ],
+    "sessionsPerInventory": 3
+  },
+  "remaining": {
+    "server": "Fresh authoritative original/prioradmin absence and own logout",
+    "history": "Official archival of pending original CP profile; coherent DB/WAL/SHM snapshot28972 preserved/77actual rows",
+    "guardCSV": "Exactlegacyguard and150byteCSV retained;registrationalreadywholearchived",
+    "lease": "BUSY; needgenuinecompletion/SETTLED/ordinaryRELEASED/FREE"
+  },
+  "diagnosis": "False whole-session equality includes observer last activity; global unrelatedrootdaemon FDcount/digest churn blocks ownlogout. No newproduct/model/reference/cold. HistoricalERROR/all6BenqualityEXCLUDED preserved.",
+  "addressedContinuationSource": "9c64a23fe2bc2f989d09862e1febae5afc2f996f",
+  "package": {
+    "zipBytes": 2893544,
+    "zipSha256": "6ec79312013dcce0c0d81d13a26a5e3d37e2a3f60685822a4972570efb8e3ba3",
+    "manifestSha256": "3922d49c7257310da3d6e06eb13ea79055f5f260f5c92e850d27b4300b5168c8",
+    "payloads": 1006
+  },
+  "sourceStatus": "NOT_INSTALLED_NOT_APPLIED; independently gated before effects",
+  "automation": "OFF",
+  "foreign": "MAS/evalrun untouched"
+}

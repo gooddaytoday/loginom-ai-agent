@@ -1,0 +1,46 @@
+{
+  "status": "DELEGATED_COORDINATOR_DECISION_SOURCE_FIRST_NOT_APPLIED",
+  "scope": "LAB57 dedicated eval-tests only; MAS is foreign and untouched; automation stays deleted/OFF",
+  "operator": "Root codex-coordinator personally; original Ben owner/task/lease/acquiredAt/config immutable; Ben final independent acceptance only",
+  "diagnosis": {
+    "actual": "945 live Dispatcher TypeError GetSessionsManager not a function; raw and cause hashes retained in canonical stop receipt",
+    "source": "Loginom7.4.2 safeCast cold QueryInterface is awaitable; bg.objectId is a selector descriptor, GetObjectId is native identity",
+    "priorD1": "Missing raw response remains UNKNOWN; do not retroactively infer its cause"
+  },
+  "chosen": "Narrow native ABI await + native proxy identity for observer and own empty logout; distinct nonmodel dispatcher-continue one-shot after independent exact source admission",
+  "alternativesRejected": [
+    "Replay any of the five consumed commands/onces: violates actual history",
+    "Return to new Evaler→Ben cleanup chain: contradicts current owner assignment",
+    "Infer cessation from own process exit, fake inventory or reconstruct native IDs: invalid evidence"
+  ],
+  "accounting": {
+    "originalRecovery": "1/1 ATTEMPTED e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269",
+    "technicalContinuation": "1/1 CONSUMED f28e8821cd1ede51ebe1f35716f3a19213b27436aab3d55e4b15ae9a65870a14",
+    "sandboxRepair": "1/1 CONSUMED 26dde29c221c4082a3e84e135d7a99926e0f292bb9591ba5d4ef9b88871d3310",
+    "observerRepair": "1/1 CONSUMED 8359c09485888676a95f35c4fd4782879698e65f4033d768c8556d5987dcbdd2",
+    "fdStability": "1/1 CONSUMED 1c1648c08d0c905801d970e64d401147619d12262e20d6718c5a4120ac27bdb4",
+    "dispatcherAbiContinuation": "0/1 SOURCE ONLY; no implicit retry/reset/resume; distinct durable once before effects",
+    "modelReferenceProductCold": 0,
+    "Ben": "6/6 consumed originalERROR/code2/all6qualityEXCLUDED/no retries;77Luna-high5archives1pending/billedUNKNOWN/oldSHMSTOP",
+    "Rich": "4PASS2qualityFAIL0ERROR/refs1/1/2/1/1/3/cold11/10/8",
+    "BenCold": "9/9/8+oldERROR1",
+    "repeatLedger": "3/10remaining7/noreset/precharge",
+    "admission": "3/3",
+    "wrapper": "1/1"
+  },
+  "entry": "dispatcher-continue",
+  "newRoot": "lab57-dispatcher-continuation",
+  "guards": [
+    "independent exact clean source review before install/helper/admission/native/profile/resource effects",
+    "preserve all five prior exact once/controller/admission/source/capture/error/history/reservation bindings",
+    "1728 prior native/controller/signed Root-child PIDs all absent; six actual CFG profiles plus five retained diagnostic roots protected; no silent PID omission",
+    "privileged request max65536 bytes, reject oversized before JSON parse; no truncation; exact signed source/node/uid/request/ancestry/final two full FD passes unchanged",
+    "bounded readonly own FD reobservations from admitted945 unchanged; unknown/foreign/reused/denied/incomplete/race=>STOP",
+    "coherent original28972file DB/WAL/SHM snapshot+normal private-copy77row audit first; original recovery remains ATTEMPTED sameinode",
+    "genuine complete stable original+prioradmin scope absence or addressed readonly/nonrunning unique original closure; ACK alone notcessation",
+    "current diagnostic exact nativeID empty ownlogout and continuous complete process capture; official history before legacywholeguard/exactCSV",
+    "real attestation/completion/SETTLED/ordinaryRELEASED/FREE then independent Ben cases/validators/attestation ACCEPT",
+    "error/crash/uncertainty retains all once receipts; no retry/rollback/rebind/manual lock unlink; no guessed creds/roles/server defaults/network/AppArmor mutation"
+  ],
+  "deadline": "No human approval or management-time gate; technical bounded commands and cleanup remain"
+}

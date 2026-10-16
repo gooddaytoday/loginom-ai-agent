@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "decision": "ROOT_SANDBOX_REPAIR_ONE_SHOT_SOURCE_FIRST",
+  "scope": "LAB-57 original remaining cleanup on eval-tests ONLY",
+  "operator": "Root main chat; Ben independent final acceptance only",
+  "reason": "Actual377 reaches MCP but Chromium launch aborts; unpriv_bwrap sys_admin DENIED. Original product used existing dedicated /usr/local/libexec/loginom-evals/bwrap, new adapter wrongly selected /usr/bin/bwrap. Existing dedicated root-owned binary bytes and loaded dedicated policy observed read-only; no new host policy or resource mutation is needed.",
+  "actualStopReceiptSha256": "41b021698c788068fd6176d75f1b3063bab4bb04836bbe7bbe60449fbc49e9c0",
+  "preserve": {
+    "originalRecovery": "1/1 ATTEMPTED",
+    "technicalContinuation": "1/1 CONSUMED",
+    "originalOnce": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269",
+    "continuationOnce": "f28e8821cd1ede51ebe1f35716f3a19213b27436aab3d55e4b15ae9a65870a14",
+    "originalOwnerTaskLeaseConfigAcquiredAt": true,
+    "originalERRORFAILHistoryAndAllSixBenQualityExcluded": true,
+    "registrationAlreadyWholeArchived": true,
+    "snapshotAnd77Rows": true
+  },
+  "newTechnicalAllowance": {
+    "name": "sandbox-repair",
+    "limit": 1,
+    "consumed": 0,
+    "entry": "repair",
+    "proofRoot": "lab57-sandbox-repair",
+    "once": "lab57-sandbox-repair.once.json",
+    "isScientificAllowance": false,
+    "reacquireReserveResetRebind": false,
+    "retryOnUncertainty": false
+  },
+  "requiredSourceChanges": [
+    "Bind both failed attempts exact bytes/identity/controllers/captures/closed transport and prove all old PIDs absent at each effect",
+    "Reuse existing root-owned dedicated bwrap with exact path/bytes/dev/inode/mode/owner and unchanged loaded policy verification, preserve all mounts and chromiumSandbox:true",
+    "Distinct owner decision/new held operation controller/private durable once before remaining effects; no original execute/continue/reserve/archive replay",
+    "Retain original snapshot/no SQL on originals; unchanged genuine cessation/logout/history/whole guard/exactCSV/attestation/completion/ordinary RELEASED/FREE gates; exact new history/attestation roots"
+  ],
+  "admission": "NEW clean final source actual independent code/diff/TDD/negatives/build/process review by Evaler before install/helper/native/profile/resource effects. Author PASS is not admission. No unchanged full suites or new cleanup worker.",
+  "newCalls": {
+    "model": 0,
+    "reference": 0,
+    "product": 0,
+    "cold": 0
+  },
+  "mas": "FOREIGN/NO_INTERVENTION",
+  "automation": "OFF",
+  "humanOrManagementTimeGate": false
+}

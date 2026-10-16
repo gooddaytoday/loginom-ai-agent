@@ -1,0 +1,15 @@
+{
+  "decision": "SOURCE_ACCEPT",
+  "source": "9c64a23fe2bc2f989d09862e1febae5afc2f996f",
+  "exactArchiveVerified": true,
+  "executableRebuildByteEqual": true,
+  "canonicalSha256": "407912c074ac8d2e4c55e555b4311f85de2277c3f64213aa6219dcc055904761",
+  "comment": "01a14087-7f68-7a8b-afa3-9a35e54089dc",
+  "attachment": "01a14087-7de4-754a-8f44-cdef345c67dd",
+  "payloads": 97,
+  "captureProcesses": [
+    4,
+    2,
+    3
+  ]
+}

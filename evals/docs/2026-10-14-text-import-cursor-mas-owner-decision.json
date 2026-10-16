@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "scope": "LAB57 only; delegated coordinator exact MAS provider-runtime extension",
+  "decision": "ALLOW_BOUND_CURSOR_MAS_ONLY_WITH_FRESH_RUNTIME_PLACEMENT_REPLAY",
+  "recordedAt": "2026-10-14T12:20:55.196711+00:00",
+  "humanAuthority": "Current owner explicitly delegates autonomous operator/resource decisions to coordinator; owner asserts MAS host does not overlap eval-tests and must not block it",
+  "baseOwnerAmendmentSha256": "e2925de35befd22407908e938e693bfcfaef62b73f9681af890ff7b8ad9bc4e3",
+  "originalRuntime": "a5fa993f-2903-4997-a832-955ffbb1203c",
+  "masRuntime": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+  "cursorMasRuntime": "490365fb-afb2-4cf3-a694-23459da7a6d1",
+  "originalDaemon": "01a11562-4949-78b7-9ddf-15a69d670749",
+  "masDaemon": "01a116e7-cc72-796d-8f8a-e4e8c9f33d9e",
+  "runtimeOwner": "2ea8db17-3196-431f-b1e9-880afe84e2e1",
+  "runtimeMode": "local",
+  "masProvider": "codex",
+  "cursorProvider": "cursor",
+  "actualPlacementRows": [
+    {
+      "id": "a5fa993f-2903-4997-a832-955ffbb1203c",
+      "daemon_id": "01a11562-4949-78b7-9ddf-15a69d670749",
+      "owner_id": "2ea8db17-3196-431f-b1e9-880afe84e2e1",
+      "provider": "codex",
+      "runtime_mode": "local",
+      "device_info": "eval-tests · codex-cli 0.159.2"
+    },
+    {
+      "id": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+      "daemon_id": "01a116e7-cc72-796d-8f8a-e4e8c9f33d9e",
+      "owner_id": "2ea8db17-3196-431f-b1e9-880afe84e2e1",
+      "provider": "codex",
+      "runtime_mode": "local",
+      "device_info": "mas · codex-cli 0.160.1"
+    },
+    {
+      "id": "490365fb-afb2-4cf3-a694-23459da7a6d1",
+      "daemon_id": "01a116e7-cc72-796d-8f8a-e4e8c9f33d9e",
+      "owner_id": "2ea8db17-3196-431f-b1e9-880afe84e2e1",
+      "provider": "cursor",
+      "runtime_mode": "local",
+      "device_info": "mas · 2026.10.01-e373342"
+    }
+  ],
+  "primaryContract": "https://github.com/multica-ai/multica/blob/2ea01ae4ef55de4310b99af192d2dbd367832883/apps/docs/content/docs/daemon-runtimes.mdx",
+  "inference": "Actual Cursor490 and owner-attested CodexMAS24 runtime records bind exact same daemon and owner, different provider; primary registration contract defines separate tool runtimes on same daemon/computer. Thus Cursor490 shares attested MAS placement, not eval-tests. Labels/different UUIDs alone were not used. No foreign host/tasks/credentials accessed or changed.",
+  "futureGuard": "Only exact490 task+agent runtime consistency PLUS fresh complete runtime inventory, unique exact3rows, same pinned daemon/owner/local/provider fields, originaleval-testsdaemon binding unchanged. Missing/conflicting/ambiguous/other UUID/labels/status/pagination/RootBen controller =>REFUSE. Ledger retains complete observations and explicitdecision/hash.",
+  "actualOriginalHostProof": "Roote881 signedcomplete two273PID passes no original/foreignnative/denied/profileFD; all6profiles/zeroForeignMarkers/exactcontainerbirth/no mounts/CSVidentity unchanged; wholeGrefusedONLYnewCursorMAS4pending",
+  "Roote881Execute": "One separatelyadmittedforeground12:12:25→12:12:35code2 before recovery/once; no uncertain effect repeat; originalOwner preserved",
+  "RootPhysicalOutcome": "recovery0/1 unspent; originalonceabsent; scientificmodel/reference/product/cold0; oldERROR/qualityexcluded retained",
+  "mustPrecedeEffects": "tested minimal executable derivative + independent exact SOURCE admission required; this ownerdecisionalone doesnot bypassoldG orgrantREADY/FREE/PASS",
+  "automation": "OFF; nohuman/timeapproval gate"
+}

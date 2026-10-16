@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "status": "ACTUAL_ROOT945_STOP_NOT_STAND_CLEANUP",
+  "source": "945a7acee2dfad39baf9e4d87c3564b4bd5f8cb9",
+  "foreground": {
+    "exit": 2,
+    "pid": 2292685,
+    "birth": "111824894",
+    "startedAt": "2026-10-15T10:08:51.758788+00:00",
+    "finishedAt": "2026-10-15T10:12:44.330906+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "fdContinuationOncePresent": true,
+    "priorObserverRepairConsumed": 1,
+    "sandboxRepairConsumed": 1,
+    "priorContinuationConsumed": 1,
+    "originalRecoveryConsumed": 1,
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": true,
+    "controllerStillPresent": false
+  },
+  "fdContinuationOnce": {
+    "sha256": "1c1648c08d0c905801d970e64d401147619d12262e20d6718c5a4120ac27bdb4",
+    "identity": {
+      "device": 64512,
+      "inode": 17857954
+    }
+  },
+  "capture": {
+    "status": "confirmed",
+    "error": null,
+    "complete": true,
+    "unknown": 0,
+    "browser": 1,
+    "wrapperStartupCount": 1,
+    "unresolvedStartups": 0,
+    "zeroPasses": [
+      {
+        "observed_at": "2026-10-15T10:12:35.138Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-15T10:12:35.242Z",
+        "owned_remaining": 0
+      }
+    ]
+  },
+  "ownTransport": {
+    "browserTransportClosed": true,
+    "browserProcessTerminated": true
+  },
+  "actualNative": [
+    "OWN_PAGE_NAVIGATED10:11:23.548Z",
+    "OWN_LOGIN_FIELDS_SET10:11:42.359Z",
+    "OWN_LOGIN_OBSERVED10:12:01.724Z"
+  ],
+  "actualFirstDispatcherError": [
+    {
+      "file": "dispatcher-observation-aa62fb17-12c9-4c51-9ed3-bb1ddeea4c2c.json",
+      "isError": true,
+      "types": [
+        "TypeError"
+      ],
+      "knownGates": [],
+      "knownNonFunctionSymbols": [
+        "GetSessionsManager"
+      ],
+      "knownMissingPropertySymbols": [],
+      "rawTextBytes": 264,
+      "rawTextSha256": "50cbe3a7d3a004d3a2be86637a26b7c4a3c5fbae2511d5676d5b23ed814663fa",
+      "at": "2026-10-15T10:12:21.793Z"
+    }
+  ],
+  "diagnosis": "Cold interface QueryInterface returns a thenable. Shipped public bg.mscorlib.safeCast returns it unchanged; missing await makes GetSessionsManager unavailable. Exact actual TypeError reproduced offline executing emitted adapter with real shipped cast helpers and explicit protocol fixture. Also discovered bg.objectId is a selector descriptor; native identity must use shipped ProxyObjectsHelper.GetObjectId. Both observer and own logout need await/actual nativeID. Old d1 missing response remains UNKNOWN.",
+  "sourceOnlyProgress": "RED exact same TypeError→GREEN await cast; separate descriptor identity RED→GREEN native helper; own logout cold-interface RED→GREEN. No new stand/native effects after945STOP.",
+  "limitedFreshPostStop": {
+    "at": "2026-10-15T10:24:36.073294+00:00",
+    "all1728ObservedPriorPidsAbsent": true,
+    "diagnosticRegistrationPresent": false,
+    "operationPresent": false,
+    "signalsSent": 0,
+    "diagnosticOwnerPresent": false,
+    "diagnosticLogoutPresent": false,
+    "serverScopeCessation": false
+  },
+  "preserved": {
+    "originalRecovery": "1/1ATTEMPTED/e704",
+    "continuation": "1/1CONSUMED/f28",
+    "sandboxRepair": "1/1CONSUMED/26dde",
+    "observerRepair": "1/1CONSUMED/8359",
+    "fdContinuation": "1/1CONSUMED/1c1648",
+    "BenOwnerTaskLeaseConfigAcquiredAt": "UNCHANGED/BUSY",
+    "BenProduct": "6/6/originalwholeERROR/all6qualityEXCLUDED/no retries",
+    "history77": "5archives+1pending/Luna-high/billedUNKNOWN/originalDB not SQL-opened",
+    "Rich": "4PASS2qualityFAIL/refs1/1/2/1/1/3/cold11/10/8",
+    "BenCold": "9/9/8+oldERROR1",
+    "repeats": "3/10remaining7/noreset/precharge",
+    "admission": "3/3",
+    "wrapper": "1/1",
+    "newModelReferenceProductCold": 0
+  },
+  "notProven": [
+    "actual complete Dispatcher inventory",
+    "prior-admin/original session cessation",
+    "own native logout",
+    "official history archival",
+    "legacyguard/exactCSV cleanup",
+    "completion",
+    "RELEASED",
+    "FREE",
+    "Ben final ACCEPT"
+  ],
+  "next": "Finish concrete tested async vendor ABI derivative and separate technical allowance with all5 spent receipts preserved; independent exact final SOURCE gate before any new effects; Root sole operator.",
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "DELETED_OFF"
+}

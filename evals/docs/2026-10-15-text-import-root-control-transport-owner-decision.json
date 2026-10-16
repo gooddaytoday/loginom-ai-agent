@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "decision": "ONE_DISTINCT_ROOT_CONTROL_GET_TRANSPORT_CONTINUATION_AFTER_INDEPENDENT_EXACT_SOURCE_GATE",
+  "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "operator": "Codex root coordinator personally; Ben final independent cases/validators/attestation only",
+  "priorSource": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+  "priorSourceManifestSha256": "51234110346544dad878341b630193c8cd89ce05f85f30e4ee31ede1fdec01f9",
+  "priorOnceSha256": "13699c77cc3a7cb7262f292cda6f78ae7303275e66a40e664cb444356baf0905",
+  "priorController": {
+    "pid": 2336136,
+    "starttime": "112755967"
+  },
+  "priorOperation": {
+    "device": 64512,
+    "inode": 18619289
+  },
+  "actualStopReceiptSha256": "42a7086b4310a108ecc29c7540c56016f25169248ceeefcc1cd5dcf6d094cb54",
+  "cause": "Exact Multica runtime-list readonly GET timed out30s after once and before diagnostic mkdir/native; no lower TLS cause established.",
+  "actualNoNativeBasis": {
+    "diagnosticAbsent": true,
+    "nativeArtifactsAbsent": [
+      "diagnostic",
+      "diagnostic.process-group",
+      "native-command.json",
+      "native-capture",
+      "diagnostic-owner.json",
+      "diagnostic-logout.json",
+      "diagnostic-transport.json",
+      "dispatcher-before.json",
+      "dispatcher-cessation.json",
+      "original-binding.json",
+      "history.json",
+      "archive-guard.json",
+      "storage.json",
+      "attestation.json"
+    ],
+    "rootStage": "remaining-route/new-continuation-diagnostic guard BEFOREmkdir",
+    "oldNativeCapture": "ABSENT and remainsABSENT;never synthesized"
+  },
+  "authority": "2026-10-13 owner delegation743f98ac + direct Root personal operator takeover; no human/time gate",
+  "limit": 1,
+  "consumed": 0,
+  "routeCommand": "control-continue",
+  "root": "lab57-control-transport",
+  "once": "lab57-control-transport.once.json",
+  "beforeEffects": "Independent exact clean SOURCE admission, no-replace support/source-bound helper/private Root admission; original heldoperationguard/owner/task/acquiredAt/config/token unchanged; full immediatelyfresh sixCFG/sevenretaineddiagnostics/allknownpriorPIDs/queues/container/storage/node execPath+procselfexe/sandbox/history required. Distinct private wx0600 once+fileparentfsync before profile/native/resource effects.",
+  "transportChange": "A fixed allowlist of Multica agent-list/runtime-list/agent-tasks READONLY GET CLI operations uses a5s own subprocess bound; on timeout child is killed+waited per subprocess.run contract and a distinct typed read-only timeout returned. Max3 TOTAL whole observations across complete-expiry and typed GETtimeouts; final full snapshot strictly<15s. No per-page retry or merging.",
+  "neverRetry": [
+    "CalledProcessError/nonzeroCLI exit",
+    "unknownstatus/page/cursor",
+    "permissions/FD/PID/profile/container/storage",
+    "unknown classes",
+    "native/browser/login/closure/effect uncertainty",
+    "once after error/crash"
+  ],
+  "tlsDecision": "GODEBUG tlsmlkem0 NOT selected:5paired ABBA GETs allpassed bothmodes, placementdigest equal; default0.102..1.485s/compat0.092..0.528s. No lower TLS cause proven; retain all TLS/network/CLI/global defaults.",
+  "ledger": {
+    "originalRecovery": "1/1ATTEMPTED",
+    "technicalContinuation": "1/1",
+    "sandboxRepair": "1/1",
+    "observerRepair": "1/1",
+    "fdStability": "1/1",
+    "dispatcherAbi": "1/1",
+    "kernelObservation": "1/1CONSUMED",
+    "controlTransport": "0/1distinct;not original recovery reset",
+    "productBen": "6/6originalERROR/all6qualityEXCLUDED/noretry",
+    "modelReferenceProductCold": "0new",
+    "repeats": "3/10remaining7/noreset/precharge",
+    "admission": "3/3",
+    "wrapper": "1/1"
+  },
+  "newBaseline": "Preserve actual kernel.once/privatecause/sourceadmission/snapshot/history/registration/failure bytes+dev/inode/time/hash; actualknown2103PIDabsence plus priorpreonceRoot2326510 conservatively included as2104. Missing native capture remains missing.",
+  "completion": "Genuine original/prioradmin server cessation+ownempty diagnostic logout/processproof+official77row coherent DB/WAL/SHM history beforewholeguard/CSV; genuineattestation/completion/originalreservationSETTLED→ordinaryRELEASED/FREE thenBenACCEPT. No manual lock deletion/synthetic release/PASS/rebind.",
+  "boundaries": "MAS foreign/nointervention;automationOFF;scientificinputs/oracle/graph/typed/native/owner/onegesture/qualitycriteria unchanged."
+}

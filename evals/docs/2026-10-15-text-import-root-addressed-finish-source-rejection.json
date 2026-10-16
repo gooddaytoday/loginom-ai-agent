@@ -1,0 +1,36 @@
+{
+  "status": "SOURCE_REJECT_MUST_NOT_INSTALL",
+  "source": "3943434b86766d4c47f0f75949417d2b5f942b2a",
+  "comment": "01a14025-f2eb-7ad4-911a-9a3637a84665",
+  "parent": "01a1401f-c0b5-7a22-9b71-abf16d60b4ae",
+  "attachment": "01a14025-f291-79ba-925d-ceac92c8347f",
+  "archiveSha256": "8b5eb113d23773bc64aaa9723fd064b61ef2f5ac75c4f6124290f03da26e0be4",
+  "canonicalSha256": "69c82e98dad887efff4414e0b31fe360e1fb6ec0facb1437c74af7e52a27ecf6",
+  "payloads": 88,
+  "crcPathsBytesHashesVerified": true,
+  "exeRebuildMatches": true,
+  "captures": [
+    {
+      "file": "own-proofs/addressed/process-cleanup.json",
+      "processes": 10
+    },
+    {
+      "file": "own-proofs/build/process-cleanup.json",
+      "processes": 2
+    },
+    {
+      "file": "own-proofs/typecheck/process-cleanup.json",
+      "processes": 3
+    },
+    {
+      "file": "author-evidence/proofs/root-finish-supervised164/capture/process-cleanup.json",
+      "processes": 10
+    }
+  ],
+  "defect": "AF1 exact lab57-root-finish/after-history absent from production coherent-copy audit root allowlist. SOURCE failure before any live effect; old roots/original/foreign/alias negatives remain valid.",
+  "repair": "Only exact canonical path plus regression, no native/historySQL/criteria changes; changed-source independent gate again before installation",
+  "installed": false,
+  "actualControl": "1/1 spent704894a1, all8 immutable/originalrecovery1/1",
+  "addressedFinish": "0/1 UNSPENT; original3943 local operator files MUST NOT execute",
+  "scienceAndAutomation": "OldERROR/all6BenqualityEXCLUDED unchanged/no modelrefproductcold/automationOFF"
+}

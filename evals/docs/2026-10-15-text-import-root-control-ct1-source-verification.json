@@ -1,0 +1,55 @@
+{
+  "status": "CT1_FIXED_READY_EXACT_INDEPENDENT_SOURCE_REVIEW_NOT_APPLIED",
+  "source": "ea601e3d9e35adb36ec79b74cafa903df4f3ab6a",
+  "rejectedPredecessor": "e0c47ade7f5a331eec810768afabfa128bd1c5ef",
+  "base": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+  "ownerDecisionSha256": "5b6c7ee8f4dec4c47b18a6294b2d9a930f61349474be66458e7c973a7f663b8d",
+  "predecessorRejectionComment": "01a13fd9-2130-7e5f-bf46-ae25a404ac57",
+  "rejectionCanonicalSha256": "37b51136485f83b0cc51ded9ff7757eff3b1cf99fd24d643baefc99bccfdc514",
+  "rejectionZipSha256": "21ece6152141e74049d19100b726cb6605229553bf0df8bcd3b37bae07decf20",
+  "all209RejectionPayloadsVerified": true,
+  "repair": "One production line: terminal known markers BEFORE any retryable agent/runtime/task GET. Three independent negatives now0GET/AssertionError+exact marker evidence; no-marker timeout control still2GET/PermissionError. Original unedited collect AST, synthetic interfaces only.",
+  "changedSinceRejected": [
+    "evals/script/lab57-route-inspect.py",
+    "evals/test/fixtures/lab57-profile-timeout.py",
+    "evals/test/lab57-profile-timeout.test.ts"
+  ],
+  "tests": {
+    "prior161Passes": "Historical predecessor valid evidence retained; unchanged suites not repeated",
+    "affected": [
+      "",
+      " 15 pass",
+      " 0 fail",
+      " 70 expect() calls",
+      "Ran 15 tests across 2 files. [645.00ms]",
+      ""
+    ],
+    "typecheck": "PASS",
+    "builds": "2 clean full-source exports byte-equal",
+    "processes": 8,
+    "capture": "continuous/complete/confirmed/error=null/unknown[]/twozero",
+    "allREDandErrorsRetained": true
+  },
+  "package": {
+    "source": "ea601e3d9e35adb36ec79b74cafa903df4f3ab6a",
+    "zipSha256": "523ac46760840aaf7affc2725a991b862a825d823a0149555482846356bcb484",
+    "manifestSha256": "042008879fdb9007919241c45f1254ac44e19ae26a4f73420238e90cfb299675",
+    "payloads": 1878
+  },
+  "sourceManifestSha256": "231d33570e8b8b5a8b567ea5ca3aafeaefd89cb5510f9c21e7be9fae2b874174",
+  "executableSha256": "769db257cacaef990211901fd7896140f20ad7601db5bde9edae3e4067686ee2",
+  "sourceEntries": 922,
+  "gitBlobs": 921,
+  "sameExecutableAsRejected": true,
+  "sameExecutableDoesNotAdmitPythonSource": true,
+  "e0Installed": false,
+  "replacementInstalled": false,
+  "controlAllowance": "0/1 unchanged; no eighth attempt",
+  "oldSpent": 7,
+  "originalRecovery": "1/1 unchanged",
+  "originalOwnerLeaseScience": "Immutable; actual originalBUSY/ERROR/all6BenqualityEXCLUDED/no new model/reference/product/cold",
+  "operator": "Root personally, Ben final independent acceptance only",
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "OFF",
+  "next": "One routed exact replacement source gate; no repeat of unchanged full suites/reviews, no cleanup delegation."
+}

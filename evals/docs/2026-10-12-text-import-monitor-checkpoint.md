@@ -1,17 +1,15 @@
-# Мониторинг LAB-56–LAB-63
-
-- Первая проверка: 2026-10-12 10:41:02 MSK; источники — текущие issue/runs/metadata/комментарии Multica.
-- Heartbeat этого чата: lab-56-lab-63-30, ACTIVE, интервал 30 минут, первая плановая проверка около 11:06 MSK 2026-10-12.
-- Дубликаты automation и matching shell loop до создания не обнаружены; scheduling readback подтвердил target текущего чата.
-- LAB-56: in_review; Ben ACCEPT и проверка Evaler от 2026-10-12 прочитаны, допуск/actual Luna high PASS по их evidence; done ещё не выставлен.
-- LAB-57: in_progress, Rich run 01a12f01-84a3-74d5-87b8-fbe1d15a5a25 running с 10:27:25 MSK.
-- Прогресс Rich подтверждён: 81 native messages, свежие tool results до 10:39:45 MSK; текущий worker не выглядит остановленным.
-- Предыдущий capacity failure Rich обработан Evaler одним продолжением; его лимит исчерпан, исходный ERROR и бюджеты сохранены.
-- LAB-58–LAB-63: in_progress/admission, active runs нет, ожидают независимый ACCEPT/cleanup предыдущих карточек.
-- Human execution authorization прочитано в root comments; последовательность 0→1→2→3→4→5→6→7 сохраняется.
-- LAB-55 сейчас in_review; сервер/runtime/leases/profiles/models/CLI не изменялись этим мониторингом.
-- Rich/Ben/Evaler модели сохраняются; scenario reference/product Loginom AI Agent — openai/gpt-6-luna/high.
-- Нового неразрешённого блокера по прочитанным источникам нет; никакого dispatch/retry/нового model smoke не сделано.
-- Raw server readbacks находятся только в ignored .bundle/text-import-monitor-20261012; secrets/raw logs не добавляются в Git.
-- Новая проверка каждые 30 минут: не дублировать активные/queued runs, решать подтверждённые блокеры в разрешённом scope.
-- Автоматизация удаляется только после подтверждённого выполнения всех 8 карточек; partial ACCEPT/in_review/cancelled/idle недостаточно.
+# LAB-57 — завершение
+2026-10-15 21:56:21 UTC: сервер Multica done, revision 569; active/queued=[]; owner_completion.status=done.
+Ben: ACCEPT 01a14189-3cb4-7c28-b092-c6b91308debc, frozen eb1c2b0da02210a9d95569849ae056fa4784440c; cases, validators, attestation и cleanup приняты.
+Пакет Ben: 35 payload, CRC/paths/types/bytes/hashes проверены; ZIP 95760acc… / manifest a2e0afe3…; findings=[].
+Root лично исполнил очистку: native fec2874… и адресное завершение 48e35302…; повторных model/reference/product/cold запусков нет.
+Настоящие completion caa20627… → ordinary RELEASED 21:15:40 UTC → Root FREE 21:16:02 и Ben FREE 21:42:05/code0/stderr0.
+Исходный lease целиком operations/completed/d2532e9f-fe82-4d73-ac5b-62776e79fcfc; owner/task/acquiredAt/config/token и inode 17837096 сохранены.
+Guard inode 3840909/owner3840913 и registration inode3710822 сохранены целиком; exact150byte CSV отсутствует; все6 CFG profiles/processes/storage чисты.
+История: 28972 original/snapshot, 81114 whole-history, 4215 transferred files; 14DB/24 coherent DB-WAL-SHM и exact77 Luna/high rows проверены Root и Ben.
+Исходная recovery1/1 SETTLED на прежнем inode4234514; 17 прежних once и 18th filesystem-finish сохранены без reset.
+Ben6/6 product consumed/wholeERRORcode2/all6qualityEXCLUDED без rescore/retry; Rich4PASS2qualityFAIL0ERROR; исторические FAIL/ERROR/UNKNOWN/SHMSTOP и ledgers сохранены.
+Каноника: 2026-10-15-text-import-root-cleanup-completion-verification.json; lab57-final-accept-verification.json; lab57-owner-completion-receipt.json.
+Owner comment 01a1418d-0d1a/parent Ben ACCEPT: body/one Evaler mention/attachment d7b6bd50… побайтно подтверждены; handoff receipt сохранён.
+Evaler ACK 01a1418f-856f: metadata синхронизирована, 9 новых payload проверены; существующий task завершён, новых поручений нет; cleanup не повторять.
+MAS/evalrun — чужой стенд и не затрагивался; automation OFF; новые карточки/merge/release этим завершением не назначены.

@@ -1,0 +1,138 @@
+{
+  "source": "ca99158ba93928eb24151390ee94fe0ad31fd371",
+  "base": "9c64a23fe2bc2f989d09862e1febae5afc2f996f",
+  "productionDelta": "Only2 Python decision literals7288→e4b3;4subprocess regressions. Rest939Gitblobs unchanged.",
+  "actualPrior": {
+    "exit": 2,
+    "pid": 2386192,
+    "birth": "114432382",
+    "startedAt": "2026-10-15T17:23:26.638897+00:00",
+    "finishedAt": "2026-10-15T17:23:47.424068+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "settlementContinuationOncePresent": false,
+    "previousRootFinalConsumed": 1,
+    "previousAddressedFinishConsumed": 1,
+    "priorControlConsumed": 1,
+    "priorKernelConsumed": 1,
+    "priorAbiContinuationConsumed": 1,
+    "priorFdContinuationConsumed": 1,
+    "priorObserverRepairConsumed": 1,
+    "sandboxRepairConsumed": 1,
+    "priorContinuationConsumed": 1,
+    "originalRecoveryConsumed": 1,
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": false,
+    "routeRootPresent": false,
+    "controllerStillPresent": false
+  },
+  "preonceRefusal": {
+    "at": "2026-10-15T17:24:05.523378+00:00",
+    "stages": [
+      {
+        "stage": "continuation-admission",
+        "at": "2026-10-15T17:23:26.757Z",
+        "status": "ENTERED_NOT_COMPLETED"
+      },
+      {
+        "stage": "retained-history-verification",
+        "at": "2026-10-15T17:23:28.581Z",
+        "status": "ENTERED_NOT_COMPLETED"
+      },
+      {
+        "stage": "fresh-continuation-guard",
+        "at": "2026-10-15T17:23:44.457Z",
+        "status": "ENTERED_NOT_COMPLETED"
+      }
+    ],
+    "refusal": {
+      "version": 1,
+      "binding": {
+        "operation": "LAB57-control-transport-one-shot",
+        "originalOnce": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269",
+        "originalRecovery": 1
+      },
+      "stage": "fresh-continuation-guard",
+      "status": "BLOCKED",
+      "exception": {
+        "name": "Error",
+        "code": null,
+        "reason": "OWNED_COMMAND_FAILED",
+        "signal": null,
+        "killed": false,
+        "cause": {
+          "name": "Error",
+          "code": 1,
+          "reason": "REDACTED_MESSAGE",
+          "signal": null,
+          "killed": false
+        }
+      },
+      "originalOutcome": "ERROR",
+      "cleanup": "UNCONFIRMED",
+      "at": "2026-10-15T17:23:47.316Z"
+    },
+    "files": [
+      {
+        "name": "stage-0003.json",
+        "bytes": 115,
+        "sha256": "ca3bd9e27be27f0a697d37029a73fd446cfd39511af0f8ed80061caefd251e2e"
+      },
+      {
+        "name": "stage-0002.json",
+        "bytes": 120,
+        "sha256": "db95dc3c08959c5ccf904872c13db5bb555e7fa76f1d079667a4cc3295ccdc42"
+      },
+      {
+        "name": "retained-snapshot-verified.json",
+        "bytes": 284,
+        "sha256": "280764f5856665a63141b614532fc2b5b48ad1302bdd9c327c4dc83d9e719b02"
+      },
+      {
+        "name": "stage-0001.json",
+        "bytes": 113,
+        "sha256": "1a4829210517fbe406899e89925ee286ca79ff8b9c6b29d743debe2f19aeba25"
+      },
+      {
+        "name": "command-cause-ca918296-bd3f-4908-9b4d-164a073fade9.json",
+        "bytes": 159,
+        "sha256": "c17c712b5096f9fde63c0e9c95a87e7818f9410b02bbebd88b01129f8b67764f"
+      },
+      {
+        "name": "start.json",
+        "bytes": 311,
+        "sha256": "055a2858c92ecf6b132f0b15f9f22b4b2fc612476e14be70a28f4aaf95dc2220"
+      },
+      {
+        "name": "refusal.json",
+        "bytes": 643,
+        "sha256": "a6b0435b2f397a767dcbb352b1009b70b5c02e060714abbf31c9716ed22f5b8f"
+      },
+      {
+        "name": "command-private-3d4b38f3-6341-41b4-8c6d-813b52150463.json",
+        "bytes": 531,
+        "sha256": "eb899b35e3eb65677403a0544fc08ec0bb062188ff6a6e4cc01b66ca02f222f1"
+      }
+    ]
+  },
+  "settlementAllowance": "0/1 UNSPENT;all10oldonce/originalrecovery1/1 preserved;no reset",
+  "gate": "SOURCE_ONLY_NOT_INSTALLED_NOT_APPLIED",
+  "handoff": {
+    "comment": "01a1409f-6acb-7c46-b7d8-ea06849e8b34",
+    "parent": "01a14087-7f68-7a8b-afa3-9a35e54089dc",
+    "attachment": "01a1409c-9d62-75c5-994c-36cf0aa83c81",
+    "oneMention": true,
+    "bodyReadback": "EXACT",
+    "uploadByteEqual": true
+  },
+  "package": {
+    "zipBytes": 2831168,
+    "zipSha256": "412511af998c166c31b2a0288409343c39c8f246c1f7831e5c9c4e422383b4c9",
+    "manifestSha256": "8d1540a88e0726df2e82a471fec908c289329b98547e67735537ef0bf8823bdd",
+    "payloads": 984
+  },
+  "tests": "RED1PASS3FAIL→GREEN4PASS0FAIL;typecheck205;2buildbyteequal;unchangedfull/cases/native not repeated",
+  "science": "No model/reference/product/cold;originalERROR/code2/Benall6qualityEXCLUDED retained",
+  "scope": "Rootpersonaloperator/Benfinalindependentonly;MAS/evalrunforeignuntouched;automationOFF"
+}

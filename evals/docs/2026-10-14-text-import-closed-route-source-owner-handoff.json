@@ -1,0 +1,32 @@
+{
+  "format": 1,
+  "checked_utc": "2026-10-14T05:41:48.838143+00:00",
+  "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "comment_id": "01a138ec-f852-7e9e-961d-01eef7bfc25e",
+  "parent_id": "01a138d5-7561-7199-b4e1-ef92ef88b749",
+  "marker": "LAB57-E46-SOURCE-OWNER-PREREQUISITES-20261014-e46bdc90",
+  "body_bytes": 6206,
+  "body_sha256": "4c66bf9437ce191232bc6aae607bbb2d7fb22b17af559d87964985f0b821d5d3",
+  "body_parent_exact_readback": true,
+  "one_routed_Evaler_mention_verified": true,
+  "attachment_id": "01a138ec-f687-7380-bd19-ca86689fa3ce",
+  "canonical_file": "evals/docs/2026-10-14-text-import-closed-route-source-verification.json",
+  "canonical_bytes": 14593,
+  "canonical_sha256": "49b14d977910347646e9222ef44bda22862a1da8aa6cc60bd37f445094b63168",
+  "attachment_bytes_readback_equal": true,
+  "source_sha": "e46bdc9003354cf4e58fb0899c4ba3b39152a1f0",
+  "decision": "FINAL_SOURCE_ACCEPTED / OPERATOR_NOT_READY / READ_ONLY_PREREQUISITE_DIAGNOSIS",
+  "live_install_native_recovery_authorized_now": false,
+  "human_approval_or_time_gate": false,
+  "active_queued_after_post": [
+    {
+      "id": "01a138ec-f86d-7e5e-ba53-faea7b1086a9",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "status": "running",
+      "started_at": "2026-10-14T08:40:16+03:00",
+      "trigger_comment_id": "01a138ec-f852-7e9e-961d-01eef7bfc25e"
+    }
+  ],
+  "no_duplicate_Rich_Ben_or_third_review": true,
+  "resource_native_model_profile_credential_mutations": 0
+}

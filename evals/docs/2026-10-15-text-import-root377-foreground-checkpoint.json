@@ -1,0 +1,25 @@
+{
+  "status": "ACTUAL_ROOT_FOREGROUND_IN_FLIGHT_NOT_COMPLETION",
+  "observedAt": "2026-10-15T07:10:34.778653+00:00",
+  "source": "377302ddf5344b40e6068995ed9cc5d1b86e7c41",
+  "controller": {
+    "pid": 2255609,
+    "birth": "110749408",
+    "present": true
+  },
+  "stage": "remaining-route",
+  "originalOnceSha256": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269",
+  "originalRecovery": "1/1 ATTEMPTED unchanged",
+  "newTechnicalContinuation": "1/1 actual once PRESENT/CONSUMED before remaining effects; hash to be captured after foreground",
+  "operationHeld": true,
+  "retainedSnapshotVerified": {
+    "files": 28972
+  },
+  "sourceAdmissionComment": "01a13e56-5d13-7ba6-8428-067e1c97e81e",
+  "privateOperatorAdmissionSha256": "1d8fbf7855449583a7a4c9a72979087942433f1629cafa6bcb1eb61b0d6b7768",
+  "resourceScope": "dedicated eval-tests only; no MAS intervention",
+  "NativeREADYCleanupCompletionRELEASEDFREEBenACCEPT": "NOT YET VERIFIED",
+  "newModelReferenceProductCold": 0,
+  "monitoring": "Avoid additional remote status processes while full PID-roster admission is in flight; wait own foreground channel and existing records",
+  "automation": "OFF"
+}

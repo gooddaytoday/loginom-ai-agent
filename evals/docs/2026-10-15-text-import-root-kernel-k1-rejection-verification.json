@@ -1,0 +1,19 @@
+{
+  "status": "INDEPENDENT_SOURCE_REJECT_CONFIRMED_NOT_INSTALLED",
+  "rejectedSource": "53d823f3e7538e278a786e8265540c4c65201b96",
+  "comment": "01a13f4b-7c7b-722b-9272-bafc1dab2be9",
+  "parent": "01a13f3f-736b-7278-b8ba-aa7544eb890a",
+  "attachment": "01a13f4b-7c07-75b3-b2f5-e97d280300ba",
+  "zipSha256": "769794e917dec392eb5fe266bf3d705f366372e1d7046d40ce45ffdd7a92501a",
+  "manifestSha256": "5ec91ff8ece8f98e7ea0db68ac65c77563b9116cbfa75ce913c5b373b1be8f01",
+  "canonicalRejectionSha256": "c7d8bd915e440db0ea34da982122d7dfc0d9fea7b31c9d2ee54084bbc4356e8b",
+  "payloads": 66,
+  "allCRCPathsTypesHashesVerified": true,
+  "finding": "K1 optional kernelThread allows signed current fresh proof with missing field in one/all rows of both equal final inventories. Two independent negatives+bundled production Node reproduce SOURCE false admission; no live occurrence claimed.",
+  "independent": "21PASS2FAIL/15Python scenarios+isolatedselfstat/3confirmedcaptures/byteequalrebuild; unchanged full suites not repeated",
+  "rootRepairSourceOnly": "Mandatory boolean in every current live final row; Root4 new missing-field negatives with/withoutrestart RED→GREEN; exact independent21tests nowPASS; 32targetedPASS/typecheck. Only2 sourcefiles modified from rejected53. New clean source still needs independent gate.",
+  "kernelAllowance": "0/1 UNSPENT; rejected53 not installed/helper/native/profile/resource0; all6 spent unchanged",
+  "actual": "OriginalBenBUSY/no genuine cleanup/completion/RELEASED/FREE/BenACCEPT",
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "OFF"
+}

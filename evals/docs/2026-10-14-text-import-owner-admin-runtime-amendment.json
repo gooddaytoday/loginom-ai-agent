@@ -1,0 +1,62 @@
+{
+  "format": "LAB56-LAB63-HUMAN-OWNER-ADMIN-RUNTIME-AMENDMENT-v1",
+  "recorded_utc": "2026-10-14T06:51:05.851726+00:00",
+  "authority": "direct human owner clarification in this Codex session; supplied credentials and runtime isolation, not worker assertion",
+  "scope": {
+    "workspace": "dcf616e7-66eb-470a-9b04-6462f220cf3b",
+    "project": "de16c24b-4121-45c3-9f5a-e16ddabb90e8",
+    "cards": "LAB-56–LAB-63",
+    "original_runtime": "a5fa993f-2903-4997-a832-955ffbb1203c",
+    "runtime_label": "eval-tests",
+    "container": "b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e",
+    "Loginom_endpoint": "http://localhost/app/"
+  },
+  "administrator": {
+    "existing_active_test_pair_supplied_by_owner": true,
+    "pair_canonical_file": "evals/AGENTS.md",
+    "pair_scope": "Loginom administrator on dedicated eval-tests; owner confirms common test-stand defaults, not SSH/Multica/model/production",
+    "exact_pair_explicitly_authorized_for_Git_documentation": true,
+    "credential_provenance_search_superseded": true,
+    "extra_owner_confirmation_required": false,
+    "runtime_credential_file_private_0600_required": true,
+    "other_secrets_Git_prohibition_retained": true
+  },
+  "runtime_scope": {
+    "owner_attested_disjoint_runtime": "24aa980b-b8c3-43e2-b087-bad8f79c9517",
+    "label": "mas",
+    "its_active_queued_tasks_do_not_block_eval_tests": true,
+    "must_not_wait_for_global_infrastructure_idle": true,
+    "no_interference_or_messages_to_mas": true,
+    "does_not_authorize_other_unknown_runtime_exceptions": true,
+    "unknown_missing_or_conflicting_task_runtime_binding_is_not_mas": true
+  },
+  "supersedes": {
+    "admin": "TRUSTED_ADMIN_CREDENTIAL_PROVENANCE_UNAVAILABLE from prior bounded search; owner now supplies valid pair",
+    "queue": "exacte46 ALL-pending foreign-mas blocker; narrowed human-approved runtime boundary required before executable adoption",
+    "old_time_and_human_gates": "remain superseded by original owner policy743"
+  },
+  "preserved": {
+    "base_source": "e46bdc9003354cf4e58fb0899c4ba3b39152a1f0",
+    "active_support": "0fd20f7c7e36724ca78a58bb8f9085b78884a87b",
+    "frozen_cases": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+    "original_Ben_owner_lease_guard_once_recovery_history": "unchanged",
+    "historical_ERROR_FAIL_UNKNOWN_and_scientific_counts": "unchanged/no product/reference repeats or resets",
+    "new_guard_source_admission": "targeted TDD/negatives/clean exact SHA/independent final review before install/live effects",
+    "genuine_cleanup_ordinary_release_FREE_independent_cases_validator_ACCEPT": "required"
+  },
+  "fresh_server_read": {
+    "checked_utc": "2026-10-14T06:46:14.442973+00:00",
+    "LAB57": "in_progress332/phaseblocked; one original Evaler readonly task01a1391a-8386 running; no Ben/Rich duplicate",
+    "LAB56": "done72/no runs",
+    "LAB58_to63": "backlog10/admission/no runs"
+  },
+  "documentation": {
+    "file": "evals/AGENTS.md",
+    "bytes": 9790,
+    "sha256": "6d4bffa49f577674164547451ca0dbb2426a7756b1c247af105bcf40486d2aa6",
+    "new_section": "Уточнение владельца для LAB-56–LAB-63 от 2026-10-14"
+  },
+  "automation": "deleted by user and remains disabled; this amendment does not re-enable it",
+  "current_action": "steer existing Evaler task in its current thread; finish LAB57 under scoped source and technical completion gates",
+  "live_effects_from_record_creation": 0
+}

@@ -1,0 +1,67 @@
+{
+  "status": "EXACT_SHIM_AND_FINAL_ADDRESSED_SOURCE_REVIEW_PENDING_NOT_INSTALLED",
+  "source": "3e609eb58c7b816bc2ad08782636d04b21162056",
+  "base": "f28ec2b48c4b83edc524b90ef44a4e5c4927e76d",
+  "operatorDecisionSha256": "728bb4950c9029affd975931aa06ae63d561e163dc5355e442356dcb14719564",
+  "sourceEntries": 938,
+  "sourceManifestSha256": "9400126ef20d1670037cbfae58040fd4c80bd8d1937104a6b777c83185c6f925",
+  "executableSha256": "31535a8dae8d5fefe34855e8bed664060e3eb0b6e6fe3b31806dff91d8892e71",
+  "changedPaths": [
+    "evals/docs/evaler/lab57-root-final-decision.json",
+    "evals/docs/evaler/lab57-root-final-pids.json",
+    "evals/script/lab57-fd-observer.py",
+    "evals/script/lab57-root-issue-runs.py",
+    "evals/script/lab57-route-inspect.py",
+    "evals/script/lab57_history_audit_scope.py",
+    "evals/src/lab57-continuation.ts",
+    "evals/src/lab57-fd-observer.ts",
+    "evals/src/lab57-original-shim.json",
+    "evals/src/lab57-recovery-attestation.ts",
+    "evals/src/lab57-root-finish.ts",
+    "evals/src/lab57-route-host.ts",
+    "evals/test/fixtures/lab57-profile-timeout.py",
+    "evals/test/fixtures/lab57-root-final-node.ts",
+    "evals/test/lab57-original-shim.test.ts",
+    "evals/test/lab57-root-final.test.ts",
+    "evals/test/lab57-root-finish.test.ts"
+  ],
+  "delta": "Only exact originalb030 containerd-shim33814/birth42327045/UID0parent1/sameimagehash+command/CID permits bounded discarded whole-read restarts on FDcount/digest churn. All final two passes remain complete/strictlyequal, no partialnative admission. Signed consumer verifies exact reason/certificate. One distinct RootFinal continuation after spent9; preserves failed9records/native98, olddiagnostic eighthcoverage/PIDs2205, sameowner/lease/config/snapshot. Scopedissue57coordination unchanged; native/history/guardCSV/completion/release bodies unchanged, only exactroot audit/evidence path additions.",
+  "checks": {
+    "affected": [
+      "",
+      " 70 pass",
+      " 0 fail",
+      " 222 expect() calls",
+      "Ran 70 tests across 7 files. [4.90s]",
+      ""
+    ],
+    "typecheck": "PASS179",
+    "captureProcesses": 27,
+    "capture": "continuous/complete/confirmed/errornull/unknown[]/twozero",
+    "builds": "2clean byte-equal",
+    "savedEvidence": "Actual failednative98 publiccapture+wrapper startup verifier PASS181, rawCommand/capture byteequal onoriginalhost, newnativecalls0; raw remainsprivate",
+    "errorsRetained": [
+      "RED1738PASS3FAIL\u2192GREEN17411PASS forfixedshim; unknownpid/birth/uid/parent/native/profile/protected/image/persistent refuse",
+      "RootFinalRED1753FAIL\u2192GREEN17625PASS; moduleinitialization177TDZfixedliteralroot\u2192GREEN178actualNode4PASS, final70PASS7files; oldunchangednative/cases/full suites not repeated"
+    ]
+  },
+  "archive": {
+    "zipBytes": 3055452,
+    "zipSha256": "4d5fd45fbae500f96a65fd8d2ad3ef65065b3a105291219f381ecc04f9ddd887",
+    "manifestSha256": "946e3c73538843125d14fb194fa6c61a2ced6cd13d6449131afb1f4c12a5677a",
+    "payloads": 1017
+  },
+  "handoff": {
+    "comment": "01a14049-8b4e-75cf-91d3-159247a90756",
+    "parent": "01a1402f-def9-7221-af0e-0658f323a34c",
+    "attachment": "01a14049-82cf-7412-bc0f-d715ccb5df21",
+    "reviewTask": "01a14049-8b62-7b7d-84b0-1f795240a3dc",
+    "bodyParentOneMentionReadback": true,
+    "cleanupDispatch": false
+  },
+  "actualPrior": "f28Root67558EXIT2 ownadminLOGIN observed, owntransportclosed/all98processzero. FirstDispatcher observation gate FDrefused beforetoolcall. Originalservercessation/ownserverID/logoutUNKNOWN, nooriginalClose/history/guardCSV/completion reached.",
+  "allowance": "Previousaddressed1/1/rootonce8ddd7246/all9spent immutable;control1/1/originalrecovery1/1. New concrete RootFinal0/1 underdelegated7288, no reset/replay/sciencecalls.",
+  "remaining": "Genuine original/prioradminserver inventory/cessation/ownlogout/official77history/wholeguard/exactCSV/completion/SETTLED/ordinaryRELEASED/FREE thenBenfinalACCEPT. Prioradminaccount alone neverauthorizesclose; existingstrictscopeabsence remains.",
+  "scope": "Root personallyoperator;Ben finalindependentonly;no universalframework/cleanupworker;MAS/evalrunforeignuntouched;automationOFF",
+  "modelReferenceProductCold": 0
+}

@@ -1,0 +1,5 @@
+abi <abi/5.0>,
+include <tunables/global>
+profile loginom-lab57-startup-chromium /home/user/.local/share/loginom-evals-runtime/cli-rich-startup-proposal-d6fc9c9b7b499d0a182c972815913b541e4cb81b/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome flags=(unconfined) {
+  userns,
+}

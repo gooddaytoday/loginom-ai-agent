@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "decision": "ROOT_NARROW_LAB77_EVALRUN_QUEUE_RESOURCE_NONOVERLAP_FOR_LAB57_CLEANUP_ONLY",
+  "authority": "Owner delegation743f98ac + direct personal Root cleanup instruction; coordinator decides scoped resource obstacle autonomously",
+  "scope": "LAB57 Root codex-coordinator cleanup queue partition ONLY; not Ben-task/scientific admission; no action on LAB77/evalrun/MAS",
+  "sourceBase": "ea601e3d9e35adb36ec79b74cafa903df4f3ab6a",
+  "preonceStopReceiptSha256": "fd279f42c90db628b427c98c8c4a3880f387630ec1e21431b68d1a8f999e1c95",
+  "original": {
+    "host": "10.200.13.152",
+    "user": "user",
+    "root": "/home/user/.local/share/loginom-evals-runtime",
+    "runtime": "a5fa993f-2903-4997-a832-955ffbb1203c",
+    "daemon": "01a11562-4949-78b7-9ddf-15a69d670749",
+    "container": "b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e",
+    "noBindMountsRequired": true
+  },
+  "exception": {
+    "agent": "5218b92b-71e0-4197-8225-4c30521a3467",
+    "runtime": "9f8907d3-de44-4f7f-bfa3-a2a2f94db70b",
+    "daemon": "01a0f90f-27cd-723e-a37e-56bfa34b0e8d",
+    "provider": "codex",
+    "runtimeMode": "local",
+    "runtimeOwner": "2ea8db17-3196-431f-b1e9-880afe84e2e1",
+    "issue": "01a13fd2-a6b1-7459-b641-fb41b04eb229"
+  },
+  "resourceEvidence": {
+    "pinnedSource": "0afc231618daefd27cebfdd8b40e4c269dc97fef",
+    "runbookPath": "evals/docs/2026-10-15-evalrun-runbook.md",
+    "runbookSha256": "038289dd423f65e122f569f2871768f1ee89e069595cf1a7ec0fdf6db490a3fc",
+    "validationSha256": "b52d32c15d4cb24906801e0db6fa3e86c72a4be05aa4c4c3a6a42a3d6b99f0a5",
+    "checkpointSha256": "d858ced49c7cb27185290e7242d2164faf70a9c5955994ca89d92c8a4df8a724",
+    "foreignHost": "10.200.9.134",
+    "foreignUser": "kartai",
+    "foreignRoot": "/home/kartai/.local/share/loginom-evals-runtime",
+    "foreignServices": "own loginom-evals-server/studio; no bindmounts; Studio127.0.0.1:80",
+    "currentLab77DescriptionSha256": "cfb8ce513f5ea8ac312a1fd68be12af4294dda67b5c1569d4e8849d5c778ff86",
+    "currentLab77Contract": "Owner-activated LAB77 names exact runtime9f/daemon01a0f and OWN resources; explicitly do not change eval-tests/foreignresources. It is input data, not authorization to operate LAB77.",
+    "basis": "Distinct pinned host/user/local R/local-only Studio plus explicit workload resource contract; NOT runtime UUID/label/daemon alone. No foreign-host connection performed."
+  },
+  "implementation": "Add optional issue_id provenance into safe CLI task rows only when present; Python+Node exact replay require Root mode, exact agent/taskruntime/roster/runtime placements+owner/provider/local and exact LAB77 issue. Missing/changed/foreign issue/runtime/agent/placement/originalOwner rebind STOP. Every row retained, hash/count/order/pages unchanged; no filtering roster or skipping errors. Ledger includes taskIssue/decision SHA. Same branch in partial complete-page blocker precedence.",
+  "notAuthorized": [
+    "Any connection/exec/mutation/cancel/lease/process/message on MAS/evalrun/LAB77/otherCodexchats",
+    "Any other9f taskissue or agent/provider/runtime",
+    "Broad foreignruntime/globalidle bypass",
+    "Any scientific criteria/allowance/reset/model/reference/product/cold retry"
+  ],
+  "guards": "Original heldlease/owner/task/acquiredAt/config/7spent/privateonces/recovery1/1/exactNode/bwrap/sixCFG/sevenretaineddiagnostics/full privilegedFD strictpair/container/storage/history/nativecessation/history/ordinaryrelease all remain; add known preonceRoot2347551 toabsence manifest2105; no synthetic missingcapture.",
+  "sourceGate": "New exact independent clean SOURCE admission before no-replace installation/new source-bound helper/privateadmission/effects. Root personally executes; Ben final independentcases/validators/attestation only. Do not repeat unchanged full suites.",
+  "allowance": "Same existing control-continue0/1 UNSPENT; no new recovery/reservation/native retry or consumed once replay. Old ea601 preoncefailure retained; next has new proofdir/owncontroller/attemptreceipt.",
+  "completion": "Only genuine cessation+ownlogout+official77history→wholeguard/CSV→attestation/completion/originalreservationSETTLED→ordinaryRELEASED/FREE→BenACCEPT",
+  "automation": "OFF"
+}

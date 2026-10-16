@@ -1,0 +1,298 @@
+{
+  "version": 1,
+  "decision": "LAB57_ROOT_ADDRESSED_FINISH_ONCE",
+  "operator": "Codex root coordinator",
+  "scope": "Only exact original LAB57 run and existing eval-tests resources, original owner/task/lease/acquiredAt/config unchanged; no general recovery system",
+  "ownerAuthority": "Owner latest correction explicitly authorizes simpler addressed operator method and a distinct documented continuation after exhausted route, with preserved history and independent changed-source admission; no new human/time gate",
+  "actualStop": {
+    "source": "7082a865790de7d19780fc93ce00b7b0ede8031f",
+    "sourceManifestSha256": "b14459171ab46e65b8383ade7c052ad73c29e9eec11571d0bba418599a796cc9",
+    "controller": {
+      "pid": 2354606,
+      "birth": "113556713"
+    },
+    "operation": {
+      "device": 64512,
+      "inode": 18630401
+    },
+    "exit": 2,
+    "start": "2026-10-15T14:57:29.944635Z",
+    "finish": "2026-10-15T14:58:44.603356Z",
+    "stage": "remaining-route/continuation-private-root before mkdir",
+    "cause": "Repeated global agent-task-history CLI reads each timed out; three fresh collections exhausted. No diagnostic/native/login/server/history-finalize/guard/CSV effects reached.",
+    "privateCommandSha256": "7f6caa91c5487dd2e4d7415f45db05b6ab6e1c0e837b94010776cf4309372868",
+    "originalOutcome": "ERROR",
+    "quality": "EXCLUDED"
+  },
+  "terminalObservation": {
+    "at": "2026-10-15T15:03:34.270922+00:00",
+    "owner": {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/owner.json",
+      "device": 64512,
+      "inode": 17837097,
+      "bytes": 500,
+      "mode": 384,
+      "mtimeNs": "1791930497229073348",
+      "ctimeNs": "1791930497229073348",
+      "sha256": "7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64"
+    },
+    "rawConfig": {
+      "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-eb1-independent/node-eval-ops.json",
+      "device": 64512,
+      "inode": 4753134,
+      "bytes": 4068,
+      "mode": 384,
+      "mtimeNs": "1791930461660141406",
+      "ctimeNs": "1791930461660141406",
+      "sha256": "ffbc373a557e0156a4726874d424a330922286545310bb0e0cd9b12863646b35"
+    },
+    "onces": [
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-closed.once.json",
+        "device": 64512,
+        "inode": 17825805,
+        "bytes": 1908,
+        "mode": 384,
+        "mtimeNs": "1791983179309551488",
+        "ctimeNs": "1791983179309551488",
+        "sha256": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-continuation.once.json",
+        "device": 64512,
+        "inode": 17825809,
+        "bytes": 2656,
+        "mode": 384,
+        "mtimeNs": "1792048198562862361",
+        "ctimeNs": "1792048198562862361",
+        "sha256": "f28e8821cd1ede51ebe1f35716f3a19213b27436aab3d55e4b15ae9a65870a14"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-sandbox-repair.once.json",
+        "device": 64512,
+        "inode": 17836663,
+        "bytes": 3126,
+        "mode": 384,
+        "mtimeNs": "1792051614525920454",
+        "ctimeNs": "1792051614525920454",
+        "sha256": "26dde29c221c4082a3e84e135d7a99926e0f292bb9591ba5d4ef9b88871d3310"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-observer-repair.once.json",
+        "device": 64512,
+        "inode": 17856556,
+        "bytes": 3651,
+        "mode": 384,
+        "mtimeNs": "1792056307514349264",
+        "ctimeNs": "1792056307514349264",
+        "sha256": "8359c09485888676a95f35c4fd4782879698e65f4033d768c8556d5987dcbdd2"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-fd-continuation.once.json",
+        "device": 64512,
+        "inode": 17857954,
+        "bytes": 4225,
+        "mode": 384,
+        "mtimeNs": "1792058959043437436",
+        "ctimeNs": "1792058959043437436",
+        "sha256": "1c1648c08d0c905801d970e64d401147619d12262e20d6718c5a4120ac27bdb4"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-dispatcher-continuation.once.json",
+        "device": 64512,
+        "inode": 17858353,
+        "bytes": 4852,
+        "mode": 384,
+        "mtimeNs": "1792061740514757822",
+        "ctimeNs": "1792061740514757822",
+        "sha256": "2b1b08f033a8421ae2995380c55a510bc44cd27a864e45e508b7f92f85d3d7f1"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-kernel-continuation.once.json",
+        "device": 64512,
+        "inode": 17858356,
+        "bytes": 5540,
+        "mode": 384,
+        "mtimeNs": "1792068270028637005",
+        "ctimeNs": "1792068270028637005",
+        "sha256": "13699c77cc3a7cb7262f292cda6f78ae7303275e66a40e664cb444356baf0905"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-control-transport.once.json",
+        "device": 64512,
+        "inode": 17858358,
+        "bytes": 6287,
+        "mode": 384,
+        "mtimeNs": "1792076298111823394",
+        "ctimeNs": "1792076298111823394",
+        "sha256": "704894a10550707163b5709843ce1cece2fde5b22a5ee8a2990fa30bcea8b814"
+      }
+    ],
+    "latestOnceSafe": {
+      "status": "CONSUMED_BEFORE_EFFECT",
+      "sourceSha": "7082a865790de7d19780fc93ce00b7b0ede8031f",
+      "sourceManifestSha": "b14459171ab46e65b8383ade7c052ad73c29e9eec11571d0bba418599a796cc9",
+      "controller": {
+        "pid": 2354606,
+        "starttime": "113556713"
+      },
+      "operation": {
+        "device": 64512,
+        "inode": 18630401
+      },
+      "ownerTask": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+      "acquiredAt": "2026-10-13T22:28:17.228Z",
+      "decisionSha256": "5b6c7ee8f4dec4c47b18a6294b2d9a930f61349474be66458e7c973a7f663b8d"
+    },
+    "operationPresent": false,
+    "routeRootPresent": false,
+    "controller2354606Present": false,
+    "proofs": [
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-scope-94a2eed7bbe9/admission-280ebe68-6958-407f-8870-e91095d818ba.json",
+        "device": 64512,
+        "inode": 18630407,
+        "bytes": 1382599,
+        "mode": 384,
+        "mtimeNs": "1792076297376797106",
+        "ctimeNs": "1792076297376797106",
+        "sha256": "34560003660915e96b5f6da90ac7fa45500d0a2601d1823acc3dc37ec943bd67"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-scope-94a2eed7bbe9/command-cause-cd879253-bbb1-4fb3-af5e-52fa24da233f.json",
+        "device": 64512,
+        "inode": 18630411,
+        "bytes": 311,
+        "mode": 384,
+        "mtimeNs": "1792076324411764006",
+        "ctimeNs": "1792076324411764006",
+        "sha256": "bfe42fbe3cf4c062e3302262fa7fd76f73945a8a6a5b995207828d36808ea0c8"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-scope-94a2eed7bbe9/command-private-8f9115c4-ed33-44f3-afa4-95adffac1d20.json",
+        "device": 64512,
+        "inode": 18630410,
+        "bytes": 5552,
+        "mode": 384,
+        "mtimeNs": "1792076324370762540",
+        "ctimeNs": "1792076324370762540",
+        "sha256": "7f6caa91c5487dd2e4d7415f45db05b6ab6e1c0e837b94010776cf4309372868"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-scope-94a2eed7bbe9/command-private-success-1dc9755e-7e2e-41e3-8ea3-1cb3bde876b0.json",
+        "device": 64512,
+        "inode": 18630405,
+        "bytes": 327,
+        "mode": 384,
+        "mtimeNs": "1792076297079786482",
+        "ctimeNs": "1792076297079786482",
+        "sha256": "827de6b4261c8c3d495672c2f7c326f2c78da7d2e7e49bcee15771e75ab1fc73"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-scope-94a2eed7bbe9/fresh-guard-d5d0a8e9-ce52-48cb-b507-92e5cd48a3c4.json",
+        "device": 64512,
+        "inode": 18630406,
+        "bytes": 1382076,
+        "mode": 384,
+        "mtimeNs": "1792076297143788772",
+        "ctimeNs": "1792076297143788772",
+        "sha256": "400616a69901a89559af1a3af57c69d98761a7824cf67e6c59ddf402bd174a65"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-scope-94a2eed7bbe9/refusal.json",
+        "device": 64512,
+        "inode": 18630401,
+        "bytes": 800,
+        "mode": 384,
+        "mtimeNs": "1792076324494766976",
+        "ctimeNs": "1792076324494766976",
+        "sha256": "5db087a460d2522d9be589131c6b110ac265fe8ea9d480119abff8a3d6e19ac6"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-scope-94a2eed7bbe9/retained-snapshot-verified.json",
+        "device": 64512,
+        "inode": 18630403,
+        "bytes": 284,
+        "mode": 384,
+        "mtimeNs": "1792076269013782704",
+        "ctimeNs": "1792076269013782704",
+        "sha256": "ddb6a911c42adef6a4f3b38ea3fc1f7639a78a4ce1e379e9ce8fe550529ad231"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-scope-94a2eed7bbe9/stage-0001.json",
+        "device": 64512,
+        "inode": 18630400,
+        "bytes": 113,
+        "mode": 384,
+        "mtimeNs": "1792076250094106039",
+        "ctimeNs": "1792076250094106039",
+        "sha256": "2f800aaae6827afacfaded84096a3502e5385d5fe832f65668290d1d20308d7c"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-scope-94a2eed7bbe9/stage-0002.json",
+        "device": 64512,
+        "inode": 18630402,
+        "bytes": 120,
+        "mode": 384,
+        "mtimeNs": "1792076251957172670",
+        "ctimeNs": "1792076251957172670",
+        "sha256": "89aec7a852ca8eab015d7bc07428e69a648afe732e7d42ab4dd426ecda3f205f"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-scope-94a2eed7bbe9/stage-0003.json",
+        "device": 64512,
+        "inode": 18630404,
+        "bytes": 115,
+        "mode": 384,
+        "mtimeNs": "1792076269042783740",
+        "ctimeNs": "1792076269042783740",
+        "sha256": "cb7a995f418b580eb572c37917887caceafb5d584349fe9670e2d5d924c09950"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-scope-94a2eed7bbe9/stage-0004.json",
+        "device": 64512,
+        "inode": 18630408,
+        "bytes": 117,
+        "mode": 384,
+        "mtimeNs": "1792076298066821784",
+        "ctimeNs": "1792076298066821784",
+        "sha256": "9605fa4a4404830e0f7b01c6ce9c52861ed77d03aa2117f3b1949724d0b1e39d"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-scope-94a2eed7bbe9/stage-0005.json",
+        "device": 64512,
+        "inode": 18630409,
+        "bytes": 106,
+        "mode": 384,
+        "mtimeNs": "1792076298152824860",
+        "ctimeNs": "1792076298152824860",
+        "sha256": "d5eff03e908719668cf2d43bb096fcfa525e32aaaa5b4b82c5c15b2b2a93a748"
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-scope-94a2eed7bbe9/start.json",
+        "device": 64512,
+        "inode": 18630399,
+        "bytes": 311,
+        "mode": 384,
+        "mtimeNs": "1792076250025103570",
+        "ctimeNs": "1792076250025103570",
+        "sha256": "5998be0933dc65f6e5844e830f29725ebdd4ba36f5de641dbd9bbffb821c7fb8"
+      }
+    ]
+  },
+  "change": "For only this Root one-shot, replace repeated full infrastructure task-history inventory with authoritative complete issue-runs --active for exact LAB57. Keep held original common operation/owner/lease/config and all real six-profile/process/native/FD/debugger/container/storage checks before resource effects. Foreign MAS/evalrun tasks/resources not inspected or changed. Accepted native/official history/guard/CSV/completion/ordinary release implementation unchanged.",
+  "continuation": {
+    "limit": 1,
+    "once": "lab57-root-finish.once.json",
+    "root": "lab57-root-finish",
+    "previousControlConsumed": 1,
+    "originalRecoveryConsumed": 1,
+    "all8SpentPreserved": true,
+    "noReplayAfterUncertainOutcome": true,
+    "notScientificRetry": true
+  },
+  "coordination": "Root only, no cleanup worker; Ben one final independent cases/validators/attestation/cleanup ACCEPT after actual FREE",
+  "criteria": "Actual authoritative original/prioradmin cessation + own logout/process closure + official77-row history + exact whole guard archive/CSV absence + genuine completion/SETTLED + ordinary RELEASED/FREE; no synthetic pass/release; original ERROR/all6BenqualityEXCLUDED remain",
+  "modelReferenceProductCold": 0,
+  "automation": "OFF"
+}

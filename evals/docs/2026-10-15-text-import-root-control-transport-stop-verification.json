@@ -1,0 +1,321 @@
+{
+  "status": "ACTUAL_KERNEL_ONCE_CONSUMED_PRE_NATIVE_TRANSPORT_STOP",
+  "verifiedAt": "2026-10-15T12:54:11.688918+00:00",
+  "source": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+  "actualForeground": {
+    "exit": 2,
+    "pid": 2336136,
+    "birth": "112755967",
+    "startedAt": "2026-10-15T12:44:02.489955+00:00",
+    "finishedAt": "2026-10-15T12:45:12.338284+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "kernelContinuationOncePresent": true,
+    "priorAbiContinuationConsumed": 1,
+    "priorFdContinuationConsumed": 1,
+    "priorObserverRepairConsumed": 1,
+    "sandboxRepairConsumed": 1,
+    "priorContinuationConsumed": 1,
+    "originalRecoveryConsumed": 1,
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": true,
+    "controllerStillPresent": false
+  },
+  "onceSha256": "13699c77cc3a7cb7262f292cda6f78ae7303275e66a40e664cb444356baf0905",
+  "onceIdentity": {
+    "sourceSha": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+    "sourceManifestSha": "51234110346544dad878341b630193c8cd89ce05f85f30e4ee31ede1fdec01f9",
+    "controller": {
+      "pid": 2336136,
+      "starttime": "112755967"
+    },
+    "operation": {
+      "device": 64512,
+      "inode": 18619289
+    },
+    "ownerTask": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+    "acquiredAt": "2026-10-13T22:28:17.228Z"
+  },
+  "pins": [
+    {
+      "path": "lab57-kernel-continuation/archive-registration.json",
+      "device": 64512,
+      "inode": 18619307,
+      "bytes": 1281,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068279436972543",
+      "ctimeNs": "1792068279437972578",
+      "sha256": "fc7f6668084126a68c61c9083c130b410ce6ee526c039cc442e253686d186d77"
+    },
+    {
+      "path": "lab57-kernel-continuation/command-cause-72e43403-5ddb-4f92-bcad-6fe9e6ee63a9.json",
+      "device": 64512,
+      "inode": 18619309,
+      "bytes": 311,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068312147139087",
+      "ctimeNs": "1792068312147139087",
+      "sha256": "bfe42fbe3cf4c062e3302262fa7fd76f73945a8a6a5b995207828d36808ea0c8"
+    },
+    {
+      "path": "lab57-kernel-continuation/command-private-1899878f-7d3d-4f10-b091-ffe159e8e120.json",
+      "device": 64512,
+      "inode": 18619308,
+      "bytes": 2591,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068312099137377",
+      "ctimeNs": "1792068312099137377",
+      "sha256": "4097d647d12dda47ddcd373d134df674ac80a8e4fda04bdbedfc30341951ce2e"
+    },
+    {
+      "path": "lab57-kernel-continuation/history-before.json",
+      "device": 64512,
+      "inode": 18619306,
+      "bytes": 20410,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068279395971075",
+      "ctimeNs": "1792068279395971075",
+      "sha256": "6c7e46ae8857f7762093c3d07c8d2b361bc3b846924337917167d9addc6b2d21"
+    },
+    {
+      "path": "lab57-kernel-continuation/retained-baseline.json",
+      "device": 64512,
+      "inode": 18619304,
+      "bytes": 3463,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068279203964228",
+      "ctimeNs": "1792068279203964228",
+      "sha256": "81703b3dd55dc5042e0a0f2a83608bf448356c473e7fbbd8ee032755e710cdc1"
+    },
+    {
+      "path": "lab57-kernel-continuation/snapshot.json",
+      "device": 64512,
+      "inode": 18619305,
+      "bytes": 14286051,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068279241965584",
+      "ctimeNs": "1792068279241965584",
+      "sha256": "55d4b93e1a3694e450e4fe1065cf5f26d028e08003bfbbdd816793e8a856fdd0"
+    },
+    {
+      "path": "lab57-kernel-continuation/source-admission.json",
+      "device": 64512,
+      "inode": 18619303,
+      "bytes": 1845,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068279164639264",
+      "ctimeNs": "1792068279164639264",
+      "sha256": "f46201bf32a777fdf533f8562890ed8546a16fded5edd4d9aa8c7ac54d1f4ed5"
+    },
+    {
+      "path": "lab57-kernel-continuation-failure-94a6df09-f51a-4c29-a99d-d3b5c1208dbd.json",
+      "device": 64512,
+      "inode": 17858357,
+      "bytes": 285,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068312188140551",
+      "ctimeNs": "1792068312188140551",
+      "sha256": "c7b9de30ae62980879142ed74d74ca411b5139ce20c6137162981382b0b601ce"
+    },
+    {
+      "path": "lab57-kernel-continuation.once.json",
+      "device": 64512,
+      "inode": 17858356,
+      "bytes": 5540,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068270028637005",
+      "ctimeNs": "1792068270028637005",
+      "sha256": "13699c77cc3a7cb7262f292cda6f78ae7303275e66a40e664cb444356baf0905"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-readonly-433eee5ae30e/refusal.json",
+      "device": 64512,
+      "inode": 18619289,
+      "bytes": 801,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068312230142048",
+      "ctimeNs": "1792068312230142048",
+      "sha256": "273746a4cff4d370c8f83e7390e9094b230ca39dfd14c9a389eefc0bb1379d7b"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-readonly-433eee5ae30e/stage-0001.json",
+      "device": 64512,
+      "inode": 18619288,
+      "bytes": 113,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068242634660053",
+      "ctimeNs": "1792068242634660053",
+      "sha256": "a3fef6422cacd3e9b9a27620980bda167c4d6cc427ac3f0f2742cad327267880"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-readonly-433eee5ae30e/stage-0002.json",
+      "device": 64512,
+      "inode": 18619290,
+      "bytes": 120,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068244441724497",
+      "ctimeNs": "1792068244441724497",
+      "sha256": "19d55a98962c1d5501981f218b43aa187fbfe20f85cfd21fa33a3b0aac6b32e6"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-readonly-433eee5ae30e/stage-0003.json",
+      "device": 64512,
+      "inode": 18619292,
+      "bytes": 115,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068256518155179",
+      "ctimeNs": "1792068256518155179",
+      "sha256": "bb8fd3fc5ab88ba0664ea30ec7921b62a8abddac5db821fa70838016c4185310"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-readonly-433eee5ae30e/stage-0004.json",
+      "device": 64512,
+      "inode": 18619298,
+      "bytes": 117,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068269979635256",
+      "ctimeNs": "1792068269979635256",
+      "sha256": "73562a4cb5ed710b4c7958620c9472137575eb5bc32aea3daf0cd77b4d00427a"
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-readonly-433eee5ae30e/stage-0005.json",
+      "device": 64512,
+      "inode": 18619299,
+      "bytes": 106,
+      "mode": 384,
+      "uid": 1000,
+      "mtimeNs": "1792068270070638503",
+      "ctimeNs": "1792068270070638503",
+      "sha256": "b4046acb45a333b366d3fc5dd2804a44a787e52d5f98ae08b230a54510e669de"
+    }
+  ],
+  "absence": {
+    "at": "2026-10-15T12:52:41.243371+00:00",
+    "knownPids": 2103,
+    "presentPids": [],
+    "signedRootChildren": [
+      2336193,
+      2336675
+    ],
+    "diagnosticDirectoryAbsent": true,
+    "absentNativeArtifacts": [
+      "diagnostic",
+      "diagnostic.process-group",
+      "native-command.json",
+      "native-capture",
+      "diagnostic-owner.json",
+      "diagnostic-logout.json",
+      "diagnostic-transport.json",
+      "dispatcher-before.json",
+      "dispatcher-cessation.json",
+      "original-binding.json",
+      "history.json",
+      "archive-guard.json",
+      "storage.json",
+      "attestation.json"
+    ],
+    "operationAbsent": true,
+    "signalsSent": 0,
+    "nativeCapture": "ABSENT;not synthesized"
+  },
+  "cause": {
+    "at": "2026-10-15T12:47:05.624786+00:00",
+    "records": [
+      {
+        "file": "command-private-1899878f-7d3d-4f10-b091-ffe159e8e120.json",
+        "sha256": "4097d647d12dda47ddcd373d134df674ac80a8e4fda04bdbedfc30341951ce2e",
+        "stderrBytes": 2480,
+        "stdoutBytes": 0,
+        "frames": [
+          {
+            "file": "lab57-readonly-window.py",
+            "line": 10
+          },
+          {
+            "file": "lab57-route-inspect.py",
+            "line": 45
+          },
+          {
+            "file": "lab57-route-inspect.py",
+            "line": 16
+          },
+          {
+            "file": "subprocess.py",
+            "line": 473
+          },
+          {
+            "file": "subprocess.py",
+            "line": 578
+          },
+          {
+            "file": "lab57-route-inspect.py",
+            "line": 79
+          },
+          {
+            "file": "lab57-readonly-window.py",
+            "line": 13
+          }
+        ],
+        "classes": [
+          "CalledProcessError",
+          "READONLY_COLLECTION_PARTIAL"
+        ],
+        "observations": [
+          {
+            "attempt": 1,
+            "result": "INCOMPLETE_REFUSED",
+            "elapsedMs": 30174.82949490659
+          }
+        ],
+        "fdRefusal": null
+      }
+    ]
+  },
+  "friendlyCause": "Multica runtime list returned1 after its30s HTTP deadline; actual friendly message Request timed out/server did not respond. No TLS-layer cause proven.",
+  "controlledReadonlyPair": {
+    "defaultSeconds": 0.43,
+    "tlsmlkem0Seconds": 0.145,
+    "bothExit0": true,
+    "causeNotConfirmedByThisPair": true,
+    "persistedEnvironmentChanges": 0
+  },
+  "nativeEffects": 0,
+  "nativeZeroBasis": "Source continueClosedRoute new-continuation-diagnostic gate failed before mkdir diagnostic; actual diagnostic/registration/native-command/native-capture/native responses all absent. No process capture or server cessation synthesized.",
+  "history": "Copied snapshot/history-before/archive-registration hashes equal original preserved receipts; original owner rawSHA unchanged.",
+  "localInspectorError": "First baseline helper refused exit1/stderr1169; raw not captured. Corrected placeholder/count and locally compiled remote program; separate readonly observation succeeded. No inferred restoration of initial trace.",
+  "ledger": {
+    "originalRecovery": "1/1ATTEMPTED",
+    "technicalContinuation": "1/1",
+    "sandboxRepair": "1/1",
+    "observerRepair": "1/1",
+    "fdStability": "1/1",
+    "dispatcherAbi": "1/1",
+    "kernelObservation": "1/1CONSUMED, must not replay",
+    "modelReferenceProductCold": "0new",
+    "BenProduct": "6/6originalERROR/all6qualityEXCLUDED/noretry",
+    "Rich": "4PASS2qualityFAIL/refs1/1/2/1/1/3/cold11/10/8",
+    "BenCold": "9/9/8+oldERROR1",
+    "repeats": "3/10remaining7,noreset/precharge",
+    "admission": "3/3",
+    "wrapper": "1/1"
+  },
+  "next": "Diagnose read-only Multica transport; prepare minimal bound separate continuation SOURCE/TDD and independent exact admission before any effects. Root remains operator, Ben final only. No repeat of old kernel-continue.",
+  "actualCleanup": "UNCONFIRMED/no completion/RELEASED/FREE/Ben ACCEPT",
+  "MAS": "FOREIGN/nointervention",
+  "automation": "OFF"
+}

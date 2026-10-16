@@ -1,0 +1,92 @@
+{
+  "status": "EXACT_SOURCE_INSTALLED_PRIVATE_ADMISSION_ROOT_EXECUTION_STARTING",
+  "source": "48e35302d0368df5f585fb096f220d2064164b5a",
+  "nativeSource": "fec2874e24c9c201ddc0a57d6a4fba1ed47ab8b4",
+  "sourceEntries": 974,
+  "zipSha256": "237c938031d94fe462bd231ae41cf99697b314b6c61e6b81c373d75024ace436",
+  "manifestSha256": "f48a8f8915f93a391f35072003aa42b7feb27875ddc62a7436d4eebe42c581e9",
+  "sourceManifestSha256": "b6da975735e9f126d4302967667ec3bea00697a1e3778b034262768bcf6e05a6",
+  "finishScriptSha256": "f1149bed821815cac1cd1f1e6a83013f189cf0a5e2d49f3f026ea7de2d9e0e33",
+  "delta": "One incident-specific filesystem finish; originalfec native context/source/controller/once retained; separate current Root operator; unchanged full original auditor + normal releaseNodeStand. Never replay completed native/status/history transfer.",
+  "actualCompleted": "fec native0/originalceased/ownlogout+transportclosed83zero; statusready0/16zero;4215files transferred;28972originals unchanged;81114wholehistoryfiles/14DB24coherentfiles/exact77normalSQLprivatecopyrows.",
+  "remaining": "durable history proof / whole exact legacy guard archive / one owned150byteCSV / realattestation+same-inodeSETTLED+completion / ordinaryRELEASED/FREE / oneBenindependentACCEPT",
+  "limits": "17spent attempts preserved; originalrecovery1/1; newdistinctfilesystemonce only; no model/reference/product/cold/MAS effects; automationOFF",
+  "tests": "REDmissingmodule291 retained; final27targetedPASS30expects/isolatednamespace, typecheck296PASS; no unchangedfullsuite/review",
+  "independentGate": {
+    "decision": "SOURCE_ACCEPT",
+    "source": "48e35302d0368df5f585fb096f220d2064164b5a",
+    "receiptSha256": "7b85f766b629effaa0465b2aebcded1207da30f74540617295ed572d8ff1cb82",
+    "all337EvidenceHashesVerified": true,
+    "allStagingHashesVerified": true,
+    "scope": "only8changedfiles; oldnative/fullsuite not repeated",
+    "caseAccept": false
+  },
+  "operatorExecution": "Root personally; Ben one final independent review only",
+  "ownerDecision": {
+    "operation": "LAB57-history-finish-only",
+    "operator": "Codex coordinator; explicit human handover retained; original Ben owner is unchanged",
+    "scope": "Only LAB-57 and dedicated eval-tests; MAS/evalrun is foreign and untouched",
+    "nativeSource": "fec2874e24c9c201ddc0a57d6a4fba1ed47ab8b4",
+    "actualNative": "EXIT0; original SERVER_OWNERSHIP_SCOPE_CEASED; own OWN_DIAGNOSTIC_LOGGED_OUT; transport closed; 83 continuous/complete/confirmed processes, error=null, unknown=[], two zero-owned passes",
+    "originalController": "2416221/115601293 absent; original operation guard removed",
+    "actualHistory": {
+      "outerCommand": "120000ms SIGTERM retained; child effects diagnosed read-only before any continuation",
+      "management": "loginom status ready/exit0; 16 processes confirmed closed",
+      "transfer": "Already completed: lab57-original-owned-5lDYK0; 4215 files/53497176 bytes. Never repeat recovery or transfer",
+      "integrity": "28972 original files retain bytes/device/inode; all 81114 archive files inventoried; 14 databases/24 coherent DB-WAL-SHM copies; normal private-copy SQL audit exact77 Luna/high assistant rows; original SQL never opened",
+      "preparedSha256": "6add06757ffef4c5fe8fd397c262439d77a0f8221cd2d3049f8df17b06602343"
+    },
+    "remaining": [
+      {
+        "resource": "Completed history without final history.json",
+        "blocks": "final cleanup attestation",
+        "completion": "fresh equality to prepared whole history/coherent copies/exact77 rows; durable actual history.json"
+      },
+      {
+        "resource": "Exact original legacy harness guard and one owned150-byte CSV",
+        "blocks": "clean profiles and empty isolated storage",
+        "completion": "whole atomic no-replace guard archive with bytes/inodes preserved; exact CSV identity/hash checked then absent"
+      },
+      {
+        "resource": "Original common lease and attempted recovery receipt",
+        "blocks": "ordinary release/FREE and independent Ben acceptance",
+        "completion": "genuine attestation; same reservation inode SETTLED; actual recovery completion; unchanged releaseNodeStand gates and fresh FREE"
+      }
+    ],
+    "implementationRevision": "Use one incident-specific filesystem finish instead of replaying the previous all-stage route. Old live-controller requirement is supplemented by a separate current Root operator record; old native context/once/controller/source remains byte-bound. All original evidence/history/reservation/owner and ordinary release checks remain.",
+    "currentExecution": "exact d6 Node parent + exact manifested existing Bun child; separate independently accepted source/admission; no login, browser, native, recoverIfNeeded, archiveProfileHistory, model/reference/product/cold calls",
+    "accounting": "All17 spent overall attempts preserved; original recovery1/1 remains consumed. One distinct wx0600+file/parent-fsync filesystem-finish once before new resource effects. No retry after uncertainty; inspect actual effect first. Original ERROR/FAIL and Ben6/6/all6qualityEXCLUDED unchanged",
+    "independentGate": "Review only changed finalizer/current-operator auditor section and relevant negatives before installing/executing changed source; unchanged accepted components/suites not repeated. Ben receives one finished package after actual release/FREE for independent final cases/validators/attestation/cleanup ACCEPT",
+    "humanApprovalRequired": false,
+    "automation": "OFF; do not restore"
+  },
+  "initialSetupRefusal": {
+    "stage": "ZIP entry type validation before install.attempted",
+    "cause": "ZipFile.writestr manifest.json external_attr mode0600/S_IFMT0; source entries regular; bytes/manifest match accepted",
+    "freshAfter": {
+      "sourceFinal": false,
+      "sourceStage": false,
+      "installAttempted": false,
+      "installCompleted": false,
+      "privateAdmission": false,
+      "finishOnce": false,
+      "operation": false,
+      "ownerHashUnchanged": true
+    },
+    "changesToSourceOrPackage": 0,
+    "resourceEffects": 0,
+    "continuation": "one condition accepts absent type bits ONLY for exact manifest.json; manual O_EXCL regular writes+all SHA/path checks unchanged; independent adapter-only gate required"
+  },
+  "installerAdapter": {
+    "receiptSha256": "309191a5f28c1dcdb2626c9838e19f9b5fa2d7c36ca8bda098ed8903dd402533",
+    "adapterSha256": "8825fc5682916fc6233dbcedcb50c389e3172604d8253b072e2c31c403ef8832",
+    "actualInstall": "{\"status\": \"SOURCE_INSTALLED_ONLY\", \"source\": \"48e35302d0368df5f585fb096f220d2064164b5a\", \"files\": 974, \"originalProfileNativeEffects\": 0}",
+    "sourceAndPackageByteUnchanged": true
+  },
+  "privateAdmission": {
+    "sha256": "ed54a6d87745f07d550d59f59fe4f16845e4d543d41e27bb37801b6248aa4533",
+    "resourceEffectsBeforeRootExecution": 0,
+    "localReceiptReaderCorrection": "nested adapter.sha256 before SSH; original KeyError retained in tool history",
+    "privateDataEncodingCorrection": "Python generation placed SOURCE substitution before bytes payload; previous whole-script SyntaxError before admission creation; source install not repeated"
+  }
+}

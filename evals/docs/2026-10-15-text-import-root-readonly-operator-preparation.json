@@ -1,0 +1,88 @@
+{
+  "status": "SOURCE_HELPER_PRIVATE_ADMISSION_PREPARED_NOT_NATIVE_COMPLETION",
+  "time": "2026-10-15T12:44:00.899484+00:00",
+  "source": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+  "support": {
+    "status": "SOURCE_INSTALLED_ONLY",
+    "source": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+    "filesVerified": 911,
+    "noReplace": true,
+    "nativeReady": false
+  },
+  "helper": {
+    "status": "NARROW_READ_ONLY_HELPER_PROVISIONED_NOT_NATIVE_READY",
+    "source": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+    "attempt": {
+      "path": "/root/lab57-root-readonly-006a38c7e-provision-manifest-path.once.json",
+      "device": 64512,
+      "inode": 5545390,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o600",
+      "bytes": 1756,
+      "sha256": "85694739da6dca4ceeff9fa3495f82791ff21708051e6126f3f5b601888e5e58"
+    },
+    "helperDirectory": {
+      "path": "/var/lib/loginom-evals/fd-observer/006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+      "device": 64512,
+      "inode": 1179910,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o755",
+      "bytes": 4096,
+      "sha256": null
+    },
+    "script": {
+      "path": "/var/lib/loginom-evals/fd-observer/006a38c7e950061efa20f8f02af0d3ea452ca3a0/lab57-fd-observer.py",
+      "device": 64512,
+      "inode": 1179911,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o555",
+      "bytes": 19950,
+      "sha256": "c698f307155154c7b8d1d7390a68e09f6eaf3d841f24d34fca1ec41e4cecffec"
+    },
+    "binding": {
+      "path": "/var/lib/loginom-evals/fd-observer/006a38c7e950061efa20f8f02af0d3ea452ca3a0/binding.json",
+      "device": 64512,
+      "inode": 1179913,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o444",
+      "bytes": 29909,
+      "sha256": "858d7cdcc6d14a4a79071025049252d39e10731fae13f52ae2e2887eb98e8e2f"
+    },
+    "privateKey": {
+      "uid": 0,
+      "mode": "0o600",
+      "singleLink": true,
+      "materialDisclosed": false
+    },
+    "policy": {
+      "path": "/etc/sudoers.d/loginom-lab57-fd-006a38c7e",
+      "device": 64512,
+      "inode": 1574758,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o440",
+      "bytes": 159,
+      "sha256": "5cb99a478c087986fc1636f77e91bba8024e77f979925a577090014e1667e33e"
+    },
+    "otherPoliciesByteUnchanged": true,
+    "fullVisudoExit": 0,
+    "originalOwnerConfigPreserved": true,
+    "originalNativeProfileRecoveryEffects": 0
+  },
+  "privateAdmission": {
+    "admissionPath": "/home/user/.local/share/loginom-evals-runtime/operators/lab57-root-readonly-cbe358d2c830/final-root-operator-admission.json",
+    "admissionSha256": "f46201bf32a777fdf533f8562890ed8546a16fded5edd4d9aa8c7ac54d1f4ed5",
+    "preonceDirectory": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-readonly-433eee5ae30e",
+    "status": "PRIVATE_ROOT_ADMISSION_AFTER_INDEPENDENT_SOURCE",
+    "originalOwnerUnchanged": true,
+    "source": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+    "originalRecoveryEffects": 0,
+    "credentialsRepublished": false
+  },
+  "boundaries": "All6spent originalowner/task/config/acquiredAt/history unchanged; kernel0/1 freshly asserted by private preparation; Root soleoperator; no scenario calls; MAS untouched; automationOFF",
+  "remaining": "One actual owned foreground kernel-continue under immediately fresh gates. No cleanup/RELEASED/FREE/ACCEPT claimed."
+}

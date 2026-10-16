@@ -1,0 +1,20 @@
+{
+  "decision": "SOURCE_ACCEPT",
+  "source": "ca99158ba93928eb24151390ee94fe0ad31fd371",
+  "exactArchiveVerified": true,
+  "executableRebuildByteEqual": true,
+  "reviewer": "independent existing /root/preflight_spec_review",
+  "scope": "Only two Python7288→e4b3 literal repairs and four subprocess regressions; accepted9c64 components unchanged; no new budget/reset/rebind",
+  "receipt": "/home/kiselev/storage/tmp/lab57-root-diag-20261015/local-independent-binding/SOURCE_ACCEPT.json",
+  "receiptSha256": "a9bf81b5e64cbf59de531ee7a8febc19c49c47f2a567cd1df50d9c4d37379417",
+  "evidenceSha256": "3686df936c61576c03b7fea1b5c95160a3e557bc68450d301b538ac001385439",
+  "caseAccept": false,
+  "nativeCleanupProven": false,
+  "formalReviewer": "Evaler",
+  "formalComment": "01a140b5-2b78-7047-9df3-d5d2d0fc3037",
+  "formalReceiptSha256": "7fc34c40d38e520407af361bf1012d843668a71aaa2263fb5b7d838b35b45f73",
+  "formalArchiveSha256": "fd651b83b0c9842083760364f84038cdd18f3b7ed7eaf9394f669a4340efa26e",
+  "formalPayloadsVerified": 71,
+  "formalCanonicalBytes": 8948,
+  "routing": "Formal Evaler task finished normally; active[] at2026-10-15T18:02:16Z; conditional localreview fallback not used; no cancellation/duplicate worker"
+}

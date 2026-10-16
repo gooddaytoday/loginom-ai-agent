@@ -1,0 +1,17 @@
+{
+  "source": "f057960e0a84c7134601f6843385359c27d93438",
+  "base": "1056c10652f7b48a1d8a20c4bf9c656e376137b1",
+  "decision": "648b6f00f58c22ce2f312b4bd946a82d51b283689cd3ad11dbf03467487dee92",
+  "package": {
+    "zipBytes": 3002515,
+    "zipSha256": "3d57331546ee2248f1138b9a691539bef4cad6d247eeb36cc00ff14bc68b8055",
+    "manifestSha256": "bf0b2f5d09dbd5feeec69578cd072078fa649bf1e6f6190818e7da7c09484442",
+    "payloads": 1015
+  },
+  "sourceManifestSha256": "6ea43bd2950e53e13e5d8ae302c96459f0c13e5b7e531bcdaa78a6ccdf00d0c8",
+  "executableSha256": "8b7e2942d33e332778da9487752d6634dde8e15766ed675412a13374de29096f",
+  "delta": "Two-line FDclassification filter uses SAME alreadyacceptedresource_inventory as comparison. Raw terminalerror/finalrawpair preserved; discarded-readmetadata isresource-relevant only. No blanketretry/limitschange. Plusdistinct addressedroot/once/12spent84capture/2523PIDs/11diagnostics/currentbinding/history-attestationroot.",
+  "tests": "MixedRED222→GREEN223/227 with7unsafe/exhaustionchecks and actualTSconsumer;newrootRED2240P4F→GREEN2259PASS0FAIL;typecheck226testextrapropertyFAIL→228PASS;2cleanbuilds;continuousSOURCEcapturesconfirmedcompleteerrornullunknown[]twozero;unchangedfullsuite not repeated.",
+  "state": "NOT_INSTALLED;independentexactSOURCEgatepending;stagingOFFLINE_ONLY",
+  "scope": "Rootsoleoperator;Benfinalindependentonly;all12spent/originalrecovery1/1 preserved;no model/reference/product/cold;MAS/evalrununtouched;automationOFF;nohuman/timegate/no generalframework"
+}

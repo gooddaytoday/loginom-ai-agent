@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "status": "READY_SOURCE_FOR_INDEPENDENT_EVALER_ADMISSION_NOT_APPLIED",
+  "source": "fdbfae6d7a94c06b1343872b7465f6e289f58b08",
+  "base": "d1d38f63fcea1e6f3647f28ed9d453454ee29f6f",
+  "operator": "Root personally; Ben independent final cases/validators/attestation only",
+  "ownerDecisionSha256": "b92583ccc5f8c7bce97745e04814b588a8c37546569622ac85fe84841f9da55e",
+  "lastFreshServer": {
+    "status": "in_progress",
+    "revision": 461,
+    "activeQueued": 0,
+    "latestEvalerACK": "01a13ea9-1e34-7f19-a84b-501dedde449e",
+    "actualCleanupReleasedFreeAccept": false
+  },
+  "package": {
+    "zipSha256": "88160be5b5cbf4a1423a43d913796a75cf2a6d1ad9b0aba109d36a89db0b7f77",
+    "manifestSha256": "1b34052bb82c98b257e53b1649df885ca9a2b4df12766f2d32f4b9317db3067d",
+    "payloads": 1044,
+    "sourceManifestSha256": "e295a757298760f6abdf7b82794fa1b24af969d7c5bd68592dce0da13986ccc0",
+    "sourceEntries": 886,
+    "gitBlobs": 885,
+    "executableSha256": "fea808946c3765145c17292a653ddc4e34fc57fd4c9671d1f4861bc6f6e51b25",
+    "crcPathsTypesHashesAndEveryGitBlobVerified": true
+  },
+  "sourceChanges": [
+    "First/every actual Dispatcher raw result/lower cause privately persisted before parser refusal; original missing d1 response remains missing",
+    "Exact existing dedicated nested bwrap initial startup trace retained before immutable admission; unresolved startup remains unknown even after exit; no admitted identity refresh",
+    "Separate observe-repair entry/root/once and exact previous d1 failed-capture binding; all900 previous PID absence and original owner/lease/reservation/three spent receipts retained",
+    "Fresh source-bound signed allUID/allPID/allFD producer covers all6 CFG plus exact3 retained diagnostic roots; production inspector/consumer require same900 PID binding",
+    "Complete stable authoritative inventories must exclude prior admin diagnostics apart from current own bound self; unknown/foreign peers never closed",
+    "History/attestation root selects only exact new proof root; original snapshot/history77/error/quality and ordinary genuine release gates preserved"
+  ],
+  "validation": {
+    "affected": "219PASS/0FAIL/550expects/12files",
+    "newEntryHistory": "35PASS/0FAIL/120expects/4files overlaps the affected set",
+    "typecheck": "PASS",
+    "build": "2 clean exact Git exports byte-equal",
+    "process": {
+      "mode": "continuous",
+      "complete": true,
+      "status": "confirmed",
+      "error": null,
+      "processes": 3,
+      "verification": [
+        {
+          "observed_at": "2026-10-15T09:02:25.824Z",
+          "owned_remaining": 0
+        },
+        {
+          "observed_at": "2026-10-15T09:02:25.925Z",
+          "owned_remaining": 0
+        }
+      ]
+    },
+    "failures": "All RED/errors retained; standalone capture first missed fixture output dir before dispatch; next intentionally identity-changing nested negative caused outer capture FAILED (retained), not cleanup proof. Separate scoped observer/cause tests capture confirmed. No unchanged full suites."
+  },
+  "limitations": [
+    "installation",
+    "native READY",
+    "prior admin diagnostic cessation",
+    "original server cessation",
+    "official history archival",
+    "cleanup",
+    "completion",
+    "RELEASED",
+    "FREE",
+    "Ben ACCEPT"
+  ],
+  "accounting": {
+    "originalRecovery": "1/1ATTEMPTED",
+    "technicalContinuation": "1/1CONSUMED",
+    "sandboxRepair": "1/1CONSUMED",
+    "observerRepair": "0/1SOURCE only",
+    "modelReferenceProductCold": 0,
+    "BenProduct": "6/6/originalERROR/all6qualityEXCLUDED/no retry",
+    "Rich": "4PASS2qualityFAIL/refs1/1/2/1/1/3/cold11/10/8",
+    "BenCold": "9/9/8+oldERROR1",
+    "repeats": "3/10remaining7/noreset/precharge",
+    "admission": "3/3",
+    "wrapper": "1/1"
+  },
+  "retainedFixtureErrors": [
+    "Typecheck detected optional verification access; fixed optional chain, later typecheckPASS",
+    "Source capture first failed before dispatch because fixture output dir missing; retained",
+    "Outer supervisor correctly rejected identity-changing nested negative child; retained as FAILED; separate source observer tests capture3 confirmed, not native cleanup",
+    "First clean export build mount expected absent node_modules directory; retained; bundle has no runtime deps, dev-only mount omitted; two subsequent exact clean builds byteequal"
+  ],
+  "boundaries": "MAS foreign/no intervention; automationOFF; original owner/task/lease/config/acquiredAt/once/errors retained; exact Node+dedicatedbwrap+loadedpolicy; signed all900PID/allUID/allFD/all6CFG+3retaineddiagnostics; first raw observer response/cause persisted; pre-admission wrapper trace/unresolvedunknown/post-admission identity strict; genuine prioradmin absence/currentownlogout; unchanged cessation/history/wholeguard/CSV/attestation/release/ACCEPT.",
+  "next": "One routed Evaler independent exact final source review; then Root source-bound install/helper/private admission and own foreground observe-repair only after exact acceptance. No new cleanup worker or third Ben review."
+}

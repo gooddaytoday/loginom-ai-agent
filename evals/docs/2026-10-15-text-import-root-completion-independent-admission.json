@@ -1,0 +1,67 @@
+{
+  "decision": "SOURCE_ACCEPT",
+  "source": "1056c10652f7b48a1d8a20c4bf9c656e376137b1",
+  "parent": "ca99158ba93928eb24151390ee94fe0ad31fd371",
+  "operatorDecisionSha256": "af22d51ac54dab3e604fd64b45fea12f31a0fb888443f8b18e31e480d4529eb5",
+  "createdUtc": "2026-10-15T18:24:31.540632+00:00",
+  "scope": "Exact LAB-57 addressed root-completion retention/binding/history-root/attestation-root delta and offline staging; source-only",
+  "exactArchiveVerified": true,
+  "executableRebuildByteEqual": true,
+  "artifact": {
+    "zipSha256": "5ed4c3a4e529c9d02f3ec74ab264e63e107406261169d392d290a8c2dee526f3",
+    "manifestSha256": "37d9f53160ed5a7e2bb7f42489278ea91d34a4c560267ba22fc7e9fb1e2fceec",
+    "sourceManifestSha256": "20b427ece5f9050339abcd87f6bbf009e58e61851a0a6e76e020ebf5155e268b",
+    "executableSha256": "d08dce8541963aa8ad51f22a7079c21bebd67e7472367dfd9125608819ea10f9",
+    "payloads": 1005,
+    "sourceEntries": 946,
+    "gitBlobs": 945,
+    "unchangedBaseBlobs": 934
+  },
+  "checks": {
+    "targetedTests": 8,
+    "independentBoundaryChecks": 31,
+    "allFinalSupervisedRuns": "exit0/continuous/confirmed/captureComplete/errorNull/unknownEmpty/twoZeroRemaining",
+    "priorCa99Binding": "exact once2cb898fd and78 terminal root pins;124process capture bound;logout absence retained",
+    "all11SpentPreserved": "existing retention chain unchanged plus exact ca99 settlement check",
+    "protectedPids": 2438,
+    "retainedDiagnosticRoots": 10,
+    "fdNativeLogoutHistoryGuardCsvCompletionReleaseBodiesUnchanged": true,
+    "newRoot": "lab57-root-completion",
+    "newOnceLimit": 1,
+    "newOnceConsumedBeforeEffects": 0,
+    "currentOldForeignBindingsAndRoots": "PASS",
+    "independentRebuildAndNodeSourceOnlyPlan": "PASS",
+    "offlineOperatorStaging": "PASS",
+    "sourceInstallZipSha256": "c0587996fc1bca9e8971accf379578d03647576784ba67e22cf0a063cc1a983f",
+    "sourceBoundHelperSha256": "36b454528fb8dca45d86f4c395deee728af906d80cabb678d56ca2eed9113b2b",
+    "sourceCleanAfter": true,
+    "diffCheck": "PASS"
+  },
+  "evidence": {
+    "directory": "/home/kiselev/storage/tmp/lab57-root-diag-20261015/local-independent-completion",
+    "manifest": "evidence.json",
+    "manifestSha256": "95046136bac218066160c06110713b44585c6ed9780156f8a59e8ef80c39ada8"
+  },
+  "reviewLocalErrors": {
+    "preservedRuns": [
+      "independent-negatives218",
+      "independent-negatives219",
+      "independent-negatives220"
+    ],
+    "correctionRecords": [
+      "runner-correction.json",
+      "independent-test-correction.json"
+    ],
+    "sourceChanges": false,
+    "finalIndependentRun": "independent-negatives221 PASS31"
+  },
+  "findings": [],
+  "limitations": [
+    "This is SOURCE_ACCEPT only; no native READY, actual cleanup, completion/release/FREE or case ACCEPT is established.",
+    "No SSH, remote CLI, real Multica/MAS, native/model/reference/product/cold execution, lease/profile/credential read or mutation was performed by this review.",
+    "Operator staging scripts were parsed and reviewed as text; they were not imported or executed. Actual helper provisioning and operator effects remain untested here.",
+    "Historical retention was checked against exact source and supplied local safe terminal snapshot; current remote state was not revalidated.",
+    "The original intra-pass roster delta remains UNKNOWN; FD behavior stays strict and the transient refusal can recur.",
+    "Unchanged component suites and fullsuite were not repeated. Author typecheck212 was inspected, not rerun."
+  ]
+}

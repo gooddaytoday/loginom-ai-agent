@@ -1,0 +1,363 @@
+{
+  "recorded_utc": "2026-10-14T02:55:19.591038+00:00",
+  "fresh_server_read_utc": "2026-10-14T02:40:58.463676+00:00",
+  "issue": "LAB-57",
+  "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "owner_policy_sha256": "743f98aca40dd362f3ac80c8a8d97308863ba83d3e32430533ae4101464096c0",
+  "source_report": {
+    "comment": "01a13841-33c4-7a58-afb9-975acb78719f",
+    "parent": "01a13800-0e67-765f-80ca-962c4e052ab2",
+    "author": "Rich",
+    "task": "01a13800-0e7e-7a06-b9f9-fa673320765b",
+    "status": "EXECUTABLE_SOURCE_CANDIDATE / NOT_APPLIED"
+  },
+  "archive": {
+    "archive_sha256": "2dacc49b75ac3415de05ec2b27c0e9c0f5503783e0ab744f419b6e51550279a6",
+    "manifest_sha256": "542d180e2775c244fbd080119ef17738504dcecee5de91ce35e4fccf97aa5dea",
+    "payload_count": 168,
+    "unique_paths_types_hashes_embedded_external_equality": true,
+    "tar_files": 169,
+    "tar_directory_records": 28,
+    "reader_correction": "Initial regular-only and unprefixed assumptions corrected by observed safe directory records and single archive root; no execution rerun."
+  },
+  "source": {
+    "source_sha": "dba983f404d205488ff29c9e3e493b78927f4889",
+    "ancestor_base": "144e607a68bd603a1d67d228ebef990eeeff3b89",
+    "immediate_parent": "e7a2205aeefd2c18ee2ece67fab2ab8ad502cd53",
+    "source_manifest_sha256": "100220fecccc72037d62f9d5e35c96e2b3487b5857938f32af3c888749c9e406",
+    "git_blobs": 810,
+    "tar_payload_hashes": 810,
+    "parent800_unchanged": true,
+    "new10_git_blobs_equal": true,
+    "diff": [
+      "A\tevals/docs/lab57-dispatcher-receipt.schema.json",
+      "A\tevals/docs/lab57-dispatcher-transport-plan.md",
+      "A\tevals/script/lab57-dispatcher-candidate.ts",
+      "A\tevals/src/lab57-dispatcher-browser.ts",
+      "A\tevals/src/lab57-dispatcher-host.ts",
+      "A\tevals/src/lab57-dispatcher-runtime.ts",
+      "A\tevals/src/lab57-dispatcher-transport.ts",
+      "A\tevals/src/lab57-dispatcher.ts",
+      "A\tevals/test/lab57-dispatcher-transport.test.ts",
+      "A\tevals/test/lab57-dispatcher.test.ts"
+    ],
+    "reader_correction": "Initial immediate parent-equality assumption corrected: exact144 is ancestor of TDD chain; final diff/all800base blobs verified."
+  },
+  "executable": {
+    "bytes": 26955,
+    "sha256": "072ce08ad86e4c2e2883fad250abf9fdae62626f23d18bfcfb7642a3fab46ed0"
+  },
+  "patch": {
+    "bytes": 71669,
+    "sha256": "cf45e85fa9708019dae3b84539e5f479c441749647ea3528bf9f5b965efa41ef"
+  },
+  "independent_source_review": {
+    "files_reviewed": [
+      "evals/docs/lab57-dispatcher-receipt.schema.json",
+      "evals/docs/lab57-dispatcher-transport-plan.md",
+      "evals/script/lab57-dispatcher-candidate.ts",
+      "evals/src/lab57-dispatcher-browser.ts",
+      "evals/src/lab57-dispatcher-host.ts",
+      "evals/src/lab57-dispatcher-runtime.ts",
+      "evals/src/lab57-dispatcher-transport.ts",
+      "evals/src/lab57-dispatcher.ts",
+      "evals/test/lab57-dispatcher-transport.test.ts",
+      "evals/test/lab57-dispatcher.test.ts"
+    ],
+    "decision": "SOURCE_COMPONENT_ACCEPTED_FOR_CLOSED_ROUTE_INTEGRATION_ONLY_NOT_LIVE_ADOPTED",
+    "scope": "Exact immutable dba transport component; final closed Ben route still must be independently reviewed/adopted before any original-stand effect. Source review does not independently ACCEPT cases.",
+    "source_model_profiles_credentials_docker_network_hidden_for_tests": true,
+    "root_two_new_test_files": {
+      "PASS": 78,
+      "FAIL": 0,
+      "expects": 149,
+      "environment": "bwrap unshare-all/read-only source/clearenv/tmpfs; explicit synthetic fixture mode; Node24.19.0; no real CLI/native/profile/storage/credentials/network/Docker"
+    },
+    "saved_typecheck_build_functional_node": "PASS; genuine saved command results/captures verified; unchanged historical suites not repeated",
+    "saved_captures": [
+      {
+        "label": "executable-green",
+        "exit_code": 0,
+        "command_result_sha256": "0ddcb78fa4131262b91356a422a74eba039aeab6649f4aeab5c443dcc190a850",
+        "process_cleanup_sha256": "5546c4d71edc3a599e2a47a243c101797722581cb2d9c14f9ac28474fcf14f3b",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "final-addressed-green",
+        "exit_code": 0,
+        "command_result_sha256": "19c82d2a2b6eb53661b0164594104551b237374a15817f65565fc776a0d27ab4",
+        "process_cleanup_sha256": "c881feda786c121d3c131c455e14165e763b3275a37ff8e032cc107680b030f9",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "final-addressed-types",
+        "exit_code": 0,
+        "command_result_sha256": "85df6c099ece6a7a6b5d973be23c06c906b79aebd106488f36fa6b1de111e9c5",
+        "process_cleanup_sha256": "265bb6ae26fe43625112ef2b78e9d80d0abca18a3260b2a7d1a752fe7c9c4b6d",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "final-launch-green",
+        "exit_code": 0,
+        "command_result_sha256": "d8009f2370f532b0f5a63aa656cefad97133de27223a99b4494ee2e29960e13f",
+        "process_cleanup_sha256": "30fab04bbb4d7af37034e129e8cc6a877e35ffbc4ef70def6abbf05ca8e64a0d",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "final-launch-types",
+        "exit_code": 0,
+        "command_result_sha256": "f4e3a08d03acb06f7ff12d9048d493b994328b10a2f1c5a6a27b5c3e36a8ccb6",
+        "process_cleanup_sha256": "a4fb1046e1f37809ca4ac713def792ec85de64095dbefb3aba00c59b4db58d87",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "launch-pin-green",
+        "exit_code": 0,
+        "command_result_sha256": "7449bed96d1152216947128a7d896697d0050f768e985a2473ecc6d016f27b0f",
+        "process_cleanup_sha256": "1095154de9649ed11287c3521dfa0284d1f6e22c02303c2e55ea08b682cbd784",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "launch-pin-red",
+        "exit_code": 1,
+        "command_result_sha256": "765a0ad907ba0490bee887ece346902c563c6c3ea15cc7f679f15132f3aff795",
+        "process_cleanup_sha256": "dde48bd41fa6358293c92dec0d538455baa488fcb3198ef2ea6fdf5e6ca5039e",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "launch-pin-types",
+        "exit_code": 0,
+        "command_result_sha256": "c26f6fbb5e4e8a492151186df7ea0288c253af92dc06174985414d16855429a1",
+        "process_cleanup_sha256": "616d0cac805fd93d846a7d5966df1ae6cfa39b855ffa3881612030eb954ec2b5",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "policy-green",
+        "exit_code": 0,
+        "command_result_sha256": "4e7096b77d83c89d20d64acab3dc0647c786589c5aa9e4dca0fad182b29277f2",
+        "process_cleanup_sha256": "71b4f443f4719165c341c079078681d1029317957470059bff4c74e9d005b02d",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "policy-red-addressed",
+        "exit_code": 1,
+        "command_result_sha256": "c24f9ebd979fa9580a87bddb59e1982592a18236dee4315271f05b9523f37e18",
+        "process_cleanup_sha256": "baa44cc288ab6f11bde935fcdb3ec559eb4d6e78909705a85b48fa8452518e58",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "transport-durable-green",
+        "exit_code": 0,
+        "command_result_sha256": "6db54766fbc5d4a785f8b59a8531b9b3eda67728c85499ac0aa52ff38816c47c",
+        "process_cleanup_sha256": "2261cd790a5bc70ee9db2812ed808679deb353e400f2e66d435f0e09b6844dfe",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "transport-green-canonical",
+        "exit_code": 0,
+        "command_result_sha256": "a27b61a3fc1f5dc86373eb4d8a992ab651d4221ba9922c8e5d176fcaa44facac",
+        "process_cleanup_sha256": "5f3edde53b0602058cd4e185fd366a454cfb556a26eac810544a97a610e413f4",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "transport-green-initial",
+        "exit_code": 1,
+        "command_result_sha256": "5f627f113a798193fb6b5ecf4823ecc8a69a9c7addd40d3b38e0bd00f7349b24",
+        "process_cleanup_sha256": "aec2a0e3ec3a81c2db3e747ec8f93164df0407283287268ee896a1266d852736",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "typecheck-durable",
+        "exit_code": 0,
+        "command_result_sha256": "fad21e21447b9848115b98f38536b5c928ce55d3c093a0691704a524a2a42620",
+        "process_cleanup_sha256": "8808d41c568b4a8da4479f90bf2d80eabcaf9db7ae07251e151e6fda1e516afa",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "typecheck-green",
+        "exit_code": 0,
+        "command_result_sha256": "182542f3784f7c6b3b914f0b0917cacb8b03170cd1c90e6529ec649fb9189bd4",
+        "process_cleanup_sha256": "bea7353798ade31ac318bb3f5057f07853c724b3dacac8b33ad5ee14644ac043",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "typecheck-host",
+        "exit_code": 0,
+        "command_result_sha256": "bb04b507ad8210bfbba335493f66513c46b911c92226dbd5e454f4dc25a30ba2",
+        "process_cleanup_sha256": "68bfd9a3a925e2ce8d826617356f90327ea141d0b9b7b993d5a529fc06f9a63a",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      },
+      {
+        "label": "typecheck-initial",
+        "exit_code": 2,
+        "command_result_sha256": "da0f7dac8eb9b72500f5744715e47455a377fe653ad7507f7cb067857926c6c3",
+        "process_cleanup_sha256": "d6be8b8ce36358f6bcb6c9b7d8386a11c7c97d909d2e09b21b3272106aa331b4",
+        "capture_complete": true,
+        "unknown_processes": [],
+        "two_zero_owned_passes": true
+      }
+    ],
+    "public_client": {
+      "version": "7.4.2",
+      "independently_read_hash_matched_files": [
+        {
+          "path": "bg/admin/SessionsManagerForm.js",
+          "bytes": 52347,
+          "sha256": "e70ccf4d0cf4e37b87c149c08bc3a46c5ce50901a5c996e0e9ef80a2bbeb0e0a"
+        },
+        {
+          "path": "bg/app/MapTree.js",
+          "bytes": 252920,
+          "sha256": "5ff56cec4f2111534c4c7b04233d3f79c044ec4372d691d79612a11bb98f822b"
+        },
+        {
+          "path": "bg/app/MainForm.js",
+          "bytes": 112459,
+          "sha256": "d0b2324d7162816d675e52adc5a5674b46b635d516157ced799ea33690a3c42e"
+        },
+        {
+          "path": "bg/app/Version.js",
+          "bytes": 2090,
+          "sha256": "10d0272c12fac8be8ee8a673273601d6c8ac89ee49e48344bbca420b87126a5e"
+        },
+        {
+          "path": "bg/js/bg.model.js",
+          "bytes": 749000,
+          "sha256": "d3ab87a3aca82985d41a8b9d4b3502c9d8d662204c67c07fb3ff2156d802407a"
+        },
+        {
+          "path": "bg/js/bg.model.rpc.js",
+          "bytes": 5094119,
+          "sha256": "53d043e4a7ee9dcc8006aa8915ca43d83a1df427fa0d73d8ea403357ec61a28f"
+        }
+      ],
+      "source_only_unauthenticated_HTTP_GET": true,
+      "admin_and_actual_ID_membership": "UNOBSERVED",
+      "enum": {
+        "mstClient": 0,
+        "mstSelf": 1,
+        "mstShared": 2,
+        "mstPool": 3,
+        "mstBackup": 4
+      },
+      "native_interface": "vendor GetSessionsManager/UpdateSessionInfos/Count/SessionInfo/PackageInfo/CloseSession(proxy,0); not invented private RPC",
+      "ssh_read_sessions_closed": true
+    },
+    "verified_boundaries": [
+      "actual run/journal/package SHA bytes required by deriveOriginalBinding; offline claimed hashes are not admission",
+      "complete indexed inventory including shared/pool/backup references, role/build/origin/self/count/path checks",
+      "unique account/package membership and immutable original lineage plus creation window; unknown/replaced/running/foreign/extra membership refused",
+      "readonly nonrunning singly referenced saved target only; writable dirty state unobservable => BLOCKED",
+      "stable before/after full inventory, same native proxy and canonical final preconditions; ACK alone not cessation",
+      "private exclusive0600 once/file+parent fsync before close; retained on race/error/crash/no resume",
+      "full post absence and preserved peers; original ERROR/cleanup UNCONFIRMED preserved",
+      "offline CLI refuses live flags before input reads; no shared helper/lifecycle/checker mutation"
+    ],
+    "required_final_route_checks": [
+      "Original Ben common lease and held operation guard; reserve one original unspent recovery and separate overall durable private once BEFORE first creation/login/native/profile/resource effect",
+      "Immediate fresh full8 queues, all six actual CFG profiles, process ancestry/absence/FD/browser/debugger, exact container incarnation/isolation/no bind mounts, source/config/raw guard/registration/storage identities",
+      "Preserve coherent original DB/WAL/SHM/runtime/session snapshot before profile mutation; actual77Luna/high rows/history intact",
+      "Run component with exact manifested d6 resources/loginom/bin/node and recheck process.execPath bytes/device/inode/hash before connector/effects; component currently checks Node version, so caller/closed-route admission must additionally enforce actual executable identity",
+      "Create only new private diagnostic using supported d6 managed API; authentic admin/interface/label-format complete inventory must be observed; unknown privilege => STOP/evidence, no roles/accounts/credentials changes",
+      "Component callback must verify original guard/overall once/source/session resource bindings before EVERY native call; no no-op callback in live route",
+      "Actual supported diagnostic logout/process/browser closure plus official original history before whole guard archive/exact CSV cleanup",
+      "New genuine recovery capture/completion/ordinary eligible RELEASED and subsequent FREE, independently evaluated saved measurements; no old receipt substituted"
+    ]
+  },
+  "saved_integrity_limits": {
+    "rich_readonly_receipt_original171": "delivered safe receipt reports171 original hashes and three protected record identities unchanged; root did not reread live171 files in this turn",
+    "root_known_original_journal": "exact532cc89d execution-events.jsonl hash independently reread from prior315 preserved archive; no DB opened",
+    "source800_parent": "all800 Git blobs independently equal",
+    "active785": "preserved through verified parent800/f3/0fd chain",
+    "current_real_stand": "not inspected or mutated by root; saved Rich BUSY originalBen owner only"
+  },
+  "accounting": {
+    "root_new_model_native_product_reference_cold_recovery_calls": 0,
+    "root_host_server_resource_profile_mutations": 0,
+    "rich_reference": [
+      1,
+      1,
+      2,
+      1,
+      1,
+      3
+    ],
+    "rich_product_initial_repeat1_each": true,
+    "rich_quality": "historical4PASS/2qualityFAIL/0ERROR unchanged",
+    "rich_cold": "11/10/8",
+    "rich_cleanup_continuations": 2,
+    "ben_product_consumed": "6/6; original wholeERROR/code2/all6qualitycountsEXCLUDED/no retries",
+    "ben_cold": "9/9/8+oldERROR1",
+    "actual_ben_model_rows": 77,
+    "scenario": "openai/gpt-6-luna/high; 5official archives+1pending; billedUNKNOWN",
+    "confirmed_same_cause_repeats": 3,
+    "repeat_limit": 10,
+    "remaining": 7,
+    "new_charge": 0,
+    "admission": "3/3",
+    "old_wrapper": "1/1",
+    "original_recovery_consumed": 0,
+    "allowances_not_reset": true
+  },
+  "actual_acceptance_cleanup": {
+    "Ben_independent_ACCEPT": "ABSENT",
+    "server_cessation": "UNPROVEN",
+    "cleanup": "UNCONFIRMED",
+    "ordinary_RELEASED_FREE": "ABSENT",
+    "LAB57_done": false,
+    "LAB58_started": false,
+    "all_eight_done": false
+  },
+  "errors_preserved": {
+    "archive_download": {
+      "initial_cli_read_exit": 1,
+      "initial_lower_cause": "UNKNOWN_RAW_DIAGNOSTICS_NOT_RETAINED",
+      "instrumented_diagnostic_read_exit": 0,
+      "elapsed_seconds": 2.02,
+      "checked_utc": "2026-10-14T02:42:33.828436+00:00",
+      "raw_private_diagnostics_not_printed_or_committed": true,
+      "cli_network_configuration_mutations": 0,
+      "archive_exists": true,
+      "bytes": 2042066,
+      "sha256": "2dacc49b75ac3415de05ec2b27c0e9c0f5503783e0ab744f419b6e51550279a6"
+    },
+    "root_readers": [
+      "Initial regular-only tar/unprefixed assumption corrected from safe28directory records/single root",
+      "Immediate parent equality assumption corrected from verified144 ancestor/TDD chain/final10added diff/all810blobs",
+      "Original journal initially treated as JSON instead of observed JSONL, and run hash was not present in prior315 manifest; corrected journal format; missing run file not invented. No native execution/release repeated."
+    ]
+  },
+  "coordination": "Evaler task01a13841-33e4 already running review atfreshread. No duplicate Rich/Ben task or third review. One concrete owner source decision will use existing report thread after immediate fresh reply/queue check; live adoption not inferred."
+}

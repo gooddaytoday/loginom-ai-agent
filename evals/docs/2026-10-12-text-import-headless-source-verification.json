@@ -1,0 +1,38 @@
+{
+  "checked_utc": "2026-10-12T13:55:36.822269+00:00",
+  "base_sha": "8e2bc4fc480d9037ab1a9b4f5fe269daa716e97b",
+  "published_partial_sha": "1cdbc18ad6c87e3f6f584cdb7cfa1c52d4eaed8a",
+  "branch": "rich-text-pilot",
+  "changed_files": [
+    "evals/script/text-import-cold/provenance.json",
+    "evals/script/text-import-cold/reader.mjs",
+    "evals/test/text-import-cold-reader.test.ts"
+  ],
+  "reader_only_existing_browser_mode_changed": true,
+  "provenance_files": [
+    {
+      "file": "diagnostic-session.mjs",
+      "sha256": "3bba6064d086a1f7e7fc82798c56995c6ac74ffe94d9d9fa7db7a8777c07f475",
+      "bytes_verified": true,
+      "original_source_sha_preserved": true
+    },
+    {
+      "file": "static-source-proof.mjs",
+      "sha256": "8c9f89ec1d2914c427c822b8cdac508b5496bafc1326ce805810f164d2341213",
+      "bytes_verified": true,
+      "original_source_sha_preserved": true
+    },
+    {
+      "file": "reader.mjs",
+      "sha256": "c901c6fd24fde338f77b370e819661657a8b1cb0196add79b72276c81a1fbf42",
+      "bytes_verified": true,
+      "original_source_sha_preserved": true
+    }
+  ],
+  "native_oracle_cold_checker_unchanged": true,
+  "test_source_review": "real exact resources reader subprocess plus unchanged cold checker; requires owned lease; opt-in live regression; no mocks/source-string assertions",
+  "local_new_reader_runtime_test": "NOT_RUN; exact resources/live lease belong to active Rich",
+  "cold_ACCEPT": "NOT_CONFIRMED; final report/evidence pending",
+  "full_pilot_READY_FOR_BEN": false,
+  "monitor_model_or_lease_calls": false
+}

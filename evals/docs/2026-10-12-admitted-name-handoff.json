@@ -1,0 +1,29 @@
+{
+  "issue": "LAB-57",
+  "issue_id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "comment_id": "01a12f39-f6bb-7833-ab55-4b301920b902",
+  "parent_id": "01a12f2a-f960-7a43-a7a6-3ef84f3a9b69",
+  "created_at": "2026-10-12T11:28:10+03:00",
+  "harness_patch_sha": "7c463a35fe19887a2c3d38b4e32c7dc665ab2ffa",
+  "attachment_id": "01a12f39-f5c1-74bf-8a2e-632314c62b79",
+  "archive_sha256": "f2dece4f042a293bd9947b739958e0f26e284268d387b343ac672b7c4c193b60",
+  "server_bytes": "VERIFIED",
+  "trigger_outcomes": [
+    {
+      "reason_code": "queued",
+      "status": "queued",
+      "target_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "target_type": "agent"
+    }
+  ],
+  "active_runs": [
+    {
+      "id": "01a12f39-f6e6-7881-8230-17fd10024d46",
+      "status": "running",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "started_at": "2026-10-12T11:28:11+03:00"
+    }
+  ],
+  "user_authorization": "User explicitly authorized coordination through Evaler in this chat on 2026-10-12",
+  "runtime_acceptance": "PENDING"
+}

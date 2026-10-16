@@ -1,0 +1,453 @@
+{
+  "at": "2026-10-15T21:16:02.773456+00:00",
+  "standPresent": false,
+  "archive": "/home/user/.local/share/loginom-evals-runtime/operations/completed/d2532e9f-fe82-4d73-ac5b-62776e79fcfc",
+  "operationPresentOriginal": false,
+  "owner": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/d2532e9f-fe82-4d73-ac5b-62776e79fcfc/owner.json",
+    "device": 64512,
+    "inode": 17837097,
+    "bytes": 500,
+    "mode": 384,
+    "uid": 1000,
+    "sha256": "7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64"
+  },
+  "stand": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/d2532e9f-fe82-4d73-ac5b-62776e79fcfc",
+    "device": 64512,
+    "inode": 17837096,
+    "bytes": 12288,
+    "mode": 448,
+    "uid": 1000,
+    "sha256": null
+  },
+  "result": {
+    "exit": 0,
+    "pid": 2423325,
+    "birth": "115822293",
+    "startedAt": "2026-10-15T21:15:05.746307+00:00",
+    "finishedAt": "2026-10-15T21:15:40.164434+00:00",
+    "stdoutSha256": "1b15f7b0eff9ff29c2233925150c8ab66d7a8cd36300badf32d594c31e413409",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "controllerStillPresent": false,
+    "standPresent": false,
+    "newFinishOncePresent": false,
+    "operationPresent": false,
+    "originalOwnerUnchanged": null
+  },
+  "once": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/d2532e9f-fe82-4d73-ac5b-62776e79fcfc/lab57-history-finish.once.json",
+    "device": 64512,
+    "inode": 17858388,
+    "bytes": 3931,
+    "mode": 384,
+    "uid": 1000,
+    "sha256": "54dbf2d12439fdfb626d9606af36330662161d2a5dc996352355cc66ed41c30c"
+  },
+  "native": {
+    "exit": 0,
+    "status": "confirmed",
+    "complete": true,
+    "error": null,
+    "unknown": [],
+    "processes": 83,
+    "verification": [
+      {
+        "observed_at": "2026-10-15T20:40:35.260Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-15T20:40:35.363Z",
+        "owned_remaining": 0
+      }
+    ]
+  },
+  "records": {
+    "history.json": {
+      "pin": {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/d2532e9f-fe82-4d73-ac5b-62776e79fcfc/lab57-root-admin/history.json",
+        "device": 64512,
+        "inode": 18760185,
+        "bytes": 40325644,
+        "mode": 384,
+        "uid": 1000,
+        "sha256": "86fe060a38115662aa59f5d1af1bd46cfb77857621a862fbbb5aa8bec24ece35"
+      },
+      "fields": [
+        "actualTransferredFiles",
+        "archiveFiles",
+        "assistantRows",
+        "beforeSha",
+        "coherentCopies",
+        "coherentSnapshot",
+        "historyArchive",
+        "model",
+        "originalRowsPreserved",
+        "protectedOriginalFiles",
+        "rows",
+        "snapshotSha",
+        "status"
+      ],
+      "status": "OFFICIAL_HISTORY_VERIFIED",
+      "sourceSha": null,
+      "originalOutcome": null,
+      "quality": null,
+      "assistantRows": 77,
+      "operatorSource": null
+    },
+    "archive-guard.json": {
+      "pin": {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/d2532e9f-fe82-4d73-ac5b-62776e79fcfc/lab57-root-admin/archive-guard.json",
+        "device": 64512,
+        "inode": 18760188,
+        "bytes": 1573,
+        "mode": 384,
+        "uid": 1000,
+        "sha256": "830b37fa18f83160cd02312cce3b68cd784e636dbbd279a124ba165d966af3d4"
+      },
+      "fields": [
+        "status",
+        "destination",
+        "cleanup",
+        "reservation"
+      ],
+      "status": "RECORD_ARCHIVED",
+      "sourceSha": null,
+      "originalOutcome": null,
+      "quality": null,
+      "assistantRows": null,
+      "operatorSource": null
+    },
+    "storage.json": {
+      "pin": {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/d2532e9f-fe82-4d73-ac5b-62776e79fcfc/lab57-root-admin/storage.json",
+        "device": 64512,
+        "inode": 18760190,
+        "bytes": 373,
+        "mode": 384,
+        "uid": 1000,
+        "sha256": "e100bcfa4fa0c1f15ecf63099fbfc354d2a12c321bc512e846dcbec1f64283d7"
+      },
+      "fields": [
+        "status",
+        "path",
+        "identity",
+        "sha256",
+        "containerId"
+      ],
+      "status": "OWNED_CSV_REMOVED",
+      "sourceSha": null,
+      "originalOutcome": null,
+      "quality": null,
+      "assistantRows": null,
+      "operatorSource": null
+    },
+    "attestation.json": {
+      "pin": {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/d2532e9f-fe82-4d73-ac5b-62776e79fcfc/lab57-root-admin/attestation.json",
+        "device": 64512,
+        "inode": 18760192,
+        "bytes": 41552184,
+        "mode": 384,
+        "uid": 1000,
+        "sha256": "0405d03f50ea707d66b88d3d4f3b81bccd4f0cabbd6c98dbdae2ecba1079c58a"
+      },
+      "fields": [
+        "operator",
+        "completionOperator",
+        "operation",
+        "sourceSha",
+        "originalOutcome",
+        "quality",
+        "process",
+        "cessation",
+        "logout",
+        "history",
+        "guard",
+        "csv",
+        "context",
+        "files"
+      ],
+      "status": null,
+      "sourceSha": "fec2874e24c9c201ddc0a57d6a4fba1ed47ab8b4",
+      "originalOutcome": "ERROR",
+      "quality": "EXCLUDED",
+      "assistantRows": null,
+      "operatorSource": "48e35302d0368df5f585fb096f220d2064164b5a"
+    }
+  },
+  "files": [],
+  "lab57-recovery-completion.json": {
+    "pin": {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/d2532e9f-fe82-4d73-ac5b-62776e79fcfc/lab57-recovery-completion.json",
+      "device": 64512,
+      "inode": 17858389,
+      "bytes": 743,
+      "mode": 384,
+      "uid": 1000,
+      "sha256": "caa20627fc8503e75a6a4398c4ed220debdb100925d6d86470a6d871111a6f9b"
+    },
+    "value": {
+      "version": 1,
+      "owner": {
+        "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+        "task": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+        "role": "ben",
+        "phase": "eval",
+        "sha": "eb1c2b0da02210a9d95569849ae056fa4784440c"
+      },
+      "acquiredAt": "2026-10-13T22:28:17.228Z",
+      "kind": "recovery",
+      "receipt": "/home/user/.local/share/loginom-evals-runtime/operations/recovery-incidents/797aa76730080a7d1413841a3b8e93228c905ebcc9cdb14ac08ac51dfc8f6fa3.json",
+      "profile": "eval",
+      "historyArchive": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile.history/lab57-original-owned-5lDYK0",
+      "processEvidence": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-admin/native-command.json"
+    }
+  },
+  "release.json": {
+    "pin": {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/d2532e9f-fe82-4d73-ac5b-62776e79fcfc/release.json",
+      "device": 64512,
+      "inode": 17858390,
+      "bytes": 580,
+      "mode": 384,
+      "uid": 1000,
+      "sha256": "3a4e0107029e95c63253c9af3e4d745efe4c29e0e11e02b7342a81da0879506a"
+    },
+    "value": {
+      "status": "RELEASED",
+      "owner": {
+        "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+        "task": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+        "role": "ben",
+        "phase": "eval",
+        "sha": "eb1c2b0da02210a9d95569849ae056fa4784440c"
+      },
+      "acquiredAt": "2026-10-13T22:28:17.228Z",
+      "releasedAt": "2026-10-15T21:15:40.000Z",
+      "kind": "recovery",
+      "evidenceSha256": "caa20627fc8503e75a6a4398c4ed220debdb100925d6d86470a6d871111a6f9b",
+      "containerId": "b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e",
+      "archive": "/home/user/.local/share/loginom-evals-runtime/operations/completed/d2532e9f-fe82-4d73-ac5b-62776e79fcfc"
+    }
+  },
+  "attestationChecks": {
+    "proofFiles": 109,
+    "proofBad": [],
+    "historyFiles": 81114,
+    "historyBad": [],
+    "originalRows": 77,
+    "normalWalShm": true,
+    "originalSqlOpened": false,
+    "snapshotFileCount": 28972,
+    "transferFileCount": 4215
+  },
+  "reservation": {
+    "pin": {
+      "path": "/home/user/.local/share/loginom-evals-runtime/operations/recovery-incidents/797aa76730080a7d1413841a3b8e93228c905ebcc9cdb14ac08ac51dfc8f6fa3.json",
+      "device": 64512,
+      "inode": 4234514,
+      "bytes": 749,
+      "mode": 384,
+      "uid": 1000,
+      "sha256": "266fd22e9cd9496919e958196393c58ee9fc4a697750b65941bb07002fad1894"
+    },
+    "status": "SETTLED",
+    "attestationSha256": "0405d03f50ea707d66b88d3d4f3b81bccd4f0cabbd6c98dbdae2ecba1079c58a"
+  },
+  "retainedOnces": [
+    {
+      "name": "lab57-closed.once.json",
+      "expectedSha256": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269",
+      "actualSha256": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269"
+    },
+    {
+      "name": "lab57-continuation.once.json",
+      "expectedSha256": "f28e8821cd1ede51ebe1f35716f3a19213b27436aab3d55e4b15ae9a65870a14",
+      "actualSha256": "f28e8821cd1ede51ebe1f35716f3a19213b27436aab3d55e4b15ae9a65870a14"
+    },
+    {
+      "name": "lab57-control-transport.once.json",
+      "expectedSha256": "704894a10550707163b5709843ce1cece2fde5b22a5ee8a2990fa30bcea8b814",
+      "actualSha256": "704894a10550707163b5709843ce1cece2fde5b22a5ee8a2990fa30bcea8b814"
+    },
+    {
+      "name": "lab57-dispatcher-continuation.once.json",
+      "expectedSha256": "2b1b08f033a8421ae2995380c55a510bc44cd27a864e45e508b7f92f85d3d7f1",
+      "actualSha256": "2b1b08f033a8421ae2995380c55a510bc44cd27a864e45e508b7f92f85d3d7f1"
+    },
+    {
+      "name": "lab57-fd-continuation.once.json",
+      "expectedSha256": "1c1648c08d0c905801d970e64d401147619d12262e20d6718c5a4120ac27bdb4",
+      "actualSha256": "1c1648c08d0c905801d970e64d401147619d12262e20d6718c5a4120ac27bdb4"
+    },
+    {
+      "name": "lab57-kernel-continuation.once.json",
+      "expectedSha256": "13699c77cc3a7cb7262f292cda6f78ae7303275e66a40e664cb444356baf0905",
+      "actualSha256": "13699c77cc3a7cb7262f292cda6f78ae7303275e66a40e664cb444356baf0905"
+    },
+    {
+      "name": "lab57-observer-repair.once.json",
+      "expectedSha256": "8359c09485888676a95f35c4fd4782879698e65f4033d768c8556d5987dcbdd2",
+      "actualSha256": "8359c09485888676a95f35c4fd4782879698e65f4033d768c8556d5987dcbdd2"
+    },
+    {
+      "name": "lab57-root-admin.once.json",
+      "expectedSha256": "cbd6da6f55a3459c7d000c58849f50002649dbc8c8c491055cce309ea4b0d13f",
+      "actualSha256": "cbd6da6f55a3459c7d000c58849f50002649dbc8c8c491055cce309ea4b0d13f"
+    },
+    {
+      "name": "lab57-root-closeout.once.json",
+      "expectedSha256": "9b6daec064611a9bd411597da6212111547ee3871687fe57daacea8394bf5031",
+      "actualSha256": "9b6daec064611a9bd411597da6212111547ee3871687fe57daacea8394bf5031"
+    },
+    {
+      "name": "lab57-root-completion.once.json",
+      "expectedSha256": "c323c7f779dacf5f3d0a729beb7761e389ea6b44b4c6d5c6caa546c0eb36b534",
+      "actualSha256": "c323c7f779dacf5f3d0a729beb7761e389ea6b44b4c6d5c6caa546c0eb36b534"
+    },
+    {
+      "name": "lab57-root-final.once.json",
+      "expectedSha256": "dea4c62af1502a43c1869aad91b43e73358fed51bd3bdab1fe45a170118458ec",
+      "actualSha256": "dea4c62af1502a43c1869aad91b43e73358fed51bd3bdab1fe45a170118458ec"
+    },
+    {
+      "name": "lab57-root-finish.once.json",
+      "expectedSha256": "8ddd72466c977ce9240a08c7e7cb6f16f87f10b40685d1aedcbbc25943c56a91",
+      "actualSha256": "8ddd72466c977ce9240a08c7e7cb6f16f87f10b40685d1aedcbbc25943c56a91"
+    },
+    {
+      "name": "lab57-root-logout.once.json",
+      "expectedSha256": "60b5f7ee17633d091da81cbe7dd891a55741c84025397f5032b1df5bb946b216",
+      "actualSha256": "60b5f7ee17633d091da81cbe7dd891a55741c84025397f5032b1df5bb946b216"
+    },
+    {
+      "name": "lab57-root-pair.once.json",
+      "expectedSha256": "fcccfd5218f8064fa48394350513b20061a1a2a58f014fac13b1acdd9e7c8097",
+      "actualSha256": "fcccfd5218f8064fa48394350513b20061a1a2a58f014fac13b1acdd9e7c8097"
+    },
+    {
+      "name": "lab57-root-release.once.json",
+      "expectedSha256": "677eb16e3452a8f43af04c4fa84ce2068bff3f89d46fe5aa2a0f6d176345f6d9",
+      "actualSha256": "677eb16e3452a8f43af04c4fa84ce2068bff3f89d46fe5aa2a0f6d176345f6d9"
+    },
+    {
+      "name": "lab57-root-settlement.once.json",
+      "expectedSha256": "2cb898fd29890304a49c7458f00cb44b98a25994d4dc47d9d77e19270d3005aa",
+      "actualSha256": "2cb898fd29890304a49c7458f00cb44b98a25994d4dc47d9d77e19270d3005aa"
+    },
+    {
+      "name": "lab57-sandbox-repair.once.json",
+      "expectedSha256": "26dde29c221c4082a3e84e135d7a99926e0f292bb9591ba5d4ef9b88871d3310",
+      "actualSha256": "26dde29c221c4082a3e84e135d7a99926e0f292bb9591ba5d4ef9b88871d3310"
+    }
+  ],
+  "profileMarkers": [
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/roles/rich/reference-profile",
+      "writer": false,
+      "pending": false,
+      "registration": false,
+      "harness": false
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/roles/rich/eval-profile",
+      "writer": false,
+      "pending": false,
+      "registration": false,
+      "harness": false
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/reference-profile",
+      "writer": false,
+      "pending": false,
+      "registration": false,
+      "harness": false
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile",
+      "writer": false,
+      "pending": false,
+      "registration": false,
+      "harness": false
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/roles/evalbaseline/eval-profile",
+      "writer": false,
+      "pending": false,
+      "registration": false,
+      "harness": false
+    },
+    {
+      "path": "/home/user/.local/share/loginom-evals-runtime/roles/evalrunner/eval-profile",
+      "writer": false,
+      "pending": false,
+      "registration": false,
+      "harness": false
+    }
+  ],
+  "guardArchive": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile.harness-lease.lab57-preserved",
+    "device": 64512,
+    "inode": 3840909,
+    "bytes": 4096,
+    "mode": 448,
+    "uid": 1000,
+    "sha256": null
+  },
+  "guardOwner": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile.harness-lease.lab57-preserved/owner.json",
+    "device": 64512,
+    "inode": 3840913,
+    "bytes": 96,
+    "mode": 384,
+    "uid": 1000,
+    "sha256": "f3d323b799d38e4a1ebe1ad901bf69a08e572479674cc94d6f1751642ea87106"
+  },
+  "registrationArchive": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile.process-group.lab57-preserved",
+    "device": 64512,
+    "inode": 3710822,
+    "bytes": 7,
+    "mode": 384,
+    "uid": 1000,
+    "sha256": "f03f26330addd250ebebfc615ffb52350ba77aba21b95bc94ce93344dc27a0a9"
+  },
+  "ownedCsvAbsent": true,
+  "actualStatus": {
+    "exit": 0,
+    "value": {
+      "status": "FREE",
+      "code": 0
+    },
+    "stderrBytes": 0
+  },
+  "originalRunHashes": {
+    "summary.json": "93a750552ae7bfb97697e7e4563f1fd1b0ee046ca4a3018048bb632386985058",
+    "code-verdict.json": "b832669145a229999b39d02f293a2e0300ea9466c7e4beae6bbdcae5a2c2bf10",
+    "txt-semicolon-cp1251-decimal/1/cleanup.json": "1ef7a1544f4a779bcf9648300a3afa081953cf2eaa7ecda90c35769fb31862f1"
+  },
+  "verificationStatus": "ACTUAL_CLEANUP_COMPLETION_RELEASED_FREE_VERIFIED",
+  "independentCaseAccept": "PENDING; source gate and Root cleanup verification are not Ben ACCEPT",
+  "sources": {
+    "native": "fec2874e24c9c201ddc0a57d6a4fba1ed47ab8b4",
+    "completionOperator": "48e35302d0368df5f585fb096f220d2064164b5a",
+    "frozenCases": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+    "officialSupport": "0fd20f7c7e36724ca78a58bb8f9085b78884a87b",
+    "officialCLI": "d6fc9c9b7b499d0a182c972815913b541e4cb81b"
+  },
+  "science": {
+    "benProduct": "6/6 consumed; original wholeERROR/code2/all6qualityEXCLUDED unchanged; no retry",
+    "richProduct": "4PASS/2qualityFAIL/0ERROR preserved",
+    "newModel": 0,
+    "newReference": 0,
+    "newProduct": 0,
+    "newCold": 0,
+    "originalRecovery": "1/1 consumed; same inode SETTLED; initial bytes preserved in old onces",
+    "all17PriorAttemptHashesPreserved": true,
+    "finishAttempt": "18th technical overall once consumed once; no reset",
+    "confirmedSameCauseRepeats": "Rich3/10 remaining7 unchanged",
+    "billedCost": "UNKNOWN"
+  },
+  "scope": "Root personally completed dedicated eval-tests only; MAS/evalrun foreign untouched; automation OFF"
+}

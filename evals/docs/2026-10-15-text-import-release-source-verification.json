@@ -1,0 +1,50 @@
+{
+  "status": "INDEPENDENT_SOURCE_ACCEPTED_ACTUAL_EXIT2_RESTRICTED_CALLBACK_TIMER",
+  "source": "8be13377e6ee2b6b1442819094ed03d60d417996",
+  "ancestorBase": "931e27590f208b96cad986aa901fbd9a9010ed76",
+  "immediateParent": "1b85c77734 (TDD source chain)",
+  "archive": {
+    "source": "8be13377e6ee2b6b1442819094ed03d60d417996",
+    "zip": "/home/kiselev/storage/tmp/lab57-root-diag-20261015/lab57-release-8be13377e-delivery.zip",
+    "zipBytes": 3195705,
+    "zipSha256": "a4571d3988cc705a7d21ab4a18675afb944d0ab51da70600e679e5a44fe9ed7c",
+    "manifestSha256": "211f5358754f1130a5071a0a8938338d2d2905256b4cbe4e267153b6cd0e3cc7",
+    "payloads": 1022
+  },
+  "sourceManifestSha256": "58344d40b116ed37cf9b193ba2931a4903693c265680110e7731b46fcb17486f",
+  "executableSha256": "32c2722dbe72582519f777e880be05870977fae961a36322de26a914e279264b",
+  "sourceEntries": 958,
+  "gitBlobs": 957,
+  "unchangedBaseBlobs": 939,
+  "delta": "OneMCP twoindexedreadonlyinventories/strict15s/rawpair;duplicateoutergatesremoved/internalfullpermitstays. Purpose-scoped immutableowncleanup token afterexactcurrentRoot/once/source/owner/op/controller/node/ancestry;capturedprivatedircheckAFTERissuer. Onlyfixedownlogout/transport usesit, arbitraryJS/originalCloseSession/history/guardCSV/release remainFULLgated. Newroot/once with14spent/105capture2756PIDs13diagnostics.",
+  "scope": "Rootsoleoperator, no arbitrarycleanupJS/nativegrant. Ownfixedlogout/transportclose useimmutableoneshotpurpose scopedcurrentRoot; original/resource effects retainfullgate. No sharedharness contracts changed; no generalrecoveryframework.",
+  "tests": {
+    "targeted": "99PASS0FAIL278expects/5affectedfiles",
+    "typecheck": "PASS256",
+    "builds": "257258byteequal",
+    "continuousCapture": "confirmed/complete/errornull/unknown[]/twozero",
+    "priorRED": "246/248/253 retained; prior3independentfindings resolved beforeeffects",
+    "fullSuite": "unchanged not repeated"
+  },
+  "actualPrior": "93152824 EXIT2 beforehistory/guardCSV/completion/release;own105closed;oldadminactualABSENT;strict pairgap15217ms invalid. All14oldonces/recovery1of1 preserved;newaddressedRoot0of1 unspent.",
+  "next": "Exact one callback timer correction in new clean8b9f, preserve this failed attempt, independently admit changed line/address bindings before effects.",
+  "independentReview": {
+    "decision": "SOURCE_ACCEPT",
+    "reviewer": "existing /root/preflight_spec_review",
+    "receiptSha256": "ac8376ba96ed0b2e757b67d276c18a8222e9989334ee7b8946d4a21ba03b8f64",
+    "evidenceSha256": "09277136b803ac9902a11ee0a5378a446f70f571d116646fd2edb8a72b86bb71",
+    "targeted": "20PASS0FAIL128expects;53binding;6directory;39priorbyteexactscopechecks reused",
+    "caseAccept": false
+  },
+  "operatorActual": {
+    "foreground": 9244,
+    "controller": 2409587,
+    "exit": 2,
+    "processes": 69,
+    "processProof": "continuous/confirmed/complete/errornull/unknown[]/twozero",
+    "transportClosed": true,
+    "newOnceConsumed": 1,
+    "historyGuardCsvCompletionRelease": false,
+    "canonical": "2026-10-15-text-import-restricted-pair-stop-verification.json"
+  }
+}

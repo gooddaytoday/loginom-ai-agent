@@ -1,0 +1,81 @@
+{
+  "recorded_utc": "2026-10-14T03:14:36.480980+00:00",
+  "fresh_full8_utc": "2026-10-14T03:11:09.678094+00:00",
+  "issue": "LAB-57",
+  "canonical_owner_source_policy": "743f98aca40dd362f3ac80c8a8d97308863ba83d3e32430533ae4101464096c0",
+  "source_canonical_preserved_sha256": "d0a88e88421acc203fb7917050e4b7bbfe00bd59345d6f717a3b0c2af27faa35",
+  "amendment": {
+    "comment": "01a1385e-7729-7a63-b906-e07c0e1fa138",
+    "parent": "01a13857-0ef8-7387-9385-32806a532175",
+    "created_at": "2026-10-14T06:04:37+03:00",
+    "one_Ben_mention": true,
+    "attachment_id": "01a1385e-76f8-7dae-80f9-9c3af5bd085a",
+    "bytes": 14993,
+    "sha256": "fb82ffe7a1baf12af196375015a21d59d8e2034ce38eca3d63036f9d490cdf98",
+    "manifest_sha256": "437eb05fa46470bf3953dd8540a0ab877cf02b5ba4725bf36db74d0a6c29a069",
+    "payload_count": 4,
+    "CRC_paths_types_hashes_verified": true,
+    "scope_sha256": "7bdda4e92541dc8f1efb56ff70ae5cfe39a0ad57bc97acde1acb25dc1091153e",
+    "embedded_source_canonical_bytes_equal": true,
+    "source_component": "dba983f404d205488ff29c9e3e493b78927f4889",
+    "effective_stage": "SOURCE_ONLY_FULL_CLOSED_ROUTE_INTEGRATION",
+    "supersedes": "Any conditional authority in dispatcher-ben-owned-recovery-scope.json to install/adopt a live pin or execute recovery after only worker-local checks. First deliver the complete executable closed route, tested prerequisites/negatives and staged command plan; Evaler then independently reviews it and records the final operator decision. No repeated human approval is required.",
+    "existing_Ben_task": "01a13857-dd8e-76a6-9f83-67d41ac5e63a",
+    "Ben_started_at": "2026-10-14T06:06:25+03:00",
+    "amendment_precedes_Ben_start": true,
+    "original_owner_task": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+    "original_acquiredAt": "2026-10-13T22:28:17.228Z",
+    "review_cycle": 2,
+    "reject_count": 1,
+    "final_closed_handler": "NOT_YET_DELIVERED_OR_INDEPENDENTLY_ADMITTED",
+    "source_author_tests_do_not_admit_live_effects": true
+  },
+  "node_gate": {
+    "required": "At admission and EVERY native/resource effect, process.execPath AND /proc/self/exe canonical path/bytes/device/inode/SHA must bind exact d6 manifested resources/loginom/bin/node; same version/equal-byte copy/other inode/changed resource/alias/refuses; durable identity evidence.",
+    "Evaler_reported_readonly_identity_receipt_sha256": "aa9c0f359ba66bfd62b699d7deac2c9e6a2263777917f256bfd8815b62277d62",
+    "reported_device_inode": [
+      64512,
+      3840497
+    ],
+    "reported_bytes": 125989464,
+    "reported_sha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+    "root_actual_node_binary_reread": false,
+    "not_future_native_admission": true
+  },
+  "source_only_prohibitions": [
+    "live support installation/adoption",
+    "connector/observer/login/closure",
+    "recovery reservation or profile/resource mutations",
+    "new scenario reference/product/model/cold/admission/probe generations"
+  ],
+  "unchanged_requirements": [
+    "original Ben common lease/held operation guard/exact owner/config/protected identity",
+    "one unspent recovery and distinct durable overall once BEFORE first future effect",
+    "coherent original DB/WAL/SHM/runtime/session snapshot first",
+    "immediately fresh full queues/all6actual CFG/processancestry/absence/FD/browserdebugger/exactcontainer/isolation/storage/pins",
+    "genuine admin/interface/Name/full authoritative inventory and unique original scope",
+    "writable dirty unknown/foreign/ambiguous/running/error/mismatch/race/denied/partial/crash => STOP/no retry/once retained",
+    "genuine cessation + own diagnostic logout/process cleanup + official77Luna/high history BEFORE whole guard/CSV",
+    "new genuine recovery completion/ordinary RELEASED/FREE/independent cases AND validators/negatives ACCEPT; original ERROR retained"
+  ],
+  "fresh_server": {
+    "LAB56": "done70/owner ACK/active0",
+    "LAB57": "in_progress311/phaseblocked/frozeneb1/review2/reject1",
+    "Ben_continuation": "running06:06:25+03 same task01a13857-dd8e",
+    "Evaler_gate_sync": "task01a1385b-6f49 queued; no separate ACK for second clarification yet observed, first owner amendment already implements SOURCE-only independent final decision gate",
+    "LAB58_63": "in_progress9/admission/no runs",
+    "worker_models": "gpt-6.1-sol/xhigh/concurrency1 unchanged",
+    "runtime": "eval-tests online/same daemon"
+  },
+  "root_this_turn": {
+    "new_native_model_product_reference_cold_recovery_resource_profile_calls": 0,
+    "new_tests": 0,
+    "new_comments_dispatches": 0,
+    "automation_delete": false,
+    "private_DB_opened": false
+  },
+  "accounting": "Ben product6/6 consumed/originalwholeERROR/all6qualityEXCLUDED/no retries; 77Luna-high5archives+1pending/billedUNKNOWN/oldSHM STOP; Rich4PASS2qualityFAIL0ERROR/refs1/1/2/1/1/3/product1each/cold11/10/8/cleanupcontinuations2; Ben cold9/9/8+oldERROR1; repeats3/10remaining7/admission3/3/wrapper1/1/recovery0 last proved, no reset/precharge or consumption inferred from running source task",
+  "actual_cleanup_ACCEPT_RELEASED_FREE": "ABSENT",
+  "all_eight_done": false,
+  "next_step": "Existing Ben delivers final SOURCE; independent exact-source review/admission by coordinator/Evaler then once-owned actual recovery; coordinator resolves future owner decisions without human approval. No duplicate worker/new review or unchanged full check."
+}

@@ -1,0 +1,123 @@
+{
+  "status": "EXACT_SOURCE_ADOPTED_BY_DELEGATED_ROOT_OPERATOR_BEFORE_SETUP",
+  "time": "2026-10-15T12:42:11.768787+00:00",
+  "source": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+  "independentGate": {
+    "decision": "SOURCE_ACCEPT",
+    "source": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+    "comment": "01a13f8e-7e94-77f2-bf82-b1edd851b0d2",
+    "attachment": "01a13f8e-7e07-74cf-9f94-d9b6a8b2a7f5",
+    "archiveSha256": "66d9df25759df26ed471886139e82c127066d15148e2895b9d43d350f0b62424",
+    "manifestSha256": "ef275e0676831798810b8853e19ec1b85a5f8c67c2662309da9d1c102ad6da20",
+    "admissionSha256": "6586a8202c8aac864cf88268ef802f4374c226e0b17975be2f46b443d2d64c2a",
+    "payloads": 123,
+    "exactArchiveVerified": true,
+    "executableRebuildByteEqual": true,
+    "independentTests": "123affected+9independent across retained runs;7wholewindow+2concrete4-agent24orderedpages/exactd6Node",
+    "captures": [
+      {
+        "file": "own-proofs/addressed/process-cleanup.json",
+        "processes": 401,
+        "mode": "continuous"
+      },
+      {
+        "file": "own-proofs/build/process-cleanup.json",
+        "processes": 2,
+        "mode": "continuous"
+      },
+      {
+        "file": "own-proofs/queue-only/process-cleanup.json",
+        "processes": 29,
+        "mode": "continuous"
+      },
+      {
+        "file": "own-proofs/initial-fixture-mode-error/process-cleanup.json",
+        "processes": 53,
+        "mode": "continuous"
+      },
+      {
+        "file": "author-evidence/proofs/queue-supervised98/capture/process-cleanup.json",
+        "processes": 12,
+        "mode": "continuous"
+      }
+    ],
+    "localReviewerErrorsRetained": [
+      "Review ZIP extraction produced fakeCLI0600, causingPermissionError;restore its actual Git100755 only in own readonly contour,bytes unchanged. Initialresult/capture retained.",
+      "Reviewer Bun.build relative test/fixture path resolved incorrectly as EISDIR test;corrected only own absolute entrypoint;2test rerun,source/test criteria unchanged."
+    ],
+    "sourceOnlyNotCaseAcceptOrCleanup": true
+  },
+  "localOperatorInputs": {
+    "status": "OFFLINE_OPERATOR_INPUTS_ONLY_NOT_EXECUTED",
+    "source": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+    "files": 911,
+    "supportZipSha256": "b0d0790973509f1eebde4d5934974c7f9fe251c9abe38b949ee3d0e7a610c776",
+    "allSyntaxAndEmbeddedScriptsParsed": true,
+    "sourceAdmissionRequiredBeforeAnyExecution": true,
+    "exactManifestPidFileRetained": true,
+    "all6spentRetained": true,
+    "kernelAllowance": "0/1 unchanged",
+    "effects": 0,
+    "scripts": [
+      {
+        "file": "install_support.py",
+        "sha256": "51a6278ea6063465d606afe49d9432e904d1039e55f22336883ffc7c83074580",
+        "basedOn": "/home/kiselev/storage/tmp/lab57-root-diag-20261015/kernel-k1-operator/install_support.py"
+      },
+      {
+        "file": "provision_observer.py",
+        "sha256": "8f65cdda637ec9f042a79b27e13c5d57e37013eac161cb6b5f6335cee77305f5",
+        "basedOn": "/home/kiselev/storage/tmp/lab57-root-diag-20261015/kernel-k1-operator/provision_observer_manifest_path.py"
+      },
+      {
+        "file": "setup_after_admission.py",
+        "sha256": "e21aca627fcc0fa77787f25339e1b7c5801a359f73e315c86a6c62db7fb9edd2",
+        "basedOn": "/home/kiselev/storage/tmp/lab57-root-diag-20261015/kernel-k1-operator/setup_after_admission.py"
+      },
+      {
+        "file": "prepare_admission.py",
+        "sha256": "ee62f5786e3cffc2545e205001c798d4aabe2df64569f0c595d4f8590c473b2d",
+        "basedOn": "/home/kiselev/storage/tmp/lab57-root-diag-20261015/kernel-k1-operator/prepare_admission.py"
+      },
+      {
+        "file": "root_execute.py",
+        "sha256": "7693e18329bcd484413b7a80034984bd7d523a153370c4eb236e5bef17b7f0d0",
+        "basedOn": "/home/kiselev/storage/tmp/lab57-root-diag-20261015/kernel-k1-operator/root_execute.py"
+      },
+      {
+        "file": "operator_control.py",
+        "sha256": "18bd0271b91717f45fdb6975b647a5baead867a4ff605e0a840020e422ed7be0",
+        "basedOn": "/home/kiselev/storage/tmp/lab57-root-diag-20261015/kernel-k1-operator/operator_control.py"
+      }
+    ]
+  },
+  "exactInputReview": {
+    "status": "OFFLINE_EXACT_OPERATOR_INPUT_BINDINGS_VERIFIED",
+    "source": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+    "manifestEntries": 911,
+    "pids": 2100,
+    "manifestPidPath": "evals/docs/evaler/lab57-root-kernel-observation-pids.json",
+    "pidBytesSha256": "b711bf5527e1d7b4c4830ed35a0ecd42fabebf66ec1c2c9ea73bf2ce6c74c82f",
+    "all6PreviousOnceBindingsPresent": true,
+    "effects": 0,
+    "admissionCertPresent": false
+  },
+  "sourceManifestSha256": "51234110346544dad878341b630193c8cd89ce05f85f30e4ee31ede1fdec01f9",
+  "kernelAllowance": "0/1 UNSPENT by last actual receipt; must freshly verify",
+  "originalRecoveryAnd6Spent": "preserved, no reset/rebind/replay",
+  "operator": "Root personally; no cleanup worker dispatch; Ben final only",
+  "next": "Fresh terminal coordination → no-replace immutable support/helper → new private admission/preonce directory → exact kernel-continue under fresh guards",
+  "notYetProven": [
+    "new source installation",
+    "new helper provision",
+    "new private admission",
+    "native cleanup",
+    "completion",
+    "RELEASED",
+    "FREE",
+    "Ben ACCEPT"
+  ],
+  "science": "no new model/reference/product/cold; previous ledgers/ERROR/excluded quality unchanged",
+  "MAS": "foreign/no intervention",
+  "automation": "OFF"
+}

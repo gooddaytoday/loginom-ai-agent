@@ -1,0 +1,238 @@
+{
+  "source": "1056c10652f7b48a1d8a20c4bf9c656e376137b1",
+  "result": {
+    "exit": 2,
+    "pid": 2396044,
+    "birth": "114811259",
+    "startedAt": "2026-10-15T18:26:35.395370+00:00",
+    "finishedAt": "2026-10-15T18:28:36.486371+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "completionContinuationOncePresent": true,
+    "previousRootFinalConsumed": 1,
+    "previousAddressedFinishConsumed": 1,
+    "priorControlConsumed": 1,
+    "priorKernelConsumed": 1,
+    "priorAbiContinuationConsumed": 1,
+    "priorFdContinuationConsumed": 1,
+    "priorObserverRepairConsumed": 1,
+    "sandboxRepairConsumed": 1,
+    "priorContinuationConsumed": 1,
+    "originalRecoveryConsumed": 1,
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": true,
+    "routeRootPresent": true,
+    "controllerStillPresent": false
+  },
+  "at": "2026-10-15T18:28:42.555874+00:00",
+  "owner": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/owner.json",
+    "device": 64512,
+    "inode": 17837097,
+    "bytes": 500,
+    "mode": 384,
+    "sha256": "7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64",
+    "mtimeNs": "1791930497229073348",
+    "ctimeNs": "1791930497229073348"
+  },
+  "once": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/lab57-root-completion.once.json",
+    "device": 64512,
+    "inode": 17858369,
+    "bytes": 6628,
+    "mode": 384,
+    "sha256": "c323c7f779dacf5f3d0a729beb7761e389ea6b44b4c6d5c6caa546c0eb36b534",
+    "mtimeNs": "1792088818535275909",
+    "ctimeNs": "1792088818535275909"
+  },
+  "records": {
+    "diagnostic-transport.json": {
+      "browserTransportClosed": true,
+      "browserProcessTerminated": true
+    }
+  },
+  "native": {
+    "exit": 2,
+    "status": "confirmed",
+    "complete": true,
+    "mode": "continuous",
+    "error": null,
+    "unknown": [],
+    "count": 84,
+    "verification": [
+      {
+        "observed_at": "2026-10-15T18:28:31.780Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-15T18:28:31.884Z",
+        "owned_remaining": 0
+      }
+    ],
+    "captureRawEqual": true
+  },
+  "actualRefusal": {
+    "name": "ObserverRefused",
+    "code": null,
+    "gate": "TWO_PASS_COHERENCE_CHANGED",
+    "observationRefusals": [
+      {
+        "attempt": 1,
+        "reason": "OWN_FD_ACTIVITY_UNCERTAIN",
+        "changes": [
+          {
+            "before": {
+              "pid": 2397948,
+              "parent": 2397661,
+              "birth": "114819722",
+              "uid": 1000,
+              "fdCount": 157,
+              "fdDigest": "8bf03f39393c6b6d1b56799d7aa8ffbcfa462ea7156e2a0a112edeb085c7bf54",
+              "nativeComm": "chrome",
+              "kernelThread": false
+            },
+            "after": {
+              "pid": 2397948,
+              "parent": 2397661,
+              "birth": "114819722",
+              "uid": 1000,
+              "fdCount": 156,
+              "fdDigest": "9fb178084d376e4c2954e1d3fd0c0e95c267bf3871d8093ad6690e065a92bbf3",
+              "nativeComm": "chrome",
+              "kernelThread": false
+            }
+          }
+        ],
+        "ancestry": [
+          {
+            "pid": 2396044,
+            "parent": 2396043,
+            "birth": "114811259",
+            "uid": 1000
+          },
+          {
+            "pid": 2396627,
+            "parent": 2396044,
+            "birth": "114815034",
+            "uid": 1000
+          },
+          {
+            "pid": 2396941,
+            "parent": 2396627,
+            "birth": "114815934",
+            "uid": 1000
+          },
+          {
+            "pid": 2396955,
+            "parent": 2396941,
+            "birth": "114815937",
+            "uid": 1000
+          },
+          {
+            "pid": 2397659,
+            "parent": 2396955,
+            "birth": "114818544",
+            "uid": 1000
+          },
+          {
+            "pid": 2397660,
+            "parent": 2397659,
+            "birth": "114818545",
+            "uid": 1000
+          },
+          {
+            "pid": 2397661,
+            "parent": 2397660,
+            "birth": "114818545",
+            "uid": 1000
+          },
+          {
+            "pid": 2397948,
+            "parent": 2397661,
+            "birth": "114819722",
+            "uid": 1000
+          }
+        ]
+      }
+    ],
+    "coherenceDifferences": {
+      "beforeSha256": "858189d8b6230876622c384b3c4204c59bc2f552e7d8676c3cf590c28c34b034",
+      "afterSha256": "49122a88489551e788029890d0f34f0814007354e812eae8b9886123f0aaf744",
+      "changes": [
+        {
+          "before": {
+            "pid": 129707,
+            "parent": 1,
+            "birth": "43340042",
+            "uid": 0,
+            "fdCount": 47,
+            "fdDigest": "ecad0bd25d2d995657c1138f1534fed32fa87d602a56c936ce5e56879a784476",
+            "nativeComm": null,
+            "kernelThread": false
+          },
+          "after": {
+            "pid": 129707,
+            "parent": 1,
+            "birth": "43340042",
+            "uid": 0,
+            "fdCount": 49,
+            "fdDigest": "956305f62268c21e076cbead68afa6ac0d5f2844be65a98eb2f3175d0a3b8929",
+            "nativeComm": null,
+            "kernelThread": false
+          }
+        },
+        {
+          "before": {
+            "pid": 129708,
+            "parent": 1,
+            "birth": "43340042",
+            "uid": 0,
+            "fdCount": 31,
+            "fdDigest": "8a70fccc57ca70cdb20f9492467423d16db5467c65127af9bbb831bf1d491c11",
+            "nativeComm": null,
+            "kernelThread": false
+          },
+          "after": {
+            "pid": 129708,
+            "parent": 1,
+            "birth": "43340042",
+            "uid": 0,
+            "fdCount": 32,
+            "fdDigest": "4fc29fb6d9aa8085e452f0777cf7c96f2d5714d9ce5ead05338e2d9a2f1ac08b",
+            "nativeComm": null,
+            "kernelThread": false
+          }
+        },
+        {
+          "before": {
+            "pid": 2398001,
+            "parent": 2397948,
+            "birth": "114819730",
+            "uid": 1000,
+            "fdCount": 35,
+            "fdDigest": "af9a38f88d72e034af4bcde71135d42ed48a73eea72e54bce252f8faa4e6e22a",
+            "nativeComm": "chrome",
+            "kernelThread": false
+          },
+          "after": {
+            "pid": 2398001,
+            "parent": 2397948,
+            "birth": "114819730",
+            "uid": 1000,
+            "fdCount": 37,
+            "fdDigest": "76cf5cf9753125d9c576d8ab74688a8cecf89ebc93d6e7300d05c1f72348ec63",
+            "nativeComm": "chrome",
+            "kernelThread": false
+          }
+        }
+      ]
+    }
+  },
+  "diagnosis": "Comparison normalizes irrelevantUID0parent1daemonFDchanges; classification wronglyusedrawchanges including those daemonrows andrefused eligibleownChromeFDactivity. Tinyfix classifies same normalizeddelta;rawterminalerror unchanged;finalrawsignedpair preserved. Per-discard metadata remains resource-relevant only,not rawall.",
+  "remaining": "Own actual serverabsence/logout/process,official77history,wholeguard/exactCSV,genuinecompletion/SETTLED/RELEASED/FREE,independentBenACCEPT",
+  "all12SpentPreserved": true,
+  "newModelReferenceProductCold": 0,
+  "originalBenQuality": "ERRORcode2/all6EXCLUDED/product6/6spent/no retries",
+  "foreign": "MAS/evalrununtouched;automationOFF"
+}

@@ -1,0 +1,203 @@
+{
+  "version": 1,
+  "decision": "SOURCE_REJECT",
+  "source": "e0c47ade7f5a331eec810768afabfa128bd1c5ef",
+  "base": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+  "issue": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+  "trigger": "01a13fcf-2f3d-7162-b951-4c3ad1fcb901",
+  "reviewer": "Evaler independent of Root author",
+  "mustNotInstall": true,
+  "input": {
+    "attachment": "01a13fcf-174e-7a2f-bdcd-9bdc62c5ca7d",
+    "archiveSha256": "fa689b6842ef9bea6f3d3529abd7b81b8d692467fa5457d6521aa602f205d9b6",
+    "manifestSha256": "34e86caff6dbaeee1a47ee9f0ab86728855d33b6102fe034f98d20c878ca066b",
+    "payload": 1642,
+    "crcPathsTypesBytesHashes": "PASS"
+  },
+  "sourceManifestSha256": "586ceff923492a962ff721336c0a22e147767689dcf5e72115c3243fc7c00359",
+  "executableSha256": "769db257cacaef990211901fd7896140f20ad7601db5bde9edae3e4067686ee2",
+  "git": {
+    "source": "e0c47ade7f5a331eec810768afabfa128bd1c5ef",
+    "base": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+    "sourceEntries": 920,
+    "gitBlobs": 919,
+    "changedPaths": [
+      "evals/docs/evaler/lab57-root-control-transport-decision.json",
+      "evals/docs/evaler/lab57-root-control-transport-pids.json",
+      "evals/docs/evaler/lab57-root-control-transport-pins.json",
+      "evals/docs/evaler/lab57-root-control-transport-plan.md",
+      "evals/script/lab57-fd-observer.py",
+      "evals/script/lab57-owned-route.ts",
+      "evals/script/lab57-queue-pages.py",
+      "evals/script/lab57-readonly-window.py",
+      "evals/script/lab57-route-inspect.py",
+      "evals/script/lab57_history_audit_scope.py",
+      "evals/script/lab57_multica_read.py",
+      "evals/src/lab57-closed-route.ts",
+      "evals/src/lab57-continuation.ts",
+      "evals/src/lab57-control-transport-continuation.ts",
+      "evals/src/lab57-recovery-attestation.ts",
+      "evals/src/lab57-route-host.ts",
+      "evals/test/fixtures/fake-multica-queues.py",
+      "evals/test/lab57-command-diagnostics.test.ts",
+      "evals/test/lab57-control-transport.test.ts",
+      "evals/test/lab57-history-audit-scope.test.ts",
+      "evals/test/lab57-mas-queues.test.ts",
+      "evals/test/lab57-multica-read.test.ts",
+      "evals/test/lab57-readonly-window.test.ts"
+    ],
+    "unchangedBaseBlobs": 896,
+    "supervisorAbiFdConsumerStatusRuntimeContractUnchanged": true
+  },
+  "defects": [
+    {
+      "id": "CT1",
+      "locations": [
+        "evals/script/lab57-route-inspect.py:35",
+        "evals/script/lab57-route-inspect.py:45",
+        "evals/script/lab57-route-inspect.py:73",
+        "evals/script/lab57-readonly-window.py:13"
+      ],
+      "problem": "A profile blocker already collected in markers is masked by a later typed MulticaReadTimeout. The runner starts a second whole observation despite the owner neverRetry permissions/FD/PID/profile/container/storage condition. Known pending-work priority is implemented, but known profile markers are not checked before any retryable CLI read.",
+      "reproduction": "Candidate unedited collect() AST with explicit in-memory synthetic six-profile/CFG/cleanup/CLI interfaces, then actual collect_fresh(). .writer+runtime-list timeout, other-profile sibling .harness-lease+runtime-list timeout, .writer+agent-list timeout each invokes the target GET twice. The first timeout restarts collection; deliberately nonretryable PermissionError on second request proves and stops the unwanted retry. No-marker control correctly permits that single restart. No candidate source/test/fixture edited.",
+      "actual": "3 intended STOP negatives FAIL; each received2 target calls instead of <=1. No-marker control PASS. Known marker should preferably stop BEFORE any CLI request.",
+      "expected": "A known profile blocker must terminate the whole read-only collection without retry, preserving the blocker as terminal evidence even when a later GET would time out. Only a collection without known resource blockers may use the bounded timeout restart.",
+      "minimalRepair": "Refuse known markers immediately after profile scan, before agent-list/runtime-list/task-pages; add these three source-connected negatives and clean-timeout positive. Preserve all raw diagnostics/max3/final15s/full inventory/other gates. Root authors any replacement; new exact independent SOURCE gate before install/effects.",
+      "scope": "Synthetic SOURCE-only mechanism, not a claimed live occurrence or native/guard/PASS bypass."
+    }
+  ],
+  "independent": {
+    "addressed": "91PASS/0FAIL/275expects/6changed affected testfiles. Covers own CLI kill+wait/whitelist/partial streams, concurrent semantic and pending priority, exact MAS partition and all pages/whole-window/history/private diagnostics/new entry/accounting/footprint.",
+    "negative": "1PASS/3FAIL/9expects/4tests: three CT1 regressions reproduce; marker-free control passes. These are unresolved candidate failures, not reviewer setup failures.",
+    "capture": {
+      "negative": {
+        "exit": 1,
+        "capture": {
+          "processes": 2,
+          "status": "confirmed",
+          "complete": true,
+          "error": null,
+          "unknown": [],
+          "mode": "continuous",
+          "twoZero": [
+            {
+              "observed_at": "2026-10-15T13:51:22.670Z",
+              "owned_remaining": 0
+            },
+            {
+              "observed_at": "2026-10-15T13:51:22.771Z",
+              "owned_remaining": 0
+            }
+          ]
+        }
+      },
+      "addressed": {
+        "exit": 0,
+        "capture": {
+          "processes": 87,
+          "status": "confirmed",
+          "complete": true,
+          "error": null,
+          "unknown": [],
+          "mode": "continuous",
+          "twoZero": [
+            {
+              "observed_at": "2026-10-15T13:51:58.429Z",
+              "owned_remaining": 0
+            },
+            {
+              "observed_at": "2026-10-15T13:51:58.530Z",
+              "owned_remaining": 0
+            }
+          ]
+        }
+      },
+      "build": {
+        "exit": 0,
+        "capture": {
+          "processes": 2,
+          "status": "confirmed",
+          "complete": true,
+          "error": null,
+          "unknown": [],
+          "mode": "continuous",
+          "twoZero": [
+            {
+              "observed_at": "2026-10-15T13:51:53.266Z",
+              "owned_remaining": 0
+            },
+            {
+              "observed_at": "2026-10-15T13:51:53.368Z",
+              "owned_remaining": 0
+            }
+          ]
+        }
+      }
+    },
+    "build": {
+      "sha256": "769db257cacaef990211901fd7896140f20ad7601db5bde9edae3e4067686ee2",
+      "node": "v24.19.0",
+      "sourceStageRecoveryEffects": 0
+    },
+    "isolation": "unshare-all/clearenv/read-only candidate source/tmpfs/synthetic CLI; no original profiles/auth/storage/network/native/Docker. Exact d6 Node bytes/dev/inode/path pinned; unchanged0fd supervisor hash verified. All launched SOURCE calls collected before final.",
+    "limitations": "Focused rejection review, not an exhaustive safety/completeness acceptance. No independent live host/session/cleanup verification. Author historical161PASS remains valid but does not cover CT1. Unchanged full suites not rerun."
+  },
+  "author": {
+    "tests": "161PASS/0FAIL/397expects/10files;typecheckPASS saved proofs; two clean supplied builds match exact own rebuild. RED134/138/140/142 and intermediate errors retained.",
+    "capture": {
+      "processes": 95,
+      "status": "confirmed",
+      "complete": true,
+      "error": null,
+      "unknown": [],
+      "mode": "continuous",
+      "twoZero": [
+        {
+          "observed_at": "2026-10-15T13:43:28.294Z",
+          "owned_remaining": 0
+        },
+        {
+          "observed_at": "2026-10-15T13:43:28.395Z",
+          "owned_remaining": 0
+        }
+      ]
+    }
+  },
+  "reportedOperational": {
+    "source": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+    "receiptSha256": "42a7086b4310a108ecc29c7540c56016f25169248ceeefcc1cd5dcf6d094cb54",
+    "kernelConsumed": 1,
+    "kernelLimit": 1,
+    "kernelOnceSha256": "13699c77cc3a7cb7262f292cda6f78ae7303275e66a40e664cb444356baf0905",
+    "controller": 2336136,
+    "birth": "112755967",
+    "exit": 2,
+    "operation": "64512/18619289 removed",
+    "nativeCapture": "ABSENT;not synthesized",
+    "stage": "runtime-list CLI HTTP timeout after kernel once, before diagnostic mkdir/native. PIDgone/operationabsent are Root receipt observations, not new independent host proof.",
+    "lowerTlsCause": "UNPROVEN;five ABBA pairs do not prove a TLS cause;GODEBUG/defaults unchanged"
+  },
+  "ownerDecisionSha256": "5b6c7ee8f4dec4c47b18a6294b2d9a930f61349474be66458e7c973a7f663b8d",
+  "controlTransport": {
+    "limit": 1,
+    "consumed": 0,
+    "status": "SOURCE_REJECTED_NOT_RUN",
+    "noPrecharge": true
+  },
+  "retained": "All7spent attempts/onces including kernel1/1, original recovery/reservation1/1, original Ben owner/task/acquiredAt/config/token/lease/frozeneb1/review2/reject1/originalERROR/all6qualityEXCLUDED/product6/6/no retries/77Luna-high/billedUNKNOWN retained. Rich4PASS2qualityFAIL/refs/cold/repeats3/10remain7/admission3/3/wrapper1/1 unchanged. Lower Writer UNKNOWN and SHMSTOP retained.",
+  "next": "Root alone authors minimal CT1 repair, then exact independent SOURCE admission before install/provision/private admission/any live effects. No cleanup worker/Ben/Rich dispatch;Ben final independent cases/validators/attestation only after genuine cleanup/release. No new scientific allowance/reset/replay/rebind.",
+  "mandatoryRemaining": "Genuine original/prior-admin scope cessation, own empty diagnostic logout/transport/continuous native cleanup, official77rows normal private-copyWALSHM history BEFOREwholeguard/exactCSV;realattestation/completion/SETTLED/ordinaryRELEASED/freshFREE thenBenfinalACCEPT. Ownprocesscleanup/ACK are not servercessation.",
+  "localReviewErrors": [
+    "First authenticated CLI attachment download timed out; own initial verifier encountered FileNotFound while download process still running; completion collected exit1. One sequential authenticated CLI retry succeeded; no issue/resource/native mutation.",
+    "Initial metadata draft8206bytes exceeded8192; no write attempted. Removed duplicated current report IDs from observation/checkpoint; authoritative state.processed_report_ids and verification.report_id retained; original full metadata attached."
+  ],
+  "effects": {
+    "install": 0,
+    "helperProvision": 0,
+    "native": 0,
+    "profileResource": 0,
+    "modelReferenceProductCold": 0,
+    "workerDispatch": 0
+  },
+  "boundaries": "MAS foreign NO INTERVENTION;automationOFF;nohuman/timegate;originalBUSY/cleanupUNCONFIRMED;completion/RELEASED/FREE/BenACCEPT absent."
+}

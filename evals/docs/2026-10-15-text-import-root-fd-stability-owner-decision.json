@@ -1,0 +1,51 @@
+{
+  "version": 2,
+  "decision": "ROOT_FD_STABILITY_CONTINUATION_SOURCE_FIRST",
+  "scope": "LAB-57 original remaining cleanup on dedicated eval-tests only",
+  "operator": "Root personally; Ben independent final cases/validators/attestation only",
+  "basis": {
+    "actualStopReceiptSha256": "bfd418c45c3ed1fa76354e5e12b1c18b6d686cda69493337d9fa55d80d731b4f",
+    "source": "fdbfae6d7a94c06b1343872b7465f6e289f58b08",
+    "actual": "09:24:37→09:28:00UTC EXIT2; initial navigation/fields set; fresh FD guard STOP before third login gesture; no Dispatcher observation",
+    "nativeCapture": "368 continuous/complete/confirmed/errornull/unknown0/browser1/startup1resolved/twozero; process cleanup only, not server cessation",
+    "refusal": "initial PROC_LIFETIME_UNCERTAIN PID2282314 fd17 ENOENT; signed passes prove same-birth UID1000 Root child parent2280408; next TWO_PASS_COHERENCE_CHANGED actual differing pair/delta not retained, lower exact cause UNKNOWN",
+    "localReproduction": "Actual Python producer synthetic controlled backend reproduces own FD activity; bounded complete read-only re-observation accepts only final strict coherent pair; foreign/reused/protected/original PID and exhausted observations refuse. No real native/model effects."
+  },
+  "preserve": {
+    "originalRecovery": "1/1 ATTEMPTED/e704",
+    "technicalContinuation": "1/1 CONSUMED/f28",
+    "sandboxRepair": "1/1 CONSUMED/26dde29",
+    "observerRepair": "1/1 CONSUMED/8359c09485888676a95f35c4fd4782879698e65f4033d768c8556d5987dcbdd2",
+    "originalBenOwnerTaskLeaseConfigAcquiredAt": true,
+    "allPreviousSourcesAdmissionsCapturesErrorsOnceAndHistory": true,
+    "originalERRORAll6BenQualityExcludedProduct6of6NoRetry": true,
+    "noCapturePromotion": "Current confirmed capture proves only its own processes; prior d1 failed capture remains FAILED"
+  },
+  "newTechnicalAllowance": {
+    "name": "fd-stability-continuation",
+    "limit": 1,
+    "consumed": 0,
+    "entry": "fd-continue",
+    "proofRoot": "lab57-fd-continuation",
+    "once": "lab57-fd-continuation.once.json",
+    "scientificAllowance": false,
+    "reacquireReserveReplayResetRebind": false,
+    "automaticResumeAfterErrorUncertainty": false
+  },
+  "sourceRequirements": [
+    "Exact all4 prior onces/controllers/admissions/captures/reservation/source/registration/snapshot binding, fresh absence for all1270 PIDs and all6 CFG plus4 retained diagnostic roots in complete signed allPID/allUID/allFD proof",
+    "At most3 complete read-only inventory attempts per observation; restart own FD activity only when both complete passes have no original PIDs/foreign native/denied/protected refs and identical PID/birth/UID/parent/native classification; every changed FD process has genuine unchanged UID1000 ancestry to exact current Root controller. Foreign/unknown/reused/incomplete/denied/protected activity STOP; final admitted pair still exactly coherent across every PID/FD digest, never ignore/coalesce/omit a process or FD",
+    "Durable actual private failed command stdout/stderr before parsing and safe complete coherence deltas on every final refusal; preserve failed inventories rather than turning them into admission",
+    "New once/root/entry/private source admission retaining original reservation, original all4 spent allowances and scientific counters; no retry of spent commands. All exact Node/process.execPath+/proc/self/exe/dedicated bwrap/policy/container/source/fresh queue/storage gates unchanged",
+    "Same prior authenticated admin absence/current own empty observer/logout, genuine original cessation/native process capture/history77/wholeguard/exactCSV/attestation/completion/original reservationSETTLED/ordinaryRELEASED/FREE/BenACCEPT mandatory"
+  ],
+  "admission": "New clean exact full SOURCE/plan/TDD/negatives/build/process independently admitted by Evaler before install/helper/native/profile/resource effects. Author PASS is not admission or Ben ACCEPT. No new cleanup worker or third review.",
+  "newModelReferenceProductCold": 0,
+  "sameCauseLedger": "3/10 remaining7 unchanged/noreset/precharge; first FD coherence blocker not charged without Rich-confirmed repeat",
+  "temporaryLocalData": "/home/kiselev/storage/tmp",
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "DELETED_OFF",
+  "humanOrManagementTimeGate": false,
+  "supersedesUnappliedDecisionSha256": "d8d799ad23a76ed6ea441bc249433f14187630409118541bccaf93ed0c732b96",
+  "beforeAdmissionCorrection": "1269 captured/controller union plus separately signed same-birth Root helper PID2282314 =1270. Adding one absence guard only; no old receipt/reset/effect. V1 retained in Git history, never applied."
+}

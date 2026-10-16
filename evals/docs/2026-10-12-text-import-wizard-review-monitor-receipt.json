@@ -1,0 +1,99 @@
+{
+  "checked_utc": "2026-10-12T15:53:50.559003+00:00",
+  "issue": "LAB-57",
+  "issue_revision": 115,
+  "evaler_dispatch_comment": "01a130cf-f443-719e-97b1-c4e94ce2a11c",
+  "parent_report": "01a130b1-248a-7537-b29d-8fc2d9b5c26f",
+  "diagnosis_task": "01a130cf-f462-77ae-925b-7883730d80b7",
+  "diagnosis_task_status": "queued",
+  "native_ordinal": 9,
+  "repeat_consumed": 2,
+  "repeat_limit": 10,
+  "root_classification": "UNCLASSIFIED",
+  "dispatch_precharged": false,
+  "assigned_scope": "offline wizard ownership diagnosis; proven authored-reader public-API TDD only; no cold/reference/product/model/probe",
+  "working_partial_sha": "1cdbc18ad6c87e3f6f584cdb7cfa1c52d4eaed8a",
+  "artifacts": [
+    {
+      "filename": "lab57-wizard-review.json",
+      "id": "01a130cf-e773-75c6-9a13-b72e92865f1b",
+      "bytes": 2718,
+      "sha256": "d869b64d3961d2c26b89e6582244954849877fea3092f60235b04f19e052fb92",
+      "metadata_hash_matches": true
+    },
+    {
+      "filename": "lab57-wizard-ledger.json",
+      "id": "01a130cf-f0b0-7e07-9f75-b74215e0e6e5",
+      "bytes": 8587,
+      "sha256": "e734a49bf27d13937034deb3c7c6a55f36ad1f5fb180d7a935ac7b96496d4f81",
+      "metadata_hash_matches": true
+    },
+    {
+      "filename": "lab57-wizard-history.json",
+      "id": "01a130cf-f305-7f27-8650-fc62e911ae9d",
+      "bytes": 10483,
+      "sha256": "119b7bbe3fa3d6d9c8fef296bd4c86e15de960a1d64b452b0c2e74b256cbabd7",
+      "metadata_hash_matches": true
+    }
+  ],
+  "ledger_cumulative_charge_sum_verified": 2,
+  "historical_native_tasks_server_status_matches": 8,
+  "evaler_review": {
+    "author_partial_accepted": true,
+    "TXT_CSV_warm_cold": "PASS",
+    "CP1251_reference_1": "historical sequence FAIL preserved",
+    "CP1251_reference_2_warm": "PASS",
+    "CP1251_cold": "ERROR preserved",
+    "safety_resolution": "RELEASED/FREE, confirmed; not cold PASS",
+    "files_verified": 348,
+    "actual_model_proof_rows": 53,
+    "actual_model": "openai/gpt-6-luna/high",
+    "ready_for_ben": false
+  },
+  "viewport_handoff_comment": "01a130cd-5c11-7aff-a072-583fdbf8113b",
+  "viewport_handoff_delivered_to_evaler_run": "01a130cd-5c36-7072-880c-f018a5655cf0",
+  "viewport_handoff_evaler_status": "running",
+  "monitor_reopened_private_DB_or_journals": false,
+  "monitor_new_handoff_or_native_dispatch": false,
+  "monitor_live_model_browser_lease_actions": false,
+  "worker_models_unchanged": true,
+  "all_eight_done": false,
+  "card_states": {
+    "LAB-55": {
+      "status": "in_review",
+      "revision": 16
+    },
+    "LAB-56": {
+      "status": "in_review",
+      "revision": 65
+    },
+    "LAB-57": {
+      "status": "in_progress",
+      "revision": 115
+    },
+    "LAB-58": {
+      "status": "in_progress",
+      "revision": 9
+    },
+    "LAB-59": {
+      "status": "in_progress",
+      "revision": 9
+    },
+    "LAB-60": {
+      "status": "in_progress",
+      "revision": 9
+    },
+    "LAB-61": {
+      "status": "in_progress",
+      "revision": 9
+    },
+    "LAB-62": {
+      "status": "in_progress",
+      "revision": 9
+    },
+    "LAB-63": {
+      "status": "in_progress",
+      "revision": 9
+    }
+  }
+}

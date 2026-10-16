@@ -1,0 +1,370 @@
+{
+  "format": "LAB57-STATUS-REPAIRED-SOURCE-OWNER-VERIFICATION-v1",
+  "checked_utc": "2026-10-14T09:19:23.985931+00:00",
+  "authority": {
+    "human_amendment_commit": "125507f837b89c2bdf69f2b33cedd20e0b102192",
+    "human_amendment_sha256": "e2925de35befd22407908e938e693bfcfaef62b73f9681af890ff7b8ad9bc4e3",
+    "AGENTS_sha256": "6d4bffa49f577674164547451ca0dbb2426a7756b1c247af105bcf40486d2aa6",
+    "delegation_policy_sha256": "743f98aca40dd362f3ac80c8a8d97308863ba83d3e32430533ae4101464096c0",
+    "no_new_human_or_management_time_gate": true,
+    "automation": "DELETED_BY_USER; remains off"
+  },
+  "delivery": {
+    "report": "01a139a9-61f5-7085-829f-3bd71587ed92",
+    "parent": "01a13977-b6a3-7659-9649-1570f590e7b0",
+    "attachment": "01a139a9-6154-7b2e-8b9d-195fe5cf7ee7",
+    "bytes": 3329932,
+    "sha256": "f2b8d4a0558ce058293747891b616dd34c389a300fa62f4c8a3909950f1e8ab3",
+    "manifest_sha256": "c7a8f49ceb51b02c7ef5d105a9e42054efd3624a0229b391292002eb79714485",
+    "payloads": 1868,
+    "CRC_regular_paths_unique_bytes_hashes_embedded_external_manifest": "VERIFIED"
+  },
+  "source": {
+    "source": "150396a9a8062711ec94ae6cf4f31e6136a27eb9",
+    "base": "9642b2aa613e9b20acc4775664f437fadb4c4468",
+    "all840Gitblobs_plus_generatedExe": true,
+    "all834parent_other_files_equal": true,
+    "exact6path_diff": [
+      "evals/docs/evaler/lab57-owned-route-source.md",
+      "evals/script/lab57-queue-pages.py",
+      "evals/src/lab57-queue-scope.ts",
+      "evals/src/lab57-task-statuses.json",
+      "evals/test/lab57-mas-queues.test.ts",
+      "evals/test/lab57-queue-status.test.ts"
+    ],
+    "new_status_contract_primary_schema_confirmed": true,
+    "executable_sha256": "bd2aa7186fe8221760a07f89fe4348f806c856da445ebfdd1cf473c31a7ecafd",
+    "source_only": true
+  },
+  "source_manifest_sha256": "a7fb89d6bd9f57b86d4e20cca190e7f2b5a361a82e578a5e3454e65f649dc52a",
+  "source_files": 841,
+  "Git_blobs": 840,
+  "remote_branch": "lab57-status-repair",
+  "remote_exact_head_verified": "150396a9a8062711ec94ae6cf4f31e6136a27eb9",
+  "source_review": {
+    "all_six_changed_paths_read": "4modified+2added; all834 other parent source files byte-identical",
+    "fix": "One manifested status vocabulary used by concrete Python parser before partition and production TypeScript replay before partition. No unsupported state is silently terminal; known terminal controls remain in full inventory; active statuses retain exact mas/controller/original runtime gates.",
+    "root_primary_source_read": "Pinned actual-platform task status SQL constraint opened independently by root;8 states match new manifested vocabulary",
+    "primary_source_url": "https://raw.githubusercontent.com/multica-ai/multica/2ea01ae4ef55de4310b99af192d2dbd367832883/server/migrations/128_comment_routing_escalation.up.sql",
+    "platform_vocabulary": {
+      "source_url": "https://github.com/multica-ai/multica",
+      "installed_cli_version": "0.6.1",
+      "installed_cli_build_commit": "2ea01ae4ef55de4310b99af192d2dbd367832883",
+      "binary_sha256": "e069d85efcac007a3eeb9b029ec8d4b12a13aac591c13badf4ca97abb3cef343",
+      "primary_source_files": [
+        {
+          "path": "server/migrations/128_comment_routing_escalation.up.sql",
+          "sha256": "89b44b26a716097b3654a08c90eb3638d2d9534d0f12319b5e4dffb4463cf95f",
+          "git_blob": "294db81989646f05288e529e0a2b53529f75e5de"
+        },
+        {
+          "path": "server/pkg/db/queries/agent.sql",
+          "sha256": "880b084309ad0724b49f8de5faeedc4be3e52b6782f24434663412f82f672385",
+          "git_blob": "0af074b364762d7aa29134e681e86baecf4ee937"
+        },
+        {
+          "path": "server/cmd/multica/cmd_agent.go",
+          "sha256": "ade9f759c79d0e7f3b473edb28623f261366a99accc953e6793faa4408c88287",
+          "git_blob": "99c6a51477321b51446dce6c25b3973b5bb2f429"
+        }
+      ],
+      "constraint_states": [
+        "queued",
+        "dispatched",
+        "running",
+        "completed",
+        "failed",
+        "cancelled",
+        "waiting_local_directory",
+        "deferred"
+      ],
+      "pending": [
+        "queued",
+        "dispatched",
+        "running",
+        "waiting_local_directory",
+        "deferred"
+      ],
+      "terminal": [
+        "completed",
+        "failed",
+        "cancelled"
+      ],
+      "observed_cli_controls": {
+        "running": {
+          "id": "01a13977-b6c6-747a-8f7d-55cb0829cff4",
+          "status": "running",
+          "agent_id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        },
+        "completed": {
+          "id": "01a1393d-4903-7125-a22c-1d9808eb7a27",
+          "status": "completed",
+          "agent_id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        },
+        "failed": {
+          "id": "01a12ebe-71ff-7f33-85de-c927274c0862",
+          "status": "failed",
+          "agent_id": "99804e93-d241-45f2-872d-8a1e16ec7f3d",
+          "runtime_id": "a5fa993f-2903-4997-a832-955ffbb1203c"
+        }
+      },
+      "controls_limit": "CLI task metadata only; no resource/native admission; no exhaustive live scan",
+      "legacy_unproven_values_now_refused": [
+        "pending",
+        "retrying",
+        "scheduled"
+      ],
+      "raw_cli_rows_privately0600_not_delivered": true
+    },
+    "root_independent_targeted": {
+      "file": "test/lab57-queue-status.test.ts",
+      "pass": 56,
+      "fail": 0,
+      "expects": 200,
+      "isolation": "bwrap unshare-all readonly source/clearenv/tmpfs; synthetic CLI/bundled Bun1.3.14+Node24.19.0; no realprofiles/auth/storage/Docker/network",
+      "new_only_not_repeated_unchanged_suites": true
+    },
+    "saved_process_TDD_build_evidence": {
+      "captures": [
+        {
+          "label": "status-exact-build-05",
+          "exit": 0,
+          "mode": "continuous",
+          "processes": 2,
+          "result_sha256": "5fb19ab258bfc3b670051d14ca42dc9ed2cf923ea36fc97b2a5e8daea153ef51",
+          "pass": null,
+          "fail": null
+        },
+        {
+          "label": "status-exact-build-06",
+          "exit": 0,
+          "mode": "continuous",
+          "processes": 2,
+          "result_sha256": "bf649ce8e28fec647d9a9bf45f2851d50737f271f7520c2c1dcd879b1077abd4",
+          "pass": null,
+          "fail": null
+        },
+        {
+          "label": "status-final-build-09",
+          "exit": 0,
+          "mode": "continuous",
+          "processes": 2,
+          "result_sha256": "68aad9db7f4049e095ee81313c1d61b198727e6e859ab70fc9afab6cf290d72d",
+          "pass": null,
+          "fail": null
+        },
+        {
+          "label": "status-final-build-10",
+          "exit": 0,
+          "mode": "continuous",
+          "processes": 2,
+          "result_sha256": "124de1f916263e822ce1479bd9b2720c4b91d787f84d6192524038d74079d7dd",
+          "pass": null,
+          "fail": null
+        },
+        {
+          "label": "status-final-types-11",
+          "exit": 0,
+          "mode": "unit_after_exit",
+          "processes": 1,
+          "result_sha256": "cd1c9c1517a40ba7f93fe09921fcebf183e2fac41b127f78d59e16ce48494238",
+          "pass": null,
+          "fail": null
+        },
+        {
+          "label": "status-future-conflict-07",
+          "exit": 1,
+          "mode": "continuous",
+          "processes": 2,
+          "result_sha256": "9b00b943fdd44c22dea2b1b8b5d783096dd78667f735bd3e72940ae965c97997",
+          "pass": "0",
+          "fail": "1"
+        },
+        {
+          "label": "status-future-conflict-green-08",
+          "exit": 0,
+          "mode": "continuous",
+          "processes": 4,
+          "result_sha256": "345b67f7ae1522ff244afb0ffe0e62ba3337478801a03d7983f3eb936ac11159",
+          "pass": "1",
+          "fail": "0"
+        },
+        {
+          "label": "status-green-02",
+          "exit": 0,
+          "mode": "continuous",
+          "processes": 193,
+          "result_sha256": "e4d981a716bfddcf7768c169ce6ca7a9ba2961883a549a74b458071c4e7bba54",
+          "pass": "56",
+          "fail": "0"
+        },
+        {
+          "label": "status-red-01",
+          "exit": 1,
+          "mode": "continuous",
+          "processes": 272,
+          "result_sha256": "9bb679cfedb61ac021c41825f9725778fcc679663242d1cda19681d193291b16",
+          "pass": "23",
+          "fail": "33"
+        },
+        {
+          "label": "status-regression-03",
+          "exit": 0,
+          "mode": "continuous",
+          "processes": 217,
+          "result_sha256": "f25067471470bac2d434f659a49049448820f3c62c5d53c78ea0166405e04817",
+          "pass": "132",
+          "fail": "0"
+        },
+        {
+          "label": "status-types-04",
+          "exit": 0,
+          "mode": "unit_after_exit",
+          "processes": 1,
+          "result_sha256": "cb4d4f562f40754c62d70151789ac70b1a9460adde45f8388391533343dd6844",
+          "pass": null,
+          "fail": null
+        }
+      ],
+      "all11confirmed_twoZeroPasses": true,
+      "build838Correction_actual840Inputs": 840,
+      "matchingFinalExeBuilds": [
+        "proofs/status-final-build-09/lab57-owned-route.mjs",
+        "proofs/status-exact-build-06/lab57-owned-route.mjs",
+        "proofs/status-final-build-10/lab57-owned-route.mjs",
+        "proofs/status-exact-build-05/lab57-owned-route.mjs"
+      ],
+      "sourceOnly": true,
+      "nativeAdmission": false
+    },
+    "source_author_saved_checks": {
+      "initial_red": {
+        "pass": 23,
+        "fail": 33
+      },
+      "status_green": {
+        "pass": 56,
+        "fail": 0
+      },
+      "affected_regression": {
+        "pass": 132,
+        "fail": 0
+      },
+      "final_future_conflict": {
+        "pass": 1,
+        "fail": 0
+      },
+      "fixture_setup_failure": "retained; initial compound witness had stale row hash; corrected before final exact builds",
+      "typecheck": "PASS"
+    },
+    "source_failure_history": "OriginalRich UNKNOWN/null and future_active/conflicting-runtime falseELIGIBLE preserved. Initial23PASS33FAIL and compound fixture stale-row-hash0PASS1FAIL retained; final56/132/1PASS/typecheck/builds checked. Fixtures/source/production checks not altered by root.",
+    "other_once_owner_Node_native_cessation_profile_storage_validator_stages": "Byte-identical to parent; no eligibility/criteria weakening",
+    "own_bare_export_removed": true
+  },
+  "source_decision": {
+    "status": "SOURCE_ACCEPTED_BY_INDEPENDENT_COORDINATOR",
+    "exact_sha": "150396a9a8062711ec94ae6cf4f31e6136a27eb9",
+    "source_manifest_sha256": "a7fb89d6bd9f57b86d4e20cca190e7f2b5a361a82e578a5e3454e65f649dc52a",
+    "executable_sha256": "bd2aa7186fe8221760a07f89fe4348f806c856da445ebfdd1cf473c31a7ecafd",
+    "admitted_scope": "Original Ben LAB57 incident only; already authorized original-owned NONMODEL closed cleanup after fresh actual technical admission; no case ACCEPT/nativeREADY/cleanup success asserted",
+    "rejected_9642": "SOURCE_REJECT remains immutable; its prior conditional operator admission stays HELD; no installation/retry with rejected source",
+    "future_new_defect": "STOP before install/effects; preserve history; minimally repair and independently admit new exact source; no human/time gate"
+  },
+  "fresh_partial": {
+    "at": "2026-10-14T09:15:20.948809+00:00",
+    "status": "in_progress",
+    "revision": 369,
+    "phase": "ben",
+    "review_cycle": 2,
+    "reject_count": 1,
+    "frozen": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+    "active_queued": [
+      {
+        "id": "01a13978-5001-74bb-a47d-eee39c9041a3",
+        "status": "running",
+        "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+        "started_at": "2026-10-14T12:06:53+03:00"
+      }
+    ]
+  },
+  "operator_requirements": [
+    "Finish/reconcile current independent Evaler review once; any newly demonstrated defect stops install/effects and gets addressed with new independently reviewed source",
+    "Use owner supplied dedicated Loginom test pair privately UID-owned single-link0600; no provenance/reconnect search or role/account/password mutation",
+    "Prepare private FINAL_OPERATOR_ADMITTED binding exact source/manifest/executable/admin SHA/canonical d0a88/history c40d6b1b and one actual continuing Ben task; this receipt alone is not a private admission file",
+    "Install exact reviewed immutable new tree by delivered exclusive/no-replace installer; retain0fd/d6/89/history/shareddefaults",
+    "Ben retains original owner/task01a1375d/acquired22:28:17.228/eb1/configd204/rawffbc/owner7d34/commonlease64512:17837096 and held operationguard; no token/config/acquire/rebind or old ABANDONED reuse",
+    "One original unspent recovery and distinct overall durable privatewx0600/file+parentfsync once BEFORE first diagnostic/native/profile/resource effect; coherent original DB/WAL/SHM/runtime/session snapshot first",
+    "Fresh complete scoped queues incl explicit mas exclusion ledger; ALL6 actual CFG/proc ancestry/absence/UID-FD/native-debugger/container-birth/no-mounts/storage/pins/rawowner-config-registration-guard; actual process.execPath AND /proc/self/exe exactd6 path/bytes/device/inode/SHA before connector/every effect",
+    "Genuine authoritative stable full original-scope absence OR uniquely owned readonly/nonrunning original target closure; actual administrator inventory and correlation; ACK/model/document UUID alone is not cessation",
+    "Own empty native diagnostic actual logout/continuous process proofs and official77Luna-high preserved history BEFORE exact whole legacyguard archive and ownedCSV removal",
+    "Then separate genuine attestation/completion/ordinaryRELEASED/freshFREE and independent final cases/validators/attestation ACCEPT before LAB57done/LAB58",
+    "Unknown/foreign/mismatch/dirty-unobservable/reusedPID/race/crash/error/uncertaineffect retains once and STOP; no retry/reset/rollback/foreignclose/logout-all/poolclear"
+  ],
+  "private_preparation_delegated": "Evaler may prepare private UID-owned single-link0600 provided Loginom administrator JSON and FINAL_OPERATOR_ADMITTED under this exact owner decision, with exact new source/manifest/executable/admin hashes and actual one Ben followup. No ROOT-only paperwork/human approval gate. This public receipt is not a private admission file.",
+  "preserved_accounting": {
+    "ben_product": 6,
+    "ben_product_budget": 6,
+    "recovery": 0,
+    "recovery_budget": 1,
+    "repeats": 3,
+    "repeats_budget": 10,
+    "repeats_remaining": 7,
+    "admission": 3,
+    "admission_budget": 3,
+    "wrapper": 1,
+    "wrapper_budget": 1,
+    "references": [
+      1,
+      1,
+      2,
+      1,
+      1,
+      3
+    ],
+    "reference_budget_per_case": 3,
+    "rich_product": 6,
+    "rich_quality": {
+      "pass": 4,
+      "fail": 2,
+      "error": 0
+    },
+    "rich_cold": [
+      11,
+      10,
+      8
+    ],
+    "ben_cold": [
+      9,
+      9,
+      8
+    ],
+    "ben_cold_errors": 1,
+    "cleanup_continuations": 2,
+    "billed": "UNKNOWN",
+    "charges_this_stage": 0
+  },
+  "preserved_history": {
+    "prior_report": "01a138c3-dda8-7cb1-97eb-04739e69b751",
+    "prior_zip_attachment": "01a138c3-dcda-7c70-8761-b6c89713835b",
+    "prior_zip_sha256": "f8f404bc787dfbe5876acb47265ee6aa14fa564591ba2f89a3d21677a4b6afab",
+    "original_history_inventory_sha256": "c40d6b1bfe6742a5d9b8ca695cb3e7c31754765f8f21e44ce488af034b4f38b0",
+    "original_history_files": 28972,
+    "actual_luna_high_rows": 77,
+    "prior_full_verification": "171 hashes/record identities; retained without repeating full scan",
+    "independent_calculation_sha256": "37ec6f197609e88de3fe3daaf04a7477b3730cf825ddfbea1277ab4cea1d2ed2",
+    "independence_receipt_sha256": "627306e0e929e184164ef73913b1e3808caa1d27e20bd679b880f5a99e482a77"
+  },
+  "root_work": {
+    "new_source_tests": 56,
+    "new_model_native_profile_resource_stand_recovery_once_mutations": 0,
+    "unchanged_full_suites": 0,
+    "source_candidate_edits": 0,
+    "foreign_interference": 0
+  },
+  "actual_cleanup_ordinary_RELEASED_FREE_independent_case_ACCEPT": "ABSENT; originalBen lease lastprovedBUSY",
+  "no_more_duplicate_source_review": "Use current coordinator/any already dispatched technical review exactly once; independent exact root gate performed; no new third case review or reviewer loop",
+  "automation": "DELETED_BY_USER; not restored",
+  "next": "Current Evaler reconciles exact new source decision and coordinates one original-owned Ben cleanup; genuine final attestation/release/FREE and independent cases/validators acceptance remain required"
+}

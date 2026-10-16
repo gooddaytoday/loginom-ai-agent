@@ -1,0 +1,123 @@
+{
+  "status": "ROOT_OPERATOR_ADOPTION_BEFORE_NATIVE_FOREGROUND",
+  "source": "f89f674e3c614e711123685415211fd864fa8d12",
+  "independentAdmission": {
+    "decision": "SOURCE_ACCEPT",
+    "source": "f89f674e3c614e711123685415211fd864fa8d12",
+    "comment": "01a13f30-c1d3-7c23-85fd-d2a6885d75fd",
+    "attachment": "01a13f30-c195-7d5e-b2f5-eb5c4f97b36e",
+    "archiveSha256": "06790d50706813a1f460108e223ddd122c6bb48c67e9b4a2b705f67047ba92a0",
+    "manifestSha256": "5f4331159d06bb794696ec4e44000722fba31f929d24c26dbd18906b246deafb",
+    "admissionSha256": "ec979e19b4d70886c4afc9fe849b306bac7ae780a2eba0f7f136f825b028f8bb",
+    "payloads": 74,
+    "exactArchiveVerified": true,
+    "executableRebuildByteEqual": true,
+    "independentTests": "116PASS0FAIL324expects/25newindependent+91targeted/actual1728PID23585byte request + oversized malformed11roots",
+    "ownCaptures": "5confirmed/complete/errornull/twozero; initialrunnerfailurepreserved",
+    "sourceOnlyNotCaseAcceptOrCleanup": true
+  },
+  "installation": {
+    "status": "SOURCE_INSTALLED_ONLY",
+    "source": "f89f674e3c614e711123685415211fd864fa8d12",
+    "filesVerified": 901,
+    "noReplace": true,
+    "nativeReady": false
+  },
+  "helper": {
+    "status": "NARROW_READ_ONLY_HELPER_PROVISIONED_NOT_NATIVE_READY",
+    "source": "f89f674e3c614e711123685415211fd864fa8d12",
+    "attempt": {
+      "path": "/root/lab57-root-dispatcher-abi-f89f674e3-provision.once.json",
+      "device": 64512,
+      "inode": 5545364,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o600",
+      "bytes": 1552,
+      "sha256": "ef787fe70754f9de50121bfded5df990e35fd0bfa9e840106c89494961c803af"
+    },
+    "helperDirectory": {
+      "path": "/var/lib/loginom-evals/fd-observer/f89f674e3c614e711123685415211fd864fa8d12",
+      "device": 64512,
+      "inode": 1179900,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o755",
+      "bytes": 4096,
+      "sha256": null
+    },
+    "script": {
+      "path": "/var/lib/loginom-evals/fd-observer/f89f674e3c614e711123685415211fd864fa8d12/lab57-fd-observer.py",
+      "device": 64512,
+      "inode": 1179901,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o555",
+      "bytes": 18524,
+      "sha256": "d19a12afae52527bbec24c98f2304ca92bcb83fcdcb69f4ff9540dbab1927a18"
+    },
+    "binding": {
+      "path": "/var/lib/loginom-evals/fd-observer/f89f674e3c614e711123685415211fd864fa8d12/binding.json",
+      "device": 64512,
+      "inode": 1179903,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o444",
+      "bytes": 24960,
+      "sha256": "0630c700dd9f9139523cd29d699ffd09592dbc1003048be68b2c3b18be482f9a"
+    },
+    "policy": {
+      "path": "/etc/sudoers.d/loginom-lab57-fd-f89f674e3",
+      "device": 64512,
+      "inode": 1574756,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o440",
+      "bytes": 159,
+      "sha256": "96f68a6b5f6eca2a26825c03455160a8c3698a6ed72a8047632801bdbed767f2"
+    },
+    "otherPoliciesByteUnchanged": true,
+    "fullVisudoExit": 0,
+    "originalOwnerConfigPreserved": true,
+    "originalNativeProfileRecoveryEffects": 0
+  },
+  "privateAdmission": {
+    "admissionPath": "/home/user/.local/share/loginom-evals-runtime/operators/lab57-root-dispatcher-abi-63959548f7bd/final-root-operator-admission.json",
+    "admissionSha256": "ed46d74689a09f342721eecbfc71d3c85090b2bdf12d10f9eb061a36079e4e6d",
+    "preonceDirectory": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-dispatcher-abi-59597fe56d9e",
+    "status": "PRIVATE_ROOT_ADMISSION_AFTER_INDEPENDENT_SOURCE",
+    "originalOwnerUnchanged": true,
+    "source": "f89f674e3c614e711123685415211fd864fa8d12",
+    "originalRecoveryEffects": 0,
+    "credentialsRepublished": false
+  },
+  "accountingBeforeForeground": {
+    "originalRecovery": "1/1ATTEMPTED",
+    "technicalContinuation": "1/1CONSUMED",
+    "sandboxRepair": "1/1CONSUMED",
+    "observerRepair": "1/1CONSUMED",
+    "fdStability": "1/1CONSUMED",
+    "dispatcherAbi": "0/1SOURCE only",
+    "modelReferenceProductCold": 0,
+    "BenProduct": "6/6/originalERROR/all6qualityEXCLUDED/no retry",
+    "Rich": "4PASS2qualityFAIL/refs1/1/2/1/1/3/cold11/10/8",
+    "BenCold": "9/9/8+oldERROR1",
+    "repeats": "3/10remaining7/noreset/precharge",
+    "admission": "3/3",
+    "wrapper": "1/1"
+  },
+  "ownSourceOnlyEffects": "immutable support/sourceboundreadonlyhelper+narrow sudo/privateadmission; no oldpins/config/lease/once rebind; newnative/model/reference/product/cold0 yet",
+  "next": "Root personally one foreground dispatcher-continue; all original binding/freshresource/once/history/cessation/cleanup/release gates mandatory",
+  "notProven": [
+    "nativeREADY",
+    "servercessation",
+    "officialhistory",
+    "standcleanup",
+    "completion",
+    "RELEASED",
+    "FREE",
+    "BenACCEPT"
+  ],
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "OFF"
+}

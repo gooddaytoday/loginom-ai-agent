@@ -1,0 +1,37 @@
+{
+  "status": "EXACT_ACCEPTED_SOURCE_AND_PRIVATE_OPERATOR_PREPARED",
+  "source": "7082a865790de7d19780fc93ce00b7b0ede8031f",
+  "sourceAdmission": {
+    "comment": "01a14008-43ef-7bea-a65a-32b6cdc9132b",
+    "sha256": "ad181fe0548c751924f9f3f778c31cb315429d3794375fb20dbc93cce9729146"
+  },
+  "install": {
+    "status": "SOURCE_INSTALLED_ONLY",
+    "source": "7082a865790de7d19780fc93ce00b7b0ede8031f",
+    "filesVerified": 927,
+    "noReplace": true,
+    "nativeReady": false
+  },
+  "observer": {
+    "status": "NARROW_READ_ONLY_HELPER_PROVISIONED_NOT_NATIVE_READY",
+    "source": "7082a865790de7d19780fc93ce00b7b0ede8031f",
+    "attemptSha256": "c03916ff2ef35af7e152a313a29b757ab917ce4400925d6f73b10040ea6f4cae",
+    "scriptSha256": "843085b8bdc1da86645848da19390031f3e635255330c73660192705d824e387",
+    "bindingSha256": "c65130f21af5b28f99d8026efcbbdaf0e3e045fa81c1b10cc30657d9b96fe98e",
+    "policySha256": "f5dbb14b91e7fde4d9d7441b4fd59b32b68049be92b8a8264487b44e2930c48e",
+    "otherPoliciesByteUnchanged": true,
+    "fullVisudoExit": 0,
+    "privateKeyMaterialDisclosed": false,
+    "originalOwnerConfigPreserved": true
+  },
+  "privateAdmission": {
+    "status": "PRIVATE_ROOT_ADMISSION_AFTER_INDEPENDENT_SOURCE",
+    "sha256": "4df8f86224bfbde01fc4059b39836b1f24ef5fd86acc2741f48eb3592cff78e6",
+    "originalRecoveryEffects": 0,
+    "credentialsRepublished": false
+  },
+  "actualExecution": "Started separately in local foreground82892; running is not confirmation of cleanup/consumption/result",
+  "preserved": "Original owner/task/lease/acquiredAt/config/all7spent immutable; same existing control0/1, no new allowance",
+  "science": "No model/reference/product/cold; old ERROR/all6BenqualityEXCLUDED preserved",
+  "automation": "OFF"
+}

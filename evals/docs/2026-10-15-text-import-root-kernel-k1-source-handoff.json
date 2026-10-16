@@ -1,0 +1,23 @@
+{
+  "status": "ROUTED_CORRECTED_EXACT_SOURCE_REVIEW_ONLY",
+  "comment": "01a13f51-7b0a-74cb-8b6e-de07cc547085",
+  "parent": "01a13f4b-7c7b-722b-9272-bafc1dab2be9",
+  "attachment": "01a13f51-69ea-73e8-83ad-b647daca0737",
+  "bodySha256": "1bfe311d0a8dec9029233915fe8b150d5ee42205237875822c7c5b9847f735a3",
+  "oneEvalerMention": true,
+  "source": "de285aa4fe659b8e0277fe5bb8bc772d4fc82452",
+  "zipSha256": "d52b6b7e7f1a23e854b5f1ae97fa91321000588e00c2c91da739888a5a0072f4",
+  "deliveryManifestSha256": "386f97f37845498b217bf6e28115a7b2a043fcc9a336813921ceb0676cce49f9",
+  "freshExactReadback": true,
+  "active": [
+    {
+      "id": "01a13f51-7b1d-7b6e-8963-024a74d8ea54",
+      "status": "running"
+    }
+  ],
+  "kernelAllowance": "0/1unspent/no rejected source installation",
+  "operator": "Root sole operator after independent exact admission; Ben final only",
+  "noNewModelReferenceProductCold": 0,
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "OFF"
+}

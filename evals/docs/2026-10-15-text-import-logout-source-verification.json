@@ -1,0 +1,54 @@
+{
+  "status": "INDEPENDENT_SOURCE_ACCEPTED_NOT_ACTUAL_CLEANUP",
+  "source": "931e27590f208b96cad986aa901fbd9a9010ed76",
+  "parent": "f057960e0a84c7134601f6843385359c27d93438",
+  "archive": {
+    "source": "931e27590f208b96cad986aa901fbd9a9010ed76",
+    "zip": "/home/kiselev/storage/tmp/lab57-root-diag-20261015/lab57-logout-931e27590-delivery.zip",
+    "zipBytes": 3113525,
+    "zipSha256": "9040e9075893457ec7047ffc04aff11a556fc8ab187afb439b476919c2ce706e",
+    "manifestSha256": "5b852778d165458d6d326b07e364073aedc6faf466df0eca951750806261582c",
+    "payloads": 1037
+  },
+  "sourceManifestSha256": "f89a31c86f9caf2706ac2ac435889d868382a25c3eb5bd023aa9fe3ae82775ac",
+  "executableSha256": "6699ac4e152c7241991614f8e017f9551c65b63d51ad85f1fbf6620a5299caff",
+  "sourceEntries": 955,
+  "gitBlobs": 954,
+  "unchangedBaseBlobs": 938,
+  "scope": "Onlyactualvendorlogout disposedstate and exactunrelatedservice FDcounterprojection;new addressed root preserves13spent/126capture2650PIDs12diagnostics. OriginalBenowner/task/acquired/config/lease and allscience unchanged. Root soleoperator.",
+  "tests": {
+    "targeted": "16PASS0FAIL119expects/4files",
+    "actualPythonProducerSignedNodeConsumer": true,
+    "capturedVendorDispose": true,
+    "typecheck": "PASS239",
+    "builds": "241242 byteequal",
+    "continuousSourceCapture": "complete/confirmed/errornull/unknown[]/twozero",
+    "fullSuites": "unchanged not repeated",
+    "originalREDAndIntermediateFailures": "retained"
+  },
+  "packageMetadataCorrection": {
+    "source": "931e27590f208b96cad986aa901fbd9a9010ed76",
+    "deliveredArchiveSha256": "9040e9075893457ec7047ffc04aff11a556fc8ab187afb439b476919c2ce706e",
+    "indexMinorCorrection": "tests string says112expects;actual saved stderr is119expects/16PASS0FAIL. Original archive retained unchanged; executable/source unaffected.",
+    "actualProof": {
+      "path": "proofs/logout-final240/capture/stderr.txt",
+      "sha256": "74c7c7f3aec48759c0f0fc22814b307f79f9c2dc0b3081874644f7ab218085b8"
+    }
+  },
+  "next": "Root personally executes address-bound route. Historical logout UNKNOWN; fresh authoritative original/prioradminabsence mandatory. No new cleanupworker.",
+  "independentAdmission": {
+    "receiptSha256": "e733c76a2deb66703dc5ef000bf787a663886cecf923dddaef34349a6bc09faa",
+    "evidenceManifestSha256": "ec5ef9c7ab6a4e9ab845a5109edc99b605317f38e787d1dd08f164824758e556",
+    "decision": "SOURCE_ACCEPT",
+    "findings": [],
+    "actualTargeted": {
+      "pass": 16,
+      "fail": 0,
+      "expects": 119
+    },
+    "independentBoundaryChecks": 59,
+    "exactArchiveVerified": true,
+    "executableRebuildByteEqual": true,
+    "caseAccept": false
+  }
+}

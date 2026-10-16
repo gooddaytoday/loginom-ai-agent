@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "status": "ACTUAL_SOURCE_INSTALL_HELPER_AND_PRIVATE_ADMISSION_NOT_NATIVE_COMPLETION",
+  "source": "fdbfae6d7a94c06b1343872b7465f6e289f58b08",
+  "independentAdmission": {
+    "decision": "SOURCE_ACCEPT",
+    "source": "fdbfae6d7a94c06b1343872b7465f6e289f58b08",
+    "comment": "01a13edc-241d-7e39-ba7d-41698e5236ea",
+    "attachment": "01a13edc-23ee-73c3-b1d0-d0f8e35aa1b2",
+    "archiveSha256": "cf424327ce64549f2c744c8668d9521107ea3227bb96f1d3bc04d7454a876000",
+    "manifestSha256": "f029f76b63421b7a572463778a88080d194bee0cb1e9dd8cbe3c627c25155e85",
+    "admissionSha256": "c7761451ad1ba04cd6f5ba3580aa12a5ac4bb11b65b5b8b6c29c496199c1e370",
+    "payloads": 71,
+    "exactArchiveVerified": true,
+    "executableRebuildByteEqual": true,
+    "independentTests": "45PASS116expects+3real kernel cases22expects",
+    "retainedFailures": "missing gcc/outer identity-changing negative captures remain FAILED; never cleanup proof",
+    "sourceOnlyNotCaseAcceptOrCleanup": true
+  },
+  "actualSupport": {
+    "status": "SOURCE_INSTALLED_ONLY",
+    "source": "fdbfae6d7a94c06b1343872b7465f6e289f58b08",
+    "filesVerified": 886,
+    "noReplace": true,
+    "nativeReady": false
+  },
+  "actualReadonlyHelper": {
+    "status": "NARROW_READ_ONLY_HELPER_PROVISIONED_NOT_NATIVE_READY",
+    "source": "fdbfae6d7a94c06b1343872b7465f6e289f58b08",
+    "attempt": {
+      "path": "/root/lab57-root-observer-repair-fdbfae6d7-provision.once.json",
+      "device": 64512,
+      "inode": 5545353,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o600",
+      "bytes": 1348,
+      "sha256": "8e8cd93aaa1145a16992a8f546cfc70b765242c247012b13ce268660ad9ae1a2"
+    },
+    "helperDirectory": {
+      "path": "/var/lib/loginom-evals/fd-observer/fdbfae6d7a94c06b1343872b7465f6e289f58b08",
+      "device": 64512,
+      "inode": 1179890,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o755",
+      "bytes": 4096,
+      "sha256": null
+    },
+    "script": {
+      "path": "/var/lib/loginom-evals/fd-observer/fdbfae6d7a94c06b1343872b7465f6e289f58b08/lab57-fd-observer.py",
+      "device": 64512,
+      "inode": 1179891,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o555",
+      "bytes": 16244,
+      "sha256": "df18e32883aa9bae048ee284c600dbd9a95bc948c7d88043f0a581687f0e9d76"
+    },
+    "binding": {
+      "path": "/var/lib/loginom-evals/fd-observer/fdbfae6d7a94c06b1343872b7465f6e289f58b08/binding.json",
+      "device": 64512,
+      "inode": 1179893,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o444",
+      "bytes": 13973,
+      "sha256": "4bb8e4296fda3b74eaa9ceb803c02e2dd4bf73c0ee6adf9d0532d1a31d19b4b3"
+    },
+    "privateKey": {
+      "uid": 0,
+      "mode": "0o600",
+      "singleLink": true,
+      "materialDisclosed": false
+    },
+    "policy": {
+      "path": "/etc/sudoers.d/loginom-lab57-fd-fdbfae6d7",
+      "device": 64512,
+      "inode": 1574754,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o440",
+      "bytes": 159,
+      "sha256": "0080134960285ef8452074ceac58b04c67577068711f9bc68000bae736c7a3c5"
+    },
+    "beforeSudoers": {
+      "loginom-lab57-fd-9409bda38": "579f95441e7e10d75be0493c144e3e346441731c1924bafa9475ecdca56d4bb2",
+      "README": "5c108b32f7e4f0f33ed7a76e6e6aa1713358ccfc76ec0719b17a1b3a87b8e1ef",
+      "loginom-lab57-fd-d1d38f63f": "8f76a5e78d4c1c43fc5fc8cc595488c7f4ad3d371114df58576c58f2d167998a",
+      "loginom-lab57-fd-49a8a1c04": "51b45fd3cde8c0f38314d6f9f18c62ab4871f264d44cfe7fc583ae7059fbf5fd",
+      "loginom-lab57-fd-377302ddf": "a0ef74529316d4f999e5fa144dcda3a0906a44be4ec861e6ec9985c02c753890",
+      "loginom-lab57-fd-e8815ae0e": "64c0b15c6c46b19f3a8e92a2f54f275c4034dd3ccd1e33bc628324ec317530b4"
+    },
+    "afterSudoers": {
+      "loginom-lab57-fd-9409bda38": "579f95441e7e10d75be0493c144e3e346441731c1924bafa9475ecdca56d4bb2",
+      "README": "5c108b32f7e4f0f33ed7a76e6e6aa1713358ccfc76ec0719b17a1b3a87b8e1ef",
+      "loginom-lab57-fd-fdbfae6d7": "0080134960285ef8452074ceac58b04c67577068711f9bc68000bae736c7a3c5",
+      "loginom-lab57-fd-d1d38f63f": "8f76a5e78d4c1c43fc5fc8cc595488c7f4ad3d371114df58576c58f2d167998a",
+      "loginom-lab57-fd-49a8a1c04": "51b45fd3cde8c0f38314d6f9f18c62ab4871f264d44cfe7fc583ae7059fbf5fd",
+      "loginom-lab57-fd-377302ddf": "a0ef74529316d4f999e5fa144dcda3a0906a44be4ec861e6ec9985c02c753890",
+      "loginom-lab57-fd-e8815ae0e": "64c0b15c6c46b19f3a8e92a2f54f275c4034dd3ccd1e33bc628324ec317530b4"
+    },
+    "otherPoliciesByteUnchanged": true,
+    "fullVisudoExit": 0,
+    "originalOwnerConfigPreserved": true,
+    "originalNativeProfileRecoveryEffects": 0
+  },
+  "privateAdmission": {
+    "admissionSha256": "c74ddc482e31717987901d4062bedb58e69763d7949f1bb68bd39dc099ad29f8",
+    "status": "PRIVATE_ROOT_ADMISSION_AFTER_INDEPENDENT_SOURCE",
+    "originalOwnerUnchanged": true,
+    "source": "fdbfae6d7a94c06b1343872b7465f6e289f58b08",
+    "originalRecoveryEffects": 0,
+    "credentialsRepublished": false
+  },
+  "next": "Root sole foreground observe-repair after fresh queues/integrity gates; no new reserve/reset/model/reference/product/cold",
+  "originalBenOwnerLeaseConfigAcquiredAtPreserved": true,
+  "originalRecovery": "1/1 ATTEMPTED",
+  "technicalContinuation": "1/1 CONSUMED",
+  "sandboxRepair": "1/1 CONSUMED",
+  "observerRepair": "0/1 before foreground",
+  "cleanupReleasedFreeBenAccept": false,
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "DELETED_OFF"
+}

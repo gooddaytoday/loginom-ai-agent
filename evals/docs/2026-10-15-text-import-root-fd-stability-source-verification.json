@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "status": "READY_SOURCE_FOR_INDEPENDENT_REVIEW_NOT_APPLIED",
+  "source": "945a7acee2dfad39baf9e4d87c3564b4bd5f8cb9",
+  "base": "fdbfae6d7a94c06b1343872b7465f6e289f58b08",
+  "ownerDecisionSha256": "3b6923b11c9dc482b99c5a0d7611effe473eb82a2e4066b84d3f16c6cbec2ce2",
+  "actualStopReceiptSha256": "bfd418c45c3ed1fa76354e5e12b1c18b6d686cda69493337d9fa55d80d731b4f",
+  "sourceChanges": [
+    "At most3 full readonly inventories restart only unchanged-birth UID1000 own FD activity with exact Root ancestry, clean complete passes and no original/foreign/denied/protected refs. Final everyPID/everyFD pair remains strictly coherent. Unknown/foreign/reused/core change never eligible.",
+    "Actual safe coherence deltas retained on failure; failed command stdout/stderr privately persisted before parsing; no recovered previous lost pair claimed.",
+    "New fd-continue entry/root/wx0600 once/private admission, all4 spent sources/controllers/onces/captures/pins/reservation retained; all1270 prior PIDs incl signed Roothelper2282314 and all6 CFG+4 prior diagnostics. Source/policy/Node/native/history/original-owner gates unchanged."
+  ],
+  "tests": {
+    "affected": "114PASS/0FAIL/292expects/11files",
+    "newEntryHistory": "30PASS/0FAIL/95expects/2files overlaps the affected set",
+    "typecheck": "PASS",
+    "build": "2 clean exact Git exports byte-equal",
+    "process": {
+      "mode": "continuous",
+      "complete": true,
+      "status": "confirmed",
+      "error": null,
+      "processes": 3,
+      "verification": [
+        {
+          "observed_at": "2026-10-15T09:49:27.441Z",
+          "owned_remaining": 0
+        },
+        {
+          "observed_at": "2026-10-15T09:49:27.543Z",
+          "owned_remaining": 0
+        }
+      ]
+    },
+    "failures": "All new RED/errors retained; prior fdb failed foreground and missing final pair delta remain UNKNOWN. Current source capture confirmed; saved original368 capture verified only as own-process cleanup. No unchanged full suites or supervisor suite repeated."
+  },
+  "package": {
+    "sourceEntries": 893,
+    "gitBlobs": 892,
+    "sourceManifestSha256": "e215260deef2d9c1b25edf575775b487c592f673be7d1e97403713ea14815287",
+    "executableSha256": "d01e6f6944702a94fcf58cd3cbfedcd09d0ea4f6b99f814d153f1c7fa8bb3aca",
+    "zipSha256": "0bb609423755e2d3e81979b68e1789e11e5a64e23aa2358952b43faaf0794edd",
+    "deliveryManifestSha256": "b4ada7d463976aef425d56d84ad6aa5d7020b19ecc9b1f505cad23774b18af2e",
+    "payloads": 970,
+    "crcPathsTypesHashesAllGitBlobsVerified": true
+  },
+  "accounting": {
+    "originalRecovery": "1/1ATTEMPTED",
+    "technicalContinuation": "1/1CONSUMED",
+    "sandboxRepair": "1/1CONSUMED",
+    "observerRepair": "1/1CONSUMED",
+    "fdStability": "0/1SOURCE only",
+    "modelReferenceProductCold": 0,
+    "BenProduct": "6/6/originalERROR/all6qualityEXCLUDED/no retry",
+    "Rich": "4PASS2qualityFAIL/refs1/1/2/1/1/3/cold11/10/8",
+    "BenCold": "9/9/8+oldERROR1",
+    "repeats": "3/10remaining7/noreset/precharge",
+    "admission": "3/3",
+    "wrapper": "1/1"
+  },
+  "operator": "Root personally; Ben only final independent cases/validators/attestation",
+  "currentActual": "Original recovery/continuation/sandbox/observer all1/1; originalBenBUSY/noReleasedFreeAccept; new FD continuation0/1SOURCE only",
+  "noNewModelReferenceProductCold": 0,
+  "notProven": [
+    "installation",
+    "native READY",
+    "prior admin diagnostic cessation",
+    "original server cessation",
+    "official history archival",
+    "cleanup",
+    "completion",
+    "RELEASED",
+    "FREE",
+    "Ben ACCEPT"
+  ],
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "DELETED_OFF",
+  "next": "One routed Evaler exact SOURCE review/admission in same incident/review2/reject1; no new cleanup worker. Root install/foreground only after acceptance."
+}

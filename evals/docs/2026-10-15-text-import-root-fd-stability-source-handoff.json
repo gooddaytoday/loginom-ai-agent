@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "source": "945a7acee2dfad39baf9e4d87c3564b4bd5f8cb9",
+  "comment": "01a13efc-d150-7968-9783-6d365530999d",
+  "parent": "01a13edc-241d-7e39-ba7d-41698e5236ea",
+  "attachment": "01a13efc-cdb9-78ae-9864-2a6912a306da",
+  "bodyParentOneEvalerMentionReadbackVerified": true,
+  "status": "in_progress",
+  "revision": 469,
+  "activeSourceReview": [
+    {
+      "id": "01a13efc-d167-786e-a6c8-d2e9422747c5",
+      "status": "running"
+    }
+  ],
+  "operator": "Root personally; no cleanup worker; Ben final independent only",
+  "sourceNotApplied": true,
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "DELETED_OFF"
+}

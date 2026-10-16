@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "status": "READY_SOURCE_FOR_INDEPENDENT_REVIEW_NOT_APPLIED",
+  "source": "d1d38f63fcea1e6f3647f28ed9d453454ee29f6f",
+  "base": "377302ddf5344b40e6068995ed9cc5d1b86e7c41",
+  "sourceEntries": 878,
+  "gitBlobs": 877,
+  "sourceManifestSha256": "50381207a12bb9d5f6d461b556fa1240f391eb7c637b589a5d3ffa2fb40e3e8e",
+  "executableSha256": "96c9e46133ef826a1ab65effb549ce35721ae55fbedea59b3d349353ef4344c2",
+  "zipSha256": "e507514392c69759992158652ca6022d8b78e461e97d88eb01ff44556de5d81c",
+  "deliveryManifestSha256": "fea70eabc546a16baf98c0643de0667f7b6327b40650f8b7e3bba31912ea72ac",
+  "payloads": 956,
+  "ownerDecisionSha256": "07667b68e0c476e46493cc706c507f2aa7e5a49bf04634bdf098e076ad0e73a2",
+  "changes": [
+    "evals/docs/evaler/lab57-root-sandbox-repair-decision.json",
+    "evals/docs/evaler/lab57-root-sandbox-repair-pins.json",
+    "evals/docs/evaler/lab57-root-sandbox-repair-plan.md",
+    "evals/script/lab57-fd-observer.py",
+    "evals/script/lab57-owned-route.ts",
+    "evals/script/lab57_history_audit_scope.py",
+    "evals/src/lab57-closed-route.ts",
+    "evals/src/lab57-continuation.ts",
+    "evals/src/lab57-dedicated-boundary.ts",
+    "evals/src/lab57-dispatcher-host.ts",
+    "evals/src/lab57-fd-observer.ts",
+    "evals/src/lab57-recovery-attestation.ts",
+    "evals/src/lab57-route-host.ts",
+    "evals/src/lab57-sandbox-repair.ts",
+    "evals/test/fixtures/lab57-sandbox-repair-capture.json",
+    "evals/test/lab57-continuation-attestation.test.ts",
+    "evals/test/lab57-continuation.test.ts",
+    "evals/test/lab57-dedicated-boundary.test.ts",
+    "evals/test/lab57-history-audit-scope.test.ts",
+    "evals/test/lab57-sandbox-repair.test.ts"
+  ],
+  "validation": {
+    "addressed": "153PASS/0FAIL/312expects/9files; final supervised same affected tests passed; actual255 safe projection structural check only",
+    "typecheck": "PASS",
+    "build": "two clean exact Git exports byte-equal",
+    "capture": {
+      "processes": 6,
+      "status": "confirmed",
+      "complete": true,
+      "error": null,
+      "unknown": [],
+      "zeroPasses": [
+        {
+          "observed_at": "2026-10-15T07:46:26.671Z",
+          "owned_remaining": 0
+        },
+        {
+          "observed_at": "2026-10-15T07:46:26.772Z",
+          "owned_remaining": 0
+        }
+      ]
+    },
+    "retainedErrors": "Each saved RED before implementation; read memory uri/uris typo corrected and actual read succeeded; read-only unprivileged securityfs probe refused, so existing source-bound privileged read-only producer measures it; duplicated namespace UID options warning retained, actual UID1000 fixture/capture passed. No live execution repeated."
+  },
+  "accounting": {
+    "originalRecovery": "1/1 ATTEMPTED/oncee704 immutable",
+    "priorTechnicalContinuation": "1/1 CONSUMED/oncef28 immutable",
+    "newSandboxRepairLimit": 1,
+    "newSandboxRepairConsumed": 0,
+    "BenProduct": "6/6 spent/originalERROR/all6qualityEXCLUDED/no retries",
+    "Rich": "4PASS2qualityFAIL/refs1/1/2/1/1/3/cold11/10/8",
+    "BenCold": "9/9/8+oldERROR1",
+    "repeats": "3/10remaining7/noreset/precharge",
+    "admission": "3/3",
+    "wrapper": "1/1",
+    "newModelReferenceProductCold": 0
+  },
+  "boundaries": "Existing dedicated root-owned bwrap originally used by Ben; exact path/dev/inode/bytes/uid/gid/mode/SHA/policy source/loaded kernel raw bound at each fresh signed gate. No new AppArmor/default/resource permission mutation. Both historical attempts/controllers/captures/once/reservation/registration/snapshot bound and preserved. New explicit repair entry/root/once, not reset or replay. Unchanged cessation/logout/history/wholeguard/CSV/attestation/completion/ordinaryrelease/FREE gates. MAS foreign untouched; automationOFF.",
+  "notProven": [
+    "native READY",
+    "actual admin login",
+    "server cessation",
+    "official pending history archival",
+    "guard/CSV cleanup",
+    "completion",
+    "ordinary RELEASED/FREE",
+    "Ben final ACCEPT"
+  ],
+  "operator": "Root only; Ben independent final acceptance",
+  "sourceAcceptancePending": true,
+  "actualPriorStop": "2026-10-15-text-import-root377-native-stop-verification.json",
+  "mas": "FOREIGN/NO_INTERVENTION",
+  "automation": "OFF"
+}

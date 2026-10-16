@@ -1,0 +1,265 @@
+{
+  "version": 1,
+  "recordedAt": "2026-10-15T07:37:04.367080+00:00",
+  "issue": "LAB-57",
+  "source": "377302ddf5344b40e6068995ed9cc5d1b86e7c41",
+  "result": "BLOCKED_NOT_RELEASED",
+  "actualForeground": {
+    "exit": 2,
+    "pid": 2255609,
+    "birth": "110749408",
+    "startedAt": "2026-10-15T07:09:36.888075+00:00",
+    "finishedAt": "2026-10-15T07:11:57.372080+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "continuationOncePresent": true,
+    "originalRecoveryConsumed": 1,
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": true,
+    "controllerStillPresent": false
+  },
+  "actualStop": {
+    "at": "2026-10-15T07:13:23.721304+00:00",
+    "originalOnceSha256": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269",
+    "continuationOnceSha256": "f28e8821cd1ede51ebe1f35716f3a19213b27436aab3d55e4b15ae9a65870a14",
+    "operationPresent": false,
+    "completionPresent": false,
+    "proofNames": [
+      "admission-02f060a1-c9de-46fe-9c32-cde3ac79db64.json",
+      "admission-0cafee5e-032e-4c55-be98-87c9155a17ad.json",
+      "admission-25c1c375-47e3-432c-8dfe-2a69ca0813af.json",
+      "admission-2786bb12-b2e7-4a1c-aea3-ec448cdd79a3.json",
+      "admission-448e948a-adff-4d9f-bbe2-51983b87d196.json",
+      "admission-453f4226-9c89-4691-a1e4-8b47898d7f0c.json",
+      "admission-5ffe0ff1-ade7-4caf-80ee-bd7ae3ca94f5.json",
+      "admission-a7a66252-134f-45eb-be98-0202188621a9.json",
+      "admission-add67502-2a08-4aac-af7d-28c8672506cd.json",
+      "admission-aeead017-a6d8-4979-88bd-6c7e4cd25258.json",
+      "admission-b26f56ae-176e-4d7e-b721-50ec111a08e2.json",
+      "admission-bad15c16-b868-4c57-b843-72f80f70443e.json",
+      "admission-db602d5e-74b3-4665-a353-b0167d1b0add.json",
+      "archive-registration.json",
+      "command-cause-0eda1f2b-aad2-4d34-a706-42147e0ee841.json",
+      "diagnostic",
+      "diagnostic-transport.json",
+      "fresh-guard-1d905ca7-c33d-4026-9649-9d1c276cd049.json",
+      "fresh-guard-3ae42175-4e64-43e4-8ef3-ce22cb3e42fc.json",
+      "fresh-guard-5bf8165e-1359-46e2-a435-016691dc6573.json",
+      "fresh-guard-7c6b12e1-b351-4a4c-afc3-95b43d798fe0.json",
+      "fresh-guard-7cc38de4-f02e-4bf1-8c64-173592aae1ce.json",
+      "fresh-guard-7e9e8ce0-8a6c-4c58-9d58-d21532c35d51.json",
+      "fresh-guard-8ad5f449-6b91-4528-b5c8-4ddf57d40568.json",
+      "fresh-guard-95ce1773-8aaa-4a11-9b43-b4b5b9b00d67.json",
+      "fresh-guard-bb208e02-f206-442f-bc08-1c933087559c.json",
+      "fresh-guard-c356feac-584c-464a-95d6-467b194e779d.json",
+      "fresh-guard-cfc621ea-8e71-4973-915c-fe00a3ca82c5.json",
+      "fresh-guard-d0273aec-3456-4cc2-b637-6d8d245e7771.json",
+      "fresh-guard-f271500e-f56b-4a9d-b010-8a1f96a654c2.json",
+      "history-before.json",
+      "native-capture",
+      "native-cause-bade8fa2-fe06-44c9-9ac0-efc537be206b.json",
+      "native-command.json",
+      "native-failure-85403bf0-ed04-47cc-9daf-03ea6e144134.json",
+      "native-response-54a39c3e-c2f4-4bb4-8a10-2b2df2057eaa.json",
+      "retained-baseline.json",
+      "snapshot.json",
+      "source-admission.json"
+    ],
+    "refusal": {
+      "version": 1,
+      "binding": {
+        "operation": "LAB57-continuation-one-shot",
+        "originalOnce": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269",
+        "originalRecovery": 1
+      },
+      "stage": "remaining-route",
+      "status": "BLOCKED",
+      "exception": {
+        "name": "Error",
+        "code": null,
+        "reason": "OWNED_COMMAND_FAILED",
+        "signal": null,
+        "killed": false,
+        "cause": {
+          "name": "Error",
+          "code": 1,
+          "reason": "REDACTED_MESSAGE",
+          "signal": null,
+          "killed": false
+        }
+      },
+      "originalOutcome": "ERROR",
+      "cleanup": "UNCONFIRMED",
+      "at": "2026-10-15T07:11:57.281Z"
+    },
+    "causes": [
+      {
+        "command": "bun",
+        "exception": {
+          "name": "Error",
+          "code": 1,
+          "reason": "REDACTED_MESSAGE",
+          "signal": null,
+          "killed": false
+        }
+      }
+    ],
+    "native-command.json": {
+      "exitCode": 2,
+      "processCount": 255,
+      "status": "confirmed",
+      "complete": true,
+      "error": null,
+      "unknownCount": 0,
+      "browserBindings": 1,
+      "verification": [
+        {
+          "observed_at": "2026-10-15T07:11:49.583Z",
+          "owned_remaining": 0
+        },
+        {
+          "observed_at": "2026-10-15T07:11:49.686Z",
+          "owned_remaining": 0
+        }
+      ]
+    },
+    "diagnostic-transport.json": {
+      "browserTransportClosed": true,
+      "browserProcessTerminated": true
+    }
+  },
+  "sandboxDiagnosis": {
+    "originalAndOwnedConfig": {
+      "originalCP": {
+        "sha256": "f0bddf62f992f1ccb05a03ce1b4722f0357378def35dcd8925f99e7f6905cc7c",
+        "headless": true,
+        "chromiumSandbox": true,
+        "sandboxArgs": [],
+        "allArgsCount": 1,
+        "executablePathPinned": true
+      },
+      "newDiagnostic": {
+        "sha256": "c2554be5a4062d1b814fb9e4c939d48721842e304fd1f166d717c484b49ce703",
+        "headless": true,
+        "chromiumSandbox": true,
+        "sandboxArgs": [],
+        "allArgsCount": 1,
+        "executablePathPinned": true
+      }
+    },
+    "kernelAudit": {
+      "auditRows": [
+        {
+          "pid": 2261585,
+          "at": "1792048300683400",
+          "fields": {
+            "apparmor": "DENIED",
+            "operation": "capable",
+            "profile": "unpriv_bwrap",
+            "comm": "chrome",
+            "class": "cap",
+            "capname": "sys_admin"
+          }
+        }
+      ],
+      "rowsTotal": 1,
+      "aaExecExists": true,
+      "rawJournalNotPersisted": true
+    },
+    "helperFatal": {
+      "toolIsError": true,
+      "chromeSandboxUid": 1000,
+      "chromeSandboxMode": "0755",
+      "cause": "SUID sandbox helper abort; same-window sys_admin DENIED under unpriv_bwrap",
+      "lowerOriginalWriterCause": "UNKNOWN"
+    },
+    "originalProductBoundary": {
+      "keys": [
+        "pid",
+        "starttime",
+        "uid",
+        "parent",
+        "group",
+        "session",
+        "executable",
+        "device",
+        "inode"
+      ],
+      "matches": [
+        {
+          "pid": 2133639,
+          "starttime": "99242766",
+          "uid": 1000,
+          "executable": "/usr/local/libexec/loginom-evals/bwrap"
+        },
+        {
+          "pid": 2133640,
+          "starttime": "99242766",
+          "uid": 1000,
+          "executable": "/usr/local/libexec/loginom-evals/bwrap"
+        }
+      ]
+    },
+    "existingDedicatedBwrap": {
+      "/usr/local/libexec/loginom-evals/bwrap": {
+        "sha256": "523da3e7399044be5163aee6f57a77a6bef7454376e28f0a0627920bae1b76b6",
+        "dev": 64512,
+        "ino": 6293126,
+        "bytes": 80424,
+        "mode": "0o755",
+        "uid": 0,
+        "gid": 0,
+        "symlink": false,
+        "canonical": "/usr/local/libexec/loginom-evals/bwrap"
+      },
+      "/usr/bin/bwrap": {
+        "sha256": "523da3e7399044be5163aee6f57a77a6bef7454376e28f0a0627920bae1b76b6",
+        "dev": 64512,
+        "ino": 6033243,
+        "bytes": 80424,
+        "mode": "0o755",
+        "uid": 0,
+        "gid": 0,
+        "symlink": false,
+        "canonical": "/usr/bin/bwrap"
+      }
+    },
+    "existingPolicy": [
+      {
+        "path": "/etc/apparmor.d/loginom-evals-bwrap",
+        "sha256": "d9a65cb68f156b6b200132267380029008059b363e160ff02be888b6e197fd32",
+        "source": "abi <abi/5.0>,\ninclude <tunables/global>\nprofile loginom-evals-bwrap /usr/local/libexec/loginom-evals/bwrap flags=(unconfined) {\n  userns,\n}\n"
+      }
+    ]
+  },
+  "limits": {
+    "originalRecovery": "1/1 ATTEMPTED",
+    "technicalContinuation": "1/1 CONSUMED",
+    "model": 0,
+    "reference": 0,
+    "product": 0,
+    "cold": 0,
+    "sameCauseRepeats": "3/10; no inferred new charge"
+  },
+  "preservation": {
+    "originalBenOwnerLeaseTaskConfigAcquiredAt": "UNCHANGED",
+    "originalOutcome": "ERROR/code2",
+    "allSixBenQuality": "EXCLUDED",
+    "BenProduct": "6/6 spent/no retries",
+    "history": "28972 original files and snapshot reverified;77 Luna/high rows;5 archives+1 pending",
+    "originalOnce": "e7046e3a1df4543ef4d44b86551c1e4063a6e87da479e90fbbb4ffa675926269",
+    "continuationOnce": "f28e8821cd1ede51ebe1f35716f3a19213b27436aab3d55e4b15ae9a65870a14",
+    "ordinaryCompletionReleasedFree": false,
+    "independentCaseAccept": false
+  },
+  "coordination": {
+    "serverRevision": 448,
+    "serverStatus": "in_progress",
+    "activeQueued": 0,
+    "lastComment": "01a13e56-5d13-7ba6-8428-067e1c97e81e",
+    "metadataIsPreExecution": "continuation0/1 stale; this receipt records actual1/1"
+  },
+  "mas": "FOREIGN/NO_INTERVENTION",
+  "automation": "DELETED/OFF"
+}

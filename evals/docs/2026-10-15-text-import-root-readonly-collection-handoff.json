@@ -1,0 +1,86 @@
+{
+  "status": "POSTED_AND_READBACK_VERIFIED",
+  "comment": "01a13f84-d9b8-7d61-be74-cfed9c07c200",
+  "parent": "01a13f59-bead-7e18-917f-629b9ca8e2c6",
+  "bodySha256": "2045be7a35bc1c199e0e831f0997467915ec278413f8f17f1f96ec9b63e52f4c",
+  "mentions": 1,
+  "attachment": "01a13f84-7ec1-7566-9ca9-78b335a77c74",
+  "package": {
+    "source": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+    "zip": "/home/kiselev/storage/tmp/lab57-root-diag-20261015/lab57-root-readonly-006a38c7e-delivery.zip",
+    "zipSha256": "124280fe90aedcf281b9c8f899de543b34ece79f5cefbb056d818d4754be0904",
+    "manifestSha256": "46db44d13cb4444dba34daaab5204e49906800859bdf7525d6346b5323859a43",
+    "payloads": 1328,
+    "index": {
+      "status": "READY_SOURCE_FOR_INDEPENDENT_REVIEW / NOT_APPLIED",
+      "source": "006a38c7e950061efa20f8f02af0d3ea452ca3a0",
+      "base": "de285aa4fe659b8e0277fe5bb8bc772d4fc82452",
+      "sourceEntries": 911,
+      "gitBlobs": 910,
+      "unchangedBaseBlobs": 903,
+      "changedPaths": [
+        "evals/docs/evaler/lab57-root-readonly-collection-plan.md",
+        "evals/script/lab57-queue-pages.py",
+        "evals/script/lab57-readonly-window.py",
+        "evals/script/lab57-route-inspect.py",
+        "evals/test/fixtures/fake-multica-queues.py",
+        "evals/test/lab57-mas-queues.test.ts",
+        "evals/test/lab57-readonly-window.test.ts"
+      ],
+      "manifestSha256": "51234110346544dad878341b630193c8cd89ce05f85f30e4ee31ede1fdec01f9",
+      "executableSha256": "436efef4be51206e57f5404f13f69ba4200413c23798da269d95c9cfd44d40ce",
+      "executableByteEqualAdmittedDe285": true,
+      "tests": {
+        "affected": "123PASS0FAIL332expects/4files",
+        "typecheck": "PASS",
+        "builds": "2 clean exports byte-equal AND exact prior admitted executable",
+        "processes": 12,
+        "capture": "continuous/complete/confirmed/error=null/unknown[]/twozero",
+        "failuresPreserved": [
+          "red84 wrong test mount and artificial inventory hash diagnosed; corrected fixture mount and replay actual bytes",
+          "red85 actual serial concurrency failure",
+          "red87 missing module",
+          "red89 invalid bounds",
+          "red91 missing expiry history",
+          "green92 failed Python3.10 lacks add_note; compatible explicit cause chain then green93",
+          "red94 known blocker was retried; now one observation then STOP"
+        ]
+      },
+      "runtimeEffects": 0,
+      "kernelAllowance": "0/1 UNSPENT by actual preonce refusal",
+      "allSixPriorConsumedUnchanged": true,
+      "nativeAndScientificCriteria": "unchanged; no new model/reference/product/cold",
+      "window": "unchanged15s; max3 whole completed clean readonly collections only; no partial/error/known-blocker retry; final whole fresh; no merge/reset/old timestamp reuse",
+      "scope": "Root sole cleanup operator; Evaler SOURCE review only; Ben final cases/validators/attestation independent ACCEPT; MAS foreign/no intervention; automation OFF",
+      "notProven": [
+        "new source admission/installation",
+        "kernel continuation",
+        "server cessation",
+        "official history finalization",
+        "cleanup",
+        "completion",
+        "RELEASED",
+        "FREE",
+        "Ben ACCEPT"
+      ]
+    }
+  },
+  "server": {
+    "status": "in_progress",
+    "revision": 495,
+    "metadata": {
+      "evaler.state": "{\"state\":{\"issue_id\":\"01a1214a-fcf8-7e0c-8c1c-f5dd600180b3\",\"phase\":\"ben\",\"base_sha\":\"59ab36329c13f1399dab4313e94f3e9c6954301b\",\"frozen_sha\":\"eb1c2b0da02210a9d95569849ae056fa4784440c\",\"executor\":\"Ben\",\"delivery_sha\":null,\"review_cycle\":2,\"reject_count\":1,\"processed_report_ids\":[\"01a13f51-7b0a-74cb-8b6e-de07cc547085\"],\"last_dispatch\":{\"id\":\"LAB57-BEN-EB1-01a13753\",\"phase\":\"ben\",\"sha\":\"eb1c2b0da02210a9d95569849ae056fa4784440c\",\"root_trigger\":\"01a13753-5c9f-7ba5-9380-a064ca7e9699\",\"task_id\":\"01a1375d-ce4a-7c35-a3a3-94cf64a8b589\",\"outcome\":\"BLOCKED;Ben final only\"},\"processed_report_history\":\"IDs in attached full history\"},\"dependency\":{\"issue_id\":\"01a1214a-22b2-7274-bf31-e1dddca9e85f\",\"status\":\"done\",\"gate\":\"VERIFIED_ACCEPT_CLEANUP\",\"accept_confirmed\":true,\"cleanup_confirmed\":true,\"frozen_sha\":\"59ab36329c13f1399dab4313e94f3e9c6954301b\",\"report_comment_id\":\"01a12edf-8658-7aa6-8336-cf4d3bfe8c22\"},\"observation\":{\"report_id\":\"01a13f51-7b0a-74cb-8b6e-de07cc547085\",\"source_status\":\"de285 SOURCE_ACCEPT;K1fixed\",\"live_status\":\"BUSY;all6spent;kernel0/1\"},\"authorization\":{\"owner_delegation_comment_id\":\"01a13591-5d06-7734-b05b-5e3a4a9fd6c7\",\"owner_policy_sha256\":\"743f98aca40dd362f3ac80c8a8d97308863ba83d3e32430533ae4101464096c0\",\"human_approval_gate\":false,\"runtime_admin_amendment\":{\"comment_id\":\"01a13932-b536-79dc-b904-3c1f60ca10dc\",\"commit\":\"125507f837b89c2bdf69f2b33cedd20e0b102192\",\"sha256\":\"e2925de35befd22407908e938e693bfcfaef62b73f9681af890ff7b8ad9bc4e3\"},\"root_operator\":{\"takeover_comment\":\"01a139d3-c44d-798e-98af-2c76f66a3756\",\"decision_comment\":\"01a13a0d-ca08-7864-b419-968bd214aeb6\",\"thread\":\"01a120d5-a234-7481-b7ac-e68bbacc5f6d\",\"canonical_sha256\":\"9ead37bbc4aab16a83efafdb47c7b1efc40e5cdf8b7419e6e68bec44035eaf49\",\"source_admission_sha256\":\"c0cf041faa2ac34ec65ff8601a054d0be0140fd17279152165437454dd75a402\"},\"cursor_mas_scope\":{\"decision_sha256\":\"bfc38c4263a99d1f99aa3475a10e3d7ea2dec740af6a011d94b7d5706a39f5bf\",\"runtime\":\"490365fb-afb2-4cf3-a694-23459da7a6d1\",\"scope\":\"LAB57 scoped queues;MAS untouched\"},\"technical_continuation\":{\"decision_sha256\":\"8fb42276b6964bbca59546b099b585dd748274583f5881de1fc00d359798ef9b\",\"limit\":1,\"consumed\":1,\"status\":\"CONSUMED_EXIT2\"},\"sandbox_repair\":{\"decision_sha256\":\"07667b68e0c476e46493cc706c507f2aa7e5a49bf04634bdf098e076ad0e73a2\",\"limit\":1,\"consumed\":1,\"status\":\"CONSUMED_EXIT2\"},\"observer_repair\":{\"decision_sha256\":\"b92583ccc5f8c7bce97745e04814b588a8c37546569622ac85fe84841f9da55e\",\"limit\":1,\"consumed\":1,\"status\":\"CONSUMED_EXIT2\"},\"fd_stability\":{\"decision_sha256\":\"3b6923b11c9dc482b99c5a0d7611effe473eb82a2e4066b84d3f16c6cbec2ce2\",\"limit\":1,\"consumed\":1,\"status\":\"CONSUMED_EXIT2\"},\"dispatcher_abi\":{\"decision_sha256\":\"dbc623862886da8610cbd25a42f4a7b1a0c8fd6055bc7feb704c84a39648906e\",\"limit\":1,\"consumed\":1,\"status\":\"CONSUMED_EXIT2\"},\"kernel_observation\":{\"decision_sha256\":\"91af777a45c847cc2f8253b971e5919cf871024893e285bc3cb0eca62c8f5edb\",\"limit\":1,\"consumed\":0,\"status\":\"SOURCE_ACCEPTED_NOT_RUN\"}},\"pins\":{\"harness\":\"59ab36329c13f1399dab4313e94f3e9c6954301b\",\"cli\":\"d6fc9c9b7b499d0a182c972815913b541e4cb81b\",\"skill_version\":\"1.0.7\",\"skill_tree_sha256\":\"577c50a1d494844eecfa9559de0d63faaa8a2786057bfe3c434cfbd9d8ca5c89\",\"operational_supplement\":\"0fd20f7c7e36724ca78a58bb8f9085b78884a87b\",\"operator_adapter_source\":\"f89f674e3c614e711123685415211fd864fa8d12\"},\"scope\":{\"node\":\"imports.text / delimited\",\"card\":1,\"case_ids\":[\"txt-comma-utf8\",\"csv-comma-utf8\",\"txt-semicolon-cp1251-decimal\",\"csv-pipe-multiline\",\"tsv-utf8\",\"tsv-utf16le\"],\"input_attachment_id\":\"01a1214a-fbfa-78cf-a614-856157add9c4\",\"input_sha256\":\"f175fe6b01793e451ad334a0b5ee8b8b91f3e569d732027e4360c025571beccd\",\"reference_attempt_limit_per_case\":3,\"fresh_product_repeat_per_case\":1,\"current_stage\":\"Root kernel0/1;Ben final only\",\"working_partial_sha\":\"eb1c2b0da02210a9d95569849ae056fa4784440c\"},\"execution\":{\"runtime_id\":\"a5fa993f-2903-4997-a832-955ffbb1203c\",\"worker_models\":\"gpt-6.1-sol/xhigh\",\"worker_concurrency\":1,\"scenario_model\":\"openai/gpt-6-luna\",\"scenario_variant\":\"high\",\"provider_model_id\":\"gpt-6-luna\",\"endpoint\":\"http://localhost/app/\",\"container_id\":\"b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e\"},\"budgets\":{\"reference_consumed\":{\"txt-comma-utf8\":1,\"csv-comma-utf8\":1,\"txt-semicolon-cp1251-decimal\":2,\"csv-pipe-multiline\":1,\"tsv-utf8\":1,\"tsv-utf16le\":3},\"reference_limit_per_case\":3,\"product\":6,\"cold\":8,\"LAB-56_admission\":\"3/3 PASS, exhausted\",\"new_smoke_probes_generations\":0,\"recovery\":1,\"cold_reader_invocations\":11,\"cold_browser_launch_attempts\":10,\"normal_cleanup_browser_continuations\":2,\"product_consumed_by_executor\":{\"Rich\":\"1 per each6 IDs\",\"Ben\":\"1 per each6 IDs;6/6 consumed; no retries\"}},\"rich_native_runs\":{\"authorization_comment_id\":\"01a12f9e-6ca3-73d7-acbf-c0180d51fef5\",\"native_tasks_count\":22,\"next_native_ordinal\":23,\"repeat_limit\":10,\"repeat_consumed\":3,\"repeat_remaining\":7,\"counting\":\"Confirmed same-cause repeats; no precharge/reset\",\"ledger_sha256\":\"0acbfd6a17ed80d8ba15aa647dc216daa8c967b448691abf976c4d93f2f099ac\",\"pending_task_classification\":\"Unique incident charge0; no samecause confirmation/dispatch\",\"ledger_attachment_id\":\"01a136c0-c5f4-7b1b-b23e-71e99408ff8e\",\"last_task_id\":\"01a139d0-0ab0-7a46-907f-8004baa51254\"},\"verification\":{\"report_id\":\"01a13f51-7b0a-74cb-8b6e-de07cc547085\",\"attachment_id\":\"01a13f51-69ea-73e8-83ad-b647daca0737\",\"archive_sha256\":\"d52b6b7e7f1a23e854b5f1ae97fa91321000588e00c2c91da739888a5a0072f4\",\"verified\":\"1002/908/907Git;58PASS;Node6\"},\"diagnostic_wrapper\":{\"limit\":1,\"consumed\":1,\"status\":\"EXHAUSTED\"},\"history_snapshot\":{\"file\":\"prior-metadata-history.json\",\"review_sha256\":\"510575898c54f8adeab224077d1f46d5b77f2a9452e75beed31ffc6dafdea335\",\"attachment_id\":\"01a13f59-be7b-7037-83dc-b03eaa1a3c44\"},\"autonomous_stage\":{\"authorization_comment_id\":\"01a13591-5d06-7734-b05b-5e3a4a9fd6c7\",\"time_and_human_gates\":\"SUPERSEDED\",\"technical_timeouts\":\"UNCHANGED\"},\"ben_native_runs\":{\"accepted_review\":2,\"product_consumed\":6,\"product_limit_per_case\":1,\"cold\":{\"calls\":9,\"launches\":9,\"completed\":8,\"errors\":1,\"not_started\":[]},\"last_verdict\":\"BLOCKED; Ben final only\",\"pending_frozen_sha\":\"eb1c2b0da02210a9d95569849ae056fa4784440c\",\"rejected_sha\":\"c26bc4fec5a7bbf9c23943a8ff4406c2e33674aa\",\"task_ids_history\":\"Prior IDs in attached full history\"},\"cleanup_dispatch\":{\"kind\":\"independent-source-accept\",\"operator\":\"Root\",\"owner_task\":\"01a1375d-ce4a-7c35-a3a3-94cf64a8b589\",\"review_cycle\":2,\"outcome\":\"SOURCE_ACCEPT_NO_DISPATCH\",\"cleanup_worker_dispatch\":\"PROHIBITED\",\"comment_id\":\"01a13f59-bead-7e18-917f-629b9ca8e2c6\"},\"cleanup_incident\":{\"source_sha256\":\"1ef7a1544f4a779bcf9648300a3afa081953cf2eaa7ecda90c35769fb31862f1\",\"lease_owner_sha256\":\"7d343a0f13f97506770e08a24e10f2d3360c88754dfd7184776cef4508b0be64\",\"config_sha256\":\"d20475fc9ef2e273b6098943c810886f5f2af580bd76ba82d739022594f84981\",\"raw_config_sha256\":\"ffbc373a557e0156a4726874d424a330922286545310bb0e0cd9b12863646b35\",\"acquiredAt\":\"2026-10-13T22:28:17.228Z\",\"helper_recovery_consumed\":1,\"underlying_root\":\"Writer UNKNOWN; Root49 ENOENT unclassified\",\"first_charge\":0},\"cleanup_proposal\":{\"source_sha\":\"de285aa4fe659b8e0277fe5bb8bc772d4fc82452\",\"source_manifest_sha256\":\"f708e9d105d28f9e7b5beecf5b0d8b1ae7317b7ec2dcaf33a7c740f401840561\",\"executable_sha256\":\"436efef4be51206e57f5404f13f69ba4200413c23798da269d95c9cfd44d40ce\",\"decision\":\"SOURCE_ACCEPT\",\"installed\":false,\"live_admission\":\"Root;fresh/private gates\",\"once_consumed\":true,\"recovery_consumed\":1,\"rejected_source_sha\":\"53d823f3e7538e278a786e8265540c4c65201b96\"},\"root_operator_checkpoint\":{\"source\":\"f89f674e3c614e711123685415211fd864fa8d12\",\"installed\":true,\"pid\":2307649,\"birth\":\"112102672\",\"exit\":2,\"receipt_sha256\":\"7227e601096df04e4f6cac68218859fc01d562a9b2efc3d6851504726baec00b\",\"once_sha256\":\"2b1b08f033a8421ae2995380c55a510bc44cd27a864e45e508b7f92f85d3d7f1\",\"state\":\"Reported own368confirmed/browser1/startup1;PID/op absent;no cessation/logout/release\",\"blocker\":\"F89 kernel arrival;old d1 UNKNOWN\",\"original_recovery\":1,\"continuation\":1,\"sandbox_repair\":1,\"observer_repair\":1,\"fd_stability\":1,\"new_native_scenario\":0,\"repeat_charge\":0,\"dispatcher_abi\":1}}"
+    }
+  },
+  "active": [
+    {
+      "id": "01a13f84-d9d4-70e8-b0f3-9d1b28b3c716",
+      "agent_id": "de4ba430-2182-4085-a148-fa4a3fc8a6f5",
+      "status": "dispatched",
+      "created_at": "2026-10-15T15:23:53+03:00",
+      "started_at": null
+    }
+  ],
+  "operator": "Root, no cleanup dispatch; existing Evaler SOURCE-only review",
+  "automation": "OFF"
+}

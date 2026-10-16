@@ -1,0 +1,61 @@
+{
+  "status": "SH1_EXACT_SOURCE_REVIEW_PENDING_NOT_INSTALLED",
+  "source": "d3ec74aa89afaf412fd14143d4f9b6ed0ddb6fdc",
+  "reviewedRejectedBase": "3e609eb58c7b816bc2ad08782636d04b21162056",
+  "sourceManifestSha256": "a722b31a7db1861d84dbccad50907cfcf228274625b9a55e43575d8b14f3191a",
+  "executableSha256": "73754df2437274524afeaa84d6ab2bc60cd6239793f773fd88e9491ee5298294",
+  "sourceEntries": 938,
+  "changedPaths": [
+    "evals/src/lab57-fd-observer.ts",
+    "evals/test/lab57-original-shim.test.ts"
+  ],
+  "delta": "SH1 only: typeof row.fdDigest===string before regex for both before/after discarded shim certificate rows;3regressions. All other reviewed3e609 source bytes unchanged, rejected3e609 NEVERinstalled/executed.",
+  "checks": {
+    "affected": [
+      "",
+      " 14 pass",
+      " 0 fail",
+      " 41 expect() calls",
+      "Ran 14 tests across 1 file. [1.98s]",
+      ""
+    ],
+    "typecheck": "PASS186",
+    "captureProcesses": 12,
+    "capture": "continuous/complete/confirmed/errornull/unknown[]/twozero",
+    "builds": "2clean byte-equal",
+    "signedRepro": "Original independent exactNode RSA13cases byte-unchanged replay187 PASS;3arrays reject,stringpositivepass; syntheticSOURCE_ONLY, no livecompletion",
+    "errorsRetained": [
+      "OwnRED18411PASS3FAIL\u2192GREEN18514PASS; priorindependent27PASS3FAIL91expects/canonical2b874155\u202699payloadallpreserved",
+      "No unchanged70/native/case/full suites repeated"
+    ]
+  },
+  "archive": {
+    "zipBytes": 3108857,
+    "zipSha256": "5f16396c13e1836d24638553b7c674f0f139a6c2ef342af5869f4c6f9a2069ab",
+    "manifestSha256": "cadd28f304dd1fc0fd43b872c20fd4696ca689af692a5b6a5cd04f9c3c67539e",
+    "payloads": 978
+  },
+  "handoff": {
+    "comment": "01a1405c-62a0-72ef-82ad-fb65718df9ff",
+    "parent": "01a14054-85b0-756a-94c5-19ec20728838",
+    "attachment": "01a1405b-9f74-7175-a035-11fddcfc7d0f",
+    "reviewTask": "01a1405c-62b7-7058-9f53-c32a385f85c9",
+    "bodyParentOneMentionAndFullAttachmentBytesReadback": true,
+    "cleanupDispatch": false
+  },
+  "recovery": {
+    "postConfirmedWithoutRetry": true,
+    "originalFailureStage": "Remote18 finalsnapshot->10CLIissue-runs nonzero after POST; raw691preserved",
+    "lowerCliReason": "UNKNOWN; rawCLIstderr notcapturedbyoriginalassert",
+    "privateStderrSha256": "ad418865bce19511939e758733910b7a792ddcf19782cc6ea94801e2ee52a3c2",
+    "freshBodyParentOneMentionAttachmentBytesReadback": true,
+    "commentRelationalAttachments": "Empty array becausemanual !filebodylink; actuallinkedattachment downloaded/verified, not missing",
+    "localInspectorError": "First recovery incorrectly required relationalattachments nonempty. Corrected usingactualbodyUUID+download, no repost/effect."
+  },
+  "allowance": "Same RootFinal0/1 UNSPENT7288; previousaddressed1/1/rootonce8ddd7246/all9spent immutable;control1/1/originalrecovery1/1. No newcounter/reset/replay/sciencecalls.",
+  "actualPrior": "f28Root67558EXIT2 loginobserved/owntransportclosed/native98zero; original/prioradminservercessation UNPROVEN, no close/history/guardCSV/completion reached.",
+  "remaining": "Original/prioradminfullinventory/cessation\u2192ownlogout/official77history/wholeguard/exactCSV/completion/SETTLED/ordinaryRELEASED/FREE thenBenfinalACCEPT.",
+  "automation": "OFF",
+  "foreign": "MAS/evalrununtouched",
+  "modelReferenceProductCold": 0
+}

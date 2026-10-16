@@ -1,0 +1,132 @@
+{
+  "at": "2026-10-15T07:09:32.678025+00:00",
+  "status": "EXACT_SOURCE_INSTALLED_HELPER_BOUND_PRIVATE_ROOT_ADMITTED_NOT_NATIVE_READY",
+  "source": "377302ddf5344b40e6068995ed9cc5d1b86e7c41",
+  "independentAdmission": {
+    "decision": "SOURCE_ACCEPT",
+    "source": "377302ddf5344b40e6068995ed9cc5d1b86e7c41",
+    "exactArchiveVerified": true,
+    "executableRebuildByteEqual": true,
+    "admissionComment": "01a13e56-5d13-7ba6-8428-067e1c97e81e",
+    "admissionSha256": "2dba2032e56624f951893bc4d6e10284f7741424cf9ad2db1e85e3785bbce8d8",
+    "sourceManifestSha256": "7e899d0a581313c0aaf4b46dccce0e838741cb4ac00cfd36f582c445252b301b",
+    "executableSha256": "b7d37c4ee1891b6009f7404707d620bb1a9253df05da7700ae0c585c2a64308e",
+    "independentTests": "66PASS0FAIL92expects/21newnegatives",
+    "genuineSourceCaptures": [
+      {
+        "path": "independent-proofs/evaler-377-build/process-cleanup.json",
+        "processes": 2,
+        "complete": true,
+        "twoZero": true
+      },
+      {
+        "path": "independent-proofs/evaler-377-addressed/process-cleanup.json",
+        "processes": 3,
+        "complete": true,
+        "twoZero": true
+      }
+    ],
+    "notCaseAccept": true,
+    "newSourceEffects": 0
+  },
+  "independentArchive": {
+    "comment": "01a13e56-5d13-7ba6-8428-067e1c97e81e",
+    "author": "Evaler",
+    "zipSha256": "4bbf1a915dbe3a1af8213533287f7a18fda47160c43f6e48eaeafbd5c6c72484",
+    "manifestSha256": "2714aadba19c410e6fe459d7f7dd33b8ad78742b7fe4c99c8e4d159610dd791b",
+    "payloads": 42,
+    "CRCPathsTypesHashesVerified": true,
+    "admissionPath": "source-admission.json",
+    "admissionSha256": "2dba2032e56624f951893bc4d6e10284f7741424cf9ad2db1e85e3785bbce8d8"
+  },
+  "ownerDecisionSha256": "8fb42276b6964bbca59546b099b585dd748274583f5881de1fc00d359798ef9b",
+  "sourceInstall": {
+    "status": "SOURCE_INSTALLED_ONLY",
+    "source": "377302ddf5344b40e6068995ed9cc5d1b86e7c41",
+    "filesVerified": 870,
+    "noReplace": true,
+    "nativeReady": false
+  },
+  "observer": {
+    "status": "NARROW_READ_ONLY_HELPER_PROVISIONED_NOT_NATIVE_READY",
+    "source": "377302ddf5344b40e6068995ed9cc5d1b86e7c41",
+    "attempt": {
+      "path": "/root/lab57-root-continuation-377302ddf-provision.once.json",
+      "device": 64512,
+      "inode": 5545325,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o600",
+      "bytes": 1144,
+      "sha256": "ef6feef1f40933e505eb9a25c64bbe1457e4d0288454632028941a5bf78fd38f"
+    },
+    "helperDirectory": {
+      "path": "/var/lib/loginom-evals/fd-observer/377302ddf5344b40e6068995ed9cc5d1b86e7c41",
+      "device": 64512,
+      "inode": 1179854,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o755",
+      "bytes": 4096,
+      "sha256": null
+    },
+    "script": {
+      "path": "/var/lib/loginom-evals/fd-observer/377302ddf5344b40e6068995ed9cc5d1b86e7c41/lab57-fd-observer.py",
+      "device": 64512,
+      "inode": 1179865,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o555",
+      "bytes": 14101,
+      "sha256": "f312df6771a79af582da5b8ce193eb9284256aa0e148e017b04b29e888476698"
+    },
+    "binding": {
+      "path": "/var/lib/loginom-evals/fd-observer/377302ddf5344b40e6068995ed9cc5d1b86e7c41/binding.json",
+      "device": 64512,
+      "inode": 1179883,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o444",
+      "bytes": 2338,
+      "sha256": "f61ed73e5207c2b7f77168e867b551cb0aec568db385dae39d0d629014e0ec9e"
+    },
+    "privateKey": {
+      "uid": 0,
+      "mode": "0o600",
+      "singleLink": true,
+      "materialDisclosed": false
+    },
+    "policy": {
+      "path": "/etc/sudoers.d/loginom-lab57-fd-377302ddf",
+      "device": 64512,
+      "inode": 1574637,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o440",
+      "bytes": 159,
+      "sha256": "a0ef74529316d4f999e5fa144dcda3a0906a44be4ec861e6ec9985c02c753890"
+    },
+    "otherPoliciesByteUnchanged": true,
+    "fullVisudoExit": 0,
+    "originalOwnerConfigPreserved": true,
+    "originalNativeProfileRecoveryEffects": 0
+  },
+  "privateRootAdmission": {
+    "admissionPath": "/home/user/.local/share/loginom-evals-runtime/operators/lab57-root-continuation-ef66ae32b730/final-root-operator-admission.json",
+    "admissionSha256": "1d8fbf7855449583a7a4c9a72979087942433f1629cafa6bcb1eb61b0d6b7768",
+    "preonceDirectory": "/home/user/.local/share/loginom-evals-runtime/roles/ben/agent-work/lab57-preonce/root-continuation-1d4f981c8cf5",
+    "status": "PRIVATE_ROOT_ADMISSION_AFTER_INDEPENDENT_SOURCE",
+    "originalOwnerUnchanged": true,
+    "source": "377302ddf5344b40e6068995ed9cc5d1b86e7c41",
+    "originalRecoveryEffects": 0,
+    "credentialsRepublished": false
+  },
+  "originalRecovery": "1/1 ATTEMPTED remains; oldoncee704 retained",
+  "separateContinuation": "0/1 before foreground",
+  "sourceReadyIsNotCleanup": true,
+  "currentOrdinaryReleaseFREEBenACCEPT": false,
+  "profilesModelsCredentialsSharedDefaultsMutated": false,
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "OFF",
+  "next": "Fresh queues/replies then own foreground continue; no server comment that would create competing task before full guard"
+}

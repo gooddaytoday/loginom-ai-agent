@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "status": "ACTUAL_SOURCE_INSTALL_HELPER_PRIVATE_ADMISSION_NOT_NATIVE_COMPLETION",
+  "source": "945a7acee2dfad39baf9e4d87c3564b4bd5f8cb9",
+  "ownerDecisionSha256": "3b6923b11c9dc482b99c5a0d7611effe473eb82a2e4066b84d3f16c6cbec2ce2",
+  "independentAdmission": {
+    "decision": "SOURCE_ACCEPT",
+    "source": "945a7acee2dfad39baf9e4d87c3564b4bd5f8cb9",
+    "comment": "01a13f05-a412-78b9-befb-58ee853f63fd",
+    "attachment": "01a13f05-a3e6-7c2e-a03d-8af4ecdf5dea",
+    "archiveSha256": "4b297b1c04a3d8e4c9416af664bd2139cffd55865bc51dd29f937132c9e7473e",
+    "manifestSha256": "b1e0b143688ee09fed03178a28c251ba42677017569ba1593889b8a98c849d43",
+    "admissionSha256": "d429a50de856d1ad7a56e06a39d2cd141f23fac379229a704c57f6ed22f5dff9",
+    "payloads": 65,
+    "exactArchiveVerified": true,
+    "executableRebuildByteEqual": true,
+    "independentTests": "32PASS94expects+16Python scenarios",
+    "sourceOnlyNotCaseAcceptOrCleanup": true
+  },
+  "actualSupport": {
+    "status": "SOURCE_INSTALLED_ONLY",
+    "source": "945a7acee2dfad39baf9e4d87c3564b4bd5f8cb9",
+    "filesVerified": 893,
+    "noReplace": true,
+    "nativeReady": false
+  },
+  "actualReadonlyHelper": {
+    "status": "NARROW_READ_ONLY_HELPER_PROVISIONED_NOT_NATIVE_READY",
+    "source": "945a7acee2dfad39baf9e4d87c3564b4bd5f8cb9",
+    "attempt": {
+      "path": "/root/lab57-root-fd-stability-945a7acee-provision.once.json",
+      "device": 64512,
+      "inode": 5545355,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o600",
+      "bytes": 1450,
+      "sha256": "5b99a3cfe282dc67be309effceeb8cacce09224f2bd60bc9b8501f50784851a1"
+    },
+    "helperDirectory": {
+      "path": "/var/lib/loginom-evals/fd-observer/945a7acee2dfad39baf9e4d87c3564b4bd5f8cb9",
+      "device": 64512,
+      "inode": 1179895,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o755",
+      "bytes": 4096,
+      "sha256": null
+    },
+    "script": {
+      "path": "/var/lib/loginom-evals/fd-observer/945a7acee2dfad39baf9e4d87c3564b4bd5f8cb9/lab57-fd-observer.py",
+      "device": 64512,
+      "inode": 1179896,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o555",
+      "bytes": 18082,
+      "sha256": "2841def8383c48d5201ab15074254e836317697d7887db03219754c46d5ac8f4"
+    },
+    "binding": {
+      "path": "/var/lib/loginom-evals/fd-observer/945a7acee2dfad39baf9e4d87c3564b4bd5f8cb9/binding.json",
+      "device": 64512,
+      "inode": 1179898,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o444",
+      "bytes": 18889,
+      "sha256": "b89f974489a9e2fb9faf05e597a30d1b9fe97c31217d659d2d3d8f0da637778a"
+    },
+    "privateKey": {
+      "uid": 0,
+      "mode": "0o600",
+      "singleLink": true,
+      "materialDisclosed": false
+    },
+    "policy": {
+      "path": "/etc/sudoers.d/loginom-lab57-fd-945a7acee",
+      "device": 64512,
+      "inode": 1574755,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o440",
+      "bytes": 159,
+      "sha256": "23c55dd9f7da43d54f2496a9d09fee4c3fe56d4729a53f4906ac40617621f537"
+    },
+    "beforeSudoers": {
+      "loginom-lab57-fd-9409bda38": "579f95441e7e10d75be0493c144e3e346441731c1924bafa9475ecdca56d4bb2",
+      "README": "5c108b32f7e4f0f33ed7a76e6e6aa1713358ccfc76ec0719b17a1b3a87b8e1ef",
+      "loginom-lab57-fd-fdbfae6d7": "0080134960285ef8452074ceac58b04c67577068711f9bc68000bae736c7a3c5",
+      "loginom-lab57-fd-d1d38f63f": "8f76a5e78d4c1c43fc5fc8cc595488c7f4ad3d371114df58576c58f2d167998a",
+      "loginom-lab57-fd-49a8a1c04": "51b45fd3cde8c0f38314d6f9f18c62ab4871f264d44cfe7fc583ae7059fbf5fd",
+      "loginom-lab57-fd-377302ddf": "a0ef74529316d4f999e5fa144dcda3a0906a44be4ec861e6ec9985c02c753890",
+      "loginom-lab57-fd-e8815ae0e": "64c0b15c6c46b19f3a8e92a2f54f275c4034dd3ccd1e33bc628324ec317530b4"
+    },
+    "afterSudoers": {
+      "loginom-lab57-fd-945a7acee": "23c55dd9f7da43d54f2496a9d09fee4c3fe56d4729a53f4906ac40617621f537",
+      "loginom-lab57-fd-9409bda38": "579f95441e7e10d75be0493c144e3e346441731c1924bafa9475ecdca56d4bb2",
+      "README": "5c108b32f7e4f0f33ed7a76e6e6aa1713358ccfc76ec0719b17a1b3a87b8e1ef",
+      "loginom-lab57-fd-fdbfae6d7": "0080134960285ef8452074ceac58b04c67577068711f9bc68000bae736c7a3c5",
+      "loginom-lab57-fd-d1d38f63f": "8f76a5e78d4c1c43fc5fc8cc595488c7f4ad3d371114df58576c58f2d167998a",
+      "loginom-lab57-fd-49a8a1c04": "51b45fd3cde8c0f38314d6f9f18c62ab4871f264d44cfe7fc583ae7059fbf5fd",
+      "loginom-lab57-fd-377302ddf": "a0ef74529316d4f999e5fa144dcda3a0906a44be4ec861e6ec9985c02c753890",
+      "loginom-lab57-fd-e8815ae0e": "64c0b15c6c46b19f3a8e92a2f54f275c4034dd3ccd1e33bc628324ec317530b4"
+    },
+    "otherPoliciesByteUnchanged": true,
+    "fullVisudoExit": 0,
+    "originalOwnerConfigPreserved": true,
+    "originalNativeProfileRecoveryEffects": 0
+  },
+  "privateAdmission": {
+    "admissionSha256": "5c2aa6eaf8075e0505220cd4287663ea9409297acd55f9a655ef3b6564d38dd9",
+    "status": "PRIVATE_ROOT_ADMISSION_AFTER_INDEPENDENT_SOURCE",
+    "originalOwnerUnchanged": true,
+    "source": "945a7acee2dfad39baf9e4d87c3564b4bd5f8cb9",
+    "originalRecoveryEffects": 0,
+    "credentialsRepublished": false
+  },
+  "originalRecovery": "1/1ATTEMPTED",
+  "technicalContinuation": "1/1CONSUMED",
+  "sandboxRepair": "1/1CONSUMED",
+  "observerRepair": "1/1CONSUMED",
+  "newFdContinuation": "0/1 before foreground",
+  "RootSoleOperator": true,
+  "BenFinalIndependentOnly": true,
+  "originalBenOwnerLeaseConfigAcquiredAtPreserved": true,
+  "newModelReferenceProductCold": 0,
+  "cleanupReleasedFreeBenAccept": false,
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "DELETED_OFF"
+}

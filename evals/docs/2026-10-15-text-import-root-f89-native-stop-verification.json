@@ -1,0 +1,212 @@
+{
+  "status": "ACTUAL_ROOT_F89_STOP_NOT_STAND_CLEANUP",
+  "source": "f89f674e3c614e711123685415211fd864fa8d12",
+  "foreground": {
+    "exit": 2,
+    "pid": 2307649,
+    "birth": "112102672",
+    "startedAt": "2026-10-15T10:55:09.492578+00:00",
+    "finishedAt": "2026-10-15T10:58:44.754950+00:00",
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "5d7fbfafdd982195a7208166d3c5ed2b7ef812ebb0434797cf2c054290b496b1",
+    "dispatcherContinuationOncePresent": true,
+    "priorFdContinuationConsumed": 1,
+    "priorObserverRepairConsumed": 1,
+    "sandboxRepairConsumed": 1,
+    "priorContinuationConsumed": 1,
+    "originalRecoveryConsumed": 1,
+    "originalOverallOncePresent": true,
+    "operationPresent": false,
+    "diagnosticPresent": true,
+    "controllerStillPresent": false
+  },
+  "consumedAbiOnce": {
+    "sha256": "2b1b08f033a8421ae2995380c55a510bc44cd27a864e45e508b7f92f85d3d7f1",
+    "device": 64512,
+    "inode": 17858353,
+    "once": {
+      "version": 1,
+      "status": "CONSUMED_BEFORE_EFFECT",
+      "sourceSha": "f89f674e3c614e711123685415211fd864fa8d12",
+      "sourceManifestSha": "e5976d4f9aa8c63c7d58ceda4372c8564a63ec4c7e12f6a3fee1e800073a174c",
+      "ownerTask": "01a1375d-ce4a-7c35-a3a3-94cf64a8b589",
+      "acquiredAt": "2026-10-13T22:28:17.228Z",
+      "controller": {
+        "pid": 2307649,
+        "starttime": "112102672"
+      },
+      "operation": {
+        "device": 64512,
+        "inode": 18517377
+      },
+      "administratorSha": "4c5728fbb8ae6695798f4f3cca665a9c41a7ce33796462461e392e46a1bb5fab",
+      "admissionSha": "ed46d74689a09f342721eecbfc71d3c85090b2bdf12d10f9eb061a36079e4e6d"
+    }
+  },
+  "capture": {
+    "status": "confirmed",
+    "error": null,
+    "complete": true,
+    "unknown": 0,
+    "browser": 1,
+    "wrapperStartupCount": 1,
+    "unresolvedStartups": 0,
+    "zeroPasses": [
+      {
+        "observed_at": "2026-10-15T10:58:31.090Z",
+        "owned_remaining": 0
+      },
+      {
+        "observed_at": "2026-10-15T10:58:31.195Z",
+        "owned_remaining": 0
+      }
+    ]
+  },
+  "ownTransport": {
+    "browserTransportClosed": true,
+    "browserProcessTerminated": true
+  },
+  "actualNative": [
+    {
+      "file": "command-cause-21fd7513-0823-47b3-a9c4-10a74c917dbd.json",
+      "mtimeUTC": "2026-10-15T10:58:16.916747+00:00",
+      "record": {
+        "command": "python3",
+        "exception": {
+          "name": "RuntimeError",
+          "code": null,
+          "reason": "REDACTED_MESSAGE",
+          "signal": null,
+          "killed": false,
+          "cause": {
+            "name": "ObserverRefused",
+            "code": null,
+            "reason": "TWO_PASS_COHERENCE_CHANGED",
+            "signal": null,
+            "killed": false,
+            "cause": {
+              "name": "Error",
+              "code": 1,
+              "reason": "REDACTED_MESSAGE",
+              "signal": null,
+              "killed": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "file": "command-cause-5805a118-861a-450a-a467-0424d6d232f6.json",
+      "mtimeUTC": "2026-10-15T10:58:44.553805+00:00",
+      "record": {
+        "command": "bun",
+        "exception": {
+          "name": "Error",
+          "code": 1,
+          "reason": "REDACTED_MESSAGE",
+          "signal": null,
+          "killed": false
+        }
+      }
+    },
+    {
+      "file": "native-response-adeb39ca-1707-446c-a180-0bd36894645b.json",
+      "mtimeUTC": "2026-10-15T10:58:07.132372+00:00",
+      "at": "2026-10-15T10:58:07.132Z",
+      "isError": false,
+      "resultStatuses": [
+        "OWN_LOGIN_FIELDS_SET"
+      ],
+      "responseBytes": 836
+    },
+    {
+      "file": "native-response-ff100763-100a-4d55-b3ca-3f6b37d3016b.json",
+      "mtimeUTC": "2026-10-15T10:57:49.252687+00:00",
+      "at": "2026-10-15T10:57:49.253Z",
+      "isError": false,
+      "resultStatuses": [
+        "OWN_PAGE_NAVIGATED"
+      ],
+      "responseBytes": 668
+    }
+  ],
+  "safeTerminalDelta": [
+    {
+      "file": "command-private-39c87d8a-30cb-4d8b-a7bc-60fbd48a8f91.json",
+      "sha256": "40bc30328d6f424b7290984f618fa683f9f8bb0a3ab7cf31d41dff9ba5202eed",
+      "delta": {
+        "name": "ObserverRefused",
+        "code": null,
+        "gate": "TWO_PASS_COHERENCE_CHANGED",
+        "coherenceDifferences": {
+          "beforeSha256": "0ec03062c43a4d214fab96be0ed8751b3ed18d05bb8e4c6f1b787009b7732794",
+          "afterSha256": "d2bba7ab9145f2283b866bde330c96b0c70f09e25e8986c19b188cbb47908539",
+          "changes": [
+            {
+              "before": null,
+              "after": {
+                "pid": 2315494,
+                "parent": 2,
+                "birth": "112121384",
+                "uid": 0,
+                "fdCount": 0,
+                "fdDigest": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+                "nativeComm": null
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "sameBirthReadOnlyKernelIdentity": {
+    "pid": 2315494,
+    "present": true,
+    "signals": 0,
+    "birth": "112121384",
+    "parent": 2,
+    "uid": 0,
+    "flags": 69238880,
+    "fdCount": 0,
+    "exePresent": false,
+    "kernelThreadDefinitions": [
+      {
+        "file": "/usr/src/linux-headers-7.0.0-38/include/linux/sched.h",
+        "line": "#define PF_KTHREAD\t\t0x00200000\t/* I am a kernel thread */"
+      },
+      {
+        "file": "/usr/src/linux-headers-7.0.0-38-generic/include/linux/sched.h",
+        "line": "#define PF_KTHREAD\t\t0x00200000\t/* I am a kernel thread */"
+      }
+    ]
+  },
+  "diagnosis": "A new empty-FD UID0 parent2 process appeared BETWEEN the two complete passes. SamePID/birth fresh privileged read confirms PF_KTHREAD and no executable/FD. Current signed schema did not capture kernelThread; no old bit invented. Prepare narrowly bounded full-observation restart for actual captured PF_KTHREAD-only churn; final two full signed inventories must still be exactly equal. No unchanged retry/native probe. First UID1000 /proc FD read refused; root readonly capability read diagnosed it; no mutation/signals.",
+  "limitedFresh": {
+    "at": "2026-10-15T10:59:18.197681+00:00",
+    "oldCount": 1728,
+    "newCaptureCount": 368,
+    "presentPids": [],
+    "diagnosticRegistrationPresent": false,
+    "diagnosticOwnerPresent": false,
+    "diagnosticLogoutPresent": false,
+    "dispatcherRecords": 0,
+    "operationPresent": false,
+    "signalsSent": 0
+  },
+  "allPriorObservedPids": 2100,
+  "allSixSpent": "originalRecovery+technical+sandbox+observer+FD+ABI each1/1; no replay/reset/rebind",
+  "notProven": [
+    "loginobserved",
+    "actualDispatcherABI",
+    "servercessation",
+    "officialhistory",
+    "guardCSV",
+    "completion",
+    "RELEASED",
+    "FREE",
+    "BenACCEPT"
+  ],
+  "science": "Ben6/6originalwholeERROR/all6qualityEXCLUDED/no retries/77Luna-high5archives1pending/billedUNKNOWN/Rich4PASS2qualityFAIL/repeats3of10remaining7/admission3/3/wrapper1/1 unchanged/newmodelreferenceproductcold0",
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "OFF"
+}

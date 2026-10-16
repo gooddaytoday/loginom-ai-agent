@@ -1,0 +1,21 @@
+{
+  "scope": "SOURCE_ADMISSION_AND_DELIVERY_ONLY",
+  "case_id": "txt-comma-utf8",
+  "original_harness_sha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+  "original_result": {
+    "verdict": "FAIL",
+    "reason": "source: exact admitted bytes required"
+  },
+  "patched_result": "PASS",
+  "patched_checker_sha256": "0bba83f74349238416cce6cb059ef6b49115373425f4b7291bc31d847d3a9b63",
+  "source_events_sha256": "b3f07cc49bc3a0fe3b9ae114afb18742833c627ebbd37cfd8a3d59b5f2c2828e",
+  "source_archive_sha256": "5a846d7b044ec975fd518d07d49d9b598e5cb48d5463f94c13c279f26c04104b",
+  "manifest_sha256": "327686059e021743663d0ad763e0a1b22a0e2157794f96dd9fa3a4328faa7193",
+  "internal_files_verified": 116,
+  "admitted_name": "8a61685823094e223dbef99f3bb732f57a50debe0392f3871299650c6ab61667-0-comma_utf8.txt",
+  "input_bytes": 200,
+  "input_sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19",
+  "reference_budget": "txt-comma-utf8 1/3; other five 0/3; unchanged",
+  "runtime": "NOT_RUN",
+  "full_warm_cold_reference_acceptance": "NOT_CONFIRMED_BY_THIS_REPLAY"
+}

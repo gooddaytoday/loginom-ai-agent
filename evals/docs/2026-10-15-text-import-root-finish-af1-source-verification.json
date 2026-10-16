@@ -1,0 +1,52 @@
+{
+  "status": "AF1_REPAIR_SOURCE_ONLY_INDEPENDENT_REVIEW_PENDING",
+  "source": "f28ec2b48c4b83edc524b90ef44a4e5c4927e76d",
+  "reviewedRejectedBase": "3943434b86766d4c47f0f75949417d2b5f942b2a",
+  "oldSourceMustNotInstall": true,
+  "delta": "AF1 only: one exact canonical lab57-root-finish/after-history path in existing private-copy audit allowlist, plus one regression test. Every other previously reviewed394343 byte unchanged. No SQL/native/guard/CSV/history/validator/queue policy changes. Rejected394343 not installed/executed.",
+  "sourceEntries": 932,
+  "sourceManifestSha256": "85e5b3f4d6e7ce559aebe52ea04c2fdb42d4e2749622245c6bc819ba820410e3",
+  "executableSha256": "da60454261b9c8b63c0b4d0599a42a480cda01264312a5ed31e14a5884a88476",
+  "changedPaths": [
+    "evals/script/lab57_history_audit_scope.py",
+    "evals/test/lab57-root-finish-history.test.ts"
+  ],
+  "archive": {
+    "zipBytes": 2987147,
+    "zipSha256": "823083a4f3ec9fb2ca058bcdf966baba2174ab3f4d5d219fa570399fd805b3f3",
+    "manifestSha256": "7a975eb7206b702d063a3b56a7ed83d317d4950e58577e449416769760560a6a",
+    "payloads": 965
+  },
+  "checks": {
+    "affected": [
+      "",
+      " 9 pass",
+      " 0 fail",
+      " 36 expect() calls",
+      "Ran 9 tests across 1 file. [275.00ms]",
+      ""
+    ],
+    "typecheck": "PASS170",
+    "captureProcesses": 4,
+    "capture": "continuous/complete/confirmed/errornull/unknown[]/twozero",
+    "builds": "2clean byte-equal",
+    "redErrorsRetained": [
+      "AF1RED1688PASS1FAIL exactnewroot; GREEN1699PASS0FAIL36expects; original/foreign/alias/traversal/copy/wrongsnapshot refuse",
+      "394343 SOURCE_REJECT_AF1/21PASS1FAIL89expects canonical andfull88payloadarchive retained; no live effects"
+    ]
+  },
+  "handoff": {
+    "comment": "01a1402a-0d55-71d3-bad1-069eec6367c8",
+    "parent": "01a14025-f2eb-7ad4-911a-9a3637a84665",
+    "attachment": "01a1402a-0707-73a3-8522-14a5add2f821",
+    "reviewTask": "01a1402a-0d75-7c4a-8647-f9efedfc29cc",
+    "bodyParentOneMentionReadback": true,
+    "cleanupDispatch": false
+  },
+  "allowance": "Same addressedfinish0/1 UNSPENT;control1/1 spent704894a1; all8spent/originalrecovery1/1 preserved, no reset/replay/new scientific calls.",
+  "operator": "Root only; old3943 offline inputs marked MUST_NOT_EXECUTE; new localtemplates requireexactAF1admission beforeeffect",
+  "remaining": "Genuine servercessation/ownlogout/official77history/wholeguard/exactCSV/completion/SETTLED/ordinaryRELEASED/FREE thenBenfinalACCEPT; existingacceptedcomponents reused.",
+  "modelReferenceProductCold": 0,
+  "foreign": "No MAS/evalrun intervention",
+  "automation": "OFF"
+}

@@ -1,0 +1,108 @@
+{
+  "status": "SOURCE_READY_INDEPENDENT_FINAL_REVIEW_RUNNING_NOT_APPLIED",
+  "at": "2026-10-15T06:51:52.359809+00:00",
+  "issueStatus": "in_progress",
+  "revision": 444,
+  "phase": "ben",
+  "source": "377302ddf5344b40e6068995ed9cc5d1b86e7c41",
+  "sourceEntries": 870,
+  "sourceManifestSha256": "7e899d0a581313c0aaf4b46dccce0e838741cb4ac00cfd36f582c445252b301b",
+  "executableSha256": "b7d37c4ee1891b6009f7404707d620bb1a9253df05da7700ae0c585c2a64308e",
+  "delivery": {
+    "zipSha256": "0c27c9698857de8fde2f383ea56c4f4a9c8e2d2093dcfcc743781d9fed16324d",
+    "manifestSha256": "6ce39efc1a973314e5a6eb063c86f7eb9d5406f3b06c150a74990bd40a558064",
+    "payloads": 1145
+  },
+  "ownerDecisionSha256": "8fb42276b6964bbca59546b099b585dd748274583f5881de1fc00d359798ef9b",
+  "independentSourceHistory": [
+    {
+      "comment": "01a13e3a-f715-7bb8-99d2-2c790abd00e3",
+      "zipSha256": "7f02c5f8a5bc7618bcb0d15bb5ef179a7c54d3ee6852fd6086a54bd129de7da1",
+      "manifestSha256": "f1164f2c7a9abd9bb1393540a08c0c0ff93fd33c4bde71406e336c7e4e646f74",
+      "payloads": 56,
+      "CRCPathsTypesHashesVerified": true,
+      "rejection": "final-rejection.json",
+      "finding": "CE2 previous history lost on terminal denied/unknown/ObserverRefused; reproduced3 localRED thenGREEN; original rejection preserved",
+      "initialLocalReaderError": "assumed manifest.json; actual delivery-manifest.json verified, no repeated execution/effects",
+      "liveEffects": 0
+    },
+    {
+      "comment": "01a13e4d-7816-7e55-9894-684231afe30a",
+      "zipSha256": "4ac436e38136e48a7eb3892ad5c79e967fb8208795b0b1b1bf27924ade09c70f",
+      "manifestSha256": "41f644f7455bfb017d22f8c1b6b1f1b89429f9656184e1e78b38fc4e114c7b76",
+      "payloads": 52,
+      "CRCPathsTypesHashesVerified": true,
+      "decision": "SOURCE_HELD3fdb/CAP1; CE2 independently fixed61PASS117assertions",
+      "RootCorrection": "exact failed preconnect process-only function, actual safe144 screening; final native browser gate unchanged",
+      "newSource": "377302ddf5344b40e6068995ed9cc5d1b86e7c41",
+      "newEffects": 0
+    }
+  ],
+  "validation": {
+    "addressed": "final retained-baseline84PASS/0FAIL/135expects/7files; actual saved144 safe projection retained-only/final-native-refused; previous146/53/56/44+independentREJECT retained; unchanged suites not rerun",
+    "typecheck": "PASS package bun typecheck exact bundledNode24.19",
+    "build": "two clean exact Git exports byte-equal",
+    "capture": {
+      "processes": 4,
+      "status": "confirmed",
+      "complete": true,
+      "error": null,
+      "unknown": [],
+      "zeroPasses": [
+        {
+          "observed_at": "2026-10-15T06:41:28.398Z",
+          "owned_remaining": 0
+        },
+        {
+          "observed_at": "2026-10-15T06:41:28.499Z",
+          "owned_remaining": 0
+        }
+      ]
+    },
+    "retainedErrors": "RED tests; marker before initial permit regression corrected; local absent capture output dir before dispatch corrected; shell doc update relative-path error then separate doc commit. No production criteria weakened."
+  },
+  "lastSafeProjection": {
+    "oldRawSha256": "f9bc1c6597664bc0c52a82e93a352375bb6ed53a58f7ec1722971d3494965232",
+    "processes": 144,
+    "UIDs": "1000x144",
+    "browserBindings": 0,
+    "actualNewScreening": "RETAINED_PROCESS_CLEANUP_ONLY",
+    "actualFinalNativeScreening": "REFUSED",
+    "originalBytesChanged": false,
+    "newEffects": 0
+  },
+  "handoff": {
+    "comment": "01a13e4e-e33a-73e3-b6b4-a1369e37e6bb",
+    "parent": "01a13e46-300c-78b1-af3d-4515b15103ad",
+    "oneEvalerMention": true,
+    "bodyMatch": true,
+    "issueScopedAttachment": "01a13e4e-df66-7c56-8bbb-59350951942a",
+    "linkByteMatch": true,
+    "commentAttachmentCount": 0,
+    "sourceTask": "01a13e4e-e352-7120-ad30-7890ba360223",
+    "activeCount": 1
+  },
+  "protocolCorrection": {
+    "attachmentsCannotSteer": "Verified primary comment.go ignores steer_task_ids for comments with attachment_ids. Own queued duplicates cancelled with evidence; no running/foreign worker stopped.",
+    "turnFallback": "Final text-only linked delivery fell back to queued as previous turn ended, and is now sole current review. No parallel cleanup worker.",
+    "sourceReference": "https://github.com/multica-ai/multica/blob/main/server/internal/handler/comment.go"
+  },
+  "accounting": {
+    "originalRecovery": "1/1 ATTEMPTED unchanged",
+    "oldOnce": "e704 immutable and retained",
+    "newSeparateTechnicalContinuationLimit": 1,
+    "newContinuationEffects": 0,
+    "BenProduct": "6/6 spent/originalERROR/all6qualityEXCLUDED/no retry",
+    "Rich": "4PASS2qualityFAIL,refs1/1/2/1/1/3,cold11/10/8",
+    "BenCold": "9/9/8+oldERROR1",
+    "repeats": "3/10remaining7/noreset/precharge",
+    "admission": "3/3",
+    "wrapper": "1/1",
+    "newModelReferenceProductCold": 0
+  },
+  "operatorInputs": "Prepared privately for exact377; NOT_EXECUTED; independent exact admission still required before install/helper/native effects",
+  "currentGates": "No actual server cessation/official pending history archival/legacyguard or CSV cleanup/completion/ordinaryRELEASED/FREE/final Ben ACCEPT yet",
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "OFF_NO_RESTORE",
+  "next": "Exact independent SOURCE admission -> Root own foreground one-shot remaining route -> Ben final independent ACCEPT -> ownerDONE57"
+}

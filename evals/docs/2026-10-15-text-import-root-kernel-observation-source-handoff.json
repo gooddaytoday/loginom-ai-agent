@@ -1,0 +1,22 @@
+{
+  "status": "ROUTED_INDEPENDENT_SOURCE_REVIEW_ONLY",
+  "comment": "01a13f3f-736b-7278-b8ba-aa7544eb890a",
+  "parent": "01a13f30-c1d3-7c23-85fd-d2a6885d75fd",
+  "attachment": "01a13f3f-70ae-7cf5-a7f7-13702be00940",
+  "bodySha256": "beaf930adc2547b8188da1a3ab931dcf477ec21b15a1964cd11bce9a284dc67d",
+  "oneEvalerMention": true,
+  "source": "53d823f3e7538e278a786e8265540c4c65201b96",
+  "zipSha256": "f984e9a2b4d84911c056590de4c4093ac100cda5976d38caf87da3611a21b946",
+  "deliveryManifestSha256": "794bed41a958c3a548a27159fa80b6df430c29dc3167c99c6eb07135a4eee178",
+  "freshReadback": true,
+  "active": [
+    {
+      "id": "01a13f3f-7378-7972-b094-c250748bbd5c",
+      "status": "running"
+    }
+  ],
+  "operator": "Root personally after independent exact admission; Ben final only",
+  "newSourceInstalledOrExecuted": false,
+  "MAS": "FOREIGN_UNTOUCHED",
+  "automation": "OFF"
+}

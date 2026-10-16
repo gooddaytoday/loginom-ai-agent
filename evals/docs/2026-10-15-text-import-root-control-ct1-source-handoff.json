@@ -1,0 +1,25 @@
+{
+  "status": "REPLACEMENT_EXACT_SOURCE_REVIEW_RUNNING_NO_CLEANUP",
+  "source": "ea601e3d9e35adb36ec79b74cafa903df4f3ab6a",
+  "comment": "01a13fdf-23d8-71e7-afdd-d5a12725fb4f",
+  "parent": "01a13fd9-2130-7e5f-bf46-ae25a404ac57",
+  "attachment": "01a13fde-bdf5-7d91-a632-001f1273d3d6",
+  "bodySha256": "061bdb351c051900a25d6e54bcd87537788d2f32d438ca8eefa459cd8d9c6932",
+  "oneEvalerMention": true,
+  "bodyParentAttachmentReadbackVerified": true,
+  "zipSha256": "523ac46760840aaf7affc2725a991b862a825d823a0149555482846356bcb484",
+  "revision": 507,
+  "active": [
+    {
+      "id": "01a13fdf-2406-7aa2-8c95-f7355c114cc1",
+      "status": "running"
+    }
+  ],
+  "rejectedE0Installed": false,
+  "newSourceInstalled": false,
+  "controlAllowance": "0/1 unchanged",
+  "operator": "Root personally",
+  "Ben": "final independent cases/validators/attestation only",
+  "MAS": "FOREIGN_NO_INTERVENTION",
+  "automation": "OFF"
+}
