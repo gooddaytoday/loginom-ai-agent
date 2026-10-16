@@ -1,0 +1,10 @@
+{
+  "case_id": "csv-semicolon-cp1251-decimal",
+  "outcome": "positive",
+  "warm": "PASS",
+  "cold": "PASS",
+  "events_sha256": "61124eb1a780ad2fd3f69ac6d03ea8e4cfcb37c1e94b6d8b737eaf21d8e5fd4f",
+  "reference_sha256": "5750d8d333cbbfb1d5a78bf74ac4a1cc9c0be3d10b35fd368bf12a8662c2f4d2",
+  "cold_report_sha256": "1ad905fd5e4c9d5a35a207b5e6188e2d484ddd52ffca6c2767909a88d7f7e2e4",
+  "admission": "CODE_CHECKS_ONLY; actual model, budgets and stand cleanup require independent operational verification"
+}
