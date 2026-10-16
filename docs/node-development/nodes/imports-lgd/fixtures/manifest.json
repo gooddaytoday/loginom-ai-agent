@@ -1,0 +1,238 @@
+{
+  "status": "qualified_native_fixtures_not_cli_acceptance",
+  "producer": "stock Loginom 7.4.2 native UI",
+  "research_source_sha": "ef84e68a22bd46f3f24549edd829cfb293836703",
+  "date": "2026-10-07",
+  "new_export_handler_used": false,
+  "schema": [
+    {
+      "name": "Id",
+      "label": "Id",
+      "type": "integer",
+      "data_kind": "discrete",
+      "purpose": "Не задано",
+      "used": true
+    },
+    {
+      "name": "Text",
+      "label": "Text",
+      "type": "string",
+      "data_kind": "discrete",
+      "purpose": "Не задано",
+      "used": true
+    },
+    {
+      "name": "Amount",
+      "label": "Amount",
+      "type": "real",
+      "data_kind": "continuous",
+      "purpose": "Не задано",
+      "used": true
+    },
+    {
+      "name": "Occurred",
+      "label": "Occurred",
+      "type": "datetime",
+      "data_kind": "discrete",
+      "purpose": "Не задано",
+      "used": true
+    },
+    {
+      "name": "Active",
+      "label": "Active",
+      "type": "boolean",
+      "data_kind": "discrete",
+      "purpose": "Не задано",
+      "used": true
+    }
+  ],
+  "files": [
+    {
+      "name": "source.lgd",
+      "bytes": 334,
+      "sha256": "f748f8652775e1173a34c91fe83c5ffe2d51f3b4985e2d612dbab5d086d18725",
+      "values_spec": "lgd-values.csv",
+      "written_checksum": "Сжатых данных",
+      "origin": "stock ExportNativeParamsWizard",
+      "compression": "LZ4",
+      "bitness": "64-битная система",
+      "native_result": "all_values_checked"
+    },
+    {
+      "name": "empty.lgd",
+      "bytes": 141,
+      "sha256": "072a1f0694f7518d20c8e0ab5f7ef9bc9817b48bdd6e69df0ab71392c66ef9d5",
+      "values_spec": "empty-values.csv",
+      "written_checksum": "Сжатых данных",
+      "origin": "stock ExportNativeParamsWizard",
+      "compression": "LZ4",
+      "bitness": "64-битная система",
+      "native_result": "all_values_checked"
+    },
+    {
+      "name": "replace.lgd",
+      "bytes": 388,
+      "sha256": "5ad95ec9907b1e7b17c0e50ab90c1e17a7f22649f22694b4cf93d1aa797577e4",
+      "values_spec": "replace-values.csv",
+      "written_checksum": "Сжатых данных",
+      "origin": "stock ExportNativeParamsWizard",
+      "compression": "LZ4",
+      "bitness": "64-битная система",
+      "native_result": "all_values_checked"
+    },
+    {
+      "name": "corrupt.lgd",
+      "bytes": 334,
+      "sha256": "8e250a584ac5e3dde7ae73a3997b243d0c45fa14d759e77682495e5b7dd7c4ac",
+      "values_spec": "lgd-values.csv",
+      "written_checksum": "Сжатых данных",
+      "origin": "source.lgd XOR1 offset333 outside block checksum",
+      "compression": "LZ4",
+      "bitness": "64-битная система",
+      "native_result": "accepted_endmark_mutation_not_checksum_case"
+    },
+    {
+      "name": "corrupt-block.lgd",
+      "bytes": 334,
+      "sha256": "8e89edbc0c84d994d7794ee46e461c0eba95ce0f2ee87cf99467419cef0ef452",
+      "values_spec": "lgd-values.csv",
+      "written_checksum": "Сжатых данных",
+      "origin": "source.lgd XOR1 offset320 inside compressed block",
+      "compression": "LZ4",
+      "bitness": "64-битная система",
+      "native_result": "checksum_error_on_changed_formula_off"
+    },
+    {
+      "name": "no-checksum.lgd",
+      "bytes": 330,
+      "sha256": "d288c8f000589d400199169b7579c8e9abe369f209f5f9833b34a7e43f381daa",
+      "values_spec": "lgd-values.csv",
+      "written_checksum": "Нет",
+      "origin": "stock ExportNativeParamsWizard checksum=Нет",
+      "compression": "LZ4",
+      "bitness": "64-битная система",
+      "native_result": "all_values_checked"
+    },
+    {
+      "name": "properties-stage0.lgd",
+      "bytes": 359,
+      "sha256": "d12e5ed680c0213be32eccf5b1257f002ccf525a420ec2b1f184d3f2595a8d13",
+      "values_spec": "properties-values.csv",
+      "schema": [
+        {
+          "name": "RecordId",
+          "label": "Идентификатор",
+          "type": "integer",
+          "data_kind": "discrete",
+          "purpose": "Не задано",
+          "used": true
+        },
+        {
+          "name": "Text",
+          "label": "Text",
+          "type": "string",
+          "data_kind": "discrete",
+          "purpose": "Не задано",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real",
+          "data_kind": "continuous",
+          "purpose": "Не задано",
+          "used": true
+        },
+        {
+          "name": "Occurred",
+          "label": "Occurred",
+          "type": "datetime",
+          "data_kind": "discrete",
+          "purpose": "Не задано",
+          "used": true
+        }
+      ],
+      "written_checksum": "Сжатых данных",
+      "origin": "stock ExportNativeParamsWizard after native rename/label/exclusion",
+      "compression": "LZ4",
+      "bitness": "64-битная система",
+      "native_result": "source_fields_and_all_values_checked",
+      "research_source_sha": "8d5309c668d0b171ae7a788b65b7c60f72071fb4"
+    }
+  ],
+  "specs": [
+    {
+      "name": "lgd-values.csv",
+      "bytes": 291,
+      "sha256": "1156616e12a8c46c44f0a605418e06b556e10a02a3f251de391126d1964e4594"
+    },
+    {
+      "name": "empty-values.csv",
+      "bytes": 32,
+      "sha256": "b068314d76ceb031a87af651efbb884f8cd342ea65e2cd93f13cda3cbdb18954"
+    },
+    {
+      "name": "replace-values.csv",
+      "bytes": 371,
+      "sha256": "7a4874ed9799cb2060969895a7c4937d7c22c7dc4b6945471c7b642bfdf6d168"
+    },
+    {
+      "name": "properties-values.csv",
+      "bytes": 259,
+      "sha256": "c51862bbf5d5cca91fc117a538aed776c78f2294b3205110a87e9fc0e5cdc338"
+    }
+  ],
+  "checksum_block": {
+    "inclusive_offsets": [
+      27,
+      325
+    ],
+    "checksum_offset": 326,
+    "stored_xxh32": "0x3e65e55a",
+    "changed_xxh32": "0xae7d2a2a",
+    "mutation_offset": 320,
+    "xor": 1,
+    "decoded_size": 424,
+    "decoded_mutation_offset": 418,
+    "checksum_off_formula": "=SUM(A0:A2)"
+  },
+  "limitations": [
+    "No independent BGDATA parser",
+    "Variant creation unsupported in observed field editor; Variant file reading NOT_RUN",
+    "DDF, 32-bit, other compression and variables NOT_RUN",
+    "Native cold read qualified separately; full CLI/model and handler cold oracle NOT_RUN",
+    "Checksum ON refusal proven at preview only; execution refusal NOT_RUN"
+  ],
+  "server": {
+    "edition": "Enterprise",
+    "version": "7.4.2",
+    "source": "native About UI under worker account",
+    "os": "NOT_EXPOSED_IN_OBSERVED_ABOUT_UI"
+  },
+  "property_diagnostic": {
+    "input": "source.lgd",
+    "output": "properties-stage0.lgd",
+    "renamed": {
+      "from": "Id",
+      "name": "RecordId",
+      "label": "Идентификатор"
+    },
+    "excluded": {
+      "name": "Active",
+      "used": false,
+      "meaning": "native output mapping exclusion; absent from exported source schema"
+    },
+    "variant": {
+      "status": "UNSUPPORTED_IN_OBSERVED_UI",
+      "reason": "EditColumnDefForm type_label disabled for selected integer field",
+      "variant_file_read": "NOT_RUN"
+    }
+  },
+  "inventory": {
+    "DDF": "NOT_RUN",
+    "32-bit": "NOT_RUN",
+    "other compression": "NOT_RUN",
+    "Variant file/subtypes": "NOT_RUN",
+    "variables": "NOT_RUN"
+  }
+}
