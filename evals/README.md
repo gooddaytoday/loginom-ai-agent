@@ -1,5 +1,7 @@
 # Eval harness Loginom AI Agent
 
+LAB-58–LAB-63: [общая база и обычный запуск/очистка](docs/2026-10-16-text-import-integration.md). Исторические incident-only инструкции LAB-57 не являются prerequisites новой карточки.
+
 Собирает сопоставимые результаты построения сценариев Loginom: прогоняет задачи через standalone CLI, забирает `.lgp`, сверяет экспорт с oracle и оценивает граф судьёй `codex exec`. `compare` вычисляет отдельные вердикты «хуже / лучше / неразличимо» по completion, oracle и структуре, с отдельным признаком «не хуже», надёжностью pass^1/pass^k и наблюдаемым правилом 3/3 → 0/3. Дизайн: `docs/superpowers/specs/2026-09-18-evals-design.md`.
 
 ## Предпосылки

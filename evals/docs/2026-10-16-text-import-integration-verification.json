@@ -1,0 +1,616 @@
+{
+  "checkedAt": "2026-10-16T06:34:49.485233+00:00",
+  "base": "e796cc39daa2aa5a90641b664c27401c2ad4f2e1",
+  "verifiedDevelopmentAndInstalledHelperSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+  "finalBranch": "text-import-evals; subsequent commit contains documentation/receipts only",
+  "initialCards": [
+    {
+      "identifier": "LAB-56",
+      "status": "done",
+      "revision": 72,
+      "activeQueued": []
+    },
+    {
+      "identifier": "LAB-57",
+      "status": "done",
+      "revision": 569,
+      "activeQueued": []
+    },
+    {
+      "identifier": "LAB-58",
+      "status": "backlog",
+      "revision": 10,
+      "activeQueued": []
+    },
+    {
+      "identifier": "LAB-59",
+      "status": "backlog",
+      "revision": 10,
+      "activeQueued": []
+    },
+    {
+      "identifier": "LAB-60",
+      "status": "backlog",
+      "revision": 10,
+      "activeQueued": []
+    },
+    {
+      "identifier": "LAB-61",
+      "status": "backlog",
+      "revision": 10,
+      "activeQueued": []
+    },
+    {
+      "identifier": "LAB-62",
+      "status": "backlog",
+      "revision": 10,
+      "activeQueued": []
+    },
+    {
+      "identifier": "LAB-63",
+      "status": "backlog",
+      "revision": 10,
+      "activeQueued": []
+    }
+  ],
+  "sourcePreservation": {
+    "pilotSha": "eb1c2b0da02210a9d95569849ae056fa4784440c",
+    "exactPilotFiles": 72,
+    "cases": 6,
+    "historicalDocsFrom": "78b2fbe57ebb2b6fbd4b3ee5385d2dadb736ba91",
+    "bytePreservedDocs": 195,
+    "newReferencesGenerated": 0
+  },
+  "validation": {
+    "evalsFull": {
+      "pass": 628,
+      "skip": "live cold reader regression admission/resources absent; new cold run forbidden",
+      "fail": 0,
+      "assertions": 3274,
+      "seconds": 691.31,
+      "scope": "runtime source440473c35a; final b82707aa80 differs only removal of identical duplicate admission test, followed by2 targeted passes and package typecheck"
+    },
+    "finalDedupTargeted": {
+      "pass": 2,
+      "fail": 0
+    },
+    "evalsTypecheck": "PASS",
+    "agentRegression": {
+      "pass": 47,
+      "fail": 0
+    },
+    "hostStartupRegression": {
+      "pass": 3,
+      "fail": 0
+    },
+    "agentTypecheck": "PASS",
+    "hostTypecheck": "PASS",
+    "prePushHook": "32 typecheck tasks successful;30 cached",
+    "portableCliTupleLimitation": "actual5cd/d73 installation paths absent locally; conditional test makes no installed-bytes claim; actual d6 CLI bytes separately read on eval-tests"
+  },
+  "independentGuardDelta": {
+    "verdict": "ACCEPT",
+    "targetedPass": 109,
+    "skip": 5,
+    "fail": 0,
+    "skipReason": "Docker-dependent checks intentionally excluded from independent review; full local suite separately ran them",
+    "profileGuardCases": 12,
+    "schemaCases": 4,
+    "sources": [
+      {
+        "file": "evals/src/node-eval-ops.ts",
+        "sha256": "46c952808371f82a069e7bfd68e117a176727330eabeab4298968c9ad1605afd"
+      },
+      {
+        "file": "evals/src/management-evidence.ts",
+        "sha256": "0354b180bea55ff22e7adc4d21583a1d7e9f34486451467745b508f7bce44bad"
+      },
+      {
+        "file": "evals/src/profile.ts",
+        "sha256": "07d6698117dfd890c0f17a435cca272c1c2515807594816e0d8d5972f1998759"
+      },
+      {
+        "file": "evals/src/cli.ts",
+        "sha256": "bafc20319c902545c94856b3b1a6070eb2bb6f31c67f1c9fdf076407429c9f44"
+      }
+    ],
+    "reviewedCleanOpsSha256": "46c952808371f82a069e7bfd68e117a176727330eabeab4298968c9ad1605afd",
+    "installedSmokeScriptReviewedSha256": "99a04122df1296a8955f062e3f5b0be70d176fc90d3a1735d11aab5a055e8087"
+  },
+  "offlineReplay": {
+    "mode": "offline namespace binds of byte-verified original-native-journals at receipt paths; no actual server path claim",
+    "selectedManifestVerifiedFiles": 328,
+    "referencePass": 6,
+    "savedColdEvidencePass": 6,
+    "richProduct": {
+      "pass": 4,
+      "qualityFail": 2,
+      "errors": 0,
+      "code": 1
+    },
+    "originalHistoricalBen": "6 product attempts consumed; original whole ERROR/code2; all6 EXCLUDED from quality; not rerun",
+    "noHistoricalRecalculationForNewSha": true
+  },
+  "installed": {
+    "sourceSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+    "artifact": "/home/user/.local/share/loginom-evals-runtime/support/text-import-b82707aa8091c73322371c6278e92a98886d21ca",
+    "manifestSha256": "7d39c03bbb434ad81eeaeacdde7a1168fc9970974a5828c64e44101da5032948",
+    "verifiedSourceFiles": 1583,
+    "config": "/home/user/.local/share/loginom-evals-runtime/operations/text-import-b82707aa8091c73322371c6278e92a98886d21ca.json",
+    "configSha256": "c6e75d06d894540e6aad1e250e72302bdc3168a394ffcf4a40abcb43d2ed9593",
+    "previousConfigUnchanged": "194bd03649c7fb393959bebe9af60340c8e3ab76425146e32b05fcb1eccc12a2",
+    "worktrees": {
+      "rich": "/home/user/.local/share/loginom-evals-runtime/checkouts/text-import-rich-b82707aa8091c73322371c6278e92a98886d21ca/loginom-ai-agent",
+      "ben": "/home/user/.local/share/loginom-evals-runtime/checkouts/text-import-ben-b82707aa8091c73322371c6278e92a98886d21ca/loginom-ai-agent",
+      "evaler": "/home/user/.local/share/loginom-evals-runtime/checkouts/text-import-evaler-b82707aa8091c73322371c6278e92a98886d21ca/loginom-ai-agent"
+    },
+    "cliSourceSha": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+    "newModelReferenceProductColdRuns": 0
+  },
+  "installedSmoke": {
+    "receipt": "evals/docs/2026-10-16-text-import-installed-smoke-receipt.json",
+    "receiptSha256": "a3a354d009094fb3ea8189ec0e2369fdea17ba818e36fce4d949097c796f31f1",
+    "scope": "targeted non-model smoke with continuous supervisor proofs, not full runNodeUnitChecks",
+    "targetedTests": 46,
+    "typecheckExit": 0,
+    "sourceSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+    "readiness": "READY",
+    "release": {
+      "status": "RELEASED",
+      "owner": {
+        "issue": "text-import-integration",
+        "task": "readiness-20261016-b82707aa80",
+        "role": "rich",
+        "phase": "unit",
+        "sha": "b82707aa8091c73322371c6278e92a98886d21ca"
+      },
+      "acquiredAt": "2026-10-16T06:27:31.316Z",
+      "releasedAt": "2026-10-16T06:28:08.366Z",
+      "kind": "unit",
+      "evidenceSha256": "01705da1714f6077857889d13d3c2316fafc45d0efc7de90539729b02d2ba203",
+      "containerId": "b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e",
+      "archive": "/home/user/.local/share/loginom-evals-runtime/operations/completed/448bdca2-4641-4136-a917-80acc6c33374"
+    },
+    "finalStand": "FREE",
+    "rootAbsent": true,
+    "sixProfilesClean": true,
+    "managementReceipts": [
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/448bdca2-4641-4136-a917-80acc6c33374/capture-native-check-4eee5a71-5fb8-4ff1-b9e0-0edb2464dcd2/management-result.json",
+        "sha256": "aab6d01a457c66b533a9342c877708fbb3390d9f6b8c2c869083631484adb91a",
+        "arguments": [
+          "loginom",
+          "check",
+          "--format",
+          "json",
+          "--headless"
+        ],
+        "exitCode": 0,
+        "binding": {
+          "owner": {
+            "issue": "text-import-integration",
+            "task": "readiness-20261016-b82707aa80",
+            "role": "rich",
+            "phase": "unit",
+            "sha": "b82707aa8091c73322371c6278e92a98886d21ca"
+          },
+          "acquiredAt": "2026-10-16T06:27:31.316Z",
+          "configSha256": "1d15f46a9641ab1df75bf4d77b73008d9a633c26f053a01b6896eb39b082a15b",
+          "containerId": "b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e"
+        }
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/448bdca2-4641-4136-a917-80acc6c33374/preflight-attempt-03aGE6/preflight/1792132055190-c97ef47f-3981-4c9c-90ef-d07aede747ef/management-result.json",
+        "sha256": "8900ec12fbc63a89181c2b9881f050391240ee911e70fc000879f7506eaa0a7c",
+        "arguments": [
+          "loginom",
+          "status",
+          "--format",
+          "json",
+          "--headless"
+        ],
+        "exitCode": 0,
+        "binding": {
+          "owner": {
+            "issue": "text-import-integration",
+            "task": "readiness-20261016-b82707aa80",
+            "role": "rich",
+            "phase": "unit",
+            "sha": "b82707aa8091c73322371c6278e92a98886d21ca"
+          },
+          "acquiredAt": "2026-10-16T06:27:31.316Z",
+          "configSha256": "1d15f46a9641ab1df75bf4d77b73008d9a633c26f053a01b6896eb39b082a15b",
+          "containerId": "b030b7bc86873b473f5d77d90132b82d3a4d15e993074929939c099748e3918e"
+        }
+      }
+    ],
+    "processProofs": [
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/448bdca2-4641-4136-a917-80acc6c33374/capture-unit-test-ba0f5a22-187a-4967-859c-02e9563b667f",
+        "processProofSha256": "6cc11a30028fc8ed5ee90e173ceeb7b41fdcaf8d715da45454c2ab1b378b3ef1",
+        "status": "confirmed",
+        "error": null,
+        "captureComplete": true,
+        "verification": [
+          {
+            "observed_at": "2026-10-16T06:28:03.445Z",
+            "owned_remaining": 0
+          },
+          {
+            "observed_at": "2026-10-16T06:28:03.547Z",
+            "owned_remaining": 0
+          }
+        ]
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/448bdca2-4641-4136-a917-80acc6c33374/capture-unit-typecheck-9ce239e2-86b7-47e5-89a9-902ac4048e59",
+        "processProofSha256": "f63f3de3a1e36926378453f612e38ef110d957da0f09d4c12404ba3f4621406f",
+        "status": "confirmed",
+        "error": null,
+        "captureComplete": true,
+        "verification": [
+          {
+            "observed_at": "2026-10-16T06:28:06.237Z",
+            "owned_remaining": 0
+          },
+          {
+            "observed_at": "2026-10-16T06:28:06.340Z",
+            "owned_remaining": 0
+          }
+        ]
+      }
+    ],
+    "historyPathRemapping": "preflight receipt paths under stand.lease move unchanged to release.archive; use same relative path there after RELEASED"
+  },
+  "os": {
+    "files": [
+      {
+        "path": "/etc/apparmor.d/loginom-lab57-startup-chromium",
+        "sha256": "f83e9f1b98972892f1d675267845341a6c6ec4f4528e41cddf1c1ffe78cf217c"
+      },
+      {
+        "path": "/etc/systemd/system/loginom-evals-routes.service",
+        "sha256": "2dbbd4360d9ea4612cd7c7ea94096f916476467ba6239231a57290cf0c494835"
+      },
+      {
+        "path": "/etc/vpn-egress-lockdown/rules.nft",
+        "sha256": "83691f6cfbbf90cb1fe1d496e307ea5f8be4a077aaa8c90271974e84c9beb470"
+      }
+    ],
+    "targetLoadedProfile": [
+      "loginom-lab57-startup-chromium (unconfined)"
+    ],
+    "actions": "READ_ONLY; no policy/network reload or changes"
+  },
+  "assignments": {
+    "marker": "TEXT-IMPORT-COMMON-BASE-20261016-b82707aa80",
+    "handoffIssue": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+    "mode": "one administrative Evaler handoff in LAB58 description + linked no-start instructions; no comment mention/run/wakeup",
+    "updated": [
+      {
+        "identifier": "LAB-58",
+        "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+        "oldRevision": 10,
+        "revision": 12,
+        "status": "backlog",
+        "activeQueued": [],
+        "descriptionSha256": "c07bc2d98717eeaf239c7004c7d8ed5d8e6243a56e320dfe18da6fade9d25e80",
+        "metadataSha256": "439430267aa757dd95d12bcc17c9ac5646793bc1147b65c07779cd195fc221c2",
+        "verifiedStartSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+        "readback": "EXACT",
+        "noStart": true
+      },
+      {
+        "identifier": "LAB-59",
+        "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+        "oldRevision": 10,
+        "revision": 12,
+        "status": "backlog",
+        "activeQueued": [],
+        "descriptionSha256": "93bec422063e63af51a92d0ce3284a2f4ea9a21a7ad2e4bfcc93b8c62f555027",
+        "metadataSha256": "2918ff1772a30ab303aa828ef66991e0ec7a5527419d9a958017f23e398cd227",
+        "verifiedStartSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+        "readback": "EXACT",
+        "noStart": true
+      },
+      {
+        "identifier": "LAB-60",
+        "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+        "oldRevision": 10,
+        "revision": 12,
+        "status": "backlog",
+        "activeQueued": [],
+        "descriptionSha256": "72bb84b1e3be3c35217c88d52bfc9ac801353050d4cc81f3760c6a340d845fe4",
+        "metadataSha256": "924de67a5da6b5f6164b66bdc9cb19900352aa5457f16a408cb2633e55257bff",
+        "verifiedStartSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+        "readback": "EXACT",
+        "noStart": true
+      },
+      {
+        "identifier": "LAB-61",
+        "id": "01a1214b-4adc-75df-97df-2917732a449a",
+        "oldRevision": 10,
+        "revision": 12,
+        "status": "backlog",
+        "activeQueued": [],
+        "descriptionSha256": "363f58e9dad63904881feb37bebd8b5b8c21dcd0aa0501167beca153b30e29af",
+        "metadataSha256": "90caff1b0ab6935d747c53a1495e2ccd4d81961c928fae660236e5b2cd9622af",
+        "verifiedStartSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+        "readback": "EXACT",
+        "noStart": true
+      },
+      {
+        "identifier": "LAB-62",
+        "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+        "oldRevision": 10,
+        "revision": 12,
+        "status": "backlog",
+        "activeQueued": [],
+        "descriptionSha256": "e7f668e1cc87fd6a30e7af8f8b76a4fee52ddc01d14f7f57e2f2e5cf23a180ed",
+        "metadataSha256": "00e34a4942177f616e033f2f825eb62b1280c919d02d9fa1b9c9ab577bab99dd",
+        "verifiedStartSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+        "readback": "EXACT",
+        "noStart": true
+      },
+      {
+        "identifier": "LAB-63",
+        "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+        "oldRevision": 10,
+        "revision": 12,
+        "status": "backlog",
+        "activeQueued": [],
+        "descriptionSha256": "7d1c6a77ad89413db9e31bbcf634691aa040609bdff985f47651ff3cc1d842dd",
+        "metadataSha256": "4b4951ec227e029cc9371a8eafb1d92a62704c327229127a690feb5b9fd02fb2",
+        "verifiedStartSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+        "readback": "EXACT",
+        "noStart": true
+      }
+    ]
+  },
+  "scope": {
+    "newModelReferenceProductColdRuns": 0,
+    "newRichBenEvalerTasks": 0,
+    "Lab56Lab57Reopened": false,
+    "Lab57CleanupRepeated": false,
+    "foreignMasEvalrunActions": false,
+    "automationRestored": false,
+    "devMainMergeOrProductRelease": false
+  },
+  "finalMulticaReadback": {
+    "at": "2026-10-16T06:34:56.312268+00:00",
+    "cards": [
+      {
+        "identifier": "LAB-56",
+        "id": "01a1214a-22b2-7274-bf31-e1dddca9e85f",
+        "status": "done",
+        "revision": 72,
+        "activeQueued": [],
+        "ownerCompletion": "done",
+        "baseSha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+        "frozenSha": "59ab36329c13f1399dab4313e94f3e9c6954301b"
+      },
+      {
+        "identifier": "LAB-57",
+        "id": "01a1214a-fcf8-7e0c-8c1c-f5dd600180b3",
+        "status": "done",
+        "revision": 569,
+        "activeQueued": [],
+        "ownerCompletion": "done",
+        "baseSha": "59ab36329c13f1399dab4313e94f3e9c6954301b",
+        "frozenSha": "eb1c2b0da02210a9d95569849ae056fa4784440c"
+      },
+      {
+        "identifier": "LAB-58",
+        "id": "01a1214b-0f31-722e-8e69-7f1e212ddb54",
+        "status": "backlog",
+        "revision": 12,
+        "activeQueued": [],
+        "ownerCompletion": null,
+        "baseSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+        "frozenSha": null
+      },
+      {
+        "identifier": "LAB-59",
+        "id": "01a1214b-2251-7f39-8dce-7ee254edf773",
+        "status": "backlog",
+        "revision": 12,
+        "activeQueued": [],
+        "ownerCompletion": null,
+        "baseSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+        "frozenSha": null
+      },
+      {
+        "identifier": "LAB-60",
+        "id": "01a1214b-38c2-753b-9da5-c6575e143343",
+        "status": "backlog",
+        "revision": 12,
+        "activeQueued": [],
+        "ownerCompletion": null,
+        "baseSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+        "frozenSha": null
+      },
+      {
+        "identifier": "LAB-61",
+        "id": "01a1214b-4adc-75df-97df-2917732a449a",
+        "status": "backlog",
+        "revision": 12,
+        "activeQueued": [],
+        "ownerCompletion": null,
+        "baseSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+        "frozenSha": null
+      },
+      {
+        "identifier": "LAB-62",
+        "id": "01a1214b-62a8-7a84-9d75-ab1e85b7c2c8",
+        "status": "backlog",
+        "revision": 12,
+        "activeQueued": [],
+        "ownerCompletion": null,
+        "baseSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+        "frozenSha": null
+      },
+      {
+        "identifier": "LAB-63",
+        "id": "01a1214b-7482-7b30-913d-1606fa8420e4",
+        "status": "backlog",
+        "revision": 12,
+        "activeQueued": [],
+        "ownerCompletion": null,
+        "baseSha": "b82707aa8091c73322371c6278e92a98886d21ca",
+        "frozenSha": null
+      }
+    ],
+    "futureCardRunHistory": {
+      "LAB-58": [
+        {
+          "id": "01a12778-0e50-7e08-a4fe-a0dc221065bb",
+          "status": "completed",
+          "created_at": "2026-10-10T23:19:01+03:00",
+          "started_at": "2026-10-10T23:58:06+03:00"
+        },
+        {
+          "id": "01a12774-a216-76f1-b555-16459288d315",
+          "status": "cancelled",
+          "created_at": "2026-10-10T23:15:17+03:00",
+          "started_at": null
+        },
+        {
+          "id": "01a1275f-c486-7b37-a9b2-a434df3f3240",
+          "status": "completed",
+          "created_at": "2026-10-10T22:52:30+03:00",
+          "started_at": "2026-10-10T23:01:34+03:00"
+        },
+        {
+          "id": "01a1274d-5232-74ad-a810-3f02001181be",
+          "status": "completed",
+          "created_at": "2026-10-10T22:32:21+03:00",
+          "started_at": "2026-10-10T22:35:19+03:00"
+        }
+      ],
+      "LAB-59": [
+        {
+          "id": "01a12778-9951-7544-9a35-a9f394f4aa55",
+          "status": "completed",
+          "created_at": "2026-10-10T23:19:37+03:00",
+          "started_at": "2026-10-11T00:00:04+03:00"
+        },
+        {
+          "id": "01a12774-7442-7f0a-a1b3-3e52ecf17ff5",
+          "status": "cancelled",
+          "created_at": "2026-10-10T23:15:05+03:00",
+          "started_at": null
+        },
+        {
+          "id": "01a1275f-c943-7934-a8e9-ae72ebbe043a",
+          "status": "completed",
+          "created_at": "2026-10-10T22:52:31+03:00",
+          "started_at": "2026-10-10T23:03:45+03:00"
+        },
+        {
+          "id": "01a1274d-4bb5-76ec-8674-f1bd8211df4c",
+          "status": "completed",
+          "created_at": "2026-10-10T22:32:19+03:00",
+          "started_at": "2026-10-10T22:32:20+03:00"
+        }
+      ],
+      "LAB-60": [
+        {
+          "id": "01a12778-da57-704b-b1b9-67b0e5054ebf",
+          "status": "completed",
+          "created_at": "2026-10-10T23:19:54+03:00",
+          "started_at": "2026-10-11T00:00:54+03:00"
+        },
+        {
+          "id": "01a12774-4e45-7bc3-bcd2-c45d4b5394b9",
+          "status": "cancelled",
+          "created_at": "2026-10-10T23:14:56+03:00",
+          "started_at": null
+        },
+        {
+          "id": "01a1275f-cea9-7927-812c-a717167e5acf",
+          "status": "completed",
+          "created_at": "2026-10-10T22:52:32+03:00",
+          "started_at": "2026-10-10T23:06:47+03:00"
+        },
+        {
+          "id": "01a126fc-dc55-754d-87d0-014d1aa82fd8",
+          "status": "completed",
+          "created_at": "2026-10-10T21:04:28+03:00",
+          "started_at": "2026-10-10T21:09:05+03:00"
+        }
+      ],
+      "LAB-61": [
+        {
+          "id": "01a12779-0d64-7ca4-bf58-6e4ac1cde3ac",
+          "status": "completed",
+          "created_at": "2026-10-10T23:20:07+03:00",
+          "started_at": "2026-10-11T00:01:47+03:00"
+        },
+        {
+          "id": "01a12773-929d-7999-adaa-7f6c2515c6e1",
+          "status": "cancelled",
+          "created_at": "2026-10-10T23:14:08+03:00",
+          "started_at": null
+        },
+        {
+          "id": "01a1275f-d323-74ac-8a80-c40a287c575f",
+          "status": "completed",
+          "created_at": "2026-10-10T22:52:33+03:00",
+          "started_at": "2026-10-10T23:08:58+03:00"
+        },
+        {
+          "id": "01a126fa-fe1c-78a5-bfdf-dacde5473cf8",
+          "status": "completed",
+          "created_at": "2026-10-10T21:02:25+03:00",
+          "started_at": "2026-10-10T21:04:27+03:00"
+        }
+      ],
+      "LAB-62": [
+        {
+          "id": "01a12779-3ca8-7f05-85b3-1d52ebd35dd5",
+          "status": "completed",
+          "created_at": "2026-10-10T23:20:19+03:00",
+          "started_at": "2026-10-11T00:02:47+03:00"
+        },
+        {
+          "id": "01a12773-fce1-7b24-8877-9481b76c17e8",
+          "status": "cancelled",
+          "created_at": "2026-10-10T23:14:35+03:00",
+          "started_at": null
+        },
+        {
+          "id": "01a1275f-d7d6-7eec-9712-27518acaf623",
+          "status": "completed",
+          "created_at": "2026-10-10T22:52:35+03:00",
+          "started_at": "2026-10-10T23:10:43+03:00"
+        },
+        {
+          "id": "01a126fa-7625-7744-beb7-e0f2322bb74a",
+          "status": "completed",
+          "created_at": "2026-10-10T21:01:50+03:00",
+          "started_at": "2026-10-10T21:02:25+03:00"
+        }
+      ],
+      "LAB-63": [
+        {
+          "id": "01a12779-7f7b-7499-b60c-9f3939751159",
+          "status": "completed",
+          "created_at": "2026-10-10T23:20:36+03:00",
+          "started_at": "2026-10-11T00:03:53+03:00"
+        },
+        {
+          "id": "01a1275f-ddca-7130-9e58-da4725ac6489",
+          "status": "completed",
+          "created_at": "2026-10-10T22:52:36+03:00",
+          "started_at": "2026-10-10T23:13:03+03:00"
+        },
+        {
+          "id": "01a126f9-dc10-7b3a-8e6e-542a3c60ac91",
+          "status": "completed",
+          "created_at": "2026-10-10T21:01:11+03:00",
+          "started_at": "2026-10-10T21:01:12+03:00"
+        }
+      ]
+    }
+  }
+}
