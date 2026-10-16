@@ -80,14 +80,42 @@ test('model coordinates account for zoom, translation, scroll and grid before sc
  }
  assert.throws(()=>nodePlacementPoint({...view(),scale:0},{x:1,y:2}),/transform/);
 });
-function fixture({visible=false,stuck=false,changed=false,ambiguous=false,wrongTip=false,delayed=false}={}){
- let v=view(),open=visible,clicks=0,guards=0;
- const toggle={count:async()=>1,isVisible:async()=>true,click:async()=>{open=!open;}};
+function fixture({visible=false,stuck=false,changed=false,ambiguous=false,wrongTip=false,delayed=false,overflow=false,foreignMenu=false,existingMenu=false,duplicateItem=false,menuStuck=false}={}){
+ let v=view(),open=visible,clicks=0,guards=0,menuOpen=false,overflowClicks=0;
+ const toggle={count:async()=>1,isVisible:async()=>!overflow,getAttribute:async()=> 'Показать карту сценария',click:async()=>{open=!open;}};
+ const overflowButton={count:async()=>1,isVisible:async()=>true,isEnabled:async()=>true,click:async()=>{overflowClicks++;menuOpen=true;}};
+ const item={count:async()=>duplicateItem?2:1,isVisible:async()=>menuOpen,isEnabled:async()=>true,click:async()=>{open=!open;menuOpen=false;}};
+ const menu={count:async()=>foreignMenu?0:1,isVisible:async()=>menuOpen&&!foreignMenu,
+  waitFor:async({state})=>{assert.equal(menuOpen&&!foreignMenu,state==='visible');},
+  locator:s=>{assert.equal(s,'[data-tid]');return {filter:({hasText})=>{assert.equal(hasText.source,'^Показать карту сценария$');return item;}};},
+  press:async key=>{assert.equal(key,'Escape');if(!menuStuck)menuOpen=false;}};
  let ready=!delayed;
  const zoom={count:async()=>ambiguous?2:1,isVisible:async()=>open&&ready,getAttribute:async()=>wrongTip?'Увеличить масштаб':'Уменьшить масштаб',click:async()=>{assert.ok(ready);clicks++;if(!stuck)v.scale/=1.1;},waitFor:async({state})=>{ready=true;assert.equal(open,state==='visible');}};
  const owner={count:async()=>1,isVisible:async()=>true,locator:s=>{assert.equal(s,'.bg-workflow-outline-toolbar [data-tid$=";tlb;b"]');return zoom;}};
- return {args:{page:{locator:s=>{if(s.includes('btnShowOutline'))return toggle;assert.equal(s,'[data-tid="MF;TF;ModelForm;cntDiagram"]');return owner;},waitForTimeout:async()=>{}},root:{evaluate:async()=>structuredClone(v)},position:{x:1300,y:100},prefix:'MF;TF',guard:async()=>{guards++;if(changed&&clicks)throw Error('Graph changed');},remaining:()=>10000,readViewport:()=>{},project:nodePlacementPoint},state:()=>({v,open,clicks,guards})};
+ return {args:{page:{locator:s=>{if(s.includes('btnShowOutline'))return toggle;if(s==='.x-menu:visible')return {count:async()=>existingMenu||menuOpen?1:0};if(s==='[data-tid="MF;TF;ModelForm;tlbModel;b"]')return overflowButton;if(s==='[data-tid="MF;TF;ModelForm;tlbModel;b;mn"]')return menu;assert.equal(s,'[data-tid="MF;TF;ModelForm;cntDiagram"]');return owner;},waitForTimeout:async()=>{}},root:{evaluate:async()=>structuredClone(v)},position:{x:1300,y:100},prefix:'MF;TF',guard:async()=>{guards++;if(changed&&clicks)throw Error('Graph changed');},remaining:()=>10000,readViewport:()=>{},project:nodePlacementPoint},state:()=>({v,open,clicks,guards,menuOpen,overflowClicks})};
 }
+test('hidden outline toggle uses its owned toolbar overflow and closes both UI surfaces',async()=>{
+ const f=fixture({overflow:true}),r=await revealNodePlacement(f.args);
+ assert.equal(r.fully_visible,true);assert.equal(f.state().overflowClicks,2);
+ assert.equal(f.state().open,false);assert.equal(f.state().menuOpen,false);
+});
+test('another workflow menu or duplicate outline items cannot authorize a click',async()=>{
+ for(const options of [{foreignMenu:true},{duplicateItem:true}]){
+  const f=fixture({overflow:true,...options});await assert.rejects(revealNodePlacement(f.args));
+  assert.equal(f.state().clicks,0);assert.equal(f.state().open,false);
+  if(options.duplicateItem)assert.equal(f.state().menuOpen,false);
+ }
+});
+test('unconfirmed overflow dismissal does not claim placement cleanup',async()=>{
+ const f=fixture({overflow:true,duplicateItem:true,menuStuck:true});
+ await assert.rejects(revealNodePlacement(f.args),e=>e.placement_navigation_unverified===true);
+ assert.equal(f.state().clicks,0);
+});
+test('an already visible menu is preserved without opening the toolbar overflow',async()=>{
+ const f=fixture({overflow:true,existingMenu:true});
+ await assert.rejects(revealNodePlacement(f.args),/overflow unavailable/);
+ assert.equal(f.state().overflowClicks,0);assert.equal(f.state().clicks,0);
+});
 test('outline is awaited after opening; another workflow cannot provide the control',async()=>{
  const f=fixture({delayed:true});assert.equal((await revealNodePlacement(f.args)).fully_visible,true);assert.equal(f.state().open,false);
 });
