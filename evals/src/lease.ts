@@ -29,6 +29,20 @@ export function acquireResourceLease(input: ResourceRequest, admit?: (previous: 
   return acquireResource(input, undefined, admit)
 }
 
+export async function reopenResourceLease(input: { key: string; lockRoot: string }, expected: Reservation) {
+  const guard = await resourceGuard(input.key, input.lockRoot)
+  try {
+    const receipt = path.join(input.lockRoot, `${new Bun.CryptoHasher("sha256").update(input.key).digest("hex")}.reservation.json`)
+    const current = await readReservation(receipt, input.key)
+    if (!current || current.state !== "retained" || JSON.stringify(current) !== JSON.stringify(expected))
+      throw new EvalFailure("LEASE_CAS_STALE", 2)
+    await readLeaseReceipt(current.journal)
+    await requireOwnerExited(current)
+    await guard.checkGuard()
+    return resourceLease(current, receipt, guard)
+  } catch (error) { await guard.close(); throw error }
+}
+
 export async function acquireResourceSet(inputs: ResourceRequest[], admit?: (previous: Reservation | undefined, input: ResourceRequest) => Promise<void>) {
   if (!inputs.length || new Set(inputs.map(input => input.key)).size !== inputs.length || inputs.some(input => input.lockRoot !== inputs[0]!.lockRoot))
     throw new EvalFailure("LEASE_KEYS_INVALID", 2)
@@ -106,13 +120,7 @@ async function acquireResource(input: ResourceRequest, expected?: { token: strin
         throw new EvalFailure("LEASE_LINEAGE_INVALID", 2)
       await Promise.all(previous.lineage.map(item => readLeaseReceipt(item.journal))).catch(() => { throw new EvalFailure("LEASE_JOURNAL", 2) })
       await readLeaseReceipt(previous.journal).catch(() => { throw new EvalFailure("LEASE_JOURNAL", 2) })
-      const bootId = (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim()
-      if (previous.owner.uid !== process.getuid?.()) throw new EvalFailure("LEASE_OWNER_UNVERIFIED", 2)
-      const owner = previous.owner.bootId === bootId ? await readFile(`/proc/${previous.owner.pid}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
-        if (error.code === "ENOENT") return undefined
-        throw new EvalFailure("LEASE_OWNER_UNVERIFIED", 2)
-      }) : undefined
-      if (owner && owner.slice(owner.lastIndexOf(")") + 2).split(" ")[19] === previous.owner.starttime) throw new EvalFailure("BUSY", 2)
+      await requireOwnerExited(previous)
       if (previous.state === "released") await admitReleased!(previous)
     }
     const raw = await readFile(`/proc/${process.pid}/stat`, "utf8")
@@ -127,15 +135,30 @@ async function acquireResource(input: ResourceRequest, expected?: { token: strin
     }
     await guard.checkGuard()
     await writeLeaseReceipt(receipt, reservation)
+    return resourceLease(reservation, receipt, guard)
+  } catch (error) { await guard.close(); throw error }
+}
+
+async function requireOwnerExited(reservation: Reservation) {
+  const bootId = (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim()
+  if (reservation.owner.uid !== process.getuid?.()) throw new EvalFailure("LEASE_OWNER_UNVERIFIED", 2)
+  const owner = reservation.owner.bootId === bootId ? await readFile(`/proc/${reservation.owner.pid}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw new EvalFailure("LEASE_OWNER_UNVERIFIED", 2)
+  }) : undefined
+  if (owner && owner.slice(owner.lastIndexOf(")") + 2).split(" ")[19] === reservation.owner.starttime) throw new EvalFailure("BUSY", 2)
+}
+
+function resourceLease(reservation: Reservation, receipt: string, guard: Awaited<ReturnType<typeof resourceGuard>>) {
     return { reservation, receipt, guardFile: guard.guardFile, close: guard.close, async assertHeld() {
       if (guard.closed) throw new EvalFailure("LEASE_NOT_HELD", 2)
       await guard.checkGuard()
-      if (JSON.stringify(await readReservation(receipt, input.key)) !== JSON.stringify(reservation))
+      if (JSON.stringify(await readReservation(receipt, reservation.key)) !== JSON.stringify(reservation))
         throw new EvalFailure("LEASE_NOT_HELD", 2)
     }, async release(proof: string) {
       await guard.checkGuard()
       const evidence = await readLeaseReceipt(proof).catch(() => { throw new EvalFailure("LEASE_RELEASE_UNCONFIRMED", 2) })
-      const current = await readReservation(receipt, input.key)
+      const current = await readReservation(receipt, reservation.key)
       if (guard.closed || !jsonObject(evidence) || evidence.version !== 2 || evidence.status !== "confirmed" || evidence.key !== reservation.key ||
         evidence.token !== reservation.token || evidence.revision !== reservation.revision || current?.token !== reservation.token || current?.revision !== reservation.revision ||
         JSON.stringify(current) !== JSON.stringify(reservation) ||
@@ -144,7 +167,6 @@ async function acquireResource(input: ResourceRequest, expected?: { token: strin
       await writeLeaseReceipt(receipt, { ...reservation, state: "released", releaseEvidence: { path: proof, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(evidence)).digest("hex") } })
       await guard.close()
     } }
-  } catch (error) { await guard.close(); throw error }
 }
 
 export async function withResourceReservationGuards<T>(keys: string[], lockRoot: string, use: (rows: { key: string; reservation: Reservation | undefined }[]) => Promise<T>) {
