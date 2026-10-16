@@ -28,7 +28,7 @@ export async function preflightCrossTableSource(options,ctx,config){
  const definition=await readOutputDefinitionPages(channel,{expectedCount:observed.node_mapping.target_fields.length});
  need(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===observed.node_mapping.target_fields[i][k])),'rendered/native definitions differ');
  const fields=observed.node_mapping.target_fields.filter(f=>!f.excluded);let refusal;
- try{resolveCrossTableParameters(r.parameters,fields);}catch(error){refusal=error;}
+ try{resolveCrossTableParameters(r.parameters,fields,r.read);}catch(error){refusal=error;}
  const cancelled=await closePreparedWizard(channel);
  need(cancelled.verified===true&&cancelled.settings_applied===false,'preflight cancellation unconfirmed');
  const returned=await channel.observe({condition:'upstream graph after CrossTable preflight cancellation',ready:s=>s.prepared_node_context?.surface==='graph'});

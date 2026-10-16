@@ -50,6 +50,25 @@ test('upstream name, kind, type and label are verified rather than inferred',()=
   const xs=structuredClone(fields);mutate(xs);assert.throws(()=>resolveCrossTableParameters(p,xs));
  }
 });
+test('exact Variant result values require full native reading during source validation',()=>{
+ const xs=structuredClone(fields);xs[2].type='variant';
+ for(const fn of ['min','max','first','last']){
+  const q={...p,facts:[{field:field('Amount'),functions:[fn]}]};
+  const read={ports:[0],sample_rows:100,require_exact_numbers:true};
+  assert.throws(()=>resolveCrossTableParameters(q,xs,read),/read.coverage=full/);
+  assert.doesNotThrow(()=>resolveCrossTableParameters(q,xs,{...read,coverage:'full'}));
+ }
+});
+test('Variant counts and schema-only reads retain ordinary reading',()=>{
+ const xs=structuredClone(fields);xs[2].type='variant';
+ const q={...p,facts:[{field:field('Amount'),functions:['min']}]};
+ const read={ports:[0],sample_rows:100,require_exact_numbers:true};
+ for(const patch of [{ports:[]},{sample_rows:0},{require_exact_numbers:false}])
+  assert.doesNotThrow(()=>resolveCrossTableParameters(q,xs,{...read,...patch}));
+ for(const fn of ['count','unique_count','null_count'])
+  assert.doesNotThrow(()=>resolveCrossTableParameters({...q,facts:[{field:field('Amount'),functions:[fn]}]},xs,read));
+ assert.doesNotThrow(()=>resolveCrossTableParameters(p,fields,read));
+});
 test('native Index binds to the verified input mapping, never to a display name guess',()=>{
  const context={verified:true,document_id:'doc',workflow_id:'wf',node_id:'node'};
  const native={verified:true,inventory_complete:true,node_context:context,input_fields:fields.map(({name,...f})=>({...f,record_id:'r'+f.index}))};
