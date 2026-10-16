@@ -64,6 +64,24 @@ test("judge version: VPN mode uses the named service boundary", async () => {
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("VPN judge inherits its explicit home and operational settings without credentials", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-unit-env-"))
+  try {
+    await Bun.write(path.join(root, "systemctl"), '#!/bin/sh\nprintf "LoadState=not-found\\nActiveState=inactive\\nMainPID=0\\n"\nexit 4\n')
+    await chmod(path.join(root, "systemctl"), 0o700)
+    await Bun.write(path.join(root, "wrapper.ts"), `console.log(JSON.stringify({ home: process.env.CODEX_HOME, path: process.env.PATH,
+      leaked: ["OPENAI_API_KEY", "LOGINOM_PASSWORD", "AWS_SECRET_ACCESS_KEY", "PRIVATE_UNKNOWN_TOKEN"].filter(key => process.env[key]) }))`)
+    const result = await judgeVersion({ systemd: true, command: [process.execPath, path.join(root, "wrapper.ts")],
+      env: { PATH: root + ":/usr/bin:/bin", CODEX_HOME: root, OPENAI_API_KEY: "provider-private", LOGINOM_PASSWORD: "slot-private",
+        AWS_SECRET_ACCESS_KEY: "cloud-private", PRIVATE_UNKNOWN_TOKEN: "unknown-private" } })
+    expect(result.exitCode).toBe(0)
+    const observed = JSON.parse(result.stdout)
+    expect(observed.home).toBe(root)
+    expect(observed.path).toBe(root + ":/usr/bin:/bin")
+    expect(observed.leaked).toEqual([])
+  } finally { await rm(root, { recursive: true }) }
+})
+
 test("judge unit: a stalled unit lookup cannot extend the wrapper deadline", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-unit-deadline-"))
   const finished = path.join(root, "query-finished")

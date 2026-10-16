@@ -252,6 +252,17 @@ test("agentCommand: v2 slots force HTTP-only transport despite inherited WebSock
   expect(agentCommand(loadConfig(["--dry-run"], {}), {}).env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS).toBeUndefined()
 })
 
+test("agentCommand: real slots inherit only operational environment, never unrelated credentials", () => {
+  const config = loadConfig([], { EVAL_SLOTS_FILE: "private-slots.json", EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/pinned/cli", EVAL_AGENT_MODEL: "openai/gpt-6-luna",
+    JUDGE_MODEL: "gpt-6-sol", LOGINOM_DOCK_API_KEY: "dock-private" })
+  const command = agentCommand(config, { PATH: "/usr/bin:/bin", HOME: "/private/home", LANG: "C.UTF-8", TMPDIR: "/private/tmp",
+    OPENAI_API_KEY: "openai-private", ANTHROPIC_API_KEY: "anthropic-private", AWS_SECRET_ACCESS_KEY: "aws-private",
+    PRIVATE_UNRELATED_TOKEN: "unrelated-private", CODEX_HOME: "/private/judge", LOGINOM_PASSWORD: "slot-private" })
+  expect(command.env).toMatchObject({ PATH: "/usr/bin:/bin", HOME: "/private/home", LANG: "C.UTF-8", TMPDIR: "/private/tmp" })
+  expect(Object.values(command.env).join("\n")).not.toContain("-private")
+  expect(command.env.CODEX_HOME).toBeUndefined()
+})
+
 test("agentCommand: only configured slot auth can grant the shared directory", () => {
   const config = loadConfig(["--dry-run"], { EVAL_SLOTS_FILE: "fixture-programmatic-only" })
   const inherited = { LOGINOM_AI_AGENT_SHARED_AUTH_DIR: "/untrusted/inherited" }
@@ -583,7 +594,7 @@ test("runAgent: отказ записи process evidence сохраняет из
 })
 
 
-test("runAgent: отказ релевантного /proc сохраняет исход и останавливает cleanup", async () => {
+test("runAgent: полностью прочитанная чужая ancestry не мешает cleanup при закрытом exe", async () => {
   const out = await mkdtemp(path.join(os.tmpdir(), "evals-proc-denied-"))
   const command = fakeCommand()
   const pending = runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_EXIT_DELAY_MS: "700" } },
@@ -604,10 +615,10 @@ test("runAgent: отказ релевантного /proc сохраняет и�
     const run = await pending
     expect(run.exitCode).toBe(0)
     expect(run.sessionId).toBe("ses_fixture03")
-    expect(run.processCleanup.status).toBe("failed")
-    expect(run.processCleanup.error).toContain("Cannot inspect process identity")
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.processCleanup.error).toBeNull()
     expect(child.exitCode).toBeNull()
-  } finally { child.kill("SIGKILL"); await exited }
+  } finally { child.kill("SIGKILL"); await exited; await rm(out, { recursive: true }) }
 })
 
 test("runAgent: отказ записи run evidence сохраняет измеренный исход", async () => {
