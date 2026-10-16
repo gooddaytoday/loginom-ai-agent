@@ -2,7 +2,7 @@ import path from "node:path"
 import { spawn } from "node:child_process"
 import { Readable, Writable } from "node:stream"
 import os from "node:os"
-import { constants } from "node:fs"
+import { constants, type Stats } from "node:fs"
 import { lstat, mkdtemp, open, readdir, readFile, readlink, realpath, stat, writeFile, rm } from "node:fs/promises"
 import { createJsonOutputRedactor, createOutputRedactor } from "./output-redaction"
 
@@ -37,6 +37,7 @@ export type ProcessCleanup = {
   browserBindings?: { process: ProcessIdentity; runtimeDirectory: string; observed_at: string }[]
   bindingRefusals?: { process: ProcessIdentity; has_data_dir: boolean; data_inside_profile: boolean; new_runtime_match: boolean; executable_match: boolean; ancestry_match: boolean }[]
   peerProcesses?: { process: ProcessIdentity; launcher: ProcessIdentity; owner: ProcessOwner }[]
+  writerRefusal?: WriterUnavailable["refusal"]
 }
 
 // Only this module can publish a spawned launcher and its admitted ancestry.
@@ -48,6 +49,15 @@ const message = (error: unknown) => error instanceof Error ? error.message : Str
 const gone = (error: unknown) => ["ENOENT", "ESRCH"].includes((error as NodeJS.ErrnoException).code ?? "")
 const key = (process: ProcessIdentity) => `${process.pid}:${process.starttime}`
 const inside = (file: string, root: string) => file === root || file.startsWith(root + path.sep)
+
+class WriterUnavailable extends Error {
+  readonly refusal
+  constructor(info: Stats, operation: string, phase: string | null, code: string | null) {
+    super("Writer owner unavailable")
+    this.refusal = { operation, phase, code, observedAt: new Date().toISOString(),
+      directory: { device: info.dev, inode: info.ino, uid: info.uid, mode: info.mode & 0o777 } }
+  }
+}
 
 // Resource observers receive copies, never the identity records used for signaling.
 export function supervisedProcesses() {
@@ -69,14 +79,14 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
   if (!info.isDirectory() || info.isSymbolicLink()) throw Error("Writer is not a private directory")
   const ownerPath = path.join(directory, "owner")
   const ownerBefore = await lstat(ownerPath).catch(async (error: NodeJS.ErrnoException) => {
-    if (error.code !== "ENOENT") throw Error("Writer owner unavailable")
+    if (error.code !== "ENOENT") throw new WriterUnavailable(info, "owner-stat", null, error.code ?? null)
     return observeWriterTransition(directory, info, true)
   })
   if (!ownerBefore) return null
   if (!ownerBefore.isFile() || ownerBefore.isSymbolicLink()) throw Error("Writer owner is not a private file")
   const file = await open(ownerPath, constants.O_RDONLY | constants.O_NOFOLLOW)
     .catch(async (error: NodeJS.ErrnoException) => {
-      if (error.code !== "ENOENT") throw Error("Writer owner unavailable")
+      if (error.code !== "ENOENT") throw new WriterUnavailable(info, "owner-open", null, error.code ?? null)
       await observeWriterTransition(directory, info)
       return undefined
     })
@@ -101,7 +111,7 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
 }
 
 /** Initial creation and release both have bounded ownerless windows; an observed owner cannot be replaced. */
-async function observeWriterTransition(directory: string, expected: Awaited<ReturnType<typeof lstat>>, acquiring = false) {
+async function observeWriterTransition(directory: string, expected: Stats, acquiring = false) {
   let absent = 0
   for (let attempt = 0; attempt < 6; attempt++) {
     const current = await lstat(directory).catch((error: NodeJS.ErrnoException) => {
@@ -123,7 +133,7 @@ async function observeWriterTransition(directory: string, expected: Awaited<Retu
     } else if (++absent === 2) return
     if (attempt < 5) await Bun.sleep(20)
   }
-  throw Error("Writer owner unavailable")
+  throw new WriterUnavailable(expected, "transition", acquiring ? "acquiring" : "releasing", null)
 }
 
 async function processView(pid: number, required = true, owners: ProcessIdentity[] = [], retries = 2): Promise<ProcessView | undefined> {
@@ -696,6 +706,7 @@ export async function superviseProcess(input: {
     }).catch((error) => {
       cleanup.peerProcesses = []
       cleanup.error ??= message(error)
+      if (error instanceof WriterUnavailable) cleanup.writerRefusal ??= error.refusal
     })
     return scanning.then(() => confirmed)
   }

@@ -947,3 +947,87 @@ without restart. Nine duplicate temp files and one unnecessary copied browser
 cache removed. This completes the controlled research test. Arbitrary user
 traversal, SessionBackup, all-workload operation/mmap coverage, production
 cleanup/release/unpause and admission remain open; both grants remain false.
+
+
+## Text finalizer storage gate: first setup failed before RED — 2026-10-16
+
+`native-agent-replay-343ea78a-304a-4c2a-aa0e-4a5e0d413aaa`: first
+hardlink finalizer qualification stopped during `ensureProfile`, before agent
+admission or the target storage assertion. Native test0 PASS/1 FAIL80.01s;
+read-only `loginom status` exit0/timedOut=false/interrupted=false, continuous
+process proof failed `Writer owner unavailable`. Unknown0/all3 own admissions
+allowed/final verification0,0 do not repair the original error. Admin transport,
+dispose and continuous closure confirmed. Runtime directories are empty, so
+`observeWriterReleaseSettlement` refuses this source under its existing contract;
+no guard weakening, synthetic closure or normal lease release is permitted.
+The historical writer transition cause is unproven; this single result is not a
+flakiness classification. Original log SHA256
+`dc4f883557ba22e4ac8bf5937ecac8ba996bec7249e99a5775c4f20b61339a97`
+and19 exact repo source snapshots retained privately. Own controller
+`/home/kiselev/storage/tmp/evals-native-agent-wXSWjb`, pair nonce
+`82f9bd00-81c4-46a4-b1bc-5371c345692b`; original failed verdict remains failed.
+Read-only audit confirmed all16 original identities absent (1 management entry +
+1 admin connection); exact report SHA256
+`56fb5a2c3f6c33de9c1ebd0c902afc87de441d55b8c0cd113977e45565f997de`.
+Public factory then destroyed only this pair without restart after exact epoch,
+published inode and empty user-root checks. All3 immutable resource IDs and own
+root are absent; disposal verification SHA256
+`274cd92e68bb137822f172479471ee62674e2b6dcf0eb088f2d04d20b38852e3`.
+Original failed proof/controller sources are retained privately; normal release,
+storageDeletionAllowed and nextAdmissionAllowed remain false.
+
+The unchanged second attempt `native-agent-replay-4347483f-7c78-49c7-8677-d87b744ee414`
+also failed before the target assertion:0 PASS/1 FAIL130.88s. Status proof is
+confirmed; setup exit0 but failed continuous proof has the same writer error,
+unknown0/final0,0. Full union34 original actors is freshly absent. Original
+settlement records cli=false/admin=true/historyArchived=false: ensureProfile
+failed before initial archive; nonempty history is not an archive failure.
+Private signal report SHA256
+`33943d827fc1d313db94ab7ebf19b7c33b5e25e92e3da61e06175c799bbc5982`,
+19 source snapshots and original log retained. Own root
+`/home/kiselev/storage/tmp/evals-native-agent-wymvm9` is preserved pending explicit
+research archival/decommission; failed proof is not repaired. This setup source
+has a validation runtime directory, but settlement API eligibility was not fully
+qualified or exercised. The exact writer transition cause remains unproven.
+
+The third unchanged attempt `native-agent-replay-ac6fd528-1222-4790-81e4-87a8ac8ffe73`
+reached the actual text agent (exit0, `Native replay complete`, no tools) but failed
+its continuous writer proof before finalizer admission:0 PASS/1 FAIL/1 assertion
+168.47s. Both management proofs and admin closure confirmed; failed agent proof
+is stored twice byte-identically, counted once. Full original union40 is freshly
+absent; runtimeDirectories=[]/unknown0/final0,0 do not qualify normal release.
+Original root `/home/kiselev/storage/tmp/evals-native-agent-bgO18J` and initial
+archive are preserved; the agent archive was not reached, not proven to have
+failed. Private diagnosis SHA256
+`75fdf2b2a856747c177cc76d7458566a47cc08d43389ffb70d7ae6b618cb8313`.
+All3 original native failures and19 repo snapshots per case are retained. The
+writer-error class recurred at status/setup/agent phases; exact root cause and
+flaky classification remain unproven. These runs do not establish the intended
+hardlink RED. Its pending test patch is retained at first incident evidence,
+`pending-storage-finalizer.patch` SHA256
+`3abb1be3e2454f00f23d79cb381b2f7c24d8cd64225164e37c76e6c7fa48e1b3`;
+no missing runtime storage gate has been implemented from these failed setups.
+
+Research retirement completed for434748 and ac6fd after fresh34/40 identity absence,
+exact epoch/published root inode and empty own storage/backup observations. Existing
+archiveProfileEvidence produced committed manifests before factory destruction;
+all roots recursively match original metadata/hash. The actual agent SQLite family
+passed quick_check and exact SDK session lookup on a private copy; originals are
+unchanged. All6 immutable Docker IDs and both own controller roots are absent.
+Private disposal audits:434748 SHA256
+`46f05bbdcbb5b4a6e2f0ffbfd2d02997d059283c5a607815e2d945a68e77ce9f`,
+ac6fd SHA256
+`d81b7ef436ef7df5523e757c56dbb7ce26ce423a16a149dfdb4c134607ddc09a`;
+28 checks each. Original failures/local reservations and archives are retained;
+no proof requalification, normal release or production cleanup/admission grant.
+
+A separate TDD diagnostic change now persists optional writerRefusal metadata;
+59 supervisor-related PASS/3 existing nativeBusy SKIP/246 assertions, final
+writer11 PASS/21, typecheck/diff PASS. It preserves original error/failed state,
+budget and guard. Reader phase is not proof of the writer's actual historical
+phase. Original3 native failures predate this instrumentation; the exact native
+cause and intended storage gate still need a new instrumented qualification.
+Private verification and source snapshots are in first incident writer-refusal/;
+12 duplicate temporary logs/helpers were removed only after retained SHA read-back,
+cleanup receipt SHA256
+`ef8d3d41e545037f292c51f0b3056795a08f3e9df7d130f7a272a5732976a0f7`.
