@@ -20,8 +20,55 @@ import { management } from "../src/profile"
 import { readUserActivation, stageUserPreparation } from "../src/user-environment"
 import { readManagementSession, recordManagementSession } from "../src/management-sessions"
 import { signalProcess, supervisedProcesses, type ProcessIdentity } from "../src/process-supervisor"
+import { captureServerFiles, readServerFiles } from "../src/server-files"
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
+
+integration("server file evidence replays a fenced raw kernel snapshot", async () => {
+  const fixture = await storageCodecFixture()
+  try {
+    const evidence = process.env.EVAL_ADMIN_LIVE_CONFIG ? path.join(path.dirname((await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG, 1)).controller.stateDir),
+      "evidence", `native-server-files-${crypto.randomUUID()}`) : undefined
+    if (evidence) {
+      await mkdir(evidence, { mode: 0o700 })
+      console.error(`native fenced file evidence: ${evidence}`)
+      await writeLeaseReceipt(path.join(evidence, "source-pins.json"), { root: fixture.root, identity: fixture.pair.identity, resources: fixture.pair.resources,
+        sources: await Promise.all([import.meta.path, path.resolve(import.meta.dir, "../src/server-files.ts"),
+          path.resolve(import.meta.dir, "../fixtures/server-files.sh"), path.resolve(import.meta.dir, "../src/parallel-pair.ts"),
+          path.resolve(import.meta.dir, "../src/lease.ts"), path.resolve(import.meta.dir, "../src/slots.ts"),
+          path.resolve(import.meta.dir, "helpers/storage-codec-fixture.ts"), path.resolve(import.meta.dir, "helpers/parallel-fixture.ts")]
+          .map(async file => ({ path: file, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(file).bytes()).digest("hex") }))) })
+    }
+    const observed = await captureServerFiles(fixture.file, fixture.server, fixture.lease)
+    if (evidence) await writeLeaseReceipt(path.join(evidence, "snapshot.json"), { observed, receipt: await readLeaseReceipt(observed.source.path),
+      server: fixture.server.reservation, slot: await readLeaseReceipt(fixture.lease.receipt), cleanupAllowed: false })
+    expect(observed.snapshot.complete).toBe(true)
+    expect(observed.snapshot.processes.some(process => process.pid === 1)).toBe(true)
+    expect(observed.identity).toEqual(fixture.pair.identity)
+    expect(observed.storageDeletionAllowed).toBe(false)
+    expect(await readServerFiles(fixture.file, fixture.server, fixture.lease, observed.source)).toEqual(observed)
+    expect(await readLeaseReceipt(observed.source.path)).toMatchObject({ version: 1, kind: "server-file-observation",
+      context: { slotId: fixture.lease.slot.id, leaseToken: fixture.lease.token }, frame: { containerId: fixture.pair.identity.containerId } })
+    const receipt = await readLeaseReceipt(observed.source.path) as { context: Record<string, unknown>; frame: typeof observed.snapshot.frame }
+    for (const output of [receipt.frame.output + "unknown\0\0\0\0\0\0", receipt.frame.output.split("\0").slice(0, 6).join("\0") + "\0" + receipt.frame.output]) {
+      const corrupt = { ...receipt, frame: { ...receipt.frame, output } }
+      await writeLeaseReceipt(observed.source.path, corrupt)
+      try {
+        await expect(readServerFiles(fixture.file, fixture.server, fixture.lease, { path: observed.source.path,
+          sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(corrupt)).digest("hex") })).rejects.toThrow("SERVER_FILE_SCAN_FRAME")
+      } finally { await writeLeaseReceipt(observed.source.path, receipt) }
+    }
+    await expect(readServerFiles(fixture.file, fixture.server, fixture.lease, { ...observed.source, sha256: "0".repeat(64) })).rejects.toThrow("SERVER_FILE_SOURCE_UNCONFIRMED")
+    const foreign = { ...receipt, context: { ...receipt.context, slotId: "foreign-slot" } }
+    await writeLeaseReceipt(observed.source.path, foreign)
+    try {
+      await expect(readServerFiles(fixture.file, fixture.server, fixture.lease, { path: observed.source.path,
+        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(foreign)).digest("hex") })).rejects.toThrow("SERVER_FILE_SOURCE_UNCONFIRMED")
+    } finally { await writeLeaseReceipt(observed.source.path, receipt) }
+    expect(await readServerFiles(fixture.file, fixture.server, fixture.lease, observed.source)).toEqual(observed)
+  } finally { await fixture.dispose() }
+  await expect(captureServerFiles(fixture.file, fixture.server, fixture.lease)).rejects.toThrow("LEASE_NOT_HELD")
+}, 90_000)
 
 for (const mode of ["manual", "finalizer", "interrupted-finalizer", "reconnected-finalizer", "unknown"] as const) test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.LOGINOM_DOCK_API_KEY)(`native CLI setup and check retain session observations during their own process lifetimes${mode === "manual" ? "" : mode === "finalizer" ? " with finalizer" : mode === "interrupted-finalizer" ? " with interrupted finalizer" : mode === "reconnected-finalizer" ? " with reconnected finalizer" : " with unknown session"}`, async () => {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)

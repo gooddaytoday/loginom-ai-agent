@@ -6,7 +6,7 @@ import { globalLockRoot, writeLeaseReceipt } from "../src/lease"
 import { createPair, destroyPair, readServerIdentity } from "../src/parallel-pair"
 import { loadSlots, parseSlots } from "../src/slots"
 import { parallelFixture } from "./helpers/parallel-fixture"
-import { serverFileObservation } from "./helpers/server-file-observation"
+import { serverFileObservation } from "../src/server-files"
 
 test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)("kernel observer preserves trailing newline paths and sees a live mmap control", async () => {
   const source = await loadSlots(process.env.EVAL_ADMIN_LIVE_CONFIG!, 1)
@@ -21,7 +21,7 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG)("kernel observer preserves trai
   const evidence = path.join(path.dirname(source.controller.stateDir), "evidence", `native-file-observer-${crypto.randomUUID()}`)
   await mkdir(evidence, { mode: 0o700 })
   console.error(`native file observer evidence: ${evidence}`)
-  const pins = await Promise.all([import.meta.path, path.resolve(import.meta.dir, "helpers/server-file-observation.ts"),
+  const pins = await Promise.all([import.meta.path, path.resolve(import.meta.dir, "../src/server-files.ts"),
     path.resolve(import.meta.dir, "../fixtures/server-files.sh"), path.resolve(import.meta.dir, "../src/parallel-pair.ts")].map(async file =>
     ({ path: file, sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(file).bytes()).digest("hex") })))
   await writeLeaseReceipt(path.join(evidence, "source-pins.json"), { sources: pins, root, identity: pair.identity, resources: pair.resources })
