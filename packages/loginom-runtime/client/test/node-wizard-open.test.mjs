@@ -6,7 +6,7 @@ const fixture=()=>{
  const node={verified:true,surface:'graph',document_id:'doc',workflow_id:'flow',node_id:'node',tid:'MF;TF-1;Graph;Import'};
  const path=[{tid:'flow',label:'Scenario'}];
  const state={loginom_build:'7.4.2',prepared_node_context:node,wizard:{status:'absent'},navigation_context:{status:'observed',path},
-  ui:{masks:[],dialogs:[],elements:[{tid:node.tid+';Setting',allowed_actions:['begin_wizard'],wizard_open:{node:{node_label:'Import',part:'settings'},workflow_path:path}}]}};
+  ui:{masks:[],dialogs:[],elements:[{tid:node.tid+';Setting',allowed_actions:['begin_wizard'],interaction:{state:'point_observed',point:{x:30,y:40}},wizard_open:{node:{node_label:'Import',part:'settings'},workflow_path:path}}]}};
  const binding=wizardOpenBinding(state);
  state.wizard_pending_owner={status:'observed',node:{tid:'flow>Import'},path:[...path,{tid:'flow>Import',label:'Import'},{tid:'flow>Import>Settings',label:'Settings'}]};
  state.ui.dialogs=[{ref:'question',title:'Loginom 7.4.2',text:'Loginom 7.4.2 Настройка узла приведет к его деактивации. Вы действительно хотите начать настраивать узел? Да Да, больше не спрашивать Нет'}];
@@ -40,7 +40,7 @@ test('deactivation gestures cannot run without a native prepared-node binding',(
 test('wizard opening reconciles duplicate native keys through the exact prepared GUID and label',async()=>{
  for(const fault of [null,'node','document','workflow','label','path']){
   const {state}=fixture();state.ui={masks:[],dialogs:[],elements:[
-   {ref:'settings',tid:state.prepared_node_context.tid+';Setting',allowed_actions:['begin_wizard'],wizard_open:{node:{node_label:'Import@1'},workflow_path:[{tid:'flow',label:'Scenario'}]}},
+   {ref:'settings',tid:state.prepared_node_context.tid+';Setting',allowed_actions:['begin_wizard'],interaction:{state:'point_observed',point:{x:30,y:40}},wizard_open:{node:{node_label:'Import@1'},workflow_path:[{tid:'flow',label:'Scenario'}]}},
    {tid:state.prepared_node_context.tid+';Label;Label',label:'Import',graph_node:{part:'label'}}]};
   const after=structuredClone(state);after.prepared_node_context.surface='wizard';
   after.wizard={status:'observed',owner_context:{status:'observed',node:{tid:'flow>Import-3',label:'Import'},path:[{tid:'flow',label:'Scenario'},{tid:'flow>Import-3',label:'Import'},{tid:'flow>Import-3>Settings',label:'Settings'}]}};
@@ -51,6 +51,27 @@ test('wizard opening reconciles duplicate native keys through the exact prepared
   else assert.equal((await openPreparedWizard(channel)).verified,true);
   assert.equal(gestures,1);
  }
+});
+
+test('wizard opening waits for a verified hit point even when opening is advertised',async()=>{
+ const {state}=fixture();state.wizard_pending_owner=undefined;
+ state.ui={masks:[],dialogs:[],elements:[{ref:'settings',tid:state.prepared_node_context.tid+';Setting',allowed_actions:['begin_wizard'],
+  interaction:{state:'obscured',point:null},wizard_open:{node:{node_label:'Import'},workflow_path:[{tid:'flow',label:'Scenario'}]}}]};
+ assert.throws(()=>wizardOpenBinding(state),/settings control/);
+ const after=structuredClone(state);after.prepared_node_context.surface='wizard';after.wizard={status:'observed',owner_context:{status:'observed',node:{tid:'flow>Import',label:'Import'},path:[{tid:'flow',label:'Scenario'},{tid:'flow>Import',label:'Import'},{tid:'flow>Import>Settings',label:'Settings'}]}};
+ let opened=false,gestures=0;
+ const channel={observe:async({ready})=>{
+  if(opened)return after;
+  assert.equal(ready(state),false,'an obscured control must remain a read-only wait');
+  state.ui.elements[0].interaction={state:'point_observed',point:{x:30,y:40}};
+  assert.equal(ready(state),true);return structuredClone(state);
+ },perform:async({initialObservation,ready})=>{
+  assert.equal(initialObservation.ui.elements[0].interaction.state,'point_observed');
+  assert.equal(ready(initialObservation),true);const hidden=structuredClone(initialObservation);hidden.ui.elements[0].interaction={state:'obscured',point:null};
+  assert.equal(ready(hidden),false,'fresh observations must also retain the point requirement');
+  opened=true;gestures++;
+ }};
+ assert.equal((await openPreparedWizard(channel)).verified,true);assert.equal(gestures,1);
 });
 
 test('duplicate deactivation breadcrumb requires native pending owner binding, never label alone',()=>{

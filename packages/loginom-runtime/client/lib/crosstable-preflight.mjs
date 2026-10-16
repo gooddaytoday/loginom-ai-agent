@@ -20,7 +20,7 @@ export async function preflightCrossTableSource(options,ctx,config){
  if(!graph.node_outputs.node_selected){await selectPreparedGraphNode(channel,graph,'select CrossTable upstream',{refreshReplacedBody:true});
   graph=await channel.observe({condition:'selected CrossTable upstream',readOutputs:true,ready:s=>s.node_outputs?.verified===true&&s.node_outputs.node_selected});}
  const ports=graph.node_outputs.ports.filter(p=>p.index===input.output);
- if(ports.length!==1||ports[0].active!==true){const error=Error('CrossTable: execute and read the upstream table before configuring this node');
+ if(ports.length!==1||ports[0].active!==true){const error=Error('CrossTable: upstream output is inactive; execute the existing upstream node again with read.ports=[] or sample_rows=0, then submit this CrossTable request with a new operation_id. Reading upstream rows is not required.');
   error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  await channel.openOutputPort(input.output);await showMissingValuesMappingTable(channel);
  const observed=await channel.observe({condition:'upstream complete output definition',readMappings:true,
@@ -28,7 +28,7 @@ export async function preflightCrossTableSource(options,ctx,config){
  const definition=await readOutputDefinitionPages(channel,{expectedCount:observed.node_mapping.target_fields.length});
  need(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===observed.node_mapping.target_fields[i][k])),'rendered/native definitions differ');
  const fields=observed.node_mapping.target_fields.filter(f=>!f.excluded);let refusal;
- try{resolveCrossTableParameters(r.parameters,fields);}catch(error){refusal=error;}
+ try{resolveCrossTableParameters(r.parameters,fields,r.read);}catch(error){refusal=error;}
  const cancelled=await closePreparedWizard(channel);
  need(cancelled.verified===true&&cancelled.settings_applied===false,'preflight cancellation unconfirmed');
  const returned=await channel.observe({condition:'upstream graph after CrossTable preflight cancellation',ready:s=>s.prepared_node_context?.surface==='graph'});

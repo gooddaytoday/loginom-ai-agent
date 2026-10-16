@@ -223,6 +223,46 @@ test('strict pre-gesture epoch refusal refreshes and rebinds one unchanged field
 test('local epoch recovery stops after two refreshes',async()=>{
   const f=recoveryFixture({refusals:10});await assert.rejects(f.perform(),/did not confirm/);assert.equal(f.mutations,3);
 });
+test('prepared settings opening refreshes only a proved pre-gesture obscured point',async()=>{
+ for(const mode of ['safe','persistent','effect','unknown','cleanup','phase','gesture','precondition','missing_trace','other_control','other_action','changed_node','expired']){
+  const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+  const node={document_id:'doc',workflow_id:'flow',node_id:'node'},binding={document_id:'doc',workflow_ref,node};
+  const operation={id:'settings',deadline:10000,action:{action_key:'node.apply',revision:'1'}};
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},scan:{complete:true},wizard:{status:'absent'},
+   prepared_node_context:{...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Node'},
+   ui:{masks:[],dialogs:[],truncated:{masks:false,dialogs:false},elements:[{ref:'ui-graph',tid:'MF;TF-1;ModelForm;cmpDiagram'},
+    {ref:'ui-settings-0',tid:'MF;TF-1;Graph;Node;Setting',allowed_actions:['begin_wizard','click'],interaction:{state:'point_observed',point:{x:30,y:40}},wizard_open:{node:{node_label:'Node'},workflow_path:workflow_ref.navigation_path}}]}};
+  if(mode==='other_control')state.ui.elements[1].tid='MF;TF-1;Graph;Other;Setting';
+  let attempts=0,reads=0,time=1;const records=[];
+  const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>time,wait:async()=>{},maxSteps:32,
+   record:async e=>{records.push(e);return structuredClone(e)},wrapMutation:(code,reference)=>({reference}),execute:async code=>{
+    if(typeof code==='string'){
+     reads++;const output=structuredClone(state);output.ui.elements[1].ref='ui-settings-'+reads;
+     if(mode==='changed_node'&&attempts)output.prepared_node_context.node_id='foreign';
+     return {status:'SUCCEEDED',output};
+    }
+    attempts++;const result={operation_id:code.reference.id,action_key:'ui.act',status:attempts>1&&mode!=='persistent'?'SUCCEEDED':'NOT_APPLIED',phase:'preconditions',effect_possible:false,cleanup_complete:true,error:{code:'UI_REFERENCE_OBSCURED'},trace:[]};
+    if(mode==='effect')result.effect_possible=true;
+    if(mode==='unknown')result.status='AMBIGUOUS';
+    if(mode==='cleanup')result.cleanup_complete=false;
+    if(mode==='phase')result.phase='applying';
+    if(mode==='gesture')result.trace=[{event:'ui_gesture_applied'}];
+    if(mode==='precondition')result.trace=[{event:'ui_preconditions_verified'}];
+    if(mode==='missing_trace')result.trace=undefined;
+    if(mode==='expired')time=10001;
+    return result;
+   }});
+  const perform=()=>channel.perform({condition:'same prepared settings',ready:s=>s.ui.elements[1].interaction.state==='point_observed',
+   identity:s=>s.prepared_node_context,resolve:s=>({verb:mode==='other_action'?'click':'begin_wizard',ref:s.ui.elements[1].ref})});
+  if(mode==='safe')await perform();else await assert.rejects(perform(),undefined,mode);
+  assert.equal(attempts,mode==='safe'?2:mode==='persistent'?3:1,mode);
+  assert.equal(operation.deadline,10000,mode);
+  if(mode==='safe'){
+   const steps=records.filter(e=>e.phase==='node_step_prepared');assert.notEqual(steps[0].action.ref,steps[1].action.ref);
+   assert.equal(records.find(e=>e.phase==='node_step_refresh_authorized').reason,'prepared_settings_point_obscured');
+  }
+ }
+});
 test('a proven pre-gesture time scan refusal rebinds the same action with a new receipt',async()=>{
  const f=recoveryFixture({receipt:n=>n===1?timedScanRefusal('ui.act'):{}});await f.perform();assert.equal(f.mutations,2);
  const refresh=f.records.find(r=>r.phase==='node_step_refresh_authorized');assert.equal(refresh.reason,'read_scan_time_limit');
@@ -608,7 +648,13 @@ for(const mode of ['ready','loading','unverified_without_mask','foreign_dialog',
  assert.equal(records.some(r=>r.phase==='node_step_prepared'),false);
  if(['unverified_without_mask','foreign_dialog','foreign_mask'].includes(mode)){
   const refused=records.find(r=>r.phase==='node_observation_context_refused');
-  assert.equal(refused.reason,'Node procedure is blocked by a mask or dialog');
+  const prefix='Node procedure is blocked by a mask or dialog: ';
+  assert.ok(refused.reason.startsWith(prefix));
+  const blockers=JSON.parse(refused.reason.slice(prefix.length));
+  assert.equal(blockers.scan_complete,true);
+  assert.deepEqual(blockers.truncated,{dialogs:false,masks:false});
+  assert.deepEqual(blockers.dialogs,[{anchor_tid:mode==='foreign_dialog'?'foreign':root}]);
+  assert.deepEqual(blockers.masks,mode==='unverified_without_mask'?[]:[{kind:'busy',target_tid:mode==='foreign_mask'?'foreign':root+';PreviewForm'}]);
   assert.equal(refused.outcome.output.node_preview_schema.reason,'preview_visible_form');
   assert.deepEqual(refused.outcome.output.ui,state.ui);
   await assert.rejects(channel.act({verb:'click',ref:'preview'}),/fresh internal observation/);
@@ -786,4 +832,42 @@ test('root refusal retains bounded code and trace without payloads, retries or u
  assert.equal(event.stage,'roots');assert.equal(JSON.stringify(event).includes('secret payload'),false);
  await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
  assert.ok(!f.events.includes('mutated'));
+});
+
+
+for(const mode of ['ordinary','history','expired'])test('process history readiness keeps its original operation deadline: '+mode,async()=>{
+ let clock=0;const records=[];
+ const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+ const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const node={...binding.node,verified:true,surface:'graph',tid:'MF;TF-1;ModelForm;Graph;Node'};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},prepared_node_context:node,
+  scan:{complete:true},wizard:{status:'absent'},ui:{elements:[],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+ const operation={id:'history-'+mode,deadline:45000,action:{action_key:'node.apply',revision:'1'}};
+ const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,
+  now:()=>clock,monotonicNow:()=>clock,wait:async ms=>{clock+=ms;},record:async e=>{records.push(e);return structuredClone(e);},
+  execute:async code=>{clock+=2500;if(code.includes('function workspaceUiCapability'))return {status:'SUCCEEDED',output:structuredClone(state)};
+   return {verified:true,node_context:node,inventory_complete:true,root_id:'history',processes:[],show_completed:mode==='expired'||clock<20000};}});
+ const read=channel.observe({condition:'completed history temporarily hidden',readProcesses:true,settleProcessHistory:mode!=='ordinary',
+  ready:s=>s.node_processes?.verified===true&&s.node_processes.show_completed===false});
+ if(mode==='history'){
+  const result=await read;assert.equal(result.node_processes.show_completed,false);assert.ok(clock>15000&&clock<operation.deadline);
+  assert.equal(records.find(e=>e.phase==='node_observation_completed').readiness.timeout_ms,45000);
+ }else{
+  await assert.rejects(read,/readiness timeout/);
+  assert.ok(clock>=(mode==='ordinary'?15000:45000));
+  assert.equal(records.find(e=>e.phase==='node_observation_timeout').effect_possible,false);
+ }
+ assert.equal(operation.deadline,45000);assert.equal(records.some(e=>e.phase==='node_step_prepared'),false);
+});
+
+for(const mode of ['missing_process_read','missing_owner','mixed_output_settlement','invalid_flag'])test('process history settlement refuses '+mode+' before reading',async()=>{
+ let reads=0;
+ const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+ const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const channel=createNodeProcedure({operation:{id:'history-scope',deadline:10000,action:{action_key:'node.apply',revision:'1'}},
+  preparedNodeContext:mode==='missing_owner'?undefined:binding,targetOrigin:'http://example.test',targetBuild:'7.4.2',now:()=>1,
+  execute:async()=>{reads++;throw Error('Unexpected read');},record:async e=>e});
+ await assert.rejects(channel.observe({condition:'history',ready:()=>true,readProcesses:mode!=='missing_process_read',
+  settleProcessHistory:mode==='invalid_flag'?'yes':true,...(mode==='mixed_output_settlement'?{readOutputs:true,settleOutputPort:'11111111-1111-1111-1111-111111111111'}:{})}),/History settlement requires/);
+ assert.equal(reads,0);
 });

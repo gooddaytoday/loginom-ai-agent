@@ -47,7 +47,7 @@ export function validateCrossTableParameters(p,mode,r){
  need(!r.mappings.length||r.finish==='execute','CrossTable output mapping requires fresh materialization with execute');
  need(r.read.ports.every(p=>p===0),'one output zero supported');return p;
 }
-export function resolveCrossTableParameters(p,fields){
+export function resolveCrossTableParameters(p,fields,read){
  const get=ref=>{const xs=fields.filter(f=>f.name===ref.name);need(xs.length===1,'input field missing: '+ref.name);return xs[0];};
  const columns=crossTableDimensions(p).map(get),keys=p.row_keys.map(get),facts=p.facts.map(f=>({...get(f.field),functions:f.functions}));
  need(columns.every(f=>f.data_kind==='Дискретный'&&['string','integer','real','boolean','datetime'].includes(f.type)),'column dimensions require supported discrete fields');
@@ -56,5 +56,8 @@ export function resolveCrossTableParameters(p,fields){
   &&(f.available_functions===undefined||(f.available_functions&CROSSTABLE_FUNCTIONS[fn].bit)!==0))),'unsupported fact type/function pair');
  need([...keys,...columns,...facts].every(f=>f.label&&f.label.length<=120&&!f.label.includes('|')),'roles need unique unambiguous labels without |');
  need(new Set([...keys,...columns,...facts].map(f=>f.label)).size===keys.length+facts.length+columns.length,'duplicate role labels are unsupported');
+ if(read?.require_exact_numbers===true&&read.sample_rows>0&&read.ports.includes(0)
+  &&facts.some(f=>f.type==='variant'&&f.functions.some(fn=>['min','max','first','last'].includes(fn))))
+  need(read.coverage==='full','exact Variant result values require read.coverage=full for native reading; correct the request before creating the report');
  return {keys,column:columns[0]??null,columns,facts};
 }

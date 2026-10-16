@@ -157,7 +157,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       || !closing && state.ui.dialogs.some(d => !allowedDialog(d,tableDialog) && !allowedOutputEditor(d,state) && !allowedNodeEditor(d,state) && (!allowTransient || d.identity?.anchor_tid !== 'toast' && !pendingFilterDialog(d,state) && !pendingPreviewDialog(d,state)))
       || ['dialogs','masks'].some(key => state.ui.truncated?.[key] !== false)
       || state.scan?.complete !== true) {
-      throw new Error('Node procedure is blocked by a mask or dialog');
+      const blockers={scan_complete:state.scan?.complete,truncated:state.ui?.truncated,
+        masks:Array.isArray(state.ui?.masks)?state.ui.masks.slice(0,4).map(m=>({kind:m.kind,target_tid:m.target_tid})):null,
+        dialogs:Array.isArray(state.ui?.dialogs)?state.ui.dialogs.slice(0,4).map(d=>({anchor_tid:d.identity?.anchor_tid})):null};
+      throw new Error('Node procedure is blocked by a mask or dialog: '+JSON.stringify(blockers));
     }
   };
   const crossTableOwnedStep=async(verb,payload,makeCode)=>{
@@ -263,7 +266,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessHistory = false } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -272,6 +275,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(settleOutputPort!==undefined&&(!readOutputs||!preparedNodeContext||tablePage||tableDialog
         ||typeof settleOutputPort!=='string'||!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(settleOutputPort)))
         throw Error('Output settlement requires a prepared native port');
+      if(typeof settleProcessHistory!=='boolean'||settleProcessHistory&&(!readProcesses||!preparedNodeContext||tablePage||tableDialog||settleOutputPort!==undefined))
+        throw Error('History settlement requires a prepared native process read');
       readOutputs ||= !!tablePage || !!tableDialog;
       if(wizardConfirmation && (!preparedNodeContext || !['close','deactivation'].includes(wizardConfirmation.kind)))throw Error('A prepared wizard confirmation binding is required');
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
@@ -292,11 +297,11 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       // Wall time binds the parent deadline once; elapsed waits must survive clock corrections.
       const started = now(), monotonicStarted = monotonicNow();
       const observationNow = () => started + monotonicNow() - monotonicStarted;
-      const deadline = settleOutputPort?operation.deadline:Math.min(operation.deadline, started + timeoutMs);
+      const deadline = settleOutputPort||settleProcessHistory?operation.deadline:Math.min(operation.deadline, started + timeoutMs);
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
       let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
       try {
-      for (let sample = 0; settleOutputPort || sample < 80; sample++) {
+      for (let sample = 0; settleOutputPort || settleProcessHistory || sample < 80; sample++) {
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         if (sample) await wait(Math.min(200, Math.max(0, deadline - observationNow())));
@@ -679,12 +684,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const epochRefusal=r.phase==='preconditions'&&r.error?.code==='UI_EPOCH_CHANGED'
             ||r.phase==='observing'&&r.error?.code==='UI_ROOT_STALE';
           const scanRefusal=timeScanRefusal(r,'ui.act');
+          const settingsPointRefusal=r.phase==='preconditions'&&r.error?.code==='UI_REFERENCE_OBSCURED'
+            &&action.verb==='begin_wizard'&&preparedNodeContext&&observed.prepared_node_context?.surface==='graph'
+            &&observed.ui.elements.some(e=>e.ref===action.ref&&e.tid===observed.prepared_node_context.tid+';Setting'
+              &&e.wizard_open&&e.interaction?.state==='point_observed');
           // Only an opting-in source selector can prove a replaced native body.
           // This remains a new observation and bound attempt, never a raw retry.
           const bodyRefusal=r.phase==='preconditions'&&r.error?.code==='UI_REFERENCE_STALE'
             &&bodyRefreshes===0&&typeof refreshReplacedBody==='function'
             &&refreshReplacedBody({receipt:r,observation:observed,action})===true;
-          if(!epochRefusal&&!bodyRefusal&&!scanRefusal)throw error;
+          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!settingsPointRefusal)throw error;
           if(bodyRefusal)bodyRefreshes++;
           const event = await entry('node_step_refresh_authorized', {
             step:operation.nodeStepSequence,internal_operation_id:r.operation_id,
@@ -693,6 +702,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             effect_possible: false,
             ...(bodyRefusal?{reason:'prepared_graph_body_replaced'}:{}),
             ...(scanRefusal?{reason:'read_scan_time_limit'}:{}),
+            ...(settingsPointRefusal?{reason:'prepared_settings_point_obscured'}:{}),
           });
           if (event?.rejected_operation_id !== r.operation_id || event.retry !== attempt + 1
             || event.binding_sha256 !== binding || event.intent_sha256 !== intent) {
