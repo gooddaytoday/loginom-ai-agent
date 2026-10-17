@@ -1,0 +1,4 @@
+Reference;Libelle;Montant;Date;Texte
+0001;café;12.25;2026-10-05;
+0002;garçon;0;2026-10-06;?
+0003;naïve;-2.5;2026-10-07;"left;right ""quoted"""

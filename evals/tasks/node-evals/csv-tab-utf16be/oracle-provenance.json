@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "method": "independent original TASK JSON and Python csv/Decimal/calendar calculation before all model calls",
+  "program": "evals/script/lab58-oracle.py",
+  "programSha256": "1d4ce4c4c5f2bc107bad957138fe1c2a399554431823c88a3019ee19168163fd",
+  "id": "csv-tab-utf16be",
+  "inputsArchiveSha256": "3cab0866997e36677b816050eab1b709c56c663fb9db945811fd93fbaffe6a63",
+  "inputTaskHashes": {
+    "TASK.md": "b90df7a3dddf9e3240b0761643df008fdc955f21aef3016e8e28aafdb5d8205c",
+    "data/tab_utf16be.csv": "cc726e1b706dd86c90af4f5763fae0300a618eba43935747f82bde49fa08a72b"
+  },
+  "independentOracleSha256": "7934fa0df607ccb3563948856deb35d5fdafaf128e4863ae52b387b47f3d7a15",
+  "existingExpectedSha256": "7934fa0df607ccb3563948856deb35d5fdafaf128e4863ae52b387b47f3d7a15",
+  "rows": 3,
+  "status": "EXACT_MATCH"
+}
