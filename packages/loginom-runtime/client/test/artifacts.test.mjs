@@ -92,6 +92,33 @@ test('host startup upload grant binds artifact, exact Loginom destination and ex
   } finally {await rm(directory,{recursive:true,force:true});}
 });
 
+test('misspelled second upload grant refuses and reports only its exact admitted argument pair',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'dock-grant-typo-'));
+  try {
+    const sourcePath=join(directory,'source');await writeFile(sourcePath,'abc');
+    const store=await createArtifactStore({directory:join(directory,'store')});
+    const descriptors=await admitStartupArtifacts(store,['main.csv','second.csv','third.csv'].map(name=>({
+      sourcePath,name,bytes:3,sha256:createHash('sha256').update('abc').digest('hex'),upload:{directory:'/test',overwrite:'reject'},
+    })));
+    const [main,second,third]=descriptors;
+    assert.deepEqual(store.getUploadGrant(main.artifact_id,main.upload.grant_id),main);
+    for(const grant of [second.upload.grant_id.slice(1),main.upload.grant_id,third.upload.grant_id]) {
+      assert.throws(()=>store.getUploadGrant(second.artifact_id,grant),error=>{
+        assert.equal(error.code,'ARTIFACT_GRANT_NOT_FOUND');
+        assert.ok(error.message.includes(JSON.stringify({artifact_id:second.artifact_id,upload_grant_id:second.upload.grant_id})));
+        assert.ok(error.message.includes('second.csv'));
+        assert.ok(!error.message.includes(main.upload.grant_id)&&!error.message.includes(third.upload.grant_id));
+        return true;
+      });
+    }
+    assert.deepEqual(store.getUploadGrant(second.artifact_id,second.upload.grant_id),second);
+    assert.deepEqual(store.list(),descriptors);
+    assert.throws(()=>store.getUploadGrant('unknown',second.upload.grant_id),error=>{
+      assert.ok(!error.message.includes(second.upload.grant_id));return true;
+    });
+  } finally {await rm(directory,{recursive:true,force:true});}
+});
+
 test('malformed upload grants reject the entire startup batch before admission',async()=>{
   const request={sourcePath:'/not-read/source',name:'file.csv',bytes:3,sha256:'0'.repeat(64)};
   let admitted=0;const store={admit:async()=>{admitted++;}};
