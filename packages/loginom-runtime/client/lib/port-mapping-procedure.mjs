@@ -1,5 +1,6 @@
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
 import {expandOutputChanges} from './output-mapping-changes.mjs';
+import {ensureMappingTableView} from './mapping-table-view.mjs';
 
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const mappingControl=(s,suffix)=>{
@@ -258,6 +259,8 @@ export async function excludeOutputField(channel,sourceRecordId) {
     &&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true
     &&s.node_mapping.mapping_wizard==='DerivedDataSourceOutputSocketWizard';
   let state=await channel.observe({condition:'native output mapping before exclusion',readMappings:true,ready});
+  // Definition paging uses Table view; bind the baseline after that guarded UI-only transition.
+  state=await ensureMappingTableView(channel,state);
   const baseline=state.node_mapping,source=baseline.source_fields.filter(f=>f.record_id===sourceRecordId);
   if(source.length!==1||source[0].required!==false)throw Error('Only a verified optional source can be excluded');
   const existing=baseline.target_fields.filter(f=>f.excluded===true&&f.exclusion_source?.record_id===sourceRecordId);
