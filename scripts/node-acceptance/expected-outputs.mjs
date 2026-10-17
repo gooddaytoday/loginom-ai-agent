@@ -4,12 +4,13 @@ export function parseExpectedOutputs(expected){
  need(Array.isArray(expected.nodes),'EXPECTED_SHAPE_INVALID');
  const multiple=Object.hasOwn(expected,'outputs');
  need(!multiple||!['columns','rows','output_node_type'].some(k=>Object.hasOwn(expected,k)),'EXPECTED_MIXED_OUTPUT_FORMS');
- const fields=['output_node_type','output_node_label','columns','rows','ordered','output_port'];
+ const fields=['output_node_type','output_node_label','columns','rows','ordered','output_port','column_order'];
  const outputs=multiple?expected.outputs:[Object.fromEntries(fields.filter(k=>Object.hasOwn(expected,k)).map(k=>[k,expected[k]]))];
  need(Array.isArray(outputs)&&outputs.length>0&&outputs.length<=32,'EXPECTED_OUTPUTS_INVALID');
  for(const output of outputs){
   need(output&&Object.keys(output).every(k=>fields.includes(k))
    &&(!Object.hasOwn(output,'ordered')||typeof output.ordered==='boolean')
+   &&(!Object.hasOwn(output,'column_order')||['exact','any'].includes(output.column_order))
    &&(!Object.hasOwn(output,'output_port')||Number.isSafeInteger(output.output_port)&&output.output_port>=0)
    &&(output.output_node_label===undefined||typeof output.output_node_label==='string'&&output.output_node_label.length>0)
    &&typeof output.output_node_type==='string'&&output.output_node_type.length>0
@@ -35,7 +36,7 @@ export function parseExpectedOutputs(expected){
 export function matchesExpectedOutput(data,expected){
  if(data.row_count!==expected.rows.length||!data.sample_complete||!data.precision?.numbers_verified
   ||data.sample?.length!==expected.rows.length||data.schema?.length!==expected.columns.length)return false;
- if(expected.columns.some((c,i)=>data.schema[i].name!==c.name||data.schema[i].label!==(c.label??c.name)||data.schema[i].type!==c.type))return false;
+ if(expected.column_order==='exact'&&expected.columns.some((c,i)=>data.schema[i].name!==c.name||data.schema[i].label!==(c.label??c.name)||data.schema[i].type!==c.type))return false;
  const indices=new Map(data.schema.map((f,i)=>[f.name,i]));
  if(indices.size!==expected.columns.length||expected.columns.some(c=>{
   const f=data.schema[indices.get(c.name)];return !f||f.label!==(c.label??c.name)||f.type!==c.type;
