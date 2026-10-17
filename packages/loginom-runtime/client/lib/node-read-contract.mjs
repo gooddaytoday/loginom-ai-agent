@@ -38,7 +38,10 @@ function retainedMappingSchemas(node,sourceId){
 }
 export function buildNodeReadRequest(args,source){
  const outcome=source?.outcome,node=outcome?.output,request=source?.parameters;
- need(outcome?.status==='SUCCEEDED'&&outcome.cleanup_complete===true&&node?.cleanup_complete===true
+ // A release after a stopped read keeps the verified configuration and the
+ // completed execution; only its output was not refreshed.
+ const releasedRead=outcome?.status==='FAILED'&&node?.checkpoint_kind==='local_node_released'&&node.released_phase==='read';
+ need((outcome?.status==='SUCCEEDED'||releasedRead)&&outcome.cleanup_complete===true&&node?.cleanup_complete===true
   &&node.execution?.status==='completed'&&node.node&&request?.target?.type!=='exports.text',
   'Invalid parameters.source_operation_id: a completed local table node operation with confirmed cleanup is required');
  const javascript=request.target.type==='programming.javascript';

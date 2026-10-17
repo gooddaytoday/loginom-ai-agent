@@ -16,11 +16,12 @@ import {closePreparedWizard} from './node-wizard-close.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
-import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
+import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable,restoreStoppedTableRead} from './node-output-procedure.mjs';
 import {readTableOutputPages} from './table-output-pages.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
 import {readCollapseNativeOutput} from './collapse-native-output.mjs';
 import {finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from './node-import-continuation.mjs';
+import {releasePendingNode,proveFinishLaunchRefused,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 
 const requireValue=(ok,message)=>{if(!ok)throw Error(message);};
 const verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
@@ -50,7 +51,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
   validate:implementation.validate,configure:(ctx,p,drivers)=>drivers.configureCalculator(ctx,p)});}
  const nodeApplyDriverFactory=options=>{
   const {operation,execute,onRecord,now,receiptOptions}=options;
-  let channel,activeSignal,configured,mapping,columns,executionDriver,executionReceipt,multipleOutputs,preconfiguration,inputCheckpoint,outputCheckpoint,configurationGraph,openCheckpoint;
+  let channel,activeSignal,configured,mapping,columns,executionDriver,executionReceipt,multipleOutputs,preconfiguration,inputCheckpoint,outputCheckpoint,configurationGraph,openCheckpoint,readView,finishStart;
   const graphForRejection=async()=>{
    const g=await operation.nodeTargetAdapter.observe({document_id:operation.nodeApply.request.document_id,workflow_ref:operation.nodeApply.request.workflow_ref},operation.deadline);
    requireValue(g.complete===true&&g.document_id===operation.nodeApply.node.document_id&&g.workflow_ref.workflow_id===operation.nodeApply.node.workflow_id,'Complete calculator rollback graph required');
@@ -290,6 +291,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
    async finish(mode,ctx){enter(ctx);if(mode==='close')return closePreparedWizard(channel);requireValue(mode==='done','Separate calculator port requires intermediate Done');return finishWizard(mode);},
    async finishGraph(mode,ctx){
     enter(ctx);
+    finishStart??=operation.nodeStepSequence??0;
     if(mode==='execute'&&implementation?.beforeGraphExecute)await implementation.beforeGraphExecute(options,ctx,configured);
     const graph=await channel.observe({condition:'calculator graph ready after port commit',ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
     // Loginom can leave a visible port without an SVG shape after port Done.
@@ -326,7 +328,8 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     if(read.coverage==='full')requireValue(implementation?.fullUiOutput===true&&read.sample_rows===100,
      'Full bounded UI output is unavailable for this handler');
     if(implementation?.readOutputs){requireValue(multipleOutputs?.verified,'Verified output schemas missing');return implementation.readOutputs(channel,read,ctx,multipleOutputs);}
-    const table=await openNewOutputTable(channel,0),formatProof=read.require_exact_numbers?await configureTablePrecision(channel,table.table):null;
+    const table=await openNewOutputTable(channel,0);readView={table:table.table,formatProof:null,restored:false,formatting:{}};
+    const formatProof=read.require_exact_numbers?await configureTablePrecision(channel,table.table,{progress:readView.formatting}):null;readView.formatProof=formatProof;
     let readSettings,data,formatRestoration;
     try {
       readSettings=await prepareTableRead(channel,table.table);
@@ -335,8 +338,8 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
        ?implementation.materializedSchema(raw.columns,configured,{node:ctx.node,execution:ctx.execution}):null;
       data=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:materialized?.columns??columns,requireExactNumbers:read.require_exact_numbers});
       if(materialized)data.category_fields=materialized.category_fields;
-    } finally { if(formatProof)formatRestoration=await restoreTablePrecision(channel,formatProof); }
-    const returned=await returnFromOutputTable(channel,table.table);
+    } finally { if(formatProof){formatRestoration=await restoreTablePrecision(channel,formatProof);readView.restored=true;} }
+    const returned=await returnFromOutputTable(channel,table.table);readView=null;
     if(read.coverage==='full')requireValue(data.sample_complete===true&&data.sample_rows===data.row_count
      &&!data.limitations?.length,'Full bounded UI output exceeds the readable row/cell/byte window');
     return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,
@@ -409,6 +412,30 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
       recovery:{verified:true,finish_receipt_id:outputCheckpoint.finish_reference.id,observed_mapping:observed,calculator,probe_cancel:cancelled}});
     },
    }:{}),
+   // A stopped graph finish may resume only when every launch-class gesture
+   // in this phase has a settled receipt refused before any precondition or
+   // gesture. Selection clicks are re-observed; a launch is never repeated.
+   ...(!implementation?.beforeGraphExecute?{async verifyPendingFinish(state,{signal}={}){
+    activeSignal=signal;signal?.throwIfAborted();
+    requireValue(state.pending?.phase==='finish'&&state.pending.receipt_id===operation.id+':finish'&&finishStart!==undefined&&channel
+     &&!operation.transportUncertain&&now()<Math.min(state.deadline,state.pending.deadline)
+     &&(state.request.finish!=='execute'||executionDriver),'Original finish boundary is not resumable');
+    operation.deadline=Math.min(state.deadline,state.pending.deadline);
+    const proof=await proveFinishLaunchRefused({steps:channel.stepsSince(finishStart),readReceipt:options.readReceipt});
+    if(state.request.finish==='execute')executionDriver.allowRefusedLaunch(proof);
+    finishStart=undefined;
+    return proof;
+   }}:{}),
+   async releasePending(state,{signal}={}){
+    enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
+    signal?.throwIfAborted();
+    // A stopped read may leave its own output Table open with exact-number
+    // formatting or a settings dialog. Restore that before leaving the view.
+    const view=state.pending.phase==='read'?readView:null;
+    return releasePendingNode({operation,channel,readReceipt:options.readReceipt,restoreRead:view?async()=>{
+     await restoreStoppedTableRead(channel,view);readView=null;return true;
+    }:undefined});
+   },
    async verifyContinuation(state,{signal}={}){
     if(state.output_mapping_recovered&&state.phases.at(-1)?.phase==='output_mapping'){
      if(!channel||state.pending||state.cleanup_complete!==true||!outputCheckpoint?.probe_verified||now()>=Math.min(state.deadline,state.configure_deadline))return false;

@@ -100,7 +100,7 @@ Loginom, проверяет frontend build через публичный `bg.app
 | `dock_workspace_observe` | Читает граф, настройки, диалоги, сообщения, маски и ячейки таблиц; возвращает доступные UI `ref` и `observation_id` |
 | `dock_ui_action` | Принимает `observation_id`, `operation_id`, `action` с `verb` из `click`, `double_click`, `fill`, `press`, `drag` и полями по схеме; выполняет один жест по свежим собственным refs |
 | `dock_operation_inspect` | По необязательному `operation_id` читает браузерную квитанцию и сверяет заданную либо текущую pending-операцию |
-| `dock_operation_recover` | Принимает исходный `operation_id`, отдельный `recovery_operation_id` и `strategy` из `complete_link`, `restore_control`, `accept_observed_state`, `abandon_operation`; для последних двух нужен `observation_id`; проверяет возможность и результат восстановления |
+| `dock_operation_recover` | Принимает исходный `operation_id`, отдельный `recovery_operation_id` и `strategy` из `complete_link`, `restore_control`, `accept_observed_state`, `abandon_operation`; для последних двух нужен `observation_id`, кроме освобождения остановленной `dock_node_apply` через `abandon_operation`, где доказательство собирает сам Dock; проверяет возможность и результат восстановления |
 
 Агент начинает с discovery, не угадывая action keys. Неизвестное действие и
 ошибочные аргументы возвращаются обычным MCP-content с `FAILED`; существующая
