@@ -1,0 +1,37 @@
+{
+  "path": "data/requests.csv",
+  "bytes": 128,
+  "sha256": "cbf391f6c5e34cd522a3510641e5cb4c7702a422ccfe0d9d52ea3fe2211aa91c",
+  "encoding": "UTF-8",
+  "bom": false,
+  "newline": "LF",
+  "delimiter": ",",
+  "header": true,
+  "rows": 2,
+  "columns": [
+    {
+      "name": "RequestId",
+      "label": "RequestId",
+      "type": "string"
+    },
+    {
+      "name": "Key",
+      "label": "Key",
+      "type": "string"
+    },
+    {
+      "name": "When",
+      "label": "When",
+      "type": "string"
+    },
+    {
+      "name": "Body",
+      "label": "Body",
+      "type": "string"
+    }
+  ],
+  "null_marker": "?",
+  "nulls_present": false,
+  "empty_string": "\"\"",
+  "decimal": "."
+}

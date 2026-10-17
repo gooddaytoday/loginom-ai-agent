@@ -1,0 +1,622 @@
+{
+  "contract_status": "stage0_proposal_requires_W2_json_projection",
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "integration.rest_request"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "integration.rest_request",
+      "output_node_label": "REST GET",
+      "output_port": 0,
+      "ordered": false,
+      "json_projection": {
+        "source_columns": [
+          {
+            "name": "RequestID",
+            "label": "Идентификатор запроса",
+            "type": "integer"
+          },
+          {
+            "name": "Response",
+            "label": "Ответ сервера",
+            "type": "string"
+          }
+        ],
+        "source_column": "Response",
+        "fields": {
+          "Method": "/method",
+          "EchoHeader": "/headers/X-Lab86",
+          "EchoBody": "/data",
+          "EchoRequestId": "/args/RequestId",
+          "EchoKey": "/args/Key",
+          "EchoWhen": "/args/When"
+        }
+      },
+      "columns": [
+        {
+          "name": "RequestID",
+          "label": "Идентификатор запроса",
+          "type": "integer"
+        },
+        {
+          "name": "Method",
+          "label": "Method",
+          "type": "string"
+        },
+        {
+          "name": "EchoHeader",
+          "label": "EchoHeader",
+          "type": "string"
+        },
+        {
+          "name": "EchoBody",
+          "label": "EchoBody",
+          "type": "string"
+        },
+        {
+          "name": "EchoRequestId",
+          "label": "EchoRequestId",
+          "type": "string"
+        },
+        {
+          "name": "EchoKey",
+          "label": "EchoKey",
+          "type": "string"
+        },
+        {
+          "name": "EchoWhen",
+          "label": "EchoWhen",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "RequestID": 0,
+          "Method": "GET",
+          "EchoHeader": "wave2",
+          "EchoBody": "",
+          "EchoRequestId": "r-a",
+          "EchoKey": "a b&я",
+          "EchoWhen": "2024-02-29T12:00:00.000"
+        },
+        {
+          "RequestID": 1,
+          "Method": "GET",
+          "EchoHeader": "wave2",
+          "EchoBody": "",
+          "EchoRequestId": "r-b",
+          "EchoKey": "x/y?",
+          "EchoWhen": "2024-03-01T12:00:00.000"
+        }
+      ]
+    },
+    {
+      "output_node_type": "integration.rest_request",
+      "output_node_label": "REST GET",
+      "output_port": 1,
+      "ordered": false,
+      "columns": [
+        {
+          "name": "RequestID",
+          "label": "Идентификатор запроса",
+          "type": "integer"
+        },
+        {
+          "name": "ErrorCode",
+          "label": "Код завершения",
+          "type": "integer"
+        },
+        {
+          "name": "ErrorDesc",
+          "label": "Описание ошибки",
+          "type": "string"
+        },
+        {
+          "name": "HttpStatusCode",
+          "label": "Код состояния HTTP",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "RequestID": 0,
+          "ErrorCode": 0,
+          "ErrorDesc": "OK",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestID": 1,
+          "ErrorCode": 0,
+          "ErrorDesc": "OK",
+          "HttpStatusCode": 200
+        }
+      ]
+    },
+    {
+      "output_node_type": "integration.rest_request",
+      "output_node_label": "REST DELETE",
+      "output_port": 0,
+      "ordered": false,
+      "json_projection": {
+        "source_columns": [
+          {
+            "name": "RequestID",
+            "label": "Идентификатор запроса",
+            "type": "integer"
+          },
+          {
+            "name": "Response",
+            "label": "Ответ сервера",
+            "type": "string"
+          }
+        ],
+        "source_column": "Response",
+        "fields": {
+          "Method": "/method",
+          "EchoHeader": "/headers/X-Lab86",
+          "EchoBody": "/data",
+          "EchoRequestId": "/args/RequestId",
+          "EchoKey": "/args/Key",
+          "EchoWhen": "/args/When"
+        }
+      },
+      "columns": [
+        {
+          "name": "RequestID",
+          "label": "Идентификатор запроса",
+          "type": "integer"
+        },
+        {
+          "name": "Method",
+          "label": "Method",
+          "type": "string"
+        },
+        {
+          "name": "EchoHeader",
+          "label": "EchoHeader",
+          "type": "string"
+        },
+        {
+          "name": "EchoBody",
+          "label": "EchoBody",
+          "type": "string"
+        },
+        {
+          "name": "EchoRequestId",
+          "label": "EchoRequestId",
+          "type": "string"
+        },
+        {
+          "name": "EchoKey",
+          "label": "EchoKey",
+          "type": "string"
+        },
+        {
+          "name": "EchoWhen",
+          "label": "EchoWhen",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "RequestID": 0,
+          "Method": "DELETE",
+          "EchoHeader": "wave2",
+          "EchoBody": "",
+          "EchoRequestId": "r-a",
+          "EchoKey": "a b&я",
+          "EchoWhen": "2024-02-29T12:00:00.000"
+        },
+        {
+          "RequestID": 1,
+          "Method": "DELETE",
+          "EchoHeader": "wave2",
+          "EchoBody": "",
+          "EchoRequestId": "r-b",
+          "EchoKey": "x/y?",
+          "EchoWhen": "2024-03-01T12:00:00.000"
+        }
+      ]
+    },
+    {
+      "output_node_type": "integration.rest_request",
+      "output_node_label": "REST DELETE",
+      "output_port": 1,
+      "ordered": false,
+      "columns": [
+        {
+          "name": "RequestID",
+          "label": "Идентификатор запроса",
+          "type": "integer"
+        },
+        {
+          "name": "ErrorCode",
+          "label": "Код завершения",
+          "type": "integer"
+        },
+        {
+          "name": "ErrorDesc",
+          "label": "Описание ошибки",
+          "type": "string"
+        },
+        {
+          "name": "HttpStatusCode",
+          "label": "Код состояния HTTP",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "RequestID": 0,
+          "ErrorCode": 0,
+          "ErrorDesc": "OK",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestID": 1,
+          "ErrorCode": 0,
+          "ErrorDesc": "OK",
+          "HttpStatusCode": 200
+        }
+      ]
+    },
+    {
+      "output_node_type": "integration.rest_request",
+      "output_node_label": "REST POST",
+      "output_port": 0,
+      "ordered": false,
+      "json_projection": {
+        "source_columns": [
+          {
+            "name": "RequestID",
+            "label": "Идентификатор запроса",
+            "type": "integer"
+          },
+          {
+            "name": "Response",
+            "label": "Ответ сервера",
+            "type": "string"
+          }
+        ],
+        "source_column": "Response",
+        "fields": {
+          "Method": "/method",
+          "EchoHeader": "/headers/X-Lab86",
+          "EchoBody": "/data",
+          "EchoRequestId": "/args/RequestId",
+          "EchoKey": "/args/Key",
+          "EchoWhen": "/args/When"
+        }
+      },
+      "columns": [
+        {
+          "name": "RequestID",
+          "label": "Идентификатор запроса",
+          "type": "integer"
+        },
+        {
+          "name": "Method",
+          "label": "Method",
+          "type": "string"
+        },
+        {
+          "name": "EchoHeader",
+          "label": "EchoHeader",
+          "type": "string"
+        },
+        {
+          "name": "EchoBody",
+          "label": "EchoBody",
+          "type": "string"
+        },
+        {
+          "name": "EchoRequestId",
+          "label": "EchoRequestId",
+          "type": "string"
+        },
+        {
+          "name": "EchoKey",
+          "label": "EchoKey",
+          "type": "string"
+        },
+        {
+          "name": "EchoWhen",
+          "label": "EchoWhen",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "RequestID": 0,
+          "Method": "POST",
+          "EchoHeader": "wave2",
+          "EchoBody": "{\"amount\":10}",
+          "EchoRequestId": "r-a",
+          "EchoKey": "a b&я",
+          "EchoWhen": "2024-02-29T12:00:00.000"
+        },
+        {
+          "RequestID": 1,
+          "Method": "POST",
+          "EchoHeader": "wave2",
+          "EchoBody": "{\"amount\":20}",
+          "EchoRequestId": "r-b",
+          "EchoKey": "x/y?",
+          "EchoWhen": "2024-03-01T12:00:00.000"
+        }
+      ]
+    },
+    {
+      "output_node_type": "integration.rest_request",
+      "output_node_label": "REST POST",
+      "output_port": 1,
+      "ordered": false,
+      "columns": [
+        {
+          "name": "RequestID",
+          "label": "Идентификатор запроса",
+          "type": "integer"
+        },
+        {
+          "name": "ErrorCode",
+          "label": "Код завершения",
+          "type": "integer"
+        },
+        {
+          "name": "ErrorDesc",
+          "label": "Описание ошибки",
+          "type": "string"
+        },
+        {
+          "name": "HttpStatusCode",
+          "label": "Код состояния HTTP",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "RequestID": 0,
+          "ErrorCode": 0,
+          "ErrorDesc": "OK",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestID": 1,
+          "ErrorCode": 0,
+          "ErrorDesc": "OK",
+          "HttpStatusCode": 200
+        }
+      ]
+    },
+    {
+      "output_node_type": "integration.rest_request",
+      "output_node_label": "REST PUT",
+      "output_port": 0,
+      "ordered": false,
+      "json_projection": {
+        "source_columns": [
+          {
+            "name": "RequestID",
+            "label": "Идентификатор запроса",
+            "type": "integer"
+          },
+          {
+            "name": "Response",
+            "label": "Ответ сервера",
+            "type": "string"
+          }
+        ],
+        "source_column": "Response",
+        "fields": {
+          "Method": "/method",
+          "EchoHeader": "/headers/X-Lab86",
+          "EchoBody": "/data",
+          "EchoUrl": "/url"
+        }
+      },
+      "columns": [
+        {
+          "name": "RequestID",
+          "label": "Идентификатор запроса",
+          "type": "integer"
+        },
+        {
+          "name": "Method",
+          "label": "Method",
+          "type": "string"
+        },
+        {
+          "name": "EchoHeader",
+          "label": "EchoHeader",
+          "type": "string"
+        },
+        {
+          "name": "EchoBody",
+          "label": "EchoBody",
+          "type": "string"
+        },
+        {
+          "name": "EchoUrl",
+          "label": "EchoUrl",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "RequestID": 0,
+          "Method": "PUT",
+          "EchoHeader": "wave2",
+          "EchoBody": "{\"amount\":10}",
+          "EchoUrl": "https://httpbin.org/anything/r-a"
+        },
+        {
+          "RequestID": 1,
+          "Method": "PUT",
+          "EchoHeader": "wave2",
+          "EchoBody": "{\"amount\":20}",
+          "EchoUrl": "https://httpbin.org/anything/r-b"
+        }
+      ]
+    },
+    {
+      "output_node_type": "integration.rest_request",
+      "output_node_label": "REST PUT",
+      "output_port": 1,
+      "ordered": false,
+      "columns": [
+        {
+          "name": "RequestID",
+          "label": "Идентификатор запроса",
+          "type": "integer"
+        },
+        {
+          "name": "ErrorCode",
+          "label": "Код завершения",
+          "type": "integer"
+        },
+        {
+          "name": "ErrorDesc",
+          "label": "Описание ошибки",
+          "type": "string"
+        },
+        {
+          "name": "HttpStatusCode",
+          "label": "Код состояния HTTP",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "RequestID": 0,
+          "ErrorCode": 0,
+          "ErrorDesc": "OK",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestID": 1,
+          "ErrorCode": 0,
+          "ErrorDesc": "OK",
+          "HttpStatusCode": 200
+        }
+      ]
+    },
+    {
+      "output_node_type": "integration.rest_request",
+      "output_node_label": "REST PATCH",
+      "output_port": 0,
+      "ordered": false,
+      "json_projection": {
+        "source_columns": [
+          {
+            "name": "RequestID",
+            "label": "Идентификатор запроса",
+            "type": "integer"
+          },
+          {
+            "name": "Response",
+            "label": "Ответ сервера",
+            "type": "string"
+          }
+        ],
+        "source_column": "Response",
+        "fields": {
+          "Method": "/method",
+          "EchoHeader": "/headers/X-Lab86",
+          "EchoBody": "/data",
+          "EchoUrl": "/url"
+        }
+      },
+      "columns": [
+        {
+          "name": "RequestID",
+          "label": "Идентификатор запроса",
+          "type": "integer"
+        },
+        {
+          "name": "Method",
+          "label": "Method",
+          "type": "string"
+        },
+        {
+          "name": "EchoHeader",
+          "label": "EchoHeader",
+          "type": "string"
+        },
+        {
+          "name": "EchoBody",
+          "label": "EchoBody",
+          "type": "string"
+        },
+        {
+          "name": "EchoUrl",
+          "label": "EchoUrl",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "RequestID": 0,
+          "Method": "PATCH",
+          "EchoHeader": "wave2",
+          "EchoBody": "{\"amount\":10}",
+          "EchoUrl": "https://httpbin.org/anything/r-a"
+        },
+        {
+          "RequestID": 1,
+          "Method": "PATCH",
+          "EchoHeader": "wave2",
+          "EchoBody": "{\"amount\":20}",
+          "EchoUrl": "https://httpbin.org/anything/r-b"
+        }
+      ]
+    },
+    {
+      "output_node_type": "integration.rest_request",
+      "output_node_label": "REST PATCH",
+      "output_port": 1,
+      "ordered": false,
+      "columns": [
+        {
+          "name": "RequestID",
+          "label": "Идентификатор запроса",
+          "type": "integer"
+        },
+        {
+          "name": "ErrorCode",
+          "label": "Код завершения",
+          "type": "integer"
+        },
+        {
+          "name": "ErrorDesc",
+          "label": "Описание ошибки",
+          "type": "string"
+        },
+        {
+          "name": "HttpStatusCode",
+          "label": "Код состояния HTTP",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "RequestID": 0,
+          "ErrorCode": 0,
+          "ErrorDesc": "OK",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestID": 1,
+          "ErrorCode": 0,
+          "ErrorDesc": "OK",
+          "HttpStatusCode": 200
+        }
+      ]
+    }
+  ]
+}
