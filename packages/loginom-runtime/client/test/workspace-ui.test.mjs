@@ -4251,6 +4251,33 @@ test('scan time budget accepts 500 ms but rejects 501 ms before issuing referenc
   }
 });
 
+test('owned wizard retries one timed scan, including after a gesture, without replaying it',async()=>{
+ for(const mode of ['transient','persistent','after_gesture','unbound']) {
+  const {page,binding}=await exportInputPortOverflowFixture(),clock=fixtureClock();
+  page.context.Date=clock.Date;
+  const wizardTid=binding.workflow_ref.prefix+';WizrdMCF';
+  const probe=page.add('button',wizardTid+';btnProbe','Probe',undefined,page.document.querySelectorAll('[data-tid="'+wizardTid+'"]')[0]);
+  const before=await page.execute({mode:'observe',prepared_node_context:binding});
+  const target=before.output.ui.elements.find(e=>e.tid===probe.attrs['data-tid']);
+  let reads=0,first=false;
+  const evaluate=page.evaluate.bind(page),query=page.document.querySelectorAll.bind(page.document);
+  page.evaluate=(fn,arg)=>{if(arg&&Object.hasOwn(arg,'discoverRoots')){reads++;first=true;}return evaluate(fn,arg);};
+  page.document.querySelectorAll=selector=>{
+   if(first){first=false;if(mode==='persistent'||reads===(mode==='after_gesture'?2:1))clock.advance(600);}
+   return query(selector);
+  };
+  const result=await page.execute(mode==='after_gesture'
+   ?{mode:'act',prepared_node_context:binding,snapshot:before.output,action:{verb:'click',ref:target.ref}}
+   :{mode:'observe',...(mode==='unbound'?{}:{prepared_node_context:binding})});
+  const success=['transient','after_gesture'].includes(mode);
+  assert.equal(result.status,success?'SUCCEEDED':'NOT_APPLIED',mode+JSON.stringify(result.error));
+  assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,mode==='unbound'?0:1,mode);
+  assert.equal(reads,mode==='after_gesture'?3:mode==='unbound'?1:2,mode);
+  assert.equal(page.events.filter(e=>e==='click').length,mode==='after_gesture'?1:0,mode);
+  if(!success){assert.equal(result.error.code,'UI_SCAN_LIMIT');assert.equal(result.output.ui,undefined);}
+ }
+});
+
 test('mask settlement cannot extend unbound or unrelated actions',()=>{
   for(const options of [
     {mode:'observe'},
