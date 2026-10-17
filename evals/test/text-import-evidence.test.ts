@@ -370,6 +370,36 @@ test("text import preserves a known first refusal and corrects the same GUID exa
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
 
+test("wrong delimiter accepts the exact definition-count refusal and rejects inconsistent counts or Execute", async () => {
+  for (const id of ["txt-wrong-delimiter", "csv-wrong-delimiter"]) {
+    const f = await positiveFixture(id)
+    try {
+      Object.assign(f.output, { status: "FAILED", configuration: {}, execution: { status: "not_requested", execution_id: null },
+        error: { code: "NODE_APPLY_STOPPED", message: "Import definition count differs: requested 2, observed 1" } })
+      f.calls.splice(3)
+      f.events.splice(1)
+      f.events.push(JSON.parse(JSON.stringify({ operation_id: "import", phase: "node_phase_refused", receipt: {
+        phase: "configure", status: "FAILED", verification: "text_import_binding_draft_discarded",
+        cleanup_complete: true, settings_unchanged: true, proof: { closed: { verified: true, cleanup_complete: true,
+          draft_discarded: true, settings_applied: false, execution_started: false,
+          node_context: { ...f.output.node, verified: true, surface: "graph", locked: false } } } } })))
+      await rm(path.join(f.attempt, "artifact"), { recursive: true })
+      await f.write()
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      for (const message of ["Import definition count differs: requested 3, observed 1", "Import definition count differs: requested 2, observed 2",
+        "Import definition count differs", "Import definition count differs: requested 2, observed 1 extra"]) {
+        Object.assign(f.output, { error: { code: "NODE_APPLY_STOPPED", message } })
+        await f.write()
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("typed binding/count")
+      }
+      Object.assign(f.output, { error: { code: "NODE_APPLY_STOPPED", message: "Import definition count differs: requested 2, observed 1" } })
+      f.events.push(JSON.parse(JSON.stringify({ operation_id: "import", phase: "node_step_prepared", action: { verb: "execute_wizard" } })))
+      await f.write()
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("Execute")
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }
+})
+
 test("incomplete initial settings pass only with a native discarded draft and no Execute", async () => {
   const f = await positiveFixture("initial-incomplete-settings")
   try {
