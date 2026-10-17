@@ -57,6 +57,14 @@ export function createNodeOperationRunner({run,validate,progress,admitResume}) {
    if([...jobs.values()].some(job=>job.state==='running'))throw Error('Another node operation is running');
    return launch(request,signature,1,false);
   },
+  // A verified runtime release replaces the retained AMBIGUOUS outcome of a
+  // settled job. It never starts work or touches a running job.
+  settle(id,outcome) {
+   const job=find(id);
+   if(job.state!=='settled')throw Error('Only a settled node job can receive a released outcome');
+   job.outcome=structuredClone(outcome);delete job.error;
+   return snapshot(job);
+  },
   status(id){return snapshot(find(id));},
   async wait(id,{timeoutMs=1000,signal}={}) {
    const job=find(id);

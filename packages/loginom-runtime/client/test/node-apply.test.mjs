@@ -258,6 +258,23 @@ test('import readiness timeout releases only a verified discarded draft and asks
  }
 });
 
+test('import configure refused before a gesture discards only its verified draft and asks to repeat the same settings',async()=>{
+ const f=fixture();
+ f.handlers.get('imports.text').configure=async()=>{
+  const error=new Error('Node procedure step did not confirm completion; inspect before retry: The document changed since this observation');
+  error.receipt={status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,trace:[],error:{code:'UI_EPOCH_CHANGED',message:'The document changed since this observation'}};
+  error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+   verification:'text_import_refresh_draft_discarded',proof:{closed:{verified:true,cleanup_complete:true,draft_discarded:true,settings_applied:false,
+    execution_started:false,node_context:{verified:true,surface:'graph',document_id:'doc',workflow_id:'workflow',node_id:'node1'}}}};
+  throw error;
+ };
+ const result=await f.run();
+ assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
+ assert.equal(result.error.cause.code,'UI_EPOCH_CHANGED');
+ assert.match(result.next_step.instruction,/SAME settings/);
+ assert.ok(result.next_step.instruction.includes(JSON.stringify({kind:'existing',type:'imports.text',ref:result.node})));
+});
+
 test('self source references name the current port source and cannot mix opaque IDs',()=>{
  const f=fixture(),p=request();p.mappings=[{direction:'output',port:0,fields:[{source:{kind:'configured_field',name:'Сумма'}}]}];
  assert.doesNotThrow(()=>validateNodeApplyRequest(p,f.handlers));

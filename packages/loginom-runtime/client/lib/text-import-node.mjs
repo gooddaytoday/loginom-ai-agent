@@ -1,7 +1,7 @@
 import {verifyUploadLineage} from './upload-lineage.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
 import {resolveTextImportEncoding} from './text-import-encoding.mjs';
-import {createNodeProcedure,NodeReadinessTimeout} from './node-procedure.mjs';
+import {createNodeProcedure,NodeReadinessTimeout,NodeProcedureStepError} from './node-procedure.mjs';
 import {configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError,ImportInitialSettingsError} from './text-import-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {readOutputDefinitionPages,readImportDefinitionPages} from './import-definition-pages.mjs';
@@ -15,6 +15,7 @@ import {openPreparedWizard} from './node-wizard-open.mjs';
 import {textImportConfigurationReadback} from './text-import-readback.mjs';
 import {textImportStepBudget} from './text-import-limits.mjs';
 import {textImportParametersSchema} from './node-api.mjs';
+import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 
 const requireValue=(v,m)=>{if(!v)throw new Error(m);};
 const one=(xs,m)=>{requireValue(xs.length===1,m);return xs[0];};
@@ -104,8 +105,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRea
     configurationReadback:textImportConfigurationReadback,
     validate:validateTextImportNodeParameters,
     configure:(ctx,p,drivers)=>drivers.configureTextImport(ctx,p)}]]);
-  const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,verifiedUploads,uploadHistory})=>{
-    let channel,configured,outputColumns,owner,executionDriver,executionReceipt,sourceReceipt,activeSignal;
+  const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,readReceipt,verifiedUploads,uploadHistory})=>{
+    let channel,configured,outputColumns,owner,executionDriver,executionReceipt,sourceReceipt,activeSignal,readView;
     const continuationSignal={throwIfAborted:()=>activeSignal?.throwIfAborted(),get aborted(){return activeSignal?.aborted;},get reason(){return activeSignal?.reason;}};
     const enter=ctx=>{
       activeSignal=ctx.signal;
@@ -168,10 +169,16 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRea
           // закрытие черновика не сохраняет его частичную настройку.
           const readiness=error instanceof NodeReadinessTimeout;
           const initialSettings=error instanceof ImportInitialSettingsError;
-          if(!(error instanceof ImportColumnBindingError||readiness||initialSettings)||operation.transportUncertain)throw error;
+          // A gesture refused before its preconditions (for example after the
+          // bounded UI_EPOCH_CHANGED refreshes) applied nothing; the draft is
+          // discarded like a readiness timeout, never retried in place.
+          const r=error instanceof NodeProcedureStepError?error.receipt:null;
+          const refused=r?.status==='NOT_APPLIED'&&r.effect_possible===false&&r.cleanup_complete===true&&Array.isArray(r.trace)
+            &&!r.trace.some(e=>['ui_preconditions_verified','ui_gesture_applied'].includes(e.event));
+          if(!(error instanceof ImportColumnBindingError||readiness||initialSettings||refused)||operation.transportUncertain)throw error;
           const closed=await closePreparedWizard(channel);
           error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
-            verification:initialSettings?'text_import_initial_settings_draft_discarded':readiness?'text_import_readiness_draft_discarded':'text_import_binding_draft_discarded',proof:{closed}};
+            verification:initialSettings?'text_import_initial_settings_draft_discarded':readiness?'text_import_readiness_draft_discarded':refused?'text_import_refresh_draft_discarded':'text_import_binding_draft_discarded',proof:{closed}};
           throw error;
         }
       },
@@ -247,20 +254,29 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRea
         if(read.ports.length===0)return verified({status:'complete',ports:[],no_output_requested:true,execution_id:executionReceipt.execution_id,evidence_ref:ctx.receipt_id});
         requireValue(read.ports.length===1&&read.ports[0]===0,'Text import has one data output');
         requireValue(Array.isArray(outputColumns)&&outputColumns.length>0,'Verified output mapping is unavailable');
-        const opened=await openNewOutputTable(channel,0);
-        const formatProof=read.require_exact_numbers?await configureTablePrecision(channel,opened.table):null;
+        const opened=await openNewOutputTable(channel,0);readView={table:opened.table,formatProof:null,restored:false};
+        const formatProof=read.require_exact_numbers?await configureTablePrecision(channel,opened.table):null;readView.formatProof=formatProof;
         let readSettings,data,formatRestoration,raw;
         try {
           readSettings=await prepareTableRead(channel,opened.table);
           raw=await readTableOutputPages(channel,opened.table,{sampleRows:read.sample_rows});
           data=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:outputColumns,requireExactNumbers:read.require_exact_numbers});
-        } finally { if(formatProof)formatRestoration=await restoreTablePrecision(channel,formatProof); }
-        const workflowReturn=await returnFromOutputTable(channel,opened.table);
+        } finally { if(formatProof){formatRestoration=await restoreTablePrecision(channel,formatProof);readView.restored=true;} }
+        const workflowReturn=await returnFromOutputTable(channel,opened.table);readView=null;
         // Private acceptance may retain raw civil evidence; no public response/schema changes.
         await onTableRead?.({raw,table_creation:opened,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:workflowReturn});
         return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:executionReceipt.execution_id,evidence_ref:ctx.receipt_id,
           ports:[{port:0,port_guid:opened.port_guid,fresh:true,freshness_basis:'new_bound_table_after_verified_node_execution',execution_id:executionReceipt.execution_id,...data}],
           table_creation:opened,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:workflowReturn});
+      },
+      async releasePending(state,{signal}={}) {
+        enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
+        signal?.throwIfAborted();
+        const view=state.pending.phase==='read'?readView:null;
+        return releasePendingNode({operation,channel,readReceipt,restoreRead:view?async()=>{
+          if(view.formatProof&&!view.restored){await restoreTablePrecision(channel,view.formatProof);view.restored=true;}
+          await returnFromOutputTable(channel,view.table);readView=null;return true;
+        }:undefined});
       },
       async verifyContinuation(state,{signal}={}) {
         if(!channel||!configured||state.pending||state.cleanup_complete!==true
