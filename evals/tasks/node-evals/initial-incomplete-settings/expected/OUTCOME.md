@@ -1,0 +1,15 @@
+# Ожидаемый диагностический исход
+
+Первичный неполный контракт отклонён до применения настроек/Execute; закрыт только собственный черновик. Не утверждать отсутствие временного target create без квитанции; чужие узлы не изменяются.
+
+```json
+{
+  "kind": "incomplete_initial_settings",
+  "description": "Первичный неполный контракт отклонён до применения настроек/Execute; закрыт только собственный черновик. Не утверждать отсутствие временного target create без квитанции; чужие узлы не изменяются.",
+  "engine_rejection_required": false,
+  "cleanup_required": true,
+  "request_omits": "columns",
+  "negative_fixture": false,
+  "known_refusal_required": true
+}
+```

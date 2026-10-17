@@ -1,0 +1,8 @@
+{
+  "case_id": "initial-incomplete-settings",
+  "outcome": "diagnostic",
+  "warm": "PASS",
+  "cold": "NOT_APPLICABLE",
+  "events_sha256": "b349ce7fc7fc1abc4a2e8a05e8205fc751065261c40a3a3e11d7e147a7d26aba",
+  "admission": "CODE_CHECKS_ONLY; actual model, budgets and stand cleanup require independent operational verification"
+}

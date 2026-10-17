@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "case_id": "initial-incomplete-settings",
+  "output_mode": "diagnostic",
+  "builder_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-01a14b91/reference-initial-incomplete-settings-2/initial-incomplete-settings/2",
+  "reference_attempt_number": 2,
+  "reference_attempts_consumed": 2,
+  "reference_limit": 3,
+  "source_harness_sha": "1b93b62c8",
+  "source_harness_dirty": false,
+  "session_id": "ses_eb468e0a2ffeI7h7fLaR0lP90n",
+  "actual_model": {
+    "providerID": "openai",
+    "modelID": "gpt-6-luna",
+    "variant": "high",
+    "proof_sha256": "244b8e00be60c94623bf5b8bfe983d38c968187c087febe6c30fc26579e205d3"
+  },
+  "cli_pin": {
+    "sourceCommit": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+    "sourceDirty": false,
+    "sourceTreeSha256": "04dd1fbfb63a21bb09c84b6c1d4fca4af459789fa6e0e5b365e3bd3710cd0416",
+    "manifestSha256": "96763b4b8aaae92642cbd9c624df47a10b2d09bc0a47762c870e2671a51d7bf8",
+    "binarySha256": "1e49d62432ac1803ad7e154a48b01f099cd443b44d72e257cb9166390706dfca",
+    "resourceManifestSha256": "5359de7aacf8590c8a77cb97d48f287c31e9402d0343f12e52712d519cfe23b5",
+    "configRawSha256": "e91a5c0aa9b47ae61b85b8d7d12319dfc441a6fe6940f508ec28fe4c1d8b16d0",
+    "configCanonicalSha256": "e7b0dbce4c637d220e244fadf7a50edfa55c79f549914aa8b45f7a19157c8e23",
+    "version": "0.1.17-lab61.initial.a2ba3d0f",
+    "files_verified": 5389,
+    "pinsRawSha256": "58e11f1242cf3b46723395095e214ee5b80de1aece9e4439a14efa59aa32b565"
+  },
+  "product_skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+  "action_manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+  "warm": "PASS",
+  "negative_checks_sha256": "ba83151f8d9c81bee83041fd1f5af78d7711aa16b4a1ed4fb8cecf01d07ec3dc",
+  "cold": "NOT_APPLICABLE: diagnostic contract",
+  "reference_package": "NOT_REQUIRED: diagnostic contract",
+  "observed_package_sha256": null,
+  "cleanup": {
+    "status": "confirmed",
+    "sha256": "37f176453f2bd8a298ed0a344bd6dba91aa230140ff98a8d67d501ab5ba2d390"
+  },
+  "prompt_sha256": "94114aaa8df8144cb9eb47612c205de56c147702c1b3e68d740089470c335ee5",
+  "methodology_version": "1.0.7",
+  "operational_release": "bound separately after genuine stage completion; no early release claim",
+  "validation_harness_sha": "1b93b62c8bbcdcd4ea2bf0c6de317547cced96a8",
+  "checker_sha256": "7c2d07f3d9ff1204f6126e4e21a151bc5118b4470953d1a115bfd91ed6aa26e0"
+}

@@ -1,0 +1,14 @@
+{
+  "case_id": "initial-incomplete-settings",
+  "basis": "original TASK and input bytes; independent Python stdlib parsing before model",
+  "program_sha256": "bd3e397e609d3ddabe156af30fbec477276369b8d8b25946409c089924ea5b47",
+  "task_sha256": "f101a3a3396f5a6bc807689da19e6495c0d1ebc019c9ee42ce7fb8f07f5f5c51",
+  "inputs": [
+    {
+      "path": "data/comma_utf8.txt",
+      "sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19"
+    }
+  ],
+  "independent_expectation_sha256": "72e5b621988abce380c4639f6077db9d4d79cf7e2a9cd5f6baa1c05054a61478",
+  "recorded_before_reference_dispatch": true
+}
