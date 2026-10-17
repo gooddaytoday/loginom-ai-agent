@@ -12,9 +12,9 @@ Immutable build5389entries/resources4394/source260 сверены; новая co
 Первый немодельный preflightPROFILE_NOT_READY/AppArmor сохранён; unit646PASS/15SKIP/typecheckPASS,ordinaryRELEASED/healthyFREE.
 OS proposal8c60514a0c7e4d790ff2c1a710bb82b2685cb13e принят Ben01a14aba; Evaler4d4cd3fd verification/handoff25d8f848 сверены.
 Оператор применил только exact282bytepolicybf25939f/root:root0644,одна загрузка--add--skip-cache; kernelraw5714bytesSHA71b3d550 равен exact compilation.
-193foreignkernelpolicies/cache/globaluserns1/шестьпрофилей/config hashes неизменны; lease/model/native вызовов нет.
+174foreignrawrecords/193loadedentries/cache/globaluserns1/шестьпрофилей/config hashes неизменны; lease/model/native вызовов нет.
 Доказательства: ../2026-10-17-lab61-apparmor-operator.md и receipt264de519; старыеd6/f2aa/config сохранены.
-Следующий native Evaler: проверить operator receipt и один свежий Rich installation admission без модели по новым pins.
+Evaler operatorverification6209a6ee проверен; freshRich01a14acc-a52a-7677-8103-b843fe930f16: preflightREADY/connectionVALID,unit646PASS/15SKIP/typecheckPASS,release/FREE ещё не подтверждены.
 После его gates отдельное решение о case continuation новой версии; только Evaler пишет state/provenance/нужныеold-newlimits безсброса.
 Ben independent10caseACCEPT/actualLuna-high/evidence/cleanup→genuinecompletion→ordinaryRELEASED→healthyFREE передLAB62/63 обязательны.
 Цикл до полногоLAB63/acceptedcommonintegration; dev/main/productrelease не назначены.

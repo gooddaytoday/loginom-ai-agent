@@ -1,0 +1,10 @@
+{
+  "scope": "count clarification only; original operator receipt and evidence bytes immutable",
+  "original_receipt_sha256": "264de5199ac13f934ee1f91f1acdb5c06d275171b94b06fa4556db80fe9ed481",
+  "foreign_kernel_raw_records_unchanged": 174,
+  "foreign_loaded_profile_entries_unchanged": 193,
+  "raw_record_count_after": 175,
+  "loaded_profile_count_after": 194,
+  "explanation": "193 counts loaded profile entries, not independently enumerated raw records. Canonical before/after maps contain174 foreign raw records. No repeated OS effect or change in byte-identity/preservation proofs.",
+  "native_evaler_verification_sha256": "6209a6ee8ba90553bcf4e83baba25103ac83dbc68454487ea0ae685bdd09693c"
+}
