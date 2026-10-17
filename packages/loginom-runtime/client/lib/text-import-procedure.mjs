@@ -54,9 +54,9 @@ export function isTextImportSourceReady(state) {
     && typeof fields.rows_to_skip.value==='string' && /^[0-9]+$/.test(fields.rows_to_skip.value);
 }
 
-function validateSettings(p,maxColumns) {
+function validateSettings(p,maxColumns,initial=false) {
   requireValue(p && typeof p === 'object' && !Array.isArray(p), 'Text import parameters are required');
-  requireValue(Object.keys(p).sort().join(',') === 'columns,format,source', 'Unexpected text import parameters');
+  requireValue(Object.keys(p).sort().join(',') === (initial?'format,source':'columns,format,source'), 'Unexpected text import parameters');
   requireValue(p.source && Object.keys(p.source).sort().join(',') === 'encoding,first_line_as_title,rows_to_skip,source_path', 'Source parameters are incomplete');
   requireValue(typeof p.source.source_path === 'string' && /^\/(?!\/)/.test(p.source.source_path)
     && p.source.source_path.length <= 2048 && !/[|*?%\\\x00-\x1f]/.test(p.source.source_path)
@@ -76,6 +76,7 @@ function validateSettings(p,maxColumns) {
   if(Object.hasOwn(p.format,'date_format'))requireValue(['dd/mm/yyyy','mm/dd/yyyy','yyyy/mm/dd','dd/mm/yy','mm/dd/yy','yy/mm/dd'].includes(p.format.date_format),'Invalid date_format');
   if(Object.hasOwn(p.format,'date_separator'))requireValue(['.','/','\\','-'].includes(p.format.date_separator),'Invalid date_separator');
   requireValue(p.format.delimiter.length === 1 && ['.', ','].includes(p.format.decimal_separator), 'Explicit delimiters are required');
+  if(initial)return;
   requireValue(Array.isArray(p.columns) && p.columns.length >= 1 && p.columns.length <= maxColumns,
     maxColumns===8?'The current reader supports 1–8 fully visible configured columns':'Delimited import supports 1–1000 explicitly configured columns');
   requireValue(new Set(p.columns.map(c => c?.name)).size === p.columns.length, 'Duplicate column names');
@@ -94,10 +95,13 @@ function validateSettings(p,maxColumns) {
 }
 export const validateTextImportRequest=p=>validateSettings(p,8);
 export const validateTextImportFieldsRequest=p=>{validateSettings(p,1000);resolveTextImportEncoding(p.source.encoding);};
+// Only the absent columns property admits the owned initial-refusal lifecycle.
+// Source/format keep exactly the full-new validation; no columns are invented.
+export const validateTextImportInitialRequest=p=>{validateSettings(p,1000,true);resolveTextImportEncoding(p.source.encoding);};
 
 export class ImportInitialSettingsError extends Error {
-  constructor(reason) {
-    super('Existing import has no saved source. Supply complete settings.source including an explicit source_path matching the verified upload, complete settings.format and nonempty settings.columns; the upload reference does not supply settings. '+reason);
+  constructor(reason,newDraft=false) {
+    super((newDraft?'New import draft has incomplete initial settings. ':'Existing import has no saved source. ')+'Supply complete settings.source including an explicit source_path matching the verified upload, complete settings.format and nonempty settings.columns; the upload reference does not supply settings. '+reason);
     this.name='ImportInitialSettingsError';
   }
 }
@@ -317,7 +321,8 @@ async function setImportFormatField(channel,initial,name,text) {
 }
 
 async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
-  (patch?validateTextImportPatch:fieldsOnly?validateTextImportFieldsRequest:validateTextImportRequest)(parameters);
+  const initial=fieldsOnly&&!patch&&parameters&&!Object.hasOwn(parameters,'columns');
+  (patch?validateTextImportPatch:initial?validateTextImportInitialRequest:fieldsOnly?validateTextImportFieldsRequest:validateTextImportRequest)(parameters);
   parameters=structuredClone(parameters);
   if(patch)parameters={source:parameters.source??{},format:parameters.format??{},columns:parameters.columns??[]};
   requireValue(owner?.status === 'observed' && owner.node?.tid && owner.path?.length, 'An observed wizard owner is required');
@@ -360,6 +365,10 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
     await act(s, { verb: 'wizard_step', ref: control(s, 'btnNext', 'wizard_step'), expected_stage: to });
     return read(to);
   };
+  if(initial) {
+    await read('text_import_file','new import source initialized',isTextImportSourceReady);
+    throw new ImportInitialSettingsError('settings.columns is absent; no settings were changed.',true);
+  }
   // Source and format are caller decisions. No automatic type detection result
   // is treated as confirmation of the requested schema.
   const sourceBaseline=patch?(await read('text_import_file','existing source initialized',isTextImportSourceReady)).wizard.import_source:null;
