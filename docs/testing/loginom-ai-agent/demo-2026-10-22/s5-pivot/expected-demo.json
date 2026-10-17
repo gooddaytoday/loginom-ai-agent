@@ -1,0 +1,62 @@
+{
+  "package_path": "/demo-2026-10-22/s5-pivot.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.cross_table"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.reform_columns",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Office",
+          "label": "Office",
+          "type": "real"
+        },
+        {
+          "name": "Warehouse",
+          "label": "Warehouse",
+          "type": "real"
+        },
+        {
+          "name": "Tech",
+          "label": "Tech",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "Север",
+          "Office": 5257.5,
+          "Warehouse": 1976.0,
+          "Tech": 44970.0
+        },
+        {
+          "Region": "Центр",
+          "Office": 7530.0,
+          "Warehouse": 1365.0,
+          "Tech": 77490.0
+        },
+        {
+          "Region": "Юг",
+          "Office": 4334.0,
+          "Warehouse": 2505.0,
+          "Tech": 35420.0
+        }
+      ]
+    }
+  ]
+}
