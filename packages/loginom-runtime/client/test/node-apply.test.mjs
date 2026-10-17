@@ -252,10 +252,29 @@ test('import readiness timeout releases only a verified discarded draft and asks
   assert.match(result.error.message,/readiness timeout: text_import_format: column editor/);
   if(!invalid) {
    assert.equal(result.next_step.tool,'dock_node_apply');
-   assert.match(result.next_step.instruction,/SAME settings/);assert.doesNotMatch(result.next_step.instruction,/observed source names/);
+   // The discarded first wizard of a new node saved no source; repeat with it explicitly.
+   assert.match(result.next_step.instruction,/explicit source_path equal to the verified upload destination/);assert.doesNotMatch(result.next_step.instruction,/observed source names/);
    assert.ok(result.next_step.instruction.includes(JSON.stringify({kind:'existing',type:'imports.text',ref:result.node})));
   }
  }
+});
+
+for(const kind of ['new','existing'])test('import configure refused before a gesture discards only its verified '+kind+' draft and names the retry settings',async()=>{
+ const f=fixture(),r=request();
+ if(kind==='existing')r.target={kind:'existing',type:'imports.text',ref:{document_id:'doc',workflow_id:'workflow',node_id:'node1'}};
+ f.handlers.get('imports.text').configure=async()=>{
+  const error=new Error('Node procedure step did not confirm completion; inspect before retry: The document changed since this observation');
+  error.receipt={status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,trace:[],error:{code:'UI_EPOCH_CHANGED',message:'The document changed since this observation'}};
+  error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+   verification:'text_import_refresh_draft_discarded',proof:{closed:{verified:true,cleanup_complete:true,draft_discarded:true,settings_applied:false,
+    execution_started:false,node_context:{verified:true,surface:'graph',document_id:'doc',workflow_id:'workflow',node_id:'node1'}}}};
+  throw error;
+ };
+ const result=await f.run(r);
+ assert.equal(result.status,'FAILED',JSON.stringify(result.error));assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
+ assert.equal(result.error.cause.code,'UI_EPOCH_CHANGED');
+ assert.match(result.next_step.instruction,kind==='new'?/explicit source_path equal to the verified upload destination/:/SAME settings/);
+ assert.ok(result.next_step.instruction.includes(JSON.stringify({kind:'existing',type:'imports.text',ref:result.node})));
 });
 
 test('self source references name the current port source and cannot mix opaque IDs',()=>{

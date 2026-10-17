@@ -124,7 +124,7 @@ test('lost finish cannot be repeated, abandoned, or repaired through generic UI'
  const state=(await f.runtime.inspect({operationId:'apply'})).output;
  assert.equal(state.state,'pending');assert.deepEqual(state.recovery_options,[]);assert.equal(state.internal_resume_available,false);
  await assert.rejects(f.runtime.runNodeApply(request(),{resume:true}),/unresolved phase/);
- await assert.rejects(f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'repair'}),/enclosing node procedure/);
+ await assert.rejects(f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'repair'}),/Release proof unavailable/);
  await assert.rejects(f.runtime.uiAct({verb:'click',ref:'ui-1'},{operationId:'gesture',observationId:'obs',recoveryOperationId:'apply'}),/original node phase/);
  await assert.rejects(f.runtime.runNodeApply({...request(),operation_id:'other'}),/pending/);
  assert.equal(f.calls.length,count);assert.throws(()=>f.runtime.assertPreparationAllowed(),/uncertain/);

@@ -146,15 +146,16 @@ export async function applyNode({request, operation, handlers, drivers, record,
   };
   let state=operation.nodeApply;
   let continuingConfigure=false;
-  let continuingOpen=false,openRecovery;
+  let continuingOpen=false,openRecovery,continuingFinish=false;
   if(state) {
     requireValue(state.signature===signature, 'node.apply operation ID was used with different parameters or handler');
     continuingConfigure=resume&&state.pending?.phase==='configure'&&request.target.type==='transform.date_time'
       &&typeof drivers.verifyPendingConfigure==='function';
     continuingOpen=resume&&state.pending?.phase==='open'&&typeof drivers.verifyPendingOpen==='function';
-    if(state.pending&&!continuingConfigure&&!continuingOpen)throw Error('Inspect the unresolved original node phase before continuing');
+    continuingFinish=resume&&state.pending?.phase==='finish'&&typeof drivers.verifyPendingFinish==='function';
+    if(state.pending&&!continuingConfigure&&!continuingOpen&&!continuingFinish)throw Error('Inspect the unresolved original node phase before continuing');
     if(state.result)return structuredClone(state.result);
-    requireValue(resume && (state.cleanup_complete===true||continuingConfigure||continuingOpen), 'Explicit inspected resume is required');
+    requireValue(resume && (state.cleanup_complete===true||continuingConfigure||continuingOpen||continuingFinish), 'Explicit inspected resume is required');
     requireValue(state.resumes<3, 'Node resume budget exhausted');
     // A journal cannot resurrect an unsaved draft. The live driver must attest
     // the same prepared package and every already accepted phase.
@@ -162,6 +163,11 @@ export async function applyNode({request, operation, handlers, drivers, record,
       openRecovery=await drivers.verifyPendingOpen(state,{signal});
       requireValue(openRecovery?.verified===true&&typeof openRecovery.wizard_open==='boolean','Original open boundary is not verified');
       await acknowledge({phase:'node_open_recovery_checked',signature,receipt_id:state.pending.receipt_id,recovery:openRecovery});
+    }else if(continuingFinish){
+      // A refused finish proof is final for this operation; only release remains.
+      const recovery=await drivers.verifyPendingFinish(state,{signal}).catch(error=>{state.finish_resume_refused=true;throw error;});
+      requireValue(recovery?.verified===true&&recovery.launch_effect===false,'Original finish boundary is not verified');
+      await acknowledge({phase:'node_finish_recovery_checked',signature,receipt_id:state.pending.receipt_id,recovery});
     }else requireValue(await (continuingConfigure?drivers.verifyPendingConfigure(state,{signal}):drivers.verifyContinuation(state,{signal}))===true, 'Live package or accepted phases differ from checkpoint');
     state.resumes++;
     delete state.verified_refusal;
@@ -186,12 +192,13 @@ export async function applyNode({request, operation, handlers, drivers, record,
     const deadline=Math.min(state.deadline,now()+budget,configuration?state.configure_deadline:Infinity,
       executionPhase&&state.execution_wait?.phase===name?state.execution_wait.deadline:Infinity);
     requireValue(now()<deadline,'node.apply configuration deadline elapsed');
-    const oldConfigure=continuingConfigure&&name==='configure',oldOpen=continuingOpen&&name==='open';
-    const pending=oldConfigure||oldOpen?state.pending:{phase:name,receipt_id:operation.id+':'+name,deadline,
+    const oldConfigure=continuingConfigure&&name==='configure',oldOpen=continuingOpen&&name==='open',oldFinish=continuingFinish&&name==='finish';
+    const pending=oldConfigure||oldOpen||oldFinish?state.pending:{phase:name,receipt_id:operation.id+':'+name,deadline,
       effect_possible:mutation,before_node:structuredClone(state.node)};
     requireValue(!oldConfigure||pending.receipt_id===operation.id+':configure'&&now()<pending.deadline,'Original configure boundary differs');
     requireValue(!oldOpen||pending.receipt_id===operation.id+':open'&&now()<pending.deadline,'Original open boundary differs');
-    if(!oldConfigure&&!oldOpen)await acknowledge({phase:'node_phase_prepared',signature,receipt:pending});
+    requireValue(!oldFinish||pending.receipt_id===operation.id+':finish'&&now()<pending.deadline,'Original finish boundary differs');
+    if(!oldConfigure&&!oldOpen&&!oldFinish)await acknowledge({phase:'node_phase_prepared',signature,receipt:pending});
     check();
     state.pending=pending;state.cleanup_complete=false;
     // Preserve uncertainty until the driver and journal both confirm completion.
@@ -225,7 +232,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
       }
       const importClosed=refusal?.proof?.closed;
       if(name==='configure'&&request.target.type==='imports.text'
-        &&['text_import_binding_draft_discarded','text_import_readiness_draft_discarded','text_import_initial_settings_draft_discarded'].includes(refusal?.verification)&&refusal.phase===name
+        &&['text_import_binding_draft_discarded','text_import_readiness_draft_discarded','text_import_refresh_draft_discarded','text_import_initial_settings_draft_discarded'].includes(refusal?.verification)&&refusal.phase===name
         &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
         &&refusal.settings_unchanged===true&&importClosed?.verified===true&&importClosed.cleanup_complete===true
         &&importClosed.draft_discarded===true&&importClosed.settings_applied===false
@@ -234,7 +241,11 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&['document_id','workflow_id','node_id'].every(k=>importClosed.node_context[k]===state.node?.[k])) {
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
-        state.correctable_import_request=refusal.verification==='text_import_initial_settings_draft_discarded'?'initial_settings':refusal.verification==='text_import_readiness_draft_discarded'?'readiness':'binding';
+        // A discarded first wizard of a new node leaves no saved source, so the
+        // retry must name source_path explicitly; an existing node keeps its own.
+        const draftOnly=['text_import_readiness_draft_discarded','text_import_refresh_draft_discarded'].includes(refusal.verification);
+        state.correctable_import_request=refusal.verification==='text_import_initial_settings_draft_discarded'||draftOnly&&request.target.kind==='new'?'initial_settings'
+          :draftOnly?'readiness':'binding';
       }
       if(name==='configure'&&request.target.type==='transform.calculator'
         &&(request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0
@@ -448,6 +459,52 @@ export async function applyNode({request, operation, handlers, drivers, record,
         ...(typeof error.receipt?.error?.code==='string'&&typeof error.receipt.error.message==='string'?{cause:{code:error.receipt.error.code.slice(0,120),
           message:String(error.receipt.error.message??'').slice(0,240)}}:{})}};
   }
+}
+
+/** Ends a stopped operation without continuing it. Only the trusted driver's
+ * release proof clears the phase; verified phases keep their facts, while an
+ * unverified commit or launch is reported as unknown rather than inferred.
+ */
+export async function releaseNodeApply({operation,handlers,drivers,record,signal}) {
+  const state=operation.nodeApply,pending=state?.pending,request=state?.request;
+  requireValue(pending&&state.node&&!state.result&&typeof drivers?.releasePending==='function',
+    'Release proof unavailable: no stopped phase of a known node with a release verifier');
+  const {handler}=validateNodeApplyRequest(request,handlers);
+  const proof=await drivers.releasePending(state,{signal});
+  requireValue(proof?.verified===true&&proof.cleanup_complete===true
+    &&['document_id','workflow_id','node_id'].every(k=>proof.node_context?.[k]===state.node[k]),'Release proof differs from the stopped node');
+  const verified=name=>state.phases.some(p=>p.phase===name);
+  const committed=request.finish!=='close'&&(verified('finish')||handler.output_wizard==='separate'&&verified('node_finish')&&verified('output_mapping'));
+  const launch=['materialization_start','materialization_execute','execute'].includes(pending.phase)||pending.phase==='finish'&&request.finish==='execute';
+  const readingOnly=request.mode===NODE_READ_MODE;
+  const configuration=readingOnly?{status:'not_requested'}:committed?{status:'applied',...(verified('finish')&&handler.configurationReadback
+    ?{readback:handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id})}:{})}
+    :{status:proof.cleanup.wizard_closed&&!verified('node_finish')?'discarded':'unknown'};
+  const execution=['completed','failed','cancelled'].includes(state.execution.status)||!launch?state.execution
+    :{status:'unknown',execution_id:state.execution.execution_id??null};
+  // A released reread points back to its own verified source operation.
+  const readSource=readingOnly?request.parameters.source_operation_id
+    :pending.phase==='read'&&execution.status==='completed'&&configuration.readback?operation.id:null;
+  const result={operation_id:operation.id,status:'FAILED',effect_possible:true,phases:state.phases.map(({value,...p})=>p),
+    node:state.node,execution,output:state.output,package_saved:false,cleanup_complete:true,
+    warnings:[...(proof.cleanup.wizard_closed?['The unsaved wizard draft of this node was cancelled during release.']:[]),
+      ...(proof.cleanup.read_view_restored?['The output Table view opened for reading was restored and closed during release.']:[]),
+      ...(proof.cleanup.views_returned?['The node visualizers opened for reading were left during release; a Table visualizer added by the stopped read may remain on its output port.']:[])],
+    configuration,checkpoint_kind:'local_node_released',persisted_package_verified:false,pending_phase:null,released_phase:pending.phase,
+    error:{code:'NODE_OPERATION_RELEASED',message:'Phase '+pending.phase+' stopped without a verified receipt. The operation was released after Dock proved the node rests unlocked on an unchanged quiet graph; nothing of the stopped phase was repeated.'},
+    next_step:readSource?{tool:'dock_node_read',original_operation_id:operation.id,
+      instruction:(readingOnly?'This output read was released. ':'The node is configured and executed; only reading its output stopped. ')
+        +'To read the output, call dock_node_read with a NEW operation_id and source_operation_id:"'+readSource+'". Saving the package and work on other nodes are allowed now.'}
+      :{tool:'dock_node_apply',original_operation_id:operation.id,
+      instruction:'Configuration: '+configuration.status+'. Execution: '+execution.status+'. Do not recreate the node and do not resume this released operation. To continue with this node, submit a NEW operation_id with target:'
+        +JSON.stringify({kind:'existing',type:request.target.type,ref:state.node})
+        +' and inputs:[] (existing links stay), supplying the complete intended settings for an existing node of this type; choose finish:"execute" when output is needed. Saving the package and work on other nodes are allowed now.'}};
+  const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,
+    phase:'node_operation_released',signature:state.signature,receipt:{...pending,proof},result};
+  const saved=await record(event);
+  requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(event),'Node phase journal acknowledgement differs');
+  state.pending=null;state.cleanup_complete=true;state.effect_possible=true;state.result=structuredClone(result);
+  return result;
 }
 
 function correctNodeRequest(request,node) {

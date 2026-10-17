@@ -26,6 +26,54 @@ export async function returnFromOutputTable(channel,table) {
     workflow_path:path,execution_started:false,reopen_performed:false};
 }
 
+// A stopped read can leave its own Table with a Format or Filter dialog open.
+// Format edits reach the Table only through Apply, so an unapplied draft is
+// cancelled; precision is restored only when Apply may have committed it.
+export async function restoreStoppedTableRead(channel,view) {
+  const cancelled=await cancelOwnTableDialog(channel,view.table);
+  const proof=view.formatProof??(view.formatting?.apply_issued?{table:view.table,original_formats:view.formatting.originals}:null);
+  if(proof&&!view.restored){await restoreTablePrecision(channel,proof);view.restored=true;}
+  const returned=await returnFromOutputTable(channel,view.table);
+  return {dialog_cancelled:cancelled,precision_restored:!!proof,returned};
+}
+
+async function cancelOwnTableDialog(channel,table) {
+  for(const kind of ['format','filter']) {
+    const tid=table.table_tid+';ModalWindow_Browse'+(kind==='format'?'Format':'Filter')+';btnCancel';
+    const cancel=s=>s.ui.elements.filter(e=>e.tid===tid&&e.allowed_actions.includes('click'));
+    // Each read admits only its own dialog kind; another kind refuses at once.
+    const s=await channel.observe({condition:'stopped read '+kind+' dialog',tableDialog:{table,kind},readOutputs:true,
+      ready:s=>s.ui.dialogs.length===0||cancel(s).length===1}).catch(()=>null);
+    if(!s)continue;
+    if(!s.ui.dialogs.length)return false;
+    await channel.perform({condition:'cancel the stopped read '+kind+' dialog',initialObservation:s,ready:s=>cancel(s).length===1,
+      identity:()=>({table,dialog:kind}),resolve:s=>({verb:'click',ref:one(cancel(s),'Unique Table dialog Cancel required').ref})});
+    await channel.observe({condition:'stopped read '+kind+' dialog closed',tableDialog:{table,kind},readOutputs:true,ready:s=>s.ui.dialogs.length===0});
+    return true;
+  }
+  throw Error('A dialog other than this Table read blocks release');
+}
+
+// A stopped read may leave the node's visualizers open before any Table is
+// active. Only the observed parent-scenario control of the same node is used.
+export async function returnFromNodeViews(channel,node) {
+  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  const owned=s=>s.prepared_node_context?.verified===true&&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k]);
+  const navigable=s=>owned(s)&&s.prepared_node_context.surface==='views'&&s.workflow_navigation?.status==='observed'
+    &&s.ui.elements.filter(e=>e.ref===s.workflow_navigation.control_ref&&e.tid===s.workflow_navigation.control_tid
+      &&e.allowed_actions.includes('click')).length===1;
+  const before=await channel.observe({condition:'node graph or its visualizers',readOutputs:true,readNavigation:true,
+    ready:s=>owned(s)&&s.prepared_node_context.surface==='graph'||navigable(s)});
+  if(before.prepared_node_context.surface==='graph')return {verified:true,returned:false};
+  const path=before.workflow_navigation.path;
+  await channel.perform({condition:'return from node visualizers to its scenario',initialObservation:before,
+    ready:s=>navigable(s)&&same(s.workflow_navigation.path,path),identity:()=>({node,path}),
+    resolve:s=>({verb:'click',ref:s.workflow_navigation.control_ref})});
+  const after=await channel.observe({condition:'visualizers returned to the prepared scenario',readNavigation:true,
+    ready:s=>owned(s)&&s.prepared_node_context.surface==='graph'&&s.navigation_context?.status==='observed'&&same(s.navigation_context.path,path)});
+  return {verified:true,returned:true,node_context:after.prepared_node_context,workflow_path:path};
+}
+
 async function revealViewerCard(channel,state,select,verb){
   let s=state;
   for(let attempt=0;attempt<100;attempt++){
@@ -120,7 +168,7 @@ export function verifyTableDateTimeFormat(observed,target) {
   return {index:target.index,key:target.key,type:target.type,mask,representation:'custom',precision:'millisecond',timezone:'unspecified'};
 }
 
-export async function configureTablePrecision(channel,table,{alreadyOpen=false,restore=null}={}) {
+export async function configureTablePrecision(channel,table,{alreadyOpen=false,restore=null,progress=null}={}) {
   const dialog={table,kind:'format'};let offset=0,definition;
   const read=(condition,ready=()=>true)=>channel.observe({condition,tableDialog:dialog,tableFormatPage:{offset,limit:8},ready:s=>s.table_settings?.status==='observed'
     &&s.table_settings.kind==='format'&&!!s.table_settings.format?.page?.schema_id&&(!definition||s.table_settings.format.page.schema_id===definition.schema_id)&&ready(s)});
@@ -139,6 +187,8 @@ export async function configureTablePrecision(channel,table,{alreadyOpen=false,r
   const deferred=restore?datetime.filter(t=>{const original=restore.find(f=>f.index===t.index&&f.key===t.key&&f.type===t.type);return original?.settings.format_string===''&&original.settings.custom===false&&original.settings.formatting===true;}):[];
   const targets=[...numeric,...datetime.filter(t=>!deferred.includes(t))];
   const originals=[];
+  // A stopped read restores from these originals once Apply may have committed.
+  if(progress)progress.originals=originals;
   const select=async target=>{
     const native=definition.fields.find(f=>f.index===target.definition_index);
     offset=Math.floor(native.index/8)*8;
@@ -199,6 +249,7 @@ export async function configureTablePrecision(channel,table,{alreadyOpen=false,r
       'Stored Table field mask differs from the selected format');
   }
   if(!s)s=await read('Table format ready to apply');
+  if(progress)progress.apply_issued=true;
   await action(s,'apply bound Table format',s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===table.table_tid+';ModalWindow_BrowseFormat;btnApply'),'Unique Table format Apply missing').ref}),()=>({fields:targets}));
   await channel.observe({condition:'Table format dialog closed',tableDialog:dialog,readOutputs:true,ready:s=>s.ui.dialogs.length===0&&s.node_outputs?.tables?.some(t=>t.active&&t.view_guid===table.view_guid)});
   const default_datetime_restoration=deferred.length?await restoreEmptyDateTimeFormats(channel,table,deferred,restore):[];
