@@ -259,7 +259,7 @@ def known_refusal(call, calls, events, workspace):
     rows = [event for event in events if event.get('operation_id') == call['input']['operation_id']]
     refused = [event.get('receipt', {}) for event in rows if event.get('phase') == 'node_phase_refused']
     require(len(refused) == 1 and refused[0].get('phase') == 'configure' and refused[0].get('status') == 'FAILED'
-        and refused[0].get('verification') in ('text_import_binding_draft_discarded', 'text_import_readiness_draft_discarded', 'text_import_initial_settings_draft_discarded')
+        and refused[0].get('verification') in ('text_import_binding_draft_discarded', 'text_import_readiness_draft_discarded', 'text_import_refresh_draft_discarded', 'text_import_initial_settings_draft_discarded')
         and refused[0].get('settings_unchanged') is True and refused[0].get('cleanup_complete') is True, 'diagnostic: native draft refusal required')
     closed = refused[0].get('proof', {}).get('closed', {})
     context = closed.get('node_context', {})
