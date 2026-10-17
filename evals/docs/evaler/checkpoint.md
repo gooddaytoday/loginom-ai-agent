@@ -1,20 +1,19 @@
 # Node evals — checkpoint
-Дата: 17.10.2026; владелец разрешил последовательное завершение LAB-59→60→61→62→63 после gates.
-Общая ветка text-import-evals: принятую LAB-58 интегрировали от 204c5c0258 без force.
-LAB-58 done152; Ben ACCEPT 01a14784-b249-7978-b047-4ee880440b3d.
-Case frozen 68161f9e34d792e82d8e92c396f76c69c17787ab, execution f2aa79b41579909681d6c7a1356452b2b7a3964b.
-Приёмка 5PASS/4FAIL/0ERROR; прежние ERROR/FAIL/расход сохраняются.
-Canonical verification SHA256 8af8498d5df740c2f89ade0dc38ae6f035d8ecdc764d4970de06cd95e64c1c73 сверена.
-Текущие helper/config/container/checkout: ../2026-10-16-text-import-integration.md.
-Helper f2aa: все 1700 файлов сверены; принятый executable интегрирован без изменения bytes.
-Offline integration: 103 PASS / 0 FAIL / 565 assertions; typecheck PASS.
-Текущая LAB-59: Ben проверяет frozen c05028803; 12 IDs и 24 TASK/input bytes сохраняются.
-Начальные пределы: reference 3/case, product 1/case/executor, recovery 1/lease, rework 3.
-Разрешение ../2026-10-17-text-import-series-authorization.md: все необходимые повышения LAB-59–63 с учётом расхода.
-Counters/once/ledger/идентичности не сбрасывать; неизменённые повторы запрещены.
-Перед dispatch: очереди прочитаны полностью, других active нет; FREE, container running, HTTP200, 6 чистых профилей.
-Следующий этап Rich: собственный status → acquire → немодельный preflight на lease первого этапа.
-Сценарная модель явно openai/gpt-6-luna/high; actual архив обязателен; модели работников прежние.
-SHA назначения фиксируется в шапке LAB-59 и state.base_sha; receipt нативной доставки — в metadata.
-Ровно одно routed поручение; Rich → Evaler → Ben; Ben считает ожидания до авторских ответов.
-После ACCEPT/evidence/cleanup/healthy FREE координатор закрывает карточку; принятый результат в общую ветку, затем следующий старт. Цикл остановить после LAB-63; dev/main/release не назначены.
+Дата: 17.10.2026; действует последовательное разрешение LAB59→60→61→62→63.
+LAB59 done44; accepted frozen c05028803ff2061de38aa20b9df94fc33a807a7e.
+Ben ACCEPT 01a148fb-d31d-73c9-98e3-bb4d47365903; Evaler 01a14902-ab46-7550-9c7e-0f2c02dd065d.
+Verification SHA256 936a4fa9a2061180defe71cc1182821497c283e2b3cf37cf91689d5cb9a41869 повторно проверен.
+Ben8PASS/4FAIL/0ERROR, Rich5PASS/7FAIL/0ERROR, исходные FAIL/расход сохранены.
+12 fresh cold PASS, 180 значений/типов совпали; 12 actual Luna/high архивов и cleanup проверены.
+Genuine completion→ordinary RELEASED→healthy FREE; root свежие FREE/container running/HTTP200.
+Принятый c050 интегрирован merge3414f0becb с f705 owner docs; все executable/test/case bytes совпадают.
+Новый oracle-test1PASS/0FAIL и typecheck PASS; полный suite644PASS/15SKIP/0FAIL — независимый Ben.
+Два неблокирующих errata и исходные CRLF/whitespace сохранены: ../2026-10-17-lab59-completion.md.
+Следующая LAB60: 11 исходных кейсов; ZIP SHA256 1acbf1603bd1fe4839d71434bc3122c6270eb3f2156de52f06951d7b23c1bac5.
+Текущие helper/config/CLI/container/checkout: ../2026-10-16-text-import-integration.md; установки прежние.
+Один native Evaler admission: проверить общую ветку, inputs/расход/queue/pins; записать base_sha и один Rich dispatch.
+Rich: собственный status→acquire→немодельный preflight на lease первого этапа; актуальный clean SHA из шапки.
+Сценарная модель явно Luna/high; проверка actual архивов обязательна; модели работников прежние.
+Необходимые лимиты повышать с сохранением расхода, old/new/основания и проверкой; counters/once/ledger не сбрасывать.
+Ben считает своё ожидание до авторских материалов/live; каждый исполнитель очищает своё; неизвестное не чистое.
+Общий цикл продолжается до подтверждённого завершения LAB63; dev/main/продуктовый release не назначены.
