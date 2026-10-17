@@ -1,0 +1,13 @@
+{
+  "issue": "LAB-61",
+  "source_report_id": "01a14b00-2630-7e58-8cd1-66fbcb718ee2",
+  "attachment_id": "01a14b00-25dd-7c55-9a2e-ef2a52ddeec1",
+  "archive": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-initial-blocker-evidence/lab61-continuation-blocked-1b93b62c.zip",
+  "archive_bytes": 9860420,
+  "archive_sha256": "6b4d4a141168ba45304ffdb64842bb6f264ccec4dbb949fbc19a80e080763dad",
+  "manifest_sha256": "964007f28f5a0ed12b7769f32a4214f190c5804e9cfdc1cb2226bc388c809b8a",
+  "payload_files": 554,
+  "all_payload_hashes_verified": true,
+  "source_sha": "1b93b62c8bbcdcd4ea2bf0c6de317547cced96a8",
+  "scope": "Delivery integrity only; not independent blocker review or full ten-case ACCEPT"
+}
