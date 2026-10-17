@@ -31,11 +31,14 @@ export async function restConnectionCapability(page,t){
   const point=async locator=>{
    need(await locator.count()===1,'control is missing or ambiguous');
    return locator.evaluate(e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);
-    if(r.width<=0||r.height<=0||x<0||y<0||x>=innerWidth||y>=innerHeight||!hit||!(hit===e||e.contains(hit))||e.closest('.x-item-disabled,.x-btn-disabled'))throw Error('REST control is not reachable');return {x,y};});
+    if(r.width<=0||r.height<=0||x<0||y<0||x>=innerWidth||y>=innerHeight||!hit||!(hit===e||e.contains(hit))||e.closest('.x-item-disabled,.x-btn-disabled'))throw Error('REST control is not reachable: '+e.closest('[data-tid]')?.getAttribute('data-tid'));return {x,y};});
   };
   const quiet=()=>wait('loading mask',()=>page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count().then(n=>n===0));
   const click=async(tid,double=false)=>{await quiet();const p=await wait('reachable '+tid,async()=>{try{return await point(find(tid));}catch{return null;}});await guard();effect=true;await page.mouse[double?'dblclick':'click'](p.x,p.y);};
-  const fill=async(tid,value,key='Tab')=>{await quiet();await guard();const input=find(tid).locator('input');await point(input);effect=true;await input.fill(value,{timeout:remaining()});await guard();await input.press(key,{timeout:remaining()});};
+  // Ext retains visible editor containers while their input is still hidden or
+  // zero-sized. Wait for this exact input's hit-test before the sole fill.
+  const reachableInput=tid=>wait('reachable input '+tid,async()=>{try{return await point(find(tid).locator('input'));}catch{return null;}});
+  const fill=async(tid,value,key='Tab')=>{await quiet();await reachableInput(tid);await guard();const input=find(tid).locator('input');effect=true;await input.fill(value,{timeout:remaining()});await guard();await input.press(key,{timeout:remaining()});};
   const moduleTid=t.workflow_ref.navigation_path.at(-2).tid,form=t.workflow_ref.prefix+';ConnectionsViewWizard',wizard=t.workflow_ref.prefix+';WizardModelConnectionForm',fields=wizard+';ConnectionWizard;';
   await click(moduleTid);
   const connections=await wait('module connections entry',async()=>{
@@ -52,7 +55,7 @@ export async function restConnectionCapability(page,t){
    await click(vendor,true);
    tile=await wait('new connection tile',async()=>{const added=(await tiles()).filter(c=>!before.some(b=>b.tid===c.tid));need(added.length<=1,'unexpected added connections');return added[0];});
   }
-  await click(tile.tid);await click(form+';tbrActions;btnConfigConnection');await wait('REST connection wizard',()=>find(fields+'pedURL;ValueControl').isVisible());await quiet();
+  await click(tile.tid);await click(form+';tbrActions;btnConfigConnection');await reachableInput(fields+'pedURL;ValueControl');await quiet();
   const connectionOwner=await page.evaluateHandle(()=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return {wizard:c.FController,node:c.Node.data.node.ParentNode};});
   const read=async()=>{
    await guard();need(await page.evaluate(b=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return c.FController===b.wizard&&c.Node.data.node.ParentNode===b.node&&b.wizard.FModelNode===b.node.FConnectionNode;},connectionOwner),'connection wizard owner changed');
@@ -69,7 +72,7 @@ export async function restConnectionCapability(page,t){
     const before=(await read()).parameters;await click(fields+'btnAdd');
     const added=await wait('new URL parameter',async()=>{const next=(await read()).parameters.filter(q=>!before.some(b=>b.name===q.name));return next.length===1?next[0]:null;});
     need(added.type==='Строковый','new URL parameter must be string');
-    await click(added.tid,true);await wait('URL name editor',()=>find(fields+'grdParams;tbl;celleditor;txt').isVisible());
+    await click(added.tid,true);
     await fill(fields+'grdParams;tbl;celleditor;txt',q.name,'Enter');
     await wait('URL name committed',async()=>(await read()).parameters.some(p=>p.name===q.name));
    }
@@ -80,7 +83,7 @@ export async function restConnectionCapability(page,t){
   await click(wizard+';btnDone');await wait('connection wizard committed',()=>find(form+';cntTile;ListView;tbl').isVisible());await quiet();
   // Reopen the saved object and independently reread the visible settings.
   const saved=(await tiles()).filter(c=>c.name===t.connection.name);need(saved.length===1,'saved connection is not unique');
-  await click(saved[0].tid);await click(form+';tbrActions;btnConfigConnection');await wait('saved connection wizard',()=>find(fields+'pedURL;ValueControl').isVisible());await quiet();
+  await click(saved[0].tid);await click(form+';tbrActions;btnConfigConnection');await reachableInput(fields+'pedURL;ValueControl');await quiet();
   need(await page.evaluate(b=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return c.Node.data.node.ParentNode===b.node&&c.FController.FModelNode===b.node.FConnectionNode;},connectionOwner),'saved connection owner differs');
   await connectionOwner.dispose();
   const persisted={name:await find(fields+'fldLabel').locator('input').inputValue(),base_url:await find(fields+'pedURL;ValueControl').locator('input').inputValue(),method:await find(fields+'pedVerb;ValueControl').locator('input').inputValue(),url_mode:await find(fields+'pedFieldType;ValueControl').locator('input').inputValue(),authentication:await find(fields+'txtAuth').locator('input').inputValue(),ignore_certificate:await find(fields+'pedIgnoreCertificateErrors;ValueControl').evaluate(e=>e.classList.contains('x-form-cb-checked')),
