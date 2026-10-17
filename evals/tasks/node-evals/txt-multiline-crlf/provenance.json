@@ -1,0 +1,10 @@
+{
+  "case_id": "txt-multiline-crlf",
+  "outcome": "positive",
+  "warm": "PASS",
+  "cold": "PASS",
+  "events_sha256": "08a14e7aa5aa7daf1d7bf8addc843818c1793005738465df4608edd3323c210b",
+  "reference_sha256": "32516d49b7817a0f8055aad0e449c0c83417292be3ff07e3a0517a79a1118b45",
+  "cold_report_sha256": "03fcce6162463d8a55b25efd1068a4398e3042f238b6f12997f533e041a4def8",
+  "admission": "CODE_CHECKS_ONLY; actual model, budgets and stand cleanup require independent operational verification"
+}

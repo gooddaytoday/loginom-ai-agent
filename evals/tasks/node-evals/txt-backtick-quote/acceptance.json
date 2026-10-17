@@ -1,0 +1,15 @@
+{
+  "family": "text-import",
+  "case_id": "txt-backtick-quote",
+  "spec": "SPEC.json",
+  "checks": [
+    "input",
+    "import",
+    "graph",
+    "sequence",
+    "result"
+  ],
+  "cold_required": true,
+  "runtime": "NOT_RUN",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea"
+}

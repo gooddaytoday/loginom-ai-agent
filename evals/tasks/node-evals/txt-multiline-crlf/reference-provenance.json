@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "case_id": "txt-multiline-crlf",
+  "builder_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab60-01a14923/reference-txt-multiline-crlf-1/txt-multiline-crlf/1",
+  "reference_number": 1,
+  "reference_model_attempts_consumed": 1,
+  "reference_limit": 3,
+  "source_harness_sha": "c0588df2b33cac8181bde0338c19827b2e297c04",
+  "source_harness_dirty": false,
+  "session_id": "ses_eb6c54ec3ffeXLybFTcIsH6JT8",
+  "actual_model": {
+    "providerID": "openai",
+    "modelID": "gpt-6-luna",
+    "variant": "high",
+    "proof_sha256": "dc74d1f6790360b92fee60cb682aa0a472320129cb24ac0f6d1d4f436961f357"
+  },
+  "cli": {
+    "cli_source": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+    "manifest_sha256": "71a239098deec163333f2d3515f3ba252144ae10f87d5c7ee6a81926541c1b98",
+    "binary_sha256": "11ce613ea14f3205cf1e8be767157e827bca7d7f4b4f7f8fe1e1d153daf42454",
+    "cold_pin": {
+      "sourceCommit": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+      "sourceDirty": false,
+      "manifestSha256": "71a239098deec163333f2d3515f3ba252144ae10f87d5c7ee6a81926541c1b98",
+      "binarySha256": "11ce613ea14f3205cf1e8be767157e827bca7d7f4b4f7f8fe1e1d153daf42454"
+    }
+  },
+  "product_skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+  "action_manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+  "reference_sha256": "32516d49b7817a0f8055aad0e449c0c83417292be3ff07e3a0517a79a1118b45",
+  "warm": "PASS",
+  "cold": {
+    "status": "PASS",
+    "report_sha256": "03fcce6162463d8a55b25efd1068a4398e3042f238b6f12997f533e041a4def8",
+    "cleanup_sha256": "349e8376e1da6d56de09b047f2c1c28aec327b507e9b713561766bdde2021758",
+    "storage_ledger_sha256": "1417ac4c441da6c2c98cf5d94b566aa47ac1ce6366aeba4695870a736b296530"
+  },
+  "reference_cleanup": {
+    "status": "confirmed",
+    "sha256": "3a473be56c8b8284d33c98ae922caa50b461196b8850459f5f866d6743e9d68a"
+  },
+  "operational_stage_release": "bound separately in final author report after genuine completion; no early release claim",
+  "methodology_version": "1.0.7",
+  "final_spec_metadata_changes": [
+    "case_readiness",
+    "runner_adaptation"
+  ],
+  "original_draft_spec_sha256": "0840f3b147f24959f38b1af880f23fcfbe883d8a0a6a782c0aaf494003a3aec4",
+  "prompt_sha256": "6da639c092d471052b10702f5897c824632a337628026ca44d575cd69dc79643"
+}

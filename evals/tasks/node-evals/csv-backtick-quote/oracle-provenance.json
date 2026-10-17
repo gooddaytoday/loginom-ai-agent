@@ -1,0 +1,35 @@
+{
+  "calculator": "evals/script/lab60-oracle.py",
+  "calculator_sha256": "474dee5b0b3c55fcf12dfe4b8d371ca141f30c0129bfd02add7edd9dd591948d",
+  "source": "original TASK.md and input bytes only",
+  "manifest_sha256": "1daf9c38be816379880d7bf428a9d9a707b0ec85c16e7489601ef916f183207d",
+  "id": "csv-backtick-quote",
+  "task_sha256": "8ba6a127af5830ed23540c24641a4bc6fd334d697de5e96702dc5d4e94819281",
+  "input": "backtick_quote.csv",
+  "input_sha256": "cc0dfcc437dbb75eab166f593104df83b23c7daf4d3dd1a5f3c0dedfe7295f0a",
+  "settings": {
+    "source": {
+      "encoding": "65001",
+      "rows_to_skip": 0,
+      "first_line_as_title": true
+    },
+    "format": {
+      "delimiter": "|",
+      "text_qualifier": "`",
+      "decimal_separator": ".",
+      "null_marker": "?",
+      "multiple_delimiters": false,
+      "date_format": "yyyy/mm/dd",
+      "date_separator": "-"
+    }
+  },
+  "source_headers": [
+    "Идентификатор",
+    "Название",
+    "Сумма",
+    "Дата",
+    "Текст"
+  ],
+  "oracle_sha256": "b6b956abb33ba18848f526c38da5a08dd8ca75b4c34255bcef8b36aa3a378e13",
+  "row_count": 3
+}

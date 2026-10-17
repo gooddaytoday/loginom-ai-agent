@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "case_id": "csv-multiline-lf",
+  "builder_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab60-01a14923/reference-csv-multiline-lf-1/csv-multiline-lf/1",
+  "reference_number": 1,
+  "reference_model_attempts_consumed": 1,
+  "reference_limit": 3,
+  "source_harness_sha": "c0588df2b33cac8181bde0338c19827b2e297c04",
+  "source_harness_dirty": false,
+  "session_id": "ses_eb6a7e074ffeV2Vc0hnZG6z1AD",
+  "actual_model": {
+    "providerID": "openai",
+    "modelID": "gpt-6-luna",
+    "variant": "high",
+    "proof_sha256": "cce805d654b4f6185e75b3c8c8a1ed55c699d74fa93708572454a678bbaab125"
+  },
+  "cli": {
+    "cli_source": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+    "manifest_sha256": "71a239098deec163333f2d3515f3ba252144ae10f87d5c7ee6a81926541c1b98",
+    "binary_sha256": "11ce613ea14f3205cf1e8be767157e827bca7d7f4b4f7f8fe1e1d153daf42454",
+    "cold_pin": {
+      "sourceCommit": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+      "sourceDirty": false,
+      "manifestSha256": "71a239098deec163333f2d3515f3ba252144ae10f87d5c7ee6a81926541c1b98",
+      "binarySha256": "11ce613ea14f3205cf1e8be767157e827bca7d7f4b4f7f8fe1e1d153daf42454"
+    }
+  },
+  "product_skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+  "action_manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+  "reference_sha256": "ab4ba5c3ae6ea8f06cb93beedecba370e0b02e107131b0452fcd70ea58792103",
+  "warm": "PASS",
+  "cold": {
+    "status": "PASS",
+    "report_sha256": "fd68b05293f99d997fbe26085f86c2a2889740b35d326c6474268f18cbf2d9c4",
+    "cleanup_sha256": "605991bf840e308243ea6549db3c0c067bc6f1c1c8d4480e51038050a4006906",
+    "storage_ledger_sha256": "bb83c2076a4d56fb12a169caa6a0adb59f2297e763984aa11f34e4385b006f5e"
+  },
+  "reference_cleanup": {
+    "status": "confirmed",
+    "sha256": "0e707b80b1bd28a26f2a30a7fb16f529df8a9765d67d58930c52d4d3d2e97e2a"
+  },
+  "operational_stage_release": "bound separately in final author report after genuine completion; no early release claim",
+  "methodology_version": "1.0.7",
+  "final_spec_metadata_changes": [
+    "case_readiness",
+    "runner_adaptation"
+  ],
+  "original_draft_spec_sha256": "fbcf8ad7deee675c343c0eca61fe73529d4adcc4833db0121bbc4f0645e47e52",
+  "hint": {
+    "sha256": "cdc65f85753e2afc546edca5078ab4b75bce28b1a5e26cf0899fa23c9cb27c00",
+    "path": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab60-01a14923/reference-csv-multiline-lf-1/hint.txt"
+  },
+  "prompt_sha256": "4931d163556575164e6648a0c229f4b058b742c9c4160dcb6af43ff0682caf43"
+}

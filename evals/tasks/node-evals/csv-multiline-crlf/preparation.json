@@ -1,0 +1,40 @@
+{
+  "source_path": "technical/csv/csv-multiline-crlf",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1748,
+      "sha256": "d2a9e8c93d0f3ab27f0e5c2ae1295af1e83af6f12fb37874ef4ba195f3ad8d68"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 3907,
+      "sha256": "7a8763b8a01c5ad8b70b3b2e43faeeb03d105fe57e81e8d64566700e70c83f95"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5267,
+      "sha256": "1c2966366bda95db8236bb59295ec70d3ede7a8401f2d9d4a8d27d49603fd98a"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3775,
+      "sha256": "e492d3435a86660fce3ec0c914649d3f5787b8066041de7b26cde27c5d91ca0a"
+    },
+    {
+      "path": "data/multiline_crlf.csv",
+      "bytes": 204,
+      "sha256": "3b55bdd5b6fdfbacbb84fa63287272cad12a8b6d5bf27d6f4d1e1b8e2773e299"
+    },
+    {
+      "path": "expected/table.json",
+      "bytes": 1885,
+      "sha256": "0dc30c2ba402d6193332f77c17e82629ecfbbff42d2e7255b84902f0ec351d76"
+    }
+  ],
+  "adaptations": [
+    "external independent cold handoff clarified"
+  ],
+  "runtime": "NOT_RUN"
+}

@@ -1,0 +1,35 @@
+{
+  "calculator": "evals/script/lab60-oracle.py",
+  "calculator_sha256": "474dee5b0b3c55fcf12dfe4b8d371ca141f30c0129bfd02add7edd9dd591948d",
+  "source": "original TASK.md and input bytes only",
+  "manifest_sha256": "1daf9c38be816379880d7bf428a9d9a707b0ec85c16e7489601ef916f183207d",
+  "id": "csv-multiline-crlf",
+  "task_sha256": "04dbbe9ead87ec5ca81f668a4a688d0dfa7cbaf68bb578e94333411cb2bd065b",
+  "input": "multiline_crlf.csv",
+  "input_sha256": "3b55bdd5b6fdfbacbb84fa63287272cad12a8b6d5bf27d6f4d1e1b8e2773e299",
+  "settings": {
+    "source": {
+      "encoding": "65001",
+      "rows_to_skip": 0,
+      "first_line_as_title": true
+    },
+    "format": {
+      "delimiter": ",",
+      "text_qualifier": "\"",
+      "decimal_separator": ".",
+      "null_marker": "?",
+      "multiple_delimiters": false,
+      "date_format": "yyyy/mm/dd",
+      "date_separator": "-"
+    }
+  },
+  "source_headers": [
+    "Идентификатор",
+    "Название",
+    "Сумма",
+    "Дата",
+    "Текст"
+  ],
+  "oracle_sha256": "0dc30c2ba402d6193332f77c17e82629ecfbbff42d2e7255b84902f0ec351d76",
+  "row_count": 3
+}

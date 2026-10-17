@@ -1,0 +1,35 @@
+{
+  "calculator": "evals/script/lab60-oracle.py",
+  "calculator_sha256": "474dee5b0b3c55fcf12dfe4b8d371ca141f30c0129bfd02add7edd9dd591948d",
+  "source": "original TASK.md and input bytes only",
+  "manifest_sha256": "1daf9c38be816379880d7bf428a9d9a707b0ec85c16e7489601ef916f183207d",
+  "id": "txt-multiline-lf",
+  "task_sha256": "3139447975a18bf5f4320015f5f95cdbf9cd1894d60a02ba3a5925d2791ee594",
+  "input": "multiline_lf.txt",
+  "input_sha256": "9abcbfaef88b3bd01797b85cda8da40ca09b303a9fa130b6cd986c786b9de369",
+  "settings": {
+    "source": {
+      "encoding": "65001",
+      "rows_to_skip": 0,
+      "first_line_as_title": true
+    },
+    "format": {
+      "delimiter": ",",
+      "text_qualifier": "\"",
+      "decimal_separator": ".",
+      "null_marker": "?",
+      "multiple_delimiters": false,
+      "date_format": "yyyy/mm/dd",
+      "date_separator": "-"
+    }
+  },
+  "source_headers": [
+    "Идентификатор",
+    "Название",
+    "Сумма",
+    "Дата",
+    "Текст"
+  ],
+  "oracle_sha256": "c4bdb5ba38e67773dc7f9d1d59f78f14743fca85ac7e430a6db63fd65b81734b",
+  "row_count": 3
+}

@@ -1,0 +1,35 @@
+{
+  "calculator": "evals/script/lab60-oracle.py",
+  "calculator_sha256": "474dee5b0b3c55fcf12dfe4b8d371ca141f30c0129bfd02add7edd9dd591948d",
+  "source": "original TASK.md and input bytes only",
+  "manifest_sha256": "1daf9c38be816379880d7bf428a9d9a707b0ec85c16e7489601ef916f183207d",
+  "id": "csv-single-quote",
+  "task_sha256": "af02fd59479a0ed6a4f97d98f3f8544fedc96f89fdd644fcbf0da71c1c42d0e9",
+  "input": "single_quote.csv",
+  "input_sha256": "b4db01539f6f8118dd093fd2b68bcdbceef5c8d8ba3c81aba4c19d5f32bdd3e9",
+  "settings": {
+    "source": {
+      "encoding": "65001",
+      "rows_to_skip": 0,
+      "first_line_as_title": true
+    },
+    "format": {
+      "delimiter": ";",
+      "text_qualifier": "'",
+      "decimal_separator": ".",
+      "null_marker": "?",
+      "multiple_delimiters": false,
+      "date_format": "yyyy/mm/dd",
+      "date_separator": "-"
+    }
+  },
+  "source_headers": [
+    "Идентификатор",
+    "Название",
+    "Сумма",
+    "Дата",
+    "Текст"
+  ],
+  "oracle_sha256": "51fdbd788f35ccdbd25810f140d56759aa869fd546ef8e498dbabc00e202a3d7",
+  "row_count": 3
+}
