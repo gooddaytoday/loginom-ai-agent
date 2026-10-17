@@ -1,0 +1,48 @@
+{
+  "independent_calculator": "script/lab59-oracle.py",
+  "calculator_sha256": "21ef973d66b51aaad517d560ef5ccd546d71c378b0256cde55aa87dd72b0dec0",
+  "inputs_archive_sha256": "14c81f76a19c1ca931ffaf22d45fa8587b5d5adb5d86cd14bae7cd0c32967deb",
+  "independent": {
+    "id": "csv-merge-off",
+    "task_sha256": "cb7bfc5a5b7f1587c80453123aae7f948b392347eeaa9fd88e9273e99a9552a4",
+    "input": "merge_off.csv",
+    "input_sha256": "8f0e40c946b3b722144bee7dcf78d2252c8b999132e5d0b89b843894f6ef8b74",
+    "settings": {
+      "source": {
+        "encoding": "65001",
+        "rows_to_skip": 0,
+        "first_line_as_title": true
+      },
+      "format": {
+        "delimiter": ";",
+        "text_qualifier": "\"",
+        "decimal_separator": ".",
+        "null_marker": "?",
+        "multiple_delimiters": false,
+        "date_format": "yyyy/mm/dd",
+        "date_separator": "-"
+      }
+    },
+    "source_headers": [
+      "Идентификатор",
+      "Название",
+      "Сумма",
+      "Дата",
+      "Текст"
+    ],
+    "oracle_sha256": "2eb83c918a42b97b2becd523f51c2e3682a35a06f52000d2191d2ec8fa5e7af6",
+    "row_count": 3
+  },
+  "baseline_files": {
+    "SPEC.json": "328b5277558d97dc93897acd69e9fc359a699809930c2e3d313cacaee6f17027",
+    "acceptance.json": "0c3bbd9fa61d3f73cf703b86e8a11b4731b7b3837b8c8a03f30bbe9f4cad0bae",
+    "task.json": "20dae0444dd6c5331a5f3f36dc4c77db2dfc0bbd605c136d7a57d766d4255ba5",
+    "PROVENANCE.md": "a132b4d097811fdb291c80f4cd6b166b039cf961be0c9d2a97c32c1ee073b9ec",
+    "TASK.md": "cb7bfc5a5b7f1587c80453123aae7f948b392347eeaa9fd88e9273e99a9552a4",
+    "SPEC.md": "841bdad9ad3069aadffd62224f597a7a4d7449b17a09c1eeed3ee9beddf6bbc5",
+    "preparation.json": "fbe6bfad0b449f91b1b4248aafddd5564a0a3074b7061cd0d14fe401abc09956",
+    "data/merge_off.csv": "8f0e40c946b3b722144bee7dcf78d2252c8b999132e5d0b89b843894f6ef8b74",
+    "expected/table.json": "2eb83c918a42b97b2becd523f51c2e3682a35a06f52000d2191d2ec8fa5e7af6"
+  },
+  "comparison": "PASS: independently calculated typed table equals prepared expected; before any reference"
+}

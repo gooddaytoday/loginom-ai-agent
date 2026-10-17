@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "case_id": "txt-merge-on",
+  "builder_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab59-01a14823/reference-live/reference-txt-merge-on-1/txt-merge-on/1",
+  "reference_number": 1,
+  "reference_model_attempts_consumed": 1,
+  "reference_limit": 3,
+  "source_harness_sha": "eea62fa3cf3ea1c30cc5d028e71fb04175eb6873",
+  "source_harness_dirty": false,
+  "session_id": "ses_eb7bbf4aeffe6j0C9Zp447ZM0o",
+  "actual_model": {
+    "providerID": "openai",
+    "modelID": "gpt-6-luna",
+    "variant": "high",
+    "proof_sha256": "d54648f0b82357553c08aa9a794895eb003f204475a906edb6dcf02abd23600b"
+  },
+  "cli": {
+    "cli_source": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+    "manifest_sha256": "71a239098deec163333f2d3515f3ba252144ae10f87d5c7ee6a81926541c1b98",
+    "binary_sha256": "11ce613ea14f3205cf1e8be767157e827bca7d7f4b4f7f8fe1e1d153daf42454",
+    "cold_pin": {
+      "sourceCommit": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+      "sourceDirty": false,
+      "manifestSha256": "71a239098deec163333f2d3515f3ba252144ae10f87d5c7ee6a81926541c1b98",
+      "binarySha256": "11ce613ea14f3205cf1e8be767157e827bca7d7f4b4f7f8fe1e1d153daf42454"
+    }
+  },
+  "product_skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+  "action_manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+  "reference_sha256": "7925ed10a6690e28b14e8e1060d6262566c3a2d5ff36a70eaa8db68ae4bcac5e",
+  "warm": "PASS",
+  "cold": {
+    "status": "PASS",
+    "report_sha256": "b0448a025d024fc8635b23524c47698115f41f9324d55b3cd4aa237bfa847be1",
+    "cleanup_sha256": "774250456fde9b4740e81eaf744233fc28eee208e3d6dc962f83b7cead1e26a9",
+    "storage_ledger_sha256": "81e95cac811566396c2169bf11942fcf04f0f478fec2355f8979033319327f2a"
+  },
+  "reference_cleanup": {
+    "status": "confirmed",
+    "sha256": "79d499b7cc879bcf9e780a71e7d0ac8025ffa013b830afceb1fd45fa280bd159"
+  },
+  "operational_stage_release": "bound separately in final author report after genuine completion; no early release claim",
+  "methodology_version": "1.0.7",
+  "hint": null,
+  "final_spec_metadata_changes": [
+    "case_readiness",
+    "runner_adaptation"
+  ],
+  "original_draft_spec_sha256": "674950d548b56b9bc7de173be49b6466bb348d9e295496537ffe7729b61ebf50"
+}

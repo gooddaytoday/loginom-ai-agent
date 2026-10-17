@@ -1,0 +1,10 @@
+{
+  "case_id": "csv-merge-on",
+  "outcome": "positive",
+  "warm": "PASS",
+  "cold": "PASS",
+  "events_sha256": "39236c35eda627fd7a9e1c207be469061594becceb76369ba80c3e678a0408c1",
+  "reference_sha256": "8f2969021204ab59042cb00c3d43cd0ad3f68cf7ba8cd0cbc565be349abbed4a",
+  "cold_report_sha256": "d7535587fc161c5fdd76190a214b4577836f0d329318245002d19708d72029b4",
+  "admission": "CODE_CHECKS_ONLY; actual model, budgets and stand cleanup require independent operational verification"
+}

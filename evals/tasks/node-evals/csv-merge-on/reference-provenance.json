@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "case_id": "csv-merge-on",
+  "builder_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab59-01a14823/reference-live/reference-csv-merge-on-1/csv-merge-on/1",
+  "reference_number": 1,
+  "reference_model_attempts_consumed": 1,
+  "reference_limit": 3,
+  "source_harness_sha": "eea62fa3cf3ea1c30cc5d028e71fb04175eb6873",
+  "source_harness_dirty": false,
+  "session_id": "ses_eb7a6b12cffeZqIWgfG7nBkXGv",
+  "actual_model": {
+    "providerID": "openai",
+    "modelID": "gpt-6-luna",
+    "variant": "high",
+    "proof_sha256": "40321d756543d9e1b1853fdafdd6116cace475c5fa36fe949b85b04566335b92"
+  },
+  "cli": {
+    "cli_source": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+    "manifest_sha256": "71a239098deec163333f2d3515f3ba252144ae10f87d5c7ee6a81926541c1b98",
+    "binary_sha256": "11ce613ea14f3205cf1e8be767157e827bca7d7f4b4f7f8fe1e1d153daf42454",
+    "cold_pin": {
+      "sourceCommit": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+      "sourceDirty": false,
+      "manifestSha256": "71a239098deec163333f2d3515f3ba252144ae10f87d5c7ee6a81926541c1b98",
+      "binarySha256": "11ce613ea14f3205cf1e8be767157e827bca7d7f4b4f7f8fe1e1d153daf42454"
+    }
+  },
+  "product_skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+  "action_manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+  "reference_sha256": "8f2969021204ab59042cb00c3d43cd0ad3f68cf7ba8cd0cbc565be349abbed4a",
+  "warm": "PASS",
+  "cold": {
+    "status": "PASS",
+    "report_sha256": "d7535587fc161c5fdd76190a214b4577836f0d329318245002d19708d72029b4",
+    "cleanup_sha256": "bb585f21a38f939ef43b8bf59e01c31b3b7b7ee9ee30bb7f3ec96362315b3fd8",
+    "storage_ledger_sha256": "7802d4035e026223eb78b4ebbaccc1dc55dfd2dfe2d9a5ce6fdd7ac508a7a739"
+  },
+  "reference_cleanup": {
+    "status": "confirmed",
+    "sha256": "8134f913461dd7fce5d145c092749e4bb33e5131169dea9aba0da67a6dc74f9f"
+  },
+  "operational_stage_release": "bound separately in final author report after genuine completion; no early release claim",
+  "methodology_version": "1.0.7",
+  "hint": {
+    "sha256": "8de6e9845a605c607b242c5b5a8aac55bfa1240c2ec51a4ecd1d47b951750914",
+    "path": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab59-01a14823/reference-live/reference-csv-merge-on-1/hint.txt"
+  },
+  "final_spec_metadata_changes": [
+    "case_readiness",
+    "runner_adaptation"
+  ],
+  "original_draft_spec_sha256": "ec0b86dae47503dd86f68b83b65a2d9ce32da7fc2afa116c5ecbe9b5a265a47c"
+}

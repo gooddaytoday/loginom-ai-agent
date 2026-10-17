@@ -1,0 +1,42 @@
+{
+  "independent_calculator": "script/lab59-oracle.py",
+  "calculator_sha256": "21ef973d66b51aaad517d560ef5ccd546d71c378b0256cde55aa87dd72b0dec0",
+  "inputs_archive_sha256": "14c81f76a19c1ca931ffaf22d45fa8587b5d5adb5d86cd14bae7cd0c32967deb",
+  "independent": {
+    "id": "csv-no-header-skip",
+    "task_sha256": "dae503f640ac05b2d5aea3c60f28ee72df9c0feab9285926ec02a12eed08936c",
+    "input": "no_header_skip.csv",
+    "input_sha256": "6ac4739e92e7756cb8396407beee792d01c89e8a06aa8d1e232e972bb1d32f31",
+    "settings": {
+      "source": {
+        "encoding": "65001",
+        "rows_to_skip": 2,
+        "first_line_as_title": false
+      },
+      "format": {
+        "delimiter": "|",
+        "text_qualifier": "\"",
+        "decimal_separator": ".",
+        "null_marker": "?",
+        "multiple_delimiters": false,
+        "date_format": "yyyy/mm/dd",
+        "date_separator": "-"
+      }
+    },
+    "source_headers": null,
+    "oracle_sha256": "1ba0336493b18ae7503287ed5ee58083f49b5eaf8a35587dbc8bbcb8c510b7f7",
+    "row_count": 3
+  },
+  "baseline_files": {
+    "SPEC.json": "60f5f2f448a1c3635cf1ead04143514dfd2bda714f2ac1ae3bf7c9385b496481",
+    "acceptance.json": "944846d6565552dd30ef26a965f6254ca8b3c21b4282ebfa6914b3fd968ea874",
+    "task.json": "69ca0057b78a5dae344a751520e4aa894ecc81f2f5715f0e3eadce60d63bb403",
+    "PROVENANCE.md": "92972d14cf80f895df48f83a55fed41663402f074410c6e1244e30056e0b00e0",
+    "TASK.md": "dae503f640ac05b2d5aea3c60f28ee72df9c0feab9285926ec02a12eed08936c",
+    "SPEC.md": "0f37fed46c14551ba870322d55cd3d5c73e108ea1b3afdf36279607e80f7eef4",
+    "preparation.json": "848b6cf49a71ea9a361309c5a7362218707d322ce36923bd7c4f0f091b37dfc7",
+    "data/no_header_skip.csv": "6ac4739e92e7756cb8396407beee792d01c89e8a06aa8d1e232e972bb1d32f31",
+    "expected/table.json": "1ba0336493b18ae7503287ed5ee58083f49b5eaf8a35587dbc8bbcb8c510b7f7"
+  },
+  "comparison": "PASS: independently calculated typed table equals prepared expected; before any reference"
+}
