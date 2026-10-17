@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent stage-0 expectations; no network or Loginom imports. W2 proposal."""
+"""Independent GET result expectations; no network or Loginom imports."""
 import argparse
 import csv
 import hashlib
@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-TYPE = "integration.rest_request"
+TYPE = "programming.javascript"
 
 
 def column(name, kind="string", label=None):
@@ -18,42 +18,19 @@ def generate():
     raw = (ROOT / "data/requests.csv").read_bytes()
     with (ROOT / "data/requests.csv").open(encoding="utf-8", newline="") as source:
         reader = csv.DictReader(source)
-        if reader.fieldnames != ["RequestId", "Key", "When", "Body"]:
+        if reader.fieldnames != ["RequestId", "Key"]:
             raise ValueError("Unexpected input schema")
         requests = list(reader)
     if len(requests) != 2 or len({r["RequestId"] for r in requests}) != 2:
         raise ValueError("Expected two distinct requests")
-    if any(not r["RequestId"].isascii() or "/" in r["RequestId"] for r in requests):
-        raise ValueError("Path fixture must be safe ASCII")
-    native = [column("RequestID", "integer", "Идентификатор запроса"),
-              column("Response", label="Ответ сервера")]
-    status = [native[0], column("ErrorCode", "integer", "Код завершения"),
-              column("ErrorDesc", label="Описание ошибки"),
-              column("HttpStatusCode", "integer", "Код состояния HTTP")]
-    outputs = []
-    for method in ["GET", "DELETE", "POST", "PUT", "PATCH"]:
-        query = method in {"GET", "DELETE", "POST"}
-        fields = {"Method": "/method", "EchoHeader": "/headers/X-Lab86", "EchoBody": "/data"}
-        fields.update({"EchoRequestId": "/args/RequestId", "EchoKey": "/args/Key",
-                       "EchoWhen": "/args/When"} if query else {"EchoUrl": "/url"})
-        rows = []
-        for i, request in enumerate(requests):
-            row = {"RequestID": i, "Method": method, "EchoHeader": "wave2",
-                   "EchoBody": request["Body"] if method in {"POST", "PUT", "PATCH"} else ""}
-            row.update({"EchoRequestId": request["RequestId"], "EchoKey": request["Key"],
-                        "EchoWhen": request["When"]} if query else
-                       {"EchoUrl": "https://httpbin.org/anything/" + request["RequestId"]})
-            rows.append(row)
-        common = {"output_node_type": TYPE, "output_node_label": "REST " + method}
-        outputs.append({**common, "output_port": 0, "ordered": False,
-                        "json_projection": {"source_columns": native, "source_column": "Response", "fields": fields},
-                        "columns": [native[0]] + [column(name) for name in fields], "rows": rows})
-        outputs.append({**common, "output_port": 1, "ordered": False, "columns": status,
-                        "rows": [{"RequestID": i, "ErrorCode": 0, "ErrorDesc": "OK", "HttpStatusCode": 200}
-                                 for i in range(len(requests))]})
-    expected = {"contract_status": "stage0_proposal_requires_W2_json_projection",
-                "package_path": "{{PACKAGE_PATH}}", "nodes": [{"type": "imports.text"}, {"type": TYPE}],
-                "outputs": outputs}
+    expected = {
+        "package_path": "{{PACKAGE_PATH}}",
+        "nodes": [{"type": "imports.text"}, {"type": "integration.rest_request"}, {"type": TYPE}],
+        "output_node_type": TYPE,
+        "columns": [column("RequestId"), column("Key"), column("HttpStatusCode", "integer")],
+        "rows": [{"RequestId": request["RequestId"], "Key": request["Key"], "HttpStatusCode": 200}
+                 for request in requests],
+    }
     manifest = {"path": "data/requests.csv", "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
                 "encoding": "UTF-8", "bom": False, "newline": "LF", "delimiter": ",", "header": True,
                 "rows": len(requests), "columns": [column(name) for name in reader.fieldnames],
@@ -79,7 +56,7 @@ def main():
             path.write_text(content, encoding="utf-8")
         elif path.read_text(encoding="utf-8") != content:
             raise SystemExit("STALE: " + name)
-    print("Fixture expectations verified (W2 proposal; not a live/cold PASS).")
+    print("Fixture expectations verified (not a live/cold PASS).")
 
 
 if __name__ == "__main__":
