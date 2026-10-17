@@ -1,9 +1,9 @@
-# Node evals — checkpoint
-Дата:17.10.2026;owner59→60→61→62→63/autonomous blockers/neededlimits;single heartbeat30min;onlyEvaler writesstate.
+# LAB59–63 — series checkpoint
+Дата:17.10.2026 UTC/18.10.2026 MSK;owner59→60→61→62→63/autonomous blockers/neededlimits;single heartbeat30min;onlyEvaler writesstate.
 LAB59done44/LAB60done38/acceptedc050-7500/history/verificationd2f089db сохранены;не возобновлять.
-Accepted code/test/case7d3a5cbda2873094219dec836b1b6c0ffa40f639 unchanged;common subsequent commits docs-only;no dev/mainrelease.
+Accepted code/test/case7d3a5cbda2873094219dec836b1b6c0ffa40f639 unchanged;common after9d only5docs delivery/nativeverification/admission/runbook/checkpoint;not unaccepted6ed/product/no dev-mainrelease.
 LAB61 original20TASK-input hashes/10IDs/criteria/Ben inputs-onlyb9d2b534 unchanged;diagnostic/no fakepackage-cold.
-Unacceptedcase1b93b62c8bbcdcd4ea2bf0c6de317547cced96a8/historya1eee8 remains outsidecommon;6d6+3two-e refs retainprovenance.
+UNACCEPTED cases/harness6ed1f51393d7893d80d4364522d197c1a269d99d directparent1b93/historya1eee8 remains outsidecommon;6d6+3two-e references retainownprovenance;initialnewa2ba.
 Precontinuation formalreference14/product0/recovery0/probes0/rework3;allFAIL-AMBIGUOUS/once/ledger retained,no limitincrease.
 Historical2e990 source/db69e290/OS8c605-bf25939f appliedONCE/installationd546d160-decision97c8bba5 and oldd6/helperf2aa/config preserved.
 Old14DB/112actualLuna-high/Evaler8074065b/genuineaeb136f4→ordinaryRELEASED17:46:43→healthyFREE17:47:01 preserved.
@@ -16,5 +16,5 @@ OS04a39fb8 BenACCEPT01a14b72/49negative/77ed146d;policy5cd834b0 APPLIEDONCE20:04
 OperatorZIPace0a2fe/13payload/nativefeb45655 verified;newadmission Rich01a14b7a READY01a14b89:82payload771ce07f/manifest2c23ae20/root3cfd8fcd/nativea43a997e.
 FreshpreflightREADY20:12:41/unit646PASS15SKIP0FAIL3399assertions/typecheck0/genuinecompletionb9f07f2c20:21:52→ordinaryRELEASED20:22:02→healthyFREE20:22:11 beforecurrentcaselease;2449history/20DB-journal-WAL/350historical/20inputs verified.
 Native decision3c7021a8/handoff01a14b91-4d20 authorizesRich initial#2 then physicalproduct10 onlyafterall10warmrefs,newPRODUCTa2ba/Luna-high/no-infra-retry;Benlive/fullACCEPT separate.
-CurrentRich01a14b91-4d36-7785-afea-6f20d54c66b1 RUNNING eval-tests/mainphaserich137;ownreferencelease20:35:54/caseSHA1b93;5queues181/66/28/11/13 onlyRichactive,readtransfersfirst/no duplicate.
-Currentpreliminary:all10refs gate/Richcandidate6ed1f51393d7893d80d4364522d197c1a269d99d UNACCEPTED;originalrefcompletiondaf5ce17→ordinaryRELEASED20:46:37 verified. Firstproductwrapper setupERROR0CLI-modelcalls/profilepathintimeoutargv;nonmodelnew-script hypothesis passed/guardunchanged. One allowedrecovery consumed/original1919c573→ordinaryRELEASED20:51:36 ownerbindingverified;oldERROR/reservation/once retained;newownproductlease20:52:04/source6ed/confige91 unchanged. Preliminaryreference15/product0/recovery1;formalREPORT/Ben10caseACCEPT/evidence/actualmodel/cleanup/completion/RELEASED/healthyFREE/acceptedcommonintegration pending before62→63;stoponlyfull63.
+Rich READY_FOR_BEN01a14beb completed;Evaler verified1154payload/140caseGit/20TASK-input/350old/45202history/11nativejournals/90actualLuna-highmessages/210standarchivefiles;native09e2fb85 hashchecked. Exactadmission256fd80b/downloadbyteequal,recovered_author preserveswrapperERROR0calls/reservation/recovery1919c573;fullreview notACCEPT.
+Native Ben01a14bf2-e3ed-71e7-a75e-a3fc612a434b QUEUED eval-tests/handoff01a14bf2-e3cf/mainphaseben147/frozen6ed;positive taskread22:19 resolvestransportambiguity/no duplicate. Eactualusage ref15/Richproduct10=3PASS7FAIL/Ben0/recovery1/probes0/rework3 unchangedlimits;Ben10firstphysicalcalls afteroffline/ownfreshlease-preflight allowed,Luna-high/no-infra-retry/no reference-probe-authorretry. NativeFREE22:15 snapshot beforeBenlease;fullBen10caseACCEPT/finalmodel-evidence-cleanup/genuinecompletion/ordinaryRELEASED/healthyFREE/no unfinishedworkers/acceptedcommonintegration before62→63;onlyfull63 stopsautomation.

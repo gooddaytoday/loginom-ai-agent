@@ -1,0 +1,345 @@
+{
+  "intent_id": "LAB61-BEN-FULL-REVIEW-6ed1f513-01a14beb",
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "trigger_comment_id": "01a14beb-9728-70c8-9202-882e7b9a4176",
+  "decision": "AUTHOR_DELIVERY_VERIFIED; admit initial full independent Ben review via recovered_author; not full ACCEPT",
+  "cases_sha": "6ed1f51393d7893d80d4364522d197c1a269d99d",
+  "product_sha": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "version": "0.1.17-lab61.initial.a2ba3d0f",
+  "config": "/home/user/.local/share/loginom-evals-runtime/operations/lab61-initial-a2ba3d0f.json",
+  "config_raw_sha256": "e91a5c0aa9b47ae61b85b8d7d12319dfc441a6fe6940f508ec28fe4c1d8b16d0",
+  "pins_raw_sha256": "58e11f1242cf3b46723395095e214ee5b80de1aece9e4439a14efa59aa32b565",
+  "common_documentary_sha": "9d18347eb05d3b2bb1b044006c6ec10a3c5509c2",
+  "accepted_case_base": "7d3a5cbda2873094219dec836b1b6c0ffa40f639",
+  "verification": {
+    "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+    "source_report_id": "01a14beb-9728-70c8-9202-882e7b9a4176",
+    "cases_sha": "6ed1f51393d7893d80d4364522d197c1a269d99d",
+    "product_sha": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+    "delivery": {
+      "archive_sha256": "400dcf57db6e8c8fe92dec31190d29a7c808dccf664c39934b2e2261daae4a44",
+      "manifest_sha256": "d004030f958e4519c197a00ebe89bfa58425759adf53589c5747855c3c3b8c42",
+      "payloads_verified": 1154,
+      "case_files_equal_exact_git": 140,
+      "original_TASK_input_files_verified": 20
+    },
+    "historical_evidence_files_verified": 350,
+    "new_closed_history_files_verified": 45202,
+    "new_native_journals_verified": 11,
+    "new_actual_model_proofs": [
+      {
+        "case": "initial-incomplete-settings",
+        "session": "ses_eb468e0a2ffeI7h7fLaR0lP90n",
+        "assistant_messages": 9
+      },
+      {
+        "case": "csv-ambiguous-headers",
+        "session": "ses_eb42a87e7ffeMwA1YcKIXr4VEv",
+        "assistant_messages": 4
+      },
+      {
+        "case": "csv-unclosed-quote",
+        "session": "ses_eb44052ecffe7GeL3kW2MukQ5m",
+        "assistant_messages": 12
+      },
+      {
+        "case": "csv-wrong-delimiter",
+        "session": "ses_eb4316553ffeIZztptESbs239F",
+        "assistant_messages": 8
+      },
+      {
+        "case": "csv-wrong-encoding",
+        "session": "ses_eb438d7afffer9lh5DZ0zvr7pZ",
+        "assistant_messages": 9
+      },
+      {
+        "case": "initial-incomplete-settings",
+        "session": "ses_eb42438adffeYcvyLqM6GiYSGh",
+        "assistant_messages": 10
+      },
+      {
+        "case": "missing-source-column",
+        "session": "ses_eb41d9cb0ffeNTQ33F4ltjMDoR",
+        "assistant_messages": 11
+      },
+      {
+        "case": "txt-ambiguous-headers",
+        "session": "ses_eb446a03effeZwoHpDKsL6qmPm",
+        "assistant_messages": 4
+      },
+      {
+        "case": "txt-unclosed-quote",
+        "session": "ses_eb45c40deffertF0ohnRtpcR4s",
+        "assistant_messages": 8
+      },
+      {
+        "case": "txt-wrong-delimiter",
+        "session": "ses_eb44d6a31ffeUFSqehJrxFFo0A",
+        "assistant_messages": 8
+      },
+      {
+        "case": "txt-wrong-encoding",
+        "session": "ses_eb4549253ffesq3Z6c0TmQCSk2",
+        "assistant_messages": 7
+      }
+    ],
+    "products": [
+      {
+        "case": "txt-unclosed-quote",
+        "verdict": "FAIL",
+        "completion_sha256": "5dcad04bbf9bb0b8a8f1f55e9278b01acb5b980b28b2ad243b1a262c061e5234",
+        "released_at": "2026-10-17T21:00:11.935Z"
+      },
+      {
+        "case": "txt-wrong-encoding",
+        "verdict": "FAIL",
+        "completion_sha256": "662c2c82545a55340bd95404dbdf91c5a75da86a5ab872aa0ba572026b291f3f",
+        "released_at": "2026-10-17T21:08:14.013Z"
+      },
+      {
+        "case": "txt-wrong-delimiter",
+        "verdict": "FAIL",
+        "completion_sha256": "d32f3f6b3e71db1b6a9984c66cb4a9b2d732ac95c601dd9a0874566701f2a4ca",
+        "released_at": "2026-10-17T21:15:39.639Z"
+      },
+      {
+        "case": "txt-ambiguous-headers",
+        "verdict": "PASS",
+        "completion_sha256": "76b99c358f9cbd5355309cfb890c236ae510227fcc47a3cfa410ff5b2c86a59f",
+        "released_at": "2026-10-17T21:22:31.706Z"
+      },
+      {
+        "case": "csv-unclosed-quote",
+        "verdict": "FAIL",
+        "completion_sha256": "aa0dc9b5e032e163a1645a0182a7170236bc2213cd71d91ea29b5ece9fdf8547",
+        "released_at": "2026-10-17T21:30:42.324Z"
+      },
+      {
+        "case": "csv-wrong-encoding",
+        "verdict": "FAIL",
+        "completion_sha256": "0d30802f15d80d23aaa1c3f1b7b47fa43e297dfd72913a620d7be7a990296288",
+        "released_at": "2026-10-17T21:38:50.382Z"
+      },
+      {
+        "case": "csv-wrong-delimiter",
+        "verdict": "FAIL",
+        "completion_sha256": "ebc84e0066bfb6c26a84713fc0e78c635b27fcbc3563ce8271a0d33fbfd49878",
+        "released_at": "2026-10-17T21:46:20.169Z"
+      },
+      {
+        "case": "csv-ambiguous-headers",
+        "verdict": "PASS",
+        "completion_sha256": "4a4cc05f85d84af7806c589d9c48c12dfa697abe6c3a7b6c26947d01e18f23e1",
+        "released_at": "2026-10-17T21:53:13.651Z"
+      },
+      {
+        "case": "initial-incomplete-settings",
+        "verdict": "PASS",
+        "completion_sha256": "8be962746c8435cd037caa376b26426403476d08b04d7442fbd7fe5bdd561e19",
+        "released_at": "2026-10-17T22:00:27.466Z"
+      },
+      {
+        "case": "missing-source-column",
+        "verdict": "FAIL",
+        "completion_sha256": "f43510568379053812bc3388a2c6318faa4f00d307bc88ec2758aeffd2e25366",
+        "released_at": "2026-10-17T22:08:16.935Z"
+      }
+    ],
+    "stand_archive_files_verified": 210,
+    "wrapper_resolution_sha256": "109e7c9b539c13a9d0ca67ee51a96d99ebac8bc32ecb3e3d07adf3c12771d486",
+    "reference_completion_sha256": "daf5ce174d88d5c77f45a44b8dbc728a6dd8741c5f364440b77767a0c7299efc",
+    "reference_release": "2026-10-17T20:46:37.368Z",
+    "final_author_health": {
+      "at": "2026-10-17T22:08:36.366Z",
+      "status": "FREE",
+      "lease_absent": true,
+      "endpoint": {
+        "url": "http://localhost/app/",
+        "http_status": 200,
+        "bytes": 2065
+      },
+      "container": {
+        "id": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+        "running": true,
+        "isolation_marker_verified": true,
+        "bind_mounts_absent": true
+      },
+      "storage_empty": true,
+      "storage_roots": [
+        "/workdir/UserStorage",
+        "/workdir/SessionBackup"
+      ],
+      "profiles": [
+        {
+          "path": "/home/user/.local/share/loginom-evals-runtime/roles/rich/reference-profile",
+          "clean": true,
+          "harness_lease_absent": true
+        },
+        {
+          "path": "/home/user/.local/share/loginom-evals-runtime/roles/rich/eval-profile",
+          "clean": true,
+          "harness_lease_absent": true
+        },
+        {
+          "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/reference-profile",
+          "clean": true,
+          "harness_lease_absent": true
+        },
+        {
+          "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile",
+          "clean": true,
+          "harness_lease_absent": true
+        },
+        {
+          "path": "/home/user/.local/share/loginom-evals-runtime/roles/evalbaseline/eval-profile",
+          "clean": true,
+          "harness_lease_absent": true
+        },
+        {
+          "path": "/home/user/.local/share/loginom-evals-runtime/roles/evalrunner/eval-profile",
+          "clean": true,
+          "harness_lease_absent": true
+        }
+      ],
+      "live_browsers": [],
+      "debuggers_closed": true,
+      "healthy_shared_stand": true,
+      "installed_cli_admission": "READY",
+      "installed_cli_source": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+      "prior_failed_admission_preserved": true
+    },
+    "evaler_current_read_only_health": {
+      "at": "2026-10-17T22:15:08.711Z",
+      "clean_profiles": 6,
+      "http": 200,
+      "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+      "running": true,
+      "storage_empty": true,
+      "read_only": true,
+      "native_cli_calls": 0
+    },
+    "evaler_current_helper_status": {
+      "status": "FREE",
+      "code": 0,
+      "diagnostic": {
+        "version": 1,
+        "operation": "status",
+        "stage": "arguments",
+        "dispatch": "not_started",
+        "reason": "OK",
+        "at": "2026-10-17T22:15:08.780Z"
+      }
+    },
+    "scope": "delivery/consumption/cleanup verified; not independent ten-case ACCEPT",
+    "source_bundle_verified": true,
+    "published_cases_branch": "lab61-initial-cases-a2ba",
+    "published_common_sha": "9d18347eb05d3b2bb1b044006c6ec10a3c5509c2",
+    "common_non_documentary_delta_from_accepted_7d3": [],
+    "actual_worker_queues": {
+      "rich": 66,
+      "ben": 28,
+      "evaler": 182,
+      "baseline": 11,
+      "runner": 13,
+      "active": "current Evaler only"
+    },
+    "original_zero_attempt_wrapper_bytes_verified": true
+  },
+  "wrapper_resolution": {
+    "kind": "recovered_author",
+    "original_wrapper_verdict": "ERROR",
+    "physical_calls_before_failure": 0,
+    "unused_reservation_retained": true,
+    "original_summary_sha256": "63ae6e6cd1b749aa59bd84e30124e45af4606f1df0a0bf66fb4adc77fcb6b873",
+    "new_hypothesis": "unchanged guard; launch env loaded from file rather than outer timeout argv",
+    "argv_reproduction": {
+      "hypothesis": "outer timeout argv embeds EVAL_PROFILE_DIR value, matching unchanged pgrep profile guard; load exports from a script instead",
+      "model_calls": 0,
+      "guard_modified": false,
+      "checks": [
+        {
+          "case": "bad-timeout-argv",
+          "child_pid": 3159824,
+          "guard_matches": [
+            3159824
+          ],
+          "contains_child": true
+        },
+        {
+          "case": "good-script-argv",
+          "child_pid": 3159828,
+          "guard_matches": [],
+          "contains_child": false
+        }
+      ],
+      "all_expected": true
+    },
+    "ordinary_recovery_completion_sha256": "1919c573e604ddcc4e1a0430113d378559a47622d8610c7177ffe03e15d31fc7",
+    "ordinary_release_at": "2026-10-17T20:51:36.175Z",
+    "measured_products": {
+      "PASS": 3,
+      "FAIL": 7,
+      "ERROR": 0
+    },
+    "historical_ERROR_retained": true,
+    "permits": "initial independent Ben review only; no extra author model attempts"
+  },
+  "usage_before_Ben": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 3,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 1
+    },
+    "reference_total": 15,
+    "product_physical_calls": 10,
+    "recovery": 1,
+    "probes": 0,
+    "source_report_sha256": "b4232952e0dc600eaa063b7dd346b0e449ae845eb123a0a39a27e4e0b1bc04be",
+    "historical_outcomes_preserved": true,
+    "budget_increases": [],
+    "source_report_id": "01a14beb-9728-70c8-9202-882e7b9a4176",
+    "product_by_case": {
+      "txt-unclosed-quote": 1,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 1,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 1,
+      "missing-source-column": 1
+    },
+    "rework_limit": 3,
+    "pre_dispatch_wrapper": {
+      "original_verdict": "ERROR",
+      "physical_model_calls": 0,
+      "outcome_preserved": true,
+      "reservation_carried_forward": true,
+      "budget_reset": false
+    },
+    "product_calls_by_role": {
+      "Rich": 10,
+      "Ben": 0
+    }
+  },
+  "Ben_authorized": {
+    "offline": "exact clean source/all10 TASK/checker/reference/native/negative review; original sealed inputs-only expectations retained",
+    "product": "10 original IDs, one physical invocation each by Ben; repeat1, no-infra-retry; no new author/reference/probe calls",
+    "model": "openai/gpt-6-luna/high unchanged",
+    "physical_product_already_consumed_by_Ben": 0,
+    "before_effects": "verify actual once/ledger, pins and clean checkout; own status/acquire/fresh preflight; unresolved gates stop effects",
+    "cleanup": "own cleanup/archive/genuine completion/ordinary RELEASED/healthy FREE; preserve ERROR/FAIL/AMBIGUOUS and all budgets",
+    "acceptance": "all reproducible findings in one report; separate eval quality from product PASS/FAIL; no ACCEPT with Ben infrastructure ERROR or unknown cleanup",
+    "after": "no common integration/LAB62/63 until full Ben ACCEPT and verified FREE"
+  },
+  "limits_changed": false,
+  "original_requests_and_history_preserved": true
+}

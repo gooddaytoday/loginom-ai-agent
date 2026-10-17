@@ -1,0 +1,44 @@
+{
+  "kind": "operator_delivery_integrity_only",
+  "observed_utc": "2026-10-17T22:16:11.733029+00:00",
+  "source_report_id": "01a14beb-9728-70c8-9202-882e7b9a4176",
+  "source_task_id": "01a14b91-4d36-7785-afea-6f20d54c66b1",
+  "source_sha": "6ed1f51393d7893d80d4364522d197c1a269d99d",
+  "product_source_sha": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "archive": {
+    "bytes": 20189382,
+    "sha256": "400dcf57db6e8c8fe92dec31190d29a7c808dccf664c39934b2e2261daae4a44",
+    "manifest_sha256": "d004030f958e4519c197a00ebe89bfa58425759adf53589c5747855c3c3b8c42",
+    "payload_count": 1154,
+    "payload_bytes": 149001856,
+    "all_sizes_hashes_exact_membership_verified": true
+  },
+  "parts": [
+    {
+      "file": "lab61-cases-a2ba-6ed1f513-ready.zip.part01",
+      "bytes": 5242880,
+      "sha256": "9e6c94969af869fc0ccf2a46be0e07e7bf5d20dafa3a754f250420d5caf22952"
+    },
+    {
+      "file": "lab61-cases-a2ba-6ed1f513-ready.zip.part02",
+      "bytes": 5242880,
+      "sha256": "71325cc3a423498cfa3e0e7381890512e385b624badeb2aabb6dc5a4a0598209"
+    },
+    {
+      "file": "lab61-cases-a2ba-6ed1f513-ready.zip.part03",
+      "bytes": 5242880,
+      "sha256": "5171a9c98dd3982830422336477abfc39323e6c15940fa32896bb3d2056bab89"
+    },
+    {
+      "file": "lab61-cases-a2ba-6ed1f513-ready.zip.part04",
+      "bytes": 4460742,
+      "sha256": "bb49bfff5b5d124f5bce4230390a4fc204203dc6f01ec72a501e2a1a1f651947"
+    }
+  ],
+  "report_bytes_equal": true,
+  "full_Ben_ACCEPT": false,
+  "limitations": [
+    "Delivery integrity only; independent full ten-case review, original live cleanup/model verification and acceptance remain Evaler/Ben gates.",
+    "Quality FAIL outcomes and wrapper ERROR remain unchanged. No model/native/lease/guard actions by operator."
+  ]
+}
