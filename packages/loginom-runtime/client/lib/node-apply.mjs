@@ -241,8 +241,11 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&['document_id','workflow_id','node_id'].every(k=>importClosed.node_context[k]===state.node?.[k])) {
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
-        state.correctable_import_request=refusal.verification==='text_import_initial_settings_draft_discarded'?'initial_settings'
-          :['text_import_readiness_draft_discarded','text_import_refresh_draft_discarded'].includes(refusal.verification)?'readiness':'binding';
+        // A discarded first wizard of a new node leaves no saved source, so the
+        // retry must name source_path explicitly; an existing node keeps its own.
+        const draftOnly=['text_import_readiness_draft_discarded','text_import_refresh_draft_discarded'].includes(refusal.verification);
+        state.correctable_import_request=refusal.verification==='text_import_initial_settings_draft_discarded'||draftOnly&&request.target.kind==='new'?'initial_settings'
+          :draftOnly?'readiness':'binding';
       }
       if(name==='configure'&&request.target.type==='transform.calculator'
         &&(request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0
