@@ -29,13 +29,13 @@ const upload=()=>({operation_id:source.upload_operation_id,artifact:structuredCl
   output:{...source,destination:'/test/comma_utf8.txt',server_copy_verification:{verification_id:'verified-initial-input',
     status:'SUCCEEDED',bytes_verified:true,upload_completion_verified:true,destination:'/test/comma_utf8.txt',bytes:source.bytes,sha256:source.sha256}}}});
 
-function fixture({fault,mutateRequest=()=>{},mutateUpload=()=>{},mutateHistory=()=>{}}={}) {
+function fixture({fault,readinessOwner,mutateRequest=()=>{},mutateUpload=()=>{},mutateHistory=()=>{}}={}) {
   const r=request();mutateRequest(r);
   const uploaded=upload();mutateUpload(uploaded);
   const history={complete:true,records:[{...structuredClone(uploaded),sequence:0,destination:'/test/comma_utf8.txt',cleanup_confirmed:true,transport_uncertain:false}]};
   mutateHistory(history);
   const events=[],gestures=[],reads=[],graph={complete:true,dom_epoch:'graph-1',document_id:'doc',workflow_ref:workflow,nodes:[],links:[],foreign_links:[]};
-  let time=1,opened=false,closed=false,consoleOpen=false,menuOpen=false,prepared,changed=false;
+  let time=1,opened=false,closed=false,consoleOpen=false,menuOpen=false,prepared,changed=false,readinessTimedOut=false;
   const operation={id:r.operation_id,action:{action_key:'node.apply',revision:'1.0.0'},deadline:30001,
     checkpoint:{document_id:'doc',workflow_ref:workflow}};
   const support=createTextImportNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'});
@@ -55,6 +55,7 @@ function fixture({fault,mutateRequest=()=>{},mutateUpload=()=>{},mutateHistory=(
         ...(menuOpen?[element('ui-filter','mnContextMenu;mniShowCompletedProcesses',['click','press'])]:[])]}});
   const record=async e=>{
     events.push(structuredClone(e));
+    if(e.phase==='node_observation_timeout'&&e.condition==='text_import_file: new import source initialized')readinessTimedOut=true;
     if(e.phase==='node_step_prepared')prepared=structuredClone(e);
     if(fault==='durable'&&e.phase==='node_step_prepared'&&e.action.ref==='ui-close')throw Error('fixture durable write failed');
     if(fault==='intent'&&e.phase==='node_step_prepared'&&e.action.ref==='ui-close')return {...e,signature:'foreign-intent'};
@@ -88,6 +89,14 @@ function fixture({fault,mutateRequest=()=>{},mutateUpload=()=>{},mutateHistory=(
     // Change ownership after openWizard has captured the original owner, on
     // the first configure observation, not during initial opening.
     if(opened&&events.some(e=>e.phase==='node_phase_prepared'&&e.receipt.phase==='configure')) {
+      if(readinessOwner) {
+        // Exhaust only the bounded read, within the original configure/total
+        // deadlines. Change the owner only after that timeout was journalled.
+        if(!readinessTimedOut){s.wizard.import_source.fields.source_path.status='pending';time=16002;}
+        else if(readinessOwner==='node_tid')s.wizard.owner_context.node.tid='Foreign';
+        else if(readinessOwner==='path_tid')s.wizard.owner_context.path[0].tid='ForeignScenario';
+        else if(readinessOwner==='path_label')s.wizard.owner_context.path[0].label='Changed Scenario';
+      }
       if(fault==='owner')s.wizard.owner_context.node.tid='Foreign';
       if(fault==='graph')s.prepared_node_context.node_id='foreign';
       if(fault==='document')s.dom_epoch.document='foreign';
@@ -118,8 +127,40 @@ function fixture({fault,mutateRequest=()=>{},mutateUpload=()=>{},mutateHistory=(
     return {verified:true,cleanup_complete:true,effect_possible:true,node:result.node.ref,target:result};
   };
   const run=(changedRequest=r,options={})=>applyNode({request:changedRequest,operation,handlers:support.nodeApplyHandlers,drivers,record,now:()=>time,...options});
-  return {r,operation,events,gestures,reads,graph,run,get closed(){return closed;},get changed(){return changed;}};
+  return {r,operation,events,gestures,reads,graph,run,get closed(){return closed;},get changed(){return changed;},get readinessTimedOut(){return readinessTimedOut;}};
 }
+
+// BEN-INITIAL-OWNER-01: graph GUIDs alone cannot authorize cancelling a wizard
+// whose original native node/path owner changed after the readiness timeout.
+for(const readinessOwner of ['unchanged','node_tid','path_tid','path_label'])test('initial readiness timeout preserves original owner: '+readinessOwner,async()=>{
+  const f=fixture({readinessOwner,mutateRequest:r=>{r.budgets={configure_ms:60000,execute_ms:10000,total_ms:90000};}});
+  const before=structuredClone(f.r),result=await f.run();
+  if(process.env.INITIAL_LIFECYCLE_EVIDENCE_DIR) {
+    await mkdir(process.env.INITIAL_LIFECYCLE_EVIDENCE_DIR,{recursive:true});
+    await writeFile(process.env.INITIAL_LIFECYCLE_EVIDENCE_DIR+'/readiness-owner-'+readinessOwner+'.json',
+      JSON.stringify({fixture_only:true,readinessOwner,timedOut:f.readinessTimedOut,request:f.r,result,events:f.events,gestures:f.gestures,reads:f.reads},null,2)+'\n');
+  }
+  assert.equal(f.readinessTimedOut,true);
+  const timeout=f.events.filter(e=>e.phase==='node_observation_timeout');assert.equal(timeout.length,1);
+  assert.equal(timeout[0].elapsed_ms,16001);assert.equal(timeout[0].effect_possible,false);
+  assert.equal(f.operation.nodeApply.configure_deadline,60001);assert.equal(f.operation.nodeApply.deadline,90001);
+  assert.deepEqual(f.r,before);assert.equal(result.effect_possible,true);assert.deepEqual(result.node,node);
+  assert.equal(result.execution.status,'not_requested');assert.equal(result.execution.execution_id,null);
+  assert.ok(!f.events.some(e=>e.phase==='node_phase_prepared'&&['output_mapping','finish','execute','read'].includes(e.receipt.phase)));
+  if(readinessOwner==='unchanged') {
+    assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);assert.equal(f.closed,true);
+    assert.equal(f.gestures.filter(a=>a.ref==='ui-close').length,1);
+    const refusal=f.events.filter(e=>e.phase==='node_phase_refused');assert.equal(refusal.length,1);
+    assert.equal(refusal[0].receipt.verification,'text_import_readiness_draft_discarded');
+    assert.equal(refusal[0].receipt.settings_unchanged,true);
+  } else {
+    assert.equal(result.status,'AMBIGUOUS',JSON.stringify(result));assert.equal(result.cleanup_complete,false);assert.equal(result.pending_phase,'configure');
+    assert.equal(f.closed,false);assert.equal(f.gestures.filter(a=>a.ref==='ui-close').length,0);
+    assert.ok(!f.events.some(e=>e.phase==='node_step_prepared'&&e.action.ref==='ui-close'));
+    assert.ok(!f.events.some(e=>e.phase==='node_phase_refused'));
+    const count=f.gestures.length;await assert.rejects(f.run(undefined,{resume:true}),/unresolved/);assert.equal(f.gestures.length,count);
+  }
+});
 
 for(const finish of ['done','execute','close'])test('initial omitted columns: owned create/refuse/close before settings, '+finish,async()=>{
   const f=fixture({mutateRequest:r=>{r.finish=finish;if(finish==='execute')r.read.ports=[0];}}),before=structuredClone(f.r);

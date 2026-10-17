@@ -170,7 +170,11 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           const readiness=error instanceof NodeReadinessTimeout;
           const initialSettings=error instanceof ImportInitialSettingsError;
           if(!(error instanceof ImportColumnBindingError||readiness||initialSettings)||operation.transportUncertain)throw error;
-          const closed=await closePreparedWizard(initialSettings&&operation.nodeApply.request.target.kind==='new'?{
+          // The initial read can time out before the typed settings refusal.
+          // Both exits must retain the owner captured when this draft opened.
+          const preserveOwner=operation.nodeApply.request.target.kind==='new'
+            &&(initialSettings||readiness&&!Object.hasOwn(p.settings,'columns'));
+          const closed=await closePreparedWizard(preserveOwner?{
             ...channel,observe:options=>channel.observe({...options,ready:state=>{
               requireValue(state.wizard?.status!=='observed'||JSON.stringify(state.wizard.owner_context)===JSON.stringify(owner),
                 'Import owner changed before initial draft close');
