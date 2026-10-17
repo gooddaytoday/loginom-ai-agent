@@ -5,16 +5,7 @@
       "type": "imports.text"
     },
     {
-      "type": "transform.calculator"
-    },
-    {
       "type": "transform.group_data"
-    },
-    {
-      "type": "transform.sorting"
-    },
-    {
-      "type": "transform.reform_columns"
     },
     {
       "type": "exports.text"
@@ -22,55 +13,55 @@
   ],
   "outputs": [
     {
-      "output_node_type": "transform.reform_columns",
+      "output_node_type": "export_input",
       "ordered": true,
       "columns": [
         {
-          "name": "Регион",
+          "name": "Region",
           "label": "Регион",
           "type": "string"
         },
         {
-          "name": "Категория",
+          "name": "Category",
           "label": "Категория",
           "type": "string"
         },
         {
-          "name": "Выручка",
+          "name": "Revenue",
           "label": "Выручка",
           "type": "real"
         }
       ],
       "rows": [
         {
-          "Регион": "Центр",
-          "Категория": "Техника",
-          "Выручка": 80193.0
+          "Region": "Центр",
+          "Category": "Техника",
+          "Revenue": 80193.0
         },
         {
-          "Регион": "Юг",
-          "Категория": "Техника",
-          "Выручка": 60272.0
+          "Region": "Юг",
+          "Category": "Техника",
+          "Revenue": 60272.0
         },
         {
-          "Регион": "Север",
-          "Категория": "Техника",
-          "Выручка": 54400.0
+          "Region": "Север",
+          "Category": "Техника",
+          "Revenue": 54400.0
         },
         {
-          "Регион": "Центр",
-          "Категория": "Офис",
-          "Выручка": 8895.0
+          "Region": "Центр",
+          "Category": "Офис",
+          "Revenue": 8895.0
         },
         {
-          "Регион": "Юг",
-          "Категория": "Офис",
-          "Выручка": 6839.0
+          "Region": "Юг",
+          "Category": "Офис",
+          "Revenue": 6839.0
         },
         {
-          "Регион": "Север",
-          "Категория": "Офис",
-          "Выручка": 6182.0
+          "Region": "Север",
+          "Category": "Офис",
+          "Revenue": 6182.0
         }
       ]
     }

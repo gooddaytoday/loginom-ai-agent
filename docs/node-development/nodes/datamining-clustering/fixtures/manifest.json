@@ -1,0 +1,45 @@
+{
+  "format": {
+    "encoding": "UTF-8",
+    "bom": false,
+    "delimiter": ",",
+    "decimal_separator": ".",
+    "header": true,
+    "line_ending": "LF",
+    "null_marker": "?"
+  },
+  "files": [
+    {
+      "path": "../acceptance/data/points.csv",
+      "bytes": 149,
+      "sha256": "92ec8dbc85df904e2ef550cea18d22a3dfca97455b48fed3b5bd69d1f07fda90",
+      "rows": 12,
+      "columns": [
+        {
+          "name": "RowID",
+          "type": "integer",
+          "data_kind": "Непрерывный",
+          "usage": "Не задано"
+        },
+        {
+          "name": "X",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "usage": "Используемое"
+        },
+        {
+          "name": "Y",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "usage": "Используемое"
+        }
+      ]
+    }
+  ],
+  "oracle": {
+    "implementation": "Python standard library: csv, decimal, math, json",
+    "python": "3.14.4",
+    "external_dependencies": [],
+    "distance_absolute_tolerance": 1e-08
+  }
+}

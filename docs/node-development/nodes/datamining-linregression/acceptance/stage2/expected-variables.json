@@ -1,0 +1,38 @@
+{
+  "status": "requires_W4",
+  "output_node_type": "datamining.lin_regression",
+  "output_port": 2,
+  "port_kind": "variables",
+  "variables": [
+    {
+      "name": "TotalSamples",
+      "label": "Всего примеров",
+      "type": "integer",
+      "value": 6
+    },
+    {
+      "name": "TotalSelectedSamples",
+      "label": "Всего отобранных примеров",
+      "type": "integer",
+      "value": 6
+    },
+    {
+      "name": "TrainSamples",
+      "label": "Примеров в обучающем множестве",
+      "type": "integer",
+      "value": 6
+    },
+    {
+      "name": "DFE",
+      "label": "Число степеней свободы ошибки",
+      "type": "integer",
+      "value": 4
+    },
+    {
+      "name": "ModelDF",
+      "label": "Число степеней свободы модели",
+      "type": "integer",
+      "value": 1
+    }
+  ]
+}

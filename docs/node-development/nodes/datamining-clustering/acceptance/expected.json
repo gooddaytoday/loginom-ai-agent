@@ -1,0 +1,194 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.clustering"
+    },
+    {
+      "type": "exports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "datamining.clustering",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "Cluster",
+          "label": "Номер кластера",
+          "type": "integer"
+        },
+        {
+          "name": "Distance",
+          "label": "Расстояние до центра кластера",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 0
+          }
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Y",
+          "label": "Y",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 0
+          }
+        },
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Cluster": 2,
+          "Distance": 0.1414213562373095,
+          "RowID": 1,
+          "X": -0.1,
+          "Y": -0.1
+        },
+        {
+          "Cluster": 2,
+          "Distance": 0.1414213562373095,
+          "RowID": 2,
+          "X": -0.1,
+          "Y": 0.1
+        },
+        {
+          "Cluster": 2,
+          "Distance": 0.1414213562373095,
+          "RowID": 3,
+          "X": 0.1,
+          "Y": -0.1
+        },
+        {
+          "Cluster": 2,
+          "Distance": 0.1414213562373095,
+          "RowID": 4,
+          "X": 0.1,
+          "Y": 0.1
+        },
+        {
+          "Cluster": 1,
+          "Distance": 0.1414213562373095,
+          "RowID": 5,
+          "X": 19.9,
+          "Y": -0.1
+        },
+        {
+          "Cluster": 1,
+          "Distance": 0.1414213562373095,
+          "RowID": 6,
+          "X": 19.9,
+          "Y": 0.1
+        },
+        {
+          "Cluster": 1,
+          "Distance": 0.1414213562373095,
+          "RowID": 7,
+          "X": 20.1,
+          "Y": -0.1
+        },
+        {
+          "Cluster": 1,
+          "Distance": 0.1414213562373095,
+          "RowID": 8,
+          "X": 20.1,
+          "Y": 0.1
+        },
+        {
+          "Cluster": 0,
+          "Distance": 0.1414213562373095,
+          "RowID": 9,
+          "X": -0.1,
+          "Y": 19.9
+        },
+        {
+          "Cluster": 0,
+          "Distance": 0.1414213562373095,
+          "RowID": 10,
+          "X": -0.1,
+          "Y": 20.1
+        },
+        {
+          "Cluster": 0,
+          "Distance": 0.1414213562373095,
+          "RowID": 11,
+          "X": 0.1,
+          "Y": 19.9
+        },
+        {
+          "Cluster": 0,
+          "Distance": 0.1414213562373095,
+          "RowID": 12,
+          "X": 0.1,
+          "Y": 20.1
+        }
+      ]
+    },
+    {
+      "output_node_type": "datamining.clustering",
+      "output_port": 1,
+      "columns": [
+        {
+          "name": "Cluster",
+          "label": "Номер кластера",
+          "type": "integer"
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Y",
+          "label": "Y",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 0
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Cluster": 0,
+          "X": 0.0,
+          "Y": 20.0
+        },
+        {
+          "Cluster": 1,
+          "X": 20.0,
+          "Y": 0.0
+        },
+        {
+          "Cluster": 2,
+          "X": 0.0,
+          "Y": 0.0
+        }
+      ]
+    }
+  ]
+}

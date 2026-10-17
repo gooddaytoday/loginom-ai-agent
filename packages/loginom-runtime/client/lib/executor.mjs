@@ -15,7 +15,7 @@ import { makeWorkspaceUiCode, validateUiAction, uiActionSchema } from './workspa
 import { createObservationPages } from './observation-pages.mjs';
 import { makeWorkspaceBootstrapCode } from './workspace.mjs';
 import { createNodeProcedure } from './node-procedure.mjs';
-import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow } from './node-apply.mjs';
+import { applyNode, validateNodeApplyRequest, reconcileNodeWorkflow, releaseNodeApply } from './node-apply.mjs';
 import {reconcileOutputMappingPhase} from './node-output-mapping-recovery.mjs';
 import {reconcileInputMappingPhase} from './node-input-mapping-recovery.mjs';
 import { createNodeOperationRunner } from './node-operation-runner.mjs';
@@ -32,7 +32,7 @@ const operationInspectTool = { name: 'dock_operation_inspect',
   inputSchema: { type: 'object', properties: { operation_id: identifier }, additionalProperties: false },
   annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false } };
 const operationRecoverTool = { name: 'dock_operation_recover',
-  description: 'Recover in the same session: complete_link connects the existing added input; restore_control confirms cleanup of a completed call; accept_observed_state resolves an uncertain generic UI gesture after a fresh observation. abandon_operation explicitly stops pursuing a completed operation after inspecting its fresh state, so a mistaken request or changed goal can be corrected with new actions. Its original outcome remains unsuccessful; it does not undo effects or verify the goal. Both observation strategies require observation_id and confirmed browser completion/cleanup. operation_id is the original pending ID; recovery_operation_id is a NEW unique request ID (for example repair-001). Inspect first, verify and continue.',
+  description: 'Recover in the same session: complete_link connects the existing added input; restore_control confirms cleanup of a completed call; accept_observed_state resolves an uncertain generic UI gesture after a fresh observation. abandon_operation explicitly stops pursuing a completed operation after inspecting its fresh state, so a mistaken request or changed goal can be corrected with new actions. Its original outcome remains unsuccessful; it does not undo effects or verify the goal. Both observation strategies require observation_id and confirmed browser completion/cleanup. For a stopped dock_node_apply operation, abandon_operation is the only strategy and takes no observation_id: Dock itself proves that the node rests unlocked on an unchanged quiet graph (it may cancel only that node\'s own wizard draft or output Table view), never repeats the stopped gesture, and returns the node with its configuration/execution status and next_step. operation_id is the original pending ID; recovery_operation_id is a NEW unique request ID (for example repair-001). Inspect first, verify and continue.',
   inputSchema: { type: 'object', properties: { operation_id: identifier, recovery_operation_id: identifier,
     observation_id: identifier, strategy: { type: 'string', enum: ['complete_link', 'restore_control', 'accept_observed_state', 'abandon_operation'] } }, required: ['operation_id', 'recovery_operation_id', 'strategy'], additionalProperties: false },
   annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false } };
@@ -1569,7 +1569,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   },pinned,origin:targetOrigin,build:targetBuild});
   const nodeApplyOutcome=(operation,result)=>({status:result.status,action_key:'node.apply',
     action_revision:operation.action.revision,operation_id:operation.id,
-    phase:result.status==='SUCCEEDED'?'node_ready':result.pending_phase??'node_incomplete',
+    phase:result.status==='SUCCEEDED'?'node_ready':result.checkpoint_kind==='local_node_released'?'node_released':result.pending_phase??'node_incomplete',
     effect_possible:result.effect_possible,cleanup_complete:result.cleanup_complete,
     output:structuredClone(result),error:result.error??null,trace:[]});
   const inspectApply=async operation=>{
@@ -1642,6 +1642,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       await remember(operation,'completed',outcome);
       operation.outcome=outcome;operation.cleanupConfirmed=true;
       if(pending===operation)pending=null;
+      // A release whose delivery journal failed is redelivered here; its job
+      // must not keep the earlier AMBIGUOUS outcome as unsettled work.
+      if(nodeJobs.has(operation.id)&&nodeJobs.status(operation.id).state==='settled')nodeJobs.settle(operation.id,outcome);
       return outcome;
     }
     return structuredClone(operation.outcome??failed(operation,'NODE_PHASE_UNRESOLVED','The original node phase requires its own verified receipt'));
@@ -1707,6 +1710,46 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return outcome;
     } catch (error) { return failed(operation, 'RECONCILIATION_FAILED', String(error?.message ?? error).slice(0, 1000)); }
   };
+  // Release never continues the stopped phase. Its driver proves that the node
+  // rests unlocked on a quiet unchanged graph and reports unverified settings or
+  // execution as unknown; no observation_id is taken from the caller.
+  const nodeReleaseStep=operation=>!operation.transportUncertain&&!nodeJobs.busy&&operation.nodeApply?.pending
+    &&operation.nodeApply.node&&typeof operation.nodeApplyDrivers?.releasePending==='function'?{tool:'dock_operation_recover',
+      arguments:{operation_id:operation.id,strategy:'abandon_operation'},required_fields:['recovery_operation_id'],
+      id_roles:{operation_id:'original_pending_operation',recovery_operation_id:'new_unique_request'},
+      requires:['runtime_release_proof'],provides:['released_node_operation','unblocked_workspace'],
+      instruction:'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'}:null;
+  const releaseApply=async(operation,{strategy,recoveryOperationId,signature,signal})=>{
+    if(strategy!=='abandon_operation')throw new Error('Use the enclosing node procedure to resume this internal phase; only abandon_operation can release a stopped node operation');
+    if(running||nodeJobs.busy)throw new Error('Another Dock action is still running');
+    if(!nodeReleaseStep(operation))throw new Error('Release proof unavailable: inspect the operation; its last browser call is unconfirmed or its stopped phase has no node release verifier');
+    running=true;
+    try{
+      const record={...operation,id:recoveryOperationId,parameters:{original_operation_id:operation.id,strategy}};
+      await remember(record,'recovery_prepared');
+      observations.clear();
+      let returned;
+      try{
+        const result=await releaseNodeApply({operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,record:onRecord,signal});
+        operation.outcome=nodeApplyOutcome(operation,result);operation.cleanupConfirmed=true;
+        await remember(operation,'operation_abandoned',operation.outcome);
+        pending=null;nodeJobs.settle(operation.id,operation.outcome);
+        returned={status:'SUCCEEDED',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'resolved',
+          effect_possible:false,error:null,trace:[],recovery_operation_id:recoveryOperationId,
+          output:{resolution:'released_after_proof',goal_verified:false,original_outcome:structuredClone(operation.outcome)}};
+      }catch(error){
+        // The original operation keeps its gate. A blocker the user can clear is
+        // named explicitly instead of leaving an empty recovery list.
+        returned={status:'AMBIGUOUS',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'release_refused',
+          effect_possible:true,trace:[],recovery_operation_id:recoveryOperationId,
+          error:{code:'NODE_RELEASE_REFUSED',message:String(error?.message??error).slice(0,1000)},
+          output:{original_operation_pending:pending===operation,...(error?.userAction?{user_action:error.userAction}:{})}};
+      }
+      await remember(record,'recovery_completed',returned);
+      auxiliary.set(recoveryOperationId,{signature,outcome:structuredClone(returned)});
+      return structuredClone(returned);
+    }finally{running=false;}
+  };
   const recoveryAdvice = operation => {
     const base = [{ tool: 'dock_workspace_observe', arguments: {}, required_fields: [],
       requires: [], provides: ['observation_id', 'fresh_ui_refs'] }];
@@ -1715,25 +1758,39 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       required_fields: [], requires: [], provides: ['completion_receipt', 'cleanup_state'] });
     if(operation.action.capability==='node.apply'&&operation.nodeApply?.pending?.phase==='open'
       &&typeof operation.nodeApplyDrivers?.verifyPendingOpen==='function'&&!operation.transportUncertain){
-      return {recovery_options:['resume'],next_steps:[{tool:'dock_node_resume',arguments:{operation_id:operation.id},required_fields:[],
+      // Release stays available if the opening proof is refused on resume.
+      const release=nodeReleaseStep(operation);
+      return {recovery_options:['resume',...(release?['abandon_operation']:[])],next_steps:[{tool:'dock_node_resume',arguments:{operation_id:operation.id},required_fields:[],
         requires:['fresh_same_node_and_settled_open_receipt'],provides:['continuation_of_original_operation'],
-        instruction:'Reobserve the original node; retry only opening if no wizard is open, otherwise continue its owned wizard.'}],internal_resume_available:true};
+        instruction:'Reobserve the original node; retry only opening if no wizard is open, otherwise continue its owned wizard.'},...(release?[release]:[])],internal_resume_available:true};
+    }
+    if(operation.action.capability==='node.apply'&&operation.nodeApply?.pending?.phase==='finish'&&!operation.nodeApply.finish_resume_refused
+      &&typeof operation.nodeApplyDrivers?.verifyPendingFinish==='function'&&!operation.transportUncertain){
+      const release=nodeReleaseStep(operation);
+      return {recovery_options:['resume',...(release?['abandon_operation']:[])],next_steps:[{tool:'dock_node_resume',arguments:{operation_id:operation.id},required_fields:[],
+        requires:['settled_finish_receipts_refused_before_launch'],provides:['continuation_of_original_operation'],
+        instruction:'Resume retries the graph finish only if every launch or deactivation gesture of the stopped finish was refused before taking effect. If resume is refused, release the operation.'},...(release?[release]:[])],internal_resume_available:true};
     }
     if(operation.action.capability==='node.apply'&&operation.nodeApply?.pending?.phase==='input_mapping'&&operation.inputMappingRecovery){
       const recovery=operation.inputMappingRecovery;
       if(recovery.available)base.push({tool:'dock_node_resume',arguments:{operation_id:operation.id},required_fields:[],
         requires:['original_completed_input_done','same_prepared_graph','live_mapping_probe'],provides:['verified_input_mapping','continuation_of_original_operation']});
-      return {recovery_options:[],next_steps:base,input_mapping_recovery:structuredClone(recovery),internal_resume_available:false};
+      const release=!recovery.available&&nodeReleaseStep(operation);
+      return {recovery_options:release?['abandon_operation']:[],next_steps:release?[release,...base]:base,input_mapping_recovery:structuredClone(recovery),internal_resume_available:false};
     }
     if(operation.action.capability==='node.apply'&&operation.nodeApply?.pending?.phase==='output_mapping'&&operation.outputMappingRecovery){
       const recovery=operation.outputMappingRecovery;
       if(recovery.available)base.push({tool:'dock_node_resume',arguments:{operation_id:operation.id},required_fields:[],
         requires:['original_completed_output_done','same_prepared_graph','live_mapping_probe'],provides:['verified_output_mapping','continuation_of_original_operation']});
-      return {recovery_options:[],next_steps:recovery.available?[base.at(-1)]:[base[0]],output_mapping_recovery:structuredClone(recovery),internal_resume_available:false};
+      const release=!recovery.available&&nodeReleaseStep(operation);
+      return {recovery_options:release?['abandon_operation']:[],next_steps:recovery.available?[base.at(-1)]:release?[release,base[0]]:[base[0]],output_mapping_recovery:structuredClone(recovery),internal_resume_available:false};
     }
     if (operation.transportUncertain) return { recovery_options: [], next_steps: base };
-    if(operation.action.capability==='node.apply')return {recovery_options:[],next_steps:base,
-      internal_resume_available:operation.cleanupConfirmed===true&&!operation.nodeApply?.pending};
+    if(operation.action.capability==='node.apply'){
+      const release=nodeReleaseStep(operation);
+      return {recovery_options:release?['abandon_operation']:[],next_steps:release?[release,...base]:base,
+        internal_resume_available:operation.cleanupConfirmed===true&&!operation.nodeApply?.pending};
+    }
     if(operation.action.capability==='node.target.internal')return {recovery_options:[],next_steps:base,internal_resume_available:operation.cleanupConfirmed===true&&!operation.targetPhase?.pending};
     if(operation.action.capability==='artifact.upload') {
       if(operation.deliveryOperationId){
@@ -1798,11 +1855,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       &&operation.nodeApply.request.target.type==='transform.date_time'&&typeof operation.nodeApplyDrivers?.verifyPendingConfigure==='function';
     const openContinuation=operation?.nodeApply?.pending?.phase==='open'&&!operation.transportUncertain
       &&typeof operation.nodeApplyDrivers?.verifyPendingOpen==='function';
-    return !operation||pending!==operation||!configureContinuation&&!openContinuation&&(!!operation.nodeApply?.pending||!operation.cleanupConfirmed);
+    const finishContinuation=operation?.nodeApply?.pending?.phase==='finish'&&!operation.transportUncertain
+      &&!operation.nodeApply.finish_resume_refused&&typeof operation.nodeApplyDrivers?.verifyPendingFinish==='function';
+    return !operation||pending!==operation||!configureContinuation&&!openContinuation&&!finishContinuation&&(!!operation.nodeApply?.pending||!operation.cleanupConfirmed);
   };
   const nodeJobs=createNodeOperationRunner({run:(request,options)=>runtime.runNodeApply(request,options),
     admitResume:id=>{
       const operation=operations.get(id),phase=operation?.nodeApply?.pending?.phase,drivers=operation?.nodeApplyDrivers;
+      if(operation?.nodeApply?.result?.checkpoint_kind==='local_node_released')
+        throw new Error('The original node operation was released; follow its next_step with a NEW operation_id');
       // Эти фазы сначала сверяют собственные квитанции; итоговую проверку делает runNodeApply.
       if(phase==='input_mapping'&&drivers?.recoverInputMapping||phase==='output_mapping'&&drivers?.recoverOutputMapping
         ||['workflow','target'].includes(phase))return;
@@ -1934,7 +1995,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (operations.has(recoveryOperationId)) throw new Error('Recovery ID conflicts with an existing operation');
       const operation = operations.get(operationId);
       if (!operation || pending !== operation) throw new Error('Recovery requires the pending operation of this session');
-      if(['node.target.internal','node.apply'].includes(operation.action.capability))throw new Error('Use the enclosing node procedure to resume this internal phase');
+      if(operation.action.capability==='node.target.internal')throw new Error('Use the enclosing node procedure to resume this internal phase');
+      if(operation.action.capability==='node.apply')return releaseApply(operation,{strategy,recoveryOperationId,signature,signal});
       if(operation.action.capability==='artifact.upload')throw new Error('Upload requires server transfer verification before recovery or abandonment');
       if (!['complete_link', 'restore_control', 'accept_observed_state', 'abandon_operation'].includes(strategy)) throw new Error('Unsupported recovery strategy');
       if (strategy === 'complete_link' && operation.action.capability !== 'link.create.v1') throw new Error('complete_link requires a pending link.create operation');
