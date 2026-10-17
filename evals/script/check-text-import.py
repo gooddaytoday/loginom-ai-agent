@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 
 sys.dont_write_bytecode = True
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-from text_import_oracle import compare, parse_source
+from text_import_oracle import compare, parse_source, validate_table
 IDS = [case for group in json.loads((ROOT / 'src/text-import-cases.json').read_text())['groups'] for case in group['ids']]
 CHECKS = {'input', 'import', 'graph', 'sequence', 'result', 'diagnostic'}
 
@@ -318,7 +318,9 @@ def typed_table(receipt):
                 require(isinstance(value, str), 'result: canonical typed string required')
             cells.append({'type': cell['type'], 'value': value})
         rows.append(cells)
-    return {'schema': schema, 'comparison': 'ordered', 'row_count': port['row_count'], 'rows': rows}
+    table = {'schema': schema, 'comparison': 'ordered', 'row_count': port['row_count'], 'rows': rows}
+    validate_table(table)
+    return table
 
 
 def unused_structural_ports(attempt_dir, node, output_guid):
@@ -384,9 +386,22 @@ def package_graph(attempt_dir, node_id=None, source_path=None, empty=False, outp
 
 def settled_receipt(calls, call):
     receipts = [row for row in calls if row['result'].get('operation_id') == call['input']['operation_id']]
+    require(all(row['result'].get('status') not in ('AMBIGUOUS', 'TIMED_OUT') for row in receipts), 'sequence: unknown effect preserved')
+    inspections = [row for row in receipts if row['tool'].endswith('operation_inspect')]
+    for row in inspections:
+        result, output = row['result'], row['result'].get('output', {})
+        require(after(row, call) and row['input'].get('operation_id') == call['input']['operation_id']
+            and result.get('action_key') == 'operation.inspect' and result.get('status') == 'SUCCEEDED'
+            and result.get('effect_possible') is False and output.get('effect_state') == 'verified'
+            and output.get('cleanup_confirmed') is True, 'sequence: unknown inspect effect/cleanup preserved')
+    receipts = [row for row in receipts if row not in inspections]
     require(receipts and receipts[-1]['result'].get('state') == 'settled'
         and (receipts[-1] == call or after(receipts[-1], call)), 'sequence: settled receipt required')
-    require(all(row['result'].get('status') not in ('AMBIGUOUS', 'TIMED_OUT') for row in receipts), 'sequence: unknown effect preserved')
+    for row in inspections:
+        outcome = row['result']['output'].get('outcome')
+        if outcome is not None:
+            require(outcome.get('operation_id') == call['input']['operation_id']
+                and outcome.get('status') == receipts[-1]['result'].get('status'), 'sequence: inspect outcome differs')
     return receipts[-1]
 
 
@@ -416,6 +431,59 @@ def known_refusal(call, calls, events, workspace):
     return result
 
 
+def damage_diagnosed(text, kind, replacements, affected_fields):
+    """Recognize an asserted consequence, not a damage word anywhere in a transcript.
+
+    The caller first proves the actual damage from the input and full typed native
+    result. Here RU/EN assertions may report that damage generally, a bad decoding,
+    or a swallowed record. No single word/phrase or extra report format is required.
+    Questions, instructions, hypotheses and explicit denials do not assert a result.
+    """
+    text = re.sub(r'[`*_]', '', text.casefold().replace('ё', 'е'))
+    clauses = re.split(r'(?<=[.!?;])|\n+|\b(?:но|однако|but|however)\b', text)
+    damage = r'(?:поврежд\w*|искаж\w*|утрат\w*|потер\w*|неполнот\w*|corrupt\w*|damag\w*|loss|lost|incomplete\w*)'
+    names = '|'.join(re.escape(name.casefold()) for name in affected_fields)
+    field = rf'|(?:пол\w*|значени\w*|field|value)\s+(?:of\s+)?(?:{names})' if names else ''
+    subject = rf'(?:данн\w*|текст\w*|импорт\w*|вход\w*|unicode|выборк\w*|запис\w*|строк\w*|data|text|input|import|records?|rows?{field})'
+    assertions = []
+    for clause in clauses:
+        # A warning's absence says nothing about data damage; the TASK explicitly
+        # allows a successful engine run without a native warning.
+        warning = re.search(r'(?:warning|предупрежден)', clause)
+        denied = re.search(
+            rf'(?:{damage})(?:\s+{subject})?(?:\s+и\s+{damage})?\s+(?:нет\b|отсутств\w*|не\s+(?:выявлен\w*|обнаружен\w*|наблюда\w*))'
+            rf'|\b(?:нет|никаких|без|no|without)\s+(?:{subject}\s+)?{damage}'
+            rf'|{subject}\s+(?:не\s+(?:поврежден\w*|искажен\w*)|(?:is|was|were|are)\s+not\s+(?:damaged|corrupted))'
+            r'|\b(?:импорт|данные|текст)\s+(?:полностью\s+)?коррект(?:ен|ны)\b'
+            r'|\bevery source record was read correctly\b', clause)
+        if denied and (not warning or denied.start() < warning.start()):
+            return False
+        if re.search(r'\?|\b(?:если|нужно|следует|проверь|проверить|сообщи|возможно|возможн\w*|может|task|whether|should|might|could|if)\b', clause):
+            continue
+        # Negation of the observation is not negation in "прочитан неверно".
+        if re.search(r'\b(?:не\s+(?:обнаруж\w*|наблюда\w*|выяв\w*)|not\s+(?:observed|detected))', clause):
+            continue
+        if re.search(r'\b(?:не|not)\s+(?:поглот\w*|поглощ\w*|объедин\w*|скле\w*|попал\w*|swallow\w*|absorb\w*|merged|consum\w*|неверно|некорректно)', clause):
+            continue
+        generic = re.search(
+            rf'(?:обнаруж\w*|наблюда\w*|выяв\w*|зафиксир\w*|detected|observed|found)\s+(?:{subject}\s+)?{damage}'
+            rf'|{subject}\s+(?:(?:был\w*|стал\w*|оказал\w*|выгляд\w*|отобража\w*|is|was|were|are|has been|looks|appears)\s+)?(?:поврежден\w*|искажен\w*|неполн\w*|некоррект\w*|corrupted|damaged|lost|incomplete)'
+            rf'|(?:поврежден\w*|искажен\w*|неполн\w*|corrupted|damaged|lost|incomplete)\s+{subject}', clause)
+        bad_read = re.search(
+            rf'{subject}.{{0,35}}(?:прочитан\w*|декодирован\w*|раскодирован\w*|read|decoded)\s+(?:неверно|некорректно|ошибочно|incorrectly|wrongly)'
+            r'|(?:неверн\w*|неправильн\w*|wrong|incorrect)\s+(?:декодирован\w*|декодир\w*|decoding)', clause)
+        quote = re.search(
+            r'(?:кавыч\w*|quote).{0,50}(?:поглот\w*|объедин\w*|скле\w*|swallow\w*|consum\w*|absorb\w*)'
+            r'|(?:запис\w*|строк\w*|record|row).{0,50}(?:поглощ\w*|попал\w*|absorbed|merged).{0,35}(?:name|пол\w*|field)', clause)
+        substitution = any(re.search(r'\bвместо\s+' + re.escape(expected.casefold()) + r'.{0,80}' + re.escape(actual.casefold()), clause)
+            or re.search(re.escape(actual.casefold()) + r'.{0,80}\b(?:instead of|rather than)\s+' + re.escape(expected.casefold()), clause)
+            for expected, actual in replacements)
+        assertions.append(bool(generic or bad_read
+            or kind == 'unclosed-quote' and quote
+            or kind == 'wrong-encoding' and substitution))
+    return any(assertions)
+
+
 def diagnostic(spec, task_dir, attempt_dir, calls, events, workspace, transfers):
     applies = [call for call in calls if call['tool'].endswith('node_apply')]
     require(len(applies) == 1, 'diagnostic: one uncorrected apply required')
@@ -428,7 +496,11 @@ def diagnostic(spec, task_dir, attempt_dir, calls, events, workspace, transfers)
     if spec['id'] == 'initial-incomplete-settings':
         require('columns' not in settings and settings == wanted, 'diagnostic: omitted columns required')
     else:
-        require(settings == {**wanted, 'columns': spec['columns']}, 'diagnostic: exact assigned settings required')
+        # The product selects source_name ?? name. Only the redundant exact name
+        # is equivalent here; preserve every other key, value and column order.
+        normalized = {**settings, 'columns': [{key: value for key, value in column.items()
+            if key != 'source_name' or value != column.get('name')} for column in settings.get('columns', [])]}
+        require(normalized == {**wanted, 'columns': spec['columns']}, 'diagnostic: exact assigned settings required')
     result = settled_receipt(calls, call)['result']
     damaged = spec['id'].endswith(('wrong-encoding', 'unclosed-quote'))
     if damaged and result.get('execution', {}).get('status') == 'failed':
@@ -456,11 +528,20 @@ def diagnostic(spec, task_dir, attempt_dir, calls, events, workspace, transfers)
         observed, _ = native_application(events, call, result)
         configuration_matches(spec, observed, transfers[0]['output']['destination'])
         actual = typed_table(result)
+        require(actual['schema'] == [{key: column[key] for key in ('name', 'label', 'type', 'data_kind')}
+            for column in spec['columns']], 'result: assigned output schema differs')
         raw = (task_dir / spec['inputs'][0]['path']).read_bytes()
         recipe = {'source': {'encoding': 'cp1251' if spec['id'].endswith('wrong-encoding') else 'utf-8'},
             'settings': spec['settings'], 'columns': spec['columns'], 'source_headers': spec.get('source_headers')}
+        replacements = []
+        affected_fields = set()
         if spec['id'].endswith('wrong-encoding'):
             original = parse_source(raw, recipe)
+            replacements = [(expected['value'], observed['value'])
+                for before, current in zip(original['rows'], actual['rows']) for expected, observed in zip(before, current)
+                if isinstance(expected['value'], str) and isinstance(observed['value'], str) and expected['value'] != observed['value']]
+            affected_fields = {column['name'] for before, current in zip(original['rows'], actual['rows'])
+                for column, expected, observed in zip(actual['schema'], before, current) if expected != observed}
             differs = False
             try:
                 compare(original, actual)
@@ -474,9 +555,14 @@ def diagnostic(spec, task_dir, attempt_dir, calls, events, workspace, transfers)
             except (ValueError, csv.Error):
                 invalid = True
             require(invalid, 'diagnostic: malformed source must be independently established')
-        text = ' '.join(json.loads(line).get('part', {}).get('text', '') for line in (attempt_dir / 'events.jsonl').read_text().splitlines()
-            if line.strip() and json.loads(line).get('type') == 'text')
-        require(re.search(r'поврежд|неполнот|утрат|искаж|corrupt|incomplete|loss', text, re.I), 'diagnostic: damage must be diagnosed in the report')
+            affected_fields = {column['name'] for row in actual['rows'] for column, cell in zip(actual['schema'], row)
+                if isinstance(cell['value'], str) and '\n' in cell['value']}
+        terminal = settled_receipt(calls, call)
+        text = '\n'.join(event.get('part', {}).get('text', '')
+            for index, line in enumerate((attempt_dir / 'events.jsonl').read_text().splitlines()) if line.strip()
+            for event in [json.loads(line)] if index > terminal['index'] and event.get('type') == 'text')
+        kind = 'wrong-encoding' if spec['id'].endswith('wrong-encoding') else 'unclosed-quote'
+        require(damage_diagnosed(text, kind, replacements, affected_fields), 'diagnostic: damage must be diagnosed in the report')
         if (attempt_dir / 'artifact/package.lgp').exists():
             package_graph(attempt_dir, result['node']['node_id'], transfers[0]['output']['destination'])
         return

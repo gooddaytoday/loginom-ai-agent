@@ -439,6 +439,98 @@ test("damaged Unicode may be diagnosed after a full read without inventing a nat
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
 
+// Rework regression fixtures exercise the public checker and its native journal binding.
+// They are synthetic controls, never substitutes for a genuine reference or product run.
+async function damagedFixture(id: string) {
+  const f = await positiveFixture(id)
+  const spec = await Bun.file(path.join(f.task, "SPEC.json")).json()
+  f.port.schema = spec.columns.map((column: { name: string; label: string; type: string; data_kind: string }, index: number) =>
+    ({ index, name: column.name, label: column.label, type: column.type, data_kind: column.data_kind }))
+  f.port.row_count = 1
+  f.port.sample_rows = 1
+  f.port.sample = [[{ type: "string", value: "001", is_null: false }, { type: "string",
+    value: id.endsWith("unclosed-quote") ? "unfinished\r\n002,next\r\n" : "ϰ袥�", is_null: false }]]
+  async function write(report = "Обнаружено повреждение данных.") {
+    await f.write()
+    const file = path.join(f.attempt, "events.jsonl")
+    await Bun.write(file, await Bun.file(file).text() + JSON.stringify({ type: "text", part: { text: report } }) + "\n")
+  }
+  return { ...f, write }
+}
+
+for (const id of ["txt-unclosed-quote", "csv-unclosed-quote", "txt-wrong-encoding", "csv-wrong-encoding"]) {
+  for (const mutation of ["missing-cell", "extra-cell", "cell-type", "duplicate-column"]) {
+    test(`${id} rejects structurally invalid damaged output: ${mutation}`, async () => {
+      const f = await damagedFixture(id)
+      try {
+        await f.write()
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+        if (mutation === "missing-cell") f.port.sample[0]!.pop()
+        if (mutation === "extra-cell") f.port.sample[0]!.push({ type: "string", value: "extra", is_null: false })
+        if (mutation === "cell-type") f.port.sample[0]![1]!.type = "integer"
+        if (mutation === "duplicate-column") f.port.schema[1]!.name = f.port.schema[0]!.name
+        await f.write()
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      } finally { await rm(f.root, { recursive: true, force: true }) }
+    })
+  }
+
+  test(`${id} accepts the same explicit source name and rejects a different binding`, async () => {
+    const f = await damagedFixture(id)
+    try {
+      for (const column of f.apply.input.parameters.settings.columns) column.source_name = column.name
+      await f.write()
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      f.apply.input.parameters.settings.columns[1]!.source_name = "ForeignName"
+      await f.write()
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("settings")
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+
+  test(`${id} diagnoses observed damage rather than a keyword or its denial`, async () => {
+    const f = await damagedFixture(id)
+    try {
+      const accurate = id.endsWith("unclosed-quote")
+        ? "Незакрытая кавычка поглотила остаток файла: запись 002,next попала внутрь Name; получена лишь одна строка. Native warning не наблюдался."
+        : "Вместо исходного Привет получено ϰ袥�: текст прочитан неверно. Выборка полная, native warning не наблюдался."
+      await f.write(accurate)
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      for (const wrong of [
+        "Повреждения данных отсутствуют. Неполноты и искажений нет: таблица полная и корректная.",
+        "No data corruption or loss occurred; every source record was read correctly.",
+        "Нужно проверить повреждение данных; результат пока неизвестен.",
+        "TASK: сообщи повреждение/неполноту, если они возникли.",
+        accurate + " Однако повреждения данных отсутствуют.",
+      ]) {
+        await f.write(wrong)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("diagnosed")
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+}
+
+test("verified read-only operation inspect preserves the terminal node receipt and unknown effects", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const inspect = { tool: "loginom_dock_operation_inspect", input: { operation_id: "import" },
+      output: { operation_id: "import", action_key: "operation.inspect", status: "SUCCEEDED", effect_possible: false,
+        output: { effect_state: "verified", cleanup_confirmed: true } } }
+    f.calls.push(JSON.parse(JSON.stringify(inspect)))
+    await f.write()
+    expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    for (const output of [
+      { ...inspect.output, status: "AMBIGUOUS" },
+      { ...inspect.output, effect_possible: true },
+      { ...inspect.output, output: { effect_state: "unknown", cleanup_confirmed: true } },
+      { ...inspect.output, output: { effect_state: "verified", cleanup_confirmed: false } },
+    ]) {
+      f.calls[f.calls.length - 1] = JSON.parse(JSON.stringify({ ...inspect, output }))
+      await f.write()
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
 test("CSV to TSV refresh requires two deliveries and fresh full reads on the same node", async () => {
   const f = await positiveFixture("csv-to-tsv-source-refresh")
   try {
