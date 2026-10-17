@@ -1,20 +1,20 @@
 # Node evals — checkpoint
-Дата:17.10.2026;owner серияLAB59→60→61→62→63/autonomous blockers/neededlimits,один heartbeat30min.
-LAB59done44/LAB60done38 подтверждены;acceptedc050/7500/history сохранены,не возобновлять.
-LAB60 Ben11PASS/0FAIL/0ERROR,verificationd2f089db;cleanup/genuineRELEASED/healthyFREE подтверждены.
-Accepted common code/test/case7d3a5cbda2873094219dec836b1b6c0ffa40f639;новые commits только docs,не product dev/main merge/release.
-LAB61 original20TASK/input hashes/10IDs сохранены;diagnostic/no fakepackage-cold;полного ACCEPT ещё нет.
-New PRODUCT CLI2e990 independently Ben01a14a96/db69e290;immutable5389entries/resources4394/source260 verified,старыеd6/f2aa/config сохранены.
-Configlab61-epoch-2e990a84a/rawSHAd1ee7748 Rich/Ben only;OS8c605 independently Ben01a14aba/26negativechecks.
-Exact282bytepolicybf25939f appliedONCE16:49UTC;kernelraw71b3d550 equals exactcompilation,174foreignraw/193loadedentries unchanged;не повторятьload.
-Fresh installationREADY/unit646PASS/15SKIP/0FAIL/typecheckPASS/genuinecompletion→ordinaryRELEASED→healthyFREE verifiedd546d160;decision97c8bba5 preserved.
-Rich01a14ae0 завершил BLOCKED01a14b00-2630-7e58-8cd1-66fbcb718ee2;new unaccepted clean source1b93b62c8bbcdcd4ea2bf0c6de317547cced96a8,не common.
-9/10readyrefs:6historicald6+csv-wrong-delimiter#3/csv-ambiguous-headers#1/missing-source-column#1 на2e990;143negative/16positive controls reportedPASS.
-Reference14/CSV3/3/initial1/3,productNOT_RUN0/recovery0/probes0,limits unchanged;историческиеFAIL/AMBIGUOUS/once/ledger не менять.
-Initial#1 target=new/no columns rejected atrequest.validate/effectfalse/cleanuptrue доdraft;exactvalidator offline replay reportedPASS.
-ИсходныйTASKf101a3a3 требует собственныйdraft→incompletecontract→knownrefusal→draftclosure;раннийrequestreject один не доказываеткейс.
-Архив9860420bytes/SHA6b4d4a14/554payload hashes/manifest964007f2 проверены;deliveryreceipt ../2026-10-17-lab61-initial-blocker-delivery.json.
-Originalreferencecompletionaeb136f4 и actualordinaryRELEASED17:46:43.497UTC checked;delivered healthyFREE17:47:01.379UTC,lease absent.
-Native Evaler01a14b00-2658-7acc-89c4-c8a81b7a1376 проверяет14actualLuna-high archives/cleanup и готовит Ben offline review;readlatest transfers,no duplicates.
-OnlyEvaler updatesstate/consumption14/provenance;operator notstatewriter;новые effects ждут совместимого пути/targetedTDD/independent exactsource review.
-FullBen10caseACCEPT/actualmodel/evidence/cleanup→genuinecompletion→ordinaryRELEASED→healthyFREE/acceptedcommonintegration beforeLAB62/63;stopcycle onlyfull63.
+Дата:17.10.2026;owner59→60→61→62→63/autonomous blockers/neededlimits;single heartbeat30min.
+LAB59done44/LAB60done38/acceptedc050-7500/history/verificationd2f089db сохранены;не возобновлять.
+Accepted common code/test/case7d3a5cbda2873094219dec836b1b6c0ffa40f639;последующие commits только docs,не dev/main product release.
+LAB61 исходные20TASK-input hashes/10IDs/criteria и Ben expectationsb9d2b534 неизменны;diagnostic/no fakepackage-cold.
+Unaccepted cases1b93b62c8bbcdcd4ea2bf0c6de317547cced96a8:9/10refs ready(6d6+3new2e990),не common.
+Reference14/CSV3of3/initial1of3/productNOT_RUN0/recovery0/probes0/rework3;allFAIL-AMBIGUOUS/once/ledger retained.
+InstalledPRODUCT2e990 sourceBen01a14a96/db69e290;immutable/pins/configlab61-epoch/rawSHAd1ee7748 preserved,oldd6/helperf2aa untouched.
+OS8c605 Ben01a14aba/26negativechecks;exactpolicybf25939f appliedONCE/kernelraw71b3d550,174foreignraw/193loadedentries unchanged;не reload. Installationadmissiond546d160/decision97c8bba5/unit646PASS15SKIP0FAIL/typecheck preserved;не новый caseACCEPT.
+RichBLOCKED01a14b00 archive9860420bytes/SHA6b4d4a14/554payload/manifest964007f2 verified;deliveryad8ebc1e.
+Evaler8074065b verified14DB/112actualLuna-high/nativejournals/20inputs/cleanup;genuineaeb136f4→ordinaryRELEASED17:46:43→healthyFREE17:47:01.
+BenVERDICT01a14b0e-e990-7109-ae9c-f4467e113753:public user-v1 creator absent;new/no columns fails beforedraft;full10caseACCEPT notdone.
+Benarchive19370bytes/SHAa9483116/10payload/manifest1610e3c0 verified;native Evalerverification9729d2bc copied inprojectdocs.
+Native request01a14b12-ae47-748e-9de5-cbb42699589b asks Anewproductlifecycle vs Bcriterionchange;coordinator chooses A underownerdelegation.
+New explicit initial-scope ../2026-10-17-lab61-initial-cli-correction-authorization.md;42f7 remains narrow historical epoch permission.
+Design/implementation in ../plans/2026-10-17-lab61-initial-cli-*.md:existingimports.text/new→own draft→typedrefusal before settings/Apply/Execute→nativeownedclose.
+Only one RichOFFLINE source phase fromexact2e990 nowauthorized;read native queues/transfers first;no duplicate/active checkout mutation.
+TargetedRED exact2e990→minimalGREEN/negative/regression→cleanSHA→independentBenreview;build/install/browser/lease/live/model closed untillatergates.
+OnlyEvaler writesstate/counters/provenance;newsource/newmeasurement version explicit;9historicalreadyrefs preserved;neededlimits old/new/usage beforeeffects.
+FullBen10caseACCEPT/evidence/actualmodel/cleanup/genuinecompletion/ordinaryRELEASED/healthyFREE/acceptedcommonintegration beforeLAB62→63;stop onlyfull63.

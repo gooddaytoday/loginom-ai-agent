@@ -1,0 +1,50 @@
+{
+  "observed_utc": "2026-10-17T18:14:08.809767+00:00",
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "scope": "independent initial lifecycle blocker review verified; request for intended case/product contract, no correction admitted",
+  "report_id": "01a14b0e-e990-7109-ae9c-f4467e113753",
+  "review_task_id": "01a14b05-705a-76c6-baef-c4e9695612dd",
+  "cases_sha": "1b93b62c8bbcdcd4ea2bf0c6de317547cced96a8",
+  "installed_product_sha": "2e990a84aa25dc37a4e808da564be752aae6f564",
+  "verdict": "BLOCKED",
+  "archive_attachment_id": "01a14b0e-e967-7c45-a520-b1f65ecd7466",
+  "archive_sha256": "a9483116bfa7e47495c5a258979f583de53ee1c4845bbb54da7ca32b4ee80822",
+  "archive_bytes": 19370,
+  "manifest_sha256": "1610e3c057e324582467d5c0a019e5df4585459259a19ee6bb7de5262def2d10",
+  "payload_files_verified": 10,
+  "independent_readonly_replay_results_match": {
+    "public-path": true,
+    "checker": true
+  },
+  "new_target_matrix_rejected_before_target": 9,
+  "browser_callbacks": 0,
+  "existing_blank_node_unit_fixture_mutations": 0,
+  "profile": "user-v1",
+  "public_blank_creator": "not provided by verified surface",
+  "exact_checker_failure": {
+    "errors": [],
+    "failures": [
+      "diagnostic: known refusal before Execute required"
+    ]
+  },
+  "native_target_configure_close_events": 0,
+  "installed_exact_source_modules_verified": 7,
+  "original_TASK_sha256": "f101a3a3396f5a6bc807689da19e6495c0d1ebc019c9ee42ce7fb8f07f5f5c51",
+  "original_input_sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19",
+  "original_inputs_only_expectations_sha256": "b9d2b534832edd05b2f54c6b51dc2f0c4c236d2bc30d956352daa541c0f815ef",
+  "scope_boundary_document": "evals/docs/2026-10-17-lab61-cli-correction-authorization.md@42f7caef13dfa6e33fc53d0ede17a2267721ead3",
+  "scope_boundary_quote": "Разрешение ограничено нужным исправлением format-field пути и зависимыми проверками для завершения LAB61",
+  "meaning_decision_required": "original owned-draft lifecycle vs correct early no-effect admission refusal",
+  "preserve_TASK_option": "separate product lifecycle/API change from exact2e with Rich offline TDD then Ben exact-source review before build/install/admission",
+  "preserve_current_product_option": "owner explicitly revises initial TASK/criterion to early no-effect refusal, with independently reviewed harness/expectations; no fake native draft close",
+  "review_is_not_full10case_ACCEPT": true,
+  "historical_reference14_productNOT_RUN0_recovery0_probes0_unchanged": true,
+  "archived_cleanup_completion_RELEASED_FREE_confirmed_from_prior_Evaler_proof": "8074065ba6fb0c835db14246c1cae8f48a38fed679d47006bdd23fd4248295cd",
+  "current_helper_status": "FREE",
+  "current_native_health": "not newly exercised",
+  "all_review_processes_foreground_completed": true,
+  "only_active_task": "01a14b0e-e9c5-7e41-9532-d40a949ade67",
+  "pending_workers": [],
+  "new_build_install_live_model_calls": 0,
+  "common_documentary_sha": "31bacc5e0f505ffd0d60165640c75fba862c5e52"
+}
