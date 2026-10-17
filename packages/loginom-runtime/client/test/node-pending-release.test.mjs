@@ -15,16 +15,19 @@ const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br
 const graphOf=()=>({complete:true,document_id:'doc',workflow_ref:workflow,
  nodes:[{ref:node,type:'imports.text',label:'Source',position:{x:320,y:280},inputs:[],outputs:[0]}],links:[],foreign_links:[]});
 
-function surface({wizard=false,foreign=false,locked=false,dialog=false}={}) {
- let open=wizard;const gestures=[];
- const state=()=>open?{wizard:{status:'observed',root_ref:'ui-w',root_tid:'W',stage:'text_import_format',owner_context:{status:'observed',node:{tid:'owner'}}},
+function surface({wizard=false,foreign=false,locked=false,dialog=false,views=false}={}) {
+ let open=wizard,visualizers=views;const gestures=[];const path=[{tid:'MF;TF-1;path',label:'Сценарий'}];
+ const state=()=>visualizers?{wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'views'},
+  workflow_navigation:{status:'observed',control_ref:'ui-nav',control_tid:'MF;TF-1;path',path},
+  ui:{elements:[{tid:'MF;TF-1;path',ref:'ui-nav',allowed_actions:['click']}],dialogs:[],masks:[]}}
+  :open?{wizard:{status:'observed',root_ref:'ui-w',root_tid:'W',stage:'text_import_format',owner_context:{status:'observed',node:{tid:'owner'}}},
   prepared_node_context:{...node,...(foreign?{node_id:'other'}:{}),verified:true,surface:'wizard'},
   ui:{elements:[{tid:'W;btnClose',ref:'ui-close',allowed_actions:['click']}],dialogs:[],masks:[]}}
-  :{wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'graph',locked},
+  :{wizard:{status:'absent'},prepared_node_context:{...node,verified:true,surface:'graph',locked},navigation_context:{status:'observed',path},
    ui:{elements:[],dialogs:dialog?[{ref:'ui-d'}]:[],masks:[]}};
  return {gestures,channel:{
   observe:async({ready})=>{const s=state();if(!ready(s))throw Error('Node procedure readiness timeout');return structuredClone(s);},
-  perform:async({resolve,initialObservation})=>{gestures.push(resolve(initialObservation));open=false;}}};
+  perform:async({resolve,initialObservation})=>{gestures.push(resolve(initialObservation));open=false;visualizers=false;}}};
 }
 const stopped=({graph=graphOf,receipt={state:'completed',receipt:{cleanup_complete:true}},transportUncertain=false}={})=>({
  transportUncertain,lastReceipt:{id:'apply:n7'},deadline:Date.now()+10000,
@@ -35,12 +38,16 @@ const release=(operation,channel,restoreRead)=>releasePendingNode({operation,cha
 test('release proves a quiet unchanged graph without a gesture',async()=>{
  const s=surface(),proof=await release(stopped(),s.channel);
  assert.equal(proof.verified,true);assert.equal(proof.cleanup_complete,true);assert.equal(proof.effect_possible,false);
- assert.deepEqual(proof.cleanup,{wizard_closed:false,read_view_restored:false});assert.deepEqual(s.gestures,[]);
+ assert.deepEqual(proof.cleanup,{wizard_closed:false,read_view_restored:false,views_returned:false});assert.deepEqual(s.gestures,[]);
  assert.equal(proof.node_context.node_id,'new');assert.equal(proof.graph.nodes.length,1);
 });
 test('release cancels only the stopped node\'s own wizard draft',async()=>{
  const s=surface({wizard:true}),proof=await release(stopped(),s.channel);
  assert.deepEqual(s.gestures,[{verb:'click',ref:'ui-close'}]);assert.equal(proof.cleanup.wizard_closed,true);assert.equal(proof.effect_possible,true);
+});
+test('release leaves the stopped node\'s visualizers through the observed scenario control',async()=>{
+ const s=surface({views:true}),proof=await release(stopped(),s.channel);
+ assert.deepEqual(s.gestures,[{verb:'click',ref:'ui-nav'}]);assert.equal(proof.cleanup.views_returned,true);assert.equal(proof.effect_possible,true);
 });
 test('release restores a stopped read view before checking the graph',async()=>{
  const s=surface(),order=[];
@@ -95,7 +102,7 @@ function fixture({release:releaseDriver}={}) {
  return {runtime,calls,events,drivers,handler};
 }
 const proved=({wizard_closed=false,read_view_restored=false}={})=>()=>({verified:true,cleanup_complete:true,effect_possible:wizard_closed||read_view_restored,
- node_context:{...node,verified:true,surface:'graph',locked:false},graph:graphOf(),cleanup:{wizard_closed,read_view_restored}});
+ node_context:{...node,verified:true,surface:'graph',locked:false},graph:graphOf(),cleanup:{wizard_closed,read_view_restored,views_returned:false}});
 const stop=async(f,phase)=>{
  const key=phase==='read'?'readOutput':'finish',original=f.drivers[key];let first=true;
  f.drivers[key]=async(...args)=>{if(!first)return original(...args);first=false;f.calls.push(phase);throw Error('Local node cancellation requested');};
