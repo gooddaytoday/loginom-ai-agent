@@ -15,7 +15,7 @@ import {closePreparedWizard} from './node-wizard-close.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
-import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
+import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable,restoreStoppedTableRead} from './node-output-procedure.mjs';
 import {readTableOutputPages} from './table-output-pages.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
 import {readCollapseNativeOutput} from './collapse-native-output.mjs';
@@ -327,8 +327,8 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     if(read.coverage==='full')requireValue(implementation?.fullUiOutput===true&&read.sample_rows===100,
      'Full bounded UI output is unavailable for this handler');
     if(implementation?.readOutputs){requireValue(multipleOutputs?.verified,'Verified output schemas missing');return implementation.readOutputs(channel,read,ctx,multipleOutputs);}
-    const table=await openNewOutputTable(channel,0);readView={table:table.table,formatProof:null,restored:false};
-    const formatProof=read.require_exact_numbers?await configureTablePrecision(channel,table.table):null;readView.formatProof=formatProof;
+    const table=await openNewOutputTable(channel,0);readView={table:table.table,formatProof:null,restored:false,formatting:{}};
+    const formatProof=read.require_exact_numbers?await configureTablePrecision(channel,table.table,{progress:readView.formatting}):null;readView.formatProof=formatProof;
     let readSettings,data,formatRestoration;
     try {
       readSettings=await prepareTableRead(channel,table.table);
@@ -430,11 +430,10 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
     signal?.throwIfAborted();
     // A stopped read may leave its own output Table open with exact-number
-    // formatting. Restore that formatting before leaving the view.
+    // formatting or a settings dialog. Restore that before leaving the view.
     const view=state.pending.phase==='read'?readView:null;
     return releasePendingNode({operation,channel,readReceipt:options.readReceipt,restoreRead:view?async()=>{
-     if(view.formatProof&&!view.restored){await restoreTablePrecision(channel,view.formatProof);view.restored=true;}
-     await returnFromOutputTable(channel,view.table);readView=null;return true;
+     await restoreStoppedTableRead(channel,view);readView=null;return true;
     }:undefined});
    },
    async verifyContinuation(state,{signal}={}){
