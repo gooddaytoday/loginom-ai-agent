@@ -100,6 +100,7 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
       else {assert.equal(entryDelay,0,'menu must wait for homepage readiness');events.push('menu');}
     },
     async fill(value) { events.push({ fill: value });if(selector.includes('edtFileName'))openedPath=value; },
+    async press(key) { assert.equal(key,'Tab');assert.ok(selector.includes('edtUsername'));events.push('username_lookup'); },
     locator(child) { return locator(selector + ' ' + child); },
   });
   return { events, tabs, context, openFiles() {add(null);const tab=tabs.at(-1);tab.graph=null;tab.area=null;packages.delete(tab);}, page: {
