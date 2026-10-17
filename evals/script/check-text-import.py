@@ -7,6 +7,8 @@ import sys
 import importlib.util
 import decimal
 import re
+import csv
+import io
 import zipfile
 import xml.etree.ElementTree as ET
 
@@ -466,7 +468,6 @@ def diagnostic(spec, task_dir, attempt_dir, calls, events, workspace, transfers)
                 differs = True
             require(differs, 'diagnostic: Unicode damage must be observed')
         else:
-            import csv
             invalid = False
             try:
                 parse_source(raw, recipe)
@@ -487,7 +488,13 @@ def diagnostic(spec, task_dir, attempt_dir, calls, events, workspace, transfers)
         require('OtherName' in result['error']['message'], 'diagnostic: missing OtherName refusal required')
     if spec['id'].endswith('wrong-delimiter'):
         message = result['error']['message'].lower()
-        require('column' in message or 'field' in message or 'пол' in message, 'diagnostic: typed binding/count refusal required')
+        raw = (task_dir / spec['inputs'][0]['path']).read_bytes()
+        headers = next(csv.reader(io.StringIO(raw.decode('utf-8-sig'), newline=''),
+            delimiter=spec['settings']['format']['delimiter'], quotechar=spec['settings']['format']['text_qualifier']), [])
+        count_refusal = result['error']['message'] == (
+            f"Import definition count differs: requested {len(spec['columns'])}, observed {len(headers)}")
+        require('column' in message or 'field' in message or 'пол' in message or count_refusal,
+            'diagnostic: typed binding/count refusal required')
     if (attempt_dir / 'artifact/package.lgp').exists():
         package_graph(attempt_dir, result['node']['node_id'])
 
