@@ -11,7 +11,7 @@ import {networkInterfaces, tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {systemProxyFixture} from './support/system-proxy-fixture.mjs';
-import {isWindowsCryptoRequest, isWindowsCryptSvcOwner, observeWindowsCryptSvc} from './support/windows-crypto-probe.mjs';
+import {isWindowsCryptoRequest, isWindowsCryptSvcOwner, observeWindowsCryptSvc, observeWindowsSocketOwner} from './support/windows-crypto-probe.mjs';
 
 const execute = promisify(execFile);
 function trackSocket(socket, sockets) {
@@ -92,6 +92,15 @@ test('Loginom Chromium connects directly with a configured proxy', {
   const certificateObservations = [];
   const pacReads = [];
   const sockets = new Set();
+  // Windows owners of unexpected proxy connections while product browsers run.
+  // They only explain a failure; every such request still fails the check.
+  const owners = [];
+  const ownerObservations = [];
+  const unexpected = (url, socket, done) => {
+    requests.push(url);
+    if (process.platform !== 'win32' || !state.product) { done(); return; }
+    ownerObservations.push(observeWindowsSocketOwner(socket).then(owner => owners.push({url, owner})).finally(done));
+  };
   const origin = createServer((request, response) => {
     if (request.url === '/proxy.pac') {
       pacReads.push(request.url);
@@ -122,11 +131,11 @@ test('Loginom Chromium connects directly with a configured proxy', {
       }).finally(() => response.end('PROXY')));
       return;
     }
-    requests.push(request.url); response.end('PROXY');
+    unexpected(request.url, request.socket, () => response.end('PROXY'));
   });
   const state = {};
   t.after(async () => {
-    await Promise.allSettled(certificateObservations);
+    await Promise.allSettled([...certificateObservations, ...ownerObservations]);
     try { await state.native?.restore(); }
     finally {
       for (const socket of sockets) socket.destroy();
@@ -139,8 +148,7 @@ test('Loginom Chromium connects directly with a configured proxy', {
   });
   proxy.on('connect', (request, socket) => {
     trackSocket(socket, sockets);
-    requests.push(request.url);
-    socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n');
+    unexpected(request.url, socket, () => socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n'));
   });
   origin.on('upgrade', (request, socket) => {
     trackSocket(socket, sockets);
@@ -189,10 +197,13 @@ test('Loginom Chromium connects directly with a configured proxy', {
         }
         const before = requests.length;
         const pacBefore = pacReads.length;
-        await run('managed');
-        await run('mcp');
-        await Promise.all(certificateObservations);
-        assert.deepEqual(requests.slice(before), [], 'Product navigation must never reach the proxy');
+        const ownersBefore = owners.length;
+        state.product = true;
+        try { await run('managed'); await run('mcp'); }
+        finally { state.product = false; }
+        await Promise.all([...certificateObservations, ...ownerObservations]);
+        assert.deepEqual(requests.slice(before), [], 'Product navigation must never reach the proxy'
+          + (owners.length > ownersBefore ? '; Windows owners: ' + JSON.stringify(owners.slice(ownersBefore)) : ''));
         assert.equal(pacReads.length, pacBefore, 'Product browsers must not load a PAC');
       });
     }
