@@ -4865,7 +4865,7 @@ test('grouped mapping pages bind group-local indexes and permit only subpixel ta
   const {page,c,records}=bufferedMappingFixture();
   const rename=e=>{if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard',family);for(const child of e.children)rename(child);};rename(c.form);
   records.forEach((r,i)=>{r.data.GroupField=i<10?'':'Исключенные';r.data.Index=i<10?i:i-10;});
-  c.rows[11].box.width+=fault==='clipped'?0.5:1/128;
+  c.rows[11].box.width+=fault==='clipped'?2:1/128;
   if(fault==='group')records[19].data.GroupField='Unknown';
   if(fault==='index')records[19].data.Index=19;
   const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
@@ -5219,16 +5219,16 @@ test('fractional geometry keeps ordinary and addressed output definitions comple
 });
 
 test('fractional geometry accepts only bounded edge error and retains refusal diagnostics',async()=>{
-  for(const extra of [0,0.000025,1/128,1/64,1/32,1/32+0.00001,0.25,0.5,1,NaN,Infinity]) {
+  for(const extra of [0,0.000025,1/128,1/64,1/32,0.25,0.5,1,1+0.00001,2,NaN,Infinity]) {
     const page=new Page(),c=mappingCoverageFixture(page);
     c.rows[0].box={...c.rows[0].box,width:500+extra};
     const observed=await page.observe();
     assert.equal(observed.wizard.output_columns.definition_coverage.status,
-      Number.isFinite(extra)&&extra<=1/32?'complete_configured_rows':'partial',String(extra));
-    if(Number.isFinite(extra)&&extra>1/32){
+      Number.isFinite(extra)&&extra<=1?'complete_configured_rows':'partial',String(extra));
+    if(Number.isFinite(extra)&&extra>1){
       assert.equal(observed.geometry.failure.condition,'right_containment');
-      assert.equal(observed.geometry.failure.tolerance,1/32);
-      assert.ok(observed.geometry.failure.delta>1/32);
+      assert.equal(observed.geometry.failure.tolerance,1);
+      assert.ok(observed.geometry.failure.delta>1);
     }
   }
 });
@@ -5391,17 +5391,17 @@ for(const prefix of ['ConsoleForm','MF;ConsoleForm'])test('bounded '+prefix+' co
 });
 
 for(const [card,family] of [['LAB-66','DerivedDataSourceOutputSocketWizard'],['LAB-69','DerivedDataSourceMappingEngineOutputPortWizard']])
- test(card+' excluded mapping row admits observed 1/32 CSS px overflow within owned definition pages',async()=>{
-  for(const fault of ['observed','overflow','foreign_record','group','left','cell']) {
+ test(card+' mapping rows admit 0.5/1 CSS px and reject 2 CSS px overflow within owned definition pages',async()=>{
+  for(const fault of ['observed','half_pixel','one_pixel','overflow','foreign_record','group','left','cell']) {
    const {page,c,records}=bufferedMappingFixture();
    for(const e of page.document.all())if(e.attrs['data-tid']?.startsWith(c.base))e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard',family);
    records.forEach((r,i)=>{r.data.GroupField=i<10?'':'Исключенные';r.data.Index=i<10?i:i-10;});
-   c.rows[11].box.width+=fault==='overflow'?1/32+1/128:1/32;
+   c.rows[11].box.width+=fault==='overflow'?2:fault==='half_pixel'?0.5:fault==='one_pixel'?1:1/32;
    if(fault==='foreign_record')c.rows[11].attrs['data-recordid']='foreign';
    if(fault==='group')records[11].data.GroupField='Unknown';
    if(fault==='left')c.rows[11].box.x-=1/32;
    if(fault==='cell')c.rows[11].children[4].box.width+=1/16;
    const result=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
-   assert.equal(result.output.wizard.output_columns.page.status,fault==='observed'?'complete_definition_page':'unverified_definition_page',fault);
+   assert.equal(result.output.wizard.output_columns.page.status,['observed','half_pixel','one_pixel'].includes(fault)?'complete_definition_page':'unverified_definition_page',fault);
   }
  });
