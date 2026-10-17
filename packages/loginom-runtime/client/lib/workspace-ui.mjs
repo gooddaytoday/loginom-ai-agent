@@ -1079,7 +1079,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               const matches=fields.filter(f=>f.row_ref===refOf(row));
               const nameCells=all.filter(e=>{charge();return row.contains(e) && (getTid(e)??'').startsWith(base+'colName_');});
               if(row.parentElement!==container || row.getAttribute('data-recordindex')!==String(index)
-                || row.getAttribute('data-boundview')!==boundId || !inside(row,container,1/32)
+                || row.getAttribute('data-boundview')!==boundId || !inside(row,container,1)
                 || !geometryCheck(rb.y,previous?previous.y+previous.height:cb.y,'row_continuity',row) || matches.length!==1 || matches[0].status!=='observed'
                 || nameCells.length!==1)return false;
               const key=getTid(nameCells[0]).slice((base+'colName_').length);
@@ -1100,8 +1100,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const fields=wizard.output_columns.fields,containers=body?[...body.querySelectorAll('.x-grid-item-container')]:[];
         const rows=body?[...body.querySelectorAll('table.x-grid-item')]:[];
         const inputs=filter?[...filter.querySelectorAll('input')].filter(e=>visible(e)&&!sensitive(e)):[];
-        // Excluded native mapping rows in LAB-66/LAB-69 extend 1/32 CSS px on the right.
-        // Apply that bound only to row containment; other bounds and identity checks remain unchanged.
+        // Native mapping rows can extend beyond their container after exclusion.
+        // Allow one CSS pixel on the right for font/DPI rounding; other bounds and identities remain unchanged.
         const nativeInside=(e,parent,rightTolerance=geometryEpsilon)=>{
           if(!visible(e)||sensitive(e))return false;
           const b=boxOf(e),p=boxOf(parent);
@@ -1128,7 +1128,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               const matches=fields.filter(f=>f.row_ref===refOf(row));
               const names=all.filter(e=>{charge();return row.contains(e)&&(getTid(e)??'').startsWith(base+'colName_');});
               if(row.parentElement!==container || row.getAttribute('data-recordindex')!==String(index)
-                || row.getAttribute('data-boundview')!==boundId || !nativeInside(row,container,1/32)
+                || row.getAttribute('data-boundview')!==boundId || !nativeInside(row,container,1)
                 || !geometryCheck(rb.y,previous?previous.y+previous.height:cb.y,'row_continuity',row) || matches.length!==1 || matches[0].status!=='observed' || names.length!==1)return false;
               const key=getTid(names[0]).slice((base+'colName_').length);
               return ['colName_','colDisplayName_',...(roleGrid?[]:['colSourceDisplayName_']),'colDataKind_',wizard.stage==='input_mapping'?'colUsageType_':'colDefaultUsageType_'].every(prefix=>{
@@ -1183,7 +1183,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
                 });
                 return completeCells && row.parentElement===container && row.getAttribute('data-boundview')===boundId
                   && row.getAttribute('data-recordindex')===String(index) && row.getAttribute('data-recordid')===String(r.internalId)
-                  && nativeInside(row,container,1/32) && (!previous || geometryCheck(b.y,previous.y+previous.height,'row_continuity',row))
+                  && nativeInside(row,container,1) && (!previous || geometryCheck(b.y,previous.y+previous.height,'row_continuity',row))
                   && f.status==='observed' && f.row_ref===refOf(row) && f.name===r.data.Name && f.label===r.data.DisplayName;
               });
             if(valid)window={first,total:records.length,signature:JSON.stringify({root:wizard.root_ref,
