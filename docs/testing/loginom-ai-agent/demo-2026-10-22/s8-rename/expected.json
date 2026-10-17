@@ -5,16 +5,7 @@
       "type": "imports.text"
     },
     {
-      "type": "transform.calculator"
-    },
-    {
       "type": "transform.group_data"
-    },
-    {
-      "type": "transform.sorting"
-    },
-    {
-      "type": "transform.reform_columns"
     },
     {
       "type": "exports.text"
