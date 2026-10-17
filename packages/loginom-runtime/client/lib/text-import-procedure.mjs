@@ -286,6 +286,36 @@ export async function selectImportColumnOption(channel,initial,index,property,la
     resolve:state=>({verb:'select_wizard_option',ref:option(state).ref})});
 }
 
+// Delayed native parsing can invalidate a format snapshot before its gesture.
+// Refresh only the same field and unchanged parsing values through perform.
+async function setImportFormatField(channel,initial,name,text) {
+  const describe=state=>{
+    const w=state.wizard,f=w?.settings?.fields?.[name];
+    requireValue(w?.status==='observed'&&w.stage==='text_import_format'&&w.root_tid&&w.root_ref
+      &&w.owner_context?.status==='observed'&&w.owner_context.node?.tid&&w.owner_context.path?.length
+      &&f?.status==='observed'&&f.truncated!==true&&f.owner_ref&&f.input_ref&&f.source_tid,
+      'Import format field owner unobserved');
+    const input=one(state.ui.elements.filter(e=>e.ref===f.input_ref),'Import format input changed');
+    const binding=input.wizard_field;
+    requireValue(input.allowed_actions?.includes('set_wizard_field')
+      &&binding?.scope==='import_format'&&binding.stage===w.stage&&binding.name===name
+      &&binding.owner_ref===f.owner_ref&&binding.root_ref===w.root_ref,'Import format field binding changed');
+    const fields=Object.fromEntries(Object.keys(w.settings.fields).sort().map(key=>{
+      const field=w.settings.fields[key];
+      requireValue(field.status==='observed'&&field.truncated!==true&&['string','boolean'].includes(typeof field.value),
+        'Import parsing settings incompletely observed');
+      return [key,field.value];
+    }));
+    return {root:{tid:w.root_tid,ref:w.root_ref},owner:{node:w.owner_context.node.tid,
+      path:w.owner_context.path.map(({tid,label})=>({tid,label}))},
+      field:{name,tid:f.source_tid,input_tid:input.tid??null,owner_ref:f.owner_ref,max_length_utf16:binding.max_length_utf16},fields};
+  };
+  const expected=describe(initial);
+  return channel.perform({condition:'set bound import format '+name,initialObservation:initial,
+    ready:state=>{requireValue(same(describe(state),expected),'Import format field or parsing settings changed');return true;},identity:describe,
+    resolve:state=>({verb:'set_wizard_field',ref:state.wizard.settings.fields[name].input_ref,text})});
+}
+
 async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   (patch?validateTextImportPatch:fieldsOnly?validateTextImportFieldsRequest:validateTextImportRequest)(parameters);
   parameters=structuredClone(parameters);
@@ -419,7 +449,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
         state.wizard.settings.fields[name]?.value === label), name);
       requireValue(after.value === label && after.owner_ref === f.owner_ref && after.input_ref === f.input_ref,
         'Import format field or exact label changed after selection');
-    } else await act(s, { verb: 'set_wizard_field', ref: f.input_ref, text });
+    } else await setImportFormatField(channel,s,name,text);
   }
   let parsedColumns;
   if(patch) {
