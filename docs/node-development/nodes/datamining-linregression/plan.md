@@ -1,5 +1,7 @@
 # Линейная регрессия: подплан для Multica
 
+> **Волна 2 (решение владельца 17.10.2026).** Ведёт сквад «Обработчики узлов — волна 2», ветка `nodes-wave2`, объём — этапы 0 и 1. Done этапа 1: модель `openai/gpt-6.1-sol/medium` (1800 с) по бизнес-заданию `acceptance/task.md` строит импорт CSV → узел → экспорт и сохраняет пакет, `cold-check.mjs` PASS по `expected.json`; ≥2/3 у исполнителя и 2/3 у проверяющего на одном SHA. Матрица раздела 4 для этапа 1 справочная, её остальные пункты переходят в этапы 2+. Общие W делает одна карточка W; допуск вещественных колонок уже есть (`tolerance` в `scripts/node-acceptance/expected-outputs.mjs`).
+
 Статус: `discovery_required`. Редакция 1 от 2026-10-05, автор — переработка подпланов в ветке `node-coverage-plans`.
 Component ID: `component.dataMining.LinRegression`, slug `datamining-linregression`. Runtime type и режим: `datamining.lin_regression` / `enter` — предложение до конца этапа 0.
 База назначения: ветка задания из карточки; исследованы исходники `loginom@dada8010e`. Loginom: ожидается 7.4.2, фактическую версию записать на этапе 0; платформа исполнителя — Linux x64.
