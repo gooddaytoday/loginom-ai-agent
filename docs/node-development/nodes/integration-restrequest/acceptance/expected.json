@@ -1,0 +1,44 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "programming.javascript"
+    }
+  ],
+  "output_node_type": "programming.javascript",
+  "columns": [
+    {
+      "name": "RequestId",
+      "label": "RequestId",
+      "type": "string"
+    },
+    {
+      "name": "Key",
+      "label": "Key",
+      "type": "string"
+    },
+    {
+      "name": "HttpStatusCode",
+      "label": "HttpStatusCode",
+      "type": "integer"
+    }
+  ],
+  "rows": [
+    {
+      "RequestId": "r-a",
+      "Key": "a b&я",
+      "HttpStatusCode": 200
+    },
+    {
+      "RequestId": "r-b",
+      "Key": "x/y?",
+      "HttpStatusCode": 200
+    }
+  ]
+}
