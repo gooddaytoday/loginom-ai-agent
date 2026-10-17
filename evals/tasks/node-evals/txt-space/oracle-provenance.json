@@ -1,0 +1,48 @@
+{
+  "independent_calculator": "script/lab59-oracle.py",
+  "calculator_sha256": "21ef973d66b51aaad517d560ef5ccd546d71c378b0256cde55aa87dd72b0dec0",
+  "inputs_archive_sha256": "14c81f76a19c1ca931ffaf22d45fa8587b5d5adb5d86cd14bae7cd0c32967deb",
+  "independent": {
+    "id": "txt-space",
+    "task_sha256": "8be6909e031a747e2281bc96414f0ebaa47cec96c08fd276b52cf344e1d09596",
+    "input": "space.txt",
+    "input_sha256": "c5d6de495d9373b2596b171085441eff904b95c3d8be52a7fdff9a9dfc2bbb58",
+    "settings": {
+      "source": {
+        "encoding": "65001",
+        "rows_to_skip": 0,
+        "first_line_as_title": true
+      },
+      "format": {
+        "delimiter": " ",
+        "text_qualifier": "\"",
+        "decimal_separator": ".",
+        "null_marker": "?",
+        "multiple_delimiters": false,
+        "date_format": "yyyy/mm/dd",
+        "date_separator": "-"
+      }
+    },
+    "source_headers": [
+      "Идентификатор",
+      "Название",
+      "Сумма",
+      "Дата",
+      "Текст"
+    ],
+    "oracle_sha256": "0bc4155d4160a9e6466874b8bfed82800409440140778193b840cca28786519a",
+    "row_count": 3
+  },
+  "baseline_files": {
+    "SPEC.json": "2b79a010f1c2dfa415c99085e5079777e53880fdf5a2ce7590b22c6a83cd5912",
+    "acceptance.json": "f31ef5d6331c18cedbd7d48c323b9588c951af40e4a8265de46d4ca7479e1529",
+    "task.json": "96a681402081f8f5cde0a4d9f8ded3f99307500e7272da4e77dd83e6e6907825",
+    "PROVENANCE.md": "61d20d55ba04404fbb9bf272afdb4a0064559cc066f1070dd016e51e9f9769d0",
+    "TASK.md": "8be6909e031a747e2281bc96414f0ebaa47cec96c08fd276b52cf344e1d09596",
+    "SPEC.md": "8e9a3ddbc6630a5489d46b708a78cf874446733b766a8277ac373471c25fbee4",
+    "preparation.json": "0ba1e8cc6eedc851a674322c91b8a1d37141647718cc8ee2f2d0c75b2dfd7a07",
+    "data/space.txt": "c5d6de495d9373b2596b171085441eff904b95c3d8be52a7fdff9a9dfc2bbb58",
+    "expected/table.json": "0bc4155d4160a9e6466874b8bfed82800409440140778193b840cca28786519a"
+  },
+  "comparison": "PASS: independently calculated typed table equals prepared expected; before any reference"
+}

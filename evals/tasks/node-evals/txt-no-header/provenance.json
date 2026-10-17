@@ -1,0 +1,10 @@
+{
+  "case_id": "txt-no-header",
+  "outcome": "positive",
+  "warm": "PASS",
+  "cold": "PASS",
+  "events_sha256": "9f1dde210e2ca675bdd0ab621de00d20b7918c17082cf7daf876c3ae159a5c61",
+  "reference_sha256": "942f51654a4fd08ef36ff7440b43232ca8fac718c1957488374e7cbcca97c34d",
+  "cold_report_sha256": "562608ece7443e1c93f7f7418e338d4c268812891cbe06e92e192a9e31504c36",
+  "admission": "CODE_CHECKS_ONLY; actual model, budgets and stand cleanup require independent operational verification"
+}

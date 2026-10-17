@@ -1,0 +1,48 @@
+{
+  "independent_calculator": "script/lab59-oracle.py",
+  "calculator_sha256": "21ef973d66b51aaad517d560ef5ccd546d71c378b0256cde55aa87dd72b0dec0",
+  "inputs_archive_sha256": "14c81f76a19c1ca931ffaf22d45fa8587b5d5adb5d86cd14bae7cd0c32967deb",
+  "independent": {
+    "id": "txt-merge-on",
+    "task_sha256": "4684dbccb42db9af960574067716cae7c25b74b76b8a88c34fabafc97e1ad1bb",
+    "input": "merge_on.txt",
+    "input_sha256": "d055de93eac3be3686acc5f542e1f92c69c9ab92b4ca71bc11dc807e8db23061",
+    "settings": {
+      "source": {
+        "encoding": "65001",
+        "rows_to_skip": 0,
+        "first_line_as_title": true
+      },
+      "format": {
+        "delimiter": ";",
+        "text_qualifier": "\"",
+        "decimal_separator": ".",
+        "null_marker": "?",
+        "multiple_delimiters": true,
+        "date_format": "yyyy/mm/dd",
+        "date_separator": "-"
+      }
+    },
+    "source_headers": [
+      "Идентификатор",
+      "Название",
+      "Сумма",
+      "Дата",
+      "Текст"
+    ],
+    "oracle_sha256": "db4257709d41da47ea915c96f71d56aa4640fd19cc2093ecd515d42e12c6f0ac",
+    "row_count": 3
+  },
+  "baseline_files": {
+    "SPEC.json": "674950d548b56b9bc7de173be49b6466bb348d9e295496537ffe7729b61ebf50",
+    "acceptance.json": "1afd030c0bee6a5d18a060510e393c641cb6dc5342916283122f97a769e9ec40",
+    "task.json": "9a9c7d69c32cfc34c2de7b56148778dca49159a2a2332d27176b789989730672",
+    "PROVENANCE.md": "c4336ba347394f3c5141f9ac9f2240b7c1c66a8e1c7ff180a520a70f0ea0caee",
+    "TASK.md": "4684dbccb42db9af960574067716cae7c25b74b76b8a88c34fabafc97e1ad1bb",
+    "SPEC.md": "16cfea75428a25286b526e47432c50078f1ab7ce895a504ab28d06d996233638",
+    "preparation.json": "50794fe112334523363de0acc1245bf51b5922d533153938205db82486a44fa8",
+    "data/merge_on.txt": "d055de93eac3be3686acc5f542e1f92c69c9ab92b4ca71bc11dc807e8db23061",
+    "expected/table.json": "db4257709d41da47ea915c96f71d56aa4640fd19cc2093ecd515d42e12c6f0ac"
+  },
+  "comparison": "PASS: independently calculated typed table equals prepared expected; before any reference"
+}

@@ -1,0 +1,10 @@
+{
+  "case_id": "csv-merge-off",
+  "outcome": "positive",
+  "warm": "PASS",
+  "cold": "PASS",
+  "events_sha256": "af2b59db3a9012480987c99e1305605503493898e1e2e8edc2c0b4e963aa8adb",
+  "reference_sha256": "7d2096ada642caac685a3fb005fbefb75e781c49e5d501ac7044ddf2a035dacb",
+  "cold_report_sha256": "320dc30ce9dbaf45d8531a8619c823fd8f37be5bd104b60fcfe8ca575be21596",
+  "admission": "CODE_CHECKS_ONLY; actual model, budgets and stand cleanup require independent operational verification"
+}

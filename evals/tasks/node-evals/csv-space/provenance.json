@@ -1,0 +1,10 @@
+{
+  "case_id": "csv-space",
+  "outcome": "positive",
+  "warm": "PASS",
+  "cold": "PASS",
+  "events_sha256": "ddec6378fc3cd33dade399f12d0596eca429889d9a132b14fa1349fa1c0b82b3",
+  "reference_sha256": "370e3634d011781d1324525fb13b6a8bd0a92fda97a5e8eba0af2365616f815b",
+  "cold_report_sha256": "3f8bf44de3a6d941ac8a5b018d0847e59a4215eec6f41e112047fc033c6e16cd",
+  "admission": "CODE_CHECKS_ONLY; actual model, budgets and stand cleanup require independent operational verification"
+}

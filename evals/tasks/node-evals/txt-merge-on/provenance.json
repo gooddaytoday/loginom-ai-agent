@@ -1,0 +1,10 @@
+{
+  "case_id": "txt-merge-on",
+  "outcome": "positive",
+  "warm": "PASS",
+  "cold": "PASS",
+  "events_sha256": "049d99752c4011e8e3ff9a6fe93d1c80ebe620b5eaf65cd7a2120a0193d29e08",
+  "reference_sha256": "7925ed10a6690e28b14e8e1060d6262566c3a2d5ff36a70eaa8db68ae4bcac5e",
+  "cold_report_sha256": "b0448a025d024fc8635b23524c47698115f41f9324d55b3cd4aa237bfa847be1",
+  "admission": "CODE_CHECKS_ONLY; actual model, budgets and stand cleanup require independent operational verification"
+}
