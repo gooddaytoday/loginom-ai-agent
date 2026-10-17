@@ -364,6 +364,26 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
 
 // Final lifecycle after a separate output-port wizard has saved its settings.
 // This does not reopen the node wizard or treat intermediate Done as final.
+// Training is a separate native launch. Its completed process must settle
+// before the ordinary Execute captures a new process-history baseline.
+export async function trainConfiguredNode(channel,node) {
+  const driver=createNodeExecutionProcedure(channel,node);
+  await driver.prepare();
+  const ready=s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'
+    &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k]);
+  const graph=await channel.observe({condition:'owned node before training',ready});
+  await channel.perform({condition:'open training menu of owned node',initialObservation:graph,ready,
+    identity:()=>node,resolve:s=>({verb:'right_click',ref:one(s.ui.elements.filter(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'&&e.allowed_actions.includes('right_click')),'Owned training node body required').ref})});
+  const menu=s=>s.ui.elements.filter(e=>e.label==='Обучить узел'&&e.tid?.startsWith('mn;')&&e.allowed_actions.includes('click'));
+  const observed=await channel.observe({condition:'native Train command',readTraining:true,ready:s=>ready(s)&&menu(s).length===1});
+  await channel.perform({condition:'train owned node once',initialObservation:observed,ready:s=>ready(s)&&menu(s).length===1,
+    identity:()=>node,resolve:s=>({verb:'click',ref:one(menu(s),'One native Train command required').ref})});
+  await driver.identify();
+  const completed=await driver.waitCompleted();
+  requireValue(completed.verified===true&&completed.owner_verified===true,'Native training completion is unconfirmed');
+  return {status:'trained',node:structuredClone(node),execution_id:completed.execution_id};
+}
+
 export async function finishConfiguredGraph(channel,driver,mode,node) {
   requireValue(['done','execute'].includes(mode),'A configured graph supports Done or Execute; Close belongs to the node draft');
   const graph=await channel.observe({condition:'configured node and ports returned to graph',readOutputs:true,

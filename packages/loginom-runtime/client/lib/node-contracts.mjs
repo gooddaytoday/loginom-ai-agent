@@ -6,6 +6,7 @@ export const NODE_CONTRACT_REVISION = '1.0.0';
 // Zoom cannot reveal that footprint at the canvas's zero-scroll boundary.
 export const NODE_POSITION_MIN = 64;
 const definitions = [
+  ['datamining.clustering','Кластеризация','clusterization',1,2,false,['k_means'],'processors/datamining/clustering.md'],
   ['transform.cross_table','Кросс-таблица','crosstab',1,1,false,['pivot'],'processors/transformation/cross-table.html'],
   ['research.duplicates', 'Дубликаты и противоречия', 'duplicates', 1, 1, false, ['mark'], 'processors/scrutiny/duplicates.md'],
   ['preprocessing.data_recovery', 'Заполнение пропусков', 'datarecovery', 1, 1, false, ['impute'], 'processors/preprocessing/imputation.md'],
@@ -25,9 +26,10 @@ const definitions = [
 ];
 const freeze = value => { if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value); } return value; };
 export const NODE_TYPES = freeze(Object.fromEntries(definitions.map(([type, title, icon, inputs, outputs, additional, modes, help]) => [type, {
-  type, title, palette_group: type === 'programming.javascript' ? 'Программирование' : type === 'exports.text' ? 'Экспорт' : type === 'research.duplicates' ? 'Исследование' : type === 'preprocessing.data_recovery' ? 'Предобработка' : type === 'imports.text' ? 'Импорт' : 'Трансформация', icon_class: 'bg-vendor-icon-' + icon, contract_revision: NODE_CONTRACT_REVISION,
+  type, title, palette_group: type === 'datamining.clustering' ? 'Data_Mining' : type === 'programming.javascript' ? 'Программирование' : type === 'exports.text' ? 'Экспорт' : type === 'research.duplicates' ? 'Исследование' : type === 'preprocessing.data_recovery' ? 'Предобработка' : type === 'imports.text' ? 'Импорт' : 'Трансформация', icon_class: 'bg-vendor-icon-' + icon, contract_revision: NODE_CONTRACT_REVISION,
   tabular_inputs: inputs, tabular_outputs: outputs, additional_tabular_inputs: additional, modes,
-  semantics: type === 'transform.cross_table' ? 'Pivot summary: row keys × column categories × numeric fact aggregates. fixed preserves captured categories with optional NULL/Other groups; sliding changes categories after source updates. Reread the SAME node with dock_node_read and its original source_operation_id; never reconfigure to refresh categories.'
+  semantics: type === 'datamining.clustering' ? 'K-means clustering of numeric features. Execute trains or retrains on the current connected input, then executes. Output 0 retains all rows with Cluster and Distance; output 1 contains cluster centers. Default seed 42 and no normalization; other modes and applying a saved model to new data are deferred.'
+    : type === 'transform.cross_table' ? 'Pivot summary: row keys × column categories × numeric fact aggregates. fixed preserves captured categories with optional NULL/Other groups; sliding changes categories after source updates. Reread the SAME node with dock_node_read and its original source_operation_id; never reconfigure to refresh categories.'
     : type === 'programming.javascript' ? 'Loginom 7.4.2 synchronous scalar Data API, one tabular input and output (port 0); declared or code-defined schema. Requires an installed owned handler.'
     : type === 'transform.join_data' ? 'Join two tables by keys; not positional Соединение.'
     : type === 'transform.union_data' ? 'Append rows, preserving duplicates; not UNION DISTINCT.' : type === 'research.duplicates' ? 'Mark all copies and contradictions; retain all rows. Filtering Duplicate=false removes every member of a duplicate group. Unassigned fields are preserved and ignored. No automatic deduplication or conflict resolution.' : title,
