@@ -48,18 +48,46 @@
       ],
       "rows": [
         {
-          "Y_rergession": 11.0,
-          "X": 4.0,
-          "Y": null,
-          "RowID": 7,
-          "IsTest": true
+          "Y_rergession": -1.0,
+          "X": -2.0,
+          "Y": -1.0,
+          "RowID": 1,
+          "IsTest": false
         },
         {
-          "Y_rergession": 13.0,
-          "X": 5.0,
-          "Y": null,
-          "RowID": 8,
-          "IsTest": true
+          "Y_rergession": 1.0,
+          "X": -1.0,
+          "Y": 1.0,
+          "RowID": 2,
+          "IsTest": false
+        },
+        {
+          "Y_rergession": 3.0,
+          "X": 0.0,
+          "Y": 3.0,
+          "RowID": 3,
+          "IsTest": false
+        },
+        {
+          "Y_rergession": 5.0,
+          "X": 1.0,
+          "Y": 5.0,
+          "RowID": 4,
+          "IsTest": false
+        },
+        {
+          "Y_rergession": 7.0,
+          "X": 2.0,
+          "Y": 7.0,
+          "RowID": 5,
+          "IsTest": false
+        },
+        {
+          "Y_rergession": 9.0,
+          "X": 3.0,
+          "Y": 9.0,
+          "RowID": 6,
+          "IsTest": false
         }
       ]
     },

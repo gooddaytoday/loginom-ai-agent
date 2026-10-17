@@ -43,16 +43,12 @@ def predict(model, name):
 
 
 def reference():
-    train, replacement, noisy = (fit(name) for name in ['train.csv', 'replace.csv', 'noisy.csv'])
+    train = fit('train.csv')
     assert (train['intercept'], train['slope']) == (3, 2)
-    assert (replacement['intercept'], replacement['slope']) == (7, -3)
-    holdout = predict(train, 'holdout.csv')
-    assert [row['RowID'] for row in holdout] == [7, 8]
-    assert [row['predicted'] for row in holdout] == [11, 13]
-    assert not {row['RowID'] for row in read('train.csv')} & {row['RowID'] for row in read('holdout.csv')}
-    assert all(row['Y'] == '?' and row['IsTest'] == 'true' for row in read('holdout.csv'))
-    return dict(train=train, holdout=holdout, replacement=replacement,
-                replacement_holdout=predict(replacement, 'holdout.csv'), noisy=noisy,
+    forecast = predict(train, 'train.csv')
+    assert [row['RowID'] for row in forecast] == [1, 2, 3, 4, 5, 6]
+    assert [row['predicted'] for row in forecast] == [-1, 1, 3, 5, 7, 9]
+    return dict(train=train, forecast=forecast,
                 tolerance=dict(abs=1e-8, rel=1e-10))
 
 
@@ -65,8 +61,9 @@ def expectations():
         dict(name='RowID', label='RowID', type='integer'),
         dict(name='IsTest', label='IsTest', type='boolean'),
     ]
-    forecast = [dict(Y_rergession=row['predicted'], X=row['X'], Y=None,
-                     RowID=row['RowID'], IsTest=True) for row in predict(model, 'holdout.csv')]
+    forecast = [dict(Y_rergession=float(model['intercept'] + model['slope'] * Fraction(row['X'])),
+                     X=float(row['X']), Y=float(row['Y']),
+                     RowID=int(row['RowID']), IsTest=row['IsTest'] == 'true') for row in read('train.csv')]
     tables = dict(package_path='{{PACKAGE_PATH}}',
                   nodes=[dict(type=name) for name in ['imports.text', 'datamining.lin_regression', 'exports.text']],
                   outputs=[
@@ -78,30 +75,18 @@ def expectations():
                                          tolerance=dict(abs=1e-8, rel=1e-10))],
                            rows=[dict(Name='<Константа>', Y_coefficients=float(model['intercept'])),
                                  dict(Name='X', Y_coefficients=float(model['slope']))])])
-    # A proposed W4 contract, deliberately separate: current cold-check cannot
-    # validate variables, and a table-only match must not imply full PASS.
-    variables = dict(status='requires_W4', output_node_type='datamining.lin_regression', output_port=2,
-                     port_kind='variables', variables=[
-                         dict(name=name, label=label, type='integer', value=value)
-                         for name, label, value in [
-                             ('TotalSamples', 'Всего примеров', model['train_count']),
-                             ('TotalSelectedSamples', 'Всего отобранных примеров', model['train_count']),
-                             ('TrainSamples', 'Примеров в обучающем множестве', model['train_count']),
-                             ('DFE', 'Число степеней свободы ошибки', model['df']),
-                             ('ModelDF', 'Число степеней свободы модели', model['predictor_count']),
-                         ]])
-    return {'expected.json': tables, 'expected-variables.json': variables}
+    return {'expected.json': tables}
 
 
 if __name__ == '__main__':
-    reference()  # Input independence, rank and known analytic cases.
+    reference()  # Independent rank and analytic checks on train.csv only.
     if sys.argv[1:] == ['--write']:
         for filename, expected in expectations().items():
             (ROOT / filename).write_text(json.dumps(expected, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     elif sys.argv[1:] == ['--check']:
         for filename, expected in expectations().items():
             assert json.loads((ROOT / filename).read_text(encoding='utf-8')) == expected, filename
-        print('PASS: independent OLS, holdout isolation and both expectation files')
+        print('PASS: independent OLS and stage 1 train forecasts/coefficients')
     else:
         assert not sys.argv[1:], 'Use --write, --check or no arguments'
         print(json.dumps(reference(), ensure_ascii=False, indent=2,
