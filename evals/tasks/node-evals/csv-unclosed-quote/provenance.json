@@ -1,0 +1,8 @@
+{
+  "case_id": "csv-unclosed-quote",
+  "outcome": "diagnostic",
+  "warm": "PASS",
+  "cold": "NOT_APPLICABLE",
+  "events_sha256": "452bdd9646a0828ee253986ae1149833a02f52c3ddd014ebc505e18bcfe97801",
+  "admission": "CODE_CHECKS_ONLY; actual model, budgets and stand cleanup require independent operational verification"
+}

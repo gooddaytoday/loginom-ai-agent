@@ -1,0 +1,14 @@
+{
+  "case_id": "txt-wrong-delimiter",
+  "basis": "original TASK and input bytes; independent Python stdlib parsing before model",
+  "program_sha256": "bd3e397e609d3ddabe156af30fbec477276369b8d8b25946409c089924ea5b47",
+  "task_sha256": "55e5edfa76047a7e0c916c04de1f45da2b3e832556e050e4fe2ac9d16d3e2fcd",
+  "inputs": [
+    {
+      "path": "data/wrong_delimiter.txt",
+      "sha256": "92441055dd7d146da19c049e44e6632d6977eb67ae06d7237786ea4439515cbb"
+    }
+  ],
+  "independent_expectation_sha256": "59085df3c3ae1a0e1787e4f0aa7193b3fd08b12c4c3039366eddcb886b9cee16",
+  "recorded_before_reference_dispatch": true
+}

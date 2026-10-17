@@ -1,0 +1,14 @@
+{
+  "case_id": "csv-unclosed-quote",
+  "basis": "original TASK and input bytes; independent Python stdlib parsing before model",
+  "program_sha256": "bd3e397e609d3ddabe156af30fbec477276369b8d8b25946409c089924ea5b47",
+  "task_sha256": "c1794d909261bf429da4aafd756cf941385b54173de4d3916caa2a412e5e0578",
+  "inputs": [
+    {
+      "path": "data/unclosed_quote.csv",
+      "sha256": "e8eda3b3c2a61603838a9b3eaf3dc6fbac6c7bde4ab966452cfb3fa292d76f2c"
+    }
+  ],
+  "independent_expectation_sha256": "6b751ac9ffeaebc26cc588d42b87c572437035a1eba9238b67a465a163fbd2b4",
+  "recorded_before_reference_dispatch": true
+}

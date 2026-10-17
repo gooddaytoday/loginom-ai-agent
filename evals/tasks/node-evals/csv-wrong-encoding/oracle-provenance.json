@@ -1,0 +1,14 @@
+{
+  "case_id": "csv-wrong-encoding",
+  "basis": "original TASK and input bytes; independent Python stdlib parsing before model",
+  "program_sha256": "bd3e397e609d3ddabe156af30fbec477276369b8d8b25946409c089924ea5b47",
+  "task_sha256": "44f526346e5c8ceaab2bd6a6a86028bbf791d570f22d345cbb17812cabf842d7",
+  "inputs": [
+    {
+      "path": "data/wrong_encoding.csv",
+      "sha256": "97f88be2af869453bc726e51889dcb10c5bd1d2a8fd7b96cca6f125b888d3ee6"
+    }
+  ],
+  "independent_expectation_sha256": "f6a0dbe4723ef7fb19acb4b7aab7fa4a21622b69ff03aaed1938f9519d4f728c",
+  "recorded_before_reference_dispatch": true
+}

@@ -1,0 +1,14 @@
+{
+  "case_id": "txt-wrong-encoding",
+  "basis": "original TASK and input bytes; independent Python stdlib parsing before model",
+  "program_sha256": "bd3e397e609d3ddabe156af30fbec477276369b8d8b25946409c089924ea5b47",
+  "task_sha256": "54d6f1a81454c3048fbc574385615a799f6a8b6eaa0d751a82cfd3177b308d61",
+  "inputs": [
+    {
+      "path": "data/wrong_encoding.txt",
+      "sha256": "97f88be2af869453bc726e51889dcb10c5bd1d2a8fd7b96cca6f125b888d3ee6"
+    }
+  ],
+  "independent_expectation_sha256": "beaced0a19a08fddaa8025325dc01357b75a9ee37e1b147564d31bcfa43f4fc7",
+  "recorded_before_reference_dispatch": true
+}

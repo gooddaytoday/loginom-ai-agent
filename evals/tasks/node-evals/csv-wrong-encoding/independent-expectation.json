@@ -1,0 +1,22 @@
+{
+  "case_id": "csv-wrong-encoding",
+  "input": "data/wrong_encoding.csv",
+  "bytes": 21,
+  "sha256": "97f88be2af869453bc726e51889dcb10c5bd1d2a8fd7b96cca6f125b888d3ee6",
+  "task_sha256": "44f526346e5c8ceaab2bd6a6a86028bbf791d570f22d345cbb17812cabf842d7",
+  "native_warning_required": false,
+  "unknown_effect_acceptable": false,
+  "cleanup_required": true,
+  "independent_source_status": "not_valid_utf8",
+  "original_cp1251_table": [
+    [
+      "Id",
+      "Name"
+    ],
+    [
+      "001",
+      "Привет"
+    ]
+  ],
+  "acceptable_outcome": "verified known refusal or full typed table proving Unicode loss plus explicit damage diagnosis; keep UTF-8 request"
+}

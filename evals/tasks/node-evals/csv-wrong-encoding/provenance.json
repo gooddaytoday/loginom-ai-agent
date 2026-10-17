@@ -1,0 +1,8 @@
+{
+  "case_id": "csv-wrong-encoding",
+  "outcome": "diagnostic",
+  "warm": "PASS",
+  "cold": "NOT_APPLICABLE",
+  "events_sha256": "6465ebc7f842d9c1aeeeef75cc9f908f59910476d0034b840768e83ebd286acc",
+  "admission": "CODE_CHECKS_ONLY; actual model, budgets and stand cleanup require independent operational verification"
+}

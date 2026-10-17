@@ -1,0 +1,8 @@
+{
+  "case_id": "txt-ambiguous-headers",
+  "outcome": "diagnostic",
+  "warm": "PASS",
+  "cold": "NOT_APPLICABLE",
+  "events_sha256": "65ce2a3f3245642965117908ad8f7de96cd7db1613d2079ebb0d4b05623593d9",
+  "admission": "CODE_CHECKS_ONLY; actual model, budgets and stand cleanup require independent operational verification"
+}
