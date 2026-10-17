@@ -1,0 +1,20 @@
+{
+  "observed_utc": "2026-10-17T20:46:00.094263+00:00",
+  "scope": "Root delivered native installation-admission evidence integrity and original completion/release binding; historical healthy FREE precedes current Rich case lease, not full10caseACCEPT",
+  "report_id": "01a14b89-142a-7ce3-9a22-67dd0c317ef6",
+  "archive_bytes": 254814,
+  "archive_sha256": "771ce07fc8921a42ecd5d45a27b8bf45665b0ebb10e394a28335ae13be08f514",
+  "payload_count": 82,
+  "manifest_sha256": "2c23ae208863899b67054659d2e75a7265e33d12249d96a6f3d105a087db8de0",
+  "all_payload_bytes_hashes_exact_membership_verified": true,
+  "original_completion_path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/1758b7b1-b31e-477f-a71c-4a72c36b6875/unit-3e541838-c016-4ead-a6a2-6d908b65ab46/completion.json",
+  "genuine_completion_sha256": "b9f07f2c27f71275a5dcab441f678ca87c1ea3e6aea2ef139fc2863567543d51",
+  "original_release_core_sha256": "2b419aa922df29a7686c5dd9dc4e99188b9ce942168a17bd7703885e14dfdc00",
+  "original_ordinary_release_verified": true,
+  "release_utc": "2026-10-17T20:22:02.506Z",
+  "healthy_FREE_before_new_case_lease": "2026-10-17T20:22:11.535Z",
+  "native_Evaler_verification_sha256": "a43a997e8bf24be8a5ff5be4d9ba17b1c2e1fd2f71b872b0f228ad9ff7934dce",
+  "continuation_decision_sha256": "3c7021a895957d6cd8aa0198e13d1868cf406b6353a03d2e85f92e7331cfb096",
+  "official_decision_download_byte_exact": true,
+  "root_new_native_model_reference_product_calls": 0
+}

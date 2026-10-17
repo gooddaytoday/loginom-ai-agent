@@ -1,0 +1,146 @@
+{
+  "at": "2026-10-17T20:28:15.282079+00:00",
+  "kind": "fresh_initial_installation_admission_verified_ready_released_free",
+  "report_id": "01a14b89-142a-7ce3-9a22-67dd0c317ef6",
+  "archive_sha256": "771ce07fc8921a42ecd5d45a27b8bf45665b0ebb10e394a28335ae13be08f514",
+  "payload_hashes_verified": 82,
+  "manifest_sha256": "2c23ae208863899b67054659d2e75a7265e33d12249d96a6f3d105a087db8de0",
+  "product_source": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "harness_source": "1b93b62c8bbcdcd4ea2bf0c6de317547cced96a8",
+  "native_checks": [
+    {
+      "kind": "status",
+      "processes": 16,
+      "proof_sha256": "d54e41d909738aa12d5c6ed75b79ebee2f86f6f91d093a96929d97a4a392ed46",
+      "final_owned_remaining": [
+        0,
+        0
+      ],
+      "capture_matches": true
+    },
+    {
+      "kind": "check",
+      "processes": 31,
+      "proof_sha256": "65a784d99d262070328b2d4bfe360895eac8110c7cf187815922ee8a0d35b21e",
+      "final_owned_remaining": [
+        0,
+        0
+      ],
+      "capture_matches": true
+    }
+  ],
+  "preflight": {
+    "code": 0,
+    "status": "READY",
+    "sha": "1b93b62c8bbcdcd4ea2bf0c6de317547cced96a8",
+    "dirty": false,
+    "containerId": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "cliSourceSha": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+    "model": "openai/gpt-6-luna",
+    "variant": "high",
+    "admission": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/preflight-attempt-huOZhm/admission-complete.json",
+    "processEvidence": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/capture-native-check-9ff9cbcc-b0f0-4bdc-8923-e45d94353a91/process-cleanup.json",
+    "historyArchive": "/home/user/.local/share/loginom-evals-runtime/roles/rich/eval-profile.history/node-ops-admission-01a14b7a-d60a-7b35-bbb2-bf0f5df5b2e1-4Zegbm",
+    "diagnostic": {
+      "version": 1,
+      "operation": "preflight",
+      "stage": "operation",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-17T20:12:41.649Z"
+    },
+    "diagnosticReceipt": "/home/user/.local/share/loginom-evals-runtime/operations/stand.lease/diagnostic-1f9ec0ad-8637-4a28-af5c-81959582b4e8.json"
+  },
+  "unit_result": {
+    "test": {
+      "pass": 646,
+      "skip": 15,
+      "fail": 0,
+      "assertions": 3399,
+      "tests": 661,
+      "files": 59
+    },
+    "typecheck_exit": 0
+  },
+  "completion_sha256": "b9f07f2c27f71275a5dcab441f678ca87c1ea3e6aea2ef139fc2863567543d51",
+  "completion_equals_closed_archive": true,
+  "release_core": {
+    "status": "RELEASED",
+    "owner": {
+      "issue": "01a1214b-4adc-75df-97df-2917732a449a",
+      "task": "01a14b7a-d60a-7b35-bbb2-bf0f5df5b2e1",
+      "role": "rich",
+      "phase": "unit",
+      "sha": "1b93b62c8bbcdcd4ea2bf0c6de317547cced96a8"
+    },
+    "acquiredAt": "2026-10-17T20:12:05.385Z",
+    "releasedAt": "2026-10-17T20:22:02.506Z",
+    "kind": "unit",
+    "evidenceSha256": "b9f07f2c27f71275a5dcab441f678ca87c1ea3e6aea2ef139fc2863567543d51",
+    "containerId": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "archive": "/home/user/.local/share/loginom-evals-runtime/operations/completed/1758b7b1-b31e-477f-a71c-4a72c36b6875"
+  },
+  "release_archive_sha256": "2b419aa922df29a7686c5dd9dc4e99188b9ce942168a17bd7703885e14dfdc00",
+  "release_output_matches_core": true,
+  "verification_note": "Initial byte-equality check compared enriched CLI release output to core archive receipt; verified exact core digest and field projection instead. No evidence changed.",
+  "admission_history_files_hashed": 2449,
+  "database_journal_wal_entries_hashed": 20,
+  "historical_reference_evidence_files_reverified": 350,
+  "original_TASK_input_verified": 20,
+  "retained_ready_reference_count": 9,
+  "operator_apply_receipt_retained": "1c7b8b60f9c6288bcf6438bcc8bdaf4a4fad07da94e85dda75b5d1bd547a3444",
+  "new_calls_in_admission": {
+    "model": 0,
+    "reference": 0,
+    "product": 0,
+    "recovery": 0
+  },
+  "current_health": {
+    "at": "2026-10-17T20:25:14.579Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-17T20:25:13.703Z"
+    }
+  },
+  "queues_empty_except_current_Evaler": true,
+  "LAB60_done_revision38": true,
+  "common_documentary_sha": "e111f9a07d5cf6a4b5341c2ceaf34cd0cd2148fe",
+  "consumption": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 3,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 1,
+      "missing-source-column": 1
+    },
+    "reference_total": 14,
+    "product_physical_calls": 0,
+    "recovery": 0,
+    "probes": 0,
+    "source_report_sha256": "7d6de2aff7dce731f4ee448ca31bb807875d223e07365b93cc2d7fe47a0018b5",
+    "historical_outcomes_preserved": true,
+    "budget_increases": [],
+    "source_report_id": "01a14b00-2630-7e58-8cd1-66fbcb718ee2"
+  },
+  "full_ten_case_acceptance_pending": true
+}
