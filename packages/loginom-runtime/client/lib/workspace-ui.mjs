@@ -372,10 +372,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         delta:Number.isFinite(delta)?delta:null,tolerance,...(element?{ref:refOf(element)}:{})};
       return valid;
     };
-    const geometryInside=(b,p,element)=>[b.x,b.y,b.width,b.height,p.x,p.y,p.width,p.height].every(Number.isFinite)
+    const geometryInside=(b,p,element,rightTolerance=geometryEpsilon)=>[b.x,b.y,b.width,b.height,p.x,p.y,p.width,p.height].every(Number.isFinite)
       && geometryCheck(p.x,b.x,'left_containment',element,geometryEpsilon,false)
       && geometryCheck(p.y,b.y,'top_containment',element,geometryEpsilon,false)
-      && geometryCheck(b.x+b.width,p.x+p.width,'right_containment',element,geometryEpsilon,false)
+      && geometryCheck(b.x+b.width,p.x+p.width,'right_containment',element,rightTolerance,false)
       && geometryCheck(b.y+b.height,p.y+p.height,'bottom_containment',element,geometryEpsilon,false);
 
     // One evaluate is synchronous: no gesture or event-loop yield occurs in
@@ -1051,11 +1051,11 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const containers=[...body.querySelectorAll('.x-grid-item-container')];charge();
         const rows=[...body.querySelectorAll('table.x-grid-item')];charge();
         const inputs=[...filter.querySelectorAll('input')].filter(e=>{charge();return visible(e) && !sensitive(e);});
-        const inside=(e,parent)=>{
+        const inside=(e,parent,rightTolerance=geometryEpsilon)=>{
           if(!visible(e) || sensitive(e))return false;
           const b=boxOf(e),p=boxOf(parent),vw=globalThis.innerWidth,vh=globalThis.innerHeight;
           return [b.x,b.y,b.width,b.height,p.x,p.y,p.width,p.height,vw,vh].every(Number.isFinite)
-            && vw>0 && vh>0 && geometryInside(b,{x:0,y:0,width:vw,height:vh},e) && geometryInside(b,p,e);
+            && vw>0 && vh>0 && geometryInside(b,{x:0,y:0,width:vw,height:vh},e) && geometryInside(b,p,e,rightTolerance);
         };
         const dimensions=[body.clientWidth,body.clientHeight,body.scrollWidth,body.scrollHeight,body.scrollLeft,body.scrollTop];
         const fields=wizard.output_columns.fields;
@@ -1079,7 +1079,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               const matches=fields.filter(f=>f.row_ref===refOf(row));
               const nameCells=all.filter(e=>{charge();return row.contains(e) && (getTid(e)??'').startsWith(base+'colName_');});
               if(row.parentElement!==container || row.getAttribute('data-recordindex')!==String(index)
-                || row.getAttribute('data-boundview')!==boundId || !inside(row,container)
+                || row.getAttribute('data-boundview')!==boundId || !inside(row,container,1)
                 || !geometryCheck(rb.y,previous?previous.y+previous.height:cb.y,'row_continuity',row) || matches.length!==1 || matches[0].status!=='observed'
                 || nameCells.length!==1)return false;
               const key=getTid(nameCells[0]).slice((base+'colName_').length);
@@ -1100,10 +1100,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const fields=wizard.output_columns.fields,containers=body?[...body.querySelectorAll('.x-grid-item-container')]:[];
         const rows=body?[...body.querySelectorAll('table.x-grid-item')]:[];
         const inputs=filter?[...filter.querySelectorAll('input')].filter(e=>visible(e)&&!sensitive(e)):[];
-        const nativeInside=(e,parent)=>{
+        // Native mapping rows can extend beyond their container after exclusion.
+        // Allow one CSS pixel on the right for font/DPI rounding; other bounds and identities remain unchanged.
+        const nativeInside=(e,parent,rightTolerance=geometryEpsilon)=>{
           if(!visible(e)||sensitive(e))return false;
           const b=boxOf(e),p=boxOf(parent);
-          return b.width>0 && b.height>0 && geometryInside(b,p,e);
+          return b.width>0 && b.height>0 && geometryInside(b,p,e,rightTolerance);
         };
         const container=containers[0],boundId=body?.getAttribute('id');
         const noEditors=!all.some(e=>{charge();return ((getTid(e)??'').startsWith(base+'grdTargetColumns;tbl;celleditor')
@@ -1126,7 +1128,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               const matches=fields.filter(f=>f.row_ref===refOf(row));
               const names=all.filter(e=>{charge();return row.contains(e)&&(getTid(e)??'').startsWith(base+'colName_');});
               if(row.parentElement!==container || row.getAttribute('data-recordindex')!==String(index)
-                || row.getAttribute('data-boundview')!==boundId || !nativeInside(row,container)
+                || row.getAttribute('data-boundview')!==boundId || !nativeInside(row,container,1)
                 || !geometryCheck(rb.y,previous?previous.y+previous.height:cb.y,'row_continuity',row) || matches.length!==1 || matches[0].status!=='observed' || names.length!==1)return false;
               const key=getTid(names[0]).slice((base+'colName_').length);
               return ['colName_','colDisplayName_',...(roleGrid?[]:['colSourceDisplayName_']),'colDataKind_',wizard.stage==='input_mapping'?'colUsageType_':'colDefaultUsageType_'].every(prefix=>{
@@ -1181,7 +1183,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
                 });
                 return completeCells && row.parentElement===container && row.getAttribute('data-boundview')===boundId
                   && row.getAttribute('data-recordindex')===String(index) && row.getAttribute('data-recordid')===String(r.internalId)
-                  && nativeInside(row,container) && (!previous || geometryCheck(b.y,previous.y+previous.height,'row_continuity',row))
+                  && nativeInside(row,container,1) && (!previous || geometryCheck(b.y,previous.y+previous.height,'row_continuity',row))
                   && f.status==='observed' && f.row_ref===refOf(row) && f.name===r.data.Name && f.label===r.data.DisplayName;
               });
             if(valid)window={first,total:records.length,signature:JSON.stringify({root:wizard.root_ref,

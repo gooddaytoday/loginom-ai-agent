@@ -1713,6 +1713,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if (!operation || pending !== operation) return { recovery_options: [], next_steps: base };
     base.unshift({ tool: 'dock_operation_inspect', arguments: { operation_id: operation.id },
       required_fields: [], requires: [], provides: ['completion_receipt', 'cleanup_state'] });
+    if(operation.action.capability==='node.apply'&&operation.nodeApply?.pending?.phase==='open'
+      &&typeof operation.nodeApplyDrivers?.verifyPendingOpen==='function'&&!operation.transportUncertain){
+      return {recovery_options:['resume'],next_steps:[{tool:'dock_node_resume',arguments:{operation_id:operation.id},required_fields:[],
+        requires:['fresh_same_node_and_settled_open_receipt'],provides:['continuation_of_original_operation'],
+        instruction:'Reobserve the original node; retry only opening if no wizard is open, otherwise continue its owned wizard.'}],internal_resume_available:true};
+    }
     if(operation.action.capability==='node.apply'&&operation.nodeApply?.pending?.phase==='input_mapping'&&operation.inputMappingRecovery){
       const recovery=operation.inputMappingRecovery;
       if(recovery.available)base.push({tool:'dock_node_resume',arguments:{operation_id:operation.id},required_fields:[],
@@ -1790,7 +1796,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const nodeResumeBlocked=operation=>{
     const configureContinuation=operation?.nodeApply?.pending?.phase==='configure'
       &&operation.nodeApply.request.target.type==='transform.date_time'&&typeof operation.nodeApplyDrivers?.verifyPendingConfigure==='function';
-    return !operation||pending!==operation||!configureContinuation&&(!!operation.nodeApply?.pending||!operation.cleanupConfirmed);
+    const openContinuation=operation?.nodeApply?.pending?.phase==='open'&&!operation.transportUncertain
+      &&typeof operation.nodeApplyDrivers?.verifyPendingOpen==='function';
+    return !operation||pending!==operation||!configureContinuation&&!openContinuation&&(!!operation.nodeApply?.pending||!operation.cleanupConfirmed);
   };
   const nodeJobs=createNodeOperationRunner({run:(request,options)=>runtime.runNodeApply(request,options),
     admitResume:id=>{

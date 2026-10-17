@@ -2,6 +2,36 @@ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const requireValue=(value,message)=>{if(!value)throw Error(message);};
 const question='Настройка узла приведет к его деактивации. Вы действительно хотите начать настраивать узел? Да Да, больше не спрашивать Нет';
 
+// Only a settled opening gesture and a fresh owned surface can authorize
+// continuation. A missing/unknown browser reply never permits another click.
+export async function inspectPendingWizardOpen({operation,checkpoint,channel,readReceipt,readGraph,now,configurationObservation}) {
+ const state=operation.nodeApply,pending=state?.pending,step=channel?.lastPreparedStep,ref=operation.lastReceipt;
+ requireValue(checkpoint&&pending?.phase==='open'&&pending.receipt_id===operation.id+':open'
+  &&state.phases.at(-1)?.phase==='input_mapping'&&state.phases.every(p=>['source','workflow','target','input_mapping'].includes(p.phase))
+  &&state.execution.status==='not_requested'&&state.output.status==='not_refreshed'&&!operation.transportUncertain
+  &&now()<Math.min(state.deadline,state.configure_deadline,pending.deadline)
+  &&step?.step>checkpoint.step&&step.internal_operation_id===ref?.id&&step.signature===ref.signature
+  &&['click','right_click','begin_wizard','confirm_wizard_deactivation'].includes(step.action?.verb), 'Original settled open boundary required');
+ const response=await readReceipt(ref),r=response?.receipt;
+ requireValue(response?.state==='completed'&&r?.operation_id===ref.id&&r.action_key==='ui.act'
+  &&r.cleanup_complete===true&&(r.status==='SUCCEEDED'||r.effect_possible===false&&r.error?.code==='UI_EPOCH_CHANGED'),
+ 'Original open gesture has an unresolved effect');
+ const current=await channel.observe({condition:'original open recovery surface',ready:s=>s.wizard?.status==='absent'||s.wizard?.status==='observed'});
+ const n=current.prepared_node_context;
+ requireValue(n?.verified===true&&['document_id','workflow_id','node_id'].every(k=>n[k]===state.node?.[k]),'Original target node is absent or changed');
+ if(current.wizard.status==='absent'){
+  requireValue(n.surface==='graph'&&current.wizard_pending_owner?.status!=='observed'
+   &&r.status!=='SUCCEEDED'&&r.effect_possible===false,'Absent wizard requires a proved pre-gesture refusal');
+  requireValue(same(await readGraph(),checkpoint.graph),'Original source or target graph changed');
+  return {verified:true,wizard_open:false,receipt_id:ref.id};
+ }
+ requireValue(n.surface==='wizard'&&current.wizard.owner_context?.status==='observed','Original wizard ownership is not verified');
+ // The native wizard binding attests the original node object. The graph's
+ // DOM is hidden on this surface, so do not try to reopen it for a graph read.
+ const opened=await channel.observe(configurationObservation);
+ return {verified:true,wizard_open:true,receipt_id:ref.id,value:{verified:true,cleanup_complete:true,effect_possible:true,node_context:opened.prepared_node_context}};
+}
+
 export function wizardOpenBinding(state) {
  const n=state.prepared_node_context;
  requireValue(n?.verified===true&&n.surface==='graph'&&state.wizard?.status==='absent',

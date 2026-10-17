@@ -146,17 +146,23 @@ export async function applyNode({request, operation, handlers, drivers, record,
   };
   let state=operation.nodeApply;
   let continuingConfigure=false;
+  let continuingOpen=false,openRecovery;
   if(state) {
     requireValue(state.signature===signature, 'node.apply operation ID was used with different parameters or handler');
     continuingConfigure=resume&&state.pending?.phase==='configure'&&request.target.type==='transform.date_time'
       &&typeof drivers.verifyPendingConfigure==='function';
-    if(state.pending&&!continuingConfigure)throw Error('Inspect the unresolved original node phase before continuing');
+    continuingOpen=resume&&state.pending?.phase==='open'&&typeof drivers.verifyPendingOpen==='function';
+    if(state.pending&&!continuingConfigure&&!continuingOpen)throw Error('Inspect the unresolved original node phase before continuing');
     if(state.result)return structuredClone(state.result);
-    requireValue(resume && (state.cleanup_complete===true||continuingConfigure), 'Explicit inspected resume is required');
+    requireValue(resume && (state.cleanup_complete===true||continuingConfigure||continuingOpen), 'Explicit inspected resume is required');
     requireValue(state.resumes<3, 'Node resume budget exhausted');
     // A journal cannot resurrect an unsaved draft. The live driver must attest
     // the same prepared package and every already accepted phase.
-    requireValue(await (continuingConfigure?drivers.verifyPendingConfigure(state,{signal}):drivers.verifyContinuation(state,{signal}))===true, 'Live package or accepted phases differ from checkpoint');
+    if(continuingOpen){
+      openRecovery=await drivers.verifyPendingOpen(state,{signal});
+      requireValue(openRecovery?.verified===true&&typeof openRecovery.wizard_open==='boolean','Original open boundary is not verified');
+      await acknowledge({phase:'node_open_recovery_checked',signature,receipt_id:state.pending.receipt_id,recovery:openRecovery});
+    }else requireValue(await (continuingConfigure?drivers.verifyPendingConfigure(state,{signal}):drivers.verifyContinuation(state,{signal}))===true, 'Live package or accepted phases differ from checkpoint');
     state.resumes++;
     delete state.verified_refusal;
   } else {
@@ -180,11 +186,12 @@ export async function applyNode({request, operation, handlers, drivers, record,
     const deadline=Math.min(state.deadline,now()+budget,configuration?state.configure_deadline:Infinity,
       executionPhase&&state.execution_wait?.phase===name?state.execution_wait.deadline:Infinity);
     requireValue(now()<deadline,'node.apply configuration deadline elapsed');
-    const oldConfigure=continuingConfigure&&name==='configure';
-    const pending=oldConfigure?state.pending:{phase:name,receipt_id:operation.id+':'+name,deadline,
+    const oldConfigure=continuingConfigure&&name==='configure',oldOpen=continuingOpen&&name==='open';
+    const pending=oldConfigure||oldOpen?state.pending:{phase:name,receipt_id:operation.id+':'+name,deadline,
       effect_possible:mutation,before_node:structuredClone(state.node)};
     requireValue(!oldConfigure||pending.receipt_id===operation.id+':configure'&&now()<pending.deadline,'Original configure boundary differs');
-    if(!oldConfigure)await acknowledge({phase:'node_phase_prepared',signature,receipt:pending});
+    requireValue(!oldOpen||pending.receipt_id===operation.id+':open'&&now()<pending.deadline,'Original open boundary differs');
+    if(!oldConfigure&&!oldOpen)await acknowledge({phase:'node_phase_prepared',signature,receipt:pending});
     check();
     state.pending=pending;state.cleanup_complete=false;
     // Preserve uncertainty until the driver and journal both confirm completion.
@@ -346,7 +353,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
       && id(value.node.node_id), 'Target phase returned a foreign node')});state.node=target.node;
     if(!readingOnly){
     await phase('input_mapping',ctx=>drivers.mapPorts(request.mappings.filter(m=>m.direction==='input'),ctx));
-    await phase('open',ctx=>drivers.openWizard(ctx));
+    await phase('open',ctx=>openRecovery?.wizard_open?openRecovery.value:drivers.openWizard(ctx));
     await phase('configure',ctx=>handler.configure(ctx,request.parameters,drivers));
     // A separate port wizard can open only after the node settings are saved.
     // Close must discard the node draft before any such intermediate commit.
