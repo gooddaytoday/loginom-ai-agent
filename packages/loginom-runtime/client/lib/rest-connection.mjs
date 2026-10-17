@@ -61,7 +61,7 @@ export async function restConnectionCapability(page,t){
    await guard();need(await page.evaluate(b=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return c.FController===b.wizard&&c.Node.data.node.ParentNode===b.node&&b.wizard.FModelNode===b.node.FConnectionNode;},connectionOwner),'connection wizard owner changed');
    const value=name=>find(fields+name).locator('input').inputValue();
    return {name:await value('fldLabel'),base_url:await value('pedURL;ValueControl'),method:await value('pedVerb;ValueControl'),url_mode:await value('pedFieldType;ValueControl'),authentication:await value('txtAuth'),ignore_certificate:await find(fields+'pedIgnoreCertificateErrors;ValueControl').evaluate(e=>e.classList.contains('x-form-cb-checked')),
-    parameters:await page.locator('[data-tid^='+JSON.stringify(fields+'colName_')+']').evaluateAll(es=>es.filter(e=>e.getBoundingClientRect().width>0).map(e=>({name:e.textContent.trim(),tid:e.getAttribute('data-tid'),type:e.parentElement.querySelector('[data-columnid="colDataType"]')?.textContent.trim()})))};
+    parameters:await find(fields+'grdParams;tbl').locator('[data-tid^='+JSON.stringify(fields+'colName_')+']').evaluateAll(es=>es.filter(e=>e.getBoundingClientRect().width>0).map(e=>({name:e.textContent.trim(),tid:e.getAttribute('data-tid'),type:e.parentElement.querySelector('[data-columnid="colDataType"]')?.textContent.trim()})))};
   };
   let observed=await read();
   need(observed.method==='GET'&&observed.url_mode==='Строка запроса'&&observed.authentication==='Не требуется'&&!observed.ignore_certificate,'only GET/query without authentication and with certificate verification is supported');
@@ -70,7 +70,7 @@ export async function restConnectionCapability(page,t){
    await fill(fields+'pedURL;ValueControl',t.connection.base_url);await fill(fields+'fldLabel',t.connection.name);
    for(const q of t.query_parameters){
     const before=(await read()).parameters;await click(fields+'btnAdd');
-    const added=await wait('new URL parameter',async()=>{const next=(await read()).parameters.filter(q=>!before.some(b=>b.name===q.name));return next.length===1?next[0]:null;});
+    const added=await wait('new URL parameter',async()=>{const next=(await read()).parameters.filter(q=>!before.some(b=>b.name===q.name));return next.length===1&&next[0].type?next[0]:null;});
     need(added.type==='Строковый','new URL parameter must be string');
     await click(added.tid,true);
     await fill(fields+'grdParams;tbl;celleditor;txt',q.name,'Enter');
@@ -87,7 +87,7 @@ export async function restConnectionCapability(page,t){
   need(await page.evaluate(b=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return c.Node.data.node.ParentNode===b.node&&c.FController.FModelNode===b.node.FConnectionNode;},connectionOwner),'saved connection owner differs');
   await connectionOwner.dispose();
   const persisted={name:await find(fields+'fldLabel').locator('input').inputValue(),base_url:await find(fields+'pedURL;ValueControl').locator('input').inputValue(),method:await find(fields+'pedVerb;ValueControl').locator('input').inputValue(),url_mode:await find(fields+'pedFieldType;ValueControl').locator('input').inputValue(),authentication:await find(fields+'txtAuth').locator('input').inputValue(),ignore_certificate:await find(fields+'pedIgnoreCertificateErrors;ValueControl').evaluate(e=>e.classList.contains('x-form-cb-checked')),
-   parameters:await page.locator('[data-tid^='+JSON.stringify(fields+'colName_')+']').evaluateAll(es=>es.filter(e=>e.getBoundingClientRect().width>0).map(e=>({name:e.textContent.trim(),tid:e.getAttribute('data-tid'),type:e.parentElement.querySelector('[data-columnid="colDataType"]')?.textContent.trim()})))};
+   parameters:await find(fields+'grdParams;tbl').locator('[data-tid^='+JSON.stringify(fields+'colName_')+']').evaluateAll(es=>es.filter(e=>e.getBoundingClientRect().width>0).map(e=>({name:e.textContent.trim(),tid:e.getAttribute('data-tid'),type:e.parentElement.querySelector('[data-columnid="colDataType"]')?.textContent.trim()})))};
   need(JSON.stringify(persisted)===JSON.stringify(observed),'saved connection readback differs');
   await click(wizard+';btnDone');await wait('connection readback closed',()=>find(form+';cntTile;ListView;tbl').isVisible());
   await click(moduleTid);
