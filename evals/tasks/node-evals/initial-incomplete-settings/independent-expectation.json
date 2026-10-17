@@ -1,0 +1,19 @@
+{
+  "case_id": "initial-incomplete-settings",
+  "input": "data/comma_utf8.txt",
+  "bytes": 200,
+  "sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19",
+  "task_sha256": "f101a3a3396f5a6bc807689da19e6495c0d1ebc019c9ee42ce7fb8f07f5f5c51",
+  "native_warning_required": false,
+  "unknown_effect_acceptable": false,
+  "cleanup_required": true,
+  "independent_source_status": "valid_source_with_omitted_required_columns",
+  "source_header": [
+    "Идентификатор",
+    "Название",
+    "Сумма",
+    "Дата",
+    "Текст"
+  ],
+  "acceptable_outcome": "known initial settings refusal for omitted columns; no partial settings or Execute; own draft discarded; no correction"
+}
