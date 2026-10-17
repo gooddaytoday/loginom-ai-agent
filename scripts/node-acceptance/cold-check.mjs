@@ -147,10 +147,13 @@ try {
 
   const types=new Set(expectedOutputs.map(o=>o.output_node_type));
   const matches=graph.nodes.filter(n=>types.has(n.type)&& (multiple||!saved.node||n.ref.node_id===saved.node));
-  if(matches.length!==expectedOutputs.length)throw Error("COLD_EXTRA_OR_MISSING_OUTPUT_NODE");
+  if(matches.length===0||matches.length>expectedOutputs.length)throw Error("COLD_EXTRA_OR_MISSING_OUTPUT_NODE");
   const actual=[],ownedExecutions=[];
   for(const [outputIndex,target] of matches.entries()){
   const node=target.ref;
+  const ports=[...new Set(expectedOutputs.filter(o=>o.output_node_type===target.type
+    &&(o.output_node_label===undefined||o.output_node_label===target.label)).map(o=>o.output_port??0))];
+  if(ports.length===0)throw Error('COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
 
   const operation = {
     id: "cold-read-expected-"+outputIndex,
@@ -189,9 +192,10 @@ try {
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
   ownedExecutions.push(execution);
 
+  for(const outputPort of ports){
   let useNative=false,ownedPreview;
   const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,execution,deadline:operation.deadline,receipt_id:operation.id};
-  if(nativeConfiguration){
+  if(nativeConfiguration&&outputPort===0){
    const {openOwnedNativePreview,closeOwnedNativePreview}=await load('client/lib/collapse-native-output.mjs');
    ownedPreview=await openOwnedNativePreview(channel,ctx);
    useNative=coldNativeEligible(nativeConfiguration,ownedPreview.preview);
@@ -218,7 +222,7 @@ try {
     data=read.ports[0];
   }
   if(!data){
-  const opened = await openNewOutputTable(channel, 0)
+  const opened = await openNewOutputTable(channel, outputPort)
   const precision = await configureTablePrecision(channel, opened.table)
   const readSettings = await prepareTableRead(channel, opened.table)
   const raw = await readTableOutputPages(channel, opened.table, {
@@ -239,14 +243,16 @@ try {
   await returnFromOutputTable(channel, opened.table)
   }
 
-  actual.push({node,type:target.type,label:target.label,execution,data});
+  actual.push({node,type:target.type,label:target.label,output_port:outputPort,execution,data});
   // Preserve independently read values before correspondence can refuse. A
   // failed match is still FAIL; this private checkpoint makes it diagnosable.
   const checkpoint=JSON.stringify({phase:'independent_cold_read_checkpoint',path:saved.path,outputs:actual});
   if([config.api_key,loginPassword].filter(Boolean).some(secret=>checkpoint.includes(secret)))throw Error('SECRET_IN_RESULT');
   await writeFile(join(args.output,'actual-readback.json'),checkpoint+'\n');
   }
-  const correspondence=matchExpectedOutputs(actual,expectedOutputs);
+  }
+  const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true});
+  const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
 
   // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.
   // Cleanup проверяет точное владение пакетом/аккаунтом перед discard.
@@ -273,8 +279,8 @@ try {
     status: "PASS",
     phase: "independent_cold_reopen_readback",
     path: saved.path,
-    ...(multiple?{outputs:actual.map(a=>({node:a.node,execution:a.execution,output:{ports:[a.data]}})),correspondence}
-      :{node:actual[0].node,execution:actual[0].execution,output:{ports:[actual[0].data]}}),
+    ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
+      :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
     cleanup: {
       package_closed: cleanup.package_closed === true,
