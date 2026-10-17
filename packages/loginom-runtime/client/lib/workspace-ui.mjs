@@ -770,7 +770,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               ||preparedInputPort.port===0&&e.textContent.trim()==='Источник данных'
               ||(preparedInputPort.port===0&&e.textContent.trim()==='Главная таблица'
                 ||preparedInputPort.port===1&&e.textContent.trim()==='Присоединяемая таблица')
-                &&crumbs[5].querySelectorAll('.bg-vendor-icon-joindata').length===1));
+                &&crumbs[5].querySelectorAll('.bg-vendor-icon-joindata').length===1
+              // Union numbers each appended input by its native tabular port.
+              ||preparedInputPort.port>=1&&e.textContent.trim()==='Присоединяемая таблица '+preparedInputPort.port
+                &&crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1));
           const items=crumbs.map((e,i)=>({ref:refOf(e),tid:getTid(e),label:hiddenCaption(e,i)?e.textContent.trim():textOf(e,true)}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const bounded=items.every(i=>i.tid.length<=2048&&i.label.length<240)&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096;
