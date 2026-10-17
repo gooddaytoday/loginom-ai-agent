@@ -1,0 +1,22 @@
+{
+  "case_id": "txt-wrong-encoding",
+  "input": "data/wrong_encoding.txt",
+  "bytes": 21,
+  "sha256": "97f88be2af869453bc726e51889dcb10c5bd1d2a8fd7b96cca6f125b888d3ee6",
+  "task_sha256": "54d6f1a81454c3048fbc574385615a799f6a8b6eaa0d751a82cfd3177b308d61",
+  "native_warning_required": false,
+  "unknown_effect_acceptable": false,
+  "cleanup_required": true,
+  "independent_source_status": "not_valid_utf8",
+  "original_cp1251_table": [
+    [
+      "Id",
+      "Name"
+    ],
+    [
+      "001",
+      "Привет"
+    ]
+  ],
+  "acceptable_outcome": "verified known refusal or full typed table proving Unicode loss plus explicit damage diagnosis; keep UTF-8 request"
+}

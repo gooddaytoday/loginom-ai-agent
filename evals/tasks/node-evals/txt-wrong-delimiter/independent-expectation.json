@@ -1,0 +1,24 @@
+{
+  "case_id": "txt-wrong-delimiter",
+  "input": "data/wrong_delimiter.txt",
+  "bytes": 20,
+  "sha256": "92441055dd7d146da19c049e44e6632d6977eb67ae06d7237786ea4439515cbb",
+  "task_sha256": "55e5edfa76047a7e0c916c04de1f45da2b3e832556e050e4fe2ac9d16d3e2fcd",
+  "native_warning_required": false,
+  "unknown_effect_acceptable": false,
+  "cleanup_required": true,
+  "independent_source_status": "one_column_with_assigned_comma",
+  "parsed_table": [
+    [
+      "Id|Name"
+    ],
+    [
+      "001|value"
+    ]
+  ],
+  "requested_fields": [
+    "Id",
+    "Name"
+  ],
+  "acceptable_outcome": "known binding/count refusal before Execute; no settings applied; owned draft discarded"
+}

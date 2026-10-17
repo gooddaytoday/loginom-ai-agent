@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "case_id": "txt-wrong-encoding",
+  "output_mode": "diagnostic",
+  "builder_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-encoding-1/txt-wrong-encoding/1",
+  "reference_attempt_number": 1,
+  "reference_attempts_consumed": 1,
+  "reference_limit": 3,
+  "source_harness_sha": "7d3a5cbda",
+  "source_harness_dirty": false,
+  "session_id": "ses_eb5d26882ffe7XsHZTxVTu4I7P",
+  "actual_model": {
+    "providerID": "openai",
+    "modelID": "gpt-6-luna",
+    "variant": "high",
+    "proof_sha256": "38c1107bf1e277e8de7be9812871b386c0854eb5790ff4586ad9e1455f5ea1b7"
+  },
+  "cli_pin": {
+    "sourceCommit": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+    "sourceDirty": false,
+    "version": "0.1.17-lab57.startup.d6fc9c9b",
+    "manifestSha256": "71a239098deec163333f2d3515f3ba252144ae10f87d5c7ee6a81926541c1b98",
+    "binarySha256": "11ce613ea14f3205cf1e8be767157e827bca7d7f4b4f7f8fe1e1d153daf42454",
+    "files_verified": 5389
+  },
+  "product_skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+  "action_manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+  "warm": "PASS",
+  "negative_checks_sha256": "619a88f200630ad5bf38224d27d9a5876b650e45320e7a7da6ebc201e0c839fd",
+  "cold": "NOT_APPLICABLE: diagnostic contract",
+  "reference_package": "NOT_REQUIRED: diagnostic contract",
+  "observed_package_sha256": "4f92c606b56961e7bdaf9b7406706903e67e3794ca41b8d637d5f9161841e34e",
+  "cleanup": {
+    "status": "confirmed",
+    "sha256": "80aebcc7d6aa62929035f59b557d9962e7b29babcdb330347c1202f3b636f26c"
+  },
+  "prompt_sha256": "8c508dc6d140d5c7d338a829f8416dc545ceb4867b02c76d00f0ad94130ce656",
+  "methodology_version": "1.0.7",
+  "operational_release": "bound separately after genuine stage completion; no early release claim"
+}

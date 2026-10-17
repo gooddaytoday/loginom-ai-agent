@@ -1,0 +1,13 @@
+{
+  "case_id": "txt-unclosed-quote",
+  "input": "data/unclosed_quote.txt",
+  "bytes": 36,
+  "sha256": "e8eda3b3c2a61603838a9b3eaf3dc6fbac6c7bde4ab966452cfb3fa292d76f2c",
+  "task_sha256": "b8ce65b39a3404e6d0f95bc222e9338cb8334958367bf7dfce566212469718a1",
+  "native_warning_required": false,
+  "unknown_effect_acceptable": false,
+  "cleanup_required": true,
+  "independent_source_status": "malformed_csv",
+  "parser_error": "unexpected end of data",
+  "acceptable_outcome": "verified known refusal or exact full typed observed table plus explicit damage/incompleteness diagnosis; never certify correct import"
+}

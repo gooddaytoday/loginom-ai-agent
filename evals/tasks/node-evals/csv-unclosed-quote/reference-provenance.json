@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "case_id": "csv-unclosed-quote",
+  "output_mode": "diagnostic",
+  "builder_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-unclosed-quote-1/csv-unclosed-quote/1",
+  "reference_attempt_number": 1,
+  "reference_attempts_consumed": 1,
+  "reference_limit": 3,
+  "source_harness_sha": "39a50f07c",
+  "source_harness_dirty": false,
+  "session_id": "ses_eb5c33e4bffeUNnPIzxCloQ2hA",
+  "actual_model": {
+    "providerID": "openai",
+    "modelID": "gpt-6-luna",
+    "variant": "high",
+    "proof_sha256": "f3d570b2422cc7b53c6ea93e11dca7719f9f94866b17f64f9ba8560d813da46b"
+  },
+  "cli_pin": {
+    "sourceCommit": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+    "sourceDirty": false,
+    "version": "0.1.17-lab57.startup.d6fc9c9b",
+    "manifestSha256": "71a239098deec163333f2d3515f3ba252144ae10f87d5c7ee6a81926541c1b98",
+    "binarySha256": "11ce613ea14f3205cf1e8be767157e827bca7d7f4b4f7f8fe1e1d153daf42454",
+    "files_verified": 5389
+  },
+  "product_skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+  "action_manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+  "warm": "PASS",
+  "negative_checks_sha256": "ced79b7630285134ef09a023b664f45d0fb837f79259f0b2e9b35be767fe2176",
+  "cold": "NOT_APPLICABLE: diagnostic contract",
+  "reference_package": "NOT_REQUIRED: diagnostic contract",
+  "observed_package_sha256": "ddac79f3330c8c60122e9452a9d0abf8b5b37c0d2b38ae9542ca2afe9feac19f",
+  "cleanup": {
+    "status": "confirmed",
+    "sha256": "930759c14528083e835c816c8e6fe9b920d4078227f9322eb92e05611d6c6dfc"
+  },
+  "prompt_sha256": "a6fb1d751c907e0511a1ad65aaaf5083b909d432760afb6783a94a7a73c01ceb",
+  "methodology_version": "1.0.7",
+  "operational_release": "bound separately after genuine stage completion; no early release claim",
+  "validation_harness_sha": "39a50f07c452cbe9050c52e3df6782d3dbd90da4",
+  "checker_sha256": "7c2d07f3d9ff1204f6126e4e21a151bc5118b4470953d1a115bfd91ed6aa26e0"
+}

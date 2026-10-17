@@ -1,0 +1,22 @@
+{
+  "case_id": "txt-ambiguous-headers",
+  "input": "data/ambiguous_headers.txt",
+  "bytes": 23,
+  "sha256": "c7519031b5932dc11febfd15807c8205d9892229ab7913321eea7d96eabd7bba",
+  "task_sha256": "481e4316ce246c8deb4f68766e650ae90420ce790f150adf11a2db35afaa47c0",
+  "native_warning_required": false,
+  "unknown_effect_acceptable": false,
+  "cleanup_required": true,
+  "independent_source_status": "duplicate_raw_headers",
+  "parsed_table": [
+    [
+      "Name",
+      "Name"
+    ],
+    [
+      "left",
+      "right"
+    ]
+  ],
+  "acceptable_outcome": "request.validate NOT_APPLIED REQUEST_REJECTED Duplicate source column names; effect_possible=false; no target creation/Execute; no correction"
+}

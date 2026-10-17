@@ -1,0 +1,14 @@
+{
+  "case_id": "txt-ambiguous-headers",
+  "basis": "original TASK and input bytes; independent Python stdlib parsing before model",
+  "program_sha256": "bd3e397e609d3ddabe156af30fbec477276369b8d8b25946409c089924ea5b47",
+  "task_sha256": "481e4316ce246c8deb4f68766e650ae90420ce790f150adf11a2db35afaa47c0",
+  "inputs": [
+    {
+      "path": "data/ambiguous_headers.txt",
+      "sha256": "c7519031b5932dc11febfd15807c8205d9892229ab7913321eea7d96eabd7bba"
+    }
+  ],
+  "independent_expectation_sha256": "91ee02aa881faaef6a99a2f0305f638cf0b8358194778aa059baf726ac57da60",
+  "recorded_before_reference_dispatch": true
+}
