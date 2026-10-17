@@ -57,5 +57,11 @@ export function readReplacementBrowser(prefix){
  const other={mode:['keep','null','value'][mode]};
  if(mode===2){const c=cmp(field.type==='string'?'edtReplaceOther':field.type==='real'?'edtReplaceOtherFloat':'edtReplaceOtherInt'),v=c?.getValue?.();other.value=typed(v,field.type);if(!other.value)return fail('replacement_other_value');}
  const editors=exact(base+'ReplaceEditor').filter(e=>e.checkVisibility({checkVisibilityCSS:true}));
- return {verified:true,inventory_complete:true,state_source:'cached_replacement_stores',input_fields:fields,selected:field.name,pairs,other,case_sensitive:caseSensitive,precision,editor_open:editors.length>0,settings_applied:false};
+ const separator=suffix=>{const c=cmp(suffix);return ['.',','].includes(c?.decimalSeparator)?c.decimalSeparator:null;};
+ const real_decimal_separators=field.type==='real'?{
+  from:separator('ReplaceEditor;fldVariant;ValueContainer;num'),
+  to:separator('ReplaceEditor-1;fldVariant;ValueContainer;num'),
+  other:separator('edtReplaceOtherFloat'),
+ }:null;
+ return {verified:true,inventory_complete:true,state_source:'cached_replacement_stores',input_fields:fields,selected:field.name,pairs,other,case_sensitive:caseSensitive,precision,editor_open:editors.length>0,real_decimal_separators,settings_applied:false};
 }
