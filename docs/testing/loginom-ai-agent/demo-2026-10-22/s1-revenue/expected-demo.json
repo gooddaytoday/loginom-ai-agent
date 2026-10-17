@@ -13,7 +13,7 @@
   ],
   "outputs": [
     {
-      "output_node_type": "transform.sorting",
+      "output_node_type": "export_input",
       "ordered": true,
       "columns": [
         {
