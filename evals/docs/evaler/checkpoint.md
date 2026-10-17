@@ -1,20 +1,20 @@
 # Node evals — checkpoint
-Дата: 17.10.2026; действует последовательное разрешение LAB59→60→61→62→63.
-LAB59 done44, принятая история c050/3414f0/9d015 сохранена; не возобновлять.
-LAB60 done38; accepted frozen7500e2c3b81624191a3122af1c002afba58e2d01.
-Ben ACCEPT01a149e7-33ab-70ac-a9db-98b854111965; Evaler01a149eb-ed22-7780-ab3b-cee0e2c6570a.
-Verification SHA256 d2f089db4f31f897821b5adc18cdf876dd941f640dd615b937caf064ea39a327 прочитан/проверен.
-Ben11PASS/0FAIL/0ERROR;11fresh coldPASS/165typed values; actual Luna/high/cleanup подтверждены.
-Unit645PASS/15SKIP/0FAIL/typecheckPASS;231rejected mutations+22positive controlsPASS.
-Genuine completion→ordinary RELEASED→healthy FREE; root fresh FREE/container running/HTTP200.
-Rich8PASS/3FAIL/0ERROR и LF reference#1 FAIL сохранены; reference12, recovery0, probes0, counters не сброшены.
-Принятый7500 включён fast-forward с историей; все executable/test/case bytes сохранены.
-Адресный oracle-test1PASS/0FAIL/3assertions и typecheckPASS; новый commit меняет только docs.
-Итог и первичные receipts: ../2026-10-17-lab60-completion.md; прежняя LAB59 там не переписывается.
-Следующая LAB61:10 исходных diagnostic кейсов; inputsZIP9a4a82e8a0d9b8ec21741578f0702c0117407be317e8de04031507bc4919d85a.
-20 TASK/input/manifest bytes сверены; diagnostic не требует фиктивного пакета/cold, следовать исходному TASK.
-Native Evaler: проверить delivery/checkouts/queue/pins/расход/зависимость; самому записать base_sha/authorization и один Rich dispatch.
-Rich: свежий status→acquire→немодельный preflight на lease первого этапа; Luna/high явно, actual archives обязательны.
-Ben сохраняет собственные ожидания до авторских материалов/live; каждый очищает своё, unknown не clean.
-LAB61 blocked33: Ben BLOCKER_CONFIRMED01a14a5a; делегирован отдельный CLI patch отd6→exact-source review→новый admission, текущие live gates закрыты.
-Решение: ../2026-10-17-lab61-cli-correction-authorization.md; история/бюджеты/guards сохранены, цикл доLAB63, dev/main/release не назначены.
+Дата:17.10.2026; последовательная серияLAB59→60→61→62→63, один heartbeat30min.
+LAB59done44/LAB60done38 подтверждены; принятые c050/7500 и вся история сохранены, не возобновлять.
+LAB60 Ben11PASS/0FAIL/0ERROR; ACCEPT01a149e7/Evaler01a149eb,verificationd2f089db; cleanup/genuineRELEASED/healthyFREE проверены.
+Общий accepted code/data7d3a5cbda2873094219dec836b1b6c0ffa40f639; последующие commits документальные.
+LAB61 исходные20TASK/input hashes/10IDs ZIP9a4a82e8 проверены; diagnostic следует TASK, фиктивный пакет/cold запрещён.
+Unaccepted casesa1eee8637d59a362582f3dd45c98adbb84ab46f3 остаются отдельными,6/10reference ready.
+Расход9reference(txt-unclosed3,other started1),product0/recovery0/probes0; FAIL/AMBIGUOUS/once/ledger сохранены.
+Новая продуктовая CLI2e990a84aa25dc37a4e808da564be752aae6f564 отexactd6 принята Ben01a14a96; RED/GREEN56 и own59PASS.
+Source ACCEPT не равен приёмке кейсов;653PASS/2environment errors и2addressed rechecks сохранены, полного655rerun нет.
+Immutable build5389entries/resources4394/source260 сверены; новая configlab61-epoch-2e990a84a,rawSHAd1ee7748,Rich/Ben only.
+Первый немодельный preflightPROFILE_NOT_READY/AppArmor сохранён; unit646PASS/15SKIP/typecheckPASS,ordinaryRELEASED/healthyFREE.
+OS proposal8c60514a0c7e4d790ff2c1a710bb82b2685cb13e принят Ben01a14aba; Evaler4d4cd3fd verification/handoff25d8f848 сверены.
+Оператор применил только exact282bytepolicybf25939f/root:root0644,одна загрузка--add--skip-cache; kernelraw5714bytesSHA71b3d550 равен exact compilation.
+193foreignkernelpolicies/cache/globaluserns1/шестьпрофилей/config hashes неизменны; lease/model/native вызовов нет.
+Доказательства: ../2026-10-17-lab61-apparmor-operator.md и receipt264de519; старыеd6/f2aa/config сохранены.
+Следующий native Evaler: проверить operator receipt и один свежий Rich installation admission без модели по новым pins.
+После его gates отдельное решение о case continuation новой версии; только Evaler пишет state/provenance/нужныеold-newlimits безсброса.
+Ben independent10caseACCEPT/actualLuna-high/evidence/cleanup→genuinecompletion→ordinaryRELEASED→healthyFREE передLAB62/63 обязательны.
+Цикл до полногоLAB63/acceptedcommonintegration; dev/main/productrelease не назначены.
