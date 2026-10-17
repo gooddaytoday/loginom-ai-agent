@@ -1,4 +1,5 @@
 import {closePreparedWizard} from './node-wizard-close.mjs';
+import {returnFromNodeViews} from './node-output-procedure.mjs';
 
 const requireValue=(value,message)=>{if(!value)throw new Error(message);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -26,7 +27,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   requireValue(response?.state==='completed'&&response.receipt?.cleanup_complete===true,
    'The last browser gesture of this operation has no confirmed cleanup');
  }
- const cleanup={wizard_closed:false,read_view_restored:false};
+ const cleanup={wizard_closed:false,read_view_restored:false,views_returned:false};
  if(restoreRead)cleanup.read_view_restored=await restoreRead();
  // A heavy wizard can exceed the observation budget; only the user can then
  // cancel it. Its unsaved settings are lost, which the agent must say first.
@@ -43,6 +44,10 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   await closePreparedWizard(channel);
   cleanup.wizard_closed=true;
  }
+ // A read stopped before its Table became active leaves this node's
+ // visualizers open; return through the observed scenario control only.
+ if(current.wizard.status==='absent'&&current.prepared_node_context?.surface==='views'&&sameNode(current.prepared_node_context,node))
+  cleanup.views_returned=(await returnFromNodeViews(channel,node)).returned;
  const quiet=s=>s.wizard?.status==='absent'&&s.prepared_node_context?.surface==='graph'
   &&sameNode(s.prepared_node_context,node)&&s.prepared_node_context.locked===false
   &&s.ui?.dialogs?.length===0&&s.ui?.masks?.length===0;
@@ -57,7 +62,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  requireValue(same(graph,await readReleaseGraph(operation,node))&&same(first.prepared_node_context,second.prepared_node_context),
   'The graph changed during release; inspect the operation again');
  requireValue(graph.nodes.filter(n=>same(n.ref,node)).length===1,'The released node is absent from its graph');
- return {verified:true,cleanup_complete:true,effect_possible:cleanup.wizard_closed||cleanup.read_view_restored,
+ return {verified:true,cleanup_complete:true,effect_possible:cleanup.wizard_closed||cleanup.read_view_restored||cleanup.views_returned,
   node_context:second.prepared_node_context,graph,cleanup};
 }
 
