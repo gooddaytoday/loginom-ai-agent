@@ -1,0 +1,64 @@
+{
+  "kind": "operator_full_delivery_integrity_only",
+  "observed_utc": "2026-10-17T23:46:45.291463+00:00",
+  "report_id": "01a14c31-1797-749e-b8ab-9ae580c21afb",
+  "verdict_delivered": "REJECT",
+  "source_sha": "6ed1f51393d7893d80d4364522d197c1a269d99d",
+  "product_source_sha": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "archive": {
+    "bytes": 13554840,
+    "sha256": "cbb427ae719c4924fc689fa87cad64231df1f953998c554478b7a28886e11d2d",
+    "manifest_sha256": "989ae0870751195bc518d38e02dd40e8b99affc4a6e32b0feeb8feaac61405df",
+    "payload_count": 537,
+    "members_including_manifest": 538,
+    "payload_bytes": 192958571,
+    "all_sizes_hashes_and_exact_membership_verified": true
+  },
+  "parts": [
+    {
+      "path": "lab61-ben-full-6ed1-evidence.zip.part-001",
+      "bytes": 4194304,
+      "sha256": "b99b9004fe8021db96b9519bf3e51128270802343890e3a7861511508845ccf9"
+    },
+    {
+      "path": "lab61-ben-full-6ed1-evidence.zip.part-002",
+      "bytes": 4194304,
+      "sha256": "14a39c09cbbd9d24c2273c78e0727a1483439077005628efae5d8ad8916320b8"
+    },
+    {
+      "path": "lab61-ben-full-6ed1-evidence.zip.part-003",
+      "bytes": 4194304,
+      "sha256": "128905d79526b259b326c9db3ad664c866820ee2e222a28d8ba6f4dd178252f8"
+    },
+    {
+      "path": "lab61-ben-full-6ed1-evidence.zip.part-004",
+      "bytes": 971928,
+      "sha256": "11168319db2272394bcd741bc891488060e9ba2afacddf237d0694e8de501713"
+    }
+  ],
+  "standalone_report_equal": true,
+  "standalone_report_sha256": "1cce27df0dcbd2487f9c8d53f1834d5ac4ef07e6624093b225787848f087a050",
+  "native_evaler_verification_sha256": "098bd07b393fd19a5de8b1595f9470d5f6d09f1de2df4f706ae9f3929a33d0d7",
+  "native_decision_sha256": "4632c3eed246e996d12278cad0a0c5a12c16e81b50dcc4c3c9ca505fd5471e69",
+  "raw_outcomes_preserved": true,
+  "full_ACCEPT": false,
+  "limitations": [
+    "Integrity verification; semantic and independent executable re-review remain native Ben/Evaler gates.",
+    "No live/model/lease/config/guard/OS effects by operator."
+  ],
+  "original_completion_verified": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/c5ce46d3-8f4a-4abe-8d72-53c2adb3f12b/eval-completion-3d003db7-5176-4d5a-9def-2243626bf401.json",
+    "sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+    "bytes_equal_delivered": true,
+    "owner_issue_task_role_phase_sha_equal": true,
+    "kind": "eval",
+    "case_count": 10
+  },
+  "original_ordinary_release_verified": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/c5ce46d3-8f4a-4abe-8d72-53c2adb3f12b/release.json",
+    "sha256": "1d9e17e0b34ddff48791a493f49ebfd525b1d17a0e8b5a0b2a1d110d73671274",
+    "bytes_equal_delivered": true,
+    "evidence_sha256_equals_original_completion": true,
+    "released_at": "2026-10-17T23:13:39.197Z"
+  }
+}
