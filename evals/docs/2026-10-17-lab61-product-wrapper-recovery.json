@@ -1,0 +1,65 @@
+{
+  "observed_utc": "2026-10-17T20:57:27.477854+00:00",
+  "scope": "Read-only original completion/release/config/new-owner verification; no measured product verdict or full ten-case acceptance",
+  "native_task": "01a14b91-4d36-7785-afea-6f20d54c66b1",
+  "original_records": [
+    {
+      "kind": "reference",
+      "completion_path": "/home/user/.local/share/loginom-evals-runtime/roles/rich/reference-work/lab61-a2ba-01a14b91/reference-completion-v2.json",
+      "completion_sha256": "daf5ce174d88d5c77f45a44b8dbc728a6dd8741c5f364440b77767a0c7299efc",
+      "release_path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/cf4153af-05ce-4b8b-87c5-fd6812ea0448/release.json",
+      "release_core_sha256": "1ec59a5d2d47dda541a298327d214478e7d435d33b28ed45f7fca5597792464d",
+      "ordinary_release_utc": "2026-10-17T20:46:37.368Z",
+      "owner": {
+        "issue": "01a1214b-4adc-75df-97df-2917732a449a",
+        "task": "01a14b91-4d36-7785-afea-6f20d54c66b1",
+        "role": "rich",
+        "phase": "reference",
+        "sha": "1b93b62c8bbcdcd4ea2bf0c6de317547cced96a8"
+      },
+      "completion_release_identity_verified": true
+    },
+    {
+      "kind": "recovery",
+      "completion_path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/e87a2a98-198b-4f95-be3e-dde57046f993/recovery-completion-dc3e52e7-a628-4ebb-bf6d-a01a9ba86460.json",
+      "completion_sha256": "1919c573e604ddcc4e1a0430113d378559a47622d8610c7177ffe03e15d31fc7",
+      "release_path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/e87a2a98-198b-4f95-be3e-dde57046f993/release.json",
+      "release_core_sha256": "af2f2d48198a02e000de6c785c03981f09012038742d173dfc98309d3c8a0a1a",
+      "ordinary_release_utc": "2026-10-17T20:51:36.175Z",
+      "owner": {
+        "issue": "01a1214b-4adc-75df-97df-2917732a449a",
+        "task": "01a14b91-4d36-7785-afea-6f20d54c66b1",
+        "role": "rich",
+        "phase": "eval",
+        "sha": "6ed1f51393d7893d80d4364522d197c1a269d99d"
+      },
+      "completion_release_identity_verified": true
+    }
+  ],
+  "current_config_sha256": "e91a5c0aa9b47ae61b85b8d7d12319dfc441a6fe6940f508ec28fe4c1d8b16d0",
+  "new_own_product_lease_safe": {
+    "issue": "01a1214b-4adc-75df-97df-2917732a449a",
+    "task": "01a14b91-4d36-7785-afea-6f20d54c66b1",
+    "role": "rich",
+    "phase": "eval",
+    "sha": "6ed1f51393d7893d80d4364522d197c1a269d99d",
+    "acquiredAt": "2026-10-17T20:52:04.447Z"
+  },
+  "worker_progress_basis": {
+    "seq357_358": "Product wrapper ERROR before first CLI/model; reported zero attempts/tool calls/physical product calls; profile path in external timeout argv triggered unchanged idle guard.",
+    "seq393_394": "Nonmodel reproduction confirmed script environment removes self-match; guard unchanged. One allowed recovery consumed; old ERROR and original reservation preserved, unused physical call remains."
+  },
+  "formal_Evaler_consumption_snapshot_before_continuation": {
+    "reference": 14,
+    "product": 0,
+    "recovery": 0
+  },
+  "current_worker_reported_consumption_preliminary": {
+    "reference": 15,
+    "initial_reference": 2,
+    "product": 0,
+    "recovery": 1
+  },
+  "no_root_lease_mutation_native_model_calls": true,
+  "final_report_complete_evidence_counters_and_independent_Ben_acceptance_pending": true
+}
