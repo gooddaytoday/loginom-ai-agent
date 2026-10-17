@@ -1,8 +1,12 @@
 import {ensureGroupingOutputSources as ensureDerivedOutputSources} from './grouping-output-sources.mjs';
 import {resolveConfiguredOutputMapping,configureOutputFields,reorderOutputFields,configureOutputAutosync} from './port-mapping-procedure.mjs';
-export async function configureSortingOutput(channel,configuration,parameters,mapping={}){
+export async function configureSortingOutput(channel,configuration,parameters,mapping={},request){
  const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
- const sources=configuration.input_fields.map(f=>({...f,used:true})),requested={direction:'output',port:0,...mapping},changes=[];
+ // Native autosync saves only referenced input columns; after reopen it can
+ // append pass-through fields in a different order. Fix a new node's output
+ // layout, preserving an explicit choice and any existing node's settings.
+ const sources=configuration.input_fields.map(f=>({...f,used:true})),requested={direction:'output',port:0,
+  ...(request?.target.kind==='new'?{autosync:false}:{}),...mapping},changes=[];
  let s=await channel.observe({condition:'sorting output inventory',readMappings:true,ready});
  s=await ensureDerivedOutputSources(channel,s);
  resolveConfiguredOutputMapping(requested,sources,s.node_mapping);

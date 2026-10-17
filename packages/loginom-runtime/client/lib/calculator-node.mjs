@@ -249,7 +249,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     await channel.openOutputPort(0);
     const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
     if(implementation){
-     const result=await implementation.configureOutput(channel,configured,operation.nodeApply.request.parameters,mappings[0]??{});
+     const result=await implementation.configureOutput(channel,configured,operation.nodeApply.request.parameters,mappings[0]??{},operation.nodeApply.request);
      mapping=result.native_mapping;columns=mapping.target_fields.filter(f=>!f.excluded);
      const definition=await readOutputDefinitionPages(channel,{expectedCount:mapping.target_fields.length});
      requireValue(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===mapping.target_fields[i][k])),'Derived output definition differs');
