@@ -1,0 +1,74 @@
+{
+  "at": "2026-10-17T19:04:51.477754+00:00",
+  "kind": "source_delivery_admission_for_independent_review_only",
+  "author_report_id": "01a14b3e-ecc3-7062-b5ae-ca2fcb923dca",
+  "archive_sha256": "981b4fe027dff4e2230882eb6ce4b75999a88742027af2f9004ce46f41f4bedc",
+  "payload_files_verified": 63,
+  "evidence_manifest_sha256": "d38d70ba7a150745a48998c654ad9ed2160af802f2991fce5304596f7e05db9e",
+  "candidate": "4070ca4a70c03bf4fcb0024fa860e3bac987b547",
+  "parent": "2e990a84aa25dc37a4e808da564be752aae6f564",
+  "clean_checkout": "/home/user/.local/share/loginom-evals-runtime/checkouts/rich-initial-source-01a14b32/loginom-ai-agent",
+  "clean_source_and_red_parent": true,
+  "exact_remote_readback": "4070ca4a70c03bf4fcb0024fa860e3bac987b547",
+  "bundle_verified": true,
+  "source_manifest_files_git_and_disk_verified": 1243,
+  "changed_files": [
+    "packages/loginom-runtime/client/lib/text-import-limits.mjs",
+    "packages/loginom-runtime/client/lib/text-import-node.mjs",
+    "packages/loginom-runtime/client/lib/text-import-procedure.mjs",
+    "packages/loginom-runtime/client/test/text-import-initial-new-lifecycle.test.mjs",
+    "packages/loginom-runtime/client/test/text-import-node.test.mjs"
+  ],
+  "common_documentary_sha": "6e2ad279e90bd4426110c0cb6491d828f61935cb",
+  "common_accepted_code_tests_cases_unchanged": "7d3a5cbda2873094219dec836b1b6c0ffa40f639",
+  "worker_queues_empty_before_dispatch": true,
+  "LAB60_done_revision38": true,
+  "health": {
+    "at": "2026-10-17T19:03:49.564Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-17T19:03:48.684Z"
+    }
+  },
+  "author_tests": "RED3FAIL/GREEN66PASS/regression303PASS/client2709PASS10SKIP/checker3positive9negative are delivered author results, not Evaler reproduction or native evidence",
+  "source_acceptance_pending": true,
+  "build_install_live_model_gates_closed": true,
+  "main_case_gate_unchanged": true,
+  "consumption": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 3,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 1,
+      "missing-source-column": 1
+    },
+    "reference_total": 14,
+    "product_physical_calls": 0,
+    "recovery": 0,
+    "probes": 0,
+    "source_report_sha256": "7d6de2aff7dce731f4ee448ca31bb807875d223e07365b93cc2d7fe47a0018b5",
+    "historical_outcomes_preserved": true,
+    "budget_increases": [],
+    "source_report_id": "01a14b00-2630-7e58-8cd1-66fbcb718ee2"
+  }
+}

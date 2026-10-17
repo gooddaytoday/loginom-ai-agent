@@ -1,0 +1,16 @@
+{
+  "schema": "operator-delivery-verification/v1",
+  "at": "2026-10-17T19:20:24.279926+00:00",
+  "issue": "LAB-61",
+  "report_id": "01a14b4c-009e-7d09-bda9-36c0b5b12e00",
+  "attachment_id": "01a14b4c-0041-7779-b6fa-0adaf8fa67ca",
+  "archive_bytes": 409054,
+  "archive_sha256": "0e63b39ec47e819d2480ac20e40d339c8bd6ca7c4f6ea2f0792fecee8db7dff3",
+  "manifest_member": "EVIDENCE-MANIFEST.json",
+  "manifest_sha256": "e70bd7db7bb1536b181ecf17e1d6bc462730d1efb790be633860cfbff43feedb",
+  "payload_files_verified": 97,
+  "payload_set_size_and_sha256_verified": true,
+  "candidate": "4070ca4a70c03bf4fcb0024fa860e3bac987b547",
+  "verdict": "REJECT",
+  "scope": "Byte integrity of delivered independent source-review evidence only; not source ACCEPT, product FAIL, live cleanup proof or full case acceptance. No active task restarted, no build/install/model/live action."
+}

@@ -1,0 +1,101 @@
+{
+  "at": "2026-10-17T19:19:18.245024+00:00",
+  "kind": "independent_source_REJECT_delivery_and_rework_admission",
+  "review_report_id": "01a14b4c-009e-7d09-bda9-36c0b5b12e00",
+  "review_dispatch_id": "01a14b41-69dd-7cb3-928d-0886966a049d",
+  "candidate_sha": "4070ca4a70c03bf4fcb0024fa860e3bac987b547",
+  "archive_sha256": "0e63b39ec47e819d2480ac20e40d339c8bd6ca7c4f6ea2f0792fecee8db7dff3",
+  "payload_hashes_verified": 97,
+  "manifest_sha256": "e70bd7db7bb1536b181ecf17e1d6bc462730d1efb790be633860cfbff43feedb",
+  "finding_id": "BEN-INITIAL-OWNER-01",
+  "finding": "original wizard owner wrapper missing on readiness-timeout close path of initial lifecycle",
+  "source_condition_verified": true,
+  "review_results_delivered": {
+    "same_owner_pass": 1,
+    "changed_owner_fail": 3,
+    "exit_code": 1
+  },
+  "raw_fixtures_checked": [
+    {
+      "variant": "node_tid",
+      "synthetic": true,
+      "timeout": true,
+      "status": "FAILED",
+      "effect_possible": true,
+      "cleanup_complete": true,
+      "raw_sha256": "f04dd84ea1fc40d0492f7e3c2b6757bc19569d63be12dcd760ef246524aed466"
+    },
+    {
+      "variant": "path_tid",
+      "synthetic": true,
+      "timeout": true,
+      "status": "FAILED",
+      "effect_possible": true,
+      "cleanup_complete": true,
+      "raw_sha256": "dde6fb30ef7fe19bb17f7883006998c91aab216240271c5d5f274fff55e65557"
+    },
+    {
+      "variant": "path_label",
+      "synthetic": true,
+      "timeout": true,
+      "status": "FAILED",
+      "effect_possible": true,
+      "cleanup_complete": true,
+      "raw_sha256": "5ef5bee73b8ad0de3ed2332dd1ad2221d1f1cd1f0d4c4c51eec8a6625d209ec5"
+    }
+  ],
+  "own_test_reproduction": false,
+  "source_review_scope_only": true,
+  "product_measured": false,
+  "initial_source_rework_assigned": 1,
+  "main_case_state_not_transitioned": true,
+  "consumption": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 3,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 1,
+      "missing-source-column": 1
+    },
+    "reference_total": 14,
+    "product_physical_calls": 0,
+    "recovery": 0,
+    "probes": 0,
+    "source_report_sha256": "7d6de2aff7dce731f4ee448ca31bb807875d223e07365b93cc2d7fe47a0018b5",
+    "historical_outcomes_preserved": true,
+    "budget_increases": [],
+    "source_report_id": "01a14b00-2630-7e58-8cd1-66fbcb718ee2"
+  },
+  "health": {
+    "at": "2026-10-17T19:18:14.501Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-17T19:18:13.624Z"
+    }
+  },
+  "worker_queues_empty_before_dispatch": true,
+  "LAB60_done_revision38": true,
+  "common_published_sha_observed": "6e2ad279e90bd4426110c0cb6491d828f61935cb",
+  "operator_worktree_has_uncommitted_docs_only": true,
+  "scope": "one Rich OFFLINE source rework; no build/install/browser/lease/live/model/reference/product"
+}

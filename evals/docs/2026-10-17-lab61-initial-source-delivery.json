@@ -1,0 +1,32 @@
+{
+  "schema": "operator-delivery-verification/v1",
+  "at": "2026-10-17T19:15:28.688946+00:00",
+  "issue": "LAB-61",
+  "author_report_id": "01a14b3e-ecc3-7062-b5ae-ca2fcb923dca",
+  "attachment_id": "01a14b3e-ec68-7f1d-ba84-16952c81cfc4",
+  "archive_bytes": 367176,
+  "archive_sha256": "981b4fe027dff4e2230882eb6ce4b75999a88742027af2f9004ce46f41f4bedc",
+  "manifest_sha256": "d38d70ba7a150745a48998c654ad9ed2160af802f2991fce5304596f7e05db9e",
+  "all_payload_files_verified": 63,
+  "archive_member_set_and_sizes_verified": true,
+  "candidate": "4070ca4a70c03bf4fcb0024fa860e3bac987b547",
+  "direct_parent": "2e990a84aa25dc37a4e808da564be752aae6f564",
+  "bundle_sha256": "88d0af9ac789fd760a444f534fa4a9b0deadea76495f907f276907d6e4c209ee",
+  "bundle_verify": "PASS in original verification pass",
+  "manifest_git_tree_scope": "whole commit root, not runtime subtree",
+  "git_root_tree": "5d1448c7f9ef17b7de44258d7550eaa7b3878852",
+  "runtime_subtree": "968b40bb1dd1432365b160582ab89235f89f8ab2",
+  "all_runtime_git_blob_hashes_verified": 1243,
+  "runtime_bytes": 18317708,
+  "changed_files": [
+    "packages/loginom-runtime/client/lib/text-import-limits.mjs",
+    "packages/loginom-runtime/client/lib/text-import-node.mjs",
+    "packages/loginom-runtime/client/lib/text-import-procedure.mjs",
+    "packages/loginom-runtime/client/test/text-import-initial-new-lifecycle.test.mjs",
+    "packages/loginom-runtime/client/test/text-import-node.test.mjs"
+  ],
+  "changed_source_delivery_equal_git": true,
+  "native_evaler_verification_sha256": "4b963cecc057fba8cc279da47c25d90a6e91649085d0ed7c484026cb7a623f21",
+  "observer_correction": "First pass verified all63 payload, bundle and parent; observer wrongly compared manifest.git_tree with runtime subtree and stopped. Read actual root/subtree objects, confirmed manifest git_tree is whole commit root; corrected comparison and verified all1243 Git blobs. Candidate, archive and installed bytes unchanged.",
+  "scope": "Delivery integrity only. Not independent semantic source review, installation admission, live proof or ten-case ACCEPT. No tests, build, installed payload, browser, lease, model or scenario actions by operator."
+}
