@@ -1,0 +1,8 @@
+{
+  "case_id": "csv-wrong-delimiter",
+  "outcome": "diagnostic",
+  "warm": "PASS",
+  "cold": "NOT_APPLICABLE",
+  "events_sha256": "0a256700a7ef77ca2ba971a2e1a1d6b8f4c04f7cbbeba05e772c10d3a5adfcb8",
+  "admission": "CODE_CHECKS_ONLY; actual model, budgets and stand cleanup require independent operational verification"
+}

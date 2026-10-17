@@ -1,0 +1,8 @@
+{
+  "case_id": "missing-source-column",
+  "outcome": "diagnostic",
+  "warm": "PASS",
+  "cold": "NOT_APPLICABLE",
+  "events_sha256": "cfb447643c927167e5971b1f68371c0a6d729b167ddf42b0ac3173d5209479fd",
+  "admission": "CODE_CHECKS_ONLY; actual model, budgets and stand cleanup require independent operational verification"
+}
