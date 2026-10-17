@@ -1,0 +1,125 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.lin_regression"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "datamining.lin_regression",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "Y_rergession",
+          "label": "Y|Регрессия",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "real"
+        },
+        {
+          "name": "Y",
+          "label": "Y",
+          "type": "real"
+        },
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "IsTest",
+          "label": "IsTest",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        {
+          "Y_rergession": -1.0,
+          "X": -2.0,
+          "Y": -1.0,
+          "RowID": 1,
+          "IsTest": false
+        },
+        {
+          "Y_rergession": 1.0,
+          "X": -1.0,
+          "Y": 1.0,
+          "RowID": 2,
+          "IsTest": false
+        },
+        {
+          "Y_rergession": 3.0,
+          "X": 0.0,
+          "Y": 3.0,
+          "RowID": 3,
+          "IsTest": false
+        },
+        {
+          "Y_rergession": 5.0,
+          "X": 1.0,
+          "Y": 5.0,
+          "RowID": 4,
+          "IsTest": false
+        },
+        {
+          "Y_rergession": 7.0,
+          "X": 2.0,
+          "Y": 7.0,
+          "RowID": 5,
+          "IsTest": false
+        },
+        {
+          "Y_rergession": 9.0,
+          "X": 3.0,
+          "Y": 9.0,
+          "RowID": 6,
+          "IsTest": false
+        }
+      ]
+    },
+    {
+      "output_node_type": "datamining.lin_regression",
+      "output_port": 1,
+      "columns": [
+        {
+          "name": "Name",
+          "label": "Имена входных полей",
+          "type": "string"
+        },
+        {
+          "name": "Y_coefficients",
+          "label": "Y|Коэффициенты",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Name": "<Константа>",
+          "Y_coefficients": 3.0
+        },
+        {
+          "Name": "X",
+          "Y_coefficients": 2.0
+        }
+      ]
+    }
+  ]
+}

@@ -168,6 +168,12 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       if(!keepConsoleOpen)await closeConsole(s);
       return structuredClone(baseline);
     },
+    // Only a caller holding receipts that prove every launch/deactivation
+    // gesture was refused before taking effect may clear this one-flight guard.
+    allowRefusedLaunch(proof) {
+      requireValue(proof?.verified===true&&proof.launch_effect===false&&baseline&&!execution,'A proved no-effect launch refusal is required');
+      launchAttempted=false;deactivationAttempted=false;
+    },
     async launchGraph() {
       requireValue(baseline&&!execution&&!launchAttempted&&!deactivationAttempted,'A prepared, not-yet-launched graph execution is required');
       const same=s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'

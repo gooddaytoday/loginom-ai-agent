@@ -1,4 +1,4 @@
-import {parseExpectedOutputs,matchExpectedOutputs} from "./expected-outputs.mjs"
+import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
 import { readFile, mkdir, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
@@ -141,18 +141,21 @@ try {
     if(!source.source)throw Error('COLD_SOURCE_PROVENANCE_MISSING');
    }
   }
+  const types=new Set(expectedOutputs.map(o=>o.output_node_type));
+  const exportInput=types.has('export_input')?resolveExportInput(graph):null;
   for (const want of expected.nodes) {
     if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
 
-  const types=new Set(expectedOutputs.map(o=>o.output_node_type));
-  const matches=graph.nodes.filter(n=>types.has(n.type)&& (multiple||!saved.node||n.ref.node_id===saved.node));
+  const matches=graph.nodes.filter(n=>types.has(n.type)&& (multiple||!saved.node||n.ref.node_id===saved.node)
+    ||exportInput&&n.ref.node_id===exportInput.node.ref.node_id);
   if(matches.length===0||matches.length>expectedOutputs.length)throw Error("COLD_EXTRA_OR_MISSING_OUTPUT_NODE");
   const actual=[],ownedExecutions=[];
   for(const [outputIndex,target] of matches.entries()){
   const node=target.ref;
   const ports=[...new Set(expectedOutputs.filter(o=>o.output_node_type===target.type
-    &&(o.output_node_label===undefined||o.output_node_label===target.label)).map(o=>o.output_port??0))];
+    &&(o.output_node_label===undefined||o.output_node_label===target.label)).map(o=>o.output_port??0)
+    .concat(exportInput&&node.node_id===exportInput.node.ref.node_id?[exportInput.output_port]:[]))];
   if(ports.length===0)throw Error('COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
 
   const operation = {
@@ -251,7 +254,7 @@ try {
   await writeFile(join(args.output,'actual-readback.json'),checkpoint+'\n');
   }
   }
-  const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true});
+  const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
 
   // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.

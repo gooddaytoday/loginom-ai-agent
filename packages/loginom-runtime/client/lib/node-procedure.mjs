@@ -64,6 +64,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   const nextStep=()=>{sequence++;return operation.nodeStepSequence=(operation.nodeStepSequence??0)+1;};
   let snapshot = null;
   let lastPreparedStep = null;
+  // Bounded identities of prepared gestures. A recovery reads their own
+  // browser receipts; the log never authorizes a gesture by itself.
+  const preparedSteps = [];
+  let preparedStepsTrimmed = false;
   let evidenceSnapshot = null;
   let snapshotTableDialog = null;
   let snapshotWizardConfirmation = null;
@@ -583,6 +587,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (!persisted || JSON.stringify(persisted.action) !== JSON.stringify(action)
         || persisted.signature !== signature||processControl&&JSON.stringify(persisted.process_control)!==JSON.stringify(processControl)) throw new Error('Prepared step was not durably preserved after redaction');
       lastPreparedStep = structuredClone(persisted);
+      preparedSteps.push({ step: persisted.step, internal_operation_id: persisted.internal_operation_id, signature: persisted.signature, verb: action.verb });
+      if (preparedSteps.length > 512) { preparedSteps.shift(); preparedStepsTrimmed = true; }
       signal?.throwIfAborted();
       if (now() >= operation.deadline) throw new Error('Node procedure deadline elapsed before mutation');
       const openingWait=preparedNodeContext&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(action.verb)
@@ -718,6 +724,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     get steps() { return sequence; },
     get lastPreparedStep() { return structuredClone(lastPreparedStep); },
+    stepsSince(step) {
+      if (preparedStepsTrimmed && !(preparedSteps[0]?.step <= step + 1)) throw new Error('Prepared step log no longer covers this boundary');
+      return structuredClone(preparedSteps.filter(item => item.step > step));
+    },
   };
   return Object.freeze(channel);
 }
