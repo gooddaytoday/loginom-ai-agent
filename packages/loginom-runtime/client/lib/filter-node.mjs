@@ -19,7 +19,7 @@ export function validateFilterParameters(p,mode,r){
  need(r.finish!=='close'||r.mappings.every(m=>m.direction!=='input'),'Close cannot commit input mappings');
 }
 export function createFilterNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'transform.filter_data',mode:'conditions',revision:'filter-v3-internal-1',inputMappingRecovery:true,parameterSchema:filterParametersSchema,readback:filterConfigurationReadback,
+ type:'transform.filter_data',mode:'conditions',revision:'filter-v3-internal-1',inputMappingRecovery:true,openRecovery:true,parameterSchema:filterParametersSchema,readback:filterConfigurationReadback,
  validate:validateFilterParameters,
  validateInput:(p,resolved,native)=>p.groups===undefined?undefined:resolveFilterConditions(p,resolved.fields??native.target_fields),
  preflight:(options,ctx,config)=>preflightTabularSource(options,ctx,config,{required:options.operation.parameters.parameters.groups!==undefined,resolve:resolveFilterConditions,label:'filter'}),

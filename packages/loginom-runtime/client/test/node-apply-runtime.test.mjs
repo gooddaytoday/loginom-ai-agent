@@ -4,6 +4,7 @@ import {createActionRuntime,parseCapabilityResult} from '../lib/executor.mjs';
 import vm from 'node:vm';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeJobResultSchema} from '../lib/node-result-schema.mjs';
+import {inspectPendingWizardOpen} from '../lib/node-wizard-open.mjs';
 import {actions} from './support/executor-fixture.mjs';
 const validateJob=new AjvJsonSchemaValidator().getValidator(nodeJobResultSchema);
 const assertJob=job=>{const result=validateJob(job);assert.equal(result.valid,true,result.errorMessage);};
@@ -25,6 +26,49 @@ function fixture({execute=async()=>{throw Error('Unexpected public transport')},
   onRecord:async e=>{events.push(e);if(e.phase===failRecord)throw Error('disk unavailable');return e;}});
  return {runtime,adapter,calls,events,graph,drivers,handler,handlers,failRecord:p=>{failRecord=p}};
 }
+
+for(const variant of ['absent','opened','missing-node','unknown-receipt','changed-graph','expired','journal'])test('open UI_EPOCH_CHANGED recovery: '+variant,async()=>{
+ let context,checkpoint,opens=0,time=1000;
+ const node={document_id:'doc',workflow_id:'wf',node_id:'new'};
+ const step={step:1,internal_operation_id:'apply:n1',signature:'sig',action:{verb:'begin_wizard'}};
+ const ref={id:step.internal_operation_id,signature:step.signature};
+ const f=fixture({now:()=>time,wrapDrivers:(ctx,drivers)=>{
+  context=ctx;
+  return {...drivers,openWizard:async()=>{
+   opens++;f.calls.push('open');if(opens>1)return {verified:true,cleanup_complete:true};
+   checkpoint={graph:structuredClone(f.graph),step:0};ctx.operation.lastReceipt=ref;
+   const error=Error('UI_EPOCH_CHANGED');error.receipt={error:{code:'UI_EPOCH_CHANGED'}};throw error;
+  },verifyPendingOpen:state=>inspectPendingWizardOpen({operation:ctx.operation,checkpoint,now:()=>time,
+   channel:{lastPreparedStep:step,observe:async()=>({wizard:variant==='opened'?{status:'observed',owner_context:{status:'observed'}}:{status:'absent'},
+    prepared_node_context:{...node,verified:variant!=='missing-node',surface:variant==='opened'?'wizard':'graph'}})},
+   readGraph:async()=>{assert.notEqual(variant,'opened','Graph DOM is hidden by the wizard');return f.graph;},configurationObservation:{},readReceipt:async()=>({state:variant==='unknown-receipt'?'pending':'completed',
+    receipt:{operation_id:ref.id,action_key:'ui.act',status:variant==='opened'?'SUCCEEDED':'NOT_APPLIED',cleanup_complete:true,
+     effect_possible:variant==='opened',error:variant==='opened'?null:{code:'UI_EPOCH_CHANGED'}}})})};
+ }});
+ f.drivers.finish=async mode=>{f.calls.push('finish');return {verified:true,cleanup_complete:true,mode,execution_id:'exec'};};
+ f.drivers.waitExecution=async()=>{f.calls.push('execute');return {verified:true,cleanup_complete:true,status:'completed',execution_id:'exec'};};
+ f.drivers.readOutput=async()=>({verified:true,cleanup_complete:true,status:'complete',execution_id:'exec',evidence_ref:'evidence',ports:[]});
+ const r=request();r.finish='execute';
+ await f.runtime.startNodeApply(r);const stopped=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+ assert.equal(stopped.outcome.status,'AMBIGUOUS');assert.equal(stopped.outcome.output.pending_phase,'open');
+ const deadlines=[context.operation.nodeApply.deadline,context.operation.nodeApply.configure_deadline,context.operation.nodeApply.pending.deadline];
+ assert.deepEqual((await f.runtime.inspect({operationId:'apply'})).output.recovery_options,['resume']);
+ if(variant==='missing-node')f.graph.nodes=[];
+ if(variant==='changed-graph')f.graph.links.push({source:'foreign',target:'new',input:0});
+ if(variant==='expired')time=40000;
+ if(variant==='journal')f.failRecord('node_open_recovery_checked');
+ f.runtime.startNodeApply({operation_id:'apply'},{resume:true});const resumed=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+ if(['absent','opened'].includes(variant)){
+  assert.equal(resumed.outcome.status,'SUCCEEDED',JSON.stringify(resumed));assert.equal(opens,variant==='opened'?1:2);
+  assert.equal(f.calls.filter(c=>c==='create').length,1);assert.equal(f.calls.filter(c=>c==='mapping').length,2);
+  assert.equal(f.calls.filter(c=>c==='configure').length,1);assert.equal(f.calls.filter(c=>c==='execute').length,1);
+  assert.deepEqual([context.operation.nodeApply.deadline,context.operation.nodeApply.configure_deadline],deadlines.slice(0,2));
+  assert.equal(f.events.find(e=>e.phase==='node_phase_completed'&&e.receipt.phase==='open').receipt.value.verified,true);
+ }else{
+  assert.equal(resumed.outcome.status,'AMBIGUOUS');assert.equal(opens,1);assert.ok(!f.calls.includes('configure'));assert.ok(!f.calls.includes('execute'));
+  assert.throws(()=>f.runtime.assertPreparationAllowed());
+ }
+});
 test('node drivers carry plain observations and typed outcomes through the real bridge parser',async()=>{
  let observed;
  const f=fixture({execute:async code=>{
