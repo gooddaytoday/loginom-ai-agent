@@ -1,0 +1,87 @@
+{
+  "observed_utc": "2026-10-17T17:19:34.050932+00:00",
+  "scope": "fresh non-model installation admission independently verified by Evaler; continuation decision requires canonical reducer and native comment binding",
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "report_id": "01a14ada-bf6c-706b-979e-1a69085d1709",
+  "author_task_id": "01a14acc-a52a-7677-8103-b843fe930f16",
+  "archive_attachment_id": "01a14ada-bf06-7202-8e75-9956b13a717c",
+  "archive_sha256": "bd6ce8633c6431e4fe41f79d7fe00bfdd734276f335bd18d4dc33245572b0d6c",
+  "archive_bytes": 647568,
+  "manifest_sha256": "d8566cf32ec230975f08967f50b1a05ef99accb5906e3a623585c7c1ce32a58a",
+  "payload_files_verified": 64,
+  "admission": "READY",
+  "ready_at": "2026-10-17T17:01:07.002Z",
+  "native_status": "ready",
+  "native_check": {
+    "ok": true,
+    "code": "LOGINOM_CONNECTION_VALID"
+  },
+  "both_native_exit_codes": 0,
+  "native_capture_original_archive_and_hashes_verified": true,
+  "native_process_proofs_confirmed": true,
+  "native_observed_processes": [
+    16,
+    31
+  ],
+  "native_unknown_and_binding_refusals": 0,
+  "native_two_final_remaining_each": [
+    0,
+    0
+  ],
+  "recorded_processes_absent": true,
+  "admission_history_files_verified": 2446,
+  "admission_history_DB_WAL_preserved": true,
+  "genuine_completion_sha256": "ed022225bc37fd00bc657b43110901909add32ba6c069339cf8c6edbf5fbd80f",
+  "original_completion_and_release_verified": true,
+  "ordinary_release": "2026-10-17T17:10:35.229Z",
+  "release_archive": "/home/user/.local/share/loginom-evals-runtime/operations/completed/9470d336-848c-4799-98d0-f45bba127dd2",
+  "unit": {
+    "pass": 646,
+    "skip": 15,
+    "fail": 0,
+    "typecheck": "PASS"
+  },
+  "actual_current_cli_entries_verified": 5389,
+  "actual_helper_files_verified": 1700,
+  "product_source_sha": "2e990a84aa25dc37a4e808da564be752aae6f564",
+  "harness_resume_sha": "a1eee8637d59a362582f3dd45c98adbb84ab46f3",
+  "common_documentary_sha": "f6532c40cadd358615a5d63f4952579364a0c560",
+  "common_published_clean_and_docs_only": true,
+  "config_path": "/home/user/.local/share/loginom-evals-runtime/operations/lab61-epoch-2e990a84a.json",
+  "config_raw_sha256": "d1ee77485a433b9340d33583e88d9185a4af0e1f6bcab03e2d99fb9365c8629d",
+  "old_failed_preflight_and_d6_config_pins_preserved": true,
+  "fresh_stand": {
+    "status": "healthy FREE",
+    "profiles_clean": 6,
+    "container_running": true,
+    "HTTP": 200,
+    "storage_backup_empty": true
+  },
+  "dependency_done_revision": 38,
+  "pending_workers_before_dispatch": [],
+  "only_active_task": "01a14ada-bf8e-7308-8a56-49e488dd7ec3",
+  "consumption_before": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 1,
+      "csv-ambiguous-headers": 0,
+      "initial-incomplete-settings": 0,
+      "missing-source-column": 0
+    },
+    "reference_total": 9,
+    "product_physical_calls": 0,
+    "recovery": 0,
+    "probes": 0,
+    "source_report_sha256": "ca1dd7e4f19edad8527c017e66590dd7eb74595ebc6ac1738962baf431af8bc4",
+    "historical_outcomes_preserved": true,
+    "budget_increases": []
+  },
+  "budget_increase_needed": false,
+  "new_model_reference_product_calls_by_Evaler": 0,
+  "preview_only_gate": "ready_to_dispatch; actual canonical decision ID must be the new published Evaler comment ID"
+}

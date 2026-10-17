@@ -1,0 +1,70 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "intent_id": "LAB61-RICH-CASE-CONTINUE-2e990a-01a14ada",
+  "kind": "explicit corrected product version continuation; retain historical reference provenance",
+  "original_blocked_report_id": "01a14a4b-b72a-786a-9b35-8c1daf44cecc",
+  "harness_resume_sha": "a1eee8637d59a362582f3dd45c98adbb84ab46f3",
+  "documentary_common_sha": "f6532c40cadd358615a5d63f4952579364a0c560",
+  "product_source_sha": "2e990a84aa25dc37a4e808da564be752aae6f564",
+  "product_version": "0.1.17-lab61.epoch.2e990a84",
+  "config_path": "/home/user/.local/share/loginom-evals-runtime/operations/lab61-epoch-2e990a84a.json",
+  "config_raw_sha256": "d1ee77485a433b9340d33583e88d9185a4af0e1f6bcab03e2d99fb9365c8629d",
+  "cli_bin": "/home/user/.local/share/loginom-evals-runtime/cli-rich-lab61-epoch-2e990a84aa25dc37a4e808da564be752aae6f564/bin/loginom-ai-agent-cli",
+  "EVAL_AGENT_MODEL": "openai/gpt-6-luna",
+  "EVAL_AGENT_VARIANT": "high",
+  "EVAL_NODE_OPS_CONFIG": "/home/user/.local/share/loginom-evals-runtime/operations/lab61-epoch-2e990a84a.json",
+  "new_version_basis": "Ben exact clean-source ACCEPT01a14a96 + independent OS ACCEPT01a14aba + operator apply verified + fresh installation READY01a14ada and genuine RELEASED/healthy FREE verified",
+  "reference_policy": {
+    "retained_cases": [
+      "txt-unclosed-quote",
+      "txt-wrong-encoding",
+      "txt-wrong-delimiter",
+      "txt-ambiguous-headers",
+      "csv-unclosed-quote",
+      "csv-wrong-encoding"
+    ],
+    "retained_cli_source": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+    "retained_provenance": "Preserve these six reference artifacts and their original hashes/version; they remain historical reference evidence for unchanged criteria and are not new-version product measurements. No new reference call assigned to these six.",
+    "new_case_next_global_attempt_number": {
+      "csv-wrong-delimiter": 2,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 1,
+      "missing-source-column": 1
+    },
+    "new_reference_cli_source": "2e990a84aa25dc37a4e808da564be752aae6f564",
+    "historical_total_calls": 9,
+    "reference_max_total_per_case": 3,
+    "no_limit_increase": true
+  },
+  "product_policy": {
+    "target": "Rich",
+    "cases": [
+      "txt-unclosed-quote",
+      "txt-wrong-encoding",
+      "txt-wrong-delimiter",
+      "txt-ambiguous-headers",
+      "csv-unclosed-quote",
+      "csv-wrong-encoding",
+      "csv-wrong-delimiter",
+      "csv-ambiguous-headers",
+      "initial-incomplete-settings",
+      "missing-source-column"
+    ],
+    "max_physical_calls_per_case_for_Rich": 1,
+    "consumed_before": 0,
+    "source": "2e990a84aa25dc37a4e808da564be752aae6f564",
+    "repeat": 1,
+    "infra_retry": false,
+    "Ben_live_product_authorized_now": false
+  },
+  "constraints": [
+    "Resume the case collection from clean exact a1, not product source or documentary branch; original20 TASK/input hashes and criteria unchanged.",
+    "Fresh own status/acquire/preflight on the new config before the first permitted stage; close and clean each own attempt, archive history and original journals; actual model/variant proof for all new model attempts.",
+    "Do not resume the historical unresolved AMBIGUOUS operation; csv-wrong-delimiter attempt2 is a fresh attempt after verified code/environment change. Preserve attempt1 and every FAIL/AMBIGUOUS outcome.",
+    "Preserve all counters/once/ledgers and global case attempt ordinals; reference max3/case, product1/case/role, recovery1/lease, rework_limit3 unchanged. Stop before an exhausted allowance; any later increase needs explicit old/new pre-effect decision.",
+    "Use diagnostic output mode, truthful known native refusal or complete factual damaged result. Never create fictitious reference package/cold or classify AMBIGUOUS as known refusal.",
+    "Protective/ops guard executable changes require separate TDD and independent exact-source review before effects; no lowering epoch/ownership/integrity/cleanup checks.",
+    "Do not integrate a1 into shared common as accepted. Return one exact clean author SHA/evidence covering all10 diagnostic cases with genuine completion/ordinary release/healthy FREE; full independent Ben acceptance is subsequent.",
+    "No rebuild, OS policy reload, model change, dev/main merge or product release."
+  ]
+}
