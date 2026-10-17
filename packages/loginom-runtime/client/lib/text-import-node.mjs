@@ -6,7 +6,7 @@ import {configureTextImportFields,configureTextImportPatch,validateTextImportFie
 import {withBrowserReceipt} from './executor.mjs';
 import {readOutputDefinitionPages,readImportDefinitionPages} from './import-definition-pages.mjs';
 import {makeRetainedImportSourceCode,makeRetainedImportFormatCode,verifyConfiguredImportContinuation,verifyMappedImportContinuation,finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from './node-import-continuation.mjs';
-import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
+import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable,restoreStoppedTableRead} from './node-output-procedure.mjs';
 import {readTableOutputPages} from './table-output-pages.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
 import {createNodeExecutionProcedure} from './node-execution-procedure.mjs';
@@ -254,8 +254,8 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRea
         if(read.ports.length===0)return verified({status:'complete',ports:[],no_output_requested:true,execution_id:executionReceipt.execution_id,evidence_ref:ctx.receipt_id});
         requireValue(read.ports.length===1&&read.ports[0]===0,'Text import has one data output');
         requireValue(Array.isArray(outputColumns)&&outputColumns.length>0,'Verified output mapping is unavailable');
-        const opened=await openNewOutputTable(channel,0);readView={table:opened.table,formatProof:null,restored:false};
-        const formatProof=read.require_exact_numbers?await configureTablePrecision(channel,opened.table):null;readView.formatProof=formatProof;
+        const opened=await openNewOutputTable(channel,0);readView={table:opened.table,formatProof:null,restored:false,formatting:{}};
+        const formatProof=read.require_exact_numbers?await configureTablePrecision(channel,opened.table,{progress:readView.formatting}):null;readView.formatProof=formatProof;
         let readSettings,data,formatRestoration,raw;
         try {
           readSettings=await prepareTableRead(channel,opened.table);
@@ -274,8 +274,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRea
         signal?.throwIfAborted();
         const view=state.pending.phase==='read'?readView:null;
         return releasePendingNode({operation,channel,readReceipt,restoreRead:view?async()=>{
-          if(view.formatProof&&!view.restored){await restoreTablePrecision(channel,view.formatProof);view.restored=true;}
-          await returnFromOutputTable(channel,view.table);readView=null;return true;
+          await restoreStoppedTableRead(channel,view);readView=null;return true;
         }:undefined});
       },
       async verifyContinuation(state,{signal}={}) {
