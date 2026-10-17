@@ -112,7 +112,7 @@ export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,e
  need(new Set(actual.map(a=>JSON.stringify([a.node.node_id,a.output_port??0]))).size===actual.length,'COLD_DUPLICATE_OUTPUT_PORT');
  const used=new Set(),matches=[];
  for(const [index,want] of outputs.entries()){
-  const port=want.output_port??0;
+  const port=want.output_node_type==='export_input'?exportInput?.output_port:want.output_port??0;
   const candidates=actual.filter(a=>(want.output_node_type==='export_input'
    ?exportInput&&a.node.node_id===exportInput.node.ref.node_id&&(a.output_port??0)===exportInput.output_port
    :a.type===want.output_node_type&&(a.output_port??0)===port

@@ -37,6 +37,15 @@ test('missing or ambiguous export, connection, source and port refuse before out
  }
 });
 
+test('export from filter output 1 preserves the connected port for cold readback lookup',()=>{
+ const g={complete:true,nodes:[node('filter','transform.filter_data',[0,1]),node('export','exports.text',[])],
+  links:[{source:'filter',output:1,target:'export',input:0}]};
+ const readback=actual('filter',1),binding=resolveExportInput(g);
+ const [match]=matchExpectedOutputs([readback],[output],{exportInput:binding});
+ assert.equal(match.output_port,1);
+ assert.equal([readback].find(a=>a.node.node_id===match.node.node_id&&a.output_port===match.output_port),readback);
+});
+
 test('ordinary outputs retain type, label and port matching beside an export input',()=>{
  const binding=resolveExportInput(graph()),ordinary={...output,output_node_type:'transform.filter_data',output_node_label:'Original',output_port:0};
  const filter={...actual('filter',0),label:'Original'};
