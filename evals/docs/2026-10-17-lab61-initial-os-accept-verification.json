@@ -1,0 +1,102 @@
+{
+  "at": "2026-10-17T20:01:07.526289+00:00",
+  "kind": "exact_OS_source_ACCEPT_and_addressed_operator_handoff_admission",
+  "review_report_id": "01a14b72-8150-73da-8b69-1212bf6a5524",
+  "verdict": "ACCEPT_OS_SOURCE_ONLY",
+  "os_source_sha": "04a39fb867ceb6c10af26e46a8980063fdda9a3a",
+  "product_source_sha": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "archive_sha256": "e96073dbd91eac5f4d01facba880378d0cf02648daf5f7f7fe21177980ea7d47",
+  "payload_hashes_verified": 64,
+  "manifest_sha256": "88e371bb2c4f70252adceb2dfdf1537c0548dcab5fa69c73786d32a4f9cff5e8",
+  "independent_negative_count": 49,
+  "independent_parser_calls": 8,
+  "parser_effect_scope_verified_from_delivered_results": true,
+  "binding": {
+    "scope": "OFFLINE exact OS proposal source review",
+    "source": "04a39fb867ceb6c10af26e46a8980063fdda9a3a",
+    "parent_product": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+    "source_clean": true,
+    "payload_hashes_verified": 42,
+    "cli_entries_verified": 5389,
+    "resource_entries_verified": 4394,
+    "runtime_source_files_compared": 260,
+    "source_tree_sha256": "04dd1fbfb63a21bb09c84b6c1d4fca4af459789fa6e0e5b365e3bd3710cd0416",
+    "source_snapshot_files": 12760,
+    "chrome_path": "/home/user/.local/share/loginom-evals-runtime/cli-rich-lab61-initial-a2ba3d0fc8de25c50e497233506b4a6e4f50e06d/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+    "chrome_sha256": "8c599d43aec53f2460a31ae2f4af6bd863f8258b34ff519564bc5d4726bfaa1e",
+    "policy_sha256": "5cd834b0b2660fcf952997513c99fa87f86f2c88648c237e4f6e4d1dd0c95c74",
+    "manifest_sha256": "96763b4b8aaae92642cbd9c624df47a10b2d09bc0a47762c870e2671a51d7bf8",
+    "resource_manifest_sha256": "5359de7aacf8590c8a77cb97d48f287c31e9402d0343f12e52712d519cfe23b5",
+    "binary_sha256": "1e49d62432ac1803ad7e154a48b01f099cd443b44d72e257cb9166390706dfca",
+    "config_raw_sha256": "e91a5c0aa9b47ae61b85b8d7d12319dfc441a6fe6940f508ec28fe4c1d8b16d0",
+    "config_canonical_sha256": "e7b0dbce4c637d220e244fadf7a50edfa55c79f549914aa8b45f7a19157c8e23",
+    "sidecar_sha256": "58e11f1242cf3b46723395095e214ee5b80de1aece9e4439a14efa59aa32b565",
+    "config_changed_paths": [
+      "/roles/rich/cliBin",
+      "/roles/ben/cliBin"
+    ],
+    "baseline_policy_sha256": "bf25939f9c3599827417fcbbdb2d269867c7fc9fba79249f4c02f5cfc2f973e9",
+    "d6_policy_sha256": "f83e9f1b98972892f1d675267845341a6c6ec4f4528e41cddf1c1ffe78cf217c",
+    "new_browser_cli_build_install_native_calls": 0,
+    "remote_readback": "not attempted or asserted; exact bundle/local Git verified"
+  },
+  "current_pins_and_source_rechecked": true,
+  "policy_bytes": 286,
+  "target_file_absent_before_handoff": true,
+  "kernel_profile_inventory": "not inspected or claimed by Evaler; operator must capture before effects",
+  "restriction": "1",
+  "own_OS_effects": 0,
+  "remote_exact_readback_now": {
+    "common": "aa79366628da379db6109b48439888f336d8fc45",
+    "os": "04a39fb867ceb6c10af26e46a8980063fdda9a3a"
+  },
+  "queues_empty_except_current_Evaler": true,
+  "LAB60_done_revision38": true,
+  "health": {
+    "at": "2026-10-17T20:00:07.118Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-17T20:00:06.237Z"
+    }
+  },
+  "consumption_unchanged": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 3,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 1,
+      "missing-source-column": 1
+    },
+    "reference_total": 14,
+    "product_physical_calls": 0,
+    "recovery": 0,
+    "probes": 0,
+    "source_report_sha256": "7d6de2aff7dce731f4ee448ca31bb807875d223e07365b93cc2d7fe47a0018b5",
+    "historical_outcomes_preserved": true,
+    "budget_increases": [],
+    "source_report_id": "01a14b00-2630-7e58-8cd1-66fbcb718ee2"
+  },
+  "main_case_state_unchanged": true,
+  "scope": "owner-appointed coordinator addressed exact OS install/load/verify only; no native admission/browser/lease/model/reference/product/case continuation",
+  "operator_member_id": "2ea8db17-3196-431f-b1e9-880afe84e2e1"
+}

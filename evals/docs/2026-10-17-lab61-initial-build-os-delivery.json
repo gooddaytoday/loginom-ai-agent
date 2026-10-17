@@ -1,0 +1,23 @@
+{
+  "observed_utc": "2026-10-17T19:56:15.356742+00:00",
+  "scope": "Root delivery and actual immutable installation integrity only; independent OS review/native admission/case acceptance remain separate",
+  "source": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "proposal": "04a39fb867ceb6c10af26e46a8980063fdda9a3a",
+  "archive_sha256": "1a93d324d2569b4cb32fbbd45c3b04f87ddff3e699b214d335b0c0f84c808529",
+  "archive_bytes": 468205,
+  "payload_count": 42,
+  "manifest_sha256": "93c213caa664ae0a504f4d8b0dc2869a098e88dd410aeea5a5f537698f6280d6",
+  "payload_bytes_hashes_and_exact_membership_verified": true,
+  "actual_cli_entries_bytes_modes_links_verified": 5389,
+  "actual_resources_bytes_verified": 4394,
+  "actual_installed_runtime_source_equal_exact_git_blobs": 260,
+  "actual_config_changed_paths": [
+    "/roles/ben/cliBin",
+    "/roles/rich/cliBin"
+  ],
+  "policy_equal_exact_git_payload_sha256": "5cd834b0b2660fcf952997513c99fa87f86f2c88648c237e4f6e4d1dd0c95c74",
+  "policy_bytes": 286,
+  "bundle_parent_verified": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "browser_lease_native_admission_model_calls": 0,
+  "operator_observation_error_preserved": "One read-only card parser assumed metadata evaler.state was an object; observed string encoding and corrected parser, no task dispatch or state mutation."
+}

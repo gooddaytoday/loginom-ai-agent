@@ -1,0 +1,16 @@
+{
+  "observed_utc": "2026-10-17T20:00:13.059280+00:00",
+  "scope": "Root integrity of independent Ben exact OS source review delivery, not kernel application or native admission",
+  "report_id": "01a14b72-8150-73da-8b69-1212bf6a5524",
+  "candidate": "04a39fb867ceb6c10af26e46a8980063fdda9a3a",
+  "product_source": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "archive_sha256": "e96073dbd91eac5f4d01facba880378d0cf02648daf5f7f7fe21177980ea7d47",
+  "archive_bytes": 115257,
+  "manifest_sha256": "88e371bb2c4f70252adceb2dfdf1537c0548dcab5fa69c73786d32a4f9cff5e8",
+  "payload_count": 64,
+  "all_payload_bytes_hashes_exact_membership_verified": true,
+  "independent_Ben_reported_negative_controls": 49,
+  "parser_calls": 8,
+  "kernel_cache_writes_by_root": 0,
+  "OS_apply_native_admission_case_acceptance_not_implied": true
+}

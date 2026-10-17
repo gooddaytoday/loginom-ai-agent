@@ -1,0 +1,224 @@
+{
+  "at": "2026-10-17T19:36:22.346738+00:00",
+  "kind": "exact_source_ACCEPT_and_next_build_stage_admission",
+  "review_report_id": "01a14b5b-c575-7dd6-ba88-c037135e4abd",
+  "source_sha": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "parent_sha": "4070ca4a70c03bf4fcb0024fa860e3bac987b547",
+  "initial_base_sha": "2e990a84aa25dc37a4e808da564be752aae6f564",
+  "verdict": "ACCEPT_SOURCE_ONLY",
+  "finding_closed": "BEN-INITIAL-OWNER-01",
+  "prior_REJECT_preserved": "01a14b4c-009e-7d09-bda9-36c0b5b12e00",
+  "archive_sha256": "8bc7a4744d0c3dc608c969da804c24a3716accf44f54572bc834f5e08ed89819",
+  "payload_hashes_verified": 58,
+  "manifest_sha256": "4c33ddd2427f0644fd4cdc3a29b9c701eb9ae1b223178e2138667699484e2ff2",
+  "original_Ben_tests_byte_identical": true,
+  "raw_review_outcomes_verified": [
+    {
+      "variant": "node_tid",
+      "red": "FAILED/cleanup=true",
+      "green": "AMBIGUOUS/cleanup=false/pending configure",
+      "close_gestures": 0
+    },
+    {
+      "variant": "path_tid",
+      "red": "FAILED/cleanup=true",
+      "green": "AMBIGUOUS/cleanup=false/pending configure",
+      "close_gestures": 0
+    },
+    {
+      "variant": "path_label",
+      "red": "FAILED/cleanup=true",
+      "green": "AMBIGUOUS/cleanup=false/pending configure",
+      "close_gestures": 0
+    }
+  ],
+  "test_results": {
+    "ben-predicate-boundaries": {
+      "argv": [
+        "/home/user/.local/share/loginom-evals-runtime/node-v24.19.0-linux-x64/bin/node",
+        "--test",
+        "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/owner-rereview-work/green-tests/ben-predicate-boundaries.test.mjs"
+      ],
+      "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/owner-rereview-work/green-source/packages/loginom-runtime",
+      "timeout_seconds": 90,
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 16.974980077007785,
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "skipped": 0
+    },
+    "ben-prior-negative": {
+      "argv": [
+        "/home/user/.local/share/loginom-evals-runtime/node-v24.19.0-linux-x64/bin/node",
+        "--test",
+        "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/owner-rereview-work/green-tests/ben-negative.test.mjs",
+        "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/owner-rereview-work/green-tests/ben-confirmation.test.mjs"
+      ],
+      "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/owner-rereview-work/green-source/packages/loginom-runtime",
+      "timeout_seconds": 90,
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 32.26980126998387,
+      "tests": 33,
+      "pass": 33,
+      "fail": 0,
+      "skipped": 0
+    },
+    "guard-regression": {
+      "argv": [
+        "/home/user/.local/share/loginom-evals-runtime/node-v24.19.0-linux-x64/bin/node",
+        "--test",
+        "client/test/node-procedure.test.mjs",
+        "client/test/node-wizard-close.test.mjs",
+        "client/test/user-workflow.test.mjs",
+        "client/test/node-api.test.mjs",
+        "client/test/upload-lineage.test.mjs",
+        "client/test/node-target.test.mjs",
+        "client/test/node-import-continuation.test.mjs"
+      ],
+      "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/owner-rereview-work/green-source/packages/loginom-runtime",
+      "timeout_seconds": 150,
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 0.6654976608697325,
+      "tests": 179,
+      "pass": 179,
+      "fail": 0,
+      "skipped": 0
+    },
+    "import-regression": {
+      "argv": [
+        "/home/user/.local/share/loginom-evals-runtime/node-v24.19.0-linux-x64/bin/node",
+        "--test",
+        "client/test/text-import-node.test.mjs",
+        "client/test/text-import-patch.test.mjs",
+        "client/test/text-import-format-recovery.test.mjs",
+        "client/test/text-import-source-replacement.test.mjs",
+        "client/test/node-apply.test.mjs",
+        "client/test/node-apply-runtime.test.mjs",
+        "client/test/text-import-initial-new-lifecycle.test.mjs"
+      ],
+      "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/owner-rereview-work/green-source/packages/loginom-runtime",
+      "timeout_seconds": 180,
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 1.068713123910129,
+      "tests": 307,
+      "pass": 307,
+      "fail": 0,
+      "skipped": 0
+    },
+    "initial-green": {
+      "argv": [
+        "/home/user/.local/share/loginom-evals-runtime/node-v24.19.0-linux-x64/bin/node",
+        "--test",
+        "client/test/text-import-initial-new-lifecycle.test.mjs"
+      ],
+      "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/owner-rereview-work/green-source/packages/loginom-runtime",
+      "timeout_seconds": 90,
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 0.7724619179498404,
+      "tests": 70,
+      "pass": 70,
+      "fail": 0,
+      "skipped": 0
+    },
+    "owner-green": {
+      "argv": [
+        "/home/user/.local/share/loginom-evals-runtime/node-v24.19.0-linux-x64/bin/node",
+        "--test",
+        "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/owner-rereview-work/green-tests/ben-readiness-owner.test.mjs"
+      ],
+      "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/owner-rereview-work/green-source/packages/loginom-runtime",
+      "timeout_seconds": 60,
+      "exit_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 0.2142341979779303,
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0
+    },
+    "owner-red": {
+      "argv": [
+        "/home/user/.local/share/loginom-evals-runtime/node-v24.19.0-linux-x64/bin/node",
+        "--test",
+        "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/owner-rereview-work/red-tests/ben-readiness-owner.test.mjs"
+      ],
+      "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/owner-rereview-work/red-source/packages/loginom-runtime",
+      "timeout_seconds": 60,
+      "exit_code": 1,
+      "timed_out": false,
+      "elapsed_seconds": 0.21424380596727133,
+      "tests": 4,
+      "pass": 1,
+      "fail": 3,
+      "skipped": 0
+    }
+  },
+  "own_test_rerun": false,
+  "previous_full_source_manifest_verification_sha256": "1096615c1ceb5b2df8d7243d4a8ac0b4f7d1006e1979ca0e24f01d9c334e3373",
+  "current_source_clean_exact": true,
+  "queues_empty_except_current_Evaler": true,
+  "LAB60_done_revision38": true,
+  "health": {
+    "at": "2026-10-17T19:35:22.035Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-17T19:35:21.156Z"
+    }
+  },
+  "common_documentary_sha": "aa79366628da379db6109b48439888f336d8fc45",
+  "next_stage": {
+    "target": "Rich",
+    "source": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+    "version": "0.1.17-lab61.initial.a2ba3d0f",
+    "immutable_root": "/home/user/.local/share/loginom-evals-runtime/cli-rich-lab61-initial-a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+    "config": "/home/user/.local/share/loginom-evals-runtime/operations/lab61-initial-a2ba3d0f.json",
+    "scope": "immutable build/install/resources/binary/manifest/config/pins plus separate OFFLINE exact AppArmor proposal; no lease/browser/native admission/model/case continuation",
+    "os_old_policy_sha256": "bf25939f9c3599827417fcbbdb2d269867c7fc9fba79249f4c02f5cfc2f973e9",
+    "os_review_and_operator_apply_separate": true
+  },
+  "consumption_unchanged": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 3,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 1,
+      "missing-source-column": 1
+    },
+    "reference_total": 14,
+    "product_physical_calls": 0,
+    "recovery": 0,
+    "probes": 0,
+    "source_report_sha256": "7d6de2aff7dce731f4ee448ca31bb807875d223e07365b93cc2d7fe47a0018b5",
+    "historical_outcomes_preserved": true,
+    "budget_increases": [],
+    "source_report_id": "01a14b00-2630-7e58-8cd1-66fbcb718ee2"
+  },
+  "main_case_state_unchanged": true,
+  "full_ten_case_acceptance_pending": true
+}

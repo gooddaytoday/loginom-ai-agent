@@ -1,0 +1,106 @@
+{
+  "schema": "operator-source-accept-delivery/v1",
+  "at": "2026-10-17T19:45:56.634010+00:00",
+  "issue": "LAB-61",
+  "source": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "direct_parent": "4070ca4a70c03bf4fcb0024fa860e3bac987b547",
+  "initial_base": "2e990a84aa25dc37a4e808da564be752aae6f564",
+  "bundle_verified": true,
+  "all_runtime_git_blobs_verified": 1243,
+  "root_tree": "ed1c6b3c7bfbfd4cdd7f564b58cbb4af584cf1af",
+  "changed_files": [
+    "packages/loginom-runtime/client/lib/text-import-node.mjs",
+    "packages/loginom-runtime/client/test/text-import-initial-new-lifecycle.test.mjs"
+  ],
+  "archives": [
+    {
+      "folder": "lab61-owner-rework-a2ba3d0f-evidence",
+      "archive": "lab61-owner-rework-a2ba3d0f.zip",
+      "archive_sha256": "b1ee966f425bc7dd5e7c5b281a7a183a7e7be0aa2bebfcf00fa7198b6ec4d854",
+      "archive_bytes": 703113,
+      "payload_files_verified": 82,
+      "manifest_member": "MANIFEST.json",
+      "manifest_sha256": "48b536a327f3807af786d81b440f93f5c8927a3b816bb1d1de14c68b1b53ed18",
+      "proof_names": [
+        "ben-green/ben-readiness-owner-raw-node_tid.json",
+        "ben-green/ben-readiness-owner-raw-path_label.json",
+        "ben-green/ben-readiness-owner-raw-path_tid.json",
+        "ben-green/ben-readiness-owner-raw-unchanged.json",
+        "ben-green/ben-readiness-owner.test.mjs",
+        "ben-red/ben-readiness-owner-raw-node_tid.json",
+        "ben-red/ben-readiness-owner-raw-path_label.json",
+        "ben-red/ben-readiness-owner-raw-path_tid.json",
+        "ben-red/ben-readiness-owner-raw-unchanged.json",
+        "ben-red/ben-readiness-owner.test.mjs",
+        "candidate.bundle",
+        "green-fixtures/readiness-owner-node_tid.json",
+        "green-fixtures/readiness-owner-path_label.json",
+        "green-fixtures/readiness-owner-path_tid.json",
+        "green-fixtures/readiness-owner-unchanged.json",
+        "red-fixtures/readiness-owner-node_tid.json",
+        "red-fixtures/readiness-owner-path_label.json",
+        "red-fixtures/readiness-owner-path_tid.json",
+        "red-fixtures/readiness-owner-unchanged.json",
+        "runtime-source-manifest.json"
+      ]
+    },
+    {
+      "folder": "lab61-ben-owner-rereview-a2ba3d0f-evidence",
+      "archive": "lab61-ben-owner-rereview-a2ba3d0f.zip",
+      "archive_sha256": "8bc7a4744d0c3dc608c969da804c24a3716accf44f54572bc834f5e08ed89819",
+      "archive_bytes": 260310,
+      "payload_files_verified": 58,
+      "manifest_member": "EVIDENCE-MANIFEST.json",
+      "manifest_sha256": "4c33ddd2427f0644fd4cdc3a29b9c701eb9ae1b223178e2138667699484e2ff2",
+      "proof_names": [
+        "delivery/candidate.bundle",
+        "delivery/runtime-source-manifest.json",
+        "green-tests/ben-readiness-owner-raw-node_tid.json",
+        "green-tests/ben-readiness-owner-raw-path_label.json",
+        "green-tests/ben-readiness-owner-raw-path_tid.json",
+        "green-tests/ben-readiness-owner-raw-unchanged.json",
+        "green-tests/ben-readiness-owner.test.mjs",
+        "independent-expectations.json",
+        "initial-source-review-expectations.json",
+        "owner-rereview-expectations.json",
+        "prior-review/ben-readiness-owner-exit.json",
+        "prior-review/ben-readiness-owner.log",
+        "red-tests/ben-readiness-owner-raw-node_tid.json",
+        "red-tests/ben-readiness-owner-raw-path_label.json",
+        "red-tests/ben-readiness-owner-raw-path_tid.json",
+        "red-tests/ben-readiness-owner-raw-unchanged.json",
+        "red-tests/ben-readiness-owner.test.mjs",
+        "scope-results.json"
+      ]
+    }
+  ],
+  "ben_green_raw_verified": [
+    {
+      "variant": "node_tid",
+      "status": "AMBIGUOUS",
+      "cleanup_complete": false,
+      "pending_phase": "configure",
+      "close_gestures": 0,
+      "raw_sha256": "ea5cc678df0f372b3bd53ceea2bbcfac93e70d962ccbd41ac309cc4c07867430"
+    },
+    {
+      "variant": "path_tid",
+      "status": "AMBIGUOUS",
+      "cleanup_complete": false,
+      "pending_phase": "configure",
+      "close_gestures": 0,
+      "raw_sha256": "13f6f68f33a7132c7740ccb9bec06ee8260c010ff81a2e6d34219146e30e4de1"
+    },
+    {
+      "variant": "path_label",
+      "status": "AMBIGUOUS",
+      "cleanup_complete": false,
+      "pending_phase": "configure",
+      "close_gestures": 0,
+      "raw_sha256": "a3671e0abb9ae5d47a47f910d60b3802b51731428fa52c97b208f64cc0317917"
+    }
+  ],
+  "original_ben_reproducer_byte_identical": "e8dad1ed7a6ba44d40447890bd271b6de7545c36b6bad996aae51da91765ada8",
+  "native_evaler_source_accept_verification_sha256": "dccfe752c501b3970d333ff1f3d46f333c27b2e66dd75c49f915b2809d51c395",
+  "scope": "Delivered source and independent Ben evidence integrity only. Ben source ACCEPT is separate from full10case acceptance; no build/browser/lease/live/model action by operator."
+}

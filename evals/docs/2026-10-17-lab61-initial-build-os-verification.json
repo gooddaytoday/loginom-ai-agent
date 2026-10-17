@@ -1,0 +1,89 @@
+{
+  "at": "2026-10-17T19:52:11.070453+00:00",
+  "kind": "OS_proposal_delivery_admission_for_independent_review_only",
+  "author_report_id": "01a14b68-b9e2-7dbc-aa79-a2485f31d41e",
+  "source_accept_report_id": "01a14b5b-c575-7dd6-ba88-c037135e4abd",
+  "archive_sha256": "1a93d324d2569b4cb32fbbd45c3b04f87ddff3e699b214d335b0c0f84c808529",
+  "delivery_installation_verification": {
+    "at": "2026-10-17T19:51:38.727874+00:00",
+    "payloads_verified": 42,
+    "evidence_manifest_sha256": "93c213caa664ae0a504f4d8b0dc2869a098e88dd410aeea5a5f537698f6280d6",
+    "cli_entries_hashes_and_lstat_modes_and_links_verified": 5389,
+    "resources_verified": 4394,
+    "runtime_sources_git_and_installed_verified": 260,
+    "manifest_sha256": "96763b4b8aaae92642cbd9c624df47a10b2d09bc0a47762c870e2671a51d7bf8",
+    "resource_manifest_sha256": "5359de7aacf8590c8a77cb97d48f287c31e9402d0343f12e52712d519cfe23b5",
+    "binary_sha256": "1e49d62432ac1803ad7e154a48b01f099cd443b44d72e257cb9166390706dfca",
+    "config_raw_sha256": "e91a5c0aa9b47ae61b85b8d7d12319dfc441a6fe6940f508ec28fe4c1d8b16d0",
+    "config_delta_only_Rich_Ben_cliBin": true,
+    "pins_sha256": "58e11f1242cf3b46723395095e214ee5b80de1aece9e4439a14efa59aa32b565",
+    "os_source": "04a39fb867ceb6c10af26e46a8980063fdda9a3a",
+    "product_source": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+    "source_clean_two_files_only": true,
+    "policy_sha256": "5cd834b0b2660fcf952997513c99fa87f86f2c88648c237e4f6e4d1dd0c95c74",
+    "old_policy_exact_substitutions_only": true,
+    "browser_path": "/home/user/.local/share/loginom-evals-runtime/cli-rich-lab61-initial-a2ba3d0fc8de25c50e497233506b4a6e4f50e06d/resources/loginom/browsers/chromium-1243/chrome-linux64/chrome",
+    "browser_sha256": "8c599d43aec53f2460a31ae2f4af6bd863f8258b34ff519564bc5d4726bfaa1e",
+    "bundle_verified": true,
+    "policy_not_applied_by_evaler": true,
+    "native_cli_calls_by_evaler": 0,
+    "verification_notes": [
+      "initial verifier incorrectly used target stat mode for symlink; actual manifest mode is lstat/link mode, verified with link text and target byte hash",
+      "two current git remote reads timed out; gh unavailable; author exact remote receipt retained; review uses verified bundle/local Git"
+    ]
+  },
+  "source_review_pending": true,
+  "installation_native_admission": "NOT_RUN",
+  "source_ready_does_not_imply_full_case_ACCEPT": true,
+  "os_review_scope": "independent exact04a39fb8 against parent/producta2ba; read-only pins/bytes; parser no kernel/cache writes; negative bounds controls on copies",
+  "common_documentary_sha_local_verified": "aa79366628da379db6109b48439888f336d8fc45",
+  "remote_readback_now": "two bounded git calls exit124; gh unavailable; author delivered exact remote proof retained; no guessed current remote state",
+  "queues_empty_except_current_Evaler": true,
+  "LAB60_done_revision38": true,
+  "health": {
+    "at": "2026-10-17T19:49:36.713Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-17T19:49:35.834Z"
+    }
+  },
+  "consumption_unchanged": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 3,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 1,
+      "missing-source-column": 1
+    },
+    "reference_total": 14,
+    "product_physical_calls": 0,
+    "recovery": 0,
+    "probes": 0,
+    "source_report_sha256": "7d6de2aff7dce731f4ee448ca31bb807875d223e07365b93cc2d7fe47a0018b5",
+    "historical_outcomes_preserved": true,
+    "budget_increases": [],
+    "source_report_id": "01a14b00-2630-7e58-8cd1-66fbcb718ee2"
+  },
+  "main_case_state_unchanged": true,
+  "os_apply_browser_lease_native_admission_model_reference_product_closed": true
+}
