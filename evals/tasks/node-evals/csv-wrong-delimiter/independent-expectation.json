@@ -1,0 +1,24 @@
+{
+  "case_id": "csv-wrong-delimiter",
+  "input": "data/wrong_delimiter.csv",
+  "bytes": 20,
+  "sha256": "92441055dd7d146da19c049e44e6632d6977eb67ae06d7237786ea4439515cbb",
+  "task_sha256": "992aa0e51114d091d33de5411bdbf1a9c6309e1819ba19a0f6228c3bfd00d74b",
+  "native_warning_required": false,
+  "unknown_effect_acceptable": false,
+  "cleanup_required": true,
+  "independent_source_status": "one_column_with_assigned_comma",
+  "parsed_table": [
+    [
+      "Id|Name"
+    ],
+    [
+      "001|value"
+    ]
+  ],
+  "requested_fields": [
+    "Id",
+    "Name"
+  ],
+  "acceptable_outcome": "known binding/count refusal before Execute; no settings applied; owned draft discarded"
+}

@@ -1,0 +1,14 @@
+{
+  "case_id": "missing-source-column",
+  "basis": "original TASK and input bytes; independent Python stdlib parsing before model",
+  "program_sha256": "bd3e397e609d3ddabe156af30fbec477276369b8d8b25946409c089924ea5b47",
+  "task_sha256": "eafccf80d1feb72b4b271c30bd6db3300946e3037001adefbd8718e551e89048",
+  "inputs": [
+    {
+      "path": "data/ambiguous_headers.txt",
+      "sha256": "c7519031b5932dc11febfd15807c8205d9892229ab7913321eea7d96eabd7bba"
+    }
+  ],
+  "independent_expectation_sha256": "6cec91211582674dd7cd28c39965c26a69ead1c6af3c604fc11c31109a936b9c",
+  "recorded_before_reference_dispatch": true
+}

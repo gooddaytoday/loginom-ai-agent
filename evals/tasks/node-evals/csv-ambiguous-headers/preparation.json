@@ -1,0 +1,45 @@
+{
+  "source_path": "technical/csv/csv-ambiguous-headers",
+  "source_archive_sha256": "18f4e8fe6b86517d8d26c646547b7a58c514c9009c07eb378f9e3df2d5fe63ea",
+  "original_files": [
+    {
+      "path": "PROVENANCE.md",
+      "bytes": 1756,
+      "sha256": "6ea6223b82f9214d8ce48e0f244b7ea179cd45ef368459c9ddfa43427f1b950a"
+    },
+    {
+      "path": "SPEC.json",
+      "bytes": 1331,
+      "sha256": "36a39e5a62f4b220acf5a536d7f7431ff6a121a6f9b5e385df7b039237039460"
+    },
+    {
+      "path": "SPEC.md",
+      "bytes": 5950,
+      "sha256": "ab92d783f070e3cef3d60debe1a42b36fa1adfba2235a6d888ce918bacee5820"
+    },
+    {
+      "path": "TASK.md",
+      "bytes": 3840,
+      "sha256": "cbe4295bbf4b4712a54ff1ea2fdd905e9d55965709318e091ae8cb11cb4257ec"
+    },
+    {
+      "path": "data/ambiguous_headers.csv",
+      "bytes": 23,
+      "sha256": "c7519031b5932dc11febfd15807c8205d9892229ab7913321eea7d96eabd7bba"
+    },
+    {
+      "path": "expected/OUTCOME.md",
+      "bytes": 1139,
+      "sha256": "71664e77e5e9516f885791d72e7046bb9b9ad4bb582cff42090dab3b2b7f8607"
+    },
+    {
+      "path": "expected/outcome.json",
+      "bytes": 680,
+      "sha256": "d588295ddbdc622ebc45526e42d7e417f88046c3aa74f4c58dc6388e5799f549"
+    }
+  ],
+  "adaptations": [
+    "removed create/execute/save lifecycle from request rejection"
+  ],
+  "runtime": "NOT_RUN"
+}

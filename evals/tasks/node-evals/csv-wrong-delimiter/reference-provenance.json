@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "case_id": "csv-wrong-delimiter",
+  "output_mode": "diagnostic",
+  "builder_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-wrong-delimiter-3/csv-wrong-delimiter/3",
+  "reference_attempt_number": 3,
+  "reference_attempts_consumed": 3,
+  "reference_limit": 3,
+  "source_harness_sha": "a1eee8637",
+  "source_harness_dirty": false,
+  "session_id": "ses_eb5145e2fffeNeBj2c0iFJzUd2",
+  "actual_model": {
+    "providerID": "openai",
+    "modelID": "gpt-6-luna",
+    "variant": "high",
+    "proof_sha256": "d8d956dfeabb51c87084755af2b3af07e69f9ab2175e6f991c5fccb839b7d5d2"
+  },
+  "cli_pin": {
+    "sourceCommit": "2e990a84aa25dc37a4e808da564be752aae6f564",
+    "sourceDirty": false,
+    "sourceTreeSha256": "0e1e2ece1e2d2b8c4cd353eb8344e3501c1039417d9efa5f512333fb3776da8c",
+    "version": "0.1.17-lab61.epoch.2e990a84",
+    "manifestSha256": "20d688b6f84877567fed15a9f276e6c756f77083d0b98af5f2632289af351f6b",
+    "binarySha256": "e7e10104d7cc8e9502253489c832e97e6be2cf3471d71c3b5e86c677ea91dfcb",
+    "resourceManifestSha256": "82aef8ce0998acba1803187297700d173f193b5a27e30c743b33a2990d0c7152",
+    "files_verified": 5389
+  },
+  "product_skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+  "action_manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+  "warm": "PASS",
+  "negative_checks_sha256": "2f0a3820edb54e908cf0399900752ec0dc48f54d684c73e0e92bce80b93971c7",
+  "cold": "NOT_APPLICABLE: diagnostic contract",
+  "reference_package": "NOT_REQUIRED: diagnostic contract",
+  "observed_package_sha256": null,
+  "cleanup": {
+    "status": "confirmed",
+    "sha256": "57993827a209ff4965a77f170404fef9b18d09cdab3f5724a5c0a8b25d14bed7"
+  },
+  "prompt_sha256": "6e0536bb6d174238fbf96d17600cafbec1f90b380334c65e7e4e5afd6b74be2e",
+  "methodology_version": "1.0.7",
+  "operational_release": "bound separately after genuine stage completion; no early release claim",
+  "validation_harness_sha": "a1eee8637d59a362582f3dd45c98adbb84ab46f3",
+  "checker_sha256": "7c2d07f3d9ff1204f6126e4e21a151bc5118b4470953d1a115bfd91ed6aa26e0",
+  "native_refusal_negatives_sha256": "808afe5f0cc896ea9e8bf33a67f73181d3cd6c0f0a7cc63dc8bd6896db6e3e1e"
+}

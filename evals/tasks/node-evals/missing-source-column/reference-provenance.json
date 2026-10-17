@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "case_id": "missing-source-column",
+  "output_mode": "diagnostic",
+  "builder_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-missing-source-column-1/missing-source-column/1",
+  "reference_attempt_number": 1,
+  "reference_attempts_consumed": 1,
+  "reference_limit": 3,
+  "source_harness_sha": "a1eee8637",
+  "source_harness_dirty": false,
+  "session_id": "ses_eb509a69cffeUih04lj5der2vf",
+  "actual_model": {
+    "providerID": "openai",
+    "modelID": "gpt-6-luna",
+    "variant": "high",
+    "proof_sha256": "5ba81a472f0e4fe200c5806cb6f9e630e7be33332ccd2ba5161f073470c5ff67"
+  },
+  "cli_pin": {
+    "sourceCommit": "2e990a84aa25dc37a4e808da564be752aae6f564",
+    "sourceDirty": false,
+    "sourceTreeSha256": "0e1e2ece1e2d2b8c4cd353eb8344e3501c1039417d9efa5f512333fb3776da8c",
+    "version": "0.1.17-lab61.epoch.2e990a84",
+    "manifestSha256": "20d688b6f84877567fed15a9f276e6c756f77083d0b98af5f2632289af351f6b",
+    "binarySha256": "e7e10104d7cc8e9502253489c832e97e6be2cf3471d71c3b5e86c677ea91dfcb",
+    "resourceManifestSha256": "82aef8ce0998acba1803187297700d173f193b5a27e30c743b33a2990d0c7152",
+    "files_verified": 5389
+  },
+  "product_skill_revision": "907ff16bc39752f808b8ab6d3caf06c57f21f605f0da0fe238fff5975a41b148",
+  "action_manifest_sha256": "17764f9a8137b199e4d89d4bdeea1a004778f825d50bfba6b68d64a9f5a588a4",
+  "warm": "PASS",
+  "negative_checks_sha256": "7fa2c31ad3c6b760b1c0422d4432da87aa32f59a0b6faa5f668201d0fae990d2",
+  "cold": "NOT_APPLICABLE: diagnostic contract",
+  "reference_package": "NOT_REQUIRED: diagnostic contract",
+  "observed_package_sha256": null,
+  "cleanup": {
+    "status": "confirmed",
+    "sha256": "2a6ea0151542d3023e35e29a16a435a9448c15e9c6facda85e4f64908bec02ef"
+  },
+  "prompt_sha256": "45ee6a6b473ea6c575618914e199fc09b17ed90a27451d04b23108ec76890c7e",
+  "methodology_version": "1.0.7",
+  "operational_release": "bound separately after genuine stage completion; no early release claim",
+  "validation_harness_sha": "a1eee8637d59a362582f3dd45c98adbb84ab46f3",
+  "checker_sha256": "7c2d07f3d9ff1204f6126e4e21a151bc5118b4470953d1a115bfd91ed6aa26e0",
+  "native_refusal_negatives_sha256": "df5583ce6c7c7e01f9e70a6b2184fde6852aa6edc599006dc5d7c1dc9dedbff3"
+}
