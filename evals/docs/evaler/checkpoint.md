@@ -11,10 +11,10 @@ RichBLOCKED01a14b00 archive9860420bytes/SHA6b4d4a14/554payload/manifest964007f2 
 Evaler8074065b verified14DB/112actualLuna-high/nativejournals/20inputs/cleanup;genuineaeb136f4→ordinaryRELEASED17:46:43→healthyFREE17:47:01.
 BenVERDICT01a14b0e-e990-7109-ae9c-f4467e113753:public user-v1 creator absent;new/no columns fails beforedraft;full10caseACCEPT notdone.
 Benarchive19370bytes/SHAa9483116/10payload/manifest1610e3c0 verified;native Evalerverification9729d2bc copied inprojectdocs.
-Native request01a14b12-ae47-748e-9de5-cbb42699589b asks Anewproductlifecycle vs Bcriterionchange;coordinator chooses A underownerdelegation.
+Native Evaler01a14b1d-4580-7d25-b93f-9b04aa840400 completed:accepted delegated A;исходные decision requests/format scope сохранены,exact verification66391d20 вprojectdocs;mainengine blocked.
 New explicit initial-scope ../2026-10-17-lab61-initial-cli-correction-authorization.md;42f7 remains narrow historical epoch permission.
 Design/implementation in ../plans/2026-10-17-lab61-initial-cli-*.md:existingimports.text/new→own draft→typedrefusal before settings/Apply/Execute→nativeownedclose.
-Only one RichOFFLINE source phase fromexact2e990 nowauthorized;read native queues/transfers first;no duplicate/active checkout mutation.
+Native Rich01a14b32-6501-7289-a618-9f5e7c174014 RUNNING eval-tests поhandoff01a14b32-64e2-77b9-913c-9de8beac0ba1:одинclean isolated OFFLINE source отexact2e990;не дублироватьactive/queued/checkout.
 TargetedRED exact2e990→minimalGREEN/negative/regression→cleanSHA→independentBenreview;build/install/browser/lease/live/model closed untillatergates.
 OnlyEvaler writesstate/counters/provenance;newsource/newmeasurement version explicit;9historicalreadyrefs preserved;neededlimits old/new/usage beforeeffects.
 FullBen10caseACCEPT/evidence/actualmodel/cleanup/genuinecompletion/ordinaryRELEASED/healthyFREE/acceptedcommonintegration beforeLAB62→63;stop onlyfull63.
