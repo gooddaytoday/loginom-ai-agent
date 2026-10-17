@@ -49,9 +49,31 @@ test('ambiguous, reused, extra and numerically substituted reports fail',()=>{
  }
 });
 
-test('ordered field composition refuses permutations even when every value and identity is preserved',()=>{
+test('column permutations match by name unless exact column order is requested',()=>{
  const a=structuredClone(actual('ordered',10));a.data.schema.reverse();a.data.sample[0].reverse();
- assert.throws(()=>matchExpectedOutputs([a],[report(10)]));
+ for(const options of [{},{column_order:'any'}])assert.equal(matchExpectedOutputs([a],[{...report(10),...options}]).length,1);
+ assert.throws(()=>matchExpectedOutputs([a],[{...report(10),column_order:'exact'}]));
+ assert.equal(matchExpectedOutputs([actual('ordered',10)],[{...report(10),column_order:'exact'}]).length,1);
+});
+test('name-based column matching still rejects extra, missing, duplicate, renamed or mistyped columns',()=>{
+ for(const change of [a=>a.data.schema.pop(),a=>a.data.schema.push({name:'Extra',label:'Extra',type:'string'}),
+  a=>a.data.schema[1]={...a.data.schema[0]},a=>a.data.schema[0].name='Other',
+  a=>a.data.schema[0].label='Other',a=>a.data.schema[1].type='integer',
+  a=>a.data.sample[0].reverse()]){
+  const a=structuredClone(actual('changed',10));change(a);
+  assert.throws(()=>matchExpectedOutputs([a],[report(10)]));
+ }
+});
+test('column_order accepts exact or any in both expected forms and rejects other values',()=>{
+ const base={package_path:'/own/order.lgp',nodes:[]};
+ for(const column_order of ['exact','any'])for(const multiple of [true,false]){
+  const output={...report(10),column_order};
+  assert.equal(parseExpectedOutputs({...base,...(multiple?{outputs:[output]}:output)}).outputs[0].column_order,column_order);
+ }
+ for(const column_order of ['EXACT','',null,true,1,[],{}])for(const multiple of [true,false]){
+  const output={...report(10),column_order};
+  assert.throws(()=>parseExpectedOutputs({...base,...(multiple?{outputs:[output]}:output)}));
+ }
 });
 test('stage-three labels disambiguate identical outputs only after exact schema and value verification',()=>{
  const first={...actual('a',10),label:'First'},second={...actual('b',10),label:'Second'};
