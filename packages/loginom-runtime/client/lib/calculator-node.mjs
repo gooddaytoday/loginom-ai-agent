@@ -11,7 +11,7 @@ import {configureCalculator} from './calculator-procedure.mjs';
 import {rejectUnchangedCalculatorDraft,verifiedCalculatorSyntaxFailure} from './calculator-request-refusal.mjs';
 import {calculatorConfigurationReadback} from './calculator-readback.mjs';
 import {calculatorParametersSchema} from './node-api.mjs';
-import {openPreparedWizard} from './node-wizard-open.mjs';
+import {openPreparedWizard,inspectPendingWizardOpen} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
@@ -50,7 +50,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
   validate:implementation.validate,configure:(ctx,p,drivers)=>drivers.configureCalculator(ctx,p)});}
  const nodeApplyDriverFactory=options=>{
   const {operation,execute,onRecord,now,receiptOptions}=options;
-  let channel,activeSignal,configured,mapping,columns,executionDriver,executionReceipt,multipleOutputs,preconfiguration,inputCheckpoint,outputCheckpoint,configurationGraph;
+  let channel,activeSignal,configured,mapping,columns,executionDriver,executionReceipt,multipleOutputs,preconfiguration,inputCheckpoint,outputCheckpoint,configurationGraph,openCheckpoint;
   const graphForRejection=async()=>{
    const g=await operation.nodeTargetAdapter.observe({document_id:operation.nodeApply.request.document_id,workflow_ref:operation.nodeApply.request.workflow_ref},operation.deadline);
    requireValue(g.complete===true&&g.document_id===operation.nodeApply.node.document_id&&g.workflow_ref.workflow_id===operation.nodeApply.node.workflow_id,'Complete calculator rollback graph required');
@@ -102,8 +102,16 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
    }:{}),
    ...(!implementation||implementation.preflight?{beforeTarget:ctx=>(implementation?.preflight??preflightCalculatorSource)(options,ctx,{targetOrigin,targetBuild})}:{}),
    verifySource:async()=>verified({not_applicable:true,source_kind:'upstream_table'}),
+   ...(implementation?.openRecovery?{async verifyPendingOpen(state,{signal}={}){
+    activeSignal=signal;signal?.throwIfAborted();
+    operation.deadline=Math.min(state.deadline,state.configure_deadline,state.pending.deadline);
+    return inspectPendingWizardOpen({operation,checkpoint:openCheckpoint,channel,readReceipt:options.readReceipt,
+     readGraph:graphForRejection,now,configurationObservation:implementation.configurationObservation});
+   }}:{}),
    async openWizard(ctx) {
-    enter(ctx);executionDriver=createNodeExecutionProcedure(channel,ctx.node);await executionDriver.prepare();
+    enter(ctx);
+    if(implementation?.openRecovery)openCheckpoint={graph:await graphForRejection(),step:operation.nodeStepSequence??0};
+    executionDriver=createNodeExecutionProcedure(channel,ctx.node);await executionDriver.prepare();
     if(!implementation)configurationGraph=await graphForRejection();
     if(implementation?.beforeOpen){
      const before=await channel.observe({condition:'select owned node before internal preparation',ready:s=>s.prepared_node_context?.surface==='graph'});
