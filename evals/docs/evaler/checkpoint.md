@@ -16,5 +16,5 @@ Rich8PASS/3FAIL/0ERROR и LF reference#1 FAIL сохранены; reference12, r
 Native Evaler: проверить delivery/checkouts/queue/pins/расход/зависимость; самому записать base_sha/authorization и один Rich dispatch.
 Rich: свежий status→acquire→немодельный preflight на lease первого этапа; Luna/high явно, actual archives обязательны.
 Ben сохраняет собственные ожидания до авторских материалов/live; каждый очищает своё, unknown не clean.
-Лимиты повышать при необходимости с old/new/основанием и сохранением расхода/once/ledger; критерии прежние.
-Цикл до подтверждённой LAB63; установки по активному runbook; dev/main/продуктовый release не назначены.
+LAB61 blocked33: Ben BLOCKER_CONFIRMED01a14a5a; делегирован отдельный CLI patch отd6→exact-source review→новый admission, текущие live gates закрыты.
+Решение: ../2026-10-17-lab61-cli-correction-authorization.md; история/бюджеты/guards сохранены, цикл доLAB63, dev/main/release не назначены.
