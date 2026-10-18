@@ -1,0 +1,134 @@
+{
+  "checked_utc": "2026-10-18T07:47:24.952079+00:00",
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "source_report_id": "01a14ded-de57-7b01-a74f-1308e4185de3",
+  "source_sha": "9d49d54465fe1cf38bf24dfbcd84a1ceab975aa9",
+  "original_blocked_stop": {
+    "reject_count": 9,
+    "rework_limit": 8,
+    "review_cycle": 9,
+    "cleanup_required": false,
+    "issue_revision": 362
+  },
+  "explicit_limit_before_effects": {
+    "old": 8,
+    "new": 9,
+    "completed_reworks": 8,
+    "fresh_REJECTs": 9,
+    "canonical_scope_sha256": "6e1dfe6a5d4bf73c77b9ad32587ca22f100392922ceb8c62ffc964881517ab0f",
+    "blocked_issue_readback_revision": 363,
+    "state_consumption_equal": true,
+    "counters_reset": false
+  },
+  "actual_usage": {
+    "reference": 15,
+    "Rich_product": 10,
+    "Ben_product": 10,
+    "Rich_recovery": 1,
+    "Ben_recovery": 0,
+    "probes": 0
+  },
+  "all_six_budget_increases_retained": true,
+  "prior_full_decision_bindings_archived": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/roles/evaler/work/lab61-ben-reject9-01a14ded/archived-verifications.json",
+    "sha256": "249ae8fce0314fdb689408a0d7df981e4216fa1f088b3fefeda395f179be6361",
+    "sections": [
+      "before_rework8_decision",
+      "before_rework9_decision"
+    ]
+  },
+  "canonical_continue_event": {
+    "kind": "continue_after_evaler",
+    "id": "01a14df5-2e47-7b64-b503-7200fedb6c3f",
+    "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+    "report_id": "01a14ded-de57-7b01-a74f-1308e4185de3",
+    "sha": "9d49d54465fe1cf38bf24dfbcd84a1ceab975aa9",
+    "target": "Rich",
+    "stand_ready": true
+  },
+  "continue_action": "ready_to_dispatch",
+  "separate_dispatch_receipt": {
+    "queued_task_id": "01a14df5-2e69-7e31-ae52-63c0ae5cb023",
+    "final_issue_revision": 368,
+    "final_state_equal_receipt": true,
+    "initial_ambiguous_resolved_no_redispatch": true
+  },
+  "only_consumption_enrichment_after_limit_readback": {
+    "decision_comment_id": "01a14df5-2e47-7b64-b503-7200fedb6c3f"
+  },
+  "original_native_files": [
+    {
+      "name": "reject-gate-input.json",
+      "bytes": 2542,
+      "sha256": "142ad372f1b9f5e33a04efe4e0344702c365ff025a4ae3f5293b374171a49ea8"
+    },
+    {
+      "name": "reject-gate-output.json",
+      "bytes": 2260,
+      "sha256": "4599864c1de7749038c7bba3422b5d8a992b60ce8ffff565cbf0915f3dd6a976"
+    },
+    {
+      "name": "outer-blocked.json",
+      "bytes": 7875,
+      "sha256": "0c500ed06070f4855f0bd425637b4d62c74b22b239350ac8cb35e5fe90112364"
+    },
+    {
+      "name": "issue-blocked-readback.json",
+      "bytes": 171866,
+      "sha256": "45b23c0159c0a1ba2559280f271ba63fe5bc77965cd5d55df56502d41095c607"
+    },
+    {
+      "name": "outer-limit-authorized.json",
+      "bytes": 8372,
+      "sha256": "f25f6fa8670dc14991af58a0eb537d6891938d2635367ed999d616a1cc763337"
+    },
+    {
+      "name": "issue-limit-readback.json",
+      "bytes": 172270,
+      "sha256": "fdd9396f5da3c5c9d6d1739c9dc6feffb71a17bcf98030d505d781a81acfbad8"
+    },
+    {
+      "name": "continue-input.json",
+      "bytes": 2517,
+      "sha256": "6521f1c15a191902ae077f3f4e106657a9fac8f73e0854dd579df8cacf53225f"
+    },
+    {
+      "name": "continue-output.json",
+      "bytes": 1865,
+      "sha256": "29b3517bad756dd33d832433c1b24e6a4a1f4d62393d363cc4d46d2628cc01b4"
+    },
+    {
+      "name": "dispatch-input.json",
+      "bytes": 1933,
+      "sha256": "a880758167e08f67d290dcd6703c77d73e0714277dcd5bf76a65800ebc3e88a3"
+    },
+    {
+      "name": "dispatch-output.json",
+      "bytes": 2116,
+      "sha256": "4c9197e9f71b7a57dc8c430af54f1173b6704165d6e455611bb0be12b0104121"
+    },
+    {
+      "name": "receipt-input.json",
+      "bytes": 2218,
+      "sha256": "4ddaa99f066150b10c92a3b41b9cca1ebc3ec9b8c8c56c843b1c2e8f86c7cd16"
+    },
+    {
+      "name": "receipt-output.json",
+      "bytes": 2106,
+      "sha256": "0256a12b563902b30b11e435a341058ad1bcedbfdc464a7241f3340763baa294"
+    },
+    {
+      "name": "outer-final.json",
+      "bytes": 8518,
+      "sha256": "918e2a691c4c9855c59f6ffb2822328d15c4a61af67507c8ea5ee42bc8353caa"
+    },
+    {
+      "name": "issue-final-readback.json",
+      "bytes": 174205,
+      "sha256": "208cd47378506b3082f65c98074f35ae944b5f454371b53d8de1ec4b2268fbd9"
+    }
+  ],
+  "root_state_continue_dispatch_comment_actions": false,
+  "new_physical_model_or_live_effects": false,
+  "unknown_patch_accepted": false
+}
