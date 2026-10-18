@@ -768,6 +768,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
             &&(i===8&&e.textContent.trim()==='Настройка'||i===7&&(e.textContent.trim()==='Входной источник данных'
               ||preparedInputPort.port===0&&e.textContent.trim()==='Источник данных'
+              ||preparedInputPort.port===0&&preparedInputPort.native_index===2&&e.textContent.trim()==='Источник данных запроса'
+                &&crumbs[5].querySelectorAll('.bg-vendor-icon-restclient').length===1
               ||(preparedInputPort.port===0&&e.textContent.trim()==='Главная таблица'
                 ||preparedInputPort.port===1&&e.textContent.trim()==='Присоединяемая таблица')
                 &&crumbs[5].querySelectorAll('.bg-vendor-icon-joindata').length===1));

@@ -3734,6 +3734,55 @@ test('hidden export input caption cannot replace native ownership or exact bread
   }
 });
 
+async function restInputPortOverflowFixture() {
+  // Request-data caption: Loginom Help, REST request / Input ports.
+  // Overflow geometry comes from the existing export fixture, not a REST DOM capture.
+  const fixture=await exportInputPortOverflowFixture();
+  for(const [i,crumb] of fixture.crumbs.entries()) {
+    crumb.attrs['data-tid']=crumb.attrs['data-tid'].replaceAll('Источник_данных','Источник_данных_запроса');
+    if(i===7)crumb.ownText='Источник данных запроса';
+  }
+  fixture.crumbs[5].children[0].attrs.class='bg-vendor-icon-restclient';
+  // REST's table input is logical input0 but native input2, after the
+  // connection and variables. LAB-88/0352 confirmed that opening binding.
+  fixture.opening.nativeIndex=2;fixture.opening.portTree.FIndex=2;fixture.opening.port.FPortIndex=2;
+  return fixture;
+}
+
+test('owned REST input recognizes its request-data caption in breadcrumb overflow',async()=>{
+  const {page,binding}=await restInputPortOverflowFixture();
+  const full=await page.execute({mode:'observe',prepared_node_context:binding});
+  assert.equal(full.status,'SUCCEEDED',JSON.stringify(full.error));
+  assert.equal(full.output.prepared_node_context.input_port.native_index,2);
+  assert.equal(full.output.wizard.input_port_context.status,'observed');
+  assert.equal(full.output.wizard.input_port_context.port_display_label,'Источник данных запроса');
+  const narrow=await page.execute({mode:'observe',root_ref:full.output.wizard.root_ref,prepared_node_context:binding});
+  assert.deepEqual(narrow.output.wizard.input_port_context,full.output.wizard.input_port_context);
+  assert.deepEqual(page.events,[]);
+});
+
+test('REST overflow caption preserves exact input, icon, opening and navigation guards',async()=>{
+  for(const mode of ['unbound','missing_opening','foreign_port','wrong_port','wrong_native_index','wrong_icon','wrong_caption','foreign_path','hidden_panel','missing_icon']) {
+    const {page,binding,crumbs,panel,opening,preparation}=await restInputPortOverflowFixture();
+    if(mode==='missing_opening')preparation.inputPortOpenReceipts.clear();
+    if(mode==='foreign_port')opening.port.FGuid='foreign';
+    if(mode==='wrong_port')opening.portIndex=1;
+    if(mode==='wrong_native_index'){opening.nativeIndex=1;opening.portTree.FIndex=1;opening.port.FPortIndex=1;}
+    if(mode==='wrong_icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
+    if(mode==='wrong_caption')for(const crumb of crumbs.slice(7)) {
+      crumb.attrs['data-tid']=crumb.attrs['data-tid'].replace('Источник_данных_запроса','Источник_данных_запроса_2');
+      if(crumb===crumbs[7])crumb.ownText='Источник данных запроса 2';
+    }
+    if(mode==='foreign_path')crumbs[7].attrs['data-tid']=crumbs[7].attrs['data-tid'].replace('TF-5','TF-3');
+    if(mode==='hidden_panel')panel.style.display='none';
+    if(mode==='missing_icon')crumbs[8].children[0].remove();
+    const result=await page.execute({mode:'observe',...(mode==='unbound'?{}:{prepared_node_context:binding})});
+    if(['missing_opening','foreign_port'].includes(mode))assert.equal(result.error?.code,'PREPARED_NODE_CONTEXT_CHANGED',mode);
+    else assert.notEqual(result.output.wizard.input_port_context?.status,'observed',mode);
+    assert.deepEqual(page.events,[],mode);
+  }
+});
+
 test('input port context rejects foreign duplicated hidden and incomplete breadcrumb evidence',async()=>{
   for(const mode of ['wrong_wizard','hidden','duplicate','duplicate_panel','foreign','wrong_folder','caption_number','broken_chain','clipped','missing_icon','hidden_icon','foreign_tab','bounded']){
     const {page}=await inputPortContextFixture(mode),r=await page.observe();assert.notEqual(r.wizard.input_port_context?.status,'observed',mode);
