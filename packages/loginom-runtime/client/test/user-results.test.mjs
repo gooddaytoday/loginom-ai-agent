@@ -90,6 +90,19 @@ test('compact actions retain navigation and issued UI controls needed for recove
   const result = compactActionResult(raw);
   assert.deepEqual(result.output, raw.output);assert.equal(result.trace, undefined);assert.equal(raw.trace.length, 1);
 });
+
+test('compact Save retains optional arrangement warnings after dropping its internal trace', () => {
+  for (const status of ['performed','skipped','unconfirmed']) {
+    const arrangement = { event: 'package_arrangement', at_ms: 100, status,
+      reason: status === 'performed' ? null : 'button_unavailable', warning: status !== 'performed' };
+    const raw = { operation_id: 'save', status: 'SUCCEEDED', action_key: 'package.save_checkpoint',
+      output: { package_ref: { path: '/own/result.lgp' } }, trace: [arrangement] };
+    const result = compactActionResult(raw);
+    assert.deepEqual(result.output.arrangement, { status, reason: arrangement.reason, warning: arrangement.warning });
+    assert.equal(result.trace, undefined);
+    assert.equal(validate(result).valid, true);
+  }
+});
 test('initial knowledge bundle omits per-type schemas while retaining revision pins', () => {
   const schema = { type: 'object', required: ['keys'] };
   const result = compactKnowledgeBundle({ session_manifest: { digest: 'pin' }, actions: [{ action_key: 'save', input_schema: schema, revision: '2' }],
