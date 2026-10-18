@@ -111,12 +111,19 @@ function javascriptReadSourceBinding(source){
  return {source_sha256:source.sha256,source_utf8_bytes:source.utf8_bytes,source_lf_lines:source.lf_lines};
 }
 export function alignReadSchema(actual,expected){
- need(actual.length===expected.length&&new Set(actual.map(f=>f.name)).size===actual.length,
-  'Output schema changed since the source operation');
+ const changed=message=>{
+  const error=Error(message+'. Observed field names: '+JSON.stringify(actual.map(f=>f.name)).slice(0,220)
+   +'. The source_operation_id is stale. Cancel this stopped read with dock_node_cancel and confirm cleanup_complete:true. '
+   +'Then submit a NEW dock_node_apply operation_id on the SAME existing node with current intended settings, inputs:[], mappings:[] and finish:"execute". '
+   +'Use only that new SUCCEEDED operation with confirmed cleanup as source_operation_id for dock_node_read; do not reuse the old source or a failed operation.');
+  error.code='NODE_READ_SCHEMA_CHANGED';throw error;
+ };
+ if(!(actual.length===expected.length&&new Set(actual.map(f=>f.name)).size===actual.length))
+  changed('Output schema changed since the source operation');
  return actual.map((field,index)=>{
   const prior=expected.find(f=>f.name===field.name);
-  need(prior&&field.index===index&&['name','label','type'].every(k=>field[k]===prior[k]),
-   'Output field identity changed since the source operation');
+  if(!(prior&&field.index===index&&['name','label','type'].every(k=>field[k]===prior[k])))
+   changed('Output field identity changed since the source operation');
   return {...prior,index};
  });
 }

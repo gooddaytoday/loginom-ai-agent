@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildNodeReadRequest,alignReadSchema} from '../lib/node-read-contract.mjs';
-import {applyNode,validateNodeApplyRequest} from '../lib/node-apply.mjs';
+import {applyNode,releaseNodeApply,validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {dispatchNodeApi,nodeApiTools} from '../lib/node-api.mjs';
 import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 import {javascriptCodeReadback} from '../lib/javascript-code-node.mjs';
@@ -59,6 +59,33 @@ test('field reordering preserves identity while type, label, missing and repeate
  const fields=[...schema,{index:1,name:'key',label:'Key',type:'string'}];
  const reordered=[{...fields[1],index:0},{...fields[0],index:1}];assert.deepEqual(alignReadSchema(reordered,fields),reordered);
  for(const actual of [[...reordered,{...reordered[0],index:2}],[reordered[0]],reordered.map(f=>({...f,type:'boolean'})),reordered.map(f=>({...f,label:'Wrong'}))])assert.throws(()=>alignReadSchema(actual,fields));
+});
+test('a stale read names current fields and after verified cancellation requests a new successful node operation',async()=>{
+ const request=buildNodeReadRequest(args,source()),operation={id:'read'},calls=[],events=[];
+ const actual=[{index:0,name:'ProductRank',label:'Ранг товара',type:'real'}];
+ const ok=value=>({verified:true,cleanup_complete:true,effect_possible:false,...value});
+ const drivers={verifySource:async()=>ok({}),prepareTarget:async()=>ok({node}),
+  finishGraph:async()=>{calls.push('execute');return ok({mode:'execute',execution_id:'fresh',settings_applied:false});},
+  waitExecution:async()=>ok({execution_id:'fresh',status:'completed'}),
+  readOutput:async()=>{alignReadSchema(actual,schema);assert.fail('Stale schema must refuse');},
+  releasePending:async()=>{calls.push('release');return {verified:true,cleanup_complete:true,node_context:node,
+   cleanup:{wizard_closed:false,read_view_restored:true,views_returned:true}};}};
+ const record=async event=>{events.push(structuredClone(event));return structuredClone(event);};
+ const stopped=await applyNode({request,operation,handlers,drivers,record});
+ assert.equal(stopped.status,'AMBIGUOUS');assert.equal(stopped.pending_phase,'read');assert.equal(stopped.cleanup_complete,false);
+ assert.match(stopped.error.message,/Output field identity changed/);
+ assert.match(stopped.error.message,/Observed field names: \["ProductRank"\]/);
+ assert.match(stopped.error.message,/dock_node_cancel.*cleanup_complete:true/);
+ assert.match(stopped.error.message,/NEW dock_node_apply.*SAME existing node.*finish:"execute"/);
+ assert.match(stopped.error.message,/new SUCCEEDED operation with confirmed cleanup/);
+ assert.ok(stopped.error.message.length<1000);assert.deepEqual(calls,['execute']);
+ const released=await releaseNodeApply({operation,handlers,drivers,record});
+ assert.equal(released.cleanup_complete,true);assert.equal(released.next_step.tool,'dock_node_apply');
+ assert.match(released.next_step.instruction,/NEW operation_id.*"kind":"existing".*"node_id":"node"/);
+ assert.match(released.next_step.instruction,/inputs:\[\].*complete intended settings.*finish:"execute"/);
+ assert.doesNotMatch(released.next_step.instruction,/source_operation_id:"created"/);
+ assert.deepEqual(calls,['execute','release']);assert.equal(operation.nodeApply.pending,null);
+ assert.equal(events.at(-1).phase,'node_operation_released');
 });
 test('read refuses settings mutation and stale execution output without retrying browser effects',async()=>{
  for(const fault of ['settings','execution','output','lost_finish']){

@@ -2008,6 +2008,53 @@ test('typed wizard opening verifies node and workflow path after one settings cl
   }
 });
 
+test('prepared wizard opening retries one refused sample and preserves native owner guards',async()=>{
+ for(const fault of [null,'node','owner','path','absent']) {
+  const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
+  page.waitForTimeout=async ms=>clock.advance(ms);
+  let path='';
+  for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий']) {
+   path+=(path?'>':'')+label;
+   const crumb=page.add('a',base+'cnrNaviMode;b.s_'+path,label,undefined,panel);
+   if(label==='Сценарий')page.add('span',null,'',undefined,crumb).attrs.class='maptree-icon-workflow';
+  }
+  const graph=page.add('div',base+'ModelForm;cmpDiagram'),body=page.add('g',base+'Graph;REST','',undefined,graph);
+  page.add('span',base+'Graph;REST;Label;Label','REST',undefined,body);
+  page.add('g',base+'Graph;REST;Setting','',{x:500,y:300,width:30,height:30},graph);
+  let reads=0;
+  const binding=async()=>({verified:true,document_id:'doc',workflow_id:'workflow',
+   node_id:fault==='node'&&reads>=26?'foreign':'node',surface:page.events.includes('click')?'wizard':'graph',
+   tid:base+(page.events.includes('click')?'WizrdMCF':'Graph;REST'),...(!page.events.includes('click')?{locked:false}:{})});
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,kind:'workspace-ui',prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},binding));
+  const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_open),click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);graph.remove();
+   const wizard=page.add('div',base+'WizrdMCF');page.add('button',base+'WizrdMCF;RESTRequestWizard;btnHelp','',undefined,wizard);
+   const ownerPath=fault==='path'?path.replace('Модуль1','Модуль2'):path,owner=fault==='owner'?'Other':'REST';
+   const node=page.add('a',base+'cnrNaviMode;b.s_'+ownerPath+'>'+owner,owner,undefined,panel);
+   page.add('span',null,'',undefined,node).attrs.class='bg-vendor-icon-restclient';
+   const last=page.add('a',base+'cnrNaviMode;b.s_'+ownerPath+'>'+owner+'>Настройка','Настройка',undefined,panel);
+   page.add('span',null,'',undefined,last).attrs.class='maptree-icon-wizard';
+  };
+  const evaluate=page.evaluate.bind(page);
+  page.evaluate=async(fn,arg)=>{const out=await evaluate(fn,arg);
+   if(arg?.discoverRoots===false&&page.events.includes('click')) {
+    reads++;
+    // The native controller has switched while the rendered wizard read is
+    // still absent. Exhaust the existing bounded observations before retry.
+    if(reads<=25||fault==='absent')out.wizard={status:'absent'};
+   }
+   return out;
+  };
+  const result=await page.act({verb:'begin_wizard',ref:button.ref},snapshot);
+  assert.equal(result.status,fault?'AMBIGUOUS':'SUCCEEDED',fault+JSON.stringify({error:result.error,trace:result.trace}));
+  const retry=result.trace.filter(e=>e.event==='wizard_open_confirmation_read_retried');
+  assert.equal(retry.length,1,fault+JSON.stringify(result.error));assert.equal(retry[0].initial_observation.wizard.status,'absent');
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  if(fault)assert.equal(result.error.code,fault==='node'?'PREPARED_NODE_CONTEXT_CHANGED':'WIZARD_OPEN_NOT_CONFIRMED');
+ }
+});
+
 test('wizard cancellation confirms the original graph after one exact affirmative click',async()=>{
  for(const mode of ['success','wrong_question','wrong_node','still_open']) {
   const page=new Page(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
