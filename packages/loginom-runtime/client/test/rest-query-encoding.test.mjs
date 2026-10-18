@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {restQueryEncoderRequest} from '../lib/rest-request-node.mjs';
+import {restQueryEncoderRequest,createRestRequestNodeSupport} from '../lib/rest-request-node.mjs';
 import {createJavascriptCodeNodeSupport} from '../lib/javascript-code-node.mjs';
 import {createRedactor} from '../lib/redact.mjs';
-import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
+import {validateNodeApplyRequest,applyNode} from '../lib/node-apply.mjs';
 
 const request=()=>({operation_id:'rest',contract_revision:'1.0.0',document_id:'doc',
  workflow_ref:{workflow_id:'flow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'module',label:'Module'},{tid:'flow',label:'Flow'}]},
@@ -49,4 +49,29 @@ test('generated child request uses the installed JavaScript contract and bounded
  assert.doesNotThrow(()=>validateNodeApplyRequest(child,support.nodeApplyHandlers));
  assert.ok(child.operation_id.length<=128);
  assert.notEqual(child.operation_id,restQueryEncoderRequest({...r,operation_id:'y'.repeat(128)},2500,1000).operation_id);
+});
+
+test('existing connected REST refuses before creating another codec or connection and points to the same node',async()=>{
+ for(const source of ['owned-encoder','foreign-source']) {
+  const r={...request(),target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'flow',node_id:'rest'}},
+   mode:'request',finish:'execute',mappings:[],read:{ports:[],sample_rows:0,require_exact_numbers:false},
+   budgets:{configure_ms:600000,execute_ms:600000,total_ms:600000}};
+  r.parameters.connection={name:'Echo',base_url:'https://echo.test/anything'};
+  const graph={complete:true,document_id:'doc',workflow_ref:r.workflow_ref,
+   nodes:[{ref:r.target.ref,type:'integration.rest_request'},{ref:{node_id:source},type:'programming.javascript'}],
+   links:[{source,output:0,target:'rest',input:0}]},before=structuredClone(graph),calls=[],events=[];
+  const operation={id:r.operation_id,parameters:r,nodeTargetAdapter:{observe:async()=>{calls.push('observe');return graph;}}};
+  const support=createRestRequestNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
+  const drivers=support.nodeApplyDriverFactory({operation,now:Date.now,onRecord:async e=>e,receiptOptions:()=>({}),
+   execute:async()=>assert.fail('No browser mutation or encoder operation may start')});
+  const result=await applyNode({request:r,operation,handlers:support.nodeApplyHandlers,
+   drivers:{...drivers,prepareTarget:async(_,ctx)=>drivers.beforeTarget(ctx)},record:async e=>{events.push(e);return e;}});
+  assert.equal(result.status,'NOT_APPLIED');assert.equal(result.effect_possible,false);
+  assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
+  assert.deepEqual(calls,['observe']);assert.deepEqual(graph,before);
+  assert.match(result.error.message,/next_step: dock_node_apply with a NEW operation_id/);
+  assert.ok(result.error.message.includes(JSON.stringify(r.target)));assert.match(result.error.message,/inputs:\[\], parameters:\{\}/);
+  assert.equal(events.some(e=>e.operation_id!==r.operation_id),false);
+  assert.doesNotThrow(()=>validateNodeApplyRequest({...r,inputs:[],parameters:{},finish:'done'},support.nodeApplyHandlers));
+ }
 });

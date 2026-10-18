@@ -89,6 +89,16 @@ export function createRestRequestNodeSupport(config){
   return createTabularTransformNodeSupport(config,{...implementation,
    preflight:async(options,ctx)=>{
     if(!request.parameters.connection)return {verified:true,cleanup_complete:true,effect_possible:false,not_applicable:true};
+    if(request.target.kind==='existing'&&request.inputs.length){
+     const graph=await options.operation.nodeTargetAdapter.observe({document_id:request.document_id,workflow_ref:request.workflow_ref},ctx.deadline,ctx.signal);
+     need(graph.complete===true&&graph.document_id===request.document_id&&graph.workflow_ref.workflow_id===request.workflow_ref.workflow_id,'complete owned graph is required before query encoding');
+     if(graph.links.some(link=>link.target===request.target.ref.node_id&&link.input===0)){
+      const error=Error('REST request: input 0 is already connected; no encoder or connection was created. next_step: dock_node_apply with a NEW operation_id, target:'+JSON.stringify(request.target)
+       +', inputs:[], parameters:{}, finish:"done". This preserves the existing input and saved bindings; inspect them before execution.');
+      error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+      throw error;
+     }
+    }
     // Loginom 7.4.2 concatenates raw query values before parsing the URL.
     // Prepare values through the existing JS lifecycle, rather than requiring
     // the model to author a codec or changing the caller's source table.
