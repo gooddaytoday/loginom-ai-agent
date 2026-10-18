@@ -1,0 +1,51 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.excel"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "imports.excel",
+      "output_port": 0,
+      "columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "integer"
+        },
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Amount",
+          "label": "Amount",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Id": 1,
+          "Region": "North",
+          "Amount": 10.0
+        },
+        {
+          "Id": 2,
+          "Region": "South",
+          "Amount": 20.0
+        },
+        {
+          "Id": 3,
+          "Region": "West",
+          "Amount": 30.0
+        }
+      ]
+    }
+  ]
+}

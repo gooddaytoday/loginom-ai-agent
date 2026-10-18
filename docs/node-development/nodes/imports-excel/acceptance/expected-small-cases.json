@@ -1,0 +1,2694 @@
+{
+  "workbook.xlsx": {
+    "schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": 4
+      },
+      {
+        "name": "Text",
+        "label": "Text",
+        "type": 5
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": 4
+      }
+    ],
+    "rows": [
+      [
+        {
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "is_null": false,
+          "value": "А"
+        },
+        {
+          "is_null": false,
+          "value": 10
+        }
+      ],
+      [
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": true,
+          "value": null
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 2
+        },
+        {
+          "is_null": false,
+          "value": "Б"
+        },
+        {
+          "is_null": false,
+          "value": 20
+        }
+      ]
+    ],
+    "row_count": 3
+  },
+  "blank-exclude.xlsx": {
+    "schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": 4
+      },
+      {
+        "name": "Text",
+        "label": "Text",
+        "type": 5
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": 4
+      }
+    ],
+    "rows": [
+      [
+        {
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "is_null": false,
+          "value": "А"
+        },
+        {
+          "is_null": false,
+          "value": 10
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 2
+        },
+        {
+          "is_null": false,
+          "value": "Б"
+        },
+        {
+          "is_null": false,
+          "value": 20
+        }
+      ]
+    ],
+    "row_count": 2
+  },
+  "blank-stop.xlsx": {
+    "schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": 4
+      },
+      {
+        "name": "Text",
+        "label": "Text",
+        "type": 5
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": 4
+      }
+    ],
+    "rows": [
+      [
+        {
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "is_null": false,
+          "value": "А"
+        },
+        {
+          "is_null": false,
+          "value": 10
+        }
+      ]
+    ],
+    "row_count": 1
+  },
+  "named-extend.xlsx": {
+    "schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": 4
+      },
+      {
+        "name": "Text",
+        "label": "Text",
+        "type": 5
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": 4
+      }
+    ],
+    "rows": [
+      [
+        {
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "is_null": false,
+          "value": "А"
+        },
+        {
+          "is_null": false,
+          "value": 10
+        }
+      ],
+      [
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": true,
+          "value": null
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 2
+        },
+        {
+          "is_null": false,
+          "value": "Б"
+        },
+        {
+          "is_null": false,
+          "value": 20
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 3
+        },
+        {
+          "is_null": false,
+          "value": "В"
+        },
+        {
+          "is_null": false,
+          "value": 30
+        }
+      ]
+    ],
+    "row_count": 4
+  },
+  "late-type.xlsx": {
+    "schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": 4
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": 4
+      }
+    ],
+    "rows": [
+      [
+        {
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "is_null": false,
+          "value": 1
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 2
+        },
+        {
+          "is_null": false,
+          "value": 2
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 3
+        },
+        {
+          "is_null": false,
+          "value": 3
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 4
+        },
+        {
+          "is_null": false,
+          "value": 4
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 5
+        },
+        {
+          "is_null": false,
+          "value": 5
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 6
+        },
+        {
+          "is_null": false,
+          "value": 6
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 7
+        },
+        {
+          "is_null": false,
+          "value": 7
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 8
+        },
+        {
+          "is_null": false,
+          "value": 8
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 9
+        },
+        {
+          "is_null": false,
+          "value": 9
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 10
+        },
+        {
+          "is_null": false,
+          "value": 10
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 11
+        },
+        {
+          "is_null": false,
+          "value": 11
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 12
+        },
+        {
+          "is_null": false,
+          "value": 12
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 13
+        },
+        {
+          "is_null": false,
+          "value": 13
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 14
+        },
+        {
+          "is_null": false,
+          "value": 14
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 15
+        },
+        {
+          "is_null": false,
+          "value": 15
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 16
+        },
+        {
+          "is_null": false,
+          "value": 16
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 17
+        },
+        {
+          "is_null": false,
+          "value": 17
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 18
+        },
+        {
+          "is_null": false,
+          "value": 18
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 19
+        },
+        {
+          "is_null": false,
+          "value": 19
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 20
+        },
+        {
+          "is_null": false,
+          "value": 20
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 21
+        },
+        {
+          "is_null": false,
+          "value": 21
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 22
+        },
+        {
+          "is_null": false,
+          "value": 22
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 23
+        },
+        {
+          "is_null": false,
+          "value": 23
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 24
+        },
+        {
+          "is_null": false,
+          "value": 24
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 25
+        },
+        {
+          "is_null": false,
+          "value": 25
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 26
+        },
+        {
+          "is_null": false,
+          "value": 26
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 27
+        },
+        {
+          "is_null": false,
+          "value": 27
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 28
+        },
+        {
+          "is_null": false,
+          "value": 28
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 29
+        },
+        {
+          "is_null": false,
+          "value": 29
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 30
+        },
+        {
+          "is_null": false,
+          "value": 30
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 31
+        },
+        {
+          "is_null": false,
+          "value": 31
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 32
+        },
+        {
+          "is_null": false,
+          "value": 32
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 33
+        },
+        {
+          "is_null": false,
+          "value": 33
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 34
+        },
+        {
+          "is_null": false,
+          "value": 34
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 35
+        },
+        {
+          "is_null": false,
+          "value": 35
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 36
+        },
+        {
+          "is_null": false,
+          "value": 36
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 37
+        },
+        {
+          "is_null": false,
+          "value": 37
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 38
+        },
+        {
+          "is_null": false,
+          "value": 38
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 39
+        },
+        {
+          "is_null": false,
+          "value": 39
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 40
+        },
+        {
+          "is_null": false,
+          "value": 40
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 41
+        },
+        {
+          "is_null": false,
+          "value": 41
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 42
+        },
+        {
+          "is_null": false,
+          "value": 42
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 43
+        },
+        {
+          "is_null": false,
+          "value": 43
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 44
+        },
+        {
+          "is_null": false,
+          "value": 44
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 45
+        },
+        {
+          "is_null": false,
+          "value": 45
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 46
+        },
+        {
+          "is_null": false,
+          "value": 46
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 47
+        },
+        {
+          "is_null": false,
+          "value": 47
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 48
+        },
+        {
+          "is_null": false,
+          "value": 48
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 49
+        },
+        {
+          "is_null": false,
+          "value": 49
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 50
+        },
+        {
+          "is_null": false,
+          "value": 50
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 51
+        },
+        {
+          "is_null": false,
+          "value": 51
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 52
+        },
+        {
+          "is_null": false,
+          "value": 52
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 53
+        },
+        {
+          "is_null": false,
+          "value": 53
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 54
+        },
+        {
+          "is_null": false,
+          "value": 54
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 55
+        },
+        {
+          "is_null": false,
+          "value": 55
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 56
+        },
+        {
+          "is_null": false,
+          "value": 56
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 57
+        },
+        {
+          "is_null": false,
+          "value": 57
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 58
+        },
+        {
+          "is_null": false,
+          "value": 58
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 59
+        },
+        {
+          "is_null": false,
+          "value": 59
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 60
+        },
+        {
+          "is_null": false,
+          "value": 60
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 61
+        },
+        {
+          "is_null": false,
+          "value": 61
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 62
+        },
+        {
+          "is_null": false,
+          "value": 62
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 63
+        },
+        {
+          "is_null": false,
+          "value": 63
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 64
+        },
+        {
+          "is_null": false,
+          "value": 64
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 65
+        },
+        {
+          "is_null": false,
+          "value": 65
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 66
+        },
+        {
+          "is_null": false,
+          "value": 66
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 67
+        },
+        {
+          "is_null": false,
+          "value": 67
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 68
+        },
+        {
+          "is_null": false,
+          "value": 68
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 69
+        },
+        {
+          "is_null": false,
+          "value": 69
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 70
+        },
+        {
+          "is_null": false,
+          "value": 70
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 71
+        },
+        {
+          "is_null": false,
+          "value": 71
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 72
+        },
+        {
+          "is_null": false,
+          "value": 72
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 73
+        },
+        {
+          "is_null": false,
+          "value": 73
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 74
+        },
+        {
+          "is_null": false,
+          "value": 74
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 75
+        },
+        {
+          "is_null": false,
+          "value": 75
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 76
+        },
+        {
+          "is_null": false,
+          "value": 76
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 77
+        },
+        {
+          "is_null": false,
+          "value": 77
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 78
+        },
+        {
+          "is_null": false,
+          "value": 78
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 79
+        },
+        {
+          "is_null": false,
+          "value": 79
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 80
+        },
+        {
+          "is_null": false,
+          "value": 80
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 81
+        },
+        {
+          "is_null": false,
+          "value": 81
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 82
+        },
+        {
+          "is_null": false,
+          "value": 82
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 83
+        },
+        {
+          "is_null": false,
+          "value": 83
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 84
+        },
+        {
+          "is_null": false,
+          "value": 84
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 85
+        },
+        {
+          "is_null": false,
+          "value": 85
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 86
+        },
+        {
+          "is_null": false,
+          "value": 86
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 87
+        },
+        {
+          "is_null": false,
+          "value": 87
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 88
+        },
+        {
+          "is_null": false,
+          "value": 88
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 89
+        },
+        {
+          "is_null": false,
+          "value": 89
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 90
+        },
+        {
+          "is_null": false,
+          "value": 90
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 91
+        },
+        {
+          "is_null": false,
+          "value": 91
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 92
+        },
+        {
+          "is_null": false,
+          "value": 92
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 93
+        },
+        {
+          "is_null": false,
+          "value": 93
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 94
+        },
+        {
+          "is_null": false,
+          "value": 94
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 95
+        },
+        {
+          "is_null": false,
+          "value": 95
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 96
+        },
+        {
+          "is_null": false,
+          "value": 96
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 97
+        },
+        {
+          "is_null": false,
+          "value": 97
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 98
+        },
+        {
+          "is_null": false,
+          "value": 98
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 99
+        },
+        {
+          "is_null": false,
+          "value": 99
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 100
+        },
+        {
+          "is_null": false,
+          "value": 100
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 101
+        },
+        {
+          "is_null": false,
+          "value": 101
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 102
+        },
+        {
+          "is_null": false,
+          "value": 102
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 103
+        },
+        {
+          "is_null": false,
+          "value": 103
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 104
+        },
+        {
+          "is_null": false,
+          "value": 104
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 105
+        },
+        {
+          "is_null": false,
+          "value": 105
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 106
+        },
+        {
+          "is_null": false,
+          "value": 106
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 107
+        },
+        {
+          "is_null": false,
+          "value": 107
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 108
+        },
+        {
+          "is_null": false,
+          "value": 108
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 109
+        },
+        {
+          "is_null": false,
+          "value": 109
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 110
+        },
+        {
+          "is_null": false,
+          "value": 110
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 111
+        },
+        {
+          "is_null": false,
+          "value": 111
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 112
+        },
+        {
+          "is_null": false,
+          "value": 112
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 113
+        },
+        {
+          "is_null": false,
+          "value": 113
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 114
+        },
+        {
+          "is_null": false,
+          "value": 114
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 115
+        },
+        {
+          "is_null": false,
+          "value": 115
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 116
+        },
+        {
+          "is_null": false,
+          "value": 116
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 117
+        },
+        {
+          "is_null": false,
+          "value": 117
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 118
+        },
+        {
+          "is_null": false,
+          "value": 118
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 119
+        },
+        {
+          "is_null": false,
+          "value": 119
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 120
+        },
+        {
+          "is_null": false,
+          "value": 120
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 121
+        },
+        {
+          "is_null": false,
+          "value": 121
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 122
+        },
+        {
+          "is_null": false,
+          "value": 122
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 123
+        },
+        {
+          "is_null": false,
+          "value": 123
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 124
+        },
+        {
+          "is_null": false,
+          "value": 124
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 125
+        },
+        {
+          "is_null": false,
+          "value": 125
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 126
+        },
+        {
+          "is_null": false,
+          "value": 126
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 127
+        },
+        {
+          "is_null": false,
+          "value": 127
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 128
+        },
+        {
+          "is_null": false,
+          "value": 128
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 129
+        },
+        {
+          "is_null": false,
+          "value": 129
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 130
+        },
+        {
+          "is_null": false,
+          "value": 130
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 131
+        },
+        {
+          "is_null": false,
+          "value": 131
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 132
+        },
+        {
+          "is_null": false,
+          "value": 132
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 133
+        },
+        {
+          "is_null": false,
+          "value": 133
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 134
+        },
+        {
+          "is_null": false,
+          "value": 134
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 135
+        },
+        {
+          "is_null": false,
+          "value": 135
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 136
+        },
+        {
+          "is_null": false,
+          "value": 136
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 137
+        },
+        {
+          "is_null": false,
+          "value": 137
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 138
+        },
+        {
+          "is_null": false,
+          "value": 138
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 139
+        },
+        {
+          "is_null": false,
+          "value": 139
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 140
+        },
+        {
+          "is_null": false,
+          "value": 140
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 141
+        },
+        {
+          "is_null": false,
+          "value": 141
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 142
+        },
+        {
+          "is_null": false,
+          "value": 142
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 143
+        },
+        {
+          "is_null": false,
+          "value": 143
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 144
+        },
+        {
+          "is_null": false,
+          "value": 144
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 145
+        },
+        {
+          "is_null": false,
+          "value": 145
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 146
+        },
+        {
+          "is_null": false,
+          "value": 146
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 147
+        },
+        {
+          "is_null": false,
+          "value": 147
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 148
+        },
+        {
+          "is_null": false,
+          "value": 148
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 149
+        },
+        {
+          "is_null": false,
+          "value": 149
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 150
+        },
+        {
+          "is_null": false,
+          "value": 150
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 151
+        },
+        {
+          "is_null": false,
+          "value": 151
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 152
+        },
+        {
+          "is_null": false,
+          "value": 152
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 153
+        },
+        {
+          "is_null": false,
+          "value": 153
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 154
+        },
+        {
+          "is_null": false,
+          "value": 154
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 155
+        },
+        {
+          "is_null": false,
+          "value": 155
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 156
+        },
+        {
+          "is_null": false,
+          "value": 156
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 157
+        },
+        {
+          "is_null": false,
+          "value": 157
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 158
+        },
+        {
+          "is_null": false,
+          "value": 158
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 159
+        },
+        {
+          "is_null": false,
+          "value": 159
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 160
+        },
+        {
+          "is_null": false,
+          "value": 160
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 161
+        },
+        {
+          "is_null": false,
+          "value": 161
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 162
+        },
+        {
+          "is_null": false,
+          "value": 162
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 163
+        },
+        {
+          "is_null": false,
+          "value": 163
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 164
+        },
+        {
+          "is_null": false,
+          "value": 164
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 165
+        },
+        {
+          "is_null": false,
+          "value": 165
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 166
+        },
+        {
+          "is_null": false,
+          "value": 166
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 167
+        },
+        {
+          "is_null": false,
+          "value": 167
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 168
+        },
+        {
+          "is_null": false,
+          "value": 168
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 169
+        },
+        {
+          "is_null": false,
+          "value": 169
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 170
+        },
+        {
+          "is_null": false,
+          "value": 170
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 171
+        },
+        {
+          "is_null": false,
+          "value": 171
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 172
+        },
+        {
+          "is_null": false,
+          "value": 172
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 173
+        },
+        {
+          "is_null": false,
+          "value": 173
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 174
+        },
+        {
+          "is_null": false,
+          "value": 174
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 175
+        },
+        {
+          "is_null": false,
+          "value": 175
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 176
+        },
+        {
+          "is_null": false,
+          "value": 176
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 177
+        },
+        {
+          "is_null": false,
+          "value": 177
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 178
+        },
+        {
+          "is_null": false,
+          "value": 178
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 179
+        },
+        {
+          "is_null": false,
+          "value": 179
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 180
+        },
+        {
+          "is_null": false,
+          "value": 180
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 181
+        },
+        {
+          "is_null": false,
+          "value": 181
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 182
+        },
+        {
+          "is_null": false,
+          "value": 182
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 183
+        },
+        {
+          "is_null": false,
+          "value": 183
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 184
+        },
+        {
+          "is_null": false,
+          "value": 184
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 185
+        },
+        {
+          "is_null": false,
+          "value": 185
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 186
+        },
+        {
+          "is_null": false,
+          "value": 186
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 187
+        },
+        {
+          "is_null": false,
+          "value": 187
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 188
+        },
+        {
+          "is_null": false,
+          "value": 188
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 189
+        },
+        {
+          "is_null": false,
+          "value": 189
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 190
+        },
+        {
+          "is_null": false,
+          "value": 190
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 191
+        },
+        {
+          "is_null": false,
+          "value": 191
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 192
+        },
+        {
+          "is_null": false,
+          "value": 192
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 193
+        },
+        {
+          "is_null": false,
+          "value": 193
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 194
+        },
+        {
+          "is_null": false,
+          "value": 194
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 195
+        },
+        {
+          "is_null": false,
+          "value": 195
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 196
+        },
+        {
+          "is_null": false,
+          "value": 196
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 197
+        },
+        {
+          "is_null": false,
+          "value": 197
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 198
+        },
+        {
+          "is_null": false,
+          "value": 198
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 199
+        },
+        {
+          "is_null": false,
+          "value": 199
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 200
+        },
+        {
+          "is_null": false,
+          "value": 200
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 201
+        },
+        {
+          "is_null": true,
+          "value": null
+        }
+      ]
+    ],
+    "row_count": 201
+  },
+  "two-headers.xlsx": {
+    "schema": [
+      {
+        "name": "Id_Identifier",
+        "label": "Id|Identifier",
+        "type": 4
+      },
+      {
+        "name": "Text_Caption",
+        "label": "Text|Caption",
+        "type": 5
+      },
+      {
+        "name": "Amount_Total",
+        "label": "Amount|Total",
+        "type": 4
+      }
+    ],
+    "rows": [
+      [
+        {
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "is_null": false,
+          "value": "А"
+        },
+        {
+          "is_null": false,
+          "value": 10
+        }
+      ]
+    ],
+    "row_count": 1
+  },
+  "irregular.xlsx": {
+    "schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": 4
+      },
+      {
+        "name": "Text",
+        "label": "Text",
+        "type": 5
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": 4
+      },
+      {
+        "name": "Occurred",
+        "label": "Occurred",
+        "type": 2
+      },
+      {
+        "name": "Active",
+        "label": "Active",
+        "type": 1
+      },
+      {
+        "name": "Formula",
+        "label": "Formula",
+        "type": 4
+      }
+    ],
+    "rows": [
+      [
+        {
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "is_null": false,
+          "value": "nonempty"
+        },
+        {
+          "is_null": false,
+          "value": 0
+        },
+        {
+          "is_null": false,
+          "value": "2026-01-02T03:04:05.000"
+        },
+        {
+          "is_null": false,
+          "value": false
+        },
+        {
+          "is_null": false,
+          "value": 3
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 2
+        },
+        {
+          "is_null": false,
+          "value": ""
+        },
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": false,
+          "value": true
+        },
+        {
+          "is_null": true,
+          "value": null
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 3
+        },
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": true,
+          "value": null
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 4
+        },
+        {
+          "is_null": false,
+          "value": "merged"
+        },
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": true,
+          "value": null
+        }
+      ]
+    ],
+    "row_count": 4
+  },
+  "manual.xlsx": {
+    "schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": 4
+      },
+      {
+        "name": "Caption",
+        "label": "Подпись",
+        "type": 5
+      }
+    ],
+    "rows": [
+      [
+        {
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "is_null": false,
+          "value": "v1"
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 2
+        },
+        {
+          "is_null": false,
+          "value": "v2"
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 3
+        },
+        {
+          "is_null": false,
+          "value": "v3"
+        }
+      ]
+    ],
+    "row_count": 3
+  },
+  "book-a.xlsx": {
+    "schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": 4
+      },
+      {
+        "name": "Text",
+        "label": "Text",
+        "type": 5
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": 4
+      }
+    ],
+    "rows": [
+      [
+        {
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "is_null": false,
+          "value": "v1"
+        },
+        {
+          "is_null": false,
+          "value": 10
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 2
+        },
+        {
+          "is_null": false,
+          "value": "v2"
+        },
+        {
+          "is_null": false,
+          "value": 20
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 3
+        },
+        {
+          "is_null": false,
+          "value": "v3"
+        },
+        {
+          "is_null": false,
+          "value": 30
+        }
+      ]
+    ],
+    "row_count": 3
+  },
+  "empty.xlsx": {
+    "schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": 4
+      },
+      {
+        "name": "Text",
+        "label": "Text",
+        "type": 5
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": 4
+      }
+    ],
+    "rows": [],
+    "row_count": 0
+  },
+  "book-b.xlsx": {
+    "schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": 4
+      },
+      {
+        "name": "Text",
+        "label": "Text",
+        "type": 5
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": 4
+      }
+    ],
+    "rows": [
+      [
+        {
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "is_null": false,
+          "value": "v11"
+        },
+        {
+          "is_null": false,
+          "value": 110
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 2
+        },
+        {
+          "is_null": false,
+          "value": "v12"
+        },
+        {
+          "is_null": false,
+          "value": 120
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 3
+        },
+        {
+          "is_null": false,
+          "value": "v13"
+        },
+        {
+          "is_null": false,
+          "value": 130
+        }
+      ]
+    ],
+    "row_count": 3
+  },
+  "named-fixed.xlsx": {
+    "schema": [
+      {
+        "name": "Id",
+        "label": "Id",
+        "type": 4
+      },
+      {
+        "name": "Text",
+        "label": "Text",
+        "type": 5
+      },
+      {
+        "name": "Amount",
+        "label": "Amount",
+        "type": 4
+      }
+    ],
+    "rows": [
+      [
+        {
+          "is_null": false,
+          "value": 1
+        },
+        {
+          "is_null": false,
+          "value": "А"
+        },
+        {
+          "is_null": false,
+          "value": 10
+        }
+      ],
+      [
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": true,
+          "value": null
+        },
+        {
+          "is_null": true,
+          "value": null
+        }
+      ],
+      [
+        {
+          "is_null": false,
+          "value": 2
+        },
+        {
+          "is_null": false,
+          "value": "Б"
+        },
+        {
+          "is_null": false,
+          "value": 20
+        }
+      ]
+    ],
+    "row_count": 3
+  }
+}
