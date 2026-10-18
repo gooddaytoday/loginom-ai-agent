@@ -100,19 +100,24 @@ for(const fault of ['binding','execution','lease','restore','cleanup','transport
  assert.equal(saved.operation_id,'export-op');assert.equal(saved.status,'AMBIGUOUS');assert.equal(page.storage.size,0);
 });
 
-for(const success of [false,true])test('native export read returns from Files after '+(success?'confirmed download':'the observed refusal without claiming bytes'),async()=>{
+for(const kind of ['download_refusal','success','storage_scroll','unknown_scroll','unclean_scroll','changed_scroll','foreign_storage','scroll_journal_failure'])test('native export read preserves exact refusal boundary: '+kind,async()=>{
+ const success=kind==='success',storage=!['download_refusal','success'].includes(kind);
  let files=false,downloads=0,releases=0,retained=0;const gestures=[],records=[];
+ let scrollTop=0,scrollIssued=false;
  const filesWorkflow={workflow_id:'files',prefix:'MF;TF-2',tab_tid:'files-tab'},targetOrigin='https://loginom.invalid';
  const element=(tid,ref=tid,extra={})=>({tid,ref:'ui-'+ref.replace(/[^a-zA-Z0-9-]/g,'-'),allowed_actions:['click'],...extra});
  const snapshot=()=>({authenticated:true,origin:targetOrigin,loginom_build:'7.4',dom_epoch:{document:'browser',revision:1},
-  workflow_ref:files?filesWorkflow:workflow,ui:{dialogs:[],masks:[],elements:[
+  workflow_ref:files?{...filesWorkflow,...(scrollIssued&&kind==='foreign_storage'?{prefix:'foreign'}:{})}:workflow,wizard:{status:'absent'},ui:{dialogs:[],masks:[],elements:[
    element('MF;cntMain;tlbMainToolbar'),element('MF;cntMain;tlbMainToolbar;btnFilestorage'),
    element('MF;cntMain;cntWorkspace;Workspace;t.br'),element(workflow.tab_tid),element('files-tab'),
    element('MF;TF-2;NavigationBar;NavigationPanel'),element('MF;TF-2;FileStorageForm;btnRefresh'),
-   element('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix('result.csv'),'csv',{label:'result.csv',storage_entry:{bytes:57},allowed_actions:['click','double_click']})]},
+   element('MF;TF-2;FileStorageForm;pnlFileStorage;tbl','file-table'),
+   ...(storage?[element('MF;TF-2;FileStorageForm;colName_other','other',{label:'other',interaction:{state:'point_observed'},
+    scroll:{ref:'ui-scroll-owner',top:scrollIssued&&kind==='changed_scroll'?999:scrollTop,max_top:3000},allowed_actions:['scroll']})]
+    :[element('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix('result.csv'),'csv',{label:'result.csv',storage_entry:{bytes:57},allowed_actions:['click','double_click']})])]},
   file_storage:files?{status:'observed',directory:'/user'}:undefined});
  const options={operation:{id:'export-op'},targetOrigin,targetBuild:'7.4',storageDirectories:{packages:'/user',inputs:'/user',exports:'/user'},
-  onRecord:async e=>{records.push(e);return e;},receiptOptions:()=>({}),
+  onRecord:async e=>{records.push(e);if(kind==='scroll_journal_failure'&&e.phase==='export_file_scroll_refused_restored')throw Error('journal unavailable');return e;},receiptOptions:()=>({}),
   artifactStore:{outputSessionId:'session',stageOutput:async b=>{assert.deepEqual(b,binding);return {artifact_id:'artifact',path:'/private/download.csv',
    release:async()=>{releases++;},retain:async()=>{assert.ok(success);retained++;},verify:async()=>{assert.ok(success);return {artifact_id:'artifact',bytes:57,sha256:'abc'};}};}},
   execute:async code=>{
@@ -123,6 +128,12 @@ for(const success of [false,true])test('native export read returns from Files af
    assert.ok(match,'known native observation or gesture');const task=JSON.parse(match[1]);
    if(task.mode==='act'){
     const tid=task.snapshot.ui.elements.find(e=>e.ref===task.action.ref).tid;gestures.push(tid);
+    if(task.action.verb==='scroll'){
+     assert.equal(scrollIssued,false,'never repeat the refused gesture');scrollIssued=true;scrollTop=1000;
+     return {status:'AMBIGUOUS',action_key:'ui.act',phase:'observing',effect_possible:true,cleanup_complete:kind!=='unclean_scroll',
+      error:{code:'UI_SCAN_LIMIT'},trace:[{event:'ui_scroll_applied',from:0,to:1000,owner_ref:'ui-scroll-owner'},
+       ...(kind==='unknown_scroll'?[]:[{event:'ui_gesture_applied',verb:'scroll'}]),{event:'ui_scan_limit',limit_kind:'time',scan_stage:'data_views'}]};
+    }
     if(tid.endsWith('btnFilestorage'))files=true;
     if(tid===workflow.tab_tid)files=false;
     return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};
@@ -132,11 +143,32 @@ for(const success of [false,true])test('native export read returns from Files af
  const ctx={...node,node,workflow_ref:workflow,execution:{status:'completed',execution_id:'exec'},deadline:Date.now()+10000};
  const result=await readNativeExportFile(options,ctx,{destination:'/user/result.csv',configured:{destination_check:{verified:true,destination:'/user/result.csv',existed:false}}},
   {verified:true,owner_verified:true,status:'completed',execution_id:'exec'}).catch(e=>e);
- if(success){assert.equal(result.artifact_id,'artifact',String(result.stack));assert.equal(retained,1);}
- else{assert.ok(result.nodePhaseRefusal,String(result.stack));assert.equal(verifiedExportReadRefusal(result.nodePhaseRefusal,node,ctx.execution,'export-op'),true);}
- assert.equal(downloads,1);assert.equal(releases,success?0:1);assert.equal(files,false);
- assert.deepEqual(gestures,['MF;cntMain;tlbMainToolbar;btnFilestorage','MF;TF-2;FileStorageForm;btnRefresh',workflow.tab_tid]);
- assert.equal(records.some(r=>r.phase==='export_file_download_refused_restored'),!success);
+ if(storage){
+  assert.equal(downloads,0);assert.equal(retained,0);assert.equal(scrollIssued,true);
+  if(kind==='storage_scroll'){
+   assert.ok(result.nodePhaseRefusal,String(result.stack));assert.equal(verifiedExportReadRefusal(result.nodePhaseRefusal,node,ctx.execution,'export-op'),true);
+   assert.equal(result.nodePhaseRefusal.proof.storage_step.download_started,false);assert.equal(files,false);assert.equal(releases,1);
+   const {f,job,page}=await stoppedExport(result.nodePhaseRefusal);
+   assert.equal(job.outcome.status,'FAILED');assert.equal(job.outcome.output.pending_phase,null);assert.equal(f.hasUnsettledWork(),false);
+   assert.equal(job.outcome.output.next_step.tool,'dock_action_run');assert.match(job.outcome.output.next_step.instruction,/package.save_checkpoint/);
+   const saved=await f.run('package.save_checkpoint',{path:'/user/data/packages/scroll-refusal.lgp',conflict_policy:'fail'},{operationId:'save-scroll-refusal'});
+   assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));assert.equal(page.packagePath,'/user/data/packages/scroll-refusal.lgp');
+   for(const change of [p=>{p.proof.storage_step.download_started=true;},p=>{p.proof.storage_step.observed_scroll.top=999;},p=>{p.proof.storage_step.moved.owner_ref='foreign';}]){
+    const forged=structuredClone(result.nodePhaseRefusal);change(forged);const blocked=await stoppedExport(forged);
+    assert.equal(blocked.job.outcome.status,'AMBIGUOUS');assert.equal(blocked.job.outcome.output.pending_phase,'read');assert.equal(blocked.f.hasUnsettledWork(),true);
+   }
+  }else{
+   assert.ok(result instanceof Error);assert.equal(result.nodePhaseRefusal,undefined);
+   assert.equal(gestures.includes(workflow.tab_tid),kind==='scroll_journal_failure');
+  }
+  assert.equal(records.some(r=>r.phase==='export_file_scroll_refused_restored'),['storage_scroll','scroll_journal_failure'].includes(kind));
+ }else{
+  if(success){assert.equal(result.artifact_id,'artifact',String(result.stack));assert.equal(retained,1);}
+  else{assert.ok(result.nodePhaseRefusal,String(result.stack));assert.equal(verifiedExportReadRefusal(result.nodePhaseRefusal,node,ctx.execution,'export-op'),true);}
+  assert.equal(downloads,1);assert.equal(releases,success?0:1);assert.equal(files,false);
+  assert.deepEqual(gestures,['MF;cntMain;tlbMainToolbar;btnFilestorage','MF;TF-2;FileStorageForm;btnRefresh',workflow.tab_tid]);
+ }
+ assert.equal(records.some(r=>r.phase==='export_file_download_refused_restored'),kind==='download_refusal');
  assert.equal(records.some(r=>r.phase==='export_file_bytes_verified'),success);
  assert.equal(records.some(r=>r.phase==='export_file_read_completed'),success);
 });
