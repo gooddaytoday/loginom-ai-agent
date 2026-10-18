@@ -2486,3 +2486,38 @@ test("thirteenth quantity and warning continuations compose without donating tru
     }
   } finally { await rm(f.root, { recursive: true, force: true }) }
 }, 30000)
+
+test("thirteenth adjunct scopes preserve every warning argument without treating context words as predicates", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const context of [" following analysis of the saved file", " after the file was reviewed", " while the file was saved"]) {
+      for (const state of [0, 1, 2, 3]) {
+        Object.assign(receipt.value!, { warnings: [...(state & 1 ? [{ code: "CODE" }] : []), ...(state & 2 ? [{ code: "W_PEER" }] : [])] })
+        for (const negative of [false, true]) for (const reverse of [false, true]) {
+          const a = "CODE", b = `${negative ? "not " : ""}W_PEER`
+          await f.write(`Data is corrupted. The engine issued warnings ${reverse ? b : a}${context} and ${reverse ? a : b}.`)
+          const result = await validateNodeAttempt(f.task, f.attempt)
+          expect(result.errors).toEqual([])
+          expect(result.failures.length === 0).toBe(Boolean(state & 1) && (negative ? !(state & 2) : Boolean(state & 2)))
+        }
+      }
+      for (const thirdPresent of [false, true]) {
+        Object.assign(receipt.value!, { warnings: [{ code: "CODE" }, { code: "W_PEER" }, ...(thirdPresent ? [{ code: "Ω_THIRD" }] : [])] })
+        await f.write(`Data is corrupted. The engine issued warnings CODE${context}, W_PEER${context}, and [Ω_THIRD].`)
+        const result = await validateNodeAttempt(f.task, f.attempt)
+        expect(result.errors).toEqual([])
+        expect(result.failures.length === 0).toBe(thirdPresent)
+      }
+    }
+    Object.assign(receipt.value!, { warnings: [{ code: "CODE" }] })
+    for (const text of [
+      "The warning CODE was emitted by the engine and W_PEER is a filename.",
+      "The engine issued warning CODE following analysis of the saved file and W_PEER was saved in a message.",
+      "The engine issued warning CODE after the file was reviewed and the engine did not issue warning W_PEER.",
+    ]) {
+      await f.write("Data is corrupted. " + text)
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
