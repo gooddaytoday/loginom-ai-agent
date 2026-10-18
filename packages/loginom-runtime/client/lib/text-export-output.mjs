@@ -137,7 +137,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  need(owner.verified&&owner.surface==='graph','Export graph changed before file read');
  const fileBinding={session_id:artifactStore.outputSessionId,document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,node_id:ctx.node.node_id,execution_id:ctx.execution.execution_id,destination};
  const lease=await artifactStore.stageOutput(fileBinding),name=destination.split('/').at(-1),directory=destination.slice(0,-name.length-1);
- let sequence=0,uncertain=false,retained=false,released=false,observationDocument=null;
+ let sequence=0,uncertain=false,retained=false,released=false,downloadStarted=false,observationDocument=null;
  const guard=()=>{ctx.signal?.throwIfAborted();need(Date.now()<ctx.deadline,'Export file read deadline elapsed');};
  const record=async(phase,data)=>{const r=await onRecord({phase,operation_id:operation.id,...data});need(r?.phase===phase&&r.operation_id===operation.id,'Export file receipt not acknowledged');};
  const base={expected_origin:targetOrigin,expected_build:targetBuild};
@@ -165,6 +165,13 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   await record('export_file_step_prepared',{id,action,signature});uncertain=true;
   const r=await execute(withBrowserReceipt('('+makeWorkspaceUiCode({mode:'act',snapshot:s,action,...base})+')(page)',{...receiptOptions(id,'ui.act',signature),operation_id:id}));
   await record('export_file_step_completed',{id,outcome:r});uncertain=r.cleanup_complete!==true;
+  const moved=r.trace?.find(t=>t.event==='ui_scroll_applied'),scan=r.trace?.find(t=>t.event==='ui_scan_limit');
+  if(!downloadStarted&&verb==='scroll'&&r.action_key==='ui.act'&&r.status==='AMBIGUOUS'&&r.phase==='observing'
+   &&r.effect_possible===true&&!uncertain&&r.error?.code==='UI_SCAN_LIMIT'&&scan?.limit_kind==='time'&&scan.scan_stage==='data_views'
+   &&moved?.owner_ref===e.scroll?.ref&&moved.from===e.scroll.top&&Number.isFinite(moved.to)&&moved.to!==moved.from
+   &&moved.to>=0&&moved.to<=e.scroll.max_top&&r.trace.some(t=>t.event==='ui_gesture_applied'&&t.verb==='scroll'))
+   throw Object.assign(Error('Export storage scroll applied but its observation was limited'),{exportStorageScroll:{id,original,
+    expected:e.scroll,moved:{from:moved.from,to:moved.to,owner_ref:moved.owner_ref}}});
   if(r.status==='NOT_APPLIED'&&r.effect_possible===false&&r.cleanup_complete===true&&r.error?.code==='UI_EPOCH_CHANGED'&&attempt<2){
    // Keep the stable table root during scroll retries: virtual rows can
    // detach after the gesture, so they cannot own its post-observation.
@@ -220,7 +227,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
     snapshot,file_ref:file.ref,observation_id:snapshot.observation_id,download_path:lease.path};
    const signature=createHash('sha256').update(JSON.stringify({...task,download_path:undefined})).digest('hex');
    await record('export_file_download_prepared',{binding:fileBinding,artifact_id:lease.artifact_id,bytes,id,signature});
-   guard();uncertain=true;
+   guard();uncertain=true;downloadStarted=true;
    const result=await execute(withBrowserReceipt('('+makeNativeOutputDownloadCode(task)+')(page)',{...receiptOptions(id,'artifact.download',signature),operation_id:id}));
    await record('export_file_download_completed',{id,outcome:result});uncertain=result.cleanup_complete!==true;return result;
   }});
@@ -237,5 +244,26 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   await record('export_file_bytes_verified',{binding:fileBinding,result});
   const restored=await returnToWorkflow();
   await lease.retain();retained=true;await record('export_file_read_completed',{result,workflow_return_verified:true});options.rememberStorageContinuation?.(restored.continuation);return result;
+ }catch(error){
+  const scroll=error.exportStorageScroll;
+  if(!scroll||downloadStarted||uncertain||scroll.original.directory!==directory)throw error;
+  const fresh=await read({root_ref:scroll.original.root}),observed=fresh.ui.elements.map(e=>e.scroll)
+   .filter(s=>s?.ref===scroll.moved.owner_ref);
+  need(quiet(fresh)&&fresh.wizard?.status==='absent'&&fresh.file_storage?.status==='observed'&&fresh.file_storage.directory===scroll.original.directory
+   &&JSON.stringify(fresh.workflow_ref)===JSON.stringify(scroll.original.workflow)
+   &&JSON.stringify(fresh.package_identity)===JSON.stringify(scroll.original.package)&&observed.length>0
+   &&observed.every(s=>s.top===scroll.moved.to&&s.max_top===scroll.expected.max_top),'Export scroll outcome is not freshly observed');
+  const restored=await returnToWorkflow(),graph=await roots();
+  need(quiet(graph)&&JSON.stringify(graph.workflow_ref)===JSON.stringify(ctx.workflow_ref)
+   &&restored.node_context.locked===false,'Export scroll refusal workflow is not quiet or changed');
+  await lease.release();released=true;
+  const proof={binding:fileBinding,storage_step:{operation_id:scroll.id,verb:'scroll',status:'AMBIGUOUS',phase:'observing',
+   code:'UI_SCAN_LIMIT',limit_kind:'time',scan_stage:'data_views',cleanup_complete:true,download_started:false,
+   directory:scroll.original.directory,expected_scroll:scroll.expected,moved:scroll.moved,observed_scroll:observed[0]},
+   restored:{verified:true,cleanup_complete:true,quiet:true,node_context:restored.node_context},lease_released:true};
+  await record('export_file_scroll_refused_restored',{proof});
+  throw Object.assign(Error('The export completed, but storage scrolling could not finish its observation. Its scroll position was freshly confirmed, no download was started, and the original quiet workflow is restored. Save the scenario and report downloading as unconfirmed; do not repeat the export.'),
+   {nodePhaseRefusal:{phase:'read',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+    verification:'text_export_storage_refused_restored',proof}});
  }finally{if(!uncertain&&!retained&&!released)await lease.release();}
 }

@@ -128,3 +128,41 @@ test('created node without verified rendered bounds cannot silently use a point'
  const f=fixture();f.args.nodeId='missing';
  await assert.rejects(revealNodePlacement(f.args),/footprint unavailable/);assert.equal(f.state().clicks,0);
 });
+
+function overflowFixture({foreign=false,missing=false,wrongIcon=false,ambiguous=false,changed=false}={}){
+ const f=fixture();let menuOpen=false,triggers=0,items=0;
+ const old=f.args.page.locator;
+ const toggle=old('[data-tid="MF;TF;ModelForm;btnShowOutline"]');
+ const item={count:async()=>foreign||missing?0:ambiguous?2:1,isVisible:async()=>menuOpen,
+  locator:s=>{assert.equal(s,'.bg-icon-preview');return {count:async()=>wrongIcon?0:1};},
+  click:async()=>{assert.ok(menuOpen);items++;await toggle.click();}};
+ const menu={count:async()=>menuOpen?1:0,isVisible:async()=>menuOpen,
+  waitFor:async({state})=>assert.equal(menuOpen,state==='visible'),
+  locator:s=>{assert.equal(s,'[role="menuitem"][data-qtip="Показать карту сценария"]');return item;}};
+ f.args.prefix='MF;TF-7';
+ f.args.page.locator=s=>{
+  if(s==='[data-tid="MF;TF-7;ModelForm;btnShowOutline"]')return {...toggle,isVisible:async()=>false,getAttribute:async()=> 'Показать карту сценария'};
+  if(s==='[data-tid="MF;TF-7;ModelForm;tlbModel;b"]')return {count:async()=>1,isVisible:async()=>true,click:async()=>{triggers++;menuOpen=!menuOpen;}};
+  if(s==='[data-tid="MF;TF-7;ModelForm;tlbModel;b;mn"]')return menu;
+  assert.equal(s,'[data-tid="MF;TF-7;ModelForm;cntDiagram"]');return old('[data-tid="MF;TF;ModelForm;cntDiagram"]');
+ };
+ const guard=f.args.guard;f.args.guard=async()=>{await guard();if(changed&&triggers)throw Error('Graph changed');};
+ return {...f,overflow:()=>({menuOpen,triggers,items})};
+}
+test('hidden native outline button opens its exact form overflow, reveals target and restores both menus',async()=>{
+ const f=overflowFixture();const run=runInNewContext('('+revealNodePlacement.toString()+')');
+ const r=await run(f.args);
+ assert.equal(r.fully_visible,true);assert.equal(r.zoom_steps,2);assert.equal(r.outline_closed,true);
+ assert.deepEqual(f.overflow(),{menuOpen:false,triggers:4,items:2});assert.equal(f.state().open,false);
+});
+test('foreign or missing outline items, wrong icons and ambiguous items never toggle or zoom',async()=>{
+ for(const options of [{foreign:true},{missing:true},{wrongIcon:true},{ambiguous:true}]){
+  const f=overflowFixture(options);await assert.rejects(revealNodePlacement(f.args),/outline menu item unavailable/);
+  assert.equal(f.overflow().items,0);assert.equal(f.overflow().menuOpen,false);assert.equal(f.state().clicks,0);
+ }
+});
+test('graph change after opening overflow refuses the outline gesture',async()=>{
+ const f=overflowFixture({changed:true});
+ await assert.rejects(revealNodePlacement(f.args),e=>e.message==='Graph changed'&&e.placement_navigation_unverified===true);
+ assert.equal(f.overflow().items,0);assert.equal(f.state().clicks,0);
+});
