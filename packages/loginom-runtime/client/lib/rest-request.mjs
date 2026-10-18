@@ -68,9 +68,19 @@ export async function restRequestCapability(page,t,readContext){
     const exact=tid=>document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']');
     if(!p||exact(root).length!==1||c.FView.el.dom!==exact(root)[0]||exact(base.slice(0,-1)).length!==1||p.FView.el.dom!==exact(base.slice(0,-1))[0]||!c.FCardLayout.getActiveItem().el.dom.contains(p.FView.el.dom)
      ||p.FItems.grdFields.getStore()!==p.FColumnsStore||p.FItems.grdParams.getStore()!==p.FGrdParamStore||p.FColumnsStore.loading||p.FGrdParamStore.loading||p.FRequestParamLinks.loading||p.FRequestParamLinks.complete!==true)throw Error('Native REST binding inventories are unavailable');
-    const columns=p.FColumnsStore.getRange().map(r=>({name:r.data.Name,type:r.data.DataType}));
-    const parameters=p.FParamStore.getRange().map(r=>({name:r.data.Name,type:r.data.DataType}));
-    const links=p.FRequestParamLinks.getRange().map(r=>({name:r.data.ParamName,field:r.data.ColumnName}));
+    const columnRows=p.FColumnsStore.getRange(),parameterRows=p.FParamStore.getRange();
+    const columns=columnRows.map(r=>({name:r.data.Name,type:r.data.DataType}));
+    const parameters=parameterRows.map(r=>({name:r.data.Name,type:r.data.DataType}));
+    // AutoLink changes the rendered draft; FRequestParamLinks still contains
+    // the saved bindings until the wizard commits its page.
+    const grid=p.FItems.pnlLinkGrid,draw=grid?.FLinkDrawContainer;
+    if(!draw||draw.FOwner!==grid||!draw.FLinks||typeof draw.FLinks!=='object')throw Error('Native REST draft links are unavailable');
+    const pairs=Object.values(draw.FLinks);
+    if(pairs.length>32)throw Error('REST binding inventory exceeds bound');
+    const links=pairs.map(pair=>{
+     if(!Array.isArray(pair)||pair.length!==2||!columnRows.includes(pair[0])||!parameterRows.includes(pair[1]))throw Error('REST draft link records differ from the bound inventories');
+     return {name:pair[1].data.Name,field:pair[0].data.Name};
+    });
     if(columns.length>1000||parameters.length>32||links.length>32)throw Error('REST binding inventory exceeds bound');
     return {method:w.FVerb,columns,parameters,links};
    },{root,base});
