@@ -1,0 +1,93 @@
+{
+  "utc": "2026-10-18T16:20:08.674900+00:00",
+  "candidate": "5fd6148754a7cdf5fd45bebcceb0b8fb59ed340d",
+  "parent": "83ceaff967408a6a08d025103b4c3e53e23af874",
+  "tree": "a2e9d9d4e7a8c3bd530d942820513ae70a7fe405",
+  "one_ordinary_commit": true,
+  "two_changed_files": [
+    "evals/script/check-text-import.py",
+    "evals/test/text-import-evidence.test.ts"
+  ],
+  "archive_bytes": 37478535,
+  "archive_sha256": "06bb220751502b8b874949dbfdb925729ef51b022e357c4d1f5c2409317f5bf0",
+  "manifest_bytes": 1040362,
+  "manifest_sha256": "5f12995a20ab9866e33d78b1d865ba08973866be9a1e9e38fec3942545d64c4b",
+  "members": 5126,
+  "payloads": 5125,
+  "payload_bytes": 595297286,
+  "safe_unique_exact_membership_all_hash_sizes_crc": true,
+  "standalone_reports_bundle_equal": true,
+  "original_case_bytes_verified": 140,
+  "source_Git_blobs_verified": 2,
+  "patch_byte_equal_abbrev9": true,
+  "AST": {
+    "unchanged": [
+      "after",
+      "audit",
+      "bound_report_facts",
+      "calls_from",
+      "claim_asserted",
+      "claim_status",
+      "configuration_matches",
+      "damage_diagnosed",
+      "diagnostic",
+      "known_refusal",
+      "native_application",
+      "native_events",
+      "native_execution",
+      "package_graph",
+      "positive",
+      "public_output",
+      "refusal_explained",
+      "refusal_witness",
+      "rejection",
+      "report_complements",
+      "report_name_role",
+      "report_normalize",
+      "report_number_value",
+      "report_regions",
+      "report_text",
+      "report_truth",
+      "request_owner",
+      "require",
+      "settled_receipt",
+      "source_bindings",
+      "typed_table",
+      "unused_structural_ports"
+    ],
+    "changed": [
+      "report_count_relation",
+      "report_sentences",
+      "warning_arguments",
+      "warning_facts"
+    ],
+    "added": [
+      "report_predicate_head"
+    ]
+  },
+  "MODEL_sha256": "3da759e5248123f9e07280d640a831edd140bc827355bf670f81d639bfa71bb0",
+  "pre_edit_gate": {
+    "utc": "2026-10-18T15:53:50.049417+00:00",
+    "public_RED_completed": "2026-10-18T15:53:34.992043+00:00",
+    "original_RED": "396PASS12FAIL408tests11290assertions",
+    "source_test_hash_bound": true,
+    "author_records_not_external_edit_time_attestation": true
+  },
+  "full_suite_author_report": {
+    "pass": 1022,
+    "skip": 15,
+    "fail": 0,
+    "assertions": 14783,
+    "tests": 1037,
+    "files": 59
+  },
+  "source_executed": false,
+  "full_source_tar_independently_streamed_by_root": false,
+  "new_physical_calls": 0,
+  "integrated": false,
+  "independent_Ben_ACCEPT_present": false,
+  "portable_Git_bytes_verified": 145,
+  "portable_source_verification_sha256": "643b30964609959408f30e515bfa71fe0753e461527a868b65ade532dd5e381a",
+  "durable_mirror": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-checker-rework14-5fd61487-ready-delivery",
+  "mirror_provenance": "Exact immutable author archive/parts matched independent local official downloads, standalone files matched archive bytes; all5125 payload hashes/sizes/CRC checked before extraction; no source execution."
+}

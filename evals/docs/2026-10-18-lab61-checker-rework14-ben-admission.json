@@ -1,0 +1,622 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "kind": "FULL_INDEPENDENT_OFFLINE_BEN_ADMISSION",
+  "intent_id": "LAB61-BEN-REVIEW-REWORK14-5fd61487-01a14fcd",
+  "trigger_report_id": "01a14fcd-135d-73e7-b89b-90e11917b9f4",
+  "candidate": {
+    "sha": "5fd6148754a7cdf5fd45bebcceb0b8fb59ed340d",
+    "authorization_base": "83ceaff967408a6a08d025103b4c3e53e23af874",
+    "direct_parent": "83ceaff967408a6a08d025103b4c3e53e23af874",
+    "commits": [
+      "5fd6148754a7cdf5fd45bebcceb0b8fb59ed340d"
+    ],
+    "branch": "lab61-owned-arguments",
+    "tree": "a2e9d9d4e7a8c3bd530d942820513ae70a7fe405",
+    "clean_source": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-owned-arguments",
+    "checker_sha256": "d43df61d86f3bf138a19a5dff930dc6fcb3ace89465ac3969eb2f50ce5a1ed59",
+    "test_sha256": "950c3e0a15d3983266cfeefc8ec9fa2896745d7d0e6899ec4a472b18460106f5",
+    "source_delta": [
+      "evals/script/check-text-import.py",
+      "evals/test/text-import-evidence.test.ts"
+    ],
+    "AST": {
+      "unchanged": [
+        "require",
+        "calls_from",
+        "after",
+        "source_bindings",
+        "request_owner",
+        "rejection",
+        "native_events",
+        "configuration_matches",
+        "native_application",
+        "native_execution",
+        "public_output",
+        "typed_table",
+        "unused_structural_ports",
+        "package_graph",
+        "settled_receipt",
+        "known_refusal",
+        "report_text",
+        "report_normalize",
+        "report_number_value",
+        "report_complements",
+        "report_regions",
+        "claim_status",
+        "claim_asserted",
+        "bound_report_facts",
+        "report_name_role",
+        "refusal_witness",
+        "refusal_explained",
+        "report_truth",
+        "damage_diagnosed",
+        "diagnostic",
+        "positive",
+        "audit"
+      ],
+      "changed": [
+        "warning_arguments",
+        "report_sentences",
+        "report_count_relation",
+        "warning_facts"
+      ],
+      "added": [
+        "report_predicate_head"
+      ]
+    },
+    "full_Git_archive_sha256": "a5b3347fed0490d201e9ed51f58738175da267d5d02f6d8160ca32a5fde69d50"
+  },
+  "official_delivery": {
+    "root": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework14-ready-01a14fcd/extracted",
+    "payloads": 5125,
+    "archive_sha256": "06bb220751502b8b874949dbfdb925729ef51b022e357c4d1f5c2409317f5bf0",
+    "manifest_sha256": "5f12995a20ab9866e33d78b1d865ba08973866be9a1e9e38fec3942545d64c4b",
+    "attachments": [
+      {
+        "id": "01a14fcd-0b66-7f29-8e19-41ad871557e7",
+        "filename": "REPORT.md",
+        "bytes": 3885
+      },
+      {
+        "id": "01a14fcd-0bf1-74e4-8119-1e6da980b792",
+        "filename": "REPORT.json",
+        "bytes": 156825
+      },
+      {
+        "id": "01a14fcd-0c17-76dc-ac5b-aa55ab78fb53",
+        "filename": "README.md",
+        "bytes": 3790
+      },
+      {
+        "id": "01a14fcd-0c39-7721-8412-ccd64f85efa1",
+        "filename": "candidate.bundle",
+        "bytes": 6331
+      },
+      {
+        "id": "01a14fcd-0c57-7e2e-91cf-49bedca6c476",
+        "filename": "lab61-checker-rework14-5fd61487-delivery.json",
+        "bytes": 2916
+      },
+      {
+        "id": "01a14fcd-0d1d-748d-86be-c08e766d1d14",
+        "filename": "lab61-checker-rework14-5fd61487-ready.zip.part-001",
+        "bytes": 4194304
+      },
+      {
+        "id": "01a14fcd-0df3-7091-ad98-8fb905714376",
+        "filename": "lab61-checker-rework14-5fd61487-ready.zip.part-002",
+        "bytes": 4194304
+      },
+      {
+        "id": "01a14fcd-0ed9-77a4-9f35-3d46c8f3a38f",
+        "filename": "lab61-checker-rework14-5fd61487-ready.zip.part-003",
+        "bytes": 4194304
+      },
+      {
+        "id": "01a14fcd-0f94-7e98-9867-ee57dd177efb",
+        "filename": "lab61-checker-rework14-5fd61487-ready.zip.part-004",
+        "bytes": 4194304
+      },
+      {
+        "id": "01a14fcd-1077-78bf-a719-f51ac402e3ab",
+        "filename": "lab61-checker-rework14-5fd61487-ready.zip.part-005",
+        "bytes": 4194304
+      },
+      {
+        "id": "01a14fcd-1122-72e3-baf4-12187fd00828",
+        "filename": "lab61-checker-rework14-5fd61487-ready.zip.part-006",
+        "bytes": 4194304
+      },
+      {
+        "id": "01a14fcd-11d0-7dd3-bf39-1030a85e7562",
+        "filename": "lab61-checker-rework14-5fd61487-ready.zip.part-007",
+        "bytes": 4194304
+      },
+      {
+        "id": "01a14fcd-128d-73fe-b818-79c415a81b85",
+        "filename": "lab61-checker-rework14-5fd61487-ready.zip.part-008",
+        "bytes": 4194304
+      },
+      {
+        "id": "01a14fcd-132e-7d5e-96cc-99f17ae3eea7",
+        "filename": "lab61-checker-rework14-5fd61487-ready.zip.part-009",
+        "bytes": 3924103
+      }
+    ],
+    "bundle_sha256": "e4b0bd9bf3fb17a42e4e0b283399762ff195647605e60a396f96726812e382ce",
+    "diff_sha256": "c1e3972d90bf80e5a58c5e22c39bb0a0516d7ba3d2ad3ed182b6ff7704a63b75"
+  },
+  "Evaler_verification": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/roles/evaler/work/lab61-rework14-ready-01a14fcd/evaler-verification.json",
+    "sha256": "0c48f378a925e7480b92bb5ff5f9b5b8ef4524fcdece2026dc59936aacd4625e",
+    "scope": "delivery/preservation/chronology/source bindings, not independent Ben acceptance or an E full-suite rerun"
+  },
+  "canonical_contract": {
+    "canonical_md": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-eval-contract-table.md",
+    "md_sha256": "b82a7ec8581906308bc6669c3155e398da20dcf5677978d7bf13efa63f63b275",
+    "canonical_json": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-eval-contract-table.json",
+    "json_sha256": "d868bd636b33004bd945c414d591772b9e37d6c279d3c9d784499157c9e5a97f",
+    "owner_sha256": "249ed1ea8b253736ae236d1aea53916de0227888f95f1ecb355cfa27dd467ee0",
+    "before_next_admission": true,
+    "task_or_criteria_bytes_changed": false,
+    "new_physical_calls": 0
+  },
+  "owner_context_already_applied": {
+    "owner_sha256": "249ed1ea8b253736ae236d1aea53916de0227888f95f1ecb355cfa27dd467ee0",
+    "canonical_table_all10_done_no_repeat": true,
+    "operator_static_note_sha256": "c5515cb9f319201d7748c52f7da230c1972f51bc72e7e5e201c885391919d383",
+    "prior_general_root_guidance_already_applied": true,
+    "current_authorization_decision_sha256": "6d13a5ef8d4ed6416b7e3ce6ef16a5c42d8c822ee767bd7bbe6589284e95d04d"
+  },
+  "scope": [
+    "One full independent exact clean-source review of the single commit83ce→5fd61487, all MODEL, whole diff and all ten original scenarios. Record current expectations before opening author materials, preserve original inputs-only b9d2b534 and disclose aggregates known from mandatory delta/admission. Do not claim a new blind calculation. Do not patch author code.",
+    "Apply the existing canonical10 table and original TASK/SPEC/acceptance/outcome. For each finding show original requirement→input/evidence→correct assessment→actual wrong assessment. Valid new finite counterexamples remain allowed; any new criterion must be referred explicitly to Evaler. No mandatory wording/format/native warning, LLM judge, per-string exception or universal NLU target.",
+    "Review preservation of predicate-owned warning arguments across comma-delimited and parenthesized context, literal CODE/КОД versus optional label, per-argument polarity, and engine/agent/mention/receiver/relative/passive boundaries. A new subject/predicate must terminate inappropriate emitter inheritance; ordinary adjunct punctuation must not lose the next same-predicate ID. Native structured code identity is authoritative; message mention is not evidence. Audit changed functions/new pure report_predicate_head, not just unchanged AST.",
+    "Review shared finite quantity value grammar and postnominal active/passive requested/observed role markers with explicit and inherited field units. Require positive witnesses, reject contradictory sibling totals, preserve object/role/unit/local polarity and existing exclusion rules. No new TASK dictionary or obligatory word order. Exercise finite compositions and path intersections beyond Ben strings.",
+    "Independently reproduce complete immutable83ce public RED396PASS12FAIL/408tests/11290assertions on final950c3e0a test bytes, MODEL3da759e5 and own360 frozen inputs before first checker/prototype edit, then focused18PASS/390filtered on the same bytes. Source-red checker is parent007a8aec, final checker isd43df61d. Final tests are identical to this RED, distinct from prior stage c4be. Records/timestamps are source/log bindings, not external edit-time attestation.",
+    "Independently run final full suite from evals using bun test --timeout 30000 and bun typecheck on Node24.19.0/Bun1.3.14. Author claim1022PASS15SKIP0FAIL/14783assertions/1037tests59files; all408 public tests covered inside full suite. No standalone408 public GREEN claim. Preserve earlier5s/30s/FAIL/ERROR/timeout outcomes; native deadlines unchanged; no unchanged failure repeat for PASS.",
+    "Replay current count110/reader107/full428/emitter10/full40, paired14/4/16 and own360; parent own303/360→final360/360. Previous2118 plus42/84/336 =2580, seven unchanged portable2309/1847/1583/1429/1227/951/715, context8/span120/composition128/argument144/mixed24/quote32/count26/equivalence2458, negative96/positive9/native-initial18+18/omitted-error:null. Verify actual final checker hash in reports/rows; preserve genuine precommit dirty-base Git labels. Disclose overlaps and synthetic repetitions; full428=107×4, not genuine histories.",
+    "Preserve prior rework13 two separate TDD stages, its b2 intermediate errors/followup, original six wrong-b2 wrapper bindings versus qualified final reports, initial NameError and cleanup refusal with active readers. Current portable-root uses real files; verify both current source binding and immutable old script bytes. Never rename historical labels or silently replace old errors. The E initial preservation-root adaptation error is retained separately and corrected before admission, with no source/state effects.",
+    "Review all10 original cases and30 genuine archived histories: full typed/native data, exact request/source/settings/delivery/operation and owner bindings, known refusal/initial draft-close/noExecute proof, actual archived Luna/high, once/ledger and unused reservation carry-forward. Produce separate derived reports tied to final Git/checker SHA. Preserve raw Rich3/7, Ben2/8, wrapperERROR0attempts and original execution provenance6d6+3twoe+initiala2ba.",
+    "Separate eval quality, measured product PASS/FAIL and technical uncertainty. Four valid measured FAIL are not a reason to reject trustworthy eval or repair product for PASS: Rich repeatedApply txt-delimiter and delivery csv-encoding; Ben repeatedprepare/three deliveries csv-encoding and unproved assigned duplicate-source binding csv-headers. Each retains evidence. Current derived reference10PASS/Rich8PASS2FAIL/Ben8PASS2FAIL/ERROR0 are not new physical attempts or substituted raw outcomes.",
+    "REPORT.preserved_usage_snapshot cap13 is historical before the explicit13→14 decision; active metadata cap14 and all old/new/completed/fresh bindings remain authoritative. Physical reference15/Rich10/Ben10/recovery1/probes0/once/ledger unchanged. No new model or native calls, no budget reset; fresh REJECT15 exceeds cap14 and requires a separate Evaler decision.",
+    "Verify own offline cleanup plus historical genuine completion→ordinary RELEASED and own fresh read-only healthy FREE. No new lease/browser/native/admission/model/reference/product/probe/recovery/build/install/OS/reload/integration, no fabricated new completion/release/FREE lifecycle. Unknown effect/cleanup or infrastructure ERROR cannot be ACCEPT.",
+    "Return all reproducible findings in one verdict. All10covered/correct outcomes accepted/violations rejected/known defects closed, independent Ben ACCEPT and original evidence/model/cleanup/freshFREE gates permit acceptance despite legitimate product FAIL. Integration and LAB62–63 stay separate gates."
+  ],
+  "test_bindings": {
+    "MODEL_sha256": "3da759e5248123f9e07280d640a831edd140bc827355bf670f81d639bfa71bb0",
+    "public_RED": "396PASS12FAIL/408tests",
+    "same_RED_GREEN_test_sha256": "950c3e0a15d3983266cfeefc8ec9fa2896745d7d0e6899ec4a472b18460106f5",
+    "focused_GREEN": "18PASS/390filtered",
+    "final_full": {
+      "pass": 1022,
+      "skip": 15,
+      "fail": 0,
+      "assertions": 14783,
+      "tests": 1037,
+      "files": 59
+    },
+    "pre_edit_gate": {
+      "utc": "2026-10-18T15:53:50.049417+00:00",
+      "unchanged_parent_checker": true,
+      "first_checker_or_prototype_edit_not_started": true,
+      "frozen": {
+        "base": "83ceaff967408a6a08d025103b4c3e53e23af874",
+        "checker": "007a8aecbc91500b5b5e28e338383cd5ff020d8e49bd8cf528f52e1a80815ce7",
+        "tests": "950c3e0a15d3983266cfeefc8ec9fa2896745d7d0e6899ec4a472b18460106f5",
+        "MODEL": "3da759e5248123f9e07280d640a831edd140bc827355bf670f81d639bfa71bb0",
+        "own_warning_inputs": "a41b1a3c58daff686faa6b66318822f1f017affad9fcd1cf33972c8990f24dc2",
+        "recorded_utc": "2026-10-18T15:50:34.889938+00:00",
+        "checker_edits": 0,
+        "RED_command_hashes_are_authoritative": true
+      },
+      "completed_RED": {
+        "parent-ben-full428": {
+          "argv": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/scripts/rereview-83c-warning-full.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/fixtures",
+            "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-owned-arguments/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/parent-ben/full428",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/rereview-83c-warning-controls.json"
+          ],
+          "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence",
+          "started_utc": "2026-10-18T15:46:39.553657+00:00",
+          "source_hashes": {
+            "evals/script/check-text-import.py": "007a8aecbc91500b5b5e28e338383cd5ff020d8e49bd8cf528f52e1a80815ce7",
+            "evals/test/text-import-evidence.test.ts": "950c3e0a15d3983266cfeefc8ec9fa2896745d7d0e6899ec4a472b18460106f5"
+          },
+          "exit_code": 0,
+          "elapsed_seconds": 146.30714560486376,
+          "completed_utc": "2026-10-18T15:49:05.861314+00:00"
+        },
+        "parent-ben-reader-pairs4": {
+          "argv": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/scripts/rereview-83c-warning-reader.py",
+            "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-owned-arguments/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/parent-ben/reader-pairs4.json",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/rereview-83c-warning-pairs.json"
+          ],
+          "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence",
+          "started_utc": "2026-10-18T15:46:57.333650+00:00",
+          "source_hashes": {
+            "evals/script/check-text-import.py": "007a8aecbc91500b5b5e28e338383cd5ff020d8e49bd8cf528f52e1a80815ce7",
+            "evals/test/text-import-evidence.test.ts": "950c3e0a15d3983266cfeefc8ec9fa2896745d7d0e6899ec4a472b18460106f5"
+          },
+          "exit_code": 0,
+          "elapsed_seconds": 0.11415165895596147,
+          "completed_utc": "2026-10-18T15:46:57.448270+00:00"
+        },
+        "parent-ben-count-pairs14": {
+          "argv": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/scripts/rereview-83c-new-boundaries.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/truth-fixtures",
+            "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-owned-arguments/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/parent-ben/count-pairs14",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/rereview-83c-count-pairs.json"
+          ],
+          "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence",
+          "started_utc": "2026-10-18T15:46:39.360746+00:00",
+          "source_hashes": {
+            "evals/script/check-text-import.py": "007a8aecbc91500b5b5e28e338383cd5ff020d8e49bd8cf528f52e1a80815ce7",
+            "evals/test/text-import-evidence.test.ts": "950c3e0a15d3983266cfeefc8ec9fa2896745d7d0e6899ec4a472b18460106f5"
+          },
+          "exit_code": 0,
+          "elapsed_seconds": 3.269498785957694,
+          "completed_utc": "2026-10-18T15:46:42.630727+00:00"
+        },
+        "parent-ben-count110": {
+          "argv": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/scripts/rereview-83c-new-boundaries.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/truth-fixtures",
+            "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-owned-arguments/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/parent-ben/count110",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/rereview-83c-new-controls.json"
+          ],
+          "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence",
+          "started_utc": "2026-10-18T15:46:39.360858+00:00",
+          "source_hashes": {
+            "evals/script/check-text-import.py": "007a8aecbc91500b5b5e28e338383cd5ff020d8e49bd8cf528f52e1a80815ce7",
+            "evals/test/text-import-evidence.test.ts": "950c3e0a15d3983266cfeefc8ec9fa2896745d7d0e6899ec4a472b18460106f5"
+          },
+          "exit_code": 0,
+          "elapsed_seconds": 17.94374741311185,
+          "completed_utc": "2026-10-18T15:46:57.305056+00:00"
+        },
+        "parent-own-warning": {
+          "argv": [
+            "python3",
+            "deliveries/lab61-checker-rework14/ben-evidence/scripts/rereview-83c-warning-reader.py",
+            "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-owned-arguments/evals/script/check-text-import.py",
+            "deliveries/lab61-checker-rework14/own-parent-warning.json",
+            "deliveries/lab61-checker-rework14/own-warning-controls.json"
+          ],
+          "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir",
+          "started_utc": "2026-10-18T15:45:49.916157+00:00",
+          "source_hashes": {
+            "evals/script/check-text-import.py": "007a8aecbc91500b5b5e28e338383cd5ff020d8e49bd8cf528f52e1a80815ce7",
+            "evals/test/text-import-evidence.test.ts": "950c3e0a15d3983266cfeefc8ec9fa2896745d7d0e6899ec4a472b18460106f5"
+          },
+          "exit_code": 0,
+          "elapsed_seconds": 0.31449266616255045,
+          "completed_utc": "2026-10-18T15:45:50.231117+00:00"
+        },
+        "parent-ben-full-pairs16": {
+          "argv": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/scripts/rereview-83c-warning-full.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/fixtures",
+            "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-owned-arguments/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/parent-ben/full-pairs16",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/rereview-83c-warning-pairs.json"
+          ],
+          "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence",
+          "started_utc": "2026-10-18T15:46:57.477264+00:00",
+          "source_hashes": {
+            "evals/script/check-text-import.py": "007a8aecbc91500b5b5e28e338383cd5ff020d8e49bd8cf528f52e1a80815ce7",
+            "evals/test/text-import-evidence.test.ts": "950c3e0a15d3983266cfeefc8ec9fa2896745d7d0e6899ec4a472b18460106f5"
+          },
+          "exit_code": 0,
+          "elapsed_seconds": 7.676713451044634,
+          "completed_utc": "2026-10-18T15:47:05.154456+00:00"
+        },
+        "parent-public-red": {
+          "argv": [
+            "bun",
+            "test",
+            "test/text-import-evidence.test.ts",
+            "--timeout",
+            "30000"
+          ],
+          "cwd": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-owned-arguments/evals",
+          "started_utc": "2026-10-18T15:45:48.693930+00:00",
+          "source_hashes": {
+            "evals/script/check-text-import.py": "007a8aecbc91500b5b5e28e338383cd5ff020d8e49bd8cf528f52e1a80815ce7",
+            "evals/test/text-import-evidence.test.ts": "950c3e0a15d3983266cfeefc8ec9fa2896745d7d0e6899ec4a472b18460106f5"
+          },
+          "exit_code": 1,
+          "elapsed_seconds": 466.2974153221585,
+          "completed_utc": "2026-10-18T15:53:34.992043+00:00"
+        },
+        "parent-ben-reader107": {
+          "argv": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/scripts/rereview-83c-warning-reader.py",
+            "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-owned-arguments/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/parent-ben/reader107.json",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/rereview-83c-warning-controls.json"
+          ],
+          "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence",
+          "started_utc": "2026-10-18T15:46:39.360746+00:00",
+          "source_hashes": {
+            "evals/script/check-text-import.py": "007a8aecbc91500b5b5e28e338383cd5ff020d8e49bd8cf528f52e1a80815ce7",
+            "evals/test/text-import-evidence.test.ts": "950c3e0a15d3983266cfeefc8ec9fa2896745d7d0e6899ec4a472b18460106f5"
+          },
+          "exit_code": 0,
+          "elapsed_seconds": 0.16426842892542481,
+          "completed_utc": "2026-10-18T15:46:39.525495+00:00"
+        },
+        "parent-ben-emitter40": {
+          "argv": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/scripts/rereview-83c-warning-full.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/fixtures",
+            "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-owned-arguments/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/parent-ben/emitter40",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/rereview-83c-emitter-controls.json"
+          ],
+          "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence",
+          "started_utc": "2026-10-18T15:46:42.802803+00:00",
+          "source_hashes": {
+            "evals/script/check-text-import.py": "007a8aecbc91500b5b5e28e338383cd5ff020d8e49bd8cf528f52e1a80815ce7",
+            "evals/test/text-import-evidence.test.ts": "950c3e0a15d3983266cfeefc8ec9fa2896745d7d0e6899ec4a472b18460106f5"
+          },
+          "exit_code": 0,
+          "elapsed_seconds": 16.39220228092745,
+          "completed_utc": "2026-10-18T15:46:59.195469+00:00"
+        },
+        "parent-ben-all": {
+          "argv": [
+            "python3",
+            "deliveries/lab61-checker-rework14/ben-current.py",
+            "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-owned-arguments/evals/script/check-text-import.py",
+            "parent-ben"
+          ],
+          "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir",
+          "started_utc": "2026-10-18T15:46:39.303840+00:00",
+          "source_hashes": {
+            "evals/script/check-text-import.py": "007a8aecbc91500b5b5e28e338383cd5ff020d8e49bd8cf528f52e1a80815ce7",
+            "evals/test/text-import-evidence.test.ts": "950c3e0a15d3983266cfeefc8ec9fa2896745d7d0e6899ec4a472b18460106f5"
+          },
+          "exit_code": 0,
+          "elapsed_seconds": 146.60802715807222,
+          "completed_utc": "2026-10-18T15:49:05.912318+00:00"
+        },
+        "parent-ben-emitter10": {
+          "argv": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/scripts/rereview-83c-warning-reader.py",
+            "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-owned-arguments/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/parent-ben/emitter10.json",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence/rereview-83c-emitter-controls.json"
+          ],
+          "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework14/ben-evidence",
+          "started_utc": "2026-10-18T15:46:42.659573+00:00",
+          "source_hashes": {
+            "evals/script/check-text-import.py": "007a8aecbc91500b5b5e28e338383cd5ff020d8e49bd8cf528f52e1a80815ce7",
+            "evals/test/text-import-evidence.test.ts": "950c3e0a15d3983266cfeefc8ec9fa2896745d7d0e6899ec4a472b18460106f5"
+          },
+          "exit_code": 0,
+          "elapsed_seconds": 0.11421288503333926,
+          "completed_utc": "2026-10-18T15:46:42.774279+00:00"
+        }
+      },
+      "public_result": "396PASS/12FAIL/408tests/11290assertions",
+      "Ben_parent": "108/110;75/107;300/428;7/10;28/40",
+      "own_parent": "303/360"
+    },
+    "own_warning_RED_GREEN": "303of360→360of360"
+  },
+  "artifact_index": {
+    "source": "source-final/source.json",
+    "parent_checker_and_final_tests": "source-red/",
+    "MODEL": "MODEL.md",
+    "frozen": "red-inputs-frozen.json",
+    "pre_edit_gate": "pre-edit-gate.json",
+    "public_RED": "commands/parent-public-red.json",
+    "focused_GREEN": "commands/green-focused.json",
+    "full": "commands/full-suite.json",
+    "wrappers": "portable-root/wrapper-results.json",
+    "regression": "regression-qualification.json",
+    "genuine30": "genuine-replay30/REPORT.json",
+    "cleanup": "cleanup.json"
+  },
+  "consumption": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 3,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 1
+    },
+    "reference_total": 15,
+    "product_physical_calls": 20,
+    "recovery": 1,
+    "probes": 0,
+    "historical_outcomes_preserved": true,
+    "budget_increases": [
+      [
+        3,
+        4,
+        3,
+        4
+      ],
+      [
+        4,
+        5,
+        4,
+        5
+      ],
+      [
+        5,
+        6,
+        5,
+        6
+      ],
+      [
+        6,
+        7,
+        6,
+        7
+      ],
+      [
+        7,
+        8,
+        7,
+        8
+      ],
+      [
+        8,
+        9,
+        8,
+        9
+      ],
+      [
+        9,
+        10,
+        9,
+        10
+      ],
+      [
+        10,
+        11,
+        10,
+        11
+      ],
+      [
+        11,
+        12,
+        11,
+        12
+      ],
+      [
+        12,
+        13,
+        12,
+        13
+      ],
+      [
+        13,
+        14,
+        13,
+        14
+      ]
+    ],
+    "product_by_case": {
+      "txt-unclosed-quote": 2,
+      "txt-wrong-encoding": 2,
+      "txt-wrong-delimiter": 2,
+      "txt-ambiguous-headers": 2,
+      "csv-unclosed-quote": 2,
+      "csv-wrong-encoding": 2,
+      "csv-wrong-delimiter": 2,
+      "csv-ambiguous-headers": 2,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 2
+    },
+    "rework_limit": 14,
+    "pre_dispatch_wrapper": {
+      "original_verdict": "ERROR",
+      "physical_model_calls": 0,
+      "outcome_preserved": true,
+      "reservation_carried_forward": true,
+      "budget_reset": false
+    },
+    "product_calls_by_role": {
+      "Rich": 10,
+      "Ben": 10
+    },
+    "product_by_case_scope": "Rich+Ben total;1 each",
+    "recovery_by_role": {
+      "Rich": 1,
+      "Ben": 0
+    },
+    "budget_increase_columns": [
+      "old",
+      "new",
+      "completed_reworks",
+      "fresh_REJECTs"
+    ],
+    "budget_reset": false
+  },
+  "rework_limit": 14,
+  "limits_changed_by_this_admission": false,
+  "new_physical_calls_authorized": false,
+  "new_live_effects_authorized": false,
+  "product_source_unchanged": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "helper_source_unchanged": "f2aa79b41579909681d6c7a1356452b2b7a3964b",
+  "actual_read_only_health": {
+    "at": "2026-10-18T16:23:50.070Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-18T16:23:50.128Z"
+    }
+  },
+  "queues": [
+    {
+      "role": "evaler",
+      "rows": 210,
+      "active": [
+        {
+          "id": "01a14fcd-1393-70c5-8134-c1f639dcf283",
+          "status": "running",
+          "trigger": "01a14fcd-135d-73e7-b89b-90e11917b9f4"
+        }
+      ]
+    },
+    {
+      "role": "rich",
+      "rows": 80,
+      "active": []
+    },
+    {
+      "role": "ben",
+      "rows": 42,
+      "active": []
+    },
+    {
+      "role": "baseline",
+      "rows": 11,
+      "active": []
+    },
+    {
+      "role": "runner",
+      "rows": 13,
+      "active": []
+    }
+  ],
+  "published_common": "05601e626485a91b94f7da5289ae5146d7014146"
+}
