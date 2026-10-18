@@ -693,27 +693,27 @@ test('missing values prompt is read through its portal and requires a bound cons
  }
 });
 
-test('a source body proof permits only one strict stale refusal refresh',async()=>{
+for(const code of ['UI_REFERENCE_STALE','UI_REFERENCE_OBSCURED'])test('a source body proof permits only one strict '+code+' refusal refresh',async()=>{
  for(const refusals of [1,2]){
-  const f=recoveryFixture({refusals,receipt:{error:{code:'UI_REFERENCE_STALE'}},refreshReplacedBody:()=>true});
+  const f=recoveryFixture({refusals,receipt:{error:{code}},refreshReplacedBody:()=>true});
   if(refusals===1)await f.perform();else await assert.rejects(f.perform());
   assert.equal(f.mutations,2);const events=f.records.filter(e=>e.phase==='node_step_refresh_authorized');
   assert.equal(events.length,1);assert.equal(events[0].reason,'prepared_graph_body_replaced');
  }
 });
-for(const [name,options] of Object.entries({
+for(const code of ['UI_REFERENCE_STALE','UI_REFERENCE_OBSCURED'])for(const [name,options] of Object.entries({
  noOptIn:{refreshReplacedBody:undefined},unproved:{refreshReplacedBody:()=>false},
  effect:{receipt:{effect_possible:true}},ambiguous:{receipt:{status:'AMBIGUOUS'}},cleanup:{receipt:{cleanup_complete:false}},
  gesture:{receipt:{trace:[{event:'ui_gesture_applied'}]}},preconditions:{receipt:{trace:[{event:'ui_preconditions_verified'}]}},
  missingTrace:{receipt:{trace:undefined}},wrongPhase:{receipt:{phase:'applying'}},wrongError:{receipt:{error:{code:'UI_CONTEXT_CHANGED'}}},
  journal:{recordFailure:true},identity:{changedIdentity:true},intent:{changedIntent:true},
-}))test('source body refresh refuses '+name,async()=>{
- const f=recoveryFixture({refreshReplacedBody:()=>true,...options,receipt:{error:{code:'UI_REFERENCE_STALE'},...options.receipt}});
+}))test(code+' source body refresh refuses '+name,async()=>{
+ const f=recoveryFixture({refreshReplacedBody:()=>true,...options,receipt:{error:{code},...options.receipt}});
  await assert.rejects(f.perform());assert.equal(f.mutations,1);
 });
-for(const kind of ['cancel','deadline'])test('source body refresh respects fresh '+kind,async()=>{
+for(const code of ['UI_REFERENCE_STALE','UI_REFERENCE_OBSCURED'])for(const kind of ['cancel','deadline'])test(code+' source body refresh respects fresh '+kind,async()=>{
  const controller=new AbortController();let clock=1;
- const f=recoveryFixture({receipt:{error:{code:'UI_REFERENCE_STALE'}},refreshReplacedBody:()=>true,now:()=>clock,signal:controller.signal,
+ const f=recoveryFixture({receipt:{error:{code}},refreshReplacedBody:()=>true,now:()=>clock,signal:controller.signal,
  onRefresh:()=>{if(kind==='cancel')controller.abort();else clock=10000;}});
  await assert.rejects(f.perform());assert.equal(f.mutations,1);
 });
