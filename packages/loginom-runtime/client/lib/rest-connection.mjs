@@ -43,6 +43,45 @@ export async function restConnectionCapability(page,t){
   // zero-sized. Wait for this exact input's hit-test before the sole fill.
   const reachableInput=tid=>wait('reachable input '+tid,async()=>{try{return await point(find(tid).locator('input'));}catch{return null;}});
   const fill=async(tid,value,key='Tab')=>{await quiet();await reachableInput(tid);await guard();const input=find(tid).locator('input');effect=true;await input.fill(value,{timeout:remaining()});await guard();await input.press(key,{timeout:remaining()});};
+  const openSettings=async()=>{
+   const opening=await page.evaluateHandle(form=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;
+    const roots=document.querySelectorAll('[data-tid='+JSON.stringify(form)+']');
+    if(c.FController.constructor.name!=='ConnectionsViewWizard'||roots.length!==1||c.FController.FView.el.dom!==roots[0])throw Error('Connection list owner differs');
+    return {controller:c.FController,node:c.Node.data.node,root:roots[0]};},form);
+   try{
+    await click(form+';tbrActions;btnConfigConnection');
+    const result=await wait('connection wizard or deactivation question',async()=>{
+     if(await find(fields+'pedURL;ValueControl').locator('input').isVisible())return 'wizard';
+     return await page.locator('.x-window:visible').count()?'question':null;
+    });
+    if(result==='question'){
+     const question=await page.evaluateHandle(({b,t})=>{
+      const visible=e=>e.checkVisibility({checkVisibilityCSS:true}),normalize=s=>s.replace(/\s+/g,' ').trim();
+      const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;
+      const dialogs=[...document.querySelectorAll('.x-window')].filter(visible),dialog=dialogs[0],native=dialog&&Ext.getCmp(dialog.id);
+      const text='Loginom '+t.build+' Настройка узла приведет к его деактивации. Вы действительно хотите начать настраивать узел? Да Да, больше не спрашивать Нет';
+      if(c.FController!==b.controller||c.Node.data.node!==b.node||!b.root.isConnected||dialogs.length!==1||native?.el?.dom!==dialog||normalize(dialog.innerText)!==text)throw Error('Connection deactivation question differs');
+      const crumbs=[...document.querySelectorAll('[data-tid^='+JSON.stringify(t.workflow_ref.prefix+';cnrNaviMode;b.s_')+']')];
+      const nodeElement=crumbs.at(-2),wizardElement=crumbs.at(-1),nc=nodeElement&&Ext.getCmp(nodeElement.id),wc=wizardElement&&Ext.getCmp(wizardElement.id);
+      const node=nc?._node?.data?.node,wizardNode=wc?._node?.data?.node;
+      if(normalize(nodeElement?.textContent??'')!==normalize(t.connection.name)||normalize(wizardElement?.textContent??'')!=='Настройка'||nc.el.dom!==nodeElement||wc.el.dom!==wizardElement||wizardNode.ParentNode!==node||node.ParentNode!==b.node)throw Error('Pending connection wizard owner differs');
+      let yes;
+      for(const [key,label] of Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'})){
+       const es=document.querySelectorAll('[data-tid='+JSON.stringify('msgbox;tlb;'+key)+']'),e=es[0],control=e&&Ext.getCmp(e.id);
+       if(es.length!==1||!dialog.contains(e)||!visible(e)||normalize(e.textContent)!==label||control?.el?.dom!==e||control.disabled)throw Error('Connection confirmation controls differ');
+       if(key==='yes')yes=e;
+      }
+      return {dialog,native,yes,nodeElement,wizardElement,node,wizardNode,text,controller:c.FController,tree:b.node};
+     },{b:opening,t});
+     try{
+      const p=await point(find('msgbox;tlb;yes'));await guard();
+      need(await page.evaluate(q=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return q.dialog.isConnected&&Ext.getCmp(q.dialog.id)===q.native&&q.native.el.dom===q.dialog&&q.dialog.innerText.replace(/\s+/g,' ').trim()===q.text&&q.yes.isConnected&&q.dialog.contains(q.yes)&&Ext.getCmp(q.yes.id)?.disabled!==true&&c.FController===q.controller&&c.Node.data.node===q.tree&&Ext.getCmp(q.nodeElement.id)?._node?.data?.node===q.node&&Ext.getCmp(q.wizardElement.id)?._node?.data?.node===q.wizardNode&&q.wizardNode.ParentNode===q.node;},question),'Connection confirmation changed before click');
+      effect=true;await page.mouse.click(p.x,p.y);
+     }finally{await question.dispose();}
+    }
+    await reachableInput(fields+'pedURL;ValueControl');await quiet();
+   }finally{await opening.dispose();}
+  };
   const moduleTid=t.workflow_ref.navigation_path.at(-2).tid,form=t.workflow_ref.prefix+';ConnectionsViewWizard',wizard=t.workflow_ref.prefix+';WizardModelConnectionForm',fields=wizard+';ConnectionWizard;';
   await click(moduleTid);
   const connections=await wait('module connections entry',async()=>{
@@ -59,7 +98,7 @@ export async function restConnectionCapability(page,t){
    await click(vendor,true);
    tile=await wait('new connection tile',async()=>{const added=(await tiles()).filter(c=>!before.some(b=>b.tid===c.tid));need(added.length<=1,'unexpected added connections');return added[0];});
   }
-  await click(tile.tid);await click(form+';tbrActions;btnConfigConnection');await reachableInput(fields+'pedURL;ValueControl');await quiet();
+  await click(tile.tid);await openSettings();
   const connectionOwner=await page.evaluateHandle(()=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return {wizard:c.FController,node:c.Node.data.node.ParentNode};});
   const read=async()=>{
    await guard();need(await page.evaluate(b=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return c.FController===b.wizard&&c.Node.data.node.ParentNode===b.node&&b.wizard.FModelNode===b.node.FConnectionNode;},connectionOwner),'connection wizard owner changed');
@@ -87,7 +126,7 @@ export async function restConnectionCapability(page,t){
   await click(wizard+';btnDone');await wait('connection wizard committed',()=>find(form+';cntTile;ListView;tbl').isVisible());await quiet();
   // Reopen the saved object and independently reread the visible settings.
   const saved=(await tiles()).filter(c=>c.name===t.connection.name);need(saved.length===1,'saved connection is not unique');
-  await click(saved[0].tid);await click(form+';tbrActions;btnConfigConnection');await reachableInput(fields+'pedURL;ValueControl');await quiet();
+  await click(saved[0].tid);await openSettings();
   need(await page.evaluate(b=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return c.Node.data.node.ParentNode===b.node&&c.FController.FModelNode===b.node.FConnectionNode;},connectionOwner),'saved connection owner differs');
   await connectionOwner.dispose();
   const persisted={name:await find(fields+'fldLabel').locator('input').inputValue(),base_url:await find(fields+'pedURL;ValueControl').locator('input').inputValue(),method:await find(fields+'pedVerb;ValueControl').locator('input').inputValue(),url_mode:await find(fields+'pedFieldType;ValueControl').locator('input').inputValue(),authentication:await find(fields+'txtAuth').locator('input').inputValue(),ignore_certificate:await find(fields+'pedIgnoreCertificateErrors;ValueControl').evaluate(e=>e.classList.contains('x-form-cb-checked')),

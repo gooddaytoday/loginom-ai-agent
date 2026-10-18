@@ -26,7 +26,7 @@ def generate():
     expected = {
         "package_path": "{{PACKAGE_PATH}}",
         "nodes": [{"type": "imports.text"}, {"type": "integration.rest_request"}, {"type": TYPE}],
-        "output_node_type": TYPE,
+        "output_node_type": "export_input",
         "columns": [column("RequestId"), column("Key"), column("HttpStatusCode", "integer")],
         "rows": [{"RequestId": request["RequestId"], "Key": request["Key"], "HttpStatusCode": 200}
                  for request in requests],

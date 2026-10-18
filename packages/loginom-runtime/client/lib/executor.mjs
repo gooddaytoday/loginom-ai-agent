@@ -2473,7 +2473,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                   throw Error('Complete owned graph required before node preflight');
                 preflight=await operation.nodeApplyDrivers.beforeTarget(ctx);
               }
-              result=await prepareNodeTarget({request:graph,operation,adapter:operation.nodeTargetAdapter,
+              const targetRequest=preflight?.target_inputs?{...graph,inputs:preflight.target_inputs}:graph;
+              result=await prepareNodeTarget({request:targetRequest,operation,adapter:operation.nodeTargetAdapter,
                 record:onRecord,signal:ctx.signal,now});
             }finally{operation.deadline=overallDeadline;}
             if(result.status!=='SUCCEEDED'){
