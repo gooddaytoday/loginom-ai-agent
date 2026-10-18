@@ -1,0 +1,32 @@
+{
+  "utc": "2026-10-18T16:02:26.018831+00:00",
+  "archive": {
+    "bytes": 18030015,
+    "sha256": "c69e40b3281d9a276c131101a18b7920ad4b73fe7728ba13b2a8012cbefb6573"
+  },
+  "manifest_sha256": "1b02790e30be9d89e8034b0b5f5c641b40ae1b00bb1afa7c89833ae86a14f1f7",
+  "members": 2133,
+  "payloads": 2132,
+  "payload_bytes": 288102476,
+  "safe_unique_exact_membership_all_hash_sizes_crc": true,
+  "report_standalone_equal": true,
+  "contract_table_standalone_equal": true,
+  "admission_sha256": "f1a144b52264a9e35e3cf1879738f88ed7458ea1fa281d344e02c63636c7369e",
+  "portable_git": {
+    "candidate": 144,
+    "intermediate": 144,
+    "parent": 144
+  },
+  "candidate": "83ceaff967408a6a08d025103b4c3e53e23af874",
+  "source_executed": false,
+  "common_integration": false,
+  "new_physical_calls": 0,
+  "operator_observations": [
+    "Earlier summary display accessed absent blocked resume_sha; KeyError before any payload extraction/Git/receipt/native/project effects; use observed optional fields.",
+    "Initial report GET SSL timeout created no file; eleven complete downloads preserved, only missing report fetched after completed attempt.",
+    "First large stdin mirror SSH returned124; independent read-back found no target/receipts and no prior operator process, no repeat effects. New bounded compressed-stdin transfer; SSH root cause unproven."
+  ],
+  "durable_mirror": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-ben-rereview-83ceaff9-reject-delivery",
+  "mirror_provenance": "Exact E-downloaded official archive/parts/standalones matched independently downloaded local official bytes before copy; all2132 payload hashes/sizes/CRC verified before extraction; no source execution.",
+  "native_verification_sha256": "7fbb08ee1a2ff0511c54e830947d25e25a567ee17dd93ef52dd7b9d6a3044965"
+}
