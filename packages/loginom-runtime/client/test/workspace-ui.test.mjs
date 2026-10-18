@@ -3814,9 +3814,19 @@ async function inputPortFinishFixture(mode='valid') {
   if(mode==='missing_context')crumbs[7].remove();
   if(mode==='missing_mapping')nodes.get(base+'colSourceName_Region').remove();
   if(mode==='duplicate_done')page.add('button',done.attrs['data-tid'],'Готово',done.box,owner);
-  let graph,node,label,toast,loading,waits=0;
+  let graph,node,label,toast,loading,waits=0,prompt;
   const click=page.mouse.click;page.mouse.click=async(...args)=>{
     await click(...args);if(mode==='still_open')return;
+    // Loginom 7.4.2 live: Done after an upstream type change asks to delete lost links.
+    if(mode.startsWith('lost_links')&&!prompt){
+      prompt=page.add('div',null,'',{x:410,y:331,width:459,height:138});prompt.attrs.class='x-window';
+      page.add('h1',null,'Loginom '+build,undefined,prompt).attrs.role='heading';
+      page.add('span',null,mode==='lost_links_wrong_text'?'Удалить выбранные поля?':'Обнаружены связи с несуществующими объектами. Вы хотите удалить все потерянные связи и продолжить?',undefined,prompt);
+      for(const [name,label,x] of [['yes','Удалить и продолжить',480],['no','Не удалять и продолжить',620],['cancel','Отмена',780]])
+        page.add('button','msgbox;tlb;'+name,label,{x,y:430,width:120,height:28},prompt);
+      return;
+    }
+    prompt?.remove();
     owner.remove();for(const c of crumbs.slice(5))c.remove();
     if(mode==='wrong_workflow')crumbs[4].ownText='Другой сценарий';
     graph=page.add('div','MF;TF-5;ModelForm;cmpDiagram','',{x:48,y:71,width:1392,height:929});
@@ -3869,6 +3879,18 @@ test('typed input-port finish uses one gesture and quiet exact graph return with
       assert.equal(result.trace.find(e=>e.event==='input_port_finish_settled').quiet_samples,3);
     }
     if(mode==='late_body')assert.equal(waits(),5);if(mode==='churn')assert.equal(waits(),12);
+  }
+});
+
+test('input-port completion deletes only the exact lost-links prompt once and then verifies the graph return',async()=>{
+  for(const mode of ['lost_links','lost_links_wrong_text']){
+    const {page}=await inputPortFinishFixture(mode),snapshot=await page.observe();
+    const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');
+    const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot),exact=mode==='lost_links';
+    assert.equal(result.status,exact?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+    assert.equal(page.events.filter(e=>e==='click').length,exact?2:1,mode);
+    assert.equal(result.trace.filter(e=>e.event==='wizard_lost_links_deleted').length,exact?1:0,mode);
+    if(exact)assert.ok(result.trace.some(e=>e.event==='input_port_finish_verified'));
   }
 });
 
