@@ -1,0 +1,104 @@
+{
+  "checked_utc": "2026-10-18T04:23:14.058649+00:00",
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "report_id": "01a14d3b-a329-7f22-a1dd-03fe0978e902",
+  "checked_sha": "86070b607d09595a07a6fde250965096ef2fb795",
+  "archive_bytes": 13912697,
+  "archive_sha256": "74f6e2c1aae21094b20ec7a28a2c17c5926a5a864aba204ac1fb2e6bef7e2660",
+  "manifest_sha256": "3c7318b52afa009c669b90a1da5dba8d6caec5f072b576ead40b57b8d7acd44e",
+  "parts": [
+    {
+      "name": "lab61-ben-rereview-86070b60.zip.part-001",
+      "bytes": 4194304,
+      "sha256": "abe0f0fa4af15a756c5992f388d38f8e61d3a3f43c0ff5dd551910a58cfdd759"
+    },
+    {
+      "name": "lab61-ben-rereview-86070b60.zip.part-002",
+      "bytes": 4194304,
+      "sha256": "6a7818d094bb0d27b075776033e6fd00288aa91125b56598206b1b352541353a"
+    },
+    {
+      "name": "lab61-ben-rereview-86070b60.zip.part-003",
+      "bytes": 4194304,
+      "sha256": "99a24f1965c4d60996a37be0ce44e9ae2571d5ede626b0bd1970f5b2eb9a8c66"
+    },
+    {
+      "name": "lab61-ben-rereview-86070b60.zip.part-004",
+      "bytes": 1329785,
+      "sha256": "ce4ce6bfa3e2f6ba395d10a328df45c30b135a84100f08a08f8feb621aeaaee0"
+    }
+  ],
+  "payloads_verified": 830,
+  "members": 831,
+  "payload_bytes": 217321755,
+  "safe_unique_exact_membership": true,
+  "standalone_report_bytes": 26636,
+  "report_sha256": "9f248d79e839bdfd5867ee0088d77b82efc20beca266b68ad999a3bd719df406",
+  "report_byte_equal": true,
+  "exact_candidate_Git_files": 144,
+  "original_genuine_completion_sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+  "original_core_release_sha256": "1d9e17e0b34ddff48791a493f49ebfd525b1d17a0e8b5a0b2a1d110d73671274",
+  "delivered_prior_lifecycle_byte_equal": true,
+  "delivered_Ben_read_only_health": {
+    "at": "2026-10-18T04:17:12.973Z",
+    "status": "FREE",
+    "lease_absent": true,
+    "endpoint": {
+      "url": "http://localhost/app/",
+      "http_status": 200,
+      "bytes": 2065
+    },
+    "container": {
+      "id": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+      "running": true,
+      "isolation_marker_verified": true,
+      "bind_mounts_absent": true
+    },
+    "storage_empty": true,
+    "storage_roots": [
+      "/workdir/UserStorage",
+      "/workdir/SessionBackup"
+    ],
+    "profiles": [
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/rich/reference-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/rich/eval-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/reference-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/evalbaseline/eval-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/evalrunner/eval-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      }
+    ],
+    "live_browsers": [],
+    "debuggers_closed": true,
+    "healthy_shared_stand": true,
+    "installed_cli_admission": "READY",
+    "installed_cli_source": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+    "prior_failed_admission_preserved": true
+  },
+  "source_executed_integrated": false,
+  "new_model_native_live_calls": 0,
+  "classification": "delivery integrity and prior lifecycle; sixth formal independent quality REJECT, not acceptance"
+}
