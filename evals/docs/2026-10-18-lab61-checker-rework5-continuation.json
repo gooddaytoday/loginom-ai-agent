@@ -1,0 +1,46 @@
+{
+  "checked_utc": "2026-10-18T03:18:11.285186+00:00",
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "decision_comment_id": "01a14cfa-2fec-7a9f-988c-18c2a6e6f575",
+  "report_id": "01a14cf4-c0ba-7c89-aa1c-e974e9e34621",
+  "sha": "d7873d3b3fe58eb1137bb9a85655c495f3e7c812",
+  "original_reducer_blocked_reject5_limit4": true,
+  "native_metadata_limit5_before_dispatch_verified": true,
+  "actual_consumption": [
+    15,
+    20,
+    1,
+    0
+  ],
+  "increase": {
+    "old": 4,
+    "new": 5,
+    "usage": {
+      "completed_reworks": 4,
+      "fresh_REJECTs": 5
+    },
+    "decision_id": "LAB61-RICH-CHECKER-REWORK5-d7873d3b-01a14cf4",
+    "decision_document_sha256": "b03db6e1d99eaef8bd80dacf8d78cfbdaf42b6e6c0e5125348cf324fef37552c",
+    "counters_reset": false,
+    "reason": "Bound entity/actor/count/ID scopes; OFFLINE only."
+  },
+  "canonical_continue_verified_in_delivery_receipt": true,
+  "native_final_queued_task": {
+    "id": "LAB61-RICH-CHECKER-REWORK5-d7873d3b-01a14cf4",
+    "phase": "rich",
+    "sha": "d7873d3b3fe58eb1137bb9a85655c495f3e7c812",
+    "root_trigger": "01a14cfa-2fec-7a9f-988c-18c2a6e6f575",
+    "task_id": "01a14cfa-3009-7e50-ad6d-91de12bb5291",
+    "outcome": "queued"
+  },
+  "native_file_hashes": {
+    "metadata-intent.json": "e08a1c3fa6c82e4c35d2b8556b2a647a3d55db464ab9e7d8fb063677cb207734",
+    "report-decision.json": "10b06a314b1eb40bdea67e7cfb91d0f54b380ee6dda618b3bf20356bd8678838",
+    "continue-input.json": "125379100538b6cbf10be5630539a0e0fdeaf470da6d54c36eeecacab09133ce",
+    "continue-decision.json": "45c5793697340e6ea2230a7a8a4e08c94c05fc3a50a495419a45af8b7325f9e9",
+    "receipt-decision.json": "09da2c3c46b3ecbd9e4912c135663388f3796870945393a0d64ab45412559f90",
+    "issue-final-readback.json": "45ec2e06a1697762f6db16e4cee676827e9a51325b953171f66a75a833619c3d"
+  },
+  "root_wrote_evaler_state": false,
+  "root_dispatched": false
+}

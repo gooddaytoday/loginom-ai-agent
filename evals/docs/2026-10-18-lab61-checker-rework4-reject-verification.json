@@ -1,0 +1,252 @@
+{
+  "checked_sha": "d7873d3b3fe58eb1137bb9a85655c495f3e7c812",
+  "parent": "ae8233824a47b39be160cb0295900422cc86d174",
+  "tree": "9e0badf82582313ecf219dc3c60e6bf9d8cbb0c3",
+  "source_counts_equal_Git": {
+    "candidate": 144,
+    "parent": 144
+  },
+  "source_delta": [
+    "evals/script/check-text-import.py",
+    "evals/test/text-import-evidence.test.ts"
+  ],
+  "AST_unchanged": [
+    "require",
+    "calls_from",
+    "after",
+    "source_bindings",
+    "request_owner",
+    "rejection",
+    "native_events",
+    "configuration_matches",
+    "native_application",
+    "native_execution",
+    "public_output",
+    "typed_table",
+    "unused_structural_ports",
+    "package_graph",
+    "settled_receipt",
+    "known_refusal",
+    "report_text",
+    "positive"
+  ],
+  "bundle_patch_test_verified": true,
+  "patch_abbreviated_index_digits": 10,
+  "official_785_payload_verified": true,
+  "manifest_sha256": "fdb696e6d2ce5d8799dad9ac7108f7959a85a553fdeac7f5e563822d91e68e96",
+  "archive_sha256": "8ca1f732392d296b9ede322fc9d3c325f9ca068305094ceeb8bbd14bb1211a25",
+  "original_inputs_only_expectations_verified": true,
+  "preservation_counts": {
+    "files": 2703,
+    "runtime_and_ledger": 1163,
+    "pins_legacy": 22
+  },
+  "other_original_runtime_files_verified": 865,
+  "installed_CLI_entries_modes_links_verified": 5389,
+  "helper_files_verified": 1700,
+  "derived30_original_hash_bindings_verified": true,
+  "derived_counts_not_raw": {
+    "reference": {
+      "PASS": 10
+    },
+    "Rich": {
+      "PASS": 8,
+      "FAIL": 2
+    },
+    "Ben": {
+      "PASS": 8,
+      "FAIL": 2
+    }
+  },
+  "reference_provenance": [
+    {
+      "case": "txt-unclosed-quote",
+      "reference_cli": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+      "reference_ordinal": 3,
+      "selected_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-unclosed-quote-3/txt-unclosed-quote/3"
+    },
+    {
+      "case": "txt-wrong-encoding",
+      "reference_cli": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+      "reference_ordinal": 1,
+      "selected_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-encoding-1/txt-wrong-encoding/1"
+    },
+    {
+      "case": "txt-wrong-delimiter",
+      "reference_cli": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+      "reference_ordinal": 1,
+      "selected_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-delimiter-1/txt-wrong-delimiter/1"
+    },
+    {
+      "case": "txt-ambiguous-headers",
+      "reference_cli": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+      "reference_ordinal": 1,
+      "selected_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-ambiguous-headers-1/txt-ambiguous-headers/1"
+    },
+    {
+      "case": "csv-unclosed-quote",
+      "reference_cli": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+      "reference_ordinal": 1,
+      "selected_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-unclosed-quote-1/csv-unclosed-quote/1"
+    },
+    {
+      "case": "csv-wrong-encoding",
+      "reference_cli": "d6fc9c9b7b499d0a182c972815913b541e4cb81b",
+      "reference_ordinal": 1,
+      "selected_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-wrong-encoding-1/csv-wrong-encoding/1"
+    },
+    {
+      "case": "csv-wrong-delimiter",
+      "reference_cli": "2e990a84aa25dc37a4e808da564be752aae6f564",
+      "reference_ordinal": 3,
+      "selected_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-wrong-delimiter-3/csv-wrong-delimiter/3"
+    },
+    {
+      "case": "csv-ambiguous-headers",
+      "reference_cli": "2e990a84aa25dc37a4e808da564be752aae6f564",
+      "reference_ordinal": 1,
+      "selected_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-ambiguous-headers-1/csv-ambiguous-headers/1"
+    },
+    {
+      "case": "initial-incomplete-settings",
+      "reference_cli": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+      "reference_ordinal": 2,
+      "selected_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-01a14b91/reference-initial-incomplete-settings-2/initial-incomplete-settings/2"
+    },
+    {
+      "case": "missing-source-column",
+      "reference_cli": "2e990a84aa25dc37a4e808da564be752aae6f564",
+      "reference_ordinal": 1,
+      "selected_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-missing-source-column-1/missing-source-column/1"
+    }
+  ],
+  "historical_genuine_completion_sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+  "ordinary_RELEASED": "2026-10-17T23:13:39.197Z",
+  "author_model_record_verified": true,
+  "new_calls_by_Evaler": 0,
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "trigger_report_id": "01a14cf4-c0ba-7c89-aa1c-e974e9e34621",
+  "own_offline_reproduction": {
+    "candidate68": {
+      "matches": 38,
+      "false_PASS": 18,
+      "false_FAIL": 12
+    },
+    "parent68": {
+      "matches": 60
+    },
+    "reader9": {
+      "matches": 7,
+      "false_FAIL": 2
+    },
+    "full_warning12": {
+      "baseline_PASS": 4,
+      "false_FAIL": 8
+    },
+    "regressions_against_parent": 22,
+    "all_five_findings_confirmed": true
+  },
+  "closed_model_proofs_verified": 30,
+  "actual_model": "openai/gpt-6-luna/high",
+  "model_database_source_hashes_verified": true,
+  "model_database_requery_by_Evaler": false,
+  "current_read_only_health": {
+    "at": "2026-10-18T03:02:48.259Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "current_helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-18T03:02:47.394Z"
+    }
+  },
+  "common": {
+    "head": "020f96374ce2cc27e554a94ba256bc9640316c16",
+    "clean": true,
+    "diff": [
+      "evals/docs/2026-10-16-text-import-integration.md",
+      "evals/docs/2026-10-17-lab61-admission-ready-verification.json",
+      "evals/docs/2026-10-17-lab61-apparmor-operator-receipt.json",
+      "evals/docs/2026-10-17-lab61-apparmor-operator.md",
+      "evals/docs/2026-10-17-lab61-ben-initial-review-verification.json",
+      "evals/docs/2026-10-17-lab61-ben-review-admission.json",
+      "evals/docs/2026-10-17-lab61-cases-ready-delivery.json",
+      "evals/docs/2026-10-17-lab61-cases-ready-verification.json",
+      "evals/docs/2026-10-17-lab61-checker-reject-delivery.json",
+      "evals/docs/2026-10-17-lab61-checker-reject-verification.json",
+      "evals/docs/2026-10-17-lab61-checker-rework1-decision.json",
+      "evals/docs/2026-10-17-lab61-cli-correction-authorization.md",
+      "evals/docs/2026-10-17-lab61-continuation-decision.json",
+      "evals/docs/2026-10-17-lab61-initial-admission-delivery.json",
+      "evals/docs/2026-10-17-lab61-initial-admission-verification.json",
+      "evals/docs/2026-10-17-lab61-initial-apparmor-operator-receipt.json",
+      "evals/docs/2026-10-17-lab61-initial-authorization-verification.json",
+      "evals/docs/2026-10-17-lab61-initial-blocker-delivery.json",
+      "evals/docs/2026-10-17-lab61-initial-build-os-delivery.json",
+      "evals/docs/2026-10-17-lab61-initial-build-os-verification.json",
+      "evals/docs/2026-10-17-lab61-initial-cli-correction-authorization.md",
+      "evals/docs/2026-10-17-lab61-initial-continuation-decision.json",
+      "evals/docs/2026-10-17-lab61-initial-operator-verification.json",
+      "evals/docs/2026-10-17-lab61-initial-os-accept-verification.json",
+      "evals/docs/2026-10-17-lab61-initial-os-review-delivery.json",
+      "evals/docs/2026-10-17-lab61-initial-source-delivery.json",
+      "evals/docs/2026-10-17-lab61-initial-source-evaler-verification.json",
+      "evals/docs/2026-10-17-lab61-initial-source-reject-delivery.json",
+      "evals/docs/2026-10-17-lab61-initial-source-reject-verification.json",
+      "evals/docs/2026-10-17-lab61-owner-source-accept-delivery.json",
+      "evals/docs/2026-10-17-lab61-owner-source-accept-verification.json",
+      "evals/docs/2026-10-17-lab61-policy-count-clarification.json",
+      "evals/docs/2026-10-17-lab61-product-wrapper-recovery.json",
+      "evals/docs/2026-10-18-lab61-checker-rework1-ben-admission.json",
+      "evals/docs/2026-10-18-lab61-checker-rework1-delivery.json",
+      "evals/docs/2026-10-18-lab61-checker-rework1-reject-delivery.json",
+      "evals/docs/2026-10-18-lab61-checker-rework1-reject-verification.json",
+      "evals/docs/2026-10-18-lab61-checker-rework1-source.json",
+      "evals/docs/2026-10-18-lab61-checker-rework1-verification.json",
+      "evals/docs/2026-10-18-lab61-checker-rework2-ben-admission.json",
+      "evals/docs/2026-10-18-lab61-checker-rework2-decision.json",
+      "evals/docs/2026-10-18-lab61-checker-rework2-portable-source.json",
+      "evals/docs/2026-10-18-lab61-checker-rework2-ready-delivery.json",
+      "evals/docs/2026-10-18-lab61-checker-rework2-ready-verification.json",
+      "evals/docs/2026-10-18-lab61-checker-rework2-reject-delivery.json",
+      "evals/docs/2026-10-18-lab61-checker-rework2-reject-verification.json",
+      "evals/docs/2026-10-18-lab61-checker-rework3-ben-admission.json",
+      "evals/docs/2026-10-18-lab61-checker-rework3-decision.json",
+      "evals/docs/2026-10-18-lab61-checker-rework3-ready-delivery.json",
+      "evals/docs/2026-10-18-lab61-checker-rework3-ready-verification.json",
+      "evals/docs/2026-10-18-lab61-checker-rework3-reject-delivery.json",
+      "evals/docs/2026-10-18-lab61-checker-rework3-reject-verification.json",
+      "evals/docs/2026-10-18-lab61-checker-rework4-ben-admission.json",
+      "evals/docs/2026-10-18-lab61-checker-rework4-decision.json",
+      "evals/docs/2026-10-18-lab61-checker-rework4-decision.md",
+      "evals/docs/2026-10-18-lab61-checker-rework4-ready-delivery.json",
+      "evals/docs/2026-10-18-lab61-checker-rework4-ready-verification.json",
+      "evals/docs/2026-10-18-lab61-checker-rework4-resolution.json",
+      "evals/docs/evaler/checkpoint.md",
+      "evals/docs/plans/2026-10-17-lab61-initial-cli-design.md",
+      "evals/docs/plans/2026-10-17-lab61-initial-cli-implementation.md"
+    ],
+    "remote": "020f96374ce2cc27e554a94ba256bc9640316c16\trefs/heads/text-import-evals\n"
+  },
+  "all_five_queues_read": true,
+  "only_current_Evaler_active": true,
+  "dependency": {
+    "issue_id": "01a1214b-38c2-753b-9da5-c6575e143343",
+    "status": "done",
+    "revision": 38
+  },
+  "own_checker_tests_not_full_acceptance": true,
+  "classification": "fifth fresh independent eval-quality REJECT; retained measured product FAIL; no new infrastructure ERROR"
+}

@@ -1,0 +1,132 @@
+{
+  "checked_utc": "2026-10-18T03:17:44.802639+00:00",
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "report_id": "01a14cf4-c0ba-7c89-aa1c-e974e9e34621",
+  "checked_sha": "d7873d3b3fe58eb1137bb9a85655c495f3e7c812",
+  "archive_bytes": 13751485,
+  "archive_sha256": "8ca1f732392d296b9ede322fc9d3c325f9ca068305094ceeb8bbd14bb1211a25",
+  "manifest_sha256": "fdb696e6d2ce5d8799dad9ac7108f7959a85a553fdeac7f5e563822d91e68e96",
+  "parts": [
+    {
+      "name": "lab61-ben-rereview-d7873d3b.zip.part-001",
+      "bytes": 4194304,
+      "sha256": "e02294409a4a662f0abf7195267f2634356a613fae61a9ec3725746229b13722"
+    },
+    {
+      "name": "lab61-ben-rereview-d7873d3b.zip.part-002",
+      "bytes": 4194304,
+      "sha256": "dfa7b27c347240235abe9a710ccce65d47ce55d6d25c038a001748c36d0c674b"
+    },
+    {
+      "name": "lab61-ben-rereview-d7873d3b.zip.part-003",
+      "bytes": 4194304,
+      "sha256": "9d748454f5d96f2c0e82bc69e0a93075fd8911d425113627df6c1c68a21321f3"
+    },
+    {
+      "name": "lab61-ben-rereview-d7873d3b.zip.part-004",
+      "bytes": 1168573,
+      "sha256": "433e9e0aa9f99200fce544a3b717cedac584cd641820c04a1d901dfa661b840a"
+    }
+  ],
+  "classification": "delivery integrity and native continuation verification; not full ACCEPT",
+  "root_model_native_live_calls": 0,
+  "source_executed_or_integrated": false,
+  "payload_count": 785,
+  "member_count": 786,
+  "payload_bytes": 215029908,
+  "standalone_report_bytes": 23153,
+  "standalone_report_sha256": "d488950448e4451cafb701c1e41cf397410fc5e73bc4dedba30004ecf82fb699",
+  "exact_Git_candidate_files": 144,
+  "all_payloads_exact": true,
+  "exact_membership": true,
+  "safe_unique_names": true,
+  "original_completion_sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+  "original_core_release_sha256": "1d9e17e0b34ddff48791a493f49ebfd525b1d17a0e8b5a0b2a1d110d73671274",
+  "delivered_lifecycle_byte_equal": true,
+  "delivered_ben_health": {
+    "at": "2026-10-18T02:58:48.103Z",
+    "status": "FREE",
+    "lease_absent": true,
+    "endpoint": {
+      "url": "http://localhost/app/",
+      "http_status": 200,
+      "bytes": 2065
+    },
+    "container": {
+      "id": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+      "running": true,
+      "isolation_marker_verified": true,
+      "bind_mounts_absent": true
+    },
+    "storage_empty": true,
+    "storage_roots": [
+      "/workdir/UserStorage",
+      "/workdir/SessionBackup"
+    ],
+    "profiles": [
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/rich/reference-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/rich/eval-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/reference-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/evalbaseline/eval-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/evalrunner/eval-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      }
+    ],
+    "live_browsers": [],
+    "debuggers_closed": true,
+    "healthy_shared_stand": true,
+    "installed_cli_admission": "READY",
+    "installed_cli_source": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+    "prior_failed_admission_preserved": true
+  },
+  "evaler_verification_sha256": "4c71565e05123831d4a947e1031687924feba61b1e03e9e10ac437a9084da1a3",
+  "evaler_read_only_health": {
+    "at": "2026-10-18T03:02:48.259Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "Evaler_requeried_DB": false,
+  "canonical_continue_event_verified": {
+    "kind": "continue_after_evaler",
+    "id": "01a14cfa-2fec-7a9f-988c-18c2a6e6f575",
+    "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+    "report_id": "01a14cf4-c0ba-7c89-aa1c-e974e9e34621",
+    "sha": "d7873d3b3fe58eb1137bb9a85655c495f3e7c812",
+    "target": "Rich",
+    "stand_ready": true
+  },
+  "canonical_continue_result": "ready_to_dispatch",
+  "continuation_files": {
+    "continue-input.json": "125379100538b6cbf10be5630539a0e0fdeaf470da6d54c36eeecacab09133ce",
+    "continue-decision.json": "45c5793697340e6ea2230a7a8a4e08c94c05fc3a50a495419a45af8b7325f9e9"
+  },
+  "official_decision_byte_equal": true
+}
