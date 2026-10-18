@@ -242,17 +242,37 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const linkTid=source+'|Output_Data-'+p.edge.output+'|'+target.split(';Graph;')[1]+'|Input_Data-'+p.edge.input;
       const link=find(linkTid);
       if(await link.count()!==1)throw new Error('Owned link is not uniquely rendered');
-      const hit=await link.evaluate(e=>{
+      const curvePoint=()=>link.evaluate(e=>{
+        let outside=false;
         const paths=[e,...e.querySelectorAll('path')].filter(p=>typeof p.getTotalLength==='function');
         for(const path of paths){const matrix=path.getScreenCTM();if(!matrix)continue;for(const fraction of [.5,.25,.75]){
           const p=path.getPointAtLength(path.getTotalLength()*fraction),q=new DOMPoint(p.x,p.y).matrixTransform(matrix),top=document.elementFromPoint(q.x,q.y);
+          if(q.x<0||q.y<0||q.x>=innerWidth||q.y>=innerHeight){outside=true;continue;}
           if(top&&(top===e||e.contains(top)))return {x:q.x,y:q.y};}}
+        if(outside)return null;
         throw new Error('Owned link has no reachable curve point');
       });
+      let hit=await curvePoint();
+      if(!hit){
+        const canvas=find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram');
+        for(const id of [p.edge.source,p.edge.target]){
+          const nodes=before.nodes.filter(n=>n.ref.node_id===id);
+          if(nodes.length!==1||nodes[0].locked!==false)throw Error('Owned link endpoint unavailable for viewport navigation');
+          placementNavigation=await revealPosition({page,root:canvas,nodeId:id,position:nodes[0].position,prefix:task.request.workflow_ref.prefix,
+            remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();if(!sameGraph(before,await read(page,task)))throw Error('Graph changed during link viewport navigation');}});
+          if(!placementNavigation.fully_visible)throw Error('Owned link endpoint not revealed');
+        }
+        gestureBefore=await read(page,task);
+        if(!sameGraph(before,gestureBefore))throw Error('Graph changed after link viewport navigation');
+        hit=await curvePoint();
+        if(!hit)throw Error('Owned link has no reachable curve point after viewport navigation');
+      }
       // Selection can fail to appear. Leave time to return its ambiguous receipt
       // before the enclosing transport deadline, without repeating the gesture.
       if(remaining()<=1000)throw new Error('Insufficient deadline for owned link selection');
-      await ensureContext();effectPossible=true;await page.mouse.click(hit.x,hit.y);
+      await ensureContext();
+      if(JSON.stringify(await read(page,task))!==JSON.stringify(gestureBefore))throw Error('Graph changed before owned link selection');
+      effectPossible=true;await page.mouse.click(hit.x,hit.y);
       const bend=find(linkTid+';TargetBend');
       await wait('owned_link_selection_visible',async()=>await bend.count()===1&&await bend.isVisible(),1000);
       const selected=await page.evaluate(()=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;
@@ -261,7 +281,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const remove=find(task.request.workflow_ref.prefix+';ModelForm;btnRemoveSelected');
       await wait('single_link_delete_toolbar_reachable',async()=>{try{await point(remove);return true;}catch{return false;}});
       const stillSelected=await page.evaluate(tid=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;const cells=d.FmxGraph.getSelectionCells();return cells.length===1&&cells[0].edge===true&&d.FmxGraph.view.getState(cells[0])?.shape?.node?.getAttribute('data-tid')===tid;},linkTid);
-      if(!stillSelected || JSON.stringify(await read(page,task))!==JSON.stringify(before))throw new Error('Owned link selection or graph changed before deletion');
+      if(!stillSelected || JSON.stringify(await read(page,task))!==JSON.stringify(gestureBefore))throw new Error('Owned link selection or graph changed before deletion');
       await remove.click({timeout:remaining()});transient='delete';
       const message=find('msgbox;cnt;cnt;cmp');
       await message.waitFor({state:'visible',timeout:Math.min(15000,remaining())});
