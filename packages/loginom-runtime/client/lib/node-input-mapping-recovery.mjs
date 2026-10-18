@@ -23,7 +23,6 @@ export function inputMappingGraph(graph,node){
  const service=graph.rest_connection_links??[];
  need(service.length===graph.foreign_links.length && new Set(service.map(e=>e.tid)).size===service.length
   && service.every(e=>graph.foreign_links.includes(e.tid)&&e.output==='connection:0'&&e.input==='connection:0'
-   &&[node.node_id,links[0].source].includes(e.target)
    &&graph.nodes.filter(n=>n.ref.node_id===e.source&&n.type==='bg-vendor-icon-restclientconnection'&&!n.locked).length===1
    &&graph.nodes.filter(n=>n.ref.node_id===e.target&&['integration.rest_request','bg-vendor-icon-restclient'].includes(n.type)&&!n.locked).length===1),
   'complete prepared graph required');
