@@ -821,9 +821,13 @@ def report_sentences(text, atoms=(), identifiers=None):
         # utterance must not inherit the quote's speaker or epistemic scope.
         # Scalar code/field objects and atomic native reasons keep their owner.
         value = match.group()
+        body = value[1:-1]
         speech_end = (not cut and re.fullmatch(quote, value)
             and re.search(r'[.!?][»”"]$', value) and not literal_quote(value)
-            and report_predicate_head(value[1:-1])
+            # Modality/history can precede an active head, and a passive or
+            # copular predicate need not start with the active engine subject.
+            and (any(report_predicate_head(body[token.start():]) for token in re.finditer(r'\b\w', body))
+                or re.search(r'\b(?:is|are|was|were|был\w*|явля\w*)\b', body))
             # A following subjectless auxiliary still predicates this quoted
             # argument (e.g. its truth), rather than starting another report.
             and not re.match(r'\s*[,—-]?\s*(?:is|are|was|were|has|have|had|can|could|may|might|should|would|must|will|был\w*|будет|явля\w*)\b', text[match.end():])
