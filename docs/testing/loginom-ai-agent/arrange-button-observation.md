@@ -13,3 +13,5 @@ With the native WizrdMCF open, the ModelForm layout button is absent (fourth pro
 First probe saved, closed and logged out; later wizard probes had unconfirmed cleanup and closed their browsers. The fourth Close hit its 10 s observation cap with the owned wizard mask still present.
 Raw observations and screenshots belong to the LAB-92 attachment, outside Git.
 The implementation uses the existing new_draft receipt and storage session/document binding, with the same native package and tab; it adds no creation marker.
+Live s1 on 7561c301: both first Save attempts refused immediately after layout with "Package changed after save preflight"; the model retried and saved, then both cold-checks passed. These runs are not clean acceptance passes.
+The unchanged original Save checkpoint is now checked after staging the Save As dialog and entering the path, immediately before confirmation. This avoids checking during the layout repaint without adding waits or retries; permanent topology loss still prevents any file write. Live confirmation of this change is pending safety review.

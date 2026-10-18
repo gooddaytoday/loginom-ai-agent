@@ -96,6 +96,22 @@ test('both saves refuse topology drift during layout before writing the package'
   }
 });
 
+test('both saves check the original topology after staging the dialog, beyond the layout repaint', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) {
+    const page = await arrangePage(), links = [...page.edges], click = page.click.bind(page);
+    page.click = async item => {
+      await click(item);
+      if (item.symbol === 'workflow.arrange') page.edges = [];
+      if (item.symbol === 'packages.menu') page.edges = [...links];
+    };
+    const path = '/user/data/packages/layout-repaint.lgp';
+    const result = await run(page, action, { path, conflict_policy: 'fail' });
+    assert.equal(result.status, 'SUCCEEDED', JSON.stringify(result));
+    assert.deepEqual(page.storage.get(path).edges, links);
+    assert.equal(page.arrangements, 1);
+  }
+});
+
 test('layout is skipped near the original deadline while ordinary saving still completes', async () => {
   const page = await arrangePage(), deadline = page.clock + 2500;
   const result = await run(page, 'package.save_checkpoint', { path: '/user/data/packages/deadline.lgp', conflict_policy: 'fail' }, { deadline_at: deadline });

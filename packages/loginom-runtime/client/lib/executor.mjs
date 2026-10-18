@@ -1136,8 +1136,6 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       }
     } catch { arrangement.reason = 'arrangement_unconfirmed'; }
     record('package_arrangement', { ...arrangement, warning: true });
-    // Keep Save's original graph as its baseline, including after a layout attempt.
-    if (!same(await packageCheckpoint(), before)) throw Error('Package changed after save preflight');
     const continuationsBefore = keepOpen ? await packageContinuations(before.workflow_ref) : [];
     const click = async (symbol, effect = false) => interact(timeout => resolve(symbol).then(item => item.click({ timeout })), effect);
     transientDialog = true;
@@ -1145,6 +1143,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     await click('packages.save_as');
     const input = await poll(() => resolve('file_dialog.file_name', {}, { cardinality: 'zeroOrOne', stable: false }));
     await writeFileName(input, before.path);
+    // Keep the original graph; inspect it after staging the dialog, beyond the
+    // layout repaint, and before the gesture that writes the package.
+    if (!same(await packageCheckpoint(), before)) throw Error('Package changed after save preflight');
     await click('file_dialog.confirm', true);
     record('save_requested', { path: before.path });
     const expectedConflict = '"' + before.path + '" уже существует. Вы хотите заменить его?';
