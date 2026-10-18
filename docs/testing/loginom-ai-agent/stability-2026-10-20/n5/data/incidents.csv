@@ -1,0 +1,11 @@
+IncidentID,Team,Severity,Minutes
+I01,Team-A,critical,30
+I02,Team-A,critical,60
+I03,Team-B,critical,45
+I04,Team-B,critical,45
+I05,Team-C,critical,120
+I06,Team-D,critical,30
+I07,Team-A,critical,29
+I08,Team-B,high,180
+I09,Team-E,low,240
+I10,Team-D,critical,0

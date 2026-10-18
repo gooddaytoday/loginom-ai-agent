@@ -1,0 +1,13 @@
+RecordID,Region,Track,Status,Seats,Fee
+T01,East,eng,confirmed,2,10.50
+T02,East,ENG,confirmed,1,12.00
+T03,East,biz,confirmed,3,8.00
+T04,East,BIZ,cancelled,9,100.00
+T05,West,ENG,confirmed,4,5.25
+T06,West,BIZ,confirmed,2,9.50
+T07,West,biz,confirmed,1,7.00
+T08,West,eng,pending,8,80.00
+T09,North,eng,confirmed,3,6.50
+T10,North,biz,confirmed,2,10.00
+T11,North,BIZ,confirmed,1,4.50
+T12,North,ENG,cancelled,7,70.00

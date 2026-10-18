@@ -1,0 +1,66 @@
+{
+  "package_path": "/stability-2026-10-20/n4.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.join_data"
+    },
+    {
+      "type": "transform.cross_table"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Site",
+          "label": "Site",
+          "type": "string"
+        },
+        {
+          "name": "Electricity",
+          "label": "Electricity",
+          "type": "real"
+        },
+        {
+          "name": "Gas",
+          "label": "Gas",
+          "type": "real"
+        },
+        {
+          "name": "Water",
+          "label": "Water",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Site": "Plant-A",
+          "Electricity": 11.0,
+          "Gas": 6.0,
+          "Water": 2.0
+        },
+        {
+          "Site": "Plant-B",
+          "Electricity": 3.0,
+          "Gas": 6.0,
+          "Water": 3.0
+        },
+        {
+          "Site": "Plant-C",
+          "Electricity": 5.0,
+          "Gas": 3.0,
+          "Water": 1.0
+        }
+      ]
+    }
+  ]
+}
