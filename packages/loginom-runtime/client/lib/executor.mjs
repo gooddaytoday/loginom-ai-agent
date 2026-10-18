@@ -25,6 +25,9 @@ import {createJavascriptSourceReadSession,validateJavascriptSourceReadRequest} f
 import {createJavascriptContextReadSession,validateJavascriptContextReadRequest} from './javascript-context-read.mjs';
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
 import { configureTextImportDraft, validateTextImportRequest } from './text-import-procedure.mjs';
+import selectorCatalog from '../../executor/catalog/selectors.json' with { type: 'json' };
+
+const arrangementSelector = selectorCatalog.native_save_arrangement;
 
 const identifier = { type: 'string', minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9._:-]+$' };
 const operationInspectTool = { name: 'dock_operation_inspect',
@@ -1086,6 +1089,53 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
   const runPackageSaveAs = async ({ keepOpen = false } = {}) => {
     const before = await packageCheckpoint();
     if (task.checkpoint && !same(before, task.checkpoint)) throw new Error('Package changed after save preflight');
+    let arrangement = { status: 'skipped', reason: 'ownership_unconfirmed' };
+    try {
+      const admission = await page.evaluate(binding => {
+        const prep = globalThis.__loginomDockPreparationV1, app = globalThis.bg?.app;
+        if (!binding.session_id || !binding.document_id || prep?.document !== document || prep.id !== binding.document_id)
+          return { reason: 'ownership_unconfirmed' };
+        const card = app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab();
+        let node = card?.Controller?.Node?.data?.node;
+        const seen = new Set();
+        while (node && seen.size < 32 && !seen.has(node) && !(node instanceof app.PackageTreeNode)) {
+          seen.add(node); node = node.ParentNode;
+        }
+        const tabs = document.querySelectorAll('[data-tid='+JSON.stringify(binding.tab_tid)+']');
+        const creation = node instanceof app.PackageTreeNode && tabs.length === 1 && tabs[0].classList.contains('x-tab-active')
+          && [...prep.receipts.values()].some(receipt => {
+            if (receipt.phase !== 'verified' || receipt.packageNode !== node || receipt.tab !== tabs[0]) return false;
+            try {
+              const request = JSON.parse(receipt.request);
+              return request.intent === 'new_draft' && request.session === binding.session_id;
+            } catch { return false; }
+          });
+        if (!creation) return { reason: 'ownership_unconfirmed' };
+        if (node.HasRunningNodes() !== false) return { reason: 'package_running' };
+        const visible = element => !!element.getBoundingClientRect().width && !!element.getBoundingClientRect().height
+          && getComputedStyle(element).visibility !== 'hidden';
+        if ([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg,[data-tid$=";WizrdMCF"]')].some(visible))
+          return { reason: 'dialog_or_wizard_open' };
+        return null;
+      }, { ...before.workflow_ref, session_id: task.storage_binding?.session_id, document_id: task.storage_binding?.document_id });
+      if (admission?.reason) arrangement.reason = admission.reason;
+      else if (remaining() < 3000) arrangement.reason = 'save_deadline_near';
+      else {
+        // This optional native step uses the bundled, resource-pinned selector;
+        // an older remote Save catalog need not expose a new public action.
+        const definition = task.arrangement_selector;
+        if (!definition || definition.strategy !== 'data_tid' || definition.scope !== 'activeWorkflow')
+          throw Error('Bundled layout selector unavailable');
+        const buttons = await visible(tid('', before.workflow_ref.prefix+';'+definition.value));
+        const button = buttons.length === 1 && await buttons[0].isEnabled() ? buttons[0] : null;
+        if (!button) arrangement.reason = 'button_unavailable';
+        else {
+          arrangement = { status: 'attempted', reason: 'result_unconfirmed' };
+          await interact(timeout => button.click({ timeout: Math.min(timeout, 1000) }), true);
+        }
+      }
+    } catch { arrangement.reason = 'arrangement_unconfirmed'; }
+    record('package_arrangement', { ...arrangement, warning: true });
     const continuationsBefore = keepOpen ? await packageContinuations(before.workflow_ref) : [];
     const click = async (symbol, effect = false) => interact(timeout => resolve(symbol).then(item => item.click({ timeout })), effect);
     transientDialog = true;
@@ -1093,6 +1143,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     await click('packages.save_as');
     const input = await poll(() => resolve('file_dialog.file_name', {}, { cardinality: 'zeroOrOne', stable: false }));
     await writeFileName(input, before.path);
+    // Keep the original graph; inspect it after staging the dialog, beyond the
+    // layout repaint, and before the gesture that writes the package.
+    if (!same(await packageCheckpoint(), before)) throw Error('Package changed after save preflight');
     await click('file_dialog.confirm', true);
     record('save_requested', { path: before.path });
     const expectedConflict = '"' + before.path + '" уже существует. Вы хотите заменить его?';
@@ -1309,7 +1362,8 @@ export function makeCapabilityCode(action, selectors, parameters, options = {}) 
   if(readNodeTargetGraph!==undefined&&(typeof readNodeTargetGraph!=='function'||!options.node_target_context))throw Error('Internal node graph reader requires a bound context');
   const handler = requireCapability(action).handler;
   const allowedSelectors = Object.fromEntries(action.selector_symbols.map(symbol => [symbol, selectors.get(symbol)]));
-  const task = { action: structuredClone(action), selectors: structuredClone(allowedSelectors), parameters: structuredClone(parameters), ...structuredClone(serializableOptions), handler };
+  const task = { action: structuredClone(action), selectors: structuredClone(allowedSelectors), parameters: structuredClone(parameters), ...structuredClone(serializableOptions), handler,
+    ...(['packageSaveAs','packageSaveCheckpoint'].includes(handler) ? { arrangement_selector: structuredClone(arrangementSelector) } : {}) };
   const body = `(${browserCapability.toString()})(page, ${JSON.stringify(task)}, ${readNodeTargetGraph?readNodeTargetGraph.toString():'undefined'}, ${rebindNodeTargetLinkEpochs.toString()}, ${readNodeTargetLinkValidation.toString()})`;
   return ['apply', 'recover_link'].includes(task.mode) && task.receipt_namespace
     ? withBrowserReceipt(body, task) : `async (page) => ${body}`;
@@ -1458,7 +1512,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if (mutation) operation.lastReceipt.operation_id = operation.id;
     const outcome = await execute(makeCapabilityCode(operation.action, pinned.selectors, operation.parameters, {
       operation_id: operation.id, mode, checkpoint: operation.checkpoint, expected_build: targetBuild,
-      ...(operation.action.effect?.destination_policy==='session_storage'?{storage_binding:getStorageBinding()}:{}),
+      ...(operation.action.effect?.destination_policy==='session_storage'||['package.save_as','package.save_checkpoint'].includes(operation.action.action_key)
+        ?{storage_binding:getStorageBinding()}:{}),
       ...receipt, ...(mutation ? { deadline_at: mode === 'apply' ? operation.deadline : now() + operation.action.timeout_ms }
         : operation.parentDeadline !== undefined ? { deadline_at: operation.deadline } : {}),
     }), { timeout: operation.parentDeadline !== undefined && ['prepare', 'apply'].includes(mode)
