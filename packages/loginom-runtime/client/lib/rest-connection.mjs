@@ -30,7 +30,7 @@ export async function restConnectionCapability(page,t){
   };
   const point=async locator=>{
    need(await locator.count()===1,'control is missing or ambiguous');
-   return locator.evaluate(e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);
+   return locator.evaluate(e=>{if(e.closest('.x-tree-animator-wrap'))throw Error('REST tree row is still animating');const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);
     if(r.width<=0||r.height<=0||x<0||y<0||x>=innerWidth||y>=innerHeight||!hit||!(hit===e||e.contains(hit))||e.closest('.x-item-disabled,.x-btn-disabled'))throw Error('REST control is not reachable: '+e.closest('[data-tid]')?.getAttribute('data-tid'));return {x,y};});
   };
   const quiet=()=>wait('loading mask',()=>page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count().then(n=>n===0));
@@ -70,7 +70,7 @@ export async function restConnectionCapability(page,t){
    await fill(fields+'pedURL;ValueControl',t.connection.base_url);await fill(fields+'fldLabel',t.connection.name);
    for(const q of t.query_parameters){
     const before=(await read()).parameters;await click(fields+'btnAdd');
-    const added=await wait('new URL parameter',async()=>{const next=(await read()).parameters.filter(q=>!before.some(b=>b.name===q.name));return next.length===1&&next[0].type?next[0]:null;});
+    const added=await wait('new string URL parameter',async()=>{const next=(await read()).parameters.filter(q=>!before.some(b=>b.name===q.name));return next.length===1&&next[0].type==='Строковый'?next[0]:null;});
     need(added.type==='Строковый','new URL parameter must be string');
     await click(added.tid,true);
     await fill(fields+'grdParams;tbl;celleditor;txt',q.name,'Enter');
