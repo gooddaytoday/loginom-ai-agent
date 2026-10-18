@@ -1,0 +1,734 @@
+{
+  "checked_at": "2026-10-18T01:17:52.766055+00:00",
+  "candidate_sha": "b00b926261bdefd377c572cc3b81903117dc51a0",
+  "scope": "Supplement to initial ready delivery receipt7d6cd2a7 which verified changed source and archive but did not yet compare portable-candidate prefix",
+  "portable_files_equal_exact_Git": 145,
+  "files": [
+    {
+      "path": "portable-candidate/evals/script/check-text-import.py",
+      "bytes": 52043,
+      "sha256": "7716febbc6551dd9d946a2f04b026bfbe44e690f5d60088b4648bff8c06767f3"
+    },
+    {
+      "path": "portable-candidate/evals/script/inspect-node-package.py",
+      "bytes": 4295,
+      "sha256": "f5f7d3216b0f6265d847bbdbdeb18615fb60c89c6a0355841baf14e3fbeda08e"
+    },
+    {
+      "path": "portable-candidate/evals/script/text_import_oracle.py",
+      "bytes": 8923,
+      "sha256": "e3d08a25d13ec742f7e6ddc10c5a15c338448bcf32aab30e1806fbfc17abbaab"
+    },
+    {
+      "path": "portable-candidate/evals/src/text-import-cases.json",
+      "bytes": 2123,
+      "sha256": "c8df8a0b18724b5c1bd5b748df3478221a287ae9084361065ebce169d286a735"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-ambiguous-headers/PROVENANCE.md",
+      "bytes": 1756,
+      "sha256": "6ea6223b82f9214d8ce48e0f244b7ea179cd45ef368459c9ddfa43427f1b950a"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-ambiguous-headers/SPEC.json",
+      "bytes": 1329,
+      "sha256": "f7373a2b12d49ab8b90a7c2368a9ec2af80a0df6f41b783a79d92e063c53107a"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-ambiguous-headers/SPEC.md",
+      "bytes": 5950,
+      "sha256": "ab92d783f070e3cef3d60debe1a42b36fa1adfba2235a6d888ce918bacee5820"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-ambiguous-headers/TASK.md",
+      "bytes": 2095,
+      "sha256": "4d02214ac2924671ee1518858de9fb07c5d86769daca0a18e08fac58da332e5e"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-ambiguous-headers/acceptance.json",
+      "bytes": 328,
+      "sha256": "7a886bf0df2d909d4697c943bf5a0cfce1d0c7ba5cfc3ef970dcbd26360ef2ef"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-ambiguous-headers/data/ambiguous_headers.csv",
+      "bytes": 23,
+      "sha256": "c7519031b5932dc11febfd15807c8205d9892229ab7913321eea7d96eabd7bba"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-ambiguous-headers/expected/OUTCOME.md",
+      "bytes": 1139,
+      "sha256": "71664e77e5e9516f885791d72e7046bb9b9ad4bb582cff42090dab3b2b7f8607"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-ambiguous-headers/expected/outcome.json",
+      "bytes": 680,
+      "sha256": "d588295ddbdc622ebc45526e42d7e417f88046c3aa74f4c58dc6388e5799f549"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-ambiguous-headers/independent-expectation.json",
+      "bytes": 694,
+      "sha256": "619cca31c335cebcf9393f7cf919eb5c0ae8081e7e40830bad405dbb4e6cf91a"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-ambiguous-headers/oracle-provenance.json",
+      "bytes": 614,
+      "sha256": "f8c3e0107008209ea19a33aade920534ba69afeb942058f39cac6b086b86019e"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-ambiguous-headers/preparation.json",
+      "bytes": 1339,
+      "sha256": "383f4d508d83f0c080c43d918246ac75fe7cdd3f4e2a1adfbac839c09e2b263f"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-ambiguous-headers/provenance.json",
+      "bytes": 322,
+      "sha256": "8ea22521e9de57d948348ce2098231b77b5bb4ffb7cb5c2d34ca175735fc9188"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-ambiguous-headers/reference-provenance.json",
+      "bytes": 2172,
+      "sha256": "5db87122f481a74d307fa0300f6df0d95ee7c82178610f2ece9f92eb059bd451"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-ambiguous-headers/task.json",
+      "bytes": 3254,
+      "sha256": "3e1fb59e1d661afd8b6a2a19bfe554b5256ee773c226936a96bf445b7f82467e"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-unclosed-quote/PROVENANCE.md",
+      "bytes": 1747,
+      "sha256": "50241640368454624e3147bd247c13a6a8917ab34584468826348d2e7b2cf9f0"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-unclosed-quote/SPEC.json",
+      "bytes": 1216,
+      "sha256": "18c25ee898adb7b28903727fefe1a4b7faa74864d865a6a92e1ae66729bc06bd"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-unclosed-quote/SPEC.md",
+      "bytes": 5875,
+      "sha256": "1228b8617386f1dcf0387d3cac0347dee6070f8b9a58e0919ba421835b78053f"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-unclosed-quote/TASK.md",
+      "bytes": 3371,
+      "sha256": "c1794d909261bf429da4aafd756cf941385b54173de4d3916caa2a412e5e0578"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-unclosed-quote/acceptance.json",
+      "bytes": 325,
+      "sha256": "8088607aa94a4cd18665915bb2825373cb61aa210bbb32f46bd64a5149cebb72"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-unclosed-quote/data/unclosed_quote.csv",
+      "bytes": 36,
+      "sha256": "e8eda3b3c2a61603838a9b3eaf3dc6fbac6c7bde4ab966452cfb3fa292d76f2c"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-unclosed-quote/expected/OUTCOME.md",
+      "bytes": 1132,
+      "sha256": "9a1abb337cc8645ff6569873b635e5380e18139eea63dae404e1b61fe2c69249"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-unclosed-quote/expected/outcome.json",
+      "bytes": 658,
+      "sha256": "fe6ac6e6d98cfd006e7599c353f924c8e0ef862643ed94f0e3193a2dd52a5d72"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-unclosed-quote/independent-expectation.json",
+      "bytes": 611,
+      "sha256": "6b751ac9ffeaebc26cc588d42b87c572437035a1eba9238b67a465a163fbd2b4"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-unclosed-quote/oracle-provenance.json",
+      "bytes": 608,
+      "sha256": "76ef1da0a36de0a5222a0390f4b2930fa0aa057e3aef3499e20b8814714a74bb"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-unclosed-quote/preparation.json",
+      "bytes": 1316,
+      "sha256": "84b924c4f417015a1f8b605ea05f08b25f4958383eb8bedf880984f142c73d80"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-unclosed-quote/provenance.json",
+      "bytes": 319,
+      "sha256": "65368f13d1d37511105950393aa8c3cf99bcd61365430e2094835c7549cdeb90"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-unclosed-quote/reference-provenance.json",
+      "bytes": 2030,
+      "sha256": "e987af46db78ccbfa54805cf40bf1c2ce1f445351480dbb4f14ce3adc6f28996"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-unclosed-quote/task.json",
+      "bytes": 4494,
+      "sha256": "0e3fcce598fd03d4a1dcc38d39609aadaedc484477c8e0a29e55cbe842152d3f"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-delimiter/PROVENANCE.md",
+      "bytes": 1750,
+      "sha256": "92f1b0559385c0978d4482b84fbe6de044d5e56504bdc6ee4515835f88f7769d"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-delimiter/SPEC.json",
+      "bytes": 1240,
+      "sha256": "573436da7b0d711cb29e674bb5066189df5b5c30d96eb630c7167ef7624e7735"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-delimiter/SPEC.md",
+      "bytes": 5604,
+      "sha256": "eebf34773460e932fdbcb7b1ae9382468b9b9f6c082b0ffa8e42ebacc30daf85"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-delimiter/TASK.md",
+      "bytes": 3394,
+      "sha256": "992aa0e51114d091d33de5411bdbf1a9c6309e1819ba19a0f6228c3bfd00d74b"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-delimiter/acceptance.json",
+      "bytes": 326,
+      "sha256": "ee1270318ff6524634a0e0e35560cd71fb8f8f8d8f4196edb67276bd1a59530a"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-delimiter/data/wrong_delimiter.csv",
+      "bytes": 20,
+      "sha256": "92441055dd7d146da19c049e44e6632d6977eb67ae06d7237786ea4439515cbb"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-delimiter/expected/OUTCOME.md",
+      "bytes": 899,
+      "sha256": "a19e8f8ac7f4092367b69c383bc78f8e0f568efa9ffb899c41db5ebb8e7f0cd3"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-delimiter/expected/outcome.json",
+      "bytes": 559,
+      "sha256": "c8ef44381305f6bfdfcce1aa3f07294944709fa8e1b181a5cb3ec9e987adb43d"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-delimiter/independent-expectation.json",
+      "bytes": 673,
+      "sha256": "42ae6befb8d0c84a4f4b578decc746c99701aa093d062b37518a6ecc579584c9"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-delimiter/oracle-provenance.json",
+      "bytes": 610,
+      "sha256": "a3ed97394f6557f3de64296a9018fe030fa523c26330674c8c63d45e9b3e04a5"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-delimiter/preparation.json",
+      "bytes": 1317,
+      "sha256": "1af101ffb0446de4106a8d18e86779c9ba432e1f1131f64304d4626fcab301b1"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-delimiter/provenance.json",
+      "bytes": 320,
+      "sha256": "50a50ac2da57a60715975d80996b95ffbfae43266271e6a295634fb2745210d0"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-delimiter/reference-provenance.json",
+      "bytes": 2271,
+      "sha256": "f932bdb4fbbc893fa0a34eca71cda7914a052d177e1cf306151fbaa2e8d8ee67"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-delimiter/task.json",
+      "bytes": 4541,
+      "sha256": "e696880c12e23e8c356154dc6ad44319182e92cae037cf193f2957f2ee3ac283"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-encoding/PROVENANCE.md",
+      "bytes": 1747,
+      "sha256": "cc522ef5a9df3ea43f107d15266573e4863961eb8236c7ad9d9a4853ebd94365"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-encoding/SPEC.json",
+      "bytes": 1234,
+      "sha256": "0466c71473fb5e9831530336de975d946d2639defd58571e3718d2e4c5769d79"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-encoding/SPEC.md",
+      "bytes": 5617,
+      "sha256": "804e0f740e93b22a271ca64fc3f2668254b7a52abcc17a38bed2fa71f8ea6036"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-encoding/TASK.md",
+      "bytes": 3389,
+      "sha256": "44f526346e5c8ceaab2bd6a6a86028bbf791d570f22d345cbb17812cabf842d7"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-encoding/acceptance.json",
+      "bytes": 325,
+      "sha256": "c9e0aa3c4b3afb6a8558ca0045a6b84aab8768155415d30b82856fa3b6f58b72"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-encoding/data/wrong_encoding.csv",
+      "bytes": 21,
+      "sha256": "97f88be2af869453bc726e51889dcb10c5bd1d2a8fd7b96cca6f125b888d3ee6"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-encoding/expected/OUTCOME.md",
+      "bytes": 910,
+      "sha256": "0afab5aaf610dda0be57d76d723bf622458745901d801fe366fe8fc404c0f621"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-encoding/expected/outcome.json",
+      "bytes": 547,
+      "sha256": "d52629aa99ed1f6f1d858a6e8bb9cb5f522ee7008ddc6bdfc91c745f42b9a93e"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-encoding/independent-expectation.json",
+      "bytes": 667,
+      "sha256": "f6a0dbe4723ef7fb19acb4b7aab7fa4a21622b69ff03aaed1938f9519d4f728c"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-encoding/oracle-provenance.json",
+      "bytes": 608,
+      "sha256": "85eaca6ee260806824380705d14a10a1b9c9ac5786a4d99c397984e6a00b008e"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-encoding/preparation.json",
+      "bytes": 1315,
+      "sha256": "3cb30356f435a7b38656177ae452eff5c33f43ea08dad14fcc315ff2643ef10c"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-encoding/provenance.json",
+      "bytes": 319,
+      "sha256": "930aecc378862a0db322265be961dbaccd6d7bf7db4214fa146dfba79ea16385"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-encoding/reference-provenance.json",
+      "bytes": 2030,
+      "sha256": "50dc8e19d453167901340fd6b027a2c80bf3178bcd16f779c889ec51ab93339b"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/csv-wrong-encoding/task.json",
+      "bytes": 4530,
+      "sha256": "d6feb4bae0540645524a3d5c6337b3ae11ffb6965ba4054fee41fa4524544a7f"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/initial-incomplete-settings/PROVENANCE.md",
+      "bytes": 2320,
+      "sha256": "95ddce9b86d1f0f5ba4422ef0a158a96ed4151a733c7f93599595fbcf5cf53f4"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/initial-incomplete-settings/SPEC.json",
+      "bytes": 2172,
+      "sha256": "ec0ffe8d99d3d330e73604cb56e8c55bab8bab5d6592741f8a4b13d5afdabc4c"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/initial-incomplete-settings/SPEC.md",
+      "bytes": 6588,
+      "sha256": "8a0b6bb99f25fc5dca8636269270d8f526210b7299605f47e91789d61dd3f94b"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/initial-incomplete-settings/TASK.md",
+      "bytes": 1024,
+      "sha256": "f101a3a3396f5a6bc807689da19e6495c0d1ebc019c9ee42ce7fb8f07f5f5c51"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/initial-incomplete-settings/acceptance.json",
+      "bytes": 334,
+      "sha256": "c1ab3d57e4bf768e370ec2797ef56d54a0fe705cb9a1d46c229be54017ac1fd3"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/initial-incomplete-settings/data/comma_utf8.txt",
+      "bytes": 200,
+      "sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/initial-incomplete-settings/expected/OUTCOME.md",
+      "bytes": 990,
+      "sha256": "d57f1836cfa311318deb0e6247be19aefe00f46908d3a0eb7004e6da30076f38"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/initial-incomplete-settings/expected/outcome.json",
+      "bytes": 568,
+      "sha256": "4b6a61e4c17f7fb7ef4aaf87bc739d3f3dadc3fa8dc2027e0ceb6dd7e00ec3d0"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/initial-incomplete-settings/independent-expectation.json",
+      "bytes": 722,
+      "sha256": "72e5b621988abce380c4639f6077db9d4d79cf7e2a9cd5f6baa1c05054a61478"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/initial-incomplete-settings/oracle-provenance.json",
+      "bytes": 613,
+      "sha256": "33109a487d29a47421aee5097ee02ca3cc8a6dea0ef3c41eed77da8e739a718e"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/initial-incomplete-settings/preparation.json",
+      "bytes": 1340,
+      "sha256": "2bc1783638f9313908da0d457d3a59b59a9c0af4e7332db3de355adc7196c25a"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/initial-incomplete-settings/provenance.json",
+      "bytes": 328,
+      "sha256": "d17f4f09bb989107574f9d8db2fd27eb41d2d86cfb5af6ecf030376243562067"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/initial-incomplete-settings/reference-provenance.json",
+      "bytes": 2467,
+      "sha256": "d93b5268b94b6806be4108128826e148a0c814689271a0c12591d6d69e0e8feb"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/initial-incomplete-settings/task.json",
+      "bytes": 2141,
+      "sha256": "476d8e59f163b87aa9beba1628347cb0fa5696de4cf637618538d79282517792"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/missing-source-column/PROVENANCE.md",
+      "bytes": 1944,
+      "sha256": "f12b14c802ce5710854941eec991cdf6d2f52ebf22c0b773d010fd8175bbfc78"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/missing-source-column/SPEC.json",
+      "bytes": 1264,
+      "sha256": "09e93d601facb9ac1b14752f72e0d1eb3571588f90643205a6486e31ae3d30c3"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/missing-source-column/SPEC.md",
+      "bytes": 5517,
+      "sha256": "e7a4f06f83abf751a890107574038aae2ab2736a0a34468b1c772f9e5cb94882"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/missing-source-column/TASK.md",
+      "bytes": 3007,
+      "sha256": "eafccf80d1feb72b4b271c30bd6db3300946e3037001adefbd8718e551e89048"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/missing-source-column/acceptance.json",
+      "bytes": 328,
+      "sha256": "f66edeb8f44d9913f6682583e190efa7423bbe724e191c92fc08cc44c6c889b0"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/missing-source-column/data/ambiguous_headers.txt",
+      "bytes": 23,
+      "sha256": "c7519031b5932dc11febfd15807c8205d9892229ab7913321eea7d96eabd7bba"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/missing-source-column/expected/OUTCOME.md",
+      "bytes": 794,
+      "sha256": "8d8b40cbf83335b45bb384016450093198425712d4bb18627b6a21a7cdbc4056"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/missing-source-column/expected/outcome.json",
+      "bytes": 464,
+      "sha256": "2c3888b0b9aae7c555bcf241a35b647d899443abe6bd1b31d2f9edc7d8fd376a"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/missing-source-column/independent-expectation.json",
+      "bytes": 657,
+      "sha256": "6cec91211582674dd7cd28c39965c26a69ead1c6af3c604fc11c31109a936b9c"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/missing-source-column/oracle-provenance.json",
+      "bytes": 614,
+      "sha256": "947b981048960fc02500a197a9347adad8fd089156bcc30ecb1a53befa2dbb22"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/missing-source-column/preparation.json",
+      "bytes": 1329,
+      "sha256": "bc817ea167fcc9529c28b69ada3de4d3d79b9e0053c8ba4f6f7a4783a1b08ead"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/missing-source-column/provenance.json",
+      "bytes": 322,
+      "sha256": "2ccd57aa2f9a369ee30c8b7706722d6bcef94d40ff184d5214a9ed6e8aa08d7b"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/missing-source-column/reference-provenance.json",
+      "bytes": 2277,
+      "sha256": "352375e718fdc99c68b4daf33a54c034221f9d3a9c355b49fec7c3a082ec07f7"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/missing-source-column/task.json",
+      "bytes": 4141,
+      "sha256": "1dfcaf8f4376fba9d6c59612282c68c52da5468495d1e2cca6d7a6d2d3d44c03"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-ambiguous-headers/PROVENANCE.md",
+      "bytes": 1758,
+      "sha256": "321282c258f999c5105fc0f70bf1c43f5ed68f3ad47ee348ce849980df2c6701"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-ambiguous-headers/SPEC.json",
+      "bytes": 1329,
+      "sha256": "412bc5532d32020ece41e9eff5bb349a05923305755cd975e6480ffd2b360e23"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-ambiguous-headers/SPEC.md",
+      "bytes": 5950,
+      "sha256": "4fd497a31a4d2e944fc3c36f8b7b1118ed6c9322cecd6a0e1edcf0b515c33604"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-ambiguous-headers/TASK.md",
+      "bytes": 2095,
+      "sha256": "481e4316ce246c8deb4f68766e650ae90420ce790f150adf11a2db35afaa47c0"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-ambiguous-headers/acceptance.json",
+      "bytes": 328,
+      "sha256": "1dbab3e93b2a10ed6457ca97c263556703d3ca5b194c36902d6af458cd3c9b48"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-ambiguous-headers/data/ambiguous_headers.txt",
+      "bytes": 23,
+      "sha256": "c7519031b5932dc11febfd15807c8205d9892229ab7913321eea7d96eabd7bba"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-ambiguous-headers/expected/OUTCOME.md",
+      "bytes": 1139,
+      "sha256": "71664e77e5e9516f885791d72e7046bb9b9ad4bb582cff42090dab3b2b7f8607"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-ambiguous-headers/expected/outcome.json",
+      "bytes": 680,
+      "sha256": "d588295ddbdc622ebc45526e42d7e417f88046c3aa74f4c58dc6388e5799f549"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-ambiguous-headers/independent-expectation.json",
+      "bytes": 694,
+      "sha256": "91ee02aa881faaef6a99a2f0305f638cf0b8358194778aa059baf726ac57da60"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-ambiguous-headers/oracle-provenance.json",
+      "bytes": 614,
+      "sha256": "3842e029a5468ab5acf7ca7e083f16e5c6c19b576756efe85df2564122cc4e06"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-ambiguous-headers/preparation.json",
+      "bytes": 1339,
+      "sha256": "4b267ff3e8c4f71b6c969052120b7c7b8fba67f0cf65f9fbaccc88e6b80e6ff8"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-ambiguous-headers/provenance.json",
+      "bytes": 322,
+      "sha256": "df852fc1208b24765ed0d26e3177f687af220239561b9796629853eea1df0f83"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-ambiguous-headers/reference-provenance.json",
+      "bytes": 1977,
+      "sha256": "548fb6154a0e9ac32a0fa175ab704262c52b6ebef01eeeb0bd84f6312e4a78c2"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-ambiguous-headers/task.json",
+      "bytes": 3254,
+      "sha256": "0405058a546d7dee94f33170e90237631d7529ff4844428a5009b4dca573b03a"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-unclosed-quote/PROVENANCE.md",
+      "bytes": 1749,
+      "sha256": "c59165932c293bab679e770073469ccf94793705a49e28891cff4a673ca941b4"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-unclosed-quote/SPEC.json",
+      "bytes": 1216,
+      "sha256": "a8c9ee18958d2a0b57a0314864837a8077c4767c8428d06685c283ce44bfd98c"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-unclosed-quote/SPEC.md",
+      "bytes": 5875,
+      "sha256": "affeb5a6da5efbcc004c5d728a71bb8e18d4c350029c215c3ccb2537a7640b3c"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-unclosed-quote/TASK.md",
+      "bytes": 3371,
+      "sha256": "b8ce65b39a3404e6d0f95bc222e9338cb8334958367bf7dfce566212469718a1"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-unclosed-quote/acceptance.json",
+      "bytes": 325,
+      "sha256": "ccbb93158d77fbbafceef57d65e61b5328a435094c4823c9e3f7f2b74fdbf9c2"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-unclosed-quote/data/unclosed_quote.txt",
+      "bytes": 36,
+      "sha256": "e8eda3b3c2a61603838a9b3eaf3dc6fbac6c7bde4ab966452cfb3fa292d76f2c"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-unclosed-quote/expected/OUTCOME.md",
+      "bytes": 1132,
+      "sha256": "9a1abb337cc8645ff6569873b635e5380e18139eea63dae404e1b61fe2c69249"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-unclosed-quote/expected/outcome.json",
+      "bytes": 658,
+      "sha256": "fe6ac6e6d98cfd006e7599c353f924c8e0ef862643ed94f0e3193a2dd52a5d72"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-unclosed-quote/independent-expectation.json",
+      "bytes": 611,
+      "sha256": "fccd1de403b3505cd97f7b9f482740059c826aca4d8f693cc534662f8636860f"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-unclosed-quote/oracle-provenance.json",
+      "bytes": 608,
+      "sha256": "f5f867b8820c4f45ec5a555c02ec968b527a300be47c6284a796ffc2d5e223bb"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-unclosed-quote/preparation.json",
+      "bytes": 1316,
+      "sha256": "88255195a538b313c94201a129c13712570e2844dc29abedb62521d87f81e9c7"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-unclosed-quote/provenance.json",
+      "bytes": 319,
+      "sha256": "70e6485b78630d36044dd89b4027e9c1c13ce7eb797279244d8ae60fe289c734"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-unclosed-quote/reference-provenance.json",
+      "bytes": 1870,
+      "sha256": "ba7193e1fba4a28ff3c902d93193ef7f3f523bb6bf90e73226d018f268045941"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-unclosed-quote/task.json",
+      "bytes": 4494,
+      "sha256": "be5c2aacf0cfc15c34dcd1e262b2f3491b9e23535fb1bef3377f5577d0e5bcab"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-delimiter/PROVENANCE.md",
+      "bytes": 1752,
+      "sha256": "8b3aa7930bac1028c4a7d0aff13d43ca3558a142863686bcd8fbd8c823c2b390"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-delimiter/SPEC.json",
+      "bytes": 1240,
+      "sha256": "a963a5d09bd6a1fb9364e882f64897900c01c718b8ff7a402c95fdabec134174"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-delimiter/SPEC.md",
+      "bytes": 5604,
+      "sha256": "6ccbfffbea805da3616a9b13883a6adcf3eeb80a21f8f552c44843e1c16ae7a7"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-delimiter/TASK.md",
+      "bytes": 3394,
+      "sha256": "55e5edfa76047a7e0c916c04de1f45da2b3e832556e050e4fe2ac9d16d3e2fcd"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-delimiter/acceptance.json",
+      "bytes": 326,
+      "sha256": "90362cc001242cd490a0270959be26ab76b7afcb5e9ac211e0c988cc1fc66470"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-delimiter/data/wrong_delimiter.txt",
+      "bytes": 20,
+      "sha256": "92441055dd7d146da19c049e44e6632d6977eb67ae06d7237786ea4439515cbb"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-delimiter/expected/OUTCOME.md",
+      "bytes": 899,
+      "sha256": "a19e8f8ac7f4092367b69c383bc78f8e0f568efa9ffb899c41db5ebb8e7f0cd3"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-delimiter/expected/outcome.json",
+      "bytes": 559,
+      "sha256": "c8ef44381305f6bfdfcce1aa3f07294944709fa8e1b181a5cb3ec9e987adb43d"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-delimiter/independent-expectation.json",
+      "bytes": 673,
+      "sha256": "59085df3c3ae1a0e1787e4f0aa7193b3fd08b12c4c3039366eddcb886b9cee16"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-delimiter/oracle-provenance.json",
+      "bytes": 610,
+      "sha256": "33293823ab4bd61d8e31454e13c135e67d4c92a35b3dec0a0113c6ca22721ea4"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-delimiter/preparation.json",
+      "bytes": 1317,
+      "sha256": "36a0362a58a3b72ad35d0d79695f783c3180e7f61fcad0f4cc591fd3fc28bcbb"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-delimiter/provenance.json",
+      "bytes": 320,
+      "sha256": "168c719815077b0687bfea641175570cfbb0f66a4869d046c81a3cfb2fc7a795"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-delimiter/reference-provenance.json",
+      "bytes": 1811,
+      "sha256": "e9d8edf510be320e4da596a8891da0ed558254f6921637fe6a8050c193caa38a"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-delimiter/task.json",
+      "bytes": 4541,
+      "sha256": "8b25015452a0e54f51963761690a9ea091da5c28c5ac15d150c483712f414cd3"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-encoding/PROVENANCE.md",
+      "bytes": 1749,
+      "sha256": "233888a004e06eb27bd072b635af05757f16e1deed6aaf424b7ef0494b533849"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-encoding/SPEC.json",
+      "bytes": 1234,
+      "sha256": "af5bb4b2b47c7000816d9619c3b2d1e486fd6176661d63d5ba849177a7d751c8"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-encoding/SPEC.md",
+      "bytes": 5617,
+      "sha256": "6ea00e62c8f27cfa1c327a86f842f2530956c199ce085f4f722dae0f2f232769"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-encoding/TASK.md",
+      "bytes": 3389,
+      "sha256": "54d6f1a81454c3048fbc574385615a799f6a8b6eaa0d751a82cfd3177b308d61"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-encoding/acceptance.json",
+      "bytes": 325,
+      "sha256": "115fdf995c12434709a9f8f5877fb5e0d25127936eb0b72cb25b19dace855cc0"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-encoding/data/wrong_encoding.txt",
+      "bytes": 21,
+      "sha256": "97f88be2af869453bc726e51889dcb10c5bd1d2a8fd7b96cca6f125b888d3ee6"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-encoding/expected/OUTCOME.md",
+      "bytes": 910,
+      "sha256": "0afab5aaf610dda0be57d76d723bf622458745901d801fe366fe8fc404c0f621"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-encoding/expected/outcome.json",
+      "bytes": 547,
+      "sha256": "d52629aa99ed1f6f1d858a6e8bb9cb5f522ee7008ddc6bdfc91c745f42b9a93e"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-encoding/independent-expectation.json",
+      "bytes": 667,
+      "sha256": "beaced0a19a08fddaa8025325dc01357b75a9ee37e1b147564d31bcfa43f4fc7"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-encoding/oracle-provenance.json",
+      "bytes": 608,
+      "sha256": "9fdb05fbfb47e9f7a5ca2bdcd43c94507f30845b786c777ad4d1f6b48148f853"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-encoding/preparation.json",
+      "bytes": 1315,
+      "sha256": "4420c5056ca763cf75ef7345ee72e9dd3107f74d6ac482caa9c13feacacd6a2e"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-encoding/provenance.json",
+      "bytes": 319,
+      "sha256": "98085badc831871669f00c588ba3a5bfe1ca65c9cb7e503c72e5cf1cf2c22365"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-encoding/reference-provenance.json",
+      "bytes": 1870,
+      "sha256": "378fdaeccd6b4df3a0a500e8e6bfd65d0320d85afa93e7be802d1adf7a57eefa"
+    },
+    {
+      "path": "portable-candidate/evals/tasks/node-evals/txt-wrong-encoding/task.json",
+      "bytes": 4530,
+      "sha256": "8073ac66c733320b73a9542ba9107e99e17d66e18b54e64f7380b29a7bae7626"
+    },
+    {
+      "path": "portable-candidate/evals/test/text-import-evidence.test.ts",
+      "bytes": 60431,
+      "sha256": "c542287f658fbffdbe080e77a19d66f92aa704f1a0dd2430b7fc29da1730c432"
+    }
+  ],
+  "common_integration_or_ACCEPT_claimed": false
+}

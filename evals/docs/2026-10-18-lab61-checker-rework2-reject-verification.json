@@ -1,0 +1,170 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "trigger_report_id": "01a14c93-185a-7a2b-9005-65b292678be1",
+  "verdict": "REJECT",
+  "checked_sha": "b00b926261bdefd377c572cc3b81903117dc51a0",
+  "parent": "deae59d905621f9afa0ac2392a97b9cc8f4857b7",
+  "product_source_unchanged": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "archive_sha256": "0549c24982003da1e7ee17c67b62f107c2624dfe565ff03afde226f38f359446",
+  "manifest_sha256": "dec70b45d5cb0b67dd16b25cea72f7088e6ac34e5ee7e0a6d519acd2fcf25ea0",
+  "payloads_verified": 766,
+  "archive_members_including_manifest": 767,
+  "frozen_source_files_equal_Git": 144,
+  "report_equal": true,
+  "preserved_original_runtime_files_verified": 865,
+  "case_files_equal_Git": 140,
+  "genuine_derived_replays_bound_to_originals": 30,
+  "derived_counts": {
+    "reference": {
+      "PASS": 10
+    },
+    "Rich": {
+      "PASS": 8,
+      "FAIL": 2
+    },
+    "Ben": {
+      "PASS": 8,
+      "FAIL": 2
+    }
+  },
+  "fresh_model_proof_DB_hashes_bound_to_original_closed_archives": 30,
+  "recorded_assistant_actual_model_rows": 244,
+  "model_verification_scope": "recorded fresh model proofs bound to actual closed DB/WAL/SHM bytes; prior genuine model validation retained; no new model calls",
+  "completion_sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+  "ordinary_released_at": "2026-10-17T23:13:39.197Z",
+  "Ben_read_only_health": {
+    "at": "2026-10-18T01:12:33.016Z",
+    "status": "FREE",
+    "lease_absent": true,
+    "endpoint": {
+      "url": "http://localhost/app/",
+      "http_status": 200,
+      "bytes": 2065
+    },
+    "container": {
+      "id": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+      "running": true,
+      "isolation_marker_verified": true,
+      "bind_mounts_absent": true
+    },
+    "storage_empty": true,
+    "storage_roots": [
+      "/workdir/UserStorage",
+      "/workdir/SessionBackup"
+    ],
+    "profiles": [
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/rich/reference-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/rich/eval-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/reference-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/ben/eval-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/evalbaseline/eval-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      },
+      {
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/evalrunner/eval-profile",
+        "clean": true,
+        "harness_lease_absent": true
+      }
+    ],
+    "live_browsers": [],
+    "debuggers_closed": true,
+    "healthy_shared_stand": true,
+    "installed_cli_admission": "READY",
+    "installed_cli_source": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+    "prior_failed_admission_preserved": true
+  },
+  "current_read_only_health": {
+    "at": "2026-10-18T01:15:13.527Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "current_helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-18T01:15:12.671Z"
+    }
+  },
+  "pins_preserved": {
+    "/home/user/.local/share/loginom-evals-runtime/operations/lab61-initial-a2ba3d0f.json": "e91a5c0aa9b47ae61b85b8d7d12319dfc441a6fe6940f508ec28fe4c1d8b16d0",
+    "/home/user/.local/share/loginom-evals-runtime/operations/lab61-initial-a2ba3d0f-pins.json": "58e11f1242cf3b46723395095e214ee5b80de1aece9e4439a14efa59aa32b565",
+    "/etc/apparmor.d/loginom-lab61-initial-chromium": "5cd834b0b2660fcf952997513c99fa87f86f2c88648c237e4f6e4d1dd0c95c74",
+    "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/independent-expectations.json": "b9d2b534832edd05b2f54c6b51dc2f0c4c236d2bc30d956352daa541c0f815ef"
+  },
+  "verified_documentary_common_sha": "d7af9519862481c375b88a4fc971a462d17b60d2",
+  "common_docs_only_vs_accepted_base": true,
+  "new_live_model_calls_authorized": false,
+  "limits_changed": false,
+  "scope": "all4 Ben findings/source/delivery/preservation/cleanup validation; next step only third Rich OFFLINE checker rework",
+  "own_portable_controls": {
+    "diagnostic_total": 60,
+    "diagnostic_matches": 12,
+    "truth_total": 20,
+    "truth_baselines_PASS": 10,
+    "defects": {
+      "false_PASS_diagnosis": 28,
+      "false_FAIL_diagnosis": 20,
+      "invented-native-warning": 4,
+      "denies-proven-refusal": 6
+    },
+    "both_controller_exits": 0,
+    "scope": "synthetic private copies through full checker; no new native/model calls"
+  },
+  "canonical_reject_count_after_report": 3,
+  "rework_limit_unchanged": 3,
+  "current_queues": {
+    "Rich": {
+      "count": 68,
+      "active": []
+    },
+    "Ben": {
+      "count": 31,
+      "active": []
+    },
+    "Evaler": {
+      "count": 187,
+      "active": [
+        [
+          "01a14c93-18a6-785a-a0a7-625f402f9a09",
+          "running"
+        ]
+      ]
+    },
+    "Baseline": {
+      "count": 11,
+      "active": []
+    },
+    "Runner": {
+      "count": 13,
+      "active": []
+    }
+  }
+}

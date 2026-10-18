@@ -1,0 +1,65 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "source_report_id": "01a14c93-185a-7a2b-9005-65b292678be1",
+  "checked_at": "2026-10-18T01:17:21.761915+00:00",
+  "candidate_sha": "b00b926261bdefd377c572cc3b81903117dc51a0",
+  "scope": "Official archive integrity and source provenance, not acceptance. No source execution or new live/model effects.",
+  "archive_bytes": 13402162,
+  "archive_sha256": "0549c24982003da1e7ee17c67b62f107c2624dfe565ff03afde226f38f359446",
+  "manifest_sha256": "dec70b45d5cb0b67dd16b25cea72f7088e6ac34e5ee7e0a6d519acd2fcf25ea0",
+  "payloads_verified": 766,
+  "payload_bytes": 212007354,
+  "exact_membership": 767,
+  "standalone_report_equal": true,
+  "report_sha256": "476e2a05de62a2d3fea0913fbe4239faf9a436078f7c3eeb36aa1a8795b8c3b1",
+  "source_files_equal_Git": 144,
+  "source_provenance": "same exact Git source verified in preceding author receipt; all delivered candidate files compared",
+  "raw_unchanged": {
+    "Rich": {
+      "PASS": 3,
+      "FAIL": 7
+    },
+    "Ben": {
+      "PASS": 2,
+      "FAIL": 8,
+      "ERROR": 0
+    },
+    "wrapper": "ERROR/zero attempts"
+  },
+  "usage_unchanged": {
+    "reference": 15,
+    "Rich_product": 10,
+    "Ben_product": 10,
+    "recovery": 1,
+    "probes": 0
+  },
+  "derived_not_new_measurements": {
+    "reference": {
+      "PASS": 10
+    },
+    "Rich": {
+      "PASS": 8,
+      "FAIL": 2
+    },
+    "Ben": {
+      "PASS": 8,
+      "FAIL": 2
+    }
+  },
+  "full_ACCEPT_and_common_integration_pending": true,
+  "verdict": "REJECT",
+  "findings": {
+    "denial_false_PASS": 28,
+    "accurate_diagnosis_false_FAIL": 20,
+    "regressions_within_false_FAIL": 12,
+    "refusal_report_false_success": 6,
+    "invented_warning_false_PASS": 4,
+    "inspect_controls_matches": 39
+  },
+  "original_completion_and_release_unchanged": {
+    "completion": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+    "release": "1d9e17e0b34ddff48791a493f49ebfd525b1d17a0e8b5a0b2a1d110d73671274",
+    "released_at": "2026-10-17T23:13:39.197Z"
+  },
+  "Ben_read_only_health_reported_at": "2026-10-18T01:12:33.016Z"
+}

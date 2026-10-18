@@ -1,0 +1,98 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "source_report_id": "01a14c81-8539-7692-894f-a2936d3da32e",
+  "checked_at": "2026-10-18T01:17:21.375865+00:00",
+  "candidate_sha": "b00b926261bdefd377c572cc3b81903117dc51a0",
+  "scope": "Official archive integrity and source provenance, not acceptance. No source execution or new live/model effects.",
+  "archive_bytes": 7598572,
+  "archive_sha256": "dda7ff930e41b2f8374534553f8edfa9fc354decd97ca6261f03e9c66b169cde",
+  "manifest_sha256": "7fdc10d8ae8aa5c3571d3f3d5b81c311e7d4fb98f1369b58d9a9111807907e5f",
+  "payloads_verified": 1051,
+  "payload_bytes": 102699699,
+  "exact_membership": 1052,
+  "standalone_report_equal": true,
+  "report_sha256": "2002ab1e34a62b96a628c5b5e9c09bf5df0755c302114b1be2adcdf6e65130df",
+  "source_files_equal_Git": 0,
+  "source_provenance": {
+    "fetch": {
+      "code": 0,
+      "stdout": "",
+      "stderr": "From https://github.com/gooddaytoday/loginom-ai-agent\n * branch              b00b926261bdefd377c572cc3b81903117dc51a0 -> FETCH_HEAD\n"
+    },
+    "bundle": {
+      "code": 0,
+      "stdout": "The bundle contains this ref:\nb00b926261bdefd377c572cc3b81903117dc51a0 refs/heads/lab61-checker-final\nThe bundle requires this ref:\ndeae59d905621f9afa0ac2392a97b9cc8f4857b7 \nThe bundle uses this hash algorithm: sha1\n",
+      "stderr": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-checker-rework2-b00b9262-ready-delivery/source/candidate.bundle is okay\n"
+    },
+    "parent": {
+      "code": 0,
+      "stdout": "b00b926261bdefd377c572cc3b81903117dc51a0 deae59d905621f9afa0ac2392a97b9cc8f4857b7 8a946f907409cc752e273c20b485dd46699a4160\n",
+      "stderr": ""
+    },
+    "files": {
+      "code": 0,
+      "stdout": "evals/script/check-text-import.py\nevals/test/text-import-evidence.test.ts\n",
+      "stderr": ""
+    },
+    "diffcheck": {
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "checker": {
+      "bytes": 52043,
+      "sha256": "7716febbc6551dd9d946a2f04b026bfbe44e690f5d60088b4648bff8c06767f3",
+      "delivered_equal_Git": true
+    },
+    "tests": {
+      "bytes": 60431,
+      "sha256": "c542287f658fbffdbe080e77a19d66f92aa704f1a0dd2430b7fc29da1730c432",
+      "delivered_equal_Git": true
+    },
+    "patch": {
+      "bytes": 24416,
+      "sha256": "54034537d158a468e4833fffd2f83abcf5cbf5fcd6bd4e1b6ee2cddef4f25e90",
+      "delivered_equal_Git": true
+    }
+  },
+  "raw_unchanged": {
+    "Rich": {
+      "PASS": 3,
+      "FAIL": 7
+    },
+    "Ben": {
+      "PASS": 2,
+      "FAIL": 8,
+      "ERROR": 0
+    },
+    "wrapper": "ERROR/zero attempts"
+  },
+  "usage_unchanged": {
+    "reference": 15,
+    "Rich_product": 10,
+    "Ben_product": 10,
+    "recovery": 1,
+    "probes": 0
+  },
+  "derived_not_new_measurements": {
+    "reference": {
+      "PASS": 10
+    },
+    "Rich": {
+      "PASS": 8,
+      "FAIL": 2
+    },
+    "Ben": {
+      "PASS": 8,
+      "FAIL": 2
+    }
+  },
+  "full_ACCEPT_and_common_integration_pending": true,
+  "native_admission_exact": {
+    "canonical": "/home/user/.local/share/loginom-evals-runtime/roles/evaler/work/lab61-rework2-ready-01a14c81/decision.json",
+    "official_attachment": "01a14c85-1b96-7d7b-ae52-4d0805ca007e",
+    "sha256": "72a39e64146de12c739774eb306e3fea02a52a1ff13f99baab858b930fb7e3eb",
+    "byte_equal": true,
+    "initial_lookup_observation": "Previous filename review-admission.json absent; located decision.json by exact official-byte match. Read-only observation, no failed source/run effect."
+  }
+}
