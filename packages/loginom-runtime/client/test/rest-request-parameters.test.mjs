@@ -9,6 +9,10 @@ test('REST stage 1 accepts a new GET/query connection and preserves existing set
  assert.doesNotThrow(()=>validateRestRequestParameters({},'request',{...request,target:{kind:'existing'},inputs:[]}));
  const reused=parameters();delete reused.connection.base_url;
  assert.doesNotThrow(()=>validateRestRequestParameters(reused,'request',request));
+ for(const finish of ['done','close']){
+  assert.throws(()=>validateRestRequestParameters(parameters(),'request',{...request,finish}),/finish=execute/);
+  assert.doesNotThrow(()=>validateRestRequestParameters({},'request',{...request,target:{kind:'existing'},inputs:[],finish}));
+ }
 });
 test('REST readback requires the same node and a verified Done receipt',()=>{
  const node={document_id:'d',workflow_id:'w',node_id:'n'},operation_id='rest1';
