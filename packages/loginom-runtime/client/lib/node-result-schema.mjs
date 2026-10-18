@@ -188,7 +188,7 @@ export const nodeApplyResultSchema=object({operation_id:str,status:values('SUCCE
  configuration:object({status:values('applied','discarded','not_requested','unknown'),readback:configurationReadback},['status']),
  checkpoint_kind:values('local_node_checkpoint','local_node_cancellation','local_node_stopped','local_node_failed','local_node_released'),
  persisted_package_verified:{type:'boolean',const:false},pending_phase:nullable(phase),released_phase:phase,error,
- next_step:object({tool:values('dock_node_apply','dock_node_read'),original_operation_id:str,instruction:str})},
+ next_step:object({tool:values('dock_node_apply','dock_node_read','dock_action_run'),original_operation_id:str,instruction:str})},
  ['operation_id','status','effect_possible','phases','node','execution','output','package_saved','cleanup_complete','warnings']);
 const outcome=object({status:values('SUCCEEDED','FAILED','NOT_APPLIED','AMBIGUOUS'),action_key:{type:'string',const:'node.apply'},
  action_revision:str,operation_id:str,phase:str,effect_possible:bool,cleanup_complete:bool,
