@@ -1,0 +1,87 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "trigger_report_id": "01a14cbc-3a22-7b52-abc3-53f7801caef7",
+  "checked_sha": "ae8233824a47b39be160cb0295900422cc86d174",
+  "parent": "b00b926261bdefd377c572cc3b81903117dc51a0",
+  "checker_sha256": "fda04266c992b1b2c144e6ab7e6e67a196766f2b6cc6c3b36f4f587dc801a984",
+  "archive_sha256": "7e61092f2795a079064fa5c9dd87d97dda98bf5c14c59305ada146bbb87dd26f",
+  "manifest_sha256": "4e3a885467a2366c65016bcc952f89c8f1f9f8606eeea5d6923f5e14c337a831",
+  "payloads_verified": 771,
+  "members": 772,
+  "report_equal": true,
+  "source_bundle_and_exact_Git_verified": true,
+  "preserved_original_materials": 2698,
+  "Ben_runtime_ledger": 1163,
+  "other_raw_DB_ledger_files_verified": 865,
+  "pins_legacy": 22,
+  "installed_entries": [
+    {
+      "manifest": "/home/user/.local/share/loginom-evals-runtime/cli-rich-lab61-initial-a2ba3d0fc8de25c50e497233506b4a6e4f50e06d/cli-manifest.json",
+      "verified_entries": 5389
+    },
+    {
+      "manifest": "/home/user/.local/share/loginom-evals-runtime/support/text-import-f2aa79b41579909681d6c7a1356452b2b7a3964b/helper-manifest.json",
+      "verified_entries": 1700
+    }
+  ],
+  "genuine_replay30_raw_hash_bindings_verified": true,
+  "genuine_replay30_counts": {
+    "reference": {
+      "PASS": 10
+    },
+    "Rich": {
+      "PASS": 8,
+      "FAIL": 2
+    },
+    "Ben": {
+      "PASS": 8,
+      "FAIL": 2
+    }
+  },
+  "closed_model_proof_bindings_verified": 30,
+  "reported_actual_models": "openai/gpt-6-luna/high",
+  "reported_assistant_rows": 244,
+  "Evaler_requeried_DB": false,
+  "own_finite_controls": {
+    "candidate_total": 90,
+    "candidate_matches": 21,
+    "mismatches": 69,
+    "false_PASS": 36,
+    "false_FAIL": 33,
+    "parent_matches": 54,
+    "regressions": 33,
+    "warning_reader": {
+      "matches": 7,
+      "total": 7
+    }
+  },
+  "all_five_findings_confirmed": true,
+  "genuine_prior_completion_sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+  "ordinary_prior_RELEASED": "2026-10-17T23:13:39.197Z",
+  "new_physical_calls": 0,
+  "read_only_health": {
+    "at": "2026-10-18T02:01:07.971Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-18T02:01:07.050Z"
+    }
+  },
+  "common_sha": "b270cb4e535ad36014cfb997edf75b9431a07e3e",
+  "common_clean_published_documentary_only": true,
+  "new_measurements_allowed": false
+}

@@ -1,0 +1,10 @@
+{
+  "decision_sha256": "2cd9fc471d31cfba68a52b07031ec890a5cd4a0edac6f0304baf865e15442993",
+  "decision_comment_id": "01a14cc1-dada-77b4-8a96-8b6bb33cd8b6",
+  "actual_queued_task_id": "01a14cc1-db01-75f0-bc29-843958e2831d",
+  "continue_event_id": "01a14cc1-dada-77b4-8a96-8b6bb33cd8b6",
+  "prior_blocked_report": "01a14cbc-3a22-7b52-abc3-53f7801caef7",
+  "state_changed_only_by_canonical_events": true,
+  "new_rework_limit": 4,
+  "counters_preserved": true
+}

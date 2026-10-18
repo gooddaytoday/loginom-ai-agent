@@ -1,0 +1,39 @@
+{
+  "kind": "operator_exact_official_Ben_REJECT_delivery",
+  "issue": "LAB-61",
+  "verified_at_utc": "2026-10-18T02:18:03.669463+00:00",
+  "report_id": "01a14cbc-3a22-7b52-abc3-53f7801caef7",
+  "source": "ae8233824a47b39be160cb0295900422cc86d174",
+  "verdict": "REJECT",
+  "archive_bytes": 13714958,
+  "archive_sha256": "7e61092f2795a079064fa5c9dd87d97dda98bf5c14c59305ada146bbb87dd26f",
+  "manifest_sha256": "4e3a885467a2366c65016bcc952f89c8f1f9f8606eeea5d6923f5e14c337a831",
+  "payloads": 771,
+  "members": 772,
+  "payload_bytes": 214710666,
+  "all_parts_size_and_sha256_verified": true,
+  "all_payload_size_and_sha256_and_exact_membership_verified": true,
+  "standalone_REPORT_byte_equal": true,
+  "report_bytes": 23663,
+  "report_sha256": "cc7021fd89e2d3944c38963f3d9bbca12483218feff949a63180a60df5f021ca",
+  "candidate_files_equal_exact_Git": 144,
+  "original_lifecycle": {
+    "eval-completion-3d003db7-5176-4d5a-9def-2243626bf401.json": {
+      "original_sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+      "delivered_byte_equal_members": [
+        "lifecycle/prior-genuine-completion.json"
+      ]
+    },
+    "release.json": {
+      "original_sha256": "1d9e17e0b34ddff48791a493f49ebfd525b1d17a0e8b5a0b2a1d110d73671274",
+      "delivered_byte_equal_members": [
+        "lifecycle/prior-ordinary-release.json"
+      ]
+    }
+  },
+  "new_live_lifecycle_claimed": false,
+  "not_full_ACCEPT": true,
+  "no_integration": true,
+  "no_new_physical_calls": true,
+  "raw_results_not_rewritten": true
+}
