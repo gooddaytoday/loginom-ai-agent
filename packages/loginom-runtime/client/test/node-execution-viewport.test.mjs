@@ -1,8 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createNodeExecutionProcedure} from '../lib/node-execution-procedure.mjs';
-import {revealPreparedGraphNode} from '../lib/node-viewport.mjs';
-import {samePlacementGraph} from '../lib/node-placement.mjs';
+import {revealPreparedGraphNode,samePlacementGraph} from '../lib/node-placement.mjs';
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
 
 async function execution({fault,offscreen=true,selectedInitially=false}={}) {
@@ -52,4 +51,27 @@ test('prepared viewport preserves node GUID, settings and complete graph while u
   await assert.rejects(revealPreparedGraphNode(page,{...args,deadline:fault==='deadline'?0:args.deadline},read,navigate,()=>{},()=>{},samePlacementGraph),/Prepared node viewport/);
   if(['foreign','missing','locked','deadline'].includes(fault))assert.equal(calls,0);
  }
+});
+
+test('actual serialized viewport step returns a valid durable capability receipt',async()=>{
+ const {createNodeProcedure}=await import('../lib/node-procedure.mjs');
+ const {assertActionOutcome}=await import('../lib/action-catalog.mjs');
+ const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
+ const graph={complete:true,interaction_ready:true,nodes:[{ref:node,locked:false,position:{x:200,y:200}}],links:[]};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:workflow,dom_epoch:{document:'browser',revision:1},scan:{complete:true},
+  prepared_node_context:{...node,verified:true,surface:'graph',locked:false},wizard:{status:'absent'},ui:{elements:[],dialogs:[],masks:[],truncated:{elements:false,dialogs:false,masks:false}}};
+ const events=[],page={evaluate:async()=>structuredClone(graph),locator:()=>({count:async()=>1,isVisible:async()=>true,
+  evaluate:async()=>({x:0,y:0,width:1280,height:800,viewportWidth:1280,viewportHeight:800,scale:1,translate:{x:0,y:0},scroll:{x:0,y:0},node_bounds:{x:200,y:200,width:70,height:80}})})};
+ const operation={id:'read',action:{action_key:'node.read',revision:'1'},deadline:Date.now()+10000};
+ const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:workflow,node},targetOrigin:'http://example.test',targetBuild:'7.4.2',
+  record:async e=>{events.push(e);return e;},wrapMutation:(code,options)=>({code,options}),
+  execute:async code=>{
+   if(typeof code==='string')return {status:'SUCCEEDED',output:structuredClone(state)};
+   assert.equal(events.at(-1).phase,'node_step_prepared');
+   return assertActionOutcome(await Function('return ('+code.code+')')()(page));
+  }});
+ const result=await channel.revealGraphNode();assert.equal(result.action_key,'node.viewport.reveal.internal');
+ assert.equal(result.output.fully_visible,true);assert.equal(operation.cleanupConfirmed,true);
+ assert.equal(events.at(-1).phase,'node_step_completed');assert.deepEqual(events.at(-1).outcome,result);
+ await assert.rejects(channel.act({verb:'click',ref:'old'}),/fresh internal observation/);
 });
