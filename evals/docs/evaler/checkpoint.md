@@ -1,20 +1,20 @@
-# LAB59–63 checkpoint
-2026-10-18; owner f705/249ed1ea unchanged; only Evaler writes state; LAB60done38/62–63closed.
-Executionbase7d3 accepted code unchanged; latest candidate8203816f/D71 unaccepted, no integration.
-Formal REJECT16 report01a15096; completed Ben01a15071-f030, one proven receiver-relative polarity group.
-Canonical report reducer→blocked610/review16/reject16/limit15; explicit neededlimit15→16/used15/fresh16/readback611 BEFORE effects.
-Decision evals/docs/2026-10-18-lab61-checker-rework16-decision.md and JSON bind full original stop/authority/actualusage.
-One Rich OFFLINE intent LAB61-RICH-CHECKER-REWORK16-8203816f-01a15096; actual delivery/receipt in evaler.state and E workdir, no duplicate.
-E fullpaired32/48=8falsePASS8falseFAIL;reader148/221,parent144;regression6final0/base6;full24final0;count62GREEN.
-Only3 formal221 rows called regressions; own comparisons and synthetic repetitions are separately qualified.
-not-confirmed/unconfirmed shown epistemic qualifier means uncertainty, not nonemission; original FAIL retained, no changed-input sameGREEN.
-MODEL+final combinations→completed immutable8203 RED/source-testhashes BEFORE FIRST checker/prototypeedit/no parallel edit→minimalgeneralfix.
-Then allmandatorycorpora/sourceboundlogs/finalfull30s/typecheck/cleanSHA→one independentfullBen; no word/string/format exceptions.
-ZIP18ffe631/2565payload2566members/manifest87ec435c/REPORT4357cd7c/288portableGit/29rawpackagejobs checked.
-E3717materials1163ledger865raw22pins5389CLI1700helper140case20inputs30archivedmodelproofs; no privateDBquery/fullsuite rerun.
-PriorRED419-8/followups/changedinput/a2cc1044-15-3timeout+3errors/preservation0-2/final1049-15-0 remain distinct.
-Genuine30 ref10PASS/Rich8PASS2FAIL/Ben8PASS2FAIL/ERROR0;rawRich3-7/Ben2-8/wrapperERROR0 preserved.
-FourproductFAIL remain legitimate: RichApply2/Richdelivery2/Benprepare2delivery3/Benexplicit source.source_path missing.
-Usage ref15/Rich10/Ben10/recovery1/probes0; alloldnewhistory/counters/once/reservation1/provenance6d6+3twoe+initiala2ba preserved.
-EreadonlyhealthyFREE20:06:10.602/helperFREE/6profilesHTTP200storageemptyoriginalcontainer; priorgenuineaf1→ordinaryRELEASED23:13:39, no newlifecycle.
-EvalACCEPT/evidence-model-cleanup/freshFREE/completedworkers/commonintegration before closure/nextcard; no newlive/model/build/install/OS.
+# LAB61 checkpoint — interrupted rework16
+Platform01a150d5 taskRich01a150a3-0b81 terminalfailed/modelcapacity; no automaticretry; all268messages retained, not READY/newqualityREJECT.
+Existingowner/decision16/criteria/uncertainty interpretation unchanged; no newbudget/modelselection.
+review16/reject16/rework_limit16 preserved; nativeBLOCKED then one actualdecision continue_after_evaler/dispatch/receipt.
+Resume source a94d632010f15db6842f4080347f22c98a423eda/checker96aa88d1/test910a7d0a clean in R/checkouts/warning-context-alignment.
+Priorc3a2392b/checker0fa1cdc7 clean and all originalresults retained; bothdirectchildren8203, not acceptedfrozenBenSHA.
+Rich finaldeliverydir deliveries/lab61-checker-rework16-final; MODEL-relative-boundaries/64rows RED40matches24mismatches saved before abort.
+Receiverrelative must not absorb resumed passive matrixpredicate or discard nestedengineobligation; latest hypothesis already recorded by Rich.
+Before nextedit completeFINALpositive-negativepublicbaselineRED on unchangeda94; reader40/64 not publicsuiteRED; no unchangedfailedrerunforPASS.
+Collectexisting ownhandles/results first, exactowncleanup; Ecleanupnotperformed/processsnapshot0 not finalworkerproof.
+Then minimalgeneralfix/mandatorycontrols/finalfullsuite-typecheck/newsourcebindings/replay30/preservation/cleanup/verifiedpackage/READY orBLOCKED.
+No finalfullsuite/delivery/cleanup claim for a94 yet; oldc3cleanup pertains only toc3.
+Genuine30a94 ref10PASS/Rich8PASS2FAIL/Ben8PASS2FAIL/ERROR0;rawRich3-7/Ben2-8/wrapperERROR0 and4legitimateproductFAIL retained.
+Usage reference15/Rich10/Ben10/recovery1/probes0/once-ledger-reservation1 unchanged; no newphysical/live/model/install/OS/integration/62–63.
+All5queues E214/Rich82/Ben44/Baseline11/Runner16; onlyErelevantactive, no Richretryqueued.
+ExactforeignRunner01a150b6-9588 LAB81/runtime9f/homekartai independentlyresourcequalified; do notinterrupt/touchforeignstand.
+Fresh E readonlyhealthyFREE21:09:17.986/helperFREE/6cleanHTTP200emptyoriginalcontainer/nativeCLI0; historicalordinaryRELEASED remainshistorical.
+Recoverydoc evals/docs/2026-10-18-lab61-rework16-interruption-recovery.md; actualtask/stop/decisionreceipts in Estate and Eworkdir.
+Intent LAB61-RICH-RESUME-REWORK16-a94d6320-01a150d5; one native dispatch, no waitworker; selectedmodel unchanged/capacityresolvednotclaimed.
+Full independentBenACCEPT/all10/evidence-model-cleanup/freshFREE/completedworkers/commonintegration still required for closure.
