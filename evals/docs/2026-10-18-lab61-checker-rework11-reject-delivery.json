@@ -1,0 +1,100 @@
+{
+  "verified_utc": "2026-10-18T11:47:15.384760+00:00",
+  "issue": "LAB-61",
+  "Ben_task": "01a14ebd-1543-70ba-9aa6-becd8097aca0",
+  "report_comment": "01a14ed2-eddd-7458-8c9b-38ab55070d42",
+  "verdict": "REJECT",
+  "source": {
+    "candidate/": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+    "initial-b79/": "b79fdf91fcb7b812a36631fc10c6e8d17e865042",
+    "parent/": "dfe5a42c4eab86adccb2c5477c2d609be4e13d1e"
+  },
+  "archive": {
+    "bytes": 16067418,
+    "sha256": "661c8e0693e33fc99adc4a9fad90631fae07e2244c34cde2c609463267a181e4",
+    "manifest_sha256": "118819e2aaa47b49f3c2b2c0ce05c746fc375d2831afa378bad4ef3b7d633448",
+    "payloads": 1819,
+    "members": 1820,
+    "payload_bytes": 246160745,
+    "safe_unique_exact_membership": true,
+    "all_payload_hashes_verified": true,
+    "all_official_bytes_preserved": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-ben-rereview-1d85661c-reject-delivery"
+  },
+  "REPORT": {
+    "bytes": 28954,
+    "sha256": "f02b0512a8ddb496ff56dc65d22b86055e9c5cb9c841fe33c7736930098cbb8c",
+    "equal_standalone": true
+  },
+  "admission": {
+    "sha256": "808336c91c0b1e083b48d57f2b5b7d034794df61a5eebb4afb1c26e072b01475",
+    "member": "admission/evaler-admission.json",
+    "equal_canonical": true
+  },
+  "owner_clarification": {
+    "bytes": 9869,
+    "sha256": "249ed1ea8b253736ae236d1aea53916de0227888f95f1ecb355cfa27dd467ee0",
+    "exact_canonical_copy": true
+  },
+  "Git_bytes_equal": {
+    "candidate/": 144,
+    "initial-b79/": 144,
+    "parent/": 144
+  },
+  "genuine_completion_and_ordinary_release": {
+    "eval-completion-3d003db7-5176-4d5a-9def-2243626bf401.json": {
+      "sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+      "exact_archive_paths": [
+        "lifecycle/prior-genuine-completion.json"
+      ]
+    },
+    "release.json": {
+      "sha256": "1d9e17e0b34ddff48791a493f49ebfd525b1d17a0e8b5a0b2a1d110d73671274",
+      "exact_archive_paths": [
+        "lifecycle/prior-ordinary-release.json"
+      ]
+    }
+  },
+  "two_groups": [
+    "inherited count relations must retain cardinality synonyms and polarity",
+    "literal warning code identity must survive ordinary trailing temporal or passive report text"
+  ],
+  "new_controls": {
+    "transcript": {
+      "rows": 54,
+      "matches": 40,
+      "false_PASS": 14,
+      "false_FAIL": 0,
+      "regressions_vs_dfe5": 0
+    },
+    "reader": {
+      "rows": 42,
+      "matches": 30,
+      "false_PASS": 6,
+      "false_FAIL": 6,
+      "regressions_vs_dfe5": 0
+    },
+    "supplemental": {
+      "rows": 168,
+      "matches": 120,
+      "false_PASS": 24,
+      "false_FAIL": 24,
+      "synthetic_four_private_copy_repeats_not_genuine_or_independent_causes": true
+    }
+  },
+  "Ben_verification_claims": {
+    "RED": "350PASS9FAIL/explicit timeout30000",
+    "GREEN": "359PASS0FAIL/explicit timeout30000",
+    "full_suite": "973PASS15SKIP0FAIL/6678assertions/explicit timeout30000",
+    "typecheck": 0,
+    "healthy_FREE_utc": "2026-10-18T11:40:46.411Z"
+  },
+  "limits": {
+    "root_source_executed": false,
+    "root_findings_reproduced": false,
+    "root_candidate_integrated": false,
+    "new_live_model_or_native_effects": false,
+    "four_measured_product_FAIL_unchanged": true,
+    "historical_raw_ERROR_FAIL_preserved": true,
+    "Evaler_contract_matrix_pending": true
+  }
+}

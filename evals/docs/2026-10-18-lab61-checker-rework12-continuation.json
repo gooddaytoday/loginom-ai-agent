@@ -1,0 +1,136 @@
+{
+  "verified_utc": "2026-10-18T12:06:24.779173+00:00",
+  "issue": "LAB-61",
+  "native_Evaler_task": "01a14ed2-ee21-74e4-a3e6-36850620e450",
+  "canonical_blocked_revision": 457,
+  "authorized_blocked_revision": 458,
+  "final_revision": 465,
+  "old_limit": 11,
+  "new_limit": 12,
+  "completed_reworks": 11,
+  "fresh_REJECTs": 12,
+  "scope_sha256": "7518a3731a4eba2194b243de6fe02b626ef57f26f9c2143e3f1a70defc4486b3",
+  "canonical_table_md_sha256": "b82a7ec8581906308bc6669c3155e398da20dcf5677978d7bf13efa63f63b275",
+  "canonical_table_json_sha256": "d868bd636b33004bd945c414d591772b9e37d6c279d3c9d784499157c9e5a97f",
+  "current_contract_completed_before_admission": true,
+  "actual_usage_unchanged": true,
+  "eight_old_budget_bindings_archived": true,
+  "nine_budget_increases_preserved": true,
+  "continue_after_evaler_actual_comment": {
+    "kind": "continue_after_evaler",
+    "id": "01a14ee3-548b-7c68-9683-8aca0c68a524",
+    "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+    "report_id": "01a14ed2-eddd-7458-8c9b-38ab55070d42",
+    "sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+    "target": "Rich",
+    "stand_ready": true
+  },
+  "continue_action": "ready_to_dispatch",
+  "separate_dispatch_action": "dispatch",
+  "receipt_event": {
+    "kind": "receipt",
+    "dispatch_id": "LAB61-RICH-CHECKER-REWORK12-1d85661c-01a14ed2",
+    "outcome": "queued",
+    "task_id": "01a14ee3-54a5-7b61-b760-c74ae9aa4e93"
+  },
+  "final_state_equals_native_receipt": true,
+  "native_originals": [
+    {
+      "file": "lab61-checker-rework12-native-outer-before.json",
+      "bytes": 9355,
+      "sha256": "2666a91460f5b82fd278bdfb0ba65d362857ab6b7795552194da291e839b1139"
+    },
+    {
+      "file": "lab61-checker-rework12-native-outer-blocked.json",
+      "bytes": 8058,
+      "sha256": "2313be6fcd6b5c88ad3bff916928fafe8ff03a882fbfc2d06d422c6fbbefc407"
+    },
+    {
+      "file": "lab61-checker-rework12-native-outer-limit-authorized.json",
+      "bytes": 8291,
+      "sha256": "4cea423b5a153f94ed83a923e009196ea7aae56b73fc2a98d61c2a099cf829e4"
+    },
+    {
+      "file": "lab61-checker-rework12-native-outer-final.json",
+      "bytes": 8232,
+      "sha256": "585868ff05ffcafeadebf77f7ec2976b964e18690f2150addeab73b87503ef36"
+    },
+    {
+      "file": "lab61-checker-rework12-native-reject-gate-input.json",
+      "bytes": 2960,
+      "sha256": "d7106df4b85ae86fc07a94ee169402ab097e97814a43ad987eea853608b6f7c6"
+    },
+    {
+      "file": "lab61-checker-rework12-native-reject-gate-output.json",
+      "bytes": 2678,
+      "sha256": "04c4b63ee6ceb9d45215b434b6928f704613d6ad0d4a90095465111d44ab3436"
+    },
+    {
+      "file": "lab61-checker-rework12-native-continue-input.json",
+      "bytes": 2935,
+      "sha256": "3c0ae4f97b0bcd5b7b3170ee5e921f0afa316d54112b68bfe601c79f93e4cf84"
+    },
+    {
+      "file": "lab61-checker-rework12-native-continue-output.json",
+      "bytes": 2282,
+      "sha256": "ea923373c0a00a25dfc8f6395f86eef353302a9fa4ef26ba98757b88f0c2cae3"
+    },
+    {
+      "file": "lab61-checker-rework12-native-dispatch-input.json",
+      "bytes": 2351,
+      "sha256": "729622871e92859852a279b75737e982fce147ed8b361879813a65ed604ef888"
+    },
+    {
+      "file": "lab61-checker-rework12-native-dispatch-output.json",
+      "bytes": 2534,
+      "sha256": "43318e53d62c6271fa15bc0669ceb72b102db9d2e1db81caf876db60fcf81f74"
+    },
+    {
+      "file": "lab61-checker-rework12-native-dispatch-post.json",
+      "bytes": 5510,
+      "sha256": "b228a662c5cd34305169f34be439cf36de5f9e420f2925951630fedc3549d86a"
+    },
+    {
+      "file": "lab61-checker-rework12-native-receipt-input.json",
+      "bytes": 2637,
+      "sha256": "06996474c7491a35c8585fc521e6ea8b5b23415804820220bd6e27d6dfca3ef4"
+    },
+    {
+      "file": "lab61-checker-rework12-native-receipt-output.json",
+      "bytes": 2524,
+      "sha256": "a704deb7c20cfd55439e7b76e1922c5035ee529c51f351ba7e39f4e54e24daa2"
+    },
+    {
+      "file": "lab61-checker-rework12-native-issue-blocked-readback.json",
+      "bytes": 226021,
+      "sha256": "9994a9ce2adcc4bc642e8bd3ab496b0f2d9bec3ef43538c476ee1fdea9404f02"
+    },
+    {
+      "file": "lab61-checker-rework12-native-issue-limit-readback.json",
+      "bytes": 226197,
+      "sha256": "24e8edcae8883faee7581c92c4e9442dada614bffa5b3fa88665829a04460cc4"
+    },
+    {
+      "file": "lab61-checker-rework12-native-issue-final-readback.json",
+      "bytes": 229734,
+      "sha256": "9fdb28ae62ff954fdedf07b34609e3265bd1673a8907eec3888b89f306bb7775"
+    },
+    {
+      "file": "lab61-checker-rework12-native-blocked-metadata-write.stderr",
+      "bytes": 53,
+      "sha256": "b32f172fc013c8123448271a4c433d69a1318ce50f4056ac0eaf4e2aab8e200e"
+    },
+    {
+      "file": "lab61-checker-rework12-native-own-preparation-errors.json",
+      "bytes": 271,
+      "sha256": "281887ec350d32cb08c3698bef7dfe693e940542b218a3f7352ff52a9c23fe83"
+    }
+  ],
+  "limits": {
+    "root_wrote_Evaler_state": false,
+    "root_continued_dispatched_or_commented": false,
+    "duplicate_native_effects": false,
+    "new_physical_calls": 0,
+    "unknown_patch_accepted": false
+  }
+}

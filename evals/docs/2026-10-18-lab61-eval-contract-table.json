@@ -1,0 +1,1924 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "scope": "Canonical Evaler contract interpretation before any next admission, no TASK/criteria change or universal language requirement",
+  "owner_record": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-eval-contract-owner-clarification.md",
+    "sha256": "249ed1ea8b253736ae236d1aea53916de0227888f95f1ecb355cfa27dd467ee0",
+    "native_member_comment_id": "5912cded-9d94-4313-9c21-51fceaa37cba",
+    "attachment_id": "01a14ed2-ea05-71bb-b877-b4b8c8b5a5f5"
+  },
+  "canonical_table_md": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-eval-contract-table.md",
+  "canonical_table_md_sha256": "b82a7ec8581906308bc6669c3155e398da20dcf5677978d7bf13efa63f63b275",
+  "cases_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+  "case_bytes_equal_original6ed": true,
+  "original_inputs_only_expectations_sha256": "b9d2b534832edd05b2f54c6b51dc2f0c4c236d2bc30d956352daa541c0f815ef",
+  "cases": [
+    {
+      "case_id": "txt-unclosed-quote",
+      "requirements": {
+        "TASK.md": {
+          "git_path": "evals/tasks/node-evals/txt-unclosed-quote/TASK.md",
+          "sha256": "b8ce65b39a3404e6d0f95bc222e9338cb8334958367bf7dfce566212469718a1"
+        },
+        "SPEC.json": {
+          "git_path": "evals/tasks/node-evals/txt-unclosed-quote/SPEC.json",
+          "sha256": "a8c9ee18958d2a0b57a0314864837a8077c4767c8428d06685c283ce44bfd98c"
+        },
+        "acceptance.json": {
+          "git_path": "evals/tasks/node-evals/txt-unclosed-quote/acceptance.json",
+          "sha256": "ccbb93158d77fbbafceef57d65e61b5328a435094c4823c9e3f7f2b74fdbf9c2"
+        },
+        "expected/outcome.json": {
+          "git_path": "evals/tasks/node-evals/txt-unclosed-quote/expected/outcome.json",
+          "sha256": "fe6ac6e6d98cfd006e7599c353f924c8e0ef862643ed94f0e3193a2dd52a5d72"
+        }
+      },
+      "original_inputs": [
+        {
+          "git_path": "evals/tasks/node-evals/txt-unclosed-quote/data/unclosed_quote.txt",
+          "sha256": "e8eda3b3c2a61603838a9b3eaf3dc6fbac6c7bde4ab966452cfb3fa292d76f2c",
+          "bytes": 36
+        }
+      ],
+      "assigned_settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "text_qualifier": "\"",
+          "multiple_delimiters": false
+        }
+      },
+      "assigned_columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Name",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_outcome": {
+        "kind": "unclosed_quote",
+        "description": "Известный отказ либо явно обнаруженная неполнота/повреждение. Не объявлять корректный импорт. В историческом прогоне движок принял неполные данные; native warning не наблюдался. Новый движок может отказать, это допустимо.",
+        "must_not_certify_correct_table": true,
+        "native_warning_required": false,
+        "engine_rejection_required": false,
+        "unknown_effect_is_success": false,
+        "cleanup_required": true,
+        "negative_fixture": true
+      },
+      "text_required": true,
+      "text_scope": "observed known refusal/cause or executed damage/incompleteness, as described per case in canonical Markdown; initial records its known refusal/owned close, no new format",
+      "cold_required": false,
+      "current_derived": {
+        "reference": "PASS",
+        "Rich": "PASS",
+        "Ben": "PASS"
+      },
+      "genuine_evidence": [
+        {
+          "role": "reference",
+          "case": "txt-unclosed-quote",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-unclosed-quote-3/txt-unclosed-quote/3",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/txt-unclosed-quote",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-unclosed-quote-3/txt-unclosed-quote/3",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.28981035598553717,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-unclosed-quote-3/txt-unclosed-quote/3/result.json": "a681c4ca7764a15db248f49db1110d9ed41570b6c0587c27ff39302016b4bf8a",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-unclosed-quote-3/txt-unclosed-quote/3/events.jsonl": "46436cd6fa4394b12617d854d389020903ee8e892d79665391cd5822b095a9de",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-unclosed-quote-3/txt-unclosed-quote/3/cleanup.json": "c07a557db0b79832c3322ce06a476e48f4199477d314a8b1400e9826f3dd9c16",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-unclosed-quote-3/txt-unclosed-quote/3/native-import.json": "aeec004d8192bbdf51fe9da7b1f16de60c26916aa104fdcdea5b3653a4889e2a"
+          }
+        },
+        {
+          "role": "Rich",
+          "case": "txt-unclosed-quote",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-unclosed-quote/20261017-205236-6ed1f5139/txt-unclosed-quote/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/txt-unclosed-quote",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-unclosed-quote/20261017-205236-6ed1f5139/txt-unclosed-quote/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.2848584861494601,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-unclosed-quote/20261017-205236-6ed1f5139/txt-unclosed-quote/1/result.json": "0fd4ce594b064b9f8eef6a2932b2017c54794e11d8fba1213f7781d60de607b0",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-unclosed-quote/20261017-205236-6ed1f5139/txt-unclosed-quote/1/events.jsonl": "a51b0206f28f7c773cb72e3de034aba6c1a3999951a6425d3b94e3c242b33674",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-unclosed-quote/20261017-205236-6ed1f5139/txt-unclosed-quote/1/cleanup.json": "46c3a987f501aaba70768bada81e2d7087ed81298d6d272ba744b722599ac008",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-unclosed-quote/20261017-205236-6ed1f5139/txt-unclosed-quote/1/native-import.json": "ca15183378499d89549ab25069d0e9fc3cc219ea437e2728c655a195c75733db",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-unclosed-quote/20261017-205236-6ed1f5139/summary.json": "3f509291c9546190120553b39f0690d058af9cdeb43f3c14539c0ff50ee59067",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-unclosed-quote/20261017-205236-6ed1f5139/code-verdict.json": "51b605b6bd28cbb8bf867eb7405b1ab867f6bca1201d472ae50516039e0bea86"
+          }
+        },
+        {
+          "role": "Ben",
+          "case": "txt-unclosed-quote",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-unclosed-quote/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/txt-unclosed-quote",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-unclosed-quote/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.28904439392499626,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-unclosed-quote/1/result.json": "fd22da819e980e4bdb99726724e0823b911d9f1ad7da40b9d3c1f42cacf41dff",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-unclosed-quote/1/events.jsonl": "f0e18669b476ec28aef2fec4b84709e29c053b9d10511d8d09638f7ab0411e1a",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-unclosed-quote/1/cleanup.json": "eb8e85942655b3b8045e691d09960ed52c946f743fb042b2dd1576781b213f3e",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-unclosed-quote/1/native-import.json": "b8c04a68e298a8a021c399714049fc793432d21aea2f19bbc0ff101be99946f2",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/summary.json": "6210339a398754ba84438377c4f5f5d466bf8129907f7f54a47b86612560bfed",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/code-verdict.json": "bab053180febefac04cb00e530d05bbc0777b7ccf6842c4233e4c775c2192889"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "txt-wrong-encoding",
+      "requirements": {
+        "TASK.md": {
+          "git_path": "evals/tasks/node-evals/txt-wrong-encoding/TASK.md",
+          "sha256": "54d6f1a81454c3048fbc574385615a799f6a8b6eaa0d751a82cfd3177b308d61"
+        },
+        "SPEC.json": {
+          "git_path": "evals/tasks/node-evals/txt-wrong-encoding/SPEC.json",
+          "sha256": "af5bb4b2b47c7000816d9619c3b2d1e486fd6176661d63d5ba849177a7d751c8"
+        },
+        "acceptance.json": {
+          "git_path": "evals/tasks/node-evals/txt-wrong-encoding/acceptance.json",
+          "sha256": "115fdf995c12434709a9f8f5877fb5e0d25127936eb0b72cb25b19dace855cc0"
+        },
+        "expected/outcome.json": {
+          "git_path": "evals/tasks/node-evals/txt-wrong-encoding/expected/outcome.json",
+          "sha256": "d52629aa99ed1f6f1d858a6e8bb9cb5f522ee7008ddc6bdfc91c745f42b9a93e"
+        }
+      },
+      "original_inputs": [
+        {
+          "git_path": "evals/tasks/node-evals/txt-wrong-encoding/data/wrong_encoding.txt",
+          "sha256": "97f88be2af869453bc726e51889dcb10c5bd1d2a8fd7b96cca6f125b888d3ee6",
+          "bytes": 21
+        }
+      ],
+      "assigned_settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "text_qualifier": "\"",
+          "multiple_delimiters": false
+        }
+      },
+      "assigned_columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Name",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_outcome": {
+        "kind": "wrong_encoding",
+        "description": "Известный отказ либо обнаруженная утрата исходного Unicode. Исходные CP1251 bytes при настройке UTF-8 нельзя объявлять правильно прочитанными. Native warning не обязателен.",
+        "must_not_certify_correct_table": true,
+        "native_warning_required": false,
+        "engine_rejection_required": false,
+        "unknown_effect_is_success": false,
+        "cleanup_required": true,
+        "negative_fixture": true
+      },
+      "text_required": true,
+      "text_scope": "observed known refusal/cause or executed damage/incompleteness, as described per case in canonical Markdown; initial records its known refusal/owned close, no new format",
+      "cold_required": false,
+      "current_derived": {
+        "reference": "PASS",
+        "Rich": "PASS",
+        "Ben": "PASS"
+      },
+      "genuine_evidence": [
+        {
+          "role": "reference",
+          "case": "txt-wrong-encoding",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-encoding-1/txt-wrong-encoding/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/txt-wrong-encoding",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-encoding-1/txt-wrong-encoding/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.29870212310925126,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-encoding-1/txt-wrong-encoding/1/result.json": "7fad8a60f3f69deee159e640e8a341b41b8c0eb85dbc6c29b02e70044f7e44de",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-encoding-1/txt-wrong-encoding/1/events.jsonl": "c8ad906761d95d0fdcb8ca78a60fdafedd58101ab1d411d2844d475f331341a3",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-encoding-1/txt-wrong-encoding/1/cleanup.json": "80aebcc7d6aa62929035f59b557d9962e7b29babcdb330347c1202f3b636f26c",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-encoding-1/txt-wrong-encoding/1/native-import.json": "1b4ad0d27bf3e883cb689b66ecef2870f1a02869d86799ec105cc4eb1a073cf5"
+          }
+        },
+        {
+          "role": "Rich",
+          "case": "txt-wrong-encoding",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-encoding/20261017-210059-6ed1f5139/txt-wrong-encoding/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/txt-wrong-encoding",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-encoding/20261017-210059-6ed1f5139/txt-wrong-encoding/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.30748577415943146,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-encoding/20261017-210059-6ed1f5139/txt-wrong-encoding/1/result.json": "ffe7280e782a10721ec121111c564ee09e82fa07e4b42a286f462f0dc1a5f833",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-encoding/20261017-210059-6ed1f5139/txt-wrong-encoding/1/events.jsonl": "29cc4ea68b4dcde0881af917519098891607e84e088e14091e9043aa550350f4",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-encoding/20261017-210059-6ed1f5139/txt-wrong-encoding/1/cleanup.json": "beb9bab2d3e0a55dfdb6f717c59778549d4a2a9a06c65cbc4988da72406ced0a",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-encoding/20261017-210059-6ed1f5139/txt-wrong-encoding/1/native-import.json": "8d6734594fb11af541ef33ceb7b9cb5f45bb97fb768c0a19502e7ecc3ba25c20",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-encoding/20261017-210059-6ed1f5139/summary.json": "b5f3ad2afe437d232fb82978c67008cfb37d39e5b4d34c8de51944e041006ccc",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-encoding/20261017-210059-6ed1f5139/code-verdict.json": "ce79232853b25430e2698c9ed338ed59e336069a90be65fceee2645d71b2856c"
+          }
+        },
+        {
+          "role": "Ben",
+          "case": "txt-wrong-encoding",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-wrong-encoding/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/txt-wrong-encoding",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-wrong-encoding/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.32813867391087115,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-wrong-encoding/1/result.json": "f0600f2e0802964e90c57ead0a14b647606de89b993a15f37cf77634bf924c9f",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-wrong-encoding/1/events.jsonl": "30ba2d5f23a510cbfb172ad733516e4a71414319b7951c19a993867a177a179c",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-wrong-encoding/1/cleanup.json": "7d402cfcee3303ea22c8173a0e127d587f4e5f5bd03dc92cc460fb3305a5ee6d",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-wrong-encoding/1/native-import.json": "da10cd66b3b0b199dcb9afbf3558148ba8ee4051d7b21511af74d6dc9c2e3773",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/summary.json": "6210339a398754ba84438377c4f5f5d466bf8129907f7f54a47b86612560bfed",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/code-verdict.json": "bab053180febefac04cb00e530d05bbc0777b7ccf6842c4233e4c775c2192889"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "txt-wrong-delimiter",
+      "requirements": {
+        "TASK.md": {
+          "git_path": "evals/tasks/node-evals/txt-wrong-delimiter/TASK.md",
+          "sha256": "55e5edfa76047a7e0c916c04de1f45da2b3e832556e050e4fe2ac9d16d3e2fcd"
+        },
+        "SPEC.json": {
+          "git_path": "evals/tasks/node-evals/txt-wrong-delimiter/SPEC.json",
+          "sha256": "a963a5d09bd6a1fb9364e882f64897900c01c718b8ff7a402c95fdabec134174"
+        },
+        "acceptance.json": {
+          "git_path": "evals/tasks/node-evals/txt-wrong-delimiter/acceptance.json",
+          "sha256": "90362cc001242cd490a0270959be26ab76b7afcb5e9ac211e0c988cc1fc66470"
+        },
+        "expected/outcome.json": {
+          "git_path": "evals/tasks/node-evals/txt-wrong-delimiter/expected/outcome.json",
+          "sha256": "c8ef44381305f6bfdfcce1aa3f07294944709fa8e1b181a5cb3ec9e987adb43d"
+        }
+      },
+      "original_inputs": [
+        {
+          "git_path": "evals/tasks/node-evals/txt-wrong-delimiter/data/wrong_delimiter.txt",
+          "sha256": "92441055dd7d146da19c049e44e6632d6977eb67ae06d7237786ea4439515cbb",
+          "bytes": 20
+        }
+      ],
+      "assigned_settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "text_qualifier": "\"",
+          "multiple_delimiters": false
+        }
+      },
+      "assigned_columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Name",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_outcome": {
+        "kind": "wrong_delimiter",
+        "description": "При исходном | и запросе запятой требуется известный typed binding/count refusal, no Execute и confirmed cleanup. Одноколоночный результат не является запрошенными Id/Name.",
+        "must_not_certify_correct_table": true,
+        "native_warning_required": false,
+        "engine_rejection_required": false,
+        "unknown_effect_is_success": false,
+        "cleanup_required": true,
+        "negative_fixture": true,
+        "known_refusal_required": true
+      },
+      "text_required": true,
+      "text_scope": "observed known refusal/cause or executed damage/incompleteness, as described per case in canonical Markdown; initial records its known refusal/owned close, no new format",
+      "cold_required": false,
+      "current_derived": {
+        "reference": "PASS",
+        "Rich": "FAIL",
+        "Ben": "PASS"
+      },
+      "genuine_evidence": [
+        {
+          "role": "reference",
+          "case": "txt-wrong-delimiter",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-delimiter-1/txt-wrong-delimiter/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/txt-wrong-delimiter",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-delimiter-1/txt-wrong-delimiter/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.19147865916602314,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-delimiter-1/txt-wrong-delimiter/1/result.json": "ed847bc9e4b2e0665d3ac05397378422a27ed45feeaa042e414887b77d3da5d7",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-delimiter-1/txt-wrong-delimiter/1/events.jsonl": "0a2c3a62eac0b1572e89a53890cd7859ff34619ac6c817ac50f4c7f2212ddb3e",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-delimiter-1/txt-wrong-delimiter/1/cleanup.json": "206b0ec6c9d1126a003217b2eaeca6e0da89368e93269a8fe1e8f32d9f04c7b1",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-wrong-delimiter-1/txt-wrong-delimiter/1/native-import.json": "8e31633356b7558b907b4a3394737c48537817df002caf0d06cb746e0d02fd61"
+          }
+        },
+        {
+          "role": "Rich",
+          "case": "txt-wrong-delimiter",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/txt-wrong-delimiter/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/txt-wrong-delimiter",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/txt-wrong-delimiter/1",
+            ""
+          ],
+          "exit_code": 1,
+          "stdout": "{\"errors\": [], \"failures\": [\"diagnostic: one uncorrected apply required\"]}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.16544129489921033,
+          "derived_verdict": "FAIL",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/txt-wrong-delimiter/1/result.json": "c948baa50290213e295c15affb732e1cf1861ba03057914227357645c7c7ec47",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/txt-wrong-delimiter/1/events.jsonl": "989ca8bf5af34d2d3a163deaf87349a2b5abab568725942a9e938a9010eea3dc",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/txt-wrong-delimiter/1/cleanup.json": "d9971aec3353a8b0cb989db7404cd56de466bd16a5e4ca67563761c611c069d3",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/txt-wrong-delimiter/1/native-import.json": "5041bf5d9318587cfefd8874f30851d7bb0a494aefa1778ca651af7bdb8d3f95",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/summary.json": "dbbc25fcbfe770dea2266d00101f67219e643b4aa9c58fa7e6feaa34914163ef",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/code-verdict.json": "61b2b10cbefa6226ce3ef8509d1f8cb1341bce8d6476b5f5469a242e3c063bf5"
+          }
+        },
+        {
+          "role": "Ben",
+          "case": "txt-wrong-delimiter",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-wrong-delimiter/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/txt-wrong-delimiter",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-wrong-delimiter/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.19867682410404086,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-wrong-delimiter/1/result.json": "fe4c66e286f6c8706427d7e36a390d6152de0706ca5d2fd106fa40bdaa62e03e",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-wrong-delimiter/1/events.jsonl": "ad003d0d4fa780218ff3f3a510fb23ec397fb932d1a2693d453c83942b28bb3b",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-wrong-delimiter/1/cleanup.json": "2f421f833b82d7641a4fad8c45e78b3d3f445a600a55f952962e7f998683eff7",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-wrong-delimiter/1/native-import.json": "75d8ed03c952f667d75e1421873c365558c6332521112c89701c3958f156803c",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/summary.json": "6210339a398754ba84438377c4f5f5d466bf8129907f7f54a47b86612560bfed",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/code-verdict.json": "bab053180febefac04cb00e530d05bbc0777b7ccf6842c4233e4c775c2192889"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "txt-ambiguous-headers",
+      "requirements": {
+        "TASK.md": {
+          "git_path": "evals/tasks/node-evals/txt-ambiguous-headers/TASK.md",
+          "sha256": "481e4316ce246c8deb4f68766e650ae90420ce790f150adf11a2db35afaa47c0"
+        },
+        "SPEC.json": {
+          "git_path": "evals/tasks/node-evals/txt-ambiguous-headers/SPEC.json",
+          "sha256": "412bc5532d32020ece41e9eff5bb349a05923305755cd975e6480ffd2b360e23"
+        },
+        "acceptance.json": {
+          "git_path": "evals/tasks/node-evals/txt-ambiguous-headers/acceptance.json",
+          "sha256": "1dbab3e93b2a10ed6457ca97c263556703d3ca5b194c36902d6af458cd3c9b48"
+        },
+        "expected/outcome.json": {
+          "git_path": "evals/tasks/node-evals/txt-ambiguous-headers/expected/outcome.json",
+          "sha256": "d588295ddbdc622ebc45526e42d7e417f88046c3aa74f4c58dc6388e5799f549"
+        }
+      },
+      "original_inputs": [
+        {
+          "git_path": "evals/tasks/node-evals/txt-ambiguous-headers/data/ambiguous_headers.txt",
+          "sha256": "c7519031b5932dc11febfd15807c8205d9892229ab7913321eea7d96eabd7bba",
+          "bytes": 23
+        }
+      ],
+      "assigned_settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "text_qualifier": "\"",
+          "multiple_delimiters": false
+        }
+      },
+      "assigned_columns": [
+        {
+          "source_name": "Name",
+          "name": "FirstName",
+          "label": "FirstName",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "source_name": "Name",
+          "name": "SecondName",
+          "label": "SecondName",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_outcome": {
+        "kind": "ambiguous_headers",
+        "description": "Точный request.validate / NOT_APPLIED / REQUEST_REJECTED: Duplicate source column names. Эффект не возможен; import-узел не создаётся, Execute отсутствует, cleanup подтверждён. Name/Name_1 нативного мастера не запрещены сами по себе; OtherName сюда не подставляется.",
+        "must_not_certify_correct_table": true,
+        "native_warning_required": false,
+        "engine_rejection_required": false,
+        "unknown_effect_is_success": false,
+        "cleanup_required": true,
+        "negative_fixture": true,
+        "known_refusal_required": true
+      },
+      "text_required": true,
+      "text_scope": "observed known refusal/cause or executed damage/incompleteness, as described per case in canonical Markdown; initial records its known refusal/owned close, no new format",
+      "cold_required": false,
+      "current_derived": {
+        "reference": "PASS",
+        "Rich": "PASS",
+        "Ben": "PASS"
+      },
+      "genuine_evidence": [
+        {
+          "role": "reference",
+          "case": "txt-ambiguous-headers",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-ambiguous-headers-1/txt-ambiguous-headers/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/txt-ambiguous-headers",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-ambiguous-headers-1/txt-ambiguous-headers/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.08835898712277412,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-ambiguous-headers-1/txt-ambiguous-headers/1/result.json": "9dfba446bb1946ec79628f81b624c39afb6720f09215573d63ffda3ab7ea7e6c",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-ambiguous-headers-1/txt-ambiguous-headers/1/events.jsonl": "65ce2a3f3245642965117908ad8f7de96cd7db1613d2079ebb0d4b05623593d9",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-ambiguous-headers-1/txt-ambiguous-headers/1/cleanup.json": "44df3e13d872e7b62c98dabda3b552ab99efc179fff919acaefa008b97d7042b",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-txt-ambiguous-headers-1/txt-ambiguous-headers/1/native-import.json": "1c9e2c52ad1c262978ae4e99f1da4e5e8ab919b640f489c849f8b57b0f08416d"
+          }
+        },
+        {
+          "role": "Rich",
+          "case": "txt-ambiguous-headers",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-ambiguous-headers/20261017-211614-6ed1f5139/txt-ambiguous-headers/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/txt-ambiguous-headers",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-ambiguous-headers/20261017-211614-6ed1f5139/txt-ambiguous-headers/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.09058467322029173,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-ambiguous-headers/20261017-211614-6ed1f5139/txt-ambiguous-headers/1/result.json": "e2ffeff8b36d9588c799ab6c4c234be930339411e2b30cd215a088ff914bfaf1",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-ambiguous-headers/20261017-211614-6ed1f5139/txt-ambiguous-headers/1/events.jsonl": "10b34d68c98764a01cfaf36d659a85c5f2028f183ead61584481be7eaaa6856b",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-ambiguous-headers/20261017-211614-6ed1f5139/txt-ambiguous-headers/1/cleanup.json": "6c04f21de4ab9f3474416783955af0ab01a306e3154a742e3f4f5899943e115b",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-ambiguous-headers/20261017-211614-6ed1f5139/txt-ambiguous-headers/1/native-import.json": "cd4823528c91e3e8c3cc9d0c3c2eb6498c69712396c3ff3d7e787e073acc41d7",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-ambiguous-headers/20261017-211614-6ed1f5139/summary.json": "aa1009e0520380e57e1a0c1ebd3d1144c2c74be6d72f938898aed31a802cc162",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-ambiguous-headers/20261017-211614-6ed1f5139/code-verdict.json": "4c2b53b2c2743421476c62cc152ed3c0b5b2b25f51510afe010ae0604fbc5b95"
+          }
+        },
+        {
+          "role": "Ben",
+          "case": "txt-ambiguous-headers",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-ambiguous-headers/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/txt-ambiguous-headers",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-ambiguous-headers/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.08910692413337529,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-ambiguous-headers/1/result.json": "2d81bbbd3fe9f7e84f36ad0b62b39cbdfec25392bb54d9cc279127e43cf5aafa",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-ambiguous-headers/1/events.jsonl": "1dc8b5f08c9146da500887ba73e689033dd6cdf8f3549c09902bbd655cde3cc2",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-ambiguous-headers/1/cleanup.json": "dfe53212d0fba678036f6b70bea310bbb423eb9acd85e6c86c8b4dc73404341e",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/txt-ambiguous-headers/1/native-import.json": "2fd3cc1cb977b5e3947121721a2a9510e881031665027a67affec0e162f3552a",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/summary.json": "6210339a398754ba84438377c4f5f5d466bf8129907f7f54a47b86612560bfed",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/code-verdict.json": "bab053180febefac04cb00e530d05bbc0777b7ccf6842c4233e4c775c2192889"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "csv-unclosed-quote",
+      "requirements": {
+        "TASK.md": {
+          "git_path": "evals/tasks/node-evals/csv-unclosed-quote/TASK.md",
+          "sha256": "c1794d909261bf429da4aafd756cf941385b54173de4d3916caa2a412e5e0578"
+        },
+        "SPEC.json": {
+          "git_path": "evals/tasks/node-evals/csv-unclosed-quote/SPEC.json",
+          "sha256": "18c25ee898adb7b28903727fefe1a4b7faa74864d865a6a92e1ae66729bc06bd"
+        },
+        "acceptance.json": {
+          "git_path": "evals/tasks/node-evals/csv-unclosed-quote/acceptance.json",
+          "sha256": "8088607aa94a4cd18665915bb2825373cb61aa210bbb32f46bd64a5149cebb72"
+        },
+        "expected/outcome.json": {
+          "git_path": "evals/tasks/node-evals/csv-unclosed-quote/expected/outcome.json",
+          "sha256": "fe6ac6e6d98cfd006e7599c353f924c8e0ef862643ed94f0e3193a2dd52a5d72"
+        }
+      },
+      "original_inputs": [
+        {
+          "git_path": "evals/tasks/node-evals/csv-unclosed-quote/data/unclosed_quote.csv",
+          "sha256": "e8eda3b3c2a61603838a9b3eaf3dc6fbac6c7bde4ab966452cfb3fa292d76f2c",
+          "bytes": 36
+        }
+      ],
+      "assigned_settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "text_qualifier": "\"",
+          "multiple_delimiters": false
+        }
+      },
+      "assigned_columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Name",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_outcome": {
+        "kind": "unclosed_quote",
+        "description": "Известный отказ либо явно обнаруженная неполнота/повреждение. Не объявлять корректный импорт. В историческом прогоне движок принял неполные данные; native warning не наблюдался. Новый движок может отказать, это допустимо.",
+        "must_not_certify_correct_table": true,
+        "native_warning_required": false,
+        "engine_rejection_required": false,
+        "unknown_effect_is_success": false,
+        "cleanup_required": true,
+        "negative_fixture": true
+      },
+      "text_required": true,
+      "text_scope": "observed known refusal/cause or executed damage/incompleteness, as described per case in canonical Markdown; initial records its known refusal/owned close, no new format",
+      "cold_required": false,
+      "current_derived": {
+        "reference": "PASS",
+        "Rich": "PASS",
+        "Ben": "PASS"
+      },
+      "genuine_evidence": [
+        {
+          "role": "reference",
+          "case": "csv-unclosed-quote",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-unclosed-quote-1/csv-unclosed-quote/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/csv-unclosed-quote",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-unclosed-quote-1/csv-unclosed-quote/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.34166314103640616,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-unclosed-quote-1/csv-unclosed-quote/1/result.json": "c95758be041f6cb67e7d96ca3313daa131acd6d490e58f7c181d92352b9952a8",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-unclosed-quote-1/csv-unclosed-quote/1/events.jsonl": "452bdd9646a0828ee253986ae1149833a02f52c3ddd014ebc505e18bcfe97801",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-unclosed-quote-1/csv-unclosed-quote/1/cleanup.json": "930759c14528083e835c816c8e6fe9b920d4078227f9322eb92e05611d6c6dfc",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-unclosed-quote-1/csv-unclosed-quote/1/native-import.json": "b809b141fee449de62ddc16baeea0fef9efc702ab100c8eb5ca94c1af1d032d8"
+          }
+        },
+        {
+          "role": "Rich",
+          "case": "csv-unclosed-quote",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-unclosed-quote/20261017-212306-6ed1f5139/csv-unclosed-quote/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/csv-unclosed-quote",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-unclosed-quote/20261017-212306-6ed1f5139/csv-unclosed-quote/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.34665161999873817,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-unclosed-quote/20261017-212306-6ed1f5139/csv-unclosed-quote/1/result.json": "0ddf971935561be226f0de2cc041441022d87915f013652803833e4a0364ad45",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-unclosed-quote/20261017-212306-6ed1f5139/csv-unclosed-quote/1/events.jsonl": "e8e03e5d1d8e19c960767157709019ba54845562389de9567d7d5224bcf277e2",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-unclosed-quote/20261017-212306-6ed1f5139/csv-unclosed-quote/1/cleanup.json": "e9d951fe974f7c1161a6c3d71296c0a88244416c7263c129bbb56e911ce102d2",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-unclosed-quote/20261017-212306-6ed1f5139/csv-unclosed-quote/1/native-import.json": "c36c55af4714a8b9e02cdc1353802ac255d4c3ac97dbb587372364799b0adf85",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-unclosed-quote/20261017-212306-6ed1f5139/summary.json": "c175ffaed5d7dfb23c148a2d0bde0a4723b1622697de47c388b9714cfa915bc0",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-unclosed-quote/20261017-212306-6ed1f5139/code-verdict.json": "1118e328c19f67ae1194c824a55cf7ca0f941330a24b1f3c90b320a568721196"
+          }
+        },
+        {
+          "role": "Ben",
+          "case": "csv-unclosed-quote",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-unclosed-quote/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/csv-unclosed-quote",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-unclosed-quote/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.3487021119799465,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-unclosed-quote/1/result.json": "487ebd2bba6b8274d0e5fa747c43d2d7501e89b7e82c7236e6e41a707212bd48",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-unclosed-quote/1/events.jsonl": "2fc5457abd940e4566c6af39b7322a7a778bb4b7b98432c29573d57cc3131238",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-unclosed-quote/1/cleanup.json": "d8c9e28f7a1dce9ef134950fd394223a3699daf62f094abb5c50daea691fb20b",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-unclosed-quote/1/native-import.json": "99d60374284e76ca8453790bc1db8d631f7c010c0ce456a44c28b7aaa8761046",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/summary.json": "6210339a398754ba84438377c4f5f5d466bf8129907f7f54a47b86612560bfed",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/code-verdict.json": "bab053180febefac04cb00e530d05bbc0777b7ccf6842c4233e4c775c2192889"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "csv-wrong-encoding",
+      "requirements": {
+        "TASK.md": {
+          "git_path": "evals/tasks/node-evals/csv-wrong-encoding/TASK.md",
+          "sha256": "44f526346e5c8ceaab2bd6a6a86028bbf791d570f22d345cbb17812cabf842d7"
+        },
+        "SPEC.json": {
+          "git_path": "evals/tasks/node-evals/csv-wrong-encoding/SPEC.json",
+          "sha256": "0466c71473fb5e9831530336de975d946d2639defd58571e3718d2e4c5769d79"
+        },
+        "acceptance.json": {
+          "git_path": "evals/tasks/node-evals/csv-wrong-encoding/acceptance.json",
+          "sha256": "c9e0aa3c4b3afb6a8558ca0045a6b84aab8768155415d30b82856fa3b6f58b72"
+        },
+        "expected/outcome.json": {
+          "git_path": "evals/tasks/node-evals/csv-wrong-encoding/expected/outcome.json",
+          "sha256": "d52629aa99ed1f6f1d858a6e8bb9cb5f522ee7008ddc6bdfc91c745f42b9a93e"
+        }
+      },
+      "original_inputs": [
+        {
+          "git_path": "evals/tasks/node-evals/csv-wrong-encoding/data/wrong_encoding.csv",
+          "sha256": "97f88be2af869453bc726e51889dcb10c5bd1d2a8fd7b96cca6f125b888d3ee6",
+          "bytes": 21
+        }
+      ],
+      "assigned_settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "text_qualifier": "\"",
+          "multiple_delimiters": false
+        }
+      },
+      "assigned_columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Name",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_outcome": {
+        "kind": "wrong_encoding",
+        "description": "Известный отказ либо обнаруженная утрата исходного Unicode. Исходные CP1251 bytes при настройке UTF-8 нельзя объявлять правильно прочитанными. Native warning не обязателен.",
+        "must_not_certify_correct_table": true,
+        "native_warning_required": false,
+        "engine_rejection_required": false,
+        "unknown_effect_is_success": false,
+        "cleanup_required": true,
+        "negative_fixture": true
+      },
+      "text_required": true,
+      "text_scope": "observed known refusal/cause or executed damage/incompleteness, as described per case in canonical Markdown; initial records its known refusal/owned close, no new format",
+      "cold_required": false,
+      "current_derived": {
+        "reference": "PASS",
+        "Rich": "FAIL",
+        "Ben": "FAIL"
+      },
+      "genuine_evidence": [
+        {
+          "role": "reference",
+          "case": "csv-wrong-encoding",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-wrong-encoding-1/csv-wrong-encoding/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/csv-wrong-encoding",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-wrong-encoding-1/csv-wrong-encoding/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.34048592508770525,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-wrong-encoding-1/csv-wrong-encoding/1/result.json": "44899b79e53607d535e3afd243ab876ecf4430cef12168b0b4f671ccd536f551",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-wrong-encoding-1/csv-wrong-encoding/1/events.jsonl": "6465ebc7f842d9c1aeeeef75cc9f908f59910476d0034b840768e83ebd286acc",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-wrong-encoding-1/csv-wrong-encoding/1/cleanup.json": "babcb061a9eb0c30cedfbab5348c90ab8ad78dd4452382c9455f99f9d0702adf",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-01a14a1c/reference-csv-wrong-encoding-1/csv-wrong-encoding/1/native-import.json": "542d8d1056ba640e62799fafa77d867f265a9983450eee1c6d945524e0c6ab9e"
+          }
+        },
+        {
+          "role": "Rich",
+          "case": "csv-wrong-encoding",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/csv-wrong-encoding/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/csv-wrong-encoding",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/csv-wrong-encoding/1",
+            ""
+          ],
+          "exit_code": 1,
+          "stdout": "{\"errors\": [], \"failures\": [\"source: exact delivery count required\"]}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.07633884996175766,
+          "derived_verdict": "FAIL",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/csv-wrong-encoding/1/result.json": "8ef6df9b04e61978f265480cba5fc11a2fe738edaf883597b6667bcf373e1e9d",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/csv-wrong-encoding/1/events.jsonl": "439051a77df02e34441db927823691b61d0ada4c999ac6f4ddb87a8f9dae49a7",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/csv-wrong-encoding/1/cleanup.json": "1bffdb67608470af1ec3abd98e0f9bec2871ed7a661b4237b0f81a24a5ba2336",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/csv-wrong-encoding/1/native-import.json": "9612a4da0d9a0b50c67e274e96e3cdb11ebb9ca5de220e7db845adafae3150e1",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/summary.json": "93a857688c2f011f1c78985ffa24ec570ecb9386f83c46971d83138e0336552b",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/code-verdict.json": "5a33b9c3bb23e639677b70026cf210f731d84f8d0a6532acc2ebe4f892370d4a"
+          }
+        },
+        {
+          "role": "Ben",
+          "case": "csv-wrong-encoding",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-encoding/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/csv-wrong-encoding",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-encoding/1",
+            ""
+          ],
+          "exit_code": 1,
+          "stdout": "{\"errors\": [], \"failures\": [\"source: one prepare required\"]}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.06431500590406358,
+          "derived_verdict": "FAIL",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-encoding/1/result.json": "5732d625fe70023d92bad83e2ba7bc6a0b6f3f1dd8b97fcfaaa651fc6e18233e",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-encoding/1/events.jsonl": "b78a678f9b9f2addc6c707802109e3b8ce2b7a0238b171c1ee319eaead5b3724",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-encoding/1/cleanup.json": "497c59fdf488272f4ececb43d259e42a7516a8979093369f5a7f6e300b6ee622",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-encoding/1/native-import.json": "1fd573ba0c18dfed5d82482c2e7dc7aa3de8b3affa903be6fef74c6e4a2db9f7",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/summary.json": "6210339a398754ba84438377c4f5f5d466bf8129907f7f54a47b86612560bfed",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/code-verdict.json": "bab053180febefac04cb00e530d05bbc0777b7ccf6842c4233e4c775c2192889"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "csv-wrong-delimiter",
+      "requirements": {
+        "TASK.md": {
+          "git_path": "evals/tasks/node-evals/csv-wrong-delimiter/TASK.md",
+          "sha256": "992aa0e51114d091d33de5411bdbf1a9c6309e1819ba19a0f6228c3bfd00d74b"
+        },
+        "SPEC.json": {
+          "git_path": "evals/tasks/node-evals/csv-wrong-delimiter/SPEC.json",
+          "sha256": "573436da7b0d711cb29e674bb5066189df5b5c30d96eb630c7167ef7624e7735"
+        },
+        "acceptance.json": {
+          "git_path": "evals/tasks/node-evals/csv-wrong-delimiter/acceptance.json",
+          "sha256": "ee1270318ff6524634a0e0e35560cd71fb8f8f8d8f4196edb67276bd1a59530a"
+        },
+        "expected/outcome.json": {
+          "git_path": "evals/tasks/node-evals/csv-wrong-delimiter/expected/outcome.json",
+          "sha256": "c8ef44381305f6bfdfcce1aa3f07294944709fa8e1b181a5cb3ec9e987adb43d"
+        }
+      },
+      "original_inputs": [
+        {
+          "git_path": "evals/tasks/node-evals/csv-wrong-delimiter/data/wrong_delimiter.csv",
+          "sha256": "92441055dd7d146da19c049e44e6632d6977eb67ae06d7237786ea4439515cbb",
+          "bytes": 20
+        }
+      ],
+      "assigned_settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "text_qualifier": "\"",
+          "multiple_delimiters": false
+        }
+      },
+      "assigned_columns": [
+        {
+          "name": "Id",
+          "label": "Id",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Name",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_outcome": {
+        "kind": "wrong_delimiter",
+        "description": "При исходном | и запросе запятой требуется известный typed binding/count refusal, no Execute и confirmed cleanup. Одноколоночный результат не является запрошенными Id/Name.",
+        "must_not_certify_correct_table": true,
+        "native_warning_required": false,
+        "engine_rejection_required": false,
+        "unknown_effect_is_success": false,
+        "cleanup_required": true,
+        "negative_fixture": true,
+        "known_refusal_required": true
+      },
+      "text_required": true,
+      "text_scope": "observed known refusal/cause or executed damage/incompleteness, as described per case in canonical Markdown; initial records its known refusal/owned close, no new format",
+      "cold_required": false,
+      "current_derived": {
+        "reference": "PASS",
+        "Rich": "PASS",
+        "Ben": "PASS"
+      },
+      "genuine_evidence": [
+        {
+          "role": "reference",
+          "case": "csv-wrong-delimiter",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-wrong-delimiter-3/csv-wrong-delimiter/3",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/csv-wrong-delimiter",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-wrong-delimiter-3/csv-wrong-delimiter/3",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.19193482003174722,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-wrong-delimiter-3/csv-wrong-delimiter/3/result.json": "53dfc8ca7d1b4720259def775a62469b69c1f24cee98df74efc3860b0f58fc5e",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-wrong-delimiter-3/csv-wrong-delimiter/3/events.jsonl": "0a256700a7ef77ca2ba971a2e1a1d6b8f4c04f7cbbeba05e772c10d3a5adfcb8",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-wrong-delimiter-3/csv-wrong-delimiter/3/cleanup.json": "57993827a209ff4965a77f170404fef9b18d09cdab3f5724a5c0a8b25d14bed7",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-wrong-delimiter-3/csv-wrong-delimiter/3/native-import.json": "1c23cba12f4d2247b7ed43939aa9baf35abdd899bfdc4fb89aabf63ab9ef161b"
+          }
+        },
+        {
+          "role": "Rich",
+          "case": "csv-wrong-delimiter",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-delimiter/20261017-213925-6ed1f5139/csv-wrong-delimiter/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/csv-wrong-delimiter",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-delimiter/20261017-213925-6ed1f5139/csv-wrong-delimiter/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.19559685792773962,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-delimiter/20261017-213925-6ed1f5139/csv-wrong-delimiter/1/result.json": "94579cb1ec33b6d84b229f1d14fd7201730571d219ad3414717ce207fa6e1589",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-delimiter/20261017-213925-6ed1f5139/csv-wrong-delimiter/1/events.jsonl": "3f4aed455af0500b8c8b9d92614c236774611864a55259e03f3bec98a46661db",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-delimiter/20261017-213925-6ed1f5139/csv-wrong-delimiter/1/cleanup.json": "b3372d16e1985214e99e849e27612a5f2daa3cc76c17f282fef9c9ba25ea049c",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-delimiter/20261017-213925-6ed1f5139/csv-wrong-delimiter/1/native-import.json": "bd389d7c70df5ed6508bf9dcdf84d4c4e2c61938370fce74e298ec04a0d47094",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-delimiter/20261017-213925-6ed1f5139/summary.json": "109dc86a99616db4d673174a58dfb592e9a09ab46e6335d75db0417d43f78cde",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-delimiter/20261017-213925-6ed1f5139/code-verdict.json": "ea4c1ca14c0fde0f47baf5f03ec1c42dc937a7037fb2f1132990780466aa2582"
+          }
+        },
+        {
+          "role": "Ben",
+          "case": "csv-wrong-delimiter",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-delimiter/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/csv-wrong-delimiter",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-delimiter/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.18849951401352882,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-delimiter/1/result.json": "e079bec3f26f9f8e16b711567b3314227704a6ee7cc44604476d76bf915807fd",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-delimiter/1/events.jsonl": "d943a5701c5c4218fc082619e63eb3bce0a4ffe443070f8c174967568599a2de",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-delimiter/1/cleanup.json": "93cbdfd6e0cc8cfe9b448770c83257211da9391d59d15a89b3cdcf0cc2d6c7f5",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-delimiter/1/native-import.json": "61e05ca5b233f1432027e50a83ca63c24a4ae7b14a90e0a6837911d193da8987",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/summary.json": "6210339a398754ba84438377c4f5f5d466bf8129907f7f54a47b86612560bfed",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/code-verdict.json": "bab053180febefac04cb00e530d05bbc0777b7ccf6842c4233e4c775c2192889"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "csv-ambiguous-headers",
+      "requirements": {
+        "TASK.md": {
+          "git_path": "evals/tasks/node-evals/csv-ambiguous-headers/TASK.md",
+          "sha256": "4d02214ac2924671ee1518858de9fb07c5d86769daca0a18e08fac58da332e5e"
+        },
+        "SPEC.json": {
+          "git_path": "evals/tasks/node-evals/csv-ambiguous-headers/SPEC.json",
+          "sha256": "f7373a2b12d49ab8b90a7c2368a9ec2af80a0df6f41b783a79d92e063c53107a"
+        },
+        "acceptance.json": {
+          "git_path": "evals/tasks/node-evals/csv-ambiguous-headers/acceptance.json",
+          "sha256": "7a886bf0df2d909d4697c943bf5a0cfce1d0c7ba5cfc3ef970dcbd26360ef2ef"
+        },
+        "expected/outcome.json": {
+          "git_path": "evals/tasks/node-evals/csv-ambiguous-headers/expected/outcome.json",
+          "sha256": "d588295ddbdc622ebc45526e42d7e417f88046c3aa74f4c58dc6388e5799f549"
+        }
+      },
+      "original_inputs": [
+        {
+          "git_path": "evals/tasks/node-evals/csv-ambiguous-headers/data/ambiguous_headers.csv",
+          "sha256": "c7519031b5932dc11febfd15807c8205d9892229ab7913321eea7d96eabd7bba",
+          "bytes": 23
+        }
+      ],
+      "assigned_settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "text_qualifier": "\"",
+          "multiple_delimiters": false
+        }
+      },
+      "assigned_columns": [
+        {
+          "source_name": "Name",
+          "name": "FirstName",
+          "label": "FirstName",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "source_name": "Name",
+          "name": "SecondName",
+          "label": "SecondName",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_outcome": {
+        "kind": "ambiguous_headers",
+        "description": "Точный request.validate / NOT_APPLIED / REQUEST_REJECTED: Duplicate source column names. Эффект не возможен; import-узел не создаётся, Execute отсутствует, cleanup подтверждён. Name/Name_1 нативного мастера не запрещены сами по себе; OtherName сюда не подставляется.",
+        "must_not_certify_correct_table": true,
+        "native_warning_required": false,
+        "engine_rejection_required": false,
+        "unknown_effect_is_success": false,
+        "cleanup_required": true,
+        "negative_fixture": true,
+        "known_refusal_required": true
+      },
+      "text_required": true,
+      "text_scope": "observed known refusal/cause or executed damage/incompleteness, as described per case in canonical Markdown; initial records its known refusal/owned close, no new format",
+      "cold_required": false,
+      "current_derived": {
+        "reference": "PASS",
+        "Rich": "PASS",
+        "Ben": "FAIL"
+      },
+      "genuine_evidence": [
+        {
+          "role": "reference",
+          "case": "csv-ambiguous-headers",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-ambiguous-headers-1/csv-ambiguous-headers/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/csv-ambiguous-headers",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-ambiguous-headers-1/csv-ambiguous-headers/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.09027433092705905,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-ambiguous-headers-1/csv-ambiguous-headers/1/result.json": "e701f12f58d74271e95b463d54e3a286e7b73c8ccb28062f096991dc3864e364",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-ambiguous-headers-1/csv-ambiguous-headers/1/events.jsonl": "c8b2ca2a8c6f989b98f2c297fee5eb089379831ef957bcddb9fb0759be1dbf5d",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-ambiguous-headers-1/csv-ambiguous-headers/1/cleanup.json": "02626deb67d32d7c6db4a2d83be5214c4d98ecc2e5521263365cbe1eafa571da",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-csv-ambiguous-headers-1/csv-ambiguous-headers/1/native-import.json": "034862e80cf888deffa2558a35e50fcf1512ef08bf41d83b5bd882440161cbdd"
+          }
+        },
+        {
+          "role": "Rich",
+          "case": "csv-ambiguous-headers",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-ambiguous-headers/20261017-214655-6ed1f5139/csv-ambiguous-headers/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/csv-ambiguous-headers",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-ambiguous-headers/20261017-214655-6ed1f5139/csv-ambiguous-headers/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.09822626505047083,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-ambiguous-headers/20261017-214655-6ed1f5139/csv-ambiguous-headers/1/result.json": "299e75b2149a7d85f8e250bc4c70330183a169abbc3658843091b826b6144dd8",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-ambiguous-headers/20261017-214655-6ed1f5139/csv-ambiguous-headers/1/events.jsonl": "a117e7e60919285bfb32a950f52cbde1250c7524aeccbea17dab073dfb11cbc3",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-ambiguous-headers/20261017-214655-6ed1f5139/csv-ambiguous-headers/1/cleanup.json": "f7bdb60c6cfb0e92f60487ca788b7eaa1b6c81ba24d3500e13316cd87637fa30",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-ambiguous-headers/20261017-214655-6ed1f5139/csv-ambiguous-headers/1/native-import.json": "0a3bf1a0e0939508c50a6a8f527ee7f2ef9fefb55c46923583651f93e841679b",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-ambiguous-headers/20261017-214655-6ed1f5139/summary.json": "d6b2fdadda2cc9fb72c9064fa2f4c9d8bc0eb4fc4865e4dcc4f33447f71d76ef",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-ambiguous-headers/20261017-214655-6ed1f5139/code-verdict.json": "03cd81a2ea8c0942d776966a98757060d91d1e22b41cf2408ff107c021f3b506"
+          }
+        },
+        {
+          "role": "Ben",
+          "case": "csv-ambiguous-headers",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-ambiguous-headers/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/csv-ambiguous-headers",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-ambiguous-headers/1",
+            ""
+          ],
+          "exit_code": 1,
+          "stdout": "{\"errors\": [], \"failures\": [\"import: exact duplicate source references required\"]}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.0714544989168644,
+          "derived_verdict": "FAIL",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-ambiguous-headers/1/result.json": "a7c98816d9af5b030b3612ced7f26447c7bf7199ff50c8ae02f085d4de450871",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-ambiguous-headers/1/events.jsonl": "9f33cef7c459a8b79d7459854fc56d5ea74ab32e7f2f8211ecba5bf76f7dd83a",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-ambiguous-headers/1/cleanup.json": "d76b48acc3c7e5824143bac16468a5a3f54766d1af0d372aa265d91a7f633552",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-ambiguous-headers/1/native-import.json": "14c75f9f4fc63ef85f7c1f2f72682deec83994fe555dcdf327c5ec7ef9ed9eef",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/summary.json": "6210339a398754ba84438377c4f5f5d466bf8129907f7f54a47b86612560bfed",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/code-verdict.json": "bab053180febefac04cb00e530d05bbc0777b7ccf6842c4233e4c775c2192889"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "initial-incomplete-settings",
+      "requirements": {
+        "TASK.md": {
+          "git_path": "evals/tasks/node-evals/initial-incomplete-settings/TASK.md",
+          "sha256": "f101a3a3396f5a6bc807689da19e6495c0d1ebc019c9ee42ce7fb8f07f5f5c51"
+        },
+        "SPEC.json": {
+          "git_path": "evals/tasks/node-evals/initial-incomplete-settings/SPEC.json",
+          "sha256": "ec0ffe8d99d3d330e73604cb56e8c55bab8bab5d6592741f8a4b13d5afdabc4c"
+        },
+        "acceptance.json": {
+          "git_path": "evals/tasks/node-evals/initial-incomplete-settings/acceptance.json",
+          "sha256": "c1ab3d57e4bf768e370ec2797ef56d54a0fe705cb9a1d46c229be54017ac1fd3"
+        },
+        "expected/outcome.json": {
+          "git_path": "evals/tasks/node-evals/initial-incomplete-settings/expected/outcome.json",
+          "sha256": "4b6a61e4c17f7fb7ef4aaf87bc739d3f3dadc3fa8dc2027e0ceb6dd7e00ec3d0"
+        }
+      },
+      "original_inputs": [
+        {
+          "git_path": "evals/tasks/node-evals/initial-incomplete-settings/data/comma_utf8.txt",
+          "sha256": "903cf4ea60b3732510fc7a9540358f23537c7e8dbaf07708d91df3e80178bd19",
+          "bytes": 200
+        }
+      ],
+      "assigned_settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "text_qualifier": "\"",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "multiple_delimiters": false,
+          "date_format": "yyyy/mm/dd",
+          "date_separator": "-"
+        }
+      },
+      "assigned_columns": [
+        {
+          "name": "Id",
+          "label": "Идентификатор",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Name",
+          "label": "Название",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Amount",
+          "label": "Сумма",
+          "type": "real",
+          "data_kind": "Непрерывный",
+          "used": true
+        },
+        {
+          "name": "Date",
+          "label": "Дата",
+          "type": "datetime",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "Note",
+          "label": "Текст",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_outcome": {
+        "kind": "incomplete_initial_settings",
+        "description": "Первичный неполный контракт отклонён до применения настроек/Execute; закрыт только собственный черновик. Не утверждать отсутствие временного target create без квитанции; чужие узлы не изменяются.",
+        "engine_rejection_required": false,
+        "cleanup_required": true,
+        "request_omits": "columns",
+        "negative_fixture": false,
+        "known_refusal_required": true
+      },
+      "text_required": true,
+      "text_scope": "observed known refusal/cause or executed damage/incompleteness, as described per case in canonical Markdown; initial records its known refusal/owned close, no new format",
+      "cold_required": false,
+      "current_derived": {
+        "reference": "PASS",
+        "Rich": "PASS",
+        "Ben": "PASS"
+      },
+      "genuine_evidence": [
+        {
+          "role": "reference",
+          "case": "initial-incomplete-settings",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-01a14b91/reference-initial-incomplete-settings-2/initial-incomplete-settings/2",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/initial-incomplete-settings",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-01a14b91/reference-initial-incomplete-settings-2/initial-incomplete-settings/2",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.12418282590806484,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-01a14b91/reference-initial-incomplete-settings-2/initial-incomplete-settings/2/result.json": "3c966160472ae8a643286420a3a5ddba53ede2a53a3fd958a0c5b929e3c45d6e",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-01a14b91/reference-initial-incomplete-settings-2/initial-incomplete-settings/2/events.jsonl": "b349ce7fc7fc1abc4a2e8a05e8205fc751065261c40a3a3e11d7e147a7d26aba",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-01a14b91/reference-initial-incomplete-settings-2/initial-incomplete-settings/2/cleanup.json": "37f176453f2bd8a298ed0a344bd6dba91aa230140ff98a8d67d501ab5ba2d390",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-01a14b91/reference-initial-incomplete-settings-2/initial-incomplete-settings/2/native-import.json": "e54b889e16da08f065b120c573b22d9385038d2f2db31c54916311f073d961ea"
+          }
+        },
+        {
+          "role": "Rich",
+          "case": "initial-incomplete-settings",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/initial-incomplete-settings/20261017-215349-6ed1f5139/initial-incomplete-settings/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/initial-incomplete-settings",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/initial-incomplete-settings/20261017-215349-6ed1f5139/initial-incomplete-settings/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.12794119701720774,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/initial-incomplete-settings/20261017-215349-6ed1f5139/initial-incomplete-settings/1/result.json": "d536cc67e7b42102d85e0060b5672b0cce9dd1b30c86864c7ab2d99c43f5f02b",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/initial-incomplete-settings/20261017-215349-6ed1f5139/initial-incomplete-settings/1/events.jsonl": "9922bd281e39086db4be69ba6f6c1a98b3640b663b21a626d5b23bd5a91f7663",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/initial-incomplete-settings/20261017-215349-6ed1f5139/initial-incomplete-settings/1/cleanup.json": "581f5a87510d54e19862df362ab5c0e49eb4656eb7ca804bcf28823e32d0b8c8",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/initial-incomplete-settings/20261017-215349-6ed1f5139/initial-incomplete-settings/1/native-import.json": "a6021cbeee30ccd0610cbbf55df2fd53b25ae65a347baccbcd721ec9327d17b6",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/initial-incomplete-settings/20261017-215349-6ed1f5139/summary.json": "83f319a3600e084590bdef7f51ff2bca9197fa44406646d26b21f57d686419a0",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/initial-incomplete-settings/20261017-215349-6ed1f5139/code-verdict.json": "b89b4709d7ab0666d93b79d0604b44c7b2a4cd4dffc716af0f97beb3a2142c4c"
+          }
+        },
+        {
+          "role": "Ben",
+          "case": "initial-incomplete-settings",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/initial-incomplete-settings/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/initial-incomplete-settings",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/initial-incomplete-settings/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.12991561484523118,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/initial-incomplete-settings/1/result.json": "57fc3aa829912ad453b7da333d44e6a71814bee4b544506381e8b91eeccd0f64",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/initial-incomplete-settings/1/events.jsonl": "0f4041b9a90574149695012aa60ab17ca05d8775eec318f10be91e6d69856eb0",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/initial-incomplete-settings/1/cleanup.json": "dee6a74841da5905b9bd373c680bc63a7af623720e5c6e33fd917240fed9fdbe",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/initial-incomplete-settings/1/native-import.json": "8f902bd15ea0eabf8d34d753467911ad70936e368803b6cd025f0291f7ccc739",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/summary.json": "6210339a398754ba84438377c4f5f5d466bf8129907f7f54a47b86612560bfed",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/code-verdict.json": "bab053180febefac04cb00e530d05bbc0777b7ccf6842c4233e4c775c2192889"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "missing-source-column",
+      "requirements": {
+        "TASK.md": {
+          "git_path": "evals/tasks/node-evals/missing-source-column/TASK.md",
+          "sha256": "eafccf80d1feb72b4b271c30bd6db3300946e3037001adefbd8718e551e89048"
+        },
+        "SPEC.json": {
+          "git_path": "evals/tasks/node-evals/missing-source-column/SPEC.json",
+          "sha256": "09e93d601facb9ac1b14752f72e0d1eb3571588f90643205a6486e31ae3d30c3"
+        },
+        "acceptance.json": {
+          "git_path": "evals/tasks/node-evals/missing-source-column/acceptance.json",
+          "sha256": "f66edeb8f44d9913f6682583e190efa7423bbe724e191c92fc08cc44c6c889b0"
+        },
+        "expected/outcome.json": {
+          "git_path": "evals/tasks/node-evals/missing-source-column/expected/outcome.json",
+          "sha256": "2c3888b0b9aae7c555bcf241a35b647d899443abe6bd1b31d2f9edc7d8fd376a"
+        }
+      },
+      "original_inputs": [
+        {
+          "git_path": "evals/tasks/node-evals/missing-source-column/data/ambiguous_headers.txt",
+          "sha256": "c7519031b5932dc11febfd15807c8205d9892229ab7913321eea7d96eabd7bba",
+          "bytes": 23
+        }
+      ],
+      "assigned_settings": {
+        "source": {
+          "encoding": "65001",
+          "rows_to_skip": 0,
+          "first_line_as_title": true
+        },
+        "format": {
+          "delimiter": ",",
+          "decimal_separator": ".",
+          "null_marker": "?",
+          "text_qualifier": "\"",
+          "multiple_delimiters": false
+        }
+      },
+      "assigned_columns": [
+        {
+          "name": "Name",
+          "label": "Name",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        },
+        {
+          "name": "OtherName",
+          "label": "OtherName",
+          "type": "string",
+          "data_kind": "Дискретный",
+          "used": true
+        }
+      ],
+      "expected_outcome": {
+        "kind": "missing_column",
+        "description": "Known FAILED/node_incomplete: Requested source field is missing or ambiguous: OtherName; Execute не запрошен, owned cleanup подтверждён. Это historical missing-field доказательство, не duplicate source preflight.",
+        "engine_rejection_required": false,
+        "cleanup_required": true,
+        "missing_name": "OtherName",
+        "negative_fixture": false,
+        "known_refusal_required": true
+      },
+      "text_required": true,
+      "text_scope": "observed known refusal/cause or executed damage/incompleteness, as described per case in canonical Markdown; initial records its known refusal/owned close, no new format",
+      "cold_required": false,
+      "current_derived": {
+        "reference": "PASS",
+        "Rich": "PASS",
+        "Ben": "PASS"
+      },
+      "genuine_evidence": [
+        {
+          "role": "reference",
+          "case": "missing-source-column",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-missing-source-column-1/missing-source-column/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/missing-source-column",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-missing-source-column-1/missing-source-column/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.20985366287641227,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-missing-source-column-1/missing-source-column/1/result.json": "b5c0aca8526301685a2eac0f165696193c0cc014e7216bed38b4dfdfb86d2d6a",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-missing-source-column-1/missing-source-column/1/events.jsonl": "cfb447643c927167e5971b1f68371c0a6d729b167ddf42b0ac3173d5209479fd",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-missing-source-column-1/missing-source-column/1/cleanup.json": "2a6ea0151542d3023e35e29a16a435a9448c15e9c6facda85e4f64908bec02ef",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-2e990a-01a14ae0/reference-missing-source-column-1/missing-source-column/1/native-import.json": "06acd27846f127ff78025f3fe7508950abd120149533f8bcd97ead10d3422c9c"
+          }
+        },
+        {
+          "role": "Rich",
+          "case": "missing-source-column",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/missing-source-column/20261017-220102-6ed1f5139/missing-source-column/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/missing-source-column",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/missing-source-column/20261017-220102-6ed1f5139/missing-source-column/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.20666059898212552,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/missing-source-column/20261017-220102-6ed1f5139/missing-source-column/1/result.json": "b8ed2f02815177d6f0b5521909c93a6f59c09ba7df40e7e4940203e9d66c5186",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/missing-source-column/20261017-220102-6ed1f5139/missing-source-column/1/events.jsonl": "f7e9ed37cb88988489d12ebb2f5056ceedbf20d141f353b9f8423966cd96a9f7",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/missing-source-column/20261017-220102-6ed1f5139/missing-source-column/1/cleanup.json": "b40724f694d88a2a2d4f27ffe62038d5b0a92ecea8af09729bcb88c9af0375fa",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/missing-source-column/20261017-220102-6ed1f5139/missing-source-column/1/native-import.json": "c42cca4ee3274652b919a9bfbab3aff3cef92564b60474d64e296ec46d162d9c",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/missing-source-column/20261017-220102-6ed1f5139/summary.json": "05347884ab21b3997376de9956f5f5c6b0642093c635719959e195a89569d244",
+            "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/missing-source-column/20261017-220102-6ed1f5139/code-verdict.json": "8a628e7a0e344f527cc6907e086f5e7bec82e88a903211733f2091309f40dc6e"
+          }
+        },
+        {
+          "role": "Ben",
+          "case": "missing-source-column",
+          "checker_git_sha": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+          "checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+          "original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/missing-source-column/1",
+          "command": [
+            "/usr/bin/python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/script/check-text-import.py",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-d7b2b65921ec/workdir/rereview-1d8-source/evals/tasks/node-evals/missing-source-column",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/missing-source-column/1",
+            ""
+          ],
+          "exit_code": 0,
+          "stdout": "{\"errors\": [], \"failures\": []}\n",
+          "stderr": "",
+          "elapsed_seconds": 0.20275712106376886,
+          "derived_verdict": "PASS",
+          "original_files_sha256": {
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/missing-source-column/1/result.json": "a9fd3858852497dd66cb121192b1868c8557ba1c9ce2e3994fa09b1c848f12c5",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/missing-source-column/1/events.jsonl": "a2e8f997b4965cbb793d4fb14a638517a1657d604ad2faf3b473d4d554d2cc00",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/missing-source-column/1/cleanup.json": "1ab2b7191ef42f4b88c4433a5731312a31f296d694611636870285223ddc237f",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/missing-source-column/1/native-import.json": "61fa882326a18ecbe928ff5fada6953e334d8aec525942cb74666ab7963e40fa",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/summary.json": "6210339a398754ba84438377c4f5f5d466bf8129907f7f54a47b86612560bfed",
+            "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/code-verdict.json": "bab053180febefac04cb00e530d05bbc0777b7ccf6842c4233e4c775c2192889"
+          }
+        }
+      ]
+    }
+  ],
+  "measured_product_FAIL_proofs": [
+    {
+      "role": "Rich",
+      "case": "txt-wrong-delimiter",
+      "native_and_original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/txt-wrong-delimiter/1",
+      "tool_call_counts": {
+        "prepare": 1,
+        "deliver": 1,
+        "apply": 2
+      },
+      "derived_checker_output": {
+        "errors": [],
+        "failures": [
+          "diagnostic: one uncorrected apply required"
+        ]
+      },
+      "original_files_sha256": {
+        "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/txt-wrong-delimiter/1/result.json": "c948baa50290213e295c15affb732e1cf1861ba03057914227357645c7c7ec47",
+        "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/txt-wrong-delimiter/1/events.jsonl": "989ca8bf5af34d2d3a163deaf87349a2b5abab568725942a9e938a9010eea3dc",
+        "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/txt-wrong-delimiter/1/cleanup.json": "d9971aec3353a8b0cb989db7404cd56de466bd16a5e4ca67563761c611c069d3",
+        "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/txt-wrong-delimiter/1/native-import.json": "5041bf5d9318587cfefd8874f30851d7bb0a494aefa1778ca651af7bdb8d3f95",
+        "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/summary.json": "dbbc25fcbfe770dea2266d00101f67219e643b4aa9c58fa7e6feaa34914163ef",
+        "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/txt-wrong-delimiter/20261017-210848-6ed1f5139/code-verdict.json": "61b2b10cbefa6226ce3ef8509d1f8cb1341bce8d6476b5f5469a242e3c063bf5"
+      }
+    },
+    {
+      "role": "Rich",
+      "case": "csv-wrong-encoding",
+      "native_and_original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/csv-wrong-encoding/1",
+      "tool_call_counts": {
+        "prepare": 1,
+        "deliver": 2,
+        "apply": 1
+      },
+      "derived_checker_output": {
+        "errors": [],
+        "failures": [
+          "source: exact delivery count required"
+        ]
+      },
+      "original_files_sha256": {
+        "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/csv-wrong-encoding/1/result.json": "8ef6df9b04e61978f265480cba5fc11a2fe738edaf883597b6667bcf373e1e9d",
+        "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/csv-wrong-encoding/1/events.jsonl": "439051a77df02e34441db927823691b61d0ada4c999ac6f4ddb87a8f9dae49a7",
+        "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/csv-wrong-encoding/1/cleanup.json": "1bffdb67608470af1ec3abd98e0f9bec2871ed7a661b4237b0f81a24a5ba2336",
+        "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/csv-wrong-encoding/1/native-import.json": "9612a4da0d9a0b50c67e274e96e3cdb11ebb9ca5de220e7db845adafae3150e1",
+        "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/summary.json": "93a857688c2f011f1c78985ffa24ec570ecb9386f83c46971d83138e0336552b",
+        "/home/user/.local/share/loginom-evals-runtime/roles/rich/results/lab61-a2ba-product-v2-01a14b91/csv-wrong-encoding/20261017-213117-6ed1f5139/code-verdict.json": "5a33b9c3bb23e639677b70026cf210f731d84f8d0a6532acc2ebe4f892370d4a"
+      }
+    },
+    {
+      "role": "Ben",
+      "case": "csv-wrong-encoding",
+      "native_and_original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-encoding/1",
+      "tool_call_counts": {
+        "prepare": 2,
+        "deliver": 3,
+        "apply": 0
+      },
+      "derived_checker_output": {
+        "errors": [],
+        "failures": [
+          "source: one prepare required"
+        ]
+      },
+      "original_files_sha256": {
+        "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-encoding/1/result.json": "5732d625fe70023d92bad83e2ba7bc6a0b6f3f1dd8b97fcfaaa651fc6e18233e",
+        "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-encoding/1/events.jsonl": "b78a678f9b9f2addc6c707802109e3b8ce2b7a0238b171c1ee319eaead5b3724",
+        "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-encoding/1/cleanup.json": "497c59fdf488272f4ececb43d259e42a7516a8979093369f5a7f6e300b6ee622",
+        "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-wrong-encoding/1/native-import.json": "1fd573ba0c18dfed5d82482c2e7dc7aa3de8b3affa903be6fef74c6e4a2db9f7",
+        "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/summary.json": "6210339a398754ba84438377c4f5f5d466bf8129907f7f54a47b86612560bfed",
+        "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/code-verdict.json": "bab053180febefac04cb00e530d05bbc0777b7ccf6842c4233e4c775c2192889"
+      }
+    },
+    {
+      "role": "Ben",
+      "case": "csv-ambiguous-headers",
+      "native_and_original_attempt": "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-ambiguous-headers/1",
+      "tool_call_counts": {
+        "prepare": 1,
+        "deliver": 1,
+        "apply": 1
+      },
+      "derived_checker_output": {
+        "errors": [],
+        "failures": [
+          "import: exact duplicate source references required"
+        ]
+      },
+      "original_files_sha256": {
+        "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-ambiguous-headers/1/result.json": "a7c98816d9af5b030b3612ced7f26447c7bf7199ff50c8ae02f085d4de450871",
+        "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-ambiguous-headers/1/events.jsonl": "9f33cef7c459a8b79d7459854fc56d5ea74ab32e7f2f8211ecba5bf76f7dd83a",
+        "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-ambiguous-headers/1/cleanup.json": "d76b48acc3c7e5824143bac16468a5a3f54766d1af0d372aa265d91a7f633552",
+        "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/csv-ambiguous-headers/1/native-import.json": "14c75f9f4fc63ef85f7c1f2f72682deec83994fe555dcdf327c5ec7ef9ed9eef",
+        "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/summary.json": "6210339a398754ba84438377c4f5f5d466bf8129907f7f54a47b86612560bfed",
+        "/home/user/.local/share/loginom-evals-runtime/roles/ben/results/lab61-full-product-6ed1-01a14bf2/20261017-223603-6ed1f5139/code-verdict.json": "bab053180febefac04cb00e530d05bbc0777b7ccf6842c4233e4c775c2192889"
+      }
+    }
+  ],
+  "current_checker_sha256": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+  "raw_outcomes_immutable": {
+    "Rich": "3PASS7FAIL",
+    "Ben": "2PASS8FAIL",
+    "wrapper": "ERROR0attempts"
+  },
+  "derived_only_counts": {
+    "reference": {
+      "PASS": 10
+    },
+    "Rich": {
+      "PASS": 8,
+      "FAIL": 2
+    },
+    "Ben": {
+      "PASS": 8,
+      "FAIL": 2
+    }
+  },
+  "Ben_latest_requirement_mapping": {
+    "path": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-ben-reject12-01a14ed2/extracted/review/requirement-mapping.json",
+    "sha256": "9da91880675e8a2a86aa1d04c0e9e243d751413ee45123cf2f061e2678c70031"
+  },
+  "latest_two_findings_classification": "confirmed existing eval defects, not new criteria; private report/native copies distinct from measured product histories",
+  "latest_own_replay": {
+    "results": [
+      {
+        "name": "candidate54",
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/evaler/work/lab61-ben-reject12-01a14ed2/candidate54/new-scope-controls.json",
+        "rows": 54,
+        "matches": 40,
+        "mismatches": 14,
+        "false_PASS": 14,
+        "false_FAIL": 0
+      },
+      {
+        "name": "base54",
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/evaler/work/lab61-ben-reject12-01a14ed2/base54/new-scope-controls.json",
+        "rows": 54,
+        "matches": 34,
+        "mismatches": 20,
+        "false_PASS": 18,
+        "false_FAIL": 2
+      },
+      {
+        "name": "reader42",
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/evaler/work/lab61-ben-reject12-01a14ed2/reader42.json",
+        "rows": 42,
+        "matches": 30,
+        "mismatches": 12,
+        "false_PASS": 6,
+        "false_FAIL": 6
+      },
+      {
+        "name": "base-reader42",
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/evaler/work/lab61-ben-reject12-01a14ed2/base-reader42.json",
+        "rows": 42,
+        "matches": 30,
+        "mismatches": 12,
+        "false_PASS": 6,
+        "false_FAIL": 6
+      },
+      {
+        "name": "full-warning168",
+        "path": "/home/user/.local/share/loginom-evals-runtime/roles/evaler/work/lab61-ben-reject12-01a14ed2/full-warning168/new-warning-full-controls.json",
+        "rows": 168,
+        "matches": 120,
+        "mismatches": 48,
+        "false_PASS": 24,
+        "false_FAIL": 24
+      }
+    ],
+    "transcript_regressions": 0,
+    "reader_regressions": 0
+  },
+  "consumption_unchanged": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 3,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 1
+    },
+    "reference_total": 15,
+    "product_physical_calls": 20,
+    "recovery": 1,
+    "probes": 0,
+    "historical_outcomes_preserved": true,
+    "budget_increases": [
+      {
+        "old": 3,
+        "new": 4,
+        "usage": {
+          "completed_reworks": 3,
+          "fresh_REJECTs": 4
+        },
+        "counters_reset": false,
+        "reason": "Proposition scope."
+      },
+      {
+        "old": 4,
+        "new": 5,
+        "usage": {
+          "completed_reworks": 4,
+          "fresh_REJECTs": 5
+        },
+        "counters_reset": false,
+        "reason": "Object/count/ID binding."
+      },
+      {
+        "old": 5,
+        "new": 6,
+        "usage": {
+          "completed_reworks": 5,
+          "fresh_REJECTs": 6
+        },
+        "counters_reset": false,
+        "reason": "Scope/roles/contradiction/code identity."
+      },
+      {
+        "old": 6,
+        "new": 7,
+        "usage": {
+          "completed_reworks": 6,
+          "fresh_REJECTs": 7
+        },
+        "counters_reset": false,
+        "reason": "Governor/argument/attempt/code scope."
+      },
+      {
+        "old": 7,
+        "new": 8,
+        "usage": {
+          "completed_reworks": 7,
+          "fresh_REJECTs": 8
+        },
+        "counters_reset": false,
+        "reason": "Predicate dependencies and positive count witness."
+      },
+      {
+        "old": 8,
+        "new": 9,
+        "usage": {
+          "completed_reworks": 8,
+          "fresh_REJECTs": 9
+        },
+        "counters_reset": false,
+        "reason": "Dependency precedence and inherited predicate roles; OFFLINE."
+      },
+      {
+        "old": 9,
+        "new": 10,
+        "usage": {
+          "completed_reworks": 9,
+          "fresh_REJECTs": 10
+        },
+        "reason": "Independent finite predicates/relations and per-item code arguments; OFFLINE.",
+        "counters_reset": false
+      },
+      {
+        "old": 10,
+        "new": 11,
+        "usage": {
+          "completed_reworks": 10,
+          "fresh_REJECTs": 11
+        },
+        "reason": "Enumerate relations; preserve code identity and argument polarity; OFFLINE.",
+        "decision_document_sha256": "88b6842518c4ec4732c44bb56cc5e155093432ff9a570cda3c980008eddf82e7",
+        "counters_reset": false,
+        "decision_comment_id": "01a14e81-135c-7a6f-a94c-f88e6d7bb00e"
+      }
+    ],
+    "product_by_case": {
+      "txt-unclosed-quote": 2,
+      "txt-wrong-encoding": 2,
+      "txt-wrong-delimiter": 2,
+      "txt-ambiguous-headers": 2,
+      "csv-unclosed-quote": 2,
+      "csv-wrong-encoding": 2,
+      "csv-wrong-delimiter": 2,
+      "csv-ambiguous-headers": 2,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 2
+    },
+    "rework_limit": 11,
+    "pre_dispatch_wrapper": {
+      "original_verdict": "ERROR",
+      "physical_model_calls": 0,
+      "outcome_preserved": true,
+      "reservation_carried_forward": true,
+      "budget_reset": false
+    },
+    "product_calls_by_role": {
+      "Rich": 10,
+      "Ben": 10
+    },
+    "product_by_case_scope": "Rich+Ben total;1 each",
+    "recovery_by_role": {
+      "Rich": 1,
+      "Ben": 0
+    }
+  },
+  "quality_acceptance": false,
+  "physical_product_rerun_needed": false,
+  "closure_rule": "All10 covered; correct accepted, violations rejected, known eval defects closed, independent Ben ACCEPT and evidence/model/cleanup/genuine completion→ordinary RELEASED→fresh healthy FREE; valid product FAIL allowed; in_review by Evaler, accepted common integration beforeLAB62–63."
+}

@@ -1,0 +1,100 @@
+{
+  "verified_utc": "2026-10-18T11:53:34.584667+00:00",
+  "issue": "LAB-61",
+  "native_Evaler_task": "01a14ed2-ee21-74e4-a3e6-36850620e450",
+  "canonical_markdown": {
+    "bytes": 19879,
+    "sha256": "b82a7ec8581906308bc6669c3155e398da20dcf5677978d7bf13efa63f63b275"
+  },
+  "canonical_JSON": {
+    "bytes": 122355,
+    "sha256": "d868bd636b33004bd945c414d591772b9e37d6c279d3c9d784499157c9e5a97f"
+  },
+  "assigned_IDs": [
+    "csv-ambiguous-headers",
+    "csv-unclosed-quote",
+    "csv-wrong-delimiter",
+    "csv-wrong-encoding",
+    "initial-incomplete-settings",
+    "missing-source-column",
+    "txt-ambiguous-headers",
+    "txt-unclosed-quote",
+    "txt-wrong-delimiter",
+    "txt-wrong-encoding"
+  ],
+  "original_TASK_SPEC_acceptance_expected_and_input_bindings_verified": 50,
+  "all_case_bytes_unchanged_from_original_6ed": true,
+  "genuine_history_bindings": 30,
+  "unique_original_files_hash_verified": 142,
+  "product_FAIL_proofs": [
+    {
+      "role": "Rich",
+      "case": "txt-wrong-delimiter",
+      "tool_call_counts": {
+        "prepare": 1,
+        "deliver": 1,
+        "apply": 2
+      },
+      "derived_checker_output": {
+        "errors": [],
+        "failures": [
+          "diagnostic: one uncorrected apply required"
+        ]
+      }
+    },
+    {
+      "role": "Rich",
+      "case": "csv-wrong-encoding",
+      "tool_call_counts": {
+        "prepare": 1,
+        "deliver": 2,
+        "apply": 1
+      },
+      "derived_checker_output": {
+        "errors": [],
+        "failures": [
+          "source: exact delivery count required"
+        ]
+      }
+    },
+    {
+      "role": "Ben",
+      "case": "csv-wrong-encoding",
+      "tool_call_counts": {
+        "prepare": 2,
+        "deliver": 3,
+        "apply": 0
+      },
+      "derived_checker_output": {
+        "errors": [],
+        "failures": [
+          "source: one prepare required"
+        ]
+      }
+    },
+    {
+      "role": "Ben",
+      "case": "csv-ambiguous-headers",
+      "tool_call_counts": {
+        "prepare": 1,
+        "deliver": 1,
+        "apply": 1
+      },
+      "derived_checker_output": {
+        "errors": [],
+        "failures": [
+          "import: exact duplicate source references required"
+        ]
+      }
+    }
+  ],
+  "contract_review": "Root read canonical table, original TASK/SPEC/acceptance; truthful explanation required where specified, no mandatory wording or universal NLU; new examples demonstrate existing requirements. Evaler distinguishes product/eval/technical uncertainty.",
+  "limits": {
+    "quality_ACCEPT": false,
+    "current_two_eval_defects_remain": true,
+    "root_executed_unaccepted_checker": false,
+    "new_physical_or_live_model_calls": 0,
+    "root_wrote_Evaler_state": false,
+    "original_attempts_counters_history_unchanged": true
+  }
+}
