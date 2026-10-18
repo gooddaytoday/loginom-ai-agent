@@ -175,7 +175,8 @@ function validateActions(catalog, manifest, allowedStatuses) {
 
 function validateSelectors(catalog, manifest) {
   if (!isObject(catalog)) fail('selectors.json must be an object');
-  exactKeys(catalog, new Set(['schema_version', 'catalog_version', 'e2e_commit', 'selectors']), 'selectors.json');
+  // Native Save's optional bundled selector is not a remotely granted action.
+  exactKeys(catalog, new Set(['schema_version', 'catalog_version', 'e2e_commit', 'selectors', 'native_save_arrangement']), 'selectors.json');
   if (catalog.schema_version !== 1 || catalog.catalog_version !== manifest.catalog_version || catalog.e2e_commit !== manifest.e2e_commit) {
     fail('selectors.json identity does not match manifest');
   }
