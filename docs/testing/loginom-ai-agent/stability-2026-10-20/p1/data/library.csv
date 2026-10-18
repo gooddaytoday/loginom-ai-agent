@@ -1,0 +1,17 @@
+BookID,Shelf,DaysOverdue
+BK15,History,30
+BK11,Science,7
+BK12,History,14
+BK01,Fiction,0
+BK13,Science,2
+BK10,Science,3
+BK09,History,21
+BK07,Fiction,6
+BK03,History,7
+BK16,Science,4
+BK05,Fiction,12
+BK06,Science,0
+BK02,Science,1
+BK04,Fiction,8
+BK08,Fiction,9
+BK14,History,8

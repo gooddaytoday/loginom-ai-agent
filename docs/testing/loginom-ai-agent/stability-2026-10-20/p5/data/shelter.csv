@@ -1,0 +1,17 @@
+AnimalID,Species,Status
+AN01,Rabbit,Q
+AN11,Rabbit,A
+AN15,Dog,A
+AN07,Cat,A
+AN12,Dog,Hold
+AN13,Dog,Q
+AN05,Cat,Q
+AN16,Cat,Hold
+AN09,Dog,Q
+AN08,Rabbit,Hold
+AN04,Dog,Hold
+AN06,Dog,R
+AN14,Rabbit,R
+AN10,Cat,R
+AN02,Cat,R
+AN03,Rabbit,A

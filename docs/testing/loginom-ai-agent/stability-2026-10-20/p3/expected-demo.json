@@ -1,0 +1,45 @@
+{
+  "package_path": "/stability-2026-10-20/p3.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/hall-visits.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Hall",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Visits",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Hall": "Ancient",
+          "Visits": 102
+        },
+        {
+          "Hall": "Modern",
+          "Visits": 122
+        },
+        {
+          "Hall": "Nature",
+          "Visits": 83
+        }
+      ]
+    }
+  ]
+}
