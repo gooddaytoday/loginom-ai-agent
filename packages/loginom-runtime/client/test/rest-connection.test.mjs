@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {restConnectionCapability} from '../lib/rest-connection.mjs';
 import vm from 'node:vm';
 
-const cases={input:'a retained visible REST container cannot authorize filling its zero-sized input',parameter:'REST waits for the added parameter type before checking string bindings',palette:'REST waits for the newly expanded palette item before its single drag',animation:'REST does not start a drag from a hit-testable row inside its native tree animation',expander:'REST expands the moving connection tree with one stable locator click',confirm:'REST confirms one owned active-connection deactivation',foreign:'REST refuses a deactivation question belonging to another connection tree'};
+const cases={mime:'REST explicitly writes and rereads the saved allowed response Content-Type',mime_stale:'REST refuses an allowed response Content-Type that did not persist',input:'a retained visible REST container cannot authorize filling its zero-sized input',parameter:'REST waits for the added parameter type before checking string bindings',palette:'REST waits for the newly expanded palette item before its single drag',animation:'REST does not start a drag from a hit-testable row inside its native tree animation',expander:'REST expands the moving connection tree with one stable locator click',confirm:'REST confirms one owned active-connection deactivation',foreign:'REST refuses a deactivation question belonging to another connection tree'};
 for(const [stage,title]of Object.entries(cases))test(title,async()=>{
  const prefix='MF;TF-1',fields=prefix+';WizardModelConnectionForm;ConnectionWizard;';
  const item=prefix+';ModelForm;pnlConnections;headercontainer;text_Root>Текущий_модуль>Echo;TreeText';
  let urlPoints=0,tileReads=0,fills=0,visibleChecks=0,parameterReads=0,queryFills=0,palettePoints=0,added=false,label='REST-сервис',url='',paramName='param0',lastSelector='';
  let held=false,dragMoves=0,downCount=0,upCount=0,expanded=stage!=='expander',expansions=0;
- let opening=false,confirmations=0;
+ let opening=false,confirmations=0,responseType='application/json',responseFills=0,wizardCloses=0;
  const form=prefix+';ConnectionsViewWizard',root={isConnected:true},tree={},connection={ParentNode:stage==='foreign'?{}:tree},wizardNode={ParentNode:connection};
  const controls=Object.fromEntries(Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'}).map(([key,textContent])=>['msgbox;tlb;'+key,{id:key,textContent,checkVisibility:()=>true,isConnected:true}]));
  const nodeElement={id:'connection',textContent:'Echo'},wizardElement={id:'wizard',textContent:'Настройка'};
@@ -32,6 +32,7 @@ for(const [stage,title]of Object.entries(cases))test(title,async()=>{
    if(selector.includes('fldLabel'))return label;
    if(selector.includes('pedURL'))return url;
    if(selector.includes('pedVerb'))return 'GET';
+   if(selector.includes('pedResponseContentType'))return stage==='mime_stale'&&wizardCloses>0?'application/json':responseType;
    if(selector.includes('pedFieldType'))return 'Строка запроса';
    if(selector.includes('txtAuth'))return 'Не требуется';
    throw Error('Unexpected input value read');
@@ -57,13 +58,14 @@ for(const [stage,title]of Object.entries(cases))test(title,async()=>{
    return fn(element);
   },
   fill:async value=>{
+   if(selector.includes('pedResponseContentType')){responseFills++;responseType=value;return;}
    if(selector.includes('pedURL')){assert.equal(urlPoints,4);url=value;fills++;if(stage==='input')throw Error('fixture stopped after the sole reachable fill');return;}
    if(selector.includes('fldLabel')){label=value;return;}
    assert.ok(selector.includes('celleditor'));queryFills++;if(stage==='parameter')throw Error('fixture stopped after the typed parameter editor');paramName=value;
   },
   press:async()=>{},
  });
- const page={locator,mouse:{click:async()=>{if(lastSelector.includes('btnAdd'))added=true;if(lastSelector.includes('btnConfigConnection')&&['confirm','foreign'].includes(stage))opening=true;if(lastSelector.includes('msgbox;tlb;yes')){confirmations++;assert.equal(confirmations,1);}},dblclick:async()=>{},
+ const page={locator,mouse:{click:async()=>{if(lastSelector.includes(';WizardModelConnectionForm;btnDone'))wizardCloses++;if(lastSelector.includes('btnAdd'))added=true;if(lastSelector.includes('btnConfigConnection')&&['confirm','foreign'].includes(stage))opening=true;if(lastSelector.includes('msgbox;tlb;yes')){confirmations++;assert.equal(confirmations,1);}},dblclick:async()=>{},
   move:async()=>{if(held){dragMoves++;}},
   down:async()=>{assert.equal(palettePoints,2);if(stage==='palette')throw Error('fixture stopped before the sole palette drag');held=true;downCount++;},
   up:async()=>{held=false;upCount++;}},waitForTimeout:async()=>{},
@@ -79,14 +81,17 @@ for(const [stage,title]of Object.entries(cases))test(title,async()=>{
  try{
   const result=await restConnectionCapability(page,{deadline:Date.now()+10000,document_id:'doc',origin:'http://example.test',build:'7.4.2',
    workflow_ref:{workflow_id:'flow',tab_tid:'tab',prefix,navigation_path:[{tid:'module'},{label:'Сценарий'}]},
-   connection:{name:'Echo',base_url:'https://httpbin.org/anything'},query_parameters:[{name:'Key',field:'Key'}]});
-  assert.equal(result.verified,['animation','expander','confirm'].includes(stage),result.error);
-  if(['animation','expander','confirm'].includes(stage)){assert.equal(result.connection.reference_node_id,'rest-reference');assert.equal(result.cleanup_complete,true);}
+   connection:{name:'Echo',base_url:'https://httpbin.org/anything',...(['mime','mime_stale'].includes(stage)?{response_content_type:'text/html'}:{})},query_parameters:[{name:'Key',field:'Key'}]});
+  assert.equal(result.verified,['animation','expander','confirm','mime'].includes(stage),result.error);
+  if(['animation','expander','confirm','mime'].includes(stage)){assert.equal(result.connection.reference_node_id,'rest-reference');assert.equal(result.cleanup_complete,true);}
+  else if(stage==='mime_stale'){assert.match(result.error,/saved connection readback differs/);assert.equal(responseFills,1);assert.equal(wizardCloses,1);return;}
   else if(stage==='foreign'){assert.match(result.error,/Pending connection wizard owner differs/);assert.equal(confirmations,0);return;}
   else assert.equal(result.error,stage==='input'?'fixture stopped after the sole reachable fill':stage==='parameter'?'fixture stopped after the typed parameter editor':'fixture stopped before the sole palette drag');
   if(stage==='expander')assert.equal(expansions,1);
-  assert.equal(fills,1);assert.equal(urlPoints,['palette','animation','expander','confirm'].includes(stage)?6:4);assert.ok(visibleChecks>0);
+  assert.equal(fills,1);assert.equal(urlPoints,['palette','animation','expander','confirm','mime'].includes(stage)?6:4);assert.ok(visibleChecks>0);
   if(stage==='confirm')assert.equal(confirmations,1);
+  if(stage==='mime'){assert.equal(responseFills,1);assert.equal(wizardCloses,2);assert.equal(result.connection.response_content_type,'text/html');}
+  if(!['mime','mime_stale'].includes(stage)){assert.equal(responseFills,0);assert.equal(Object.hasOwn(result.connection??{},'response_content_type'),false);}
   if(stage==='parameter'){assert.equal(parameterReads,2);assert.equal(queryFills,1);}
   if(['palette','animation','expander'].includes(stage)){assert.equal(palettePoints,2);assert.equal(queryFills,1);}
  }finally{
