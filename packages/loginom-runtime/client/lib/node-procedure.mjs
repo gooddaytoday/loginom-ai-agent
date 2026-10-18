@@ -1,3 +1,6 @@
+import {readGraph} from './node-target-browser.mjs';
+import {NODE_TYPES} from './node-contracts.mjs';
+import {revealPreparedGraphNode,revealNodePlacement,nodePlacementViewport,nodePlacementPoint,samePlacementGraph} from './node-placement.mjs';
 import {makeJavascriptOutputPreviewCode} from './javascript-output-preview.mjs';
 import {makeCrossTableContextCode} from './crosstable-context.mjs';
 import {makeCrossTableVariablesCode,makeCrossTableBindingsCode} from './crosstable-variables.mjs';
@@ -233,6 +236,32 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
+    async revealGraphNode() {
+      checkBudget();
+      if(!preparedNodeContext)throw Error('Viewport navigation requires a prepared node');
+      const before=await channel.observe({condition:'prepared graph before node viewport navigation',
+        ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'});
+      assertContext(before);checkBudget();
+      const step=nextStep(),id=operation.id+':n'+step,action={verb:'reveal_prepared_node'},actionKey='node.viewport.reveal.internal';
+      const signature=digest([id,action,evidenceSnapshot]),observationHash=digest(evidenceSnapshot);
+      snapshot=null;evidenceSnapshot=null;
+      const prepared=await entry('node_step_prepared',{step,internal_operation_id:id,action,observation_sha256:observationHash,signature});
+      if(prepared?.signature!==signature||JSON.stringify(prepared.action)!==JSON.stringify(action))throw Error('Node viewport navigation was not durably prepared');
+      signal?.throwIfAborted();checkBudget();
+      const code=`async page=>(${revealPreparedGraphNode.toString()})(page,${JSON.stringify({binding:preparedNodeContext,origin:targetOrigin,build:targetBuild,deadline:operation.deadline,types:NODE_TYPES})},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${samePlacementGraph.toString()})`;
+      const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'node_viewport',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:null,trace:[]}}`;
+      let result;
+      try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:Math.max(1,operation.deadline-now())});}
+      catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
+      if(result.operation_id!==id||result.action_key!==actionKey){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw Error('Node viewport receipt identity differs');}
+      operation.cleanupConfirmed=result.cleanup_complete===true;operation.nodeEffectPossible ||= result.effect_possible===true;
+      const completed=await entry('node_step_completed',{step,internal_operation_id:id,outcome:structuredClone(result)});
+      if(JSON.stringify(completed?.outcome)!==JSON.stringify(result))throw Error('Node viewport outcome was not durably preserved');
+      if(result.status!=='SUCCEEDED'||!operation.cleanupConfirmed||result.output?.verified!==true
+        ||result.output.graph_unchanged!==true||result.output.fully_visible!==true||result.output.settings_applied!==false
+        ||['document_id','workflow_id','node_id'].some(k=>result.output.node?.[k]!==preparedNodeContext.node[k]))throw new NodeProcedureStepError(result);
+      return structuredClone(result);
+    },
     async openOutputPort(port) {return channel.openPort('output',port);},
     async openInputPort(port) {return channel.openPort('input',port);},
     async openPort(direction,port) {
