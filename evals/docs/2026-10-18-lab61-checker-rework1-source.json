@@ -1,0 +1,45 @@
+{
+  "checked_at": "2026-10-18T00:19:57.450824+00:00",
+  "scope": "Independent exact source/delivery checks in separate operator-owned bare repository; no integration or source execution.",
+  "original_observations_preserved": [
+    "W/source lacks6ed prerequisite: recorded unchanged in delivery receipt64333734",
+    "Default git diff equality assertion failed because new bare repo uses7-digit index vs delivered9-digit; explicit --abbrev=9 checks exact original bytes, no content change."
+  ],
+  "checks": {
+    "bundle_verify": {
+      "code": 0,
+      "stdout": "The bundle contains this ref:\ndeae59d905621f9afa0ac2392a97b9cc8f4857b7 HEAD\nThe bundle requires this ref:\n6ed1f51393d7893d80d4364522d197c1a269d99d \nThe bundle uses this hash algorithm: sha1\n",
+      "stderr": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-checker-rework1-deae59d9-delivery/source/candidate.bundle is okay\n"
+    },
+    "parent_tree": {
+      "code": 0,
+      "stdout": "deae59d905621f9afa0ac2392a97b9cc8f4857b7 6ed1f51393d7893d80d4364522d197c1a269d99d 2b0271ab1f9de7911a0ccbb031102c53ee9d14ed\n",
+      "stderr": ""
+    },
+    "files": {
+      "code": 0,
+      "stdout": "evals/script/check-text-import.py\nevals/test/text-import-evidence.test.ts\n",
+      "stderr": ""
+    },
+    "diff_check": {
+      "code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "exact_diff": {
+      "bytes": 18524,
+      "sha256": "7da35da00ac989964f5886526d104d392ef85a41914479de1862242fd881b0dd",
+      "delivered_byte_equal_git": true
+    },
+    "checker": {
+      "bytes": 48873,
+      "sha256": "3c1cfbf40c39f0a4bcd177a7d95859ad8b9eaab304eafced2fa705b6d17fe68a",
+      "delivered_byte_equal_git": true
+    },
+    "tests": {
+      "bytes": 51498,
+      "sha256": "c275d705fd24643970fcd7ec9fea7d3488ab8b6c7b62c7be196cf8ef9a55cfb4",
+      "delivered_byte_equal_git": true
+    }
+  }
+}

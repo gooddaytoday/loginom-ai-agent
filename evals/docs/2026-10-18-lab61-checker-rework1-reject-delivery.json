@@ -1,0 +1,84 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "source_report_id": "01a14c61-c038-79f1-9452-46de85a66c15",
+  "source_task_id": "01a14c53-b8e0-7d06-85de-1389fe84c4af",
+  "checked_at": "2026-10-18T00:22:17.575905+00:00",
+  "verdict_delivered": "REJECT",
+  "candidate_sha": "deae59d905621f9afa0ac2392a97b9cc8f4857b7",
+  "scope": "Official delivery integrity and exact source snapshot. Native Evaler verification/next decision are separate. No new live/model effects.",
+  "official_attachments": [
+    "01a14c61-be2b-7ace-ac95-ca8e9196171b",
+    "01a14c61-be4e-7f04-a607-3aab6c862770",
+    "01a14c61-bf5e-7e08-b6a8-6c76dcfe3c31",
+    "01a14c61-bffd-7450-9bb0-cefb0de1a62f"
+  ],
+  "archive_bytes": 6595566,
+  "archive_sha256": "4be96bd89693b0dda82d858d623a7262755a46b27acc0016218efcf8af48692f",
+  "manifest_sha256": "765f513d142011c569c0c077194f29733435023138ba200823129f288f63b1b7",
+  "parts_verified": [
+    {
+      "name": "lab61-ben-rereview-deae59d9.zip.part-001",
+      "bytes": 4194304,
+      "sha256": "8926a4739848c30d0f7b73cae53ef22cf55880edb9bbc98698f605b8488185bd"
+    },
+    {
+      "name": "lab61-ben-rereview-deae59d9.zip.part-002",
+      "bytes": 2401262,
+      "sha256": "7f167b4942229d174563f88c0a4c5ce742c9c8746c3f32a7f38948ff5abc650d"
+    }
+  ],
+  "payloads_verified": 556,
+  "payload_bytes": 97374651,
+  "exact_membership": 557,
+  "standalone_REPORT_byte_equal": true,
+  "report_sha256": "722f482356b939f5ac06d7d3263c27bbc150b0def6a6f58619928f62a945c437",
+  "frozen_source_files_equal_exact_git": 144,
+  "checker_sha256": "3c1cfbf40c39f0a4bcd177a7d95859ad8b9eaab304eafced2fa705b6d17fe68a",
+  "original_completion_verified": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/c5ce46d3-8f4a-4abe-8d72-53c2adb3f12b/eval-completion-3d003db7-5176-4d5a-9def-2243626bf401.json",
+    "sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+    "release_path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/c5ce46d3-8f4a-4abe-8d72-53c2adb3f12b/release.json",
+    "release_sha256": "1d9e17e0b34ddff48791a493f49ebfd525b1d17a0e8b5a0b2a1d110d73671274",
+    "historical_release_at": "2026-10-17T23:13:39.197Z",
+    "not_a_new_live_lifecycle": true
+  },
+  "findings_delivered": {
+    "diagnosis_false_PASS": 24,
+    "diagnosis_false_FAIL": 8,
+    "inspect_contradictions_false_PASS": 5
+  },
+  "raw_results_retained": {
+    "Rich": {
+      "PASS": 3,
+      "FAIL": 7
+    },
+    "Ben": {
+      "PASS": 2,
+      "FAIL": 8,
+      "ERROR": 0
+    },
+    "wrapper": "ERROR/zero attempts"
+  },
+  "derived_counts_not_new_measurements": {
+    "reference": {
+      "PASS": 10
+    },
+    "Rich": {
+      "PASS": 8,
+      "FAIL": 2
+    },
+    "Ben": {
+      "PASS": 8,
+      "FAIL": 2
+    }
+  },
+  "consumption_unchanged": {
+    "reference": 15,
+    "Rich_product": 10,
+    "Ben_product": 10,
+    "recovery": 1,
+    "probes": 0
+  },
+  "Ben_read_only_health_reported_at": "2026-10-18T00:19:00.701Z",
+  "common_integration_or_ACCEPT_claimed": false
+}

@@ -1,0 +1,73 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "source_report_id": "01a14c4f-73d0-7cf1-926b-3f4bba874fb1",
+  "checked_at": "2026-10-18T00:18:35.900145+00:00",
+  "scope": "Official delivery integrity and exact source provenance; independent full Ben review remains pending. No new live/model effects.",
+  "candidate_sha": "deae59d905621f9afa0ac2392a97b9cc8f4857b7",
+  "direct_parent": "6ed1f51393d7893d80d4364522d197c1a269d99d",
+  "official_archive_attachment_id": "01a14c4f-7350-7162-aca5-49a12c6ca47f",
+  "archive_bytes": 6621328,
+  "archive_sha256": "7ca3b3c20ed8a1fbe275672721c9c341b9dbcc3972c1f7c7a228c2a32e21c8fd",
+  "manifest_sha256": "efaa4060ca706c394e6a15f9ebcebf2db3e9d0e36c5d052840a732a9129322af",
+  "payloads_verified": 376,
+  "payload_bytes": 98262154,
+  "exact_membership": 377,
+  "standalone_report_byte_equal": true,
+  "report_sha256": "0ae972e8108ffb943c0222d5a7c0b5d471ef7fa9353f87ba62ce024ae34d70ec",
+  "checker_sha256": "3c1cfbf40c39f0a4bcd177a7d95859ad8b9eaab304eafced2fa705b6d17fe68a",
+  "source_provenance_checks": {
+    "bundle_verify": {
+      "code": 1,
+      "stdout": "",
+      "stderr": "error: Repository lacks these prerequisite commits:\nerror: 6ed1f51393d7893d80d4364522d197c1a269d99d \n"
+    },
+    "bundle_heads": {
+      "code": 0,
+      "stdout": "deae59d905621f9afa0ac2392a97b9cc8f4857b7 HEAD\n",
+      "stderr": ""
+    },
+    "candidate_exists": {
+      "code": 128,
+      "stdout": "",
+      "stderr": "fatal: Not a valid object name deae59d905621f9afa0ac2392a97b9cc8f4857b7^{commit}\n"
+    },
+    "fresh_remote": {
+      "code": 0,
+      "stdout": "deae59d905621f9afa0ac2392a97b9cc8f4857b7\trefs/heads/lab61-checker-rework\ndc80083b60349ce309a300dbc1df778f09a86224\trefs/heads/text-import-evals\n",
+      "stderr": ""
+    }
+  },
+  "raw_outcomes_unchanged": {
+    "Rich": {
+      "PASS": 3,
+      "FAIL": 7
+    },
+    "Ben": {
+      "PASS": 2,
+      "FAIL": 8,
+      "ERROR": 0
+    },
+    "wrapper": "ERROR/zero physical attempts"
+  },
+  "usage_unchanged": {
+    "reference": 15,
+    "Rich_product": 10,
+    "Ben_product": 10,
+    "recovery": 1,
+    "probes": 0
+  },
+  "derived30_counts_author_claims_only": {
+    "reference": {
+      "PASS": 10
+    },
+    "Rich": {
+      "PASS": 8,
+      "FAIL": 2
+    },
+    "Ben": {
+      "PASS": 8,
+      "FAIL": 2
+    }
+  },
+  "no_accept_or_common_integration_claim": true
+}
