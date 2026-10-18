@@ -1,0 +1,118 @@
+{
+  "package_path": "/stability-2026-10-20/p6.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/seats-free.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "ShowID",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Stage",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Capacity",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Reserved",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "FreeSeats",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "ShowID": "SH15",
+          "Stage": "Small",
+          "Capacity": 100,
+          "Reserved": 98,
+          "FreeSeats": 2
+        },
+        {
+          "ShowID": "SH03",
+          "Stage": "Main",
+          "Capacity": 100,
+          "Reserved": 80,
+          "FreeSeats": 20
+        },
+        {
+          "ShowID": "SH02",
+          "Stage": "Main",
+          "Capacity": 120,
+          "Reserved": 119,
+          "FreeSeats": 1
+        },
+        {
+          "ShowID": "SH08",
+          "Stage": "Small",
+          "Capacity": 120,
+          "Reserved": 90,
+          "FreeSeats": 30
+        },
+        {
+          "ShowID": "SH11",
+          "Stage": "Small",
+          "Capacity": 80,
+          "Reserved": 68,
+          "FreeSeats": 12
+        },
+        {
+          "ShowID": "SH09",
+          "Stage": "Main",
+          "Capacity": 100,
+          "Reserved": 99,
+          "FreeSeats": 1
+        },
+        {
+          "ShowID": "SH14",
+          "Stage": "Small",
+          "Capacity": 80,
+          "Reserved": 65,
+          "FreeSeats": 15
+        },
+        {
+          "ShowID": "SH05",
+          "Stage": "Small",
+          "Capacity": 80,
+          "Reserved": 75,
+          "FreeSeats": 5
+        },
+        {
+          "ShowID": "SH06",
+          "Stage": "Small",
+          "Capacity": 80,
+          "Reserved": 70,
+          "FreeSeats": 10
+        },
+        {
+          "ShowID": "SH12",
+          "Stage": "Small",
+          "Capacity": 80,
+          "Reserved": 72,
+          "FreeSeats": 8
+        }
+      ]
+    }
+  ]
+}
