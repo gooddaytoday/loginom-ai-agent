@@ -93,15 +93,15 @@ test('output field driver preserves a matching field without opening its editor'
  assert.equal((await configureOutputField(f.channel,f.field)).effect_possible,false);assert.equal(f.mutations(),0);
 });
 
-function reorderFixture(grouped=false) {
+function reorderFixture(grouped=false,sourceSelection) {
  const sources=(grouped?['A','B','C','D']:['A','B','C']).map((name,i)=>({name,label:name,record_id:'s'+i,field_id:String(i),index:i,type:'string'}));
  let fields=sources.map((source,index)=>({name:source.name,label:source.label,type:'string',data_kind:'Дискретный',record_id:'t'+index,field_id:String(index),index,source})),selected=null,actions=0;
  if(grouped)fields=fields.map((f,i)=>({...f,excluded:i>=2,group_index:i%2}));
  const state=()=>({wizard:{root_ref:'wizard',root_tid:'W',stage:'output_mapping',output_columns:{page:{status:'complete_definition_page',schema_id:'schema',offset:0,limit:8,total_columns:fields.length,returned:fields.length,next_offset:null},fields:fields.map(f=>({...f,status:'observed',name_ref:f.record_id,selected:f.record_id===selected}))}},
-  node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,autosync:false,...(grouped?{mapping_wizard:'DerivedDataSourceOutputSocketWizard'}:{}),source_fields:sources,target_fields:fields,rendered_indices:fields.map(f=>f.index)},
+  node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,autosync:false,...(grouped?{mapping_wizard:'DerivedDataSourceOutputSocketWizard'}:{}),...(sourceSelection===undefined?{}:{source_selection:sourceSelection}),source_fields:sources,target_fields:fields,rendered_indices:fields.map(f=>f.index)},
   ui:{elements:[...fields.map(f=>({ref:f.record_id,allowed_actions:['click']})),{ref:'up',tid:'W;'+(grouped?'DerivedDataSourceOutputSocketWizard':'ColumnsMappingEngineOutputPortWizard')+';btnMoveMappingColumnUp',allowed_actions:['click']}]}});
  const channel={async observe(o){const s=structuredClone(state());if(!o.ready(s))throw Error('Not ready');return s;},async perform(o){const s=structuredClone(state());assert.ok(o.ready(s));const a=o.resolve(s);actions++;
-  if(a.ref!=='up')selected=a.ref;else{const index=fields.findIndex(f=>f.record_id===selected);assert.ok(index>0);if(grouped)assert.equal(fields[index-1].excluded,fields[index].excluded);[fields[index-1],fields[index]]=[fields[index],fields[index-1]];fields=fields.map((f,index)=>({...f,index,...(grouped?{group_index:index%2}:{})}));channel.afterMove?.(fields);}}};
+  if(a.ref!=='up')selected=a.ref;else{const index=fields.findIndex(f=>f.record_id===selected);assert.ok(index>0);if(grouped)assert.equal(fields[index-1].excluded,fields[index].excluded);[fields[index-1],fields[index]]=[fields[index],fields[index-1]];fields=fields.map((f,index)=>({...f,index,...(grouped?{group_index:index%2}:{})}));if(channel.sourceSelectionAfterMove)sourceSelection=channel.sourceSelectionAfterMove(sourceSelection);channel.afterMove?.(fields);}}};
  return {channel,actions:()=>actions};
 }
 test('output reorder moves only requested records and retains native source identities',async()=>{
@@ -113,6 +113,40 @@ test('output reorder refuses incomplete goals and stops after an unexpected nati
  const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');
  for(const ids of [['t0'],['t0','t0','t2'],['t0','t1','foreign']]){const f=reorderFixture();await assert.rejects(reorderOutputFields(f.channel,ids));assert.equal(f.actions(),0);}
  const f=reorderFixture();f.channel.afterMove=fields=>{fields[0].label='Wrong';};await assert.rejects(reorderOutputFields(f.channel,['t2','t1','t0']),/unrelated/);assert.equal(f.actions(),2);
+});
+
+test('output reorder permits only disappearance of a verified empty source selection',async()=>{
+ const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const f=reorderFixture(true,{verified:true,record_ids:[]});
+ f.channel.sourceSelectionAfterMove=()=>undefined;
+ const result=await reorderOutputFields(f.channel,['t1','t0','t3','t2']);
+ assert.equal(result.moves,2);assert.equal(f.actions(),4);
+ assert.equal(Object.hasOwn(result.definition,'source_selection'),false);
+ assert.deepEqual(result.definition.target_fields.map(f=>f.record_id),['t1','t0','t3','t2']);
+});
+for(const sourceSelection of [
+ {verified:true,record_ids:['s0']},
+ {verified:false,record_ids:[]},
+ {verified:true,record_ids:[],unexpected:true},
+])test('output reorder retains the source selection guard: '+JSON.stringify(sourceSelection),async()=>{
+ const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const f=reorderFixture(true,sourceSelection);f.channel.sourceSelectionAfterMove=()=>undefined;
+ await assert.rejects(reorderOutputFields(f.channel,['t1','t0','t3','t2']),/unrelated native mapping state/);
+ assert.equal(f.actions(),2,'stop after the first move, before another selection or move');
+});
+test('output reorder refuses another mapping change even when empty selection disappears',async()=>{
+ const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const f=reorderFixture(true,{verified:true,record_ids:[]});f.channel.sourceSelectionAfterMove=()=>undefined;
+ f.channel.afterMove=fields=>{fields[0].source.label='Changed';};
+ await assert.rejects(reorderOutputFields(f.channel,['t1','t0','t3','t2']),/unrelated native mapping state/);
+ assert.equal(f.actions(),2);
+});
+test('output reorder refuses a newly nonempty source selection',async()=>{
+ const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const f=reorderFixture(true,{verified:true,record_ids:[]});
+ f.channel.sourceSelectionAfterMove=()=>({verified:true,record_ids:['s0']});
+ await assert.rejects(reorderOutputFields(f.channel,['t1','t0','t3','t2']),/unrelated native mapping state/);
+ assert.equal(f.actions(),2);
 });
 
  test('field edit planning breaks cycles without taking an existing or requested name',async()=>{
