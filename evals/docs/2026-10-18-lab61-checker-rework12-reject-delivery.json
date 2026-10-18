@@ -1,0 +1,98 @@
+{
+  "verified_utc": "2026-10-18T13:25:26.275541+00:00",
+  "issue": "LAB-61",
+  "Ben_task": "01a14f09-6a65-7deb-befa-9d46698726ef",
+  "report_comment": "01a14f26-1bce-7a83-bcd8-7ea7c4a6e864",
+  "verdict": "REJECT",
+  "source": {
+    "candidate/": "fd5c0956fd91f7aeaa2473b7d2f2bcd1f573d5e2",
+    "parent/": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f"
+  },
+  "archive": {
+    "bytes": 16298305,
+    "sha256": "e049a54d8578a44a86699f18de80f769fafbd290f5dacaeb098038d17d8acd2c",
+    "manifest_sha256": "f85a80bbf8d5ed13014e6ce52692c297f21c69e442e7c15066cfe2dbb72325f9",
+    "payloads": 1785,
+    "members": 1786,
+    "payload_bytes": 256572242,
+    "safe_unique_exact_membership": true,
+    "all_payload_hashes_verified": true,
+    "all_official_bytes_preserved": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-ben-rereview-fd5c0956-reject-delivery"
+  },
+  "REPORT": {
+    "bytes": 27244,
+    "sha256": "42938a06b906ce69be0ef151fb47ae37145df6ab4a642c2c338a72658f6d2b2e",
+    "equal_standalone": true
+  },
+  "admission": {
+    "sha256": "19b5c6951f1af6224307e82e5706708439138641635d1910989f7b56c9c841a0",
+    "member": "admission/lab61-checker-rework12-ben-admission.json",
+    "equal_canonical": true,
+    "path_resolved_by_exact_manifest_hash_after_preserved_initial_basename_error": true
+  },
+  "canonical_contract_table_MD_JSON_equal_official_and_canonical": true,
+  "Git_bytes_equal": {
+    "candidate/": 144,
+    "parent/": 144
+  },
+  "Git_verification_completed_before_original_admission_path_error_no_redownload_or_repeat": true,
+  "genuine_completion_and_ordinary_release": {
+    "eval-completion-3d003db7-5176-4d5a-9def-2243626bf401.json": {
+      "sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+      "exact_archive_paths": [
+        "lifecycle/prior-genuine-completion.json"
+      ]
+    },
+    "release.json": {
+      "sha256": "1d9e17e0b34ddff48791a493f49ebfd525b1d17a0e8b5a0b2a1d110d73671274",
+      "exact_archive_paths": [
+        "lifecycle/prior-ordinary-release.json"
+      ]
+    }
+  },
+  "two_groups": [
+    "single cardinality domain across explicit TASK/source relation, marker, inherited grammar and truth comparison",
+    "every predicate-local warning argument survives context before the next argument with local polarity"
+  ],
+  "new_controls": {
+    "transcript": {
+      "rows": 42,
+      "matches": 36,
+      "false_PASS": 2,
+      "false_FAIL": 4,
+      "regressions": 0
+    },
+    "reader": {
+      "rows": 84,
+      "matches": 60,
+      "false_PASS": 24,
+      "false_FAIL": 0,
+      "regressions_vs_parent": 16,
+      "parent_CODE_KOD_rejection_was_wrong_first_object_not_correct_second_binding": true
+    },
+    "supplemental": {
+      "rows": 336,
+      "matches": 240,
+      "false_PASS": 96,
+      "regressions": 64,
+      "synthetic_four_private_copy_repeats_not_genuine_or_independent_causes": true
+    }
+  },
+  "Ben_verification_claims": {
+    "RED": "359PASS12FAIL/explicit timeout30000",
+    "GREEN": "371PASS0FAIL/explicit timeout30000",
+    "full_suite": "985PASS15SKIP0FAIL/9570assertions/explicit timeout30000",
+    "typecheck": 0,
+    "portable1847_initial_parallel_timeout420s_preserved": true,
+    "portable1847_separate_bounded_sequential_result": "1847/1847",
+    "healthy_FREE_utc": "2026-10-18T13:08:24.802Z"
+  },
+  "limits": {
+    "root_source_executed": false,
+    "root_findings_reproduced": false,
+    "root_candidate_integrated": false,
+    "new_live_model_or_native_effects": false,
+    "four_measured_product_FAIL_unchanged": true,
+    "historical_raw_ERROR_FAIL_preserved": true
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "verified_utc": "2026-10-18T13:24:04.149272+00:00",
+  "issue": "LAB-61",
+  "source": "Direct human clarification to complete trustworthy eval and fix common causes; root read-only source observation, no new criterion",
+  "human_authorization_record_sha256": "249ed1ea8b253736ae236d1aea53916de0227888f95f1ecb355cfa27dd467ee0",
+  "comment_id": "0aab57c9-e3ac-4eb8-ab24-8e1817b5b131",
+  "client_request_id": "e4dfe03b-191e-4246-ae73-1d6387257c41",
+  "parent_formal_REJECT13": "01a14f26-1bce-7a83-bcd8-7ea7c4a6e864",
+  "target_existing_Evaler_task": "01a14f26-1c10-745d-a975-91b24da083ed",
+  "creation_status": 201,
+  "authoritative_idempotent_lookup_status": 200,
+  "delivery_status": "delivered",
+  "created_at": "2026-10-18T16:17:40+03:00",
+  "native_Evaler_read_and_applied_context": true,
+  "native_after_sha256": "a66a42babd6052cd2f09fb6c3a55b6f47b6ec36b42db29b6df1a06056cbf16a1",
+  "root_static_source_note_sha256": "c5515cb9f319201d7748c52f7da230c1972f51bc72e7e5e201c885391919d383",
+  "all_native_and_local_receipts": [
+    {
+      "file": "lab61-rework13-root-context-preflight.json",
+      "bytes": 2167,
+      "sha256": "03cf4721e33d02abd30eea0a2b8fc6e2c5a93ee48c9a5bdc3acd899dbc9e9082"
+    },
+    {
+      "file": "lab61-rework13-root-context-payload.json",
+      "bytes": 4479,
+      "sha256": "ab486f7e0c3cb3cbbb0334b4e2adc506d7892c1dbd95282127d038414e5d33fa"
+    },
+    {
+      "file": "lab61-rework13-root-context-receipt.json",
+      "bytes": 5200,
+      "sha256": "024eef6243f086646e1dbd5e69194e1d15a0bf27abc09614fdfa3b26a7066dd0"
+    },
+    {
+      "file": "lab61-rework13-root-context-delivery-readback.json",
+      "bytes": 5288,
+      "sha256": "679f991f97eed884e7ce971a76329cbcc8ac65320c59fcb7f54fd826b1bfc11d"
+    },
+    {
+      "file": "lab61-rework13-root-context-once.json",
+      "bytes": 6135,
+      "sha256": "c12cfb3aebfdbb90d26febb88f77aa2d17f9492173b5ea5469f8cba6dbd3548d"
+    }
+  ],
+  "limits": {
+    "new_task_or_leader": false,
+    "worker_interrupted": false,
+    "root_state_counter_change": false,
+    "assignee_or_worker_model_change": false,
+    "new_product_or_live_call": false,
+    "criterion_change": false
+  },
+  "transport_observations": "Two local idempotent receipt reads failed during TLS handshake; original201 retained. Same client UUID lookup over direct verified persistent HTTPS returned existing200/delivered. No second comment created; global proxy/SSH/helper configuration unchanged."
+}
