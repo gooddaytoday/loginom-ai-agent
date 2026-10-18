@@ -6,7 +6,7 @@ export const NODE_CONTRACT_REVISION = '1.0.0';
 // Zoom cannot reveal that footprint at the canvas's zero-scroll boundary.
 export const NODE_POSITION_MIN = 64;
 const definitions = [
-  ['integration.rest_request','REST-запрос','restrequest',1,2,false,['request'],'processors/integration/rest-request.html'],
+  ['integration.rest_request','REST-запрос','restclient',1,2,false,['request'],'processors/integration/rest-request.html'],
   ['transform.cross_table','Кросс-таблица','crosstab',1,1,false,['pivot'],'processors/transformation/cross-table.html'],
   ['research.duplicates', 'Дубликаты и противоречия', 'duplicates', 1, 1, false, ['mark'], 'processors/scrutiny/duplicates.md'],
   ['preprocessing.data_recovery', 'Заполнение пропусков', 'datarecovery', 1, 1, false, ['impute'], 'processors/preprocessing/imputation.md'],

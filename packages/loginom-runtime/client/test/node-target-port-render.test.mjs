@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {verifyNodeTargetEffect} from '../lib/node-target.mjs';
 import {createNodeTargetBrowserAdapter,readGraph} from '../lib/node-target-browser.mjs';
 function fixture(){
  class PackageTreeNode{};class WorkFlowTreeNode{};class ModelForm{};
@@ -81,4 +82,12 @@ test('link binding uses the same verified native port fallback as graph observat
  assert.equal(g.native_bindings[0].node_id,'n');assert.equal(g.native_bindings[0].label,'Calc');
  assert.deepEqual(Array.from(g.native_bindings[0].outputs),[0]);
  f.wrongHit();await assert.rejects(f.binding(),/Visible port identity/);
+});
+
+test('rendered REST client identity is accepted as the requested REST node after creation',async()=>{
+ const f=fixture();f.node.FIconCls='bg-vendor-icon-restclient';
+ const after=await f.read(),before={...after,nodes:[]};
+ assert.equal(after.nodes[0].type,'integration.rest_request');
+ const result=verifyNodeTargetEffect({kind:'create',before,parameters:{type:'integration.rest_request'}},after);
+ assert.equal(result.node_id,'n');
 });
