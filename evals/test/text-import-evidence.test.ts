@@ -2342,3 +2342,147 @@ test("twelfth count and warning head compositions cannot hide a contradiction in
     }
   } finally { await rm(f.root, { recursive: true, force: true }) }
 }, 30000)
+
+// Rework13 freezes cross-path quantities and predicate-bound warning enumeration.
+const quantityFamilies = [
+  [["one", 1], ["single", 1], ["одно", 1], ["один", 1], ["одна", 1], ["единственное", 1], ["одного", 1], ["одному", 1], ["одной", 1], ["единственная", 1]],
+  [["two", 2], ["both", 2], ["два", 2], ["две", 2], ["оба", 2], ["двух", 2], ["двумя", 2], ["обе", 2], ["обоих", 2]],
+  [["three", 3], ["три", 3], ["трех", 3], ["four", 4], ["четыре", 4], ["five", 5], ["пять", 5], ["четырех", 4], ["пяти", 5]],
+  [["0", 0], ["1", 1], ["2", 2], ["3", 3], ["4", 4], ["5", 5]],
+] as const
+for (const id of ["txt-wrong-delimiter", "csv-wrong-delimiter"]) for (const [family, aliases] of quantityFamilies.entries()) {
+  test(`${id} thirteenth cardinality family ${family} agrees across every count path`, async () => {
+    const f = await reportedRefusalFixture(id)
+    try {
+      for (const [word, value] of aliases) for (const role of ["requested", "observed"] as const) for (const negative of [false, true]) {
+        const expectedValue = role === "requested" ? 2 : 1
+        const marker = role === "requested" ? "Requested" : "Observed"
+        const object = role === "requested" ? "TASK" : "source"
+        const predicate = role === "requested" ? "specifies" : "contains"
+        const passive = role === "requested" ? "specified in TASK" : "present in source"
+        const n = `${negative ? "not " : ""}${word}`
+        for (const fact of [
+          `${marker} ${n} fields.`,
+          `${n} fields are ${passive}.`,
+          `${marker} ${expectedValue} fields and ${n} columns.`,
+          `${object} ${predicate} ${expectedValue} fields and ${predicate} ${n} fields.`,
+        ]) {
+          await f.write(`Requested two fields. Observed one field. ${fact}`)
+          const result = await validateNodeAttempt(f.task, f.attempt)
+          expect(result.errors).toEqual([])
+          expect(result.failures.length === 0).toBe(negative ? value !== expectedValue : value === expectedValue)
+        }
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }, 30000)
+}
+
+for (const id of ["txt-wrong-delimiter", "csv-wrong-delimiter"]) {
+  test(`${id} thirteenth shared domain preserves witnesses unit scope and local exclusions`, async () => {
+    const f = await reportedRefusalFixture(id)
+    try {
+      for (const one of ["single", "одна", "единственное"]) for (const two of ["both", "двух"]) {
+        for (const clauses of [[`${two} fields are specified in TASK`, `${one} field is present in source`], [`${one} field is present in source`, `${two} fields are specified in TASK`]]) {
+          await f.write(clauses.join(" and ") + ".")
+          expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+        }
+        for (const [report, expected] of [
+          [`Requested ${two} fields. Observed three files and ${one} field.`, true],
+          [`Requested ${two} fields. Observed three files and ${two} fields.`, false],
+          [`Requested ${two} fields. Observed ${one} field and ${two} files and not ${two}.`, true],
+          [`Requested ${two} fields. Observed ${one} field and not ${one}.`, false],
+          [`Requested not ${one} field. Observed not ${two} fields.`, false],
+          [`Requested ${two} fields. Observed ${one} field. ${two} files are present in source.`, true],
+          [`Requested ${two} fields. Observed ${one} field. ${one} field is specified in TASK.`, false],
+        ] as const) {
+          await f.write(report)
+          const result = await validateNodeAttempt(f.task, f.attempt)
+          expect(result.errors).toEqual([])
+          expect(result.failures.length === 0).toBe(expected)
+        }
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }, 30000)
+}
+
+for (const id of ["txt-unclosed-quote", "csv-wrong-encoding"]) for (const first of ["CODE", "КОД", "Ω_ROOT"]) {
+  test(`${id} thirteenth enumerates ${first} and every warning sibling through context`, async () => {
+    const f = await damagedFixture(id)
+    try {
+      const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+      const second = "W_PEER"
+      for (const state of [0, 1, 2, 3]) {
+        Object.assign(receipt.value!, { warnings: [...(state & 1 ? [{ code: first, message: `mentions ${second}` }] : []), ...(state & 2 ? [{ code: second }] : [])] })
+        for (const context of [" near completion", " following analysis", " within this attempt"]) for (const join of [" and ", ", and ", " и "]) for (const negative of [false, true]) {
+          const a = first, b = `${negative ? "not " : ""}${second}`
+          for (const pair of [`${a}${context}${join}${b}`, `${b}${context}${join}${a}`]) {
+            await f.write(`Data is corrupted. The engine issued warnings ${pair}.`)
+            const result = await validateNodeAttempt(f.task, f.attempt)
+            expect(result.errors).toEqual([])
+            expect(result.failures.length === 0).toBe(Boolean(state & 1) && (negative ? !(state & 2) : Boolean(state & 2)))
+          }
+        }
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }, 30000)
+}
+
+test("thirteenth warning enumeration respects objects quotations speech history and new predicates", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    Object.assign(receipt.value!, { warnings: [{ code: "CODE", message: "mentions W_PEER and W_THIRD" }] })
+    for (const report of [
+      "The engine issued warning CODE near completion and the filename is [W_PEER].",
+      "The engine issued warning CODE near completion and [W_PEER] was saved in a file.",
+      "The engine issued warning CODE near completion and W_PEER is a message identifier.",
+      "The engine issued warning CODE near completion and I cannot confirm that the engine issued warning W_PEER.",
+      "The engine issued warning CODE near completion and previously the engine issued warning W_PEER.",
+      "The engine issued warning CODE with message «W_PEER and W_THIRD».",
+      "The engine issued warning CODE near completion and the engine did not issue warning W_PEER.",
+      "The engine issued warning CODE near completion and warning W_PEER was not emitted by the engine.",
+    ]) {
+      await f.write("Data is corrupted. " + report)
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    }
+    for (const report of [
+      "The engine issued warnings CODE with message «W_PEER and W_THIRD» and [W_PEER].",
+      "The engine issued warnings [CODE] following analysis and [code W_PEER].",
+      "The engine issued warnings CODE near completion, W_PEER following analysis, and W_THIRD.",
+      "The engine issued warning CODE near completion and the engine issued warning W_PEER.",
+      "The engine issued warning CODE near completion and warning W_PEER was emitted by the engine.",
+    ]) {
+      await f.write("Data is corrupted. " + report)
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+    }
+    for (const warnings of [[{ code: "CODE" }, { code: "W_PEER" }], [{ code: "CODE" }]]) {
+      Object.assign(receipt.value!, { warnings })
+      for (const negative of [false, true]) {
+        await f.write(`Data is corrupted. The warnings CODE near completion and [W_PEER] were ${negative ? "not " : ""}emitted by the engine.`)
+        const result = await validateNodeAttempt(f.task, f.attempt)
+        expect(result.errors).toEqual([])
+        expect(result.failures.length === 0).toBe(!negative && warnings.length === 2)
+      }
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+test("thirteenth quantity and warning continuations compose without donating truth", async () => {
+  const f = await reportedRefusalFixture("csv-wrong-delimiter")
+  try {
+    for (const [count, correct] of [["Два поля указаны в задании и единственное поле имеется в источнике.", true], ["Requested two fields. Observed one field. Единственное поле указано в задании.", false]] as const) {
+      for (const negative of [false, true]) {
+        const warning = `The engine did not issue warnings CODE following analysis and ${negative ? "not " : ""}W_PEER.`
+        for (const text of [`${count} ${warning}`, `${warning} ${count}`]) {
+          await f.write(text)
+          const result = await validateNodeAttempt(f.task, f.attempt)
+          expect(result.errors).toEqual([])
+          expect(result.failures.length === 0).toBe(correct)
+        }
+        const falseWarning = "The engine did not issue warning CODE following analysis and the engine issued warning W_PEER."
+        await f.write(`${count} ${falseWarning}`)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      }
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)

@@ -477,7 +477,21 @@ def report_normalize(text):
     return re.sub(r'[`*]', '', text).replace('ё', 'е').replace('Ё', 'Е')
 
 
-def warning_arguments(text, identifiers=()):
+_REPORT_NUMERALS = {
+    1: r'од(?:ин|на|но|ного|ному|ной)|единственн\w*|one|single',
+    2: r'дв[ае]|двух|двум\w*|об[ае]|обоих|two|both',
+    3: r'три|трех|three', 4: r'четыре|четырех|four', 5: r'пять|пяти|five',
+}
+_REPORT_NUMBER = r'\d+|' + '|'.join(_REPORT_NUMERALS.values())
+
+
+def report_number_value(text):
+    """Resolve the same quantity grammar used by every report count path."""
+    return int(text) if text.isdigit() else next(
+        value for value, pattern in _REPORT_NUMERALS.items() if re.fullmatch(pattern, text))
+
+
+def warning_arguments(text, identifiers=(), prefix=''):
     """Read every code object before clause cuts or predicate polarity checks."""
     identifier = r'\w[\w-]*'
     concrete = lambda token: token in identifiers or bool(re.search(r'[_0-9-]', token))
@@ -501,6 +515,15 @@ def warning_arguments(text, identifiers=()):
             end += re.match(r'[\s)\]»"”]*', text[end:]).end()
             return item.group(), end, False, wrapped or concrete(item.group())
         return None
+    # A passive emission may follow its subject list. In an active frame a
+    # following finite predicate instead starts a separate assertion.
+    emission = r'issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*|warn(?:ed|s)|предупред\w*'
+    frame = re.split(r'[;.!?]|\b(?:and|but|however|и|но|однако)\b', prefix)[-1]
+    active = bool(re.search(r'\b(?:' + emission + r')\b', frame))
+    finite = (r'\b(?:is|are|am|was|were|has|have|had|do|does|did|can|cannot|could|must|should|will|would'
+        r'|said|says|reported|reports|saved|saves|wrote|writes|contains|specified'
+        r'|был\w*|есть|име\w*|сказ\w*|сообщ\w*|сохран\w*|' + emission + r')\b')
+    protected = r'«[^»]*»|“[^”]*”|"[^"]*"|\[[^\]]*\]|\([^)]*\)'
     rows, cursor = [], 0
     while True:
         start = cursor
@@ -508,9 +531,23 @@ def warning_arguments(text, identifiers=()):
         if not item: break
         code, cursor, negative, _ = item
         rows.append({'code':code, 'negative':negative, 'start':start, 'end':cursor})
-        sibling = re.match(r'[\s)\]»"”]*(?:,\s*(?:(?:and|и)\s+)?|\b(?:and|и)\b\s*)', text[cursor:])
-        if not sibling: break
-        cursor += sibling.end()
+        continuation = None
+        for sibling in re.finditer(protected + r'|(?P<stop>[;!?]|\.(?=\s|$))'
+                r'|(?P<separator>,\s*(?:(?:and|и)\s+)?|\b(?:and|и)\b\s*)', text[cursor:]):
+            if sibling.group('stop') is not None: break
+            if sibling.group('separator') is None: continue
+            gap = re.sub(protected, ' ', text[cursor:cursor + sibling.start()])
+            if re.search(finite, gap): break
+            following = cursor + sibling.end()
+            child = head(following)
+            if not child: break
+            suffix = text[child[1]:].lstrip()
+            passive = re.match(r'(?:(?:is|are|was|were|been|был\w*)\s+)?(?:(?:not|never|не)\s+)?(?:' + emission + r')\b', suffix)
+            if re.match(finite, suffix) and (active or not passive): break
+            continuation = following
+            break
+        if continuation is None: break
+        cursor = continuation
     return rows
 
 
@@ -610,7 +647,7 @@ def report_sentences(text, atoms=(), identifiers=None):
     complements = report_complements(text, atoms)
     warning_lists = []
     for match in re.finditer(r'\b(?:warn(?:s|ed|ing|ings)?|предупрежд\w*|предупред\w*)\b', text):
-        arguments = warning_arguments(text[match.end():], identifiers)
+        arguments = warning_arguments(text[match.end():], identifiers, text[:match.end()])
         if len(arguments) > 1: warning_lists.append((match.start(), match.end() + arguments[-1]['end']))
     text = ''.join(' ' if char == '\n' and any(left <= i < right for left, right in complements + warning_lists) else char for i, char in enumerate(text))
     quote = r'«[^»]*»|“[^”]*”|"[^"]*"|\[[^\]]*\]'
@@ -623,7 +660,7 @@ def report_sentences(text, atoms=(), identifiers=None):
     quoted = speech_pattern + native_quotes + '|' + quote
     quoted += ''.join('|' + r'\s+'.join(re.escape(part) for part in atom.split()) for atom in atoms if atom)
     # Numerical alternatives share an argument unit and must survive comma cuts.
-    quoted += r'|\b(?:\d+|два|две|три|четыре|пять|one|two|three|four|five)\b\s*,\s*(?:а|but|and)?\s*(?:не|not)\s+(?:\d+|два|две|три|четыре|пять|one|two|three|four|five)\s+(?:пол\w*|fields?|columns?)\b'
+    quoted += rf'|\b(?:{_REPORT_NUMBER})\b\s*,\s*(?:а|but|and)?\s*(?:не|not)\s+(?:{_REPORT_NUMBER})\s+(?:пол\w*|fields?|columns?)\b'
     # A relative emission shares its antecedent warning object. Keep both
     # predicates together; warning_facts resolves their independent polarity.
     quoted += (r'|\b(?:warnings?|предупрежд\w*)\b[^;.!?]{0,100}?\b(?:that|which|котор\w*)\s+'
@@ -671,7 +708,7 @@ def report_sentences(text, atoms=(), identifiers=None):
             return next(value for start, end, value in reversed(regions) if start <= position <= end)
         independent = (r'(?:данн\w*|текст\w*|причин\w*|предупрежд\w*|нужн\w*|data|text|cause|warnings?'
             r'|движ\w*|engine|it\s+(?:did|does|has|was)|the\s+engine|фактически|actually|now|сейчас)\b')
-        count_number = r'\d+|one|single|two|both|three|four|five|одно|один|одна|единственное|два|две|оба|двух|три|трех|четыре|пять'
+        count_number = _REPORT_NUMBER
         count_verbs = r'specifi\w*|requir\w*|contain\w*|has|have|exist\w*|present|указа\w*|зада\w*|задан\w*|содерж\w*|име\w*|присутств\w*|есть'
         count_head = (rf'(?:(?:not|не)\s+)?(?:{count_number})\b|(?:the\s+)?(?:task|source|задани\w*|источник\w*)\b'
             rf'|(?:in|в)\s+(?:the\s+)?(?:task|source|задани\w*|источник\w*)\b'
@@ -687,7 +724,7 @@ def report_sentences(text, atoms=(), identifiers=None):
         protected = [(match.start(), match.end()) for match in re.finditer(quoted, sentence)]
         warning_lists = []
         for match in re.finditer(r'\b(?:warn(?:s|ed|ing|ings)?|предупрежд\w*|предупред\w*)\b', sentence):
-            arguments = warning_arguments(sentence[match.end():], identifiers)
+            arguments = warning_arguments(sentence[match.end():], identifiers, sentence[:match.end()])
             if len(arguments) > 1: warning_lists.append((match.start(), match.end() + arguments[-1]['end']))
         boundaries = [(match.start(), match.end()) for match in re.finditer(cuts, sentence) if match.group('cut') is not None
             and not any(left < match.start() < right for left, right in warning_lists)]
@@ -876,10 +913,7 @@ def refusal_witness(sentences, reason, spec):
     if not counts:
         return False
     requested, observed = map(int, counts.groups())
-    numerals = {1: r'од(?:ин|на|но|ного|ному|ной)|единственн\w*|one|single',
-                2: r'дв[ае]|двух|двум\w*|об[ае]|обоих|two|both',
-                3: r'три|трех|three', 4: r'четыре|четырех|four', 5: r'пять|пяти|five'}
-    number = lambda n: rf'\b(?:{n}|{numerals.get(n, str(n))})\b'
+    number = lambda n: rf'\b(?:{n}|{_REPORT_NUMERALS.get(n, str(n))})\b'
     required, actual = number(requested), number(observed)
     field_unit = r'(?:исходн\w*\s+|source\s+)?' + fields
     # A number followed by another explicit noun is not an elliptical field
@@ -897,7 +931,7 @@ def refusal_witness(sentences, reason, spec):
             named = len(names) == requested and bool(names) and all(re.search(r'\b' + re.escape(name) + r'\b', sentence) for name in names)
             # Named-column ellipsis is useful only without an explicit numeric
             # quantity. A contradictory number/unit cannot be overruled by names.
-            explicit = re.search(r'\b(?:\d+|' + '|'.join(numerals.values()) + r')\b', sentence)
+            explicit = re.search(rf'\b(?:{_REPORT_NUMBER})\b', sentence)
             requested_seen |= bool(re.search(required + r'\s+' + field_unit, sentence) or named and not explicit)
             field_context |= requested_seen
         obs = re.search(r'\b(?:обнаруж\w*|наблюда\w*|получ\w*|оказал\w*|есть|только|observed|found|only|single|единственн\w*)\b', sentence)
@@ -909,7 +943,7 @@ def refusal_witness(sentences, reason, spec):
 
 def report_count_relation(clause, field_context=False):
     """An explicit finite TASK/source predicate outranks quantitative ellipsis."""
-    number = r'\d+|one|single|two|both|three|four|five|одно|один|одна|два|две|оба|двух|три|трех|четыре|пять'
+    number = _REPORT_NUMBER
     unit = r'(?:исходн\w*\s+|source\s+)?(?:пол\w*|колон\w*|столб\w*|fields?|columns?)'
     if not field_context and not re.search(r'\b' + unit + r'\b', clause): return None
     quantity = rf'(?P<neg_before>(?:not|не)\s+)?(?P<n>{number})\b(?:\s+(?P<unit>{unit})\b)'
@@ -979,8 +1013,7 @@ def refusal_explained(sentences, reason, spec):
                         facts.append(ReportFact(clause, match, 'settings.columns' if initial else 'source.' + missing[0], 'absent', value=value))
         if counts:
             expected = dict(zip(['requested', 'observed'], map(int, counts.groups())))
-            numbers = {'one':1,'single':1,'одно':1,'один':1,'одна':1,'единственное':1,'two':2,'both':2,'два':2,'две':2,'оба':2,'двух':2,'three':3,'три':3,'трех':3,'four':4,'четыре':4,'five':5,'пять':5}
-            number = r'\d+|' + '|'.join(numbers)
+            number = _REPORT_NUMBER
             unit = r'пол\w*|колон\w*|столб\w*|columns?|fields?|строк\w*|rows?|файл\w*|files?'
             markers = r'запрош\w*|ожида\w*|requested|required|expected|получ\w*|обнаруж\w*|наблюда\w*|observed|found'
             marker_rows = list(re.finditer(rf'\b(?P<marker>{markers})\b', clause))
@@ -1002,13 +1035,13 @@ def refusal_explained(sentences, reason, spec):
                     field_unit = bool(re.fullmatch(r'(?:исходн\w*\s+|source\s+)?(?:пол\w*|колон\w*|столб\w*|columns?|fields?)', quantity['unit']))
                 if not field_unit: continue
                 role = relation[0] if relation else (getattr(clause, 'count_role', None) or ('requested' if re.match(r'запрош|ожида|requested|required|expected', marker['marker']) else 'observed'))
-                raw = quantity['n'];n = int(raw) if raw.isdigit() else numbers[raw]
+                n = report_number_value(quantity['n'])
                 negative = bool(quantity['neg_before'] or quantity['neg_after']) if relation else bool(quantity['neg'])
                 fact = ReportFact(clause, quantity if elided else marker, 'source.fields', 'excluded_total' if negative else 'total', role=role, value=(n != expected[role] if negative else n == expected[role]))
                 fact.quantity, fact.unit = n, 'fields'
                 facts.append(fact)
                 if not relation and quantity['other']:
-                    raw = quantity['other'];n = int(raw) if raw.isdigit() else numbers[raw]
+                    n = report_number_value(quantity['other'])
                     facts.append(ReportFact(clause, marker, 'source.fields', 'alternative_total', role=role, value=n != expected[role]))
     literal = r'\s+'.join(re.escape(part) for part in reason.split())
     relevant = [fact for fact in facts if fact.polarity and not any(
@@ -1068,7 +1101,7 @@ def warning_facts(clause):
         # Prenominal code: "the CODE warning" binds the same warning object.
         previous = re.search(rf'\b({identifier})\s*$', left)
         implicit = not re.fullmatch(topic, match.group())
-        arguments = warning_arguments(match.group() + right if implicit else right, lexical_ids)
+        arguments = warning_arguments(match.group() + right if implicit else right, lexical_ids, clause[:match.end()])
         if arguments:
             offset = match.start() if implicit else match.end()
             start, end = offset + arguments[0]['start'], offset + arguments[-1]['end']
