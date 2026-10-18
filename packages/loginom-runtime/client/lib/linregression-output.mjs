@@ -15,8 +15,17 @@ export async function configureLinRegressionOutputs(channel,configuration,p,mapp
  const ready=s=>s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.mapping_wizard==='DerivedDataSourceOutputSocketWizard';
  const observe=condition=>channel.observe({condition,readMappings:true,ready});
  let state=await observe('complete native regression coefficients');
- const initial=state.node_mapping,keep=linRegressionOutputColumns(configuration,1).map(f=>f.name);
- need(initial.source_fields.length===0&&initial.target_fields.every(f=>f.required===false&&f.inherited===false),'only optional native coefficient fields can be selected');
+ const initial=state.node_mapping,expected=linRegressionOutputColumns(configuration,1),keep=expected.map(f=>f.name);
+ // Reopening an already configured coefficient output materializes its native
+ // source inventory. Admit that readback only when the intended selection and
+ // every retained/excluded source binding are unchanged; no gesture is needed.
+ const bindings=initial.target_fields.map(f=>f.excluded?f.exclusion_source:f.source);
+ const configured=initial.source_fields.length===initial.target_fields.length
+  &&same(initial.target_fields.filter(f=>!f.excluded).map(({name,label,type})=>({name,label,type})),expected)
+  &&new Set(bindings.map(s=>s?.record_id)).size===bindings.length
+  &&initial.target_fields.every((f,i)=>bindings[i]?.name===f.name&&bindings[i]?.type===f.type
+   &&initial.source_fields.some(s=>same(s,bindings[i])));
+ need((initial.source_fields.length===0||configured)&&initial.target_fields.every(f=>f.required===false&&f.inherited===false),'only optional native coefficient fields can be selected');
  need(keep.every(name=>initial.target_fields.some(f=>f.name===name&&!f.excluded)),'coefficient names differ from the configured target');
  const semantic=fs=>fs.map(({index,group_index,...f})=>f);
  for(const name of initial.target_fields.filter(f=>!keep.includes(f.name)&&!f.excluded).map(f=>f.name)){
