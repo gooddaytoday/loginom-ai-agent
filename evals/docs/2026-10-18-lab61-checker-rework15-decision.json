@@ -1,0 +1,245 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "kind": "EXPLICIT_EVALER_REWORK_SCOPE_AND_LIMIT",
+  "intent_id": "LAB61-RICH-CHECKER-REWORK15-5fd61487-01a15004",
+  "source_report_id": "01a15004-a7ba-7469-88fe-821ac6c95541",
+  "source_sha": "5fd6148754a7cdf5fd45bebcceb0b8fb59ed340d",
+  "authority": {
+    "permission_sha": "f705228205b0eb40f6b1938714b46746898d79ef",
+    "current_issue_description_grants_necessary_limits": true,
+    "owner_clarification_comment": "5912cded-9d94-4313-9c21-51fceaa37cba",
+    "owner_clarification_sha256": "249ed1ea8b253736ae236d1aea53916de0227888f95f1ecb355cfa27dd467ee0"
+  },
+  "canonical_contract_table": {
+    "canonical_md": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-eval-contract-table.md",
+    "md_sha256": "b82a7ec8581906308bc6669c3155e398da20dcf5677978d7bf13efa63f63b275",
+    "canonical_json": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-eval-contract-table.json",
+    "json_sha256": "d868bd636b33004bd945c414d591772b9e37d6c279d3c9d784499157c9e5a97f",
+    "owner_sha256": "249ed1ea8b253736ae236d1aea53916de0227888f95f1ecb355cfa27dd467ee0",
+    "before_next_admission": true,
+    "task_or_criteria_bytes_changed": false,
+    "new_physical_calls": 0
+  },
+  "original_stop": {
+    "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+    "phase": "blocked",
+    "base_sha": "7d3a5cbda2873094219dec836b1b6c0ffa40f639",
+    "frozen_sha": "5fd6148754a7cdf5fd45bebcceb0b8fb59ed340d",
+    "executor": null,
+    "delivery_sha": null,
+    "review_cycle": 15,
+    "reject_count": 15,
+    "rework_limit": 14,
+    "processed_report_ids": [
+      "01a14a4b-b72a-786a-9b35-8c1daf44cecc",
+      "01a14ae0-b509-7721-92f7-1dc24d6621ee",
+      "01a14b00-2630-7e58-8cd1-66fbcb718ee2",
+      "01a14b91-4d20-7981-8992-6ef9fc07e2ef",
+      "01a14beb-9728-70c8-9202-882e7b9a4176",
+      "01a14c31-1797-749e-b8ab-9ae580c21afb",
+      "01a14c4f-73d0-7cf1-926b-3f4bba874fb1",
+      "01a14c61-c038-79f1-9452-46de85a66c15",
+      "01a14c81-8539-7692-894f-a2936d3da32e",
+      "01a14c93-185a-7a2b-9005-65b292678be1",
+      "01a14cab-9386-7cf7-8dcc-458e38cc0d83",
+      "01a14cbc-3a22-7b52-abc3-53f7801caef7",
+      "01a14cc1-dada-77b4-8a96-8b6bb33cd8b6",
+      "01a14cdf-00b8-779f-a044-67051cdd3993",
+      "01a14cf4-c0ba-7c89-aa1c-e974e9e34621",
+      "01a14cfa-2fec-7a9f-988c-18c2a6e6f575",
+      "01a14d26-8046-79f7-85bc-1ff1f200e33f",
+      "01a14d3b-a329-7f22-a1dd-03fe0978e902",
+      "01a14d44-c333-7b3f-a0e1-d24fdcea437e",
+      "01a14d60-81d8-77a2-aec0-f915ec48327d",
+      "01a14d78-13e0-7317-a7cc-d626659071f4",
+      "01a14d7e-5451-72da-86dd-00b357794990",
+      "01a14da1-71fd-7dae-bc7a-5f83f6166a88",
+      "01a14db7-6a1e-7369-9ce3-eba9946d8b49",
+      "01a14dbd-0bf6-7d7e-b590-39fb64c3a6f8",
+      "01a14dd6-b922-7031-b283-300489c5ac73",
+      "01a14ded-de57-7b01-a74f-1308e4185de3",
+      "01a14df5-2e47-7b64-b503-7200fedb6c3f",
+      "01a14e19-d508-7664-8320-8930bd578de7",
+      "01a14e34-7255-70d8-8251-01fe6ce8b87b",
+      "01a14e3c-6f3e-79c8-a608-92fc4f4d8053",
+      "01a14e62-e0c1-72c6-bb04-3e00f392cce4",
+      "01a14e7b-b76b-7192-8356-034f62033bfb",
+      "01a14e81-135c-7a6f-a94c-f88e6d7bb00e",
+      "01a14eb7-b927-7e7e-93c5-35bdb1616325",
+      "01a14ed2-eddd-7458-8c9b-38ab55070d42",
+      "01a14ee3-548b-7c68-9683-8aca0c68a524",
+      "01a14f02-58ef-77b1-8d9a-78c77a13f3f1",
+      "01a14f26-1bce-7a83-bcd8-7ea7c4a6e864",
+      "01a14f31-10af-72f9-8840-812adb4ad512",
+      "01a14f6e-1ad3-7864-8166-f5c4715d653b",
+      "01a14fa1-8a10-78a6-8f93-de3d717c83bf",
+      "01a14fac-e8d9-73b0-8f97-2773c00209bf",
+      "01a14fcd-135d-73e7-b89b-90e11917b9f4",
+      "01a15004-a7ba-7469-88fe-821ac6c95541"
+    ],
+    "last_dispatch": {
+      "id": "LAB61-BEN-REVIEW-REWORK14-5fd61487-01a14fcd",
+      "phase": "ben",
+      "sha": "5fd6148754a7cdf5fd45bebcceb0b8fb59ed340d",
+      "root_trigger": "01a14fcd-135d-73e7-b89b-90e11917b9f4",
+      "task_id": "01a14fd3-e477-79f3-a18b-409bb5b34486",
+      "outcome": "queued"
+    },
+    "blocked_context": {
+      "reason": "EVALER_DECISION_REQUIRED: rework limit reached",
+      "report_id": "01a15004-a7ba-7469-88fe-821ac6c95541",
+      "sha": "5fd6148754a7cdf5fd45bebcceb0b8fb59ed340d",
+      "cleanup_required": false
+    }
+  },
+  "limit": {
+    "name": "rework_limit",
+    "old": 14,
+    "new": 15,
+    "usage": {
+      "completed_reworks": 14,
+      "fresh_REJECTs": 15
+    },
+    "reason": "Recognize owned quantity-role predicates through truthful adjuncts consistently in truth/witness paths; bind relative warning clauses to their own antecedent without transferring sibling reception polarity; one general OFFLINE stage.",
+    "counters_reset": false
+  },
+  "scope_md_sha256": "b08097dafae3ddc38ed86ce254fdd8b6b4a3c532652943900538abaca67ae307",
+  "verification": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/roles/evaler/work/lab61-ben-reject15-01a15004/evaler-verification.json",
+    "sha256": "015e04ee101ff0d2145f03fe73590d961a91eae248e87e04063ffa584f2cd57a"
+  },
+  "actual_usage_preserved": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 3,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 1
+    },
+    "reference_total": 15,
+    "product_physical_calls": 20,
+    "recovery": 1,
+    "probes": 0,
+    "historical_outcomes_preserved": true,
+    "budget_increases": [
+      [
+        3,
+        4,
+        3,
+        4
+      ],
+      [
+        4,
+        5,
+        4,
+        5
+      ],
+      [
+        5,
+        6,
+        5,
+        6
+      ],
+      [
+        6,
+        7,
+        6,
+        7
+      ],
+      [
+        7,
+        8,
+        7,
+        8
+      ],
+      [
+        8,
+        9,
+        8,
+        9
+      ],
+      [
+        9,
+        10,
+        9,
+        10
+      ],
+      [
+        10,
+        11,
+        10,
+        11
+      ],
+      [
+        11,
+        12,
+        11,
+        12
+      ],
+      [
+        12,
+        13,
+        12,
+        13
+      ],
+      [
+        13,
+        14,
+        13,
+        14
+      ]
+    ],
+    "product_by_case": {
+      "txt-unclosed-quote": 2,
+      "txt-wrong-encoding": 2,
+      "txt-wrong-delimiter": 2,
+      "txt-ambiguous-headers": 2,
+      "csv-unclosed-quote": 2,
+      "csv-wrong-encoding": 2,
+      "csv-wrong-delimiter": 2,
+      "csv-ambiguous-headers": 2,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 2
+    },
+    "rework_limit": 14,
+    "pre_dispatch_wrapper": {
+      "original_verdict": "ERROR",
+      "physical_model_calls": 0,
+      "outcome_preserved": true,
+      "reservation_carried_forward": true,
+      "budget_reset": false
+    },
+    "product_calls_by_role": {
+      "Rich": 10,
+      "Ben": 10
+    },
+    "product_by_case_scope": "Rich+Ben total;1 each",
+    "recovery_by_role": {
+      "Rich": 1,
+      "Ben": 0
+    },
+    "budget_increase_columns": [
+      "old",
+      "new",
+      "completed_reworks",
+      "fresh_REJECTs"
+    ],
+    "budget_reset": false
+  },
+  "product_FAIL_allowed_in_accepted_eval": true,
+  "new_requirements_introduced": false,
+  "new_physical_live_calls_authorized": false,
+  "models_unchanged": true,
+  "supplemental_context_verification": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/roles/evaler/work/lab61-ben-reject15-01a15004/supplemental-ownership-context-verification.json",
+    "sha256": "d8662af6625984356f9160a94adbf992dca33966d293e18b42deb2de5cfed7d6",
+    "static_not_verdict_or_limit_authority": true
+  },
+  "full_independent_Ben_review_required": true,
+  "integration_LAB62_LAB63_authorized": false
+}

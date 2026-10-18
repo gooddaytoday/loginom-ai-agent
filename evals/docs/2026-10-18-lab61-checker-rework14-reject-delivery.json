@@ -1,0 +1,82 @@
+{
+  "utc": "2026-10-18T17:24:12.743617+00:00",
+  "candidate": "5fd6148754a7cdf5fd45bebcceb0b8fb59ed340d",
+  "archive_bytes": 16437370,
+  "archive_sha256": "d4298bd622150fbac38a6d5a6000b1ce1e091560cf455c481850d57af03f983d",
+  "manifest_bytes": 365456,
+  "manifest_sha256": "75629f2ff45d5313ab6f55a51504effe9262e5d89033f3055f9b51135b44bd43",
+  "members": 1967,
+  "payloads": 1966,
+  "payload_bytes": 268098919,
+  "safe_unique_exact_membership_all_hash_sizes_crc": true,
+  "report_standalone_equal": true,
+  "admission_exact_member": "admission/lab61-checker-rework14-ben-admission.json",
+  "admission_sha256": "509ed88a726814be67d9f7a200ca7656526e7ecbb2e64150e422315d1c826243",
+  "portable_Git": {
+    "candidate": 144,
+    "parent": 144
+  },
+  "separate_official_verification_json_sha256": "748dc8b8d06f0e162f6bba20e58b8ac67a3bfb8219b3449c5446a44beccc0748",
+  "separate_official_raw_verification_ZIP_sha256": "348db9511cbdc144ba38c3adbe4ee170b4c6cf9baeae12e198ede4db4f85fbfa",
+  "separate_raw_ZIP_members": 70,
+  "source_or_external_verifier_executed": false,
+  "new_physical_model_calls": 0,
+  "common_integration": false,
+  "durable_mirror_utc": "2026-10-18T17:41:38.112128+00:00",
+  "official_files": {
+    "lab61-ben-rereview-5fd61487.zip.part-001": {
+      "bytes": 4194304,
+      "sha256": "cc384936492426e34a277c38b6923ceba88c496b2af1b86c51806fad6eba9bbf"
+    },
+    "lab61-ben-rereview-5fd61487-delivery.json": {
+      "bytes": 1218,
+      "sha256": "bcf28b13934ce20fff89028ff007b486c2335854c7970b9cc59ac10f79bee8c9"
+    },
+    "rereview-5fd-verify-package.py": {
+      "bytes": 5022,
+      "sha256": "7880d5efe169542d26f6d0b882bd8b5f2c37108ae4c24f66f1d553d12e7107a5"
+    },
+    "lab61-ben-rereview-5fd61487-package-verification-raw.zip": {
+      "bytes": 108269,
+      "sha256": "348db9511cbdc144ba38c3adbe4ee170b4c6cf9baeae12e198ede4db4f85fbfa"
+    },
+    "lab61-ben-rereview-5fd61487.zip.part-004": {
+      "bytes": 3854458,
+      "sha256": "91940336e895935a7f9c90578589ba8a829db16e32624e4b8f0819280b7cba0b"
+    },
+    "rereview-5fd-packaged-verification.json": {
+      "bytes": 29367,
+      "sha256": "748dc8b8d06f0e162f6bba20e58b8ac67a3bfb8219b3449c5446a44beccc0748"
+    },
+    "lab61-ben-rereview-5fd61487.zip": {
+      "bytes": 16437370,
+      "sha256": "d4298bd622150fbac38a6d5a6000b1ce1e091560cf455c481850d57af03f983d"
+    },
+    "rereview-5fd-README.md": {
+      "bytes": 6085,
+      "sha256": "04542dc2f7262fdbd051b805d012108b5b64974034fb671e6ba8ac1529b77709"
+    },
+    "lab61-ben-rereview-5fd61487.zip.part-002": {
+      "bytes": 4194304,
+      "sha256": "e5fd468c810930399952efd00881ff20d8436a763f52cdc696f5f0d35a7f0128"
+    },
+    "rereview-5fd-report.md": {
+      "bytes": 18533,
+      "sha256": "71aae1a3f00fa7801deb62b997ce804dfbbbc892cfe7f4d1597072a2ca4dd4f6"
+    },
+    "lab61-ben-rereview-5fd61487.zip.part-003": {
+      "bytes": 4194304,
+      "sha256": "c96aa7004412b5cfd1f511bf93a1413eff7517c4dec4581639e0774b8d204df9"
+    },
+    "prepost-readonly-check.json": {
+      "bytes": 293,
+      "sha256": "3411808fa257359579e16d618b3b92990b244e7caf7876b959553922d254e590"
+    }
+  },
+  "local_independent_download_root_verification_sha256": "02f177847b1f955a6a362726cf400d75997a2eecc91f102d9d4c6fceb9231846",
+  "durable_mirror": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-ben-rereview-5fd61487-reject-delivery",
+  "all_1966_payload_hashes_checked_before_extraction": true,
+  "historic_genuine_completion_and_release_original_bytes_equal": true,
+  "native_E_verification_sha256": "015e04ee101ff0d2145f03fe73590d961a91eae248e87e04063ffa584f2cd57a",
+  "no_redownload_no_source_execution_no_native_effects": true
+}

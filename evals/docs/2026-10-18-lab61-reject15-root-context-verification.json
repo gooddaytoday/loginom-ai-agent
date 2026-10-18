@@ -1,0 +1,44 @@
+{
+  "utc": "2026-10-18T17:40:58.897482+00:00",
+  "client_request_id": "3f4e6868-c235-4b8d-8e3c-2972ebe8da20",
+  "comment_id": "39528a49-87e9-4962-9703-abfea6e3496c",
+  "task_id": "01a15004-a7ec-7c53-b5f4-3583e7fc4447",
+  "source_report_id": "01a15004-a7ba-7469-88fe-821ac6c95541",
+  "creation_http": 201,
+  "initial_transport_status": "pending",
+  "no_transport_ACK_claim": true,
+  "applied_by_native_E": true,
+  "E_message_sequence_evidence": [
+    51,
+    52,
+    57,
+    58
+  ],
+  "E_canonical_semantic_application": "d8662af6625984356f9160a94adbf992dca33966d293e18b42deb2de5cfed7d6",
+  "static_note_sha256": "4409de5bde1432fbf4ff8822295ef51c5be8440a96eb75da036304ea472a5d4e",
+  "formal_example_has_explicit_I": true,
+  "protected_relative_span_crosses_sibling_predicate": true,
+  "shared_subject_is_provisional_matrix_hypothesis_not_third_proven_defect": true,
+  "new_dispatch_or_interruption": false,
+  "operator_is_not_owner": true,
+  "new_criteria_or_limit_authority": false,
+  "no_repeat": true,
+  "local_context_files": {
+    "lab61-reject15-root-context-payload.json": {
+      "bytes": 4906,
+      "sha256": "ed780a5499a4b07aa7fa635c3c5817fe057c64e62ecf84b0323e11b632fd6fb2"
+    },
+    "lab61-reject15-root-context-receipt.json": {
+      "bytes": 5519,
+      "sha256": "689b59cfee77eea1fb79dae2791920f2c9c6d7c94db7713ccb0fb0d0d5768504"
+    },
+    "lab61-reject15-root-context-once.json": {
+      "bytes": 1038,
+      "sha256": "9105adcda7cba9b47aa00f546e5b4999685a0f66288fe163881b78be5dba2821"
+    },
+    "lab61-reject15-root-context-readback.json": {
+      "bytes": 5333,
+      "sha256": "1429054b38efa51567d157d5ffe543ef227d9db18098090c35b32fd2d77bddd9"
+    }
+  }
+}
