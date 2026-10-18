@@ -3628,8 +3628,8 @@ test('input port overflow caption requires native binding and the exact hidden c
  }
 });
 
-async function joinInputPortOverflowFixture(mode='valid',port=1) {
-  const caption=port===0?'Главная таблица':'Присоединяемая таблица';
+async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
+  const caption=port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
   const {page,panel,crumbs}=await inputPortContextFixture();
   // Loginom 7.4.2 native diagnostic: 1280x800, input1 and Настройка hidden
   // by breadcrumb overflow; node/input/wizard icons remain in the same DOM.
@@ -3644,7 +3644,7 @@ async function joinInputPortOverflowFixture(mode='valid',port=1) {
     if(i>=7)c.style.display='none';
     for(const icon of c.children)icon.box={x:c.box.x+1,y:c.box.y+1,width:16,height:16};
   }
-  crumbs[5].children[0].attrs.class='bg-vendor-icon-joindata';
+  crumbs[5].children[0].attrs.class=vendor==='union'?'bg-vendor-icon-uniondata':'bg-vendor-icon-joindata';
   page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[7]).attrs.class='bg-vendor-icon-tunedatasourcesocketdef';
   if(mode==='wrong_icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
   if(mode==='wrong_caption')for(const c of crumbs.slice(7)) {
@@ -3681,6 +3681,51 @@ test('owned Join input observes its actual hidden joined-table breadcrumb',async
   assert.equal(full.wizard.input_port_context.opening_verified,false);
   assert.deepEqual(page.events,[]);
 });
+
+test('owned Union input observes its numbered hidden appended-table breadcrumb',async()=>{
+  // Loginom 7.4.2 live: a long Union label pushes 'Присоединяемая таблица 2' and
+  // 'Настройка' into the breadcrumb overflow while input2 is bound natively.
+  const {page}=await joinInputPortOverflowFixture('valid',2,'union');
+  const full=await page.observe(),narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+  assert.equal(full.wizard.input_port_context.status,'observed');
+  assert.equal(full.wizard.input_port_context.port_display_label,'Присоединяемая таблица 2');
+  assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
+});
+
+test('three-input Union offers Done and owned close only with its exact numbered overflow owner',async()=>{
+ for(const port of [1,2])for(const mode of ['valid','union_wrong_number','wrong_icon','missing_native_port','unverified_owner']) {
+  const {page}=await joinInputPortOverflowFixture(mode,port,'union');
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0];
+  const c=mappingCoverageFixture(page,4);page.context.innerWidth=1280;
+  for(const child of [...c.form.children]) {
+   if(child.attrs['data-tid']?.endsWith(';btnAddMappingColumn')){child.remove();continue;}
+   for(const e of [child,...child.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid']
+    .replace('MF;TF-1;','MF;TF-5;').replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard')
+    .replace('colDefaultUsageType_','colUsageType_');
+   wizard.append(child);
+  }
+  c.form.remove();page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1208,y:380,width:64,height:64},wizard);
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  const done=r.output.ui?.elements?.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone');
+  assert.equal(done?.allowed_actions.includes('finish_wizard')===true,mode==='valid',port+':'+mode+JSON.stringify({error:r.error,wizard:r.output.wizard}));
+  if(mode==='valid')assert.equal(r.output.wizard.output_columns.page.status,'complete_definition_page');
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const close=await page.execute({mode:'observe'});
+  assert.equal(close.output.ui?.elements?.some(e=>e.allowed_actions.includes('confirm_wizard_close'))===true,mode==='valid',port+':'+mode);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+// A Join numbered caption remains refused by the 'wrong_caption' Join case.
+for(const [name,mode] of [['a number other than the native port','union_wrong_number'],['a foreign node icon','wrong_icon']])
+  test('hidden numbered Union caption is refused for '+name,async()=>{
+    const {page}=await joinInputPortOverflowFixture(mode,2,'union');
+    assert.notEqual((await page.observe()).wizard.input_port_context.status,'observed');
+  });
 
 test('owned Join input observes its known main-table caption when overflow hides it',async()=>{
   // The same native Join exposed Главная таблица with verified input0/GUID/opening;
