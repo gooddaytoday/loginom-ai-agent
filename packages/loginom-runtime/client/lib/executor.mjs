@@ -1714,6 +1714,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   // rests unlocked on a quiet unchanged graph and reports unverified settings or
   // execution as unknown; no observation_id is taken from the caller.
   const nodeReleaseStep=operation=>!operation.transportUncertain&&!nodeJobs.busy&&operation.nodeApply?.pending
+    &&(!operation.nodeApplyDrivers?.releasePendingPhases||operation.nodeApplyDrivers.releasePendingPhases.includes(operation.nodeApply.pending.phase))
     &&operation.nodeApply.node&&typeof operation.nodeApplyDrivers?.releasePending==='function'?{tool:'dock_operation_recover',
       arguments:{operation_id:operation.id,strategy:'abandon_operation'},required_fields:['recovery_operation_id'],
       id_roles:{operation_id:'original_pending_operation',recovery_operation_id:'new_unique_request'},

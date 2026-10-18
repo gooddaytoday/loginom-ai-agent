@@ -4944,6 +4944,18 @@ test('graph launch only exposes typed execution for the exact native selected no
  assert.equal(e.graph_execution.node_id,'node-a');assert.throws(()=>validateUiAction({verb:'click',ref:e.ref},r.output));
  const done=await f.execute({mode:'act',action:{verb:'execute_graph_node',ref:e.ref},snapshot:r.output});assert.equal(done.status,'SUCCEEDED');assert.equal(f.page.events.filter(e=>e==='click').length,1);
 });
+test('graph launch refuses a repainted body of the same selected node before the execution gesture',async()=>{
+ const f=graphLaunchFixture(),view=f.model.FDiagram.FmxGraph.view,original=view.getState;let reads=0;
+ view.getState=()=>{
+  if(++reads<3)return original();
+  return {shape:{node:f.page.add('div','MF;TF-1;Graph;Calculator','',{x:100,y:100,width:100,height:50})}};
+ };
+ const observed=await f.execute({mode:'observe'}),button=observed.output.ui.elements.find(e=>e.tid===f.button.attrs['data-tid']);
+ const outcome=await f.execute({mode:'act',action:{verb:'execute_graph_node',ref:button.ref},snapshot:observed.output});
+ assert.equal(outcome.error.code,'GRAPH_EXECUTION_CONTEXT_CHANGED');assert.equal(outcome.status,'NOT_APPLIED');
+ assert.equal(outcome.effect_possible,false);assert.equal(outcome.cleanup_complete,true);
+ assert.equal(f.page.events.filter(e=>e==='click').length,0);
+});
 for(const [name,mutate] of Object.entries({unselected:f=>f.select([]),foreign:f=>f.select([{}]),multiple:f=>f.select([f.owner.FCell,{}]),locked:f=>f.owner.FLocked=true,disabled:f=>f.native.disabled=true,deactivate:f=>f.native.tooltip='Деактивировать узел',duplicate:f=>f.model.FDiagram.FNodes.FCollection.push({...f.owner}),foreign_button:f=>f.native.el.dom={}}))test('graph launch refuses native '+name+' drift without a gesture',async()=>{
  const f=graphLaunchFixture(),r=await f.execute({mode:'observe'}),e=r.output.ui.elements.find(e=>e.tid===f.button.attrs['data-tid']);
  assert.ok(e.graph_execution);mutate(f);

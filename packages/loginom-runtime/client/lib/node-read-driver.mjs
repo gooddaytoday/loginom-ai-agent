@@ -10,6 +10,7 @@ import {createJavascriptSourceAdmission} from './javascript-source-admission.mjs
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
 import {openManagedJavascriptOutputViews} from './javascript-managed-views.mjs';
 import {withJavascriptSourcePolicyBoundary} from './javascript-source-policy-refusal.mjs';
+import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const verified=value=>({verified:true,cleanup_complete:true,effect_possible:false,...value});
 
@@ -113,5 +114,14 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
   // Same-ID delivery retries return the original worker. Unknown browser effects
   // stay blocked; this route never restarts an uncertain execution automatically.
   verifyContinuation:async()=>false,
+  ...(!javascript?{
+   releasePendingPhases:['finish'],
+   async releasePending(state,{signal}={}){
+    need(state.pending?.phase==='finish','Only a stopped output-read graph finish can be released here');
+    enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
+     workflow_ref:state.request.workflow_ref,node:state.node});
+    return releasePendingNode({operation,channel,readReceipt:options.readReceipt});
+   },
+  }:{}),
  };
 }
