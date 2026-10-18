@@ -57,6 +57,31 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
  };
  let view=await root.evaluate(readViewport,nodeId),point=project(view,position),opened=false,steps=0,error,zoom;
  const toggle=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;btnShowOutline')+']');
+ const setOutline=async opening=>{
+  if(await toggle.count()!==1)throw Error('Canvas outline control unavailable');
+  if(await toggle.isVisible()){
+   await guard();await toggle.click({timeout:remaining()});if(opening)opened=true;return;
+  }
+  // At 1280px the native toolbar moves this button into its own overflow
+  // menu. Bind that portal by the prepared form, never by a global label.
+  if(await toggle.getAttribute('data-qtip')!=='Показать карту сценария')throw Error('Canvas outline control unavailable');
+  const trigger=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;tlbModel;b')+']');
+  const menu=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;tlbModel;b;mn')+']');
+  if(await trigger.count()!==1||!await trigger.isVisible()||await menu.count()>1||await menu.isVisible())throw Error('Owned canvas outline menu unavailable');
+  await guard();await trigger.click({timeout:remaining()});
+  try {
+   await menu.waitFor({state:'visible',timeout:Math.min(2000,remaining())});
+   const item=menu.locator('[role="menuitem"][data-qtip="Показать карту сценария"]');
+   if(await menu.count()!==1||await item.count()!==1||!await item.isVisible()||await item.locator('.bg-icon-preview').count()!==1)throw Error('Owned canvas outline menu item unavailable');
+   await guard();await item.click({timeout:remaining()});if(opening)opened=true;
+  } finally {
+   // Native check items keep the menu open and can cover the outline.
+   if(await menu.isVisible()){
+    try {await guard();await trigger.click({timeout:remaining()});await menu.waitFor({state:'hidden',timeout:Math.min(2000,remaining())});}
+    catch(e){e.placement_navigation_unverified=true;throw e;}
+   }
+  }
+ };
  // Loginom allocates outline IDs per form (cnt, cnt-1, ...). A global
  // cnt lookup can select a hidden outline belonging to another workflow.
  try {
@@ -67,8 +92,7 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
    zoom=owner.locator('.bg-workflow-outline-toolbar [data-tid$=";tlb;b"]');
    if(await zoom.count()>1)throw Error('Owned canvas zoom-out control is ambiguous');
    if(await zoom.count()===0||!await zoom.isVisible()){
-    if(await toggle.count()!==1||!await toggle.isVisible())throw Error('Canvas outline control unavailable');
-    await toggle.click({timeout:remaining()});opened=true;
+    await setOutline(true);
     await zoom.waitFor({state:'visible',timeout:Math.min(2000,remaining())});
    }
    if(await zoom.count()!==1||!await zoom.isVisible()||await zoom.getAttribute('data-qtip')!=='Уменьшить масштаб')throw Error('Exact canvas zoom-out control unavailable');
@@ -85,7 +109,7 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
  }catch(e){error=e;}
  finally {
   if(opened) {
-   try {await guard();await toggle.click({timeout:remaining()});await zoom.waitFor({state:'hidden',timeout:Math.min(2000,remaining())});}
+   try {await guard();await setOutline(false);await zoom.waitFor({state:'hidden',timeout:Math.min(2000,remaining())});}
    catch(e){e.placement_navigation_unverified=true;error=e;}
   }
  }
