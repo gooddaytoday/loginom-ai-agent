@@ -34,7 +34,11 @@ export async function restConnectionCapability(page,t){
     if(r.width<=0||r.height<=0||x<0||y<0||x>=innerWidth||y>=innerHeight||!hit||!(hit===e||e.contains(hit))||e.closest('.x-item-disabled,.x-btn-disabled'))throw Error('REST control is not reachable: '+e.closest('[data-tid]')?.getAttribute('data-tid'));return {x,y};});
   };
   const quiet=()=>wait('loading mask',()=>page.locator('.x-mask:visible,.x-mask-msg:visible,.bg-mask-message:visible,.x-window:visible').count().then(n=>n===0));
-  const click=async(tid,double=false)=>{await quiet();const p=await wait('reachable '+tid,async()=>{try{return await point(find(tid));}catch{return null;}});await guard();effect=true;await page.mouse[double?'dblclick':'click'](p.x,p.y);};
+  const click=async(tid,double=false)=>{await quiet();const p=await wait('reachable '+tid,async()=>{try{return await point(find(tid));}catch{return null;}});await guard();effect=true;
+   // The accordion can move this small expander after the coordinate read.
+   // Wait for its native click target to be stable before the sole expansion.
+   if(tid.endsWith(';TreeExpander'))await find(tid).click({timeout:remaining()});
+   else await page.mouse[double?'dblclick':'click'](p.x,p.y);};
   // Ext retains visible editor containers while their input is still hidden or
   // zero-sized. Wait for this exact input's hit-test before the sole fill.
   const reachableInput=tid=>wait('reachable input '+tid,async()=>{try{return await point(find(tid).locator('input'));}catch{return null;}});

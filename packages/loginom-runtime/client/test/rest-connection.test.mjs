@@ -2,16 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {restConnectionCapability} from '../lib/rest-connection.mjs';
 
-const cases={input:'a retained visible REST container cannot authorize filling its zero-sized input',parameter:'REST waits for the added parameter type before checking string bindings',palette:'REST waits for the newly expanded palette item before its single drag',animation:'REST does not start a drag from a hit-testable row inside its native tree animation'};
+const cases={input:'a retained visible REST container cannot authorize filling its zero-sized input',parameter:'REST waits for the added parameter type before checking string bindings',palette:'REST waits for the newly expanded palette item before its single drag',animation:'REST does not start a drag from a hit-testable row inside its native tree animation',expander:'REST expands the moving connection tree with one stable locator click'};
 for(const [stage,title]of Object.entries(cases))test(title,async()=>{
  const prefix='MF;TF-1',fields=prefix+';WizardModelConnectionForm;ConnectionWizard;';
  const item=prefix+';ModelForm;pnlConnections;headercontainer;text_Root>Текущий_модуль>Echo;TreeText';
  let urlPoints=0,tileReads=0,fills=0,visibleChecks=0,parameterReads=0,queryFills=0,palettePoints=0,added=false,label='REST-сервис',url='',paramName='param0',lastSelector='';
- let held=false,dragMoves=0,downCount=0,upCount=0;
+ let held=false,dragMoves=0,downCount=0,upCount=0,expanded=stage!=='expander',expansions=0;
  const previous={document:globalThis.document,innerWidth:globalThis.innerWidth,innerHeight:globalThis.innerHeight};
  globalThis.innerWidth=1280;globalThis.innerHeight=800;
  const locator=(selector,input=false)=>({
-  count:async()=>selector.startsWith('.x-mask')?0:1,
+  count:async()=>selector.startsWith('.x-mask')?0:selector.includes('pnlConnections;headercontainer;text_Root>Текущий_модуль>')&&!expanded?0:1,
+  click:async()=>{assert.ok(selector.includes(';TreeExpander'));expanded=true;expansions++;},
   locator:child=>child==='input'?locator(selector,true):locator(selector+' '+child),
   // This is the observed Ext failure: its container claims visibility before
   // the actual input has a usable rectangle. Neither may cause a fill.
@@ -27,7 +28,7 @@ for(const [stage,title]of Object.entries(cases))test(title,async()=>{
   evaluateAll:async()=>{
    if(selector.includes('ListViewForm'))return [prefix+';ListViewForm;cntTile;ListView;headercontainer;title_1'];
    if(selector.includes('ConnectionsViewWizard')&&selector.includes('title_'))return ++tileReads===1?[]:[{tid:prefix+';ConnectionsViewWizard;cntTile;ListView;headercontainer;title_0',name:label}];
-   if(selector.includes('pnlConnections'))return [item];
+   if(selector.includes('pnlConnections'))return expanded?[item]:[];
    if(selector.includes('colName_')){
     if(!added)return [];
     assert.ok(selector.includes('grdParams;tbl'));
@@ -64,12 +65,13 @@ for(const [stage,title]of Object.entries(cases))test(title,async()=>{
   const result=await restConnectionCapability(page,{deadline:Date.now()+10000,document_id:'doc',origin:'http://example.test',build:'7.4.2',
    workflow_ref:{workflow_id:'flow',tab_tid:'tab',prefix,navigation_path:[{tid:'module'},{label:'Сценарий'}]},
    connection:{name:'Echo',base_url:'https://httpbin.org/anything'},query_parameters:[{name:'Key',field:'Key'}]});
-  assert.equal(result.verified,stage==='animation');
-  if(stage==='animation'){assert.equal(result.connection.reference_node_id,'rest-reference');assert.equal(result.cleanup_complete,true);}
+  assert.equal(result.verified,['animation','expander'].includes(stage));
+  if(['animation','expander'].includes(stage)){assert.equal(result.connection.reference_node_id,'rest-reference');assert.equal(result.cleanup_complete,true);}
   else assert.equal(result.error,stage==='input'?'fixture stopped after the sole reachable fill':stage==='parameter'?'fixture stopped after the typed parameter editor':'fixture stopped before the sole palette drag');
-  assert.equal(fills,1);assert.equal(urlPoints,['palette','animation'].includes(stage)?6:4);assert.ok(visibleChecks>0);
+  if(stage==='expander')assert.equal(expansions,1);
+  assert.equal(fills,1);assert.equal(urlPoints,['palette','animation','expander'].includes(stage)?6:4);assert.ok(visibleChecks>0);
   if(stage==='parameter'){assert.equal(parameterReads,2);assert.equal(queryFills,1);}
-  if(['palette','animation'].includes(stage)){assert.equal(palettePoints,2);assert.equal(queryFills,1);}
+  if(['palette','animation','expander'].includes(stage)){assert.equal(palettePoints,2);assert.equal(queryFills,1);}
  }finally{
   for(const [key,value]of Object.entries(previous))if(value===undefined)delete globalThis[key];else globalThis[key]=value;
  }
