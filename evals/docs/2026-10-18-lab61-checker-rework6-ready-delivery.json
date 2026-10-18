@@ -1,0 +1,70 @@
+{
+  "checked_utc": "2026-10-18T05:19:32.464056+00:00",
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "report_id": "01a14d60-81d8-77a2-aec0-f915ec48327d",
+  "source": {
+    "head": "1113633ef082a9f80f10f76afbd2ab18db67dc1d",
+    "parent": "86070b607d09595a07a6fde250965096ef2fb795",
+    "tree": "d5adff86170a743f3c6d87dc1d8fc856cc25d834",
+    "clean": true,
+    "bundle_sha256": "109bda28094fe3ae03e1665f84cfdd8b005f4dd2375bc3f2d3d496264f2cacf3",
+    "diff_sha256": "01b317d6bdeef619763c48ae8bb2e1af365a9608cb115302d16f815044ed2652",
+    "full_source_tar_sha256": "7823957cc5817c4ce983630aad96010e04366930fed85051c70615cf996cb6b8",
+    "full_source_tar_bytes": 310691840,
+    "source_file_sha256": {
+      "evals/script/check-text-import.py": "aa922478173edd93f3ebb43cd451953b217cf4bd4c6f6ae0ed47f8a41e1e6fb5",
+      "evals/test/text-import-evidence.test.ts": "36ccc3d37327d241557e6c06dea9513e65403921664885f3d2276b17463c36f0"
+    },
+    "test_RED_bytes_sha256": "36ccc3d37327d241557e6c06dea9513e65403921664885f3d2276b17463c36f0"
+  },
+  "archive_bytes": 15404842,
+  "archive_sha256": "632f2cf122b70584b630cca86958e19fce449d50f3c6658677204d986e6189de",
+  "manifest_sha256": "fc9a82bf751a7d7a3b5d175a226f597acce124d7f4a21e058a42e76280e2a7f8",
+  "parts": [
+    {
+      "name": "lab61-checker-rework6-1113633e-ready.zip.part-001",
+      "bytes": 4194304,
+      "sha256": "45e7ffc195d634ab8d7844ea8cd2668681a7d10a74412d26ea30458b758308aa"
+    },
+    {
+      "name": "lab61-checker-rework6-1113633e-ready.zip.part-002",
+      "bytes": 4194304,
+      "sha256": "0f9f78317d51e03e6f200596054689f2511f4ff964b790f95b799c9cc04edfab"
+    },
+    {
+      "name": "lab61-checker-rework6-1113633e-ready.zip.part-003",
+      "bytes": 4194304,
+      "sha256": "90fa7b59d403b99c768c8e94952444faf89b25a2dd2db225bc44399a764662d7"
+    },
+    {
+      "name": "lab61-checker-rework6-1113633e-ready.zip.part-004",
+      "bytes": 2821930,
+      "sha256": "fdfe37db9b0e6515dfe6daaf64167cfca94e76bdb830f6832a1e29dc59c04f4a"
+    }
+  ],
+  "payloads_verified": 1588,
+  "archive_members": 1589,
+  "payload_bytes": 232175068,
+  "exact_safe_unique_membership": true,
+  "report_standalone_byte_equal": true,
+  "report_sha256": "400d7187415af2ad28a85b70ef86f205c51fc6fdb9bce1bd886db1d279f75184",
+  "model_sha256": "52744da934b0021882338dea6bfde080f008fab12d5ee6383e2009237bc442d4",
+  "model_record_sha256": "c458f3119fd8c0f94b9fc274ed312a0c37291dfb5475c93c613be79addbcc9f1",
+  "standalone_bundle_patch_archive_byte_equal": true,
+  "own_bare_Git_parent_tree_delta_patch_abbrev9_verified": true,
+  "portable_candidate_Git_files_verified": 145,
+  "fresh_remote_readback": [
+    "1113633ef082a9f80f10f76afbd2ab18db67dc1d\trefs/heads/lab61-checker-sixth",
+    "f85f4ddce35a9103187bda1682e303f50e163f4d\trefs/heads/text-import-evals"
+  ],
+  "source_delta": [
+    "evals/script/check-text-import.py",
+    "evals/test/text-import-evidence.test.ts"
+  ],
+  "source_executed": false,
+  "source_integrated": false,
+  "author_full_tar_hash_independently_verified_by_root": false,
+  "native_Evaler_verification_sha256": "16b6a356e7d15f1db0a460ec3aae917153f94389811ba6beac42068f30e8e13f",
+  "native_Ben_admission_sha256": "9080109735d27397b44599fcbdebe91a8062734ba0f873a6f5a256647ff3ed9e",
+  "full_Ben_ACCEPT": false
+}

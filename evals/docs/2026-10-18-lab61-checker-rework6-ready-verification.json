@@ -1,0 +1,675 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "trigger_report_id": "01a14d60-81d8-77a2-aec0-f915ec48327d",
+  "checked_sha": "1113633ef082a9f80f10f76afbd2ab18db67dc1d",
+  "parent": "86070b607d09595a07a6fde250965096ef2fb795",
+  "tree": "d5adff86170a743f3c6d87dc1d8fc856cc25d834",
+  "product_source_unchanged": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "archive_sha256": "632f2cf122b70584b630cca86958e19fce449d50f3c6658677204d986e6189de",
+  "manifest_sha256": "fc9a82bf751a7d7a3b5d175a226f597acce124d7f4a21e058a42e76280e2a7f8",
+  "payloads_verified": 1588,
+  "archive_members": 1589,
+  "report_equal": true,
+  "source_bundle_verified": true,
+  "source_delta": [
+    "evals/script/check-text-import.py",
+    "evals/test/text-import-evidence.test.ts"
+  ],
+  "AST": {
+    "unchanged": [
+      "require",
+      "calls_from",
+      "after",
+      "source_bindings",
+      "request_owner",
+      "rejection",
+      "native_events",
+      "configuration_matches",
+      "native_application",
+      "native_execution",
+      "public_output",
+      "typed_table",
+      "unused_structural_ports",
+      "package_graph",
+      "settled_receipt",
+      "known_refusal",
+      "report_text",
+      "claim_asserted",
+      "damage_diagnosed",
+      "diagnostic",
+      "positive",
+      "audit"
+    ],
+    "changed": [
+      "report_sentences",
+      "claim_status",
+      "bound_report_facts",
+      "refusal_explained",
+      "report_truth"
+    ],
+    "added": [
+      "refusal_witness",
+      "warning_facts"
+    ]
+  },
+  "portable_files_equal_Git": {
+    "portable-candidate": 145
+  },
+  "clean_candidate_source": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-checker-sixth",
+  "preserved_original_materials": {
+    "Rich": 1155,
+    "Ben": 831,
+    "cases": 140,
+    "reference-runtime": 226,
+    "Rich-runtime": 410
+  },
+  "preserved_original_files_verified": 2762,
+  "Ben_runtime_and_ledger_files_verified": 1163,
+  "installed_entries": [
+    {
+      "root": "/home/user/.local/share/loginom-evals-runtime/support/text-import-f2aa79b41579909681d6c7a1356452b2b7a3964b",
+      "entries": 1700,
+      "manifest_sha256": "ed3de08343ba8161964590956f2356a7933d9ab6a7f17d8f6eb65f6bf1a5c9db"
+    },
+    {
+      "root": "/home/user/.local/share/loginom-evals-runtime/cli-rich-lab61-initial-a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+      "entries": 5389,
+      "manifest_sha256": "96763b4b8aaae92642cbd9c624df47a10b2d09bc0a47762c870e2671a51d7bf8"
+    }
+  ],
+  "pins_and_profile_hashes_preserved": true,
+  "derived30_raw_hash_bindings_verified": true,
+  "author_derived_counts_not_acceptance": {
+    "reference": {
+      "PASS": 10
+    },
+    "Rich": {
+      "PASS": 8,
+      "FAIL": 2
+    },
+    "Ben": {
+      "PASS": 8,
+      "FAIL": 2
+    }
+  },
+  "reference_provenance": "6xd6 +3x2e990 +initialxa2ba",
+  "model_record_sha256": "c458f3119fd8c0f94b9fc274ed312a0c37291dfb5475c93c613be79addbcc9f1",
+  "model_sha256": "52744da934b0021882338dea6bfde080f008fab12d5ee6383e2009237bc442d4",
+  "model_precedes_recorded_RED_not_external_edit_attestation": true,
+  "actual_Luna_high_archived_proofs": [
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Ben-csv-ambiguous-headers.json",
+      "sha256": "2d690c61a49be108d76eb330b05853c810126cc1691188f9dbf2c96f1c4a2319",
+      "case": "csv-ambiguous-headers"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Ben-csv-unclosed-quote.json",
+      "sha256": "9a60badec66d4616e0e96304855a218b46190ed5166a96107a305e8156139241",
+      "case": "csv-unclosed-quote"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Ben-csv-wrong-delimiter.json",
+      "sha256": "2a0fe035becf54a76a043e043c1eaf476c200bbf00e97fd696a97bd952d14ac1",
+      "case": "csv-wrong-delimiter"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Ben-csv-wrong-encoding.json",
+      "sha256": "f4f670051f04e8fb2c700406a65f465ffff1c9f610c726a3b9395b03cd221561",
+      "case": "csv-wrong-encoding"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Ben-initial-incomplete-settings.json",
+      "sha256": "480b41ef59b75cffdd041920092d3b64efe0144c1c761989a9ade50d909b56cb",
+      "case": "initial-incomplete-settings"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Ben-missing-source-column.json",
+      "sha256": "dfcf7b9ee14711818a0aa8f0bf9fb86afefe034b9a128af4002b01826516096a",
+      "case": "missing-source-column"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Ben-txt-ambiguous-headers.json",
+      "sha256": "ffb46037d05ae4428cafefecea1d8ae92b9f39c6ddd16290524071a40e11d7d8",
+      "case": "txt-ambiguous-headers"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Ben-txt-unclosed-quote.json",
+      "sha256": "a7d762e68427bb92b4c6c61883dc0110cf90c5f1bb7a444967d62d44d8ce38b1",
+      "case": "txt-unclosed-quote"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Ben-txt-wrong-delimiter.json",
+      "sha256": "1c2ce386ac5794c25fec6fc9df16edaa19f8e4a0953edd84f6fe204ad873496b",
+      "case": "txt-wrong-delimiter"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Ben-txt-wrong-encoding.json",
+      "sha256": "d052dd131309f180b98429d90175a1666c383071b6bb3c6300c65c9e40b400f2",
+      "case": "txt-wrong-encoding"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Rich-csv-ambiguous-headers.json",
+      "sha256": "e653fb18f62a2cec634c26e24d65192e31e628c1ec7f8ea0b49669d894bc9322",
+      "case": "csv-ambiguous-headers"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Rich-csv-unclosed-quote.json",
+      "sha256": "e9aeac189f6bea7870e94e2c6c1251fc0a6beb0cfa5fd1780f406d66f65a75a1",
+      "case": "csv-unclosed-quote"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Rich-csv-wrong-delimiter.json",
+      "sha256": "edf3695bb9493171e34b66ae709e10a01e47aa381277f2bf7751ca3ce83dab38",
+      "case": "csv-wrong-delimiter"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Rich-csv-wrong-encoding.json",
+      "sha256": "a6e149a0affb5248f6a248871b54936e864a1a018c4f3a9eb2eea1f7fbb6d6d7",
+      "case": "csv-wrong-encoding"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Rich-initial-incomplete-settings.json",
+      "sha256": "4a40059a1f8d866d6420849a5aa42e6fa9f080fee63fc5fe4cdc312d668d661a",
+      "case": "initial-incomplete-settings"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Rich-missing-source-column.json",
+      "sha256": "7a54fc7d3aaa477cf55a2d279838475e9c11198a29ce4d7cb5006ad156420f17",
+      "case": "missing-source-column"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Rich-txt-ambiguous-headers.json",
+      "sha256": "c7a667293315e87370063465738bbd8215357c3fe3c1176b012facc0644044f6",
+      "case": "txt-ambiguous-headers"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Rich-txt-unclosed-quote.json",
+      "sha256": "00cadb14a6e9510977bc0294677161b44e6a19fefaa06cd756c03528199323e2",
+      "case": "txt-unclosed-quote"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Rich-txt-wrong-delimiter.json",
+      "sha256": "ccf3fa6b23dc5bd83b719e2b065093449c4014989dea05e35f0a160a8d8fb978",
+      "case": "txt-wrong-delimiter"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/Rich-txt-wrong-encoding.json",
+      "sha256": "a678b1b1fda6c8f52e08379d945722ca3774daec99020179f3e8eaa859765e96",
+      "case": "txt-wrong-encoding"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/reference-csv-ambiguous-headers.json",
+      "sha256": "0ad3d95bc2c1ae7221456156f84757ad77f20368e3b6b925501cc72a3f43833b",
+      "case": "csv-ambiguous-headers"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/reference-csv-unclosed-quote.json",
+      "sha256": "f3d570b2422cc7b53c6ea93e11dca7719f9f94866b17f64f9ba8560d813da46b",
+      "case": "csv-unclosed-quote"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/reference-csv-wrong-delimiter.json",
+      "sha256": "d8d956dfeabb51c87084755af2b3af07e69f9ab2175e6f991c5fccb839b7d5d2",
+      "case": "csv-wrong-delimiter"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/reference-csv-wrong-encoding.json",
+      "sha256": "09740a71801615269a1c6bd5bfc9d1dac4e927925579b8155ddf351f83a250fe",
+      "case": "csv-wrong-encoding"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/reference-initial-incomplete-settings.json",
+      "sha256": "244b8e00be60c94623bf5b8bfe983d38c968187c087febe6c30fc26579e205d3",
+      "case": "initial-incomplete-settings"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/reference-missing-source-column.json",
+      "sha256": "5ba81a472f0e4fe200c5806cb6f9e630e7be33332ccd2ba5161f073470c5ff67",
+      "case": "missing-source-column"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/reference-txt-ambiguous-headers.json",
+      "sha256": "2c9b44ffdfb3fc299c021c15fed1e16287024f5862440d337abad48d71e4e6b0",
+      "case": "txt-ambiguous-headers"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/reference-txt-unclosed-quote.json",
+      "sha256": "4264ba0ddf8e747b123afa41b0f14616fbbcd74bbb33af41c7325cf4f7ebf81c",
+      "case": "txt-unclosed-quote"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/reference-txt-wrong-delimiter.json",
+      "sha256": "cfa469772415d1ee5599edf6724a1cac3b5e14e2c7a9f8c7571eaf863a1c6101",
+      "case": "txt-wrong-delimiter"
+    },
+    {
+      "proof": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework6-ready-01a14d60/extracted/ben-evidence/review/fresh-model-proofs/reference-txt-wrong-encoding.json",
+      "sha256": "38c1107bf1e277e8de7be9812871b386c0854eb5790ff4586ad9e1455f5ea1b7",
+      "case": "txt-wrong-encoding"
+    }
+  ],
+  "model_database_requery_by_Evaler": false,
+  "author_frozen_qualification_rows_not_independent_acceptance": 712,
+  "historical_Ben_genuine_completion_sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+  "historical_Ben_ordinary_release": "2026-10-17T23:13:39.197Z",
+  "no_new_live_lifecycle_claimed": true,
+  "new_live_model_calls_authorized": false,
+  "limits_changed": false,
+  "scope": "Evaler delivery/source boundaries/preservation/queues/read-only health before independent Ben full OFFLINE re-review; not acceptance",
+  "recorded_RED_commands": {
+    "composition-red-2.json": {
+      "argv": [
+        "/home/user/.local/share/loginom-evals-runtime/bin/bun",
+        "test",
+        "test/text-import-evidence.test.ts",
+        "--test-name-pattern",
+        "a following speaker|current refusal facts"
+      ],
+      "cwd": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-checker-sixth/evals",
+      "started_utc": "2026-10-18T04:40:21.730135+00:00",
+      "exit_code": 1,
+      "elapsed_seconds": 0.2369023140054196,
+      "completed_utc": "2026-10-18T04:40:21.967036+00:00"
+    },
+    "final-red.json": {
+      "argv": [
+        "/home/user/.local/share/loginom-evals-runtime/bin/bun",
+        "test",
+        "test/text-import-evidence.test.ts"
+      ],
+      "cwd": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-red-sixth/evals",
+      "started_utc": "2026-10-18T04:38:43.465132+00:00",
+      "exit_code": 1,
+      "elapsed_seconds": 86.06945813284256,
+      "completed_utc": "2026-10-18T04:40:09.534587+00:00"
+    },
+    "red-ben.json": {
+      "argv": [
+        "python3",
+        "deliveries/lab61-checker-rework6/controls.py",
+        "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-checker-sixth/evals/script/check-text-import.py",
+        "red",
+        "scope172",
+        "reader15",
+        "full60"
+      ],
+      "cwd": ".",
+      "started_utc": "2026-10-18T04:33:08.531266+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 47.76530403015204,
+      "completed_utc": "2026-10-18T04:33:56.296600+00:00"
+    },
+    "final-red-v2.json": {
+      "argv": [
+        "/home/user/.local/share/loginom-evals-runtime/bin/bun",
+        "test",
+        "test/text-import-evidence.test.ts"
+      ],
+      "cwd": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-red-sixth/evals",
+      "started_utc": "2026-10-18T04:41:28.354633+00:00",
+      "exit_code": 1,
+      "elapsed_seconds": 85.49470942793414,
+      "completed_utc": "2026-10-18T04:42:53.849341+00:00"
+    },
+    "red-new-tests.json": {
+      "argv": [
+        "/home/user/.local/share/loginom-evals-runtime/bin/bun",
+        "test",
+        "test/text-import-evidence.test.ts",
+        "--test-name-pattern",
+        "composes independent|retains multiline|checks all current|warning propositions"
+      ],
+      "cwd": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-checker-sixth/evals",
+      "started_utc": "2026-10-18T04:33:59.890521+00:00",
+      "exit_code": 1,
+      "elapsed_seconds": 0.9920471028890461,
+      "completed_utc": "2026-10-18T04:34:00.882566+00:00"
+    },
+    "final-red-v3.json": {
+      "argv": [
+        "/home/user/.local/share/loginom-evals-runtime/bin/bun",
+        "test",
+        "test/text-import-evidence.test.ts"
+      ],
+      "cwd": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-red-sixth/evals",
+      "started_utc": "2026-10-18T04:46:06.329259+00:00",
+      "exit_code": 1,
+      "elapsed_seconds": 85.21297305100597,
+      "completed_utc": "2026-10-18T04:47:31.542230+00:00"
+    },
+    "object-roles-red.json": {
+      "argv": [
+        "/home/user/.local/share/loginom-evals-runtime/bin/bun",
+        "test",
+        "test/text-import-evidence.test.ts",
+        "--test-name-pattern",
+        "quoted duplicate-name|an engine receiving"
+      ],
+      "cwd": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-checker-sixth/evals",
+      "started_utc": "2026-10-18T04:44:29.625333+00:00",
+      "exit_code": 1,
+      "elapsed_seconds": 0.22238464700058103,
+      "completed_utc": "2026-10-18T04:44:29.847715+00:00"
+    }
+  },
+  "verified_final_commands_not_independent_acceptance": {
+    "final-red-v3": {
+      "record": {
+        "argv": [
+          "/home/user/.local/share/loginom-evals-runtime/bin/bun",
+          "test",
+          "test/text-import-evidence.test.ts"
+        ],
+        "cwd": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-red-sixth/evals",
+        "started_utc": "2026-10-18T04:46:06.329259+00:00",
+        "exit_code": 1,
+        "elapsed_seconds": 85.21297305100597,
+        "completed_utc": "2026-10-18T04:47:31.542230+00:00"
+      },
+      "record_sha256": "6744bf6fe8332596eac0875fc21aa34542511ff69d0edc6297c9634ef2b4ba18",
+      "stdout_sha256": "d6684989b8dd63b37d2f1954270826fbe1bd89a8debd12bcacf03ed1c6140ef6",
+      "stderr_sha256": "3a62b408185edd028bf9b3fcce4dbf4660a54141f6c1388ef44d3b8440f90429"
+    },
+    "frozen-full-unit": {
+      "record": {
+        "argv": [
+          "/home/user/.local/share/loginom-evals-runtime/bin/bun",
+          "test"
+        ],
+        "cwd": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-checker-sixth/evals",
+        "started_utc": "2026-10-18T04:47:45.396198+00:00",
+        "exit_code": 0,
+        "elapsed_seconds": 591.5908597439993,
+        "completed_utc": "2026-10-18T04:57:36.987055+00:00"
+      },
+      "record_sha256": "50c46592ae7e866de67ac25a9bc453c1212834ab903ccc1c0596fcb584355cd2",
+      "stdout_sha256": "8da634fb13bb3b019032b9e09189b5a555e8a94f413b6c7eb63ad69ca82b51a9",
+      "stderr_sha256": "dcb163a0144ea8453e8321c5c56af1816f2de15ced1b17bd566faef3678904bc"
+    },
+    "frozen-typecheck": {
+      "record": {
+        "argv": [
+          "/home/user/.local/share/loginom-evals-runtime/bin/bun",
+          "typecheck"
+        ],
+        "cwd": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-checker-sixth/evals",
+        "started_utc": "2026-10-18T04:47:45.396403+00:00",
+        "exit_code": 0,
+        "elapsed_seconds": 2.670518491184339,
+        "completed_utc": "2026-10-18T04:47:48.066901+00:00"
+      },
+      "record_sha256": "87e5342ade34098e13815b97a35e659c63ee079c141e76351f94c9cc51eb906b",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    "frozen-controls": {
+      "record": {
+        "argv": [
+          "python3",
+          "deliveries/lab61-checker-rework6/controls.py",
+          "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-checker-sixth/evals/script/check-text-import.py",
+          "frozen",
+          "new-diagnosis",
+          "truth",
+          "prior-table",
+          "prior-inspect",
+          "new-inspect",
+          "new90",
+          "warning7",
+          "new68",
+          "reader9",
+          "full12",
+          "scope172",
+          "reader15",
+          "full60",
+          "null8"
+        ],
+        "cwd": ".",
+        "started_utc": "2026-10-18T04:47:45.398373+00:00",
+        "exit_code": 0,
+        "elapsed_seconds": 187.65246913698502,
+        "completed_utc": "2026-10-18T04:50:53.050839+00:00"
+      },
+      "record_sha256": "8119c19f4037e09f1d33269f9c9c3da828d2bbb42bcb00b633b47a2ab73b3522",
+      "stdout_sha256": "0cd5e67c3c365c0d90d82e88a30dd0e1bd5aaafcf9551d80d41f3f902d3fd974",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "frozen-replay30": {
+      "record": {
+        "argv": [
+          "python3",
+          "deliveries/lab61-checker-rework6/replay.py",
+          "replay-frozen"
+        ],
+        "cwd": ".",
+        "started_utc": "2026-10-18T04:47:45.398805+00:00",
+        "exit_code": 0,
+        "elapsed_seconds": 5.227985376026481,
+        "completed_utc": "2026-10-18T04:47:50.626790+00:00"
+      },
+      "record_sha256": "48d2d211f2984576d18a4d2b481fdd667235cc384cc977ea5a011c0c88c297bb",
+      "stdout_sha256": "70c1a605a58d44a1dc6a0f852258b2bd96078341eb5f0d2d04aa4fba5e8ad6e9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "frozen-prior96-positive9": {
+      "record": {
+        "argv": [
+          "python3",
+          "deliveries/lab61-checker-rework6/run-ben-regression.py"
+        ],
+        "cwd": ".",
+        "started_utc": "2026-10-18T04:47:59.192044+00:00",
+        "exit_code": 0,
+        "elapsed_seconds": 4.241274362895638,
+        "completed_utc": "2026-10-18T04:48:03.433318+00:00"
+      },
+      "record_sha256": "5947bb33deb26ed29d9b68d00a5dedb0a2ca12f6247909362bb98077c45d580b",
+      "stdout_sha256": "27e16c100f02fe3cc5db19f79780de040c4c7be5b990c50fccba0ab4d6f678ca",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "frozen-native18": {
+      "record": {
+        "argv": [
+          "python3",
+          "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework6/ben-evidence/scripts/rereview-860-guards.py"
+        ],
+        "cwd": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework6/ben-regression-sandbox",
+        "started_utc": "2026-10-18T04:47:59.192706+00:00",
+        "exit_code": 0,
+        "elapsed_seconds": 1.6965509201399982,
+        "completed_utc": "2026-10-18T04:48:00.889258+00:00"
+      },
+      "record_sha256": "d819f424cf775063a2874982b216d3fabf3d0ef4bf96cbad2557a64424c82ae0",
+      "stdout_sha256": "02b20851fe506a6182423c49c3980170ed32b590e5c7444bc7b44d4eb10e9fd9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "frozen-portable441": {
+      "record": {
+        "argv": [
+          "python3",
+          "deliveries/lab61-checker-rework6/portable-checks.py",
+          "deliveries/lab61-checker-rework6/portable-frozen"
+        ],
+        "cwd": ".",
+        "started_utc": "2026-10-18T04:47:59.191915+00:00",
+        "exit_code": 0,
+        "elapsed_seconds": 90.171624872135,
+        "completed_utc": "2026-10-18T04:49:29.363537+00:00"
+      },
+      "record_sha256": "235827144c84350410c1c0d8323d7d5b305f65ec4fbc21050df050abaf1361be",
+      "stdout_sha256": "8f77a10285466be6ed737401a2f21de1c7ab7c60fcd559da0847e3357bc381f5",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "Ben_original_inputs_only_expectations_sha256": "b9d2b534832edd05b2f54c6b51dc2f0c4c236d2bc30d956352daa541c0f815ef",
+  "current_usage_preserved": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 3,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 1
+    },
+    "reference_total": 15,
+    "product_physical_calls": 20,
+    "recovery": 1,
+    "probes": 0,
+    "historical_outcomes_preserved": true,
+    "budget_increases": [
+      {
+        "old": 3,
+        "new": 4,
+        "usage": {
+          "completed_reworks": 3,
+          "fresh_REJECTs": 4
+        },
+        "decision_comment_id": "01a14cc1-dada-77b4-8a96-8b6bb33cd8b6",
+        "decision_document_sha256": "ffcca073617e5400f0e40bd79dabe8f83bf53a2bab2a22fb1b5e7fe83d582d1b",
+        "counters_reset": false,
+        "reason": "Five defects; proposition-scope model."
+      },
+      {
+        "old": 4,
+        "new": 5,
+        "usage": {
+          "completed_reworks": 4,
+          "fresh_REJECTs": 5
+        },
+        "decision_id": "LAB61-RICH-CHECKER-REWORK5-d7873d3b-01a14cf4",
+        "decision_document_sha256": "b03db6e1d99eaef8bd80dacf8d78cfbdaf42b6e6c0e5125348cf324fef37552c",
+        "counters_reset": false,
+        "reason": "Bound entity/actor/count/ID scopes; OFFLINE only.",
+        "decision_comment_id": "01a14cfa-2fec-7a9f-988c-18c2a6e6f575"
+      },
+      {
+        "old": 5,
+        "new": 6,
+        "usage": {
+          "completed_reworks": 5,
+          "fresh_REJECTs": 6
+        },
+        "decision_document_sha256": "ccd647ba3d33c081223d7d5f3618f85b9466a6ec2ebc7c698c8308d6dddc7ad4",
+        "counters_reset": false,
+        "reason": "Structured claim scopes/roles/contradictions/code identity; OFFLINE.",
+        "decision_comment_id": "01a14d44-c333-7b3f-a0e1-d24fdcea437e"
+      }
+    ],
+    "product_by_case": {
+      "txt-unclosed-quote": 2,
+      "txt-wrong-encoding": 2,
+      "txt-wrong-delimiter": 2,
+      "txt-ambiguous-headers": 2,
+      "csv-unclosed-quote": 2,
+      "csv-wrong-encoding": 2,
+      "csv-wrong-delimiter": 2,
+      "csv-ambiguous-headers": 2,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 2
+    },
+    "rework_limit": 6,
+    "pre_dispatch_wrapper": {
+      "original_verdict": "ERROR",
+      "physical_model_calls": 0,
+      "outcome_preserved": true,
+      "reservation_carried_forward": true,
+      "budget_reset": false
+    },
+    "product_calls_by_role": {
+      "Rich": 10,
+      "Ben": 10
+    },
+    "product_by_case_scope": "Rich+Ben total;1 each",
+    "recovery_by_role": {
+      "Rich": 1,
+      "Ben": 0
+    }
+  },
+  "author_usage_snapshot_limit": 5,
+  "author_explicit_limit_increase_separately_verified": {
+    "name": "rework_limit",
+    "old": 5,
+    "new": 6,
+    "usage": {
+      "completed_reworks": 5,
+      "fresh_REJECTs": 6
+    },
+    "reason": "Seven confirmed groups; structured claim scopes, object roles, contradictions and warning code identity; one OFFLINE rework.",
+    "counters_reset": false
+  },
+  "full_source_tar_hash_claim": "author streamed hash retained; Evaler verified Git/bundle/diff/145 portable files, did not stream the full tar independently",
+  "internal_verifier_preparation_errors_preserved": [
+    "portable-frozen is output, not source; historical usage limit5 and explicit6 are distinct; corrected own checks without changing delivery"
+  ],
+  "Evaler_full_suite_rerun": false,
+  "original_TASK_input_files_verified": 20,
+  "common": {
+    "head": "f85f4ddce35a9103187bda1682e303f50e163f4d",
+    "clean": true,
+    "hashes": {
+      "AGENTS.md": {
+        "sha256": "fa6c49732062229c9ffeca7176ac4c028d6b2713dd0601df0eba45b6fac48929",
+        "same_as_execution_base": true
+      },
+      "evals/AGENTS.md": {
+        "sha256": "d7e4d6b99b5d9e57fe3b3ad88e2b8066a05e5651d123e90d0d95508b780123be",
+        "same_as_execution_base": true
+      },
+      "evals/docs/evaler/checkpoint.md": {
+        "sha256": "a9a361eeeb48f8785f3bf4122445c999d55f4985c9ff6c65f872c5a26f506a72",
+        "same_as_execution_base": false
+      },
+      "evals/docs/evaler-orchestration.md": {
+        "sha256": "8a88691260ebeb1cabd870ea6ed1252d29d2c4765a23a4a20c9f0104eb817b93",
+        "same_as_execution_base": true
+      },
+      "evals/skills/loginom-node-eval-case/SKILL.md": {
+        "sha256": "e7f66e5147b782dacdb7ddd24450731fc952da456d98c2237b34b10cdc5589f3",
+        "same_as_execution_base": true
+      },
+      "evals/skills/loginom-node-eval-case/references/text-import.md": {
+        "sha256": "95f0309c00195aaea14870e2caf902e6a4c3c96d4a340d55c89b7e861c3dec21",
+        "same_as_execution_base": true
+      },
+      "evals/src/evaler-handoff.ts": {
+        "sha256": "390fe47ae90dfbae6b05c1623d0a9c3e34f38a175e53e29791a2c694ae4beaaa",
+        "same_as_execution_base": true
+      },
+      "evals/script/evaler-handoff.ts": {
+        "sha256": "033da13e4e2e31803cc7ee3e9a11271b9c531ef87977dc33b5b7350328979bbe",
+        "same_as_execution_base": true
+      }
+    }
+  },
+  "published_heads": "1113633ef082a9f80f10f76afbd2ab18db67dc1d\trefs/heads/lab61-checker-sixth\nf85f4ddce35a9103187bda1682e303f50e163f4d\trefs/heads/text-import-evals\n",
+  "fresh_Evaler_readonly_health": {
+    "at": "2026-10-18T05:00:23.353Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-18T05:00:22.511Z"
+    }
+  },
+  "previous_dependency": {
+    "status": "done",
+    "revision": 38
+  }
+}
