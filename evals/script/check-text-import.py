@@ -492,6 +492,7 @@ def report_complements(sentence, atoms=()):
     independent = (r'(?:the\s+)?(?:data|text|engine|warnings?|loginom)\b'
         r'|(?:данн\w*|текст\w*|движ\w*|предупрежд\w*|фактически|actually|now|сейчас)\b'
         r'|(?:запрош\w*|получ\w*|requested|observed|found)\b'
+        r'|(?:в|на|in|on)\s+(?:\w+\s+){1,4}(?:обнаруж\w*|выяв\w*|наблюд\w*|зафиксир\w*|is|are|was|were|detected|observed|found)\b'
         r'|(?:i|we|я|мы)\b|\w+\s+(?:is|are|was|were|отсутств\w*|присутств\w*)\b')
     rows = []
     prefix = r'(?:^|[;,:.!?\n]\s*|\b(?:but|however|но|однако|and|и)\s+)'
