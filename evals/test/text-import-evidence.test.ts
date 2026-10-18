@@ -509,12 +509,120 @@ for (const id of ["txt-unclosed-quote", "csv-unclosed-quote", "txt-wrong-encodin
   })
 }
 
+for (const id of ["txt-unclosed-quote", "csv-unclosed-quote", "txt-wrong-encoding", "csv-wrong-encoding"]) {
+  const reports: [string, boolean][] = [
+    ["Сообщите, что данные повреждены.", false],
+    ["Please report that data is corrupted.", false],
+    ["Повреждены данные не были. Все записи прочитаны правильно.", false],
+    ["Утверждение «данные повреждены» ложно. Все исходные записи прочитаны правильно.", false],
+    ["It is possible that data is corrupted. The result is still unknown.", false],
+    ["Warning отсутствует, данные повреждены не были.", false],
+    ["Данные повреждены не были, хотя движок предупреждений не выдал.", false],
+    ["Данные не были повреждены.", false],
+    ["Напишите в отчёте: «Данные повреждены».", false],
+    ["Пример неверного ответа: «Данные повреждены».", false],
+    ["Нельзя утверждать, что данные повреждены.", false],
+    ["Предположим, что данные повреждены.", false],
+    ["The claim that data is corrupted is false.", false],
+    ["Data is corrupted would be an incorrect conclusion.", false],
+    ["Потеря данных не произошла. Повреждения не наблюдаются.", false],
+    ["Данные повреждены? Результат пока неизвестен.", false],
+    ["Не сообщайте, что данные повреждены.", false],
+    ["Не утверждайте, что данные повреждены.", false],
+    ["Не исключено, что данные повреждены.", false],
+    ["Якобы данные повреждены.", false],
+    ["Обнаружено повреждение данных. Предупреждений движка нет.", true],
+    ["Предупреждений нет. Данные, однако, искажены.", true],
+    ["Данные были повреждены. Движок не выдал warning.", true],
+    ["The imported data is corrupted, although there was no engine warning.", true],
+    ["Подтверждаю: данные повреждены.", true],
+    ["Я сообщаю, что данные повреждены.", true],
+  ]
+  if (id.endsWith("unclosed-quote")) reports.push(
+    ["Результат неполный: вторая запись отсутствует как самостоятельная строка и стала частью значения Name первой записи. Причина — незакрытая кавычка. Движок предупреждений не выдал.", true],
+    ["В исходном файле две записи, в полученной таблице осталась одна. Отдельной строки Id=002 нет: её содержимое находится внутри Name первой записи из-за незакрытой кавычки. Прочитана вся таблица. Предупреждений движка нет.", true],
+    ["Вторая строка оказалась внутри поля Name первой строки. Незакрытая кавычка объединила записи.", true],
+    ["The second record became part of the Name field of the first record; the unmatched quote consumed it.", true],
+    ["Наблюдаемый исход: импорт завершился успешно, но в таблице обнаружена неполнота. Незакрытая кавычка поглотила остаток файла как часть значения Name; строка 002,next не стала отдельной записью. Это фактический результат импорта, не native warning.", true],
+    ["Строка 002,next не стала отдельной записью.", true],
+    ["Вторая запись не стала частью поля Name; все записи сохранены.", false],
+    ["Проверьте, стала ли вторая запись частью значения Name.", false],
+  )
+  if (id.endsWith("wrong-encoding")) reports.push(
+    ["Значение Name испорчено: исходное «Привет» превратилось в «ϰ袥�». Id сохранился как «001». Прочитана вся таблица из одной строки; движок не сообщил предупреждений.", true],
+    ["В исходном файле Name содержит «Привет», в результате получено «ϰ袥�». Кириллица превратилась в нечитаемые символы при чтении в кодировке 65001. Id = «001», строка одна. Предупреждений движка нет.", true],
+    ["Name: исходное «Привет» заменено на «ϰ袥�» при чтении. Все строки прочитаны, предупреждений нет.", true],
+    ["The original Name value «Привет» became «ϰ袥�» in the imported output.", true],
+    ["Исходное «Привет» не превратилось в «ϰ袥�». Значение Name сохранено.", false],
+    ["Замените исходное «Привет» на «ϰ袥�».", false],
+  )
+  for (const [report, accepted] of reports) test(`${id} report assertion scope: ${report}`, async () => {
+    const f = await damagedFixture(id)
+    try {
+      await f.write(report)
+      const actual = await validateNodeAttempt(f.task, f.attempt)
+      expect(actual.errors).toEqual([])
+      expect(actual.failures.length === 0).toBe(accepted)
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+}
+
+async function writeInspection(f: Awaited<ReturnType<typeof damagedFixture>>, inspection: {
+  tool: string; input: Record<string, unknown>; output: Record<string, unknown>
+}) {
+  await f.write()
+  const file = path.join(f.attempt, "events.jsonl")
+  await Bun.write(file, await Bun.file(file).text() + JSON.stringify({ type: "tool_use", part: {
+    id: "inspection", tool: inspection.tool, state: { status: "completed", input: inspection.input,
+      output: JSON.stringify(inspection.output), time: { start: 100, end: 101 } } } }) + "\n")
+}
+
+test("inspect validates every asserted settled outcome binding and uncertainty", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const snapshot = structuredClone(f.output)
+    const inspect = { tool: "loginom_dock_operation_inspect", input: { operation_id: "import" },
+      output: { operation_id: "import", action_key: "operation.inspect", status: "SUCCEEDED", effect_possible: false,
+        output: { operation_id: "import", state: "resolved", effect_state: "verified", cleanup_confirmed: true, outcome: snapshot } } }
+    await writeInspection(f, inspect)
+    expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    for (const mutate of [
+      () => { inspect.output.output.operation_id = "foreign" },
+      () => { inspect.output.output.state = "pending" },
+      () => { snapshot.cleanup_complete = false },
+      () => { snapshot.node.document_id = "foreign" },
+      () => { snapshot.node.workflow_id = "foreign" },
+      () => { snapshot.node.node_id = "foreign" },
+      () => { snapshot.state = "running" },
+      () => { snapshot.execution.execution_id = "foreign" },
+      () => { snapshot.output.status = "not_refreshed" },
+    ]) {
+      mutate()
+      await writeInspection(f, inspect)
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      Object.assign(snapshot, structuredClone(f.output))
+      inspect.output.output.operation_id = "import"
+      inspect.output.output.state = "resolved"
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("inspect cannot escape consistency checking by changing its outer operation id", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    await writeInspection(f, { tool: "loginom_dock_operation_inspect", input: { operation_id: "import" },
+      output: { operation_id: "foreign", action_key: "operation.inspect", status: "SUCCEEDED", effect_possible: false,
+        output: { operation_id: "import", state: "resolved", effect_state: "verified", cleanup_confirmed: true } } })
+    expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
 test("verified read-only operation inspect preserves the terminal node receipt and unknown effects", async () => {
   const f = await damagedFixture("txt-wrong-encoding")
   try {
     const inspect = { tool: "loginom_dock_operation_inspect", input: { operation_id: "import" },
       output: { operation_id: "import", action_key: "operation.inspect", status: "SUCCEEDED", effect_possible: false,
-        output: { effect_state: "verified", cleanup_confirmed: true } } }
+        output: { operation_id: "import", state: "resolved", effect_state: "verified", cleanup_confirmed: true } } }
     f.calls.push(JSON.parse(JSON.stringify(inspect)))
     await f.write()
     expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
