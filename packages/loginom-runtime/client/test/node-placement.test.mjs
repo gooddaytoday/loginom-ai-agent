@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
-import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
+import {createNodeTargetBrowserAdapter,mutateGraph} from '../lib/node-target-browser.mjs';
 import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
 import {nodePlacementPoint,nodePlacementPosition,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from '../lib/node-placement.mjs';
 
@@ -127,4 +127,103 @@ test('created node zoom uses its full rendered footprint, not only the drop poin
 test('created node without verified rendered bounds cannot silently use a point',async()=>{
  const f=fixture();f.args.nodeId='missing';
  await assert.rejects(revealNodePlacement(f.args),/footprint unavailable/);assert.equal(f.state().clicks,0);
+});
+
+function overflowFixture({foreign=false,missing=false,wrongIcon=false,ambiguous=false,changed=false,buffered=false}={}){
+ const f=fixture();let menuOpen=false,triggers=0,items=0,clock=1000,lastHide=-Infinity,suppressed=0;
+ const old=f.args.page.locator;
+ const toggle=old('[data-tid="MF;TF;ModelForm;btnShowOutline"]');
+ const item={count:async()=>foreign||missing?0:ambiguous?2:1,isVisible:async()=>menuOpen,
+  locator:s=>{assert.equal(s,'.bg-icon-preview');return {count:async()=>wrongIcon?0:1};},
+  click:async()=>{assert.ok(menuOpen);items++;await toggle.click();}};
+ const menu={count:async()=>menuOpen?1:0,isVisible:async()=>menuOpen,
+  waitFor:async({state})=>assert.equal(menuOpen,state==='visible'),
+  locator:s=>{assert.equal(s,'[role="menuitem"][data-qtip="Показать карту сценария"]');return item;}};
+ f.args.prefix='MF;TF-7';
+ f.args.page.locator=s=>{
+  if(s==='[data-tid="MF;TF-7;ModelForm;btnShowOutline"]')return {...toggle,isVisible:async()=>false,getAttribute:async()=> 'Показать карту сценария'};
+  if(s==='[data-tid="MF;TF-7;ModelForm;tlbModel;b"]')return {count:async()=>1,isVisible:async()=>true,click:async()=>{triggers++;if(buffered&&!menuOpen&&clock-lastHide<250){suppressed++;return;}menuOpen=!menuOpen;if(!menuOpen)lastHide=clock;}};
+  if(s==='[data-tid="MF;TF-7;ModelForm;tlbModel;b;mn"]')return menu;
+  assert.equal(s,'[data-tid="MF;TF-7;ModelForm;cntDiagram"]');return old('[data-tid="MF;TF;ModelForm;cntDiagram"]');
+ };
+ f.args.page.waitForTimeout=async ms=>{clock+=ms;};
+ const guard=f.args.guard;f.args.guard=async()=>{await guard();if(changed&&triggers)throw Error('Graph changed');};
+ return {...f,overflow:()=>({menuOpen,triggers,items}),timing:()=>({clock,lastHide,suppressed})};
+}
+test('hidden native outline button opens its exact form overflow, reveals target and restores both menus',async()=>{
+ const f=overflowFixture();const run=runInNewContext('('+revealNodePlacement.toString()+')');
+ const r=await run(f.args);
+ assert.equal(r.fully_visible,true);assert.equal(r.zoom_steps,2);assert.equal(r.outline_closed,true);
+ assert.deepEqual(f.overflow(),{menuOpen:false,triggers:4,items:2});assert.equal(f.state().open,false);
+});
+test('foreign or missing outline items, wrong icons and ambiguous items never toggle or zoom',async()=>{
+ for(const options of [{foreign:true},{missing:true},{wrongIcon:true},{ambiguous:true}]){
+  const f=overflowFixture(options);await assert.rejects(revealNodePlacement(f.args),/outline menu item unavailable/);
+  assert.equal(f.overflow().items,0);assert.equal(f.overflow().menuOpen,false);assert.equal(f.state().clicks,0);
+ }
+});
+test('graph change after opening overflow refuses the outline gesture',async()=>{
+ const f=overflowFixture({changed:true});
+ await assert.rejects(revealNodePlacement(f.args),e=>e.message==='Graph changed'&&e.placement_navigation_unverified===true);
+ assert.equal(f.overflow().items,0);assert.equal(f.state().clicks,0);
+});
+
+test('consecutive reveals respect native menu reopen suppression without repeating any opening click',async()=>{
+ const f=overflowFixture({buffered:true});
+ assert.equal((await revealNodePlacement(f.args)).fully_visible,true);
+ f.args.position={x:2000,y:100};
+ assert.equal((await revealNodePlacement(f.args)).fully_visible,true);
+ assert.deepEqual(f.overflow(),{menuOpen:false,triggers:8,items:4});
+ assert.equal(f.timing().suppressed,0);assert.equal(f.state().open,false);
+});
+test('menu settling consumes the original deadline and cannot dispatch after it expires',async()=>{
+ const f=overflowFixture({buffered:true});let available=100;
+ f.args.remaining=()=>{if(available<=0)throw Error('Original deadline');return available;};
+ f.args.page.waitForTimeout=async ms=>{available-=ms;};
+ await assert.rejects(revealNodePlacement(f.args),/Original deadline/);
+ assert.deepEqual(f.overflow(),{menuOpen:false,triggers:0,items:0});assert.equal(f.state().clicks,0);
+});
+
+// Inject failure after the native fixture gesture, then classify it through
+// the real graph mutation wrapper. A lost reply must never permit creation.
+for(const fault of ['visible-toggle','overflow-open','overflow-toggle','zoom','overflow-close','menu-cleanup'])test('lost outline gesture reply retains mutation uncertainty: '+fault,async()=>{
+ const f=fault==='visible-toggle'?fixture():overflowFixture();
+ const base=f.args.page.locator;let creates=0,triggers=0,items=0,toggles=0;
+ const lost=async(dispatch)=>{await dispatch();throw Error('Lost reply after '+fault);};
+ f.args.page.locator=selector=>{
+  if(selector==='[data-tid='+JSON.stringify(f.args.prefix+';ModelForm;cmpDiagram')+']')return f.args.root;
+  if(!selector.includes('ModelForm')){creates++;throw Error('Unexpected creation gesture');}
+  const original=base(selector);
+  if(selector.endsWith(';btnShowOutline"]')&&fault==='visible-toggle')return {...original,click:async(...args)=>{toggles++;await lost(()=>original.click(...args));}};
+  if(selector.endsWith(';tlbModel;b"]'))return {...original,click:async(...args)=>{
+   triggers++;if(fault==='overflow-open'&&triggers===1||fault==='menu-cleanup'&&triggers===2)await lost(()=>original.click(...args));
+   else await original.click(...args);
+  }};
+  if(selector.endsWith(';tlbModel;b;mn"]'))return {...original,locator:child=>{
+   const item=original.locator(child);return {...item,click:async(...args)=>{
+    items++;if(fault==='overflow-toggle'&&items===1||fault==='overflow-close'&&items===2)await lost(()=>item.click(...args));
+    else await item.click(...args);
+   }};
+  }};
+  if(selector.endsWith(';cntDiagram"]')&&fault==='zoom')return {...original,locator:child=>{
+   const zoom=original.locator(child);return {...zoom,click:async(...args)=>lost(()=>zoom.click(...args))};
+  }};
+  return original;
+ };
+ f.args.page.evaluate=async()=>true;
+ const graph={interaction_ready:true,dom_epoch:1,document_id:'doc',nodes:[],links:[]};
+ const task={deadline:Date.now()+10000,request:{document_id:'doc',workflow_ref:{prefix:f.args.prefix,workflow_id:'wf'}},
+  effect:{id:'lost-outline',kind:'create',parameters:{type:'transform.join_data',position:f.args.position},before:graph},
+  types:{'transform.join_data':{title:'Join',palette_group:'Transforms'}}};
+ const r=await mutateGraph(f.args.page,task,async()=>graph,()=>{},f.args.readViewport,nodePlacementPoint,revealNodePlacement,samePlacementGraph);
+ assert.equal(r.status,'AMBIGUOUS');assert.equal(r.effect_possible,true);assert.equal(r.cleanup_complete,false);
+ assert.match(r.error,/Lost reply after/);assert.equal(creates,0);assert.deepEqual(graph.nodes,[]);
+ if(fault==='visible-toggle')assert.equal(toggles,1);
+ if(fault==='overflow-open'){assert.equal(triggers,1);assert.equal(items,0);}
+ if(fault==='overflow-toggle')assert.equal(items,1);
+ if(fault==='overflow-close')assert.equal(items,2);
+ // After the menu-close reply is lost, a fresh owned-menu opening may restore
+ // the known-open outline. That cleanup must not erase the original fault.
+ if(fault==='menu-cleanup'){assert.equal(triggers,4);assert.equal(items,2);assert.equal(f.state().open,false);}
+ assert.equal(f.state().clicks,fault==='zoom'?1:fault==='overflow-close'?2:0);
 });
