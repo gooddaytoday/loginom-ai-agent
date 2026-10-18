@@ -1,0 +1,92 @@
+{
+  "checked_utc": "2026-10-18T06:45:49.594447+00:00",
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "report_id": "01a14db7-6a1e-7369-9ce3-eba9946d8b49",
+  "Ben_task": "01a14da7-595a-7a34-80ee-d0182a687440",
+  "source": "51a0eb16877dc1b1a6a113841219a2540077de3e",
+  "parent": "1113633ef082a9f80f10f76afbd2ab18db67dc1d",
+  "checker_sha256": "71760b1ed00a3e6362c4ea267687def626c117d8a18e65d5ea21d2fe99ee3c40",
+  "formal_Ben_verdict": "REJECT",
+  "archive_bytes": 14151533,
+  "archive_sha256": "93212d8033cf61bdd5aaf80c0b3879b62885473efbbd7348ab57d85e276874da",
+  "manifest_sha256": "e94630c885063e7ecc68904124dc33ed0e7d547e380107be83b78a09751158da",
+  "parts": [
+    {
+      "name": "lab61-ben-rereview-51a0eb16.zip.part-001",
+      "bytes": 4194304,
+      "sha256": "6c86b827dfec8287c325f7c4463077984aa52048df02f9001deba28e35327f0c"
+    },
+    {
+      "name": "lab61-ben-rereview-51a0eb16.zip.part-002",
+      "bytes": 4194304,
+      "sha256": "0bbc2676db368e0e36278ed8d76bf0e0a4873150359526ebaf9ba60b81c2ff94"
+    },
+    {
+      "name": "lab61-ben-rereview-51a0eb16.zip.part-003",
+      "bytes": 4194304,
+      "sha256": "a5dadc9e6931a8c0efd6749eddb37226e4a81b058ca59ccd6128b9f90eb0f989"
+    },
+    {
+      "name": "lab61-ben-rereview-51a0eb16.zip.part-004",
+      "bytes": 1568621,
+      "sha256": "43076426ee8df5c4c98c677bca90f7438de64e70804905080815e13a003e7e1f"
+    }
+  ],
+  "payloads_verified": 933,
+  "archive_members": 934,
+  "payload_bytes": 222135288,
+  "safe_unique_exact_membership": true,
+  "REPORT_standalone_equal": true,
+  "REPORT_bytes": 24569,
+  "REPORT_sha256": "3eb5e91a29fdf9070e7f151ea0532b7840aa7d3cb44660671434ea43b27371b6",
+  "candidate_parent_Git_files_verified": {
+    "candidate/": 144,
+    "parent/": 144
+  },
+  "admission_exact_equal": true,
+  "historical_lifecycle": [
+    {
+      "original": "/home/user/.local/share/loginom-evals-runtime/operations/completed/c5ce46d3-8f4a-4abe-8d72-53c2adb3f12b/eval-completion-3d003db7-5176-4d5a-9def-2243626bf401.json",
+      "delivered": "lifecycle/prior-genuine-completion.json",
+      "sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+      "byte_equal": true
+    },
+    {
+      "original": "/home/user/.local/share/loginom-evals-runtime/operations/completed/c5ce46d3-8f4a-4abe-8d72-53c2adb3f12b/release.json",
+      "delivered": "lifecycle/prior-ordinary-release.json",
+      "sha256": "1d9e17e0b34ddff48791a493f49ebfd525b1d17a0e8b5a0b2a1d110d73671274",
+      "byte_equal": true
+    }
+  ],
+  "ordinary_prior_release": "2026-10-17T23:13:39.197Z",
+  "Ben_own_readonly_healthy_FREE_reported": "2026-10-18T06:32:15.661Z",
+  "new_live_lifecycle": false,
+  "findings_reproduced_by_root": false,
+  "source_executed_by_root": false,
+  "source_integrated": false,
+  "Ben_reported_controls": {
+    "transcript": {
+      "rows": 156,
+      "matches": 114,
+      "false_PASS": 6,
+      "false_FAIL": 36,
+      "parent_regressions": 24
+    },
+    "reader": {
+      "rows": 16,
+      "matches": 7,
+      "false_PASS": 3,
+      "false_FAIL": 6,
+      "parent_regressions": 5
+    },
+    "full_warning_supplemental": {
+      "rows": 64,
+      "matches": 28,
+      "synthetic_repetitions_not_genuine": true
+    }
+  },
+  "raw_Rich3_7_Ben2_8_wrapperERROR0_preserved": true,
+  "derived30_ref10PASS_Rich8_2_Ben8_2_not_new_measurements": true,
+  "physical_usage_unchanged": "reference15/Rich10/Ben10/recoveryRich1Ben0/probes0",
+  "root_native_or_state_effects": false
+}

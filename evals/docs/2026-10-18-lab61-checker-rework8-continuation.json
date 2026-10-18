@@ -1,0 +1,120 @@
+{
+  "checked_utc": "2026-10-18T06:51:09.311759+00:00",
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "source_report_id": "01a14db7-6a1e-7369-9ce3-eba9946d8b49",
+  "source_sha": "51a0eb16877dc1b1a6a113841219a2540077de3e",
+  "original_blocked_stop": {
+    "reject_count": 8,
+    "rework_limit": 7,
+    "review_cycle": 8,
+    "cleanup_required": false
+  },
+  "explicit_limit_before_effects": {
+    "old": 7,
+    "new": 8,
+    "completed_reworks": 7,
+    "fresh_REJECTs": 8,
+    "canonical_scope_sha256": "58e19693c3779439067446ea665796d8e94183f4b3c75d173ac873988e126571",
+    "blocked_issue_readback_revision": 334,
+    "state_consumption_equal": true,
+    "counters_reset": false
+  },
+  "actual_usage": {
+    "reference": 15,
+    "Rich_product": 10,
+    "Ben_product": 10,
+    "Rich_recovery": 1,
+    "Ben_recovery": 0,
+    "probes": 0
+  },
+  "all_five_budget_increases_retained": true,
+  "prior_full_decision_bindings_archived": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/roles/evaler/work/lab61-ben-reject8-01a14db7/archived-verifications.json",
+    "sha256": "7c55c69eb236d86d0d775a7f3676bff1ad48374d755e452e442f02f0f8a09e79",
+    "section": "before_rework8_decision.consumption.budget_increases"
+  },
+  "canonical_continue_event": {
+    "kind": "continue_after_evaler",
+    "id": "01a14dbd-0bf6-7d7e-b590-39fb64c3a6f8",
+    "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+    "report_id": "01a14db7-6a1e-7369-9ce3-eba9946d8b49",
+    "sha": "51a0eb16877dc1b1a6a113841219a2540077de3e",
+    "target": "Rich",
+    "stand_ready": true
+  },
+  "continue_action": "ready_to_dispatch",
+  "separate_dispatch_receipt": {
+    "queued_task_id": "01a14dbd-0c22-76ba-9ba5-0dd1fed6314e",
+    "final_issue_revision": 339,
+    "final_state_equal_receipt": true,
+    "initial_ambiguous_resolved_no_redispatch": true
+  },
+  "only_consumption_enrichment_after_limit_readback": {
+    "decision_comment_id": "01a14dbd-0bf6-7d7e-b590-39fb64c3a6f8"
+  },
+  "original_native_files": [
+    {
+      "name": "reject-gate-input.json",
+      "bytes": 2404,
+      "sha256": "d8a1e814af30f09430b3d94938626950bc7ac6ae7c5e5a662bc0fb8e6b45010e"
+    },
+    {
+      "name": "reject-gate-output.json",
+      "bytes": 2122,
+      "sha256": "35621752563add0f4bc8bb4d38a02f46f4586dc8f94aa5359c56a5dafc76e235"
+    },
+    {
+      "name": "outer-limit-authorized.json",
+      "bytes": 8096,
+      "sha256": "acb385abbade8d836f9b6bebfc3e3bc01ba12748d09b03c2f4269b1dd8dcab0c"
+    },
+    {
+      "name": "issue-limit-readback.json",
+      "bytes": 155902,
+      "sha256": "6ced8628887fab88e791c7b66379d5994d3ec7aaaecea1598bf16d37b6ae6017"
+    },
+    {
+      "name": "continue-input.json",
+      "bytes": 2379,
+      "sha256": "c12bd93d44bfdc1344a4592655def36ad2dc84103448d0384f900d371e7b1f5d"
+    },
+    {
+      "name": "continue-output.json",
+      "bytes": 1727,
+      "sha256": "3628bb1d26144dc5f4a7646b31e69ca66f023edd438ad72954a12f6d8732bb77"
+    },
+    {
+      "name": "dispatch-input.json",
+      "bytes": 1795,
+      "sha256": "2f0044b6ab839048facc839ddf9ed6dcce0fc5b0d71fb980657007eb5fe97e9a"
+    },
+    {
+      "name": "dispatch-output.json",
+      "bytes": 1978,
+      "sha256": "1a5853abb10132622c14067a069a80af4054ceb039edae8264013a0601b7b352"
+    },
+    {
+      "name": "receipt-input.json",
+      "bytes": 2080,
+      "sha256": "aec91a52559ba14b3c87f295cfa7832b90583d24cd5fc79f2130305b9a2bef71"
+    },
+    {
+      "name": "receipt-output.json",
+      "bytes": 1968,
+      "sha256": "80a823bf0daad589263ca8bc9d7f057d1941f6c141b5d1265aa84f37866c51e2"
+    },
+    {
+      "name": "outer-final.json",
+      "bytes": 8242,
+      "sha256": "8f9b54edb2d3385506b8dcbdf4a61fa9a26742700a8b17b8624c2d2394ba42f5"
+    },
+    {
+      "name": "issue-final-readback.json",
+      "bytes": 157837,
+      "sha256": "82aa840fd6952fcddd3a73ac0a2ff662fac99909c5ac04f020d72b4901ddbc6a"
+    }
+  ],
+  "root_state_continue_dispatch_comment_actions": false,
+  "new_physical_model_or_live_effects": false,
+  "unknown_patch_accepted": false
+}
