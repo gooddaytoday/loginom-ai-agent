@@ -2285,7 +2285,8 @@ function readRenderedInputMapping(observation) {
           ||row.getAttribute('data-recordid')!==String(record.internalId)||row.getAttribute('data-boundview')!==grid.id
           ||d.IsCountCase!==false||typeof d.DisplayName!=='string'||!d.DisplayName||!Number.isSafeInteger(d.Index)
           ||![0,1,2,3].includes(d.Disposition)||available&&d.Disposition!==0)continue;
-        const cells=[...row.querySelectorAll('[data-tid]')].filter(e=>getTid(e)===base+column+d.DisplayName&&!e.closest('.x-grid-row-summary'));
+        const key=d.DisplayName.replace(/\s/g,'_').replace(/,/g,'');
+        const cells=[...row.querySelectorAll('[data-tid]')].filter(e=>getTid(e)===base+column+key&&!e.closest('.x-grid-row-summary'));
         if(cells.length!==1||!visible(cells[0])||sensitive(cells[0]))continue;
         crossTableCells.set(refOf(cells[0]),{input_index:d.Index,record_id:String(record.internalId),label:d.DisplayName,
           disposition:d.Disposition,role:available?'available':'used',row_ref:refOf(row),grid_ref:refOf(grid),wizard_root_ref:wizard.root_ref});
