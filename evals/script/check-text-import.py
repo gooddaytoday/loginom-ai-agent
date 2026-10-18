@@ -453,24 +453,60 @@ def report_text(attempt_dir, terminal):
         for event in [json.loads(line)] if index > terminal['index'] and event.get('type') == 'text')
 
 
-def report_sentences(text):
-    """Independent clauses retain quote/attribution scope and local cause polarity."""
+class ReportClause(str):
+    """A proposition keeps its enclosing speech/truth scope after coordination."""
+    def __new__(cls, text, scope=None):
+        value = super().__new__(cls, text)
+        value.scope = scope
+        return value
+
+
+def report_sentences(text, atoms=()):
+    """Split independent predicates, retaining any enclosing report operator.
+
+    Quoted objects are atomic. Sentence/paragraph boundaries end a scope;
+    coordination, contrast and semicolons inside it do not discard its governor.
+    Object lists (field names/count units/warning IDs) are not new predicates.
+    """
     text = re.sub(r'[`*]', '', text.casefold().replace('ё', 'е'))
     text = re.sub(r',\s*(?:однако|however)\s*,', ' ', text)
-    # A quoted proposition is atomic: an internal connector must not detach it
-    # from an enclosing "example", "claim is false" or speech act. Identifiers
-    # such as settings.columns are also preserved.
-    boundary = (r'«[^»]*»|“[^”]*”|"[^"\n]{1,300}"|(?P<cut>'
-        r'(?<=[.!?;])\s+|\n+|\s*[,—]?\s*\b(?:но|однако|but|however|although|хотя)\b[\s,]+'
-        r'|,\s*а\s+)')
-    rows, start = [], 0
-    for match in re.finditer(boundary, text):
+    quoted = r'«[^»]*»|“[^”]*”|"[^"\n]{1,300}"'
+    # A complete native error is one bound witness even if it contains its own
+    # sentences/instructions. Its fragments cannot escape an enclosing example.
+    quoted += ''.join('|' + r'\s+'.join(re.escape(part) for part in atom.split()) for atom in atoms if atom)
+    sentences, start = [], 0
+    for match in re.finditer(quoted + r'|(?P<cut>(?<=[.!?])\s+|\n+)', text):
         if match.group('cut') is not None:
-            if text[start:match.start()].strip():
-                rows.append(text[start:match.start()].strip())
+            sentences.append(text[start:match.start()].strip())
             start = match.end()
-    if text[start:].strip():
-        rows.append(text[start:].strip())
+    sentences.append(text[start:].strip())
+    rows = []
+    for sentence in sentences:
+        if not sentence:
+            continue
+        scope = None
+        # These operators govern a complement, not merely the first coordinated
+        # predicate in that complement. An uncertain cause instead stays local.
+        if sentence.rstrip(' «»"“”').endswith('?') or re.match(
+            r'^(?:пример|образец|example|template|предполож\w*|допустим|task)\b'
+            r'|^(?:оператор|пользователь|someone|operator|user)\b.{0,20}'
+            r'\b(?:утвержда\w*|сказ\w*|предполож\w*|claims?|said|suggest\w*)\b', sentence):
+            scope = 0
+        if re.match(r'^(?:ложн\w*|неверно|false)\s+(?:is\s+)?(?:the\s+)?(?:утвержден\w*|claim)\b', sentence):
+            scope = -1
+        start = 0
+        cuts = quoted + (r'|(?P<cut>;\s*|\s*[,—]?\s*\b(?:но|однако|but|however|although|хотя)\b[\s,]+'
+            r'|,\s*(?:а|и|and)\s+|\s+\b(?:и|and)\b\s+(?='
+            r'(?:не\b|нет\b|no\b|not\b|did\b|does\b|never\b)'
+            r'|[^;,.!?]{0,50}\b(?:поврежд\w*|искаж\w*|подтвержд\w*|неизвест\w*|отсутств\w*|повторя\w*'
+            r'|выда\w*|выдал\w*|предупрежд\w*|warned|issued|emitted|raised|corrupt\w*|damag\w*|unconfirmed|unknown|absent)\b))')
+        for match in re.finditer(cuts, sentence):
+            if match.group('cut') is not None:
+                if sentence[start:match.start()].strip():
+                    rows.append(ReportClause(sentence[start:match.start()].strip(), scope))
+                start = match.end()
+        if sentence[start:].strip():
+            rows.append(ReportClause(sentence[start:].strip(), scope))
     return rows
 
 
@@ -482,9 +518,15 @@ def claim_status(clause, start, end):
     span negate it; negation inside a negative presence predicate is not applied
     twice. Contrast siblings have independent scope in report_sentences.
     """
+    if getattr(clause, 'scope', None) is not None:
+        return clause.scope
     prefixes, suffixes = report_sentences(clause[:start]), report_sentences(clause[end:])
     prefix = prefixes[-1] if prefixes else ''
     suffix = suffixes[0] if suffixes else ''
+    # Full native-error witnesses may span multiple clauses. Their original
+    # report prefix has the same retained governor as a parsed proposition.
+    if getattr(prefix, 'scope', None) is not None:
+        return prefix.scope
     tail = re.sub(r'^[\s,«»"“”():—-]+', '', suffix)
     warning_topic = re.search(r'\b(?:warn(?:s|ed|ing|ings)?|предупрежд\w*|предупред\w*)\b', clause[start:end])
     if warning_topic and re.search(r'\b(?:не\s+обязател\w*|not\s+required)\b', tail):
@@ -497,7 +539,7 @@ def claim_status(clause, start, end):
         r'|\b(?:не\s+)?выдум\w*\b'
         r'|\b(?:оператор|пользователь|someone|operator|user)\b.{0,20}\b(?:утвержда\w*|сказ\w*|предполож\w*|claims?|said|suggest\w*)\b', prefix):
         return 0
-    if re.search(r'\b(?:нельзя|невозможно|неверно|отрица\w*)\b'
+    if re.search(r'\b(?:нельзя|невозможно|неверно|ложн\w*|false|отрица\w*)\b'
         r'|\bне\s+(?:утвержда\w*|подтвержда\w*|могу\s+подтверд\w*|связан\w*)\b'
         r'|\b(?:cannot|can\s+not|do\s+not|don.t)\s+(?:confirm|claim|assert)\b'
         r'|\b(?:not\s+(?:due|because)|не\s+из-за)\b', prefix):
@@ -545,36 +587,56 @@ def claim_asserted(clause, start, end):
     return claim_status(clause, start, end) == 1
 
 
+def bound_report_facts(sentence, objects, predicates):
+    """A predicate and its subject/object must be in the same noun relation.
+
+    The intervening grammar may qualify that noun or carry its auxiliary. It
+    cannot introduce a different noun/predicate, so a nearby connection error
+    cannot become an absent column or a duplicated source name.
+    """
+    gap = (r'(?:[\s,:—-]+(?:исходн\w*|входн\w*|первоначальн\w*|исходник\w*|source|original|the'
+        r'|был\w*|явля\w*|are|is|was|were|been|have|has|still|также|уже|пока|еще'
+        r'|в\s+(?:(?:первоначальн\w*|исходн\w*)\s+)?(?:запрос\w*|источник\w*|настройк\w*)'
+        r'|among\s+(?:the\s+)?source\s+fields?))*[\s,:—-]*')
+    for pattern in [rf'(?:{objects}){gap}(?:{predicates})', rf'(?:{predicates}){gap}(?:{objects})']:
+        for match in re.finditer(pattern, sentence):
+            if claim_asserted(sentence, match.start(), match.end()):
+                yield match
+
+
 def refusal_explained(sentences, reason, spec):
-    """Match the observed refusal's facts, without a required report phrase."""
+    """Ground the observed reason in object-, role- and unit-bound facts."""
     columns = spec.get('columns', []) if spec else []
-    topic = r'\b(?:columns?|fields?|names?|headers?|пол\w*|колон\w*|столб\w*|имен\w*|заголов\w*|определен\w*)\b'
+    fields = r'\b(?:columns?|fields?|пол\w*|колон\w*|столб\w*)\b'
+    names_topic = (r'\b(?:имена(?:\s+исходн\w*)?(?:\s+пол\w*)?|заголов\w*|headers?'
+        r'|(?:source\s+)?(?:column|field)\s+names?|names?\s+of\s+(?:the\s+)?(?:source\s+)?(?:columns?|fields?))\b')
     absence = (r'\b(?:отсутств\w*|пропущ\w*|опущ\w*|нет|без|missing|absent|omitted|lacks?|without)\b'
         r'|\bне\s+(?:переда\w*|зада\w*|указа\w*|определ\w*)\b'
-        r'|\b(?:not|never)\s+(?:supplied|provided|defined|specified|given)\b'
-        r'|\bno\s+(?:columns?|fields?|definitions?)\b')
+        r'|\b(?:not|never)\s+(?:supplied|provided|defined|specified|given)\b|\bno\b')
     if 'duplicate source column names' in reason:
-        patterns = [r'\b(?:дублир\w*|дубл\w*|повторя\w*|одинаков\w*|совпада\w*|duplicat\w*|identical)\b',
-                    r'\bsame\s+(?:name|header)\b',
-                    r'\b(?:одн\w*|общ\w*)\s+имен\w*\b']
-        names = set(column.get('source_name', column.get('name', '')).casefold() for column in columns)
-        for name in names:
-            if name:
-                patterns.extend([r'\b(?:both|two|2|оба|обе|два|две)\b.{0,50}(?:named|имен\w*|заголов\w*).{0,15}\b' + re.escape(name) + r'\b',
-                    re.escape(name) + r'.{0,15}\b(?:дважды|twice)\b'])
-        return any(re.search(topic, sentence) and claim_asserted(sentence, match.start(), match.end())
-            for sentence in sentences for pattern in patterns for match in re.finditer(pattern, sentence))
+        duplicate = r'\b(?:дублир\w*|дубл\w*|повторя\w*|одинаков\w*|совпада\w*|duplicat\w*|identical|same)\b'
+        for sentence in sentences:
+            if any(bound_report_facts(sentence, names_topic, duplicate)):
+                return True
+            # Quantification is bound to actual source columns and their native
+            # name, rather than to a repeated error elsewhere in the sentence.
+            for name in {str(c.get('source_name', c.get('name', ''))).casefold() for c in columns} - {''}:
+                for pattern in [
+                    r'\b(?:both|two|2|оба|обе|два|две)\s+(?:source\s+|исходн\w*\s+)?' + fields + r'.{0,20}(?:named|имен\w*|заголов\w*).{0,10}\b' + re.escape(name) + r'\b',
+                    r'\b(?:одн\w*|общ\w*|same)\s+(?:имен\w*|name)\b\s*' + re.escape(name) + r'\b',
+                    re.escape(name) + r'\s+(?:дважды|twice)\b',
+                ]:
+                    for match in re.finditer(pattern, sentence):
+                        if claim_asserted(sentence, match.start(), match.end()):
+                            return True
+        return False
     if ('initial' in reason or 'require' in reason) and 'columns' in reason:
-        return any(re.search(r'\b(?:columns?|колон\w*|определен\w*)\b', sentence)
-            and claim_asserted(sentence, match.start(), match.end())
-            for sentence in sentences for match in re.finditer(absence, sentence))
+        objects = r'\b(?:columns?|колон\w*|определен\w*(?:\s+колон\w*)?|(?:column\s+)?definitions?)\b'
+        return any(any(bound_report_facts(sentence, objects, absence)) for sentence in sentences)
     if 'missing or ambiguous' in reason:
         names = re.findall(r'"([^"]+)"', reason)
-        if not names:
-            return False
-        return any(re.search(r'\b' + re.escape(names[0]) + r'\b', sentence)
-            and claim_asserted(sentence, match.start(), match.end())
-            for sentence in sentences for match in re.finditer(absence + r'|\b(?:неоднознач\w*|ambiguous)\b', sentence))
+        return bool(names) and any(any(bound_report_facts(sentence, r'\b' + re.escape(names[0]) + r'\b',
+            absence + r'|\b(?:неоднознач\w*|ambiguous)\b')) for sentence in sentences)
     counts = re.search(r'requested (\d+), observed (\d+)', reason)
     if not counts:
         return False
@@ -584,27 +646,36 @@ def refusal_explained(sentences, reason, spec):
                 3: r'три|трех|three', 4: r'четыре|четырех|four', 5: r'пять|пяти|five'}
     number = lambda n: rf'\b(?:{n}|{numerals.get(n, str(n))})\b'
     required, actual = number(requested), number(observed)
-    requested_seen, observed_seen = False, False
+    field_unit = r'(?:исходн\w*\s+|source\s+)?' + fields
+    # A number followed by another explicit noun is not an elliptical field
+    # count. A missing unit can inherit a field topic only within this relation.
+    quantity = lambda n: n + rf'(?:\s+{field_unit}|(?=\s*[,.;:!?—-]|\s+(?:вместо|instead|rather|поэтому)\b|\s*$))'
+    requested_seen, observed_seen, field_context = False, False, False
     for sentence in sentences:
-        # Relative count explicitly binds observed -> requested. Do not lose a
-        # negated causal relation such as "refusal is not due to [this count]".
-        for match in re.finditer(actual + r'.{0,40}\b(?:вместо|instead\s+of|rather\s+than)\b.{0,20}' + required, sentence):
-            if re.search(topic, sentence) and claim_asserted(sentence, match.start(), match.end()):
+        topic = bool(re.search(fields, sentence))
+        for match in re.finditer(quantity(actual) + r'\s+\b(?:вместо|instead\s+of|rather\s+than)\b\s+' + quantity(required), sentence):
+            if (topic or field_context) and claim_asserted(sentence, match.start(), match.end()):
                 return True
         req = re.search(r'\b(?:запрош\w*|ожида\w*|requested|required|expected)\b', sentence)
         if req and claim_asserted(sentence, req.start(), req.end()):
             names = [str(column.get('name', '')).casefold() for column in columns]
-            requested_seen |= bool(re.search(required, sentence) or len(names) == requested and names
-                and all(re.search(r'\b' + re.escape(name) + r'\b', sentence) for name in names))
+            named = len(names) == requested and bool(names) and all(re.search(r'\b' + re.escape(name) + r'\b', sentence) for name in names)
+            # Named-column ellipsis is useful only without an explicit numeric
+            # quantity. A contradictory number/unit cannot be overruled by names.
+            explicit = re.search(r'\b(?:\d+|' + '|'.join(numerals.values()) + r')\b', sentence)
+            requested_seen |= bool(re.search(required + r'\s+' + field_unit, sentence) or named and not explicit)
+            field_context |= requested_seen
         obs = re.search(r'\b(?:обнаруж\w*|наблюда\w*|получ\w*|оказал\w*|есть|только|observed|found|only|single|единственн\w*)\b', sentence)
-        if obs and claim_asserted(sentence, obs.start(), obs.end()) and re.search(actual, sentence) and re.search(topic, sentence):
-            observed_seen = True
+        if obs and claim_asserted(sentence, obs.start(), obs.end()):
+            observed_seen |= bool(re.search(actual + r'\s+' + field_unit, sentence)
+                or (topic or field_context) and re.search(quantity(actual), sentence))
     return requested_seen and observed_seen
 
 
 def report_truth(text, result, events, refusal=False, spec=None):
     """Ground local report propositions in the already verified operation."""
-    sentences = report_sentences(text)
+    reason = (result.get('error') or {}).get('message', '').casefold().replace('ё', 'е')
+    sentences = report_sentences(text, [reason] if refusal else [])
     operation_id = result.get('operation_id')
     warnings = []
     def collect(value):
@@ -628,18 +699,30 @@ def report_truth(text, result, events, refusal=False, spec=None):
             collect(terminal)
     warning_evidence = json.dumps(warnings, ensure_ascii=False).casefold()
     for sentence in sentences:
-        # A declarative warning noun/verb is a proposition independently of the
-        # emission verb. This cannot silently ignore "emitted", "raised", etc.
-        for match in re.finditer(r'\b(?:warn(?:s|ed|ing|ings)?|предупрежд\w*|предупред\w*)\b', sentence):
+        # Each emission predicate owns its warning objects. Coordinated IDs
+        # share that predicate; a coordinated emission/denial has another scope.
+        for match in re.finditer(r'\b(?:warn(?:s|ed|ing|ings)?|предупрежд\w*|предупред\w*|(?:w|warn|warning)[_-][\w-]+)\b', sentence):
+            actor = sentence[:match.start()]
+            # Keep the emitter with the local predicate, including "I issued
+            # a warning" and an engine predicate nested after agent advice.
+            emitters = re.findall(r'\b(?:я|мы|i|we|engine|движ\w*|loginom)\b', actor)
+            if emitters and emitters[-1] in ('я', 'мы', 'i', 'we'):
+                continue
+            if re.match(r'(?:w|warn|warning)[_-]', match.group()):
+                # A warning ID remains an object when its noun is elided after
+                # a coordinated emission verb. Mere mention is not an emission.
+                if not re.search(r'\b(?:issu(?:e|ed|es)|emit(?:s|ted)?|rais(?:e|ed|es)|выда\w*|выдал\w*)\b', actor):
+                    continue
             status = claim_status(sentence, match.start(), match.end())
             if status == 0:
                 continue
-            if status == -1:
-                require(not warnings, 'diagnostic: report denies verified native warning')
-                continue
             codes = re.findall(r'\b(?:w|warn|warning)[_-][\w-]+\b', sentence)
-            require(warnings and all(re.search(r'\b' + re.escape(code) + r'\b', warning_evidence) for code in codes),
-                'diagnostic: report warning lacks native evidence')
+            # Absence of one ID says nothing about another verified warning.
+            present = [bool(re.search(r'\b' + re.escape(code) + r'\b', warning_evidence)) for code in codes]
+            if status == -1:
+                require(not any(present) if codes else not warnings, 'diagnostic: report denies verified native warning')
+                continue
+            require(all(present) if codes else bool(warnings), 'diagnostic: report warning lacks native evidence')
     if not refusal:
         return
     for sentence in sentences:
@@ -653,7 +736,6 @@ def report_truth(text, result, events, refusal=False, spec=None):
                 require(not claim_asserted(sentence, match.start(), match.end()), 'diagnostic: report contradicts proven refusal')
         for match in re.finditer(r'\b(?:отказ\w*\s+(?:нет|не\s+был\w*|отсутств\w*)|(?:нет|без)\s+отказ\w*|(?:no|without)\s+(?:refusals?|rejections?))\b', sentence):
             require(not claim_asserted(sentence, match.start(), match.end()), 'diagnostic: report contradicts proven refusal')
-    reason = result.get('error', {}).get('message', '').casefold().replace('ё', 'е')
     normalized = re.sub(r'\s+', ' ', re.sub(r'[`*]', '', text.casefold().replace('ё', 'е')))
     literal = re.sub(r'\s+', ' ', re.sub(r'[`*]', '', reason))
     # Full native error is a witness even with multiple sentences or semicolons.
@@ -681,13 +763,12 @@ def damage_diagnosed(text, kind, replacements, affected_fields):
     assertions = []
     for sentence in sentences:
         # Remove discourse punctuation without detaching subject from predicate.
-        sentence = re.sub(r'\b(?:но|однако|but|however|although|хотя)\b', ' ', sentence)
+        sentence = ReportClause(re.sub(r'\b(?:но|однако|but|however|although|хотя)\b', ' ', sentence), sentence.scope)
         # Do not discard introductory speech acts at a comma/colon. Assertion
         # classification needs both sides of its candidate span.
         clauses = [sentence]
         for clause in clauses:
-            clause = re.sub(r'[,«»"“”]', ' ', clause)
-            clause = re.sub(r'\s+', ' ', clause)
+            clause = ReportClause(re.sub(r'\s+', ' ', re.sub(r'[,«»"“”]', ' ', clause)), clause.scope)
             denial = re.search(
                 rf'{damage}(?:\s+\w+){{0,4}}\s+(?:нет\b|отсутств\w*|не\s+(?:был\w*|стал\w*|произош\w*|выяв\w*|обнаруж\w*|наблюда\w*))'
                 rf'|\b(?:нет|никаких|без|no|without)\s+(?:{subject}\s+)?{damage}'

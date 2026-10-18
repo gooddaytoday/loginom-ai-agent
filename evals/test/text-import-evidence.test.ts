@@ -1120,3 +1120,157 @@ for (const [id, grounded, paraphrase, denial] of [
     } finally { await rm(f.root, { recursive: true, force: true }) }
   })
 }
+
+// Fifth review: retain governing scope while binding each predicate to its object.
+for (const id of ["txt-unclosed-quote", "csv-unclosed-quote", "txt-wrong-encoding", "csv-wrong-encoding"]) {
+  test(`${id} retains enclosing scope and independent coordinated facts`, async () => {
+    const f = await damagedFixture(id)
+    try {
+      for (const fact of ["данные повреждены", "текст искажён"]) {
+        for (const other of ["предупреждений не было", "причина не подтверждена"]) {
+          for (const join of [", и ", ", но ", "; "]) for (const report of [fact + join + other, other + join + fact]) {
+            await f.write(report + ".")
+            expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+          }
+          for (const join of [", и ", ", но "]) for (const report of [fact + join + other, other + join + fact]) {
+            await f.write("Пример неверного отчёта: " + report + ".")
+            expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+          }
+        }
+        for (const report of ["Ложно утверждение «" + fact + "».", "Неверно утверждение: " + fact + "."]) {
+          await f.write(report)
+          expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+        }
+        for (const advice of ["Я предупреждаю читателя: ", "Я предупреждаю пользователя: "]) {
+          await f.write(advice + fact + ".")
+          expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+        }
+      }
+      await f.write("False is the claim that text is damaged.")
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      await f.write("I warn you: data is corrupted.")
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+  test(`${id} grounds warning polarity per emitter and identifier`, async () => {
+    const f = await damagedFixture(id)
+    try {
+      Object.assign(f.events[4]!.receipt!.value, { warnings: [{ code: "W_ALPHA", message: "Source warning" }] })
+      for (const report of [
+        "The engine issued warning W_ALPHA and did not issue warning W_BETA.",
+        "The engine did not issue warning W_BETA and issued warning W_ALPHA.",
+        "The engine issued warning W_ALPHA, but did not issue warning W_BETA.",
+        "The engine did not issue warning W_BETA, but issued warning W_ALPHA.",
+        "Я предупреждаю читателя: данные повреждены.",
+      ]) {
+        await f.write("Data is corrupted. " + report)
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      }
+      for (const report of [
+        "The engine issued warnings W_ALPHA and W_BETA.",
+        "The engine issued warning W_BETA and did not issue warning W_ALPHA.",
+        "The engine did not issue warning W_ALPHA, but issued warning W_BETA.",
+      ]) {
+        await f.write("Data is corrupted. " + report)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+}
+for (const [id, positives, negatives] of [
+  ["initial-incomplete-settings", ["columns отсутствуют, и соединение установлено.", "Соединение установлено, но columns не заданы."],
+    ["columns переданы, но соединение отсутствует.", "Нет соединения; columns имеются.", "columns переданы, и отсутствует соединение с сервером."]],
+  ["missing-source-column", ["OtherName отсутствует, и соединение установлено.", "Соединение установлено, но OtherName нет среди исходных полей."],
+    ["OtherName есть в источнике, но соединение отсутствует.", "Нет соединения; OtherName имеется."]],
+  ["txt-ambiguous-headers", ["Соединение установлено, и имена исходных полей повторяются."],
+    ["Имена исходных полей различны, но повторяется ошибка соединения.", "Повторяется ошибка соединения; заголовки различны."]],
+  ["csv-ambiguous-headers", ["Имена исходных полей повторяются, но ошибка соединения не повторяется."],
+    ["Имена исходных полей различны, и повторяется ошибка соединения.", "Повторяется ошибка соединения; заголовки различны."]],
+  ["txt-wrong-delimiter", ["Запрошены два поля. Получено одно поле и три строки.", "Запрошены два поля. Получены три строки и одно поле."],
+    ["Запрошены два поля. Получено одно окно и три поля.", "Запрошены два поля. Получены три поля и одна строка.", "Запрошены две строки. Получено одно поле."]],
+  ["csv-wrong-delimiter", ["Запрошены два поля. Получено одно поле и три строки.", "Запрошены два поля. Получены три строки и одно поле."],
+    ["Запрошены два поля. Получена одна строка и три поля.", "Запрошены два поля. Получены три поля и одна строка.", "Запрошены две строки. Получено одно поле."]],
+] as const) {
+  test(`${id} binds refusal predicates and count units to their actual object`, async () => {
+    const f = await reportedRefusalFixture(id)
+    try {
+      for (const report of positives) {
+        await f.write(report)
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      }
+      for (const report of negatives) {
+        await f.write(report)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+}
+
+for (const id of ["txt-unclosed-quote", "csv-wrong-encoding"]) {
+  test(`${id} fifth additional scope and warning-object boundaries`, async () => {
+    const f = await damagedFixture(id)
+    try {
+      for (const scope of ["Предположение оператора: ", "Operator claims that ", "Пример ответа: "]) {
+        for (const report of ["предупреждений нет, но данные повреждены", "данные повреждены, и предупреждений нет"]) {
+          await f.write(scope + report + ".")
+          expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+        }
+      }
+      Object.assign(f.events[4]!.receipt!.value, { warnings: [{ code: "W_ALPHA", message: "Source warning" }] })
+      for (const report of [
+        "The engine issued warning W_ALPHA and did not issue W_BETA.",
+        "The engine did not issue W_BETA, but issued warning W_ALPHA.",
+      ]) {
+        await f.write("Data is corrupted. " + report)
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      }
+      for (const report of [
+        "The engine issued warning W_ALPHA and did not issue W_ALPHA.",
+        "The engine issued warning W_ALPHA and issued W_BETA.",
+      ]) {
+        await f.write("Data is corrupted. " + report)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+}
+for (const id of ["txt-wrong-delimiter", "csv-wrong-delimiter"]) {
+  test(`${id} fifth additional explicit quantity overrides inferred names`, async () => {
+    const f = await reportedRefusalFixture(id)
+    try {
+      for (const report of [
+        "Запрошены три поля Id и Name. Получено одно поле.",
+        "Запрошены две строки Id и Name. Получено одно поле.",
+      ]) {
+        await f.write(report)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+}
+
+for (const id of ["txt-ambiguous-headers", "csv-ambiguous-headers", "txt-wrong-delimiter", "csv-wrong-delimiter", "initial-incomplete-settings", "missing-source-column"]) {
+  test(`${id} keeps literal witness scope across a second report introducer`, async () => {
+    const f = await reportedRefusalFixture(id)
+    try {
+      const output: { error: { message: string } } = JSON.parse(JSON.stringify(f.calls[2]!.output))
+      for (const prefix of ["Пример неверного ответа: предупреждений нет, но отказ: ", "Operator claims that no warnings exist, but the refusal was: "]) {
+        await f.write(prefix + output.error.message)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      }
+      await f.write("Предупреждений нет, но отказ: " + output.error.message)
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+}
+
+test("successful native receipts may carry an explicit null error", async () => {
+  for (const id of ["txt-unclosed-quote", "csv-unclosed-quote", "txt-wrong-encoding", "csv-wrong-encoding"]) {
+    const f = await damagedFixture(id)
+    try {
+      Object.assign(f.output, { error: null })
+      await f.write("Data is corrupted.")
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }
+})
