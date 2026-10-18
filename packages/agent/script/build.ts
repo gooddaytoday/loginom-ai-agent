@@ -152,7 +152,8 @@ const targets = selectedTarget
           return false
         }
 
-        return true
+        // A requested baseline single build replaces the native one.
+        return !baselineFlag
       })
     : allTargets
 

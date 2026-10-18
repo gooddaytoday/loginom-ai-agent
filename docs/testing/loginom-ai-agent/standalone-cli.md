@@ -420,7 +420,7 @@ NOT_RUN.
 
 Из `packages/loginom-host`: задать абсолютные pinned `LOGINOM_AI_AGENT_NODE_SOURCE`
 и `LOGINOM_AI_AGENT_BROWSER_SOURCE`, затем pinned Bun 1.3.14:
-`bun script/build-cli.ts <new-absolute-output>`. Каталог назначения не должен
+`bun script/build-cli.ts <new-absolute-output>` (на Linux x64 без AVX2 — с флагом `--baseline` и baseline-сборкой Bun той же версии). Каталог назначения не должен
 существовать. Сборка проверяет неизменность source snapshot, включает binary/resources/
 host и пишет полный manifest. Dirty snapshot явно обозначается; release требует
 отдельного clean-source процесса. Native status без CLI_BUNDLE и через symlink
