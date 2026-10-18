@@ -1,0 +1,51 @@
+{
+  "package_path": "/demo-2026-10-22/s1-revenue.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/demo-2026-10-22/revenue-north.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string"
+        },
+        {
+          "name": "Revenue",
+          "label": "Revenue",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "Север",
+          "Category": "Техника",
+          "Revenue": 54400.0
+        },
+        {
+          "Region": "Север",
+          "Category": "Офис",
+          "Revenue": 6182.0
+        }
+      ]
+    }
+  ]
+}
