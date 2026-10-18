@@ -1,0 +1,103 @@
+{
+  "verified_utc": "2026-10-18T10:25:06.634526+00:00",
+  "issue": "LAB-61",
+  "Ben_task": "01a14e67-c893-7699-be47-4e0cdb2d83ea",
+  "report_comment": "01a14e7b-b76b-7192-8356-034f62033bfb",
+  "verdict": "REJECT",
+  "source": {
+    "candidate/": "dfe5a42c4eab86adccb2c5477c2d609be4e13d1e",
+    "initial-6d028/": "6d02838c024f3450ba4709ea1e4c69ec6f482c80",
+    "parent/": "1088d04fe41f7765e3873d993b4b32a32eb5a369"
+  },
+  "archive": {
+    "bytes": 15704088,
+    "sha256": "335bca2b261f257c2c8e5962bbb9d79df414c2f1e36e44b0949b873b36b25f4f",
+    "manifest_sha256": "137c359d777534686915c58443f7edafd6a75387106c49db9c737ce8a8186dcb",
+    "payloads": 1580,
+    "members": 1581,
+    "payload_bytes": 239334361,
+    "safe_unique_exact_membership": true,
+    "all_payload_hashes_verified": true,
+    "all_official_bytes_preserved": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-ben-rereview-dfe5a42c-reject-delivery"
+  },
+  "REPORT": {
+    "bytes": 24248,
+    "sha256": "7041955da7b55d0090a6f51430dcb045b58b8b067bbe851bac03bc328046d621",
+    "equal_standalone": true
+  },
+  "admission": {
+    "sha256": "76e601569c67a7d9d221f80a6098b10d262e8693d3fcd5d9265e7c0ce40d73ef",
+    "member": "admission/evaler-admission.json",
+    "equal_canonical": true
+  },
+  "Git_bytes_equal": {
+    "candidate/": 144,
+    "initial-6d028/": 144,
+    "parent/": 144
+  },
+  "genuine_completion_and_ordinary_release": {
+    "eval-completion-3d003db7-5176-4d5a-9def-2243626bf401.json": {
+      "sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+      "exact_archive_paths": [
+        "lifecycle/prior-genuine-completion.json"
+      ]
+    },
+    "release.json": {
+      "sha256": "1d9e17e0b34ddff48791a493f49ebfd525b1d17a0e8b5a0b2a1d110d73671274",
+      "exact_archive_paths": [
+        "lifecycle/prior-ordinary-release.json"
+      ]
+    }
+  },
+  "three_groups": [
+    "all independent count relations must be enumerated",
+    "literal code identity when matching optional label",
+    "each warning argument keeps local polarity and emission antecedent"
+  ],
+  "new_controls": {
+    "transcript": {
+      "rows": 54,
+      "matches": 42,
+      "false_PASS": 10,
+      "false_FAIL": 2,
+      "regressions_vs_1088": 0
+    },
+    "reader": {
+      "rows": 20,
+      "matches": 13,
+      "false_PASS": 4,
+      "false_FAIL": 3,
+      "regressions_vs_1088": 0
+    },
+    "supplemental": {
+      "rows": 80,
+      "matches": 52,
+      "false_PASS": 16,
+      "false_FAIL": 12,
+      "synthetic_four_private_copy_repeats_not_genuine_or_independent_causes": true
+    }
+  },
+  "Ben_verification_claims": {
+    "RED": "342PASS7FAIL",
+    "GREEN": "349PASS0FAIL",
+    "full_suite": "963PASS15SKIP0FAIL/6014assertions/explicit timeout30000",
+    "typecheck": 0,
+    "quote_base_initial_final": [
+      24,
+      28,
+      32
+    ],
+    "quote_rows": 32,
+    "fastpath_equivalence": "2458/2458",
+    "isolated_default5s_initial_final": "timeout/timeout under parallel load; author final separate PASS retained; no default5s full PASS claim",
+    "healthy_FREE_utc": "2026-10-18T10:06:30.722Z"
+  },
+  "limits": {
+    "root_source_executed": false,
+    "root_findings_reproduced": false,
+    "root_candidate_integrated": false,
+    "new_live_model_or_native_effects": false,
+    "four_measured_product_FAIL_unchanged": true,
+    "historical_raw_ERROR_FAIL_preserved": true
+  }
+}
