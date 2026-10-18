@@ -1424,3 +1424,192 @@ test("an engine receiving agent advice is distinct from an engine emitting a war
     expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
+
+for (const id of ["txt-unclosed-quote", "csv-wrong-encoding"]) {
+  test(`${id} retains complement scope before punctuation and restores factual siblings`, async () => {
+    const f = await damagedFixture(id)
+    try {
+      for (const fact of ["данные повреждены", "текст искажён"]) {
+        for (const governor of ["Не утверждаю", "Нельзя утверждать", "Не подтверждено", "В примере сказано"]) {
+          for (const separator of [": ", ":\n"]) {
+            await f.write(governor + separator + fact + ".")
+            expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+          }
+        }
+        for (const report of [
+          `Пример сообщения: «данные не повреждены», фактически ${fact}.`,
+          `${fact}; пример неверного ответа: предупреждений нет, данные целы.`,
+          `Я не знаю причину, ${fact}; нужна ли помощь?`,
+        ]) {
+          await f.write(report)
+          expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+        }
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+  test(`${id} preserves the speaker across quote and attribution permutations`, async () => {
+    const f = await damagedFixture(id)
+    try {
+      for (const [open, close] of [["«", "»"], ['"', '"'], ["'", "'"]]) {
+        for (const speaker of ["the user said", "said the user", "— сказал оператор", "оператор сказал"]) {
+          await f.write(`${open}Data is corrupted${close}, ${speaker}.`)
+          expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+          await f.write(`Data is corrupted. ${open}Data is not corrupted${close}, ${speaker}.`)
+          expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+        }
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+}
+
+for (const [id, fact, opposite] of [
+  ["initial-incomplete-settings", "Свойство 'settings.columns' не присутствует в запросе.", "columns переданы."],
+  ["missing-source-column", "Поле 'OtherName' не найдено в источнике.", "OtherName присутствует."],
+  ["csv-ambiguous-headers", "Имена исходных полей 'Name' и 'Name' одинаковы.", "Имена полей источника различны."],
+] as const) {
+  test(`${id} preserves quoted object identity, negative presence and attempt scope`, async () => {
+    const f = await reportedRefusalFixture(id)
+    try {
+      await f.write(fact)
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      for (const history of ["В предыдущей попытке", "В прошлом запуске", "Ранее", "Previously"]) {
+        for (const text of [`${fact} ${history} ${opposite}`, `${history} ${opposite} ${fact}`]) {
+          await f.write(text)
+          expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+        }
+      }
+      await f.write(fact + " " + opposite)
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+}
+
+test("count predicates retain alternative units and reject quantities in another noun argument", async () => {
+  const f = await reportedRefusalFixture("csv-wrong-delimiter")
+  try {
+    for (const count of ["три", "четыре"]) {
+      await f.write(`Запрошены два, а не ${count} поля. Получено одно поле.`)
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      await f.write(`Запрошены ${count}, а не два поля. Получено одно поле.`)
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      await f.write(`Запрошены два поля. Получено подтверждение: одно поле существует в таблице из ${count} полей.`)
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("warning code arguments stay concrete across syntax, prefixes, lists and message mentions", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [real, other] of [["FORMAT_REAL", "FORMAT_OTHER"], ["ALPHA", "OMEGA"], ["CODE42", "CODE43"]] as const) {
+      Object.assign(receipt.value!, { warnings: [{ code: real, message: `A field named ${other} was observed` }] })
+      for (const noun of ["warning code CODE", "warning (CODE)", "предупреждение с кодом CODE", "CODE warning"]) {
+        for (const [code, accepted] of [[real, true], [other, false]] as const) {
+          await f.write("Data is corrupted. The engine issued " + noun.replace("CODE", code) + ".")
+          const result = await validateNodeAttempt(f.task, f.attempt)
+          expect(result.errors).toEqual([])
+          expect(result.failures.length === 0).toBe(accepted)
+        }
+      }
+      for (const list of [`${real} and ${other}`, `${other} and ${real}`]) {
+        await f.write(`Data is corrupted. The engine issued warnings ${list}.`)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      }
+      await f.write(`Data is corrupted. The engine did not issue warning ${other}.`)
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      await f.write(`Data is corrupted. The engine issued ${real}.`)
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("agent advice and embedded engine emission preserve separate polarity", async () => {
+  const f = await damagedFixture("csv-wrong-encoding")
+  try {
+    for (const report of [
+      "I warn the user that the engine did not issue warnings.",
+      "Я предупреждаю пользователя: движок не выдал предупреждений.",
+      "I issued a warning to the engine; the engine did not issue warnings.",
+    ]) {
+      await f.write("Data is corrupted. " + report)
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    }
+    for (const report of ["I warn the user that the engine issued warning FORMAT_OTHER.", "Я вижу предупреждение с кодом FORMAT_OTHER, выданное движком."]) {
+      await f.write("Data is corrupted. " + report)
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("governing regions survive English colon complements and release a factual noun sibling", async () => {
+  const f = await damagedFixture("txt-unclosed-quote")
+  try {
+    for (const prefix of ["I cannot confirm", "I do not assert", "In an example"]) {
+      await f.write(prefix + ": data is corrupted.")
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+    }
+    await f.write("Example: «data is not corrupted», the actual result: data is corrupted.")
+    expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("equivalent attempt frames preserve only their own contradictions", async () => {
+  const initial = await reportedRefusalFixture("initial-incomplete-settings")
+  try {
+    for (const prefix of ["In the previous attempt", "In the last run", "В предшествующей попытке"]) {
+      await initial.write("columns отсутствуют. " + prefix + " columns переданы.")
+      expect(await validateNodeAttempt(initial.task, initial.attempt)).toEqual({ errors: [], failures: [] })
+    }
+  } finally { await rm(initial.root, { recursive: true, force: true }) }
+})
+
+test("qualified header objects preserve only source contradictions", async () => {
+  const headers = await reportedRefusalFixture("txt-ambiguous-headers")
+  try {
+    await headers.write("source.headers повторяются. output.headers различны.")
+    expect(await validateNodeAttempt(headers.task, headers.attempt)).toEqual({ errors: [], failures: [] })
+    await headers.write("source.headers различны. output.headers повторяются.")
+    expect((await validateNodeAttempt(headers.task, headers.attempt)).failures.length).toBeGreaterThan(0)
+  } finally { await rm(headers.root, { recursive: true, force: true }) }
+})
+
+test("quoted speech and its following attribution remain one scope across physical lines", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    for (const [open, close] of [["«", "»"], ['"', '"'], ["'", "'"]]) {
+      for (const speaker of ["the user said", "— сказал оператор"]) {
+        await f.write(`${open}\nData is corrupted\n${close},\n${speaker}.`)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+        await f.write(`Data is corrupted. ${open}\nData is not corrupted\n${close},\n${speaker}.`)
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      }
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+  for (const id of ["missing-source-column", "initial-incomplete-settings"]) {
+    const refusal = await reportedRefusalFixture(id)
+    try {
+      const output = refusal.calls[2]!.output
+      const literal = "error" in output && output.error ? output.error.message : ""
+      expect(literal.length).toBeGreaterThan(0)
+      for (const [open, close] of [["«", "»"], ['"', '"'], ["'", "'"]]) {
+        await refusal.write(`${open}\n${literal}\n${close},\nthe user said.`)
+        expect((await validateNodeAttempt(refusal.task, refusal.attempt)).failures.length).toBeGreaterThan(0)
+        await refusal.write(`Фактическая причина: ${open}${literal}${close}.`)
+        expect(await validateNodeAttempt(refusal.task, refusal.attempt)).toEqual({ errors: [], failures: [] })
+      }
+    } finally { await rm(refusal.root, { recursive: true, force: true }) }
+  }
+})
+
+test("a warning description after a colon does not manufacture a code object", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    Object.assign(receipt.value!, { warnings: [{ code: "FORMAT_REAL", message: "Source warning" }] })
+    await f.write("Data is corrupted. The engine issued a warning: Source warning.")
+    expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    await f.write("Data is corrupted. The engine issued a warning: FORMAT_OTHER.")
+    expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
