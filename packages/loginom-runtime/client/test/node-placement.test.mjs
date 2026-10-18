@@ -129,8 +129,8 @@ test('created node without verified rendered bounds cannot silently use a point'
  await assert.rejects(revealNodePlacement(f.args),/footprint unavailable/);assert.equal(f.state().clicks,0);
 });
 
-function overflowFixture({foreign=false,missing=false,wrongIcon=false,ambiguous=false,changed=false}={}){
- const f=fixture();let menuOpen=false,triggers=0,items=0;
+function overflowFixture({foreign=false,missing=false,wrongIcon=false,ambiguous=false,changed=false,buffered=false}={}){
+ const f=fixture();let menuOpen=false,triggers=0,items=0,clock=1000,lastHide=-Infinity,suppressed=0;
  const old=f.args.page.locator;
  const toggle=old('[data-tid="MF;TF;ModelForm;btnShowOutline"]');
  const item={count:async()=>foreign||missing?0:ambiguous?2:1,isVisible:async()=>menuOpen,
@@ -142,12 +142,13 @@ function overflowFixture({foreign=false,missing=false,wrongIcon=false,ambiguous=
  f.args.prefix='MF;TF-7';
  f.args.page.locator=s=>{
   if(s==='[data-tid="MF;TF-7;ModelForm;btnShowOutline"]')return {...toggle,isVisible:async()=>false,getAttribute:async()=> 'Показать карту сценария'};
-  if(s==='[data-tid="MF;TF-7;ModelForm;tlbModel;b"]')return {count:async()=>1,isVisible:async()=>true,click:async()=>{triggers++;menuOpen=!menuOpen;}};
+  if(s==='[data-tid="MF;TF-7;ModelForm;tlbModel;b"]')return {count:async()=>1,isVisible:async()=>true,click:async()=>{triggers++;if(buffered&&!menuOpen&&clock-lastHide<250){suppressed++;return;}menuOpen=!menuOpen;if(!menuOpen)lastHide=clock;}};
   if(s==='[data-tid="MF;TF-7;ModelForm;tlbModel;b;mn"]')return menu;
   assert.equal(s,'[data-tid="MF;TF-7;ModelForm;cntDiagram"]');return old('[data-tid="MF;TF;ModelForm;cntDiagram"]');
  };
+ f.args.page.waitForTimeout=async ms=>{clock+=ms;};
  const guard=f.args.guard;f.args.guard=async()=>{await guard();if(changed&&triggers)throw Error('Graph changed');};
- return {...f,overflow:()=>({menuOpen,triggers,items})};
+ return {...f,overflow:()=>({menuOpen,triggers,items}),timing:()=>({clock,lastHide,suppressed})};
 }
 test('hidden native outline button opens its exact form overflow, reveals target and restores both menus',async()=>{
  const f=overflowFixture();const run=runInNewContext('('+revealNodePlacement.toString()+')');
@@ -165,4 +166,20 @@ test('graph change after opening overflow refuses the outline gesture',async()=>
  const f=overflowFixture({changed:true});
  await assert.rejects(revealNodePlacement(f.args),e=>e.message==='Graph changed'&&e.placement_navigation_unverified===true);
  assert.equal(f.overflow().items,0);assert.equal(f.state().clicks,0);
+});
+
+test('consecutive reveals respect native menu reopen suppression without repeating any opening click',async()=>{
+ const f=overflowFixture({buffered:true});
+ assert.equal((await revealNodePlacement(f.args)).fully_visible,true);
+ f.args.position={x:2000,y:100};
+ assert.equal((await revealNodePlacement(f.args)).fully_visible,true);
+ assert.deepEqual(f.overflow(),{menuOpen:false,triggers:8,items:4});
+ assert.equal(f.timing().suppressed,0);assert.equal(f.state().open,false);
+});
+test('menu settling consumes the original deadline and cannot dispatch after it expires',async()=>{
+ const f=overflowFixture({buffered:true});let available=100;
+ f.args.remaining=()=>{if(available<=0)throw Error('Original deadline');return available;};
+ f.args.page.waitForTimeout=async ms=>{available-=ms;};
+ await assert.rejects(revealNodePlacement(f.args),/Original deadline/);
+ assert.deepEqual(f.overflow(),{menuOpen:false,triggers:0,items:0});assert.equal(f.state().clicks,0);
 });
