@@ -68,6 +68,10 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
   const trigger=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;tlbModel;b')+']');
   const menu=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;tlbModel;b;mn')+']');
   if(await trigger.count()!==1||!await trigger.isVisible()||await menu.count()>1||await menu.isVisible())throw Error('Owned canvas outline menu unavailable');
+  // Ext suppresses menu reopening for 250ms after hide. A drop can need a
+  // second reveal immediately; settle before its single opening gesture.
+  await page.waitForTimeout(Math.min(300,remaining()));await guard();remaining();
+  if(await menu.isVisible())throw Error('Owned canvas outline menu changed');
   await guard();await trigger.click({timeout:remaining()});
   try {
    await menu.waitFor({state:'visible',timeout:Math.min(2000,remaining())});
