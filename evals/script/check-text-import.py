@@ -491,13 +491,57 @@ def report_number_value(text):
         value for value, pattern in _REPORT_NUMERALS.items() if re.fullmatch(pattern, text))
 
 
+def report_owned_context(clause, start, end):
+    """Separate a bound core from its dependent context, never a foreign noun."""
+    tail = clause[end:]
+    adjunct = r'in|for|with|within|under|over|during|before|after|following|at|on|by|from|about|without|при|перед|после|для|в|во|на|с|под|до'
+    history = (r'(?:in\s+(?:the\s+)?(?:previous|last|prior|earlier)\s+(?:attempt|run)'
+        r'|в\s+(?:прошл\w*|предыдущ\w*|предшеств\w*)\s+(?:запуск\w*|попытк\w*)|previously|historically)\b')
+    historical = bool(re.match(r'\s*[,;]?\s*' + history, tail))
+    valid = historical or bool(re.match(r'\s*(?:[»"”\])]*\s*[.!?]*\s*$|[(:,;]|(?:' + adjunct + r')\b)', tail))
+    # A context can license the relation boundary without being semantically
+    # empty. Retain its full text for the existing polarity/scope grammar.
+    owned = ReportClause(clause, 0 if historical else getattr(clause, 'scope', None),
+        getattr(clause, 'start', 0), getattr(clause, 'identifiers', ()))
+    owned.core_span, owned.context_span, owned.context_valid = (start, end), (end, len(clause)), valid
+    return owned
+
+
+def warning_relative_spans(text):
+    """A relative emission belongs to its nearest warning object only."""
+    topic = r'\b(?:warnings?|предупрежд\w*)\b'
+    engine = r'(?:the\s+)?(?:engine|движ\w*|loginom)\b'
+    verb = r'issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*'
+    markers, rows = list(re.finditer(topic, text)), []
+    for index, marker in enumerate(markers):
+        end = markers[index+1].start() if index+1 < len(markers) else len(text)
+        argument = text[marker.end():end]
+        relative = re.search(r'\b(?:that|which|котор\w*)\s+(?P<emission>' + engine + r'[^;.!?]*?\b(?:' + verb + r')\b)', argument)
+        relative = relative or re.search(r'\b(?:that|which|котор\w*)\s+(?P<emission>(?:\w+\s+){0,8}?(?:' + verb + r')\b\s+(?:(?:by|from)\s+' + engine + r'|движ\w*\b))', argument)
+        if relative:
+            rows.append({'object': marker.span(), 'span': (marker.start(), marker.end() + relative.end()),
+                'relative_start': marker.end() + relative.start(),
+                'emission': tuple(marker.end() + offset for offset in relative.span('emission'))})
+    return rows
+
+
 def report_predicate_head(text):
     """A new explicit subject/predicate cannot inherit a previous emitter."""
-    subject = r'(?:(?:the|an?)\s+)?(?:engine|agent|report|file|filename|message|it|i|we|я|мы|движ\w*|агент\w*|отчет\w*)'
+    subject = r'(?:(?:the|an?)\s+)?(?:engine|agent|report|file|filename|message|task|source|it|i|we|я|мы|движ\w*|агент\w*|отчет\w*|задани\w*|источник\w*)'
     auxiliary = r'(?:(?:did|does|do|has|have|had|is|are|was|were|can|cannot|could|should|will|would|not|never|не)\s+)*'
-    predicate = (r'issu\w*|emit\w*|rais\w*|warn\w*|mention\w*|report\w*|say\w*|said|sav\w*|writ\w*|wrote'
-        r'|contain\w*|confirm\w*|suggest\w*|advis\w*|check\w*|receiv\w*|выда\w*|выдал\w*|предупред\w*|сообщ\w*|упомин\w*')
-    return re.match(rf'\s*{subject}\s+{auxiliary}(?:{predicate})\b', text)
+    predicate = (r'issu\w*|emit\w*|rais\w*|warn(?:s|ed)?|mention\w*|report\w*|say\w*|said|sav\w*|writ\w*|wrote'
+        r'|contain\w*|confirm\w*|suggest\w*|advis\w*|check\w*|receiv\w*|вижу|получ\w*|наблюдаю'
+        r'|specifi\w*|requir\w*|requested|expected|observed|found|has|have|present|exist\w*'
+        r'|запрош\w*|ожида\w*|обнаруж\w*|наблюда\w*|указа\w*|зада\w*|задан\w*|содерж\w*|име\w*|присутств\w*|есть'
+        r'|выда\w*|выдал\w*|предупред\w*|сообщ\w*|упомин\w*')
+    quantity = rf'(?:(?:not|не)\s+)?(?:{_REPORT_NUMBER})\b(?:\s+(?:fields?|columns?|rows?|files?|пол\w*|колон\w*|столб\w*|строк\w*|файл\w*))?\s+'
+    head = re.match(rf'\s*(?:(?P<subject>{subject})\s+|(?P<quantity>{quantity}))?{auxiliary}(?P<predicate>{predicate})\b', text)
+    if head and not (head['subject'] or head['quantity']):
+        # A shared finite predicate still needs its own argument. A literal
+        # warning ID or a trailing truth qualifier is not a new predicate.
+        argument = rf'(?:warn(?:ing|ings)?|предупрежд\w*|(?:(?:not|не)\s+)?{_REPORT_NUMBER})\b'
+        if not re.match(r'\s+' + argument, text[head.end():]): return None
+    return head
 
 
 def warning_arguments(text, identifiers=(), prefix=''):
@@ -685,9 +729,7 @@ def report_sentences(text, atoms=(), identifiers=None):
     quoted += rf'|\b(?:{_REPORT_NUMBER})\b\s*,\s*(?:а|but|and)?\s*(?:не|not)\s+(?:{_REPORT_NUMBER})\s+(?:пол\w*|fields?|columns?)\b'
     # A relative emission shares its antecedent warning object. Keep both
     # predicates together; warning_facts resolves their independent polarity.
-    quoted += (r'|\b(?:warnings?|предупрежд\w*)\b[^;.!?]{0,100}?\b(?:that|which|котор\w*)\s+'
-        r'(?:(?:the\s+)?(?:engine|движ\w*|loginom)\b[^;.!?]{0,45}?\b(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b'
-        r'|(?:\w+\s+){0,8}?(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b\s+(?:(?:by|from)\s+(?:the\s+)?(?:engine|loginom)|движ\w*))')
+    quoted += ''.join('|' + re.escape(text[row['span'][0]:row['span'][1]]) for row in warning_relative_spans(text))
     sentences, start, carry = [], 0, None
     for match in re.finditer(quoted + r'|(?P<cut>(?<=[.!?])\s+|\n+)', text):
         if match.group('cut') is not None:
@@ -754,12 +796,18 @@ def report_sentences(text, atoms=(), identifiers=None):
             if report_predicate_head(sentence[match.end():])
             and not any(left < match.start() < right for left, right in protected + warning_lists)]
         boundaries += [(position, position) for position, _, _ in regions if position and not any(left < position < right for left, right in protected)]
-        start, role, field_role, inherited_role = 0, None, False, False
+        start, role, field_role, inherited_role, warning_subject = 0, None, False, False, None
         def append(left, right):
-            nonlocal role, field_role
+            nonlocal role, field_role, warning_subject
             part = sentence[left:right]
             position = left + len(part) - len(part.lstrip())
             clause = ReportClause(part, scope_at(position), origin + left, identifiers)
+            head = report_predicate_head(clause)
+            subject = head.groupdict().get('subject') if head else None
+            warning_subject = subject or (warning_subject if inherited_role else None)
+            clause.warning_subject = warning_subject
+            if role is not None:
+                clause.count_context = field_role
             markers = list(re.finditer(r'\b(?P<marker>запрош\w*|ожида\w*|requested|required|expected|получ\w*|обнаруж\w*|наблюда\w*|observed|found)\b[^;,.!?]{0,40}?\b(?:пол\w*|колон\w*|столб\w*|fields?|columns?)\b', clause))
             explicit = markers[-1] if markers else None
             relation = report_count_relation(clause, field_role)
@@ -782,6 +830,7 @@ def report_sentences(text, atoms=(), identifiers=None):
                 role, field_role = None, False
             if role and (quantity_unit := re.search(rf'\b(?:{count_number})\b\s+(?P<unit>пол\w*|колон\w*|столб\w*|fields?|columns?|строк\w*|rows?|файл\w*|files?)\b', clause)):
                 field_role = bool(re.fullmatch(r'пол\w*|колон\w*|столб\w*|fields?|columns?', quantity_unit['unit']))
+            clause.count_field_topic = bool(role and field_role)
             rows.append(clause)
         for left, right in sorted(set(boundaries)):
             if left < start: continue
@@ -946,6 +995,23 @@ def refusal_witness(sentences, reason, spec):
     quantity = lambda n: n + rf'(?:\s+{field_unit}|(?=\s*[,.;:!?—-]|\s+(?:вместо|instead|rather|поэтому)\b|\s*$))'
     requested_seen, observed_seen, field_context = False, False, False
     for sentence in sentences:
+        relation = report_count_relation(sentence, getattr(sentence, 'count_context', field_context))
+        if relation:
+            role, bound = relation
+            owned = report_owned_context(sentence, *bound.span())
+            if not (bound['neg_before'] or bound['neg_after']) and claim_asserted(owned, bound.start(), bound.end()):
+                value = report_number_value(bound['n'])
+                requested_seen |= role == 'requested' and value == requested
+                observed_seen |= role == 'observed' and value == observed
+                field_context = True
+            continue
+        # Named/marker-first witnesses use the same core/context boundary as
+        # quantitative truth, retaining their original field/object checks.
+        marker = re.search(r'\b(?:запрош\w*|ожида\w*|requested|required|expected|получ\w*|обнаруж\w*|наблюда\w*|observed|found)\b', sentence)
+        amount = re.search(rf'\b(?:{_REPORT_NUMBER})\b\s+{field_unit}', sentence)
+        if marker and amount:
+            owned = report_owned_context(sentence, min(marker.start(), amount.start()), max(marker.end(), amount.end()))
+            if owned.context_valid: sentence = owned
         topic = bool(re.search(fields, sentence))
         for match in re.finditer(quantity(actual) + r'\s+\b(?:вместо|instead\s+of|rather\s+than)\b\s+' + quantity(required), sentence):
             if (topic or field_context) and claim_asserted(sentence, match.start(), match.end()):
@@ -981,18 +1047,22 @@ def report_count_relation(clause, field_context=False):
         active_quantity = quantity + (r'?' if field_context else '')
         patterns = [
             rf'\b{active_quantity}\s+(?:(?:is|are|was|were)\s+)?(?P<neg_after>(?:not|не)\s+)?(?:{verb})\b\s+(?:in|by|в)\s+{object}\b',
-            rf'\b{object}\s+(?P<neg_after>(?:does\s+not|do\s+not|не)\s+)?(?:{verb})\b\s+{active_quantity}(?=\s*[.!?]*\s*$)',
-            rf'\b(?:in|в)\s+{object}\s+(?P<neg_after>(?:not|не)\s+)?(?:{verb})\b\s+{active_quantity}(?=\s*[.!?]*\s*$)',
+            rf'\b{object}\s+(?P<neg_after>(?:does\s+not|do\s+not|не)\s+)?(?:{verb})\b\s+{active_quantity}',
+            rf'\b(?:in|в)\s+{object}\s+(?P<neg_after>(?:not|не)\s+)?(?:{verb})\b\s+{active_quantity}',
         ]
         for pattern in patterns:
             match = re.search(pattern, clause)
-            if match: return role, match
+            if match and report_owned_context(clause, *match.span()).context_valid: return role, match
     # The same role/value/unit relation also permits a postnominal passive
     # marker. Only an established field relation licenses its missing unit.
     for role, marker in [('requested', r'запрош\w*|ожида\w*|requested|required|expected'),
                          ('observed', r'получ\w*|обнаруж\w*|наблюда\w*|observed|found')]:
-        match = re.search(rf'\b{active_quantity}\s+(?:(?:is|are|was|were|был\w*)\s+)?(?P<neg_after>(?:not|не)\s+)?(?:{marker})\b(?=\s*[.!?]*\s*$)', clause)
-        if match: return role, match
+        match = re.search(rf'\b{active_quantity}\s+(?:(?:is|are|was|were|был\w*)\s+)?(?P<neg_after>(?:not|не)\s+)?(?:{marker})\b', clause)
+        if match and report_owned_context(clause, *match.span()).context_valid: return role, match
+        if field_context:
+            # A missing field unit cannot consume another direct noun.
+            match = re.search(rf'\b(?:{marker})\s+(?P<neg_before>(?:not|не)\s+)?(?P<n>{number})\b(?P<unit>)(?P<neg_after>)', clause)
+            if match and report_owned_context(clause, *match.span()).context_valid: return role, match
     return None
 
 
@@ -1012,6 +1082,7 @@ def refusal_explained(sentences, reason, spec):
     absent = r'не\s+(?:присутств\w*|найден\w*)|not\s+(?:present|found)|отсутств\w*|пропущ\w*|опущ\w*|нет|missing|absent|omitted|not\s+(?:supplied|provided|defined|specified)|не\s+(?:переда\w*|зада\w*|указа\w*|определ\w*)'
     present = r'присутств\w*|есть|найден\w*|переда\w*|зад[ао]\w*|указа\w*|present|exists?|found|supplied|provided'
     gap = r'[\s,:—«»"“”-]*(?:(?:исходн\w*|входн\w*|источника|обязательн\w*|намеренно|пол\w*|свойств\w*|the|source|field|is|was|were|are|been|был\w*)[\s,:—«»"“”-]+)*'
+    count_field_context = False
     for clause in sentences:
         if duplicate:
             topic = r'\b(?:имена(?:\s+исходн\w*)?(?:\s+пол\w*)?(?:\s+источника)?|заголов\w*|(?<![\w.])(?:source\.)?headers?|(?:source\s+)?(?:field|column)\s+names?)\b'
@@ -1050,7 +1121,7 @@ def refusal_explained(sentences, reason, spec):
             marker_rows = list(re.finditer(rf'\b(?P<marker>{markers})\b', clause))
             if not marker_rows and hasattr(clause, 'count_marker'):
                 marker_rows = [match for match in re.finditer(r'(?P<marker>\w+)', clause) if match.span() == clause.count_marker]
-            relation = report_count_relation(clause, getattr(clause, 'count_context', False))
+            relation = report_count_relation(clause, getattr(clause, 'count_context', count_field_context))
             if relation: marker_rows = [relation[1]]
             elided = not marker_rows and getattr(clause, 'count_role', None)
             if elided: marker_rows = [re.match(r'(?P<marker>)', clause)]
@@ -1065,15 +1136,23 @@ def refusal_explained(sentences, reason, spec):
                 else:
                     field_unit = bool(re.fullmatch(r'(?:исходн\w*\s+|source\s+)?(?:пол\w*|колон\w*|столб\w*|columns?|fields?)', quantity['unit']))
                 if not field_unit: continue
+                count_field_context = True
                 role = relation[0] if relation else (getattr(clause, 'count_role', None) or ('requested' if re.match(r'запрош|ожида|requested|required|expected', marker['marker']) else 'observed'))
                 n = report_number_value(quantity['n'])
                 negative = bool(quantity['neg_before'] or quantity['neg_after']) if relation else bool(quantity['neg'])
                 fact = ReportFact(clause, quantity if elided else marker, 'source.fields', 'excluded_total' if negative else 'total', role=role, value=(n != expected[role] if negative else n == expected[role]))
+                core_start = quantity.start() if elided or relation else marker.start()
+                core_end = quantity.end() if elided or relation else marker.end() + quantity.end()
+                owned = report_owned_context(clause, core_start, core_end)
+                if owned.context_valid: fact.polarity = claim_status(owned, *fact.span)
                 fact.quantity, fact.unit = n, 'fields'
                 facts.append(fact)
                 if not relation and quantity['other']:
                     n = report_number_value(quantity['other'])
-                    facts.append(ReportFact(clause, marker, 'source.fields', 'alternative_total', role=role, value=n != expected[role]))
+                    alternative = ReportFact(clause, marker, 'source.fields', 'alternative_total', role=role, value=n != expected[role])
+                    alternative.polarity = fact.polarity
+                    facts.append(alternative)
+            count_field_context |= getattr(clause, 'count_field_topic', False)
     literal = r'\s+'.join(re.escape(part) for part in reason.split())
     relevant = [fact for fact in facts if fact.polarity and not any(
         match.start() <= fact.span[0] and fact.span[1] <= match.end()
@@ -1109,26 +1188,32 @@ def warning_facts(clause):
         emitted = re.search(r'\b(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b', clause)
         if emitted:
             markers = [match for match in re.compile(rf'\b{identifier}\b').finditer(clause, emitted.end()) if concrete(match.group())][:1]
+    relatives = warning_relative_spans(clause)
+    head = report_predicate_head(clause)
+    subject = (head.groupdict().get('subject') if head else None) or getattr(clause, 'warning_subject', None)
     for index, match in enumerate(markers):
         left = clause[:match.start()]
         right = clause[match.end():markers[index+1].start() if index+1 < len(markers) else len(clause)]
-        own = re.search(r'\b(?:я|мы|i|we|(?:the\s+)?(?:agent|report)|агент\w*|отчет\w*)\b', left)
+        own = re.search(r'\b(?:я|мы|i|we|(?:the\s+)?(?:agent|report)|агент\w*|отчет\w*)\b', subject or ('' if head else left))
         engine = r'(?:the\s+)?(?:engine|движ\w*|loginom)\b'
-        native = re.search(r'\b' + engine + r'[^;,.!?]{0,60}\b(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*|warn\w*|предупред\w*)\b', clause)
+        # This clause is an owned finite frame. A recognized reception/agent
+        # predicate cannot borrow an emitter found elsewhere in its text.
+        native = bool(subject and re.fullmatch(engine, subject) and re.fullmatch(r'issu\w*|emit\w*|rais\w*|warn(?:s|ed)?|выда\w*|выдал\w*|предупред\w*', head['predicate'])) if head else re.search(r'\b' + engine + r'[^;,.!?]{0,60}\b(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*|warn\w*|предупред\w*)\b', clause)
         native = native or re.search(r'\b(?:by|from|от|выдан\w*)\s+' + engine, clause)
-        receiving = re.search(r'\b(?:receiv\w*|вижу|получ\w*|наблюдаю)\b', left)
-        relative = re.search(r'\b(?:that|which|котор\w*)\s+(?P<emission>' + engine + r'[^;.!?]*?\b(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b)', right)
-        relative = relative or re.search(r'\b(?:that|which|котор\w*)\s+(?P<emission>(?:\w+\s+){0,8}?(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b\s+(?:(?:by|from)\s+' + engine + r'|движ\w*\b))', right)
+        receiving = re.fullmatch(r'receiv\w*|вижу|получ\w*|наблюдаю', head['predicate']) if head else re.search(r'\b(?:receiv\w*|вижу|получ\w*|наблюдаю)\b', left)
+        relative = next((row for row in relatives if row['object'] == match.span()), None)
         if own and not native and not relative: continue
         if receiving and re.search(r'\b(?:not|never|не)\b', left) and not relative: continue
         fact = ReportFact(clause, match, 'warning', 'emitted', role='engine' if native or relative else 'unspecified')
         if relative:
             # Negating reception does not negate this engine predicate. The
             # enclosing speech scope still governs the whole relative claim.
-            emission = ReportClause(relative['emission'], clause.scope, clause.start + match.end() + relative.start('emission'), lexical_ids)
+            owned = report_owned_context(clause, relative['span'][0], relative['span'][1])
+            emission_start, emission_end = relative['emission']
+            emission = ReportClause(clause[emission_start:emission_end], owned.scope, clause.start + emission_start, lexical_ids)
             verb = re.search(r'\b(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b', emission)
             fact.polarity = claim_status(emission, verb.start(), verb.end())
-            right = right[:relative.start()]
+            right = right[:relative['relative_start'] - match.end()]
         # Prenominal code: "the CODE warning" binds the same warning object.
         previous = re.search(rf'\b({identifier})\s*$', left)
         implicit = not re.fullmatch(topic, match.group())
@@ -1137,6 +1222,8 @@ def warning_facts(clause):
             offset = match.start() if implicit else match.end()
             start, end = offset + arguments[0]['start'], offset + arguments[-1]['end']
             context = ReportClause(clause[:start] + ' ' * (end-start) + clause[end:], clause.scope, clause.start, lexical_ids)
+            owned = report_owned_context(context, match.start(), end)
+            if owned.context_valid: context = owned
             polarity = fact.polarity if relative else claim_status(context, match.start(), match.end())
             for argument in arguments:
                 own_fact = ReportFact(context, match, 'warning', 'emitted', role=fact.role, value=[argument['code']])
