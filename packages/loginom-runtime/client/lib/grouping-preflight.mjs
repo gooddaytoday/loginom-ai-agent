@@ -13,7 +13,15 @@ export async function preflightGroupingSource(options,ctx,config){
   wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
  const graph=s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent';
  let s=await channel.observe({condition:'upstream graph before grouping validation',readOutputs:true,ready:s=>graph(s)&&s.node_outputs?.verified===true});
- const ports=s.node_outputs.ports.filter(p=>p.index===input.output);need(ports.length===1,'Exact upstream grouping port required');const port=ports[0];
+ const ports=s.node_outputs.ports.filter(p=>p.index===input.output);
+ if(ports.length!==1){
+  // This refusal precedes even the upstream preview gesture, target creation
+  // and link changes. There is no new Grouping node to release or recreate.
+  const error=Error('Exact upstream grouping port required: output '+input.output+' of node '+input.source.node_id
+   +' is not uniquely confirmed. No Grouping node or link was created. Verify the output of the SAME existing upstream node, then retry this request with a NEW operation_id; do not recreate the upstream node.');
+  error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
+ }
+ const port=ports[0];
  if(port.index!==0||port.active!==true){const error=Error('Grouping preflight requires an active source output zero');error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  const script=s.ui.elements.filter(e=>e.tid===port.tid&&e.signature?.native_graph?.status==='script');
  const admission=script.length===1?managedJavascriptPreviewAdmission(options.nodeHistory?.(),binding,port):null;
