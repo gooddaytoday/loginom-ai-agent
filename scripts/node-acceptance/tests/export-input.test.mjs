@@ -52,3 +52,64 @@ test('ordinary outputs retain type, label and port matching beside an export inp
  assert.equal(matchExpectedOutputs([filter,actual('rename',1)],[ordinary,output],{exportInput:binding}).length,2);
  assert.throws(()=>matchExpectedOutputs([{...filter,label:'Wrong'},actual('rename',1)],[ordinary,output],{exportInput:binding}));
 });
+
+test('exact full export destination is additive and valid only on one export_input',()=>{
+ const wrap=o=>({package_path:'/own/package.lgp',nodes:[],outputs:[o]});
+ const wanted={...output,export_destination:'/own/revenue-ru.csv'};
+ assert.equal(parseExpectedOutputs(wrap(wanted)).outputs[0].export_destination,wanted.export_destination);
+ assert.equal(parseExpectedOutputs({package_path:'/own/package.lgp',nodes:[],...wanted}).outputs[0].export_destination,wanted.export_destination);
+ for(const value of ['',null,undefined,42,'revenue-ru.csv','/own/../revenue-ru.csv','/own//revenue-ru.csv','/own/revenue-ru.csv\0'])
+  assert.throws(()=>parseExpectedOutputs(wrap({...wanted,export_destination:value})),/EXPECTED_EXPORT_DESTINATION_INVALID/);
+ assert.throws(()=>parseExpectedOutputs(wrap({...wanted,output_node_type:'transform.sorting'})),/EXPECTED_EXPORT_DESTINATION_INVALID/);
+ assert.throws(()=>parseExpectedOutputs({...wrap(wanted),outputs:[wanted,{...wanted,export_destination:'/own/other.csv'}]}),/EXPECTED_EXPORT_INPUT_OPTIONS_INVALID/);
+});
+
+test('exact destination selects renamed report while the earlier s1 export remains legal',()=>{
+ const g=graph();g.nodes.push(node('old-export','exports.text',[]));g.links.push({source:'filter',output:0,target:'old-export',input:0});
+ const destination='/own/revenue-ru.csv',destinations=[{node_id:'old-export',destination:'/own/revenue.csv'},{node_id:'export',destination}];
+ const binding=resolveExportInput(g,{destination,destinations});
+ assert.equal(binding.node.ref.node_id,'rename');assert.equal(binding.output_port,1);
+ assert.equal(matchExpectedOutputs([actual('rename',1)],[{...output,export_destination:destination}],{exportInput:binding}).length,1);
+ for(const ds of [[],destinations.slice(1),[destinations[1],destinations[1]],
+  destinations.map(d=>({...d,destination:'/other/revenue-ru.csv'})),destinations.map(d=>({...d,destination})),
+  destinations.map(d=>({...d,destination:d.node_id==='export'?'/own/prefix-revenue-ru.csv':d.destination}))])
+  assert.throws(()=>resolveExportInput(g,{destination,destinations:ds}),/COLD_EXTRA_OR_MISSING_OUTPUT_NODE/);
+ assert.throws(()=>resolveExportInput(g),/COLD_EXTRA_OR_MISSING_OUTPUT_NODE/);
+ const ordered=actual('rename',1);ordered.data.row_count=2;ordered.data.sample.push([{type:'string',is_null:false,value:'B'}]);
+ const orderedWant={...output,rows:[{Code:'A'},{Code:'B'}],export_destination:destination};
+ assert.equal(matchExpectedOutputs([ordered],[orderedWant],{exportInput:binding}).length,1);
+ ordered.data.sample.reverse();assert.throws(()=>matchExpectedOutputs([ordered],[orderedWant],{exportInput:binding}),/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
+ for(const mutate of [d=>{d.schema[0].name='Wrong'},d=>{d.schema[0].label='Wrong'},d=>{d.schema[0].type='real'},d=>{d.sample[0][0].value='Wrong'},d=>{d.schema.push({...d.schema[0]})}]){
+  const a=actual('rename',1);mutate(a.data);
+  assert.throws(()=>matchExpectedOutputs([a],[{...output,export_destination:destination}],{exportInput:binding}),/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
+ }
+});
+
+test('cold observes both destinations through cancelled owned wizards without exporting or saving',async()=>{
+ const {observeExportDestinations}=await import('../static-source-proof.mjs');
+ const owner=id=>({document_id:'doc',workflow_id:'wf',node_id:id,verified:true,surface:'wizard'});
+ const g=graph();g.workflow_ref={workflow_id:'wf'};g.nodes.push(node('old-export','exports.text',[]));
+ for(const n of g.nodes)Object.assign(n.ref,{document_id:'doc',workflow_id:'wf'});
+ for(const fault of [null,'foreign','missing','cleanup']){
+  const actions=[],channels=new Map();
+  const channelFor=ref=>{
+   let stage=null;const c={ref,setStage:s=>{stage=s},revealGraphNode:async()=>actions.push(['reveal',ref.node_id]),
+    observe:async o=>{const s={prepared_node_context:{...owner(ref.node_id),surface:stage?'wizard':'graph'},wizard:stage?{status:'observed',stage,root_tid:'wizard'}:{status:'absent'},
+     active_identity:'Scenario',workflow_navigation:{status:'observed',path:[{label:'Scenario'}]},ui:{elements:[{tid:'wizard;btnNext',ref:'next',allowed_actions:['wizard_step']}]}};
+     assert.ok(o.ready(s),o.condition);return s;},
+    perform:async o=>{const s={wizard:{stage,root_tid:'wizard'},ui:{elements:[{tid:'wizard;btnNext',ref:'next',allowed_actions:['wizard_step']}]}};assert.ok(o.ready(s));
+     const a=o.resolve(s);assert.equal(a.verb,'wizard_step');assert.equal(a.expected_stage,'text_export_params');actions.push(['next',ref.node_id]);stage='text_export_params';}};
+   channels.set(ref.node_id,c);return c;
+  };
+  const helpers={openPreparedWizard:async c=>{actions.push(['open',c.ref.node_id]);c.setStage('input_mapping')},
+   closePreparedWizard:async c=>{actions.push(['cancel',c.ref.node_id]);c.setStage(null);return {verified:fault!=='cleanup',settings_applied:false}},
+   selectPreparedGraphNode:async c=>actions.push(['select',c.ref.node_id]),makeTextExportContextCode:b=>b};
+  const load=async()=>helpers,execute=async b=>({verified:fault!=='missing',stage:'text_export_params',settings_applied:false,
+   node_context:owner(fault==='foreign'?'other':b.node.node_id),values:{destination:{value:b.node.node_id==='export'?'/own/revenue-ru.csv':'/own/revenue.csv'}}});
+  const result=observeExportDestinations({load,graph:g,channelFor,execute});
+  if(fault)await assert.rejects(result,/COLD_SOURCE/);
+  else assert.deepEqual(await result,[{node_id:'export',destination:'/own/revenue-ru.csv'},{node_id:'old-export',destination:'/own/revenue.csv'}]);
+  assert.equal(actions.filter(a=>a[0]==='open').length,actions.filter(a=>a[0]==='cancel').length);
+  assert.ok(actions.every(a=>['reveal','select','open','next','cancel'].includes(a[0])));
+ }
+});
