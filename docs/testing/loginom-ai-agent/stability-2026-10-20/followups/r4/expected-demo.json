@@ -1,0 +1,75 @@
+{
+  "package_path": "/stability-2026-10-20/datamining-linregression.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.lin_regression"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/forecast-refit.csv",
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "real"
+        },
+        {
+          "name": "Forecast",
+          "label": "Forecast",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": -2.0,
+          "Forecast": 13.0
+        },
+        {
+          "RowID": 2,
+          "X": -1.0,
+          "Forecast": 10.0
+        },
+        {
+          "RowID": 3,
+          "X": 0.0,
+          "Forecast": 7.0
+        },
+        {
+          "RowID": 4,
+          "X": 1.0,
+          "Forecast": 4.0
+        },
+        {
+          "RowID": 5,
+          "X": 2.0,
+          "Forecast": 1.0
+        },
+        {
+          "RowID": 6,
+          "X": 3.0,
+          "Forecast": -2.0
+        }
+      ]
+    }
+  ]
+}
