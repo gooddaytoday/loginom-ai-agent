@@ -1,20 +1,20 @@
-# LAB59–63 project checkpoint
-2026-10-18;single30minheartbeat/owner59→60→61→62→63/onlyEvalerwritesstate.
-LAB59done44/LAB60done38/LAB62-63backlog16/assigneeunchanged.
-Acceptedcode-test-case7d3 unchanged;documentary parent e99feb64e53c4efbd7250f639cdcee13de49494b;unaccepted5fd/R15WIP notintegrated.
-LAB61in_progress576/Rich/review15/reject15/limit15/frozen-resume5fd6148754a7cdf5fd45bebcceb0b8fb59ed340d.
-CurrentRich01a1500c-614c/handoff6113/intentLAB61-RICH-CHECKER-REWORK15-5fd61487-01a15004/OFFLINE/no duplicate.
-Owner249ed1ea/5912APPLIED/tableb82a-d868all10DONE/no newcriteria/productFAILallowed.
-BenREJECT15report01a15004-a7ba;countadjunctlosesrelation-witness/relativewarningcrossessiblingnegation/explicitI.
-RootZIP16437370-d4298bd6/1966payload1967members268098919bytes/MANIFEST75629f2f/REPORT71aae1a3/288Git/root3684-b15354a2.
-OfficialextraJSON748dc8b8/rawZIP348db95170members;allbytesWmirror/no sourceexec/newlive/integration.
-NativeE30811-015e04ee/history839095-5705de02/all2confirmed/3717materials1163ledger865raw140case20inputs22pins5389CLI1700helper30bindings.
-E_DBrequeryfalse/fullsuitefalse/readonlyhealthyFREE17:21:16.251/helper.307/6HTTP200emptyprofiles/originalcontainer/nativeCLI0.
-Rootcontext39528a49/client3f4e note7098-4409APPLIED Eseq52-58/proofd866/rootce4ef000;initial201pending notACK/no resend.
-Eexplicit14→15/completed14/freshREJECT15/docs+blockedEstateBEFOREeffects571/originalblocked570/decisione633-md b080.
-Rootcontinue5f57b438/fullouter570-571-576/realcontinue6113→readytodispatch→separatedispatch/queuedRich614c/no rootnativeeffects.
-12increases3→15/noreset/physical15reference20product1recovery0probes/once-ledger-reservation1/globalHEAD405 preserved.
-Product16PASS4FAIL/derived30ref10PASS-Rich8-2-Ben8-2notnewmeasurements/raw3-7-2-8-wrapperERROR0immutable.
-FourproductFAIL proof8fa26fdb;calls≠successfultransfers/Benheaderscorrectcolumns+knownrefusalbutmissingexplicitsettings.source_path.
-Fullqueues17:39:211(200+11)/81/43/11/13onlyRich614c/runtimeonline;TDDfinalparentREDbeforeFIRSTedit/allmandatorycontrols→oneBenreview.
-Acceptall10/knownbugsclosed/fullBenACCEPT/evidence-actualmodel-cleanup-genuinecompletion-ordinaryRELEASED-freshhealthyFREE-noworkers-acceptedcommon→done61despiteproductFAIL→62→63.
+# LAB59–63 checkpoint
+2026-10-18; owner f705/249ed1ea unchanged; only Evaler writes state; LAB60done38/62–63closed.
+Executionbase7d3 accepted code unchanged; latest candidate8203816f/D71 unaccepted, no integration.
+Formal REJECT16 report01a15096; completed Ben01a15071-f030, one proven receiver-relative polarity group.
+Canonical report reducer→blocked610/review16/reject16/limit15; explicit neededlimit15→16/used15/fresh16/readback611 BEFORE effects.
+Decision evals/docs/2026-10-18-lab61-checker-rework16-decision.md and JSON bind full original stop/authority/actualusage.
+One Rich OFFLINE intent LAB61-RICH-CHECKER-REWORK16-8203816f-01a15096; actual delivery/receipt in evaler.state and E workdir, no duplicate.
+E fullpaired32/48=8falsePASS8falseFAIL;reader148/221,parent144;regression6final0/base6;full24final0;count62GREEN.
+Only3 formal221 rows called regressions; own comparisons and synthetic repetitions are separately qualified.
+not-confirmed/unconfirmed shown epistemic qualifier means uncertainty, not nonemission; original FAIL retained, no changed-input sameGREEN.
+MODEL+final combinations→completed immutable8203 RED/source-testhashes BEFORE FIRST checker/prototypeedit/no parallel edit→minimalgeneralfix.
+Then allmandatorycorpora/sourceboundlogs/finalfull30s/typecheck/cleanSHA→one independentfullBen; no word/string/format exceptions.
+ZIP18ffe631/2565payload2566members/manifest87ec435c/REPORT4357cd7c/288portableGit/29rawpackagejobs checked.
+E3717materials1163ledger865raw22pins5389CLI1700helper140case20inputs30archivedmodelproofs; no privateDBquery/fullsuite rerun.
+PriorRED419-8/followups/changedinput/a2cc1044-15-3timeout+3errors/preservation0-2/final1049-15-0 remain distinct.
+Genuine30 ref10PASS/Rich8PASS2FAIL/Ben8PASS2FAIL/ERROR0;rawRich3-7/Ben2-8/wrapperERROR0 preserved.
+FourproductFAIL remain legitimate: RichApply2/Richdelivery2/Benprepare2delivery3/Benexplicit source.source_path missing.
+Usage ref15/Rich10/Ben10/recovery1/probes0; alloldnewhistory/counters/once/reservation1/provenance6d6+3twoe+initiala2ba preserved.
+EreadonlyhealthyFREE20:06:10.602/helperFREE/6profilesHTTP200storageemptyoriginalcontainer; priorgenuineaf1→ordinaryRELEASED23:13:39, no newlifecycle.
+EvalACCEPT/evidence-model-cleanup/freshFREE/completedworkers/commonintegration before closure/nextcard; no newlive/model/build/install/OS.
