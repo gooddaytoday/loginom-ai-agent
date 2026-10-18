@@ -44,7 +44,7 @@ export async function readGraph(page, task) {
     const portIdentities=record.nodeTargetPortIdentities??=new WeakMap();
     const collection = diagram.FNodes?.FCollection;
     if (!Array.isArray(collection) || collection.length > 200) fail('Graph node bound exceeded');
-    const nodeTypes = Object.values(types), byTid = new Map(),nativeBindings=[];
+    const nodeTypes = Object.values(types), byTid = new Map(),connectionPorts = new Map(),nativeBindings=[];
     const nodes = collection.map(n => {
       const dom = graph.view.getState(n.FCell)?.shape?.node, tid = dom?.getAttribute('data-tid');
       if (!tid || !containers[0].contains(dom) || !n.FGuid || !n.FCell?.geometry) fail('Node identity is not rendered');
@@ -99,6 +99,9 @@ export async function readGraph(page, task) {
           && [...exact(ptid)].filter(e=>containers[0].contains(e)).length===1)portIdentities.set(p,{graph,node:n,cell:p.FCell,guid:p.FGuid,data:p.data,nodeTid:tid,type:p.FType,subtype:p.FSubType,tid:ptid});
         const suffix = ptid.slice(tid.length + 1), m = /^(Input|Output)_Data-(\d+)$/.exec(suffix);
         allPorts.push(suffix);
+        if (/^(Input|Output)_Connection-0$/.test(suffix) && p.parent===n && p.FCell.parent===n.FCell
+          && [...exact(ptid)].filter(e=>containers[0].contains(e)).length===1)
+          connectionPorts.set(ptid,{node:n,port:p});
         if (m) { (m[1] === 'Input' ? inputs : outputs).push(Number(m[2])); byTid.set(ptid, {node:n.FGuid,index:Number(m[2]),direction:m[1]}); }
       }
       inputs.sort((a,b)=>a-b);outputs.sort((a,b)=>a-b);
@@ -108,17 +111,26 @@ export async function readGraph(page, task) {
         position:{x:n.FCell.geometry.x,y:n.FCell.geometry.y},inputs:inputs.map((_,i)=>i),outputs:outputs.map((_,i)=>i),
         other_ports:allPorts.filter(p=>! /^(Input|Output)_Data-\d+$/.test(p)).sort(),locked:n.FLocked===true};
     }).sort((a,b)=>a.ref.node_id.localeCompare(b.ref.node_id));
-    const links=[],foreign_links=[];
+    const links=[],foreign_links=[],rest_connection_links=[];
     for(const e of containers[0].querySelectorAll('[data-tid]')) {
       const tid=e.getAttribute('data-tid'), parts=tid.split(';Graph;'); if(parts.length!==2)continue;
       const body=parts[1];if(!/^[^|]+\|Output_[^;|]+\|[^|]+\|Input_[^;|]+$/.test(body))continue;
       const endpoints=body.split('|');
       const prefix=parts[0]+';Graph;',s=byTid.get(prefix+endpoints[0]+';'+endpoints[1]),t=byTid.get(prefix+endpoints[2]+';'+endpoints[3]);
-      if(s&&t)links.push({source:s.node,output:s.index,target:t.node,input:t.index});else foreign_links.push(tid);
+      if(s&&t)links.push({source:s.node,output:s.index,target:t.node,input:t.index});else {
+        foreign_links.push(tid);
+        const source=connectionPorts.get(prefix+endpoints[0]+';'+endpoints[1]),target=connectionPorts.get(prefix+endpoints[2]+';'+endpoints[3]);
+        if(endpoints[1]==='Output_Connection-0' && endpoints[3]==='Input_Connection-0'
+          && source?.node.FIconCls==='bg-vendor-icon-restclientconnection' && target?.node.FIconCls==='bg-vendor-icon-restclient'
+          && source.port.FCell.edges?.filter(edge=>edge.source===source.port.FCell && edge.target===target.port.FCell
+            && graph.view.getState(edge)?.shape?.node===e).length===1)
+          rest_connection_links.push({tid,source:source.node.FGuid,target:target.node.FGuid,output:'connection:0',input:'connection:0'});
+      }
     }
     links.sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));foreign_links.sort();
     if(links.length+foreign_links.length>400)fail('Graph link bound exceeded');
-    return {complete:true,document_id:request.document_id,workflow_ref:request.workflow_ref,dom_epoch:domEpoch,nodes,links,foreign_links,...(read_bindings?{native_bindings:nativeBindings}:{}),
+    rest_connection_links.sort((a,b)=>a.tid.localeCompare(b.tid));
+    return {complete:true,document_id:request.document_id,workflow_ref:request.workflow_ref,dom_epoch:domEpoch,nodes,links,foreign_links,...(rest_connection_links.length?{rest_connection_links}:{}),...(read_bindings?{native_bindings:nativeBindings}:{}),
       interaction_ready:model.FCreateDraggedNodeStarted===false && model.FDraggingOverGraph===false && !model.FDraggedNode};
   },task);
 }

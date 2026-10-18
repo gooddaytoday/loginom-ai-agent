@@ -17,14 +17,20 @@ export function inputMappingState(mapping,node){
 }
 export function inputMappingGraph(graph,node){
  need(graph?.complete===true&&graph.document_id===node.document_id&&graph.workflow_ref?.workflow_id===node.workflow_id
-  &&Array.isArray(graph.foreign_links)&&graph.foreign_links.length===0,'complete prepared graph required');
+  &&Array.isArray(graph.foreign_links),'complete prepared graph required');
  const links=graph.links.filter(e=>e.target===node.node_id);
  need(links.length===1&&links[0].input===0,'one unchanged source connection required');
+ const service=graph.rest_connection_links??[];
+ need(service.length===graph.foreign_links.length && new Set(service.map(e=>e.tid)).size===service.length
+  && service.every(e=>graph.foreign_links.includes(e.tid)&&e.output==='connection:0'&&e.input==='connection:0'
+   &&graph.nodes.filter(n=>n.ref.node_id===e.source&&n.type==='bg-vendor-icon-restclientconnection'&&!n.locked).length===1
+   &&graph.nodes.filter(n=>n.ref.node_id===e.target&&['integration.rest_request','bg-vendor-icon-restclient'].includes(n.type)&&!n.locked).length===1),
+  'complete prepared graph required');
  const nodes=[node.node_id,links[0].source].map(id=>{
   const found=graph.nodes.filter(n=>n.ref.node_id===id);need(found.length===1&&!found[0].locked,'unlocked source/target required');
   const {ref,type,label,inputs,outputs}=found[0];return {ref,type,label,inputs,outputs};
  });
- return {nodes,links};
+ return {nodes,links,...(service.length?{rest_connection_links:structuredClone(service)}:{})};
 }
 export function verifyInputMappingFinish(checkpoint,response){
  const r=response?.receipt,c=checkpoint;

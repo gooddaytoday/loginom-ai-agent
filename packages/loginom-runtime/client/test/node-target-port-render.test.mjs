@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {verifyNodeTargetEffect} from '../lib/node-target.mjs';
 import {createNodeTargetBrowserAdapter,readGraph} from '../lib/node-target-browser.mjs';
 function fixture(){
  class PackageTreeNode{};class WorkFlowTreeNode{};class ModelForm{};
@@ -14,7 +15,8 @@ function fixture(){
  let portTid='MF;TF-1;Graph;Calc;Output_Data-0';portDom.getAttribute=()=>portTid;
  node.FLabel={parent:node,FCell:{parent:node.FCell,visible:true},FRawValue:'Calc'};
  let rendered=true,labelRendered=true,onPaint=()=>{},pausedPaint=false;
- const graph={container:root,getCellAt:()=>wrongHit?{}:port.FCell,view:{getState:cell=>cell===node.FCell?{shape:{node:body}}:cell===node.FLabel.FCell?(labelRendered?{text:{node:labelDom}}:null):rendered?{shape:{node:duplicateShape?alternatePortDom:portDom}}:null}};
+ const extraStates=new Map();
+ const graph={container:root,getCellAt:()=>wrongHit?{}:port.FCell,view:{getState:cell=>extraStates.get(cell)??(cell===node.FCell?{shape:{node:body}}:cell===node.FLabel.FCell?(labelRendered?{text:{node:labelDom}}:null):rendered?{shape:{node:duplicateShape?alternatePortDom:portDom}}:null)}};
  const model=Object.assign(new ModelForm(),{FCreateDraggedNodeStarted:false,FDraggingOverGraph:false,FDiagram:{FmxGraph:graph,FNodes:{FCollection:[node]}}});
  const packageNode=new PackageTreeNode(),workflowNode=Object.assign(new WorkFlowTreeNode(),{ParentNode:packageNode});
  const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node:workflowNode}},FController:model}})}}}}}};
@@ -25,8 +27,30 @@ function fixture(){
  const context=vm.createContext({document,location:{origin:'http://loginom.test'},bg:{app},__loginomDockPreparationV1:preparation,getComputedStyle:()=>({visibility:'visible'}),setTimeout,clearTimeout,requestAnimationFrame:callback=>{if(pausedPaint)return;onPaint();callback(0);}});
  const page={evaluate:(fn,arg)=>vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context)};
  const adapter=createNodeTargetBrowserAdapter({origin:'http://loginom.test',build:'7.4.2',pinned:{},execute:code=>vm.runInNewContext('('+code+')',{...context})(page)});
- return {binding:()=>readGraph(page,{request,types:{},origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
+ const restLink=()=>{
+  const add=(id,icon,suffix)=>{
+   const tid='MF;TF-1;Graph;'+id,n={FGuid:id,FIconCls:icon,FCell:{geometry:{x:1,y:1}},FPorts:[]};
+   n.FLabel={parent:n,FCell:{parent:n.FCell,visible:false},FRawValue:'Arbitrary label'};
+   const p={parent:n,FCell:{parent:n.FCell,visible:true}},dom=element(tid),pd=element(tid+';'+suffix);
+   n.FPorts=[{FCollection:[p]}];model.FDiagram.FNodes.FCollection.push(n);inside.push(dom,pd);
+   extraStates.set(n.FCell,{shape:{node:dom}});extraStates.set(p.FCell,{shape:{node:pd}});return {node:n,port:p,dom:pd};
+  };
+  const source=add('connection','bg-vendor-icon-restclientconnection','Output_Connection-0'),target=add('rest','bg-vendor-icon-restclient','Input_Connection-0');
+  const tid='MF;TF-1;Graph;connection|Output_Connection-0|rest|Input_Connection-0',dom=element(tid),edge={source:source.port.FCell,target:target.port.FCell};
+  source.port.FCell.edges=[edge];inside.push(dom);extraStates.set(edge,{shape:{node:dom}});return {source,target,edge,tid};
+ };
+ return {restLink,binding:()=>readGraph(page,{request,types:{},origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
 }
+test('REST service edge is identified by native node/port types and the exact rendered edge, never labels',async()=>{
+ const f=fixture(),link=f.restLink(),g=await f.read();
+ assert.deepEqual(Array.from(g.foreign_links),[link.tid]);
+ assert.equal(g.rest_connection_links[0].source,'connection');assert.equal(g.rest_connection_links[0].target,'rest');
+ for(const change of [l=>l.source.node.FIconCls='bg-vendor-icon-textconnection',l=>l.target.node.FIconCls='bg-vendor-icon-calcdata',
+  l=>l.source.port.parent={},l=>l.target.port.FCell.parent={},l=>l.edge.target={},l=>l.source.port.FCell.edges=[]]){
+  const bad=fixture(),l=bad.restLink();change(l);const observed=await bad.read();
+  assert.equal(observed.foreign_links.length,1);assert.equal(observed.rest_connection_links,undefined);
+ }
+});
 test('outline copies outside the prepared canvas do not replace its port or label bindings',async()=>{
  const f=fixture();f.outline();await f.read();f.alternateShape();assert.deepEqual(Array.from((await f.read()).nodes[0].outputs),[0]);
  f.losePortTid();await assert.rejects(f.read(),/Visible port identity/);
@@ -81,4 +105,12 @@ test('link binding uses the same verified native port fallback as graph observat
  assert.equal(g.native_bindings[0].node_id,'n');assert.equal(g.native_bindings[0].label,'Calc');
  assert.deepEqual(Array.from(g.native_bindings[0].outputs),[0]);
  f.wrongHit();await assert.rejects(f.binding(),/Visible port identity/);
+});
+
+test('rendered REST client identity is accepted as the requested REST node after creation',async()=>{
+ const f=fixture();f.node.FIconCls='bg-vendor-icon-restclient';
+ const after=await f.read(),before={...after,nodes:[]};
+ assert.equal(after.nodes[0].type,'integration.rest_request');
+ const result=verifyNodeTargetEffect({kind:'create',before,parameters:{type:'integration.rest_request'}},after);
+ assert.equal(result.node_id,'n');
 });

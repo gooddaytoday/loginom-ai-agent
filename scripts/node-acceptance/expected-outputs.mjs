@@ -23,7 +23,8 @@ export function parseExpectedOutputs(expected){
    &&!output.export_destination.split('/').some(p=>p==='.'||p==='..'),'EXPECTED_EXPORT_DESTINATION_INVALID');
   const names=output.columns.map(c=>c.name);
   need(new Set(names).size===names.length&&output.columns.every(c=>typeof c.name==='string'&&c.name.length>0
-   &&typeof (c.label??c.name)==='string'&&['string','integer','real','boolean','datetime','variant'].includes(c.type)),'EXPECTED_COLUMNS_INVALID');
+   &&typeof (c.label??c.name)==='string'&&['string','integer','real','boolean','datetime','variant'].includes(c.type)
+   &&(!Object.hasOwn(c,'label_any')||typeof c.label_any==='boolean')),'EXPECTED_COLUMNS_INVALID');
   for(const c of output.columns)if(Object.hasOwn(c,'tolerance')){
    const t=c.tolerance;
    need(c.type==='real'&&t&&typeof t==='object'&&!Array.isArray(t)&&Object.keys(t).length>0
@@ -59,10 +60,10 @@ export function resolveExportInput(graph,{destination,destinations}={}){
 export function matchesExpectedOutput(data,expected){
  if(data.row_count!==expected.rows.length||!data.sample_complete||!data.precision?.numbers_verified
   ||data.sample?.length!==expected.rows.length||data.schema?.length!==expected.columns.length)return false;
- if(expected.column_order==='exact'&&expected.columns.some((c,i)=>data.schema[i].name!==c.name||data.schema[i].label!==(c.label??c.name)||data.schema[i].type!==c.type))return false;
+ if(expected.column_order==='exact'&&expected.columns.some((c,i)=>data.schema[i].name!==c.name||!c.label_any&&data.schema[i].label!==(c.label??c.name)||data.schema[i].type!==c.type))return false;
  const indices=new Map(data.schema.map((f,i)=>[f.name,i]));
  if(indices.size!==expected.columns.length||expected.columns.some(c=>{
-  const f=data.schema[indices.get(c.name)];return !f||f.label!==(c.label??c.name)||f.type!==c.type;
+  const f=data.schema[indices.get(c.name)];return !f||!c.label_any&&f.label!==(c.label??c.name)||f.type!==c.type;
  }))return false;
  const matchesRow=(row,want)=>expected.columns.every(c=>matchesCell(row[indices.get(c.name)],c,want[c.name]));
  if(expected.ordered)return expected.rows.every((want,i)=>matchesRow(data.sample[i],want));
