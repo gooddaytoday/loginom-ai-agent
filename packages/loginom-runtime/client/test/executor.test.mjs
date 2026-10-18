@@ -12,9 +12,6 @@ async function arrangePage({ intent = 'new_draft', running = false, wizard = fal
   page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab = () => ({
     Controller: { FController: page.model, Node: { data: { node: packageNode } } },
   });
-  page.model.FDiagram.FNodes = { get FCollection() { return page.nodes.map(node => ({
-    FGuid: node.label, FCell: { geometry: { x: node.x, y: node.y, width: 100, height: 60 } },
-  })); } };
   await page.execute('async () => null');
   const tab = { classList: { contains: () => page.active } };
   const document = { querySelectorAll: selector => selector.includes('cmpDiagram') ? [page.model.FDiagram.FmxGraph.container]
@@ -49,7 +46,7 @@ test('both saves arrange an owned draft once before writing and preserve topolog
     assert.equal(page.arrangements, 1);
     assert.deepEqual(page.storage.get(path).edges, links);
     assert.equal(page.storage.get(path).nodes[0].x, 120);
-    assert.deepEqual(outcome.trace.find(item => item.event === 'package_arrangement').reason, null);
+    assert.equal(outcome.trace.find(item => item.event === 'package_arrangement').reason, 'result_unconfirmed');
     assert.ok(outcome.trace.findIndex(item => item.event === 'package_arrangement') < outcome.trace.findIndex(item => item.event === 'save_requested'));
     validateActionParameters(actions.get(action).output_schema, outcome.output);
   }
@@ -88,25 +85,15 @@ test('native layout refusal, disabled control, wizard and running package do not
   }
 });
 
-test('layout topology drift is reported and the subsequent save snapshot matches what is written', async () => {
-  const page = await arrangePage(); page.changeTopology = true;
-  const result = await run(page, 'package.save_checkpoint', { path: '/user/data/packages/drift-layout.lgp', conflict_policy: 'fail' });
-  assert.equal(result.status, 'SUCCEEDED', JSON.stringify(result));
-  assert.equal(result.trace.find(item => item.event === 'package_arrangement').reason, 'topology_changed');
-  assert.equal(page.storage.size, 1);
-});
-
-test('unstable layout is bounded and does not repeat layout or saving', async () => {
-  const page = await arrangePage();
-  page.model.FDiagram.FNodes = { get FCollection() { return page.nodes.map(node => ({
-    FGuid: node.label, FCell: { geometry: { x: page.clock, y: node.y, width: 100, height: 60 } },
-  })); } };
-  const result = await run(page, 'package.save_checkpoint', { path: '/user/data/packages/unstable.lgp', conflict_policy: 'fail' });
-  assert.equal(result.status, 'SUCCEEDED', JSON.stringify(result));
-  assert.equal(result.trace.find(item => item.event === 'package_arrangement').reason, 'coordinates_unconfirmed');
-  assert.equal(page.arrangements, 1);
-  assert.equal(page.storage.size, 1);
-  assert.ok(page.clock < 5000);
+test('both saves refuse topology drift during layout before writing the package', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) {
+    const page = await arrangePage(); page.changeTopology = true;
+    const result = await run(page, action, { path: '/user/data/packages/drift-layout.lgp', conflict_policy: 'fail' });
+    assert.equal(result.status, 'AMBIGUOUS', JSON.stringify(result));
+    assert.match(result.error.message, /Package changed after save preflight/);
+    assert.equal(page.storage.size, 0);
+    assert.equal(result.trace.some(item => item.event === 'save_requested'), false);
+  }
 });
 
 test('layout is skipped near the original deadline while ordinary saving still completes', async () => {
@@ -123,7 +110,7 @@ test('the runtime supplies its existing session binding to the private Save step
   const engine = runtime(page, { getStorageBinding: () => page.storageBinding });
   const result = await engine.run('package.save_checkpoint', { path: '/user/data/packages/runtime-arrange.lgp', conflict_policy: 'fail' }, { operationId: 'runtime-arrange' });
   assert.equal(result.status, 'SUCCEEDED', JSON.stringify(result));
-  assert.equal(result.trace.find(item => item.event === 'package_arrangement').status, 'performed');
+  assert.equal(result.trace.find(item => item.event === 'package_arrangement').status, 'attempted');
   assert.equal(page.arrangements, 1);
 });
 

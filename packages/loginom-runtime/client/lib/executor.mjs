@@ -1087,11 +1087,11 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if (await input.inputValue() !== value) throw new Error('Loginom file name editor did not commit the requested path');
   };
   const runPackageSaveAs = async ({ keepOpen = false } = {}) => {
-    const preflight = await packageCheckpoint();
-    if (task.checkpoint && !same(preflight, task.checkpoint)) throw new Error('Package changed after save preflight');
+    const before = await packageCheckpoint();
+    if (task.checkpoint && !same(before, task.checkpoint)) throw new Error('Package changed after save preflight');
     let arrangement = { status: 'skipped', reason: 'ownership_unconfirmed' };
     try {
-      const inspectArrangement = () => page.evaluate(binding => {
+      const admission = await page.evaluate(binding => {
         const prep = globalThis.__loginomDockPreparationV1, app = globalThis.bg?.app;
         if (!binding.session_id || !binding.document_id || prep?.document !== document || prep.id !== binding.document_id)
           return { reason: 'ownership_unconfirmed' };
@@ -1103,7 +1103,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         }
         const tabs = document.querySelectorAll('[data-tid='+JSON.stringify(binding.tab_tid)+']');
         const creation = node instanceof app.PackageTreeNode && tabs.length === 1 && tabs[0].classList.contains('x-tab-active')
-          && [...prep.receipts.entries()].find(([,receipt]) => {
+          && [...prep.receipts.values()].some(receipt => {
             if (receipt.phase !== 'verified' || receipt.packageNode !== node || receipt.tab !== tabs[0]) return false;
             try {
               const request = JSON.parse(receipt.request);
@@ -1111,27 +1111,14 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
             } catch { return false; }
           });
         if (!creation) return { reason: 'ownership_unconfirmed' };
-        const model = card.Controller.FController, diagram = model?.FDiagram;
-        const roots = document.querySelectorAll('[data-tid='+JSON.stringify(binding.prefix+';ModelForm;cmpDiagram')+']');
-        if (!(model instanceof app.ModelForm) || roots.length !== 1 || diagram?.FmxGraph?.container !== roots[0])
-          return { reason: 'workflow_unconfirmed' };
         if (node.HasRunningNodes() !== false) return { reason: 'package_running' };
         const visible = element => !!element.getBoundingClientRect().width && !!element.getBoundingClientRect().height
           && getComputedStyle(element).visibility !== 'hidden';
         if ([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg,[data-tid$=";WizrdMCF"]')].some(visible))
           return { reason: 'dialog_or_wizard_open' };
-        const nodes = diagram.FNodes?.FCollection;
-        if (!Array.isArray(nodes) || nodes.length > 500) return { reason: 'coordinates_unconfirmed' };
-        const coordinates = nodes.map(item => {
-          const geometry = item.FCell?.geometry;
-          if (!item.FGuid || !geometry || ![geometry.x,geometry.y,geometry.width,geometry.height].every(Number.isFinite))
-            throw Error('Layout geometry unavailable');
-          return [item.FGuid, geometry.x, geometry.y, geometry.width, geometry.height];
-        }).sort((left,right) => left[0].localeCompare(right[0]));
-        return { ownership: [prep.id, creation[0]], coordinates };
-      }, { ...preflight.workflow_ref, session_id: task.storage_binding?.session_id, document_id: task.storage_binding?.document_id });
-      const initial = await inspectArrangement();
-      if (initial.reason) arrangement.reason = initial.reason;
+        return null;
+      }, { ...before.workflow_ref, session_id: task.storage_binding?.session_id, document_id: task.storage_binding?.document_id });
+      if (admission?.reason) arrangement.reason = admission.reason;
       else if (remaining() < 3000) arrangement.reason = 'save_deadline_near';
       else {
         // This optional native step uses the bundled, resource-pinned selector;
@@ -1139,34 +1126,18 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         const definition = task.arrangement_selector;
         if (!definition || definition.strategy !== 'data_tid' || definition.scope !== 'activeWorkflow')
           throw Error('Bundled layout selector unavailable');
-        const buttons = await visible(tid('', preflight.workflow_ref.prefix+';'+definition.value));
+        const buttons = await visible(tid('', before.workflow_ref.prefix+';'+definition.value));
         const button = buttons.length === 1 && await buttons[0].isEnabled() ? buttons[0] : null;
         if (!button) arrangement.reason = 'button_unavailable';
         else {
-          const ready = await inspectArrangement();
-          if (ready.reason || !same(ready.ownership, initial.ownership)) throw Error('Layout owner changed');
-          arrangement = { status: 'unconfirmed', reason: 'arrangement_unconfirmed' };
+          arrangement = { status: 'attempted', reason: 'result_unconfirmed' };
           await interact(timeout => button.click({ timeout: Math.min(timeout, 1000) }), true);
-          arrangement.reason = 'coordinates_unconfirmed';
-          const until = Math.min(deadline, Date.now() + 2000);
-          let previous = null;
-          while (Date.now() < until) {
-            const current = await inspectArrangement();
-            if (current.reason || !same(current.ownership, initial.ownership)) { arrangement.reason = current.reason ?? 'ownership_changed'; break; }
-            if (previous && same(previous, current.coordinates)) {
-              arrangement = same(await graphSnapshot(preflight.workflow_ref.prefix), preflight.graph)
-                ? { status: 'performed', reason: null } : { status: 'unconfirmed', reason: 'topology_changed' };
-              break;
-            }
-            previous = current.coordinates;
-            await wait(100);
-          }
         }
       }
     } catch { arrangement.reason = 'arrangement_unconfirmed'; }
-    record('package_arrangement', { ...arrangement, warning: arrangement.status !== 'performed' });
-    // The saved snapshot follows layout, including an unconfirmed layout attempt.
-    const before = await packageCheckpoint();
+    record('package_arrangement', { ...arrangement, warning: true });
+    // Keep Save's original graph as its baseline, including after a layout attempt.
+    if (!same(await packageCheckpoint(), before)) throw Error('Package changed after save preflight');
     const continuationsBefore = keepOpen ? await packageContinuations(before.workflow_ref) : [];
     const click = async (symbol, effect = false) => interact(timeout => resolve(symbol).then(item => item.click({ timeout })), effect);
     transientDialog = true;
