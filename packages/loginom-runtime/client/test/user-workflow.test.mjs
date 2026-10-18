@@ -144,7 +144,7 @@ test('nonempty selected parameters pass the user envelope and retain internal va
 test('technical defaults expand deterministically and preserve explicit choices',()=>{
  const bindings=createUserWorkflowBindings();bindings.remember(workspace());
  const tool=userNodeTool(nodeApiTools.find(t=>t.name==='dock_node_apply'));
- for(const [type,finish,ports] of [['transform.sorting','execute',[0]],['transform.filter_data','execute',[0,1]],['exports.text','execute',[]],['transform.sorting','done',[]]]){
+ for(const [type,finish,ports] of [['transform.sorting','execute',[0]],['transform.filter_data','execute',[0,1]],['datamining.clustering','execute',[0,1]],['exports.text','execute',[]],['transform.sorting','done',[]]]){
   const args=request();args.target.type=type;args.finish=finish;delete args.read;delete args.budgets;delete args.mappings;
   validateActionParameters(tool.inputSchema,args);
   const full=bindings.expandNode(args);assert.deepEqual(full.read.ports,ports);assert.deepEqual(full.mappings,[]);
