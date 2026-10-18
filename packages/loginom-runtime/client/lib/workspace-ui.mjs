@@ -3369,7 +3369,8 @@ function readRenderedInputMapping(observation) {
       // the read after a completed gesture. Repeat only that read once; never
       // replay the gesture or extend the enclosing action deadline.
       if(code==='UI_SCAN_LIMIT'&&observed.ui_read_failure.limit_kind==='time'
-        &&nodeContext?.surface==='wizard'&&!scanRetried) {
+        &&(nodeContext?.surface==='wizard'||nodeContext?.surface==='graph'&&effectPossible
+          &&['finish_wizard','execute_wizard'].includes(task.action?.verb))&&!scanRetried) {
         timeout();record('ui_scan_read_retried',{attempt:1});
         return readUi(rediscover,true);
       }

@@ -3855,6 +3855,29 @@ test('typed input-port finish uses one gesture and quiet exact graph return with
   }
 });
 
+test('input-port finish retries a timed graph read once without repeating Done',async()=>{
+ for(const persistent of [false,true]) {
+  const {page}=await inputPortFinishFixture('ellipsis'),snapshot=await page.observe();
+  const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');
+  let elapsed=0,armed=false,first=false,failures=0;
+  const Clock=page.context.Date;
+  page.context.Date=class extends Clock {static now(){return Clock.now()+elapsed;}};
+  const click=page.mouse.click,evaluate=page.evaluate.bind(page),query=page.document.querySelectorAll.bind(page.document);
+  page.mouse.click=async(...args)=>{await click(...args);armed=true;};
+  page.evaluate=(fn,arg)=>{if(arg&&Object.hasOwn(arg,'discoverRoots'))first=true;return evaluate(fn,arg);};
+  page.document.querySelectorAll=selector=>{
+   if(first){first=false;if(armed&&(persistent||failures===0)){elapsed+=600;failures++;}}
+   return query(selector);
+  };
+  const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot);
+  assert.equal(result.status,persistent?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(result.error));
+  assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,1);
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  assert.equal(failures,persistent?2:1);
+  if(persistent)assert.equal(result.error.code,'UI_SCAN_LIMIT');
+ }
+});
+
 test('input-port completion waits through late loading without repeating Done or accepting a changed owner',async()=>{
   for(const mode of ['late_loading','late_loading_long','late_loading_permanent','late_loading_foreign_node','late_loading_foreign_workflow']){
     const {page,waits}=await inputPortFinishFixture(mode),snapshot=await page.observe();
