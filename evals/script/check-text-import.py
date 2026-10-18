@@ -687,26 +687,34 @@ def report_sentences(text, atoms=(), identifiers=None):
         boundaries = [(match.start(), match.end()) for match in re.finditer(cuts, sentence) if match.group('cut') is not None
             and not any(left < match.start() < right for left, right in warning_lists)]
         boundaries += [(position, position) for position, _, _ in regions if position and not any(left < position < right for left, right in protected)]
-        start, role, inherited_role = 0, None, False
+        start, role, field_role, inherited_role = 0, None, False, False
         def append(left, right):
-            nonlocal role
+            nonlocal role, field_role
             part = sentence[left:right]
             position = left + len(part) - len(part.lstrip())
             clause = ReportClause(part, scope_at(position), origin + left, identifiers)
             markers = list(re.finditer(r'\b(?P<marker>запрош\w*|ожида\w*|requested|required|expected|получ\w*|обнаруж\w*|наблюда\w*|observed|found)\b[^;,.!?]{0,40}?\b(?:пол\w*|колон\w*|столб\w*|fields?|columns?)\b', clause))
             explicit = markers[-1] if markers else None
-            relation = report_count_relation(clause, bool(role))
+            relation = report_count_relation(clause, field_role)
             if relation:
-                clause.count_context = bool(role)
-                role = relation[0]
+                clause.count_context = field_role
+                role, field_role = relation[0], True
             elif explicit:
                 role = 'requested' if re.match(r'запрош|ожида|requested|required|expected', explicit['marker']) else 'observed'
+                field_role = True
+            elif foreign := re.match(rf'(?P<marker>запрош\w*|ожида\w*|requested|required|expected|получ\w*|обнаруж\w*|наблюда\w*|observed|found)\s+(?:{count_number})\b\s+(?:строк\w*|rows?|файл\w*|files?)\b', clause):
+                role = 'requested' if re.match(r'запрош|ожида|requested|required|expected', foreign['marker']) else 'observed'
+                field_role = False
             elif inherited_role and role and (shared := re.match(rf'(?:(?:does|do)\s+not\s+|не\s+)?(?P<marker>{count_verbs})\b\s+(?:(?:not|не)\s+)?(?:{count_number})\b', clause)):
                 clause.count_role, clause.count_marker = role, shared.span('marker')
+                clause.count_field_context = field_role
             elif inherited_role and role and re.match(r'(?:(?:не|not)\s+)?(?:\d+|one|two|three|four|five|одно|один|два|две|три|четыре|пять)\b', clause):
                 clause.count_role = role
+                clause.count_field_context = field_role
             else:
-                role = None
+                role, field_role = None, False
+            if role and (quantity_unit := re.search(rf'\b(?:{count_number})\b\s+(?P<unit>пол\w*|колон\w*|столб\w*|fields?|columns?|строк\w*|rows?|файл\w*|files?)\b', clause)):
+                field_role = bool(re.fullmatch(r'пол\w*|колон\w*|столб\w*|fields?|columns?', quantity_unit['unit']))
             rows.append(clause)
         for left, right in sorted(set(boundaries)):
             if left < start: continue
@@ -980,7 +988,7 @@ def refusal_explained(sentences, reason, spec):
             for marker in marker_rows:
                 tail = clause[marker.end():]
                 quantity = relation[1] if relation else re.match(rf'\s*(?:(?:всего|только|only|total)\s+)?(?P<neg>не\s+|not\s+)?(?P<n>{number})\b(?P<alternative>\s*,\s*(?:а|but|and)?\s*(?:не|not)\s+(?P<other>{number})\b)?\s+(?:исходн\w*\s+|source\s+)?(?P<unit>{unit})\b', tail)
-                if not quantity and elided:
+                if not quantity and elided and getattr(clause, 'count_field_context', True):
                     quantity = re.match(rf'\s*(?P<neg>не\s+|not\s+)?(?P<n>{number})\b(?P<alternative>)(?P<other>)(?P<unit>)(?=\s*[.!?]*\s*$)', tail)
                 if not quantity: continue
                 if (elided or relation) and not quantity['unit']:
