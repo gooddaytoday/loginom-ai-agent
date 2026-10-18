@@ -3932,7 +3932,15 @@ function readRenderedInputMapping(observation) {
             timeout();await page.waitForTimeout(Math.min(200,timeout()));
             observed=await waitForMasks(await readOpeningUi(),readOpeningUi,ownedLoading);
           }
-          const deactivationPending=task.action.verb==='begin_wizard'&&exactDeactivation(observed);
+          let deactivationPending=task.action.verb==='begin_wizard'&&exactDeactivation(observed);
+          if(!deactivationPending && task.prepared_node_context && contextMatches(observed)
+            && !observed.ui.masks.length && !intendedWizard(observed)) {
+            // Preserve the refused sample, then read once more within the same
+            // deadline. The original gesture and owner checks stay unchanged.
+            record('wizard_open_confirmation_read_retried',{attempt:1,initial_observation:observed});
+            timeout();observed=await readOpeningUi();
+            deactivationPending=task.action.verb==='begin_wizard'&&exactDeactivation(observed);
+          }
           if(deactivationPending)record('wizard_deactivation_question_observed',{node:opening.node,workflow_path:opening.workflow_path});
           const owner=observed.wizard?.owner_context;
           if(!deactivationPending && (!contextMatches(observed) || observed.ui.masks.length || !intendedWizard(observed)))
