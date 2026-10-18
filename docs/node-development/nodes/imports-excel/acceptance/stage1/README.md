@@ -30,3 +30,18 @@ application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.
 Исправление общего слоя Agent требует карточки W либо разрешения владельца.
 Обработчик Excel ещё не реализован; model/cold PASS 0/3, s1 NOT_RUN.
 Сырые свидетельства публикуются во вложении карточки, в Git не включаются.
+
+
+18.10.2026 продолжение по разрешению владельца: отдельный PR #136
+(`lab96-xlsx-attachment`, b9f5f4000d) устраняет provider file part для inline XLSX:
+модель получает имя/размер/описание книги, оригинальный file part сохраняется.
+42 теста message-v2 и typecheck Agent PASS. Ветка этапа 1 содержит тот же фикс.
+На чистой сборке 6a61aa06540c74ac902582f850988537b94a567f модель
+openai/gpt-6.1-sol/medium начала сценарий; dock_prepare вернул prepared=true.
+Доставка sales.xlsx остановлена до upload: ARTIFACT_VERIFICATION_UNSUPPORTED,
+«Server-copy verification supports only admitted CSV/TSV/TXT files».
+Три проверки расширений в executor.mjs и artifact-discovery.mjs не допускают XLSX;
+artifact-discovery.test.mjs явно проверяет отказ XLSX. Это отдельный runtime scope,
+который не входит в разрешённую одну правку message-v2.ts.
+Пакет не сохранён; cold-check/s1 NOT_RUN. Предлагаемая минимальная правка whitelist
+приложена к карточке для решения владельца; в продукт не внесена.
