@@ -1,0 +1,337 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "kind": "FULL_INDEPENDENT_OFFLINE_CASE_REVIEW",
+  "intent_id": "LAB61-BEN-REVIEW-REWORK10-dfe5a42c-01a14e62",
+  "trigger_report_id": "01a14e62-e0c1-72c6-bb04-3e00f392cce4",
+  "candidate": {
+    "sha": "dfe5a42c4eab86adccb2c5477c2d609be4e13d1e",
+    "authorization_base": "1088d04fe41f7765e3873d993b4b32a32eb5a369",
+    "direct_parent": "6d02838c024f3450ba4709ea1e4c69ec6f482c80",
+    "commits": [
+      "6d02838c024f3450ba4709ea1e4c69ec6f482c80",
+      "dfe5a42c4eab86adccb2c5477c2d609be4e13d1e"
+    ],
+    "tree": "14596ba9023ce4f51eb78a40f8b9d8cb5ecb57c9",
+    "branch": "lab61-confirmation-scope",
+    "clean_source": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-confirmation-scope",
+    "checker_sha256": "bb5ae7007cd0f4022c58035dbc5a993d3a143cb8314600746bfa6568e1664c82",
+    "test_sha256": "8f9615f88c58e3a6bb2d5ac4b4a1f83f958629e7a5aa4f87d164567601ab0c5e",
+    "source_delta": [
+      "evals/script/check-text-import.py",
+      "evals/test/text-import-evidence.test.ts"
+    ],
+    "protected_AST_unchanged": [
+      "require",
+      "calls_from",
+      "after",
+      "source_bindings",
+      "request_owner",
+      "rejection",
+      "native_events",
+      "configuration_matches",
+      "native_application",
+      "native_execution",
+      "public_output",
+      "typed_table",
+      "unused_structural_ports",
+      "package_graph",
+      "settled_receipt",
+      "known_refusal",
+      "report_text",
+      "report_normalize",
+      "report_regions",
+      "claim_status",
+      "claim_asserted",
+      "bound_report_facts",
+      "report_name_role",
+      "refusal_witness",
+      "report_truth",
+      "damage_diagnosed",
+      "diagnostic",
+      "positive",
+      "audit"
+    ]
+  },
+  "official_delivery": {
+    "root": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework10-ready-01a14e62/extracted",
+    "payloads": 2824,
+    "archive_sha256": "32eb8dc3ef1b89fdd9913070f85bc0c24b444aba9f1c37232b14403ef54cb9d9",
+    "manifest_sha256": "fbac33a451019cde940f4204a901346bd8f40edb1356a111bc1b10ee9738434a",
+    "delivery_attachment_id": "01a14e62-d800-710c-b8ce-24655ff74902",
+    "part_attachment_ids": [
+      "01a14e62-dba9-745d-826b-8cc607878299",
+      "01a14e62-dda0-7933-888a-3212f76da961",
+      "01a14e62-dee5-7f2b-821d-8179cf7fb1b9",
+      "01a14e62-e00f-7407-bd6e-29242f6b9669",
+      "01a14e62-e082-7089-aca2-0851a1576d86"
+    ],
+    "bundle_sha256": "95e3f934de274af6b60ed6cf57397c9a7d68cffcd8b675b55672c735542996aa",
+    "patch_sha256": "3941ec0e87fdd513897632b544a3997d41562739572e19d5ef2b3c03aaf47635"
+  },
+  "Evaler_verification": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/roles/evaler/work/lab61-rework10-ready-01a14e62/evaler-verification.json",
+    "sha256": "5cb6471500be5df7e89d608e1b86662069bb408cf1a0d75627c3a652cd6fd6c0",
+    "not_independent_Ben_acceptance": true
+  },
+  "preserved_expectations": {
+    "inputs_only_sha256": "b9d2b534832edd05b2f54c6b51dc2f0c4c236d2bc30d956352daa541c0f815ef",
+    "record_review_protocol_before_MODEL_payload_diff": true,
+    "disclose_known_author_aggregates": true,
+    "no_new_blind_calculation_claim": true
+  },
+  "scope": [
+    "One full independent exact clean-source review of MODEL and entire authorized1088→initial6d02838c→finaldfe5a42c two-commit range. Ben does not patch author code; one verdict contains all reproducible findings and own compositional boundaries.",
+    "Review independent finite confirmation with shared/explicit subject and local polarity; separate explicit TASK/source quantitative relation from inherited count ellipsis; enumerate every repeated-label/wrapped/Unicode warning argument with its own structured code identity, evidence and polarity. Preserve complement governors, contrast, quotation, attribution, history/current scope and contradictions.",
+    "Independently verify additional quoted complement-link regression and protected-span follow-up, necessary-condition count-reader fast path, new helper semantics and all unchanged native/public/typed/table/inspect/binding/initial omission/owner/effect/cleanup guards. Finite corpus does not establish universal NLU; original freeform TASK/criteria/answer contract stays unchanged.",
+    "Check MODEL→fully collected original parent RED342PASS7FAIL→pre-edit gate before first checker/prototype edit; final public test bytes stay identical across base RED/both commits. Later parent RED with30s is a separate after-implementation repeat. Preserve all prior-stage chronology and initial errors; author timestamps/source-log bindings are not external edit-time attestation.",
+    "Independently reproduce identical final tests on exact1088 and final source, appropriate full suite/typecheck. Qualified full invocation is bun test --timeout30000. Preserve initial targeted8PASS3FAIL1ERROR and original5s warning FAIL, both frozen full963PASS15SKIP0FAIL runs, controller errors and hypotheses v2/v3/v4. Final separate default5s warning PASS is not a default-timeout full-suite claim; evaluate timing/fast-path semantics without changing native deadlines.",
+    "Independently replay1700 qualified rows (prior1498+transcript102/reader20/supplemental80), extra unit26/quote32, original96negative9positive18native-initial/omitted-error:null, portable1429 and unchanged1227/951/715/native18 wrappers. Disclose all baseline/inspect/count overlaps and synthetic repeats; verify final Git/checker bindings separately from initial/intermediate records.",
+    "Full review of all ten original IDs and30 genuine histories: complete typed/native evidence, exact binding, archived actual Luna/high, once/ledger, original unused reservation carry-forward. New derived records identify final Git/checker SHA; raw summaries/verdicts, errors and four measured product FAIL stay immutable.",
+    "Verify historical genuine completion→ordinary RELEASED plus own fresh read-only healthy FREE and own cleanup. No new lease/browser/native/admission/model/reference/product/probe/recovery/build/install/OS/reload/integration or invented live lifecycle.",
+    "Quality ACCEPT may coexist with four measured product FAIL; unknown cleanup or infrastructure ERROR cannot be ACCEPT. Accepted common integration and LAB62–63 remain closed until separate Evaler decision."
+  ],
+  "final_author_artifacts": {
+    "model": "MODEL.md",
+    "record": "model-record.json",
+    "source_initial": "initial-results/source",
+    "source_final": "source-final",
+    "original_RED": "commands/parent-red",
+    "later_RED_repeat": "commands/parent-red-timeout30",
+    "before_first_edit": "before-first-checker-edit.json",
+    "first_edit_observed": "first-implementation-observed.json",
+    "initial_full": "initial-results/commands/final-full-unit",
+    "final_full": "commands/final-full-unit",
+    "typecheck": "commands/final-typecheck",
+    "initial_default_5s_FAIL": "commands/default-timeout-warning-check",
+    "final_default_5s_PASS": "commands/default-timeout-warning-check-v4",
+    "controls": "final-qualification.json",
+    "genuine_replay": "replay-final/REPORT.json",
+    "portable": "portable-final/REPORT.json",
+    "source_Git_bytes": "portable-candidate",
+    "hypotheses": [
+      "HYPOTHESIS-v2.md",
+      "HYPOTHESIS-v3.md",
+      "HYPOTHESIS-v4.md"
+    ],
+    "additional": [
+      "targeted-confirmation-red.json",
+      "targeted-count-unit-red.json",
+      "author-count-unit-controls.json",
+      "quote-link-boundaries.json",
+      "quote-scope-red.json",
+      "quote-scope-final.json"
+    ]
+  },
+  "author_claims_to_verify": {
+    "RED": "342PASS7FAIL",
+    "public_GREEN": "349PASS0FAIL",
+    "initial_and_final_full": "963PASS15SKIP0FAIL; final6014assertions; timeout30000/typecheck0",
+    "qualified_rows": 1700,
+    "portable_rows": 1429,
+    "additional_unit": 26,
+    "quote_red_green": "28/32→32/32",
+    "final_separate_default_5s_warning_PASS": true,
+    "derived_counts": {
+      "reference": {
+        "PASS": 10
+      },
+      "Rich": {
+        "PASS": 8,
+        "FAIL": 2
+      },
+      "Ben": {
+        "PASS": 8,
+        "FAIL": 2
+      }
+    }
+  },
+  "product_source": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "reference_provenance": "6×d6 +3×2e990 +initial×a2ba",
+  "raw_counts_preserved": {
+    "Rich": "3PASS/7FAIL",
+    "Ben": "2PASS/8FAIL",
+    "wrapper": "ERROR/zero attempts"
+  },
+  "consumption": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 3,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 1
+    },
+    "reference_total": 15,
+    "product_physical_calls": 20,
+    "recovery": 1,
+    "probes": 0,
+    "historical_outcomes_preserved": true,
+    "budget_increases": [
+      {
+        "old": 3,
+        "new": 4,
+        "usage": {
+          "completed_reworks": 3,
+          "fresh_REJECTs": 4
+        },
+        "counters_reset": false,
+        "reason": "Proposition scope."
+      },
+      {
+        "old": 4,
+        "new": 5,
+        "usage": {
+          "completed_reworks": 4,
+          "fresh_REJECTs": 5
+        },
+        "counters_reset": false,
+        "reason": "Object/count/ID binding."
+      },
+      {
+        "old": 5,
+        "new": 6,
+        "usage": {
+          "completed_reworks": 5,
+          "fresh_REJECTs": 6
+        },
+        "counters_reset": false,
+        "reason": "Scope/roles/contradiction/code identity."
+      },
+      {
+        "old": 6,
+        "new": 7,
+        "usage": {
+          "completed_reworks": 6,
+          "fresh_REJECTs": 7
+        },
+        "counters_reset": false,
+        "reason": "Governor/argument/attempt/code scope."
+      },
+      {
+        "old": 7,
+        "new": 8,
+        "usage": {
+          "completed_reworks": 7,
+          "fresh_REJECTs": 8
+        },
+        "counters_reset": false,
+        "reason": "Predicate dependencies and positive count witness."
+      },
+      {
+        "old": 8,
+        "new": 9,
+        "usage": {
+          "completed_reworks": 8,
+          "fresh_REJECTs": 9
+        },
+        "decision_document_sha256": "6e1dfe6a5d4bf73c77b9ad32587ca22f100392922ceb8c62ffc964881517ab0f",
+        "counters_reset": false,
+        "reason": "Dependency precedence and inherited predicate roles; OFFLINE.",
+        "decision_comment_id": "01a14df5-2e47-7b64-b503-7200fedb6c3f"
+      },
+      {
+        "old": 9,
+        "new": 10,
+        "usage": {
+          "completed_reworks": 9,
+          "fresh_REJECTs": 10
+        },
+        "reason": "Independent finite predicates/relations and per-item code arguments; OFFLINE.",
+        "decision_document_sha256": "077b594d578fa797198be56e9e4cfa66074b37d59c5ce11f6de548c88d644851",
+        "counters_reset": false,
+        "decision_comment_id": "01a14e3c-6f3e-79c8-a608-92fc4f4d8053"
+      }
+    ],
+    "product_by_case": {
+      "txt-unclosed-quote": 2,
+      "txt-wrong-encoding": 2,
+      "txt-wrong-delimiter": 2,
+      "txt-ambiguous-headers": 2,
+      "csv-unclosed-quote": 2,
+      "csv-wrong-encoding": 2,
+      "csv-wrong-delimiter": 2,
+      "csv-ambiguous-headers": 2,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 2
+    },
+    "rework_limit": 10,
+    "pre_dispatch_wrapper": {
+      "original_verdict": "ERROR",
+      "physical_model_calls": 0,
+      "outcome_preserved": true,
+      "reservation_carried_forward": true,
+      "budget_reset": false
+    },
+    "product_calls_by_role": {
+      "Rich": 10,
+      "Ben": 10
+    },
+    "product_by_case_scope": "Rich+Ben total;1 each",
+    "recovery_by_role": {
+      "Rich": 1,
+      "Ben": 0
+    }
+  },
+  "rework_limit": 10,
+  "review_gate": "independent full Ben ACCEPT plus healthy FREE; no integration or LAB62 assignment",
+  "actual_read_only_health": {
+    "at": "2026-10-18T09:45:52.114Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-18T09:45:52.171Z"
+    }
+  },
+  "queues": [
+    {
+      "role": "evaler",
+      "rows": 202,
+      "active": [
+        {
+          "id": "01a14e62-e0e9-768d-b54a-ece017901992",
+          "status": "running",
+          "trigger": "01a14e62-e0c1-72c6-bb04-3e00f392cce4"
+        }
+      ]
+    },
+    {
+      "role": "rich",
+      "rows": 76,
+      "active": []
+    },
+    {
+      "role": "ben",
+      "rows": 38,
+      "active": []
+    },
+    {
+      "role": "baseline",
+      "rows": 11,
+      "active": []
+    },
+    {
+      "role": "runner",
+      "rows": 13,
+      "active": []
+    }
+  ],
+  "no_new_physical_calls_authorized": true
+}

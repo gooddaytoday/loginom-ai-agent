@@ -1,0 +1,95 @@
+{
+  "verified_utc": "2026-10-18T09:47:49.640983+00:00",
+  "source": {
+    "head": "dfe5a42c4eab86adccb2c5477c2d609be4e13d1e",
+    "direct_parent": "6d02838c024f3450ba4709ea1e4c69ec6f482c80",
+    "authorization_base": "1088d04fe41f7765e3873d993b4b32a32eb5a369",
+    "tree": "14596ba9023ce4f51eb78a40f8b9d8cb5ecb57c9",
+    "commits": [
+      "6d02838c024f3450ba4709ea1e4c69ec6f482c80",
+      "dfe5a42c4eab86adccb2c5477c2d609be4e13d1e"
+    ],
+    "changed_paths": [
+      "evals/script/check-text-import.py",
+      "evals/test/text-import-evidence.test.ts"
+    ],
+    "source_final_bundle_equal_standalone": true,
+    "source_final_patch_equal_standalone": true,
+    "patch_against_authorization_base_abbrev9_equal": true,
+    "portable_candidate_Git_files_equal": 145,
+    "unchanged_AST_functions": [
+      "require",
+      "calls_from",
+      "after",
+      "source_bindings",
+      "request_owner",
+      "rejection",
+      "native_events",
+      "configuration_matches",
+      "native_application",
+      "native_execution",
+      "public_output",
+      "typed_table",
+      "unused_structural_ports",
+      "package_graph",
+      "settled_receipt",
+      "known_refusal",
+      "report_text",
+      "report_normalize",
+      "report_regions",
+      "claim_status",
+      "claim_asserted",
+      "bound_report_facts",
+      "report_name_role",
+      "refusal_witness",
+      "report_truth",
+      "damage_diagnosed",
+      "diagnostic",
+      "positive",
+      "audit"
+    ],
+    "fresh_remote": {
+      "refs/heads/lab61-confirmation-scope": "dfe5a42c4eab86adccb2c5477c2d609be4e13d1e",
+      "refs/heads/text-import-evals": "82d2af0ca48c50a1fd0bbcce3c11db190bf133c5"
+    }
+  },
+  "archive": {
+    "bytes": 17943926,
+    "sha256": "32eb8dc3ef1b89fdd9913070f85bc0c24b444aba9f1c37232b14403ef54cb9d9",
+    "manifest_sha256": "fbac33a451019cde940f4204a901346bd8f40edb1356a111bc1b10ee9738434a",
+    "payloads_verified": 2824,
+    "members": 2825,
+    "payload_bytes": 277004479,
+    "safe_unique_exact_membership_and_every_payload_hash_verified": true,
+    "REPORT_bytes": 7078,
+    "REPORT_sha256": "6734818f599ce30f31248ca9779ea2dba600b77dbe0f5047641be2938bd080ba",
+    "REPORT_equal_standalone": true
+  },
+  "MODEL": {
+    "sha256": "c56af78a87957eee929064b2ec3e690e1a798211bf8ba693394e1ba382dbfc67",
+    "record_sha256": "0c581f69175f513236a4b3c4caff2a0d096e26d96066ba88fcd6052cc7010134",
+    "gate_sha256": "7e36114e39031c4b3c4a2a900b1e026b0cdbe8877a136ca6b9cee32eeb3c253c",
+    "pre_edit_gate_equal_native_E": true,
+    "author_timestamps_not_external_edit_time_attestation": true
+  },
+  "qualified_author_claims": {
+    "full_suite_invocation": [
+      "bun",
+      "test",
+      "--timeout",
+      "30000"
+    ],
+    "no_default_timeout_full_suite_claim": true,
+    "initial_default_5s_warning_FAIL_preserved": true,
+    "final_separate_default_5s_warning_PASS": true,
+    "both_frozen_full_runs_retained": true,
+    "quote_followup28_to32_preserved": true,
+    "1700_rows_not_independent_acceptance": true,
+    "raw_FAIL_ERROR_and_four_measured_product_FAIL_unchanged": true
+  },
+  "root_source_executed": false,
+  "root_candidate_integrated": false,
+  "full_author_source_tar_independently_hashed": false,
+  "full_independent_Ben_ACCEPT": false,
+  "new_physical_native_model_lease_install_OS_effects": false
+}
