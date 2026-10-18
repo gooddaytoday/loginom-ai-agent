@@ -19,6 +19,14 @@ import {createRedactor} from './redact.mjs';
 import {NODE_READ_MODE} from './node-read-contract.mjs';
 import {createNodeReadDrivers} from './node-read-driver.mjs';
 
+// The journal canonicalizes JSON text and redacts URL credentials. Prepare
+// public table evidence the same way before the existing exact ACK comparison.
+export function nodeOutputForJournal(value,redactor){
+ const cleaned=redactor.redact(value);
+ if(cleaned?.type==='redaction_failure')throw Error('Node output could not be redacted');
+ return cleaned;
+}
+
 // Candidate implementations share one lifecycle, gate and browser. Dispatch by
 // the already validated request; never infer a handler from the current UI.
 export function createCandidateNodeSupport(config) {
@@ -30,15 +38,17 @@ export function createCandidateNodeSupport(config) {
  const nodeApplyHandlers=new Map([...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
-  if(options.operation.parameters?.mode===NODE_READ_MODE)return createNodeReadDrivers(options,{...config,redactor});
-  if(type==='integration.rest_request')return rest.nodeApplyDriverFactory(options);
+  if(options.operation.parameters?.mode===NODE_READ_MODE||['integration.rest_request','transform.join_data'].includes(type)){
+   const drivers=options.operation.parameters?.mode===NODE_READ_MODE?createNodeReadDrivers(options,{...config,redactor})
+    :(type==='integration.rest_request'?rest:join).nodeApplyDriverFactory(options);
+   return {...drivers,readOutput:async(...args)=>nodeOutputForJournal(await drivers.readOutput(...args),redactor)};
+  }
   if(type==='preprocessing.data_recovery')return missingValues.nodeApplyDriverFactory(options);
   if(type==='exports.text')return exports.nodeApplyDriverFactory(options);
   if(type==='transform.collapse_columns')return collapse.nodeApplyDriverFactory(options);
   if(type==='transform.date_time')return dateTime.nodeApplyDriverFactory(options);
   if(type==='research.duplicates')return duplicates.nodeApplyDriverFactory(options);
   if(type==='transform.union_data')return union.nodeApplyDriverFactory(options);
-  if(type==='transform.join_data')return join.nodeApplyDriverFactory(options);
   if(type==='transform.filter_data')return filter.nodeApplyDriverFactory(options);
   if(type==='imports.text')return imports.nodeApplyDriverFactory(options);
   if(type==='transform.reform_columns')return reform.nodeApplyDriverFactory(options);
