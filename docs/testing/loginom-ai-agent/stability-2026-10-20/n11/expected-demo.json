@@ -1,0 +1,117 @@
+{
+  "package_path": "/stability-2026-10-20/n11.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RequestId",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Key",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Method",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "HttpStatusCode",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "RequestId": "REQ-08",
+          "Key": "probe-548752",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestId": "REQ-09",
+          "Key": "probe-164068",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestId": "REQ-03",
+          "Key": "probe-881324",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestId": "REQ-01",
+          "Key": "probe-280879",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestId": "REQ-10",
+          "Key": "probe-477798",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestId": "REQ-04",
+          "Key": "probe-785699",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestId": "REQ-05",
+          "Key": "probe-626482",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestId": "REQ-02",
+          "Key": "probe-173702",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestId": "REQ-11",
+          "Key": "probe-960806",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestId": "REQ-06",
+          "Key": "probe-108727",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestId": "REQ-07",
+          "Key": "probe-154460",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestId": "REQ-12",
+          "Key": "probe-768754",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        }
+      ]
+    }
+  ]
+}

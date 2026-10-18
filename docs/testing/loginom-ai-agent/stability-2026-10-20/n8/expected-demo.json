@@ -1,0 +1,75 @@
+{
+  "package_path": "/stability-2026-10-20/n8.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.clustering"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Points",
+          "label": "Points",
+          "type": "integer"
+        },
+        {
+          "name": "MeanLoad",
+          "label": "MeanLoad",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "MeanHeat",
+          "label": "MeanHeat",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "MeanVibration",
+          "label": "MeanVibration",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Points": 5,
+          "MeanLoad": 3.1,
+          "MeanHeat": 5.05,
+          "MeanVibration": 2.2
+        },
+        {
+          "Points": 7,
+          "MeanLoad": 30.0,
+          "MeanHeat": 25.0,
+          "MeanVibration": 35.07142857142857
+        },
+        {
+          "Points": 9,
+          "MeanLoad": 60.166666666666664,
+          "MeanHeat": 64.97222222222223,
+          "MeanVibration": 54.888888888888886
+        }
+      ]
+    }
+  ]
+}
