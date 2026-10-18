@@ -12,6 +12,7 @@ const options = {sessionId:'owned-session', documentId:'owned-document', account
 function fixture(overrides = {}) {
   const events = [], state = {account:'test-2', path:options.packagePath, modified:false, running:false,
     count:1, tab:true, dialog:false, loggedOut:false, readonly:false, closeResult:true, ...overrides};
+  const fail = stage => {if(state.failStage===stage)throw Error('private upstream failure: do not persist');};
   const node = {DisplayName:'result',get PackageFileName(){return state.path;}, get ReadOnly(){return state.readonly;},
     Package:{}, HasRunningNodes:() => state.running};
   const m = {PackageNodes:{get Count(){return state.count;}, Items:() => node}, HasRunningNodes:() => state.running,
@@ -37,20 +38,29 @@ function fixture(overrides = {}) {
   vm.runInContext(`globalThis.__loginomDockPreparationV1={document,id:'owned-document',receipts:new Map([['prepare',{request:JSON.stringify({session:'owned-session'}),packageNode:ownedPackage,tab:ownedTab}]])}`,context);
   const locator = query => ({
     locator:() => locator(query+' input'),
-    async waitFor() {
+    async waitFor(settings) {
+      assert.equal(settings.timeout,options.timeoutMs);
+      fail(query.includes('LoginForm')?'login_form_wait':'tab_detach');
       events.push(query.includes('LoginForm') ? 'login-visible' : 'tab-detached');
       if (query.includes('LoginForm') ? !state.loggedOut : state.tab) throw Error('UI wait failed');
-    }, async click() {
+    }, async click(settings) {
+      assert.equal(settings.timeout,options.timeoutMs);
+      fail(query.includes('tlb;no')?'discard_click':query.includes('btnLogOut')?'logout_click':'logout_menu_open');
       if (query.includes('tlb;no')) {events.push('discard');state.confirm();}
       else if (query.includes('btnLogOut')) { events.push('logout'); state.loggedOut=true; }
       else events.push('avatar');
     }, async count(){return state.dialog?1:0;},
-    async innerText(){return query.includes('cnt;cnt;cmp')?(state.prompt??'Сохранить изменения в пакете "result"?'):state.account;},
-    async isVisible(){return !state.loggedOut;},
+    async innerText(){fail('logout_account_readback');return query.includes('cnt;cnt;cmp')?(state.prompt??'Сохранить изменения в пакете "result"?'):state.account;},
+    async isVisible(){fail('logout_readback');return !state.loggedOut;},
   });
   const page = {locator,
-    async evaluate(fn,arg){return vm.runInContext('('+fn.toString()+')',context)(arg);},
-    async waitForFunction(fn,arg){for(let i=0;i<8;i++){if(await this.evaluate(fn,arg))return;await Promise.resolve();}throw Error('timeout');},
+    async evaluate(fn,arg){
+      if(fn.toString().includes('m.ClosePackage(node, false, true)'))fail('close_request');
+      if(fn.toString().includes('remaining:globalThis'))fail('close_readback');
+      if(fn.toString().includes('m?.PackageNodes?.Count === 0'))fail('logout_inventory_readback');
+      return vm.runInContext('('+fn.toString()+')',context)(arg);
+    },
+    async waitForFunction(fn,arg,settings){assert.equal(settings.timeout,options.timeoutMs);fail('close_wait');for(let i=0;i<8;i++){if(await this.evaluate(fn,arg))return;await Promise.resolve();}throw Error('timeout');},
   };
   return {state,events,context, run:changed => vm.runInThisContext('('+makePackageCleanupCode({...options,...changed})+')')(page)};
 }
@@ -58,10 +68,23 @@ function fixture(overrides = {}) {
 test('saved owned package closes with native guards, tabs disappear, then logout', async () => {
   const f=fixture(), result=await f.run();
   assert.equal(result.status,'SUCCEEDED'); assert.equal(result.package_closed,true); assert.equal(result.logged_out,true);
+  assert.equal(result.stage,'complete');
   assert.equal(result.unsaved_changes_discarded,false);
   assert.deepEqual(f.events,['modified-read','close','tab-detached','avatar','logout','login-visible']);
   const again=await f.run();assert.equal(again.reason,'CLEANUP_ALREADY_ATTEMPTED');assert.equal(f.events.filter(e=>e==='close').length,1);
 });
+
+for(const stage of ['close_request','close_wait','close_readback','tab_detach','logout_menu_open','logout_account_readback','logout_inventory_readback','logout_click','login_form_wait','logout_readback'])
+ test('private cleanup receipt pinpoints '+stage+' without certifying unconfirmed cleanup',async()=>{
+  const f=fixture({failStage:stage}),r=await f.run();
+  assert.equal(r.status,'BLOCKED');assert.equal(r.reason,'CLEANUP_UNCONFIRMED');assert.equal(r.stage,stage);
+  assert.equal(r.package_closed,stage.startsWith('logout_')||stage==='login_form_wait');
+  assert.equal(r.logged_out,false);assert.equal(r.unsaved_changes_discarded,false);
+  if(['login_form_wait','logout_readback'].includes(stage))assert.equal(f.state.loggedOut,true);
+  assert.ok(f.events.filter(e=>e==='close').length<=1);assert.ok(f.events.filter(e=>e==='logout').length<=1);
+  assert.doesNotMatch(JSON.stringify(r),/private upstream failure/);
+  assert.equal(parsePackageCleanupResult({content:[{type:'text',text:JSON.stringify(r)}]},options).stage,stage);
+ });
 
 test('missing prepared tab refuses before native package close', async () => {
   const f=fixture({tab:false}), result=await f.run();

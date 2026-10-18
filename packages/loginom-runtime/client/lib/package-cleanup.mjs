@@ -34,7 +34,7 @@ export function parsePackageCleanupResult(response, expected) {
 async function closeOwnedPackage(page, options) {
   const {sessionId, documentId, account, packagePath, tabTid, timeoutMs} = options;
   const receipt = {version:1, session_id:sessionId, document_id:documentId, account, package_path:packagePath,
-    package_closed:false, logged_out:false, unsaved_changes_discarded:false, started_at:new Date().toISOString()};
+    package_closed:false, logged_out:false, unsaved_changes_discarded:false, stage:'close_request', started_at:new Date().toISOString()};
   const finish = (status, reason, extra = {}) => ({...receipt, ...extra, status, reason, completed_at:new Date().toISOString()});
   const at = tid => page.locator('[data-tid='+JSON.stringify(tid)+']');
   try {
@@ -79,12 +79,14 @@ async function closeOwnedPackage(page, options) {
       return {started:true, packages_before:1, modified, display_name:node.DisplayName};
     }, options);
     if (!before.started) return finish('BLOCKED', before.reason);
+    receipt.stage = 'close_wait';
     await page.waitForFunction(() => {
       const state = globalThis.__loginomDockCleanupV1;
       const visible = e => !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height && getComputedStyle(e).visibility !== 'hidden';
       return state?.done || [...document.querySelectorAll('[role="dialog"],.x-message-box')].some(visible);
     }, undefined, {timeout:timeoutMs});
     if (options.diagnosticDiscard === true && before.modified === true) {
+      receipt.stage = 'discard_prompt';
       const message = page.locator('[data-tid^="msgbox"][data-tid$="cnt;cnt;cmp"]:visible');
       const no = page.locator('[data-tid^="msgbox"][data-tid$="tlb;no"]:visible');
       if (await message.count() !== 1 || await no.count() !== 1) return finish('BLOCKED','DIAGNOSTIC_SAVE_PROMPT_MISSING');
@@ -100,31 +102,44 @@ async function closeOwnedPackage(page, options) {
         return n && '/'+n.PackageFileName.replaceAll('\\','/').replace(/^\/+/, '') === o.packagePath
           && m.FServerConnection.UserName === o.account && n.HasRunningNodes() === false;
       }, options)) return finish('BLOCKED','DIAGNOSTIC_PACKAGE_CHANGED');
+      receipt.stage = 'discard_click';
       await no.click({timeout:timeoutMs});
       receipt.unsaved_changes_discarded = true;
+      receipt.stage = 'discard_close_wait';
       await page.waitForFunction(() => globalThis.__loginomDockCleanupV1?.done === true, undefined, {timeout:timeoutMs});
     }
+    receipt.stage = 'close_readback';
     const closed = await page.evaluate(() => {
       const state = globalThis.__loginomDockCleanupV1;
       return {done:state?.done === true, closed:state?.closed === true,
         remaining:globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.PackageNodes?.Count};
     });
     if (!closed.done || !closed.closed || closed.remaining !== 0) return finish('BLOCKED', 'NATIVE_CLOSE_UNCONFIRMED');
+    receipt.stage = 'tab_detach';
     await at(tabTid).waitFor({state:'detached', timeout:timeoutMs});
     receipt.package_closed = true;
+    receipt.stage = 'logout_menu_open';
     await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:timeoutMs});
+    receipt.stage = 'logout_account_readback';
     if ((await at('MF;AppMenuForm;p.h;p.t').innerText()).trim() !== account) return finish('BLOCKED', 'LOGOUT_ACCOUNT_CHANGED');
     // Native close already removed every package; logout cannot discard work.
+    receipt.stage = 'logout_inventory_readback';
     if (!await page.evaluate(expected => {
       const m = globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree;
       return m?.PackageNodes?.Count === 0 && m.FServerConnection.UserName === expected;
     }, account)) return finish('BLOCKED', 'LOGOUT_INVENTORY_CHANGED');
+    receipt.stage = 'logout_click';
     await at('MF;AppMenuForm;btnLogOut').click({timeout:timeoutMs});
+    receipt.stage = 'login_form_wait';
     await at('LoginForm;Login;edtUsername').locator('input').waitFor({state:'visible', timeout:timeoutMs});
+    receipt.stage = 'logout_readback';
     if (await at('MF;cntMain;tlbMainToolbar;btnAvatar').isVisible()) return finish('BLOCKED', 'LOGOUT_UNCONFIRMED');
     receipt.logged_out = true;
+    receipt.stage = 'complete';
     return finish('SUCCEEDED', null, {packages_before:1, packages_after:0});
   } catch {
+    // Fixed private stage only: retain refusal and never persist raw errors,
+    // credentials, DOM contents or an inferred logout from browser closure.
     return finish('BLOCKED', 'CLEANUP_UNCONFIRMED');
   }
 }
