@@ -1,0 +1,51 @@
+{
+  "kind": "operator_exact_official_author_delivery_and_source_verification",
+  "issue": "LAB-61",
+  "report_id": "01a14cdf-00b8-779f-a044-67051cdd3993",
+  "verified_at_utc": "2026-10-18T02:47:31.790725+00:00",
+  "source": "d7873d3b3fe58eb1137bb9a85655c495f3e7c812",
+  "parent": "ae8233824a47b39be160cb0295900422cc86d174",
+  "tree": "9e0badf82582313ecf219dc3c60e6bf9d8cbb0c3",
+  "archive_bytes": 14906362,
+  "archive_sha256": "a969f197b2956dfdb0279fd680a6130c6fcf83613481fa2ce39bf379d45b5b7d",
+  "manifest_sha256": "c43b1361bea55f767da9556218f2db3cc2576d6f9b95918fe860695b0b84cfe2",
+  "payloads": 1304,
+  "members": 1305,
+  "payload_bytes": 222427305,
+  "all_part_sizes_and_sha256_verified": true,
+  "all_payload_sizes_sha256_and_exact_membership_verified": true,
+  "report_bytes": 5995,
+  "report_sha256": "52947f4e2fcca4eb468e88bf72e807ebd5c14cb975a806783be89054ef98c832",
+  "standalone_REPORT_byte_equal": true,
+  "model_bytes": 3345,
+  "model_sha256": "1c72eecc839d28e100deb1933be2fda27b6fc0fe87de8dffae8a54bd96d1e59d",
+  "standalone_MODEL_byte_equal": true,
+  "bundle_sha256": "94e24a41fd72e038c67352133bc243c1060c7a22ee53d97761744e822e02b220",
+  "bundle_verified": true,
+  "patch_sha256": "1a96e955fc29a905ce6a9eb31ee3cf2681a022b51ba84e08a37052e72f988a58",
+  "patch_byte_equal_explicit_abbrev9": true,
+  "delta": [
+    "evals/script/check-text-import.py",
+    "evals/test/text-import-evidence.test.ts"
+  ],
+  "source_file_sha256": {
+    "evals/script/check-text-import.py": "f3e7ffa2a2f161d79185b5c35664dbe71830f2e8be310b39cae59697ab72cf72",
+    "evals/test/text-import-evidence.test.ts": "e4255f49b249361b1289e2668c973daf129671f36f3ef8a189928890da01945d"
+  },
+  "diff_check": true,
+  "portable_files_equal_exact_Git": 145,
+  "fresh_remote_exact_source": true,
+  "no_source_executed": true,
+  "no_common_integration": true,
+  "not_full_ACCEPT": true,
+  "physical_usage_unchanged": {
+    "reference": 15,
+    "Rich_product": 10,
+    "Ben_product": 10,
+    "recovery": 1,
+    "probes": 0
+  },
+  "rework_limit": 4,
+  "raw_results_not_rewritten": true,
+  "derived_reports_not_new_measurements": true
+}
