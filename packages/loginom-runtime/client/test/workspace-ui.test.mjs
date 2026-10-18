@@ -2056,7 +2056,8 @@ test('prepared wizard opening retries one refused sample and preserves native ow
 });
 
 test('wizard cancellation confirms the original graph after one exact affirmative click',async()=>{
- for(const mode of ['success','wrong_question','wrong_node','still_open']) {
+ for(const mode of ['success','wrong_question','wrong_node','still_open','bound_unlock','bound_churn','bound_relock',
+  'bound_document_id','bound_workflow_id','bound_node_id','bound_tid','bound_navigation_node']) {
   const page=new Page(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
   let path='';const crumbs=[];
   for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий','Old','Настройка']) {
@@ -2073,6 +2074,21 @@ test('wizard cancellation confirms the original graph after one exact affirmativ
   page.add('span',null,mode==='wrong_question'?'Удалить пакет?':'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
   page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
   page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  if(mode.startsWith('bound_')) {
+   let graphReads=0;
+   const reader=async()=>{
+    const graph=page.events.includes('click');if(graph)graphReads++;
+    const binding={verified:true,document_id:'doc',workflow_id:'workflow',node_id:'node',
+     surface:graph?'graph':'wizard',tid:base+(graph?'Graph;Old':'WizrdMCF'),
+     ...(graph?{locked:mode==='bound_churn'?graphReads%2===1:mode==='bound_relock'?graphReads>1:graphReads===1}:{})};
+    if(graphReads>1&&!['bound_unlock','bound_churn','bound_relock'].includes(mode))
+     binding[mode.slice(6)]=mode==='bound_navigation_node'?{tid:'foreign',label:'Foreign'}:'foreign';
+    return binding;
+   };
+   page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {expected_build:build,expected_origin:origin,kind:'workspace-ui',
+     prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},reader));
+  }
   const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.allowed_actions.includes('confirm_wizard_close'));
   if(mode==='wrong_question'){assert.equal(button,undefined);continue;}
   assert.ok(button);
@@ -2083,9 +2099,14 @@ test('wizard cancellation confirms the original graph after one exact affirmativ
    const node=page.add('g',base+'Graph;'+name,'',undefined,graph);page.add('span',base+'Graph;'+name+';Label;Label',name,undefined,node);
   };
   const result=await page.act({verb:'confirm_wizard_close',ref:button.ref},snapshot);
-  assert.equal(result.status,mode==='success'?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+  const success=['success','bound_unlock'].includes(mode);
+  assert.equal(result.status,success?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
   assert.equal(page.events.filter(e=>e==='click').length,1);
-  assert.equal(result.trace.some(e=>e.event==='wizard_cancel_graph_verified'),mode==='success');
+  assert.equal(result.trace.some(e=>e.event==='wizard_cancel_graph_verified'),success);
+  if(mode==='bound_unlock')assert.equal(result.output.prepared_node_context.locked,false);
+  if(mode.startsWith('bound_')&&!success)assert.equal(result.error.code,'PREPARED_NODE_CONTEXT_CHANGED',mode);
+  if(mode.startsWith('bound_'))assert.equal(result.trace.filter(e=>e.event==='node_graph_lock_rediscovery').length,
+   mode==='bound_unlock'?1:mode==='bound_churn'?2:0,mode);
  }
 });
 
