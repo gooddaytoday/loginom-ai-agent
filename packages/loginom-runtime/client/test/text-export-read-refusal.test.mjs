@@ -109,7 +109,7 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
    {tab_tid:workflow.tab_tid,prefix:failed&&kind==='changed_workflow'?'foreign':workflow.prefix},wizard:{status:!files&&failed&&kind==='graph_wizard'?'observed':'absent'},
   ui:{dialogs:!files&&failed&&kind==='graph_dialog'?[{kind:'unknown'}]:[],masks:!files&&failed&&kind==='graph_mask'?[{kind:'unknown'}]:[],elements:[
    element('MF;cntMain;tlbMainToolbar'),element('MF;cntMain;tlbMainToolbar;btnFilestorage'),
-   element('MF;cntMain;cntWorkspace;Workspace;t.br'),element(workflow.tab_tid),element('files-tab'),
+   element('MF;cntMain;cntWorkspace;Workspace;t.br'),element(workflow.tab_tid),element('files-tab'),element('MF;TF-1;ModelForm;cmpDiagram','graph'),
    element('MF;TF-2;NavigationBar;NavigationPanel'),element('MF;TF-2;FileStorageForm;btnRefresh'),
    element('MF;TF-2;FileStorageForm;pnlFileStorage;tbl','file-table'),
    ...(kind==='directory_navigation'?[element('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix('user'),'folder',{label:'user',storage_entry:{kind:'folder'},allowed_actions:['double_click']})]:[]),
@@ -160,6 +160,7 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
    output.observation_kind=task.discover_roots?'roots':'region';output.ui.truncated={dialogs:!!task.discover_roots,masks:!!task.discover_roots};
    if(task.prepared_node_context){
     assert.deepEqual(task.prepared_node_context,{document_id:'doc',workflow_ref:workflow,node});
+    if(!task.discover_roots)assert.equal(task.root_ref,'ui-graph','restoration must avoid an unscoped full-page data_views scan');
     output.prepared_node_context={...node,...(kind==='foreign_graph'?{node_id:'other'}:{}),verified:true,surface:'graph',locked:kind==='locked_graph'};
     if(kind==='root_only')output.observation_kind='roots';
     if(kind==='truncated_masks')output.ui.truncated.masks=true;

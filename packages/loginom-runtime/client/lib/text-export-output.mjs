@@ -249,7 +249,9 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
     restore:async()=>{await returnToWorkflow();
      // Root discovery deliberately omits dialogs/masks and the UI workflow
      // has only tab/prefix. Read the full surface with the native owner binding.
-     const graph=await read({prepared_node_context:binding});
+     const regions=await read({discover_roots:true,prepared_node_context:binding});
+     const root=one(regions.ui.elements.filter(e=>e.tid===ctx.workflow_ref.prefix+';ModelForm;cmpDiagram'));
+     const graph=await read({root_ref:root.ref,prepared_node_context:binding});
      need(quiet(graph)&&graph.observation_kind!=='roots'&&graph.ui.truncated?.dialogs===false&&graph.ui.truncated?.masks===false
       &&graph.wizard?.status==='absent'&&['tab_tid','prefix'].every(k=>graph.workflow_ref?.[k]===ctx.workflow_ref[k]),
       'Export refusal workflow is not quiet or changed');
