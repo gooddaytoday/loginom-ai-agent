@@ -487,21 +487,26 @@ def warning_arguments(text, identifiers=()):
         cursor += re.match(opening, text[cursor:]).end()
         negative = re.match(r'(?:not|не)\s+', text[cursor:])
         if negative and (child := head(cursor + negative.end(), labelled or wrapped)):
-            return child[0], child[1], True
+            return child[0], child[1], True, child[3]
+        item = re.match(identifier, text[cursor:])
         label = re.match(r'(?:code|с\s+кодом|код(?:ом)?)\b[\s:=]*', text[cursor:])
         if label and (child := head(cursor + label.end(), True)):
-            return child
-        item = re.match(identifier, text[cursor:])
+            # A concrete label-shaped head is itself an ID unless the child
+            # independently marks another object. Ordinary prose is context.
+            if not (item and concrete(item.group())) or child[3]:
+                return child
         separator = re.match(r'(?:and|и)\b', text[cursor:])
         if item and not (separator and not wrapped) and (wrapped or labelled or concrete(item.group())):
-            return item.group(), cursor + item.end(), False
+            end = cursor + item.end()
+            end += re.match(r'[\s)\]»"”]*', text[end:]).end()
+            return item.group(), end, False, wrapped or concrete(item.group())
         return None
     rows, cursor = [], 0
     while True:
         start = cursor
         item = head(cursor)
         if not item: break
-        code, cursor, negative = item
+        code, cursor, negative, _ = item
         rows.append({'code':code, 'negative':negative, 'start':start, 'end':cursor})
         sibling = re.match(r'[\s)\]»"”]*(?:,\s*(?:(?:and|и)\s+)?|\b(?:and|и)\b\s*)', text[cursor:])
         if not sibling: break
@@ -666,7 +671,7 @@ def report_sentences(text, atoms=(), identifiers=None):
             return next(value for start, end, value in reversed(regions) if start <= position <= end)
         independent = (r'(?:данн\w*|текст\w*|причин\w*|предупрежд\w*|нужн\w*|data|text|cause|warnings?'
             r'|движ\w*|engine|it\s+(?:did|does|has|was)|the\s+engine|фактически|actually|now|сейчас)\b')
-        count_number = r'\d+|one|single|two|both|three|four|five|одно|один|одна|два|две|оба|двух|три|трех|четыре|пять'
+        count_number = r'\d+|one|single|two|both|three|four|five|одно|один|одна|единственное|два|две|оба|двух|три|трех|четыре|пять'
         count_verbs = r'specifi\w*|requir\w*|contain\w*|has|have|exist\w*|present|указа\w*|зада\w*|задан\w*|содерж\w*|име\w*|присутств\w*|есть'
         count_head = (rf'(?:(?:not|не)\s+)?(?:{count_number})\b|(?:the\s+)?(?:task|source|задани\w*|источник\w*)\b'
             rf'|(?:in|в)\s+(?:the\s+)?(?:task|source|задани\w*|источник\w*)\b'
@@ -708,7 +713,7 @@ def report_sentences(text, atoms=(), identifiers=None):
             elif inherited_role and role and (shared := re.match(rf'(?:(?:does|do)\s+not\s+|не\s+)?(?P<marker>{count_verbs})\b\s+(?:(?:not|не)\s+)?(?:{count_number})\b', clause)):
                 clause.count_role, clause.count_marker = role, shared.span('marker')
                 clause.count_field_context = field_role
-            elif inherited_role and role and re.match(r'(?:(?:не|not)\s+)?(?:\d+|one|two|three|four|five|одно|один|два|две|три|четыре|пять)\b', clause):
+            elif inherited_role and role and re.match(rf'(?:(?:не|not)\s+)?(?:{count_number})\b', clause):
                 clause.count_role = role
                 clause.count_field_context = field_role
             else:
