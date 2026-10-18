@@ -82,7 +82,7 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
  state=await observe('details','regression intercept readback');
  need(state.node_linregression.values.pedIntercept===true&&Object.values(state.node_linregression.switches).every(v=>v===false),'a fixed intercept is required');
  const details=state.node_linregression;
- await next('lin_regression_details',['output_mapping','done']);
+ await next('lin_regression_details','done');
  const done=await channel.observe({condition:'regression settings accepted',ready:s=>s.wizard?.stage==='done'});
  return {...roles,configuration:{...roles.configuration,normalization:normalization.fields,partition:partition.values,intercept:details.values.pedIntercept,target_field:p.target_field,node_context:done.prepared_node_context},validation:{status:'accepted_by_loginom_next',node_context:done.prepared_node_context}};
 }
