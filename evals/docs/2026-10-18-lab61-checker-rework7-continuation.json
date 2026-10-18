@@ -1,0 +1,84 @@
+{
+  "checked_utc": "2026-10-18T05:33:55.210405+00:00",
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "actual_issue_revision": 310,
+  "source": "1113633ef082a9f80f10f76afbd2ab18db67dc1d",
+  "native_Evaler_task": "01a14d78-1419-7a9b-8381-d5356a5b179c",
+  "native_Rich_task": "01a14d7e-5475-78b7-ab4a-d0cbd70cb03b",
+  "decision_comment_id": "01a14d7e-5451-72da-86dd-00b357794990",
+  "canonical_original_blocked_reject7_limit6_verified": true,
+  "canonical_authorized_blocked_reject7_limit7_and_issue_readback_equal": true,
+  "limit_change": {
+    "old": 6,
+    "new": 7,
+    "actual_completed_reworks": 6,
+    "fresh_REJECTs": 7,
+    "scope_doc_sha256": "5b909cb47ca43f5aac73e305b7e3791dc6f41c3df17ae6846a6e13dbeec26661",
+    "docs_and_state_before_continuation": true
+  },
+  "actual_usage": {
+    "reference": 15,
+    "Rich_product": 10,
+    "Ben_product": 10,
+    "recovery_Rich": 1,
+    "recovery_Ben": 0,
+    "probes": 0,
+    "rework_limit": 7
+  },
+  "four_increases_retained": [
+    [
+      3,
+      4
+    ],
+    [
+      4,
+      5
+    ],
+    [
+      5,
+      6
+    ],
+    [
+      6,
+      7
+    ]
+  ],
+  "counters_reset": false,
+  "continue_event_real_comment_issue_report_sha_target_Rich_standready_pending_empty_verified": true,
+  "continue_action": "ready_to_dispatch",
+  "separate_dispatch_and_queued_receipt_verified": true,
+  "actual_final_state_equal_receipt": true,
+  "native_original_files_exact_copied": {
+    "reject-gate-input.json": {
+      "bytes": 2266,
+      "sha256": "f7178c6b6d477880eb2d94dd00050654815b72312d3ccd3fdf2693c7196e821d"
+    },
+    "reject-gate-output.json": {
+      "bytes": 1984,
+      "sha256": "6def445bd47eaeb091ba6ac691ff355bea4ea55d16c3d7b613ac1158b46575b9"
+    },
+    "outer-limit-authorized.json": {
+      "bytes": 8109,
+      "sha256": "d6ed3ef831dc6cb537c1079ad2a7f7b73ee43bae2ab29901171c1bf772f905e6"
+    },
+    "continue-input.json": {
+      "bytes": 2241,
+      "sha256": "0ec69eaf89e1d295626e96f9ddfbc75b16c8fabf6ecbbe268477ed6aef54ec02"
+    },
+    "continue-output.json": {
+      "bytes": 1589,
+      "sha256": "58516aef16f978e0980e266d6cc1ba041f8638125c7b336cc715c0aa149ca20f"
+    },
+    "receipt-input.json": {
+      "bytes": 1942,
+      "sha256": "7a779ea98b3854345f7e2900e1659b48e0c718f9708249e8b7a96ef4d3149cb8"
+    },
+    "receipt-output.json": {
+      "bytes": 1830,
+      "sha256": "7139048db2ecb319563504abf1e967a1becaf9dd917fe3389e3514a06ef2fd1d"
+    }
+  },
+  "root_state_dispatch_continue_comment_mutations": false,
+  "new_physical_calls": 0,
+  "native_preparation_failure_retained": "receipt-controller-preparation-error.txt: historical rows missing trigger_comment_id; KeyError before continue/metadata writes; optional key correction without repost"
+}

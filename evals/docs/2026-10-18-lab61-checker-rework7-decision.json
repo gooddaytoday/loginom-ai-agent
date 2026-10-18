@@ -1,0 +1,189 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "kind": "EXPLICIT_EVALER_REWORK_SCOPE_AND_LIMIT",
+  "intent_id": "LAB61-RICH-CHECKER-REWORK7-1113633e-01a14d78",
+  "source_report_id": "01a14d78-13e0-7317-a7cc-d626659071f4",
+  "source_sha": "1113633ef082a9f80f10f76afbd2ab18db67dc1d",
+  "authority": {
+    "permission_sha": "f705228205b0eb40f6b1938714b46746898d79ef",
+    "current_issue_description_grants_necessary_limits": true
+  },
+  "original_stop": {
+    "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+    "phase": "blocked",
+    "base_sha": "7d3a5cbda2873094219dec836b1b6c0ffa40f639",
+    "frozen_sha": "1113633ef082a9f80f10f76afbd2ab18db67dc1d",
+    "executor": null,
+    "delivery_sha": null,
+    "review_cycle": 7,
+    "reject_count": 7,
+    "rework_limit": 6,
+    "processed_report_ids": [
+      "01a14a4b-b72a-786a-9b35-8c1daf44cecc",
+      "01a14ae0-b509-7721-92f7-1dc24d6621ee",
+      "01a14b00-2630-7e58-8cd1-66fbcb718ee2",
+      "01a14b91-4d20-7981-8992-6ef9fc07e2ef",
+      "01a14beb-9728-70c8-9202-882e7b9a4176",
+      "01a14c31-1797-749e-b8ab-9ae580c21afb",
+      "01a14c4f-73d0-7cf1-926b-3f4bba874fb1",
+      "01a14c61-c038-79f1-9452-46de85a66c15",
+      "01a14c81-8539-7692-894f-a2936d3da32e",
+      "01a14c93-185a-7a2b-9005-65b292678be1",
+      "01a14cab-9386-7cf7-8dcc-458e38cc0d83",
+      "01a14cbc-3a22-7b52-abc3-53f7801caef7",
+      "01a14cc1-dada-77b4-8a96-8b6bb33cd8b6",
+      "01a14cdf-00b8-779f-a044-67051cdd3993",
+      "01a14cf4-c0ba-7c89-aa1c-e974e9e34621",
+      "01a14cfa-2fec-7a9f-988c-18c2a6e6f575",
+      "01a14d26-8046-79f7-85bc-1ff1f200e33f",
+      "01a14d3b-a329-7f22-a1dd-03fe0978e902",
+      "01a14d44-c333-7b3f-a0e1-d24fdcea437e",
+      "01a14d60-81d8-77a2-aec0-f915ec48327d",
+      "01a14d78-13e0-7317-a7cc-d626659071f4"
+    ],
+    "last_dispatch": {
+      "id": "LAB61-BEN-REVIEW-REWORK6-1113633e-01a14d60",
+      "phase": "ben",
+      "sha": "1113633ef082a9f80f10f76afbd2ab18db67dc1d",
+      "root_trigger": "01a14d60-81d8-77a2-aec0-f915ec48327d",
+      "task_id": "01a14d66-2708-7dac-9709-38808249ed99",
+      "outcome": "queued"
+    },
+    "blocked_context": {
+      "reason": "EVALER_DECISION_REQUIRED: rework limit reached",
+      "report_id": "01a14d78-13e0-7317-a7cc-d626659071f4",
+      "sha": "1113633ef082a9f80f10f76afbd2ab18db67dc1d",
+      "cleanup_required": false
+    }
+  },
+  "limit": {
+    "name": "rework_limit",
+    "old": 6,
+    "new": 7,
+    "usage": {
+      "completed_reworks": 6,
+      "fresh_REJECTs": 7
+    },
+    "reason": "Seven confirmed groups; preserve governing/argument/attempt scopes before segmentation and exact warning code objects; one OFFLINE rework.",
+    "counters_reset": false
+  },
+  "scope_md_sha256": "5b909cb47ca43f5aac73e305b7e3791dc6f41c3df17ae6846a6e13dbeec26661",
+  "verification": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/roles/evaler/work/lab61-ben-reject7-01a14d78/evaler-verification.json",
+    "sha256": "c0b270f74aa6e090d94c52e29563adc475fefd9455c076b1b844e1d9991afce7"
+  },
+  "actual_usage_preserved": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 3,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 1
+    },
+    "reference_total": 15,
+    "product_physical_calls": 20,
+    "recovery": 1,
+    "probes": 0,
+    "historical_outcomes_preserved": true,
+    "budget_increases": [
+      {
+        "old": 3,
+        "new": 4,
+        "usage": {
+          "completed_reworks": 3,
+          "fresh_REJECTs": 4
+        },
+        "decision_comment_id": "01a14cc1-dada-77b4-8a96-8b6bb33cd8b6",
+        "decision_document_sha256": "ffcca073617e5400f0e40bd79dabe8f83bf53a2bab2a22fb1b5e7fe83d582d1b",
+        "counters_reset": false,
+        "reason": "Five defects; proposition-scope model."
+      },
+      {
+        "old": 4,
+        "new": 5,
+        "usage": {
+          "completed_reworks": 4,
+          "fresh_REJECTs": 5
+        },
+        "decision_id": "LAB61-RICH-CHECKER-REWORK5-d7873d3b-01a14cf4",
+        "decision_document_sha256": "b03db6e1d99eaef8bd80dacf8d78cfbdaf42b6e6c0e5125348cf324fef37552c",
+        "counters_reset": false,
+        "reason": "Bound entity/actor/count/ID scopes; OFFLINE only.",
+        "decision_comment_id": "01a14cfa-2fec-7a9f-988c-18c2a6e6f575"
+      },
+      {
+        "old": 5,
+        "new": 6,
+        "usage": {
+          "completed_reworks": 5,
+          "fresh_REJECTs": 6
+        },
+        "decision_document_sha256": "ccd647ba3d33c081223d7d5f3618f85b9466a6ec2ebc7c698c8308d6dddc7ad4",
+        "counters_reset": false,
+        "reason": "Structured claim scopes/roles/contradictions/code identity; OFFLINE.",
+        "decision_comment_id": "01a14d44-c333-7b3f-a0e1-d24fdcea437e"
+      }
+    ],
+    "product_by_case": {
+      "txt-unclosed-quote": 2,
+      "txt-wrong-encoding": 2,
+      "txt-wrong-delimiter": 2,
+      "txt-ambiguous-headers": 2,
+      "csv-unclosed-quote": 2,
+      "csv-wrong-encoding": 2,
+      "csv-wrong-delimiter": 2,
+      "csv-ambiguous-headers": 2,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 2
+    },
+    "rework_limit": 6,
+    "pre_dispatch_wrapper": {
+      "original_verdict": "ERROR",
+      "physical_model_calls": 0,
+      "outcome_preserved": true,
+      "reservation_carried_forward": true,
+      "budget_reset": false
+    },
+    "product_calls_by_role": {
+      "Rich": 10,
+      "Ben": 10
+    },
+    "product_by_case_scope": "Rich+Ben total;1 each",
+    "recovery_by_role": {
+      "Rich": 1,
+      "Ben": 0
+    }
+  },
+  "portable_replays": {
+    "candidate": {
+      "total": 174,
+      "matches": 116,
+      "false_PASS": 28,
+      "false_FAIL": 30
+    },
+    "parent_matches": 96,
+    "transcript_regressions": 22,
+    "reader20": {
+      "total": 20,
+      "matches": 9
+    },
+    "supplemental_full_warning80": {
+      "total": 80,
+      "matches": 36
+    }
+  },
+  "reference_provenance": [
+    "6xd6",
+    "3x2e990",
+    "initialxa2ba"
+  ],
+  "new_physical_calls_authorized": 0,
+  "new_live_model_calls_authorized": false,
+  "unknown_patch_accepted": false,
+  "requires_following_independent_Ben_review": true
+}
