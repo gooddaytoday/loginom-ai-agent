@@ -17,7 +17,7 @@
  * - `.json(...)` / `.jsonEffect(...)` assert response shape and optional side effects.
  * - `.mutating()` tells the runner to reset isolated state after destructive routes.
  */
-import { Effect } from "effect"
+import { Effect, Exit } from "effect"
 import { OpenApi } from "effect/unstable/httpapi"
 import { TestLLMServer } from "../../lib/llm-server"
 import path from "path"
@@ -1793,7 +1793,23 @@ const main = Effect.gen(function* () {
   return undefined
 })
 
-Effect.runPromise(main.pipe(Effect.provide(TestLLMServer.layer), Effect.scoped)).then(
+Effect.runPromise(
+  main.pipe(
+    // Scope teardown (app disposal, test LLM server) occasionally never settles in CI after every
+    // scenario has finished; bound it so the gate reports its real result instead of hanging the job.
+    Effect.onExit((exit) =>
+      Effect.sync(() => {
+        const code = Exit.isSuccess(exit) ? 0 : 1
+        setTimeout(() => {
+          console.error(`${color.yellow}teardown did not finish within 20s; exiting with ${code}${color.reset}`)
+          process.exit(code)
+        }, 20_000)
+      }),
+    ),
+    Effect.provide(TestLLMServer.layer),
+    Effect.scoped,
+  ),
+).then(
   () => process.exit(0),
   (error: unknown) => {
     console.error(`${color.red}${message(error)}${color.reset}`)
