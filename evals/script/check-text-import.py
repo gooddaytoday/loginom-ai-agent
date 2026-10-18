@@ -537,7 +537,9 @@ def warning_arguments(text, identifiers=(), prefix=''):
             if sibling.group('stop') is not None: break
             if sibling.group('separator') is None: continue
             gap = re.sub(protected, ' ', text[cursor:cursor + sibling.start()])
-            if re.search(finite, gap): break
+            # Only an adjacent predicate closes this frame. A verb inside an
+            # adjunct ("after the file was saved") does not govern the list.
+            if re.match(finite, gap.lstrip()): break
             following = cursor + sibling.end()
             child = head(following)
             if not child: break
