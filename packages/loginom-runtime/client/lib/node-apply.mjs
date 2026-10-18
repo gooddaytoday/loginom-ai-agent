@@ -433,6 +433,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
   } catch(error) {
     // No automatic rollback and no repetition of an unknown upload/run/save.
     // status/wait/inspect remain the responsibility of the owning runtime.
+    if(readingOnly&&state.pending?.phase==='read'&&error.code==='NODE_READ_SCHEMA_CHANGED')state.read_schema_changed=true;
     return {operation_id:operation.id,status:state.verified_refusal?'FAILED':state.effect_possible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:state.effect_possible,
       phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
       package_saved:false,cleanup_complete:state.cleanup_complete,warnings:[],
@@ -482,8 +483,8 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
     :{status:proof.cleanup.wizard_closed&&!verified('node_finish')?'discarded':'unknown'};
   const execution=['completed','failed','cancelled'].includes(state.execution.status)||!launch?state.execution
     :{status:'unknown',execution_id:state.execution.execution_id??null};
-  // A released reread points back to its own verified source operation.
-  const readSource=readingOnly?request.parameters.source_operation_id
+  // A released reread keeps its source unless that schema was observed stale.
+  const readSource=readingOnly&&!state.read_schema_changed?request.parameters.source_operation_id
     :pending.phase==='read'&&execution.status==='completed'&&configuration.readback?operation.id:null;
   const result={operation_id:operation.id,status:'FAILED',effect_possible:true,phases:state.phases.map(({value,...p})=>p),
     node:state.node,execution,output:state.output,package_saved:false,cleanup_complete:true,
