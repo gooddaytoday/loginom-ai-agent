@@ -193,7 +193,10 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   let r=await roots();const workspace=one(r.ui.elements.filter(e=>e.tid==='MF;cntMain;cntWorkspace;Workspace;t.br'));
   r=await read({root_ref:workspace.ref});const storageTab=one(r.ui.elements.filter(e=>e.tid===r.workflow_ref.tab_tid));
   const continuation={document_id:ctx.document_id,document:r.dom_epoch.document,tid:storageTab.tid,ref:storageTab.ref};
-  await act(r,one(r.ui.elements.filter(e=>e.tid===ctx.workflow_ref.tab_tid)));
+  try{await act(r,one(r.ui.elements.filter(e=>e.tid===ctx.workflow_ref.tab_tid)));}
+  catch(error){if(!navigationOnly||journalFailed)throw error;}
+  // The return click is navigation too: only the fresh owned graph below
+  // proves restoration, even when that click's post-observation failed.
   for(let i=0;i<50;i++){
    guard();const actual=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
    if(actual.verified&&actual.surface==='graph')return {continuation,node_context:actual};

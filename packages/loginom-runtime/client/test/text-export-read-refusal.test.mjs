@@ -96,7 +96,7 @@ for(const fault of ['binding','execution','lease','restore','cleanup','transport
 });
 
 for(const kind of ['success','download_refusal','ambiguous_download','download_transport','open_files','root_stale',
- 'download_select','directory_navigation','storage_scroll','unknown_scroll','unclean_scroll','changed_scroll','scroll_unobserved','foreign_storage',
+ 'return_tab_observation','download_select','directory_navigation','storage_scroll','unknown_scroll','unclean_scroll','changed_scroll','scroll_unobserved','foreign_storage',
  'mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','journal_failure','lease_failure'])test('native export read and real save: '+kind,async()=>{
  const success=kind==='success',storage=kind.includes('scroll')||kind==='foreign_storage';
  const blocked=['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','journal_failure','lease_failure'].includes(kind);
@@ -151,7 +151,7 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
      return {status:'AMBIGUOUS',action_key:'ui.act',phase:'observing',effect_possible:true,cleanup_complete:kind!=='unclean_scroll',
       error:{code:'UI_SCAN_LIMIT'},trace:kind==='unknown_scroll'?[]:[{event:'ui_scroll_applied',from:0,to:1000,owner_ref:'ui-scroll-owner'}]};
     }
-    if(tid===workflow.tab_tid)files=false;
+    if(tid===workflow.tab_tid){files=false;if(kind==='return_tab_observation')return {status:'AMBIGUOUS',action_key:'ui.act',cleanup_complete:false,error:{code:'UI_SCAN_LIMIT'}};}
     return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};
    }
    if(files&&!failed&&kind==='root_stale'){failed=true;return {status:'FAILED',error:{code:'UI_ROOT_STALE'}};}
