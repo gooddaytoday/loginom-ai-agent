@@ -33,10 +33,11 @@ async function rejectionFixture() {
         phase: "request_rejected", request_rejected: true, effect_possible: false, cleanup_complete: true,
         error: { code: "REQUEST_REJECTED", message: "Duplicate source column names" } } },
   ]
-  async function write() {
+  async function write(report = "Запрос отклонён: Duplicate source column names.") {
     await Bun.write(path.join(attempt, "events.jsonl"), calls.map((call, i) => JSON.stringify({ type: "tool_use",
       part: { id: `call-${i}`, tool: call.tool, state: { status: "completed", input: call.input,
-        output: JSON.stringify(call.output), time: { start: i * 10, end: i * 10 + 1 } } } })).join("\n") + "\n")
+        output: JSON.stringify(call.output), time: { start: i * 10, end: i * 10 + 1 } } } })).join("\n") + "\n" +
+        JSON.stringify({ type: "text", part: { text: report } }) + "\n")
   }
   await write()
   return { root, task, attempt, calls, write }
@@ -124,6 +125,12 @@ async function positiveFixture(id = "txt-comma-utf8") {
   async function write() {
     await Bun.write(path.join(attempt, "events.jsonl"), calls.map((call, i) => JSON.stringify({ type: "tool_use", part: { id: `call-${i}`, tool: call.tool,
       state: { status: "completed", input: call.input, output: JSON.stringify(call.output), time: { start: i * 10, end: i * 10 + 1 } } } })).join("\n") + "\n")
+    const receipt: { status: string; error?: { message: string } } = output
+    if (receipt.status === "FAILED" && receipt.error) {
+      const file = path.join(attempt, "events.jsonl")
+      await Bun.write(file, await Bun.file(file).text() + JSON.stringify({ type: "text", part: {
+        text: `Импорт отклонён: ${receipt.error.message}` } }) + "\n")
+    }
     await Bun.write(journal, events.map(event => JSON.stringify({ session_id: "fixture-session", runtime_revision: "fixture-runtime",
       manifest_sha256: "a".repeat(64), ...event })).join("\n") + "\n")
     await collectTextImportEvidence(attempt, profile)
@@ -566,6 +573,139 @@ for (const id of ["txt-unclosed-quote", "csv-unclosed-quote", "txt-wrong-encodin
     } finally { await rm(f.root, { recursive: true, force: true }) }
   })
 }
+
+
+// Third review: proposition truth, causal uncertainty, and evidence-grounded reports.
+for (const id of ["txt-unclosed-quote", "csv-unclosed-quote", "txt-wrong-encoding", "csv-wrong-encoding"]) {
+  const reports: [string, boolean][] = [
+    [
+        "Я не утверждаю, что данные повреждены.",
+        false
+    ],
+    [
+        "Неверно, что данные повреждены.",
+        false
+    ],
+    [
+        "Отрицаю, что данные повреждены.",
+        false
+    ],
+    [
+        "Сообщение «данные повреждены» не соответствует действительности.",
+        false
+    ],
+    [
+        "I cannot confirm that data is corrupted.",
+        false
+    ],
+    [
+        "No evidence shows that data is corrupted.",
+        false
+    ],
+    [
+        "Данные повреждены — так утверждать нельзя.",
+        false
+    ],
+    [
+        "Проверка подтвердила: данные повреждены.",
+        true
+    ],
+    [
+        "Проверено: данные повреждены.",
+        true
+    ],
+    [
+        "Данные повреждены, возможно, из-за выбранных настроек.",
+        true
+    ],
+    [
+        "The data is corrupted, possibly because of the requested settings.",
+        true
+    ],
+    [
+        "Данные повреждены, вероятно, из-за неверной кодировки.",
+        true
+    ],
+    [
+        "There is no evidence that data is corrupted.",
+        false
+    ],
+    [
+        "I do not claim that data is corrupted.",
+        false
+    ],
+    [
+        "The data is corrupted; the cause may be the requested encoding.",
+        true
+    ],
+    [
+        "Данные повреждены, но причину подтвердить не могу.",
+        true
+    ]
+]
+  for (const [report, accepted] of reports) test(`${id} proposition truth: ${report}`, async () => {
+    const f = await damagedFixture(id)
+    try {
+      await f.write(report)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect(result.errors).toEqual([])
+      expect(result.failures.length === 0).toBe(accepted)
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+  test(`${id} grounds affirmative warning claims in native observations`, async () => {
+    const f = await damagedFixture(id)
+    try {
+      for (const report of [
+        "Обнаружено повреждение данных. Движок выдал native warning W_BEN_INVENTED_42.",
+        "Data is corrupted. The engine reported a warning W_UNOBSERVED_17.",
+        "Данные повреждены. Наблюдалось предупреждение движка.",
+      ]) {
+        await f.write(report)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("warning")
+      }
+      for (const report of [
+        "Данные повреждены. В операции нет native warnings.",
+        "Данные повреждены. Нативное предупреждение об ошибке не наблюдалось.",
+        "Data is corrupted, although there was no engine warning.",
+        "Данные повреждены. Я не выдумывал native warning.",
+        "Data is corrupted. Do not invent an engine warning.",
+      ]) {
+        await f.write(report)
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      }
+      Object.assign(f.events[4]!.receipt!.value, { warnings: [{ code: "W_SOURCE", message: "Source warning" }] })
+      await f.write("Данные повреждены. Движок выдал native warning W_SOURCE.")
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      await f.write("Данные повреждены. Движок выдал native warning W_DIFFERENT.")
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("warning")
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+}
+
+test("known refusal needs its observed reason and cannot be contradicted by the report", async () => {
+  const f = await rejectionFixture()
+  try {
+    for (const report of [
+      "Импорт завершился успешно. Все данные прочитаны правильно, отказов не было.",
+      "Импорт отклонён.",
+      "", "Я не подтверждаю, что Duplicate source column names.",
+      "Запрос отклонён: Duplicate source column names. Импорт завершился успешно.",
+      "Запрос отклонён: источник недоступен.",
+    ]) {
+      await f.write(report)
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("report")
+    }
+    for (const report of [
+      "Запрос отклонён: Duplicate source column names.",
+      "Одинаковые имена исходных полей не позволяют выполнить импорт.",
+      "The request was rejected because source column names are duplicated.",
+      "Отказ: повторяются имена колонок. Причину появления дублей пока подтвердить нельзя.",
+    ]) {
+      await f.write(report)
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
 
 async function writeInspection(f: Awaited<ReturnType<typeof damagedFixture>>, inspection: {
   tool: string; input: Record<string, unknown>; output: Record<string, unknown>

@@ -447,6 +447,121 @@ def known_refusal(call, calls, events, workspace):
     return result
 
 
+def report_text(attempt_dir, terminal):
+    return '\n'.join(event.get('part', {}).get('text', '')
+        for index, line in enumerate((attempt_dir / 'events.jsonl').read_text().splitlines()) if line.strip()
+        for event in [json.loads(line)] if index > terminal['index'] and event.get('type') == 'text')
+
+
+def report_sentences(text):
+    # Preserve identifiers such as settings.columns and the scope surrounding a
+    # quoted proposition. Punctuation inside a sentence is not a truth boundary.
+    return re.split(r'(?<=[.!?;])(?:\s+|$)|\n+', re.sub(r'[`*]', '', text.casefold().replace('ё', 'е')))
+
+
+def claim_asserted(clause, start, end):
+    """Classify the scope of one observed proposition, not all words in a sentence.
+
+    A modal causal explanation AFTER an asserted observation does not make that
+    observation hypothetical. Speech acts governing it before/after the span do.
+    This is a finite RU/EN assertion grammar, not a general language judge.
+    """
+    prefix, suffix = clause[:start], clause[end:]
+    return not re.search(
+        r'\?|\b(?:если|нужно|следует|надо|проверь(?:те)?|проверяй(?:те)?|сообщ(?:и(?:те)?|ай(?:те)?)|утверждай(?:те)?|напиши(?:те)?|напишите|замените|предполож\w*|допустим|возможн\w*|вероятно|может|якобы|task|whether|should|might|could|if|possible|possibly|hypothetical)\b'
+        r'|\b(?:please\s+)?(?:report|check|write|say|replace)\b(?=\s+(?:that|whether|the|it|data))'
+        r'|\b(?:пример|образец|example|template)\b'
+        r'|\b(?:нельзя|невозможно|неверно)\s*(?:(?:утверждать|считать|заключить)\b)?'
+        r'|\bне\s+(?:исключен\w*|установлен\w*|доказан\w*|утвержда\w*|подтвержда\w*|могу\s+подтверд\w*)\b'
+        r'|\bотрица\w*\b|\b(?:cannot|can\s+not|do\s+not|don.t)\s+(?:confirm|claim|assert)\b'
+        r'|\b(?:no|without)\s+evidence\b'
+        r'|\b(?:ложн\w*|ложь|неверн\w*\s+вывод|incorrect\s+conclusion|false)\b', prefix
+    ) and not re.search(
+        r'\?|\b(?:ложн\w*|ложь|false|would\s+be\s+(?:an?\s+)?incorrect)\b'
+        r'|\bне\s+соответств\w*\s+действительности\b'
+        r'|\b(?:так\s+)?(?:утверждать|считать|заключить)\s+(?:нельзя|невозможно)\b', suffix)
+
+
+def report_truth(text, result, events, refusal=False):
+    """Ground the report in the already verified operation, never infer effects from prose."""
+    sentences = report_sentences(text)
+    operation_id = result.get('operation_id')
+    warnings = []
+    def collect(value):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key in ('warning', 'warnings') and item:
+                    warnings.extend(item if isinstance(item, list) else [item])
+                elif isinstance(item, (dict, list)):
+                    collect(item)
+        elif isinstance(value, list):
+            for item in value:
+                collect(item)
+    for event in events:
+        if event.get('operation_id') != operation_id:
+            continue
+        receipt = event.get('receipt', {})
+        if receipt.get('status') == 'verified':
+            collect(receipt.get('value', {}))
+        if event.get('phase') == 'node_checkpoint':
+            collect(event.get('result', {}))
+    warning_evidence = json.dumps(warnings, ensure_ascii=False).casefold()
+    for sentence in sentences:
+        for match in re.finditer(r'\b(?:warnings?|предупрежден\w*)\b', sentence):
+            prefix, suffix = sentence[:match.start()], sentence[match.end():]
+            denied = re.search(r'\b(?:не|нет|без|not|no|without)\s*(?:(?:native|engine|нативн\w*|выдал\w*|сообщ\w*|reported|issued|observed)\s*){0,3}$', prefix)
+            denied = denied or re.match(r'\s*(?:(?:движ\w*|об\s+ошибк\w*)\s+)?(?:нет\b|отсутств\w*|не\s+(?:был\w*|наблюда\w*|сообщ\w*|выда\w*)|(?:was\s+)?not\s+(?:observed|reported|issued))', suffix)
+            if denied or not claim_asserted(sentence, match.start(), match.end()):
+                continue
+            codes = re.findall(r'\b(?:w|warn|warning)[_-][\w-]+\b', sentence)
+            # Mentioning warnings in an instruction/limitation is not claiming
+            # an engine observation. Check affirmative observation predicates or
+            # a concrete warning identifier, including a concise labelled report.
+            observed = re.search(r'\b(?:выда\w*|выдал\w*|сообщ\w*|наблюда\w*|обнаруж\w*|зафиксир\w*|появ\w*|есть|был\w*|reported|issued|observed|detected|produced|there\s+(?:is|was))\b', prefix)
+            observed = observed or re.match(r'\s*(?::|(?:движ\w*\s+)?(?:есть|был\w*|наблюда\w*|обнаруж\w*|зафиксир\w*|(?:was\s+)?(?:reported|issued|observed|detected))\b)', suffix)
+            if not codes and not observed:
+                continue
+            require(warnings and all(re.search(r'\b' + re.escape(code) + r'\b', warning_evidence) for code in codes),
+                'diagnostic: report warning lacks native evidence')
+    if not refusal:
+        return
+    error = result.get('error', {}).get('message', '')
+    reason = error.split('; observed')[0].casefold().replace('ё', 'е')
+    grounded = False
+    for sentence in sentences:
+        # A successful upload/cleanup does not assert successful import. Only
+        # contradictory import/read/refusal propositions fail this guard.
+        contradiction = re.search(r'\b(?:импорт\w*|import)\s+(?:заверш\w*\s+|выполн\w*\s+|completed\s+)?(?:успеш\w*|success\w*)'
+            r'|\b(?:данн\w*|data|records)\s+(?:(?:были|was|were)\s+)?(?:прочитан\w*|read)\s+(?:правильно|корректно|correctly)'
+            r'|\b(?:отказ\w*|refusals?)\s+(?:нет\b|не\s+был\w*|did\s+not\s+occur)'
+            r'|\b(?:no|without)\s+(?:refusal|rejection)', sentence)
+        require(not contradiction or not claim_asserted(sentence, contradiction.start(), contradiction.end()),
+            'diagnostic: report contradicts proven refusal')
+        literal = re.search(re.escape(reason), sentence) if reason else None
+        if literal and claim_asserted(sentence, literal.start(), literal.end()):
+            grounded = True
+        # Accept reasons as paraphrases as well as raw messages. These concepts
+        # come from the observed typed refusal, not an answer template in TASK.
+        pattern = None
+        if 'duplicate source column names' in reason:
+            pattern = r'(?:дублир\w*|повторя\w*|одинаков\w*|duplicat\w*).{0,55}(?:имен\w*|пол\w*|колон\w*|names?|columns?)|(?:имен\w*|names?).{0,55}(?:дублир\w*|повторя\w*|одинаков\w*|duplicat\w*)'
+        elif 'columns' in reason and ('initial' in reason or 'require' in reason):
+            pattern = r'(?:отсутств\w*|опущ\w*|не\s+(?:переда\w*|задан\w*)|missing|omitted|required).{0,55}(?:columns|определен\w*\s+пол\w*)|columns.{0,55}(?:отсутств\w*|опущ\w*|не\s+переда\w*|missing|omitted|required)'
+        elif 'missing or ambiguous' in reason:
+            names = re.findall(r'"([^"]+)"', reason)
+            if names:
+                name = re.escape(names[0])
+                pattern = rf'{name}.{{0,55}}(?:отсутств\w*|неоднознач\w*|missing|ambiguous)|(?:отсутств\w*|неоднознач\w*|missing|ambiguous).{{0,55}}{name}'
+        elif 'count differs' in reason:
+            counts = re.search(r'requested (\d+), observed (\d+)', reason)
+            if counts:
+                requested, observed = counts.groups()
+                pattern = rf'(?:пол\w*|колон\w*|column\w*|field\w*).{{0,40}}{observed}.{{0,40}}(?:вместо|rather than|instead of).{{0,15}}{requested}|(?:обнаруж\w*|observed).{{0,20}}{observed}.{{0,50}}(?:запрош\w*|requested).{{0,20}}{requested}'
+        paraphrase = re.search(pattern, sentence) if pattern else None
+        grounded = grounded or bool(paraphrase and claim_asserted(sentence, paraphrase.start(), paraphrase.end()))
+    require(grounded, 'diagnostic: report must explain the observed refusal reason')
+
+
 def damage_diagnosed(text, kind, replacements, affected_fields):
     """Separate assertion scope/polarity from the independently verified consequence.
 
@@ -456,7 +571,7 @@ def damage_diagnosed(text, kind, replacements, affected_fields):
     observed field/record transformation as well as a general damage diagnosis.
     """
     text = re.sub(r'[`*_]', '', text.casefold().replace('ё', 'е'))
-    sentences = re.split(r'(?<=[.!?;])|\n+', text)
+    sentences = report_sentences(text)
     damage = r'(?:поврежд\w*|искаж\w*|испорч\w*|утрат\w*|потер\w*|неполн\w*|corrupt\w*|damag\w*|loss|lost|incomplete\w*)'
     names = '|'.join(re.escape(name.casefold()) for name in affected_fields)
     field = rf'(?:пол\w*|значени\w*|field|value)\s+(?:of\s+)?(?:{names})|(?:{names})' if names else r'(?!)'
@@ -464,18 +579,11 @@ def damage_diagnosed(text, kind, replacements, affected_fields):
     movement = r'(?:поглот\w*|поглощ\w*|объедин\w*|скле\w*|попал\w*|оказал\w*|стал\w*|преврат\w*|замен\w*|swallow\w*|consum\w*|absorb\w*|merged|became|turned|replaced)'
     assertions = []
     for sentence in sentences:
-        # Directives, examples, questions and modal/false quoted propositions do
-        # not become assertions by dropping their introductory or final clause.
-        if re.search(r'\?|\b(?:если|нужно|следует|надо|провер\w*|сообщ(?:и(?:те)?|ай(?:те)?)|утверждай(?:те)?|напиши(?:те)?|напишите|замените|предполож\w*|допустим|возможн\w*|может|якобы|task|whether|should|might|could|if|possible|possibly|hypothetical)\b'
-            r'|\b(?:please\s+)?(?:report|check|write|say|replace)\b(?=\s+(?:that|whether|the|it|data))'
-            r'|\b(?:пример|образец|example|template)\b'
-            r'|\b(?:нельзя|невозможно)\s+(?:утверждать|считать|заключить)\b'
-            r'|\bне\s+(?:исключен\w*|установлен\w*|доказан\w*)\b'
-            r'|\b(?:ложн\w*|ложь|неверн\w*\s+вывод|incorrect\s+conclusion|false|would\s+be)\b', sentence):
-            continue
         # Remove discourse punctuation without detaching subject from predicate.
         sentence = re.sub(r'\b(?:но|однако|but|however|although|хотя)\b', ' ', sentence)
-        clauses = re.split(r'[,—:]\s*(?=(?:движ\w*|предупрежден\w*|warning|данн\w*|data)\b)', sentence)
+        # Do not discard introductory speech acts at a comma/colon. Assertion
+        # classification needs both sides of its candidate span.
+        clauses = [sentence]
         for clause in clauses:
             clause = re.sub(r'[,«»"“”]', ' ', clause)
             clause = re.sub(r'\s+', ' ', clause)
@@ -486,7 +594,7 @@ def damage_diagnosed(text, kind, replacements, affected_fields):
                 rf'|\bне\s+(?:выяв\w*|обнаруж\w*|наблюда\w*).{{0,30}}{damage}'
                 r'|\b(?:импорт|данные|текст)\s+(?:полностью\s+)?коррект(?:ен|ны)\b'
                 r'|\bevery source record was read correctly\b', clause)
-            if denial:
+            if denial and claim_asserted(clause, denial.start(), denial.end()):
                 return False
             generic = re.search(
                 rf'(?:обнаруж\w*|наблюда\w*|выяв\w*|зафиксир\w*|detected|observed|found)\s+(?:{subject}\s+)?{damage}'
@@ -507,11 +615,13 @@ def damage_diagnosed(text, kind, replacements, affected_fields):
             # a separate-record predicate instead describes the observed loss;
             # it must not veto an affirmative diagnosis elsewhere in the report.
             consequences = ([swallowed] if kind == 'unclosed-quote' and swallowed else []) + (substitutions if kind == 'wrong-encoding' else [])
+            consequences = [match for match in consequences if claim_asserted(clause, match.start(), match.end())]
             for consequence in consequences:
                 if re.search(rf'\b(?:не|not)\s+(?:{movement}|прочитан\w*|read|decoded)', consequence.group()):
                     return False
             missing_record = re.search(r'(?:строк\w*|запис\w*|row|record).{0,50}\b(?:не\s+стал\w*|did not become).{0,15}(?:отдельн\w*|самостоятельн\w*|separate)\s+(?:строк\w*|запис\w*|row|record)', clause)
-            assertions.append(bool(generic or bad_read or consequences or kind == 'unclosed-quote' and missing_record))
+            candidates = [match for match in [generic, bad_read, missing_record if kind == 'unclosed-quote' else None] if match] + consequences
+            assertions.append(any(claim_asserted(clause, match.start(), match.end()) for match in candidates))
     return any(assertions)
 
 
@@ -550,6 +660,7 @@ def diagnostic(spec, task_dir, attempt_dir, calls, events, workspace, transfers)
             and len(proofs) == 1 and proofs[0].get('node') == node and proofs[0].get('owner_verified') is True
             and proofs[0].get('failure_verified') is True and proofs[0].get('output_refreshed') is False
             and proofs[0].get('execution_id') == execution['execution_id'], 'diagnostic: native terminal owner proof required')
+        report_truth(report_text(attempt_dir, settled_receipt(calls, call)), result, events, refusal=True)
         if (attempt_dir / 'artifact/package.lgp').exists():
             package_graph(attempt_dir, node['node_id'], transfers[0]['output']['destination'])
         return
@@ -589,9 +700,8 @@ def diagnostic(spec, task_dir, attempt_dir, calls, events, workspace, transfers)
             affected_fields = {column['name'] for row in actual['rows'] for column, cell in zip(actual['schema'], row)
                 if isinstance(cell['value'], str) and '\n' in cell['value']}
         terminal = settled_receipt(calls, call)
-        text = '\n'.join(event.get('part', {}).get('text', '')
-            for index, line in enumerate((attempt_dir / 'events.jsonl').read_text().splitlines()) if line.strip()
-            for event in [json.loads(line)] if index > terminal['index'] and event.get('type') == 'text')
+        text = report_text(attempt_dir, terminal)
+        report_truth(text, result, events)
         kind = 'wrong-encoding' if spec['id'].endswith('wrong-encoding') else 'unclosed-quote'
         require(damage_diagnosed(text, kind, replacements, affected_fields), 'diagnostic: damage must be diagnosed in the report')
         if (attempt_dir / 'artifact/package.lgp').exists():
@@ -612,6 +722,7 @@ def diagnostic(spec, task_dir, attempt_dir, calls, events, workspace, transfers)
             f"Import definition count differs: requested {len(spec['columns'])}, observed {len(headers)}")
         require('column' in message or 'field' in message or 'пол' in message or count_refusal,
             'diagnostic: typed binding/count refusal required')
+    report_truth(report_text(attempt_dir, settled_receipt(calls, call)), result, events, refusal=True)
     if (attempt_dir / 'artifact/package.lgp').exists():
         package_graph(attempt_dir, result['node']['node_id'])
 
@@ -713,6 +824,9 @@ def audit(task_dir, attempt_dir, package_path):
     workspace, transfers = source_bindings(spec, calls)
     if task['id'].endswith('ambiguous-headers'):
         rejection(spec, calls, workspace, transfers)
+        call = next(row for row in calls if row['tool'].endswith('node_apply'))
+        terminal = settled_receipt(calls, call)
+        report_truth(report_text(attempt_dir, terminal), terminal['result'], [], refusal=True)
         package_graph(attempt_dir, empty=True)
     elif task.get('output_mode') == 'diagnostic':
         diagnostic(spec, task_dir, attempt_dir, calls, native_events(attempt_dir), workspace, transfers)
