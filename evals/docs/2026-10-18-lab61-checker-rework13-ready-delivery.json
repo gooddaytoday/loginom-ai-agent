@@ -1,0 +1,265 @@
+{
+  "utc": "2026-10-18T14:58:55.771705+00:00",
+  "formal_READY_comment": "01a14f6e-1ad3-7864-8166-f5c4715d653b",
+  "all10_official_attachments_complete": true,
+  "standalone_REPORT_md": {
+    "bytes": 4452,
+    "sha256": "c2c582ad4ed73f56bf1ab858f7d5e88e2921177e29d8d37cae5f93bbdf52d788",
+    "byteequal_archive": true
+  },
+  "standalone_REPORT_json": {
+    "bytes": 56386,
+    "sha256": "212d898713fd47bd763e3d14896a1b6bed3f44fbc916da77433c2adb6c3939a6",
+    "byteequal_archive": true
+  },
+  "payload": {
+    "utc": "2026-10-18T14:52:21.655976+00:00",
+    "archive_bytes": 22543470,
+    "archive_sha256": "6b90016fabd8b437e17998721505ea431b59d94cd8845e85d01c33e24889dc45",
+    "manifest_path": "MANIFEST.json",
+    "manifest_bytes": 825133,
+    "manifest_sha256": "ae0d6c66fd636dc906f436a6b8ab92acaed12ba8fe7f36ef8c99d63d91f70762",
+    "payloads_verified": 4359,
+    "members": 4360,
+    "payload_bytes": 372783559,
+    "CRC": "all full member reads PASS",
+    "safe_unique_exact_membership": true,
+    "all_payload_hashes_sizes": "PASS",
+    "standalone_REPORT_json_byteequal": true,
+    "root_did_not_execute_candidate": true
+  },
+  "Git": {
+    "source_sha": "83ceaff967408a6a08d025103b4c3e53e23af874",
+    "direct_parent": "b2bdae1abf3320b2ef566aebe115a829fe4bce2f",
+    "authorization_base": "fd5c0956fd91f7aeaa2473b7d2f2bcd1f573d5e2",
+    "tree": "2b847062ac16d46113a7f0cd5232c2af2937a20f",
+    "ordinary_commits": 2,
+    "bundle_actual_ref": "HEAD",
+    "changed_files": [
+      "evals/script/check-text-import.py",
+      "evals/test/text-import-evidence.test.ts"
+    ],
+    "portable_Git_files_verified": 145,
+    "non_documentary_delta_from_accepted7d3": 142,
+    "no_checkout_created": true,
+    "bare_uses_readonly_local_project_object_alternates": true,
+    "root_did_not_execute_candidate": true
+  },
+  "AST": {
+    "unchanged": [
+      "require",
+      "calls_from",
+      "after",
+      "source_bindings",
+      "request_owner",
+      "rejection",
+      "native_events",
+      "configuration_matches",
+      "native_application",
+      "native_execution",
+      "public_output",
+      "typed_table",
+      "unused_structural_ports",
+      "package_graph",
+      "settled_receipt",
+      "known_refusal",
+      "report_text",
+      "report_normalize",
+      "report_complements",
+      "report_regions",
+      "claim_status",
+      "claim_asserted",
+      "bound_report_facts",
+      "report_name_role",
+      "report_truth",
+      "damage_diagnosed",
+      "diagnostic",
+      "positive",
+      "audit"
+    ],
+    "changed": [
+      "warning_arguments",
+      "report_sentences",
+      "refusal_witness",
+      "report_count_relation",
+      "refusal_explained",
+      "warning_facts"
+    ],
+    "added": [
+      "report_number_value"
+    ],
+    "removed": []
+  },
+  "source": {
+    "head": "83ceaff967408a6a08d025103b4c3e53e23af874",
+    "parent": "b2bdae1abf3320b2ef566aebe115a829fe4bce2f",
+    "base": "fd5c0956fd91f7aeaa2473b7d2f2bcd1f573d5e2",
+    "tree": "2b847062ac16d46113a7f0cd5232c2af2937a20f",
+    "clean": true,
+    "bundle_sha256": "850b8ef2dba9e304af178dfe46b8fea608cd9cc6fe9d2c4c8b6cd3fd0350cb65",
+    "diff_sha256": "3d2f7b83cf2a370c76d5c72146ba87963e4ce0d7b176a51e0b4f05517841f4c4",
+    "full_source_tar_sha256": "0946ce4d5702134b8d4a8ca59e6faa0cfe4f268b23201fe66b2cb77b52408b65",
+    "full_source_tar_bytes": 310794240,
+    "source_file_sha256": {
+      "evals/script/check-text-import.py": "007a8aecbc91500b5b5e28e338383cd5ff020d8e49bd8cf528f52e1a80815ce7",
+      "evals/test/text-import-evidence.test.ts": "c4beae55f26da73a35511f6e3c87959e09a0e7987c8619d2e803fb1d6d1c534e"
+    },
+    "test_RED_bytes_sha256": "c4beae55f26da73a35511f6e3c87959e09a0e7987c8619d2e803fb1d6d1c534e"
+  },
+  "TDD": {
+    "stage1_test_sha256": "0c8a9a7cdd366b01b052c8498b90b6e25d8bf8c988cef7d3e5669668d1b2f418",
+    "final_followup_test_sha256": "c4beae55f26da73a35511f6e3c87959e09a0e7987c8619d2e803fb1d6d1c534e",
+    "distinct_test_bytes_explicit": true,
+    "stage1_parent_RED": "373PASS16FAIL on fd5;initial377PASS12FAIL retained",
+    "stage2_RED": "additional public test on unchanged b2 before followup",
+    "source_log_bindings_not_external_edit_attestation": true,
+    "gates": {
+      "utc": "2026-10-18T13:45:25.280467+00:00",
+      "unchanged_parent_checker": true,
+      "first_checker_or_prototype_edit_not_started": true,
+      "frozen": {
+        "base": "fd5c0956fd91f7aeaa2473b7d2f2bcd1f573d5e2",
+        "checker": "6e70adcc93eabd8c556b903728d925d3c86f570aea85a842b7638c48ae5d28f1",
+        "tests": "0c8a9a7cdd366b01b052c8498b90b6e25d8bf8c988cef7d3e5669668d1b2f418",
+        "MODEL": "afd974f8d54499a0905a37c64eb7a8326275335508c1f3154747a8dddf6044cb",
+        "utc": "2026-10-18T13:39:24.874198+00:00",
+        "checker_edits": 0,
+        "MODEL_addendum": "43396b9615b8d4b999a7da1d42b3ebb704e292e459f7c0b301674bd763ec9229",
+        "initial_completed_RED": {
+          "argv": [
+            "bun",
+            "test",
+            "test/text-import-evidence.test.ts",
+            "--timeout",
+            "30000"
+          ],
+          "cwd": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-quantity-arguments/evals",
+          "started_utc": "2026-10-18T13:32:55.630828+00:00",
+          "exit_code": 1,
+          "elapsed_seconds": 353.097744676983,
+          "completed_utc": "2026-10-18T13:38:48.728573+00:00"
+        },
+        "initial_test_sha256": "bfed3172eafbad17ee887b495bfc28da87d7fd300f1ba37a6405d825e365581c"
+      },
+      "completed_RED": {
+        "red-public": {
+          "argv": [
+            "bun",
+            "test",
+            "test/text-import-evidence.test.ts",
+            "--timeout",
+            "30000"
+          ],
+          "cwd": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-quantity-arguments/evals",
+          "started_utc": "2026-10-18T13:32:55.630828+00:00",
+          "exit_code": 1,
+          "elapsed_seconds": 353.097744676983,
+          "completed_utc": "2026-10-18T13:38:48.728573+00:00"
+        },
+        "red-public-final": {
+          "argv": [
+            "bun",
+            "test",
+            "test/text-import-evidence.test.ts",
+            "--timeout",
+            "30000"
+          ],
+          "cwd": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-quantity-arguments/evals",
+          "started_utc": "2026-10-18T13:39:24.978857+00:00",
+          "exit_code": 1,
+          "elapsed_seconds": 348.37478022510186,
+          "completed_utc": "2026-10-18T13:45:13.353635+00:00"
+        },
+        "red-ben": {
+          "argv": [
+            "python3",
+            "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-8a45946a3a0c/workdir/deliveries/lab61-checker-rework13/controls.py",
+            "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-quantity-arguments/evals/script/check-text-import.py",
+            "red",
+            "new42",
+            "reader84",
+            "full336"
+          ],
+          "cwd": ".",
+          "started_utc": "2026-10-18T13:32:55.630681+00:00",
+          "exit_code": 0,
+          "elapsed_seconds": 122.29097184794955,
+          "completed_utc": "2026-10-18T13:34:57.921650+00:00"
+        }
+      },
+      "final_public": "373PASS/16FAIL/389tests/8366assertions",
+      "initial_public": "377PASS/12FAIL/389tests/8342assertions",
+      "Ben": "36/42,60/84,240/336",
+      "timestamps_are_source_log_bindings_not_external_edit_attestation": true
+    },
+    "followup_gate": {
+      "utc": "2026-10-18T13:55:38.320055+00:00",
+      "frozen": {
+        "base": "b2bdae1abf3320b2ef566aebe115a829fe4bce2f",
+        "authorized_base": "fd5c0956fd91f7aeaa2473b7d2f2bcd1f573d5e2",
+        "checker": "3ec276595a67f9b7c3c34173578e9f4d1a8f701ed068486e5c3f20734f9a5483",
+        "tests": "c4beae55f26da73a35511f6e3c87959e09a0e7987c8619d2e803fb1d6d1c534e",
+        "MODEL": "5f0e53f031724efaa91cf3d8566124fd31f55506447d76b69078e9290201ac14",
+        "utc": "2026-10-18T13:55:12.163636+00:00",
+        "followup_checker_edits": 0
+      },
+      "completed_RED": {
+        "argv": [
+          "bun",
+          "test",
+          "test/text-import-evidence.test.ts",
+          "-t",
+          "thirteenth adjunct scopes",
+          "--timeout",
+          "30000"
+        ],
+        "cwd": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-predicate-scopes/evals",
+        "started_utc": "2026-10-18T13:55:12.232276+00:00",
+        "exit_code": 1,
+        "elapsed_seconds": 0.4676889858674258,
+        "completed_utc": "2026-10-18T13:55:12.699962+00:00"
+      },
+      "followup_edit_not_started": true,
+      "original_stage_gate": "../lab61-checker-rework13/pre-edit-gate.json"
+    }
+  },
+  "author_final_full_suite": "1004PASS15SKIP0FAIL13837assertions/explicit30000ms;typecheck0;not_independent_Ben_ACCEPT",
+  "old_and_corrected_wrapper_source_bindings_preserved": true,
+  "historical_raw_and_four_product_FAIL_preserved": true,
+  "no_new_physical_model_calls": true,
+  "root_did_not_execute_candidate_or_integrate": true,
+  "full_author_TAR_NOT_independently_streamed_by_root": true,
+  "operator_errors": {
+    "errors": [
+      {
+        "error": "FileNotFoundError checking failed standalone REPORT.md path before retry",
+        "stage": "before download2; no file existed after HTTP000; no effects",
+        "resolution": "independently observed missing file; retry only missing report"
+      },
+      {
+        "error": "AssertionError guessed ROOT_MANIFEST.json name",
+        "stage": "after six parts joined and exact master ZIP hash verified; before payload verification/extraction/Git/lifecycle/project/native effects",
+        "resolution": "independent listing 4360 unique; actual MANIFEST.json825133 exact expected ae0d6c66; no redownload/rejoin"
+      },
+      {
+        "error": "git fetch bundle by published branch failed: actual bundle ref HEAD",
+        "stage": "after all4359payload hashes/extraction and bundle prerequisite verification; before Git blob loop/source execution/project/native effects",
+        "resolution": "git bundle list-heads bound actual ref to exact83ce; fetched actual declared ref;145Gitbytesverified; no payload or download repeat"
+      },
+      {
+        "error": "SyntaxError unterminated string literal in generated remote mirror script",
+        "stage": "remote Python parse before any statements, START marker, directory creation, archive copy, native/project effects",
+        "resolution": "use raw outer script literal and local ast.parse before SSH; original failing code output preserved in task transcript; no mirror operation began"
+      }
+    ],
+    "source_execution": false,
+    "new_native_or_model_effects": false
+  },
+  "local_only_delivery_root": "/tmp/lab61-rework13-83ceaff9-ready-delivery",
+  "remote_mirror_or_canonical_copy_pending": false,
+  "remote_delivery_root": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-checker-rework13-83ceaff9-ready-delivery",
+  "remote_mirror_provenance": "Immutable author archive/parts matched exact separately downloaded local official archive/parts/reports/bundle; all4359payload+145Git verification retained",
+  "native_E_verification_sha256": "e263f4d8e7dd880ed47d4fc7b52f0b86bbf1ff7f084a38beb1084dabba27632a",
+  "native_admission_sha256": "f1a144b52264a9e35e3cf1879738f88ed7458ea1fa281d344e02c63636c7369e",
+  "native_ready_proof_sha256": "f607104c788a0ae507b89dec3c9b2ee036a3ecfe14d411a7494916c361736701"
+}
