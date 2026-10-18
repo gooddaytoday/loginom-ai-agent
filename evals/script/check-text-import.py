@@ -491,6 +491,15 @@ def report_number_value(text):
         value for value, pattern in _REPORT_NUMERALS.items() if re.fullmatch(pattern, text))
 
 
+def report_predicate_head(text):
+    """A new explicit subject/predicate cannot inherit a previous emitter."""
+    subject = r'(?:(?:the|an?)\s+)?(?:engine|agent|report|file|filename|message|it|i|we|я|мы|движ\w*|агент\w*|отчет\w*)'
+    auxiliary = r'(?:(?:did|does|do|has|have|had|is|are|was|were|can|cannot|could|should|will|would|not|never|не)\s+)*'
+    predicate = (r'issu\w*|emit\w*|rais\w*|warn\w*|mention\w*|report\w*|say\w*|said|sav\w*|writ\w*|wrote'
+        r'|contain\w*|confirm\w*|suggest\w*|advis\w*|check\w*|receiv\w*|выда\w*|выдал\w*|предупред\w*|сообщ\w*|упомин\w*')
+    return re.match(rf'\s*{subject}\s+{auxiliary}(?:{predicate})\b', text)
+
+
 def warning_arguments(text, identifiers=(), prefix=''):
     """Read every code object before clause cuts or predicate polarity checks."""
     identifier = r'\w[\w-]*'
@@ -498,6 +507,7 @@ def warning_arguments(text, identifiers=(), prefix=''):
     opening = r'[\s\[(:«»"“”]*'
     def head(cursor, labelled=False):
         wrapped = bool(re.match(r'[\s:]*[\[(«"“]', text[cursor:]))
+        parenthesized = bool(re.match(r'[\s:]*\(', text[cursor:]))
         cursor += re.match(opening, text[cursor:]).end()
         negative = re.match(r'(?:not|не)\s+', text[cursor:])
         if negative and (child := head(cursor + negative.end(), labelled or wrapped)):
@@ -512,8 +522,13 @@ def warning_arguments(text, identifiers=(), prefix=''):
         separator = re.match(r'(?:and|и)\b', text[cursor:])
         if item and not (separator and not wrapped) and (wrapped or labelled or concrete(item.group())):
             end = cursor + item.end()
+            closed = bool(re.match(r'\s*[)\]»"”]', text[end:]))
+            # Parentheses can contain prose, not just code objects. A literal
+            # CODE before an adjunct must not be replaced by its first word.
+            explicit = (wrapped and not parenthesized and closed
+                or concrete(item.group()) and (not parenthesized or closed))
             end += re.match(r'[\s)\]»"”]*', text[end:]).end()
-            return item.group(), end, False, wrapped or concrete(item.group())
+            return item.group(), end, False, explicit
         return None
     # A passive emission may follow its subject list. In an active frame a
     # following finite predicate instead starts a separate assertion.
@@ -541,8 +556,13 @@ def warning_arguments(text, identifiers=(), prefix=''):
             # adjunct ("after the file was saved") does not govern the list.
             if re.match(finite, gap.lstrip()): break
             following = cursor + sibling.end()
+            if report_predicate_head(text[following:]): break
             child = head(following)
-            if not child: break
+            if not child:
+                # An isolated context between commas is still inside this
+                # predicate. Resume at its closing comma, with local signs.
+                if re.fullmatch(r',\s*', sibling.group('separator')): continue
+                break
             suffix = text[child[1]:].lstrip()
             passive = re.match(r'(?:(?:is|are|was|were|been|был\w*)\s+)?(?:(?:not|never|не)\s+)?(?:' + emission + r')\b', suffix)
             if re.match(finite, suffix) and (active or not passive): break
@@ -730,6 +750,9 @@ def report_sentences(text, atoms=(), identifiers=None):
             if len(arguments) > 1: warning_lists.append((match.start(), match.end() + arguments[-1]['end']))
         boundaries = [(match.start(), match.end()) for match in re.finditer(cuts, sentence) if match.group('cut') is not None
             and not any(left < match.start() < right for left, right in warning_lists)]
+        boundaries += [(match.start(), match.end()) for match in re.finditer(r',\s*(?:(?:and|и)\s+)?|\b(?:and|и)\s+', sentence)
+            if report_predicate_head(sentence[match.end():])
+            and not any(left < match.start() < right for left, right in protected + warning_lists)]
         boundaries += [(position, position) for position, _, _ in regions if position and not any(left < position < right for left, right in protected)]
         start, role, field_role, inherited_role = 0, None, False, False
         def append(left, right):
@@ -964,6 +987,12 @@ def report_count_relation(clause, field_context=False):
         for pattern in patterns:
             match = re.search(pattern, clause)
             if match: return role, match
+    # The same role/value/unit relation also permits a postnominal passive
+    # marker. Only an established field relation licenses its missing unit.
+    for role, marker in [('requested', r'запрош\w*|ожида\w*|requested|required|expected'),
+                         ('observed', r'получ\w*|обнаруж\w*|наблюда\w*|observed|found')]:
+        match = re.search(rf'\b{active_quantity}\s+(?:(?:is|are|was|were|был\w*)\s+)?(?P<neg_after>(?:not|не)\s+)?(?:{marker})\b(?=\s*[.!?]*\s*$)', clause)
+        if match: return role, match
     return None
 
 
@@ -1083,7 +1112,7 @@ def warning_facts(clause):
     for index, match in enumerate(markers):
         left = clause[:match.start()]
         right = clause[match.end():markers[index+1].start() if index+1 < len(markers) else len(clause)]
-        own = re.search(r'\b(?:я|мы|i|we)\b', left)
+        own = re.search(r'\b(?:я|мы|i|we|(?:the\s+)?(?:agent|report)|агент\w*|отчет\w*)\b', left)
         engine = r'(?:the\s+)?(?:engine|движ\w*|loginom)\b'
         native = re.search(r'\b' + engine + r'[^;,.!?]{0,60}\b(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*|warn\w*|предупред\w*)\b', clause)
         native = native or re.search(r'\b(?:by|from|от|выдан\w*)\s+' + engine, clause)
