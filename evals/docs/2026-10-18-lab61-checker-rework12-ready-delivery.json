@@ -1,0 +1,90 @@
+{
+  "verified_utc": "2026-10-18T12:48:14.319221+00:00",
+  "issue": "LAB-61",
+  "Rich_task": "01a14ee3-54a5-7b61-b760-c74ae9aa4e93",
+  "READY_report": "01a14f02-58ef-77b1-8d9a-78c77a13f3f1",
+  "candidate": "fd5c0956fd91f7aeaa2473b7d2f2bcd1f573d5e2",
+  "base_and_parent": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+  "tree": "3900a63582093ec634fa0f923cd09c4666ec9c26",
+  "one_normal_commit": true,
+  "source_final": {
+    "head": "fd5c0956fd91f7aeaa2473b7d2f2bcd1f573d5e2",
+    "parent": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+    "base": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+    "tree": "3900a63582093ec634fa0f923cd09c4666ec9c26",
+    "clean": true,
+    "bundle_sha256": "15f2fe06b07606ea530bfe41768d7386ff9eb3cefabe7675ea98c63bc363880d",
+    "diff_sha256": "c216ebdee2e4993d4951e226907166f501dd78c8e27bcc4221d03a35b9463fab",
+    "full_source_tar_sha256": "463d7ce4875d173c032173c4b52cd36b5cad19765af343dceeba52ba245b4c3f",
+    "full_source_tar_bytes": 310773760,
+    "source_file_sha256": {
+      "evals/script/check-text-import.py": "6e70adcc93eabd8c556b903728d925d3c86f570aea85a842b7638c48ae5d28f1",
+      "evals/test/text-import-evidence.test.ts": "6556269f42fc0496df5322a1a2c5131e08b94cda4cfe5f815435c39b65ef2f9c"
+    },
+    "test_RED_bytes_sha256": "6556269f42fc0496df5322a1a2c5131e08b94cda4cfe5f815435c39b65ef2f9c"
+  },
+  "archive": {
+    "payloads": 2814,
+    "members": 2815,
+    "payload_bytes": 283844417,
+    "safe_unique_exact_membership": true,
+    "all_payload_hashes_verified": true
+  },
+  "official_archive_bytes": 18484050,
+  "official_archive_sha256": "fd46787ef13071247122edae53f35c8c26e7fc0b43f85555ef4558e5fc25823e",
+  "manifest_sha256": "30870b63196676882f6958c31fd5c216a8d77f567f62bbfd9dbd61349f248ff5",
+  "REPORT_MD": {
+    "bytes": 3285,
+    "sha256": "6b6e802a4dc1641fcfc0f8308f4c838c9eface267cda625cad5d195efcae2a68",
+    "equal_standalone": true
+  },
+  "REPORT_JSON": {
+    "bytes": 35599,
+    "sha256": "bab87f8e49c8ee396fc7d8b718cada0e1c7a89b1fa91255cd4f50b5981e7051b",
+    "equal_standalone": true
+  },
+  "all_delivered_bytes": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-checker-rework12-fd5c0956-ready-delivery",
+  "portable_Git_bytes_verified": 145,
+  "AST_unchanged": 33,
+  "AST_changed": [
+    "warning_arguments",
+    "report_sentences"
+  ],
+  "RED_test_final_bytes_equal": true,
+  "MODEL_sha256": "fe1ec86e77bfa13c5c31afeceef43645a97ee8e540d4f58fd2136e69564521e3",
+  "final_pre_edit_gate_utc": "2026-10-18T12:12:35.048248+00:00",
+  "first_implementation_author_record": {
+    "utc": "2026-10-18T12:13:18.573599+00:00",
+    "checker_sha256": "6e70adcc93eabd8c556b903728d925d3c86f570aea85a842b7638c48ae5d28f1",
+    "MODEL_sha256": "fe1ec86e77bfa13c5c31afeceef43645a97ee8e540d4f58fd2136e69564521e3",
+    "public_test_sha256": "6556269f42fc0496df5322a1a2c5131e08b94cda4cfe5f815435c39b65ef2f9c",
+    "after_completed_pre_edit_gate": true,
+    "timestamp_is_source_log_binding_not_external_edit_attestation": true
+  },
+  "author_records_not_external_edit_time_attestation": true,
+  "author_results": {
+    "public_RED": "359PASS12FAIL",
+    "public_GREEN": "371PASS0FAIL",
+    "object_span_RED_GREEN": "72/120→120/120",
+    "new_Ben_controls": "54/54,42/42,168/168",
+    "prior_qualified": "1854/1854",
+    "portable": "1847/1583/1429/1227/951/715",
+    "full_suite": "985PASS15SKIP0FAIL/9570assertions/explicit timeout30000",
+    "typecheck": 0,
+    "genuine_replay30": "reference10PASS/Rich8PASS2FAIL/Ben8PASS2FAIL/ERROR0; derived not new measurements"
+  },
+  "remote_verified": {
+    "refs/heads/lab61-literal-heads": "fd5c0956fd91f7aeaa2473b7d2f2bcd1f573d5e2",
+    "refs/heads/text-import-evals": "3e477c40398653a8a65647b63f48ae3c94af0fe9"
+  },
+  "limits": {
+    "root_source_executed": false,
+    "root_findings_reproduced": false,
+    "root_integrated_candidate": false,
+    "full_author_tar_streamed_by_root": false,
+    "new_physical_calls": 0,
+    "full_independent_Ben_ACCEPT": false,
+    "historical_raw_FAIL_ERROR_and_four_product_FAIL_preserved": true,
+    "REPORT_usage_limit11_is_historical_snapshot_current_native_limit12": true
+  }
+}
