@@ -11,7 +11,8 @@ import {inspectJavascriptPreviewPort} from '../lib/javascript-output-preview.mjs
 import {runJavascriptOutputPreview,makeJavascriptOutputPreviewCode} from '../lib/javascript-output-preview.mjs';
 import {createNodeProcedure} from '../lib/node-procedure.mjs';
 import {preflightGroupingSource} from '../lib/grouping-preflight.mjs';
-import {preflightSortingSource} from '../lib/sorting-preflight.mjs';
+import {preflightSortingSource,preflightTabularSource} from '../lib/sorting-preflight.mjs';
+import {preflightJoin} from '../lib/join-node.mjs';
 const source=()=>JSON.parse(readFileSync(new URL('./fixtures/javascript-preflight-source.json',import.meta.url),'utf8'));
 function fixture(){
  const history=source(),node=history.outcome.output.node;
@@ -145,8 +146,11 @@ function preflightFixture(type){
    if(code.includes('readOutputContext'))return {verified:true,node_context:context,ports:[port],execution_freshness_verified:false};
    return {status:'SUCCEEDED',output:structuredClone(state)};
   }};
- return {history:f.history,binding:f.binding,context,state,port,calls,options,run:()=> (type==='transform.group_data'?preflightGroupingSource:preflightSortingSource)(options,{},
-  {targetOrigin:'http://localhost',targetBuild:'7.4.2'})};
+ const config={targetOrigin:'http://localhost',targetBuild:'7.4.2'};
+ if(type.startsWith('join_input_')){options.operation.parameters.target.type='transform.join_data';options.operation.parameters.inputs[0].input=Number(type.at(-1));}
+ return {history:f.history,binding:f.binding,context,state,port,calls,options,run:()=>type.startsWith('join_input_')
+  ?preflightTabularSource(options,{},config,{required:true,inputPort:Number(type.at(-1)),label:type,resolve:()=>{}})
+  :(type==='transform.group_data'?preflightGroupingSource:preflightSortingSource)(options,{},config)};
 }
 test('actual denied JS port routes Group preflight to owned fresh preview before any target creation',async()=>{
  const f=preflightFixture('transform.group_data');await assert.rejects(f.run(),/reached owned preview capture/);
@@ -201,7 +205,7 @@ for(const type of ['transform.calculator','transform.union_data'])test('private 
  await assert.rejects(f.channel.openJavascriptPreview(f.task.output),/restricted/);assert.deepEqual(f.events,[]);
 });
 
-for(const type of ['transform.group_data','transform.sorting'])test(type+' reads the fresh full preview and closes it even if schema changed',async()=>{
+for(const type of ['transform.group_data','transform.sorting','join_input_0','join_input_1'])test(type+' reads the fresh full preview and closes it even if schema changed',async()=>{
  for(const changed of [false,true]){
   const f=preflightFixture(type),browser=channelFixture(),records=[];
   const original=f.options.execute,root=f.binding.workflow_ref.prefix+';ModelForm;PreviewWindow';
@@ -316,4 +320,18 @@ for(const [name,change] of Object.entries({
  assert.equal(lease.ticket.handleValue.portElement,old);
  assert.equal(lease.ticket.handleValue.portElementReplacements,0);
  assert.deepEqual(f.events,['click']);await run({mode:'dispose'});
+});
+
+// Join consumes the same executed JS producer as sorting, with no public port actions.
+test('Join after REST JSON parsing admits the managed JS preview before target creation',async()=>{
+ const f=preflightFixture('join_input_0'),request=f.options.operation.parameters;
+ request.inputs.push({...request.inputs[0],input:1});
+ request.parameters={keys:[{left:'annual_revenue',right:'annual_revenue'}],case_sensitive:true,include_joined_keys:false};
+ await assert.rejects(preflightJoin(f.options,{}, {targetOrigin:'http://localhost',targetBuild:'7.4.2'}),/reached owned preview capture/);
+ assert.equal(f.calls.filter(code=>code.includes('runJavascriptOutputPreview')).length,1);
+});
+test('Join denies unsettled JS history before preview or graph mutation',async()=>{
+ const f=preflightFixture('join_input_0');f.history.cleanup_confirmed=false;
+ await assert.rejects(f.run(),/not settled/);
+ assert.equal(f.calls.filter(code=>code.includes('runJavascriptOutputPreview')).length,0);
 });

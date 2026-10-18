@@ -11,7 +11,7 @@
       "type": "programming.javascript"
     }
   ],
-  "output_node_type": "programming.javascript",
+  "output_node_type": "export_input",
   "columns": [
     {
       "name": "RequestId",
@@ -25,7 +25,7 @@
     },
     {
       "name": "HttpStatusCode",
-      "label": "HttpStatusCode",
+      "label": "Код состояния HTTP",
       "type": "integer"
     }
   ],

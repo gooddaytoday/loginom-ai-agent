@@ -768,6 +768,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
             &&(i===8&&e.textContent.trim()==='Настройка'||i===7&&(e.textContent.trim()==='Входной источник данных'
               ||preparedInputPort.port===0&&e.textContent.trim()==='Источник данных'
+              ||preparedInputPort.port===0&&preparedInputPort.native_index===2&&e.textContent.trim()==='Источник данных запроса'
+                &&crumbs[5].querySelectorAll('.bg-vendor-icon-restclient').length===1
               ||(preparedInputPort.port===0&&e.textContent.trim()==='Главная таблица'
                 ||preparedInputPort.port===1&&e.textContent.trim()==='Присоединяемая таблица')
                 &&crumbs[5].querySelectorAll('.bg-vendor-icon-joindata').length===1));
@@ -3932,7 +3934,15 @@ function readRenderedInputMapping(observation) {
             timeout();await page.waitForTimeout(Math.min(200,timeout()));
             observed=await waitForMasks(await readOpeningUi(),readOpeningUi,ownedLoading);
           }
-          const deactivationPending=task.action.verb==='begin_wizard'&&exactDeactivation(observed);
+          let deactivationPending=task.action.verb==='begin_wizard'&&exactDeactivation(observed);
+          if(!deactivationPending && task.prepared_node_context && contextMatches(observed)
+            && (observed.ui.masks.length || !intendedWizard(observed))) {
+            // Preserve the refused sample, then read once more within the same
+            // deadline. The original gesture and owner checks stay unchanged.
+            record('wizard_open_confirmation_read_retried',{attempt:1,initial_observation:observed});
+            timeout();observed=await readOpeningUi();
+            deactivationPending=task.action.verb==='begin_wizard'&&exactDeactivation(observed);
+          }
           if(deactivationPending)record('wizard_deactivation_question_observed',{node:opening.node,workflow_path:opening.workflow_path});
           const owner=observed.wizard?.owner_context;
           if(!deactivationPending && (!contextMatches(observed) || observed.ui.masks.length || !intendedWizard(observed)))
