@@ -1,0 +1,44 @@
+{
+  "package_path": "/demo-2026-10-22/s4-branches.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.union_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/demo-2026-10-22/branches-categories.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string"
+        },
+        {
+          "name": "Revenue",
+          "label": "Revenue",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Category": "Техника",
+          "Revenue": 178573.0
+        },
+        {
+          "Category": "Офис",
+          "Revenue": 24436.0
+        }
+      ]
+    }
+  ]
+}

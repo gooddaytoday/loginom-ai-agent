@@ -1,0 +1,56 @@
+{
+  "package_path": "/demo-2026-10-22/s1-revenue.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/demo-2026-10-22/revenue-top3.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string"
+        },
+        {
+          "name": "Revenue",
+          "label": "Revenue",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "Центр",
+          "Category": "Техника",
+          "Revenue": 80193.0
+        },
+        {
+          "Region": "Юг",
+          "Category": "Техника",
+          "Revenue": 60272.0
+        },
+        {
+          "Region": "Север",
+          "Category": "Техника",
+          "Revenue": 54400.0
+        }
+      ]
+    }
+  ]
+}
