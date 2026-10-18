@@ -1,0 +1,62 @@
+{
+  "checked_utc": "2026-10-18T04:46:58.603308+00:00",
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "source_sha": "86070b607d09595a07a6fde250965096ef2fb795",
+  "source_report_id": "01a14d3b-a329-7f22-a1dd-03fe0978e902",
+  "decision_comment_id": "01a14d44-c333-7b3f-a0e1-d24fdcea437e",
+  "native_stop_blocked6_limit5_preserved": true,
+  "native_metadata_limit6_before_dispatch_verified": true,
+  "native_metadata_intent_equal_issue_readback": true,
+  "actual_consumption": [
+    15,
+    20,
+    1,
+    0
+  ],
+  "increase": {
+    "old": 5,
+    "new": 6,
+    "usage": {
+      "completed_reworks": 5,
+      "fresh_REJECTs": 6
+    },
+    "decision_document_sha256": "ccd647ba3d33c081223d7d5f3618f85b9466a6ec2ebc7c698c8308d6dddc7ad4",
+    "counters_reset": false,
+    "reason": "Structured claim scopes/roles/contradictions/code identity; OFFLINE."
+  },
+  "all_budget_increases_preserved_count": 3,
+  "canonical_continue_event": {
+    "kind": "continue_after_evaler",
+    "id": "01a14d44-c333-7b3f-a0e1-d24fdcea437e",
+    "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+    "report_id": "01a14d3b-a329-7f22-a1dd-03fe0978e902",
+    "sha": "86070b607d09595a07a6fde250965096ef2fb795",
+    "target": "Rich",
+    "stand_ready": true
+  },
+  "canonical_continue_result": "ready_to_dispatch",
+  "native_final_queued_task": {
+    "id": "LAB61-RICH-CHECKER-REWORK6-86070b60-01a14d3b",
+    "phase": "rich",
+    "sha": "86070b607d09595a07a6fde250965096ef2fb795",
+    "root_trigger": "01a14d3b-a329-7f22-a1dd-03fe0978e902",
+    "task_id": "01a14d44-c350-7ddc-bca8-764194585947",
+    "outcome": "queued"
+  },
+  "native_final_issue_revision": 281,
+  "native_file_hashes": {
+    "report-decision.json": "6c3e0139e2b35220927966cd2187521f7ad4c894f5266e23240787f918c24457",
+    "metadata-intent.json": "4d69b3d4ec3d5dbc57eb67efbe761dd414ba5559cab4decaaa4e5d908f56e42d",
+    "issue-intent-readback.json": "4f921600a1785ff630d7c047cd9e97ad8cfc60c88a31ac18acb9aa824f0717c5",
+    "continue-input.json": "ae9407605f978fe5083acc96325315c6245e2f3be9ab79c3a96dbeef5da5c1e0",
+    "continue-decision.json": "d723acef4e31f2b1983022eaed83cc15080221d2d5017678cad737439c005e29",
+    "receipt-decision.json": "6638f709a22ad1853868d4af00482c3d196ef2c4035f7b4daaa4a935eb1a07bb",
+    "issue-final-readback.json": "fba74a3a863e2f57f92e51118c63875f856ed36271b6ac07e9971a10570afe8b"
+  },
+  "history_archive_sha256": "2363403ef6edc0ab87cdcc6b81f464964c9bbec49490ea9d38391df399604ed9",
+  "historical_consumption_source_report_hash_retained_in_archive": true,
+  "root_wrote_evaler_state": false,
+  "root_dispatched": false,
+  "new_physical_calls": 0,
+  "operator_observations": "lab61-checker-rework6-operator-observations.json"
+}
