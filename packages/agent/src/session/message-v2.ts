@@ -215,7 +215,7 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
           part.mime !== "application/x-directory" &&
           part.mime !== "application/x-loginom-package"
         ) {
-          // The original inline CSV remains in user.parts for Loginom admission.
+          // The original inline attachment remains in user.parts for Loginom admission.
           // Non-UTF8 bytes cannot be sent as a provider file part or decoded as text.
           if (
             part.mime === "text/csv" &&
@@ -225,6 +225,15 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
             userMessage.parts.push({
               type: "text",
               text: `[CSV attachment: ${JSON.stringify(part.filename)} (${part.mime}). Original bytes retained for attachment admission and verified delivery; file contents are not decoded here.]`,
+            })
+          } else if (
+            part.mime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" &&
+            part.url.startsWith("data:") &&
+            part.filename?.toLowerCase().endsWith(".xlsx")
+          ) {
+            userMessage.parts.push({
+              type: "text",
+              text: `[Excel workbook attachment: ${JSON.stringify(part.filename)} (${part.mime}, ${Buffer.from(part.url.slice(part.url.indexOf(",") + 1), "base64").byteLength} bytes). Original bytes retained for attachment admission and verified delivery; file contents are not decoded here.]`,
             })
           } else if (options?.stripMedia && isMedia(part.mime)) {
             userMessage.parts.push({

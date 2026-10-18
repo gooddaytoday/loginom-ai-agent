@@ -1,3 +1,4 @@
+import {createExcelImportNodeSupport} from './imports-excel-node.mjs';
 import {createRestRequestNodeSupport} from './rest-request-node.mjs';
 import {createLinRegressionNodeSupport} from './linregression-node.mjs';
 import {createClusteringNodeSupport} from './clustering-node.mjs';
@@ -33,11 +34,11 @@ export function nodeOutputForJournal(value,redactor){
 // the already validated request; never infer a handler from the current UI.
 export function createCandidateNodeSupport(config) {
  const linregression=createLinRegressionNodeSupport(config),clustering=createClusteringNodeSupport(config),crosstable=createCrossTableNodeSupport(config),exports=createTextExportNodeSupport(config),collapse=createCollapseNodeSupport(config),missingValues=createMissingValuesNodeSupport(config),dateTime=createDateTimeNodeSupport(config),duplicates=createDuplicatesNodeSupport(config),replacement=createReplacementNodeSupport(config),union=createUnionNodeSupport(config),join=createJoinNodeSupport(config),filter=createFilterNodeSupport(config),imports=createTextImportNodeSupport(config),calculator=createCalculatorNodeSupport(config),grouping=createGroupingNodeSupport(config),sorting=createSortingNodeSupport(config),reform=createReformNodeSupport(config);
- const rest=createRestRequestNodeSupport(config);
+ const excel=createExcelImportNodeSupport(config),rest=createRestRequestNodeSupport(config);
  const redactor=config.redactor??createRedactor();
  const javascript=config.targetBuild==='7.4.2'&&typeof config.targetOrigin==='string'&&config.targetOrigin.length>0
   ?createJavascriptCodeNodeSupport({targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,redactor}):null;
- const nodeApplyHandlers=new Map([...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
+ const nodeApplyHandlers=new Map([...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
   if(options.operation.parameters?.mode===NODE_READ_MODE||['integration.rest_request','transform.join_data'].includes(type)){
@@ -54,6 +55,7 @@ export function createCandidateNodeSupport(config) {
   if(type==='research.duplicates')return duplicates.nodeApplyDriverFactory(options);
   if(type==='transform.union_data')return union.nodeApplyDriverFactory(options);
   if(type==='transform.filter_data')return filter.nodeApplyDriverFactory(options);
+  if(type==='imports.excel')return excel.nodeApplyDriverFactory(options);
   if(type==='imports.text')return imports.nodeApplyDriverFactory(options);
   if(type==='transform.reform_columns')return reform.nodeApplyDriverFactory(options);
   if(type==='transform.replace_columns')return replacement.nodeApplyDriverFactory(options);
