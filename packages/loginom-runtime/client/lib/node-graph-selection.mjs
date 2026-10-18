@@ -13,7 +13,7 @@ export function preparedGraphSelection(state) {
 }
 
 // A failed graph selection may observe a new SVG body for the same native node.
-// Do not generalize this proof to labels, controls, hidden bodies or other errors.
+// Do not generalize this proof to labels, controls, hidden bodies or uncertain effects.
 export function isPreparedBodyReplacement({receipt,observation,action}) {
   const after=receipt?.output,a=observation?.prepared_node_context,b=after?.prepared_node_context;
   const same=(x,y)=>JSON.stringify(x)===JSON.stringify(y);
