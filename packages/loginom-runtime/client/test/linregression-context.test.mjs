@@ -41,3 +41,17 @@ test('linregression ownership must remain stable across the complete read',async
  for(const extra of [{input_port:{}},{output_port:{}},{surface:'graph'}])assert.equal((await readLinRegressionContext({}, {},async()=>({verified:true,surface:'wizard',...extra}))).reason,'linregression_node_surface');
 });
 
+
+test('the native Enter method picker is actionable through the serialized workspace observer',async()=>{
+ const {Page}=await import('./support/workspace-ui-fixture.mjs');
+ const page=new Page(),base='MF;TF-1;WizrdMCF',form=page.add('div',base);
+ const method=page.add('div',base+';LinRegressionWizard;pedRegressionMethod','',undefined,form);
+ const owner=page.add('div',method.getAttribute('data-tid')+';ValueControl','',undefined,method);
+ const picker=page.add('div',owner.getAttribute('data-tid')+';trg_picker','',{x:100,y:100,width:20,height:20},owner);
+ const observed=await page.observe();
+ assert.equal(observed.wizard.stage,'lin_regression');
+ const control=observed.ui.elements.find(e=>e.tid===picker.getAttribute('data-tid'));
+ assert.ok(control?.allowed_actions.includes('click'));
+ const clicked=await page.act({verb:'click',ref:control.ref},observed);
+ assert.equal(clicked.status,'SUCCEEDED',JSON.stringify(clicked.error));
+});
