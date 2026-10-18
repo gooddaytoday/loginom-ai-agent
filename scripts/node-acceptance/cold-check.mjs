@@ -4,7 +4,7 @@ import { readFile, mkdir, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
-import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions} from './static-source-proof.mjs'
+import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
 import {coldNativeEligible} from './cold-reader-policy.mjs'
 
@@ -142,7 +142,10 @@ try {
    }
   }
   const types=new Set(expectedOutputs.map(o=>o.output_node_type));
-  const exportInput=types.has('export_input')?resolveExportInput(graph):null;
+  const destination=expectedOutputs.find(o=>o.output_node_type==='export_input')?.export_destination;
+  const destinations=destination===undefined?undefined:await observeExportDestinations({load,graph,channelFor,execute});
+  if(destinations)await record({phase:'cold_export_destinations',destinations,settings_applied:false});
+  const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations}):null;
   for (const want of expected.nodes) {
     if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
