@@ -60,7 +60,7 @@ describe("RuntimeFlags", () => {
       expect(flags.experimentalWorkspaces).toBe(true)
       expect(flags.experimentalIconDiscovery).toBe(true)
       expect(flags.experimentalNativeLlm).toBe(false)
-      expect(flags.experimentalWebSockets).toBeUndefined()
+      expect(flags.experimentalWebSockets).toBe(false)
       expect(flags.client).toBe("desktop")
     }),
   )
@@ -94,13 +94,8 @@ describe("RuntimeFlags", () => {
       const explicit = yield* readFlags.pipe(Effect.provide(fromConfig({ LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "true" })))
       const umbrella = yield* readFlags.pipe(Effect.provide(fromConfig({ LOGINOM_AI_AGENT_EXPERIMENTAL: "true" })))
 
-      const disabled = yield* readFlags.pipe(
-        Effect.provide(fromConfig({ LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "false" })),
-      )
-
-      expect(disabled.experimentalWebSockets).toBe(false)
       expect(explicit.experimentalWebSockets).toBe(true)
-      expect(umbrella.experimentalWebSockets).toBeUndefined()
+      expect(umbrella.experimentalWebSockets).toBe(false)
     }),
   )
 

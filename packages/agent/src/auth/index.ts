@@ -4,7 +4,6 @@ import { Effect, Layer, Record, Result, Schema, Context } from "effect"
 import { NonNegativeInt } from "@loginom-ai-agent/core/schema"
 import { Global } from "@loginom-ai-agent/core/global"
 import { FSUtil } from "@loginom-ai-agent/core/fs-util"
-import { SharedAuth } from "./shared"
 
 export const OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"
 
@@ -57,16 +56,6 @@ const layer = Layer.effect(
     const decode = Schema.decodeUnknownOption(Info)
 
     const all = Effect.fn("Auth.all")(function* () {
-      const shared = SharedAuth.directory()
-      if (shared) {
-        const data = yield* Effect.tryPromise({
-          try: (signal) => SharedAuth.read(shared, signal),
-          catch: fail("Failed to read shared auth data"),
-        })
-        const valid = Schema.decodeUnknownOption(Schema.Record(Schema.String, Info))(data)
-        if (valid._tag === "None") return yield* new AuthError({ message: "Invalid shared auth data" })
-        return valid.value
-      }
       if (process.env.LOGINOM_AI_AGENT_AUTH_CONTENT) {
         try {
           return JSON.parse(process.env.LOGINOM_AI_AGENT_AUTH_CONTENT)
@@ -83,22 +72,6 @@ const layer = Layer.effect(
 
     const set = Effect.fn("Auth.set")(function* (key: string, info: Info) {
       const norm = key.replace(/\/+$/, "")
-      const shared = SharedAuth.directory()
-      if (shared)
-        return yield* Effect.tryPromise({
-          try: (signal) =>
-            SharedAuth.mutate(
-              shared,
-              norm,
-              (data) => {
-                delete data[key]
-                delete data[norm + "/"]
-                return { ...data, [norm]: info }
-              },
-              signal,
-            ),
-          catch: fail("Failed to write shared auth data"),
-        })
       const data = yield* all()
       if (norm !== key) delete data[key]
       delete data[norm + "/"]
@@ -109,12 +82,6 @@ const layer = Layer.effect(
 
     const remove = Effect.fn("Auth.remove")(function* (key: string) {
       const norm = key.replace(/\/+$/, "")
-      const shared = SharedAuth.directory()
-      if (shared)
-        return yield* Effect.tryPromise({
-          try: (signal) => SharedAuth.logout(shared, norm, signal),
-          catch: fail("Failed to remove shared auth data"),
-        })
       const data = yield* all()
       delete data[key]
       delete data[norm]
@@ -126,19 +93,5 @@ const layer = Layer.effect(
 )
 
 export const node = LayerNode.make({ service: Service, layer: layer, deps: [FSUtil.node] })
-
-// Successful OAuth callbacks are a separate internal transition. The public
-// generic auth writer cannot acknowledge an uncertain refresh transaction.
-export const verifiedLogin = Effect.fn("Auth.verifiedLogin")(function* (key: string, info: Oauth) {
-  const shared = SharedAuth.directory()
-  if (shared && key === "openai") {
-    return yield* Effect.tryPromise({
-      try: (signal) => SharedAuth.login(shared, key, info, signal),
-      catch: fail("Failed to save verified OAuth login"),
-    })
-  }
-  const auth = yield* Service
-  yield* auth.set(key, info)
-})
 
 export * as Auth from "."
