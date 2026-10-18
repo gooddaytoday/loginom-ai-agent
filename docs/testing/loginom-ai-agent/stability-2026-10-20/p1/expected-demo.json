@@ -1,0 +1,73 @@
+{
+  "package_path": "/stability-2026-10-20/p1.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/library-late.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "BookID",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Shelf",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "DaysOverdue",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "BookID": "BK15",
+          "Shelf": "History",
+          "DaysOverdue": 30
+        },
+        {
+          "BookID": "BK12",
+          "Shelf": "History",
+          "DaysOverdue": 14
+        },
+        {
+          "BookID": "BK09",
+          "Shelf": "History",
+          "DaysOverdue": 21
+        },
+        {
+          "BookID": "BK05",
+          "Shelf": "Fiction",
+          "DaysOverdue": 12
+        },
+        {
+          "BookID": "BK04",
+          "Shelf": "Fiction",
+          "DaysOverdue": 8
+        },
+        {
+          "BookID": "BK08",
+          "Shelf": "Fiction",
+          "DaysOverdue": 9
+        },
+        {
+          "BookID": "BK14",
+          "Shelf": "History",
+          "DaysOverdue": 8
+        }
+      ]
+    }
+  ]
+}

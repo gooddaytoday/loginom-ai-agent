@@ -1,0 +1,151 @@
+{
+  "package_path": "/stability-2026-10-20/p7.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/finds-materials.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "FindID",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Trench",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "MaterialCode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Material",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "FindID": "FD17",
+          "Trench": "T-C",
+          "MaterialCode": "M05",
+          "Material": "Glass"
+        },
+        {
+          "FindID": "FD06",
+          "Trench": "T-C",
+          "MaterialCode": "M06",
+          "Material": "Bone"
+        },
+        {
+          "FindID": "FD11",
+          "Trench": "T-C",
+          "MaterialCode": "M11",
+          "Material": "Silver"
+        },
+        {
+          "FindID": "FD05",
+          "Trench": "T-A",
+          "MaterialCode": "M05",
+          "Material": "Glass"
+        },
+        {
+          "FindID": "FD12",
+          "Trench": "T-B",
+          "MaterialCode": "M12",
+          "Material": "Lead"
+        },
+        {
+          "FindID": "FD02",
+          "Trench": "T-B",
+          "MaterialCode": "M02",
+          "Material": "Flint"
+        },
+        {
+          "FindID": "FD18",
+          "Trench": "T-A",
+          "MaterialCode": "M06",
+          "Material": "Bone"
+        },
+        {
+          "FindID": "FD09",
+          "Trench": "T-A",
+          "MaterialCode": "M09",
+          "Material": "Shell"
+        },
+        {
+          "FindID": "FD07",
+          "Trench": "T-B",
+          "MaterialCode": "M07",
+          "Material": "Wood"
+        },
+        {
+          "FindID": "FD08",
+          "Trench": "T-A",
+          "MaterialCode": "M08",
+          "Material": "Stone"
+        },
+        {
+          "FindID": "FD03",
+          "Trench": "T-B",
+          "MaterialCode": "M03",
+          "Material": "Bronze"
+        },
+        {
+          "FindID": "FD01",
+          "Trench": "T-C",
+          "MaterialCode": "M01",
+          "Material": "Clay"
+        },
+        {
+          "FindID": "FD15",
+          "Trench": "T-B",
+          "MaterialCode": "M03",
+          "Material": "Bronze"
+        },
+        {
+          "FindID": "FD10",
+          "Trench": "T-A",
+          "MaterialCode": "M10",
+          "Material": "Gold"
+        },
+        {
+          "FindID": "FD13",
+          "Trench": "T-C",
+          "MaterialCode": "M01",
+          "Material": "Clay"
+        },
+        {
+          "FindID": "FD14",
+          "Trench": "T-A",
+          "MaterialCode": "M02",
+          "Material": "Flint"
+        },
+        {
+          "FindID": "FD16",
+          "Trench": "T-B",
+          "MaterialCode": "M04",
+          "Material": "Iron"
+        },
+        {
+          "FindID": "FD04",
+          "Trench": "T-C",
+          "MaterialCode": "M04",
+          "Material": "Iron"
+        }
+      ]
+    }
+  ]
+}
