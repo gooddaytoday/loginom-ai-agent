@@ -3936,7 +3936,7 @@ function readRenderedInputMapping(observation) {
           }
           let deactivationPending=task.action.verb==='begin_wizard'&&exactDeactivation(observed);
           if(!deactivationPending && task.prepared_node_context && contextMatches(observed)
-            && !observed.ui.masks.length && !intendedWizard(observed)) {
+            && (observed.ui.masks.length || !intendedWizard(observed))) {
             // Preserve the refused sample, then read once more within the same
             // deadline. The original gesture and owner checks stay unchanged.
             record('wizard_open_confirmation_read_retried',{attempt:1,initial_observation:observed});
