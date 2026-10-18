@@ -64,6 +64,25 @@ export async function downloadExportWithFreshObservation({snapshot,file,download
   snapshot=fresh;file=matches[0];
  }
 }
+// Only the observed, settled no-effect epoch refusal can take this exit. An
+// unknown download or transport still owns its pending read and output lease.
+export async function releaseRefusedExportDownload({downloaded,id,binding,restore,release,record}){
+ const gesture=downloaded.trace?.find(t=>t.event==='download_gesture_result');
+ if(downloaded.operation_id!==id||downloaded.action_key!=='artifact.download'||downloaded.phase!=='requesting'
+  ||downloaded.status!=='NOT_APPLIED'||downloaded.effect_possible!==false||downloaded.cleanup_complete!==true
+  ||downloaded.error?.code!=='DOWNLOAD_GESTURE_NOT_CONFIRMED'||gesture?.status!=='NOT_APPLIED'
+  ||gesture.effect_possible!==false||gesture.cleanup_complete!==true||gesture.error_code!=='UI_EPOCH_CHANGED')return null;
+ const restored=await restore();
+ need(restored?.verified===true&&restored.cleanup_complete===true&&restored.quiet===true
+  &&restored.node_context?.verified===true&&restored.node_context.surface==='graph'&&restored.node_context.locked===false
+  &&['document_id','workflow_id','node_id'].every(k=>restored.node_context[k]===binding[k]),'Export refusal did not restore its quiet owned graph');
+ await release();
+ const proof={binding,download:{operation_id:id,status:downloaded.status,effect_possible:false,cleanup_complete:true,
+  code:downloaded.error.code,gesture_error:gesture.error_code},restored,lease_released:true};
+ await record('export_file_download_refused_restored',{proof});
+ return {phase:'read',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+  verification:'text_export_download_refused_restored',proof};
+}
 // A virtual file row may not exist in the DOM until its page is rendered.
 // Search only the observed folder, through bounded native scroll gestures.
 export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
@@ -118,7 +137,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  need(owner.verified&&owner.surface==='graph','Export graph changed before file read');
  const fileBinding={session_id:artifactStore.outputSessionId,document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,node_id:ctx.node.node_id,execution_id:ctx.execution.execution_id,destination};
  const lease=await artifactStore.stageOutput(fileBinding),name=destination.split('/').at(-1),directory=destination.slice(0,-name.length-1);
- let sequence=0,uncertain=false,retained=false,observationDocument=null;
+ let sequence=0,uncertain=false,retained=false,released=false,observationDocument=null;
  const guard=()=>{ctx.signal?.throwIfAborted();need(Date.now()<ctx.deadline,'Export file read deadline elapsed');};
  const record=async(phase,data)=>{const r=await onRecord({phase,operation_id:operation.id,...data});need(r?.phase===phase&&r.operation_id===operation.id,'Export file receipt not acknowledged');};
  const base={expected_origin:targetOrigin,expected_build:targetBuild};
@@ -161,6 +180,20 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   &&(expected===undefined||(Array.isArray(expected)?expected:[expected]).includes(s.file_storage.directory))
   &&(!previous||s.file_storage.directory!==previous.file_storage.directory||JSON.stringify(s.workflow_ref)!==JSON.stringify(previous.workflow_ref)));
  const row=name=>findNativeStorageRow({name,read,roots,ready,act,guard});
+ const returnToWorkflow=async()=>{
+  // A fresh tab observation precedes the sole return gesture. Never open a
+  // second package or guess a tab after an uncertain navigation.
+  let r=await roots();const workspace=one(r.ui.elements.filter(e=>e.tid==='MF;cntMain;cntWorkspace;Workspace;t.br'));
+  r=await read({root_ref:workspace.ref});const storageTab=one(r.ui.elements.filter(e=>e.tid===r.workflow_ref.tab_tid));
+  const continuation={document_id:ctx.document_id,document:r.dom_epoch.document,tid:storageTab.tid,ref:storageTab.ref};
+  await act(r,one(r.ui.elements.filter(e=>e.tid===ctx.workflow_ref.tab_tid)));
+  for(let i=0;i<50;i++){
+   guard();const actual=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
+   if(actual.verified&&actual.surface==='graph')return {continuation,node_context:actual};
+   await new Promise(r=>setTimeout(r,100));
+  }
+  throw Error('Export file read did not return to its workflow');
+ };
  try{
   await record('export_file_lease_prepared',{binding:fileBinding,artifact_id:lease.artifact_id});
   let r=await roots(),retainedTab=null;
@@ -191,18 +224,18 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
    const result=await execute(withBrowserReceipt('('+makeNativeOutputDownloadCode(task)+')(page)',{...receiptOptions(id,'artifact.download',signature),operation_id:id}));
    await record('export_file_download_completed',{id,outcome:result});uncertain=result.cleanup_complete!==true;return result;
   }});
+  const refusal=await releaseRefusedExportDownload({downloaded,id,binding:fileBinding,record,
+   restore:async()=>{const restored=await returnToWorkflow(),fresh=await roots();
+    need(quiet(fresh)&&JSON.stringify(fresh.workflow_ref)===JSON.stringify(ctx.workflow_ref),'Export refusal workflow is not quiet or changed');
+    return {verified:true,cleanup_complete:true,quiet:true,node_context:restored.node_context};},
+   release:async()=>{await lease.release();released=true;}});
+  if(refusal)throw Object.assign(Error('Native export execution completed and its destination file was observed, but downloading was not confirmed. The original workflow is restored; no read remains unresolved. Save the scenario now and report the download as unconfirmed; do not repeat the export.'),{nodePhaseRefusal:refusal});
   need(downloaded.status==='SUCCEEDED'&&!uncertain&&downloaded.output?.destination===destination&&downloaded.output.artifact_id===lease.artifact_id
    &&downloaded.output.download_completed&&downloaded.output.output_binding?.execution_id===ctx.execution.execution_id,'Native export download unconfirmed');
   const artifact=await lease.verify(downloaded.output.suggested_name,bytes);
   const result={artifact_id:artifact.artifact_id,destination,bytes:artifact.bytes,sha256:artifact.sha256,execution_id:ctx.execution.execution_id,verification_id:id,freshness_basis:check.existed?'explicit_replace_and_completed_native_execution':'native_absence_check_and_completed_execution'};
   await record('export_file_bytes_verified',{binding:fileBinding,result});
-  // Return through a newly observed tab; then verify the prepared node again.
-  r=await roots();const workspace=one(r.ui.elements.filter(e=>e.tid==='MF;cntMain;cntWorkspace;Workspace;t.br'));
-  r=await read({root_ref:workspace.ref});const storageTab=one(r.ui.elements.filter(e=>e.tid===r.workflow_ref.tab_tid));
-  const continuation={document_id:ctx.document_id,document:r.dom_epoch.document,tid:storageTab.tid,ref:storageTab.ref};
-  await act(r,one(r.ui.elements.filter(e=>e.tid===ctx.workflow_ref.tab_tid)));
-  let restored=false;for(let i=0;i<50;i++){guard();const actual=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);if(actual.verified&&actual.surface==='graph'){restored=true;break;}await new Promise(r=>setTimeout(r,100));}
-  need(restored,'Export file read did not return to its workflow');
-  await lease.retain();retained=true;await record('export_file_read_completed',{result,workflow_return_verified:true});options.rememberStorageContinuation?.(continuation);return result;
- }finally{if(!uncertain&&!retained)await lease.release();}
+  const restored=await returnToWorkflow();
+  await lease.retain();retained=true;await record('export_file_read_completed',{result,workflow_return_verified:true});options.rememberStorageContinuation?.(restored.continuation);return result;
+ }finally{if(!uncertain&&!retained&&!released)await lease.release();}
 }
