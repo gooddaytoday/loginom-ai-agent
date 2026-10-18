@@ -1,0 +1,135 @@
+{
+  "checked_utc": "2026-10-18T08:51:03.738534+00:00",
+  "issue": "LAB-61",
+  "ready_report": "01a14e19-d508-7664-8320-8930bd578de7",
+  "archive": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-checker-rework9-1088d04f-ready-delivery/lab61-checker-rework9-1088d04f-ready.zip",
+    "bytes": 16998754,
+    "sha256": "c1c065d4895d4aaf43d338f68102cef923ca4f18df096e6a271565ee0defd0d9",
+    "manifest_sha256": "670e47dd729fb4c9d0314efae80b7f0fbb588dcd30e684b26e7d9b6390de0c95",
+    "payloads_verified": 2293,
+    "members": 2294,
+    "payload_bytes": 261808240,
+    "safe_unique_exact_membership": true,
+    "all_payload_hashes_verified": true,
+    "REPORT_equal_standalone": true
+  },
+  "source": {
+    "head": "1088d04fe41f7765e3873d993b4b32a32eb5a369",
+    "authorization_base": "9d49d54465fe1cf38bf24dfbcd84a1ceab975aa9",
+    "direct_parent": "bae0d53817aa3c5340a050ed7861ee3ebd3f0f63",
+    "commits": [
+      "bae0d53817aa3c5340a050ed7861ee3ebd3f0f63",
+      "1088d04fe41f7765e3873d993b4b32a32eb5a369"
+    ],
+    "tree": "b1bb22cb0729d3346001bfab83cd3140a08b9962",
+    "changed_paths": [
+      "evals/script/check-text-import.py",
+      "evals/test/text-import-evidence.test.ts"
+    ],
+    "final_bundle_sha256": "d19a9cc3ca64915bddfbd4da38e5e603d2d783ed4364821f01c4b8f2258ebebb",
+    "final_patch_sha256": "1e08acae31a21971f38c7fcb1f0591bbc85bafb26fc57858bd6910be1c5e78c1",
+    "final_archive_prefix": "source-final/",
+    "initial_failed_source_prefix": "source/",
+    "range_patch_abbrev9_equal": true,
+    "portable_candidate_Git_files_equal": 145,
+    "unchanged_AST_functions": [
+      "require",
+      "calls_from",
+      "after",
+      "source_bindings",
+      "request_owner",
+      "rejection",
+      "native_events",
+      "configuration_matches",
+      "native_application",
+      "native_execution",
+      "public_output",
+      "typed_table",
+      "unused_structural_ports",
+      "package_graph",
+      "settled_receipt",
+      "known_refusal",
+      "report_text",
+      "report_normalize",
+      "claim_status",
+      "claim_asserted",
+      "bound_report_facts",
+      "refusal_witness",
+      "report_truth",
+      "damage_diagnosed",
+      "diagnostic",
+      "positive",
+      "audit"
+    ],
+    "fresh_remote": {
+      "refs/heads/lab61-nested-scope": "1088d04fe41f7765e3873d993b4b32a32eb5a369",
+      "refs/heads/text-import-evals": "2ee4e9264ef839a1b2d33d4855f86e458f03e67d"
+    }
+  },
+  "chronology": {
+    "MODEL_sha256": "39a6656fa37482052a3cfe0fb08edaaf6048fe556dc1656e11b52bd6d9582beb",
+    "model_record_sha256": "a648a268c298c7a5d4b156f941431a3efabf21434adbfd50906272fe39648ecf",
+    "completed_RED_gate_equal_Evaler": true,
+    "completed_RED_gate_sha256": "2466b6016edda614e407a05210f1920ac2946c72a06dc3537bcfd1ebc6f5503a",
+    "first_implementation_record_sha256": "dec102d22838213c63b22fa9d47e3ffc01a63e1dba7a2369e9404453f0600118",
+    "author_records_not_external_edit_time_attestation": true,
+    "initial_failed_full_suite_and_locative_followup_preserved": true,
+    "prior_rework8_overlap_preserved": true
+  },
+  "native": {
+    "Evaler_task": "01a14e19-d536-7483-b055-f4d75b1f3834",
+    "Ben_task": "01a14e22-6eff-74d5-9ea0-814396df9fdb",
+    "handoff": "01a14e22-6ed7-7d53-bdc8-a039a52d3a21",
+    "revision": 382,
+    "review_cycle": 10,
+    "reject_count": 9,
+    "rework_limit": 9,
+    "queued_receipt_state_equals_final_issue": true,
+    "exact_files": {
+      "ready-report-input.json": {
+        "bytes": 2709,
+        "sha256": "069d5389c7fd8c768aa2e21b16cdb21eb4418d203f8ea9988ce5ff62e17c7a90"
+      },
+      "ready-report-output.json": {
+        "bytes": 2102,
+        "sha256": "069a7f657198bc471590726c97b3115be8430e26f35bc8316832a3a744a89a14"
+      },
+      "dispatch-input.json": {
+        "bytes": 2201,
+        "sha256": "b6a57c62cd3d441b9f7dc2e109b0921ed6aa827a256a098661325aee001cbf1f"
+      },
+      "dispatch-output.json": {
+        "bytes": 2094,
+        "sha256": "3af45de7977d62aa3fcd7b76c9443029b2b62efda33b1f1ccfd93a90474b8daf"
+      },
+      "receipt-input.json": {
+        "bytes": 2195,
+        "sha256": "e33832a0044444dac092b56ad3dbc5e25f45c8a7cc91af565ca050b7a4d4e300"
+      },
+      "receipt-output.json": {
+        "bytes": 2086,
+        "sha256": "5fb724376f6c3ca75f492a25fe7c911b125d76d5ad95496950930be2ff421f05"
+      },
+      "outer-final.json": {
+        "bytes": 8445,
+        "sha256": "bedb277d987a069739c82bc2d2d0c192917a804880543dc78b5aa72b76fedee2"
+      },
+      "issue-final-readback.json": {
+        "bytes": 183169,
+        "sha256": "963110a423787ac87ddfbc838383a9dbfb481ad38a650fb56c47f6cc5cb301b1"
+      }
+    }
+  },
+  "limitations": {
+    "root_source_executed": false,
+    "root_findings_reproduced": false,
+    "root_integrated_candidate": false,
+    "full_author_source_tar_independently_hashed": false,
+    "Evaler_DB_requery": false,
+    "Evaler_full_suite_rerun": false,
+    "full_independent_Ben_ACCEPT": false,
+    "new_live_model_or_native_effects": false
+  },
+  "accepted_code_test_case": "7d3a5cbda2873094219dec836b1b6c0ffa40f639"
+}

@@ -1,0 +1,313 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "kind": "FULL_INDEPENDENT_OFFLINE_CASE_REVIEW",
+  "intent_id": "LAB61-BEN-REVIEW-REWORK9-1088d04f-01a14e19",
+  "trigger_report_id": "01a14e19-d508-7664-8320-8930bd578de7",
+  "candidate": {
+    "sha": "1088d04fe41f7765e3873d993b4b32a32eb5a369",
+    "authorization_base": "9d49d54465fe1cf38bf24dfbcd84a1ceab975aa9",
+    "direct_parent": "bae0d53817aa3c5340a050ed7861ee3ebd3f0f63",
+    "commits": [
+      "bae0d53817aa3c5340a050ed7861ee3ebd3f0f63",
+      "1088d04fe41f7765e3873d993b4b32a32eb5a369"
+    ],
+    "tree": "b1bb22cb0729d3346001bfab83cd3140a08b9962",
+    "branch": "lab61-nested-scope",
+    "clean_source": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-nested-scope",
+    "checker_sha256": "fcf07f7d0590dc18ba6133dcff113cde589483bf290a0da8bcaaa877980b08e5",
+    "test_sha256": "34fb72a0083e4ff7b8b2fc161954d9f5613bed7e14ef8f5879945be3e2bcbe28",
+    "source_delta": [
+      "evals/script/check-text-import.py",
+      "evals/test/text-import-evidence.test.ts"
+    ],
+    "protected_AST_unchanged": [
+      "require",
+      "calls_from",
+      "after",
+      "source_bindings",
+      "request_owner",
+      "rejection",
+      "native_events",
+      "configuration_matches",
+      "native_application",
+      "native_execution",
+      "public_output",
+      "typed_table",
+      "unused_structural_ports",
+      "package_graph",
+      "settled_receipt",
+      "known_refusal",
+      "report_text",
+      "report_normalize",
+      "claim_status",
+      "claim_asserted",
+      "bound_report_facts",
+      "refusal_witness",
+      "report_truth",
+      "damage_diagnosed",
+      "diagnostic",
+      "positive",
+      "audit"
+    ]
+  },
+  "official_delivery": {
+    "root": "/home/user/multica_workspaces/lab-6462f220cf3b/lab-61-6b0ae94f7eeb/workdir/attachments/lab61-rework9-ready-01a14e19/extracted",
+    "payloads": 2293,
+    "archive_sha256": "c1c065d4895d4aaf43d338f68102cef923ca4f18df096e6a271565ee0defd0d9",
+    "manifest_sha256": "670e47dd729fb4c9d0314efae80b7f0fbb588dcd30e684b26e7d9b6390de0c95",
+    "delivery_attachment_id": "01a14e19-d106-72cc-ae67-eee0b128e1de",
+    "part_attachment_ids": [
+      "01a14e19-d287-7a2a-8c1d-a3f80a6e1327",
+      "01a14e19-d35b-79d9-969d-ed83e04f5b23",
+      "01a14e19-d40c-7c3d-80b1-eaa62224eb77",
+      "01a14e19-d4b1-7505-bb6d-a17fdd817106",
+      "01a14e19-d4df-725b-9a8a-b5d84fe26248"
+    ],
+    "bundle_sha256": "d19a9cc3ca64915bddfbd4da38e5e603d2d783ed4364821f01c4b8f2258ebebb",
+    "patch_sha256": "1e08acae31a21971f38c7fcb1f0591bbc85bafb26fc57858bd6910be1c5e78c1"
+  },
+  "Evaler_verification": {
+    "path": "/home/user/.local/share/loginom-evals-runtime/roles/evaler/work/lab61-rework9-ready-01a14e19/evaler-verification.json",
+    "sha256": "36306fbbfb00c61bd1df97400d9abf23aaab38daf0eedb276205ea3c66118c8b",
+    "not_independent_Ben_acceptance": true
+  },
+  "preserved_expectations": {
+    "inputs_only_sha256": "b9d2b534832edd05b2f54c6b51dc2f0c4c236d2bc30d956352daa541c0f815ef",
+    "record_review_protocol_before_MODEL_payload_diff": true,
+    "disclose_known_author_aggregates": true,
+    "no_new_blind_calculation_claim": true
+  },
+  "scope": [
+    "Full independent exact clean-source review of MODEL and the entire two-commit authorized-base9d49→final1088 range, including initial bae0 and one-line locative follow-up. One verdict contains every reproducible finding; Ben does not patch author code.",
+    "Review all seven latest groups plus own compositions: physical newlines/complement governors; independent contrast; current frame nested under nonassertion; naming-head source/output role; square/Unicode warning argument identity; passive relative emission independent of reception; elliptical quantitative sibling with inherited role/unit and own polarity.",
+    "Independently check current-stage chronology: completed exact-base RED and final test hashes before the first checker/prototype edit, MODEL before RED, first-edit record. Preserve historical rework8 prototype/RED overlap without relabelling it. Source/log bindings and author records are not external edit-time attestation.",
+    "Reproduce identical final tests on exact authorized base9d49 and candidate; appropriate full suite/typecheck. Preserve first bae0 full952PASS15SKIP4FAIL, HYPOTHESIS-v2 original/corrected aggregate, exploratory wording, targeted locative RED before one-line correction and final18/18; keep initial/final artifacts and hashes separate.",
+    "Independently replay1498 qualified rows: prior1222 +main130/reader24/supplemental96/count26. Disclose13 inspect and10 count-baseline overlaps; synthetic supplemental rows are not independent causes or genuine histories. Original96 negatives/9 positives/18 native-initial, omitted/error:null, portable1227 and unchanged951/715/18 wrappers also remain required.",
+    "Keep freeform original TASK/criteria/report contract and all public/native/typed/table/inspect/binding/initial omission/owner/effect/cleanup guards. Audit changed helpers beyond unchanged AST; finite corpus is not universal NLU acceptance.",
+    "Full review of all ten original IDs and30 genuine histories: complete typed/native evidence, exact binding, archival actual Luna/high, once/ledger, original unused reservation carry-forward. Every derived result identifies exact Git/checker SHA; raw summaries/verdicts and original errors stay immutable.",
+    "Verify historical genuine completion→ordinary RELEASED and own fresh read-only healthy FREE. No new lease/browser/native/admission/model/reference/product/probe/recovery/build/install/OS/integration or policy reload. End own processes and exact temporary fixtures; do not invent a new live lifecycle.",
+    "Quality ACCEPT may coexist with four measured product FAIL. Unknown cleanup/infrastructure ERROR cannot be ACCEPT. Accepted common integration and LAB62–63 remain closed until separate Evaler decision."
+  ],
+  "final_author_artifacts": {
+    "model": "MODEL.md",
+    "record": "model-record.json",
+    "source_initial": "source",
+    "source_final": "source-final",
+    "RED": "commands/final-red",
+    "before_first_edit": "before-first-checker-edit.json",
+    "first_edit_observed": "first-implementation-observed.json",
+    "initial_full_suite": "commands/frozen-full-unit",
+    "final_full_suite": "commands/final-full-unit",
+    "typecheck": "commands/final-typecheck",
+    "controls": "final-qualification.json",
+    "genuine_replay": "replay-final/REPORT.json",
+    "portable": "portable-final/REPORT.json",
+    "source_Git_bytes": "portable-candidate",
+    "locative": [
+      "HYPOTHESIS-v2-initial.md",
+      "HYPOTHESIS-v2.md",
+      "hypothesis-v2-record.json",
+      "hypothesis-v2-final-record.json",
+      "locative-red-qualified.json",
+      "locative-final.json"
+    ]
+  },
+  "author_claims_to_verify": {
+    "RED": "335 PASS/7 FAIL",
+    "initial_full": "952 PASS/15 SKIP/4 FAIL",
+    "final_full": "956 PASS/15 SKIP/0 FAIL;5752 assertions;typecheck0",
+    "qualified_rows": 1498,
+    "portable_rows": 1227,
+    "locative_rows": 18,
+    "derived_counts": {
+      "reference": {
+        "PASS": 10
+      },
+      "Rich": {
+        "PASS": 8,
+        "FAIL": 2
+      },
+      "Ben": {
+        "PASS": 8,
+        "FAIL": 2
+      }
+    }
+  },
+  "product_source": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "reference_provenance": "6 x d6fc9c9b + 3 x 2e990a84 + initial x a2ba3d0f",
+  "raw_counts_preserved": {
+    "Rich": "3 PASS / 7 FAIL",
+    "Ben": "2 PASS / 8 FAIL",
+    "wrapper": "ERROR / zero attempts"
+  },
+  "consumption": {
+    "reference": {
+      "txt-unclosed-quote": 3,
+      "txt-wrong-encoding": 1,
+      "txt-wrong-delimiter": 1,
+      "txt-ambiguous-headers": 1,
+      "csv-unclosed-quote": 1,
+      "csv-wrong-encoding": 1,
+      "csv-wrong-delimiter": 3,
+      "csv-ambiguous-headers": 1,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 1
+    },
+    "reference_total": 15,
+    "product_physical_calls": 20,
+    "recovery": 1,
+    "probes": 0,
+    "historical_outcomes_preserved": true,
+    "budget_increases": [
+      {
+        "old": 3,
+        "new": 4,
+        "usage": {
+          "completed_reworks": 3,
+          "fresh_REJECTs": 4
+        },
+        "counters_reset": false,
+        "reason": "Proposition scope."
+      },
+      {
+        "old": 4,
+        "new": 5,
+        "usage": {
+          "completed_reworks": 4,
+          "fresh_REJECTs": 5
+        },
+        "counters_reset": false,
+        "reason": "Object/count/ID binding."
+      },
+      {
+        "old": 5,
+        "new": 6,
+        "usage": {
+          "completed_reworks": 5,
+          "fresh_REJECTs": 6
+        },
+        "counters_reset": false,
+        "reason": "Scope/roles/contradiction/code identity."
+      },
+      {
+        "old": 6,
+        "new": 7,
+        "usage": {
+          "completed_reworks": 6,
+          "fresh_REJECTs": 7
+        },
+        "counters_reset": false,
+        "reason": "Governor/argument/attempt/code scope."
+      },
+      {
+        "old": 7,
+        "new": 8,
+        "usage": {
+          "completed_reworks": 7,
+          "fresh_REJECTs": 8
+        },
+        "counters_reset": false,
+        "reason": "Predicate dependencies and positive count witness."
+      },
+      {
+        "old": 8,
+        "new": 9,
+        "usage": {
+          "completed_reworks": 8,
+          "fresh_REJECTs": 9
+        },
+        "decision_document_sha256": "6e1dfe6a5d4bf73c77b9ad32587ca22f100392922ceb8c62ffc964881517ab0f",
+        "counters_reset": false,
+        "reason": "Dependency precedence and inherited predicate roles; OFFLINE.",
+        "decision_comment_id": "01a14df5-2e47-7b64-b503-7200fedb6c3f"
+      }
+    ],
+    "product_by_case": {
+      "txt-unclosed-quote": 2,
+      "txt-wrong-encoding": 2,
+      "txt-wrong-delimiter": 2,
+      "txt-ambiguous-headers": 2,
+      "csv-unclosed-quote": 2,
+      "csv-wrong-encoding": 2,
+      "csv-wrong-delimiter": 2,
+      "csv-ambiguous-headers": 2,
+      "initial-incomplete-settings": 2,
+      "missing-source-column": 2
+    },
+    "rework_limit": 9,
+    "pre_dispatch_wrapper": {
+      "original_verdict": "ERROR",
+      "physical_model_calls": 0,
+      "outcome_preserved": true,
+      "reservation_carried_forward": true,
+      "budget_reset": false
+    },
+    "product_calls_by_role": {
+      "Rich": 10,
+      "Ben": 10
+    },
+    "product_by_case_scope": "Rich+Ben total;1 each",
+    "recovery_by_role": {
+      "Rich": 1,
+      "Ben": 0
+    }
+  },
+  "rework_limit": 9,
+  "review_gate": "independent full Ben ACCEPT plus healthy FREE; no integration or LAB62 assignment",
+  "actual_read_only_health": {
+    "at": "2026-10-18T08:30:10.766Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-18T08:30:10.822Z"
+    }
+  },
+  "queues": [
+    {
+      "role": "evaler",
+      "rows": 200,
+      "active": [
+        {
+          "id": "01a14e19-d536-7483-b055-f4d75b1f3834",
+          "status": "running",
+          "trigger": "01a14e19-d508-7664-8320-8930bd578de7"
+        }
+      ]
+    },
+    {
+      "role": "rich",
+      "rows": 75,
+      "active": []
+    },
+    {
+      "role": "ben",
+      "rows": 37,
+      "active": []
+    },
+    {
+      "role": "baseline",
+      "rows": 11,
+      "active": []
+    },
+    {
+      "role": "runner",
+      "rows": 13,
+      "active": []
+    }
+  ],
+  "no_new_physical_calls_authorized": true
+}
