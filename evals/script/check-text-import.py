@@ -490,13 +490,15 @@ def report_complements(sentence, atoms=()):
         r'|not\s+confirmed|no\s+evidence|(?:it\s+is\s+)?possible|perhaps|possibly|maybe'
         r'|возможн\w*|вероятн\w*|(?:please\s+)?check|проверь(?:те)?')
     independent = (r'(?:the\s+)?(?:data|text|engine|warnings?|loginom)\b'
+        r'|(?:(?:can|cannot|might|could)\s+(?:not\s+)?confirm|confirm|(?:не\s+)?подтвержд\w*|(?:не\s+)?могу\s+подтверд\w*)\b'
         r'|(?:данн\w*|текст\w*|движ\w*|предупрежд\w*|фактически|actually|now|сейчас)\b'
         r'|(?:запрош\w*|получ\w*|requested|observed|found)\b'
         r'|(?:в|на|in|on)\s+(?:\w+\s+){1,4}(?:обнаруж\w*|выяв\w*|наблюд\w*|зафиксир\w*|is|are|was|were|detected|observed|found)\b'
         r'|(?:i|we|я|мы)\b|\w+\s+(?:is|are|was|were|отсутств\w*|присутств\w*)\b')
     rows = []
     prefix = r'(?:^|[;,:.!?\n]\s*|\b(?:but|however|но|однако|and|и)\s+)'
-    for match in re.finditer(prefix + r'(?P<governor>' + governor + r')\b[^;:.!?]{0,80}?(?::|\b(?:that|что|whether)\b)', sentence):
+    link_gap = r'(?:(?!\b(?:but|however|но|однако)\b)[^;:.!?]){0,80}?'
+    for match in re.finditer(prefix + r'(?P<governor>' + governor + r')\b' + link_gap + r'(?::|\b(?:that|что|whether)\b)', sentence):
         if not outside(match.start('governor')): continue
         end = len(sentence)
         for boundary in re.finditer(r';|[.!?](?=\s|$)|\b(?:но|однако|but|however)\b', sentence[match.end():]):
@@ -636,7 +638,11 @@ def report_sentences(text, atoms=(), identifiers=None):
             clause = ReportClause(part, scope_at(position), origin + left, identifiers)
             markers = list(re.finditer(r'\b(?P<marker>запрош\w*|ожида\w*|requested|required|expected|получ\w*|обнаруж\w*|наблюда\w*|observed|found)\b[^;,.!?]{0,40}?\b(?:пол\w*|колон\w*|столб\w*|fields?|columns?)\b', clause))
             explicit = markers[-1] if markers else None
-            if explicit:
+            relation = report_count_relation(clause, bool(role))
+            if relation:
+                clause.count_context = bool(role)
+                role = relation[0]
+            elif explicit:
                 role = 'requested' if re.match(r'запрош|ожида|requested|required|expected', explicit['marker']) else 'observed'
             elif inherited_role and role and re.match(r'(?:(?:не|not)\s+)?(?:\d+|one|two|three|four|five|одно|один|два|две|три|четыре|пять)\b', clause):
                 clause.count_role = role
@@ -829,6 +835,29 @@ def refusal_witness(sentences, reason, spec):
     return requested_seen and observed_seen
 
 
+def report_count_relation(clause, field_context=False):
+    """An explicit finite TASK/source predicate outranks quantitative ellipsis."""
+    number = r'\d+|one|single|two|both|three|four|five|одно|один|одна|два|две|оба|двух|три|трех|четыре|пять'
+    unit = r'(?:исходн\w*\s+|source\s+)?(?:пол\w*|колон\w*|столб\w*|fields?|columns?)'
+    quantity = rf'(?P<neg_before>(?:not|не)\s+)?(?P<n>{number})\b(?:\s+(?P<unit>{unit})\b)'
+    for role, object, verb in [
+        ('requested', r'(?:(?:the\s+)?task|задани\w*)', r'specifi\w*|requir\w*|указа\w*|зада\w*|задан\w*|содерж\w*'),
+        ('observed', r'(?:(?:the\s+)?source|источник\w*)', r'exist\w*|present|contain\w*|has|have|име\w*|присутств\w*|содерж\w*|есть'),
+    ]:
+        # The unit may be omitted only in a field-count continuation. It cannot
+        # consume a different explicit noun such as files/rows.
+        active_quantity = quantity + (r'?' if field_context else '')
+        patterns = [
+            rf'\b{quantity}\s+(?:(?:is|are|was|were)\s+)?(?P<neg_after>(?:not|не)\s+)?(?:{verb})\b\s+(?:in|by|в)\s+{object}\b',
+            rf'\b{object}\s+(?P<neg_after>(?:does\s+not|do\s+not|не)\s+)?(?:{verb})\b\s+{active_quantity}(?=\s*[.!?]*\s*$)',
+            rf'\b(?:in|в)\s+{object}\s+(?P<neg_after>(?:not|не)\s+)?(?:{verb})\b\s+{active_quantity}(?=\s*[.!?]*\s*$)',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, clause)
+            if match: return role, match
+    return None
+
+
 def refusal_explained(sentences, reason, spec):
     """All recognized current relevant facts must agree with the native reason.
 
@@ -882,25 +911,28 @@ def refusal_explained(sentences, reason, spec):
             unit = r'пол\w*|колон\w*|столб\w*|columns?|fields?|строк\w*|rows?|файл\w*|files?'
             markers = r'запрош\w*|ожида\w*|requested|required|expected|получ\w*|обнаруж\w*|наблюда\w*|observed|found'
             marker_rows = list(re.finditer(rf'\b(?P<marker>{markers})\b', clause))
+            relation = report_count_relation(clause, getattr(clause, 'count_context', False))
+            if relation: marker_rows = [relation[1]]
             elided = not marker_rows and getattr(clause, 'count_role', None)
             if elided: marker_rows = [re.match(r'(?P<marker>)', clause)]
             for marker in marker_rows:
                 tail = clause[marker.end():]
-                quantity = re.match(rf'\s*(?:(?:всего|только|only|total)\s+)?(?P<neg>не\s+|not\s+)?(?P<n>{number})\b(?P<alternative>\s*,\s*(?:а|but|and)?\s*(?:не|not)\s+(?P<other>{number})\b)?\s+(?:исходн\w*\s+|source\s+)?(?P<unit>{unit})\b', tail)
+                quantity = relation[1] if relation else re.match(rf'\s*(?:(?:всего|только|only|total)\s+)?(?P<neg>не\s+|not\s+)?(?P<n>{number})\b(?P<alternative>\s*,\s*(?:а|but|and)?\s*(?:не|not)\s+(?P<other>{number})\b)?\s+(?:исходн\w*\s+|source\s+)?(?P<unit>{unit})\b', tail)
                 if not quantity and elided:
                     quantity = re.match(rf'\s*(?P<neg>не\s+|not\s+)?(?P<n>{number})\b(?P<alternative>)(?P<other>)(?P<unit>)(?=\s*[.!?]*\s*$)', tail)
                 if not quantity: continue
-                if elided and not quantity['unit']:
+                if (elided or relation) and not quantity['unit']:
                     field_unit = True
                 else:
-                    field_unit = bool(re.match(r'пол|колон|столб|column|field', quantity['unit']))
+                    field_unit = bool(re.fullmatch(r'(?:исходн\w*\s+|source\s+)?(?:пол\w*|колон\w*|столб\w*|columns?|fields?)', quantity['unit']))
                 if not field_unit: continue
-                role = elided if elided else ('requested' if re.match(r'запрош|ожида|requested|required|expected', marker['marker']) else 'observed')
+                role = relation[0] if relation else (elided if elided else ('requested' if re.match(r'запрош|ожида|requested|required|expected', marker['marker']) else 'observed'))
                 raw = quantity['n'];n = int(raw) if raw.isdigit() else numbers[raw]
-                fact = ReportFact(clause, quantity if elided else marker, 'source.fields', 'excluded_total' if quantity['neg'] else 'total', role=role, value=(n != expected[role] if quantity['neg'] else n == expected[role]))
+                negative = bool(quantity['neg_before'] or quantity['neg_after']) if relation else bool(quantity['neg'])
+                fact = ReportFact(clause, quantity if elided else marker, 'source.fields', 'excluded_total' if negative else 'total', role=role, value=(n != expected[role] if negative else n == expected[role]))
                 fact.quantity, fact.unit = n, 'fields'
                 facts.append(fact)
-                if quantity['other']:
+                if not relation and quantity['other']:
                     raw = quantity['other'];n = int(raw) if raw.isdigit() else numbers[raw]
                     facts.append(ReportFact(clause, marker, 'source.fields', 'alternative_total', role=role, value=n != expected[role]))
     literal = r'\s+'.join(re.escape(part) for part in reason.split())
@@ -963,19 +995,20 @@ def warning_facts(clause):
             codes.append(match.group())
         # Prenominal code: "the CODE warning" binds the same warning object.
         previous = re.search(rf'\b({identifier})\s*$', left)
-        wrapped = bool(re.match(r'[\s:]*[\[(«"“]', right))
-        rest = re.sub(r'^[\s\[(:«»"“”]+', '', right)
-        label = re.match(r'(?:code|с\s+кодом|код(?:ом)?)\b[\s:=]*', rest)
-        if label:
-            rest = re.sub(r'^[\s\[(:«»"“”]+', '', rest[label.end():])
-        item = re.match(identifier, rest)
-        if item and (label or wrapped or concrete(item.group())):
+        rest = right
+        while True:
+            wrapped = bool(re.match(r'[\s:]*[\[(«"“]', rest))
+            rest = re.sub(r'^[\s\[(:«»"“”]+', '', rest)
+            label = re.match(r'(?:code|с\s+кодом|код(?:ом)?)\b[\s:=]*', rest)
+            if label:
+                rest = re.sub(r'^[\s\[(:«»"“”]+', '', rest[label.end():])
+            item = re.match(identifier, rest)
+            if not item or not (label or wrapped or concrete(item.group())): break
             codes.append(item.group())
             rest = rest[item.end():]
-            while True:
-                sibling = re.match(rf'[\s)\]»"”]*(?:,|and|и)\s*[\[«"“(]*({identifier})\b', rest)
-                if not sibling or not concrete(sibling[1]): break
-                codes.append(sibling[1]);rest = rest[sibling.end():]
+            sibling = re.match(r'[\s)\]»"”]*(?:,|\band\b|\bи\b)\s*', rest)
+            if not sibling: break
+            rest = rest[sibling.end():]
         # An explicit postnominal object resolves the code; a preceding uppercase
         # format/channel adjective is then a modifier, not a second identity.
         if not codes and previous and concrete(previous[1]): codes.append(previous[1])
