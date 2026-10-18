@@ -1,0 +1,125 @@
+{
+  "verified_utc": "2026-10-18T09:02:40.250971+00:00",
+  "issue": "LAB-61",
+  "original_blocked": {
+    "revision": 392,
+    "reject_count": 10,
+    "rework_limit": 9,
+    "review_cycle": 10,
+    "frozen_sha": "1088d04fe41f7765e3873d993b4b32a32eb5a369",
+    "original_stop_preserved": true
+  },
+  "authorized_limit": {
+    "old": 9,
+    "new": 10,
+    "actual_completed_reworks": 9,
+    "actual_fresh_REJECTs": 10,
+    "readback_revision": 394,
+    "state_and_consumption_equal_readback": true,
+    "scope_sha256": "077b594d578fa797198be56e9e4cfa66074b37d59c5ce11f6de548c88d644851",
+    "decision_sha256": "b41cba0dc8e1cbf556de931c265b550f756d4dcf09cb360db7462192bb8734fb",
+    "canonical_docs_and_blocked_state_before_effects": true,
+    "usage": [
+      15,
+      20,
+      1,
+      0
+    ],
+    "seven_budget_increases_preserved": true,
+    "counters_reset": false
+  },
+  "continuation": {
+    "real_event": {
+      "kind": "continue_after_evaler",
+      "id": "01a14e3c-6f3e-79c8-a608-92fc4f4d8053",
+      "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+      "report_id": "01a14e34-7255-70d8-8251-01fe6ce8b87b",
+      "sha": "1088d04fe41f7765e3873d993b4b32a32eb5a369",
+      "target": "Rich",
+      "stand_ready": true
+    },
+    "pending_tasks": [],
+    "result": "ready_to_dispatch",
+    "dispatch_separate": true,
+    "queued_Rich_task": "01a14e3c-6f64-733f-9adb-4a151a19e16c",
+    "final_revision": 399,
+    "final_state_equals_receipt_and_issue": true,
+    "only_postlimit_consumption_enrichment": "new budget entry actual decision_comment_id"
+  },
+  "native_exact_files": {
+    "reject-gate-input.json": {
+      "bytes": 2681,
+      "sha256": "2282d18b7cce9977b07493051ddc0ad1407758cb084f54a2a2f4b16bf41e948a"
+    },
+    "reject-gate-output.json": {
+      "bytes": 2400,
+      "sha256": "2bfbf211e221b3d0a6bd5384ea22301ff730a540297329276aada21ae156ea4e"
+    },
+    "outer-blocked.json": {
+      "bytes": 8732,
+      "sha256": "6a39460f83f1d5ca7b7e8e916f517c303cdb46cfd6efaa48629b7c56d195b779"
+    },
+    "issue-blocked-readback.json": {
+      "bytes": 189727,
+      "sha256": "c1d34af6a051a26e1eab42ee2fd45a8ad2d99a24ed3e4b7f2a324edccc7c1019"
+    },
+    "outer-limit-authorized.json": {
+      "bytes": 9018,
+      "sha256": "f41671de286a0ce4611652c3a2fa74f4a4851b8a432a413efd193ecd60d0a646"
+    },
+    "issue-limit-readback.json": {
+      "bytes": 189927,
+      "sha256": "236e98f5c1eb1e6f718fb11614a0e1a78a241e373b6277855b0c503617eebeef"
+    },
+    "continue-input.json": {
+      "bytes": 2658,
+      "sha256": "c9243712b60e25daa428727a74c364464e60410c2f72716b3ffc5049f7922738"
+    },
+    "continue-output.json": {
+      "bytes": 2006,
+      "sha256": "5b3c3f976d96855539401ba16167bedbc1909cc378b62a740549f8b08476056f"
+    },
+    "dispatch-input.json": {
+      "bytes": 2075,
+      "sha256": "86c0738a1d0dffe7d9786a1343ecc745e745ca9c8213154c41f99d29dc19eda5"
+    },
+    "dispatch-output.json": {
+      "bytes": 2258,
+      "sha256": "7620fecacbb723643f017ff9bf68f6878dbc599df9455e43e724150525ad19ef"
+    },
+    "receipt-input.json": {
+      "bytes": 2361,
+      "sha256": "351045f42225ae37c7caf74d99f1f80bfea5d7fbadf58544a95e5b0f6fa62696"
+    },
+    "receipt-output.json": {
+      "bytes": 2248,
+      "sha256": "c07f332a767beef80ddae96d1256156515f16fe64de6e51e164137cd9ec701fd"
+    },
+    "outer-final.json": {
+      "bytes": 9153,
+      "sha256": "647d1f28c0e7a20cbcba10b58e9f3d2168f5bf119b5532c300f6166abfd77a1d"
+    },
+    "issue-final-readback.json": {
+      "bytes": 191853,
+      "sha256": "425500236f70bf79eb7328278ccc6f0b88ee5c24f9e2267e7419e720cb288708"
+    },
+    "predispatch-common-change.json": {
+      "bytes": 292,
+      "sha256": "5e2218b03f23ba2370dd75fd8fb11cbb509860005aac6360b84ba5736f94e8b1"
+    },
+    "predispatch-docs-metadata-write.json": {
+      "bytes": 8371,
+      "sha256": "d59aa904619f96bc54c7599a1f0cf514a0290d49862e67dd609731c405aefd42"
+    }
+  },
+  "operator_effects": {
+    "state_written": false,
+    "comment_posted": false,
+    "continue_invoked": false,
+    "dispatch_invoked": false,
+    "new_model_lease_install_OS_effects": false,
+    "repeated_native_effects": false
+  },
+  "full_independent_Ben_ACCEPT": false,
+  "LAB62_LAB63_started": false
+}

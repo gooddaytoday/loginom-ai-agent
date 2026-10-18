@@ -1,0 +1,110 @@
+{
+  "verified_utc": "2026-10-18T08:56:13.233280+00:00",
+  "issue": "LAB-61",
+  "Ben_task": "01a14e22-6eff-74d5-9ea0-814396df9fdb",
+  "report_comment": "01a14e34-7255-70d8-8251-01fe6ce8b87b",
+  "verdict": "REJECT",
+  "source": {
+    "candidate/": "1088d04fe41f7765e3873d993b4b32a32eb5a369",
+    "initial-bae0/": "bae0d53817aa3c5340a050ed7861ee3ebd3f0f63",
+    "parent/": "9d49d54465fe1cf38bf24dfbcd84a1ceab975aa9"
+  },
+  "archive": {
+    "bytes": 14805046,
+    "sha256": "b73d48376ada440b306411a45b8dc8c6623babbec3bdd109d4559c3c75bfa878",
+    "manifest_sha256": "bc175a69b5e1958488b222744a9ea8e4d74cbe6240fb4f1381146826d1dcb426",
+    "payloads": 1400,
+    "members": 1401,
+    "payload_bytes": 230568089,
+    "safe_unique_exact_membership": true,
+    "all_payload_hashes_verified": true,
+    "all_official_bytes_preserved": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-ben-rereview-1088d04f-reject-delivery"
+  },
+  "REPORT": {
+    "bytes": 25426,
+    "sha256": "f11d885898d74413129f1dc5ecf99286ca915753ad4a0d16ee88218659f10091",
+    "equal_standalone": true
+  },
+  "admission": {
+    "sha256": "58f0358a4d8bb096558ed7fc68f939595f31f918e31be7703a95a0e0b4a21867",
+    "member": "admission/evaler-admission.json",
+    "equal_canonical": true
+  },
+  "Git_bytes_equal": {
+    "candidate": 144,
+    "initial_bae0": 144,
+    "base_parent": 144
+  },
+  "genuine_completion_and_ordinary_release": {
+    "eval-completion-3d003db7-5176-4d5a-9def-2243626bf401.json": {
+      "sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+      "exact_archive_paths": [
+        "lifecycle/prior-genuine-completion.json"
+      ]
+    },
+    "release.json": {
+      "sha256": "1d9e17e0b34ddff48791a493f49ebfd525b1d17a0e8b5a0b2a1d110d73671274",
+      "exact_archive_paths": [
+        "lifecycle/prior-ordinary-release.json"
+      ]
+    }
+  },
+  "three_groups": {
+    "confirmation_after_negative_governor": {
+      "transcript_false_PASS": 20,
+      "transcript_false_FAIL": 20,
+      "regressions": 40
+    },
+    "independent_TASK_source_count_role": {
+      "transcript_false_FAIL": 8,
+      "regressions": 8
+    },
+    "repeated_code_label_warning_list": {
+      "reader_false_PASS": 7,
+      "new_outcome_regression": 1
+    }
+  },
+  "new_controls": {
+    "transcript": {
+      "rows": 102,
+      "matches": 54,
+      "false_PASS": 20,
+      "false_FAIL": 28,
+      "regressions_vs_9d49": 48
+    },
+    "reader": {
+      "rows": 20,
+      "matches": 11,
+      "false_PASS": 9,
+      "regressions": 3,
+      "two_repeat_confirmation": true
+    },
+    "supplemental": {
+      "rows": 80,
+      "matches": 44,
+      "synthetic_four_native_copy_repetitions_not_genuine_or_independent_causes": true
+    }
+  },
+  "Ben_verification_claims": {
+    "RED": "335PASS7FAIL",
+    "GREEN": "342PASS0FAIL",
+    "full_suite": "956PASS15SKIP0FAIL/5752assertions",
+    "typecheck": 0,
+    "locative_base_initial_final": [
+      8,
+      12,
+      18
+    ],
+    "locative_rows": 18,
+    "initial_bae0_four_failed_tests_targeted_rerun_not_full_initial_suite": true,
+    "healthy_FREE_utc": "2026-10-18T08:48:38.916Z"
+  },
+  "limits": {
+    "root_source_executed": false,
+    "root_findings_reproduced": false,
+    "root_candidate_integrated": false,
+    "new_live_model_or_native_effects": false,
+    "four_measured_product_FAIL_unchanged": true,
+    "historical_raw_ERROR_FAIL_preserved": true
+  }
+}
