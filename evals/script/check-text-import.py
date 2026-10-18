@@ -484,6 +484,8 @@ _REPORT_NUMERALS = {
 }
 _REPORT_NUMBER = r'\d+|' + '|'.join(_REPORT_NUMERALS.values())
 _REPORT_UNKNOWN = r'\b(?:не\s+(?:исключен\w*|установлен\w*|доказан\w*|подтвержден\w*)|not\s+confirmed|no\s+evidence|without\s+evidence|unproven|unconfirmed)\b'
+_WARNING_PASSIVE = (r'\b(?:is|are|was|were|has|have|had|был\w*)\s+(?:(?:not|never|не|been)\s+)*'
+    r'(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b\s+(?:(?:by|from)\s+(?:the\s+)?(?:engine|loginom)\b|движ\w*\b)')
 
 
 def report_number_value(text):
@@ -517,6 +519,7 @@ def warning_receiver_spans(text, identifiers=(), surface=None):
     verb = r'(?:receiv\w*|получ\w*|вижу|наблюдаю)\b'
     receiver = rf'(?:(?:{subject})\s+(?:{auxiliary})*{verb}|(?:{auxiliary})+{verb})'
     markers, rows = list(re.finditer(topic, text)), []
+    emissions = warning_relative_spans(text)
     for index, marker in enumerate(markers):
         limit = markers[index+1].start() if index+1 < len(markers) else len(text)
         arguments = warning_arguments(text[marker.end():limit], identifiers, text[:marker.end()],
@@ -550,6 +553,12 @@ def warning_receiver_spans(text, identifiers=(), surface=None):
                     if boundary.group('cut') in ',;:.!?' or finite or next_argument:
                         end = left
                         break
+            # A nested emission and a resumed matrix passive are independent
+            # finite predicates, even without punctuation after reception.
+            end = min([end] + [row['relative_start'] for row in emissions
+                if row['object'] == marker.span() and row['relative_start'] > start])
+            resumed = re.search(_WARNING_PASSIVE, text[cursor + relative.end():end])
+            if resumed: end = cursor + relative.end() + resumed.start()
             rows.append({'span': (marker.start(), end), 'receiver': (start, end)})
     return rows
 
@@ -576,10 +585,16 @@ def warning_relative_spans(text):
         end = markers[index+1].start() if index+1 < len(markers) else len(text)
         argument = text[marker.end():end]
         relative = re.search(r'\b(?:that|which|котор\w*)\s+(?P<emission>' + engine + r'[^;.!?]*?\b(?:' + verb + r')\b)', argument)
-        relative = relative or re.search(r'\b(?:that|which|котор\w*)\s+(?P<emission>(?:\w+\s+){0,8}?(?:' + verb + r')\b\s+(?:(?:by|from)\s+' + engine + r'|движ\w*\b))', argument)
+        relative = relative or re.search(r'\b(?:that|which|котор\w*)\s+(?P<emission>(?:(?!(?:receiv\w*|получ\w*|вижу|наблюдаю)\b)\w+\s+){0,8}?(?:' + verb + r')\b\s+(?:(?:by|from)\s+' + engine + r'|движ\w*\b))', argument)
         if relative:
+            core_end = marker.end() + relative.end()
+            tail = text[core_end:end]
+            resumed = re.search(_WARNING_PASSIVE, tail)
+            context_end = min([end] + ([core_end + resumed.start()] if resumed else [])
+                + ([core_end + tail.index(')')] if ')' in tail else []))
             rows.append({'object': marker.span(), 'span': (marker.start(), marker.end() + relative.end()),
                 'relative_start': marker.end() + relative.start(),
+                'context_end': context_end,
                 'emission': tuple(marker.end() + offset for offset in relative.span('emission'))})
     return rows
 
@@ -1306,10 +1321,10 @@ def warning_facts(clause):
         # Prenominal code: "the CODE warning" binds the same warning object.
         previous = re.search(rf'\b({identifier})\s*$', left)
         arguments, offset = arguments_by_marker[index]
+        context = ReportClause(''.join(' ' if any(left <= index < right for left, right in argument_spans) else char
+            for index, char in enumerate(clause)), clause.scope, clause.start, lexical_ids)
         if arguments:
             start, end = offset + arguments[0]['start'], offset + arguments[-1]['end']
-            context = ReportClause(''.join(' ' if any(left <= index < right for left, right in argument_spans) else char
-                for index, char in enumerate(clause)), clause.scope, clause.start, lexical_ids)
             owned = report_owned_context(context, match.start(), end)
             if owned.context_valid: context = owned
             polarity = fact.polarity if relative else warning_predicate_polarity(context, match.start(), match.end())
@@ -1318,11 +1333,28 @@ def warning_facts(clause):
                 own_fact.clause = original
                 own_fact.polarity = 0 if not polarity else (-1 if argument['negative'] else polarity)
                 yield own_fact
-            continue
-        # An explicit postnominal object resolves the code; a preceding uppercase
-        # format/channel adjective is then a modifier, not a second identity.
-        fact.value = [previous[1]] if previous and concrete(previous[1]) else []
-        yield fact
+        else:
+            # An explicit postnominal object resolves the code; a preceding
+            # uppercase format/channel adjective is not a second identity.
+            fact.value = [previous[1]] if previous and concrete(previous[1]) else []
+            yield fact
+        if relative:
+            # A child emission does not replace a governing engine fact.
+            # Both supported argument positions bind the same parent object.
+            begin, finish = relative['relative_start'], relative['context_end']
+            parent = ReportClause(context[:begin] + ' ' * (finish-begin) + context[finish:],
+                context.scope, context.start, lexical_ids)
+            parent_head = report_predicate_head(parent)
+            parent_native = (parent_head and re.fullmatch(engine, parent_head['subject'] or '')
+                and re.fullmatch(r'issu\w*|emit\w*|rais\w*|warn(?:s|ed)?|выда\w*|выдал\w*|предупред\w*', parent_head['predicate']))
+            if parent_native or re.search(_WARNING_PASSIVE, parent):
+                parent_polarity = warning_predicate_polarity(parent, match.start(), match.end())
+                values = [([argument['code']], argument['negative']) for argument in arguments] if arguments else [(fact.value, False)]
+                for value, negative in values:
+                    parent_fact = ReportFact(parent, match, 'warning', 'emitted', role='engine', value=value)
+                    parent_fact.clause = original
+                    parent_fact.polarity = 0 if not parent_polarity else (-1 if negative else parent_polarity)
+                    yield parent_fact
 
 
 def report_truth(text, result, events, refusal=False, spec=None):
