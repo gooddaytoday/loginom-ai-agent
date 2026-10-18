@@ -10,10 +10,10 @@ import { finalizeTextImportCase } from "../src/text-import-finalize"
 import importCases from "../src/text-import-cases.json"
 import cliPins from "../script/text-import-cold/cli-pins.json"
 
-async function rejectionFixture() {
+async function rejectionFixture(id = "txt-ambiguous-headers") {
   const root = await mkdtemp(path.join(os.tmpdir(), "text-import-refusal-"))
-  const task = path.join(root, "txt-ambiguous-headers"), attempt = path.join(root, "attempt")
-  await cp(path.join(evalsRoot, "drafts/text-import/txt-ambiguous-headers"), task, { recursive: true })
+  const task = path.join(root, id), attempt = path.join(root, "attempt")
+  await cp(path.join(evalsRoot, "drafts/text-import", id), task, { recursive: true })
   const spec = await Bun.file(path.join(task, "SPEC.json")).json()
   const file = spec.inputs[0], destination = "/eval/ambiguous_headers.txt"
   const workspace = { status: "READY", ownership_verified: true, loginom_account: "eval",
@@ -965,3 +965,158 @@ test("every ordinary positive import draft accepts exact typed evidence and reje
     } finally { await rm(f.root, { recursive: true, force: true }) }
   }
 }, 30000)
+
+
+// Fourth review: compose independently scoped propositions through the public checker.
+for (const id of ["txt-unclosed-quote", "csv-unclosed-quote", "txt-wrong-encoding", "csv-wrong-encoding"]) {
+  test(`${id} composes observation, cause, negation and attribution`, async () => {
+    const f = await damagedFixture(id)
+    try {
+      const facts = ["данные повреждены", "в таблице обнаружена неполнота"]
+      const causes = ["Возможно, причина в настройках", "Я не утверждаю, что причина в кодировке", "Причина повреждения не установлена"]
+      for (const fact of facts) {
+        for (const cause of causes) for (const report of [
+          `${cause}, но ${fact}.`, `${fact}, но ${cause.toLowerCase()}.`,
+          `${cause}; ${fact}.`, `${fact}; ${cause.toLowerCase()}.`,
+        ]) {
+          await f.write(report)
+          expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+        }
+        for (const report of [
+          `Утверждение «${fact}» неверно.`, `Утверждение «${fact}» не доказано.`,
+          `${fact}, возможно.`, `Возможно, ${fact}.`, `«${fact}» — это только гипотеза.`,
+          `Пример отчёта: «${fact}».`, `Предположение оператора: «${fact}».`,
+        ]) {
+          await f.write(report)
+          expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+        }
+      }
+      for (const [report, accepted] of [
+        ["That data is corrupted remains unproven. The result is unknown.", false],
+        ["The data is corrupted, perhaps.", false],
+        ["The cause might be the encoding, but the data is corrupted.", true],
+        ["I cannot confirm the cause; the imported data is corrupted.", true],
+        ["The data is corrupted, possibly because of the encoding.", true],
+        ["Data is corrupted. No data corruption occurred.", false],
+      ] as const) {
+        await f.write(report)
+        const result = await validateNodeAttempt(f.task, f.attempt)
+        expect(result.errors).toEqual([])
+        expect(result.failures.length === 0).toBe(accepted)
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+
+  test(`${id} treats warning existence and absence symmetrically`, async () => {
+    const f = await damagedFixture(id)
+    try {
+      const affirmative = [
+        "The engine emitted a warning.", "При чтении возникло предупреждение об ошибке.",
+        "Движок предупредил о повреждении входа.", "The engine raised a warning.",
+        "Появилось нативное предупреждение.", "A native warning was observed.",
+        "The engine warned of damaged input.",
+      ]
+      const negative = [
+        "Движок не выдал ни одного предупреждения.", "Не зафиксировано предупреждений.",
+        "The engine never issued a warning.", "Никакого предупреждения движок не выдал.",
+        "No warning was emitted by the engine.", "There were zero native warnings.",
+        "Движок ни разу не предупреждал.",
+        "The engine did not warn about anything.", "Engine warnings are absent.",
+      ]
+      for (const report of affirmative) {
+        await f.write("Data is corrupted. " + report)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("warning")
+      }
+      for (const report of [...negative, "Предположение оператора: «движок выдал warning».", "В TASK написано: «Не выдумывай native warning»."]) {
+        await f.write("Data is corrupted. " + report)
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      }
+      Object.assign(f.events[4]!.receipt!.value, { warnings: [{ code: "W_OBSERVED", message: "Source warning" }] })
+      for (const report of ["Native warning не обязателен для диагноза.", "A native warning is not required."]) {
+        await f.write("Data is corrupted. " + report)
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      }
+      for (const report of affirmative) {
+        await f.write("Data is corrupted. " + report)
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      }
+      for (const report of negative) {
+        await f.write("Data is corrupted. " + report)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.join(" ")).toContain("warning")
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+}
+
+async function reportedRefusalFixture(id: string) {
+  if (id.endsWith("ambiguous-headers")) return rejectionFixture(id)
+  const f = await positiveFixture(id)
+  const initial = id === "initial-incomplete-settings", missing = id === "missing-source-column"
+  if (initial) delete f.apply.input.parameters.settings.columns
+  const message = initial
+    ? "New import draft has incomplete initial settings. Supply source and format. settings.columns is absent; no settings were changed."
+    : missing ? 'Requested source field is missing or ambiguous: "OtherName"'
+      : "Import definition count differs: requested 2, observed 1"
+  Object.assign(f.output, { status: "FAILED", configuration: {}, execution: { status: "not_requested", execution_id: null },
+    error: { code: "NODE_APPLY_STOPPED", message } })
+  f.calls.splice(3)
+  f.events.splice(1)
+  f.events.push(JSON.parse(JSON.stringify({ operation_id: "import", phase: "node_phase_refused", receipt: {
+    phase: "configure", status: "FAILED", verification: initial ? "text_import_initial_settings_draft_discarded" : "text_import_binding_draft_discarded",
+    cleanup_complete: true, settings_unchanged: true, proof: { closed: { verified: true, cleanup_complete: true,
+      draft_discarded: true, settings_applied: false, execution_started: false,
+      node_context: { ...f.output.node, verified: true, surface: "graph", locked: false } } } } })))
+  await rm(path.join(f.attempt, "artifact"), { recursive: true })
+  async function write(report = "Отказ: " + message) {
+    await f.write()
+    const file = path.join(f.attempt, "events.jsonl")
+    const lines = (await Bun.file(file).text()).split("\n").filter(line => line && JSON.parse(line).type !== "text")
+    await Bun.write(file, lines.join("\n") + "\n" + JSON.stringify({ type: "text", part: { text: report } }) + "\n")
+  }
+  return { ...f, write }
+}
+
+for (const [id, grounded, paraphrase, denial] of [
+  ["txt-ambiguous-headers", "Отказ: имена исходных полей повторяются.", "В источнике два столбца с одним именем Name, поэтому привязка неоднозначна.", "Причина отказа — не повторяющиеся имена полей, а недоступность сервера."],
+  ["csv-ambiguous-headers", "Отказ: имена исходных полей повторяются.", "Both source columns are named Name, so the requested binding is ambiguous.", "Причина отказа — не повторяющиеся имена полей, а недоступность сервера."],
+  ["txt-wrong-delimiter", "Отказ: число полей — 1 вместо 2.", "Ожидались Id и Name, но из заголовка Id|Name получилось единственное поле: выбранная запятая его не разделяет.", "Отказ не связан с тем, что число полей 1 вместо 2; причина — недоступный сервер."],
+  ["csv-wrong-delimiter", "Отказ: число полей — 1 вместо 2.", "Запрошены два поля Id и Name; после разбора заголовка Id|Name есть только одно, поэтому настройка отклонена.", "Отказ не связан с тем, что число полей 1 вместо 2; причина — недоступный сервер."],
+  ["initial-incomplete-settings", "Отказ: columns не переданы.", "Отказ: определения колонок не заданы в первоначальном запросе; черновик закрыт без применения настроек.", "Причина отказа — не отсутствие columns, а недоступность сервера."],
+  ["missing-source-column", "Отказ: OtherName отсутствует среди полей источника.", "Отказ: среди исходных заголовков нет OtherName; имеются только Name и Name_1.", "Причина отказа — не отсутствие OtherName, а недоступность сервера."],
+] as const) {
+  test(`${id} reports refusal facts without a required phrase and rejects contradictions`, async () => {
+    const f = await reportedRefusalFixture(id)
+    try {
+      await f.write()
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      for (const report of [grounded, paraphrase]) {
+        await f.write(report)
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+        await f.write(report + " Данные доставлены корректно. Данные доставлены успешно. Оригинальные байты переданы успешно.")
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+        for (const noSuccess of ["Import success was not achieved.", "Импорт не был успешным.", "The import did not succeed."]) {
+          await f.write(report + " " + noSuccess)
+          expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+        }
+        for (const success of ["Импорт был успешным.", "Импорт прошёл успешно.", "The import succeeded.", "All data was read correctly."]) {
+          await f.write(report + " " + success)
+          expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+        }
+      }
+      for (const report of [denial, "Пример сообщения: «" + grounded + "».", "Нельзя утверждать, что " + grounded]) {
+        await f.write(report)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      }
+      if (id.endsWith("ambiguous-headers")) {
+        for (const report of ["Исходные заголовки совпадают.", "Оба столбца имеют заголовок Name."]) {
+          await f.write(report)
+          expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+        }
+        for (const report of ["Один столбец named Name, другой OtherName; причина отказа — сеть.", "Имена одинаковыми не были."]) {
+          await f.write(report)
+          expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+        }
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+}
