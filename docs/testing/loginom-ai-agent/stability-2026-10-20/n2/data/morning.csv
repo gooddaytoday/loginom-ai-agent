@@ -1,0 +1,7 @@
+DeliveryID,Courier,Status,Distance,Rate
+M01,CA,delivered,10,0.50
+M02,CB,delivered,6,0.75
+M03,CC,delivered,5,1.00
+M04,CA,cancelled,100,0.50
+M05,CD,delivered,2,2.00
+M06,CB,pending,80,0.75

@@ -1,0 +1,122 @@
+{
+  "package_path": "/stability-2026-10-20/n3.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.replace_columns"
+    },
+    {
+      "type": "transform.calculator"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Carrier",
+          "label": "Carrier",
+          "type": "string"
+        },
+        {
+          "name": "Zone",
+          "label": "Zone",
+          "type": "string"
+        },
+        {
+          "name": "MaxKg",
+          "label": "MaxKg",
+          "type": "real"
+        },
+        {
+          "name": "Base",
+          "label": "Base",
+          "type": "real"
+        },
+        {
+          "name": "PerKg",
+          "label": "PerKg",
+          "type": "real"
+        },
+        {
+          "name": "Quote",
+          "label": "Quote",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Carrier": "T05",
+          "Zone": "Central",
+          "MaxKg": 4.0,
+          "Base": 5.0,
+          "PerKg": 1.25,
+          "Quote": 7.5
+        },
+        {
+          "Carrier": "T06",
+          "Zone": "Central",
+          "MaxKg": 6.0,
+          "Base": 9.0,
+          "PerKg": 0.5,
+          "Quote": 10.0
+        },
+        {
+          "Carrier": "T08",
+          "Zone": "South",
+          "MaxKg": 2.0,
+          "Base": 4.0,
+          "PerKg": 3.0,
+          "Quote": 10.0
+        },
+        {
+          "Carrier": "T03",
+          "Zone": "South",
+          "MaxKg": 10.0,
+          "Base": 6.0,
+          "PerKg": 2.5,
+          "Quote": 11.0
+        },
+        {
+          "Carrier": "T04",
+          "Zone": "South",
+          "MaxKg": 3.0,
+          "Base": 7.0,
+          "PerKg": 2.0,
+          "Quote": 11.0
+        },
+        {
+          "Carrier": "T02",
+          "Zone": "North",
+          "MaxKg": 2.5,
+          "Base": 8.0,
+          "PerKg": 2.0,
+          "Quote": 12.0
+        },
+        {
+          "Carrier": "T01",
+          "Zone": "North",
+          "MaxKg": 5.0,
+          "Base": 10.0,
+          "PerKg": 1.5,
+          "Quote": 13.0
+        },
+        {
+          "Carrier": "T07",
+          "Zone": "North",
+          "MaxKg": 8.0,
+          "Base": 12.0,
+          "PerKg": 0.75,
+          "Quote": 13.5
+        }
+      ]
+    }
+  ]
+}

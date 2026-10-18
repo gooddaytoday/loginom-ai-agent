@@ -1,0 +1,63 @@
+{
+  "package_path": "/stability-2026-10-20/n5.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.filter_data"
+    },
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Team",
+          "label": "Team",
+          "type": "string"
+        },
+        {
+          "name": "Incidents",
+          "label": "Incidents",
+          "type": "integer"
+        },
+        {
+          "name": "Downtime",
+          "label": "Downtime",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Team": "Team-C",
+          "Incidents": 1,
+          "Downtime": 120
+        },
+        {
+          "Team": "Team-A",
+          "Incidents": 2,
+          "Downtime": 90
+        },
+        {
+          "Team": "Team-B",
+          "Incidents": 2,
+          "Downtime": 90
+        },
+        {
+          "Team": "Team-D",
+          "Incidents": 1,
+          "Downtime": 30
+        }
+      ]
+    }
+  ]
+}
