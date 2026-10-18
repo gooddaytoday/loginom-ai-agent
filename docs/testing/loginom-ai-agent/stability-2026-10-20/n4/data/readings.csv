@@ -1,0 +1,11 @@
+MeterID,Site,Plan,Units
+M01,Plant-A,E1,20
+M02,Plant-A,G1,3
+M03,Plant-A,W1,8
+M04,Plant-B,E2,12
+M05,Plant-B,G2,4
+M06,Plant-B,W2,6
+M07,Plant-C,E1,10
+M08,Plant-C,G2,2
+M09,Plant-C,W1,4
+M10,Plant-A,E2,4

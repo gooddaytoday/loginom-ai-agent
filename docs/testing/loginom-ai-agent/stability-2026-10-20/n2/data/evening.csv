@@ -1,0 +1,7 @@
+DeliveryID,Courier,Status,Distance,Rate
+E01,CA,delivered,8,0.50
+E02,CB,delivered,4,0.75
+E03,CC,delivered,3,1.00
+E04,CD,delivered,1,2.00
+E05,CA,delivered,2,0.50
+E06,CC,cancelled,90,1.00

@@ -1,0 +1,1 @@
+Сверь orders.csv и payments.csv по OrderID. Для каждого заказа долг Debt равен OrderAmount минус PaidAmount; если платёж отсутствует, PaidAmount равен нулю. В debts.csv покажи только Debt > 0 с колонками OrderID, Customer, OrderAmount, PaidAmount, Debt в таком порядке и с исходной очерёдностью заказов. Сценарий сохрани.

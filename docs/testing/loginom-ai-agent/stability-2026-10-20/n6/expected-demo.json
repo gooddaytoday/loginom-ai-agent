@@ -1,0 +1,61 @@
+{
+  "package_path": "/stability-2026-10-20/n6.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.replace_columns"
+    },
+    {
+      "type": "transform.filter_data"
+    },
+    {
+      "type": "transform.cross_table"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Business",
+          "label": "Business",
+          "type": "real"
+        },
+        {
+          "name": "Engineering",
+          "label": "Engineering",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "East",
+          "Business": 24.0,
+          "Engineering": 33.0
+        },
+        {
+          "Region": "North",
+          "Business": 24.5,
+          "Engineering": 19.5
+        },
+        {
+          "Region": "West",
+          "Business": 26.0,
+          "Engineering": 21.0
+        }
+      ]
+    }
+  ]
+}

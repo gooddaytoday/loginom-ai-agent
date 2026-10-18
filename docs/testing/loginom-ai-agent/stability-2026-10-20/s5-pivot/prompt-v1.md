@@ -1,0 +1,1 @@
+Нужен pivot.csv с колонками Region, Office, Warehouse, Tech в таком порядке. Возьми sales.csv: каждая строка отчёта — регион, Office — сумма Amount для Офиса, Warehouse — для Склада, Tech — для Техники. Сохрани сценарий.
