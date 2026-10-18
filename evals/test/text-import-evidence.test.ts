@@ -10,6 +10,143 @@ import { finalizeTextImportCase } from "../src/text-import-finalize"
 import importCases from "../src/text-import-cases.json"
 import cliPins from "../script/text-import-cold/cli-pins.json"
 
+for (const id of ["txt-wrong-delimiter", "csv-wrong-delimiter"]) {
+  test(`${id} eleventh enumerates every finite count predicate and inherited role`, async () => {
+    const f = await reportedRefusalFixture(id)
+    try {
+      for (const [task, source, wrongTask, wrongSource] of [
+        ["Two fields are specified in TASK", "one field exists in source", "one field is specified in TASK", "three fields exist in source"],
+        ["В задании указаны два поля", "в источнике имеется одно поле", "в задании указаны три поля", "в источнике имеются два поля"],
+      ] as const) {
+        for (const join of [" and ", ", and ", "; ", ", but ", " и "]) {
+          for (const [left, right] of [[task, source], [source, task]] as const) {
+            await f.write(`${left}${join}${right}.`)
+            expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+          }
+          for (const [left, right] of [[task, wrongSource], [wrongSource, task], [source, wrongSource], [task, wrongTask]] as const) {
+            await f.write(`Requested two fields. Observed one field. ${left}${join}${right}.`)
+            expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+          }
+        }
+      }
+      for (const report of [
+        "TASK specifies two fields and source contains one field.",
+        "Requested two fields and TASK specifies two fields and source contains one field.",
+        "Two fields are specified in TASK and one exists in source.",
+        "TASK specifies two fields and specifies not three fields. Observed one field.",
+        "Requested two fields. Source contains one field and contains not three fields.",
+        "Requested two fields. Observed one field and not three fields.",
+      ]) {
+        await f.write(report)
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      }
+      for (const report of [
+        "Requested two fields. Source contains one field and contains three fields.",
+        "TASK specifies two fields and specifies one field. Observed one field.",
+        "Requested two fields. Observed one field and not one field.",
+        "Requested two fields. Two fields are specified in TASK and three exist in source and observed one field.",
+        "Two files are specified in TASK and one row exists in source.",
+        "Source contains not three fields and TASK specifies not three fields.",
+      ]) {
+        await f.write(report)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }, 30000)
+}
+
+for (const code of ["CODE", "КОД", "code", "КОДОМ"]) {
+  test(`eleventh retains literal warning identity ${code} at label collisions`, async () => {
+    const f = await damagedFixture("txt-wrong-encoding")
+    try {
+      const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+      for (const form of [`[${code}]`, `(${code})`, `«${code}»`, `(code [${code}])`, `code [${code}]`, `с кодом [${code}]`]) {
+        for (const [warnings, present] of [[[{ code, message: "actual" }], true], [[{ code: "W_REAL", message: `mentions ${code}` }], false], [[], false]] as const) {
+          Object.assign(receipt.value!, { warnings })
+          for (const negative of [false, true]) {
+            await f.write(`Data is corrupted. The engine ${negative ? "did not issue" : "issued"} warning ${form}.`)
+            const result = await validateNodeAttempt(f.task, f.attempt)
+            expect(result.errors).toEqual([])
+            expect(result.failures.length === 0).toBe(negative ? !present : present)
+          }
+        }
+      }
+      Object.assign(receipt.value!, { warnings: [{ code }, { code: "W_REAL" }] })
+      await f.write(`Data is corrupted. The engine issued warnings [code W_REAL] and [${code}].`)
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }, 30000)
+}
+
+for (const [real, other] of [["W_REAL", "W_OTHER"], ["Δ_REAL", "КОД_OTHER"]] as const) {
+  test(`eleventh warning arguments retain independent signs for ${real}`, async () => {
+    const f = await damagedFixture("csv-unclosed-quote")
+    try {
+      const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+      for (const join of [", ", " and ", " и ", " and\n"]) {
+        for (const [open, close] of [["", ""], ["[code ", "]"], ["(код ", ")"]] as const) {
+          const a = `${open}${real}${close}`, b = `${open}${other}${close}`
+          for (const both of [false, true]) {
+            Object.assign(receipt.value!, { warnings: both ? [{ code: real }, { code: other }] : [{ code: real }] })
+            for (const report of [`The engine issued warnings ${a}${join}not ${b}.`, `The engine issued warnings not ${b}${join}${a}.`]) {
+              await f.write("Data is corrupted. " + report)
+              const result = await validateNodeAttempt(f.task, f.attempt)
+              expect(result.errors).toEqual([])
+              expect(result.failures.length === 0).toBe(!both)
+            }
+          }
+        }
+      }
+      Object.assign(receipt.value!, { warnings: [{ code: real }] })
+      for (const report of [
+        `The engine issued warnings ${real}, not ${other}, not W_THIRD.`,
+        `The engine did not issue warnings ${other} and W_THIRD.`,
+        `The engine did not issue warnings ${other} and not W_THIRD.`,
+        `The engine issued warning ${real}, but did not issue warning ${other}.`,
+        `I do not claim that the engine issued warnings ${other} and not ${real}.`,
+      ]) {
+        await f.write("Data is corrupted. " + report)
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      }
+      for (const report of [
+        `The engine issued warnings ${real}, not ${real}.`,
+        `The engine did not issue warnings ${other} and ${real}.`,
+        `The engine issued warnings not ${other} and W_THIRD.`,
+      ]) {
+        await f.write("Data is corrupted. " + report)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }, 30000)
+}
+
+test("eleventh count siblings keep enclosing scope without hiding actual constraints", async () => {
+  const f = await reportedRefusalFixture("csv-wrong-delimiter")
+  try {
+    for (const scope of ["I do not claim that", "Example:", "Previously"]) {
+      await f.write(`Requested two fields. Observed one field. ${scope} three fields are specified in TASK and three fields exist in source.`)
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      await f.write(`${scope} two fields are specified in TASK and one field exists in source.`)
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+    }
+    await f.write("Requested two fields. Observed one field. Example: «three fields exist in source and one field is specified in TASK».")
+    expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+test("eleventh complete counts and labelled negative warning arguments compose", async () => {
+  const f = await reportedRefusalFixture("txt-wrong-delimiter")
+  try {
+    const diagnosis = "Two fields are specified in TASK and one field exists in source."
+    await f.write(`${diagnosis} The engine did not issue warnings [CODE] and [код КОД].`)
+    expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    await f.write(`${diagnosis} The engine issued warning [CODE], not [код КОД].`)
+    expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+    await f.write(`Requested two fields. Observed one field. Two fields are specified in TASK and three fields exist in source. The engine did not issue warnings [CODE] and [КОД].`)
+    expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
 async function rejectionFixture(id = "txt-ambiguous-headers") {
   const root = await mkdtemp(path.join(os.tmpdir(), "text-import-refusal-"))
   const task = path.join(root, id), attempt = path.join(root, "attempt")
