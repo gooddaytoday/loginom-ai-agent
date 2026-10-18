@@ -1,0 +1,104 @@
+{
+  "checked_utc": "2026-10-18T05:27:09.684367+00:00",
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "report_id": "01a14d78-13e0-7317-a7cc-d626659071f4",
+  "Ben_task": "01a14d66-2708-7dac-9709-38808249ed99",
+  "source": "1113633ef082a9f80f10f76afbd2ab18db67dc1d",
+  "parent": "86070b607d09595a07a6fde250965096ef2fb795",
+  "checker_sha256": "aa922478173edd93f3ebb43cd451953b217cf4bd4c6f6ae0ed47f8a41e1e6fb5",
+  "formal_Ben_verdict": "REJECT",
+  "canonical_Evaler_processing_task": "01a14d78-1419-7a9b-8381-d5356a5b179c",
+  "Evaler_independent_decision_received": false,
+  "archive_bytes": 13977421,
+  "archive_sha256": "166930b87b4b2f515486b1df7e8d366b01b1e5a306b59e5fdfec37780891e416",
+  "manifest_sha256": "8536244aedaf1ccb6bb2041c3d33f5c92e2cbd471241cbb511a9eb936e8b7c22",
+  "parts": [
+    {
+      "name": "lab61-ben-rereview-1113633e.zip.part-001",
+      "bytes": 4194304,
+      "sha256": "c044e9b13edd8295ed1b4fbdefe0f83c85527b308fbeb02ff6b9ef61d8ba2de2"
+    },
+    {
+      "name": "lab61-ben-rereview-1113633e.zip.part-002",
+      "bytes": 4194304,
+      "sha256": "93185655d9e1e1dbfe73a0e6c65c940e2bd5bda11168d7d27e1c7ab9d508e6b0"
+    },
+    {
+      "name": "lab61-ben-rereview-1113633e.zip.part-003",
+      "bytes": 4194304,
+      "sha256": "7d9f7075db8b4d27aecf1c106f474d451e1e53459206bc7d8b6821970f109de3"
+    },
+    {
+      "name": "lab61-ben-rereview-1113633e.zip.part-004",
+      "bytes": 1394509,
+      "sha256": "04f07e64b0d33b9f63c06eba7c8001bf5e13106b49a66ef657fe5c36165c747e"
+    }
+  ],
+  "payloads_verified": 848,
+  "archive_members": 849,
+  "payload_bytes": 218279628,
+  "safe_unique_exact_membership": true,
+  "REPORT_standalone_equal": true,
+  "REPORT_bytes": 25586,
+  "REPORT_sha256": "b852e95d9e5e08a78bbde45aaf9d8d1d9da06cc7df50ea2cc545fb9b82550103",
+  "candidate_parent_Git_files_verified": {
+    "candidate/": 144,
+    "parent/": 144
+  },
+  "admission_exact_equal": true,
+  "historical_lifecycle": [
+    {
+      "original_path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/c5ce46d3-8f4a-4abe-8d72-53c2adb3f12b/eval-completion-3d003db7-5176-4d5a-9def-2243626bf401.json",
+      "delivered_path": "lifecycle/prior-genuine-completion.json",
+      "sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+      "byte_equal": true
+    },
+    {
+      "original_path": "/home/user/.local/share/loginom-evals-runtime/operations/completed/c5ce46d3-8f4a-4abe-8d72-53c2adb3f12b/release.json",
+      "delivered_path": "lifecycle/prior-ordinary-release.json",
+      "sha256": "1d9e17e0b34ddff48791a493f49ebfd525b1d17a0e8b5a0b2a1d110d73671274",
+      "byte_equal": true
+    }
+  ],
+  "historical_ordinary_release": "2026-10-17T23:13:39.197Z",
+  "Ben_own_fresh_readonly_healthy_FREE_reported": "2026-10-18T05:23:09.490Z",
+  "new_lifecycle": false,
+  "findings_reproduced_by_root": false,
+  "source_executed_by_root": false,
+  "source_integrated": false,
+  "Ben_reported_controls": {
+    "transcript": {
+      "rows": 174,
+      "matches": 116,
+      "false_PASS": 28,
+      "false_FAIL": 30,
+      "parent_matches": 96,
+      "parent_regressions": 22
+    },
+    "reader": {
+      "rows": 20,
+      "matches": 9,
+      "false_PASS": 7,
+      "false_FAIL": 4,
+      "parent_regressions": 6
+    },
+    "full_warning_supplemental": {
+      "rows": 80,
+      "matches": 36,
+      "mismatches": 44,
+      "not_new_genuine_histories": true
+    }
+  },
+  "raw_preserved": {
+    "Rich": "3PASS7FAIL",
+    "Ben": "2PASS8FAIL",
+    "wrapper": "ERROR0attempts"
+  },
+  "derived30_not_new_measurements": {
+    "reference": "10PASS",
+    "Rich": "8PASS2FAIL",
+    "Ben": "8PASS2FAIL"
+  },
+  "actual_usage_unchanged": "reference15/Rich10/Ben10/recoveryRich1Ben0/probes0/rework_limit6 before currentreport reducer",
+  "Ben_database_queries_claim": "Ben reports requery30closed DB/WAL/SHM copies for Luna/high; not root or new Evaler query claim"
+}
