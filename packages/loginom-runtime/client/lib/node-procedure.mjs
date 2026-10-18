@@ -1,3 +1,4 @@
+import {makeLinRegressionContextCode} from './linregression-context.mjs';
 import {makeClusteringContextCode} from './clustering-context.mjs';
 import {makeJavascriptOutputPreviewCode} from './javascript-output-preview.mjs';
 import {makeCrossTableContextCode} from './crosstable-context.mjs';
@@ -272,7 +273,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readLinRegression = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -286,7 +287,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
       if(tableDialog)makeNodeTableContextCode(preparedNodeContext,tableDialog.table,{row_offset:0,row_limit:0,column_offset:0,column_limit:1});
-      if ((readProcesses || readProcessControls || readOutputs || readMappings || readCalculator || readJavascript || readGrouping || readCrossTable || readDateTime || readCollapse || readMissingValues || readSorting || readReplacement || readDuplicates || readReform || readFilter || readJoin || readUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
+      if ((readLinRegression || readProcesses || readProcessControls || readOutputs || readMappings || readCalculator || readJavascript || readGrouping || readCrossTable || readDateTime || readCollapse || readMissingValues || readSorting || readReplacement || readDuplicates || readReform || readFilter || readJoin || readUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
       if(mappingEditor!==undefined){
         if(!readMappings||!preparedNodeContext)throw Error('Owned input editor requires a prepared full mapping read');
         makeNodeMappingContextCode(preparedNodeContext,mappingEditor);
@@ -455,6 +456,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const native=result.output.node_crosstable;
           if(native.node_context&&JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
             throw Error('CrossTable native owner changed during observation');
+        }
+        if(readLinRegression){
+          result.output.node_linregression=await execute(makeLinRegressionContextCode(preparedNodeContext),{timeout:readTimeout()});
+          if(result.output.node_linregression.node_context&&JSON.stringify(canonical(result.output.node_linregression.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Linear regression native owner changed during observation');
         }
         if(readClustering){
           result.output.node_clustering=await execute(makeClusteringContextCode(preparedNodeContext),{timeout:readTimeout()});
@@ -658,6 +663,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           readNavigation:initialObservation?.node_navigation_read===true,
           readMappings:initialObservation?.node_mapping!==undefined,
           mappingEditor:initialObservation?.node_mapping_editor,
+          readLinRegression:initialObservation?.node_linregression!==undefined,
           readClustering:initialObservation?.node_clustering!==undefined,
           readTraining:initialObservation?.node_training_read===true,
           readCalculator:initialObservation?.node_calculator!==undefined,
