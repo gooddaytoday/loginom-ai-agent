@@ -812,10 +812,21 @@ def report_sentences(text, atoms=(), identifiers=None):
     # predicates together; warning_facts resolves their independent polarity.
     quoted += ''.join('|' + re.escape(text[row['span'][0]:row['span'][1]]) for row in warning_relative_spans(text))
     quoted += ''.join('|' + re.escape(text[row['span'][0]:row['span'][1]]) for row in warning_receiver_spans(text, identifiers, surface))
+    def literal_quote(value):
+        return any(value[1:-1].strip() == ' '.join(atom.casefold().split()) for atom in atoms)
     sentences, start, carry = [], 0, None
     for match in re.finditer(quoted + r'|(?P<cut>(?<=[.!?])\s+|\n+)', text):
-        if match.group('cut') is not None:
-            part = ReportClause(text[start:match.start()], carry, start)
+        cut = match.group('cut') is not None
+        # A quoted utterance can end inside its closing delimiter. Its next
+        # utterance must not inherit the quote's speaker or epistemic scope.
+        # Scalar code/field objects and atomic native reasons keep their owner.
+        value = match.group()
+        speech_end = (not cut and re.fullmatch(quote, value)
+            and re.search(r'[.!?][»”"]$', value) and not literal_quote(value)
+            and report_predicate_head(value[1:-1])
+            and re.match(r'\s+\S', text[match.end():]))
+        if cut or speech_end:
+            part = ReportClause(text[start:match.start() if cut else match.end()], carry, start)
             if part:
                 sentences.append((part, part.start, carry))
                 carry = report_regions(part, atoms=atoms)[-1][2] if part.endswith(':') else None
@@ -825,6 +836,12 @@ def report_sentences(text, atoms=(), identifiers=None):
         sentences.append((part, part.start, carry))
     rows = []
     for sentence, origin, scope in sentences:
+        # A standalone quoted proposition is a speech object, whereas quoted
+        # arguments of a current predicate and literal native witnesses remain
+        # available to that predicate's existing validation.
+        standalone = re.fullmatch(r'(?P<object>' + quote + r')[.!?]*', sentence)
+        if standalone and not literal_quote(standalone['object']):
+            scope = 0
         if re.match(r'^(?:пример|образец|example|template|предполож\w*|допустим|task)\b'
             r'|^(?:the\s+)?(?:оператор|пользователь|someone|operator|user)\b.{0,20}'
             r'\b(?:утвержда\w*|сказ\w*|предполож\w*|claims?|said|suggest\w*)\b', sentence):
