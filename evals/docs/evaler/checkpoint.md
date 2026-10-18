@@ -1,20 +1,20 @@
-# LAB61 checkpoint — interrupted rework16
-Platform01a150d5 taskRich01a150a3-0b81 terminalfailed/modelcapacity; no automaticretry; all268messages retained, not READY/newqualityREJECT.
-Existingowner/decision16/criteria/uncertainty interpretation unchanged; no newbudget/modelselection.
-review16/reject16/rework_limit16 preserved; nativeBLOCKED then one actualdecision continue_after_evaler/dispatch/receipt.
-Resume source a94d632010f15db6842f4080347f22c98a423eda/checker96aa88d1/test910a7d0a clean in R/checkouts/warning-context-alignment.
-Priorc3a2392b/checker0fa1cdc7 clean and all originalresults retained; bothdirectchildren8203, not acceptedfrozenBenSHA.
-Rich finaldeliverydir deliveries/lab61-checker-rework16-final; MODEL-relative-boundaries/64rows RED40matches24mismatches saved before abort.
-Receiverrelative must not absorb resumed passive matrixpredicate or discard nestedengineobligation; latest hypothesis already recorded by Rich.
-Before nextedit completeFINALpositive-negativepublicbaselineRED on unchangeda94; reader40/64 not publicsuiteRED; no unchangedfailedrerunforPASS.
-Collectexisting ownhandles/results first, exactowncleanup; Ecleanupnotperformed/processsnapshot0 not finalworkerproof.
-Then minimalgeneralfix/mandatorycontrols/finalfullsuite-typecheck/newsourcebindings/replay30/preservation/cleanup/verifiedpackage/READY orBLOCKED.
-No finalfullsuite/delivery/cleanup claim for a94 yet; oldc3cleanup pertains only toc3.
-Genuine30a94 ref10PASS/Rich8PASS2FAIL/Ben8PASS2FAIL/ERROR0;rawRich3-7/Ben2-8/wrapperERROR0 and4legitimateproductFAIL retained.
-Usage reference15/Rich10/Ben10/recovery1/probes0/once-ledger-reservation1 unchanged; no newphysical/live/model/install/OS/integration/62–63.
-All5queues E214/Rich82/Ben44/Baseline11/Runner16; onlyErelevantactive, no Richretryqueued.
-ExactforeignRunner01a150b6-9588 LAB81/runtime9f/homekartai independentlyresourcequalified; do notinterrupt/touchforeignstand.
-Fresh E readonlyhealthyFREE21:09:17.986/helperFREE/6cleanHTTP200emptyoriginalcontainer/nativeCLI0; historicalordinaryRELEASED remainshistorical.
-Recoverydoc evals/docs/2026-10-18-lab61-rework16-interruption-recovery.md; actualtask/stop/decisionreceipts in Estate and Eworkdir.
-Intent LAB61-RICH-RESUME-REWORK16-a94d6320-01a150d5; one native dispatch, no waitworker; selectedmodel unchanged/capacityresolvednotclaimed.
-Full independentBenACCEPT/all10/evidence-model-cleanup/freshFREE/completedworkers/commonintegration still required for closure.
+# LAB61 checkpoint — REJECT17 / explicit OFFLINE rework17 decision
+Formal Ben01a1513f on clean e0e3c07b/checker8db02a9e/full range8203→a94→e0; actual task01a15119-fb98 completed.
+Canonical reducer blocked/review17/reject17/limit16 readback675; explicit16→17/completed16/fresh17 readback676 BEFORE effects.
+Ownerf705/249ed1ea and canonical10table already applied; TASK/criteria/physical budgets unchanged, no duplicate assignment.
+One eval defect: quote/example uncertainty spills into independent current engine predicate; E qualified18/32/base20 and full72/128=56falsePASS.
+Same-boundary barequote witness: E quote26/32/full104/128; own384376; overlaps/synthetic copies are not genuine histories.
+General hypothesis: resolve owned speech-object and independent predicate/context scopes before truth/witness/uncertainty inheritance.
+Preserve quote internals, literal field/code/native-error witnesses, governors, epistemic qualifiers, relative/reception/engine ownership and all native guards.
+Rich: MODEL+FINAL combinations→completed immutable e0 parent RED/source-test gate BEFORE FIRST checker/prototype edit; no parallel editing RED.
+Then minimal general fix/same-byte GREEN/all mandatory controls/frozen full30s/typecheck/new clean SHA/replay30/preservation/owned cleanup.
+No word/string/format exceptions or global quote masking; no LLM judge; final source requires one independent full Ben review.
+Technical result separate: Ben full1800s TIMEOUT observed981/6/0, exit null; disjoint tail15+105 PASS/9 SKIP and typecheck0 are not one full GREEN.
+Author1101/15/0 remains separate; original timeout/raw scratch/cleanup preserved, no unchanged full rerun for PASS or hidden deadline increase.
+ZIP28bded37/2769payload/manifestf8642ced/REPORT50aa025b/288Git/375boundreports/7wrappers/rawZIP26/6packagedjobs verified.
+Preserved3717materials1163ledger865raw22pins5389CLI1700helper140case20inputs30archived Luna/high proofs; E DBqueryfalse/fullsuitefalse.
+Genuine30 reference10PASS/Rich8PASS2FAIL/Ben8PASS2FAIL/ERROR0; rawRich3-7/Ben2-8/wrapperERROR0 retained.
+4productFAIL allowed: RichApply2/Richdelivery2/Benprepare2delivery3/Benmissingexplicit settings.source.source_path; no productfix/newphysical.
+Usage ref15/Rich10/Ben10/recovery1/probes0/cap17; history/once/ledger/reservation1/ordinals/provenance preserved; common executionbase7d3 unchanged.
+Fresh E read-only healthyFREE23:08:17.189/helperFREE; original af1 completion→ordinary RELEASED historical; no new live/model/build/install/OS/integration/62–63.
+Decision docs 2026-10-18-lab61-checker-rework17-decision.md/json; one Rich intent LAB61-RICH-CHECKER-REWORK17-e0e3c07b-01a1513f, actual receipt in Estate/E workdir.
