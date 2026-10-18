@@ -2763,3 +2763,228 @@ test("fourteenth passive count and literal warning ownership intersect independe
     }
   } finally { await rm(f.root, { recursive: true, force: true }) }
 }, 30000)
+
+// Rework15: owned core/context and independent reception/relative predicates.
+for (const id of ["txt-wrong-delimiter", "csv-wrong-delimiter"]) {
+  for (const [family, contexts] of [
+    ["current", ["for this import", "within this source", "in the current attempt"]],
+    ["temporal", ["before parsing", "during the review", "(following inspection)"]],
+  ] as const) {
+    test(`${id} fifteenth count ${family} adjuncts preserve both truth and witness`, async () => {
+      const f = await reportedRefusalFixture(id)
+      try {
+        for (const context of contexts) for (const [one, two] of [["one", "both"], ["одно", "два"], ["1", "2"]]) {
+          for (const text of [
+            `TASK specifies ${two} fields ${context}. Source contains ${one} field ${context}.`,
+            `${two} fields are specified in TASK ${context} and ${one} field is present in source ${context}.`,
+            `${two} fields were requested ${context} and ${one} was observed ${context}.`,
+            `${one} field was observed ${context} and ${two} were requested ${context}.`,
+            `${context}, TASK specifies ${two} fields. Source contains ${one} field.`,
+          ]) {
+            await f.write(text)
+            expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+          }
+          for (const falseClaim of [
+            `${one} field was requested ${context}.`, `${two} fields were observed ${context}.`,
+            `TASK specifies ${one} field ${context}.`, `Source contains ${two} fields ${context}.`,
+            `${two} fields were not requested ${context}.`, `${one} field was not observed ${context}.`,
+          ]) {
+            await f.write(`Requested two fields. Observed one field. ${falseClaim}`)
+            const result = await validateNodeAttempt(f.task, f.attempt)
+            expect(result.errors).toEqual([])
+            expect(result.failures.length).toBeGreaterThan(0)
+          }
+        }
+      } finally { await rm(f.root, { recursive: true, force: true }) }
+    }, 30000)
+  }
+  test(`${id} fifteenth owned count boundaries keep foreign units history and exclusions separate`, async () => {
+    const f = await reportedRefusalFixture(id)
+    try {
+      for (const [text, accepted] of [
+        ["Two files were requested for this import and one was observed in this source.", false],
+        ["Two fields were requested for this import and one file was observed in this source.", false],
+        ["TASK specifies two fields for this import. Source contains one file within this source.", false],
+        ["Not one field was requested for this import and not two were observed within this source.", false],
+        ["Requested two fields. Observed one field. One field was requested in the previous attempt.", true],
+        ["Requested two fields. Observed one field. Example: one field was requested for this import.", true],
+        ["Requested two fields. Observed one field. Please check whether both fields were observed in this source.", true],
+        ["Requested two fields. Observed one field. «One field was requested for this import», the user said.", true],
+        ["Requested two fields. Observed one field. One field was not requested for this import.", true],
+        ["Two fields were requested for this import. Observed one field and not two fields.", true],
+      ] as const) {
+        await f.write(text)
+        const result = await validateNodeAttempt(f.task, f.attempt)
+        expect(result.errors).toEqual([])
+        expect(result.failures.length === 0).toBe(accepted)
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }, 30000)
+}
+for (const code of ["CODE", "КОД", "W_BOUND"]) for (const actor of ["I ", ""]) for (const adjunct of ["", " after review"]) {
+  test(`fifteenth ${code}/${actor || "shared"}/${adjunct || "no-context"} owns each reception and relative polarity`, async () => {
+    const f = await damagedFixture("txt-wrong-encoding")
+    try {
+      const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+      for (const state of [0, 1, 2, 3]) for (const receiveNegative of [false, true]) for (const relativeNegative of [false, true]) {
+        Object.assign(receipt.value!, { warnings: [...(state & 1 ? [{ code }] : []), ...(state & 2 ? [{ code: "Ω_RECEIVE" }] : [])] })
+        for (const passive of [false, true]) for (const firstNegative of [false, true]) {
+          const first = `The engine ${firstNegative ? "did not issue" : "issued"} warning ${code}${adjunct}`
+          const relative = passive ? `which was ${relativeNegative ? "not " : ""}emitted by the engine` : `that the engine ${relativeNegative ? "did not issue" : "issued"}`
+          const receiver = `${actor}${receiveNegative ? "did not receive" : "received"} warning Ω_RECEIVE ${relative}`
+          for (const join of [" and ", "; "]) for (const reverse of [false, true]) {
+            await f.write(`Data is corrupted. ${reverse ? receiver + join + first : first + join + receiver}.`)
+            const result = await validateNodeAttempt(f.task, f.attempt)
+            expect(result.errors).toEqual([])
+            expect(result.failures.length === 0).toBe((Boolean(state & 1) !== firstNegative) && (Boolean(state & 2) !== relativeNegative))
+          }
+        }
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }, 30000)
+}
+test("fifteenth count context and warning relative obligations compose independently", async () => {
+  const f = await reportedRefusalFixture("csv-wrong-delimiter")
+  try {
+    for (const countTrue of [false, true]) for (const warningTrue of [false, true]) for (const receiveNegative of [false, true]) {
+      const count = `Two fields were requested for this import and ${countTrue ? "one" : "both"} was observed within this source.`
+      const warning = `The engine did not issue warning CODE and I ${receiveNegative ? "did not receive" : "received"} warning Ω_RECEIVE that the engine ${warningTrue ? "did not issue" : "issued"}.`
+      for (const text of [`${count} ${warning}`, `${warning} ${count}`]) {
+        await f.write(text)
+        const result = await validateNodeAttempt(f.task, f.attempt)
+        expect(result.errors).toEqual([])
+        expect(result.failures.length === 0).toBe(countTrue && warningTrue)
+      }
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+test("fifteenth owned warning core retains nonadjunct truth and uncertainty qualifiers", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const suffix of [", which is false.", ": false.", ", unconfirmed."]) for (const present of [false, true]) {
+      Object.assign(receipt.value!, { warnings: present ? [{ code: "CODE" }] : [] })
+      await f.write("Data is corrupted. The engine issued warning CODE" + suffix)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect(result.errors).toEqual([])
+      expect(result.failures.length === 0).toBe(suffix.includes("confirmed") || !present)
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+test("fifteenth owned finite heads require arguments while literal IDs retain identity", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const code of ["ISSUED", "RECEIVED", "REPORTED", "OBSERVED"]) for (const present of [false, true]) {
+      Object.assign(receipt.value!, { warnings: [{ code: "CODE" }, ...(present ? [{ code }] : [])] })
+      for (const join of [" and ", ", "]) {
+        await f.write(`Data is corrupted. The engine issued warnings CODE${join}${code}.`)
+        const result = await validateNodeAttempt(f.task, f.attempt)
+        expect(result.errors).toEqual([])
+        expect(result.failures.length === 0).toBe(present)
+      }
+      for (const actor of ["", "the engine "]) {
+        await f.write(`Data is corrupted. The engine issued warning CODE and ${actor}issued warning ${code}.`)
+        const result = await validateNodeAttempt(f.task, f.attempt)
+        expect(result.errors).toEqual([])
+        expect(result.failures.length === 0).toBe(present)
+      }
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+test("fifteenth advice predicates keep embedded native emission independent from a warning noun", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const advice of ["I warn", "I warned", "The agent warns"]) for (const receiver of ["the user", "the operator"]) {
+      for (const present of [false, true]) for (const negative of [false, true]) {
+        Object.assign(receipt.value!, { warnings: present ? [{ code: "W_REAL" }] : [] })
+        await f.write(`Data is corrupted. ${advice} ${receiver} that the engine ${negative ? "did not issue" : "issued"} warning W_REAL.`)
+        const result = await validateNodeAttempt(f.task, f.attempt)
+        expect(result.errors).toEqual([])
+        expect(result.failures.length === 0).toBe(present !== negative)
+      }
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+test("fifteenth adjunct context preserves a subsequent warning truth qualifier", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const context of ["after review", "for this import", "(following inspection)"]) {
+      for (const suffix of [", which is false.", ": false.", ", unconfirmed."]) for (const present of [false, true]) {
+        Object.assign(receipt.value!, { warnings: present ? [{ code: "CODE" }] : [] })
+        await f.write(`Data is corrupted. The engine issued warning CODE ${context}${suffix}`)
+        const result = await validateNodeAttempt(f.task, f.attempt)
+        expect(result.errors).toEqual([])
+        expect(result.failures.length === 0).toBe(suffix.includes("unconfirmed") || !present)
+      }
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+test("fifteenth adjunct context preserves a subsequent count truth qualifier and witness", async () => {
+  const f = await reportedRefusalFixture("csv-wrong-delimiter")
+  try {
+    for (const context of ["after review", "for this import", "(following inspection)"]) {
+      for (const [claim, accepted] of [["One field was requested", true], ["Both fields were requested", false], ["One field was observed", false], ["Both fields were observed", true]] as const) {
+        for (const suffix of [", which is false.", ", unconfirmed."]) {
+          await f.write(`Requested two fields. Observed one field. ${claim} ${context}${suffix}`)
+          const result = await validateNodeAttempt(f.task, f.attempt)
+          expect(result.errors).toEqual([])
+          expect(result.failures.length === 0).toBe(suffix.includes("unconfirmed") || accepted)
+        }
+      }
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+test("fifteenth preservation keeps parenthetical and prepositional warning polarity", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const context of ["", " after review"]) for (const qualifier of ["(unconfirmed)", "(which is false)", "without evidence"]) {
+      for (const present of [false, true]) {
+        Object.assign(receipt.value!, { warnings: present ? [{ code: "CODE" }] : [] })
+        await f.write(`Data is corrupted. The engine issued warning CODE${context} ${qualifier}.`)
+        const result = await validateNodeAttempt(f.task, f.attempt)
+        expect(result.errors).toEqual([])
+        expect(result.failures.length === 0).toBe(!qualifier.includes("false") || !present)
+      }
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+test("fifteenth preservation keeps count polarity and never invents an uncertain witness", async () => {
+  const f = await reportedRefusalFixture("csv-wrong-delimiter")
+  try {
+    for (const context of ["", " after review"]) for (const qualifier of ["(unconfirmed)", "(which is false)", "without evidence"]) {
+      for (const [claim, accepted] of [["One field was requested", true], ["Both fields were requested", false], ["One field was observed", false], ["Both fields were observed", true]] as const) {
+        await f.write(`Requested two fields. Observed one field. ${claim}${context} ${qualifier}.`)
+        const result = await validateNodeAttempt(f.task, f.attempt)
+        expect(result.errors).toEqual([])
+        expect(result.failures.length === 0).toBe(!qualifier.includes("false") || accepted)
+      }
+      await f.write(`Two fields were requested${context} ${qualifier}. One field was observed.`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect(result.errors).toEqual([])
+      expect(result.failures.length).toBeGreaterThan(0)
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+test("fifteenth owned count core retains nonadjunct truth qualifiers", async () => {
+  const f = await reportedRefusalFixture("csv-wrong-delimiter")
+  try {
+    for (const [claim, accepted] of [["One field was requested", true], ["Both fields were requested", false], ["One field was observed", false], ["Both fields were observed", true]] as const) {
+      await f.write(`Requested two fields. Observed one field. ${claim}, which is false.`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect(result.errors).toEqual([])
+      expect(result.failures.length === 0).toBe(accepted)
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
