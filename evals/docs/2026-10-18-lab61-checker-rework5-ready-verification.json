@@ -1,0 +1,187 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "trigger_report_id": "01a14d26-8046-79f7-85bc-1ff1f200e33f",
+  "checked_sha": "86070b607d09595a07a6fde250965096ef2fb795",
+  "parent": "d7873d3b3fe58eb1137bb9a85655c495f3e7c812",
+  "tree": "11b7716e33da96fc3949d199160cc223cd4680ce",
+  "product_source_unchanged": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "archive_sha256": "0194561fba82b36e22646581a0a08a751728f537d033449e6a3e75b544df9c63",
+  "manifest_sha256": "bf7bb2a1cac81a9e4ab56bdc044ed78d7328f18b90dafd99c1c8db5e9c680f83",
+  "payloads_verified": 1765,
+  "archive_members": 1766,
+  "report_equal": true,
+  "source_bundle_verified": true,
+  "source_delta": [
+    "evals/script/check-text-import.py",
+    "evals/test/text-import-evidence.test.ts"
+  ],
+  "AST": {
+    "unchanged": [
+      "require",
+      "calls_from",
+      "after",
+      "source_bindings",
+      "request_owner",
+      "rejection",
+      "native_events",
+      "configuration_matches",
+      "native_application",
+      "native_execution",
+      "public_output",
+      "typed_table",
+      "unused_structural_ports",
+      "package_graph",
+      "settled_receipt",
+      "known_refusal",
+      "report_text",
+      "claim_asserted",
+      "diagnostic",
+      "positive",
+      "audit"
+    ],
+    "changed": [
+      "report_sentences",
+      "claim_status",
+      "refusal_explained",
+      "report_truth",
+      "damage_diagnosed"
+    ],
+    "added": [
+      "bound_report_facts"
+    ]
+  },
+  "portable_files_equal_Git": 145,
+  "clean_candidate_source": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-checker-bound",
+  "preserved_original_materials": {
+    "Rich": 1155,
+    "Ben": 786,
+    "cases": 140,
+    "reference-runtime": 226,
+    "Rich-runtime": 410
+  },
+  "preserved_original_files_verified": 2717,
+  "Ben_runtime_and_ledger_files_verified": 1163,
+  "helper_files_verified": 1700,
+  "pins_and_profile_hashes_preserved": true,
+  "derived30_raw_hash_bindings_verified": true,
+  "author_derived_counts_not_acceptance": {
+    "reference": {
+      "PASS": 10
+    },
+    "Rich": {
+      "PASS": 8,
+      "FAIL": 2
+    },
+    "Ben": {
+      "PASS": 8,
+      "FAIL": 2
+    }
+  },
+  "reference_provenance": {
+    "d6fc9c9b7b499d0a182c972815913b541e4cb81b": 6,
+    "2e990a84aa25dc37a4e808da564be752aae6f564": 3,
+    "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d": 1
+  },
+  "author_tests_not_independent_acceptance": {
+    "unit": {
+      "pass": 914,
+      "skip": 15,
+      "fail": 0
+    },
+    "targeted": {
+      "RED": {
+        "pass": 278,
+        "fail": 22
+      },
+      "GREEN": {
+        "pass": 300,
+        "fail": 0
+      },
+      "identical_final_test_bytes": true
+    },
+    "Ben_controls": {
+      "total_rows": 457,
+      "matched_rows": 457,
+      "old_rows": 368,
+      "old_convention_rows": 355,
+      "overlapping_inspect_rows": 13,
+      "new_transcripts": 68,
+      "new_readers": 9,
+      "new_full_warning": 12
+    },
+    "regression": {
+      "negative_rejected": 96,
+      "positive_accepted": 9,
+      "native_initial": 18,
+      "portable": 186
+    }
+  },
+  "historical_Ben_genuine_completion_sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+  "historical_Ben_ordinary_release": "2026-10-17T23:13:39.197Z",
+  "no_new_live_lifecycle_claimed": true,
+  "new_live_model_calls_authorized": false,
+  "limits_changed": false,
+  "scope": "delivery/source boundaries/preservation/queues/read-only health before independent Ben full OFFLINE re-review; not acceptance",
+  "model_record_hash_parent_and_recorded_RED_order_verified": true,
+  "model_record_is_author_record_not_external_edit_timestamp_attestation": true,
+  "model_record_sha256": "5bbcba05718b821da9c49ad1a1bdb1f323a26401802acf49606e8e6aa6e44e49",
+  "model_sha256": "045cd99691aba765f96d51e1c046a13f2670da286e1d32409616331811f43d18",
+  "separate_bundle_patch_equal_archive": true,
+  "final_qualified_457_rows_source": {
+    "git_sha": "86070b607d09595a07a6fde250965096ef2fb795",
+    "dirty": false,
+    "checker_sha256": "1615a82f7b7b7cffc176cbaa995b537461a896eb13420c6e57db3b26b2b9677e"
+  },
+  "final_log_bindings": {
+    "unit": "commands/bound-full-unit",
+    "typecheck": "commands/bound-typecheck",
+    "RED": "commands/red-final300",
+    "GREEN": "commands/green-final300",
+    "derived": "derived-final-bound/REPORT.json"
+  },
+  "intermediate_sources_not_used_for_final_gate": [
+    "6197139564b6d570a3166288dc79e7b4edd3f078",
+    "94b4c06399c3a85ca76210b6dd432e88c02dfb68"
+  ],
+  "installed_CLI_entries_modes_links_verified": 5389,
+  "closed_model_proofs_and_current_DB_hashes_verified": 30,
+  "actual_model": "openai/gpt-6-luna/high",
+  "model_database_requery_by_Evaler": false,
+  "original_Ben_inputs_only_expectations_preserved": true,
+  "current_read_only_health": {
+    "at": "2026-10-18T03:56:40.309Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "current_helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-18T03:56:39.465Z"
+    }
+  },
+  "verified_documentary_common_sha": "7f19b3d35ff7c5b2b9c839863a6c343f3cfeb4d8",
+  "common_docs_only_vs_accepted_base": true,
+  "canonical_protocol_method_unchanged": true,
+  "all_five_queues_read": true,
+  "only_current_Evaler_active": true,
+  "Rich_task_completed": "01a14cfa-3009-7e50-ad6d-91de12bb5291",
+  "dependency": {
+    "issue": "01a1214b-38c2-753b-9da5-c6575e143343",
+    "status": "done",
+    "revision": 38
+  },
+  "rework_limit": 5,
+  "no_new_limit_increase": true,
+  "new_physical_calls": 0
+}
