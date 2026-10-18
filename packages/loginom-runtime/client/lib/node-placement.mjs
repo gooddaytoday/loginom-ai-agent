@@ -56,11 +56,17 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
    &&bounds.x+bounds.width<Math.min(v.x+v.width,v.viewportWidth)-8&&bounds.y+bounds.height<Math.min(v.y+v.height,v.viewportHeight)-8;
  };
  let view=await root.evaluate(readViewport,nodeId),point=project(view,position),opened=false,steps=0,error,zoom;
+ // A rejected gesture reply does not prove that the native UI stayed unchanged.
+ // Preserve that uncertainty even if a later owned-menu cleanup succeeds.
+ const gesture=async dispatch=>{
+  try{return await dispatch();}
+  catch(e){e.placement_navigation_unverified=true;throw e;}
+ };
  const toggle=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;btnShowOutline')+']');
  const setOutline=async opening=>{
   if(await toggle.count()!==1)throw Error('Canvas outline control unavailable');
   if(await toggle.isVisible()){
-   await guard();await toggle.click({timeout:remaining()});if(opening)opened=true;return;
+   await guard();await gesture(()=>toggle.click({timeout:remaining()}));if(opening)opened=true;return;
   }
   // At 1280px the native toolbar moves this button into its own overflow
   // menu. Bind that portal by the prepared form, never by a global label.
@@ -72,12 +78,12 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
   // second reveal immediately; settle before its single opening gesture.
   await page.waitForTimeout(Math.min(300,remaining()));await guard();remaining();
   if(await menu.isVisible())throw Error('Owned canvas outline menu changed');
-  await guard();await trigger.click({timeout:remaining()});
+  await guard();await gesture(()=>trigger.click({timeout:remaining()}));
   try {
    await menu.waitFor({state:'visible',timeout:Math.min(2000,remaining())});
    const item=menu.locator('[role="menuitem"][data-qtip="Показать карту сценария"]');
    if(await menu.count()!==1||await item.count()!==1||!await item.isVisible()||await item.locator('.bg-icon-preview').count()!==1)throw Error('Owned canvas outline menu item unavailable');
-   await guard();await item.click({timeout:remaining()});if(opening)opened=true;
+   await guard();await gesture(()=>item.click({timeout:remaining()}));if(opening)opened=true;
   } finally {
    // Native check items keep the menu open and can cover the outline.
    if(await menu.isVisible()){
@@ -102,7 +108,7 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
    if(await zoom.count()!==1||!await zoom.isVisible()||await zoom.getAttribute('data-qtip')!=='Уменьшить масштаб')throw Error('Exact canvas zoom-out control unavailable');
    while(!within(view,point)&&steps<12){
     await guard();remaining();const old=view.scale;
-    await zoom.click({timeout:remaining()});steps++;
+    await gesture(()=>zoom.click({timeout:remaining()}));steps++;
     const end=Math.min(Date.now()+1500,Date.now()+remaining());
     do {view=await root.evaluate(readViewport,nodeId);if(view.scale!==old)break;await page.waitForTimeout(Math.min(50,Math.max(0,end-Date.now())));}while(Date.now()<end);
     await guard();

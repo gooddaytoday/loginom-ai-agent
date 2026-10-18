@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
-import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
+import {createNodeTargetBrowserAdapter,mutateGraph} from '../lib/node-target-browser.mjs';
 import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
 import {nodePlacementPoint,nodePlacementPosition,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from '../lib/node-placement.mjs';
 
@@ -182,4 +182,48 @@ test('menu settling consumes the original deadline and cannot dispatch after it 
  f.args.page.waitForTimeout=async ms=>{available-=ms;};
  await assert.rejects(revealNodePlacement(f.args),/Original deadline/);
  assert.deepEqual(f.overflow(),{menuOpen:false,triggers:0,items:0});assert.equal(f.state().clicks,0);
+});
+
+// Inject failure after the native fixture gesture, then classify it through
+// the real graph mutation wrapper. A lost reply must never permit creation.
+for(const fault of ['visible-toggle','overflow-open','overflow-toggle','zoom','overflow-close','menu-cleanup'])test('lost outline gesture reply retains mutation uncertainty: '+fault,async()=>{
+ const f=fault==='visible-toggle'?fixture():overflowFixture();
+ const base=f.args.page.locator;let creates=0,triggers=0,items=0,toggles=0;
+ const lost=async(dispatch)=>{await dispatch();throw Error('Lost reply after '+fault);};
+ f.args.page.locator=selector=>{
+  if(selector==='[data-tid='+JSON.stringify(f.args.prefix+';ModelForm;cmpDiagram')+']')return f.args.root;
+  if(!selector.includes('ModelForm')){creates++;throw Error('Unexpected creation gesture');}
+  const original=base(selector);
+  if(selector.endsWith(';btnShowOutline"]')&&fault==='visible-toggle')return {...original,click:async(...args)=>{toggles++;await lost(()=>original.click(...args));}};
+  if(selector.endsWith(';tlbModel;b"]'))return {...original,click:async(...args)=>{
+   triggers++;if(fault==='overflow-open'&&triggers===1||fault==='menu-cleanup'&&triggers===2)await lost(()=>original.click(...args));
+   else await original.click(...args);
+  }};
+  if(selector.endsWith(';tlbModel;b;mn"]'))return {...original,locator:child=>{
+   const item=original.locator(child);return {...item,click:async(...args)=>{
+    items++;if(fault==='overflow-toggle'&&items===1||fault==='overflow-close'&&items===2)await lost(()=>item.click(...args));
+    else await item.click(...args);
+   }};
+  }};
+  if(selector.endsWith(';cntDiagram"]')&&fault==='zoom')return {...original,locator:child=>{
+   const zoom=original.locator(child);return {...zoom,click:async(...args)=>lost(()=>zoom.click(...args))};
+  }};
+  return original;
+ };
+ f.args.page.evaluate=async()=>true;
+ const graph={interaction_ready:true,dom_epoch:1,document_id:'doc',nodes:[],links:[]};
+ const task={deadline:Date.now()+10000,request:{document_id:'doc',workflow_ref:{prefix:f.args.prefix,workflow_id:'wf'}},
+  effect:{id:'lost-outline',kind:'create',parameters:{type:'transform.join_data',position:f.args.position},before:graph},
+  types:{'transform.join_data':{title:'Join',palette_group:'Transforms'}}};
+ const r=await mutateGraph(f.args.page,task,async()=>graph,()=>{},f.args.readViewport,nodePlacementPoint,revealNodePlacement,samePlacementGraph);
+ assert.equal(r.status,'AMBIGUOUS');assert.equal(r.effect_possible,true);assert.equal(r.cleanup_complete,false);
+ assert.match(r.error,/Lost reply after/);assert.equal(creates,0);assert.deepEqual(graph.nodes,[]);
+ if(fault==='visible-toggle')assert.equal(toggles,1);
+ if(fault==='overflow-open'){assert.equal(triggers,1);assert.equal(items,0);}
+ if(fault==='overflow-toggle')assert.equal(items,1);
+ if(fault==='overflow-close')assert.equal(items,2);
+ // After the menu-close reply is lost, a fresh owned-menu opening may restore
+ // the known-open outline. That cleanup must not erase the original fault.
+ if(fault==='menu-cleanup'){assert.equal(triggers,4);assert.equal(items,2);assert.equal(f.state().open,false);}
+ assert.equal(f.state().clicks,fault==='zoom'?1:fault==='overflow-close'?2:0);
 });
