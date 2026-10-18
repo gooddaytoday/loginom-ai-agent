@@ -497,14 +497,23 @@ def report_complements(sentence, atoms=()):
         r'|(?:i|we|я|мы)\b|\w+\s+(?:is|are|was|were|отсутств\w*|присутств\w*)\b')
     rows = []
     prefix = r'(?:^|[;,:.!?\n]\s*|\b(?:but|however|но|однако|and|и)\s+)'
-    link_gap = r'(?:(?!\b(?:but|however|но|однако)\b)[^;:.!?]){0,80}?'
-    for match in re.finditer(prefix + r'(?P<governor>' + governor + r')\b' + link_gap + r'(?::|\b(?:that|что|whether)\b)', sentence):
+    for match in re.finditer(prefix + r'(?P<governor>' + governor + r')\b', sentence):
         if not outside(match.start('governor')): continue
-        end = len(sentence)
-        for boundary in re.finditer(r';|[.!?](?=\s|$)|\b(?:но|однако|but|however)\b', sentence[match.end():]):
-            position = match.end() + boundary.start()
+        link_end = None
+        for link in re.finditer(r':|\b(?:that|что|whether)\b', sentence[match.end():]):
+            position = match.end() + link.start()
+            if position - match.end() > 80: break
             if not outside(position): continue
-            if boundary.group() in ('но', 'однако', 'but', 'however') and not re.match(independent, sentence[match.end() + boundary.end():].lstrip(' ,')):
+            boundaries = re.finditer(r'[;.!?]|\b(?:but|however|но|однако)\b', sentence[match.end():position])
+            if any(outside(match.end() + boundary.start()) for boundary in boundaries): break
+            link_end = match.end() + link.end()
+            break
+        if link_end is None: continue
+        end = len(sentence)
+        for boundary in re.finditer(r';|[.!?](?=\s|$)|\b(?:но|однако|but|however)\b', sentence[link_end:]):
+            position = link_end + boundary.start()
+            if not outside(position): continue
+            if boundary.group() in ('но', 'однако', 'but', 'however') and not re.match(independent, sentence[link_end + boundary.end():].lstrip(' ,')):
                 continue
             end = position
             break
@@ -839,6 +848,7 @@ def report_count_relation(clause, field_context=False):
     """An explicit finite TASK/source predicate outranks quantitative ellipsis."""
     number = r'\d+|one|single|two|both|three|four|five|одно|один|одна|два|две|оба|двух|три|трех|четыре|пять'
     unit = r'(?:исходн\w*\s+|source\s+)?(?:пол\w*|колон\w*|столб\w*|fields?|columns?)'
+    if not field_context and not re.search(r'\b' + unit + r'\b', clause): return None
     quantity = rf'(?P<neg_before>(?:not|не)\s+)?(?P<n>{number})\b(?:\s+(?P<unit>{unit})\b)'
     for role, object, verb in [
         ('requested', r'(?:(?:the\s+)?task|задани\w*)', r'specifi\w*|requir\w*|указа\w*|зада\w*|задан\w*|содерж\w*'),
