@@ -1,0 +1,88 @@
+{
+  "verified_utc": "2026-10-18T11:31:01.687249+00:00",
+  "issue": "LAB-61",
+  "owner_record": {
+    "path": "lab61-eval-contract-owner-clarification.md",
+    "bytes": 9869,
+    "sha256": "249ed1ea8b253736ae236d1aea53916de0227888f95f1ecb355cfa27dd467ee0",
+    "source": "direct human instruction in this Codex chat on2026-10-18; forwarded by authorized operator, not a fabricated owner reply"
+  },
+  "native_delivery": {
+    "kind": "supplement of existing exact Ben run",
+    "comment_id": "5912cded-9d94-4313-9c21-51fceaa37cba",
+    "task_id": "01a14ebd-1543-70ba-9aa6-becd8097aca0",
+    "client_request_id": "4c4f1b25-7da5-4e67-bcd5-4f391a7cdbba",
+    "created_HTTP_status": 201,
+    "existing_receipt_read_HTTP_status": 200,
+    "status": "delivered",
+    "delivered_at": "2026-10-18T14:26:33+03:00",
+    "exact_content_readback": true,
+    "one_historical_comment": true,
+    "one_bound_existing_task": true,
+    "new_worker_dispatch_or_interruption": false,
+    "plain_comment_list_did_not_expose_receipt_fields": "absence not treated as delivery failure; same-key idempotent existing receipt lookup confirmed delivered"
+  },
+  "native_after": {
+    "queue_counts": {
+      "Evaler": 204,
+      "Rich": 77,
+      "Ben": 40,
+      "Baseline": 11,
+      "Runner": 13
+    },
+    "only_active": [
+      [
+        "Ben",
+        "01a14ebd-1543-70ba-9aa6-becd8097aca0"
+      ]
+    ],
+    "issue_revision": 445,
+    "evaler_state_changed_by_operator": false,
+    "path": "lab61-owner-context-native-after.json",
+    "sha256": "8f743928d80550c10784d0cb914c800e78873881b0f97ad03191d144fb3df3d3"
+  },
+  "pending_Evaler_boundary": {
+    "ten_original_scenario_requirement_matrix": true,
+    "map_latest_REJECTs_to_original_requirements_and_common_causes": true,
+    "distinguish_eval_defect_product_FAIL_technical_uncertainty": true,
+    "preserve_required_explanation_checks": true,
+    "no_new_response_contract_or_silent_criteria_expansion": true,
+    "new_counterexamples_remain_valid": true,
+    "quality_ACCEPT_may_include_product_FAIL": true,
+    "close_only_after_existing_evidence_review_cleanup_and_integration_gates": true,
+    "not_completed_yet": true
+  },
+  "raw_exact_local_delivery_files": {
+    "payload": {
+      "bytes": 12448,
+      "sha256": "a5f89d8c710dc23f51d1ee49a6aa7a4bedf2d3f1b86496f2138871c9101812c2"
+    },
+    "once": {
+      "bytes": 1023,
+      "sha256": "cb8354e948076da24e40ea5ff311b94090ab4ec80d97d9e66e2648abea32018d"
+    },
+    "receipt": {
+      "bytes": 13169,
+      "sha256": "6962e41539e00870221a79d6048a2f309242598081a6b07c5768a98654ae7275"
+    },
+    "readback": {
+      "bytes": 12869,
+      "sha256": "0869e82bbca6bf2fa4cc88bb81f5b7cc7f486351db5dee559474fb2c4e4e40c1"
+    },
+    "delivery-readback": {
+      "bytes": 13257,
+      "sha256": "6f3c28871b12032cbd59e96671406a11eafd5662049907686c5cea1148c45d26"
+    },
+    "preflight": {
+      "bytes": 2167,
+      "sha256": "7c07efde1c1d7fc003584efae12c4219ed11aa0a292d8c901cc48070fdf9622c"
+    }
+  },
+  "primary_API_semantics_source": "https://github.com/multica-ai/multica/blob/main/server/internal/handler/task_supplement.go",
+  "limits": {
+    "state_or_counters_written": false,
+    "new_native_scenario_model_lease_build_install_OS_effects": false,
+    "full_Ben_ACCEPT": false,
+    "LAB61_done": false
+  }
+}

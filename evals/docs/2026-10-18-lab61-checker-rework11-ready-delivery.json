@@ -1,0 +1,108 @@
+{
+  "verified_utc": "2026-10-18T11:20:49.763453+00:00",
+  "issue": "LAB-61",
+  "Rich_task": "01a14e81-137d-71b7-a354-45b29ca461cb",
+  "report_comment": "01a14eb7-b927-7e7e-93c5-35bdb1616325",
+  "status": "READY_FOR_BEN_DELIVERY_VERIFIED_NOT_ACCEPTED",
+  "source": {
+    "head": "1d85661c5c7900c36c65e426ba57c81db3ad8f7f",
+    "parent": "b79fdf91fcb7b812a36631fc10c6e8d17e865042",
+    "base": "dfe5a42c4eab86adccb2c5477c2d609be4e13d1e",
+    "tree": "cd27c62e46213bc268f6a216a9657ac1c871b51f",
+    "clean": true,
+    "bundle_sha256": "db0c3d7f8f8023448ec528b68a75a7b5ffde410b1794b910553a18a83e7904cf",
+    "diff_sha256": "354d0b1055046d3f8f44eaaec221d66fc6071e6e32c2ef649b1602f2832aaab3",
+    "full_source_tar_sha256": "5984bcee5b32dc48596fe9342b5c6aec9d8c35d57a0167007b2cb780b0dbe54d",
+    "full_source_tar_bytes": 310773760,
+    "source_file_sha256": {
+      "evals/script/check-text-import.py": "fa0a288042369a725ae7eca17949f8e82cac39679e13903e742bfd79f0231d92",
+      "evals/test/text-import-evidence.test.ts": "adf582a661d4e5b6bffcef9a1e514938f5b623d494bb39e2b16efb95edff518d"
+    },
+    "test_RED_bytes_sha256": "adf582a661d4e5b6bffcef9a1e514938f5b623d494bb39e2b16efb95edff518d"
+  },
+  "archive": {
+    "bytes": 19846134,
+    "sha256": "4da01904b5c4df99dad2cebb33a8615c66622db639ac12bb94f2d08e95c3d50c",
+    "manifest_sha256": "4d2dbbe64ed9818ba699e8d65c1022fe1232446655b40497fd7bdb7feb9e2c6d",
+    "payloads": 3445,
+    "members": 3446,
+    "payload_bytes": 305380042,
+    "safe_unique_exact_membership": true,
+    "all_payload_hashes_verified": true,
+    "all_official_bytes_preserved": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-checker-rework11-1d85661c-ready-delivery"
+  },
+  "REPORT": {
+    "bytes": 6924,
+    "sha256": "013a9781969fc0628d443eec4d6f7e661b21f0680a67c31846f53ab3d04e8345",
+    "equal_standalone": true
+  },
+  "source_verified": {
+    "both_parent_relations": true,
+    "two_normal_commits": true,
+    "two_file_delta": true,
+    "exact_patch": true,
+    "portable_Git_bytes": 145,
+    "unchanged_AST_functions": [
+      "require",
+      "calls_from",
+      "after",
+      "source_bindings",
+      "request_owner",
+      "rejection",
+      "native_events",
+      "configuration_matches",
+      "native_application",
+      "native_execution",
+      "public_output",
+      "typed_table",
+      "unused_structural_ports",
+      "package_graph",
+      "settled_receipt",
+      "known_refusal",
+      "report_text",
+      "report_normalize",
+      "report_complements",
+      "report_regions",
+      "claim_status",
+      "claim_asserted",
+      "bound_report_facts",
+      "report_name_role",
+      "refusal_witness",
+      "report_truth",
+      "damage_diagnosed",
+      "diagnostic",
+      "positive",
+      "audit"
+    ],
+    "changed_AST_functions": [
+      "report_sentences",
+      "report_count_relation",
+      "refusal_explained",
+      "warning_facts"
+    ],
+    "added_AST_functions": [
+      "warning_arguments"
+    ]
+  },
+  "author_claims": {
+    "initial_full": "971PASS15SKIP2FAIL",
+    "final_full": "973PASS15SKIP0FAIL6678assertions/explicit timeout30000",
+    "parent_RED": "350PASS9FAIL",
+    "new_count_warning_controls": "54/54-20/20-80/80",
+    "qualified_controls": "1854/1854;synthetic/overlap not genuine histories",
+    "new_compositions": [
+      "128/128",
+      "144/144",
+      "mixed-unit16/24 RED to24/24GREEN"
+    ],
+    "genuine_replay30_derived": "reference10PASS/Rich8PASS2FAIL/Ben8PASS2FAIL",
+    "no_new_physical_calls": true
+  },
+  "limits": {
+    "root_source_executed": false,
+    "root_findings_reproduced": false,
+    "root_candidate_integrated": false,
+    "full_source_tar_independently_hashed": false,
+    "native_state_or_counters_written": false
+  }
+}
