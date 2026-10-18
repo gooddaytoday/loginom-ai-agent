@@ -1,0 +1,52 @@
+{
+  "kind": "operator_delivery_and_exact_source_verification",
+  "verified_at_utc": "2026-10-18T01:48:40.538860+00:00",
+  "issue": "LAB-61",
+  "report_id": "01a14cab-9386-7cf7-8dcc-458e38cc0d83",
+  "source": "ae8233824a47b39be160cb0295900422cc86d174",
+  "parent": "b00b926261bdefd377c572cc3b81903117dc51a0",
+  "tree": "8bdb7cd35b425341595a153e10bc37ce4d73a216",
+  "archive": "lab61-checker-rework3-ae823382-ready.zip",
+  "archive_bytes": 14397696,
+  "archive_sha256": "3afdfc74ea6d856e7e3d5264a8521487bf5cd2e00a9e0faca50caa47bd669cb0",
+  "manifest_sha256": "4a6d1293bede5e96d5647259a4b81950def3ded82686303b1f52f54591d576b8",
+  "payload_count": 1196,
+  "member_count": 1197,
+  "payload_bytes": 217660673,
+  "all_parts_size_sha256_verified": true,
+  "all_payload_sizes_sha256_and_exact_membership_verified": true,
+  "standalone_report_byte_equal": true,
+  "report_sha256": "5e0e10867fd5ef50085e5ed730f929621265ad4e3d6171d93e4de119f5ceabac",
+  "bundle_sha256": "4337459e013dcf1e1f2e1df6fe705df41b7008ed388097b5b48e6d9dbd0491ce",
+  "bundle_verified": true,
+  "patch_sha256": "492424370499fcea463ec07b2811d134d8ed03769fb81fef8d32bf60c6817934",
+  "patch_exact_git_abbrev9": true,
+  "delta": [
+    "evals/script/check-text-import.py",
+    "evals/test/text-import-evidence.test.ts"
+  ],
+  "diff_check": true,
+  "portable_candidate_files_equal_exact_git": 145,
+  "source_file_sha256": {
+    "evals/script/check-text-import.py": "fda04266c992b1b2c144e6ab7e6e67a196766f2b6cc6c3b36f4f587dc801a984",
+    "evals/test/text-import-evidence.test.ts": "15adaa4fbd1af7993d758773004436cf13d140046f90b92deb3a3589166983d9"
+  },
+  "fresh_remote_source_sha": "ae8233824a47b39be160cb0295900422cc86d174",
+  "source_verification_bare_git": "/home/user/.local/share/loginom-evals-runtime/operator-work/lab59-63-series-20261017/lab61-checker-rework1-verify.git",
+  "no_source_executed": true,
+  "no_common_integration": true,
+  "not_full_accept": true,
+  "physical_usage_unchanged": {
+    "reference": 15,
+    "Rich_product": 10,
+    "Ben_product": 10,
+    "Rich_recovery": 1,
+    "Ben_recovery": 0,
+    "probes": 0
+  },
+  "raw_outcomes_unchanged": {
+    "Rich": "3PASS7FAIL",
+    "Ben": "2PASS8FAIL0ERROR"
+  },
+  "derived_replay_not_new_measurements": true
+}

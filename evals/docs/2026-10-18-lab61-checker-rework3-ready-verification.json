@@ -1,0 +1,151 @@
+{
+  "issue_id": "01a1214b-4adc-75df-97df-2917732a449a",
+  "trigger_report_id": "01a14cab-9386-7cf7-8dcc-458e38cc0d83",
+  "checked_sha": "ae8233824a47b39be160cb0295900422cc86d174",
+  "parent": "b00b926261bdefd377c572cc3b81903117dc51a0",
+  "tree": "8bdb7cd35b425341595a153e10bc37ce4d73a216",
+  "product_source_unchanged": "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d",
+  "archive_sha256": "3afdfc74ea6d856e7e3d5264a8521487bf5cd2e00a9e0faca50caa47bd669cb0",
+  "manifest_sha256": "4a6d1293bede5e96d5647259a4b81950def3ded82686303b1f52f54591d576b8",
+  "payloads_verified": 1196,
+  "archive_members": 1197,
+  "report_equal": true,
+  "source_bundle_verified": true,
+  "source_delta": [
+    "evals/script/check-text-import.py",
+    "evals/test/text-import-evidence.test.ts"
+  ],
+  "AST": {
+    "unchanged": [
+      "require",
+      "calls_from",
+      "after",
+      "source_bindings",
+      "request_owner",
+      "rejection",
+      "native_events",
+      "configuration_matches",
+      "native_application",
+      "native_execution",
+      "public_output",
+      "typed_table",
+      "unused_structural_ports",
+      "package_graph",
+      "settled_receipt",
+      "known_refusal",
+      "positive"
+    ],
+    "changed": [
+      "damage_diagnosed",
+      "diagnostic",
+      "audit"
+    ],
+    "added": [
+      "report_text",
+      "report_sentences",
+      "claim_asserted",
+      "report_truth"
+    ]
+  },
+  "portable_files_equal_Git": 145,
+  "clean_candidate_source": "/home/user/.local/share/loginom-evals-runtime/checkouts/lab61-checker-third",
+  "preserved_original_materials": {
+    "Rich": 1155,
+    "Ben": 767,
+    "cases": 140,
+    "reference-runtime": 226,
+    "Rich-runtime": 410
+  },
+  "preserved_original_files_verified": 2698,
+  "Ben_runtime_and_ledger_files_verified": 1163,
+  "helper_files_verified": 1700,
+  "pins_and_profile_hashes_preserved": true,
+  "derived30_raw_hash_bindings_verified": true,
+  "author_derived_counts_not_acceptance": {
+    "reference": {
+      "PASS": 10
+    },
+    "Rich": {
+      "PASS": 8,
+      "FAIL": 2
+    },
+    "Ben": {
+      "PASS": 8,
+      "FAIL": 2
+    }
+  },
+  "reference_provenance": {
+    "d6fc9c9b7b499d0a182c972815913b541e4cb81b": 6,
+    "2e990a84aa25dc37a4e808da564be752aae6f564": 3,
+    "a2ba3d0fc8de25c50e497233506b4a6e4f50e06d": 1
+  },
+  "author_tests_not_independent_acceptance": {
+    "unit": {
+      "pass": 874,
+      "skip": 15,
+      "fail": 0
+    },
+    "targeted": {
+      "RED": {
+        "PASS": 203,
+        "FAIL": 57
+      },
+      "GREEN": {
+        "PASS": 260,
+        "FAIL": 0
+      },
+      "identical_final_test_bytes": true
+    },
+    "Ben_controls": {
+      "qualified": 271,
+      "matched": 271,
+      "original_new_diagnosis": 60,
+      "report_truth": 20,
+      "prior_table_binding_inspect": 152,
+      "new_inspect": 39
+    },
+    "regression": {
+      "old_negative_rejected": 96,
+      "old_positive_accepted": 9,
+      "native_initial_rejected": 18,
+      "portable_matched": 80
+    }
+  },
+  "historical_Ben_genuine_completion_sha256": "af1d7059007f3e3ea1bb1a70a54d3d9a44768d5384b7d3a0115105387693467a",
+  "historical_Ben_ordinary_release": "2026-10-17T23:13:39.197Z",
+  "no_new_live_lifecycle_claimed": true,
+  "new_live_model_calls_authorized": false,
+  "limits_changed": false,
+  "scope": "delivery/source boundaries/preservation/queues/read-only health before independent Ben full OFFLINE re-review; not acceptance",
+  "current_read_only_health": {
+    "at": "2026-10-18T01:43:36.459Z",
+    "clean_profiles": 6,
+    "http": 200,
+    "container": "fa0751f055123b470ed4727fb5ebcc39396a32cbbc805d249f3bc97697d82f6d",
+    "running": true,
+    "storage_empty": true,
+    "read_only": true,
+    "native_cli_calls": 0
+  },
+  "current_helper_status": {
+    "status": "FREE",
+    "code": 0,
+    "diagnostic": {
+      "version": 1,
+      "operation": "status",
+      "stage": "arguments",
+      "dispatch": "not_started",
+      "reason": "OK",
+      "at": "2026-10-18T01:43:35.641Z"
+    }
+  },
+  "verified_documentary_common_sha": "422b5a2c721c9001e23f51c6d2da39b3f4b665cf",
+  "common_docs_only_vs_accepted_base": true,
+  "current_queues": "all five read in full; only current Evaler active",
+  "dependency": {
+    "issue": "01a1214b-38c2-753b-9da5-c6575e143343",
+    "status": "done",
+    "revision": 38
+  },
+  "no_concurrent_workers": true
+}
