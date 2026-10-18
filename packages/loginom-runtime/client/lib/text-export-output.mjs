@@ -246,10 +246,14 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   uncertain=true;
   try{
    const refusal=await releaseRefusedExportRead({operationId:operation.id,binding:fileBinding,navigationOnly:navigationOnly&&!journalFailed,record,
-    restore:async()=>{const restored=await returnToWorkflow(),graph=await roots();
-     need(quiet(graph)&&graph.wizard?.status==='absent'&&JSON.stringify(graph.workflow_ref)===JSON.stringify(ctx.workflow_ref),
+    restore:async()=>{await returnToWorkflow();
+     // Root discovery deliberately omits dialogs/masks and the UI workflow
+     // has only tab/prefix. Read the full surface with the native owner binding.
+     const graph=await read({prepared_node_context:binding});
+     need(quiet(graph)&&graph.observation_kind!=='roots'&&graph.ui.truncated?.dialogs===false&&graph.ui.truncated?.masks===false
+      &&graph.wizard?.status==='absent'&&['tab_tid','prefix'].every(k=>graph.workflow_ref?.[k]===ctx.workflow_ref[k]),
       'Export refusal workflow is not quiet or changed');
-     return {verified:true,cleanup_complete:true,quiet:true,node_context:restored.node_context};},
+     return {verified:true,cleanup_complete:true,quiet:true,node_context:graph.prepared_node_context};},
     release:async()=>{await lease.release();released=true;}});
    if(refusal)throw Object.assign(Error('The native export completed, but downloading was not confirmed. The original quiet workflow is restored. Save the scenario and report downloading as unconfirmed; do not repeat the export.'),{nodePhaseRefusal:refusal});
    throw error;

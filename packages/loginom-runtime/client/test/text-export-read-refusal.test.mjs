@@ -97,17 +97,17 @@ for(const fault of ['binding','execution','lease','restore','cleanup','transport
 
 for(const kind of ['success','download_refusal','ambiguous_download','download_transport','open_files','root_stale',
  'return_tab_observation','download_select','directory_navigation','storage_scroll','unknown_scroll','unclean_scroll','changed_scroll','scroll_unobserved','foreign_storage',
- 'mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','journal_failure','lease_failure'])test('native export read and real save: '+kind,async()=>{
+ 'mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure'])test('native export read and real save: '+kind,async()=>{
  const success=kind==='success',storage=kind.includes('scroll')||kind==='foreign_storage';
- const blocked=['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','journal_failure','lease_failure'].includes(kind);
+ const blocked=['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure'].includes(kind);
  let files=false,downloads=0,releases=0,retained=0,failed=false;const gestures=[],records=[];
  let scrollTop=0,observationFailed=false,directory=kind==='directory_navigation'?'/':'/user';
  const filesWorkflow={workflow_id:'files',prefix:'MF;TF-2',tab_tid:'files-tab'},targetOrigin='https://loginom.invalid';
  const element=(tid,ref=tid,extra={})=>({tid,ref:'ui-'+ref.replace(/[^a-zA-Z0-9-]/g,'-'),allowed_actions:['click'],...extra});
  const snapshot=()=>({authenticated:true,origin:targetOrigin,loginom_build:'7.4',dom_epoch:{document:'browser',revision:1},
-  workflow_ref:files?{...filesWorkflow,...(failed&&kind==='foreign_storage'?{prefix:'foreign'}:{})}:
-   {...workflow,...(failed&&kind==='changed_workflow'?{workflow_id:'other'}:{})},wizard:{status:'absent'},
-  ui:{dialogs:!files&&failed&&kind==='graph_dialog'?[{kind:'unknown'}]:[],masks:[],elements:[
+  workflow_ref:files?{tab_tid:filesWorkflow.tab_tid,prefix:failed&&kind==='foreign_storage'?'foreign':filesWorkflow.prefix}:
+   {tab_tid:workflow.tab_tid,prefix:failed&&kind==='changed_workflow'?'foreign':workflow.prefix},wizard:{status:!files&&failed&&kind==='graph_wizard'?'observed':'absent'},
+  ui:{dialogs:!files&&failed&&kind==='graph_dialog'?[{kind:'unknown'}]:[],masks:!files&&failed&&kind==='graph_mask'?[{kind:'unknown'}]:[],elements:[
    element('MF;cntMain;tlbMainToolbar'),element('MF;cntMain;tlbMainToolbar;btnFilestorage'),
    element('MF;cntMain;cntWorkspace;Workspace;t.br'),element(workflow.tab_tid),element('files-tab'),
    element('MF;TF-2;NavigationBar;NavigationPanel'),element('MF;TF-2;FileStorageForm;btnRefresh'),
@@ -156,7 +156,15 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
    }
    if(files&&!failed&&kind==='root_stale'){failed=true;return {status:'FAILED',error:{code:'UI_ROOT_STALE'}};}
    if(files&&failed&&kind==='scroll_unobserved'&&!observationFailed){observationFailed=true;throw Error('Export scroll outcome is not freshly observed');}
-   return {status:'SUCCEEDED',output:snapshot()};
+   const output=snapshot();
+   output.observation_kind=task.discover_roots?'roots':'region';output.ui.truncated={dialogs:!!task.discover_roots,masks:!!task.discover_roots};
+   if(task.prepared_node_context){
+    assert.deepEqual(task.prepared_node_context,{document_id:'doc',workflow_ref:workflow,node});
+    output.prepared_node_context={...node,...(kind==='foreign_graph'?{node_id:'other'}:{}),verified:true,surface:'graph',locked:kind==='locked_graph'};
+    if(kind==='root_only')output.observation_kind='roots';
+    if(kind==='truncated_masks')output.ui.truncated.masks=true;
+   }
+   return {status:'SUCCEEDED',output};
   }};
  const ctx={...node,node,workflow_ref:workflow,execution:{status:'completed',execution_id:'exec'},deadline:Date.now()+10000};
  const result=await readNativeExportFile(options,ctx,{destination:'/user/result.csv',configured:{destination_check:{verified:true,destination:'/user/result.csv',existed:false}}},
@@ -176,7 +184,7 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
   const saved=await f.run('package.save_checkpoint',{path:'/user/data/packages/read-refusal.lgp',conflict_policy:'fail'},{operationId:'save-read-refusal'});
   assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));assert.equal(page.packagePath,'/user/data/packages/read-refusal.lgp');
  }
- assert.equal(records.some(r=>r.phase==='export_file_read_refused_restored'),!success&&!['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','lease_failure'].includes(kind));
+ assert.equal(records.some(r=>r.phase==='export_file_read_refused_restored'),!success&&!['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','lease_failure'].includes(kind));
  assert.equal(records.some(r=>r.phase==='export_file_bytes_verified'),success);
  assert.equal(records.some(r=>r.phase==='export_file_read_completed'),success);
 });
