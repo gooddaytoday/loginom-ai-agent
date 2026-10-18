@@ -39,7 +39,7 @@ export async function preflightMappedReform(options,ctx,config){
  const input=incoming.node_mapping;
  await closePreparedWizard(channel);
  const graph=await channel.observe({condition:'graph before mixed reform validation',ready:s=>s.prepared_node_context?.surface==='graph'});
- await selectPreparedGraphNode(channel,graph,'select existing reform for mixed request validation');
+ await selectPreparedGraphNode(channel,graph,'select existing reform for mixed request validation',{refreshReplacedBody:true});
  const opening=await openPreparedWizard(channel);
  const current=await channel.observe({condition:'mixed reform complete saved configuration',readReform:true,ready:s=>s.node_reform?.verified===true});
  let validationError;
