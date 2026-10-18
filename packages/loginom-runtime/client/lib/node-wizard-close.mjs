@@ -35,6 +35,16 @@ export function boundWizardCloseConfirmation(state,binding,requireControls=true)
   &&e.allowed_actions?.includes('click')).length===1);
 }
 
+export function boundInputMappingConflict(state,binding,requireControls=true) {
+ if(!binding?.owner?.input_port||!wizardCloseDialogOwner(state,binding))return false;
+ const ui=state.ui,dialog=ui.dialogs[0];
+ if(state.loginom_build!=='7.4.2'||dialog.title!=='Loginom 7.4.2'
+  ||dialog.text!=='Loginom 7.4.2 Обнаружены связи с несуществующими объектами. Вы хотите удалить все потерянные связи и продолжить? Удалить и продолжить Не удалять и продолжить Отмена')return false;
+ if(!requireControls)return true;
+ return Object.entries({yes:'Удалить и продолжить',no:'Не удалять и продолжить',cancel:'Отмена'}).every(([name,label])=>
+  ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name&&e.label===label&&e.signature?.dialog_ref===dialog.ref&&e.allowed_actions?.includes('click')).length===1);
+}
+
 export function cancelledWizardReady(state,binding) {
  const node=state.prepared_node_context;
  return state.wizard?.status==='absent' && node?.verified===true && node.surface==='graph'
@@ -42,15 +52,27 @@ export function cancelledWizardReady(state,binding) {
   && state.ui?.dialogs?.length===0 && state.ui?.masks?.length===0;
 }
 
-export async function closePreparedWizard(channel) {
- let s=await channel.observe({condition:'prepared wizard can be cancelled',ready:s=>s.wizard?.status==='observed'
+export async function closePreparedWizard(channel,{initialObservation}={}) {
+ let s=initialObservation??await channel.observe({condition:'prepared wizard can be cancelled',ready:s=>s.wizard?.status==='observed'
   &&s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnClose'&&e.allowed_actions.includes('click')).length===1});
  const binding=wizardCloseBinding(s);
+ if(boundInputMappingConflict(s,binding)) {
+  // Cancel only this exact owned mapping warning; neither affirmative answer
+  // is a cleanup action, since both continue the unfinished mapping.
+  await channel.perform({condition:'cancel the owned lost-links mapping question',initialObservation:s,
+   ready:s=>boundInputMappingConflict(s,binding),identity:()=>binding,
+   resolve:s=>({verb:'click',ref:s.ui.elements.find(e=>e.tid==='msgbox;tlb;cancel').ref})});
+  s=await channel.observe({condition:'mapping question cancelled without continuing',
+   ready:s=>cancelledWizardReady(s,binding)||s.wizard?.status==='observed'&&same(wizardCloseBinding(s),binding)
+    &&s.ui.dialogs.length===0&&s.ui.masks.length===0});
+ }
+ if(!cancelledWizardReady(s,binding)&&!boundWizardCloseConfirmation(s,binding)) {
  await channel.perform({condition:'close the prepared wizard draft',initialObservation:s,
   ready:s=>same(wizardCloseBinding(s),binding),identity:()=>binding,
   resolve:s=>({verb:'click',ref:s.ui.elements.find(e=>e.tid===binding.root_tid+';btnClose').ref})});
  s=await channel.observe({condition:'wizard close confirmation or closed graph',wizardConfirmation:binding,
   ready:s=>s.wizard?.status==='absent'&&s.prepared_node_context?.surface==='graph'||boundWizardCloseConfirmation(s,binding)});
+ }
  const confirmationRequired=s.wizard.status!=='absent';
  if(confirmationRequired) {
   await channel.perform({condition:'confirm cancellation of this wizard draft',initialObservation:s,
