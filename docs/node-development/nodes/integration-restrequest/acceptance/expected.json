@@ -26,7 +26,8 @@
     {
       "name": "HttpStatusCode",
       "label": "Код состояния HTTP",
-      "type": "integer"
+      "type": "integer",
+      "label_any": true
     }
   ],
   "rows": [
