@@ -7,7 +7,7 @@ export const uiActionSchema = {
   type: 'object', additionalProperties: false, required: ['verb'],
   properties: {
     verb: { type: 'string', enum: ['click', 'double_click', 'right_click', 'fill', 'press', 'drag', 'scroll', 'scroll_horizontal', 'set_checked', 'replace_expression', 'set_wizard_field', 'wizard_step', 'select_wizard_option', 'apply_expression_parameters', 'cancel_expression_parameters', 'open_wizard', 'begin_wizard', 'confirm_wizard_deactivation', 'finish_wizard', 'execute_wizard', 'execute_graph_node', 'deactivate_graph_node', 'confirm_wizard_close', 'show_process_node', 'cancel_process', 'open_node_views', 'enter_table', 'apply_output_column', 'cancel_output_column', 'apply_reform_column', 'cancel_reform_column'] },
-    expected_stage: { oneOf:[{type:'string',enum:['learn_partition','lin_regression','lin_regression_details','normalization','clustering','text_import_file','text_import_format','text_export_params','text_export_format','input_mapping','output_mapping','calculator','grouping','crosstable','sorting','replacement','collapse','missing_values','date_time','field_parameters','row_filter','join','union','done']},{const:['output_mapping','done']}],
+    expected_stage: { oneOf:[{type:'string',enum:['excel_import_file','excel_import_columns','learn_partition','lin_regression','lin_regression_details','normalization','clustering','text_import_file','text_import_format','text_export_params','text_export_format','input_mapping','output_mapping','calculator','grouping','crosstable','sorting','replacement','collapse','missing_values','date_time','field_parameters','row_filter','join','union','done']},{const:['output_mapping','done']}],
       description: 'Required only for wizard_step: destination after the observed next/previous control, not the current stage. For delimited Text Import, next follows text_import_file → text_import_format → output_mapping → done; previous reverses this order. input_mapping means a separate INPUT PORT mapping wizard, never Text Import output columns. Calculator, Grouping and Sorting validation may use [output_mapping, done] for its conditional output page. Other wizard families may have different paths; inspect their current UI and sources instead of guessing. Do not pass this field to open_wizard or finish_wizard.' },
     checked: { type: 'boolean' },
     delta_y: { type: 'integer', minimum: -1000, maximum: 1000 },
@@ -251,7 +251,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         // addressed fields become action refs; 1000 columns render ~18000 nodes.
         omittedRegions.add('unaddressed_import_definition_cells');return 2;
       }
-      if(['ImportTextFilePreviewWizard','ImportTextFileParamsWizard','ColumnsMappingEngineOutputPortWizard','DoneWizard']
+      if(['ImportExcelFilePreviewWizard','ImportExcelColumnDefsWizard','ImportTextFilePreviewWizard','ImportTextFileParamsWizard','ColumnsMappingEngineOutputPortWizard','DoneWizard']
         .some(name=>tid===base+name) && element.classList.contains('x-hidden-offsets')) {
         omittedRegions.add('inactive_import_cards');return 2;
       }
@@ -266,7 +266,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const detailElements=dom.length;
     // E2E bg/selectors.ts wizard lifecycle and P3 wizard selectors. These
     // fixed markers expose the current page without scanning its whole tree.
-    const wizardMarkers={learn_partition:';LearnPartitionWizard;SizeGridForm;grdDataSet',lin_regression:';LinRegressionWizard;pedRegressionMethod',lin_regression_details:';LinRegressionWizard-1;pedEpsilon',normalization:';NormTuneWizard',clustering:';ClusterizationWizard;pedClusters',text_import_file:';ImportTextFilePreviewWizard;edtFileName',
+    const wizardMarkers={excel_import_file:';ImportExcelFilePreviewWizard;edtFileName',excel_import_columns:';ImportExcelColumnDefsWizard;cbbAutoDetectColumnsMode',learn_partition:';LearnPartitionWizard;SizeGridForm;grdDataSet',lin_regression:';LinRegressionWizard;pedRegressionMethod',lin_regression_details:';LinRegressionWizard-1;pedEpsilon',normalization:';NormTuneWizard',clustering:';ClusterizationWizard;pedClusters',text_import_file:';ImportTextFilePreviewWizard;edtFileName',
       text_import_format:';ImportTextFileParamsWizard;edtValueNull',
       text_export_params:';ExportTextFileParamsWizard;edtFileName',
       text_export_format:';ExportTextFilePreviewWizard;edtCodePage',

@@ -1,0 +1,273 @@
+{
+  "format": 1,
+  "writer": "XlsxWriter 3.2.9",
+  "independent_reader": "OpenPyXL 3.1.5",
+  "seed": "integer sequence 1..20789; source values fixed before Loginom",
+  "files": [
+    {
+      "name": "book-a.xlsx",
+      "bytes": 5339,
+      "sha256": "784fd7af8e3eddc5e159d24e0ecc9eb62f5d1a0e3dab77333c797ce7bc2ec710",
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 4,
+          "columns": 3
+        }
+      ]
+    },
+    {
+      "name": "book-b.xlsx",
+      "bytes": 5343,
+      "sha256": "d8c7b669ee6e646b7525f75512e706506d7f6942afc58dc07b6af121b0ea687b",
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 4,
+          "columns": 3
+        }
+      ]
+    },
+    {
+      "name": "corrupt.xlsx",
+      "bytes": 19,
+      "sha256": "961c377037ecc9fe26e26c509c475b6cc71e9273cce6fc6ca1dbcd84cd784719"
+    },
+    {
+      "name": "empty.xlsx",
+      "bytes": 4911,
+      "sha256": "93386d43688994fee97f2664e16c0a4602875467835589c322197bfab7931d91",
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 1,
+          "columns": 1
+        }
+      ]
+    },
+    {
+      "name": "irregular.xlsx",
+      "bytes": 5535,
+      "sha256": "770afc88825c38958784389f228f28451a174f48bad1c3213b7d15caa89aa4d5",
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 5,
+          "columns": 6
+        }
+      ]
+    },
+    {
+      "name": "large.xlsx",
+      "bytes": 697097,
+      "sha256": "879e2c73c0cb4e151f861e69f7c6a6f61a91eb84c7304b4317064958bd7b8d21",
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 20790,
+          "columns": 5
+        }
+      ]
+    },
+    {
+      "name": "late-type.xlsx",
+      "bytes": 7439,
+      "sha256": "7af70c4162db0bff97a687bbf281c637db50eec4379b28d06e07690a3d05d67c",
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 202,
+          "columns": 2
+        }
+      ]
+    },
+    {
+      "name": "two-headers.xlsx",
+      "bytes": 5343,
+      "sha256": "f5b228b017f17b9f9bfab2bfda182326d0b9e227251102fb8e4b4da7849e6ab2",
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 3,
+          "columns": 3
+        }
+      ]
+    },
+    {
+      "name": "workbook.xlsx",
+      "bytes": 5927,
+      "sha256": "a4f4cd307363f62eed14ad33b9feec3285caba6ce137fef4f0fe17756ca6241b",
+      "sheets": [
+        {
+          "name": "Data",
+          "rows": 7,
+          "columns": 4
+        },
+        {
+          "name": "Other",
+          "rows": 2,
+          "columns": 3
+        }
+      ]
+    },
+    {
+      "name": "protected.xlsx",
+      "bytes": 10752,
+      "sha256": "cb7fa47676069c0cc8d821409c9056208dc5785e5921e703fdd8db9d3a167beb",
+      "provenance": "msoffcrypto-tool 5.4.2 encrypts book-a.xlsx with public fixture password xlsx-fixture-only; randomized encryption artifact frozen, not deterministic regenerated"
+    }
+  ],
+  "schema": {
+    "large.xlsx": {
+      "names": [
+        "Id",
+        "Text",
+        "Amount",
+        "Occurred",
+        "Active"
+      ],
+      "labels": [
+        "Id",
+        "Text",
+        "Amount",
+        "Occurred",
+        "Active"
+      ],
+      "types": [
+        4,
+        5,
+        3,
+        2,
+        1
+      ],
+      "data_kinds": [
+        1,
+        2,
+        1,
+        1,
+        2
+      ],
+      "used": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "rows": 20789,
+      "ordered": true,
+      "null_counts": [
+        0,
+        214,
+        0,
+        0,
+        0
+      ]
+    },
+    "workbook.xlsx": {
+      "sheet": "Data",
+      "range": "B3:D6",
+      "header_rows": 1,
+      "names": [
+        "Id",
+        "Text",
+        "Amount"
+      ],
+      "types": [
+        4,
+        5,
+        4
+      ],
+      "rows_by_blank_policy": {
+        "import": 3,
+        "exclude": 2,
+        "stop": 1
+      }
+    },
+    "book-a.xlsx": {
+      "rows": 3,
+      "names": [
+        "Id",
+        "Text",
+        "Amount"
+      ],
+      "types": [
+        4,
+        5,
+        4
+      ],
+      "version": "original"
+    },
+    "book-b.xlsx": {
+      "rows": 3,
+      "names": [
+        "Id",
+        "Text",
+        "Amount"
+      ],
+      "types": [
+        4,
+        5,
+        4
+      ],
+      "version": "fixed schema replacement, not stage2 A/B to B/C"
+    },
+    "two-headers.xlsx": {
+      "header_rows": 2,
+      "names": [
+        "Id_Identifier",
+        "Text_Caption",
+        "Amount_Total"
+      ],
+      "labels": [
+        "Id|Identifier",
+        "Text|Caption",
+        "Amount|Total"
+      ],
+      "types": [
+        4,
+        5,
+        4
+      ],
+      "rows": 1
+    },
+    "late-type.xlsx": {
+      "rows": 201,
+      "sample": 200,
+      "names": [
+        "Id",
+        "Amount"
+      ],
+      "types": [
+        4,
+        4
+      ],
+      "source_last": [
+        201,
+        "late-text"
+      ],
+      "observed_last": [
+        201,
+        null
+      ]
+    },
+    "irregular.xlsx": {
+      "rows": 4,
+      "types": [
+        4,
+        5,
+        4,
+        2,
+        1,
+        4
+      ],
+      "formulas": {
+        "F2": "cached 3",
+        "F3": "no cache",
+        "F4": "cached #DIV/0!"
+      },
+      "merged": "B5:C5; no fill",
+      "empty_string": "B3 shared-string empty; distinct physical null"
+    }
+  }
+}
