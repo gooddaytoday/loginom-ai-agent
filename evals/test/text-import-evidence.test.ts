@@ -1769,6 +1769,158 @@ test("relative engine emission keeps its warning object and independent polarity
   } finally { await rm(f.root, { recursive: true, force: true }) }
 })
 
+// Each confirmation, quantitative relation and warning argument owns its facts.
+for (const id of ["txt-wrong-encoding", "csv-unclosed-quote"]) {
+  test(`${id} tenth confirmation siblings own modality with shared subjects`, async () => {
+    const f = await damagedFixture(id)
+    try {
+      for (const [cause, contrast, confirmations] of [
+        ["I cannot confirm that the cause is the encoding", "but", ["can confirm that", "I can confirm that"]],
+        ["I do not claim: the cause is the delimiter", "however", ["confirm that", "I confirm that"]],
+        ["Я не утверждаю, что причина в кавычках", "но", ["подтверждаю, что", "я подтверждаю, что"]],
+      ] as const) {
+        for (const confirmation of confirmations) {
+          for (const space of [" ", "\n"]) {
+            await f.write(`${cause}, ${contrast}${space}${confirmation} data is corrupted.`)
+            expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+            await f.write(`Data is corrupted. ${cause}, ${contrast}${space}${confirmation} the engine issued warning Δ_GHOST.`)
+            expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+          }
+        }
+      }
+      for (const report of [
+        "I cannot confirm that the cause is encoding, but cannot confirm that data is corrupted.",
+        "I cannot confirm that the cause is encoding, but might confirm that data is corrupted.",
+        "Я не утверждаю, что причина в кодировке, но не подтверждаю, что данные повреждены.",
+        "I do not claim that «the cause is encoding, but can confirm that data is corrupted».",
+        "Example: I cannot confirm the cause, but can confirm that data is corrupted.",
+      ]) {
+        await f.write(report)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      }
+      for (const report of [
+        "I cannot confirm the cause, but can confirm that data is corrupted; the engine did not issue warning Δ_GHOST.",
+        "I confirm that data is corrupted, but cannot confirm that the engine issued warning Δ_GHOST.",
+        "Data is corrupted. I cannot confirm that, in this attempt, the engine issued warning Δ_GHOST.",
+      ]) {
+        await f.write(report)
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+}
+
+test("tenth confirmation applies to each refusal object without accepting adjacent inventions", async () => {
+  for (const [id, fact] of [
+    ["txt-ambiguous-headers", "source field names are identical"],
+    ["csv-ambiguous-headers", "имена исходных полей одинаковы"],
+    ["txt-wrong-delimiter", "requested two fields and observed one field"],
+    ["csv-wrong-delimiter", "запрошены два поля и получено одно поле"],
+    ["initial-incomplete-settings", "columns are missing"],
+    ["missing-source-column", "OtherName отсутствует"],
+  ] as const) {
+    const f = await reportedRefusalFixture(id)
+    try {
+      for (const prefix of ["I cannot confirm that the cause is encoding, but can confirm that", "Я не утверждаю: причина в кавычках, но подтверждаю, что"]) {
+        await f.write(`${prefix} ${fact}.`)
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+        await f.write(`${prefix} ${fact}. The engine issued warning W_GHOST.`)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  }
+})
+
+for (const id of ["txt-wrong-delimiter", "csv-wrong-delimiter"]) {
+  test(`${id} tenth quantified predicates bind their own TASK or source relation`, async () => {
+    const f = await reportedRefusalFixture(id)
+    try {
+      for (const [trueRelation, falseRelation] of [
+        ["two fields are specified in the TASK", "three fields are specified in the TASK"],
+        ["TASK specifies two fields", "TASK specifies one field"],
+        ["два поля указаны в задании", "одно поле указано в задании"],
+        ["в задании указаны два поля", "в задании указаны три поля"],
+        ["one field exists in the source", "two fields exist in the source"],
+        ["source contains one field", "source contains three fields"],
+        ["одно поле имеется в источнике", "два поля имеются в источнике"],
+        ["в источнике имеется одно поле", "в источнике имеется три поля"],
+      ] as const) {
+        for (const lead of ["Requested two fields. Observed one field", "Observed one field. Requested two fields"]) {
+          await f.write(`${lead}, but ${trueRelation}.`)
+          expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+          await f.write(`${lead}, but ${falseRelation}.`)
+          expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+        }
+      }
+      for (const report of [
+        "Requested two fields, but one field exists in the source. Observed one field, but two fields are specified in the TASK.",
+        "Requested two fields. Observed one field, but not three. TASK specifies two fields.",
+        "Requested two fields. Observed one field, but the source contains one.",
+        "Requested two fields. Observed one field, but the TASK specifies two.",
+        "Requested two fields. Observed one field. Two fields are not present in the source.",
+      ]) {
+        await f.write(report)
+        expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      }
+      for (const report of [
+        "Requested two fields. Observed one field, but two fields.",
+        "Requested two fields. Observed one field, but not one.",
+        "Requested two fields. Observed one field, but the source contains two.",
+        "Requested two fields. Observed one field, but the TASK specifies one.",
+        "Requested two fields. Observed one field. One field is not present in the source.",
+        "TASK specifies not three fields. Source contains not three fields.",
+      ]) {
+        await f.write(report)
+        expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+      }
+    } finally { await rm(f.root, { recursive: true, force: true }) }
+  })
+}
+
+test("tenth warning siblings each parse labels wrappers identities and local polarity", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [real, other, third] of [["W_ONE", "W_TWO", "W_THREE"], ["КОД_1", "КОД_2", "КОД_3"], ["Δ_1", "Δ_2", "Δ_3"]] as const) {
+      for (const [open, close, label, join] of [["[", "]", "code: ", " and "], ["(code [", "])", "", ", "], ["[", "]", "код ", " и "]] as const) {
+        const item = (code: string) => `${open}${label}${code}${close}`
+        for (const reverse of [false, true]) {
+          const pair = (reverse ? [other, real] : [real, other]).map(item).join(join)
+          Object.assign(receipt.value!, { warnings: [{ code: real, message: `Only mentions ${other}` }] })
+          for (const verb of ["issued", "did not issue"]) {
+            await f.write(`Data is corrupted. The engine ${verb} warnings ${pair}.`)
+            expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+          }
+          Object.assign(receipt.value!, { warnings: [{ code: real }, { code: other }, { code: third }] })
+          await f.write(`Data is corrupted. The engine issued warnings ${pair}${join}${item(third)}.`)
+          expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+          Object.assign(receipt.value!, { warnings: [] })
+          await f.write(`Data is corrupted. The engine did not issue warnings ${pair}${join}${item(third)}.`)
+          expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+        }
+      }
+    }
+    Object.assign(receipt.value!, { warnings: [{ code: "W_ONE" }] })
+    await f.write("Data is corrupted. The engine issued warnings [code W_ONE], but did not issue warning [code W_GHOST].")
+    expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+    await f.write("Data is corrupted. The engine did not issue warning [code W_GHOST], but issued warnings [code W_GHOST] and [code W_ONE].")
+    expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+test("tenth composed confirmation counts and warning arguments cannot hide adjacent false facts", async () => {
+  const f = await reportedRefusalFixture("csv-wrong-delimiter")
+  try {
+    const diagnosis = "I cannot confirm that the cause is encoding, but can confirm that requested two fields and observed one field."
+    for (const relation of ["Two fields are specified in TASK.", "One field exists in source."]) {
+      await f.write(`${diagnosis} ${relation} The engine did not issue warnings [code W_GHOST] and [code Δ_GHOST].`)
+      expect(await validateNodeAttempt(f.task, f.attempt)).toEqual({ errors: [], failures: [] })
+      await f.write(`${diagnosis} ${relation} The engine issued warnings [code W_GHOST] and [code Δ_GHOST].`)
+      expect((await validateNodeAttempt(f.task, f.attempt)).failures.length).toBeGreaterThan(0)
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
 test("ninth complement links preserve physical whitespace without absorbing separate questions", async () => {
   const f = await damagedFixture("txt-unclosed-quote")
   try {
