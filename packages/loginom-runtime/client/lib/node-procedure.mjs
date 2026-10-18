@@ -274,9 +274,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(!['input','output'].includes(direction))throw Error('Explicit port direction required');
       checkBudget();
       if(!preparedNodeContext||!Number.isInteger(port)||port<0||port>99)throw Error('A prepared output port index is required');
-      const before=await channel.observe({condition:'prepared graph before opening output port',
+      let before=await channel.observe({condition:'prepared graph before opening output port',
         ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'});
       assertContext(before);
+      const prefix=before.prepared_node_context.tid+';'+(direction==='input'?'Input':'Output')+'_';
+      if(before.ui.elements.some(e=>e.tid?.startsWith(prefix)&&e.interaction?.state==='outside_viewport')) {
+        await channel.revealGraphNode();
+        before=await channel.observe({condition:'prepared graph revealed before opening port',
+          ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'});
+        assertContext(before);
+      }
       checkBudget();
       const step=nextStep(),id=operation.id+':n'+step,action={verb:'open_'+direction+'_port',port},actionKey='node.'+direction+'_port.open.internal';
       const signature=digest([id,action,evidenceSnapshot]),observationHash=digest(evidenceSnapshot);
