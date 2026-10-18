@@ -180,6 +180,12 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         &&s.prepared_node_context.locked===false&&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k])
         &&s.wizard?.status==='absent'&&s.node_outputs?.verified===true;
       let s=await channel.observe({condition:'configured graph node ready for execution',readOutputs:true,ready:same});
+      const body=s.ui.elements.filter(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body');
+      if(body.length===1&&body[0].interaction?.state==='outside_viewport') {
+        await channel.revealGraphNode();
+        s=await channel.observe({condition:'configured graph node revealed before execution',readOutputs:true,
+          ready:s=>same(s)&&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'&&e.interaction?.state==='point_observed')});
+      }
       if(!s.node_outputs.node_selected) {
         const tid=s.prepared_node_context.tid;
         await channel.perform({condition:'select the configured node for execution',initialObservation:s,
