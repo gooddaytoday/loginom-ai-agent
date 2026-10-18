@@ -3872,6 +3872,29 @@ test('typed input-port finish uses one gesture and quiet exact graph return with
   }
 });
 
+test('input-port finish retries a timed graph read once without repeating Done',async()=>{
+ for(const persistent of [false,true]) {
+  const {page}=await inputPortFinishFixture('ellipsis'),snapshot=await page.observe();
+  const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');
+  let elapsed=0,armed=false,first=false,failures=0;
+  const Clock=page.context.Date;
+  page.context.Date=class extends Clock {static now(){return Clock.now()+elapsed;}};
+  const click=page.mouse.click,evaluate=page.evaluate.bind(page),query=page.document.querySelectorAll.bind(page.document);
+  page.mouse.click=async(...args)=>{await click(...args);armed=true;};
+  page.evaluate=(fn,arg)=>{if(arg&&Object.hasOwn(arg,'discoverRoots'))first=true;return evaluate(fn,arg);};
+  page.document.querySelectorAll=selector=>{
+   if(first){first=false;if(armed&&(persistent||failures===0)){elapsed+=600;failures++;}}
+   return query(selector);
+  };
+  const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot);
+  assert.equal(result.status,persistent?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(result.error));
+  assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,1);
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  assert.equal(failures,persistent?2:1);
+  if(persistent)assert.equal(result.error.code,'UI_SCAN_LIMIT');
+ }
+});
+
 test('input-port completion waits through late loading without repeating Done or accepting a changed owner',async()=>{
   for(const mode of ['late_loading','late_loading_long','late_loading_permanent','late_loading_foreign_node','late_loading_foreign_workflow']){
     const {page,waits}=await inputPortFinishFixture(mode),snapshot=await page.observe();
@@ -4266,6 +4289,33 @@ test('scan time budget accepts 500 ms but rejects 501 ms before issuing referenc
     }
     assert.deepEqual(page.events, []);
   }
+});
+
+test('owned wizard retries one timed scan, including after a gesture, without replaying it',async()=>{
+ for(const mode of ['transient','persistent','after_gesture','unbound']) {
+  const {page,binding}=await exportInputPortOverflowFixture(),clock=fixtureClock();
+  page.context.Date=clock.Date;
+  const wizardTid=binding.workflow_ref.prefix+';WizrdMCF';
+  const probe=page.add('button',wizardTid+';btnProbe','Probe',undefined,page.document.querySelectorAll('[data-tid="'+wizardTid+'"]')[0]);
+  const before=await page.execute({mode:'observe',prepared_node_context:binding});
+  const target=before.output.ui.elements.find(e=>e.tid===probe.attrs['data-tid']);
+  let reads=0,first=false;
+  const evaluate=page.evaluate.bind(page),query=page.document.querySelectorAll.bind(page.document);
+  page.evaluate=(fn,arg)=>{if(arg&&Object.hasOwn(arg,'discoverRoots')){reads++;first=true;}return evaluate(fn,arg);};
+  page.document.querySelectorAll=selector=>{
+   if(first){first=false;if(mode==='persistent'||reads===(mode==='after_gesture'?2:1))clock.advance(600);}
+   return query(selector);
+  };
+  const result=await page.execute(mode==='after_gesture'
+   ?{mode:'act',prepared_node_context:binding,snapshot:before.output,action:{verb:'click',ref:target.ref}}
+   :{mode:'observe',...(mode==='unbound'?{}:{prepared_node_context:binding})});
+  const success=['transient','after_gesture'].includes(mode);
+  assert.equal(result.status,success?'SUCCEEDED':'NOT_APPLIED',mode+JSON.stringify(result.error));
+  assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,mode==='unbound'?0:1,mode);
+  assert.equal(reads,mode==='after_gesture'?3:mode==='unbound'?1:2,mode);
+  assert.equal(page.events.filter(e=>e==='click').length,mode==='after_gesture'?1:0,mode);
+  if(!success){assert.equal(result.error.code,'UI_SCAN_LIMIT');assert.equal(result.output.ui,undefined);}
+ }
 });
 
 test('mask settlement cannot extend unbound or unrelated actions',()=>{
@@ -4910,6 +4960,18 @@ test('graph launch only exposes typed execution for the exact native selected no
  const e=r.output.ui.elements.find(e=>e.tid===f.button.attrs['data-tid']);assert.deepEqual(clone(e.allowed_actions),['execute_graph_node'],JSON.stringify(e));
  assert.equal(e.graph_execution.node_id,'node-a');assert.throws(()=>validateUiAction({verb:'click',ref:e.ref},r.output));
  const done=await f.execute({mode:'act',action:{verb:'execute_graph_node',ref:e.ref},snapshot:r.output});assert.equal(done.status,'SUCCEEDED');assert.equal(f.page.events.filter(e=>e==='click').length,1);
+});
+test('graph launch refuses a repainted body of the same selected node before the execution gesture',async()=>{
+ const f=graphLaunchFixture(),view=f.model.FDiagram.FmxGraph.view,original=view.getState;let reads=0;
+ view.getState=()=>{
+  if(++reads<3)return original();
+  return {shape:{node:f.page.add('div','MF;TF-1;Graph;Calculator','',{x:100,y:100,width:100,height:50})}};
+ };
+ const observed=await f.execute({mode:'observe'}),button=observed.output.ui.elements.find(e=>e.tid===f.button.attrs['data-tid']);
+ const outcome=await f.execute({mode:'act',action:{verb:'execute_graph_node',ref:button.ref},snapshot:observed.output});
+ assert.equal(outcome.error.code,'GRAPH_EXECUTION_CONTEXT_CHANGED');assert.equal(outcome.status,'NOT_APPLIED');
+ assert.equal(outcome.effect_possible,false);assert.equal(outcome.cleanup_complete,true);
+ assert.equal(f.page.events.filter(e=>e==='click').length,0);
 });
 for(const [name,mutate] of Object.entries({unselected:f=>f.select([]),foreign:f=>f.select([{}]),multiple:f=>f.select([f.owner.FCell,{}]),locked:f=>f.owner.FLocked=true,disabled:f=>f.native.disabled=true,deactivate:f=>f.native.tooltip='Деактивировать узел',duplicate:f=>f.model.FDiagram.FNodes.FCollection.push({...f.owner}),foreign_button:f=>f.native.el.dom={}}))test('graph launch refuses native '+name+' drift without a gesture',async()=>{
  const f=graphLaunchFixture(),r=await f.execute({mode:'observe'}),e=r.output.ui.elements.find(e=>e.tid===f.button.attrs['data-tid']);

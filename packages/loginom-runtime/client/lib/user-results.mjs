@@ -125,6 +125,8 @@ export function compactActionResult(result) {
   delete copy.trace;
   if (copy.status === 'SUCCEEDED' && ['package.save_as', 'package.save_checkpoint'].includes(copy.action_key)) {
     copy.output = pick(copy.output, ['package_ref', 'reopened', 'workflow_preserved', 'save_completed', 'persisted_content_verified', 'workflow_continuations']);
+    const arrangement = result.trace?.findLast(item => item.event === 'package_arrangement');
+    if (arrangement) copy.output.arrangement = pick(arrangement, ['status', 'reason', 'warning']);
     copy.output.reporting_constraints = ['Сохранение подтверждает пакет, но не правильность итогового текста. Для каждого численного вывода используй прочитанное поле результата узла. Разности, изменения в п.п. и темпы роста тоже должны быть вычислены в узлах; не вычитай округлённые проценты. Если нужного показателя нет, вычисли его или не добавляй необязательное число.', 'Ноль и отсутствие наблюдения различаются. Не объявляй нули пропусками или будущими периодами без явного признака в исходных данных либо условия задания. Интерпретацию, не подтверждённую данными, обозначай как гипотезу.'];
     if (copy.output.workflow_continuations) copy.output.workflow_continuations = copy.output.workflow_continuations.map(item => pick(item, ['document_id', 'workflow_ref']));
   }

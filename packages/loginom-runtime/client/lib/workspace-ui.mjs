@@ -115,7 +115,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   // A WeakMap records DOM incarnations, without adding attributes or mutating
   // Loginom. Re-rendering an identical-looking control invalidates its old ref.
   // The state is document-bound; navigation invalidates every previous reference.
-  const readUi = async (rediscover = false) => {
+  const readUi = async (rediscover = false, scanRetried = false) => {
     const nodeContext=await boundNode();
     const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort}) => {
     try {
@@ -3368,6 +3368,15 @@ function readRenderedInputMapping(observation) {
     if (observed?.ui_read_failure) {
       const code=observed.ui_read_failure.code;
       if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown'});
+      // A normal owned wizard can exceed 500 ms under contention, including
+      // the read after a completed gesture. Repeat only that read once; never
+      // replay the gesture or extend the enclosing action deadline.
+      if(code==='UI_SCAN_LIMIT'&&observed.ui_read_failure.limit_kind==='time'
+        &&(nodeContext?.surface==='wizard'||nodeContext?.surface==='graph'&&effectPossible
+          &&['finish_wizard','execute_wizard'].includes(task.action?.verb))&&!scanRetried) {
+        timeout();record('ui_scan_read_retried',{attempt:1});
+        return readUi(rediscover,true);
+      }
       const messages={UI_SCAN_LIMIT:'Workspace scan budget exceeded; use root discovery and a narrower observation',
         UI_ROOT_STALE:'Observed root is detached, hidden, inactive or expired',
         UI_EPOCH_UNAVAILABLE:'DOM mutation tracking is unavailable',UI_OBSERVATION_FAILED:'Browser observation failed'};

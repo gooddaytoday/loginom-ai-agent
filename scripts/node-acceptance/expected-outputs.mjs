@@ -4,7 +4,7 @@ export function parseExpectedOutputs(expected){
  need(Array.isArray(expected.nodes),'EXPECTED_SHAPE_INVALID');
  const multiple=Object.hasOwn(expected,'outputs');
  need(!multiple||!['columns','rows','output_node_type'].some(k=>Object.hasOwn(expected,k)),'EXPECTED_MIXED_OUTPUT_FORMS');
- const fields=['output_node_type','output_node_label','columns','rows','ordered','output_port','column_order'];
+ const fields=['output_node_type','output_node_label','columns','rows','ordered','output_port','column_order','export_destination'];
  const outputs=multiple?expected.outputs:[Object.fromEntries(fields.filter(k=>Object.hasOwn(expected,k)).map(k=>[k,expected[k]]))];
  need(Array.isArray(outputs)&&outputs.length>0&&outputs.length<=32,'EXPECTED_OUTPUTS_INVALID');
  for(const output of outputs){
@@ -18,6 +18,9 @@ export function parseExpectedOutputs(expected){
    &&Array.isArray(output.rows)&&output.rows.length<=100,'EXPECTED_SHAPE_INVALID');
   need(output.output_node_type!=='export_input'||!['output_port','output_node_label'].some(k=>Object.hasOwn(output,k)),
    'EXPECTED_EXPORT_INPUT_OPTIONS_INVALID');
+  if(Object.hasOwn(output,'export_destination'))need(output.output_node_type==='export_input'
+   &&typeof output.export_destination==='string'&&/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+$/.test(output.export_destination)
+   &&!output.export_destination.split('/').some(p=>p==='.'||p==='..'),'EXPECTED_EXPORT_DESTINATION_INVALID');
   const names=output.columns.map(c=>c.name);
   need(new Set(names).size===names.length&&output.columns.every(c=>typeof c.name==='string'&&c.name.length>0
    &&typeof (c.label??c.name)==='string'&&['string','integer','real','boolean','datetime','variant'].includes(c.type)),'EXPECTED_COLUMNS_INVALID');
@@ -33,12 +36,19 @@ export function parseExpectedOutputs(expected){
     &&(Object.hasOwn(v,'value')||/^[a-f0-9]{16}$/.test(v.bytes_le??'')),'EXPECTED_VARIANT_SUBTYPE_REQUIRED');
   }
  }
+ need(!outputs.some(o=>Object.hasOwn(o,'export_destination'))||outputs.filter(o=>o.output_node_type==='export_input').length===1,'EXPECTED_EXPORT_INPUT_OPTIONS_INVALID');
  return {multiple,outputs};
 }
-export function resolveExportInput(graph){
+export function resolveExportInput(graph,{destination,destinations}={}){
  const error='COLD_EXTRA_OR_MISSING_OUTPUT_NODE';
  need(graph?.complete===true&&Array.isArray(graph.nodes)&&Array.isArray(graph.links),error);
- const exports=graph.nodes.filter(n=>n.type==='exports.text');
+ let exports=graph.nodes.filter(n=>n.type==='exports.text');
+ if(destination!==undefined){
+  need(Array.isArray(destinations)&&destinations.length===exports.length
+   &&new Set(destinations.map(d=>d.node_id)).size===exports.length
+   &&exports.every(n=>destinations.some(d=>d.node_id===n.ref.node_id&&typeof d.destination==='string')),error);
+  exports=exports.filter(n=>destinations.some(d=>d.node_id===n.ref.node_id&&d.destination===destination));
+ }
  need(exports.length===1,error);
  const incoming=graph.links.filter(l=>l.target===exports[0].ref.node_id);
  need(incoming.length===1&&incoming[0].input===0&&Number.isSafeInteger(incoming[0].output)&&incoming[0].output>=0,error);

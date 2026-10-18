@@ -1,3 +1,6 @@
+import {readGraph} from './node-target-browser.mjs';
+import {NODE_TYPES} from './node-contracts.mjs';
+import {revealPreparedGraphNode,revealNodePlacement,nodePlacementViewport,nodePlacementPoint,samePlacementGraph} from './node-placement.mjs';
 import {makeJavascriptOutputPreviewCode} from './javascript-output-preview.mjs';
 import {makeCrossTableContextCode} from './crosstable-context.mjs';
 import {makeCrossTableVariablesCode,makeCrossTableBindingsCode} from './crosstable-variables.mjs';
@@ -24,9 +27,9 @@ import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode} from './no
 import {makeNodeProcessContextCode} from './node-process-context.mjs';
 import {makeNodeOutputContextCode} from './node-output-context.mjs';
 import {makeNodeTableContextCode} from './node-table-context.mjs';
-import {boundWizardCloseConfirmation,wizardCloseDialogOwner} from './node-wizard-close.mjs';
+import {boundWizardCloseConfirmation,wizardCloseDialogOwner,wizardCloseBinding,boundInputMappingConflict} from './node-wizard-close.mjs';
 import {boundWizardDeactivationConfirmation,wizardDeactivationDialogOwner} from './node-wizard-open.mjs';
-const boundWizardConfirmation=(...args)=>boundWizardCloseConfirmation(...args)||boundWizardDeactivationConfirmation(...args);
+const boundWizardConfirmation=(...args)=>boundWizardCloseConfirmation(...args)||boundWizardDeactivationConfirmation(...args)||boundInputMappingConflict(...args);
 const wizardConfirmationOwner=(...args)=>wizardCloseDialogOwner(...args)||wizardDeactivationDialogOwner(...args);
 
 export class NodeReadinessTimeout extends Error {
@@ -233,6 +236,32 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
+    async revealGraphNode() {
+      checkBudget();
+      if(!preparedNodeContext)throw Error('Viewport navigation requires a prepared node');
+      const before=await channel.observe({condition:'prepared graph before node viewport navigation',
+        ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'});
+      assertContext(before);checkBudget();
+      const step=nextStep(),id=operation.id+':n'+step,action={verb:'reveal_prepared_node'},actionKey='node.viewport.reveal.internal';
+      const signature=digest([id,action,evidenceSnapshot]),observationHash=digest(evidenceSnapshot);
+      snapshot=null;evidenceSnapshot=null;
+      const prepared=await entry('node_step_prepared',{step,internal_operation_id:id,action,observation_sha256:observationHash,signature});
+      if(prepared?.signature!==signature||JSON.stringify(prepared.action)!==JSON.stringify(action))throw Error('Node viewport navigation was not durably prepared');
+      signal?.throwIfAborted();checkBudget();
+      const code=`async page=>(${revealPreparedGraphNode.toString()})(page,${JSON.stringify({binding:preparedNodeContext,origin:targetOrigin,build:targetBuild,deadline:operation.deadline,types:NODE_TYPES})},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${samePlacementGraph.toString()})`;
+      const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'node_viewport',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:null,trace:[]}}`;
+      let result;
+      try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:Math.max(1,operation.deadline-now())});}
+      catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
+      if(result.operation_id!==id||result.action_key!==actionKey){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw Error('Node viewport receipt identity differs');}
+      operation.cleanupConfirmed=result.cleanup_complete===true;operation.nodeEffectPossible ||= result.effect_possible===true;
+      const completed=await entry('node_step_completed',{step,internal_operation_id:id,outcome:structuredClone(result)});
+      if(JSON.stringify(completed?.outcome)!==JSON.stringify(result))throw Error('Node viewport outcome was not durably preserved');
+      if(result.status!=='SUCCEEDED'||!operation.cleanupConfirmed||result.output?.verified!==true
+        ||result.output.graph_unchanged!==true||result.output.fully_visible!==true||result.output.settings_applied!==false
+        ||['document_id','workflow_id','node_id'].some(k=>result.output.node?.[k]!==preparedNodeContext.node[k]))throw new NodeProcedureStepError(result);
+      return structuredClone(result);
+    },
     async openOutputPort(port) {return channel.openPort('output',port);},
     async openInputPort(port) {return channel.openPort('input',port);},
     async openPort(direction,port) {
@@ -267,7 +296,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, releaseWizard = false, settleOutputPort } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -278,6 +307,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw Error('Output settlement requires a prepared native port');
       readOutputs ||= !!tablePage || !!tableDialog;
       if(wizardConfirmation && (!preparedNodeContext || !['close','deactivation'].includes(wizardConfirmation.kind)))throw Error('A prepared wizard confirmation binding is required');
+      if(releaseWizard&&!preparedNodeContext)throw Error('Wizard release requires its prepared node');
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
       if(tableDialog)makeNodeTableContextCode(preparedNodeContext,tableDialog.table,{row_offset:0,row_limit:0,column_offset:0,column_limit:1});
@@ -334,6 +364,12 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw error;
         }
         const wizard = roots.output.wizard;
+        if(releaseWizard&&wizard?.status==='observed') {
+          assertContext(roots.output,true,null,true);
+          const port=roots.output.prepared_node_context?.input_port??roots.output.prepared_node_context?.output_port;
+          if(port&&!port.opening_operation_id?.startsWith(operation.id+':n'))throw Error('Wizard port was not opened by this stopped operation');
+          wizardConfirmation??=wizardCloseBinding(roots.output);
+        }
         const portals = wizard?.status === 'observed' ? (roots.output.ui?.elements??[]).filter(e =>
           (e.tid?.startsWith(wizard.root_tid + ';') || wizard.stage==='field_parameters' && e.tid?.startsWith('EditReformColumnDefForm;') || wizard.stage==='input_mapping' && e.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist') && e.tid.endsWith(';boundlist')) : [];
         if(portals.length>1)throw new Error('Node procedure dropdown owner is ambiguous');
@@ -559,7 +595,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (!snapshot) throw new Error('A fresh internal observation is required');
       validateUiAction(action, snapshot);
       assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);
-      if(snapshotWizardConfirmation && (action.verb!==(snapshotWizardConfirmation.kind==='close'?'confirm_wizard_close':'confirm_wizard_deactivation') || snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid!=='msgbox;tlb;yes'))throw Error('Only the bound wizard confirmation can answer this question');
+      const mappingConflict=snapshotWizardConfirmation&&boundInputMappingConflict(snapshot,snapshotWizardConfirmation);
+      if(snapshotWizardConfirmation && (action.verb!==(mappingConflict?'click':snapshotWizardConfirmation.kind==='close'?'confirm_wizard_close':'confirm_wizard_deactivation')
+        || snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid!==(mappingConflict?'msgbox;tlb;cancel':'msgbox;tlb;yes')))throw Error('Only the bound wizard confirmation can answer this question');
       const step = nextStep(), id = operation.id + ':n' + step;
       const before = snapshot;
       snapshot = null;
