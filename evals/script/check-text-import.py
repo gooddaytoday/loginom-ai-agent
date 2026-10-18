@@ -477,6 +477,38 @@ def report_normalize(text):
     return re.sub(r'[`*]', '', text).replace('ё', 'е').replace('Ё', 'Е')
 
 
+def report_complements(sentence, atoms=()):
+    """Speech dependencies precede line cuts and subordinate time frames."""
+    quoted = r'«[^»]*»|“[^”]*”|"[^"]*"|\[[^\]]*\]'
+    literals = [r'\s+'.join(re.escape(part) for part in atom.split()) for atom in atoms if atom]
+    protected = '|'.join([r'[«“"]\s*' + atom + r'\s*[»”"]' for atom in literals] + [quoted] + literals)
+    spans = [m.span() for m in re.finditer(protected, sentence)]
+    outside = lambda n: not any(left < n < right for left, right in spans)
+    governor = (r'(?:я\s+)?не\s+(?:утвержда\w*|подтвержд\w*)'
+        r'|(?:нельзя|невозможно)\s+утвержда\w*'
+        r'|(?:i\s+)?(?:cannot|can\s+not|do\s+not|don.t)\s+(?:confirm|claim|assert)'
+        r'|not\s+confirmed|no\s+evidence|(?:it\s+is\s+)?possible|perhaps|possibly|maybe'
+        r'|возможн\w*|вероятн\w*|(?:please\s+)?check|проверь(?:те)?')
+    independent = (r'(?:the\s+)?(?:data|text|engine|warnings?|loginom)\b'
+        r'|(?:данн\w*|текст\w*|движ\w*|предупрежд\w*|фактически|actually|now|сейчас)\b'
+        r'|(?:запрош\w*|получ\w*|requested|observed|found)\b'
+        r'|(?:i|we|я|мы)\b|\w+\s+(?:is|are|was|were|отсутств\w*|присутств\w*)\b')
+    rows = []
+    prefix = r'(?:^|[;,:.!?\n]\s*|\b(?:but|however|но|однако|and|и)\s+)'
+    for match in re.finditer(prefix + r'(?P<governor>' + governor + r')\b[^;:.!?]{0,80}?(?::|\b(?:that|что|whether)\b)', sentence):
+        if not outside(match.start('governor')): continue
+        end = len(sentence)
+        for boundary in re.finditer(r';|[.!?](?=\s|$)|\b(?:но|однако|but|however)\b', sentence[match.end():]):
+            position = match.end() + boundary.start()
+            if not outside(position): continue
+            if boundary.group() in ('но', 'однако', 'but', 'however') and not re.match(independent, sentence[match.end() + boundary.end():].lstrip(' ,')):
+                continue
+            end = position
+            break
+        rows.append((match.start('governor'), end))
+    return rows
+
+
 def report_regions(sentence, inherited=None, atoms=()):
     """Resolve enclosing scope on the intact utterance before any clause cut."""
     regions = [(0, len(sentence), inherited)]
@@ -486,6 +518,7 @@ def report_regions(sentence, inherited=None, atoms=()):
     protected += ''.join('|' + r'\s+'.join(re.escape(part) for part in atom.split()) for atom in atoms if atom)
     quoted = [(m.start(), m.end()) for m in re.finditer(protected, sentence)]
     outside = lambda n: not any(start < n < end for start, end in quoted)
+    complements = report_complements(sentence, atoms)
     example = r'(?:в\s+|in\s+(?:(?:the|an?)\s+)?)?(?:пример\w*|образ(?:ец|це)\w*|example|template)\b'
     governing = (example + r'|(?:я\s+)?не\s+(?:утвержда\w*|подтвержд\w*)\b'
         r'|(?:нельзя|невозможно)\s+утвержда\w*\b'
@@ -493,15 +526,9 @@ def report_regions(sentence, inherited=None, atoms=()):
         r'|not\s+confirmed\b|no\s+evidence\b')
     for match in re.finditer(r'(?:^|[;,:]\s*)(?P<governor>' + governing + r')[^;:!?]*:', sentence):
         if outside(match.start('governor')):
-            regions.append((match.start('governor'), len(sentence), 0))
-    # Speech nonassertion governs its complement, not a subsequent independent
-    # predicate. Resolve the dependency before cutting at that/что or newline.
-    complement = (governing + r'|(?:it\s+is\s+)?possible|perhaps|possibly|maybe'
-        r'|возможн\w*|вероятн\w*|(?:please\s+)?check|проверь(?:те)?')
-    for match in re.finditer(r'\b(?:' + complement + r')[^;:!?]{0,80}?\b(?:that|что|whether)\b', sentence):
-        if outside(match.start()):
-            end = next((m.start() for m in re.finditer(r';|\b(?:но|однако|but|however)\b', sentence) if m.start() > match.end() and outside(m.start())), len(sentence))
-            regions.append((match.start(), end, 0))
+            end = next((right for left, right in complements if left == match.start('governor')), len(sentence))
+            regions.append((match.start('governor'), end, 0))
+    regions += [(left, right, 0) for left, right in complements]
     history = (r'(?:ранее|прежде|раньше|исторически|previously|historically'
         r'|в\s+(?:прошл\w*|предыдущ\w*|предшеств\w*)\s+(?:запуск\w*|попытк\w*)'
         r'|in\s+(?:the\s+)?(?:previous|last|prior|earlier)\s+(?:attempt|run))\b')
@@ -513,7 +540,7 @@ def report_regions(sentence, inherited=None, atoms=()):
     current = (r'в\s+текущ\w*\s+(?:запуск\w*|попытк\w*|запрос\w*|источник\w*)'
         r'|in\s+(?:the\s+current|this)\s+(?:run|attempt|request|source)')
     for match in re.finditer(r'[,;]\s*(?P<actual>фактически|actually|in\s+fact|сейчас|now|(?:the\s+)?actual\s+(?:result|reason)|фактическ\w*\s+(?:результат|причин\w*)|' + current + r')\b', sentence):
-        if outside(match.start('actual')):
+        if outside(match.start('actual')) and not any(left <= match.start('actual') < right for left, right in complements):
             regions.append((match.start('actual'), len(sentence), None))
     return sorted(regions, key=lambda row: row[0])
 
@@ -529,7 +556,11 @@ def report_sentences(text, atoms=(), identifiers=None):
         identifiers = {token.casefold() for token in re.findall(r'\b\w[\w-]*\b', text) if token.isupper()}
     text = text.casefold()
     text = re.sub(r',\s*(?:однако|however)\s*,', ' ', text)
-    quote = r'«[^»]*»|“[^”]*”|"[^"]*"'
+    # A physical newline is whitespace within a resolved complement. Elsewhere
+    # it still separates reports, including a literal reason and a new question.
+    complements = report_complements(text, atoms)
+    text = ''.join(' ' if char == '\n' and any(left <= i < right for left, right in complements) else char for i, char in enumerate(text))
+    quote = r'«[^»]*»|“[^”]*”|"[^"]*"|\[[^\]]*\]'
     speaker = r'(?:the\s+)?(?:пользователь|оператор|user|operator|someone)'
     saying = r'(?:сказ\w*|сообщ\w*|утвержда\w*|said|claims?|reported)'
     # Resolve the quote plus its attribution as one lexical span before even a
@@ -542,8 +573,9 @@ def report_sentences(text, atoms=(), identifiers=None):
     quoted += r'|\b(?:\d+|два|две|три|четыре|пять|one|two|three|four|five)\b\s*,\s*(?:а|but|and)?\s*(?:не|not)\s+(?:\d+|два|две|три|четыре|пять|one|two|three|four|five)\s+(?:пол\w*|fields?|columns?)\b'
     # A relative emission shares its antecedent warning object. Keep both
     # predicates together; warning_facts resolves their independent polarity.
-    quoted += (r'|\b(?:warnings?|предупрежд\w*)\b[^;.!?\n]{0,100}?\b(?:that|which|котор\w*)\s+'
-        r'(?:the\s+)?(?:engine|движ\w*|loginom)\b[^;.!?\n]{0,45}?\b(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b')
+    quoted += (r'|\b(?:warnings?|предупрежд\w*)\b[^;.!?]{0,100}?\b(?:that|which|котор\w*)\s+'
+        r'(?:(?:the\s+)?(?:engine|движ\w*|loginom)\b[^;.!?]{0,45}?\b(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b'
+        r'|(?:\w+\s+){0,8}?(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b\s+(?:(?:by|from)\s+(?:the\s+)?(?:engine|loginom)|движ\w*))')
     sentences, start, carry = [], 0, None
     for match in re.finditer(quoted + r'|(?P<cut>(?<=[.!?])\s+|\n+)', text):
         if match.group('cut') is not None:
@@ -595,17 +627,31 @@ def report_sentences(text, atoms=(), identifiers=None):
         protected = [(match.start(), match.end()) for match in re.finditer(quoted, sentence)]
         boundaries = [(match.start(), match.end()) for match in re.finditer(cuts, sentence) if match.group('cut') is not None]
         boundaries += [(position, position) for position, _, _ in regions if position and not any(left < position < right for left, right in protected)]
-        start = 0
+        start, role, inherited_role = 0, None, False
+        def append(left, right):
+            nonlocal role
+            part = sentence[left:right]
+            position = left + len(part) - len(part.lstrip())
+            clause = ReportClause(part, scope_at(position), origin + left, identifiers)
+            markers = list(re.finditer(r'\b(?P<marker>запрош\w*|ожида\w*|requested|required|expected|получ\w*|обнаруж\w*|наблюда\w*|observed|found)\b[^;,.!?]{0,40}?\b(?:пол\w*|колон\w*|столб\w*|fields?|columns?)\b', clause))
+            explicit = markers[-1] if markers else None
+            if explicit:
+                role = 'requested' if re.match(r'запрош|ожида|requested|required|expected', explicit['marker']) else 'observed'
+            elif inherited_role and role and re.match(r'(?:(?:не|not)\s+)?(?:\d+|one|two|three|four|five|одно|один|два|две|три|четыре|пять)\b', clause):
+                clause.count_role = role
+            else:
+                role = None
+            rows.append(clause)
         for left, right in sorted(set(boundaries)):
             if left < start: continue
             if re.fullmatch(r'(?:возможно|вероятно|может быть|perhaps|possibly|probably|maybe)\s*', sentence[start:left].strip()):
                 continue
             if sentence[start:left].strip():
-                position = start + len(sentence[start:]) - len(sentence[start:].lstrip())
-                rows.append(ReportClause(sentence[start:left], scope_at(position), origin + start, identifiers))
+                append(start, left)
+            inherited_role = bool(re.search(r'\b(?:но|однако|but|however)\b', sentence[left:right]))
             start = right
         if sentence[start:].strip():
-            rows.append(ReportClause(sentence[start:], scope_at(start + len(sentence[start:]) - len(sentence[start:].lstrip())), origin + start, identifiers))
+            append(start, len(sentence))
     return rows
 
 
@@ -705,10 +751,13 @@ def bound_report_facts(sentence, objects, predicates):
 
 
 def report_name_role(clause, match):
-    """Bind a naming relation to its nearest source/output noun modifier."""
-    phrase = re.split(r'[;.!?:]', clause[:match.start()])[-1] + match.group()
-    modifiers = list(re.finditer(r'\b(?:выходн\w*|output|запрошенн\w*|requested|исходн\w*|входн\w*|source|original)\b', phrase))
-    return 'output' if modifiers and re.match(r'выход|output|запрошенн|requested', modifiers[-1].group()) else 'source'
+    """Only this naming noun's own modifiers can determine its object role."""
+    phrase = re.sub(r'«[^»]*»|“[^”]*”|"[^"]*"', '', match.group())
+    if re.search(r'\b(?:источник\w*|исходн\w*|входн\w*|source|original)\b', phrase): return 'source'
+    if re.search(r'\b(?:выходн\w*|output)\b', phrase): return 'output'
+    adjacent = re.search(r'\b(?P<modifiers>(?:(?:выходн\w*|output|запрошенн\w*|requested|исходн\w*|входн\w*|source|original)\s+)+)$', clause[:match.start()])
+    modifiers = adjacent['modifiers'].split() if adjacent else []
+    return 'output' if modifiers and re.match(r'выход|output|запрошенн|requested', modifiers[-1]) else 'source'
 
 
 def refusal_witness(sentences, reason, spec):
@@ -831,14 +880,23 @@ def refusal_explained(sentences, reason, spec):
             number = r'\d+|' + '|'.join(numbers)
             unit = r'пол\w*|колон\w*|столб\w*|columns?|fields?|строк\w*|rows?|файл\w*|files?'
             markers = r'запрош\w*|ожида\w*|requested|required|expected|получ\w*|обнаруж\w*|наблюда\w*|observed|found'
-            for marker in re.finditer(rf'\b(?P<marker>{markers})\b', clause):
+            marker_rows = list(re.finditer(rf'\b(?P<marker>{markers})\b', clause))
+            elided = not marker_rows and getattr(clause, 'count_role', None)
+            if elided: marker_rows = [re.match(r'(?P<marker>)', clause)]
+            for marker in marker_rows:
                 tail = clause[marker.end():]
                 quantity = re.match(rf'\s*(?:(?:всего|только|only|total)\s+)?(?P<neg>не\s+|not\s+)?(?P<n>{number})\b(?P<alternative>\s*,\s*(?:а|but|and)?\s*(?:не|not)\s+(?P<other>{number})\b)?\s+(?:исходн\w*\s+|source\s+)?(?P<unit>{unit})\b', tail)
+                if not quantity and elided:
+                    quantity = re.match(rf'\s*(?P<neg>не\s+|not\s+)?(?P<n>{number})\b(?P<alternative>)(?P<other>)(?P<unit>)(?=\s*[.!?]*\s*$)', tail)
                 if not quantity: continue
-                if not re.match(r'пол|колон|столб|column|field', quantity['unit']): continue
-                role = 'requested' if re.match(r'запрош|ожида|requested|required|expected', marker['marker']) else 'observed'
+                if elided and not quantity['unit']:
+                    field_unit = True
+                else:
+                    field_unit = bool(re.match(r'пол|колон|столб|column|field', quantity['unit']))
+                if not field_unit: continue
+                role = elided if elided else ('requested' if re.match(r'запрош|ожида|requested|required|expected', marker['marker']) else 'observed')
                 raw = quantity['n'];n = int(raw) if raw.isdigit() else numbers[raw]
-                fact = ReportFact(clause, marker, 'source.fields', 'excluded_total' if quantity['neg'] else 'total', role=role, value=(n != expected[role] if quantity['neg'] else n == expected[role]))
+                fact = ReportFact(clause, quantity if elided else marker, 'source.fields', 'excluded_total' if quantity['neg'] else 'total', role=role, value=(n != expected[role] if quantity['neg'] else n == expected[role]))
                 fact.quantity, fact.unit = n, 'fields'
                 facts.append(fact)
                 if quantity['other']:
@@ -887,10 +945,11 @@ def warning_facts(clause):
         native = re.search(r'\b' + engine + r'[^;,.!?]{0,60}\b(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*|warn\w*|предупред\w*)\b', clause)
         native = native or re.search(r'\b(?:by|from|от|выдан\w*)\s+' + engine, clause)
         receiving = re.search(r'\b(?:receiv\w*|вижу|получ\w*|наблюдаю)\b', left)
-        relative = re.search(r'\b(?:that|which|котор\w*)\s+(?P<emission>' + engine + r'[^;.!?]*\b(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b)', right)
-        if own and not native: continue
+        relative = re.search(r'\b(?:that|which|котор\w*)\s+(?P<emission>' + engine + r'[^;.!?]*?\b(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b)', right)
+        relative = relative or re.search(r'\b(?:that|which|котор\w*)\s+(?P<emission>(?:\w+\s+){0,8}?(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b\s+(?:(?:by|from)\s+' + engine + r'|движ\w*\b))', right)
+        if own and not native and not relative: continue
         if receiving and re.search(r'\b(?:not|never|не)\b', left) and not relative: continue
-        fact = ReportFact(clause, match, 'warning', 'emitted', role='engine' if native else 'unspecified')
+        fact = ReportFact(clause, match, 'warning', 'emitted', role='engine' if native or relative else 'unspecified')
         if relative:
             # Negating reception does not negate this engine predicate. The
             # enclosing speech scope still governs the whole relative claim.
@@ -903,17 +962,17 @@ def warning_facts(clause):
             codes.append(match.group())
         # Prenominal code: "the CODE warning" binds the same warning object.
         previous = re.search(rf'\b({identifier})\s*$', left)
-        wrapped = bool(re.match(r'[\s:]*[(«"“]', right))
-        rest = re.sub(r'^[\s(:«»"“”]+', '', right)
+        wrapped = bool(re.match(r'[\s:]*[\[(«"“]', right))
+        rest = re.sub(r'^[\s\[(:«»"“”]+', '', right)
         label = re.match(r'(?:code|с\s+кодом|код(?:ом)?)\b[\s:=]*', rest)
         if label:
-            rest = re.sub(r'^[\s(:«»"“”]+', '', rest[label.end():])
+            rest = re.sub(r'^[\s\[(:«»"“”]+', '', rest[label.end():])
         item = re.match(identifier, rest)
         if item and (label or wrapped or concrete(item.group())):
             codes.append(item.group())
             rest = rest[item.end():]
             while True:
-                sibling = re.match(rf'[\s)»"”]*(?:,|and|и)\s*[«"“(]*({identifier})\b', rest)
+                sibling = re.match(rf'[\s)\]»"”]*(?:,|and|и)\s*[\[«"“(]*({identifier})\b', rest)
                 if not sibling or not concrete(sibling[1]): break
                 codes.append(sibling[1]);rest = rest[sibling.end():]
         # An explicit postnominal object resolves the code; a preceding uppercase
