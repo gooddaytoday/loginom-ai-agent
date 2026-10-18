@@ -483,6 +483,7 @@ _REPORT_NUMERALS = {
     3: r'три|трех|three', 4: r'четыре|четырех|four', 5: r'пять|пяти|five',
 }
 _REPORT_NUMBER = r'\d+|' + '|'.join(_REPORT_NUMERALS.values())
+_REPORT_UNKNOWN = r'\b(?:не\s+(?:исключен\w*|установлен\w*|доказан\w*|подтвержден\w*)|not\s+confirmed|no\s+evidence|without\s+evidence|unproven|unconfirmed)\b'
 
 
 def report_number_value(text):
@@ -505,6 +506,64 @@ def report_owned_context(clause, start, end):
         getattr(clause, 'start', 0), getattr(clause, 'identifiers', ()))
     owned.core_span, owned.context_span, owned.context_valid = (start, end), (end, len(clause)), valid
     return owned
+
+
+def warning_receiver_spans(text, identifiers=(), surface=None):
+    """A warning's receiver-relative owns its operators and dependent context."""
+    if not re.search(r'\b(?:that|which|котор\w*)\b', text): return []
+    topic = r'\b(?:warnings?|предупрежд\w*)\b'
+    subject = r'(?:(?:the\s+)?(?:agent|engine|report)|i|we|я|мы|агент\w*|движ\w*)\b'
+    auxiliary = r'(?:did|does|do|has|have|had|is|are|was|were|been|can|cannot|could|may|might|should|will|would|not|never|не|был\w*)\s+'
+    verb = r'(?:receiv\w*|получ\w*|вижу|наблюдаю)\b'
+    receiver = rf'(?:(?:{subject})\s+(?:{auxiliary})*{verb}|(?:{auxiliary})+{verb})'
+    markers, rows = list(re.finditer(topic, text)), []
+    for index, marker in enumerate(markers):
+        limit = markers[index+1].start() if index+1 < len(markers) else len(text)
+        arguments = warning_arguments(text[marker.end():limit], identifiers, text[:marker.end()],
+            surface[marker.end():limit] if surface is not None else None)
+        arguments = arguments or [{'end': 0}]
+        for number, argument in enumerate(arguments):
+            cursor = marker.end() + argument['end']
+            following = marker.end() + arguments[number+1]['start'] if number+1 < len(arguments) else limit
+            relative = re.match(r'[\s,(]*\b(?P<receiver>(?:that|which|котор\w*)\s+' + receiver + ')', text[cursor:following])
+            if not relative: continue
+            start, end = cursor + relative.start('receiver'), following
+            opening = text.find('(', cursor, start)
+            if opening != -1:
+                depth = 1
+                for position in range(opening+1, following):
+                    depth += (text[position] == '(') - (text[position] == ')')
+                    if not depth:
+                        start, end = opening, position+1
+                        break
+            else:
+                # A restrictive relative keeps its adjuncts; closing punctuation
+                # or a separately bound predicate/argument ends that dependency.
+                tail = cursor + relative.end()
+                pattern = r'\([^)]*\)|«[^»]*»|"[^"]*"|(?P<cut>[,;:.!?\n]|\b(?:and|but|however|и|но|однако)\b)'
+                for boundary in re.finditer(pattern, text[tail:following]):
+                    if boundary.group('cut') is None: continue
+                    left, right = tail + boundary.start(), tail + boundary.end()
+                    sibling = text[right:].lstrip()
+                    finite = report_predicate_head(sibling) or re.match(topic, sibling)
+                    next_argument = number+1 < len(arguments) and not text[right:following].strip()
+                    if boundary.group('cut') in ',;:.!?' or finite or next_argument:
+                        end = left
+                        break
+            rows.append({'span': (marker.start(), end), 'receiver': (start, end)})
+    return rows
+
+
+def warning_predicate_polarity(clause, start, end):
+    """Compose an emission's own negative auxiliary with its governing scope."""
+    emission = re.search(r'\b(?:(?P<negative>not|never|не)\s+(?:(?:been|ever|был\w*)\s+)*)?'
+        r'(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b', clause)
+    if not emission or emission['negative'] is None:
+        return claim_status(clause, start, end)
+    left, right = emission.span('negative')
+    owned = ReportClause(clause[:left] + ' ' * (right-left) + clause[right:],
+        clause.scope, clause.start, clause.identifiers)
+    return -claim_status(owned, start, end)
 
 
 def warning_relative_spans(text):
@@ -544,7 +603,7 @@ def report_predicate_head(text):
     return head
 
 
-def warning_arguments(text, identifiers=(), prefix=''):
+def warning_arguments(text, identifiers=(), prefix='', surface=None):
     """Read every code object before clause cuts or predicate polarity checks."""
     identifier = r'\w[\w-]*'
     concrete = lambda token: token in identifiers or bool(re.search(r'[_0-9-]', token))
@@ -607,6 +666,12 @@ def warning_arguments(text, identifiers=(), prefix=''):
                 # predicate. Resume at its closing comma, with local signs.
                 if re.fullmatch(r',\s*', sibling.group('separator')): continue
                 break
+            # A postposed epistemic predicate is not another code argument.
+            # A locally marked literal remains a code even when its spelling
+            # also occurs in prose; another occurrence elsewhere is insufficient.
+            if surface is not None and re.fullmatch(r',\s*', sibling.group('separator')) and re.fullmatch(_REPORT_UNKNOWN + r'[\s.!?]*', text[following:]):
+                token = list(re.finditer(r'\b' + re.escape(child[0]) + r'\b', text[following:child[1]]))[-1]
+                if not surface[following+token.start():following+token.end()].isupper(): break
             suffix = text[child[1]:].lstrip()
             passive = re.match(r'(?:(?:is|are|was|were|been|был\w*)\s+)?(?:(?:not|never|не)\s+)?(?:' + emission + r')\b', suffix)
             if re.match(finite, suffix) and (active or not passive): break
@@ -706,14 +771,15 @@ def report_sentences(text, atoms=(), identifiers=None):
     text = report_normalize(text)
     if identifiers is None:
         identifiers = {token.casefold() for token in re.findall(r'\b\w[\w-]*\b', text) if token.isupper()}
+    text = re.sub(r',\s*(?:однако|however)\s*,', ' ', text, flags=re.I)
+    surface = ''.join(char if len(char.casefold()) == 1 else ('A' if char.isupper() else 'a') * len(char.casefold()) for char in text)
     text = text.casefold()
-    text = re.sub(r',\s*(?:однако|however)\s*,', ' ', text)
     # A physical newline is whitespace within a resolved complement. Elsewhere
     # it still separates reports, including a literal reason and a new question.
     complements = report_complements(text, atoms)
     warning_lists = []
     for match in re.finditer(r'\b(?:warn(?:s|ed|ing|ings)?|предупрежд\w*|предупред\w*)\b', text):
-        arguments = warning_arguments(text[match.end():], identifiers, text[:match.end()])
+        arguments = warning_arguments(text[match.end():], identifiers, text[:match.end()], surface[match.end():])
         if len(arguments) > 1: warning_lists.append((match.start(), match.end() + arguments[-1]['end']))
     text = ''.join(' ' if char == '\n' and any(left <= i < right for left, right in complements + warning_lists) else char for i, char in enumerate(text))
     quote = r'«[^»]*»|“[^”]*”|"[^"]*"|\[[^\]]*\]'
@@ -730,6 +796,7 @@ def report_sentences(text, atoms=(), identifiers=None):
     # A relative emission shares its antecedent warning object. Keep both
     # predicates together; warning_facts resolves their independent polarity.
     quoted += ''.join('|' + re.escape(text[row['span'][0]:row['span'][1]]) for row in warning_relative_spans(text))
+    quoted += ''.join('|' + re.escape(text[row['span'][0]:row['span'][1]]) for row in warning_receiver_spans(text, identifiers, surface))
     sentences, start, carry = [], 0, None
     for match in re.finditer(quoted + r'|(?P<cut>(?<=[.!?])\s+|\n+)', text):
         if match.group('cut') is not None:
@@ -744,7 +811,7 @@ def report_sentences(text, atoms=(), identifiers=None):
     rows = []
     for sentence, origin, scope in sentences:
         if re.match(r'^(?:пример|образец|example|template|предполож\w*|допустим|task)\b'
-            r'|^(?:оператор|пользователь|someone|operator|user)\b.{0,20}'
+            r'|^(?:the\s+)?(?:оператор|пользователь|someone|operator|user)\b.{0,20}'
             r'\b(?:утвержда\w*|сказ\w*|предполож\w*|claims?|said|suggest\w*)\b', sentence):
             if not re.match(r'^task\s+(?:(?:does|do)\s+not\s+)?(?:specifi\w*|requir\w*|contain\w*)\b', sentence):
                 scope = 0
@@ -788,7 +855,7 @@ def report_sentences(text, atoms=(), identifiers=None):
         protected = [(match.start(), match.end()) for match in re.finditer(quoted, sentence)]
         warning_lists = []
         for match in re.finditer(r'\b(?:warn(?:s|ed|ing|ings)?|предупрежд\w*|предупред\w*)\b', sentence):
-            arguments = warning_arguments(sentence[match.end():], identifiers, sentence[:match.end()])
+            arguments = warning_arguments(sentence[match.end():], identifiers, sentence[:match.end()], surface[origin+match.end():origin+len(sentence)])
             if len(arguments) > 1: warning_lists.append((match.start(), match.end() + arguments[-1]['end']))
         boundaries = [(match.start(), match.end()) for match in re.finditer(cuts, sentence) if match.group('cut') is not None
             and not any(left < match.start() < right for left, right in warning_lists)]
@@ -842,6 +909,8 @@ def report_sentences(text, atoms=(), identifiers=None):
             start = right
         if sentence[start:].strip():
             append(start, len(sentence))
+    for clause in rows:
+        clause.surface = surface[clause.start:clause.start+len(clause)]
     return rows
 
 
@@ -888,7 +957,7 @@ def claim_status(clause, start, end):
     # observation. "damaged, possibly" without that object is still unasserted.
     causal_tail = re.search(r'\b(?:причин\w*|cause\w*|из-за|because|due\s+to)\b', tail)
     uncertain = r'\b(?:если|нужно|следует|надо|возможн\w*|вероятн\w*|может|якобы|if|should|might|could|possible|possibly|probably|perhaps|maybe|hypothetical)\b'
-    unknown = r'\b(?:не\s+(?:исключен\w*|установлен\w*|доказан\w*|подтвержден\w*)|no\s+evidence|without\s+evidence|unproven|unconfirmed)\b'
+    unknown = _REPORT_UNKNOWN
     if re.search(uncertain + '|' + unknown, prefix):
         return 0
     if not causal_tail and (re.search(uncertain + '|' + unknown, tail)
@@ -1181,6 +1250,14 @@ def warning_facts(clause):
     """Resolve emitter and concrete code arguments before looking at evidence."""
     identifier = r'\w[\w-]*'
     lexical_ids = getattr(clause, 'identifiers', ())
+    original = clause
+    surface = getattr(clause, 'surface', None)
+    receivers = warning_receiver_spans(clause, lexical_ids, surface)
+    if receivers:
+        text = ''.join(' ' if any(left <= index < right for left, right in (row['receiver'] for row in receivers)) else char
+            for index, char in enumerate(clause))
+        clause = ReportClause(text, clause.scope, clause.start, lexical_ids)
+        clause.warning_subject = getattr(original, 'warning_subject', None)
     concrete = lambda token: token in lexical_ids or bool(re.search(r'[_0-9-]', token))
     topic = r'warn(?:s|ed|ing|ings)?|предупрежд\w*|предупред\w*'
     markers = list(re.finditer(rf'\b(?:{topic})\b', clause))
@@ -1189,6 +1266,18 @@ def warning_facts(clause):
         if emitted:
             markers = [match for match in re.compile(rf'\b{identifier}\b').finditer(clause, emitted.end()) if concrete(match.group())][:1]
     relatives = warning_relative_spans(clause)
+    arguments_by_marker = []
+    for index, marker in enumerate(markers):
+        right = clause[marker.end():markers[index+1].start() if index+1 < len(markers) else len(clause)]
+        relative = next((row for row in relatives if row['object'] == marker.span()), None)
+        if relative: right = right[:relative['relative_start'] - marker.end()]
+        implicit = not re.fullmatch(topic, marker.group())
+        offset = marker.start() if implicit else marker.end()
+        text = marker.group() + right if implicit else right
+        arguments_by_marker.append((warning_arguments(text, lexical_ids, clause[:marker.end()],
+            surface[offset:offset+len(text)] if surface is not None else None), offset))
+    argument_spans = [(offset+argument['start'], offset+argument['end'])
+        for arguments, offset in arguments_by_marker for argument in arguments]
     head = report_predicate_head(clause)
     subject = (head.groupdict().get('subject') if head else None) or getattr(clause, 'warning_subject', None)
     for index, match in enumerate(markers):
@@ -1216,18 +1305,17 @@ def warning_facts(clause):
             right = right[:relative['relative_start'] - match.end()]
         # Prenominal code: "the CODE warning" binds the same warning object.
         previous = re.search(rf'\b({identifier})\s*$', left)
-        implicit = not re.fullmatch(topic, match.group())
-        arguments = warning_arguments(match.group() + right if implicit else right, lexical_ids, clause[:match.end()])
+        arguments, offset = arguments_by_marker[index]
         if arguments:
-            offset = match.start() if implicit else match.end()
             start, end = offset + arguments[0]['start'], offset + arguments[-1]['end']
-            context = ReportClause(clause[:start] + ' ' * (end-start) + clause[end:], clause.scope, clause.start, lexical_ids)
+            context = ReportClause(''.join(' ' if any(left <= index < right for left, right in argument_spans) else char
+                for index, char in enumerate(clause)), clause.scope, clause.start, lexical_ids)
             owned = report_owned_context(context, match.start(), end)
             if owned.context_valid: context = owned
-            polarity = fact.polarity if relative else claim_status(context, match.start(), match.end())
+            polarity = fact.polarity if relative else warning_predicate_polarity(context, match.start(), match.end())
             for argument in arguments:
                 own_fact = ReportFact(context, match, 'warning', 'emitted', role=fact.role, value=[argument['code']])
-                own_fact.clause = clause
+                own_fact.clause = original
                 own_fact.polarity = 0 if not polarity else (-1 if argument['negative'] else polarity)
                 yield own_fact
             continue
