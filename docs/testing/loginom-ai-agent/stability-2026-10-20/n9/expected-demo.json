@@ -1,0 +1,185 @@
+{
+  "package_path": "/stability-2026-10-20/n9.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.lin_regression"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Y",
+          "label": "Y",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Forecast",
+          "label": "Forecast",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": 0.5,
+          "Y": 6.0,
+          "Forecast": 5.588235294117647
+        },
+        {
+          "RowID": 2,
+          "X": 1.0,
+          "Y": 6.5,
+          "Forecast": 7.076470588235294
+        },
+        {
+          "RowID": 3,
+          "X": 1.5,
+          "Y": 9.0,
+          "Forecast": 8.564705882352941
+        },
+        {
+          "RowID": 4,
+          "X": 2.0,
+          "Y": 9.5,
+          "Forecast": 10.052941176470588
+        },
+        {
+          "RowID": 5,
+          "X": 2.5,
+          "Y": 12.0,
+          "Forecast": 11.541176470588235
+        },
+        {
+          "RowID": 6,
+          "X": 3.0,
+          "Y": 12.5,
+          "Forecast": 13.029411764705882
+        },
+        {
+          "RowID": 7,
+          "X": 3.5,
+          "Y": 15.0,
+          "Forecast": 14.51764705882353
+        },
+        {
+          "RowID": 8,
+          "X": 4.0,
+          "Y": 15.5,
+          "Forecast": 16.00588235294118
+        },
+        {
+          "RowID": 9,
+          "X": 4.5,
+          "Y": 18.0,
+          "Forecast": 17.49411764705882
+        },
+        {
+          "RowID": 10,
+          "X": 5.0,
+          "Y": 18.5,
+          "Forecast": 18.98235294117647
+        },
+        {
+          "RowID": 11,
+          "X": 5.5,
+          "Y": 21.0,
+          "Forecast": 20.470588235294116
+        },
+        {
+          "RowID": 12,
+          "X": 6.0,
+          "Y": 21.5,
+          "Forecast": 21.958823529411763
+        },
+        {
+          "RowID": 13,
+          "X": 6.5,
+          "Y": 24.0,
+          "Forecast": 23.44705882352941
+        },
+        {
+          "RowID": 14,
+          "X": 7.0,
+          "Y": 24.5,
+          "Forecast": 24.935294117647057
+        },
+        {
+          "RowID": 15,
+          "X": 7.5,
+          "Y": 27.0,
+          "Forecast": 26.423529411764704
+        },
+        {
+          "RowID": 16,
+          "X": 8.0,
+          "Y": 27.5,
+          "Forecast": 27.91176470588235
+        }
+      ]
+    },
+    {
+      "output_node_type": "datamining.lin_regression",
+      "output_port": 1,
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Name",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Y_coefficients",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Name": "<Константа>",
+          "Y_coefficients": 4.1
+        },
+        {
+          "Name": "X",
+          "Y_coefficients": 2.976470588235294
+        }
+      ]
+    }
+  ]
+}

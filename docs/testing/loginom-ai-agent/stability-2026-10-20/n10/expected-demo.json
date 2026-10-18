@@ -1,0 +1,242 @@
+{
+  "package_path": "/stability-2026-10-20/n10.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.lin_regression"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RowID",
+          "label": "RowID",
+          "type": "integer"
+        },
+        {
+          "name": "X",
+          "label": "X",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Z",
+          "label": "Z",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Y",
+          "label": "Y",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Forecast",
+          "label": "Forecast",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "RowID": 1,
+          "X": 1.0,
+          "Z": 1.0,
+          "Y": 13.75,
+          "Forecast": 13.25
+        },
+        {
+          "RowID": 2,
+          "X": 1.0,
+          "Z": 2.0,
+          "Y": 12.0,
+          "Forecast": 12.5
+        },
+        {
+          "RowID": 3,
+          "X": 1.0,
+          "Z": 3.0,
+          "Y": 11.25,
+          "Forecast": 11.75
+        },
+        {
+          "RowID": 4,
+          "X": 1.0,
+          "Z": 4.0,
+          "Y": 11.5,
+          "Forecast": 11.0
+        },
+        {
+          "RowID": 5,
+          "X": 2.0,
+          "Z": 1.0,
+          "Y": 15.75,
+          "Forecast": 15.25
+        },
+        {
+          "RowID": 6,
+          "X": 2.0,
+          "Z": 2.0,
+          "Y": 14.0,
+          "Forecast": 14.5
+        },
+        {
+          "RowID": 7,
+          "X": 2.0,
+          "Z": 3.0,
+          "Y": 13.25,
+          "Forecast": 13.75
+        },
+        {
+          "RowID": 8,
+          "X": 2.0,
+          "Z": 4.0,
+          "Y": 13.5,
+          "Forecast": 13.0
+        },
+        {
+          "RowID": 9,
+          "X": 3.0,
+          "Z": 1.0,
+          "Y": 17.75,
+          "Forecast": 17.25
+        },
+        {
+          "RowID": 10,
+          "X": 3.0,
+          "Z": 2.0,
+          "Y": 16.0,
+          "Forecast": 16.5
+        },
+        {
+          "RowID": 11,
+          "X": 3.0,
+          "Z": 3.0,
+          "Y": 15.25,
+          "Forecast": 15.75
+        },
+        {
+          "RowID": 12,
+          "X": 3.0,
+          "Z": 4.0,
+          "Y": 15.5,
+          "Forecast": 15.0
+        },
+        {
+          "RowID": 13,
+          "X": 4.0,
+          "Z": 1.0,
+          "Y": 19.75,
+          "Forecast": 19.25
+        },
+        {
+          "RowID": 14,
+          "X": 4.0,
+          "Z": 2.0,
+          "Y": 18.0,
+          "Forecast": 18.5
+        },
+        {
+          "RowID": 15,
+          "X": 4.0,
+          "Z": 3.0,
+          "Y": 17.25,
+          "Forecast": 17.75
+        },
+        {
+          "RowID": 16,
+          "X": 4.0,
+          "Z": 4.0,
+          "Y": 17.5,
+          "Forecast": 17.0
+        },
+        {
+          "RowID": 17,
+          "X": 5.0,
+          "Z": 1.0,
+          "Y": 21.75,
+          "Forecast": 21.25
+        },
+        {
+          "RowID": 18,
+          "X": 5.0,
+          "Z": 2.0,
+          "Y": 20.0,
+          "Forecast": 20.5
+        },
+        {
+          "RowID": 19,
+          "X": 5.0,
+          "Z": 3.0,
+          "Y": 19.25,
+          "Forecast": 19.75
+        },
+        {
+          "RowID": 20,
+          "X": 5.0,
+          "Z": 4.0,
+          "Y": 19.5,
+          "Forecast": 19.0
+        }
+      ]
+    },
+    {
+      "output_node_type": "datamining.lin_regression",
+      "output_port": 1,
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Name",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Y_coefficients",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Name": "<Константа>",
+          "Y_coefficients": 12.0
+        },
+        {
+          "Name": "X",
+          "Y_coefficients": 2.0
+        },
+        {
+          "Name": "Z",
+          "Y_coefficients": -0.75
+        }
+      ]
+    }
+  ]
+}
