@@ -3974,3 +3974,18 @@ test("seventeenth quoted native witnesses and field objects retain their current
     }
   } finally { await rm(f.root, { recursive: true, force: true }) }
 }, 30000)
+
+
+test("seventeenth owned quoted argument retains its outer truth predicate", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["owned-quote-truth-0", false, "\"The engine issued warning W_CURRENT.\" is true.", []], ["owned-quote-truth-1", true, "\"The engine issued warning W_CURRENT.\" is true.", [{"code": "W_CURRENT"}]], ["owned-quote-truth-2", true, "\"The engine issued warning W_CURRENT.\" is false.", []], ["owned-quote-truth-3", false, "\"The engine issued warning W_CURRENT.\" is false.", [{"code": "W_CURRENT"}]], ["owned-quote-truth-4", false, "“The engine issued warning W_CURRENT.” is true.", []], ["owned-quote-truth-5", true, "“The engine issued warning W_CURRENT.” is true.", [{"code": "W_CURRENT"}]], ["owned-quote-truth-6", true, "“The engine issued warning W_CURRENT.” is false.", []], ["owned-quote-truth-7", false, "“The engine issued warning W_CURRENT.” is false.", [{"code": "W_CURRENT"}]], ["owned-quote-truth-8", false, "«The engine issued warning W_CURRENT.» is true.", []], ["owned-quote-truth-9", true, "«The engine issued warning W_CURRENT.» is true.", [{"code": "W_CURRENT"}]], ["owned-quote-truth-10", true, "«The engine issued warning W_CURRENT.» is false.", []], ["owned-quote-truth-11", false, "«The engine issued warning W_CURRENT.» is false.", [{"code": "W_CURRENT"}]], ["owned-quote-truth-12", false, "'The engine issued warning W_CURRENT.' is true.", []], ["owned-quote-truth-13", true, "'The engine issued warning W_CURRENT.' is true.", [{"code": "W_CURRENT"}]], ["owned-quote-truth-14", true, "'The engine issued warning W_CURRENT.' is false.", []], ["owned-quote-truth-15", false, "'The engine issued warning W_CURRENT.' is false.", [{"code": "W_CURRENT"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)

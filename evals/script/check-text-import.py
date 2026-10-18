@@ -824,6 +824,9 @@ def report_sentences(text, atoms=(), identifiers=None):
         speech_end = (not cut and re.fullmatch(quote, value)
             and re.search(r'[.!?][»”"]$', value) and not literal_quote(value)
             and report_predicate_head(value[1:-1])
+            # A following subjectless auxiliary still predicates this quoted
+            # argument (e.g. its truth), rather than starting another report.
+            and not re.match(r'\s*[,—-]?\s*(?:is|are|was|were|has|have|had|can|could|may|might|should|would|must|will|был\w*|будет|явля\w*)\b', text[match.end():])
             and re.match(r'\s+\S', text[match.end():]))
         if cut or speech_end:
             part = ReportClause(text[start:match.start() if cut else match.end()], carry, start)
