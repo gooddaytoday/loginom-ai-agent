@@ -1093,7 +1093,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     try {
       const inspectArrangement = () => page.evaluate(binding => {
         const prep = globalThis.__loginomDockPreparationV1, app = globalThis.bg?.app;
-        if (prep?.document !== document) return { reason: 'ownership_unconfirmed' };
+        if (!binding.session_id || !binding.document_id || prep?.document !== document || prep.id !== binding.document_id)
+          return { reason: 'ownership_unconfirmed' };
         const card = app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab();
         let node = card?.Controller?.Node?.data?.node;
         const seen = new Set();
@@ -1104,7 +1105,10 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         const creation = node instanceof app.PackageTreeNode && tabs.length === 1 && tabs[0].classList.contains('x-tab-active')
           && [...prep.receipts.entries()].find(([,receipt]) => {
             if (receipt.phase !== 'verified' || receipt.packageNode !== node || receipt.tab !== tabs[0]) return false;
-            try { return JSON.parse(receipt.request).intent === 'new_draft'; } catch { return false; }
+            try {
+              const request = JSON.parse(receipt.request);
+              return request.intent === 'new_draft' && request.session === binding.session_id;
+            } catch { return false; }
           });
         if (!creation) return { reason: 'ownership_unconfirmed' };
         const model = card.Controller.FController, diagram = model?.FDiagram;
@@ -1125,7 +1129,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
           return [item.FGuid, geometry.x, geometry.y, geometry.width, geometry.height];
         }).sort((left,right) => left[0].localeCompare(right[0]));
         return { ownership: [prep.id, creation[0]], coordinates };
-      }, preflight.workflow_ref);
+      }, { ...preflight.workflow_ref, session_id: task.storage_binding?.session_id, document_id: task.storage_binding?.document_id });
       const initial = await inspectArrangement();
       if (initial.reason) arrangement.reason = initial.reason;
       else if (remaining() < 3000) arrangement.reason = 'save_deadline_near';
@@ -1536,7 +1540,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if (mutation) operation.lastReceipt.operation_id = operation.id;
     const outcome = await execute(makeCapabilityCode(operation.action, pinned.selectors, operation.parameters, {
       operation_id: operation.id, mode, checkpoint: operation.checkpoint, expected_build: targetBuild,
-      ...(operation.action.effect?.destination_policy==='session_storage'?{storage_binding:getStorageBinding()}:{}),
+      ...(operation.action.effect?.destination_policy==='session_storage'||['package.save_as','package.save_checkpoint'].includes(operation.action.action_key)
+        ?{storage_binding:getStorageBinding()}:{}),
       ...receipt, ...(mutation ? { deadline_at: mode === 'apply' ? operation.deadline : now() + operation.action.timeout_ms }
         : operation.parentDeadline !== undefined ? { deadline_at: operation.deadline } : {}),
     }), { timeout: operation.parentDeadline !== undefined && ['prepare', 'apply'].includes(mode)

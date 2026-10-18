@@ -12,3 +12,4 @@ The current model toolbar is the scope; nested models and running state were not
 With the native WizrdMCF open, the ModelForm layout button is absent (fourth probe).
 First probe saved, closed and logged out; later wizard probes had unconfirmed cleanup and closed their browsers. The fourth Close hit its 10 s observation cap with the owned wizard mask still present.
 Raw observations and screenshots belong to the LAB-92 attachment, outside Git.
+The implementation uses the existing new_draft receipt and storage session/document binding, with the same native package and tab; it adds no creation marker.

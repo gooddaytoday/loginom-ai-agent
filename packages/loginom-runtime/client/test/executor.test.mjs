@@ -6,6 +6,7 @@ import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from 
 
 async function arrangePage({ intent = 'new_draft', running = false, wizard = false } = {}) {
   const page = linkPage(), packageNode = new page.app.PackageTreeNode();
+  page.storageBinding = { session_id: 'own-session', document_id: 'own-document' };
   page.edges = ['Источник|Output_Data-0|Приёмник|Input_Data-0'];
   packageNode.HasRunningNodes = () => running;
   page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab = () => ({
@@ -22,7 +23,7 @@ async function arrangePage({ intent = 'new_draft', running = false, wizard = fal
       textContent: text, getAttribute: () => page.prefix+';cnrNaviMode;b.s_'+Array.from({length:index+1},(_,i)=>i).join('>'),
     }))
     : wizard ? [{ getBoundingClientRect: () => ({ width: 10, height: 10 }), visible: true }] : [] };
-  Object.assign(page.context, { document, __loginomDockPreparationV1: { document, receipts: new Map([
+  Object.assign(page.context, { document, __loginomDockPreparationV1: { document, id: 'own-document', receipts: new Map([
     ['prepare', { phase: 'verified', packageNode, tab, request: JSON.stringify({ intent, session: 'own-session' }) }],
   ]) } });
   const elements = page.elements.bind(page);
@@ -55,12 +56,14 @@ test('both saves arrange an owned draft once before writing and preserve topolog
 });
 
 test('an opened package or missing creation receipt never authorizes layout', async () => {
-  for (const mode of ['open_package','existing_workflow','missing','foreign-package','foreign-document']) {
+  for (const mode of ['open_package','existing_workflow','missing','foreign-package','foreign-document','foreign-session','missing-binding']) {
     const page = await arrangePage({ intent: mode });
     const state = page.context.__loginomDockPreparationV1;
     if (mode === 'missing') state.receipts.clear();
     if (mode === 'foreign-package') state.receipts.get('prepare').packageNode = new page.app.PackageTreeNode();
     if (mode === 'foreign-document') state.document = {};
+    if (mode === 'foreign-session') state.receipts.get('prepare').request = JSON.stringify({ intent: 'new_draft', session: 'other-session' });
+    if (mode === 'missing-binding') page.storageBinding = null;
     const result = await run(page, 'package.save_checkpoint', { path: '/user/data/packages/opened.lgp', conflict_policy: 'fail' });
     assert.equal(result.status, 'SUCCEEDED', JSON.stringify(result));
     assert.equal(page.arrangements, 0);
@@ -113,6 +116,15 @@ test('layout is skipped near the original deadline while ordinary saving still c
   assert.equal(result.trace.find(item => item.event === 'package_arrangement').reason, 'save_deadline_near');
   assert.equal(page.arrangements, 0);
   assert.ok(page.clock < deadline);
+});
+
+test('the runtime supplies its existing session binding to the private Save step', async () => {
+  const page = await arrangePage();
+  const engine = runtime(page, { getStorageBinding: () => page.storageBinding });
+  const result = await engine.run('package.save_checkpoint', { path: '/user/data/packages/runtime-arrange.lgp', conflict_policy: 'fail' }, { operationId: 'runtime-arrange' });
+  assert.equal(result.status, 'SUCCEEDED', JSON.stringify(result));
+  assert.equal(result.trace.find(item => item.event === 'package_arrangement').status, 'performed');
+  assert.equal(page.arrangements, 1);
 });
 
 test('node capability creates, types the rename and verifies actual snapped geometry with a workflow-bound ref', async () => {

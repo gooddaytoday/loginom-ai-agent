@@ -294,7 +294,8 @@ class Page {
 const nodeParameters = { component_key: 'imports.text', target_position: { x: 104, y: 104 }, expected_label: 'Источник' };
 function linkPage() { const page = new Page(); page.graph = { scrollLeft: 12, scrollTop: 15 }; page.addNode('Источник', 104, 104, ['Output_Data-0']); page.addNode('Приёмник', 400, 104, ['Input_Add', 'Input_Data-0']); return page; }
 function linkParameters(page, kind = 'add') { return { source_node: page.ref('Источник'), target_node: page.ref('Приёмник'), source_port: { kind: 'data' }, target_port: { kind } }; }
-const run = (page, key, parameters, options = {}) => page.execute(makeCapabilityCode(actions.get(key), selectors, parameters, { expected_build: build, ...options }));
+const run = (page, key, parameters, options = {}) => page.execute(makeCapabilityCode(actions.get(key), selectors, parameters, {
+  expected_build: build, ...(page.storageBinding ? { storage_binding: page.storageBinding } : {}), ...options }));
 function runtime(page, options = {}) { return createActionRuntime({ pinned: { actions, selectors, pins: {}, compatibility: { loginom_build: build } }, allowCandidate: true,
   execute: code => page.execute(code), now: () => page.clock, targetOrigin: 'https://loginom.invalid', ...options }); }
 
