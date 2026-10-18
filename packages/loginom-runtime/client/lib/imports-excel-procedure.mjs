@@ -77,7 +77,7 @@ export async function excelConfigureCapability(page,t,readContext){
      await wait('column editor',()=>editors.count().then(n=>n===1));
      need(await cell.evaluate(e=>e.classList.contains('x-grid-cell-selected')),'editor is not bound to the requested cell');
      if(row<2){const input=editors.locator('input');await guard();effect=true;await input.fill(expected[key]);await input.press('Enter');}
-     else{const tid=await editors.getAttribute('data-tid');await choose(tid,expected[key]);await guard();await editors.locator('input').press('Enter');}
+     else{const tid=await editors.getAttribute('data-tid');await choose(tid,expected[key]);}
      await wait('column editor closed',()=>editors.count().then(n=>n===0));
     }
     current=await read();

@@ -55,3 +55,28 @@ test('Excel readback requires verified commit and exact node ownership',()=>{
  assert.throws(()=>excelReadback(foreign),/owner differs/);
  value.phases[1].value.settings_applied=false;assert.throws(()=>excelReadback(value),/not committed/);
 });
+
+test('native type choice auto-commits and closes its editor without another Enter',async()=>{
+ const root='MF;TF;WizrdMCF',file=root+';ImportExcelFilePreviewWizard;',defs=root+';ImportExcelColumnDefsWizard;',grid=defs+'ColumnDefsTuning;grdSettings;grd-1';
+ let stage=0,editor=false,target=null;const pressed=[];
+ const columns=[{name:'Id',label:'Id',type:'Целый',data_kind:'Непрерывный',used:true},{name:'Region',label:'Region',type:'Строковый',data_kind:'Дискретный',used:true},{name:'Amount',label:'Amount',type:'Целый',data_kind:'Непрерывный',used:true}];
+ const source={source_path:parameters.excel.source_path,sheet_method:'По номеру',sheet:'1',header_rows:1,whole_sheet:true,blank_rows:'Импортировать'};
+ const values=new Map([[file+'edtFileName;ValueControl',source.source_path],[file+'cbbTableNamingMethod;ValueControl','По номеру'],[file+'cbbTableName;ValueContainer;cbx','1'],[file+'cbbActionBlankRow;ValueControl','Импортировать'],[file+'edtTitleRowCount;ValueControl','1'],[defs+'cbbAutoDetectColumnsMode;ValueControl','Нет']]);
+ const locator=(tid,visibleEditor=false)=>({
+  count:async()=>tid==='masks'?0:visibleEditor?(editor?1:0):1,
+  locator:()=>locator(tid,visibleEditor),getByRole:(_,{name})=>locator('option:'+name),
+  inputValue:async()=>tid.includes('celleditor')?columns[2].type:values.get(tid),
+  fill:async value=>{values.set(tid,value);},press:async key=>{pressed.push(key);if(key==='Enter'&&!editor)throw Error('Native combo editor is already closed');},
+  evaluate:async fn=>{if(fn.toString().includes('getBoundingClientRect')){target=tid;return{x:1,y:1};}return true;},
+  getAttribute:async()=>grid+';tbl;celleditor;cbx',
+  isVisible:async()=>tid===root+';btnError'?false:tid===file+'edtFileName;ValueControl'?stage===0:tid===grid?stage===1:tid.includes('ColumnsMappingEngineOutputPortWizard')?stage===2:tid===root+';DoneWizard'?stage===3:true,
+ });
+ const page={
+  locator:selector=>selector.startsWith('.x-mask')?locator('masks'):selector.startsWith('[data-tid^=')?locator(grid+';tbl;celleditor;cbx',true):locator(JSON.parse(selector.slice('[data-tid='.length,-1))),
+  mouse:{click:async()=>{if(target===root+';btnNext')stage++;if(target==='option:Вещественный'){columns[2].type='Вещественный';editor=false;}},dblclick:async()=>{editor=true;}},
+  evaluate:async(fn,arg)=>arg?.grid?structuredClone(columns):arg?.file?source:arg?.origin?true:stage,
+  waitForTimeout:async()=>{throw Error('Unexpected unready observation');},
+ };
+ const result=await excelConfigureCapability(page,{deadline:Date.now()+10000,document_id:'doc',workflow_ref:{prefix:'MF;TF'},node:{node_id:'excel'},excel:parameters.excel,origin:'https://test'},async()=>({verified:true,surface:'wizard',node_id:'excel'}));
+ assert.equal(result.verified,true,result.error);assert.equal(result.configuration.columns[2].type,'real');assert.equal(pressed.includes('Enter'),false);
+});
