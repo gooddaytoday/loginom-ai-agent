@@ -212,7 +212,12 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       const result=await channel.perform({condition:'execute the configured graph node',initialObservation:s,
         ready:s=>same(s)&&s.node_outputs.node_selected&&launch(s).length===1,
         resolve:s=>({verb:'execute_graph_node',ref:one(launch(s),'Unique native execution control required').ref}),
-        identity:s=>({node,launch:one(launch(s),'Unique native execution control required').graph_execution})});
+        identity:s=>{
+          // A native graph redraw replaces the opaque body ref without changing
+          // the launch owner or intent. The fresh gesture still checks that ref.
+          const {node_ref,...control}=one(launch(s),'Unique native execution control required').graph_execution;
+          return {node,launch:control};
+        }});
       return {verified:true,launch_gesture_verified:true,execution_completed:false,receipt:result};
     },
     async identify() {
