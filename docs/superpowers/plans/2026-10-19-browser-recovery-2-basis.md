@@ -214,7 +214,7 @@ git commit -m "feat(runtime): classify browser recovery triggers and decide resu
 | `read_ports` | `operation.nodeApply.request.read.ports` |
 | `document_id`, `package_path` (Save) | `getStorageBinding().document_id`, путь из параметров Save |
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 В `browser-recovery-executor.test.mjs` — фикстура `fixture({release, browserRecovery})` из `support/stopped-node-fixture.mjs`, `full = { remaining: () => ({ calls_remaining: 30, ms_remaining: 600000 }) }`, `refuse` — драйвер освобождения из `node-pending-release.test.mjs:145`, который бросает `NodeReleaseBlocked(..., 'Ask the user to close it with Cancel.')`:
 
@@ -274,21 +274,21 @@ test('user-v1 replies put the browser recovery next_step first', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd packages/loginom-runtime/client && "$LOGINOM_AI_AGENT_TEST_NODE" --test test/browser-recovery-executor.test.mjs test/user-results.test.mjs test/node-pending-release.test.mjs`
 Expected: FAIL в новых тестах; перенос фикстуры оставляет `node-pending-release.test.mjs` зелёным.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Срез строится одной функцией executor по таблице источников. `history` — прочие узловые операции из `operations`. Основание пересчитывается при каждом ответе, а не хранится: T1 опирается только на актуальный `operation.releaseRefused`. Основание исторической операции не выдаётся при чужой незавершённой работе; handoff повторно проверяет это после ожидания (Task 3).
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: команда Step 2 и весь набор `bun run test:upstream`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/loginom-runtime/client
