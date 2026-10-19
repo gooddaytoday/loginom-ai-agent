@@ -125,7 +125,7 @@ test("a non-boolean browser recovery capability is rejected before the host star
 })
 ```
 
-`browser-recovery-capability.test.ts` повторяет устройство теста `private CLI policies reach…` из `saved-package-shutdown.test.ts:115-219`: настоящий Node host и фиктивный `managed-entry.mjs`, который пишет `m.input.browserRecovery`:
+`browser-recovery-capability.test.ts` повторяет устройство теста `private CLI policies reach…` из `saved-package-shutdown.test.ts:115-219`: настоящий Node host и фиктивный `managed-entry.mjs`, который пишет `m.input.browserRecovery`. Сборка fixture выполняется отдельным Bun-процессом по образцу `node-host.test.ts`, чтобы не нарушать загрузчик следующих тестов:
 
 ```ts
 test.each([true, false])("browser recovery capability reaches only the task runtime: %p", async (capability) => {
