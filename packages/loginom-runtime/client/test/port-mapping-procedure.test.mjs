@@ -173,7 +173,7 @@ test('output reorder refuses a newly nonempty source selection',async()=>{
  assert.equal(r.verified,true);assert.equal(r.edits.length,1);assert.equal(f.mutations(),4);
  });
 
-function exclusionFixture({links=false}={}) {
+function exclusionFixture({links=false,rowDelete=false,deleteMode='valid'}={}) {
  const sources=['A','B','C'].map((name,index)=>({record_id:'s'+index,field_id:String(index),index,name,label:name,type:'string',required:false}));
  const native={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',autosync:true,source_fields:sources,
   target_fields:sources.map((source,index)=>({...source,record_id:'t'+index,source,group_index:index,excluded:false,inherited:false,exclusion_source:null,data_kind:'Дискретный'})),rendered_indices:[0,1,2]};
@@ -183,18 +183,21 @@ function exclusionFixture({links=false}={}) {
  const state=()=>({node_mapping:structuredClone(native),wizard:{status:'observed',stage:'output_mapping',root_tid:'W',root_ref:'root',output_columns:{
   page:{status:'complete_definition_page',schema_id:'schema',offset:0,limit:8,total_columns:native.target_fields.length,returned:native.target_fields.length,next_offset:null},
   fields:native.target_fields.map(f=>({...f,status:'observed',name_ref:f.record_id,selected:selected===f.record_id}))}},
- ui:{elements:[...native.target_fields.map(f=>({ref:f.record_id,allowed_actions:['click']})),{ref:'exclude',tid:'W;DerivedDataSourceOutputSocketWizard;btnAddMappingToExcluded',allowed_actions:['click']},
+ ui:{elements:[...native.target_fields.map(f=>({ref:f.record_id,tid:'W;DerivedDataSourceOutputSocketWizard;colName_'+f.name,allowed_actions:['click']})),
+  ...(!rowDelete?[{ref:'exclude',tid:'W;DerivedDataSourceOutputSocketWizard;btnAddMappingToExcluded',allowed_actions:['click']}]:selected?[{ref:'inline-exclude',identity:{anchor_tid:(deleteMode==='foreign_wizard'?'OTHER':'W')+';DerivedDataSourceOutputSocketWizard;colTargetDelete_'+(deleteMode==='foreign_field'?'A':native.target_fields.find(f=>f.record_id===selected).name),path:deleteMode==='foreign_path'?[1,0]:[0,0]},
+   signature:{tag:deleteMode==='wrong_tag'?'a':'img'},role:'button',visible:deleteMode!=='hidden',enabled:deleteMode!=='disabled',interaction:{state:deleteMode==='no_point'?'point_not_observed':'point_observed'},allowed_actions:deleteMode==='disabled'?[]:['click']},...(deleteMode==='duplicate'?[{ref:'inline-duplicate',identity:{anchor_tid:'W;DerivedDataSourceOutputSocketWizard;colTargetDelete_B',path:[0,0]},signature:{tag:'img'},role:'button',visible:true,enabled:true,interaction:{state:'point_observed'},allowed_actions:['click']}]:[])]:[]),
+  ...(rowDelete&&deleteMode==='disabled_toolbar'?[{ref:'exclude',tid:'W;DerivedDataSourceOutputSocketWizard;btnAddMappingToExcluded',allowed_actions:[]}]:[]),
   ...(hasView?['Table','Links'].map(name=>({ref:name,tid:'W;DerivedDataSourceOutputSocketWizard;rb'+name+';DisplayEl',allowed_actions:['click'],signature:{check_state:{kind:'radio',source:'loginom_ext',checked:name==='Links'?links:!links}}})):[])]}});
  const channel={observe:async o=>{const s=state();assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{
   const s=state();assert.ok(o.ready(s));const a=o.resolve(s);count++;
   if(a.ref==='Table'){links=false;delete native.source_selection;channel.afterTable?.(native);}
-  else if(a.ref==='exclude'){
+  else if(['exclude','inline-exclude'].includes(a.ref)){
    const field=native.target_fields.find(f=>f.record_id===selected),source=field.source;
    const groups=new Map();native.target_fields=native.target_fields.filter(f=>f!==field).map((f,index)=>{
     const group_index=groups.get(f.excluded)??0;groups.set(f.excluded,group_index+1);return {...f,index,group_index};
    });
    native.target_fields.push({...source,label:source.name,record_id:'excluded'+count,field_id:String(99+count),index:2,group_index:groups.get(true)??0,excluded:true,inherited:false,source:null,exclusion_source:source,data_kind:'Неопределенное'});
-   channel.afterExclude?.(native);
+   selected=null;channel.afterExclude?.(native);
   }else {selected=a.ref;channel.afterSelection?.(native);}
  }};
  return {channel,native,count:()=>count};
@@ -217,6 +220,19 @@ test('optional exclusion creates one source exclusion, preserves all other field
  assert.equal((await excludeOutputField(f.channel,'s1')).effect_possible,false);assert.equal(f.count(),2);
 });
 
+test('optional exclusion uses the observed Table row delete icon without a toolbar button',async()=>{
+ const {excludeOutputField}=await import('../lib/port-mapping-procedure.mjs');
+ const f=exclusionFixture({rowDelete:true});
+ f.native.source_fields[1].label=f.native.target_fields[1].label='Расстояние до центра кластера';
+ const result=await excludeOutputField(f.channel,'s1');
+ assert.equal(result.verified,true);assert.equal(f.count(),2);
+ assert.equal(result.excluded_source.record_id,'s1');assert.deepEqual(result.definition.target_fields.map(f=>[f.name,f.excluded]),[['A',false],['C',false],['B',true]]);
+ for(const deleteMode of ['foreign_wizard','foreign_field','foreign_path','wrong_tag','disabled','hidden','no_point','duplicate','disabled_toolbar']){
+  const bad=exclusionFixture({rowDelete:true,deleteMode});
+  await assert.rejects(excludeOutputField(bad.channel,'s1'),/Optional output exclusion action unavailable/);
+  assert.equal(bad.count(),1,deleteMode+': only selection, no exclusion gesture');
+ }
+});
 test('batch exclusions preserve the active field and repeated full mapping needs no gestures',async()=>{
  const {configureOutputFields}=await import('../lib/port-mapping-procedure.mjs'),f=exclusionFixture();
  const configured=f.native.source_fields.map(s=>({...s,used:true}));
