@@ -54,15 +54,23 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   const roots=()=>observe({scope:'roots'});
   const click=async(s,element,verb='click',extra={},allowStaleFolder=false)=>{
    check();const id=job.id+':nav'+(job.navigationStep=(job.navigationStep??0)+1);
+   const previousEffect=effectPossible,previousUncertain=job.navigationUncertain===true;
    job.navigationUncertain=true;
    effectPossible=true;const r=await runtime.uiAct({verb,ref:element.ref,...extra},{operationId:id,observationId:s.observation_id,signal});
    // Only a matched, cleaned-up precondition refusal permits a fresh folder lookup.
    // Never reuse its ref/observation or repeat an uncertain child operation.
    // The proven no-effect gesture leaves navigation certain, so the pre-upload
    // checkpoint remains available if the bounded retry stops.
-   if(allowStaleFolder&&r.operation_id===id&&r.status==='NOT_APPLIED'&&r.phase==='preconditions'
-     &&r.effect_possible===false&&r.cleanup_complete===true&&r.error?.code==='UI_EPOCH_CHANGED'){job.navigationUncertain=false;return false;}
-   requireValue(r.status==='SUCCEEDED'&&r.cleanup_complete===true,'Delivery navigation requires inspection: '+id);
+   if(!previousUncertain&&r.operation_id===id&&r.action_key==='ui.act'&&r.status==='NOT_APPLIED'
+     &&['preconditions','observing'].includes(r.phase)&&r.effect_possible===false&&r.cleanup_complete===true
+     &&r.error?.code!=='BROWSER_CALL_UNCERTAIN'&&Array.isArray(r.trace)
+     &&!r.trace.some(e=>['ui_preconditions_verified','ui_gesture_applied','ui_scroll_applied'].includes(e.event))){
+    job.navigationUncertain=false;effectPossible=previousEffect;
+    if(allowStaleFolder&&r.phase==='preconditions'&&r.error?.code==='UI_EPOCH_CHANGED')return false;
+    throw Error('Delivery navigation refused before effect: '+id+' ('+(r.error?.code??'NOT_APPLIED')+')');
+   }
+   requireValue(!previousUncertain&&r.operation_id===id&&r.action_key==='ui.act'&&r.status==='SUCCEEDED'
+     &&r.cleanup_complete===true,'Delivery navigation requires inspection: '+id);
    job.navigationUncertain=false;
    return true;
   };
@@ -173,14 +181,6 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    upload=await runtime.uploadDeliveredArtifact({artifactId:artifact.artifact_id,grantId:artifact.upload.grant_id,
     observationId:s.observation_id,operationId:job.uploadId,deliveryOperationId:job.id,signal});
    await acknowledge(job,'artifact_delivery_upload_receipt',{upload});
-   if(upload.status==='NOT_APPLIED'&&upload.effect_possible===false&&upload.cleanup_complete===true) {
-    submitted=false;effectPossible=false;job.uploadStarted=false;
-    const refused={status:'NOT_APPLIED',effect_possible:false,upload_submitted_or_unknown:false,
-      upload_operation_id:job.uploadId,cleanup_complete:true,code:upload.error?.code??'UPLOAD_NOT_APPLIED'};
-    await acknowledge(job,'artifact_delivery_not_applied',{result:refused});job.outcome=refused;job.phase='not_applied';job.state='settled';job.error=null;
-    return snapshot(job);
-   }
-   check();
    if(upload.error?.code==='BROWSER_CALL_UNCERTAIN') {
     check();inspected=await runtime.inspect({operationId:job.uploadId});
     requireValue(inspected.output?.operation_id===job.uploadId&&inspected.output?.cleanup_confirmed===true
@@ -190,6 +190,21 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    }
 
    }
+   // The same matched refusal can arrive directly, through inspection, or on
+   // explicit resume. None authorizes a second submission or byte download.
+   if(upload.operation_id===job.uploadId&&upload.action_key==='artifact.upload'
+     &&upload.status==='NOT_APPLIED'&&upload.effect_possible===false&&upload.cleanup_complete===true
+     &&upload.phase==='preconditions'&&upload.output?.upload_submitted!==true
+     &&upload.error?.code!=='BROWSER_CALL_UNCERTAIN'&&Array.isArray(upload.trace)
+     &&!upload.trace.some(e=>['upload_preconditions_verified','upload_input_submitted'].includes(e.event))) {
+    submitted=false;effectPossible=false;job.uploadStarted=false;
+    const refused={status:'NOT_APPLIED',effect_possible:false,upload_submitted_or_unknown:false,
+      upload_operation_id:job.uploadId,cleanup_complete:true,code:upload.error?.code??'UPLOAD_NOT_APPLIED'};
+    await acknowledge(job,'artifact_delivery_not_applied',{result:refused});job.outcome=refused;job.phase='not_applied';job.state='settled';job.error=null;
+    return snapshot(job);
+   }
+   requireValue(upload.status!=='NOT_APPLIED','Upload refusal requires inspection');
+   check();
    if(upload.status==='FAILED'&&upload.output?.conflict_rejected===true&&upload.cleanup_complete===true) {
     const refused={status:'FAILED',code:'UPLOAD_PATH_CONFLICT',destination:artifact.upload.destination,
       upload_operation_id:job.uploadId,upload_completion_verified:false,cleanup_complete:true};
@@ -229,7 +244,9 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
       artifact_id:artifact.artifact_id,input_artifact_admitted:true,directory:artifact.upload.directory,
       storage_entry:error.storage_entry,recovery:'Check the selected input directory and the signed-in Loginom account. The attachment was received; do not ask to attach it again.'}
     : {code:error.code==='ARTIFACT_VERIFICATION_UNSUPPORTED'?error.code:'ARTIFACT_DELIVERY_INCOMPLETE',message:String(error.message).slice(0,1000)};
-   job.outcome={status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,upload_submitted_or_unknown:submitted,upload_operation_id:job.uploadId,inspection_required:submitted||effectPossible&&!navigationResumable,
+   // Known navigation effects remain recorded, but an undelivered attachment
+   // with no unknown child is a settled refusal, not an ambiguous transfer.
+   job.outcome={status:navigationResumable?'NOT_APPLIED':effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,upload_submitted_or_unknown:submitted,upload_operation_id:job.uploadId,inspection_required:submitted||effectPossible&&!navigationResumable,
     ...(!submitted&&!effectPossible?{cleanup_complete:true}:{}),
     ...(submitted&&!job.verificationStarted?{next_step:{tool:'dock_artifact_delivery_resume',original_operation_id:job.id,
       instruction:'Continue verification of the original upload with a new resume_id within its original deadline; do not upload again.'}}:{}),
