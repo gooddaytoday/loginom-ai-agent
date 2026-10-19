@@ -272,11 +272,12 @@ private config/budget/results вне Git; операторские команд�
 - [x] Разобрать первый dispatch N=1: встроенный каталог CLI не содержит
   openai/gpt-6-luna; актуальный публичный каталог содержит точную модель/high.
   Cleanup слота/admin и ресурсы confirmed/PASS; это не замер трёх задач.
-- [ ] После разрешения переместить только урегулированный admin c21 в private
-  evidence выполнить штатный startup14c5 и обновить models cache под locks;
-  проверить точную модель/high без model calls и закрепить каталог.
-  Startup не менять: независимое ревью отклонило небезопасный PID-фильтр;
-  [текущий блокер/прямые проверки](../../../eval_parallel_blockers.md).
+- [x] По разрешению владельца перенести только settled admin c21 в private
+  evidence:1394 entries/bytes/hash неизменны; штатный startup14c5 освободил holds.
+  Штатный models refresh под locks обоих профилей подтвердил gpt-6-luna/high,
+  0 model calls, cleanup/release confirmed; одинаковый catalog SHA256
+  `59bcb39e34656fe40d3007de30361919dcbaff738a342f1f30f763e8cf4617bc`.
+  Startup не менялся; [evidence и закрытые отказы](../../archive/2026-10-16-evals-parallel-history.md).
 - [ ] Реальный N=1 с агентом/судьёй на трёх задачах; по замеру предложить числовые
   пороги CPU/RAM/диска и **дождаться утверждения владельца до N=2**.
 - [ ] Записать утверждённый бюджет до реального N=2, выполнить run на тех же tasks/
@@ -338,4 +339,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20. c21 holds released; N=1 отказал из-за старого models cache.14c5 cleanup/direct checks confirmed; запрошен move только settled admin c21 в private evidence, затем штатный startup/models refresh и повтор N=1.
+20. c21 admin перенесён по разрешению без изменения1394 entries; штатный startup14c5/release подтверждён. Catalog59bcb39e… вA/B квалифицировал gpt-6-luna/high без модели; следующий шаг — повтор N=1.

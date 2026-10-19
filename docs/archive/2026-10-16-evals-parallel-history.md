@@ -8045,3 +8045,23 @@ live A/B, N=1 → утверждение порогов → N=2, отдельн�
 проверки остатков; порядок исправлен, ревьюер подтвердил устранение.
 Это ревью плана и доступных интерфейсов, не runtime qualification. Тесты,
 модели и Docker mutations в рамках этой редакции не запускались.
+
+## 2026-10-19: урегулированный admin и каталог моделей
+
+По двум отдельным разрешениям владельца: server/profile holds c21be2f8… сняты
+через существующий CAS после прямых проверок; только controller/admin-5w8Hht
+перенесён в evidence/settled-admin-c21be2f8-5w8Hht acceptance state.
+1394 entries, байты/хеши/владельцы/inodes неизменны, удаления нет. Старые абсолютные
+ссылки внутри evidence исторические; relocation note сохраняет соответствие путей.
+A00yuH/прочие incidents не затронуты. Штатный startup14c5b7c6… затем подтвердил
+cleanup и освободил собственные server/profile holds без изменения кода.
+Предыдущий N=1 `20261019-063523-9d19375bf1-dirty-ZpDChg` остановился до модели:
+встроенный каталог не содержал gpt-6-luna. Короткие resources PASS не являются
+замером трёх задач. Штатный `models openai --refresh --verbose` под server/profile
+locks двух профилей подтвердил точную модель и high.reasoningEffort=high,
+0 model calls, cleanup/release confirmed. Cache обоих профилей SHA256
+`59bcb39e34656fe40d3007de30361919dcbaff738a342f1f30f763e8cf4617bc`.
+Private evidence в `/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/`:
+`settled-admin-c21-relocation.json`, `reconciled-model-quarantine-20261019.json`,
+`model-catalog-qualification-20261019.json`. Native admin/slot receipts сохранены.
+Независимое ревью отклонило PID-only фильтр admin; frozen механизмы не развивались.
