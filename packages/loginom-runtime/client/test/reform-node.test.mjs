@@ -18,3 +18,19 @@ test('reform conditional mapping cannot prune a current source name as obsolete'
  const m={verified:true,inventory_complete:true,source_identity_verified:true,node_context:owner,mapping_wizard:'DerivedDataSourceMappingEngineOutputPortWizard',source_fields:[{name:'Amount',label:'Amount',type:'real'}],target_fields:[{name:'Amount',source:null,required:false,excluded:false,inherited:false}]};
  assert.throws(()=>validateReformInlineSources(c,m),/current/);m.target_fields[0].name='Old';assert.equal(validateReformInlineSources(c,m).length,1);
 });
+
+test('new Reform output exclusions reject before a job exists and permit the corrected request with the same ID',async()=>{
+ const {createNodeOperationRunner}=await import('../lib/node-operation-runner.mjs');let calls=0;
+ const runner=createNodeOperationRunner({progress:()=>null,validate:r=>{validateReformParameters(r.parameters,'scalar',r);return 'reform';},
+  run:async()=>{calls++;return {status:'SUCCEEDED',effect_possible:false,cleanup_complete:true};}});
+ for(const key of ['fields','changes']){
+  const bad={...request(),operation_id:'format-'+key,parameters:{changes:[]},mappings:[{direction:'output',port:0,[key]:[{source:{kind:'configured_field',name:'Distance'},excluded:true}]}]};
+  assert.throws(()=>runner.start(bad),/parameters\.changes.*output mappings/);
+  assert.equal(runner.has(bad.operation_id),false);assert.equal(runner.unsettled,false);assert.equal(calls,key==='fields'?0:1);
+  const corrected={...bad,parameters:{changes:[{field:{kind:'input_field',name:'Distance'},excluded:true}]},mappings:[{direction:'output',port:0,fields:[{source:{kind:'configured_field',name:'ID'}}]}]};
+  runner.start(corrected);assert.equal((await runner.wait(corrected.operation_id)).outcome.status,'SUCCEEDED');
+ }
+ assert.equal(calls,2);
+ const existing={...request(),target:{kind:'existing'},mappings:[{direction:'output',port:0,fields:[{source:{kind:'configured_field',name:'Distance'},excluded:true}]}]};
+ assert.doesNotThrow(()=>validateReformParameters({changes:[]},'scalar',existing),'existing output admission is outside this new-node restriction');
+});
