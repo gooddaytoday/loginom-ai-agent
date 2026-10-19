@@ -229,6 +229,10 @@
   preflight25/51 PASS5.79s, typecheck/diff PASS. Второй admission-отказ до модели:
   прежний version-only unit найден по точному home/команде в systemd journal;
   run-u17489.service завершён, MainPID=0. Без сигналов root и без новых механизмов.
+  Judge hold освобождён; admin proof сохранил failed из-за чужого setuid peer.
+  Повторные прямые проверки чистые, но штатного settlement нет (независимое ревью).
+  N=1 ждёт разового решения по server/profile holds c21be2f8…;
+  [блокер и evidence](../../../eval_parallel_blockers.md). Реальных model calls ещё нет.
 - [x] Подключить JSON status к проверке provider errors: busy→idle основной
   сессии, любой retry сохраняет отказ; старый/оборванный JSON и task tool не дают
   полного покрытия. Непустой существующий --title исключает запрос автозаголовка.
@@ -325,4 +329,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20. Acceptance: native A/B4/4 PASS/clean releases; installed CLIc8a85da728 retry+sharedOAuth и judge429 qualified; startup после admission отказа подтверждён. Далее N=1,пороги,N=2.
+20. Native A/B4/4 PASS; CLIc8 retry+sharedOAuth/judge429 qualified; N=1 до dispatch блокирует failed admin proof c21be2f8…; прямые проверки чистые, нужно разовое решение владельца по броням.
