@@ -10,7 +10,7 @@
 
 - [x] Независимо проверить план: достаточность, простота и сохранность гарантий.
   Ревью одобрило план с уточнениями ниже; новые механизмы не нужны.
-- [ ] 1. Offline-судья (`judge-environment.ts`, `calibrate.ts`, `rejudge.ts`).
+- [x] 1. Offline-судья (`judge-environment.ts`, `calibrate.ts`, `rejudge.ts`).
   Сначала воспроизвести отсутствие именованного юнита в публичном offline-пути
   с fake judge/systemctl. Включить существующую systemd-границу для v2 и
   передать её через настройки версии/исполнения. Проверить calibration и
@@ -48,6 +48,10 @@ Root ведёт этот план и коммиты; каждому worker вы�
 
 ## Результат
 
+- Offline-судья: оба RED подтверждены (version/исполнение), затем 48 тестов
+  в шести связанных файлах прошли: 368 утверждений. Private home, unit timeout,
+  завершение unit и release проверены subprocess fixtures; legacy fake сохранён.
+  Production diff — три строки. Независимое ревью одобрило исправление.
 - Частичное освобождение: RED — `RECOVERY_FINALIZATION_REQUIRED` при новом
   admission после startup; GREEN — 52 теста slots/startup/lease, 177 утверждений.
   Независимое ревью не нашло обязательных замечаний. При подмене cleanup,
