@@ -231,7 +231,7 @@ private config/budget/results вне Git; операторские команд�
 
 - [x] Новый acceptance pair829f82ae…/428fd481… создан на32791, prepare/verify
   двух пользователей готовы, startup после первого отказа проверен без новых epochs.
-- [ ] Создать только новый acceptance стенд и private config; закрепить binary SHA,
+- [x] Создать только новый acceptance стенд и private config; закрепить binary SHA,
   task/rubric hashes, модели, timeouts и бюджет/условия до N=1 dispatch.
 - [x] Ровно четыре обязательных A/B сценария: взаимная невидимость файлов,
   close A сохраняет B, delete A после close/readback, unknown ownership без delete.
@@ -241,9 +241,12 @@ private config/budget/results вне Git; операторские команд�
   точный close/readback, bytes canary B после cleanup A, unknown без изменений,
   оба guarded cleanup и release. Evidence `evidence/live-ab-5fac81a1-d90a-4039-a557-b4575a30e7f9/`.
   Независимое ревью: два замечания к проверке ReadBuffer/catch исправлены.
-- [ ] Непосредственно перед N=1 проверить MemAvailable хоста против записанного
+- [x] Непосредственно перед N=1 проверить MemAvailable хоста против записанного
   бюджета (владелец наблюдал около5GiB из38GiB). Не хватает — остановиться и
   сообщить владельцу; не освобождать память остановкой чужих/удержанных стендов.
+  Перед dispatch2026-10-19 доступно17GiB при исходном minimum8GiB; private N=1
+  budget/conditions записаны, judge login status0/loggedIn/closed unit под home lock.
+  Эти исходные границы не являются утверждением бюджета N=2.
 - [ ] Реальный N=1 с агентом/судьёй на трёх задачах; по замеру предложить числовые
   пороги CPU/RAM/диска и **дождаться утверждения владельца до N=2**.
 - [ ] Записать утверждённый бюджет до реального N=2, выполнить run на тех же tasks/
