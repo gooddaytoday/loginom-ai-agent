@@ -1,0 +1,59 @@
+{
+  "package_path": "/stability-2026-10-20/p9.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.clustering"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/client-segments.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Customers",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "MeanVisits",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "MeanSpend",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Customers": 5,
+          "MeanVisits": 7.9,
+          "MeanSpend": 11.9
+        },
+        {
+          "Customers": 9,
+          "MeanVisits": 79.97222222222223,
+          "MeanSpend": 119.97222222222223
+        }
+      ]
+    }
+  ]
+}

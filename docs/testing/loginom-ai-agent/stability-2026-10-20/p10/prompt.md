@@ -1,0 +1,1 @@
+Раздели магазины из shops.csv на три естественные группы по Footfall и Basket; покажи по каждой число магазинов Shops и средние MeanFootfall и MeanBasket, номера групп не нужны. Выгрузи shop-segments.csv и сохрани сценарий.

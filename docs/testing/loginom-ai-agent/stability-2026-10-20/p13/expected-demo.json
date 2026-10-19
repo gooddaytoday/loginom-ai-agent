@@ -1,0 +1,118 @@
+{
+  "package_path": "/stability-2026-10-20/p13.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/checked-routes.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Code",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Route",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Method",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "HttpStatusCode",
+          "type": "integer",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Code": "CHK12",
+          "Route": "west",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "Code": "CHK06",
+          "Route": "local",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "Code": "CHK01",
+          "Route": "west",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "Code": "CHK07",
+          "Route": "west",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "Code": "CHK03",
+          "Route": "west",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "Code": "CHK04",
+          "Route": "east",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "Code": "CHK10",
+          "Route": "east",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "Code": "CHK11",
+          "Route": "west",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "Code": "CHK09",
+          "Route": "local",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "Code": "CHK08",
+          "Route": "local",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "Code": "CHK02",
+          "Route": "local",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        },
+        {
+          "Code": "CHK05",
+          "Route": "local",
+          "Method": "GET",
+          "HttpStatusCode": 200
+        }
+      ]
+    }
+  ]
+}
