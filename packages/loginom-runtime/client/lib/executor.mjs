@@ -2052,6 +2052,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         throw new Error('Browser recovery receipt journal acknowledgement differs');
       // The lock is released only after the receipt is durable.
       operation.outcome = nodeApplyOutcome(operation, result); operation.cleanupConfirmed = true;
+      // Redelivery of the original request reports its own failure and the linked recovery.
+      operation.outcome.output.browser_recovery = { receipt_id: receipt.id, status: receipt.status, facts: receipt.facts };
       await remember(operation, 'operation_abandoned', operation.outcome);
       pending = null; nodeJobs.settle(operation.id, operation.outcome);
       recoveryReceipts.set(receipt.id, receipt);
@@ -2090,6 +2092,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if (!ack || fingerprint('ack', Object.fromEntries(Object.keys(event).map(k => [k, ack[k]]))) !== fingerprint('ack', event))
       throw new Error('Browser recovery receipt journal acknowledgement differs');
     operation.exportRecovered = true;
+    if (operation.outcome?.output) {
+      operation.outcome.output.browser_recovery = { receipt_id: receipt.id, status: receipt.status, facts: receipt.facts,
+        file_artifacts: structuredClone(receipt.file_artifacts) };
+      // The recovered export no longer offers browser recovery as its next step.
+      operation.outcome.output.next_step = receipt.next_step;
+      nodeJobs.settle(operation.id, operation.outcome);
+    }
     recoveryReceipts.set(receipt.id, receipt);
     leased = null;
     return { status: 'completed', facts: receipt.facts, receipt_id: receipt.id, file_artifacts: receipt.file_artifacts,

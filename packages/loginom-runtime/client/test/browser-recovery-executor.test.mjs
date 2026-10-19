@@ -4,6 +4,7 @@ import { createActionRuntime } from '../lib/executor.mjs';
 import { NodeReleaseBlocked } from '../lib/node-pending-release.mjs';
 import { buildNodeReadRequest, nodeReadHandler, alignReadSchema } from '../lib/node-read-contract.mjs';
 import { actions } from './support/executor-fixture.mjs';
+import { compactNodeResult } from '../lib/user-results.mjs';
 
 const node = { document_id: 'doc', workflow_id: 'wf', node_id: 'new' };
 const workflow = { workflow_id: 'wf', tab_tid: 'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1', prefix: 'MF;TF-1', navigation_path: [{ tid: 'path', label: 'Scenario' }] };
@@ -134,6 +135,11 @@ test('the lease blocks Dock mutations; verification releases on proof and writes
   assert.deepEqual(receipt.attested_by_model, { actions_performed: ['Clicked Cancel in the wizard'] });
   assert.equal(f.runtime.hasUnsettledWork(), false);
   f.runtime.assertPreparationAllowed();
+  // Exact redelivery of the original request reports its failure and the linked recovery.
+  const redelivered = f.runtime.nodeApplyStatus('apply').outcome.output;
+  assert.deepEqual(redelivered.browser_recovery, { receipt_id: 'apply:br1', status: 'continuable',
+    facts: ['node_released_on_quiet_graph', 'no_wizard_dialog_or_mask'] });
+  assert.equal(compactNodeResult(f.runtime.nodeApplyStatus('apply')).browser_recovery.receipt_id, 'apply:br1');
 });
 
 test('T3: the same phase failing again after a recovery is continued through a fresh read of the receipt', async () => {
@@ -230,5 +236,8 @@ test('T4: an unconfirmed export download is recovered by a verified re-read with
   assert.equal(verified.file_artifacts[0].sha256, 'a'.repeat(64));
   assert.deepEqual(reads, ['new']);
   assert.throws(() => runtime.browserRecoveryBasis('export'), /No browser recovery trigger/);
-  assert.equal(runtime.nodeApplyStatus('export').outcome.status, 'FAILED');
+  const settled = runtime.nodeApplyStatus('export').outcome;
+  assert.equal(settled.status, 'FAILED');
+  assert.equal(settled.output.browser_recovery.file_artifacts[0].sha256, 'a'.repeat(64));
+  assert.equal(settled.output.next_step.tool, 'dock_action_run');
 });
