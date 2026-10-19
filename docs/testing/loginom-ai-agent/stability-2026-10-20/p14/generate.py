@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synthetic fixtures, fixed seed; Python standard library only."""
+"""Synthetic fixtures, fixed seed; XLSX writer pinned in requirements.txt."""
 import csv
 import random
 from pathlib import Path
@@ -17,36 +17,30 @@ def write(name, columns, rows):
         writer.writerows(rows)
 
 
-from xml.sax.saxutils import escape
-from zipfile import ZipFile, ZipInfo, ZIP_STORED
-
 rows = [[i, rng.choice(['East', 'West', 'Atrium']), f'{rng.randrange(1, 161) / 4:.2f}']
         for i in range(1, 16)]
 rng.shuffle(rows)
 write('exhibits.csv', ['Id', 'Gallery', 'Weight'], rows)
 # The CSV is an operator-only source copy; the model receives only the workbook.
-ns = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
-xml_rows = []
-for index, values in enumerate([['Id', 'Gallery', 'Weight'], *rows], 1):
-    cells = []
-    for column, value in zip('ABC', values):
-        ref = f'{column}{index}'
-        if index == 1 or column == 'B':
-            cells.append(f'<c r="{ref}" t="inlineStr"><is><t>{escape(str(value))}</t></is></c>')
-        else:
-            cells.append(f'<c r="{ref}" t="n"><v>{value}</v></c>')
-    xml_rows.append(f'<row r="{index}">{"".join(cells)}</row>')
-parts = {
-    '[Content_Types].xml': '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
-    '_rels/.rels': '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
-    'xl/workbook.xml': f'<workbook xmlns="{ns}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Exhibits" sheetId="1" r:id="rId1"/></sheets></workbook>',
-    'xl/_rels/workbook.xml.rels': '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
-    'xl/worksheets/sheet1.xml': f'<worksheet xmlns="{ns}"><dimension ref="A1:C16"/><sheetData>{"".join(xml_rows)}</sheetData></worksheet>',
-}
-# Fixed ZIP timestamps and stored bytes make XLSX reproducible across cwd and runs.
-with ZipFile(ROOT / 'data/exhibits.xlsx', 'w', compression=ZIP_STORED) as book:
-    for name, value in parts.items():
+# Use the same complete XLSX writer as the accepted Excel stage1 corpus.
+# Loginom 7.4.2 exposes COL1 for the previous hand-written minimal OOXML.
+import datetime
+from io import BytesIO
+from zipfile import ZipFile, ZipInfo, ZIP_STORED
+import xlsxwriter
+
+buffer = BytesIO()
+with xlsxwriter.Workbook(buffer) as book:
+    book.set_properties({'created': datetime.datetime(2026, 10, 19)})
+    sheet = book.add_worksheet('Exhibits')
+    sheet.write_row(0, 0, ['Id', 'Gallery', 'Weight'])
+    for index, (identifier, gallery, weight) in enumerate(rows, 1):
+        sheet.write_row(index, 0, [identifier, gallery, float(weight)])
+
+# Fixed ZIP timestamps/order keep the workbook reproducible.
+with ZipFile(buffer) as source, ZipFile(ROOT / 'data/exhibits.xlsx', 'w') as target:
+    for name in sorted(source.namelist()):
         info = ZipInfo(name, date_time=(2026, 10, 19, 0, 0, 0))
         info.compress_type = ZIP_STORED
         info.create_system = 0
-        book.writestr(info, value.encode('utf-8'))
+        target.writestr(info, source.read(name))

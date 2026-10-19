@@ -378,6 +378,9 @@ HTTP-эталон — контракт успешного ответа [httpbin]
 окружении её меняют в копии expected, сохраняя имя файла. Аргумент oracle
 меняет только `package_path`, не `export_destination`.
 
+Для генератора p14 установить `python3 -m pip install -r docs/testing/loginom-ai-agent/stability-2026-10-20/p14/requirements.txt`.
+Oracle по-прежнему использует только стандартную библиотеку.
+
 Проверить из корня репозитория все входы и oracle из двух cwd:
 
 ```sh

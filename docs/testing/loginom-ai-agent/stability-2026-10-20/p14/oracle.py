@@ -32,12 +32,20 @@ with ZipFile(ROOT / 'data/exhibits.xlsx') as book:
     relpath = join(dirname(workbook_path), '_rels', Path(workbook_path).name + '.rels')
     target = next(r.get('Target') for r in ET.fromstring(book.read(relpath)) if r.get('Id') == rid)
     sheet_path = target.lstrip('/') if target.startswith('/') else normpath(join(dirname(workbook_path), target))
+    strings = []
+    for rel in ET.fromstring(book.read(relpath)):
+        if not rel.get('Type').endswith('/sharedStrings'):
+            continue
+        target = rel.get('Target')
+        path = target.lstrip('/') if target.startswith('/') else normpath(join(dirname(workbook_path), target))
+        strings = [''.join(si.itertext()) for si in ET.fromstring(book.read(path))]
     records = []
     for row in ET.fromstring(book.read(sheet_path)).findall('s:sheetData/s:row', NS):
         values = {}
         for cell in row.findall('s:c', NS):
             column = ''.join(ch for ch in cell.get('r') if ch.isalpha())
             values[column] = (''.join(cell.find('s:is', NS).itertext()) if cell.get('t') == 'inlineStr'
+                              else strings[int(cell.find('s:v', NS).text)] if cell.get('t') == 's'
                               else cell.find('s:v', NS).text)
         assert set(values) == {'A', 'B', 'C'}
         records.append([values[c] for c in 'ABC'])
