@@ -154,7 +154,7 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 
 - База реализации: `0afb4c483a`; код плана 1: `adca301ec7`.
 - План 1, Tasks 1–4: выполнены, отмечены в подплане; независимое итоговое ревью и scoped-ревью фикса — без замечаний.
-- Runtime client после плана 2, Task 2: 4351 PASS / 13 SKIP; Host: 368 PASS / 7 SKIP. CLI policy: 6 PASS; Desktop packaging/manifest: 14 PASS / 2 SKIP.
+- Runtime client после плана 2, Task 4: 4369 PASS / 13 SKIP; Host: 368 PASS / 7 SKIP. CLI policy: 6 PASS; Desktop packaging/manifest: 14 PASS / 2 SKIP.
 - Typecheck agent/core/host/desktop и `git diff --check` — PASS.
 - Воспроизведённый сбой Bun loader при сборке fixture в процессе тестов устранён существующим способом отдельного compiler-процесса; production-код для этого не менялся.
 - Ограничения: проверки исходников; положительный packaged-путь и реальное recovery ещё не приняты, release-флаг в CI не включён.
@@ -164,4 +164,5 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 - План 2, Task 1: чистые функции основания/решения выполнены; 7/7 focused tests PASS, независимое review без замечаний.
 - План 2, Task 2: выполнен; 53/53 focused PASS; два замечания актуальности основания исправлены и приняты scoped review.
 - План 2, Task 3: handoff выполнен; 26/26 focused PASS на Node 24; deadline/journal fixes приняты scoped review.
-- Следующий шаг: план 2, Task 4 — общие процедуры проверки покоя, выполнения и Preview.
+- План 2, Task 4: выполнен; 213/213 focused PASS, независимое review без замечаний.
+- Следующий шаг: план 2, Task 5 — общая проверка шага и удержание verification gate.

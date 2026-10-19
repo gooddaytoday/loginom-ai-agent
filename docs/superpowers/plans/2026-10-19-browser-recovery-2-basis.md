@@ -362,7 +362,7 @@ git commit -m "feat(runtime): prove executor stop before browser handoff"
   - `procedure.verifyCompletion({signal}) → Promise<{verified: true, execution_id, ...receipt} | {verified: false, reason: 'NO_NEW_EXECUTION'|'AMBIGUOUS_EXECUTION'|string}>` — открывает консоль и читает историю один раз. Ровно одна новая группа относительно базовой линии — существующие `identifyNewExecution` и `waitCompleted` (Show Node, закрытие консоли, возврат на граф). Нет новой группы или их больше одной — консоль закрывается, возвращается отказ. `waitCompleted()` может вернуть `verified: true, status: "failed"`: это проверенный неуспех, а не выполненная цель. `verifyCompletion` нормализует `verified: true` только для `status === "completed"` с существующим owner proof; failed-квитанция сохраняется в факте с `verified: false` и причиной `EXECUTION_FAILED`. Прежнее поведение `waitCompleted` не меняется. Исключение даёт `verified: false` с его сообщением.
   - `openOwnedNativePreview(channel, ctx, index = 0)`: `activeNativeOutput` выбирает порт с этим публичным индексом (`node_outputs.ports[].index`), ожидание схемы и `closeOwnedNativePreview` сверяют `node_preview_schema.port` с `port.index`. По умолчанию — порт 0; чтение «Свёртки» не меняется.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 test('quiet-node proof reads twice and performs no gesture', async () => {
@@ -401,13 +401,13 @@ test('Preview opens and closes the requested output port', async () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail** (`--test test/node-pending-release.test.mjs test/node-procedure.test.mjs test/node-execution-stop.test.mjs test/native-preview-port.test.mjs`; Expected: FAIL — функций и параметров нет)
+- [x] **Step 2: Run tests to verify they fail** (`--test test/node-pending-release.test.mjs test/node-procedure.test.mjs test/node-execution-stop.test.mjs test/native-preview-port.test.mjs`; Expected: FAIL — функций и параметров нет)
 
-- [ ] **Step 3: Implement**; существующие тесты освобождения, выполнения и чтения «Свёртки» остаются зелёными без изменений.
+- [x] **Step 3: Implement**; существующие тесты освобождения, выполнения и чтения «Свёртки» остаются зелёными без изменений.
 
-- [ ] **Step 4: Run tests to verify they pass** (команда Step 2 и `bun run test:upstream`; Expected: PASS)
+- [x] **Step 4: Run tests to verify they pass** (команда Step 2 и `bun run test:upstream`; Expected: PASS)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/loginom-runtime/client
