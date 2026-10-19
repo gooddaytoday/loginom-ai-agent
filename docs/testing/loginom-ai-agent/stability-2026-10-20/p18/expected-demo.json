@@ -1,0 +1,95 @@
+{
+  "package_path": "/demo-2026-10-22/s2-customers.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.replace_columns"
+    },
+    {
+      "type": "transform.filter_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Code",
+          "label": "Code",
+          "type": "string"
+        },
+        {
+          "name": "Name",
+          "label": "Name",
+          "type": "string"
+        },
+        {
+          "name": "CreditLimit",
+          "label": "CreditLimit",
+          "type": "real"
+        },
+        {
+          "name": "Status",
+          "label": "Status",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "Code": "C-001",
+          "Name": "ООО Северный офис",
+          "CreditLimit": 12500.5,
+          "Status": "active"
+        },
+        {
+          "Code": "C-003",
+          "Name": "ИП Лебедев",
+          "CreditLimit": 3750.25,
+          "Status": "active"
+        },
+        {
+          "Code": "C-004",
+          "Name": "ООО Центральный сервис",
+          "CreditLimit": 50000.0,
+          "Status": "active"
+        },
+        {
+          "Code": "C-006",
+          "Name": "ИП Морозова",
+          "CreditLimit": 1250.5,
+          "Status": "active"
+        },
+        {
+          "Code": "C-007",
+          "Name": "ООО Перспектива",
+          "CreditLimit": 30000.0,
+          "Status": "active"
+        },
+        {
+          "Code": "C-009",
+          "Name": "ООО Альфа",
+          "CreditLimit": 15000.75,
+          "Status": "active"
+        },
+        {
+          "Code": "C-011",
+          "Name": "ООО Маяк",
+          "CreditLimit": 4500.0,
+          "Status": "active"
+        },
+        {
+          "Code": "C-012",
+          "Name": "ООО Резерв",
+          "CreditLimit": 0.0,
+          "Status": "active"
+        }
+      ]
+    }
+  ]
+}
