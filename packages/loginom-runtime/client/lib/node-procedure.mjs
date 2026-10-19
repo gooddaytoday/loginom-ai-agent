@@ -197,8 +197,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   const channel = {
     async openJavascriptPreview(port){
       checkBudget();
-      if(!preparedNodeContext||!['transform.group_data','transform.sorting','transform.join_data'].includes(operation.parameters?.target?.type))
-        throw Error('Managed preview is restricted to native Group, Sort and Join preflight');
+      if(!preparedNodeContext||!['transform.group_data','transform.sorting','transform.calculator','transform.join_data'].includes(operation.parameters?.target?.type))
+        throw Error('Managed preview is restricted to native Group, Sort, Calculator and Join preflight');
       const task={operation_id:operation.id+':preview'+nextStep(),owner:preparedNodeContext.node,
         workflow_ref:{prefix:preparedNodeContext.workflow_ref.prefix,tab_tid:preparedNodeContext.workflow_ref.tab_tid},
         output:{index:port.index,native_index:port.native_index,active:port.active,port_guid:port.port_guid},
