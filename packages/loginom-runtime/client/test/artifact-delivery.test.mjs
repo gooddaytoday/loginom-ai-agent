@@ -78,7 +78,7 @@ for(const fault of [null,'document','workflow','tab','offscreen','disabled','mas
  f.runtime.uiAct=async(a,o)=>{
   if(!opened){
    assert.equal(a.ref,'files-2');assert.equal(o.observationId,'toolbar-observation-2');
-   opened=true;f.calls.push('Files');return {status:'SUCCEEDED',cleanup_complete:true};
+   opened=true;f.calls.push('Files');return {operation_id:o.operationId,action_key:'ui.act',status:'SUCCEEDED',cleanup_complete:true};
   }
   return act(a,o);
  };
@@ -461,20 +461,51 @@ test('no-effect verification cannot erase an already submitted upload',async()=>
  assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
 });
 
-test('actual offscreen UI receipt clears the runtime delivery gate without a gesture',async()=>{
+for(const mode of ['still_offscreen','offscreen_after_ready'])test('owned Files readiness and safe refusal clear the runtime delivery gate: '+mode,async()=>{
  const vm=await import('node:vm');
  const {createActionRuntime}=await import('../lib/executor.mjs');
  const {Page,origin,build}=await import('./support/workspace-ui-fixture.mjs');
  const page=new Page(),toolbar=page.add('div','MF;cntMain;tlbMainToolbar');
- page.add('button','MF;cntMain;tlbMainToolbar;btnFilestorage','Файлы',{x:2000,y:0,width:40,height:30},toolbar);
- const f=fixture(),events=[];
+ page.context.innerWidth=1000;page.context.innerHeight=800;
+ const files=page.add('button','MF;cntMain;tlbMainToolbar;btnFilestorage','Файлы',{x:2000,y:100,width:40,height:20},toolbar);
+ const f=fixture(),events=[];let clock=0,offscreenReads=0,reachableReads=0;
  const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},allowCandidate:true,
   targetOrigin:origin,targetBuild:build,artifactStore:{getUploadGrant:()=>f.artifact},
-  onRecord:async e=>{events.push(e);return e;},execute:code=>vm.runInContext(`(${code})`,page.context)(page)});
+  now:()=>clock,onRecord:async e=>{
+   events.push(e);
+   if(e.phase==='observation_completed'){
+    const control=e.outcome?.output?.ui?.elements.find(item=>item.tid===files.getAttribute('data-tid'));
+    if(control?.interaction?.state==='outside_viewport'){
+     offscreenReads++;
+     // The next owned observation can become reachable; the action must use it.
+     if(mode==='offscreen_after_ready')files.box.x=40;
+    }
+    if(control?.interaction?.state==='point_observed'){
+     reachableReads++;
+     // Layout changes after the readiness read but before native uiAct preflight.
+     files.box.x=2000;
+    }
+    if(mode==='still_offscreen')clock+=16000;
+   }
+   return e;
+  },execute:code=>vm.runInContext(`(${code})`,page.context)(page)});
  const r=await runtime.deliverArtifact(request);
  assert.equal(r.outcome.status,'NOT_APPLIED',JSON.stringify(r));assert.equal(r.outcome.effect_possible,false);
- const refusal=events.find(e=>e.outcome?.error?.code==='UI_REFERENCE_OFFSCREEN');assert.ok(refusal,JSON.stringify({r,events}));
- assert.equal(refusal.outcome.operation_id,'delivery:nav1');assert.equal(refusal.outcome.effect_possible,false);
+ assert.equal(r.outcome.cleanup_complete,true);assert.equal(r.outcome.inspection_required,false);
+ assert.equal(r.outcome.upload_submitted_or_unknown,false);assert.ok(offscreenReads>=1);
+ const refusals=events.filter(e=>e.outcome?.error?.code==='UI_REFERENCE_OFFSCREEN');
+ if(mode==='offscreen_after_ready'){
+  assert.equal(reachableReads,1);assert.equal(refusals.length,1);
+  const refusal=refusals[0].outcome;
+  assert.equal(refusal.operation_id,'delivery:nav1');assert.equal(refusal.effect_possible,false);
+  assert.equal(refusal.cleanup_complete,true);assert.equal(refusal.status,'NOT_APPLIED');
+  assert.ok(!refusal.trace.some(e=>['ui_preconditions_verified','ui_gesture_applied','ui_scroll_applied'].includes(e.event)));
+ }else{
+  assert.equal(reachableReads,0);assert.equal(refusals.length,0);
+  assert.match(r.error.message,/readiness timeout: Files workspace control reachable/);
+  assert.equal(events.some(e=>e.operation_id?.startsWith('delivery:nav')),false);
+ }
+ assert.equal(events.some(e=>e.phase==='artifact_delivery_upload_receipt'),false);
  assert.equal(runtime.hasUnsettledWork(),false);assert.equal(runtime.hasActiveWork(),false);
  assert.doesNotThrow(()=>runtime.assertPreparationAllowed());assert.equal(page.events.includes('click'),false);
 });
