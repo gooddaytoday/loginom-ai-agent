@@ -180,8 +180,10 @@
 - [x] GREEN: подключить подготовленные слоты к существующим runSlotQueue и judge
   gate, убрать `SLOTS_ADMISSION_UNAVAILABLE` для этого пути. Run не вызывает
   создание/исправление пользователей; использовать прежний home/VPN wrapper.
-  Исход при неполных limit observations — incomplete/exit1; старый binary скрывает
-  session.status/retry, поэтому модельная приёмка ещё не открыта.
+  Неполные обязательные observations дают incomplete/exit1. Для актуальной цели
+  обязательны provider+judge; Dock transport остаётся unavailable в диагностике,
+  обнаруженный Dock429 по-прежнему отказ. Независимое ревью этой границы Approved;
+  legacy policy сохраняется. Report/acceptance64/293 PASS, typecheck/diff PASS.
 - [x] Run запускает `script/sample-parallel-resources.ts` с чистым env перед
   dispatch N=1/N=2 и останавливает/дожидается его в finally; out — private JSONL
   плюс существующая summary, interval=1000ms. Unit проверяет start/stop при успехе,
