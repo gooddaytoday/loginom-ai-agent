@@ -302,10 +302,11 @@ private config/budget/results вне Git; операторские команд�
 - [x] Закрыть замечание ревью обёртки: служебный Bun не читает локальный bunfig
   (`--config=/dev/null`). Canary preload RED→GREEN,11 tests/bash-n PASS;
   отдельный коммит wrapper096f18e, чужие изменения сохранены.
-- [ ] Удалять загруженный input по существующей успешной delivery-квитанции
+- [x] Удалять загруженный input по существующей успешной delivery-квитанции
   events.jsonl: точное имя в своём root, размер/SHA-256 перед delete, все children
   проверяются до изменения любого. Подключить одинаково в normal cleanup/startup;
-  чужой/неподтверждённый/изменённый файл сохраняет всё. Unit RED→GREEN, без новых описей.
+  чужой/неподтверждённый/изменённый файл сохраняет всё. Unit RED→GREEN, без новых описей;
+  slot-storage/startup12/72 PASS5.34s, typecheck/sh-n/diff PASS, Review Approved.
 - [ ] Реальный N=1 с агентом/судьёй на трёх задачах; по замеру предложить числовые
   пороги CPU/RAM/диска и **дождаться утверждения владельца до N=2**.
 - [ ] Записать утверждённый бюджет до реального N=2, выполнить run на тех же tasks/
@@ -367,4 +368,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20.4fb закрыт; N1 iLakZJ: агент completed21tools/0errors/0retry, judge64 (новая desktop-настройка; private config синхронизирован), cleanup отказал на загруженном input. Следом узкий TDD fix по delivery receipt и повтор N1; бюджетN2 утверждает владелец.
+20.N1 iLakZJ: агент completed21tools/0errors/0retry. Private judge config синхронизирован; input cleanup fix по delivery receipt12/72 PASS/TC/Review. Следом native judge/штатный startup и полный повтор N1; бюджетN2 утверждает владелец.

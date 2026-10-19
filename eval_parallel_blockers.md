@@ -50,6 +50,8 @@ Evidence: `evidence/n1-proc-race-owner-release-20261019.json` в acceptance stat
 N1 iLakZJ дошёл до завершённой задачи:21 tools/0 errors/0 retry. Судья получил64
 из-за добавленной глобальной desktop-настройки; private config синхронизирован
 под judge lease, вход подтверждён без модели. Cleanup сохранил root из-за
-хешированного имени своего input. Следующий шаг — unit TDD проверки существующей
-delivery-квитанции (точное имя/размер/hash), normal cleanup и startup, затем N1.
+хешированного имени своего input. Проверка существующей delivery-квитанции
+(точное имя/размер/hash) подключена в normal cleanup и startup:12/72 unit PASS,
+typecheck/sh-n/diff PASS, Review Approved. Следующий шаг — native judge/штатный
+startup, затем полный N1.
 Исходные результаты и карантин сохранены, подробности — в едином архиве.

@@ -36,17 +36,19 @@ export async function reconcileEnvironment(file: SlotFile, identity: ServerIdent
         let processes = await readStartupManagement({ stateDir: file.controller.stateDir, commandId: reservation.commandId,
           slotId: lease.slot.id, producerPid: reservation.owner.pid, runDir: command.runDir })
         const prefixes: string[] = []
+        const attemptDirs: string[] = []
         for (const attempt of command.attempts?.filter(attempt => attempt.slotId === lease.slot.id) ?? []) {
           if (!command.runDir || !path.isAbsolute(command.runDir) || !/^[a-z0-9_-]+$/i.test(attempt.taskId) || !Number.isSafeInteger(attempt.attempt) || attempt.attempt < 1)
             throw new EvalFailure("STARTUP_OWNERSHIP_UNCONFIRMED", 2)
           processes = await readStartupCleanup(path.join(command.runDir, attempt.taskId, String(attempt.attempt), "cleanup.json"), reservation.owner.pid)
           prefixes.push(`eval-${path.basename(command.runDir)}-${attempt.taskId}-${attempt.attempt}`)
+          attemptDirs.push(path.join(command.runDir, attempt.taskId, String(attempt.attempt)))
         }
         if (!await waitProfileIdle(lease.slot.profileDir, 1000)) throw new EvalFailure("STARTUP_PROCESS_CLEANUP_UNCONFIRMED", 2)
         const prepared = await lstat(path.join(file.controller.stateDir, `user-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
           if (error.code === "ENOENT") return undefined; throw error
         })
-        const cleanup = prepared ? processes && await cleanupSlotStorage(file, environment.server, lease, admin, processes, prefixes) : undefined
+        const cleanup = prepared ? processes && await cleanupSlotStorage(file, environment.server, lease, admin, processes, prefixes, attemptDirs) : undefined
         if (prepared && !cleanup) throw new EvalFailure("STARTUP_PROCESS_CLEANUP_UNCONFIRMED", 2)
         if (!prepared) {
           await assertProfileClean(lease.slot.profileDir)
