@@ -33,10 +33,8 @@ export async function reconcileEnvironment(file: SlotFile, identity: ServerIdent
       await assertSessionBackupEmpty(file, identity)
       await admin.inspectPoolPolicy()
       for (const lease of environment.slots) {
-        const root = path.join(file.controller.stateDir, `management-${reservation.commandId}-${lease.slot.id}`)
-        const management = await readdir(root).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return []; throw error })
-        let processes: ProcessCleanup | undefined
-        for (const name of management) processes = await readStartupCleanup(path.join(root, name, "cleanup.json"), reservation.owner.pid)
+        let processes = await readStartupManagement({ stateDir: file.controller.stateDir, commandId: reservation.commandId,
+          slotId: lease.slot.id, producerPid: reservation.owner.pid, runDir: command.runDir })
         const prefixes: string[] = []
         for (const attempt of command.attempts?.filter(attempt => attempt.slotId === lease.slot.id) ?? []) {
           if (!command.runDir || !path.isAbsolute(command.runDir) || !/^[a-z0-9_-]+$/i.test(attempt.taskId) || !Number.isSafeInteger(attempt.attempt) || attempt.attempt < 1)
@@ -68,6 +66,15 @@ export async function reconcileEnvironment(file: SlotFile, identity: ServerIdent
       token: reservation.token, revision: reservation.revision, serverEpoch: identity.serverEpoch })
     await environment.server.release(proof)
   } finally { await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())]) }
+}
+
+export async function readStartupManagement(input: { stateDir: string; commandId: string; slotId: string; producerPid: number; runDir?: string }) {
+  const root = input.runDir ? path.join(input.runDir, "preparation", input.slotId)
+    : path.join(input.stateDir, `management-${input.commandId}-${input.slotId}`)
+  const names = await readdir(root).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return []; throw error })
+  let processes: ProcessCleanup | undefined
+  for (const name of names) processes = await readStartupCleanup(path.join(root, name, "cleanup.json"), input.producerPid)
+  return processes
 }
 
 export async function readStartupCleanup(file: string, producerPid: number) {

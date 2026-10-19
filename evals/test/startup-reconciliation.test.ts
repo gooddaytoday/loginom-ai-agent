@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
-import { readStartupCleanup } from "../src/startup-reconciliation"
+import { readStartupCleanup, readStartupManagement } from "../src/startup-reconciliation"
 import { writeLeaseReceipt } from "../src/lease"
 import { reconcileEnvironment } from "../src/startup-reconciliation"
 import { parallelFixture } from "./helpers/parallel-fixture"
@@ -35,5 +35,26 @@ test("startup retains unknown prior admin ownership without touching slot files"
     await Bun.write(canary, "unknown ownership")
     await expect(reconcileEnvironment(fixture.slots, identity, "/missing-cli", fixture.lockRoot)).rejects.toThrow("STARTUP_ADMIN_CLEANUP_UNCONFIRMED")
     expect(await Bun.file(canary).text()).toBe("unknown ownership")
+  } finally { await rm(root, { recursive: true }) }
+})
+
+test("startup reads every preparation supervisor outcome from the owning command", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-startup-preparation-"))
+  const processes = { status: "confirmed", capture_complete: true, unknownProcesses: [], lifetime: { producer_pid: 12 } }
+  try {
+    await mkdir(path.join(root, "management-command-a/first"), { recursive: true })
+    await writeLeaseReceipt(path.join(root, "management-command-a/first/cleanup.json"), { processes })
+    expect(JSON.stringify(await readStartupManagement({ stateDir: root, commandId: "command", slotId: "a", producerPid: 12 }))).toBe(JSON.stringify(processes))
+  } finally { await rm(root, { recursive: true }) }
+})
+
+test("startup reconciles an admission failure using the run's actual preparation cleanup", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-startup-run-preparation-"))
+  const processes = { status: "confirmed", capture_complete: true, unknownProcesses: [], lifetime: { producer_pid: 12 } }
+  try {
+    const runDir = path.join(root, "run")
+    await mkdir(path.join(runDir, "preparation/a/status"), { recursive: true })
+    await writeLeaseReceipt(path.join(runDir, "preparation/a/status/cleanup.json"), { processes })
+    expect(JSON.stringify(await readStartupManagement({ stateDir: root, runDir, commandId: "command", slotId: "a", producerPid: 12 }))).toBe(JSON.stringify(processes))
   } finally { await rm(root, { recursive: true }) }
 })
