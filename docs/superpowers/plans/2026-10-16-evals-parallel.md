@@ -68,3 +68,6 @@ Private state `/home/kiselev/.local/state/loginom-evals/acceptance-20261016/`:
 7. План выполнен: 114 targeted, 910 unit/18skip/0fail, typecheck, diff check и ревью Passed/Approved.
 8. Старые 12 пар/инциденты и A00yuH сохранены; чужой незакоммиченный обзор не трогать.
 9. Вопрос владельцу только при действительной необходимости по контракту п.33.
+10. После ревью исправлены offline units, native archive reader и partial release:
+    `28799f2679`, `23962b6a1c`, `d32e182da2`; тесты и детали —
+    [план исправлений](2026-10-19-evals-parallel-review-fixes.md). Это source-проверки без нового live N2.
