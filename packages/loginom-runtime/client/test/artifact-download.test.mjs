@@ -182,15 +182,19 @@ test('verification reveals its original clipped or offscreen file owner once bef
 
 function nativeRevealEpochFixture(mode='once') {
   const f=revealFixture(),snapshot=f.page.uiSnapshot.bind(f.page),evaluate=f.page.evaluate.bind(f.page);
+  const rowOnly=['visible_row','row_replaced','row_missing','scroll_appeared','unknown_file'].includes(mode);
   let revision=0,checks=0,resolveEvent;
   const elements=f.page.elements.bind(f.page);
   f.page.elements=()=>elements().map(e=>e.kind==='file'?{...e,box:{x:30,y:825-f.owner.scrollTop,width:100,height:25}}:e);
-  if(mode==='visible')f.owner.scrollTop=50;
+  if(mode==='visible'||mode==='visible_no_scroll'||rowOnly)f.owner.scrollTop=50;
   f.page.directory='/test-2';
   f.page.uiSnapshot=()=>{
     const s=snapshot(),file=s.ui.elements.find(e=>e.ref===f.options.file_ref);
     s.dom_epoch.revision=revision;s.scan={mutation_counts:{other_style:revision}};
     file.storage_entry={kind:'file',bytes:revision&&mode==='size_changed'?4:3};
+    if(mode==='visible_no_scroll')file.scroll=null;
+    if(rowOnly){delete file.scroll;file.storage_entry.row_ref='same-dom-row';}
+    if(mode==='unknown_file')file.storage_entry.kind='unknown';
     if(revision) {
       if(mode==='owner_changed')file.scroll.ref='different-owner';
       if(mode==='scroll_changed')file.scroll.top++;
@@ -200,6 +204,9 @@ function nativeRevealEpochFixture(mode='once') {
       if(mode==='document_changed')s.dom_epoch.document='different';
       if(mode==='context_changed')s.file_storage.directory='/other';
       if(mode==='blocked')s.ui.masks=[{kind:'busy'}];
+      if(mode==='row_replaced')file.storage_entry.row_ref='different-dom-row';
+      if(mode==='row_missing')delete file.storage_entry.row_ref;
+      if(mode==='scroll_appeared')file.scroll={ref:'new-owner',top:0,max_top:50};
     }
     return s;
   };
@@ -231,6 +238,18 @@ test('native pre-gesture epoch refusal reobserves the same owner before exactly 
  }
 });
 
+test('LAB-109 visible file without scroll keeps its native DOM row owner across an epoch refusal',async()=>{
+ const f=nativeRevealEpochFixture('visible_row'),result=await f.run();
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.deepEqual(f.calls,['listen','click','save']);assert.equal(f.checks(),2);
+ assert.equal(result.trace.find(e=>e.event==='download_gesture_result').epoch_refreshes.length,1);
+ for(const mode of ['row_replaced','row_missing','scroll_appeared','unknown_file']) {
+  const denied=nativeRevealEpochFixture(mode),outcome=await denied.run();
+  assert.equal(outcome.status,'NOT_APPLIED',mode);assert.equal(outcome.effect_possible,false,mode);
+  assert.deepEqual(denied.calls,['listen'],mode);assert.equal(denied.checks(),1,mode);
+ }
+});
+
 test('native epoch refresh never redirects the revealed file or repeats an applied gesture',async()=>{
   for(const mode of ['owner_changed','scroll_changed','file_changed','identity_changed','signature_changed','size_changed','document_changed','context_changed','blocked','event_arrived','applied_failure','persistent']) {
     const f=nativeRevealEpochFixture(mode),result=await f.run();
@@ -238,6 +257,27 @@ test('native epoch refresh never redirects the revealed file or repeats an appli
     assert.equal(f.calls.filter(c=>c==='reveal').length,1,mode);assert.equal(f.calls.filter(c=>c==='listen').length,1,mode);
     assert.equal(f.calls.filter(c=>c==='click').length,mode==='applied_failure'?1:0,mode);
     assert.equal(f.checks(),mode==='persistent'?3:mode==='applied_failure'?2:1,mode);
+  }
+});
+
+test('epoch refusal reports the rejected reobservation guard without changing its decision',async()=>{
+  const cases={owner_changed:['scroll'],scroll_changed:['scroll'],identity_changed:['identity'],signature_changed:['signature'],
+    size_changed:['bytes'],document_changed:['context'],context_changed:['context'],blocked:['context'],
+    event_arrived:['event_pending'],persistent:['attempt_available'],visible_no_scroll:['owner']};
+  for(const [mode,failed] of Object.entries(cases)) {
+    const f=nativeRevealEpochFixture(mode),result=await f.run();
+    const refusal=result.trace.find(e=>e.event==='download_epoch_refresh_refused');
+    assert.ok(refusal,mode);assert.equal(refusal.stage,['event_arrived','persistent'].includes(mode)?'eligibility':'observation',mode);
+    for(const key of failed)assert.equal(refusal.checks[key],false,mode+':'+key);
+    assert.ok(Object.values(refusal.checks).every(v=>typeof v==='boolean'),mode);
+    assert.equal(result.error.code,'DOWNLOAD_GESTURE_NOT_CONFIRMED',mode);
+    assert.equal(f.calls.filter(c=>c==='click').length,0,mode);assert.equal(f.calls.filter(c=>c==='listen').length,1,mode);
+    if(mode==='visible_no_scroll') {
+      // LAB-109:3048's public failure alone cannot distinguish this guard
+      // from identity/signature/context changes; preserve the missing evidence.
+      assert.equal(result.status,'NOT_APPLIED');assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true);
+      assert.deepEqual(Object.entries(refusal.checks).filter(([,value])=>!value).map(([key])=>key),['owner']);
+    }
   }
 });
 

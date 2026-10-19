@@ -295,13 +295,32 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       // Keep the single listener/deadline and never repeat reveal or a gesture.
       if(!task.output_binding||attempt===2||!eventPending||action.phase!=='preconditions'
         ||action.status!=='NOT_APPLIED'||action.effect_possible!==false||action.cleanup_complete!==true
-        ||action.error?.code!=='UI_EPOCH_CHANGED')break;
+        ||action.error?.code!=='UI_EPOCH_CHANGED') {
+        if(action.error?.code==='UI_EPOCH_CHANGED')trace.push({event:'download_epoch_refresh_refused',stage:'eligibility',
+          checks:{output_bound:!!task.output_binding,attempt_available:attempt<2,event_pending:eventPending,
+            preconditions:action.phase==='preconditions',not_applied:action.status==='NOT_APPLIED',
+            no_effect:action.effect_possible===false,cleanup_complete:action.cleanup_complete===true}});
+        break;
+      }
       const previous=target(before.output),fresh=await observe(page);
       const file=fresh.status==='SUCCEEDED'&&contextMatches(fresh.output)&&target(fresh.output);
-      if(!eventPending||!file||!previous?.scroll?.ref||!same(file.scroll,previous.scroll)
+      // A visible file need not have a scrollable ancestor. In that case
+      // require its original DOM row, issued by the same native file read.
+      const owner=!!previous?.scroll?.ref||(!previous?.scroll&&!file?.scroll
+        &&typeof previous?.storage_entry?.row_ref==='string'&&previous.storage_entry.row_ref.length>0
+        &&file?.storage_entry?.row_ref===previous.storage_entry.row_ref);
+      if(!eventPending||!file||!owner||!same(file.scroll,previous.scroll)
         ||!same(file.identity,previous.identity)||!same(file.signature,previous.signature)
         ||file.storage_entry?.kind!=='file'||file.storage_entry.bytes!==task.expected_bytes
-        ||file.interaction?.state!=='point_observed'||!file.allowed_actions?.includes('double_click'))break;
+        ||file.interaction?.state!=='point_observed'||!file.allowed_actions?.includes('double_click')) {
+        trace.push({event:'download_epoch_refresh_refused',stage:'observation',checks:{event_pending:eventPending,
+          observation:fresh.status==='SUCCEEDED',context:fresh.status==='SUCCEEDED'&&contextMatches(fresh.output),
+          file:!!file,owner,scroll:!!file&&same(file.scroll,previous?.scroll),
+          identity:!!file&&same(file.identity,previous?.identity),signature:!!file&&same(file.signature,previous?.signature),
+          file_kind:file?.storage_entry?.kind==='file',bytes:file?.storage_entry?.bytes===task.expected_bytes,
+          point_observed:file?.interaction?.state==='point_observed',double_click:file?.allowed_actions?.includes('double_click')===true}});
+        break;
+      }
       epochRefreshes.push({from:before.output.dom_epoch.revision,to:fresh.output.dom_epoch.revision,
         mutation_delta:Object.fromEntries(['cursor_style','other_style','attributes','child_list','text','other','unclassified','ignored_cursor_blink']
           .map(key=>[key,(fresh.output.scan?.mutation_counts?.[key]??0)-(before.output.scan?.mutation_counts?.[key]??0)]))});
