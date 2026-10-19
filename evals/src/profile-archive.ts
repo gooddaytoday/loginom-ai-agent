@@ -2,7 +2,7 @@ import path from "node:path"
 import { constants } from "node:fs"
 import { lstat, mkdir, open, readdir, readlink, realpath, rename } from "node:fs/promises"
 import { assertProfileClean, profileHistory, waitProfileIdle } from "./profile"
-import { writerIdentity } from "./process-supervisor"
+import { writerIdentity, type ProcessCleanup } from "./process-supervisor"
 import { readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { EvalFailure } from "./fail"
 
@@ -69,7 +69,17 @@ export async function archiveProfileEvidence(profile: string, archive: string, j
 export async function confirmedProfileArchive(attemptDir: string, profileDir: string, historyDir = path.resolve(profileDir) + ".history") {
   const cleanup = await Bun.file(path.join(attemptDir, "cleanup.json")).json() as {
     result?: { status?: string }; stages?: { stage: string; status: string; path?: string }[];
-    archive?: { status?: string; archive?: string; journal?: string }
+    archive?: string | { status?: string; archive?: string; journal?: string }; profileDir?: string;
+    processes?: Partial<ProcessCleanup>; serverSessions?: string; storageDeletionAllowed?: boolean; nextAdmissionAllowed?: boolean
+  }
+  if (typeof cleanup.archive === "string") {
+    if (cleanup.profileDir !== path.resolve(profileDir) || await realpath(profileDir) !== cleanup.profileDir ||
+      !cleanup.archive.startsWith(path.resolve(historyDir) + path.sep) || await realpath(cleanup.archive) !== cleanup.archive ||
+      cleanup.processes?.status !== "confirmed" || cleanup.processes.capture_complete !== true ||
+      !Array.isArray(cleanup.processes.unknownProcesses) || cleanup.processes.unknownProcesses.length !== 0 ||
+      cleanup.serverSessions !== "confirmed" || cleanup.storageDeletionAllowed !== true || cleanup.nextAdmissionAllowed !== true)
+      throw Error("native evidence requires own confirmed history archive")
+    return cleanup.archive
   }
   const archive = cleanup.stages?.find(stage => stage.stage === "profile_history" && stage.status === "confirmed")?.path
   if (cleanup.result?.status !== "confirmed" || !archive || !archive.startsWith(path.resolve(historyDir) + path.sep) || await realpath(archive) !== archive)
