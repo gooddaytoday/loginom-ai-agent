@@ -1,10 +1,10 @@
-import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput} from "./expected-outputs.mjs"
+import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput,projectExportInput} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
 import { readFile, mkdir, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
-import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
+import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations,observeExportInputMapping} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
 import {coldNativeEligible} from './cold-reader-policy.mjs'
 
@@ -249,7 +249,15 @@ try {
   await returnFromOutputTable(channel, opened.table)
   }
 
-  actual.push({node,type:target.type,label:target.label,output_port:outputPort,execution,data});
+  const exactExport=exportInput&&node.node_id===exportInput.node.ref.node_id&&outputPort===exportInput.output_port
+   &&expectedOutputs.some(o=>o.output_node_type==='export_input'&&o.column_order==='exact');
+  let sourceData;
+  if(exactExport){
+   const inputMapping=await observeExportInputMapping({load,channelFor,target:exportInput.export_node});
+   await record({phase:'cold_export_input_mapping',node:exportInput.export_node.ref,mapping:inputMapping,settings_applied:false});
+   sourceData=data;data=projectExportInput(data,inputMapping);
+  }
+  actual.push({node,type:target.type,label:target.label,output_port:outputPort,execution,data,...(sourceData?{source_data:sourceData}:{})});
   // Preserve independently read values before correspondence can refuse. A
   // failed match is still FAIL; this private checkpoint makes it diagnosable.
   const checkpoint=JSON.stringify({phase:'independent_cold_read_checkpoint',path:saved.path,outputs:actual});

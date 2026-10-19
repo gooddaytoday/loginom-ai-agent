@@ -198,6 +198,27 @@ export async function bindColdExecutions({execute,sources,ctx,ownedExecutions}){
 
 // Inspect every saved export destination and cancel each unchanged wizard.
 // A node label, export basename or prior model receipt cannot select it.
+export async function observeExportInputMapping({load,channelFor,target}){
+ const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
+ const channel=channelFor(target.ref,'export-input-'+target.ref.node_id);
+ await channel.revealGraphNode();
+ try{
+  await channel.openInputPort(0);
+  const state=await channel.observe({condition:'cold saved export input mapping',readMappings:true,
+   ready:s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true});
+  const m=state.node_mapping,c=m.node_context;
+  need(m.source_identity_verified===true&&m.settings_applied===false&&c?.verified===true&&c.surface==='wizard'
+   &&['document_id','workflow_id','node_id'].every(k=>c[k]===target.ref[k])
+   &&c.input_port?.direction==='input'&&c.input_port.port===0&&c.input_port.native_index===1,'export input owner differs');
+  return m;
+ }finally{
+  const state=await channel.observe({condition:'cold export input cancellation surface',ready:()=>true});
+  if(state.wizard?.status==='observed'){
+   const closed=await closePreparedWizard(channel);need(closed.verified===true&&closed.settings_applied===false,'export input cancel');
+  }
+ }
+}
+
 export async function observeExportDestinations({load,graph,channelFor,execute}){
  const {openPreparedWizard}=await load('client/lib/node-wizard-open.mjs');
  const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');

@@ -55,7 +55,29 @@ export function resolveExportInput(graph,{destination,destinations}={}){
  need(incoming.length===1&&incoming[0].input===0&&Number.isSafeInteger(incoming[0].output)&&incoming[0].output>=0,error);
  const sources=graph.nodes.filter(n=>n.ref.node_id===incoming[0].source);
  need(sources.length===1&&Array.isArray(sources[0].outputs)&&sources[0].outputs.includes(incoming[0].output),error);
- return {node:sources[0],output_port:incoming[0].output};
+ return {node:sources[0],output_port:incoming[0].output,export_node:exports[0]};
+}
+export function projectExportInput(data,mapping){
+ const error='COLD_EXPORT_INPUT_MAPPING_INVALID';
+ need(mapping?.verified===true&&mapping.source_identity_verified===true&&mapping.inventory_complete===true
+  &&mapping.settings_applied===false&&Array.isArray(mapping.source_fields)&&Array.isArray(mapping.target_fields),error);
+ need(Array.isArray(data.schema)&&Array.isArray(data.sample)&&mapping.source_fields.length===data.schema.length
+  &&new Set(data.schema.map(f=>f.name)).size===data.schema.length
+  &&new Set(mapping.source_fields.map(f=>f.record_id)).size===mapping.source_fields.length
+  &&new Set(mapping.source_fields.map(f=>f.name)).size===mapping.source_fields.length,error);
+ need(mapping.source_fields.every(f=>typeof f.record_id==='string'&&f.record_id.length>0&&data.schema.filter(s=>s.name===f.name&&s.type===f.type).length===1)
+  &&mapping.target_fields.every((f,i)=>f.index===i),error);
+ const fields=mapping.target_fields.filter(f=>f.excluded!==true),indices=[];
+ need(fields.length>0&&fields.length<=128&&new Set(fields.map(f=>f.name)).size===fields.length,error);
+ const schema=fields.map((f,index)=>{
+  const sources=mapping.source_fields.filter(s=>s.record_id===f.source?.record_id);
+  need(sources.length===1&&sources[0].name===f.source.name&&sources[0].type===f.type
+   &&typeof f.name==='string'&&typeof f.label==='string',error);
+  indices.push(data.schema.findIndex(s=>s.name===sources[0].name));
+  return {index,name:f.name,label:f.label,type:f.type};
+ });
+ need(data.sample.every(row=>Array.isArray(row)&&row.length===data.schema.length),error);
+ return {...data,schema,sample:data.sample.map(row=>indices.map(i=>row[i]))};
 }
 export function matchesExpectedOutput(data,expected){
  if(data.row_count!==expected.rows.length||!data.sample_complete||!data.precision?.numbers_verified

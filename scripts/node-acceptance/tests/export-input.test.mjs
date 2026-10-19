@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseExpectedOutputs,resolveExportInput,matchExpectedOutputs} from '../expected-outputs.mjs';
+import {parseExpectedOutputs,resolveExportInput,matchExpectedOutputs,projectExportInput,matchesExpectedOutput} from '../expected-outputs.mjs';
 
 const output={output_node_type:'export_input',columns:[{name:'Code',type:'string'}],rows:[{Code:'A'}],ordered:true};
 const node=(id,type,outputs=[0])=>({ref:{node_id:id},type,label:id,outputs});
@@ -8,6 +8,44 @@ const graph=()=>({complete:true,nodes:[node('filter','transform.filter_data'),no
  links:[{source:'filter',output:0,target:'rename',input:0},{source:'rename',output:1,target:'export',input:0}]});
 const actual=(id,port,name='Code')=>({node:{node_id:id},type:id==='filter'?'transform.filter_data':'transform.reform_columns',output_port:port,
  data:{schema:[{name,label:name,type:'string'}],row_count:1,sample_complete:true,precision:{numbers_verified:true},sample:[[{type:'string',is_null:false,value:'A'}]]}});
+
+function reorderedExport(){
+ const data={schema:[{name:'Total',label:'Total',type:'real'},{name:'Region',label:'Region',type:'string'}],row_count:1,sample_complete:true,precision:{numbers_verified:true},sample:[[{type:'real',is_null:false,value:12.5},{type:'string',is_null:false,value:'North'}]]};
+ const source_fields=data.schema.map((f,index)=>({...f,index,record_id:'source-'+index}));
+ const mapping={verified:true,source_identity_verified:true,inventory_complete:true,settings_applied:false,source_fields,target_fields:[source_fields[1],source_fields[0]].map((s,index)=>({...s,index,record_id:'target-'+index,source:s}))};
+ const expected={column_order:'exact',columns:[{name:'Region',type:'string'},{name:'Total',type:'real'}],rows:[{Region:'North',Total:12.5}],ordered:true};
+ return {data,mapping,expected};
+}
+test('exact export order follows the observed input mapping without reordering the upstream evidence',()=>{
+ const {data,mapping,expected}=reorderedExport(),before=structuredClone(data);
+ assert.equal(matchesExpectedOutput(data,expected),false);
+ assert.equal(matchesExpectedOutput(projectExportInput(data,mapping),expected),true);
+ assert.deepEqual(data,before);
+ mapping.target_fields.reverse();mapping.target_fields.forEach((f,i)=>f.index=i);
+ assert.equal(matchesExpectedOutput(projectExportInput(data,mapping),expected),false);
+});
+test('export projection refuses incomplete, ambiguous, converted or unbound columns',()=>{
+ for(const change of [m=>m.verified=false,m=>m.source_identity_verified=false,m=>m.inventory_complete=false,m=>m.settings_applied=true,
+  m=>m.source_fields.pop(),m=>m.source_fields[1].record_id=m.source_fields[0].record_id,m=>delete m.source_fields[0].record_id,
+  m=>m.target_fields[0].source={record_id:'foreign'},m=>m.target_fields[0].type='real',m=>m.target_fields[0].index=9,
+  m=>m.target_fields[1].name=m.target_fields[0].name]){
+  const {data,mapping}=reorderedExport();change(mapping);assert.throws(()=>projectExportInput(data,mapping),/COLD_EXPORT_INPUT_MAPPING_INVALID/);
+ }
+ const {data,mapping,expected}=reorderedExport();data.sample[0][0].value=13;
+ assert.equal(matchesExpectedOutput(projectExportInput(data,mapping),expected),false);
+});
+test('saved export input is read and cancelled through its exact native input1 owner',async()=>{
+ const {observeExportInputMapping}=await import('../static-source-proof.mjs');
+ for(const fault of [null,'foreign','index','mutated','cleanup']){
+  let open=false;const actions=[],ref={document_id:'doc',workflow_id:'flow',node_id:'export'};
+  const m={verified:true,inventory_complete:true,source_identity_verified:true,settings_applied:fault==='mutated',node_context:{...ref,node_id:fault==='foreign'?'other':ref.node_id,verified:true,surface:'wizard',input_port:{direction:'input',port:0,native_index:fault==='index'?0:1}}};
+  const channel={revealGraphNode:async()=>{},openInputPort:async port=>{assert.equal(port,0);open=true;actions.push('open');},observe:async o=>{const s={wizard:open?{status:'observed',stage:'input_mapping'}:{status:'absent'},node_mapping:m};assert.ok(o.ready(s));return s;}};
+  const load=async()=>({closePreparedWizard:async c=>{assert.equal(c,channel);open=false;actions.push('cancel');return {verified:fault!=='cleanup',settings_applied:false};}});
+  const promise=observeExportInputMapping({load,channelFor:()=>channel,target:{ref}});
+  if(fault)await assert.rejects(promise,/COLD_SOURCE/);else assert.equal(await promise,m);
+  assert.deepEqual(actions,['open','cancel']);
+ }
+});
 
 test('export_input parses in both forms and forbids explicit output ports or labels',()=>{
  const base={package_path:'/own/export.lgp',nodes:[]};
