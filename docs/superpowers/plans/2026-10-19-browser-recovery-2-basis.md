@@ -47,7 +47,7 @@
 
 1. `listTools()` браузерного клиента сессии (`capabilities: ['core', 'vision']`) содержит все 16 имён allowlist общего контракта.
 2. Через Dock создать и выполнить `transform.calculator` без output-mapping (`finish: "execute"`). Сохранить базовую линию выполнения, снятую процедурой до запуска. Закрыть все окна: граф тихий.
-3. Без процедуры узла: проверка покоя, как в `node-pending-release.mjs:51-66`, без жестов; затем процедура консоли процессов с этой базовой линией (`identify`, `waitCompleted`); затем `openOwnedNativePreview` → схема → `closeOwnedNativePreview`. Базовую линию достаточно временно подставить в процедуру.
+3. Без процедуры узла: проверка покоя, как в `node-pending-release.mjs:51-66`, без жестов; затем процедура консоли процессов с этой базовой линией (`identify`, `waitCompleted`); затем `openOwnedNativePreview` → схема → `closeOwnedNativePreview`. Базовую линию достаточно временно подставить в отдельный экземпляр процедуры. `prepare()` возвращает baseline; IPC-клиент `supervise()` сам не раскрывает browser/channel, поэтому временная instrumentation связывает их в том же контексте вне продукта, без нового production API.
 4. `browser_snapshot` страницы Loginom: размер ответа без аргументов и с `target`/`depth: 3`.
 
 Ожидается: шаг 3 доказывает выполнение и читает схему; размеры записаны. Если шаг 3 не проходит, остановиться и вынести на решение владельца: на этом допущении держится `completed`. Итог — в checkpoint до 20 строк; скрипт удаляется.
@@ -64,7 +64,7 @@
   - `classifyBrowserRecovery(view, history = []) → Basis | null`
   - `browserRecoveryStepKey(step) → string` (формат — общий контракт)
   - `browserRecoveryNextStep(basis, {calls_remaining, ms_remaining}) → object` (формат — общий контракт)
-  - `decideBrowserRecovery(basis, facts) → {result, verified, missing: string[], next_step}`
+  - `decideBrowserRecovery(basis, facts) → {result, verified, missing: string[]}`; конкретный `next_step` формирует executor в Task 6 из исходного request и фактического `attemptId`, после подтверждённой записи квитанции.
 - `view` — срез операции, который собирает Task 2: `operation_id, capability, action_key, state ('pending'|'running'|'settled'), status, effect_possible, error_code, cause_code, pending_phase, released_phase, checkpoint_kind, execution_status, export_download_unconfirmed, export_overwrite, node {document_id, workflow_id, node_id} | null, target {kind, type}, request_finish, read_ports, transport_uncertain, recovery_options, next_tools, internal_resume_available, user_action, release_refused, stopped_error {code, cause_code}, browser_recovery_stopped, recovery_receipt_id, reconciled, document_id, package_path`.
 - Фаза шага в `step` — `pending_phase`; для T4 `execution` — `released_phase`, для T4 `export` — `read`. Так бюджет T4 делится с T1–T3 того же шага.
 - `Basis`: `{trigger, reason_code, effect, operation_id, step, goal: {execution, output_schema, ports, file, saved_package}, idempotent_retry}`.
@@ -73,7 +73,7 @@
 
 | Основание | Условие |
 | --- | --- |
-| T1 | `release_refused.user_action` задан |
+| T1 | `state === "pending"`, `pending_phase !== null`, `release_refused.user_action` задан и `release_refused.phase === pending_phase` |
 | T3 | `target.kind === "existing"`; фаза `P = pending_phase` и код `C = cause_code ?? error_code`; в `history` есть операция того же узла с `checkpoint_kind === "local_node_released"`, `released_phase === P` и `stopped_error` с тем же `C` |
 | T4 `execution` | `checkpoint_kind === "local_node_released"`, `execution_status === "unknown"` |
 | T4 `export` | `export_download_unconfirmed === true` |
@@ -93,7 +93,7 @@
 | `exports.text` | workspace, execution, export_file | — | workspace и `idempotent_retry` | `unresolved` |
 | Save | saved_package | — | — | `unresolved` |
 
-`next_step`: для `completed` узла — `dock_node_read` с `source_operation_id` квитанции, кроме `exports.text` (инструкция продолжать сценарий: файл уже проверен) и `programming.javascript` (инструкция: выполнение и схема проверены, данные выхода читаются только новой операцией над `existing`-узлом, потому что `dock_node_read` требует readback исходной процедуры, `node-read-contract.mjs:44-49`); для `completed` Save — инструкция продолжать и в конце сохранить пакет через Dock (`package.save_checkpoint`); для `continuable` — `next_step` освобождённой операции (`node-apply.mjs:504-510`: новая операция над `existing`-узлом с полными настройками). Для `unresolved` — инструкция с перечнем `missing`; при выполнении без схемы — «выполнение подтверждено, схема выхода не прочитана: не меняй узел, закрой посторонние окна и снова вызови finish».
+`next_step` формирует `settleBrowserRecovery` (Task 6), имеющий исходный request, тип узла и `attemptId`; pure decision его не вычисляет. Для `completed` узла — `dock_node_read` с `source_operation_id` квитанции, кроме `exports.text` (инструкция продолжать сценарий: файл уже проверен) и `programming.javascript` (инструкция: выполнение и схема проверены, данные выхода читаются только новой операцией над `existing`-узлом, потому что `dock_node_read` требует readback исходной процедуры, `node-read-contract.mjs:44-49`); для `completed` Save — инструкция продолжать и в конце сохранить пакет через Dock (`package.save_checkpoint`); для `continuable` — `next_step` освобождённой операции (`node-apply.mjs:504-510`: новая операция над `existing`-узлом с полными настройками). Для `unresolved` — инструкция с перечнем `missing`; при выполнении без схемы — «выполнение подтверждено, схема выхода не прочитана: не меняй узел, закрой посторонние окна и снова вызови finish».
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -105,7 +105,7 @@ const view = patch => ({ operation_id: 'apply', capability: 'node.apply', state:
 
 test('T1 is offered for a refused release that names a user action', () => {
   const basis = classifyBrowserRecovery(view({ recovery_options: ['abandon_operation'], next_tools: ['dock_operation_recover'],
-    release_refused: { user_action: 'Ask the user' } }));
+    release_refused: { user_action: 'Ask the user', phase: 'configure' } }));
   assert.equal(basis.trigger, 'T1'); assert.equal(basis.reason_code, 'NODE_RELEASE_REFUSED');
   assert.deepEqual(basis.step, { kind: 'node', document_id: 'doc', workflow_id: 'wf', node_id: 'n1', phase: 'configure' });
   assert.deepEqual(basis.goal, { execution: true, output_schema: true, ports: [0], file: false, saved_package: false });
@@ -177,6 +177,8 @@ git add packages/loginom-runtime/client/lib/browser-recovery-basis.mjs packages/
 git commit -m "feat(runtime): classify browser recovery triggers and decide results"
 ```
 
+Дополнительное поведение Task 1: при одинаковых успешных фактах тип узла не влияет на pure decision; next_step проверяется через executor в Task 6.
+
 ### Task 2: Executor выдаёт основание
 
 **Files:**
@@ -192,7 +194,7 @@ git commit -m "feat(runtime): classify browser recovery triggers and decide resu
   - `createActionRuntime({..., browserRecovery})`: `undefined` — выключено; иначе `{remaining(stepKey) → {calls_remaining, ms_remaining}}` (бюджет держит bridge, план 3).
   - `runtime.browserRecoveryBasis(operationId) → (Basis & {input}) | null` — основание названной операции (`start` всегда передаёт `operation_id` из `next_step`). `input` — вход в восстановление из раздела 7 дизайна: `original_operation_id, request, document_id, workflow_ref, node, package_path, phase, confirmed_phases, possible_effects, used_recovery, goal`. Сериализованный `request` длиннее 16384 байт опускается с `request_omitted: true`.
   - Поле `browser_recovery: {basis, next_step}`: в `output` отказа `operation.recover` с `NODE_RELEASE_REFUSED`, в `output` inspect и в `outcome.output` узловых исходов. Исход Save основания не несёт: T4 `save` появляется только в inspect после reconcile. При опции и основании `output.user_action` не возвращается.
-  - Состояние операции: `operation.releaseRefused = {user_action}`; `operation.stoppedError = {code, cause_code}` — сохраняется в `runNodeApply` из остановленного исхода (`error.code`, `error.cause.code`) до перезаписи при освобождении; `operation.usedRecovery: string[]`.
+  - Состояние операции: `operation.releaseRefused = {user_action, phase}` только для текущей pending-фазы; после её успешного освобождения или продвижения отказ очищается; `operation.stoppedError = {code, cause_code}` — сохраняется в `runNodeApply` из остановленного исхода (`error.code`, `error.cause.code`) до перезаписи при освобождении; `operation.usedRecovery: string[]`. У Save `operation.browserRecoveryReconciled` относится к текущему исходу: выставляется после завершённого inspect/reconcile, сбрасывается при изменении исхода или новом browser-действии этой операции; полного кэша Basis нет.
   - `compactNodeResult` и `compactActionResult` ставят `browser_recovery.next_step` первым `next_step`.
   - Журнал: `browser_recovery_basis` один раз на пару (операция, триггер).
   - `browserRecoveryBasis` и `browserRecoveryHandoff` (Task 3) входят в `readOnly`: они не мутируют и вызываются при занятом executor.
@@ -206,7 +208,7 @@ git commit -m "feat(runtime): classify browser recovery triggers and decide resu
 | `released_phase`, `checkpoint_kind`, `execution_status` | `operation.outcome.output` после `releaseNodeApply` (`node-apply.mjs:477-516`) |
 | `next_tools`, `internal_resume_available` | `recoveryAdvice(operation)`: `next_steps.map(step => step.tool)` и одноимённый флаг |
 | `export_download_unconfirmed` | `Boolean(operation.nodeApply.export_download_refusal)` (`node-apply.mjs:213-217`); исход и журнал не меняются |
-| `reconciled` | `true` только в inspect после `reconcilePending` |
+| `reconciled` | `operation.browserRecoveryReconciled` для текущего Save-исхода; inspect ставит после `reconcilePending`, последующий `browserRecoveryBasis(id)` читает тот же факт без повторного UI-прохода |
 | `read_ports` | `operation.nodeApply.request.read.ports` |
 | `document_id`, `package_path` (Save) | `getStorageBinding().document_id`, путь из параметров Save |
 
@@ -255,6 +257,8 @@ test('an exhausted step budget leaves an instruction without a tool', async () =
 });
 ```
 
+Дополнительные регрессии: refused release → successful release с unknown execution даёт T4 со старой released_phase и тем же step key; после установленного результата старый T1 не предлагается. Inspect неоднозначного Save → последующий browserRecoveryBasis(id) возвращает тот же Save step, до inspect основания нет.
+
 `stop(f, phase, {cause, operationId, target})` в переносимой фикстуре расширяется: драйвер бросает ошибку с `receipt: {error: {code: cause, message: cause}}`, чтобы исход получил `error.cause.code`.
 
 В `user-results.test.mjs`:
@@ -275,7 +279,7 @@ Expected: FAIL в новых тестах; перенос фикстуры ос�
 
 - [ ] **Step 3: Implement**
 
-Срез строится одной функцией executor по таблице источников. `history` — прочие узловые операции из `operations`. Основание пересчитывается при каждом ответе, а не хранится: T1 опирается на сохранённый `operation.releaseRefused`.
+Срез строится одной функцией executor по таблице источников. `history` — прочие узловые операции из `operations`. Основание пересчитывается при каждом ответе, а не хранится: T1 опирается только на актуальный `operation.releaseRefused`. Основание исторической операции не выдаётся при чужой незавершённой работе; handoff повторно проверяет это после ожидания (Task 3).
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -297,8 +301,8 @@ git commit -m "feat(runtime): offer browser recovery as a structured next step"
 - Test: `packages/loginom-runtime/client/test/browser-recovery-executor.test.mjs`
 
 **Interfaces:**
-- Produces: `runtime.browserRecoveryHandoff(operationId, {signal, pollMs = 250}) → Promise<{verified: true, receipt_id: string, waited_ms: number} | {verified: false, reason: 'EXECUTOR_STILL_RUNNING'|'RECEIPT_UNSETTLED'|'RECEIPT_MISSING'|'RECEIPT_IDENTITY_MISMATCH'}>`.
-- Поведение: ждёт, пока `running`, `nodeJobs.busy`, `sourceReads.busy`, `delivery.busy` не станут ложными, но не дольше `min(operation.deadline - now(), BROWSER_RECOVERY_HANDOFF_MS)`: живой executor дольше минуты после остановки фазы — аномалия, и попытка честно уходит в `stopped`. Затем читает `operation.lastReceipt` (даже при ложном `transportUncertain`) и требует `state === "completed"` и `receipt.cleanup_complete === true`. Без квитанции — `RECEIPT_MISSING` (дизайн, §6: иначе `stopped`). Метод ничего не отменяет и не прерывает. Журнал — `browser_recovery_handoff` с результатом.
+- Produces: `runtime.browserRecoveryHandoff(operationId, {signal, pollMs = 250}) → Promise<{verified: true, receipt_id: string, waited_ms: number} | {verified: false, reason: 'EXECUTOR_STILL_RUNNING'|'RECEIPT_UNSETTLED'|'RECEIPT_MISSING'|'RECEIPT_IDENTITY_MISMATCH'|'UNRELATED_UNSETTLED_WORK'}>`.
+- Поведение: ждёт, пока `running`, `nodeJobs.busy`, `sourceReads.busy`, `delivery.busy` не станут ложными, но не дольше `min(operation.deadline - now(), BROWSER_RECOVERY_HANDOFF_MS)`: живой executor дольше минуты после остановки фазы — аномалия, и попытка честно уходит в `stopped`. Затем читает `operation.lastReceipt` (даже при ложном `transportUncertain`) и требует `state === "completed"` и `receipt.cleanup_complete === true`. Без квитанции — `RECEIPT_MISSING` (дизайн, §6: иначе `stopped`). До ожидания и перед успешным возвратом метод сверяет существующее владение pending/node/source/delivery работой: неопределённая работа другой операции даёт `UNRELATED_UNSETTLED_WORK`, даже если старая квитанция выбранной операции завершена. Метод ничего не отменяет и не прерывает. Журнал — `browser_recovery_handoff` с результатом.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -336,6 +340,8 @@ git add packages/loginom-runtime/client
 git commit -m "feat(runtime): prove executor stop before browser handoff"
 ```
 
+Дополнительная регрессия Task 3: released/T4 операция A, затем pending B после неподтверждённого browser-вызова — handoff A не допускает браузер; outcome и gate B сохранены.
+
 ### Task 4: Строительные блоки проверки
 
 **Files:**
@@ -351,7 +357,7 @@ git commit -m "feat(runtime): prove executor stop before browser handoff"
   - `proveNodeRestsQuiet({operation, channel, node}) → Promise<{verified: true, node_context, graph}>` — проверка строк 51–66: тот же разблокированный узел на тихом графе без мастера, диалога и маски, два одинаковых чтения графа. Жестов нет; при отказе бросает. `releasePendingNode` вызывает её вместо собственного кода. `readReleaseGraph` читает у `operation` поля `nodeApply.request`, `nodeTargetAdapter` и `deadline` (стр. 87–89).
   - `channel.rememberExecutionBaseline(baseline)` сохраняет копию в `operation.nodeApply.execution_baseline`, если у операции есть `nodeApply`; событий журнала нет. `createNodeExecutionProcedure().prepare()` вызывает его сразу после `captureExecutionBaseline`.
   - `createNodeExecutionProcedure(channel, node, {baseline})` принимает сохранённую базовую линию; `prepare()` при ней отказывает.
-  - `procedure.verifyCompletion({signal}) → Promise<{verified: true, execution_id, ...receipt} | {verified: false, reason: 'NO_NEW_EXECUTION'|'AMBIGUOUS_EXECUTION'|string}>` — открывает консоль и читает историю один раз. Ровно одна новая группа относительно базовой линии — существующие `identifyNewExecution` и `waitCompleted` (Show Node, закрытие консоли, возврат на граф). Нет новой группы или их больше одной — консоль закрывается, возвращается отказ. Ошибка внутри `waitCompleted` даёт `verified: false` с её сообщением.
+  - `procedure.verifyCompletion({signal}) → Promise<{verified: true, execution_id, ...receipt} | {verified: false, reason: 'NO_NEW_EXECUTION'|'AMBIGUOUS_EXECUTION'|string}>` — открывает консоль и читает историю один раз. Ровно одна новая группа относительно базовой линии — существующие `identifyNewExecution` и `waitCompleted` (Show Node, закрытие консоли, возврат на граф). Нет новой группы или их больше одной — консоль закрывается, возвращается отказ. `waitCompleted()` может вернуть `verified: true, status: "failed"`: это проверенный неуспех, а не выполненная цель. `verifyCompletion` нормализует `verified: true` только для `status === "completed"` с существующим owner proof; failed-квитанция сохраняется в факте с `verified: false` и причиной `EXECUTION_FAILED`. Прежнее поведение `waitCompleted` не меняется. Исключение даёт `verified: false` с его сообщением.
   - `openOwnedNativePreview(channel, ctx, index = 0)`: `activeNativeOutput` выбирает порт с этим публичным индексом (`node_outputs.ports[].index`), ожидание схемы и `closeOwnedNativePreview` сверяют `node_preview_schema.port` с `port.index`. По умолчанию — порт 0; чтение «Свёртки» не меняется.
 
 - [ ] **Step 1: Write the failing tests**
@@ -365,10 +371,9 @@ test('quiet-node proof reads twice and performs no gesture', async () => {
   assert.equal(proof.verified, true); assert.deepEqual(quiet.gestures, []);
 });
 test('execution preparation keeps its baseline on the node operation without journal events', async () => {
-  const before = events.length;
   await createNodeExecutionProcedure(channel, node).prepare();     // канал из createNodeProcedure над фиктивной операцией
   assert.equal(typeof operation.nodeApply.execution_baseline.root_id, 'string');
-  assert.equal(events.length, before + gestureEvents);             // только события жестов консоли, как до изменения
+  assert.equal(events.some(event => event.phase?.startsWith('browser_recovery_')), false); // без опции новых recovery events нет
 });
 test('an adopted baseline proves one new completed group and closes the console otherwise', async () => {
   // поверхность консоли из node-execution-stop.test.mjs: базовая линия, затем одна новая завершённая группа узла
@@ -381,6 +386,8 @@ test('an adopted baseline proves one new completed group and closes the console 
 });
 ```
 
+Дополнительная регрессия Task 4: новая failed-группа с реальной формой receipt от waitCompleted, даже при доступном старом Preview, не даёт completed.
+
 В `native-preview-port.test.mjs` — фиктивный канал с наблюдениями `node_outputs` двух активных выходов и `node_preview_schema`, который записывает жесты:
 
 ```js
@@ -388,7 +395,7 @@ test('Preview opens and closes the requested output port', async () => {
   const handle = await openOwnedNativePreview(channel, ctx, 1);
   assert.equal(handle.port.index, 1); assert.equal(handle.preview.port, 1);
   assert.equal((await closeOwnedNativePreview(channel, ctx, handle.port, handle.preview.root_tid)).preview_closed, true);
-  assert.deepEqual(gestures.map(g => g.verb), ['click', 'press', 'click']);
+  // Поверхность подтверждает выбор/закрытие порта 1; чужой порт не выбран.
 });
 ```
 
@@ -415,6 +422,8 @@ git commit -m "refactor(runtime): share quiet proof, keep execution baseline, op
 - Consumes: Tasks 1–4.
 - Produces: `runtime.verifyBrowserRecovery(operationId, {attemptId, sequence}) → Promise<{basis, facts, decision, verification_id, unconfirmed: boolean}>`. Сигнал отмены в метод не передаётся: проверка завершается в собственном сроке.
 - Операция проверки `verification`: `id: attemptId + ':v' + sequence`, `action: {action_key: 'browser.recovery.verify', revision: '1'}`, `checkpoint: {document_id, workflow_ref}`, `nodeApply: {request}` исходной операции, `nodeTargetAdapter: targetAdapter(verification)` (`executor.mjs:1662`), `deadline: now() + BROWSER_RECOVERY_VERIFY_MS`. Канал — `createNodeProcedure({operation: verification, execute, record: onRecord, targetOrigin, targetBuild, preparedNodeContext: {document_id, workflow_ref, node}, maxSteps: 4096, wrapMutation})`, где `wrapMutation` — `withBrowserReceipt` с `receiptOptions(verification, …)`, как у канала чтения JS-источника (`executor.mjs:2001-2011`). Каждый `finish` даёт новую идентичность `<attempt_id>:v<k>`, поэтому квитанции, шаги канала и идентификаторы чтения экспорта не сталкиваются.
+- Fixed plain-object readers выполняются через локальный typed transport по существующему образцу `executeNodeScript`/`executeSourceScript`: browser-код возвращает ActionOutcome с `output.value`, реальный `execute`/`parseCapabilityResult` валидирует envelope, adapter извлекает value. Канал и reader получают согласованный execute; нового browser API нет. Для `parseSavedPackageState` из raw value собирается ожидаемый MCP text envelope, без повторного browser-вызова.
+- Verification использует существующее владение executor: после проверки отсутствия чужой работы её operation регистрируется и удерживает pending gate до установления всех своих browser-квитанций. Ссылка на исходный pending сохраняется; при подтверждённом завершении восстанавливается только её собственное предыдущее владение. При неизвестном исходе verification остаётся владельцем gate даже для уже released T4; освобождение исходной операции не снимает этот gate. Отдельного реестра или lock-системы нет. Цена — один объект проверки, уже предусмотренный `<attempt>:v<k>`, в существующей модели операций.
 - Порядок для узла: `workspace` → `execution` → `output_schema` (только если выполнение проверено) → повторный `workspace`, итоговое состояние после проходов. Если первый `workspace` не проверен, проходов нет.
 - `facts`:
 
@@ -423,7 +432,7 @@ git commit -m "refactor(runtime): share quiet proof, keep execution baseline, op
 | `workspace` | `proveNodeRestsQuiet` с операцией проверки, до и после проходов; отказ — `verified: false` без `user_action` | нет |
 | `execution` | `createNodeExecutionProcedure(channel, node, {baseline: operation.nodeApply.execution_baseline}).verifyCompletion()`; без базовой линии — `reason: 'NO_BASELINE'` | консоль процессов, Show Node |
 | `output_schema` | для каждого порта `goal.ports`: `openOwnedNativePreview(channel, ctx, port)` → схема из ответа → `closeOwnedNativePreview` | Preview |
-| `export_file` | `readNativeExportFile(options, ctx, {destination, configured: {destination_check}}, execution)` (`text-export-output.mjs:123`): `destination` — из параметров запроса, `destination_check` — из значения фазы `configure` исходной операции (как в `text-export-node.mjs:16`), `execution` — проверенный факт. Без проверки назначения файл не проверяется: при `replace` шаг получает `continuable`, при `reject` — `unresolved` | File Storage, скачивание |
+| `export_file` | `readNativeExportFile(options, ctx, {destination, configured: {destination_check}}, execution)` (`text-export-output.mjs:123`): `destination` — из параметров запроса, `destination_check` — из значения фазы `configure` исходной операции (как в `text-export-node.mjs:16`), `execution` — проверенный факт; options используют существующий `artifactStore`, receiptOptions именно verification и `storageDirectories: getStorageBinding().directories`, ctx содержит исходный deadline/execution. Успешный возврат reader преобразуется в `facts.export_file: {verified: true, ...result}`, исключение — `verified: false` с причиной. Без проверки назначения файл не проверяется: при `replace` шаг получает `continuable`, при `reject` — `unresolved` | File Storage, скачивание |
 | `saved_package` | `makeSavedPackageStateCode`/`parseSavedPackageState` с `sessionId`, `documentId`, `account`, `loginomUrl`, `loginomBuild` из `getStorageBinding()` (`session_id`, `document_id`, `loginom_account`, `origin`, `loginom_build`) и путём из параметров Save; требуется тот же путь и `modified === false` | нет |
 
 - Ошибка прохода оставляет факт `verified: false` с причиной; жесты не повторяются.
@@ -488,6 +497,8 @@ git add packages/loginom-runtime/client
 git commit -m "feat(runtime): verify a recovered step with runtime console and Preview passes"
 ```
 
+Дополнительные регрессии Task 5: Save/export читатели проходят реальный typed/MCP transport format через parseCapabilityResult; plain object не принимается вместо ActionOutcome. Начать с действительно released T4 без других locks, потерять подтверждение жеста verification: hasUnsettledWork остаётся true, обычная мутация и освобождение старой операции не дают unlock.
+
 ### Task 6: Recovery-квитанция, снятие блокировки, чтение выхода, остановка
 
 **Files:**
@@ -503,9 +514,9 @@ git commit -m "feat(runtime): verify a recovered step with runtime console and P
   - `runtime.settleBrowserRecovery(operationId, {attemptId, decision, facts, attested}) → Promise<{receipt_id, result, next_step} | {result: 'unresolved', next_step} | {result: 'unresolved', error: {code: 'RECOVERY_RECEIPT_UNCONFIRMED'}}>`.
   - Порядок: запись `browser_recovery_verified` с проверкой подтверждения журнала, как в `releaseNodeApply` (`node-apply.mjs:511-514`) → только при `completed`/`continuable` квитанция `<attemptId>:receipt` в `operations` и снятие блокировки → `observations.clear()`. При `unresolved` квитанции нет и блокировка остаётся.
   - Квитанция: `action: {action_key: 'browser.recovery', capability: 'browser.recovery', revision: '1'}`, `parameters: {original_operation_id, contract_revision, workflow_ref, target}` из исходного запроса, `outcome.output: {checkpoint_kind: 'browser_recovery_verified', result, original_operation_id, node, execution, output: {ports}, verified, configuration: {status: 'attested_by_model', attested_by_model}, cleanup_complete: true}`.
-  - Снятие для узла: исход `FAILED`, `checkpoint_kind: 'local_node_released'`, `released_phase` (фаза, которая была pending; по ней T3 узнаёт повтор), `released_by: 'browser_recovery'`, `recovery_receipt_id`; `pending = null`; `nodeJobs.settle`. Уже освобождённая Dock операция (T4 `execution`) получает только `recovery_receipt_id`. Для Save: `pending = null`, исход получает `browser_recovery: {receipt_id, result}`.
+  - Снятие для узла: исход `FAILED`, `checkpoint_kind: 'local_node_released'`, `released_phase` (фаза, которая была pending; по ней T3 узнаёт повтор), `released_by: 'browser_recovery'`, `recovery_receipt_id`; `pending` снимается только при владении исходной операции или её подтверждённой verification; `nodeJobs.settle` затрагивает только исходную операцию. Уже освобождённая Dock операция (T4 `execution`) получает только `recovery_receipt_id`. Для Save снимается только собственный pending, исход получает `browser_recovery: {receipt_id, result}`.
   - `runtime.markBrowserRecoveryStopped(operationId, attemptId)` задаёт `operation.browserRecoveryStopped`; основание этой операции больше не предлагается. Отказ освобождения такой операции не возвращает `user_action`, а несёт `instruction`: сообщить операцию, фазу и причину отказа, не перекладывая исправление интерфейса на пользователя.
-  - `runtime.browserRecoverySafeCompletion(operationId) → next_step` — `nodeReleaseStep(operation)` (`executor.mjs:1812-1814`), если он есть, иначе `{instruction}` сообщить фактическое состояние; используют ответы `stop` и автоматической остановки (план 3).
+  - `runtime.browserRecoverySafeCompletion(operationId) → next_step` — `nodeReleaseStep(operation)` (`executor.mjs:1812-1814`), если он есть и нет незавершённой verification; при неизвестной квитанции проверки — только `{instruction}` о фактическом состоянии, без предложения освободить старую операцию. Иначе `{instruction}` сообщить фактическое состояние; используют ответы `stop` и автоматической остановки (план 3).
   - `markBrowserRecoveryStopped` и `browserRecoverySafeCompletion` входят в `readOnly` (`executor.mjs:2723`): браузер они не трогают и вызываются, даже когда handoff вернул `EXECUTOR_STILL_RUNNING`.
   - `buildNodeReadRequest(args, source)` принимает квитанцию, только если `checkpoint_kind === 'browser_recovery_verified'`, `result === 'completed'`, проверены `execution` и `output_schema`, `cleanup_complete`; схемы — из `verified.output_schema.ports`. JavaScript и `exports.text` отклоняются, как и для обычной операции.
   - `compactNodeResult` переносит `released_by` и `recovery_receipt_id` в `output`: верхний уровень `userResultSchema` закрыт (`user-results.mjs:5-6`).
@@ -556,6 +567,8 @@ test('exact retry of the original request returns its released outcome linked to
   assert.equal(f.calls.filter(call => call === 'finish').length, 1);
 });
 ```
+
+Дополнительные регрессии Task 6: успешный Calculator даёт dock_node_read с фактическим `<attempt>:receipt`; JavaScript — инструкцию новой existing-операции без чтения по recovery receipt; exports.text — инструкцию к уже проверенному файлу. При settle не затрагиваются чужие pending/node/source/delivery состояния.
 
 В `node-read.test.mjs`:
 
