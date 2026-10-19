@@ -3662,7 +3662,7 @@ test('input port overflow caption requires native binding and the exact hidden c
 });
 
 async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
-  const caption=vendor==='group'?'Входной источник данных':port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
+  const caption=['group','sorting'].includes(vendor)?'Входной источник данных':port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
   const {page,panel,crumbs}=await inputPortContextFixture();
   // Loginom 7.4.2 native diagnostic: 1280x800, input1 and Настройка hidden
   // by breadcrumb overflow; node/input/wizard icons remain in the same DOM.
@@ -3677,7 +3677,7 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
     if(i>=7)c.style.display='none';
     for(const icon of c.children)icon.box={x:c.box.x+1,y:c.box.y+1,width:16,height:16};
   }
-  crumbs[5].children[0].attrs.class=vendor==='union'?'bg-vendor-icon-uniondata':vendor==='group'?'bg-vendor-icon-groupdata':'bg-vendor-icon-joindata';
+  crumbs[5].children[0].attrs.class=vendor==='sorting'?'bg-vendor-icon-sorting':vendor==='union'?'bg-vendor-icon-uniondata':vendor==='group'?'bg-vendor-icon-groupdata':'bg-vendor-icon-joindata';
   page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[7]).attrs.class='bg-vendor-icon-tunedatasourcesocketdef';
   if(mode==='wrong_icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
   if(mode==='wrong_caption')for(const c of crumbs.slice(7)) {
@@ -3688,7 +3688,7 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
   if(mode==='hidden_ancestor')panel.style.display='none';
   if(mode==='missing_wizard_icon')crumbs[8].children[0].remove();
   const binding={verified:true,surface:'wizard',document_id:'doc',workflow_id:'flow',node_id:'node',
-    input_port:{direction:'input',port:mode==='wrong_port'?1-port:mode==='unknown_port'?2:port,native_index:port,port_guid:'input-'+port,opening_operation_id:'join-open-'+port}};
+    input_port:{direction:'input',port:mode==='wrong_port'?1-port:mode==='unknown_port'?2:port,native_index:mode==='wrong_native_index'?1-port:port,port_guid:'input-'+port,opening_operation_id:'join-open-'+port}};
   let reads=0;
   if(mode!=='unbound')page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
     {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},async()=>{
@@ -3750,6 +3750,39 @@ test('owned Union and Grouping inputs keep their exact hidden input folder and c
   page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
   const close=await page.execute({mode:'observe'});
   assert.equal(close.output.ui?.elements?.some(e=>e.allowed_actions.includes('confirm_wizard_close'))===true,accepted,port+':'+mode);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+test('Sorting input0 keeps Done and close bound when its input folder overflows',async()=>{
+ for(const mode of ['valid','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','unknown_port','wrong_native_index','wrong_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
+  const {page}=await joinInputPortOverflowFixture(mode,0,'sorting');
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
+  if(mode==='wrong_folder_icon')crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0];
+  const c=mappingCoverageFixture(page,4);page.context.innerWidth=1280;
+  for(const child of [...c.form.children]) {
+   if(child.attrs['data-tid']?.endsWith(';btnAddMappingColumn')){child.remove();continue;}
+   for(const e of [child,...child.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid']
+    .replace('MF;TF-1;','MF;TF-5;').replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard')
+    .replace('colDefaultUsageType_','colUsageType_');
+   wizard.append(child);
+  }
+  c.form.remove();page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1208,y:380,width:64,height:64},wizard);
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  assert.equal(r.output.ui?.elements?.some(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone'&&e.allowed_actions.includes('finish_wizard'))===true,mode==='valid',mode);
+  if(r.status!=='SUCCEEDED')continue;
+  assert.equal(r.output.wizard.input_port_context.status==='observed',mode==='valid',mode);
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const close=await page.execute({mode:'observe'});
+  assert.equal(close.output.ui?.elements?.some(e=>e.allowed_actions.includes('confirm_wizard_close'))===true,mode==='valid',mode);
   assert.deepEqual(page.events,[]);
  }
 });
