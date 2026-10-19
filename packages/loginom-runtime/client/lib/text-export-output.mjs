@@ -66,14 +66,14 @@ export async function downloadExportWithFreshObservation({snapshot,file,download
 }
 // Storage navigation and download never mutate the exported data. Their failed
 // observation may be released only after a fresh return to the owned quiet graph.
-export async function releaseRefusedExportRead({operationId,binding,navigationOnly,restore,release,record}){
+export async function releaseRefusedExportRead({operationId,binding,navigationOnly,restore,release,record,failure}){
  if(navigationOnly!==true)return null;
  const restored=await restore();
  need(restored?.verified===true&&restored.cleanup_complete===true&&restored.quiet===true
   &&restored.node_context?.verified===true&&restored.node_context.surface==='graph'&&restored.node_context.locked===false
   &&['document_id','workflow_id','node_id'].every(k=>restored.node_context[k]===binding[k]),'Export refusal did not restore its quiet owned graph');
  await release();
- const proof={operation_id:operationId,binding,navigation_only:true,restored,lease_released:true};
+ const proof={operation_id:operationId,binding,navigation_only:true,restored,lease_released:true,...(failure?{failure}:{})};
  await record('export_file_read_refused_restored',{proof});
  return {phase:'read',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
   verification:'text_export_read_refused_restored',proof};
@@ -132,7 +132,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  need(owner.verified&&owner.surface==='graph','Export graph changed before file read');
  const fileBinding={session_id:artifactStore.outputSessionId,document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,node_id:ctx.node.node_id,execution_id:ctx.execution.execution_id,destination};
  const lease=await artifactStore.stageOutput(fileBinding),name=destination.split('/').at(-1),directory=destination.slice(0,-name.length-1);
- let sequence=0,uncertain=false,retained=false,released=false,navigationOnly=true,journalFailed=false,observationDocument=null;
+ let sequence=0,uncertain=false,retained=false,released=false,navigationOnly=true,journalFailed=false,observationDocument=null,readStep='storage_navigation';
  const guard=()=>{ctx.signal?.throwIfAborted();need(Date.now()<ctx.deadline,'Export file read deadline elapsed');};
  const record=async(phase,data)=>{try{const r=await onRecord({phase,operation_id:operation.id,...data});need(r?.phase===phase&&r.operation_id===operation.id,'Export file receipt not acknowledged');}catch(error){journalFailed=true;throw error;}};
  const base={expected_origin:targetOrigin,expected_build:targetBuild};
@@ -186,18 +186,23 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   &&(!previous||s.file_storage.directory!==previous.file_storage.directory||JSON.stringify(s.workflow_ref)!==JSON.stringify(previous.workflow_ref)));
  const row=name=>findNativeStorageRow({name,read,roots,ready,act,guard});
  const returnToWorkflow=async()=>{
+  readStep='return_node_context';
   const current=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
   if(current.verified&&current.surface==='graph'&&current.locked===false)return {continuation:null,node_context:current};
   // A fresh tab observation precedes the sole return gesture. Never open a
   // second package or guess a tab after an uncertain navigation.
+  readStep='return_workspace_roots';
   let r=await roots();const workspace=one(r.ui.elements.filter(e=>e.tid==='MF;cntMain;cntWorkspace;Workspace;t.br'));
+  readStep='return_tabs_observation';
   r=await read({root_ref:workspace.ref});const storageTab=one(r.ui.elements.filter(e=>e.tid===r.workflow_ref.tab_tid));
   const continuation={document_id:ctx.document_id,document:r.dom_epoch.document,tid:storageTab.tid,ref:storageTab.ref};
+  readStep='return_tab_gesture';
   try{await act(r,one(r.ui.elements.filter(e=>e.tid===ctx.workflow_ref.tab_tid)));}
   catch(error){if(!navigationOnly||journalFailed)throw error;}
   // The return click is navigation too: only the fresh owned graph below
   // proves restoration, even when that click's post-observation failed.
   for(let i=0;i<50;i++){
+   readStep='return_graph_context';
    guard();const actual=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
    if(actual.verified&&actual.surface==='graph')return {continuation,node_context:actual};
    await new Promise(r=>setTimeout(r,100));
@@ -224,6 +229,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   const e=one(s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';FileStorageForm;colName_'+storageTidSuffix(name)&&e.label===name)),bytes=e.storage_entry?.bytes;
   need(Number.isSafeInteger(bytes)&&bytes>=0&&bytes<=16*1024*1024,'Export output size is unavailable or exceeds limit');
   let id;
+  readStep='download';
   const downloaded=await downloadExportWithFreshObservation({snapshot:s,file:e,guard,refresh:ref=>read({root_ref:ref}),download:async(snapshot,file,attempt)=>{
    id=operation.id+':export-download'+(attempt?'-'+attempt:'');
    const task={...base,storage_directories:options.storageDirectories,operation_id:id,artifact:{artifact_id:lease.artifact_id,name},output_binding:{...fileBinding,directory},expected_bytes:bytes,
@@ -237,15 +243,25 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   }});
   need(downloaded.status==='SUCCEEDED'&&!uncertain&&downloaded.output?.destination===destination&&downloaded.output.artifact_id===lease.artifact_id
    &&downloaded.output.download_completed&&downloaded.output.output_binding?.execution_id===ctx.execution.execution_id,'Native export download unconfirmed');
+  readStep='verify_file';
   const artifact=await lease.verify(downloaded.output.suggested_name,bytes);
   const result={artifact_id:artifact.artifact_id,destination,bytes:artifact.bytes,sha256:artifact.sha256,execution_id:ctx.execution.execution_id,verification_id:id,freshness_basis:check.existed?'explicit_replace_and_completed_native_execution':'native_absence_check_and_completed_execution'};
   await record('export_file_bytes_verified',{binding:fileBinding,result});
   const restored=await returnToWorkflow();
-  await lease.retain();retained=true;await record('export_file_read_completed',{result,workflow_return_verified:true});options.rememberStorageContinuation?.(restored.continuation);return result;
+  readStep='retain_file';await lease.retain();retained=true;
+  readStep='record_completion';await record('export_file_read_completed',{result,workflow_return_verified:true});options.rememberStorageContinuation?.(restored.continuation);return result;
  }catch(error){
+  // Preserve the original failure before restoration changes the step or
+  // replaces its error. Never copy arbitrary messages, URLs or local paths.
+  const failure={step:readStep,code:/^[A-Z][A-Z0-9_]{0,79}$/.test(error?.code??'')?error.code:null,
+   kind:['Error','TypeError','RangeError','SyntaxError','ReferenceError','TimeoutError','AbortError','TargetClosedError'].includes(error?.name)?error.name:'OtherError',
+   reason:['Unique export file control required','Export observation document changed','Export storage gesture requires inspection',
+    'Export file read did not return to its workflow','Output lease owner changed','Unverified output cannot be retained',
+    'Invalid artifact identity','Artifact must be a regular file','Artifact changed before reading',
+    'Artifact size or SHA does not match the admitted identity'].includes(error?.message)?error.message:null};
   uncertain=true;
   try{
-   const refusal=await releaseRefusedExportRead({operationId:operation.id,binding:fileBinding,navigationOnly:navigationOnly&&!journalFailed,record,
+   const refusal=await releaseRefusedExportRead({operationId:operation.id,binding:fileBinding,navigationOnly:navigationOnly&&!journalFailed,record,failure,
     restore:async()=>{await returnToWorkflow();
      // Root discovery deliberately omits dialogs/masks and the UI workflow
      // has only tab/prefix. Read the full surface with the native owner binding.
