@@ -311,9 +311,26 @@ private config/budget/results вне Git; операторские команд�
   проверяются до изменения любого. Подключить одинаково в normal cleanup/startup;
   чужой/неподтверждённый/изменённый файл сохраняет всё. Unit RED→GREEN, без новых описей;
   slot-storage/startup12/72 PASS5.34s, typecheck/sh-n/diff PASS, Review Approved.
-- [ ] Реальный N=1 с агентом/судьёй на трёх задачах; по замеру предложить числовые
-  пороги CPU/RAM/диска и **дождаться утверждения владельца до N=2**.
-- [ ] Записать утверждённый бюджет до реального N=2, выполнить run на тех же tasks/
+- [x] Реальный N=1 с агентом/судьёй на трёх задачах: DE1Srz, exit0,3/3 completed,
+  judge100/100/100,3 cleanup confirmed, slot closed/leftovers[], provider+judge/resource
+  acceptance passed.840 samples/0 missed, max gap1009.7ms;906.054s всего.
+- [x] Предложить пороги по N=1: host CPU95%/MemAvailable8GiB, Server2 cores/256MiB,
+  Studio6 cores/1GiB, обязательные FS5GiB/10000 inodes, swap free0; прочие guards
+  прежние. Private `n2-budget-proposed-20261019.json`,25 bounds, SHA7b43211b…;
+  source/CLI/catalog/task/rubric/judge pins сохраняются.
+- [x] Владелец2026-10-19 явно утвердил предложенный бюджет N=2.
+- [x] До dispatch сохранить точную копию `n2-budget-approved-20261019.json`,
+  SHA7b43211b…; отдельная private запись фиксирует утверждение владельца.
+- [x] Первый N2 qAdMiN завершён сводкой: B две задачи100/cleanup confirmed;
+  A no_artifact и SESSION_STILL_PRESENT после CloseSession (15ms). Fresh startup
+  подтвердил отсутствие сессии (closed[]) и удалил два своих файла после guards;
+  брони освобождены, исходный failed результат сохранён. CPU host95.9253%>95%;
+  прочие24 границы, timeline/0miss/limits passed. Бюджет не менять.
+- [ ] Исправить преждевременный SESSION_STILL_PRESENT: после подтверждённого
+  CloseSession ограниченно ждать исчезновения точного имени с повторным чтением;
+  PendingDisconnect/ownership guards и unknown при остатке сохраняются. Один
+  behavioral RED→GREEN delayed readback, targeted unit/typecheck, независимое ревью.
+- [ ] Выполнить реальный N=2 на тех же tasks/
   models/pins. Проверить перекрытие двух слотов, judge settings, полную summary,
   только свою очистку, отсутствие обязательных ресурсных/лицензионных/provider отказов.
 
@@ -372,4 +389,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20.e468064b1c: delivery cleanup12/72 PASS/TC/Review; native judge100, startup убрал только своё. N1 s9821T: первая задача100/cleanup confirmed, следующая не запущена из-за чужого Desktop CDP. a20 holds сняты прямой проверкой без удаления/подделки missing cleanup; ждём безопасного окна, затем полный N1.
+20.N1 DE1Srz exit0:3/3 judge100/cleanup confirmed, resources/limits passed,840 samples/0miss, leftovers[]. БюджетN2 SHA7b43211b… явно утверждён/сохранён до dispatch. ПервыйN2 qAdMiN failed: A close readback/CPU95.9253>95. Startup confirmed/released; далее bounded readback fix и повтор с прежним бюджетом.

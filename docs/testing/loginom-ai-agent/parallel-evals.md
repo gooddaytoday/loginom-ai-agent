@@ -16,7 +16,7 @@ unavailable в диагностике, наблюдаемый Dock429 исклю
 Судья использует evals-openai с прежней OpenAI auth и нулевыми HTTP/stream retries;
 VPN/local429 квалификация дала ровно1 запрос и закрытый unit без вызовов модели.
 Четыре native A/B прошли без skip29.13s, cleanup/release подтверждены;
-модельный N=1/N=2 ещё не выполнен. Урегулированный admin c21 перенесён по
+полный N=1 DE1Srz завершён (см. ниже), бюджет N=2 утверждён. Урегулированный admin c21 перенесён по
 разрешению владельца в private evidence с неизменным содержимым; штатный startup
 разобрал прежний карантин. Оба профиля после штатного models refresh видят точную
 `openai/gpt-6-luna/high`, cache SHA256
@@ -29,9 +29,14 @@ canary preload и остальные wrapper tests прошли (11/11).
 Карантин4fb завершён по разрешению, log/DB сохранены в закрытом history;
 ancestry gone-PID fix прошёл unit checks/typecheck/review. Текущее состояние —
 в [блокерах](../../../eval_parallel_blockers.md).
-Сквозной путь первой задачи подтверждён в s9821T: агент completed, judge100,
-cleanup confirmed. Полный N=1 не получен из-за внешнего Desktop inspector/CDP;
-для повторения нужно окно без таких listener-ов (guard `sandbox.assertNoDebuggers`).
+Полный N=1 `20261019-080414-50b28da4db-dirty-DE1Srz`: exit0,3 задачи judge100,
+все cleanup confirmed, leftovers[], resources/limits passed,840 samples/0 missed.
+Пики CPU host81.4%, Server0.371 cores/48.5MiB, Studio2.547 cores/232.9MiB;
+минимум MemAvailable11.96GiB. Бюджет N=2 утверждён2026-10-19:25 bounds,
+`n2-budget-approved-20261019.json`, SHA7b43211b…; он сохранён до dispatch.
+HEAD50b28da4db сохраняется для N1/N2.
+Внешние Desktop inspector/CDP закрылись своим владельцем до N=1;
+для следующих запусков также нужно окно без них (guard `sandbox.assertNoDebuggers`).
 Чужие debug-процессы самостоятельно не останавливать и guard не отключать.
 Не запускать старый `recover` для новой
 процедуры: адресный recover и цепочка эпох больше не входят в рабочий путь.

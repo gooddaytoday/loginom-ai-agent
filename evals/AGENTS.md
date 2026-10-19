@@ -8,7 +8,9 @@
 содержит команды. Старые правила и хроника — в
 [архиве](../docs/archive/2026-10-16-evals-parallel-history.md).
 Production slots path подключён с обязательным бюджетом. Native prepare/verify
-двух слотов и четыре native A/B прошли; N=1/N=2 ещё не выполнены, приёмка не подтверждена.
+двух слотов и четыре native A/B прошли. N=1 завершён на трёх задачах, resources/
+limits/cleanup passed; бюджет N=2 утверждён. Первый N2 не принят (close readback/
+CPU host), штатный startup завершён; итоговая приёмка ожидает повторного прогона.
 
 Одна server lock с долговечной бронью на run, locks профилей и judge home;
 без user lock. Prepare создаёт недостающее/проверяет права; run только проверяет.

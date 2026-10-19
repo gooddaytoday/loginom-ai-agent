@@ -8128,3 +8128,18 @@ Public hasOwnedAncestry test реально завершённого child: RED 
 При ENOENT/ESRCH отдельно проверяется исходный PID; только его отсутствие даёт
 false, живой кандидат/ошибка доступа сохраняют отказ.9/48 targeted PASS51.84s,
 typecheck/diff PASS, независимое ревью Approved. Proc-denial cases не запускались.
+
+## 2026-10-19: первый N2 после утверждения бюджета
+
+N1 DE1Srz прошёл3/3 judge100/cleanup confirmed, ресурсы/лимиты passed. Владелец
+утвердил25 числовых границ, точная копия бюджета SHA2567b43211ba891232286e05e61c1844534cc7306ce03aa29aaa26077ce651380d7
+записана до dispatch. N2 qAdMiN на HEAD50b28da4db завершён08:47:44Z со сводкой:
+B filter/group100/cleanup confirmed; A calc no_artifact после ambiguous native
+export и cleanup SESSION_STILL_PRESENT. CloseSession acknowledged и перечитывание
+заняли15ms; fresh startup уже не обнаружил сессию (closed[]), после всех guards
+удалил ровно свой input и result.csv. Все брони released; failed receipts не менялись.
+Ресурсы:607 samples/0miss, host CPU95.9253%>95%; остальные24 границы, timeline/
+incidents/provider+judge limits passed. Утверждённый бюджет не изменялся.
+Private evidence: acceptance-20261016/evidence/reconciled-n2-quarantine-20261019.json
+и results/20261019-083618-50b28da4db-dirty-qAdMiN. Следующий шаг — unit TDD
+ограниченного ожидания exact readback после acknowledged close, затем повтор N2.
