@@ -76,6 +76,9 @@ export async function createSession(config, { headless = false, managed = null }
     // Keep the browser catalog independent of page-provided WebMCP tools.
     webmcp: false,
     capabilities: ['core', 'vision'], outputDir: artifacts,
+    // Executor code reads only its own result block. Browser recovery reads explicit
+    // subtrees instead of a full page snapshot attached to every action (design §7).
+    ...(executorMode ? { snapshot: { mode: 'none' } } : {}),
     saveSession: false, timeouts: { action: 15000, navigation: 120000, ...(executorMode ? { settle: 0 } : {}) },
   }), { mode: 0o600 });
   const releaseRoot = fileURLToPath(new URL('../../', import.meta.url));

@@ -9,6 +9,7 @@ import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {createConnection} from '@playwright/mcp';
 import {createSession} from '../lib/session.mjs';
 import {readCatalog, selectToolGroups, combineCatalogs} from '../lib/catalog.mjs';
+import {recoveryBrowserTools} from '../lib/browser-recovery.mjs';
 
 // Exercise the installed MCP/SDK protocol without creating a browser or Page.
 test('pinned MCP lists the internal execution tool without expanding the executor catalog', async () => {
@@ -24,6 +25,8 @@ test('pinned MCP lists the internal execution tool without expanding the executo
     assert.equal(config.webmcp, false);
     assert.equal(config.browser.launchOptions.chromiumSandbox, true);
     assert.equal(config.timeouts.settle, 0);
+    // Executor reads only its result block; browser recovery reads explicit subtrees.
+    assert.deepEqual(config.snapshot, {mode:'none'});
     const release = JSON.parse(await readFile(new URL('../../../product/loginom-release.json', import.meta.url), 'utf8'));
     assert.equal(session.metadata.playwrightMcp, release.playwrightMcp);
     assert.equal(session.metadata.playwright, release.playwright);
@@ -42,6 +45,8 @@ test('pinned MCP lists the internal execution tool without expanding the executo
     assert.equal(execution.inputSchema.properties.code.type, 'string');
     assert.equal(browserTools.some(tool => /^(webmcp_|browser_webmcp_)/.test(tool.name)), false);
     assert.deepEqual(await readCatalog(client), browserTools);
+    // The pinned MCP exposes every browser recovery tool with the configured capabilities.
+    for (const name of recoveryBrowserTools) assert.ok(browserTools.some(tool => tool.name === name), name);
     const remoteTools = [{name:'read', inputSchema:{type:'object'}}];
     const executorLocalTools = [{name:'dock_prepare', inputSchema:{type:'object'}}];
     for (const mode of ['executor-preview', 'executor-replay']) {
