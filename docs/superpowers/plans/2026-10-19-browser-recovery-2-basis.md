@@ -41,6 +41,8 @@
 
 ### Task 0: Живая проба главного пути
 
+**Статус: выполнено 20.10.2026.** Каталог, независимое выполнение и Preview подтверждены на реальном Loginom; независимое review принято без замечаний. Snapshot: 20 093 байта без аргументов, 1 073 байта с ограничением. Итоговый собственный пакет, transport и браузер закрыты; закрытие несохранённого пакета первой неудачной попытки осталось неподтверждённым.
+
 **Предусловия** ([preflight-отчёт](../../testing/loginom-ai-agent/reports/2026-10-19-browser-recovery-preflight.md), пункты 2–4): зависимости runtime установлены по lockfile (`cd packages/loginom-runtime/client && npm ci`), Chromium по pins и staged resources, приватная конфигурация Loginom (`LOGINOM_AI_AGENT_TEST_CONFIG`), вход и связность с Dock. Без них задача заблокирована. Tasks 1–7 начинаются только после её успеха.
 
 Временный скрипт по образцу `packages/desktop/test/loginom/runtime-acceptance.ts`, вне продукта, не коммитится. Одна сессия на реальном Loginom:
