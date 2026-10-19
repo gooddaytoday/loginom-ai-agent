@@ -17,7 +17,7 @@ export async function assertSessionBackupEmpty(file: SlotFile, identity: ServerI
 }
 
 export async function cleanupSlotStorage(file: SlotFile, server: Awaited<ReturnType<typeof acquireResourceLease>>, lease: SlotLease,
-  admin: Pick<AdminConnection, "identity" | "inspectSessionInventory" | "closeUserSession">, processes: ProcessCleanup, prefixes: string[]) {
+  admin: Pick<AdminConnection, "identity" | "inspectSessionInventory" | "closeUserSession">, processes: ProcessCleanup, prefixes: string[], attemptDirs: string[] = []) {
   if (processes.status !== "confirmed" || !processes.capture_complete || processes.unknownProcesses?.length)
     throw new EvalFailure("SLOT_PROCESS_CLEANUP_UNCONFIRMED", 2)
   await server.assertHeld()
@@ -42,12 +42,38 @@ export async function cleanupSlotStorage(file: SlotFile, server: Awaited<ReturnT
   requireServerFilesClosed(await serverFileObservation(lease.identity.containerId), storage.root)
   await server.assertHeld()
   await lease.assertHeld()
+  const delivered = await readDeliveredStorage(attemptDirs, lease.slot.username)
   if (await storageCommand(lease.identity.containerId, "cleanup-slot-storage.sh", [storage.root,
-    `${storage.device} ${storage.inode} ${storage.uid} ${storage.gid}`, ...prefixes]) !== 0)
+    `${storage.device} ${storage.inode} ${storage.uid} ${storage.gid}`, String(prefixes.length), ...prefixes,
+    ...delivered.flatMap(entry => [entry.sha256, String(entry.bytes), entry.name])]) !== 0)
     throw new EvalFailure("SLOT_STORAGE_DELETE_UNCONFIRMED", 2)
   const after = await inspectUserStorage(file, lease.identity, lease.slot, prepared.nonce)
   if (after.entries.length) throw new EvalFailure("SLOT_STORAGE_NOT_EMPTY", 2)
   return { archive, closed, removed: storage.entries.map(entry => entry.name) }
+}
+
+export async function readDeliveredStorage(attemptDirs: string[], username: string) {
+  return (await Promise.all(attemptDirs.map(async directory => {
+    const text = await Bun.file(path.join(directory, "events.jsonl")).text().catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return ""
+      throw error
+    })
+    return text.split("\n").filter(line => line.trim()).flatMap(line => {
+      const event = JSON.parse(line) as { type?: string; part?: { tool?: string; state?: { status?: string; output?: string } } }
+      if (event?.type !== "tool_use" || event.part?.tool !== "loginom_dock_artifact_deliver" ||
+        event.part.state?.status !== "completed" || typeof event.part.state.output !== "string") return []
+      const receipt = JSON.parse(event.part.state.output) as { state?: string; status?: string; cleanup_complete?: boolean;
+        output?: { status?: string; destination?: string; bytes?: number; sha256?: string; upload_completion_verified?: boolean; cleanup_complete?: boolean } }
+      const output = receipt?.output
+      if (receipt?.state !== "settled" || receipt.status !== "SUCCEEDED" || receipt.cleanup_complete !== true ||
+        output?.status !== "SUCCEEDED" || output.cleanup_complete !== true || output.upload_completion_verified !== true ||
+        typeof output.destination !== "string" || typeof output.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(output.sha256) ||
+        !Number.isSafeInteger(output.bytes) || output.bytes! < 0) return []
+      const name = path.posix.basename(output.destination)
+      return /^[a-zA-Z0-9_-][a-zA-Z0-9._-]*$/.test(name) && output.destination === `/${username}/${name}`
+        ? [{ name, bytes: output.bytes!, sha256: output.sha256 }] : []
+    })
+  }))).flat()
 }
 
 export function requireServerFilesClosed(observed: {
