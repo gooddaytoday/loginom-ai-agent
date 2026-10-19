@@ -217,6 +217,7 @@ for (const item of targets) {
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + treeSitterWorkerPath,
       LOGINOM_AI_AGENT_WORKER_PATH: workerPath,
       LOGINOM_AI_AGENT_CHANNEL: `'${Script.channel}'`,
+      LOGINOM_AI_AGENT_BROWSER_RECOVERY: process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1" ? "'1'" : "'0'",
       LOGINOM_AI_AGENT_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
       ...(item.os === "linux" ? { "process.env.OPENTUI_LIBC": JSON.stringify(item.abi ?? "glibc") } : {}),
     },
