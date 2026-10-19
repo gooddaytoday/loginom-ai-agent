@@ -50,7 +50,15 @@ export const wizardReadiness=withJavascriptWizardAddress(withJavascriptWizardMas
     &&indicatorDom.length===indicators.length&&indicatorDom.every((e,i)=>e.id===indicators[i].id);
   const checked=indicators.map((e,i)=>e.checked===true?i:-1).filter(i=>i>=0);
   const pageIndex=indicatorBinding&&checked.length===1&&indicators[checked[0]].visible?checked[0]:null;
-  const crumbs=[...document.querySelectorAll('[data-tid^='+JSON.stringify(prefix+';cnrNaviMode;b.s_')+']')].filter(visible);
+  const crumbs=[...document.querySelectorAll('[data-tid^='+JSON.stringify(prefix+';cnrNaviMode;b.s_')+']')].filter(e=>{
+    if(visible(e))return true;
+    // Toolbar overflow can hide Settings; retain only this native wizard control.
+    const style=getComputedStyle(e),control=globalThis.Ext?.getCmp?.(e.id);
+    const own=(object,key)=>object&&Object.getOwnPropertyDescriptor(object,key)?.value;
+    return e.isConnected&&e.textContent.trim()==='Настройка'&&(e.getAttribute('data-tid')??'').endsWith('>Настройка')
+      &&style.display==='none'&&style.visibility==='visible'&&style.opacity!=='0'&&!e.hasAttribute('hidden')
+      &&own(own(control,'el'),'dom')===e&&own(own(own(control,'_node'),'data'),'node')===native;
+  });
   const overlays=[...document.querySelectorAll('.bg-mask-message,.x-mask-msg,.x-mask,[role="dialog"],.x-message-box')].filter(visible);
   // Ext masks a disabled delete-all column even when the wizard is ready.
   // Match only that observed control, never arbitrary .x-mask elements.
