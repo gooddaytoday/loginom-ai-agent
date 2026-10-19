@@ -778,8 +778,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               // Union can also overflow its input folder and main table.
               ||preparedInputPort.port===0&&e.textContent.trim()==='Главная таблица'
                 &&crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
-              // Union numbers each appended input by its native tabular port.
-              ||preparedInputPort.port>=1&&e.textContent.trim()==='Присоединяемая таблица '+preparedInputPort.port
+              // The first appended Union input has no number; later ones do.
+              ||(preparedInputPort.port===1&&e.textContent.trim()==='Присоединяемая таблица'
+                ||preparedInputPort.port>=1&&e.textContent.trim()==='Присоединяемая таблица '+preparedInputPort.port)
                 &&crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1));
           const items=crumbs.map((e,i)=>({ref:refOf(e),tid:getTid(e),label:hiddenCaption(e,i)?e.textContent.trim():textOf(e,true)}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
