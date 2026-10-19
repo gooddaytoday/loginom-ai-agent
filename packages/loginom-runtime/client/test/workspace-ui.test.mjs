@@ -3718,6 +3718,30 @@ test('owned Union input observes its numbered hidden appended-table breadcrumb',
   assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
 });
 
+test('owned Union input keeps its exact hidden input folder and main-table breadcrumb',async()=>{
+ for(const mode of ['valid','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','wrong_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
+  const {page}=await joinInputPortOverflowFixture(mode,0,'union');
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
+  if(mode==='wrong_folder_icon')crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  const observed=await page.execute({mode:'observe'});
+  if(observed.status!=='SUCCEEDED'){assert.notEqual(mode,'valid');assert.deepEqual(page.events,[]);continue;}
+  const full=observed.output,narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+  assert.equal(full.wizard.input_port_context.status==='observed',mode==='valid',mode);
+  assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const close=await page.execute({mode:'observe'});
+  assert.equal(close.output.ui?.elements?.some(e=>e.allowed_actions.includes('confirm_wizard_close'))===true,mode==='valid',mode);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('three-input Union offers Done and owned close only with its exact numbered overflow owner',async()=>{
  for(const port of [1,2])for(const mode of ['valid','union_wrong_number','wrong_icon','missing_native_port','unverified_owner']) {
   const {page}=await joinInputPortOverflowFixture(mode,port,'union');
