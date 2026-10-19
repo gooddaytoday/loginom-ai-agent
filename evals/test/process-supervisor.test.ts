@@ -784,11 +784,20 @@ test("supervisor: неизвестный adopted helper вне bundle не по�
   }
 }, 20_000)
 
-test("supervisor ancestry: kernel parent chain proves own or foreign and unreadable chain refuses", async () => {
+test("supervisor ancestry: kernel parent chain proves own or foreign and rejects invalid identities", async () => {
   const raw = await readFile(`/proc/${process.pid}/stat`, "utf8")
   const owner = { pid: process.pid, starttime: raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19]! }
   expect(await hasOwnedAncestry(process.pid, [owner])).toBe(true)
   expect(await hasOwnedAncestry(1, [owner])).toBe(false)
   expect(await hasOwnedAncestry(process.pid, [{ ...owner, starttime: "0" }])).toBe(false)
-  await expect(hasOwnedAncestry(Number.MAX_SAFE_INTEGER, [owner])).rejects.toThrow()
+  expect(await hasOwnedAncestry(Number.MAX_SAFE_INTEGER, [owner])).toBe(false)
+  await expect(hasOwnedAncestry(0, [owner])).rejects.toThrow("Invalid process identity")
+})
+
+test("supervisor ancestry: a reaped candidate is absent rather than an unreadable live chain", async () => {
+  const raw = await readFile(`/proc/${process.pid}/stat`, "utf8")
+  const owner = { pid: process.pid, starttime: raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19]! }
+  const child = Bun.spawn([process.execPath, "-e", "process.exit(0)"], { stdout: "ignore", stderr: "ignore" })
+  expect(await child.exited).toBe(0)
+  expect(await hasOwnedAncestry(child.pid, [owner])).toBe(false)
 })

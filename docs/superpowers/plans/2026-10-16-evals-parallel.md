@@ -288,11 +288,13 @@ private config/budget/results вне Git; операторские команд�
   HEAD без модели: direct403/proxy405; sandbox сохраняет routing и Node env proxy.
   RED→GREEN; CLI8/28 +sandbox1/2 PASS, typecheck/diff PASS, Review Approved.
   Provider retry первого HTTP403 корректно остановил run; pass модели ещё не доказан.
-- [ ] По разрешению владельца завершить карантин4fb6d039… и исправить ancestry-read race по unit TDD:
+- [x] По разрешению владельца завершить карантин4fb6d039… и исправить ancestry-read race по unit TDD:
   ENOENT/ESRCH допускает false только если исходный PID отдельно подтверждён
   отсутствующим; живая/нечитаемая цепочка остаётся отказом. Review Approved.
   Не переписывать исходный failed proof; собственные log/DB сохранить в архив,
-  только точные server/profile holds снять через CAS по полученному разрешению.
+  только точные server/profile holds сняты через CAS. Log/DB/точный старый marker
+  сохранены в owner-recheck-4fb6d039-W6OLKv; исходный failed receipt неизменен.
+  RED→GREEN reaped child,9/48 targeted PASS51.84s, typecheck/diff PASS, Review Approved.
 - [ ] Реальный N=1 с агентом/судьёй на трёх задачах; по замеру предложить числовые
   пороги CPU/RAM/диска и **дождаться утверждения владельца до N=2**.
 - [ ] Записать утверждённый бюджет до реального N=2, выполнить run на тех же tasks/
@@ -354,4 +356,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20. Владелец разрешил archive/CAS4fb и автономное решение следующих блокеров; гарантии/утверждение бюджетаN2 сохраняются. Следом archive/release, TDD ancestry gone PID fix, повтор N=1.
+20.4fb archive/CAS выполнены без удаления, failed proof неизменен. Ancestry gone-PID fix9/48 PASS/TC/Review; гарантии/утверждение бюджетаN2 сохранены. Следом повтор N=1, технические блокеры решать самостоятельно.
