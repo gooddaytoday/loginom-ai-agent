@@ -6,6 +6,19 @@ const provider=new AjvJsonSchemaValidator(),validate=provider.getValidator(nodeA
 const result=()=>({operation_id:'op',status:'AMBIGUOUS',effect_possible:true,phases:[],node:null,
  execution:{status:'pending',execution_id:'process'},output:{status:'not_refreshed',evidence_ref:null,ports:[]},
  package_saved:false,cleanup_complete:false,warnings:[],pending_phase:'execute',error:{code:'UNKNOWN',message:'Await original receipt'}});
+test('REST readback admits optional observed response Content-Type without changing legacy results',()=>{
+ const r=result(),node={document_id:'d',workflow_id:'w',node_id:'n'};
+ const connection={name:'Status',base_url:'https://httpbin.org/status/200',method:'GET',url_mode:'query',authentication:'none',verify_server_certificate:true,query_parameters:['RequestId'],reference_node_id:'connection'};
+ r.configuration={status:'applied',readback:{kind:'rest_request',scope:'observed_before_verified_finish',node,values_are:'observed_ui_values',method:'GET',connection,
+  query_parameters:[{name:'RequestId',field:'RequestId'}],receipt_ids:['op:configure','op:node_finish'],package_persistence_verified:false}};
+ assert.equal(validate(r).valid,true);
+ for(const response_content_type of ['application/json','text/html']){
+  connection.response_content_type=response_content_type;assert.equal(validate(r).valid,true);
+ }
+ for(const response_content_type of [null,true,'text/plain']){
+  connection.response_content_type=response_content_type;assert.equal(validate(r).valid,false);
+ }
+});
 test('result schema preserves uncertainty and forbids claiming node-level package persistence',()=>{
  assert.equal(validate(result()).valid,true);
  for(const patch of [{package_saved:true},{persisted_package_verified:true},{pending_phase:'retry'},

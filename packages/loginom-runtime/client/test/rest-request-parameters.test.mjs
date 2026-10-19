@@ -4,6 +4,18 @@ import {validateRestRequestParameters} from '../lib/rest-request-parameters.mjs'
 import {restRequestReadback} from '../lib/rest-request-node.mjs';
 const request={target:{kind:'new'},inputs:[{input:0}],read:{ports:[0,1]},mappings:[],finish:'execute'};
 const parameters=()=>({connection:{name:'Echo',base_url:'https://httpbin.org/anything'},query_parameters:[{name:'RequestId',field:'RequestId'},{name:'Key',field:'Key'}]});
+test('REST response Content-Type is an explicit optional connection setting',()=>{
+ for(const response_content_type of ['application/json','text/html']){
+  const p=parameters();p.connection.response_content_type=response_content_type;
+  assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',request));
+  delete p.connection.base_url;
+  assert.doesNotThrow(()=>validateRestRequestParameters(p,'request',request));
+ }
+ for(const response_content_type of [null,true,1,'','text/plain','text/html; charset=utf-8','*/*']){
+  const p=parameters();p.connection.response_content_type=response_content_type;
+  assert.throws(()=>validateRestRequestParameters(p,'request',request),/response_content_type/);
+ }
+});
 test('REST stage 1 accepts a new GET/query connection and preserves existing settings',()=>{
  assert.doesNotThrow(()=>validateRestRequestParameters(parameters(),'request',request));
  assert.doesNotThrow(()=>validateRestRequestParameters({},'request',{...request,target:{kind:'existing'},inputs:[]}));
