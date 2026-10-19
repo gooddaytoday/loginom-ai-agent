@@ -24,6 +24,8 @@ VPN/local429 квалификация дала ровно1 запрос и за�
 Доказательства закрытых отказов — [единый архив](../../archive/2026-10-16-evals-parallel-history.md).
 Wrapper e149811 допускает разницу только корневых model defaults; правила
 сравнения TOML и защиты home — контракт п.26. Копировать меняющиеся defaults не нужно.
+Коммит096f18e отключает локальный bunfig при служебной проверке конфигурации;
+canary preload и остальные wrapper tests прошли (11/11).
 Карантин4fb завершён по разрешению, log/DB сохранены в закрытом history;
 ancestry gone-PID fix прошёл unit checks/typecheck/review. Текущее состояние —
 в [блокерах](../../../eval_parallel_blockers.md).
