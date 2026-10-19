@@ -55,7 +55,18 @@ export function resolveExportInput(graph,{destination,destinations}={}){
  need(incoming.length===1&&incoming[0].input===0&&Number.isSafeInteger(incoming[0].output)&&incoming[0].output>=0,error);
  const sources=graph.nodes.filter(n=>n.ref.node_id===incoming[0].source);
  need(sources.length===1&&Array.isArray(sources[0].outputs)&&sources[0].outputs.includes(incoming[0].output),error);
- return {node:sources[0],output_port:incoming[0].output};
+ const input_fields=destinations?.find(d=>d.node_id===exports[0].ref.node_id)?.input_fields;
+ return {node:sources[0],output_port:incoming[0].output,export_node_id:exports[0].ref.node_id,...(input_fields?{input_fields}:{})};
+}
+// export_input is the saved export's input layout, not the temporary Table's
+// display order. Reorder only from the independently observed unchanged mapping.
+function exportInputData(data,fields){
+ if(!fields)return data;
+ if(!Array.isArray(fields)||fields.length!==data.schema?.length||!fields.length
+  ||new Set(fields.map(f=>f.source_name)).size!==fields.length)return {...data,schema:[]};
+ const indices=fields.map(f=>data.schema.findIndex(c=>c.name===f.source_name&&f.name===f.source_name&&c.type===f.type));
+ if(indices.some(i=>i<0)||new Set(indices).size!==indices.length)return {...data,schema:[]};
+ return {...data,schema:indices.map((i,index)=>({...data.schema[i],index})),sample:data.sample?.map(row=>indices.map(i=>row[i]))};
 }
 export function matchesExpectedOutput(data,expected){
  if(data.row_count!==expected.rows.length||!data.sample_complete||!data.precision?.numbers_verified
@@ -127,7 +138,8 @@ export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,e
   const candidates=actual.filter(a=>(want.output_node_type==='export_input'
    ?exportInput&&a.node.node_id===exportInput.node.ref.node_id&&(a.output_port??0)===exportInput.output_port
    :a.type===want.output_node_type&&(a.output_port??0)===port
-    &&(want.output_node_label===undefined||a.label===want.output_node_label))&&matchesExpectedOutput(a.data,want));
+    &&(want.output_node_label===undefined||a.label===want.output_node_label))
+     &&matchesExpectedOutput(want.output_node_type==='export_input'?exportInputData(a.data,exportInput?.input_fields):a.data,want));
   const key=candidates.length===1?JSON.stringify([candidates[0].node.node_id,port]):undefined;
   need(candidates.length===1&&!used.has(key),'COLD_OUTPUT_NOT_UNIQUELY_MATCHED');
   used.add(key);matches.push({expected_index:index,node:candidates[0].node,output_port:port,execution:candidates[0].execution});
