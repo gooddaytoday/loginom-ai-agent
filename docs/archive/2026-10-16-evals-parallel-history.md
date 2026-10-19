@@ -8154,3 +8154,818 @@ transient неполноту: exit0, before PID1, after PID1+52291; два со�
 Штатный startup завершён, все holds released; failed receipts/results сохранены.
 Private evidence: acceptance-20261016/evidence/fd-readback-n2-20261019/,
 reconciled-n2-readback-quarantine-20261019.json и results/20261019-085326-adadb1469e-dirty-dOMERK.
+
+## 2026-10-19: план перед сокращением после успешного N2
+
+# Parallel evals: короткий план реализации
+
+> Исполнение последовательно в этой сессии. Новый код — по skill `tdd`,
+> один unit RED → минимальная реализация → GREEN → отдельный коммит.
+
+**Goal:** один реальный N=2 на трёх небольших задачах с судьёй, безопасной
+очисткой своих файлов и общей сводкой.
+**Architecture:** существующие harness и общая очередь, один выделенный Server,
+два пользователя/профиля/workspace/архива, одно admin-соединение и judge gate.
+**Tech Stack:** Bun/TypeScript, установленный CLI, Loginom Server/Studio, VPN Codex.
+**Spec:** [дизайн](../../plans/2026-10-11-evals-parallel-design.md),
+[контракт](../../../evals/docs/parallel-users-contract.md).
+
+## Общие ограничения и решения
+
+- Агент `openai/gpt-6-luna/high`, судья `gpt-6-sol/xhigh`.
+- Задачи: `filter-active-rows`, `calc-data-double`, `group-sum-qty`, repeat=1.
+- Одна server lock с долговечной бронью, profile locks, judge-home lock; без user lock.
+- Внутри run карантин без recovery; здоровый слот продолжает очередь.
+- Prepare создаёт недостающее/проверяет права; run только проверяет, Pool=0 до работы.
+- Сессии закрываются по точным native именам пользователя; readback и проверка
+  открытых файлов в своём root обязательны до удаления; SessionBackup только читать.
+- Никаких новых эпох, процессных описей/телеметрии, FD/kernel receipts,
+  server-storage archives и исследовательских операций в рабочем admin-драйвере.
+- Subreaper, pid+starttime перед сигналом, marker v2, изоляция секретов сохраняются.
+- Блокеры решать самостоятельно; вопросы только при действительной необходимости
+  по контракту п.33. Бюджет N=2 отдельно утверждает владелец.
+  Harness автоматически удаляет только своё на новом стенде после обязательных
+  проверок; старые стенды/инциденты и созданное не этим harness требуют разрешения.
+  Ограничение временными файлами текущего хода относится к работе исполнителя.
+- Предлагается новая acceptance pair `loginom-evals-acceptance-20261016-server`
+  / `loginom-evals-acceptance-20261016-studio`, private root
+  `/home/kiselev/.local/state/loginom-evals/acceptance-20261016/`, config `slots.json`.
+  Username eval-a/eval-b, раздельные a/b profile/work/history. Home судьи прежний:
+  `/home/kiselev/.local/state/loginom-evals/parallel/judge-codex`.
+  Эти имена/root отсутствовали при чтении 2026-10-16; перед созданием перепроверить.
+  Разрешено снять только retained judge reservation команды
+  `585940be-5c1b-4bff-a7c6-00459a4f7fa3` под guard после сверки identity.
+  A00yuH и все прежние стенды/инциденты сохраняются до успешного N=2.
+- Новая пара создаётся после утверждения плана, с новым loopback-портом/сетью,
+  marker v2 и private state. Старые profiles/auth/archives не перезаписываются.
+- Чужие правки не включать в коммиты. Разрешён откат двух незакоммиченных
+  archive-правок: `evals/src/attempt-finalization.ts`,
+  `evals/test/native-agent-run-integration.test.ts`; перед откатом сохранить
+  единый diff private0600 в state. `user-storage-archive.ts` не подключать,
+  его удаление и остальные неиспользуемые механизмы — шаг 7 после N=2.
+
+## 1. Документы и решение до реализации
+
+- [x] Переписать дизайн/контракт на месте, сократить runbook, перенести прежние
+  тексты с точной проверкой сохранности в один архив; старый план оставить ссылкой.
+- [x] Проверить текущие Docker resources, roots и reservations на чтение; составить
+  [перечень удержанного](../../testing/loginom-ai-agent/2026-10-16-evals-parallel-retained.md).
+- [x] Независимое ревью плана/документов: Approved; замечание порядка startup
+  исправлено (единственный admin открывается до процедуры остатков).
+- [x] Владелец утвердил план/перечень с поправками; повторное согласование не нужно.
+- [x] Поправки владельца сохранены отдельным docs-коммитом47eb78f31a; единый
+  private diff сохранён, две разрешённые archive-правки откатаны до HEAD.
+- [x] Сохранить предложенную редакцию документов отдельным коммитом
+  `docs(evals): simplify parallel run requirements and plan`.
+
+## 2. Минимальное владение и подготовка
+
+**Files:** `evals/src/slots.ts`, `lease.ts`, `environment-preparation.ts`,
+`environment-finalization.ts`, `user-environment.ts`, `script/parallel-env.ts`.
+**Unit tests:** `slots.test.ts`, `lease.test.ts`, `parallel-env.test.ts`.
+
+- [x] RED→GREEN: один server guard/reservation и два profile locks, без user lock;
+  потеря server guard отзывает slot authority. Slots31 PASS/127 assertions33.22s,
+  typecheck/diff PASS; обновлены три проверки нового режима вместо epoch recovery.
+- [x] Подключить judge-home lock к общему run (primitive/статусная проверка уже работают);
+  проверить весь prepare/verify/run путь без создания пользователей во время run.
+  Native s9821T: первая задача completed/judge100/cleanup confirmed, home released;
+  полный N=1 прерван позднее внешним CDP, не засчитывается как замер трёх задач.
+- [x] RED: prepare создаёт только недостающее/проверяет права; verify/run отказывают
+  на missing user, ACL drift, Pool!=0 и непустой SessionBackup без исправлений/delete.
+  Свежая read-only проверка пользователя/ролей/ACL подключена к prepare/verify/run,
+  как и Pool/SessionBackup. Native verify не меняет пользователей и пароли.
+- [x] GREEN: переиспользовать рабочие lease/preparation primitives; исключить user
+  lock из нового пути. Одна повторяемая startup-процедура сверяет остатки прошлого
+  run; неизвестность сохраняет карантин. Повторно берутся точные прежние tokens,
+  без новых эпох. Supervisor cleanup обязателен; unknown оставляет файлы и бронь.
+  Unit62/225 PASS, native startup после неуспешного prepare завершён с освобождением брони.
+- [x] Реализовать prepare/verify без process inventories/старого финализатора:
+  недостающий пользователь настраивается и активируется, готовый только проверяется;
+  Pool=0 до работы пользователя, backup read-only, профиль проверяется без setup.
+  История сохраняется, собственные сессии закрываются с readback, чистые guards
+  освобождаются после admin.dispose. Native prepare/verify92c5ac16…/08bb7493…
+  ready=true, verify changedUsers=[], оба профиля чисты,0 model calls; evidence
+  `/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/`.
+- [x] Проверить `bun run test test/slots.test.ts test/lease.test.ts test/parallel-env.test.ts`
+  и `bun typecheck` из `evals/`; коммит `refactor(evals): simplify run ownership and preparation`.
+  68/264 PASS41.65s; verifyProfile RED→GREEN1/5 PASS2.19s, diff PASS.
+
+## 3. Рабочий admin и безопасное завершение слота
+
+**Files:** `evals/src/loginom-admin.ts`, `script/loginom-admin-driver.mjs`,
+`src/attempt-finalization.ts`, `src/artifact.ts`, `src/profile-archive.ts`.
+**Unit tests:** `loginom-admin.test.ts`, `artifact.test.ts`, `profile-archive.test.ts`.
+
+- [x] RED→GREEN unit: точные native имена всех сессий eval-a закрываются через один заранее
+  открытый admin; eval-b/admin сохраняются; readback still-present запрещает delete.
+  Рабочая ветка существующего close-session без actor ledger; SESSION_NOT_IDLE
+  сохраняется отказом. Проверка native A/B и подключение к run ещё впереди.
+- [x] RED: неизвестное владение/root, активный открытый файл или непустой/нечитаемый
+  SessionBackup оставляют файлы неизменными; история/inputs сохраняются вне mounts.
+  RED→GREEN guards4/29 unit PASS: отказ при unknown/unconfirmed процессах,
+  неполном FD scan/open file/mapping, nonempty/unreadable/symlink backup,
+  неверном inode и чужом namespace. Cleanup координатор подключён к проверенным
+  guards; native A/B4/4 подтвердили сохранность файлов при unknown и guarded cleanup.
+- [x] GREEN: в новом пути заменить actor-ledger admission точным пользователем,
+  архивировать профиль/результаты, закрыть свои сессии, перечитать и непосредственно
+  проверить открытые файлы перед очисткой своего root. Не развивать замороженный
+  server-storage archive diff; после разрешённого отката модуль не подключать.
+- [x] Исключить research phases из рабочих операций admin-драйвера; не вводить
+  заменяющий probe protocol. Их окончательное удаление — только после N=2.
+  Драйвер требует явный LOGINOM_EVALS_ADMIN_RESEARCH=1 для старых probes;
+  штатный openLoginomAdmin его не передаёт. Read-only/native boundary32/131
+  unit PASS10.82s, typecheck/diff PASS.
+- [x] Проверить `bun run test test/loginom-admin.test.ts test/artifact.test.ts test/profile-archive.test.ts`
+  и `bun typecheck`; коммит `feat(evals): close slot user sessions before cleanup`.
+  Unit53/221 PASS29.31s, логический коммит2eeacf5030; native A/B отдельно ниже.
+
+## 4. Процессы и выделенный судья
+
+**Files:** `evals/src/process-supervisor.ts`, `cli.ts`, `profile.ts`,
+`judge-environment.ts`, `judge.ts`, `run.ts`;
+`/home/kiselev/git/codex-vpn-lockdown/bin/codex` в другом репозитории.
+**Unit tests:** `process-supervisor.test.ts`, `judge-environment.test.ts`;
+новый `verify/test_codex_home.py` рядом с существующими verify tests wrapper repo.
+
+- [x] RED/GREEN: полностью прочитанная чужая ancestry не сигналится и не карантинится;
+  ошибка чтения отказывает; own descendant проходит subreaper/pid+starttime guards.
+- [x] RED/GREEN: при подтверждённом дереве и пустом unknown ошибка
+  `Writer owner unavailable` не проваливает попытку; `.writer` снимается через
+  существующий `releaseStaleWriter`, непроверенное дерево/unknown по-прежнему отказ.
+  Profile75 PASS/218 assertions47.34s,2 proc-denial cases не запускались для
+  предотвращения помех другим агентам; typecheck/diff PASS.
+- [x] Выбранная ownership/management regression25 PASS/125 assertions109.40s
+  (82 filtered, включая proc-denial tests); strict own-unknown/birth guards PASS.
+  `bun typecheck`/diff PASS; отдельный коммит `fix(evals): ignore proven foreign process ancestry`.
+- [x] RED/GREEN wrapper unit: разрешённый canonical caller CODEX_HOME с тем же
+  lockdown-конфигом сохраняется; outside/symlink/mismatch не допускаются;
+  отсутствие caller home сохраняет прежнее поведение и сетевые ограничения.
+- [x] Wrapper-коммит d551ddf (`codex-vpn-lockdown`) определяет unit boundary: валидируемые
+  `LOGINOM_EVALS_JUDGE_UNIT=loginom-evals-judge-<UUID>` и
+  `LOGINOM_EVALS_JUDGE_TIMEOUT_SEC` (целые секунды 1..86400); `systemd-run --unit`
+  с RuntimeMaxSec и ограниченным TimeoutStopSec. Сеть/VPN остаются прежними.
+- [x] Unit RED/GREEN harness: ждать wrapper с таймаутом без сигналов root/sudo/
+  systemd-run; после выхода проверить завершение точного юнита через systemctl.
+  Root-процессы этой цепочки не ошибка владения; активный/непроверенный юнит — отказ.
+  Judge/VPN regression44 PASS/147 assertions53.61s, bun typecheck/diff PASS.
+  Для обычного локального агента остаётся supervisor/subreaper, без исключений root.
+- [x] Python unit7 PASS (включая staged-only snapshot), `bash -n`/diff PASS;
+  проверить `python3 -m unittest discover -s verify -p test_codex_home.py`
+  и `bash -n bin/codex` в wrapper repo. Отдельным маленьким коммитом
+  `fix(codex): preserve validated eval judge home` включить только свои hunks,
+  сохранив имеющиеся чужие правки bin/codex и других файлов.
+- [x] Снята ровно разрешённая judge reservation; A00yuH journal неизменён.
+  Проверить lockdown-конфиг прежнего home и `codex login status` через исправленную
+  обёртку (0 model calls). Нет/недействителен вход — остановиться и попросить вход
+  владельца; глобальный CODEX_HOME не подменяет эту проверку.
+  Проверка через repo wrapper: exit0/loggedIn=true, unit завершён,0 model calls;
+  конфиг скопирован точно/private600, статусный lease освобождён.
+
+## 5. Очередь, ресурсы и сводка: открыть настоящий slots path
+
+**Files:** `evals/src/run.ts`, `scheduler.ts`, `report.ts`, `parallel-acceptance.ts`,
+`parallel-resources.ts`, `parallel-resource-budget.ts`.
+**Unit tests:** `parallel-run.test.ts`, `scheduler.test.ts`, `parallel-users-acceptance.test.ts`.
+
+- [ ] RED: два слота проходят агент→судья→cleanup→summary; crash A карантинит
+  только A, B продолжает очередь; SIGINT прекращает выдачу; license denial
+  останавливает весь run. Артефакты/results не пропадают при ошибке cleanup; unit-проверка env и outputs
+  агента/судьи подтверждает отсутствие всех секретов, включая пароли слотов.
+  RED→GREEN env: реальные binary slots и VPN judge наследуют только служебный
+  allowlist; judge home явный. Canary/env/VPN10/33 PASS +typecheck/diff;
+  вывод уже покрывается существующими redaction tests. Один старый CLI proc-denial
+  тест обновлён под foreign ancestry; повторно не запускался ради других агентов.
+- [x] RED: запись бюджета до dispatch, host/container CPU/RAM, диск/OOM,
+  licence/provider errors определяют приёмку; процессная телеметрия не gate;
+  missing mandatory sample не PASS, скрытый 429/успешный retry не скрывает отказ.
+  Unit evidence ниже: report/acceptance64/293, runtime/resources105/555,
+  CLI retry19/61; native provider retry останавливает run с сохранённой сводкой.
+- [x] GREEN: подключить подготовленные слоты к существующим runSlotQueue и judge
+  gate, убрать `SLOTS_ADMISSION_UNAVAILABLE` для этого пути. Run не вызывает
+  создание/исправление пользователей; использовать прежний home/VPN wrapper.
+  Неполные обязательные observations дают incomplete/exit1. Для актуальной цели
+  обязательны provider+judge; Dock transport остаётся unavailable в диагностике,
+  обнаруженный Dock429 по-прежнему отказ. Независимое ревью этой границы Approved;
+  legacy policy сохраняется. Report/acceptance64/293 PASS, typecheck/diff PASS.
+- [x] Run запускает `script/sample-parallel-resources.ts` с чистым env перед
+  dispatch N=1/N=2 и останавливает/дожидается его в finally; out — private JSONL
+  плюс существующая summary, interval=1000ms. Unit проверяет start/stop при успехе,
+  отказе и SIGINT. Процессные пробы не влияют на исход, обязательные пробы влияют.
+  Helper RED→GREEN3/11 unit PASS1.63s +typecheck/diff: fresh output/первая проба,
+  idempotent stop с supervisor и summary, env allowlist, проверка MemAvailable
+  против заданного budget. Helper подключён к run/finally; OOM6/18 PASS,
+  resource/run/report/scheduler/incidents105/555 PASS30.52s +typecheck.
+- [x] Проверить `bun run test test/parallel-run.test.ts test/scheduler.test.ts test/parallel-users-acceptance.test.ts`
+  и `bun typecheck`; логические изменения сохранять отдельными коммитами
+  `feat(evals): execute prepared user slots` / `refactor(evals): bound run resource acceptance`.
+  Runtime/resources/report/incidents105/555 PASS30.52s, parallel-run29/196
+  PASS332.99s, typecheck/diff PASS. Повторное независимое ревью четырёх исправлений
+  Approved; fixture-проверки не доказывают native N=1/N=2.
+
+Владелец2026-10-19 разрешил точечную правку packages/agent вне evals/:
+- [x] RED→GREEN process-тест: локальный HTTP429→200 сохраняет успешный exit,
+  но JSON содержит существующий session.status/retry; зеркалировать status через
+  прежний emit, сохранить idle-break, адаптировать прежнее JSON-ожидание.
+- [x] Проверить затронутый process suite и typecheck, сохранить отдельным коммитом.
+  Process suite19 PASS, package typecheck/diff PASS; новый retry/busy/idle виден,
+  прежний порядок остальных событий сохраняется. Независимое мини-ревью Approved.
+- [x] Собрать отдельный private installed CLI, закрепить SHA и квалифицировать
+  retry output до A/B и N=1. Пользовательскую установку/старый candidate не менять.
+  Candidatec8a85da728 на прежней OAuth-базе eb85403ce4, version0.0.0-dev-202610190559,
+  binary SHA364dd428b29df745d5f8392f6f90c4b725de4879a958eb4824daee5a33e67552.
+  Установленный бинарник: локальный HTTP429→200,2 запроса, busy/retry/idle,
+  exit0/cleanup confirmed; private evidence `acceptance-20261016/evidence/cli-retry-20261019/`.
+- [x] Пересобрать тот же разрешённый patch двух agent-файлов на точной базе
+  eb85403ce4 в собственном временном detached checkout; чужой evals-oauth не менять.
+  Квалифицировать одновременно retry output и shared status до повторного N=1.
+  Независимое ревью переноса Approved: оба файла базы побайтно совпадают с родителем
+  патча8b2ba2bf9b. Auth-код не меняется; RED→GREEN19/61, typecheck/diff PASS.
+  Installed retry и shared status qualified: generation/principal проверены,
+  refreshRequired=false,0 model calls. Payload manifest/installed inventory проверены;
+  installer замороженной базы выполнен Bun (его Node-entry использует Bun.Glob).
+- [x] Исправить обнаруженный путь startup после отказа до dispatch: management
+  cleanup обычного run находится в run/preparation/<slot>, prepare/verify — в
+  controller/management-<command>-<slot>. Проверяется тот же supervisor producer.
+  RED→GREEN, startup/slots36/142 PASS27.90s; targeted4/10/typecheck/diff PASS.
+  Native разбор первого admission-отказа подтверждён, прежняя бронь освобождена.
+- [x] Сохранить флаг systemd в preflight version probe судьи. RED→GREEN,
+  preflight25/51 PASS5.79s, typecheck/diff PASS. Второй admission-отказ до модели:
+  прежний version-only unit найден по точному home/команде в systemd journal;
+  run-u17489.service завершён, MainPID=0. Без сигналов root и без новых механизмов.
+  Judge hold освобождён; admin proof сохранил failed из-за чужого setuid peer.
+  Повторные прямые проверки чистые, но штатного settlement нет (независимое ревью).
+  Владелец разрешил разовое снятие server/profile holds c21be2f8…; повторные
+  прямые проверки прошли, существующий CAS освободил только эти брони, без удаления.
+  Исходный failed admin receipt сохранён; [evidence](../../../eval_parallel_blockers.md).
+- [x] Подключить JSON status к проверке provider errors: busy→idle основной
+  сессии, любой retry сохраняет отказ; старый/оборванный JSON и task tool не дают
+  полного покрытия. Непустой существующий --title исключает запрос автозаголовка.
+  RED→GREEN: targeted CLI10/44, acceptance/incidents39/196 PASS; typecheck/diff PASS.
+- [x] Отключить внутренние повторы выбранного provider судьи существующими
+  request_max_retries/stream_max_retries=0; проверить локальным HTTP429 без модели.
+  Codex0.157 запрещает override встроенного openai: выбран evals-openai с name=OpenAI,
+  requires_openai_auth=true и прежним auth-dependent URL. Независимое ревью Approved.
+  VPN/local429: ровно1 POST, exit1, unit cleanup confirmed,0 model calls;
+  judge/incidents46/140 PASS43.24s, typecheck/diff PASS. Evidence `evidence/judge-retry-20261019/`.
+Новый Protocol/HTTP, сырой transport trace и новая система телеметрии не нужны.
+
+## 6. Четыре live A/B сценария, затем N=1 → утверждение → N=2
+
+**Files:** новый `evals/test/parallel-slots-live.test.ts`, существующие task inputs,
+private config/budget/results вне Git; операторские команды в runbook.
+
+- [x] Новый acceptance pair829f82ae…/428fd481… создан на32791, prepare/verify
+  двух пользователей готовы, startup после первого отказа проверен без новых epochs.
+- [x] Создать только новый acceptance стенд и private config; закрепить binary SHA,
+  task/rubric hashes, модели, timeouts и бюджет/условия до N=1 dispatch.
+- [x] Ровно четыре обязательных A/B сценария: взаимная невидимость файлов,
+  close A сохраняет B, delete A после close/readback, unknown ownership без delete.
+  Остальные live tests только явным флагом; native и proc-negative unit не совмещать.
+- [x] Сохранить live результат без skip и коммит `test(evals): qualify required slot isolation cases`.
+  Native4/4 PASS29.13s,0 model calls: admin до A/B, retained A/PendingDisconnect,
+  точный close/readback, bytes canary B после cleanup A, unknown без изменений,
+  оба guarded cleanup и release. Evidence `evidence/live-ab-5fac81a1-d90a-4039-a557-b4575a30e7f9/`.
+  Независимое ревью: два замечания к проверке ReadBuffer/catch исправлены.
+- [x] Непосредственно перед N=1 проверить MemAvailable хоста против записанного
+  бюджета (владелец наблюдал около5GiB из38GiB). Не хватает — остановиться и
+  сообщить владельцу; не освобождать память остановкой чужих/удержанных стендов.
+  Перед dispatch2026-10-19 доступно17GiB при исходном minimum8GiB; private N=1
+  budget/conditions записаны, judge login status0/loggedIn/closed unit под home lock.
+  Эти исходные границы не являются утверждением бюджета N=2.
+- [x] Разобрать первый dispatch N=1: встроенный каталог CLI не содержит
+  openai/gpt-6-luna; актуальный публичный каталог содержит точную модель/high.
+  Cleanup слота/admin и ресурсы confirmed/PASS; это не замер трёх задач.
+- [x] По разрешению владельца перенести только settled admin c21 в private
+  evidence:1394 entries/bytes/hash неизменны; штатный startup14c5 освободил holds.
+  Штатный models refresh под locks обоих профилей подтвердил gpt-6-luna/high,
+  0 model calls, cleanup/release confirmed; одинаковый catalog SHA256
+  `59bcb39e34656fe40d3007de30361919dcbaff738a342f1f30f763e8cf4617bc`.
+  Startup не менялся; [evidence и закрытые отказы](../../archive/2026-10-16-evals-parallel-history.md).
+- [x] Допустить штатный `$schema: urn:loginom-ai-agent:config`, который CLI
+  добавляет при models refresh: только in-memory нормализация перед прежним
+  строгим compare, без изменения файла/прав. RED→GREEN;18/65 targeted PASS21.47s,
+  typecheck/diff PASS, независимое ревью Approved. Другой schema/permission — drift.
+- [x] Восстановить существующий proxy route в child env подготовленных slots:
+  HTTP(S)/ALL_PROXY и NO_PROXY в обоих регистрах, только URL без auth/query/hash/path.
+  HEAD без модели: direct403/proxy405; sandbox сохраняет routing и Node env proxy.
+  RED→GREEN; CLI8/28 +sandbox1/2 PASS, typecheck/diff PASS, Review Approved.
+  Provider retry первого HTTP403 корректно остановил run; pass модели ещё не доказан.
+- [x] По разрешению владельца завершить карантин4fb6d039… и исправить ancestry-read race по unit TDD:
+  ENOENT/ESRCH допускает false только если исходный PID отдельно подтверждён
+  отсутствующим; живая/нечитаемая цепочка остаётся отказом. Review Approved.
+  Не переписывать исходный failed proof; собственные log/DB сохранить в архив,
+  только точные server/profile holds сняты через CAS. Log/DB/точный старый marker
+  сохранены в owner-recheck-4fb6d039-W6OLKv; исходный failed receipt неизменен.
+  RED→GREEN reaped child,9/48 targeted PASS51.84s, typecheck/diff PASS, Review Approved.
+- [x] Устранить повторную синхронизацию judge config из-за меняющихся глобальных
+  model defaults: wrapper e149811 сравнивает разобранный TOML без только двух
+  корневых строковых model/reasoning defaults, все protection/nested поля строго.
+  RED→GREEN,10 wrapper tests PASS/bash-n/diff PASS; чужие hunks не включены.
+- [x] Закрыть замечание ревью обёртки: служебный Bun не читает локальный bunfig
+  (`--config=/dev/null`). Canary preload RED→GREEN,11 tests/bash-n PASS;
+  отдельный коммит wrapper096f18e, чужие изменения сохранены.
+- [x] Удалять загруженный input по существующей успешной delivery-квитанции
+  events.jsonl: точное имя в своём root, размер/SHA-256 перед delete, все children
+  проверяются до изменения любого. Подключить одинаково в normal cleanup/startup;
+  чужой/неподтверждённый/изменённый файл сохраняет всё. Unit RED→GREEN, без новых описей;
+  slot-storage/startup12/72 PASS5.34s, typecheck/sh-n/diff PASS, Review Approved.
+- [x] Реальный N=1 с агентом/судьёй на трёх задачах: DE1Srz, exit0,3/3 completed,
+  judge100/100/100,3 cleanup confirmed, slot closed/leftovers[], provider+judge/resource
+  acceptance passed.840 samples/0 missed, max gap1009.7ms;906.054s всего.
+- [x] Предложить пороги по N=1: host CPU95%/MemAvailable8GiB, Server2 cores/256MiB,
+  Studio6 cores/1GiB, обязательные FS5GiB/10000 inodes, swap free0; прочие guards
+  прежние. Private `n2-budget-proposed-20261019.json`,25 bounds, SHA7b43211b…;
+  source/CLI/catalog/task/rubric/judge pins сохраняются.
+- [x] Владелец2026-10-19 явно утвердил предложенный бюджет N=2.
+- [x] До dispatch сохранить точную копию `n2-budget-approved-20261019.json`,
+  SHA7b43211b…; отдельная private запись фиксирует утверждение владельца.
+- [x] Первый N2 qAdMiN завершён сводкой: B две задачи100/cleanup confirmed;
+  A no_artifact и SESSION_STILL_PRESENT после CloseSession (15ms). Fresh startup
+  подтвердил отсутствие сессии (closed[]) и удалил два своих файла после guards;
+  брони освобождены, исходный failed результат сохранён. CPU host95.9253%>95%;
+  прочие24 границы, timeline/0miss/limits passed. Бюджет не менять.
+- [x] Исправить преждевременный SESSION_STILL_PRESENT: после подтверждённого
+  CloseSession ограниченно ждать исчезновения точного имени с повторным чтением;
+  PendingDisconnect/ownership guards и unknown при остатке сохраняются. Один
+  behavioral RED→GREEN delayed readback,15/89 targeted PASS8.26s/typecheck/diff,
+  независимое ревью Approved; четыре native A/B повторно PASS.
+- [x] Устранить transient неполноту direct FD scan без изменения guards:
+  повторить только readonly scan до3раз/100ms; complete snapshot с открытым своим
+  файлом сразу запрещает delete. Постоянная неполнота/ошибка сохраняет unknown.
+  RED→GREEN на сыром несовпадающем before/after frame, затем полном; проверить
+  постоянную неполноту и запрет повторов после полного снимка. Независимый план
+  Approved;18/99 targeted PASS8.71s/typecheck/diff, четыре native A/B PASS30.05s;
+  чужие PID не сигналить, весь cleanup не повторять.
+- [x] Выполнить реальный N=2 на тех же tasks/
+  models/pins. Проверить перекрытие двух слотов, judge settings, полную summary,
+  только свою очистку, отсутствие обязательных ресурсных/лицензионных/provider отказов.
+  J5IglH exit0:3 cleanup confirmed, оба closed/leftovers[], resource/limits PASS;
+  score0(no_artifact)/100/100 отражён честно; overlap227.208s, evaluation/CLI pins прежние.
+
+## 7. Один проход удаления неиспользуемого после успешного N=2
+
+- [ ] Одним списком согласовать судьбу старых стендов/инцидентов после N=2.
+  Неиспользуемые механизмы/тесты убрать по уже утверждённому шагу; чужие изменения
+  и incident/evidence не удалять без отдельного разрешения.
+- [ ] Убрать неиспользуемые recovery epochs/user-lock/process inventories/telemetry/
+  receipt chains/server-storage archive code и их тесты, сохранив обязательные guards.
+- [ ] `bun run test:unit`, `bun typecheck` из `evals/`, `git diff --check`;
+  коммит `refactor(evals): remove unused parallel research mechanisms`.
+- [ ] Свести повторённые правила к контракту; в дизайне/AGENTS/blockers/runbook/
+  плане оставить короткие ссылки. Проверить итог по контракту, обновить checkpoint.
+
+## Рабочие вызовы нового пути
+
+- Используются `runSlotQueue`, `runAgent` (без agentEvidence), `management`
+  (без managementEvidence) и их прямой `superviseProcess`; подтверждённый cleanup
+  supervisor-а решает исход. `superviseAgentProcess(input, undefined)` — только
+  существующий transparent fallback, без inventory. `releaseStaleWriter`,
+  `archiveProfileHistory`/`archiveProfileEvidence` сохраняют историю;
+  `serverFileObservation` непосредственно проверяет открытые файлы.
+- `judgeInfo`/`judgeVersion`/`judgeTask` для VPN проходят границу точного systemd-юнита,
+  не строгую CLI executable/ancestry-проверку sudo-цепочки. `createJudgeGate`
+  и `acquireJudgeLease` сохраняются. Обычный fake/local judge сохраняет локальный путь.
+- Не вызываются как admission/finalization gates: `superviseManagementProcess`,
+  inventory-ветки `superviseAgentProcess`/`superviseJudgeProcess`,
+  `sealAgentProcessInventory`, `pauseAgentProcessInventory`,
+  `sealManagementProcessInventory/Inventories`, `readAgentProcess*`,
+  `readManagementProcess*`, `sealJudgeProcessInventory`, `readJudgeProcessInventory`,
+  `qualifyClosedProcessEvidence`, `readResourceNativeCensus`, `checkResourceEvidence`
+  с process census. Старые `collectSlotSessions`/`finalizeSlotAttempt` с actor/receipt
+  chains не используются новым путём. Диагностика не меняет cleanup/status/exit code.
+- `archiveUserStorage`/`readUserStorageArchive` не подключаются; отдельный user lock,
+  epoch recovery и `captureServerFiles`/`readServerFiles` receipt chain не вызываются.
+
+## Checkpoint
+
+1. 2026-10-16: новая цель и поправки владельца нормативны; план утверждён.
+2. Документы/единый архив/перечень12 пар в39127c48e1, независимое ревью Approved.
+3. Старые стенды/инциденты не трогать до успешного N=2; A00yuH не удалять.
+4. Home судьи прежний parallel/judge-codex; снятие точной брони585940be… разрешено.
+5. Две archive-правки откатаны; private diff: `/home/kiselev/.local/state/loginom-evals/parallel/approved-archive-rollback-rrrs5s25/server-storage-archive.diff`.
+6. Исход нового пути: supervisor cleanup и systemd-unit судьи; описи диагностические.
+7. Harness сам очищает доказанно своё на новом стенде после обязательных проверок.
+8. N=1/N=2 collector запускает/останавливает run; перед N=1 проверить MemAvailable.
+9. N=2 ждёт утверждения числовых порогов по N=1; исправления runtime повторно Reviewed/Approved.
+10. Wrapper d551ddf:7 unit PASS; harness VPN boundary44/147 PASS, typecheck/diff PASS.
+11. Harness unit boundary0e6994f736; scoped login status exit0/clean unit/0 model calls, A00yuH journal unchanged.
+12. Evidence: parallel/judge-wrapper-check-160f11c1-aeac-4824-b79a-f52a47d25d58; status lease released.
+13. Server/profile guard: slots31/127 PASS33.22s/typecheck; user lock исключён из environment.
+14. Writer diagnostic: profile75/218 PASS47.34s +typecheck;2 proc-denial cases исключены.
+15. Foreign ancestry: ownership/management25 PASS/125 assertions109.40s +typecheck,82 filtered.
+16. Exact-name close:53/221 unit PASS29.31s +typecheck/diff; native A/B ещё не выполнен.
+17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
+18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
+19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
+20.N1 DE1Srz exit0:3/3 judge100/cleanup confirmed, resources/limits passed,840 samples/0miss, leftovers[]. БюджетN2 SHA7b43211b… явно утверждён/сохранён до dispatch. ПервыйN2 qAdMiN failed: A close readback/CPU95.9253>95. Startup confirmed/released; далее bounded readback fix и повтор с прежним бюджетом.
+
+
+### Прежний вводный checkpoint evals/AGENTS.md
+
+## Контракт пользовательских слотов — 2026-10-16
+
+Нормативны [контракт](docs/parallel-users-contract.md) и решения владельца
+от 2026-10-16; [короткий план](../docs/superpowers/plans/2026-10-16-evals-parallel.md)
+заменяет прежний план, [runbook](../docs/testing/loginom-ai-agent/parallel-evals.md)
+содержит команды. Старые правила и хроника — в
+[архиве](../docs/archive/2026-10-16-evals-parallel-history.md).
+Production slots path подключён с обязательным бюджетом. Native prepare/verify
+двух слотов и четыре native A/B прошли. N=1 завершён на трёх задачах, resources/
+limits/cleanup passed; бюджет N=2 утверждён. Первый N2 не принят (close readback/
+CPU host), штатный startup завершён; итоговая приёмка ожидает повторного прогона.
+
+Одна server lock с долговечной бронью на run, locks профилей и judge home;
+без user lock. Prepare создаёт недостающее/проверяет права; run только проверяет.
+PackagePoolSize=0 до работы пользователя. Одно admin-соединение открывается
+до слотов; все сессии пользователя слота принадлежат ему, закрываются по точным
+native именам с перечитыванием списка. До удаления непосредственно проверить
+отсутствие открытых файлов в своём root; SessionBackup только читать,
+непустой/нечитаемый — остановка без удаления. Unknown ownership — без delete.
+
+Внутри run слоты не восстанавливать: карантин с сохранением результатов,
+здоровый продолжает очередь. Остатки разбираются одной повторяемой процедурой
+перед следующим run; неизвестность сохраняет бронь и данные. Сохраняются marker
+v2, subreaper, pid+starttime перед сигналом и запрет restart общего сервера.
+Полностью прочитанная чужая ancestry — без сигнала/карантина; нечитаемая — отказ.
+
+Агент openai/gpt-6-luna/high, судья gpt-6-sol/xhigh. N=1 даёт замер порогов,
+владелец утверждает их до реального N=2 на трёх небольших задачах. Сравнение
+качества N=1/N=2 не входит в эту цель. Обязательная ресурсная приёмка — бюджет,
+host/container CPU/RAM, диск/OOM, лицензия/provider errors; процессы диагностические.
+Не развивать эпохи, user locks, process inventories/telemetry, FD/kernel receipts
+и server-storage archives. Исход решает supervisor cleanup; process inventories/
+census только диагностика и не меняют status/exit. Writer owner unavailable при
+подтверждённом дереве и пустом unknown допускает releaseStaleWriter. Только четыре обязательных live A/B сценария;
+прочие native tests по явному флагу. Новый код — unit TDD, отдельные коммиты.
+
+План после независимого ревью и перечень утверждены с поправками; согласование
+не повторять. Блокеры решать самостоятельно; вопрос только при действительной
+необходимости по контракту п.33. Harness автоматически удаляет доказанно своё на новом стенде после
+обязательных проверок; старые стенды/инциденты и созданное не им требуют решения
+владельца и до N=2 не трогаются. Ограничение временными файлами текущего хода
+относится к работе исполнителя. Нормативный источник — контракт, п.20/24/26.
+Судья использует прежний parallel/judge-codex; разрешено снять только бронь
+585940be-5c1b-4bff-a7c6-00459a4f7fa3 с сохранением A00yuH. Login status через
+исправленную VPN-обёртку без модели; нет действительного входа — запрос владельцу.
+Граница судьи — точный systemd-юнит с timeout, без сигналов root-процессам.
+Перед N=1 проверить MemAvailable против бюджета; collector запускает/останавливает run.
+
+
+### Закрытые блокеры перед итоговой приёмкой
+
+# Состояние блокеров parallel evals
+
+[План](docs/superpowers/plans/2026-10-16-evals-parallel.md) утверждён владельцем
+с поправками. Повторное согласование не требуется. Нормативные правила —
+[контракт](evals/docs/parallel-users-contract.md), особенно п.20/24/26.
+Прежняя диагностика — в [едином архиве](docs/archive/2026-10-16-evals-parallel-history.md),
+[удержанные ресурсы](docs/testing/loginom-ai-agent/2026-10-16-evals-parallel-retained.md)
+не трогать до успешного N=2 и решения владельца одним списком.
+
+Harness автоматически очищает своё и доказанно свои остатки на новом стенде
+после обязательных проверок. Ограничение временными файлами текущего хода
+относится к работе исполнителя; оно не запрещает штатную очистку harness.
+Разрешены сохранение одного private diff/откат двух незакоммиченных archive-правок
+Снята ровно judge reservation585940be-5c1b-4bff-a7c6-00459a4f7fa3; A00yuH
+не удалён. Проверка входа через исправленную repo-обёртку успешна (0 model calls),
+status lease освобождён. Проверка не заменяет реальный N=1/N=2.
+
+Известное ограничение: после аварии новый admin может получить SESSION_NOT_IDLE;
+такой слот остаётся в карантине до решения владельца. Для первого нового стенда
+старые incidents не используются. Нет действительного входа в прежнем judge home
+через исправленный VPN launcher — остановка с просьбой владельцу выполнить вход.
+Недостаточно MemAvailable для бюджета N=1 — остановка и сообщение владельцу.
+По решению владельца2026-10-19 технические блокеры решать самостоятельно;
+вопрос только при действительной необходимости по контракту п.33.
+
+CLI retry output исправлен по разрешению владельца2026-10-19; установленный
+candidatec8a85da728 сохраняет прежнюю OAuth-базу eb85403ce4. Process suite19 PASS,
+typecheck PASS; HTTP429→200:2 запроса, busy/retry/idle, exit0/cleanup confirmed;
+shared status qualified, refreshRequired=false. Evidence:
+`/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/cli-retry-20261019/`.
+Наблюдения подключены; четыре native A/B прошли. Первый admission-отказ (без модели)
+разобран startup, бронь освобождена.
+
+Блокеры c21/14c5 закрыты по разрешениям владельца: settled admin перенесён
+с неизменным содержимым, штатный startup подтвердил cleanup/release. Оба профиля
+после штатного refresh квалифицировали gpt-6-luna/high, одинаковый cache SHA256
+59bcb39e…; model calls0. Подробности и private evidence — в
+[едином архиве](docs/archive/2026-10-16-evals-parallel-history.md).
+Schema-only drift исправлен в5c93dafea9 (18/65 PASS/TC/Review), потерянный
+proxy route восстановлен вf88ce89f9c (CLI8/28+sandbox1/2 PASS/TC/Review).
+Штатный startup852/071 подтвердил cleanup/release. Модельный N=1/N=2 не завершён.
+
+Карантин4fb завершён по разрешению владельца: собственные log/DB/точный marker
+сохранены в закрытом history; original failed receipt неизменен, CAS holds released,
+данные не удалялись. Ancestry gone-PID fix прошёл9/48 targeted PASS/TC/Review.
+Evidence: `evidence/n1-proc-race-owner-release-20261019.json` в acceptance state,
+подробности — в едином архиве. Технические блокеры решать самостоятельно;
+утверждение бюджета N=2 сохраняется.
+
+N1 iLakZJ дошёл до завершённой задачи:21 tools/0 errors/0 retry. Судья получил64
+из-за добавленной глобальной desktop-настройки; private config синхронизирован
+под judge lease, вход подтверждён без модели. Cleanup сохранил root из-за
+хешированного имени своего input. Проверка существующей delivery-квитанции
+(точное имя/размер/hash) подключена в normal cleanup и startup:12/72 unit PASS,
+typecheck/sh-n/diff PASS, Review Approved. Native judge100 и startup cleanup
+подтверждены; исходные результаты не менялись.
+Исходные результаты и карантин сохранены, подробности — в едином архиве.
+
+Закрытый блокер — внешние inspector/CDP установленного Desktop из другого чата.
+В s9821T первая задача завершилась с judge100/cleanup confirmed; вторая не запущена
+из-за guard `assertNoDebuggers`. Новый процесс не создавался;71 прежний process
+из6 подтверждённых receipts завершены. Fresh admin/Pool/backup/sessions/root/FD/
+profile checks подтвердили чистое состояние; только a20 server/profile holds сняты
+существующим CAS, без удаления и без создания отсутствующего cleanup.json.
+Evidence: `evidence/n1-debugger-settlement-20261019.json`. Порты и процесс закрылись
+своим владельцем до полного N1; сообщение другому чату не требовалось и не отправлялось.
+
+Полный N1 DE1Srz завершён exit0:3/3 judge100/cleanup confirmed, leftovers[],
+resources/limits passed,840 samples/0 missed. Технических блокеров нет.
+Владелец2026-10-19 явно утвердил предусмотренный контрактом п.28 бюджет N2:
+host CPU95%/MemAvailable8GiB, Server2 cores/256MiB, Studio6 cores/1GiB,
+все обязательные FS5GiB/10000 inodes, swap free0. Файл предложения —
+`/home/kiselev/.local/state/loginom-evals/acceptance-20261016/n2-budget-proposed-20261019.json`,
+SHA2567b43211ba891232286e05e61c1844534cc7306ce03aa29aaa26077ce651380d7.
+Точная копия записана как `n2-budget-approved-20261019.json` до dispatch;
+private approval evidence сохранён. Source/CLI/catalog/task/rubric/judge pins
+сохраняются; изменения после N1 ограничены документацией при HEAD50b28da4db.
+Первый N2 qAdMiN не принят: A SESSION_STILL_PRESENT после CloseSession15ms,
+CPU хоста95.9253%>95%; B обе задачи100/cleanup confirmed. Fresh startup успешно
+подтвердил отсутствие сессии (closed[]) и очистил ровно два своих файла; server/
+profile брони released. Исходные результаты сохранены. Ограниченное ожидание
+readback после CloseSession исправлено по TDD:15/89 targeted PASS/typecheck/diff,
+Review Approved; четыре native A/B повторно PASS. Далее повторный N2
+с тем же утверждённым бюджетом и неизменными evaluation/CLI pins.
+
+N2 dOMERK прошёл25/25 ресурсных границ, limits/timeline/623 samples/0miss.
+A calc/group100/cleanup confirmed; B no_artifact/FDscan unknown. Штатный startup
+подтвердил cleanup/release. Transient неполнота scan воспроизведена на чтение;
+ограниченный повтор одного IO-чтения исправлен по TDD,18/99 unit PASS/TC/diff,
+Review Approved и четыре native A/B PASS30.05s. Далее повтор с тем же бюджетом.
+
+### Прежний статус runbook
+
+## Текущая доступность
+
+Production run с `EVAL_SLOTS_FILE` подключён и требует записанный ресурсный бюджет.
+Native prepare/verify двух пользователей на новом стенде прошли. Отдельный
+установленный CLIc8a85da728 на OAuth-базе eb85403ce4 квалифицирован локальным HTTP429→200: JSON содержит
+retry, exit0/cleanup confirmed. Harness учитывает session retries и отдельно
+подписывает обязательные источники provider/judge; Dock transport остаётся
+unavailable в диагностике, наблюдаемый Dock429 исключает успешную приёмку.
+Судья использует evals-openai с прежней OpenAI auth и нулевыми HTTP/stream retries;
+VPN/local429 квалификация дала ровно1 запрос и закрытый unit без вызовов модели.
+Четыре native A/B прошли без skip29.13s, cleanup/release подтверждены;
+полный N=1 DE1Srz завершён (см. ниже), бюджет N=2 утверждён. Урегулированный admin c21 перенесён по
+разрешению владельца в private evidence с неизменным содержимым; штатный startup
+разобрал прежний карантин. Оба профиля после штатного models refresh видят точную
+`openai/gpt-6-luna/high`, cache SHA256
+`59bcb39e34656fe40d3007de30361919dcbaff738a342f1f30f763e8cf4617bc`.
+Доказательства закрытых отказов — [единый архив](../../archive/2026-10-16-evals-parallel-history.md).
+Wrapper e149811 допускает разницу только корневых model defaults; правила
+сравнения TOML и защиты home — контракт п.26. Копировать меняющиеся defaults не нужно.
+Коммит096f18e отключает локальный bunfig при служебной проверке конфигурации;
+canary preload и остальные wrapper tests прошли (11/11).
+Карантин4fb завершён по разрешению, log/DB сохранены в закрытом history;
+ancestry gone-PID fix прошёл unit checks/typecheck/review. Текущее состояние —
+в [блокерах](../../../eval_parallel_blockers.md).
+Полный N=1 `20261019-080414-50b28da4db-dirty-DE1Srz`: exit0,3 задачи judge100,
+все cleanup confirmed, leftovers[], resources/limits passed,840 samples/0 missed.
+Пики CPU host81.4%, Server0.371 cores/48.5MiB, Studio2.547 cores/232.9MiB;
+минимум MemAvailable11.96GiB. Бюджет N=2 утверждён2026-10-19:25 bounds,
+`n2-budget-approved-20261019.json`, SHA7b43211b…; он сохранён до dispatch.
+HEAD50b28da4db сохраняется для N1/N2.
+Внешние Desktop inspector/CDP закрылись своим владельцем до N=1;
+для следующих запусков также нужно окно без них (guard `sandbox.assertNoDebuggers`).
+Чужие debug-процессы самостоятельно не останавливать и guard не отключать.
+Не запускать старый `recover` для новой
+процедуры: адресный recover и цепочка эпох больше не входят в рабочий путь.
+[Перечень удержанных стендов и инцидентов](2026-10-16-evals-parallel-retained.md)
+нужно проверить перед работой. Старые research pairs не использовать для run.
+
+
+### Дизайн перед итоговым сведением правил к контракту
+
+# Параллельные evals: один сервер, отдельные пользователи
+
+Редакция 2026-10-16. Решения владельца от этой даты заменяют прежние требования.
+Документ описывает целевой путь; его реализация и live-приёмка ещё не завершены.
+[Контракт](../../evals/docs/parallel-users-contract.md),
+[план](../superpowers/plans/2026-10-16-evals-parallel.md),
+[runbook](../testing/loginom-ai-agent/parallel-evals.md),
+[удержанные ресурсы](../testing/loginom-ai-agent/2026-10-16-evals-parallel-retained.md).
+Прежние правила, план и хроника сохранены в
+[одном архиве](../archive/2026-10-16-evals-parallel-history.md).
+
+## 1. Результат и границы
+
+Цель — один завершённый прогон N=2 на реальной модели на трёх небольших задачах:
+`filter-active-rows`, `calc-data-double`, `group-sum-qty`. Агент —
+`openai/gpt-6-luna`, variant `high`; судья — `gpt-6-sol`, reasoning `xhigh`.
+Прогон заканчивается общей сводкой, каждый слот очищает только свои рабочие
+файлы после обязательных проверок, результаты и закрытые архивы сохраняются.
+Ошибочный ответ модели отражается в результате задачи; его нельзя скрывать
+повторением ради зелёной сводки. Инфраструктурная приёмка оценивается отдельно.
+
+Предварительный N=1 на тех же задачах нужен для замера ресурсов и предложения
+порогов владельцу. Это не сравнение качества с N=2. Сравнение качества,
+node-evals-приёмка, кластеризация и автоматическое продолжение упавшего run
+не входят в эту цель.
+
+## 2. Минимальный сквозной путь
+
+Один доверенный controller обслуживает общую очередь через существующий harness.
+У слота отдельные пользователь Loginom, CLI-профиль, browser runtime, workspace,
+история и закрытый архив вне mounts агента. Общие Server/Studio выделены run.
+Слот занят до завершения агента, судьи и безопасной очистки; общая очередь не
+имеет барьера между задачами. Одна существующая judge gate сериализует работу
+в прежнем выделенном home судьи; отдельная очередь судей не требуется.
+
+Порядок: захватить server/profile/judge locks → открыть одно admin-соединение →
+выполнить повторяемую проверку остатков прошлого run → проверить подготовку
+всех выбранных слотов и PackagePoolSize=0 → пустить очередь → агент → сохранить
+результаты и историю → судья → закрыть сессии своего пользователя → перечитать
+сессии и проверить открытые файлы → очистить только свой root/workspace → сводка.
+Бюджет и параметры измерений записываются до dispatch. Admin закрывается после
+завершения всех слотов; чистые reservations освобождаются в конце run.
+
+Ошибка отдельного слота сохраняет его результаты и отправляет его в карантин.
+Здоровый слот продолжает очередь. Внутри run аварийный слот не восстанавливается
+и не получает retry, требующий восстановления. Отказ лицензии останавливает
+весь run. Другой общий сбой прекращает новые admissions и даёт активным
+процессам безопасно завершиться; неопределённость запрещает удаление.
+
+## 3. Блокировки и повторный старт
+
+На весь run одна OS-блокировка сервера с долговечной бронью. Дополнительно
+блокируются выбранные CLI-профили и home судьи. Отдельной блокировки пользователя
+нет: слот выбирается только под блокировкой сервера. Маркер
+`/workdir/.loginom-evals-isolated.json`, kind `loginom-evals-users`, version 2
+не допускает старые исполнители широкой очистки.
+
+Освободившийся после crash OS guard не снимает долговечную бронь. В начале
+следующего run одна повторяемая процедура проверяет сохранённое владение,
+свои процессы, историю, сессии и корни. Доказанно свои остатки
+на новом стенде harness очищает автоматически после обязательных проверок. Неизвестность
+оставляет данные и бронь в карантине. Не нужны цепочки эпох, адресный recover
+и восстановление активного слота. Старые нераспознанные reservations нельзя
+молча перезаписать или считать освобождёнными.
+
+## 4. Подготовка и admin
+
+Отдельная команда подготовки создаёт недостающих пользователей, задаёт и
+проверяет права, личные roots и профили. У пользователя только необходимые
+права проектирования, без администрирования, доступа к соседнему root и общим
+записываемым каталогам. Учитываются Everyone и серверные компоненты.
+Прогон проверяет подготовку; не создаёт и не чинит пользователей, ACL или Pool.
+`PackagePoolSize=0` установлен и перечитан до любой работы пользователя.
+Дрейф политики — отказ до dispatch.
+
+Admin-соединение открыто до запуска слотов и живёт весь run. Пользователей слотов
+использует только harness, поэтому все серверные сессии пользователя A принадлежат
+A. Controller выбирает пользователя по точному совпадению, получает полные
+нативные имена его сессий, закрывает каждую по точному имени и перечитывает список.
+Пустой список без запроса закрытия не заменяет закрытие ранее наблюдённых сессий.
+Неизвестный пользователь или неоднозначное имя запрещает удаление.
+После аварии новый admin может не закрыть зависшую сессию (SESSION_NOT_IDLE);
+слот тогда остаётся в карантине до решения владельца. Сессии B и
+admin не закрываются при завершении A.
+
+Рабочий admin-драйвер содержит подготовку, чтение состояния, адресное закрытие и
+завершение соединения. Исследовательские backup/pool/progress/component-пробы
+не доступны через рабочие операции. Обязательные A/B тесты используют обычные
+операции слотов; остальные live-пробы запускаются только явным флагом.
+
+## 5. Очистка и сохранность
+
+До удаления должны завершиться свои локальные процессы; история профиля с БД,
+WAL/SHM и inputs сохранена в закрытом архиве слота. Артефакты для судьи и сводки
+перенесены за границу workspace. Архивы не включаются в обычную очистку.
+
+Затем закрываются все сессии своего пользователя, свежий список подтверждает
+их отсутствие, а непосредственная проверка на сервере подтверждает отсутствие
+открытых файлов в root слота. Для этой проверки не создаётся цепочка квитанций
+FD/ядра. Неизвестный результат любого шага запрещает удаление и следующий job
+в этом слоте. Проверки canonical root, server identity, маркера v2 и владения
+защищают от symlink, подмены пути и удаления соседнего пользователя.
+
+`SessionBackup` только читается до dispatch и перед очисткой. Непустой каталог
+или невозможность его надёжно прочитать останавливает run без удаления данных.
+Поиск владельцев backup и создание положительного backup-control не требуются.
+Общий сервер никогда не перезапускается ради одного слота. Широкая очистка
+UserStorage/SessionBackup запрещена. Harness автоматически очищает своё и доказанно свои остатки на новом стенде
+после обязательных проверок. Старые стенды/инциденты и созданное другим
+harness требуют решения владельца; до успешного N=2 их не трогать.
+Ограничение временными файлами текущего хода относится к работе исполнителя.
+
+## 6. Процессы и секреты
+
+Сохраняются subreaper и проверка pid+starttime непосредственно перед сигналом.
+Полностью прочитанная цепочка родителей, не ведущая в свой launcher, означает
+чужой процесс: его нельзя трогать или карантинить. Нечитаемая цепочка — отказ,
+а не предположение о принадлежности. Не развиваются описи процессов и их
+ресурсная телеметрия; владение собственными дочерними процессами остаётся
+обязательным. Исход определяет supervisor cleanup; inventories/census только
+диагностические, их отказ не меняет исход. Writer owner unavailable при
+подтверждённом дереве и пустом unknown не проваливает попытку: .writer снимает
+releaseStaleWriter. Нельзя обходить VPN для запуска судьи.
+
+Все секреты, включая пароли пользователей и авторизацию модели/судьи, остаются
+вне окружения агента и судьи, результатов и диагностики. Runtime использует
+защищённый auth и подготовленные подключения без передачи секретов через env.
+Закрытые auth-файлы не монтируются агенту как произвольный файловый доступ.
+Профили, workspace и архивы слотов не пересекаются.
+
+В `~/git/codex-vpn-lockdown/bin/codex` требуется отдельный маленький коммит:
+сохранить переданный CODEX_HOME только внутри `~/.local/state/loginom-evals/`
+и только при том же lockdown-конфиге. Остальные ограничения launcher сохраняются;
+чужие незакоммиченные изменения этого репозитория не включаются в коммит.
+Home судьи — `/home/kiselev/.local/state/loginom-evals/parallel/judge-codex`.
+Разрешено снять его бронь команды585940be-5c1b-4bff-a7c6-00459a4f7fa3,
+сохранив A00yuH; проверить lockdown-конфиг и login status через исправленный
+launcher без model calls. Если вход отсутствует/недействителен — запрос входа владельцу.
+Именованный systemd-юнит wrapper-а с валидируемыми именем/timeout — граница
+владения. Harness не сигналит root-процессы, ждёт wrapper с таймаутом и после
+выхода проверяет завершение юнита; sudo/root ancestry не является ошибкой владения.
+
+## 7. Ресурсы и приёмка
+
+Обязательны заранее записанный бюджет, CPU/RAM хоста и контейнеров, диск,
+OOM, лицензия и ошибки провайдера. Процессная телеметрия — только диагностика;
+её неполнота не является самостоятельным отказом ресурсной приёмки.
+Run запускает/останавливает script/sample-parallel-resources.ts с чистым env
+для N=1/N=2; collector завершается в finally. При отсутствии обязательных
+замеров PASS не выставляется. До N=1 проверить MemAvailable против бюджета:
+недостаток памяти — остановка и сообщение владельцу.
+
+Сначала N=1 на закреплённых задачах, CLI, моделях, rubric и timeout. Из замера
+предлагаются числовые пороги и запас для N=2; владелец утверждает их до N=2.
+До утверждения нельзя выдавать предложенные значения за допуск. Бюджет N=2
+с утверждением записывается до запуска, не подбирается под полученный результат.
+Отказ лицензии останавливает run; OOM, ENOSPC и rate/quota ошибки провайдера
+исключают успешную инфраструктурную приёмку, даже если повторный запрос прошёл.
+
+Четыре обязательных live A/B сценария: A не видит файлов B и наоборот; закрытие
+A не затрагивает B; удаление A происходит только после закрытия его сессий;
+при неизвестном владении файлы не удаляются. Остальные live-тесты только по флагу.
+Тесты unit по TDD запускаются из `evals/`, typecheck — `bun typecheck` оттуда же.
+
+## 8. Порядок и точки решения
+
+План после независимого ревью и перечень удержанного утверждены с поправками;
+повторное согласование не требуется. Затем реализуется весь путь
+подготовка → два агента → судья → очистка → сводка с открытием slots admission.
+После N=1 требуется отдельное утверждение порогов. После успешного N=2 одним
+проходом удаляются неиспользуемые механизмы и их тесты, только после разрешения
+на конкретные удаления. Новый код — TDD на unit-уровне; логические изменения
+сохраняются отдельными conventional commits.
+
+Заморожены развитие эпох, user-lock, описей и телеметрии процессов, FD/kernel
+квитанций и архивов серверного хранилища. Не добавляются новые протоколы,
+описи или разделы контракта. Хроника ведётся в архиве, checkpoint ≤20 строк.
+Блокеры решаются самостоятельно; вопрос владельцу нужен только при действительной
+необходимости по контракту п.33. Обязательные гарантии и утверждение бюджета N=2 сохраняются.
+На шаге7 правила сводятся к контракту; здесь остаются короткие ссылки.
+
+
+## 2026-10-19: приёмка N2 и заключительное удаление
+
+N1 DE1Srz завершён с exit0 и тремя score100. N2 J5IglH завершён с exit0:
+три cleanup confirmed, оба слота closed, leftovers[], четыре брони released,
+resources/limits PASS, 583 samples/0miss, перекрытие агентов227208ms.
+Оценки N2: calc0/no_artifact, filter100, group100. Ошибка экспорта — результат
+качества, не повод изменять техническую приёмку или повторять модельный прогон.
+Pins и неизменяемые исходные evidence перечислены в текущем плане.
+
+Удалены неиспользуемые slot recovery/user-lock, inventory/accounting/receipt
+цепочки, архив серверного хранилища и исследовательские runtime/fixtures/tests.
+Сохраняются текущие supervisor, server/profile/home fencing, sessions/Pool/backup,
+прямой FD/maps guard, ресурсный budget/timeline и VPN unit. Generic resource CAS
+recovery оставлен для вызывающего его pair provisioning.
+
+Диагностика двух отказов первого полного unit (911pass/18skip/2fail):
+- Writer-тест устарел после намеренного84e0ce7f6f: контракт п.24 разрешает
+  confirmed cleanup при Writer owner unavailable и пустом unknown.503155437e
+  сохраняет exact refusal/inode и проверяет confirmed/error=null/capture/unknown[].
+  Все11 writer-тестов прошли.
+- SIGKILL archive: код и тест неизменны с1aad821bcb4. Пять отдельных повторов
+  с44 объектами прошли за4.26–8.13s при лимите10s; общая проверка превысила лимит.
+  Вероятная чувствительность к durable I/O, конкретная стадия задержки неизвестна.
+  В8ac5f21098 убраны40 лишних chunk-файлов: четыре DB/WAL/SHM/inputs сохраняют
+  SIGSTOP/SIGKILL, частичный перенос и проверку восстановления всех данных.
+  Прежний10s лимит сохранён; пять повторов прошли за1.26–2.16s, в полном наборе1.11s.
+
+Связанные проверки114/614assert, typecheck и четыре реальные A/B прошли;
+независимое заключительное ревью Approved, обязательных замечаний нет.
+Повтор полного unit с ошибочно перенесённым из native-команды umask077 дал
+908pass/18skip/2fail: отрицательные проверки public slots/auth создали600 вместо644.
+Это ошибка команды запуска, исходники не менялись. Финальный повтор с umask022:
+910pass/18skip/0fail,4564assert/76files,964.58s. Code cleanup9ef761ced7 сохранён
+после успешных проверок; план выполнен.
+Логи и исходная диагностика — private
+acceptance-20261016/evidence/step7-verification-20261019/.
+Последний native evidence: live-ab-fac76e9c-394f-4718-b9ad-8aa8bd7d3cd5.
+Его собственные browser caches удалены после confirmed proof и проверки PID births;
+журналы сохранены. Старые12 пар, инциденты и A00yuH не изменялись.
