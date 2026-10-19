@@ -1641,11 +1641,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     catch(error){return String(error?.message??error).slice(0,1000);}
     (operation.browserRecoveryLogged??=new Set()).add(offer.basis.trigger);
   };
-  const readReceipt = async (operation,reference=operation.lastReceipt) => {
+  const readReceipt = async (operation,reference=operation.lastReceipt,timeout=10000) => {
     if (!reference) return { state: 'missing' };
     const code = `async (page) => (${browserReceipt.toString()})(page, ${JSON.stringify({ receipt_namespace: receiptNamespace,
       receipt_id: reference.id, receipt_signature: reference.signature, receipt_read: true, operation_id: operation.id })})`;
-    const value = await execute(code, { timeout: 10000 });
+    const value = await execute(code, { timeout });
     assertActionOutcome(value);
     const state = value.output;
     if (state?.state === 'completed') {
@@ -2135,6 +2135,53 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return result;
     },
     browserRecoveryBasis:id=>recoveryBasis(operations.get(id)),
+    async browserRecoveryHandoff(id,{signal,pollMs=250}={}){
+      signal?.throwIfAborted();
+      const operation=operations.get(id);
+      const finish=async result=>{
+        if(browserRecovery)try{await onRecord({phase:'browser_recovery_handoff',operation_id:id,result});}catch{}
+        if(result.verified&&unrelated()){
+          const refused={verified:false,reason:'UNRELATED_UNSETTLED_WORK'};
+          if(browserRecovery)try{await onRecord({phase:'browser_recovery_handoff',operation_id:id,result:refused});}catch{}
+          return refused;
+        }
+        return result;
+      };
+      const unrelated=()=>pending&&pending!==operation||running&&pending!==operation
+        ||delivery.unsettled||sourceReads.busy||sourceReads.unsettled
+        ||nodeJobs.active&&nodeJobs.active.operation_id!==id||nodeJobs.unsettled&&!nodeJobs.has(id)
+        ||[...operations.keys()].some(other=>{
+          if(other===id||!nodeJobs.has(other))return false;
+          const job=nodeJobs.status(other);
+          return job.state==='running'||job.outcome?.status==='AMBIGUOUS'
+            ||job.outcome?.effect_possible===true&&job.outcome?.cleanup_complete!==true;
+        });
+      if(unrelated())return finish({verified:false,reason:'UNRELATED_UNSETTLED_WORK'});
+      if(!operation)return finish({verified:false,reason:'RECEIPT_MISSING'});
+      const started=now(),until=Math.min(operation.deadline??started,started+60000);
+      while((running||nodeJobs.busy||sourceReads.busy||delivery.busy)&&now()<until){
+        await new Promise(resolve=>setTimeout(resolve,Math.min(pollMs,until-now())));
+        signal?.throwIfAborted();
+      }
+      if(unrelated())return finish({verified:false,reason:'UNRELATED_UNSETTLED_WORK'});
+      if(running||nodeJobs.busy||sourceReads.busy||delivery.busy)return finish({verified:false,reason:'EXECUTOR_STILL_RUNNING'});
+      if(!operation.lastReceipt)return finish({verified:false,reason:'RECEIPT_MISSING'});
+      while(true){
+        const state=await readReceipt(operation,operation.lastReceipt,Math.max(1,Math.min(10000,until-now())))
+          .catch(error=>({state:String(error?.message??error).includes('different identity')
+          ?'identity_mismatch':'unsettled'}));
+        signal?.throwIfAborted();
+        if(state.state==='identity_mismatch')return finish({verified:false,reason:'RECEIPT_IDENTITY_MISMATCH'});
+        if(state.state==='missing')return finish({verified:false,reason:'RECEIPT_MISSING'});
+        if(state.state==='completed'&&state.receipt?.cleanup_complete===true){
+          if(unrelated())return finish({verified:false,reason:'UNRELATED_UNSETTLED_WORK'});
+          return finish({verified:true,receipt_id:operation.lastReceipt.id,waited_ms:now()-started});
+        }
+        if(state.state!=='running'||now()>=until)return finish({verified:false,reason:'RECEIPT_UNSETTLED'});
+        await new Promise(resolve=>setTimeout(resolve,Math.min(pollMs,until-now())));
+        signal?.throwIfAborted();
+      }
+    },
     waitNodeApply:async(id,options)=>{
       const result=await (sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options));
       const operation=operations.get(id);

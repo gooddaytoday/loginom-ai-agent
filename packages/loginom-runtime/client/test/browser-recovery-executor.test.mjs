@@ -9,6 +9,129 @@ import {compactNodeResult} from '../lib/user-results.mjs';
 
 const full={remaining:()=>({calls_remaining:30,ms_remaining:600000})};
 const refuse=()=>{throw new NodeReleaseBlocked('A Loginom wizard of another node is open','Ask the user to close it with Cancel.');};
+const saveWithReceipt=({receipt,now=Date.now,deadlineAt,onRecord}={})=>{
+  const key='package.save_checkpoint',revision=actions.get(key).revision;
+  const outcome={status:'AMBIGUOUS',action_key:key,action_revision:revision,operation_id:'save',
+    phase:'applied',effect_possible:true,cleanup_complete:true,error:null,trace:[],output:{}};
+  const engine=runtime(new Page(),{now,onRecord,browserRecovery:full,getStorageBinding:()=>({document_id:'doc'}),execute:async code=>{
+    if(code.includes('"receipt_read":true'))return {status:'SUCCEEDED',action_key:'operation.inspect',
+      action_revision:'1',operation_id:'save',phase:'observed',effect_possible:false,error:null,trace:[],
+      output:typeof receipt==='function'?receipt(outcome):receipt};
+    if(code.includes('"receipt_namespace":'))return outcome;
+    return {...outcome,status:'NOT_APPLIED',phase:'prepared',effect_possible:false,
+      checkpoint:{document_id:'doc',workflow_ref:{workflow_id:'wf'}}};
+  }});
+  return engine.run(key,{path:'/user/a.lgp',conflict_policy:'replace'},
+    {operationId:'save',...(deadlineAt===undefined?{}:{deadlineAt})}).then(()=>engine);
+};
+
+test('handoff waits for a running browser call without aborting it',async()=>{
+  const key='package.save_checkpoint',revision=actions.get(key).revision;
+  let release,entered;
+  const controller=new AbortController();
+  const dispatched=new Promise(resolve=>{entered=resolve;});
+  const completed={status:'AMBIGUOUS',action_key:key,action_revision:revision,operation_id:'save',
+    phase:'applied',effect_possible:true,cleanup_complete:true,error:null,trace:[],output:{}};
+  const engine=runtime(new Page(),{now:Date.now,getStorageBinding:()=>({document_id:'doc'}),
+    execute:async code=>{
+      if(code.includes('"receipt_read":true'))return {status:'SUCCEEDED',action_key:'operation.inspect',
+        action_revision:'1',operation_id:'save',phase:'observed',effect_possible:false,error:null,trace:[],
+        output:{state:'completed',receipt:completed}};
+      if(code.includes('"receipt_namespace":')){entered();await new Promise(resolve=>{release=resolve;});return completed;}
+      return {...completed,status:'NOT_APPLIED',phase:'prepared',effect_possible:false,
+        checkpoint:{document_id:'doc',workflow_ref:{workflow_id:'wf'}}};
+    }});
+  const running=engine.run(key,{path:'/user/a.lgp',conflict_policy:'replace'},
+    {operationId:'save',signal:controller.signal});
+  await dispatched;
+  const handoff=engine.browserRecoveryHandoff('save',{pollMs:10});
+  assert.equal(await Promise.race([handoff.then(()=>true),new Promise(resolve=>setTimeout(()=>resolve(false),30))]),false);
+  release();await running;
+  const proof=await handoff;
+  assert.equal(proof.verified,true);
+  assert.equal(controller.signal.aborted,false);
+});
+
+test('handoff waits for a running receipt to confirm browser cleanup',async()=>{
+  let reads=0;
+  const engine=await saveWithReceipt({receipt:outcome=>++reads===1?{state:'running'}:
+    {state:'completed',receipt:outcome},deadlineAt:Date.now()+100});
+  const proof=await engine.browserRecoveryHandoff('save',{pollMs:10});
+  assert.equal(proof.verified,true);
+  assert.equal(reads,2);
+});
+
+test('handoff rejects a browser receipt with a different identity',async()=>{
+  const engine=await saveWithReceipt({receipt:{state:'identity_mismatch'}});
+  assert.deepEqual(await engine.browserRecoveryHandoff('save',{pollMs:10}),
+    {verified:false,reason:'RECEIPT_IDENTITY_MISMATCH'});
+});
+
+test('handoff of a released node does not cross a newer pending node',async()=>{
+  const f=fixture({release:proved(),browserRecovery:full});
+  await stop(f,'finish');
+  await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-1'});
+  await stop(f,'finish',{operationId:'again',target:{kind:'existing',type:'imports.text',
+    ref:{document_id:'doc',workflow_id:'wf',node_id:'new'}}});
+  const before=f.runtime.nodeApplyStatus('again');
+  assert.deepEqual(await f.runtime.browserRecoveryHandoff('apply',{pollMs:10}),
+    {verified:false,reason:'UNRELATED_UNSETTLED_WORK'});
+  assert.deepEqual(f.runtime.nodeApplyStatus('again'),before);
+  assert.equal(f.runtime.hasUnsettledWork(),true);
+});
+
+test('handoff records its verified result',async()=>{
+  const events=[];
+  const engine=await saveWithReceipt({receipt:outcome=>({state:'completed',receipt:outcome}),
+    onRecord:async event=>events.push(event)});
+  const proof=await engine.browserRecoveryHandoff('save');
+  assert.equal(proof.verified,true);
+  assert.deepEqual(events.find(event=>event.phase==='browser_recovery_handoff')?.result,proof);
+});
+
+test('handoff bounds receipt polling by the original deadline and one minute',async()=>{
+  let clock=0,reads=0;
+  const engine=await saveWithReceipt({now:()=>clock,deadlineAt:600000,receipt:()=>{
+    reads++;clock+=20000;return {state:'running'};
+  }});
+  assert.deepEqual(await engine.browserRecoveryHandoff('save',{pollMs:1}),
+    {verified:false,reason:'RECEIPT_UNSETTLED'});
+  assert.equal(reads,3);
+  assert.equal(clock,60000);
+});
+
+test('handoff refuses a missing receipt or incomplete browser cleanup',async()=>{
+  const f=fixture({browserRecovery:full});await stop(f,'finish');
+  assert.deepEqual(await f.runtime.browserRecoveryHandoff('apply'),
+    {verified:false,reason:'RECEIPT_MISSING'});
+  const engine=await saveWithReceipt({receipt:outcome=>({state:'completed',receipt:{...outcome,cleanup_complete:false}})});
+  assert.deepEqual(await engine.browserRecoveryHandoff('save'),
+    {verified:false,reason:'RECEIPT_UNSETTLED'});
+});
+
+test('handoff waits for a running node even when it has no browser receipt yet',async()=>{
+  const f=fixture({browserRecovery:full});
+  let entered,release;
+  const started=new Promise(resolve=>{entered=resolve;});
+  f.drivers.finish=async()=>{entered();await new Promise(resolve=>{release=resolve;});
+    return {verified:true,cleanup_complete:true,effect_possible:true,execution_id:'exec',execution_started:true};};
+  f.runtime.startNodeApply(request());await started;
+  const handoff=f.runtime.browserRecoveryHandoff('apply',{pollMs:10});
+  assert.equal(await Promise.race([handoff.then(()=>true),new Promise(resolve=>setTimeout(()=>resolve(false),30))]),false);
+  release();await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+  assert.deepEqual(await handoff,{verified:false,reason:'RECEIPT_MISSING'});
+});
+
+test('cancelling the handoff wait does not cancel the browser operation',async()=>{
+  const controller=new AbortController();
+  const engine=await saveWithReceipt({deadlineAt:Date.now()+100,receipt:()=>{
+    setTimeout(()=>controller.abort(Error('Handoff cancelled')),5);
+    return {state:'running'};
+  }});
+  await assert.rejects(engine.browserRecoveryHandoff('save',{signal:controller.signal,pollMs:10}),
+    /Handoff cancelled/);
+  assert.equal(engine.hasUnsettledWork(),true);
+});
 
 test('refused release offers browser recovery instead of a user action when enabled',async()=>{
   const f=fixture({release:refuse,browserRecovery:full});await stop(f,'finish');
