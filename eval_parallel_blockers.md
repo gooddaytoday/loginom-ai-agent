@@ -40,22 +40,9 @@ Schema-only drift исправлен в5c93dafea9 (18/65 PASS/TC/Review), пот
 proxy route восстановлен вf88ce89f9c (CLI8/28+sandbox1/2 PASS/TC/Review).
 Штатный startup852/071 подтвердил cleanup/release. Модельный N=1/N=2 не завершён.
 
-Текущий блокер: command `4fb6d039-4d27-412a-82c3-4fc091eb4739`, run
-`20261019-070313-f88ce89f9c-dirty-Dt4nwP` до dispatch получил ENOENT ancestry
-`/proc/2446906/stat` при providers status. PID не входит в два own management
-processes; original failed proof: capture=true/unknown[]/два final owned_remaining0.
-Admin dispose/process cleanup confirmed. Failed receipt не переписывался.
-Прямые проверки под прежними locks:2 management+13 admin PID/starttime отсутствуют
-в двух пробах, профиль idle, сессий A/серверных файлов/FD нет, SessionBackup пуст,
-identity/Pool подтверждены. Собственные `data/log`, `data/loginom-ai-agent.db`
-сохранены в профиле и ожидают переноса в закрытый history; ничего не удалено,
-server/profile holds не сняты. Новое read-only admin соединение закрыто штатно.
-Evidence:
-`/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/n1-proc-race-quarantine-diagnostics-20261019.json`.
-Review Approved для минимального исправления: при ENOENT/ESRCH отдельно подтвердить,
-что исходный PID уже отсутствует, тогда false без ownership/signals. Живой исходный
-PID при исчезнувшем ancestor и EACCES/EPERM по-прежнему дают отказ. Новых inventories/
-протоколов нет. Владелец разрешил сохранить собственные log/DB в archive и снять
-только точные server/profile holds4fb существующим CAS. Следом TDD fix и повтор N=1.
-Старые стенды/инциденты не трогать. Последующие технические блокеры решать
-самостоятельно с сохранением гарантий; бюджет N=2 отдельно утверждает владелец.
+Карантин4fb завершён по разрешению владельца: собственные log/DB/точный marker
+сохранены в закрытом history; original failed receipt неизменен, CAS holds released,
+данные не удалялись. Ancestry gone-PID fix прошёл9/48 targeted PASS/TC/Review.
+Evidence: `evidence/n1-proc-race-owner-release-20261019.json` в acceptance state,
+подробности — в едином архиве. Технические блокеры решать самостоятельно;
+утверждение бюджета N=2 сохраняется. Следующий шаг — повтор N=1.

@@ -8083,3 +8083,18 @@ CLI8/28+Linux sandbox1/2 unit PASS, typecheck/diff PASS, независимое 
 Модельный доступ ещё проверяет следующий N=1. Старые incidents не затрагивались.
 Private evidence: `profile-schema-*-20261019.log`, `proxy-routing-*-20261019.log`,
 `reconciled-schema-quarantine-20261019.json`; результаты run и архивы сохранены.
+
+### Урегулирование4fb и исчезнувший ancestry candidate
+
+Владелец2026-10-19 разрешил archive/CAS4fb и самостоятельное решение последующих
+технических блокеров при сохранении обязательных гарантий/утверждения бюджета N=2.
+Повторные проверки:2 management+13 admin identities gone (две пробы), профиль idle,
+сессий/серверных файлов/FD нет, SessionBackup пуст, identity/Pool подтверждены.
+Собственные data/log, DB и точный stale registration marker сохранены в
+`a/history/owner-recheck-4fb6d039-W6OLKv` нового acceptance state. Оригинальный
+failed receipt SHA256 неизменен, данные не удалены, только server/profile holds4fb
+освобождены прежним CAS; proof `evidence/n1-proc-race-owner-release-20261019.json`.
+Public hasOwnedAncestry test реально завершённого child: RED ENOENT → GREEN.
+При ENOENT/ESRCH отдельно проверяется исходный PID; только его отсутствие даёт
+false, живой кандидат/ошибка доступа сохраняют отказ.9/48 targeted PASS51.84s,
+typecheck/diff PASS, независимое ревью Approved. Proc-denial cases не запускались.
