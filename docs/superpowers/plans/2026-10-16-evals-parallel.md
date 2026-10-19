@@ -197,10 +197,14 @@
   PASS332.99s, typecheck/diff PASS. Повторное независимое ревью четырёх исправлений
   Approved; fixture-проверки не доказывают native N=1/N=2.
 
-Точечный блокер перед продолжением: CLI не выводит существующий session.status/retry.
-Private diff подготовлен (путь в blockers), но не применён/не проверен: он касается
-packages/agent и его process-теста, что выходит за evals/AGENTS.md:49.
-Владельцу отправлен запрос на исключение границы; до ответа реализация остановлена.
+Владелец2026-10-19 разрешил точечную правку packages/agent вне evals/:
+- [ ] RED→GREEN process-тест: локальный HTTP429→200 сохраняет успешный exit,
+  но JSON содержит существующий session.status/retry; зеркалировать status через
+  прежний emit, сохранить idle-break, адаптировать прежнее JSON-ожидание.
+- [ ] Проверить затронутый process suite и typecheck, сохранить отдельным коммитом.
+- [ ] Собрать отдельный private installed CLI, закрепить SHA и квалифицировать
+  retry output до A/B и N=1. Пользовательскую установку/старый candidate не менять.
+Новый Protocol/HTTP, сырой transport trace и новая система телеметрии не нужны.
 
 ## 6. Четыре live A/B сценария, затем N=1 → утверждение → N=2
 
@@ -279,4 +283,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20. Acceptance: prepare92c5ac16…/verify08bb7493… ready=true/0models; startup62/225,runtime134/751 PASS+typecheck. Ждём исключения scope для CLI retry diff; затем4 A/B,N=1,пороги,N=2.
+20. Acceptance: prepare92c5ac16…/verify08bb7493… ready=true/0models; startup62/225,runtime134/751 PASS+typecheck.19.10 разрешена CLI retry правка; далее TDD,candidate,4 A/B,N=1,пороги,N=2.
