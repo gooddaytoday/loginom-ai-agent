@@ -185,7 +185,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   &&(expected===undefined||(Array.isArray(expected)?expected:[expected]).includes(s.file_storage.directory))
   &&(!previous||s.file_storage.directory!==previous.file_storage.directory||JSON.stringify(s.workflow_ref)!==JSON.stringify(previous.workflow_ref)));
  const row=name=>findNativeStorageRow({name,read,roots,ready,act,guard});
- const returnToWorkflow=async(refreshTabs=false)=>{
+ const returnToWorkflow=async(refreshTabs=false,beforeReturn=null)=>{
   readStep='return_node_context';
   const current=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
   if(current.verified&&current.surface==='graph'&&current.locked===false)return {continuation:null,node_context:current};
@@ -199,9 +199,12 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
    if(!refreshTabs||error.code!=='UI_ROOT_STALE')throw error;
    // Only the pre-gesture tab read may be repeated, with a freshly issued root.
    // Recovery and failures after the return gesture never enter this refresh.
-   const before=r;
+   // Root discovery omits active_tab_ref and package_identity. Preserve the
+   // last complete Files observation across the read-only root refresh.
+   const before=beforeReturn;
+   need(before&&quiet(before),'Export return observation baseline unavailable');
    r=await roots();
-   need(quiet(r)&&['workflow_ref','active_tab_ref','package_identity'].every(k=>JSON.stringify(r[k])===JSON.stringify(before[k])),
+   need(quiet(r)&&JSON.stringify(r.workflow_ref)===JSON.stringify(before.workflow_ref),
     'Export return workspace changed during observation refresh');
    const fresh=one(r.ui.elements.filter(e=>e.tid==='MF;cntMain;cntWorkspace;Workspace;t.br'));
    r=await read({root_ref:fresh.ref});
@@ -261,7 +264,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   const artifact=await lease.verify(downloaded.output.suggested_name,bytes);
   const result={artifact_id:artifact.artifact_id,destination,bytes:artifact.bytes,sha256:artifact.sha256,execution_id:ctx.execution.execution_id,verification_id:id,freshness_basis:check.existed?'explicit_replace_and_completed_native_execution':'native_absence_check_and_completed_execution'};
   await record('export_file_bytes_verified',{binding:fileBinding,result});
-  const restored=await returnToWorkflow(true);
+  const restored=await returnToWorkflow(true,s);
   readStep='retain_file';await lease.retain();retained=true;
   readStep='record_completion';await record('export_file_read_completed',{result,workflow_return_verified:true});options.rememberStorageContinuation?.(restored.continuation);return result;
  }catch(error){
