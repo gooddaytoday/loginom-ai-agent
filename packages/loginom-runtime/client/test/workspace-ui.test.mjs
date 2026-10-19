@@ -1733,6 +1733,34 @@ test('completed generic click rediscovers regions when its observed root closes'
   }
 });
 
+test('prepared graph control ranking bounds repeated DOM reads and refreshes uniqueness per observation',async()=>{
+  const page=new Page({clock:fixtureClock().Date}),prefix='MF;TF-1;Graph;';
+  const bodies=[];
+  for(let i=0;i<8;i++){
+    const label=i===0?'Партии; batches.csv':'Узел_'+i,tid=prefix+label;
+    bodies.push(page.add('g',tid));
+    page.add('span',tid+';Label;Label',label);
+    page.add('g',tid+';Input_Data-0');page.add('g',tid+';Output_Data-0');
+  }
+  const reads=new Map();
+  for(const element of page.document.all()){
+    const get=element.getAttribute.bind(element);
+    element.getAttribute=name=>{if(name==='data-tid')reads.set(element,(reads.get(element)??0)+1);return get(name);};
+  }
+  // Isolate the synchronous DOM reader; native context admission has its own suite.
+  const observe=()=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {mode:'observe',expected_build:build,expected_origin:origin,
+      prepared_node_context:{node:{node_id:'node-0'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}},
+    async()=>({verified:true,surface:'graph'}));
+  const first=await observe();assert.equal(first.status,'SUCCEEDED');
+  assert.equal(first.output.ui.elements.filter(e=>e.graph_node?.part==='body').length,8);
+  assert.ok(Math.max(...reads.values())<200,'ranking must not rescan every graph element for every control');
+  const tid=bodies[0].attrs['data-tid'];
+  page.add('g',tid,'',undefined,bodies[0].parentElement);
+  const second=await observe();assert.equal(second.status,'SUCCEEDED');
+  assert.equal(second.output.ui.elements.some(e=>e.tid===tid&&e.graph_node),false);
+});
+
 test('graph paging retains identified node controls without anonymous SVG vertices',async()=>{
   const page=new Page();
   for(let i=0;i<70;i++)page.add('g','MF;TF-1;Graph;Vertex');

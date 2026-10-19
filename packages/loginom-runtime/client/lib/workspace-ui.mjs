@@ -2595,6 +2595,10 @@ function readRenderedInputMapping(observation) {
       // their pinned test identifiers end with tlb;yes / tlb;no, not btn*.
       || ((getTid(element) ?? '').startsWith('msgbox') && /;tlb;(?:yes|no|ok|cancel)$/.test(getTid(element)) && !!dialogRef(element));
     const graphElements = graphPrefix ? all.filter(element=>ownedGraph(element) && visible(element) && !sensitive(element)) : [];
+    // Uniqueness is fixed within this synchronous read. Control ranking asks
+    // for the same node repeatedly; do not rescan the graph for each lookup.
+    const graphElementCounts=new Map();
+    for(const element of graphElements){const tid=getTid(element);graphElementCounts.set(tid,(graphElementCounts.get(tid)??0)+1);}
     const labels = [...new Set(graphElements.filter(element => /;Label;Label$/.test(getTid(element)) && visible(element))
       .map(element => getTid(element).slice(graphPrefix.length).replace(/;Label;Label$/, '')).filter(label => label && label !== 'Переменные_сценария'))].sort();
     const graphLabels=new Set(labels);
@@ -2607,7 +2611,7 @@ function readRenderedInputMapping(observation) {
       const matches=[...graphLabels].filter(label=>['',';Label;Label',';Setting',';Visualizers'].some(suffix=>body===label+suffix));
       if(matches.length!==1)return null;
       const label=matches[0],suffix=body.slice(label.length);
-      if(graphElements.filter(e=>getTid(e)===graphPrefix+label).length!==1)return null;
+      if(graphElementCounts.get(graphPrefix+label)!==1)return null;
       const part=suffix===''?'body':suffix===';Label;Label'?'label':suffix===';Setting'?'settings':suffix===';Visualizers'?'visualizers':null;
       return part?{node_label:label,part,...(part==='label'?{label_text:textOf(element,false,'')}: {})}:null;
     };
@@ -2621,7 +2625,7 @@ function readRenderedInputMapping(observation) {
       charge();const hit=document.elementFromPoint(x,y);
       return hit&&(hit===element||element.contains(hit))?-27:30;
     });
-    const controlPriority = element => {
+    const controlPriority = memoRead(element => {
       const tid=getTid(element)??'',base=workflow?.prefix+';WizrdMCF;';
       const filterRank=filterPriority(element);if(filterRank!==null)return filterRank;
       if(/^mn;mni[^;]+$/.test(tid) || element.getAttribute('role')==='menuitem')return -30;
@@ -2644,7 +2648,7 @@ function readRenderedInputMapping(observation) {
       const graphNode=graphNodeOf(element);
       if(graphNode)return graphNode.part==='settings'?1.5:graphNode.part==='body'?1.6:1.7;
       return priority[scopeOf(element)];
-    };
+    });
     scanStage='controls';
     const controls = candidates.filter(interesting)
       // Loginom draws anonymous canvas geometry with repeated Graph;Vertex
