@@ -30,7 +30,12 @@ export async function preflightTabularSource(options,ctx,config,{required,resolv
  if(admission)await channel.openJavascriptPreview(port);
  if(!admission){
   const portControl=s=>s.ui.elements.filter(e=>e.tid===port.tid&&e.allowed_actions.includes('click'));
-  need(portControl(s).length===1,'Upstream port is not interactable');
+  if(portControl(s).length!==1){
+   // Only the owned source observation ran: no preview, target or link gesture
+   // was dispatched. Do not strand this local refusal as an unknown mutation.
+   const error=Error('Upstream port is not interactable. No node or link was created; verify the source output and use a NEW operation_id.');
+   error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;
+  }
   await channel.perform({condition:'select upstream output for schema preview',initialObservation:s,ready:s=>graph(s)&&portControl(s).length===1,identity:()=>({node:input.source,port_guid:port.port_guid}),resolve:s=>({verb:'click',ref:portControl(s)[0].ref})});
   s=await channel.observe({condition:'selected upstream output preview command',ready:s=>graph(s)&&s.ui.elements.some(e=>e.tid===port.tid&&e.allowed_actions.includes('press'))});
   await channel.perform({condition:'open temporary upstream schema preview',initialObservation:s,ready:graph,identity:()=>({node:input.source,port_guid:port.port_guid}),resolve:s=>({verb:'press',ref:s.ui.elements.find(e=>e.tid===port.tid).ref,key:'F3'})});
