@@ -296,6 +296,15 @@ try {
   await writeFile(join(args.output,'actual-readback.json'),checkpoint+'\n');
   }
   }
+  // REST-dependent schemas are restored by cold execution. Inspect the saved
+  // export input only after its source has executed and its output was read.
+  if(exportInput){
+   const [savedExport]=await observeExportDestinations({load,channelFor,execute,includeInputFields:true,
+    graph:{...graph,nodes:graph.nodes.filter(n=>n.ref.node_id===exportInput.export_node_id)}});
+   if(savedExport.node_id!==exportInput.export_node_id)throw Error('COLD_EXPORT_INPUT_MAPPING_CHANGED');
+   exportInput.input_fields=savedExport.input_fields;
+   await record({phase:'cold_export_input_mapping',...savedExport,settings_applied:false});
+  }
   const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
 
