@@ -29,4 +29,23 @@ typecheck PASS; HTTP429→200:2 запроса, busy/retry/idle, exit0/cleanup c
 shared status qualified, refreshRequired=false. Evidence:
 `/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/cli-retry-20261019/`.
 Наблюдения подключены; четыре native A/B прошли. Первый admission-отказ (без модели)
-разобран startup, бронь освобождена. Далее модельный N=1 по плану.
+разобран startup, бронь освобождена.
+
+Текущий блокер N=1: команда `c21be2f8-1488-453a-a78b-a4aa5ac97ca3` удерживает
+server/profile A после ошибочного preflight вызова VPN wrapper обычным supervisor.
+Потерянный флаг systemd исправлен в cd59ec8717 (RED→GREEN25/51, typecheck PASS).
+Version-only unit `run-u17489.service` найден по точному home/команде в systemd
+journal и подтверждён завершённым; собственная judge reservation уже освобождена
+через прежний CAS с сохранённым доказательством. Admin `admin-5w8Hht` имеет native
+dispose/transportDisconnect confirmed, но process cleanup failed из-за чужого
+setuid PID2257892, не входившего в его13 owned процессов. Исходный receipt сохранён.
+Повторная прямая проверка:13 процессов отсутствуют по PID+starttime (две пробы),
+сессий A нет, профиль idle, root пуст, FD/maps закрыты, SessionBackup пуст,
+identity/Pool подтверждены; новый read-only admin завершён штатно. Ничего не удалено,
+server/profile брони не сняты. Evidence:
+`/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/n1-quarantine-diagnostics.json`.
+Независимое ревью подтвердило отсутствие штатного settlement для такого failed proof.
+По контракту п.23/24/33 требуется разовое решение владельца: освободить только
+точные server/profile holds этой команды существующим CAS, сохранив исходные
+failed records и отдельное подтверждение прямых проверок. До ответа N=1 не продолжать.
+Задачи ещё не dispatch-ились; реальных model calls и ресурсного замера N=1 нет.
