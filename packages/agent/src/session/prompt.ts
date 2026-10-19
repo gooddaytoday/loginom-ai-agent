@@ -10,6 +10,7 @@ import { SessionID, MessageID, PartID } from "./schema"
 import { MessageV2 } from "./message-v2"
 import { SessionRevert } from "./revert"
 import { TaskScope } from "./task-scope"
+import { BrowserRecovery } from "./browser-recovery"
 import { Session } from "./session"
 import { Agent } from "../agent/agent"
 import { Provider } from "@/provider/provider"
@@ -1343,6 +1344,44 @@ const layer = Layer.effect(
                 callID: orphan.callID,
               })
             }
+            const recovery = BrowserRecovery.active(history)
+            if (recovery && !recovery.reminded) {
+              // One reminder per attempt; the lease still holds the page for this step.
+              const reminder: SessionV1.User = {
+                id: MessageID.ascending(),
+                sessionID,
+                role: "user",
+                time: { created: Date.now() },
+                agent: lastUser.agent,
+                model: lastUser.model,
+              }
+              yield* sessions.updateMessage(reminder)
+              yield* sessions.updatePart({
+                id: PartID.ascending(),
+                messageID: reminder.id,
+                sessionID,
+                type: "text",
+                text: BrowserRecovery.reminder(recovery.operationID),
+                synthetic: true,
+                metadata: { browser_recovery_reminder: recovery.attempt },
+              } satisfies SessionV1.TextPart)
+              continue
+            }
+            // A second end of turn is no progress: stop the attempt instead of repeating the instruction.
+            if (recovery && loginom && currentTask)
+              yield* Effect.promise(() =>
+                loginom
+                  .call(
+                    "dock_browser_recovery",
+                    {
+                      action: "stop",
+                      operation_id: recovery.operationID,
+                      reason: "The agent ended its turn again without finishing browser recovery.",
+                    },
+                    currentTask.taskMessageID,
+                  )
+                  .catch(() => undefined),
+              )
             yield* Effect.logInfo("exiting loop", { "session.id": sessionID })
             break
           }
