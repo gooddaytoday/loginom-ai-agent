@@ -80,7 +80,7 @@ async function readRestOutputs(channel,read,ctx){
  return {verified:true,cleanup_complete:true,effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports,port_evidence:evidence};
 }
 export function createRestRequestNodeSupport(config){
- const implementation={type:'integration.rest_request',mode:'request',revision:'rest-request-get-v2',parameterSchema:restRequestParametersSchema,validate:validateRestRequestParameters,readback:restRequestReadback,
+ const implementation={type:'integration.rest_request',mode:'request',revision:'rest-request-get-v2',parameterSchema:restRequestParametersSchema,validate:validateRestRequestParameters,readback:restRequestReadback,keepExecutionConsoleOpen:true,
   configurationObservation:{condition:'owned REST wizard',ready:s=>s.wizard?.status==='observed'&&s.prepared_node_context?.surface==='wizard'},
   configureAllOutputs:async()=>({verified:true,cleanup_complete:true,effect_possible:false,not_applicable:true,native_output_definitions_preserved:true}),readOutputs:readRestOutputs};
  return {nodeApplyHandlers:createTabularTransformNodeSupport(config,implementation).nodeApplyHandlers,nodeApplyDriverFactory:options=>{

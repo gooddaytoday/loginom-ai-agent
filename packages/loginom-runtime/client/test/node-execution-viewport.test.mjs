@@ -23,8 +23,20 @@ async function execution({fault,offscreen=true,selectedInitially=false}={}) {
    if(a.ref==='body'){assert.equal(revealed,true);selected=true;}
    return {status:'SUCCEEDED'};}};
  const driver=createNodeExecutionProcedure(channel,node);await driver.prepare();calls.length=0;
- return {driver,calls,snapshot:state,get launchRequest(){return launchRequest}};
+ return {driver,channel,calls,snapshot:state,get launchRequest(){return launchRequest}};
 }
+
+test('a node hidden by the retained console is revealed before graph selection and launches once',async()=>{
+ const {selectPreparedGraphNode}=await import('../lib/node-graph-selection.mjs');
+ const f=await execution({offscreen:true});
+ await assert.rejects(selectPreparedGraphNode(f.channel,f.snapshot(),'select after console pin'),/no observed selection point/);
+ assert.equal(f.calls.some(call=>call.startsWith('execute_graph_node:')),false);
+ await f.channel.revealGraphNode();
+ await selectPreparedGraphNode(f.channel,f.snapshot(),'select revealed node after console pin');
+ await f.driver.launchGraph();
+ assert.equal(f.calls.filter(call=>call==='reveal').length,1);
+ assert.equal(f.calls.filter(call=>call.startsWith('execute_graph_node:')).length,1);
+});
 
 // ST4b n12: training completed, then two strictly pre-gesture epoch refusals
 // preceded a native graph-body redraw. Only graph_execution.node_ref changed.
