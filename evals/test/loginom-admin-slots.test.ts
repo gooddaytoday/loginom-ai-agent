@@ -8,6 +8,32 @@ test("native slot closure rejects names outside the exact slot before native acc
     expect(await closeSlotUserSession(input)).toEqual({ outcome: "not_applied", data: { code: "ADMIN_REQUEST_INVALID" } })
 })
 
+test("native slot closure waits for acknowledged session removal without closing a peer", async () => {
+  const rows = [{ Name: "eval-a:1", PendingDisconnect: true }, { Name: "eval-b:2", PendingDisconnect: true }]
+  let reads = 0, closes = 0
+  const manager = {
+    get Count() { return rows.length },
+    async SessionInfo(index: number) { return rows[index] },
+    async UpdateSessionInfos() {
+      if (++reads === 3) rows.shift()
+    },
+    async CloseSession(row: typeof rows[number]) {
+      expect(row.Name).toBe("eval-a:1")
+      closes++
+      return true
+    },
+  }
+  const session = { CurrentUser: { IsAdmin: true, Name: "admin" } }
+  const close: typeof closeSlotUserSession = runInNewContext(`(${closeSlotUserSession.toString()})`, {
+    setTimeout,
+    bg: { app: { Application: { FInstance: { FServerConnection: { ServerContainer: { Session: session } } } } },
+      ScopeGetObjectAsync: async () => ({ GetSessionsManager: async () => manager }) },
+  })
+  expect(await close({ username: "eval-a", name: "eval-a:1" })).toEqual({ outcome: "confirmed", data: { closed: true } })
+  expect(closes).toBe(1)
+  expect(rows.map(row => row.Name)).toEqual(["eval-b:2"])
+})
+
 test("native slot closure uses the exact current proxy and rereads sessions", async () => {
   const rows = [{ Name: "eval-a:1", PendingDisconnect: true }, { Name: "eval-b:2", PendingDisconnect: true }]
   const calls: string[] = []
@@ -25,6 +51,7 @@ test("native slot closure uses the exact current proxy and rereads sessions", as
   }
   const session = { CurrentUser: { IsAdmin: true, Name: "admin" } }
   const close: typeof closeSlotUserSession = runInNewContext(`(${closeSlotUserSession.toString()})`, {
+    setTimeout,
     bg: { app: { Application: { FInstance: { FServerConnection: { ServerContainer: { Session: session } } } } },
       ScopeGetObjectAsync: async () => ({ GetSessionsManager: async () => manager }) },
   })
