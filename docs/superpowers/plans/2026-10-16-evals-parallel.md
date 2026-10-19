@@ -99,13 +99,13 @@
   открытый admin; eval-b/admin сохраняются; readback still-present запрещает delete.
   Рабочая ветка существующего close-session без actor ledger; SESSION_NOT_IDLE
   сохраняется отказом. Проверка native A/B и подключение к run ещё впереди.
-- [ ] RED: неизвестное владение/root, активный открытый файл или непустой/нечитаемый
+- [x] RED: неизвестное владение/root, активный открытый файл или непустой/нечитаемый
   SessionBackup оставляют файлы неизменными; история/inputs сохраняются вне mounts.
   RED→GREEN guards4/29 unit PASS: отказ при unknown/unconfirmed процессах,
   неполном FD scan/open file/mapping, nonempty/unreadable/symlink backup,
   неверном inode и чужом namespace. Cleanup координатор подключён к проверенным
-  guards; native A/B и вызов из queue ещё не выполнены.
-- [ ] GREEN: в новом пути заменить actor-ledger admission точным пользователем,
+  guards; native A/B4/4 подтвердили сохранность файлов при unknown и guarded cleanup.
+- [x] GREEN: в новом пути заменить actor-ledger admission точным пользователем,
   архивировать профиль/результаты, закрыть свои сессии, перечитать и непосредственно
   проверить открытые файлы перед очисткой своего root. Не развивать замороженный
   server-storage archive diff; после разрешённого отката модуль не подключать.
@@ -233,10 +233,14 @@ private config/budget/results вне Git; операторские команд�
   двух пользователей готовы, startup после первого отказа проверен без новых epochs.
 - [ ] Создать только новый acceptance стенд и private config; закрепить binary SHA,
   task/rubric hashes, модели, timeouts и бюджет/условия до N=1 dispatch.
-- [ ] Ровно четыре обязательных A/B сценария: взаимная невидимость файлов,
+- [x] Ровно четыре обязательных A/B сценария: взаимная невидимость файлов,
   close A сохраняет B, delete A после close/readback, unknown ownership без delete.
   Остальные live tests только явным флагом; native и proc-negative unit не совмещать.
-- [ ] Сохранить live результат без skip и коммит `test(evals): qualify required slot isolation cases`.
+- [x] Сохранить live результат без skip и коммит `test(evals): qualify required slot isolation cases`.
+  Native4/4 PASS29.13s,0 model calls: admin до A/B, retained A/PendingDisconnect,
+  точный close/readback, bytes canary B после cleanup A, unknown без изменений,
+  оба guarded cleanup и release. Evidence `evidence/live-ab-5fac81a1-d90a-4039-a557-b4575a30e7f9/`.
+  Независимое ревью: два замечания к проверке ReadBuffer/catch исправлены.
 - [ ] Непосредственно перед N=1 проверить MemAvailable хоста против записанного
   бюджета (владелец наблюдал около5GiB из38GiB). Не хватает — остановиться и
   сообщить владельцу; не освобождать память остановкой чужих/удержанных стендов.
@@ -301,4 +305,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20. Acceptance: prepare/verify ready/0models; installed CLI8b2ba2bf9b HTTP429→200 qualified/cleanup confirmed. Далее provider/judge observations,4 A/B,N=1,пороги,N=2.
+20. Acceptance: prepare/verify ready; installed CLI8b2ba2bf9b и judge429 qualified; native A/B4/4 PASS/clean releases. Далее N=1,утверждение порогов,N=2.
