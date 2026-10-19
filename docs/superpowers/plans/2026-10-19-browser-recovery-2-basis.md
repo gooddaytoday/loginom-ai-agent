@@ -46,7 +46,7 @@
 Временный скрипт по образцу `packages/desktop/test/loginom/runtime-acceptance.ts`, вне продукта, не коммитится. Одна сессия на реальном Loginom:
 
 1. `listTools()` браузерного клиента сессии (`capabilities: ['core', 'vision']`) содержит все 16 имён allowlist общего контракта.
-2. Через Dock создать и выполнить `transform.calculator` без output-mapping (`finish: "execute"`). Сохранить базовую линию выполнения, снятую процедурой до запуска. Закрыть все окна: граф тихий.
+2. Через Dock создать и выполнить `transform.calculator` без output-mapping (`finish: "execute"`, `read.ports: []`). Встроенная Table здесь не нужна: схему независимо читает Preview на шаге 3, а её активация добавляет отдельную группу процессов. Сохранить базовую линию выполнения, снятую процедурой до запуска. Закрыть все окна: граф тихий.
 3. Без процедуры узла: проверка покоя, как в `node-pending-release.mjs:51-66`, без жестов; затем процедура консоли процессов с этой базовой линией (`identify`, `waitCompleted`); затем `openOwnedNativePreview` → схема → `closeOwnedNativePreview`. Базовую линию достаточно временно подставить в отдельный экземпляр процедуры. `prepare()` возвращает baseline; IPC-клиент `supervise()` сам не раскрывает browser/channel, поэтому временная instrumentation связывает их в том же контексте вне продукта, без нового production API.
 4. `browser_snapshot` страницы Loginom: размер ответа без аргументов и с `target`/`depth: 3`.
 
