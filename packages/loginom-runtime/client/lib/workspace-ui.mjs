@@ -3415,14 +3415,35 @@ function readRenderedInputMapping(observation) {
     if (observed?.ui_read_failure) {
       const code=observed.ui_read_failure.code;
       if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown'});
+      const before=task.snapshot,scroll=task.mode==='act'&&task.action?.verb==='scroll'
+        ?before?.ui.elements.find(e=>e.ref===task.action.ref):null;
+      const moved=effectPossible&&scroll?.scroll&&trace.find(t=>t.event==='ui_scroll_applied'
+        &&t.owner_ref===scroll.scroll.ref&&t.from===scroll.scroll.top
+        &&t.to===Math.max(0,Math.min(scroll.scroll.max_top,t.from+task.action.delta_y)));
+      const storageScroll=moved&&observed.ui_read_failure.scan_stage==='controls'
+        &&before.file_storage?.status==='observed'&&typeof before.active_tab_ref==='string'
+        &&before.observation_root?.identity?.anchor_tid===before.workflow_ref.prefix+';FileStorageForm;pnlFileStorage;tbl'
+        &&scroll.tid?.startsWith(before.workflow_ref.prefix+';FileStorageForm;colName_');
       // A normal owned wizard can exceed 500 ms under contention, including
-      // the read after a completed gesture. Repeat only that read once; never
-      // replay the gesture or extend the enclosing action deadline.
+      // the read after a completed gesture. The same bounded read retry covers
+      // a confirmed file-list scroll; its exact owner/position is checked below.
+      // Never replay the gesture or extend the enclosing action deadline.
       if(code==='UI_SCAN_LIMIT'&&observed.ui_read_failure.limit_kind==='time'
         &&(nodeContext?.surface==='wizard'||nodeContext?.surface==='graph'&&effectPossible
-          &&['finish_wizard','execute_wizard'].includes(task.action?.verb))&&!scanRetried) {
+          &&['finish_wizard','execute_wizard'].includes(task.action?.verb)||storageScroll)&&!scanRetried) {
         timeout();record('ui_scan_read_retried',{attempt:1});
-        return readUi(rediscover,true);
+        const fresh=await readUi(rediscover,true);
+        if(storageScroll){
+          timeout();
+          if(!fresh.authenticated||fresh.origin!==before.origin||fresh.loginom_build!==before.loginom_build
+            ||fresh.dom_epoch.document!==before.dom_epoch.document||!same(fresh.workflow_ref,before.workflow_ref)
+            ||fresh.active_tab_ref!==before.active_tab_ref||!same(fresh.package_identity,before.package_identity)
+            ||fresh.observation_root?.ref!==before.observation_root.ref||fresh.file_storage?.status!=='observed'
+            ||fresh.file_storage.directory!==before.file_storage.directory||fresh.ui.dialogs.length||fresh.ui.masks.length
+            ||!fresh.ui.elements.some(e=>e.scroll?.ref===moved.owner_ref&&e.scroll.top===moved.to&&e.scroll.max_top===scroll.scroll.max_top))
+            fail('UI_SCROLL_NOT_CONFIRMED','File-list context or scroll owner changed after its completed scroll');
+        }
+        return fresh;
       }
       const messages={UI_SCAN_LIMIT:'Workspace scan budget exceeded; use root discovery and a narrower observation',
         UI_ROOT_STALE:'Observed root is detached, hidden, inactive or expired',
