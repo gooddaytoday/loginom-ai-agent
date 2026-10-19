@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {runInNewContext} from 'node:vm';
 import {validateExcelParameters,excelColumns,excelParametersSchema} from '../lib/imports-excel-parameters.mjs';
 import {createExcelImportNodeSupport,excelReadback} from '../lib/imports-excel-node.mjs';
 import {excelConfigureCapability,makeExcelConfigureCode} from '../lib/imports-excel-procedure.mjs';
@@ -45,6 +46,27 @@ test('Excel wizard refuses a foreign prepared owner without a gesture',async()=>
  assert.equal(result.verified,false);assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true);
  assert.match(result.error,/owned wizard/);assert.doesNotThrow(()=>new Function('return '+makeExcelConfigureCode(t)));
 });
+for(const fault of ['covered','offscreen','disabled','persistent','owner','unknown_fill'])test('Excel waits for the source field hit point before its sole fill: '+fault,async()=>{
+ let reads=0,fills=0,tabs=0,waits=0;
+ const t={deadline:Date.now()+10000,document_id:'doc',workflow_ref:{prefix:'MF;TF'},node:{node_id:'excel'},excel:parameters.excel,origin:'https://test'};
+ const element={getBoundingClientRect:()=>({x:fault==='offscreen'&&reads===1?-200:10,y:10,width:100,height:20}),
+  contains:()=>false,closest:()=>fault==='disabled'&&reads===1?{}:null};
+ const input={count:async()=>1,inputValue:async()=>'',
+  evaluate:async fn=>{reads++;return runInNewContext('('+fn.toString()+')(element)',{element,document:{elementFromPoint:()=>fault==='persistent'||(reads===1&&fault!=='disabled')?null:element}});},
+  fill:async()=>{fills++;if(fault==='unknown_fill')throw Error('Lost fill acknowledgement');},
+  press:async()=>{tabs++;throw Error('Reached next step');}};
+ const page={locator:selector=>selector.startsWith('.x-mask')?{count:async()=>0}:{isVisible:async()=>true,locator:()=>input},
+  evaluate:async()=>true,waitForTimeout:async()=>{waits++;if(fault==='persistent')t.deadline=0;}};
+ const result=await excelConfigureCapability(page,t,async()=>({verified:fault!=='owner'||waits===0,surface:'wizard',node_id:'excel'}));
+ assert.equal(result.verified,false);
+ assert.ok(waits>=1,'a failed hit test must wait before dispatch');
+ if(['persistent','owner'].includes(fault)){
+  assert.equal(fills,0);assert.equal(tabs,0);assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true);
+ }else{
+  assert.equal(fills,1);assert.equal(tabs,fault==='unknown_fill'?0:1);assert.equal(result.effect_possible,true);assert.equal(result.cleanup_complete,false);
+  assert.match(result.error,fault==='unknown_fill'?/Lost fill acknowledgement/:/Reached next step/);
+ }
+});
 test('Excel readback requires verified commit and exact node ownership',()=>{
  const node={document_id:'doc',workflow_id:'workflow',node_id:'excel'};
  const c={verified:true,node_context:node,source:{source_path:'/worker/sales.xlsx'},columns:excelColumns(parameters.excel),auto_detect:'Нет'};
@@ -54,6 +76,25 @@ test('Excel readback requires verified commit and exact node ownership',()=>{
  const foreign=structuredClone(value);foreign.phases[0].value.configuration.node_context={...foreign.node,node_id:'other'};
  assert.throws(()=>excelReadback(foreign),/owner differs/);
  value.phases[1].value.settings_applied=false;assert.throws(()=>excelReadback(value),/not committed/);
+});
+
+for(const expires of [false,true])test('Excel waits for the sheet field after setting the source, preserving earlier effects: '+expires,async()=>{
+ let sheetReads=0,sourceFills=0,sheetFills=0,waits=0;
+ const t={deadline:Date.now()+10000,document_id:'doc',workflow_ref:{prefix:'MF;TF'},node:{node_id:'excel'},excel:parameters.excel,origin:'https://test'};
+ const field=kind=>({count:async()=>1,isVisible:async()=>true,locator:()=>field(kind),
+  inputValue:async()=>kind.includes('cbbTableNamingMethod')?'По номеру':sourceFills?parameters.excel.source_path:'',
+  evaluate:async fn=>{
+   const sheet=kind.includes('cbbTableName;');if(sheet)sheetReads++;
+   const element={getBoundingClientRect:()=>({x:10,y:10,width:100,height:20}),contains:()=>false,closest:()=>null};
+   return runInNewContext('('+fn.toString()+')(element)',{element,document:{elementFromPoint:()=>sheet&&sheetReads===1?null:element}});
+  },fill:async()=>{if(kind.includes('edtFileName'))sourceFills++;else sheetFills++;},
+  press:async()=>{if(!kind.includes('edtFileName'))throw Error('Sheet configured');}});
+ const page={locator:s=>s.startsWith('.x-mask')?{count:async()=>0}:field(s),evaluate:async()=>true,
+  waitForTimeout:async()=>{waits++;if(expires)t.deadline=0;}};
+ const result=await excelConfigureCapability(page,t,async()=>({verified:true,surface:'wizard',node_id:'excel'}));
+ assert.equal(sourceFills,1);assert.equal(waits,1);assert.equal(sheetFills,expires?0:1);
+ assert.equal(result.effect_possible,true);assert.equal(result.cleanup_complete,false);
+ assert.match(result.error,expires?/deadline/:/Sheet configured/);
 });
 
 test('native type choice auto-commits and closes its editor without another Enter',async()=>{
