@@ -10,7 +10,7 @@ const options = {sessionId:'owned-session', documentId:'owned-document', account
 // Run the serialized browser body. Replace only the external Loginom and UI,
 // retaining the actual guards, async close, prompt handling and logout order.
 function fixture(overrides = {}) {
-  const events = [], state = {account:'test-2', path:options.packagePath, modified:false, running:false,
+  const events = [], state = {clock:Date.now(), avatarClicks:0, avatarBudgets:[], menu:false, account:'test-2', path:options.packagePath, modified:false, running:false,
     count:1, tab:true, dialog:false, loggedOut:false, readonly:false, closeResult:true, ...overrides};
   const fail = stage => {if(state.failStage===stage)throw Error('private upstream failure: do not persist');};
   const node = {DisplayName:'result',get PackageFileName(){return state.path;}, get ReadOnly(){return state.readonly;},
@@ -31,7 +31,11 @@ function fixture(overrides = {}) {
     }};
   const dialog = {getBoundingClientRect:() => ({width:10,height:10})};
   const tab = {getAttribute:() => state.tabTid ?? options.tabTid};
-  const doc = {querySelectorAll:() => state.dialog ? [dialog] : [], contains:value => value === tab && state.tab};
+  const doc = {querySelectorAll:query => {
+    if(query.includes('btnLogOut'))return state.menu ? [dialog] : [];
+    if(query.includes('btnAvatar'))return state.avatarAbsent ? [] : [dialog];
+    return state.dialog || state.mask ? [dialog] : [];
+  }, contains:value => value === tab && state.tab};
   const context = vm.createContext({document:doc, location:{origin:'http://loginom.invalid'},
     ownedPackage:state.foreignPreparedPackage ? {} : node, ownedTab:tab,
     getComputedStyle:() => ({visibility:'visible'}), bg:{app:{Version:'7.4.2', Application:{FInstance:{FMainForm:{FMapTree:m}}}}}});
@@ -39,16 +43,26 @@ function fixture(overrides = {}) {
   const locator = query => ({
     locator:() => locator(query+' input'),
     async waitFor(settings) {
-      assert.equal(settings.timeout,options.timeoutMs);
+      assert.ok(settings.timeout > 0 && settings.timeout <= (state.timeoutMs??options.timeoutMs));
       fail(query.includes('LoginForm')?'login_form_wait':'tab_detach');
       events.push(query.includes('LoginForm') ? 'login-visible' : 'tab-detached');
       if (query.includes('LoginForm') ? !state.loggedOut : state.tab) throw Error('UI wait failed');
     }, async click(settings) {
-      assert.equal(settings.timeout,options.timeoutMs);
+      assert.ok(settings.timeout > 0 && settings.timeout <= (state.timeoutMs??options.timeoutMs));
       fail(query.includes('tlb;no')?'discard_click':query.includes('btnLogOut')?'logout_click':'logout_menu_open');
       if (query.includes('tlb;no')) {events.push('discard');state.confirm();}
       else if (query.includes('btnLogOut')) { events.push('logout'); state.loggedOut=true; }
-      else events.push('avatar');
+      else {
+        state.avatarClicks++; state.avatarBudgets.push(settings.timeout); events.push('avatar');
+        if(state.avatarTimeouts >= state.avatarClicks){
+          state.clock += state.avatarElapsed??(state.timeoutMs??options.timeoutMs);
+          if(state.menuAfterTimeout)state.menu=true;
+          if(state.maskAfterTimeout)state.mask=true;
+          if(state.accountAfterTimeout)state.account=state.accountAfterTimeout;
+          throw Object.assign(Error('private click timeout'),{name:'TimeoutError'});
+        }
+        state.menu=true;
+      }
     }, async count(){return state.dialog?1:0;},
     async innerText(){fail('logout_account_readback');return query.includes('cnt;cnt;cmp')?(state.prompt??'Сохранить изменения в пакете "result"?'):state.account;},
     async isVisible(){fail('logout_readback');return !state.loggedOut;},
@@ -60,9 +74,26 @@ function fixture(overrides = {}) {
       if(fn.toString().includes('m?.PackageNodes?.Count === 0'))fail('logout_inventory_readback');
       return vm.runInContext('('+fn.toString()+')',context)(arg);
     },
-    async waitForFunction(fn,arg,settings){assert.equal(settings.timeout,options.timeoutMs);fail('close_wait');for(let i=0;i<8;i++){if(await this.evaluate(fn,arg))return;await Promise.resolve();}throw Error('timeout');},
+    async waitForFunction(fn,arg,settings){
+      assert.ok(settings.timeout > 0 && settings.timeout <= (state.timeoutMs??options.timeoutMs));
+      if(fn.toString().includes('const menu =')){
+        events.push('logout-observe'); state.observeTimeout=settings.timeout;
+        for(let i=0;i<2;i++){
+          const value=await this.evaluate(fn,arg);
+          if(value)return {jsonValue:async()=>value,dispose:async()=>{}};
+          if(state.clearMask){state.mask=false;state.clock+=state.maskElapsed??10;}
+        }
+        throw Error('observation timeout');
+      }
+      fail('close_wait');for(let i=0;i<8;i++){if(await this.evaluate(fn,arg))return;await Promise.resolve();}throw Error('timeout');
+    },
   };
-  return {state,events,context, run:changed => vm.runInThisContext('('+makePackageCleanupCode({...options,...changed})+')')(page)};
+  const Clock = class extends Date {static now(){return state.clock;}};
+  return {state,events,context, run:changed => {
+    const code=makePackageCleanupCode({...options,timeoutMs:state.timeoutMs??options.timeoutMs,...changed});
+    state.clock=Date.now();
+    return vm.runInNewContext('('+code+')',{Date:Clock})(page);
+  }};
 }
 
 test('saved owned package closes with native guards, tabs disappear, then logout', async () => {
@@ -72,6 +103,40 @@ test('saved owned package closes with native guards, tabs disappear, then logout
   assert.equal(result.unsaved_changes_discarded,false);
   assert.deepEqual(f.events,['modified-read','close','tab-detached','avatar','logout','login-visible']);
   const again=await f.run();assert.equal(again.reason,'CLEANUP_ALREADY_ATTEMPTED');assert.equal(f.events.filter(e=>e==='close').length,1);
+});
+
+test('avatar timeout observes cleared masks and retries once before confirmed logout',async()=>{
+  const f=fixture({avatarTimeouts:1,maskAfterTimeout:true,clearMask:true,timeoutMs:8000}),r=await f.run();
+  assert.equal(r.status,'SUCCEEDED');assert.equal(r.logged_out,true);assert.equal(r.package_closed,true);
+  assert.deepEqual(f.events,['modified-read','close','tab-detached','avatar','logout-observe','avatar','logout','login-visible']);
+});
+
+test('second avatar timeout keeps the original unconfirmed cleanup refusal',async()=>{
+  const f=fixture({avatarTimeouts:2,timeoutMs:8000}),r=await f.run();
+  assert.equal(r.status,'BLOCKED');assert.equal(r.reason,'CLEANUP_UNCONFIRMED');assert.equal(r.stage,'logout_menu_open');
+  assert.equal(r.package_closed,true);assert.equal(r.logged_out,false);assert.equal(f.state.avatarClicks,2);
+  assert.equal(f.events.includes('logout'),false);assert.doesNotMatch(JSON.stringify(r),/private click timeout/);
+});
+
+test('a menu opened by a timed-out avatar click is not toggled again',async()=>{
+  const f=fixture({avatarTimeouts:1,menuAfterTimeout:true}),r=await f.run();
+  assert.equal(r.status,'SUCCEEDED');assert.equal(r.logged_out,true);assert.equal(f.state.avatarClicks,1);
+});
+
+test('avatar retry uses the original cleanup deadline and never passes timeout zero',async()=>{
+  const f=fixture({avatarTimeouts:1,avatarElapsed:29950,timeoutMs:8000}),r=await f.run();
+  assert.equal(r.status,'SUCCEEDED');assert.ok(f.state.observeTimeout<=50);assert.ok(f.state.avatarBudgets[1]<=50);assert.equal(f.state.avatarClicks,2);
+  const expired=fixture({avatarTimeouts:1,avatarElapsed:30001,timeoutMs:8000}),blocked=await expired.run();
+  assert.equal(blocked.reason,'CLEANUP_UNCONFIRMED');assert.equal(expired.state.avatarClicks,1);
+  assert.equal(expired.events.includes('logout-observe'),false);assert.equal(expired.events.includes('logout'),false);
+});
+
+test('avatar retry refuses a changed account or masks that remain visible',async()=>{
+  for(const change of [{accountAfterTimeout:'foreign'},{maskAfterTimeout:true}]){
+    const f=fixture({avatarTimeouts:1,...change}),r=await f.run();
+    assert.equal(r.reason,'CLEANUP_UNCONFIRMED');assert.equal(r.logged_out,false);assert.equal(f.state.avatarClicks,1);
+    assert.equal(f.events.includes('logout'),false);
+  }
 });
 
 for(const stage of ['close_request','close_wait','close_readback','tab_detach','logout_menu_open','logout_account_readback','logout_inventory_readback','logout_click','login_form_wait','logout_readback'])
