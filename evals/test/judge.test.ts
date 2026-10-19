@@ -63,6 +63,15 @@ test("judgeCommand: флаги codex exec и абсолютные пути", () 
   expect(cmd.join(" ")).toContain("--output-schema /tmp/j/verdict.schema.json -o /tmp/j/verdict.json -")
 })
 
+test("judgeCommand disables hidden HTTP and stream retries for its selected provider", () => {
+  const cmd = judgeCommand({ command: ["codex"], dir: "/judge", model: "gpt-6-sol", reasoning: "xhigh" })
+  const config = cmd.flatMap((arg, index) => arg === "-c" ? [cmd[index + 1]] : [])
+  expect(config).toContain("model_provider=evals-openai")
+  expect(config).toContain("model_providers.evals-openai.requires_openai_auth=true")
+  expect(config).toContain("model_providers.evals-openai.request_max_retries=0")
+  expect(config).toContain("model_providers.evals-openai.stream_max_retries=0")
+})
+
 test("judgeInfo: версия судьи и sha256 промпта", async () => {
   const info = await judgeInfo(loadConfig(["--judge-only", "x"], { JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: fakeJudge }))
   expect(info).toMatchObject({ backend: "codex", codex_version: "fake-codex 0.0.0", model: "fake", reasoning: "high" })
