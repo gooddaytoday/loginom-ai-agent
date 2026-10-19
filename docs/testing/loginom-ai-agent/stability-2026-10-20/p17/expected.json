@@ -1,0 +1,75 @@
+{
+  "package_path": "/demo-2026-10-22/s1-revenue.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.calculator"
+    },
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "transform.sorting"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.sorting",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "Category",
+          "label": "Category",
+          "type": "string"
+        },
+        {
+          "name": "Revenue",
+          "label": "Revenue",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "Центр",
+          "Category": "Техника",
+          "Revenue": 80193.0
+        },
+        {
+          "Region": "Юг",
+          "Category": "Техника",
+          "Revenue": 60272.0
+        },
+        {
+          "Region": "Север",
+          "Category": "Техника",
+          "Revenue": 54400.0
+        },
+        {
+          "Region": "Центр",
+          "Category": "Офис",
+          "Revenue": 8895.0
+        },
+        {
+          "Region": "Юг",
+          "Category": "Офис",
+          "Revenue": 6839.0
+        },
+        {
+          "Region": "Север",
+          "Category": "Офис",
+          "Revenue": 6182.0
+        }
+      ]
+    }
+  ]
+}
