@@ -1,0 +1,8 @@
+{
+  "groups": 3,
+  "centroid_distance_max": 0.6,
+  "radius_max": 1.2,
+  "source_coordinate_abs_tolerance": 1e-06,
+  "labels": "arbitrary",
+  "row_order": "any"
+}
