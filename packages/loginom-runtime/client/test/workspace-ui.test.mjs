@@ -3758,7 +3758,7 @@ test('input port overflow caption requires native binding and the exact hidden c
 });
 
 async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
-  const caption=['group','sorting'].includes(vendor)?'Входной источник данных':port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
+  const caption=['group','sorting','crosstable','calculator'].includes(vendor)?'Входной источник данных':port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
   const {page,panel,crumbs}=await inputPortContextFixture();
   // Loginom 7.4.2 native diagnostic: 1280x800, input1 and Настройка hidden
   // by breadcrumb overflow; node/input/wizard icons remain in the same DOM.
@@ -3773,9 +3773,10 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
     if(i>=7)c.style.display='none';
     for(const icon of c.children)icon.box={x:c.box.x+1,y:c.box.y+1,width:16,height:16};
   }
-  crumbs[5].children[0].attrs.class=vendor==='sorting'?'bg-vendor-icon-sorting':vendor==='union'?'bg-vendor-icon-uniondata':vendor==='group'?'bg-vendor-icon-groupdata':'bg-vendor-icon-joindata';
+  const nodeIcon={calculator:'bg-vendor-icon-calcdata',crosstable:'bg-vendor-icon-crosstab',sorting:'bg-vendor-icon-sorting',union:'bg-vendor-icon-uniondata',group:'bg-vendor-icon-groupdata',join:'bg-vendor-icon-joindata'}[vendor];
+  crumbs[5].children[0].attrs.class=nodeIcon;
   page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[7]).attrs.class='bg-vendor-icon-tunedatasourcesocketdef';
-  if(mode==='wrong_icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
+  if(mode==='wrong_icon')crumbs[5].children[0].attrs.class=vendor==='calculator'?'bg-vendor-icon-groupdata':'bg-vendor-icon-calcdata';
   if(mode==='wrong_caption')for(const c of crumbs.slice(7)) {
     c.attrs['data-tid']=c.attrs['data-tid'].replace(caption.replaceAll(' ','_'),caption.replaceAll(' ','_')+'_2');
     if(c===crumbs[7])c.ownText=caption+' 2';
@@ -3784,7 +3785,9 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
   if(mode==='hidden_ancestor')panel.style.display='none';
   if(mode==='missing_wizard_icon')crumbs[8].children[0].remove();
   const binding={verified:true,surface:'wizard',document_id:'doc',workflow_id:'flow',node_id:'node',
-    input_port:{direction:'input',port:mode==='wrong_port'?1-port:mode==='unknown_port'?2:port,native_index:mode==='wrong_native_index'?1-port:port,port_guid:'input-'+port,opening_operation_id:'join-open-'+port}};
+    input_port:{direction:'input',port:mode==='wrong_port'?1-port:mode==='unknown_port'?2:port,native_index:mode==='wrong_native_index'?1-port:port,port_guid:'input-'+port,opening_operation_id:'join-open-'+port,node_icon_class:nodeIcon}};
+  if(mode==='missing_native_icon')delete binding.input_port.node_icon_class;
+  if(mode==='wrong_native_icon')binding.input_port.node_icon_class='bg-vendor-icon-unknown';
   let reads=0;
   if(mode!=='unbound')page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
     {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},async()=>{
@@ -3850,9 +3853,9 @@ test('owned Union and Grouping inputs keep their exact hidden input folder and c
  }
 });
 
-test('Sorting input0 keeps Done and close bound when its input folder overflows',async()=>{
- for(const mode of ['valid','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','unknown_port','wrong_native_index','wrong_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
-  const {page}=await joinInputPortOverflowFixture(mode,0,'sorting');
+test('tabular input0 keeps Done and close bound to the native node icon when its input folder overflows',async()=>{
+ for(const vendor of ['group','sorting','crosstable','calculator'])for(const mode of ['valid','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','unknown_port','wrong_native_index','wrong_icon','missing_native_icon','wrong_native_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
+  const {page}=await joinInputPortOverflowFixture(mode,0,vendor);
   const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
   crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
   page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
@@ -4500,7 +4503,7 @@ test('typed output-port finish requires complete output mapping and its own port
 });
 
 test('overflow output socket requires a current native owner and visible actionable Done',async()=>{
-  for(const vendor of ['groupdata','sorting','uniondata'])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_unbound','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
+  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata'])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
     'duplicate_socket','wrong_socket_icon','missing_settings','hidden_ancestor','hidden_visibility','disabled_done','hidden_done']){
     const {page}=outputPortFinishFixture();
     const find=suffix=>page.document.all().find(e=>e.attrs['data-tid']?.endsWith(suffix));
@@ -4512,10 +4515,12 @@ test('overflow output socket requires a current native owner and visible actiona
       const folder=find('>Outputs');
       for(const e of page.document.all())if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('>Outputs','>Выходные_порты');
       folder.ownText=mode==='bound_folder_wrong_caption'?'Other':'Выходные порты';folder.style.display='none';
-      find('>Calc').children[0].attrs.class=mode==='bound_folder_wrong_type'?'bg-vendor-icon-calcdata':'bg-vendor-icon-'+vendor;
+      find('>Calc').children[0].attrs.class=mode==='bound_folder_wrong_type'?'bg-vendor-icon-'+(vendor==='calcdata'?'groupdata':'calcdata'):'bg-vendor-icon-'+vendor;
       if(mode==='bound_folder_wrong_icon')folder.children[0].attrs.class='maptree-icon-modelinputports';
     }
-    const port={direction:'output',port:0,native_index:0,port_guid:'out-guid',opening_operation_id:'open-output'};
+    const port={direction:'output',port:0,native_index:0,port_guid:'out-guid',opening_operation_id:'open-output',node_icon_class:'bg-vendor-icon-'+vendor};
+    if(mode==='bound_folder_missing_native_icon')delete port.node_icon_class;
+    if(mode==='bound_folder_wrong_native_icon')port.node_icon_class='bg-vendor-icon-unknown';
     if(mode==='bound_folder_wrong_port')port.port=port.native_index=1;
     if(mode==='bound_folder_wrong_index')port.native_index=1;
     if(mode==='bound_folder_missing_guid')delete port.port_guid;
