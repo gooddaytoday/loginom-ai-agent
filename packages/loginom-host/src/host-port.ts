@@ -6,7 +6,7 @@ import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 import { HostTaskScope } from "./task-scope"
 import { Schema } from "effect"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
-import { isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
+import { browserRecoveryToolName, isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
 
 const knowledgeTools = new Set(["find", "search", "read", "grep", "glob", "list", "tree"])
 const Admissions = Schema.Array(
@@ -72,6 +72,8 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       applyingScope: boolean
       catalog: Set<string>
       admitted: Set<string>
+      // Operation of a browser recovery attempt that still holds the page.
+      recovery?: string
     }
   >()
   const acquiring = new Map<string, string>()
@@ -86,6 +88,28 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     service.recoveries.set(run.chat, run.lease)
   }
   async function release(id: string, run: NonNullable<ReturnType<typeof runs.get>>) {
+    // A run that ends or is cancelled mid-recovery stops its attempt instead of
+    // leaving the page leased until the budget expires (design §6).
+    const generation = run.lease?.generation
+    if (run.recovery && generation !== undefined && service.hasRuntime(generation, run.chat))
+      await service
+        .runtime(generation, run.chat)
+        .then((runtime) =>
+          runtime.request(
+            "call",
+            {
+              name: browserRecoveryToolName,
+              arguments: {
+                action: "stop",
+                operation_id: run.recovery,
+                reason: "The agent run ended during browser recovery.",
+              },
+            },
+            runtimeCallTimeout(browserRecoveryToolName, undefined) + 15_000,
+          ),
+        )
+        .catch(() => undefined)
+    run.recovery = undefined
     await abandon(run)
     run.lease?.release()
     runs.delete(id)
@@ -454,6 +478,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
               service.recoveries.delete(run.chat)
             }
           }
+          if (isBrowserRecoveryTool(input.name)) run.recovery = recoveryPhase(result.result, run.recovery)
           reply({ id: data.id, result: result.result }, lease.generation)
         } catch (error) {
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
@@ -506,4 +531,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       await stop()
     },
   }
+}
+
+// Recovery replies report the lease phase; an ordinary browser action reply has none.
+function recoveryPhase(result: unknown, current: string | undefined) {
+  if (!result || typeof result !== "object" || !("structuredContent" in result)) return current
+  const value = result.structuredContent
+  if (!value || typeof value !== "object" || !("phase" in value) || typeof value.phase !== "string") return current
+  if (!["handoff", "browser", "verify"].includes(value.phase)) return undefined
+  return "operation_id" in value && typeof value.operation_id === "string" ? value.operation_id : current
 }
