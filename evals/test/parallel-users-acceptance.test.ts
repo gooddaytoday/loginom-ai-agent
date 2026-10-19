@@ -115,6 +115,9 @@ test("parallel acceptance fails on an intermediate rate limit even when the meas
   expect(assessParallelLimits(receipt)).toEqual({ status: "failed", codes: ["PROVIDER_RATE_LIMIT"] })
   expect(JSON.stringify(receipt)).toBe(before)
   expect(assessParallelLimits({ ...receipt, events: [] })).toEqual({ status: "passed", codes: [] })
+  expect(assessParallelLimits({ coverage: { provider: "complete", dock: "unavailable", judge: "complete" },
+    events: [{ source: "dock", kind: "http", status: 429 }] }, ["provider", "judge"]))
+    .toEqual({ status: "failed", codes: ["DOCK_HTTP_429"] })
 })
 
 test("parallel acceptance keeps unavailable provider, Dock and judge limit observations incomplete", () => {
