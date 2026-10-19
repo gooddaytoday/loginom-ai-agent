@@ -3948,7 +3948,10 @@ function readRenderedInputMapping(observation) {
             // Preserve the refused sample, then read once more within the same
             // deadline. The original gesture and owner checks stay unchanged.
             record('wizard_open_confirmation_read_retried',{attempt:1,initial_observation:observed});
-            timeout();observed=await readOpeningUi();
+            // The reread can lose a transient grid mask while the exact owned
+            // wizard mask is still busy. Apply the same bounded owner wait to
+            // this sample too, without another gesture or a longer deadline.
+            timeout();observed=await waitForMasks(await readOpeningUi(),readOpeningUi,ownedLoading);
             deactivationPending=task.action.verb==='begin_wizard'&&exactDeactivation(observed);
           }
           if(deactivationPending)record('wizard_deactivation_question_observed',{node:opening.node,workflow_path:opening.workflow_path});
