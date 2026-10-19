@@ -1859,7 +1859,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if (state.receipt.action_key === operation.action.action_key) operation.outcome = state.receipt;
         if (operation.cleanupConfirmed && operation.outcome.status !== 'AMBIGUOUS') {
           if(operation.action.capability==='artifact.upload' && (operation.outcome.status==='NOT_APPLIED'||operation.outcome.status==='FAILED'&&operation.outcome.output?.conflict_rejected===true))await operation.uploadLease?.release();
-          pending = null; return operation.outcome;
+          if(pending===operation)pending = null; return operation.outcome;
         }
       }
       if(operation.cleanupConfirmed===false && operation.verification?.byteOutcome?.output?.bytes_verified===true)
@@ -1869,14 +1869,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (['ui.act','artifact.upload'].includes(operation.action.capability)) {
         await remember(operation, 'reconciled', operation.outcome);
         if(operation.action.capability==='artifact.upload' && (operation.outcome?.status==='NOT_APPLIED'||operation.outcome?.status==='FAILED'&&operation.outcome.output?.conflict_rejected===true))await operation.uploadLease?.release();
-        if (operation.outcome.status !== 'AMBIGUOUS') pending = null;
+        if (operation.outcome.status !== 'AMBIGUOUS'&&pending===operation)pending = null;
         return operation.outcome;
       }
       const outcome = await invoke(operation, 'reconcile');
       await remember(operation, 'reconciled', outcome);
       operation.outcome = outcome;
       if (outcome.status === 'SUCCEEDED' || outcome.status === 'NOT_APPLIED') {
-        pending = null;
+        if(pending===operation)pending = null;
         operation.outcome = outcome;
       }
       return outcome;
@@ -2034,8 +2034,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(journalError&&result.output.browser_recovery)result.output.browser_recovery.journal_error=journalError;
       return result;
     }
-    const outcome=await reconcilePending();
-    if(['package.save_checkpoint','package.save_as'].includes(operation.action.action_key)
+    const save=['package.save_checkpoint','package.save_as'].includes(operation.action.action_key);
+    if(save&&running)return view(operation);
+    if(save)running=true;
+    const outcome=await reconcilePending().finally(()=>{if(save)running=false;});
+    if(save
       &&outcome===operation.outcome&&outcome.status==='AMBIGUOUS')operation.browserRecoveryReconciled=outcome;
     const journalError=await recordRecoveryBasis(operation);
     const result=view(operation,outcome);
@@ -2160,16 +2163,39 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       verification.outcome=failed(verification,'BROWSER_RECOVERY_PENDING','Recovery verification awaits its durable receipt');
       operations.set(verification.id,verification);pending=verification;running=true;observations.clear();
       try{
+        // A prepared gesture owns no browser receipt until it passes dispatch admission.
+        let nextReceipt;
+        const verificationReceiptOptions=(id,key,signature)=>{
+          if(verification.transportUncertain)throw Error('The previous verification gesture is unconfirmed');
+          nextReceipt={id,signature,action_key:key,operation_id:id};
+          return {receipt_namespace:receiptNamespace,receipt_id:id,receipt_signature:signature};
+        };
         const executeVerificationScript=async(code,options)=>{
           const wrapped='async page => {const base={action_key:"browser.recovery.transport",action_revision:"1",operation_id:'
             +JSON.stringify(verification.id)+',phase:"transport",effect_possible:true,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('
             +code+')(page)}};}catch(error){return {...base,status:"FAILED",cleanup_complete:false,output:{},error:{code:"BROWSER_RECOVERY_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
-          const response=await execute(wrapped,{timeout:Math.max(1,verification.deadline-now()),...options});
+          const remaining=verification.deadline-now();
+          if(remaining<5000){
+            nextReceipt=null;
+            throw Error('Browser recovery verification has insufficient observation time');
+          }
+          if(nextReceipt){
+            verification.lastReceipt=nextReceipt;nextReceipt=null;verification.transportUncertain=true;
+          }
+          const response=await execute(wrapped,{...options,timeout:Math.min(options?.timeout??remaining,remaining)});
+          if(now()>=verification.deadline)throw Error('Browser recovery verification deadline elapsed');
           if(response.status!=='SUCCEEDED')throw Error(response.error?.message??'Browser recovery transport failed');
-          return response.output.value;
+          const value=response.output.value;
+          if(value?.operation_id===verification.lastReceipt?.id&&value?.action_key===verification.lastReceipt?.action_key
+            &&value?.cleanup_complete===true)verification.transportUncertain=false;
+          return value;
         };
         const facts={};
-        const observe=async read=>{try{return await read();}catch(error){return {verified:false,reason:String(error.message??error)};}};
+        const observe=async read=>{try{
+          const fact=await read();
+          if(now()>=verification.deadline)throw Error('Browser recovery verification deadline elapsed');
+          return fact;
+        }catch(error){return {verified:false,reason:String(error.message??error)};}};
         if(basis.step.kind==='save')facts.saved_package=await observe(async()=>{
           const storage=getStorageBinding();
           const binding={sessionId:storage?.session_id,documentId:storage?.document_id,account:storage?.loginom_account,
@@ -2183,11 +2209,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           const channel=createNodeProcedure({operation:verification,execute:executeVerificationScript,record:onRecord,
             targetOrigin,targetBuild,now,preparedNodeContext:{document_id:request.document_id,workflow_ref:request.workflow_ref,node},maxSteps:4096,
             wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{
-              ...receiptOptions(verification,r.id,r.action_key,r.signature),operation_id:r.id})});
+              ...verificationReceiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
           facts.workspace=await observe(()=>proveNodeRestsQuiet({operation:verification,channel,node}));
           if(facts.workspace.verified){
             if(basis.goal.execution)facts.execution=operation.nodeApply.execution_baseline
-              ?await createNodeExecutionProcedure(channel,node,{baseline:operation.nodeApply.execution_baseline}).verifyCompletion()
+              ?await observe(()=>createNodeExecutionProcedure(channel,node,{baseline:operation.nodeApply.execution_baseline}).verifyCompletion())
               :{verified:false,reason:'NO_BASELINE'};
             if(basis.goal.output_schema&&facts.execution?.verified)facts.output_schema=await observe(async()=>{
               const ports=[];
@@ -2201,7 +2227,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             if(basis.goal.file)facts.export_file=await observe(async()=>{
               const result=await readNativeExportFile({operation:verification,execute:executeVerificationScript,onRecord,
                 artifactStore,targetOrigin,targetBuild,storageDirectories:getStorageBinding()?.directories,
-                receiptOptions:(id,key,signature)=>receiptOptions(verification,id,key,signature)},
+                receiptOptions:verificationReceiptOptions},
               {document_id:request.document_id,workflow_ref:request.workflow_ref,node,deadline:verification.deadline,execution:facts.execution},
               {destination:request.parameters.destination,configured:{destination_check:operation.nodeApply.phases
                 .find(phase=>phase.phase==='configure')?.value?.configuration?.configured?.destination_check}},facts.execution);
@@ -2213,7 +2239,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const receipt=verification.lastReceipt&&now()<verification.deadline
           ?await readReceipt(verification,verification.lastReceipt,Math.min(10000,verification.deadline-now())).catch(()=>null):null;
         const unconfirmed=!!verification.lastReceipt&&(now()>=verification.deadline||receipt?.state!=='completed'||receipt.receipt?.cleanup_complete!==true);
-        verification.verificationConfirmed=!unconfirmed;
+        verification.transportUncertain=unconfirmed;verification.verificationConfirmed=!unconfirmed;
         return {basis,facts,decision:decideBrowserRecovery(basis,facts),verification_id:verification.id,unconfirmed};
       }finally{running=false;}
     },

@@ -11,13 +11,13 @@ import {compactNodeResult} from '../lib/user-results.mjs';
 
 const full={remaining:()=>({calls_remaining:30,ms_remaining:600000})};
 const refuse=()=>{throw new NodeReleaseBlocked('A Loginom wizard of another node is open','Ask the user to close it with Cancel.');};
-const saveWithReceipt=({receipt,now=Date.now,deadlineAt,onRecord,status='AMBIGUOUS',savedState}={})=>{
+const saveWithReceipt=({receipt,now=Date.now,deadlineAt,onRecord,status='AMBIGUOUS',savedState,reconcile}={})=>{
   const key='package.save_checkpoint',revision=actions.get(key).revision;
   const outcome={status,action_key:key,action_revision:revision,operation_id:'save',
     phase:'applied',effect_possible:true,cleanup_complete:true,error:null,trace:[],output:{}};
-  const engine=runtime(new Page(),{now,onRecord,browserRecovery:full,getStorageBinding:()=>({session_id:'session',document_id:'doc',loginom_account:'user',origin:'http://example.test',loginom_build:'7.4.2'}),execute:async code=>{
-    if(code.includes('action_key:"browser.recovery.transport"'))return typedBoundaryResult(code,savedState);
-    if(savedState&&code.includes('\"mode\":\"reconcile\"'))return outcome;
+  const engine=runtime(new Page(),{now,onRecord,browserRecovery:full,getStorageBinding:()=>({session_id:'session',document_id:'doc',loginom_account:'user',origin:'http://example.test',loginom_build:'7.4.2'}),execute:async (code,options)=>{
+    if(code.includes('action_key:"browser.recovery.transport"'))return typedBoundaryResult(code,typeof savedState==='function'?await savedState(options):savedState);
+    if(savedState&&code.includes('\"mode\":\"reconcile\"'))return reconcile?reconcile(outcome):outcome;
     const other=code.includes('"operation_id":"other"');
     if(code.includes('"receipt_read":true'))return {status:'SUCCEEDED',action_key:'operation.inspect',
       action_revision:'1',operation_id:'save',phase:'observed',effect_possible:false,error:null,trace:[],
@@ -373,12 +373,13 @@ async function typedBoundaryResult(code,value) {
 
 // Transport-boundary fixture: the real channel, console and Preview procedures
 // consume the same observations as their focused procedure tests.
-async function verificationFixture({receiptExpired=false,lostPreview=false,previewRefused=false,busy=false,changedAfterPreview=false,released=false,exportFile=false,exportCheck={verified:true,destination:'/user/result.csv',existed:false}}={}) {
+async function verificationFixture({shortVerificationClock=false,receiptExpired=false,lostDownload=false,lostPreview=false,previewRefused=false,busy=false,changedAfterPreview=false,released=false,exportFile=false,exportCheck={verified:true,destination:'/user/result.csv',existed:false}}={}) {
  const node={document_id:'doc',workflow_id:'wf',node_id:'new'},workflow=request().workflow_ref;
  const context={...node,verified:true,surface:'graph',locked:false,tid:'graph-node'};
  const calls=[],events=[],gestures=[],receipts=new Map();
  let opened=false,selected=false,shown=false,preview=false,operation,files=false,exportBinding,closedPreview=false;
- const retained=[];let clockOffset=0;
+ const retained=[],downloads=[],timeouts=[];let clockOffset=0;
+ const started=Date.now();
  const el=(tid,allowed_actions=['click'])=>({tid,ref:'ui-'+Buffer.from(tid).toString('hex'),allowed_actions,signature:{tid}});
  const port={index:0,port_guid:'port-0',tid:'MF;TF-1;Graph;Source;Output_Data-0',active:true};
  const state=()=>({origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:files?{workflow_id:'files',prefix:'MF;TF-2',tab_tid:'files-tab'}:workflow,authenticated:true,
@@ -397,7 +398,8 @@ async function verificationFixture({receiptExpired=false,lostPreview=false,previ
     ...(preview?[el('MF;TF-1;ModelForm;PreviewWindow'),el('MF;TF-1;ModelForm;PreviewWindow;p.h;close')]:[])]}});
  const outcome=(output,operation_id='read',action_key='workspace.observe')=>({status:'SUCCEEDED',action_key,
   action_revision:'1',operation_id,phase:'observed',effect_possible:false,cleanup_complete:true,error:null,trace:[],output});
- const execute=async code=>{
+ const execute=async (code,options)=>{
+  if(shortVerificationClock&&clockOffset)timeouts.push(options?.timeout);
   if(code.includes('"receipt_read":true')){
    if(receiptExpired)clockOffset=240001;
    const id=JSON.parse(code.match(/"receipt_id":("[^"]+")/)[1]);
@@ -409,6 +411,7 @@ async function verificationFixture({receiptExpired=false,lostPreview=false,previ
   const action=code.match(/"action":(\{"verb":[^}]+\})/);
   if(code.includes('async function browserArtifactDownload')){
    const id=JSON.parse(code.match(/\"receipt_id\":(\"[^\"]+\")/)[1]);
+   downloads.push(id);if(lostDownload)throw Error('Download response lost');
    value=outcome({destination:'/user/result.csv',artifact_id:'artifact',download_completed:true,output_binding:exportBinding,suggested_name:'result.csv'},id,'artifact.download');
    receipts.set(id,value);
   }else if(action){
@@ -438,12 +441,14 @@ async function verificationFixture({receiptExpired=false,lostPreview=false,previ
  };
  const ok=name=>async()=>{calls.push(name);return {verified:true,cleanup_complete:true,effect_possible:false};};
  const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[{ref:node,type:'imports.text',label:'Source',position:{x:320,y:280},inputs:[],outputs:[0]}],links:[],foreign_links:[]};
- const engine=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,browserRecovery:full,now:()=>Date.now()+clockOffset,
+ const engine=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,browserRecovery:full,now:()=>(shortVerificationClock?started:Date.now())+clockOffset,
   getStorageBinding:()=>({directories:{packages:'/user',inputs:'/user',exports:'/user'}}),
   artifactStore:{outputSessionId:'session',stageOutput:async binding=>{exportBinding=binding;return {artifact_id:'artifact',path:'/private/result.csv',
    verify:async(name,bytes)=>{assert.equal(name,'result.csv');assert.equal(bytes,57);return {artifact_id:'artifact',bytes,sha256:'abc'};},
    retain:async()=>retained.push(binding),release:async()=>{}};}},
-  execute,targetOrigin:'http://example.test',targetBuild:'7.4.2',onRecord:async e=>{events.push(e);return e;},
+  execute,targetOrigin:'http://example.test',targetBuild:'7.4.2',onRecord:async e=>{
+   if(shortVerificationClock&&e.phase==='node_step_prepared')clockOffset=239900;
+   events.push(e);return e;},
   nodeTargetAdapterFactory:()=>({observe:async()=>{if(changedAfterPreview&&closedPreview)throw Error('Final graph changed');return structuredClone(graph);},preflight:async()=>{}}),
   nodeApplyHandlers:new Map([[exportFile?'exports.text':'imports.text',{revision:'1',modes:['delimited'],validate:()=>{},
    configure:exportFile?async()=>({verified:true,cleanup_complete:true,configuration:{configured:{destination_check:exportCheck}}}):ok('configure')}]]),
@@ -453,7 +458,7 @@ async function verificationFixture({receiptExpired=false,lostPreview=false,previ
  await engine.runNodeApply({...request(),target:{kind:'existing',type:exportFile?'exports.text':'imports.text',ref:node},
   ...(exportFile?{parameters:{destination:'/user/result.csv',overwrite:exportCheck?.overwrite??'reject'}}:{})});
  if(released)await engine.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'released'});
- return {runtime:engine,calls,events,gestures,operation,retained,receipts};
+ return {runtime:engine,calls,events,gestures,operation,retained,receipts,downloads,timeouts};
 }
 
 test('an executed step is completed only with its verified schema',async()=>{
@@ -605,5 +610,60 @@ test('a receipt arriving after the verification deadline cannot confirm its gest
  const f=await verificationFixture({receiptExpired:true,released:true});
  const result=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-late',sequence:1});
  assert.equal(result.unconfirmed,true);
+ assert.equal(f.runtime.hasUnsettledWork(),true);
+});
+
+test('concurrent Save inspectors cannot release verification with a late old success',async()=>{
+ const saved={version:1,session_id:'session',document_id:'doc',account:'user',package_path:'/user/a.lgp',
+  modified:false,observation:'after_confirmed_save',read_only:true,persisted_content_verified:false};
+ const replies=[];let releaseReader,readerEntered;
+ const reading=new Promise(resolve=>{readerEntered=resolve;});
+ const engine=await saveWithReceipt({savedState:async()=>{readerEntered();return new Promise(resolve=>{releaseReader=()=>resolve(saved);});},
+  reconcile:outcome=>new Promise(resolve=>{replies.push(status=>resolve({...outcome,status,...(status==='SUCCEEDED'?{output:{
+   package_ref:{kind:'package',path:'/user/a.lgp',active_identity:'/user/a.lgp'},reopened:false,workflow_preserved:true,
+   save_completed:true,persisted_content_verified:false}}:{})}));})});
+ const first=engine.inspect({operationId:'save'}),second=engine.inspect({operationId:'save'});
+ replies[0]('AMBIGUOUS');await first;
+ const verification=engine.verifyBrowserRecovery('save',{attemptId:'br-overlap',sequence:1});
+ await reading;
+ replies[1]?.('SUCCEEDED');await second;
+ releaseReader();const result=await verification;
+ assert.equal(result.decision.result,'completed');
+ assert.equal(engine.hasUnsettledWork(),true,'late original reconcile must not clear the verification gate');
+ assert.equal(replies.length,1,'a concurrent inspect returns the current snapshot without another browser call');
+});
+
+test('an unknown export download retains its receipt and forbids replacement',async()=>{
+ const f=await verificationFixture({exportFile:true,lostDownload:true,
+  exportCheck:{verified:true,destination:'/user/result.csv',existed:false,overwrite:'replace'}});
+ const first=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-lost-export',sequence:1});
+ assert.equal(first.unconfirmed,true,JSON.stringify({unconfirmed:first.unconfirmed,decision:first.decision.result,
+  returned:f.gestures.some(a=>a.ref===request().workflow_ref.tab_tid),downloads:f.downloads}));
+ assert.equal(f.runtime.hasUnsettledWork(),true);
+ await assert.rejects(f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-lost-export',sequence:2}),/remains unsettled/);
+ assert.deepEqual(f.downloads,['br-lost-export:v1:export-download']);
+ assert.equal(f.gestures.some(a=>a.ref===request().workflow_ref.tab_tid),false,'unknown download cannot authorize cleanup navigation');
+});
+
+test('a late Save reader stays unverified without inventing an unknown gesture',async()=>{
+ let clock=0;
+ const engine=await saveWithReceipt({now:()=>clock,savedState:async()=>{
+  clock=240001;
+  return {version:1,session_id:'session',document_id:'doc',account:'user',package_path:'/user/a.lgp',modified:false,
+   observation:'after_confirmed_save',read_only:true,persisted_content_verified:false};
+ }});
+ await engine.inspect({operationId:'save'});
+ const result=await engine.verifyBrowserRecovery('save',{attemptId:'br-late-save',sequence:1});
+ assert.deepEqual([result.facts.saved_package.verified,result.decision.result,result.unconfirmed],[false,'unresolved',false]);
+ assert.equal(engine.hasUnsettledWork(),true);
+});
+
+test('short verification budget refuses a prepared gesture without inventing an unknown receipt',async()=>{
+ const f=await verificationFixture({shortVerificationClock:true});
+ const result=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-short',sequence:1});
+ assert.ok(f.events.some(e=>e.phase==='node_step_prepared'));
+ assert.deepEqual(f.timeouts,[],'no browser call may use the last 100 ms for a node observation');
+ assert.deepEqual(f.gestures,[],'the prepared gesture must not reach the browser');
+ assert.deepEqual([result.facts.execution.verified,result.decision.result,result.unconfirmed],[false,'unresolved',false]);
  assert.equal(f.runtime.hasUnsettledWork(),true);
 });
