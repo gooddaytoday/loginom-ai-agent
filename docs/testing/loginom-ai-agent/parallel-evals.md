@@ -10,7 +10,11 @@
 Production run с `EVAL_SLOTS_FILE` подключён и требует записанный ресурсный бюджет.
 Native prepare/verify двух пользователей на новом стенде прошли. Отдельный
 установленный CLI8b2ba2bf9b квалифицирован локальным HTTP429→200: JSON содержит
-retry, exit0/cleanup confirmed. Подключение наблюдений в harness ещё не завершено.
+retry, exit0/cleanup confirmed. Harness учитывает session retries и отдельно
+подписывает обязательные источники provider/judge; Dock transport остаётся
+unavailable в диагностике, наблюдаемый Dock429 исключает успешную приёмку.
+Судья использует evals-openai с прежней OpenAI auth и нулевыми HTTP/stream retries;
+VPN/local429 квалификация дала ровно1 запрос и закрытый unit без вызовов модели.
 Команды ниже не подтверждают A/B или модельную готовность. Не запускать старый `recover` для новой
 процедуры: адресный recover и цепочка эпох больше не входят в рабочий путь.
 [Перечень удержанных стендов и инцидентов](2026-10-16-evals-parallel-retained.md)

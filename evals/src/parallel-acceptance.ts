@@ -282,7 +282,7 @@ export function assessParallelLicence(input: { identity: ServerIdentity; users: 
 }
 
 // Receipt policy only: trusted producers must prove coverage before declaring it complete.
-export function assessParallelLimits(input: unknown) {
+export function assessParallelLimits(input: unknown, requiredSources: readonly ("provider" | "dock" | "judge")[] = ["provider", "dock", "judge"]) {
   const receipt = acceptanceObject(input)
   const events = Array.isArray(receipt.events) ? receipt.events : []
   const codes = events.flatMap(value => {
@@ -297,7 +297,7 @@ export function assessParallelLimits(input: unknown) {
     return []
   })
   const coverage = acceptanceObject(receipt.coverage)
-  const incomplete = ["provider", "dock", "judge"].flatMap(source => coverage[source] === "complete" ? [] : [`${source.toUpperCase()}_OBSERVABILITY_INCOMPLETE`])
+  const incomplete = requiredSources.flatMap(source => coverage[source] === "complete" ? [] : [`${source.toUpperCase()}_OBSERVABILITY_INCOMPLETE`])
   if (!Array.isArray(receipt.events)) incomplete.push("LIMIT_EVENTS_MISSING")
   if (events.some(event => !validLimitEvent(event))) incomplete.push("LIMIT_EVENT_INVALID")
   return { status: codes.length ? "failed" as const : incomplete.length ? "incomplete" as const : "passed" as const, codes: [...codes, ...incomplete] }
