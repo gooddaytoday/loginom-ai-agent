@@ -198,14 +198,14 @@ export async function bindColdExecutions({execute,sources,ctx,ownedExecutions}){
 
 // Inspect every saved export destination and cancel each unchanged wizard.
 // A node label, export basename or prior model receipt cannot select it.
-export async function observeExportDestinations({load,graph,channelFor,execute}){
+export async function observeExportDestinations({load,graph,channelFor,execute,includeInputFields=false}){
  const {openPreparedWizard}=await load('client/lib/node-wizard-open.mjs');
  const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
  const {selectPreparedGraphNode}=await load('client/lib/node-graph-selection.mjs');
  const {makeTextExportContextCode}=await load('client/lib/text-export-context.mjs');
  const destinations=[];
  for(const target of graph.nodes.filter(n=>n.type==='exports.text')){
-  const channel=channelFor(target.ref,'export-destination-'+target.ref.node_id);
+  const channel=channelFor(target.ref,(includeInputFields?'export-input-':'export-destination-')+target.ref.node_id);
   await channel.revealGraphNode();
   const selected=await channel.observe({condition:'cold exact export selection',ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
   await selectPreparedGraphNode(channel,selected,'cold select saved export',{refreshReplacedBody:true});
@@ -215,6 +215,23 @@ export async function observeExportDestinations({load,graph,channelFor,execute})
   try{
    await openPreparedWizard(channel);
    let s=await channel.observe({condition:'cold saved export destination page',ready:s=>['input_mapping','text_export_params'].includes(s.wizard?.stage)});
+   let input_fields;
+   if(includeInputFields){
+    if(s.wizard.stage==='text_export_params')await channel.perform({condition:'cold readonly export input page',initialObservation:s,
+     ready:s=>s.wizard?.stage==='text_export_params',identity:()=>target.ref,
+     resolve:s=>({verb:'wizard_step',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnPrev'&&e.allowed_actions.includes('wizard_step')),'export Previous').ref,expected_stage:'input_mapping'})});
+    s=await channel.observe({condition:'cold saved export input mapping',readMappings:true,
+     ready:s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified===true});
+    const m=s.node_mapping;
+    need(m.inventory_complete===true&&m.source_identity_verified===true&&m.settings_applied===false&&m.mapping_wizard==='TuneDataSourceMappingWizard'
+     &&m.node_context?.verified===true&&m.node_context.input_port?.port===0
+     &&['document_id','workflow_id','node_id'].every(k=>m.node_context[k]===target.ref[k])
+     &&Array.isArray(m.target_fields)&&m.target_fields.length>0&&m.target_fields.length===m.source_fields?.length
+     &&m.target_fields.every((f,i)=>f.index===i&&f.excluded!==true&&f.source&&f.name===f.source.name&&f.type===f.source.type
+      &&m.source_fields.filter(source=>['record_id','field_id','name','type'].every(k=>source[k]===f.source[k])).length===1)
+     &&new Set(m.target_fields.map(f=>f.source.name)).size===m.source_fields.length,'export input mapping unavailable');
+    input_fields=m.target_fields.map(f=>({name:f.name,source_name:f.source.name,type:f.type}));
+   }
    if(s.wizard.stage==='input_mapping')await channel.perform({condition:'cold readonly export parameters page',initialObservation:s,
     ready:s=>s.wizard?.stage==='input_mapping',identity:()=>target.ref,
     resolve:s=>({verb:'wizard_step',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step')),'export Next').ref,expected_stage:'text_export_params'})});
@@ -225,7 +242,7 @@ export async function observeExportDestinations({load,graph,channelFor,execute})
     &&observed.node_context?.verified===true&&observed.node_context.surface==='wizard'
     &&['document_id','workflow_id','node_id'].every(k=>observed.node_context?.[k]===target.ref[k])
     &&typeof observed.values?.destination?.value==='string','export destination unavailable');
-   destinations.push({node_id:target.ref.node_id,destination:observed.values.destination.value});
+   destinations.push({node_id:target.ref.node_id,destination:observed.values.destination.value,...(input_fields?{input_fields}:{})});
   }finally{
    const current=await channel.observe({condition:'cold export inspection cancellation surface',ready:()=>true});
    if(current.wizard?.status==='observed'){
