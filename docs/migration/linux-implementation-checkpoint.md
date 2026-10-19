@@ -1,5 +1,20 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-19 — v0.2.2 опубликован
+
+Release source: `a0c3eb758bd5b2d492aa525815f0e9009b3d8835`, ветка `loginom`.
+Новый annotated tag `v0.2.2`; существующие теги не менялись.
+CI39210148809 PASS на попытке2: Linux/Windows/macOS, общие тесты/typecheck,
+Chromium/cleanup и Linux DEB offline non-root matrix5/5.
+Первая macOS CLI build зависла в Bun и остановлена watchdog600s;
+неизменённый повтор PASS, первопричина зависания не установлена.
+Все30 GitHub digests,29 SHA256SUMS entries и bytes19 metadata файлов сверены.
+Три manifests подтверждают единый чистый source/version;30 публичных URLs HTTP200.
+Published2026-10-19T07:24:08Z, pre-release=true, latest=false, ID417009838.
+Установка и installed GUI/live приёмка не выполнялись; профили не менялись.
+Следующий шаг: installed/live приёмка точных артефактов при отдельном поручении.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-19-v0.2.2-release.md).
+
 ## 2026-10-16 — v0.2.1 опубликован
 
 Release source:`e98b2597492c0fcad18d3e72a8c7533ae10cfa30`,ветка `loginom`.
