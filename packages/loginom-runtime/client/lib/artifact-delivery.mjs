@@ -139,13 +139,18 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    if(!r.ui.elements.some(e=>e.tid?.includes(';FileStorageForm;'))) {
     // Global all-scope scans can fall back to roots on a populated graph.
     // Read the already observed toolbar directly to retain complete controls.
+    let toolbarTab;
     const readToolbar=async root=>{
      const sameOwner=s=>s.dom_epoch?.document===r.dom_epoch.document
-       &&JSON.stringify(s.workflow_ref)===JSON.stringify(r.workflow_ref)&&s.active_tab_ref===r.active_tab_ref;
+       &&JSON.stringify(s.workflow_ref)===JSON.stringify(r.workflow_ref);
      requireValue(sameOwner(root),'Delivery toolbar owner changed');
      const toolbar=one(root.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'Main toolbar root unavailable');
      const full=await detail(root,toolbar);
      requireValue(sameOwner(full),'Delivery toolbar owner changed');
+     // Roots carry the native tab identity in workflow_ref, but only a detail
+     // read issues active_tab_ref. Pin that ref across subsequent detail reads.
+     requireValue(typeof full.active_tab_ref==='string'&&(!toolbarTab||full.active_tab_ref===toolbarTab),'Delivery toolbar tab changed');
+     toolbarTab??=full.active_tab_ref;
      return full;
     };
     const reachable=s=>s.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'

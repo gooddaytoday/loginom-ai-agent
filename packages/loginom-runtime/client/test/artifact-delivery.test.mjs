@@ -58,6 +58,7 @@ for(const fault of [null,'document','workflow','tab','offscreen','disabled','mas
   if(opened)return result;
   const s=result.output;s.file_storage={status:'unobserved'};
   const narrow=!!options.rootRef;
+  if(!narrow)delete s.active_tab_ref;
   if(narrow)reads++;
   if(reads>=2){
    if(fault==='document')s.dom_epoch.document='foreign';
@@ -339,7 +340,7 @@ test('delivery reads the observed toolbar when a populated graph only yields roo
   assert.notEqual(options?.scope,'all','a global scan can fall back to roots');
   const root=options?.scope==='roots';
   if(!root)assert.deepEqual(options,{rootRef:'toolbar',observationId:'graph-observation'});
-  return {status:'SUCCEEDED',output:{observation_id:root?'graph-observation':'toolbar-observation',dom_epoch:{document:'doc',revision:1},
+  return {status:'SUCCEEDED',output:{observation_id:root?'graph-observation':'toolbar-observation',dom_epoch:{document:'doc',revision:1},...(root?{}:{active_tab_ref:'tab'}),
    ui:{elements:root?[{ref:'toolbar',tid:'MF;cntMain;tlbMainToolbar',allowed_actions:[]}]:[{ref:'files',tid:'MF;cntMain;tlbMainToolbar;btnFilestorage',enabled:true,visible:true,interaction:{state:'point_observed'},allowed_actions:['click']}],dialogs:[],masks:[]}}};
  };
  f.runtime.uiAct=async(a,o)=>{if(a.ref==='files'){assert.equal(o.observationId,'toolbar-observation');opened=true;return {status:'SUCCEEDED',cleanup_complete:true};}return act(a,o);};
