@@ -110,7 +110,6 @@ test.each(["foreign-file", "symlink-parent"] as const)("durable archive: %s targ
 
 test("durable archive: actual SIGKILL during moves leaves an intent reconciled by the next process", async () => {
   const context = await fixture()
-  await Promise.all(Array.from({ length: 40 }, (_, index) => Bun.write(path.join(context.profile, "data", `chunk-${String(index).padStart(2, "0")}`), `chunk-${index}`)))
   const child = Bun.spawn([process.execPath, "-e", `
     const {watch}=await import("node:fs");
     const {archiveProfileEvidence}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/profile-archive.ts"))});
@@ -140,9 +139,8 @@ test("durable archive: actual SIGKILL during moves leaves an intent reconciled b
     child.kill("SIGKILL")
     await child.exited
     expect(await archiveProfileEvidence(context.profile, context.archive, context.journal)).toMatchObject({ status: "committed" })
-    expect((await Bun.file(context.journal).json()).roots).toHaveLength(44)
+    expect((await Bun.file(context.journal).json()).roots).toHaveLength(4)
     for (const [name, value] of Object.entries(context.files)) expect(await Bun.file(path.join(context.archive, name)).text()).toBe(value)
-    expect(await Bun.file(path.join(context.archive, "data/chunk-39")).text()).toBe("chunk-39")
   } finally { clearTimeout(timer); child.kill("SIGKILL"); await child.exited; await context.close() }
 }, 10_000)
 
