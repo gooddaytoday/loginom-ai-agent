@@ -53,7 +53,10 @@ export async function configureLinRegression(channel,p,{request,inputMapping}){
  const observe=(kind,condition)=>channel.observe({condition,readLinRegression:true,ready:ready(kind)});
  let state=await observe('normalization','complete regression normalizers');const normalization=state.node_linregression;
  const used=roles.configuration.fields.filter(f=>f.usage_type!==0);
- need(same(normalization.fields.map(f=>f.name),used.map(f=>f.name))&&normalization.fields.every(f=>f.norm_type===0),'only unnormalized continuous predictors and target are supported');
+ // Loginom lists predictors before the target, independently of source order.
+ need(normalization.fields.length===used.length&&new Set(normalization.fields.map(f=>f.name)).size===used.length
+  &&normalization.fields.every(f=>f.norm_type===0&&used.filter(role=>['name','label','type','index'].every(k=>f[k]===role[k])).length===1),
+  'only unnormalized continuous predictors and target are supported');
  if(normalization.source_status==='Не активировано'){
   await channel.perform({condition:'activate connected regression input',initialObservation:state,ready:ready('normalization'),identity:s=>s.prepared_node_context,
    resolve:s=>({verb:'click',ref:one(s,e=>e.tid===s.wizard.root_tid+';NormTuneWizard;btnActivationPort'&&e.allowed_actions.includes('click'),'Input activation unavailable').ref})});
