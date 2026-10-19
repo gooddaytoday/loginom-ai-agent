@@ -31,6 +31,7 @@ export async function launchNodeHost(
     environment?: NodeJS.ProcessEnv
     strictRecovery?: boolean
     closeSavedPackageOnShutdown?: boolean
+    browserRecovery?: boolean
   },
   timing: { start?: number; close?: number; terminate?: number; teardown?: number } = {},
 ) {
@@ -167,6 +168,7 @@ export async function launchNodeHost(
         ...(input.closeSavedPackageOnShutdown !== undefined
           ? { closeSavedPackageOnShutdown: input.closeSavedPackageOnShutdown }
           : {}),
+        ...(input.browserRecovery !== undefined ? { browserRecovery: input.browserRecovery } : {}),
       },
       // Restored startup acknowledges local activation independently of the Help catalog.
       // Preserve the bounded private-host budget; explicit Help preflight is a separate request.

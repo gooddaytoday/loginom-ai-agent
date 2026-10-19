@@ -93,6 +93,11 @@ export async function createBridge(config, session, { browserTransport: managedB
   if (config.closeSavedPackageOnShutdown !== undefined && typeof config.closeSavedPackageOnShutdown !== 'boolean'
       || config.closeSavedPackageOnShutdown === true && config.acceptanceCleanupPackage)
     throw Error('Invalid private saved-package cleanup policy');
+  // Browser recovery leases the managed user-v1 page only; other modes keep their own browser contract.
+  if (config.browserRecovery !== undefined && typeof config.browserRecovery !== 'boolean'
+      || config.browserRecovery === true && (config.mode !== 'executor-replay' || config.resultProfile !== 'user-v1'
+        || !managedBrowserTransport))
+    throw Error('Invalid private browser recovery policy');
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
   const userWorkflows = createUserWorkflowBindings();

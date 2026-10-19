@@ -6,6 +6,7 @@ import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 import { HostTaskScope } from "./task-scope"
 import { Schema } from "effect"
 import { prepareTool } from "../../loginom-runtime/client/lib/skill.mjs"
+import { isBrowserRecoveryTool } from "../../loginom-runtime/client/lib/browser-recovery.mjs"
 
 const knowledgeTools = new Set(["find", "search", "read", "grep", "glob", "list", "tree"])
 const Admissions = Schema.Array(
@@ -249,7 +250,10 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         (run.applyingScope ||
           run.scope?.profile !== "loginom-automation" ||
           (data.method === "admit" && !service.hasRuntime(run.lease?.generation ?? -1, run.chat)) ||
-          (browserCall && "name" in input && typeof input.name === "string" && !run.catalog.has(input.name)))
+          (browserCall &&
+            "name" in input &&
+            typeof input.name === "string" &&
+            (!run.catalog.has(input.name) || (isBrowserRecoveryTool(input.name) && !service.browserRecovery))))
       )
         throw new Error("LOGINOM_SCOPE_DENIED")
       if (data.method !== "interrupt" && service.journal.pending().length) throw new Error("LOGINOM_RECOVERY_REQUIRED")
@@ -278,9 +282,11 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             automation && run.lease && service.hasRuntime(run.lease.generation, run.chat)
               ? await (await service.runtime(run.lease.generation, run.chat)).request("list")
               : undefined
+          // The runtime lists recovery tools only under its own capability; the host
+          // independently withholds them unless this launch carries it too.
           const browser =
             listed && typeof listed === "object" && "prepared" in listed && listed.prepared === true
-              ? catalogTools(listed)
+              ? catalogTools(listed).filter((tool) => service.browserRecovery || !isBrowserRecoveryTool(tool.name))
               : []
           run.catalog = new Set([prepareTool.name, ...browser.map((tool) => tool.name)])
           reply(

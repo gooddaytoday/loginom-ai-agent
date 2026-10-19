@@ -22,6 +22,7 @@ const env = {
   LOGINOM_AI_AGENT_BUMP: process.env["LOGINOM_AI_AGENT_BUMP"],
   LOGINOM_AI_AGENT_VERSION: process.env["LOGINOM_AI_AGENT_VERSION"],
   LOGINOM_AI_AGENT_RELEASE: process.env["LOGINOM_AI_AGENT_RELEASE"],
+  LOGINOM_AI_AGENT_BROWSER_RECOVERY: process.env["LOGINOM_AI_AGENT_BROWSER_RECOVERY"],
 }
 const CHANNEL = await (async () => {
   if (env.LOGINOM_AI_AGENT_CHANNEL) return env.LOGINOM_AI_AGENT_CHANNEL
@@ -65,6 +66,9 @@ export const Script = {
   },
   get release(): boolean {
     return !!env.LOGINOM_AI_AGENT_RELEASE
+  },
+  get browserRecovery(): boolean {
+    return env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1"
   },
   get team() {
     return team

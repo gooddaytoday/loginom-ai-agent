@@ -31,6 +31,8 @@ const env = {
   ...process.env,
   LOGINOM_AI_AGENT_CHANNEL: channel,
   LOGINOM_AI_AGENT_VERSION: args.version,
+  // Prod candidates always bake browser recovery; acceptance builds may set it explicitly.
+  LOGINOM_AI_AGENT_BROWSER_RECOVERY: process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY ?? (channel === "prod" ? "1" : "0"),
   MODELS_DEV_API_JSON: join(root, "packages/product/models.json"),
   CSC_IDENTITY_AUTO_DISCOVERY: "false",
   // PR builds need the same ad-hoc resource seal as local candidates.

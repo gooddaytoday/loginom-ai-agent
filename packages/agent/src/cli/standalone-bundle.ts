@@ -5,6 +5,8 @@ import { InstallationVersion } from "@loginom-ai-agent/core/installation/version
 
 export async function standaloneBundle() {
   const installed = resolve(dirname(process.execPath), "..")
+  // A development override is never a verified release bundle.
+  const verified = process.env.LOGINOM_AI_AGENT_CLI_BUNDLE === undefined
   const root =
     process.env.LOGINOM_AI_AGENT_CLI_BUNDLE ??
     (await verifyCliManifest(installed, {
@@ -30,5 +32,5 @@ export async function standaloneBundle() {
     ),
   )
   if (files.some((value) => !value)) throw new Error("LOGINOM_BUNDLE_INCOMPLETE")
-  return { resources, node, entry }
+  return { resources, node, entry, verified }
 }
