@@ -52,6 +52,16 @@ N1 iLakZJ дошёл до завершённой задачи:21 tools/0 errors/
 под judge lease, вход подтверждён без модели. Cleanup сохранил root из-за
 хешированного имени своего input. Проверка существующей delivery-квитанции
 (точное имя/размер/hash) подключена в normal cleanup и startup:12/72 unit PASS,
-typecheck/sh-n/diff PASS, Review Approved. Следующий шаг — native judge/штатный
-startup, затем полный N1.
+typecheck/sh-n/diff PASS, Review Approved. Native judge100 и startup cleanup
+подтверждены; исходные результаты не менялись.
 Исходные результаты и карантин сохранены, подробности — в едином архиве.
+
+Текущий блокер — внешние inspector/CDP установленного Desktop из другого чата.
+В s9821T первая задача завершилась с judge100/cleanup confirmed; вторая не запущена
+из-за guard `assertNoDebuggers`. Новый процесс не создавался;71 прежний process
+из6 подтверждённых receipts завершены. Fresh admin/Pool/backup/sessions/root/FD/
+profile checks подтвердили чистое состояние; только a20 server/profile holds сняты
+существующим CAS, без удаления и без создания отсутствующего cleanup.json.
+Evidence: `evidence/n1-debugger-settlement-20261019.json`. Нужен период без внешних
+inspector/CDP для полного N1/N2; чужой Desktop не трогать, guard не отключать.
+Вопрос владельцу отправлен только о согласовании окна с чатом «Выпустить версию 0.2.2».
