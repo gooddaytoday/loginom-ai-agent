@@ -9,16 +9,17 @@ import {compactNodeResult} from '../lib/user-results.mjs';
 
 const full={remaining:()=>({calls_remaining:30,ms_remaining:600000})};
 const refuse=()=>{throw new NodeReleaseBlocked('A Loginom wizard of another node is open','Ask the user to close it with Cancel.');};
-const saveWithReceipt=({receipt,now=Date.now,deadlineAt,onRecord}={})=>{
+const saveWithReceipt=({receipt,now=Date.now,deadlineAt,onRecord,status='AMBIGUOUS'}={})=>{
   const key='package.save_checkpoint',revision=actions.get(key).revision;
-  const outcome={status:'AMBIGUOUS',action_key:key,action_revision:revision,operation_id:'save',
+  const outcome={status,action_key:key,action_revision:revision,operation_id:'save',
     phase:'applied',effect_possible:true,cleanup_complete:true,error:null,trace:[],output:{}};
   const engine=runtime(new Page(),{now,onRecord,browserRecovery:full,getStorageBinding:()=>({document_id:'doc'}),execute:async code=>{
+    const other=code.includes('"operation_id":"other"');
     if(code.includes('"receipt_read":true'))return {status:'SUCCEEDED',action_key:'operation.inspect',
       action_revision:'1',operation_id:'save',phase:'observed',effect_possible:false,error:null,trace:[],
       output:typeof receipt==='function'?receipt(outcome):receipt};
-    if(code.includes('"receipt_namespace":'))return outcome;
-    return {...outcome,status:'NOT_APPLIED',phase:'prepared',effect_possible:false,
+    if(code.includes('"receipt_namespace":'))return other?{...outcome,operation_id:'other',status:'AMBIGUOUS'}:outcome;
+    return {...outcome,operation_id:other?'other':'save',status:'NOT_APPLIED',phase:'prepared',effect_possible:false,
       checkpoint:{document_id:'doc',workflow_ref:{workflow_id:'wf'}}};
   }});
   return engine.run(key,{path:'/user/a.lgp',conflict_policy:'replace'},
@@ -89,6 +90,35 @@ test('handoff records its verified result',async()=>{
   assert.deepEqual(events.find(event=>event.phase==='browser_recovery_handoff')?.result,proof);
 });
 
+test('handoff reports journal failure without losing confirmed browser proof',async()=>{
+  const engine=await saveWithReceipt({receipt:outcome=>({state:'completed',receipt:outcome}),
+    onRecord:async event=>{if(event.phase==='browser_recovery_handoff')throw Error('Journal unavailable');}});
+  const unsettled=engine.hasUnsettledWork();
+  const proof=await engine.browserRecoveryHandoff('save');
+  assert.equal(proof.verified,true);
+  assert.equal(proof.receipt_id,'save');
+  assert.match(proof.journal_error,/Journal unavailable/);
+  assert.equal(engine.hasUnsettledWork(),unsettled);
+});
+
+test('handoff reports refusal journal failure after a newer operation becomes pending',async()=>{
+  let engine,handoffs=0;
+  engine=await saveWithReceipt({status:'NOT_APPLIED',receipt:outcome=>({state:'completed',receipt:outcome}),
+    onRecord:async event=>{
+      if(event.phase!=='browser_recovery_handoff')return;
+      if(++handoffs===1){
+        await engine.run('package.save_checkpoint',{path:'/user/b.lgp',conflict_policy:'replace'},{operationId:'other'});
+        return;
+      }
+      throw Error('Refusal journal unavailable');
+    }});
+  const proof=await engine.browserRecoveryHandoff('save');
+  assert.equal(proof.verified,false);
+  assert.equal(proof.reason,'UNRELATED_UNSETTLED_WORK');
+  assert.match(proof.journal_error,/Refusal journal unavailable/);
+  assert.equal(engine.hasUnsettledWork(),true);
+});
+
 test('handoff bounds receipt polling by the original deadline and one minute',async()=>{
   let clock=0,reads=0;
   const engine=await saveWithReceipt({now:()=>clock,deadlineAt:600000,receipt:()=>{
@@ -98,6 +128,31 @@ test('handoff bounds receipt polling by the original deadline and one minute',as
     {verified:false,reason:'RECEIPT_UNSETTLED'});
   assert.equal(reads,3);
   assert.equal(clock,60000);
+});
+
+test('handoff does not accept a completed receipt outside the original deadline',async()=>{
+  let clock=0,reads=0;
+  const expired=await saveWithReceipt({now:()=>clock,deadlineAt:100,receipt:outcome=>{
+    reads++;return {state:'completed',receipt:outcome};
+  }});
+  clock=101;
+  assert.deepEqual(await expired.browserRecoveryHandoff('save'),
+    {verified:false,reason:'RECEIPT_UNSETTLED'});
+  assert.equal(reads,0);
+
+  clock=0;
+  const late=await saveWithReceipt({now:()=>clock,deadlineAt:100,receipt:outcome=>{
+    reads++;clock=101;return {state:'completed',receipt:outcome};
+  }});
+  assert.deepEqual(await late.browserRecoveryHandoff('save'),
+    {verified:false,reason:'RECEIPT_UNSETTLED'});
+
+  clock=0;
+  const journalLate=await saveWithReceipt({now:()=>clock,deadlineAt:100,
+    receipt:outcome=>({state:'completed',receipt:outcome}),
+    onRecord:async event=>{if(event.phase==='browser_recovery_handoff')clock=101;}});
+  assert.deepEqual(await journalLate.browserRecoveryHandoff('save'),
+    {verified:false,reason:'RECEIPT_UNSETTLED'});
 });
 
 test('handoff refuses a missing receipt or incomplete browser cleanup',async()=>{

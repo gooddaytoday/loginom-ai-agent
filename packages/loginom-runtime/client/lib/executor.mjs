@@ -2138,14 +2138,21 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     async browserRecoveryHandoff(id,{signal,pollMs=250}={}){
       signal?.throwIfAborted();
       const operation=operations.get(id);
+      const record=async result=>{
+        if(!browserRecovery)return null;
+        try{await onRecord({phase:'browser_recovery_handoff',operation_id:id,result});}
+        catch(error){return String(error?.message??error).slice(0,1000);}
+        return null;
+      };
       const finish=async result=>{
-        if(browserRecovery)try{await onRecord({phase:'browser_recovery_handoff',operation_id:id,result});}catch{}
-        if(result.verified&&unrelated()){
-          const refused={verified:false,reason:'UNRELATED_UNSETTLED_WORK'};
-          if(browserRecovery)try{await onRecord({phase:'browser_recovery_handoff',operation_id:id,result:refused});}catch{}
-          return refused;
+        const firstError=await record(result);
+        if(result.verified&&(unrelated()||now()>=until)){
+          const refused={verified:false,reason:unrelated()?'UNRELATED_UNSETTLED_WORK':'RECEIPT_UNSETTLED'};
+          const secondError=await record(refused);
+          const journalError=[firstError,secondError].filter(Boolean).join('; ');
+          return {...refused,...(journalError?{journal_error:journalError}:{})};
         }
-        return result;
+        return {...result,...(firstError?{journal_error:firstError}:{})};
       };
       const unrelated=()=>pending&&pending!==operation||running&&pending!==operation
         ||delivery.unsettled||sourceReads.busy||sourceReads.unsettled
@@ -2167,10 +2174,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(running||nodeJobs.busy||sourceReads.busy||delivery.busy)return finish({verified:false,reason:'EXECUTOR_STILL_RUNNING'});
       if(!operation.lastReceipt)return finish({verified:false,reason:'RECEIPT_MISSING'});
       while(true){
-        const state=await readReceipt(operation,operation.lastReceipt,Math.max(1,Math.min(10000,until-now())))
+        const remaining=until-now();
+        if(remaining<=0)return finish({verified:false,reason:'RECEIPT_UNSETTLED'});
+        const state=await readReceipt(operation,operation.lastReceipt,Math.min(10000,remaining))
           .catch(error=>({state:String(error?.message??error).includes('different identity')
           ?'identity_mismatch':'unsettled'}));
         signal?.throwIfAborted();
+        if(now()>=until)return finish({verified:false,reason:'RECEIPT_UNSETTLED'});
         if(state.state==='identity_mismatch')return finish({verified:false,reason:'RECEIPT_IDENTITY_MISMATCH'});
         if(state.state==='missing')return finish({verified:false,reason:'RECEIPT_MISSING'});
         if(state.state==='completed'&&state.receipt?.cleanup_complete===true){
