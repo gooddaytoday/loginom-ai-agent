@@ -66,3 +66,46 @@ test('duplicate deactivation breadcrumb requires native pending owner binding, n
   assert.equal(boundWizardDeactivationConfirmation(bad,binding),false,fault);
  }
 });
+
+test('an already owned wizard is accepted without another full observation',async()=>{
+ const {state}=fixture();state.ui={masks:[],dialogs:[],elements:[
+  {ref:'settings',tid:state.prepared_node_context.tid+';Setting',allowed_actions:['begin_wizard'],
+   wizard_open:{node:{node_label:'Import'},workflow_path:[{tid:'flow',label:'Scenario'}]}}]};
+ const after={...structuredClone(state),prepared_node_context:{...state.prepared_node_context,surface:'wizard'},
+  wizard:{status:'observed',owner_context:{status:'observed',node:{tid:'flow>Import',label:'Import'},
+   path:[{tid:'flow',label:'Scenario'},{tid:'flow>Import',label:'Import'},{tid:'settings',label:'Settings'}]}}};
+ let reads=0,gestures=0;
+ const channel={observe:async()=>{reads++;if(reads>2)throw Error('unexpected full reread');return reads===1?state:after;},
+  perform:async()=>{gestures++;}};
+ assert.equal((await openPreparedWizard(channel)).verified,true);
+ assert.equal(reads,2);assert.equal(gestures,1);
+});
+
+test('a wizard without an observed owner still requires the full owner read',async()=>{
+ const {state}=fixture();state.ui={masks:[],dialogs:[],elements:[
+  {ref:'settings',tid:state.prepared_node_context.tid+';Setting',allowed_actions:['begin_wizard'],
+   wizard_open:{node:{node_label:'Import'},workflow_path:[{tid:'flow',label:'Scenario'}]}}]};
+ const pending={...structuredClone(state),prepared_node_context:{...state.prepared_node_context,surface:'wizard'},
+  wizard:{status:'observed',owner_context:{status:'unobserved'}}};
+ const after={...structuredClone(pending),wizard:{status:'observed',owner_context:{status:'observed',
+  node:{tid:'flow>Foreign',label:'Foreign'},path:[{tid:'flow',label:'Scenario'},{tid:'foreign',label:'Foreign'},{tid:'settings',label:'Settings'}]}}};
+ let reads=0;
+ const channel={observe:async()=>[state,pending,after][reads++],perform:async()=>{}};
+ await assert.rejects(openPreparedWizard(channel),/owner differs/);
+ assert.equal(reads,3);
+});
+
+test('confirming deactivation requires a fresh owner observation after that gesture',async()=>{
+ const {state:question}=fixture(),state=structuredClone(question);
+ state.wizard_pending_owner={status:'absent'};state.ui={masks:[],dialogs:[],elements:[
+  {ref:'settings',tid:state.prepared_node_context.tid+';Setting',allowed_actions:['begin_wizard'],
+   wizard_open:{node:{node_label:'Import'},workflow_path:[{tid:'flow',label:'Scenario'}]}}]};
+ const after={...structuredClone(state),prepared_node_context:{...state.prepared_node_context,surface:'wizard'},
+  wizard:{status:'observed',owner_context:{status:'observed',node:{tid:'flow>Import',label:'Import'},
+   path:[{tid:'flow',label:'Scenario'},{tid:'flow>Import',label:'Import'},{tid:'settings',label:'Settings'}]}}};
+ let reads=0,gestures=0;
+ const channel={observe:async()=>{if(reads===2)assert.equal(gestures,2);return [state,question,after][reads++];},
+  perform:async()=>{gestures++;}};
+ assert.equal((await openPreparedWizard(channel)).verified,true);
+ assert.equal(reads,3);assert.equal(gestures,2);
+});

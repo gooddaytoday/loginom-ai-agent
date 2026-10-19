@@ -79,8 +79,10 @@ export async function openPreparedWizard(channel) {
  if(deactivationRequired)await channel.perform({condition:'confirm only this node deactivation',initialObservation:s,
   ready:s=>boundWizardDeactivationConfirmation(s,binding),identity:()=>binding,
   resolve:s=>({verb:'confirm_wizard_deactivation',ref:s.ui.elements.find(e=>e.tid==='msgbox;tlb;yes').ref})});
- const after=await channel.observe({condition:'prepared node wizard opened',ready:s=>s.wizard?.status==='observed'
-  &&s.wizard.owner_context?.status==='observed'&&s.prepared_node_context?.surface==='wizard'});
+ const opened=s=>s.wizard?.status==='observed'&&s.wizard.owner_context?.status==='observed'
+  &&s.prepared_node_context?.surface==='wizard';
+ const after=!deactivationRequired&&opened(s)?s
+  :await channel.observe({condition:'prepared node wizard opened',ready:opened});
  const owner=after.wizard.owner_context;
  const n=after.prepared_node_context,normalize=v=>typeof v==='string'?v.replace(/\s/g,''):'';
  const bound=n?.verified===true&&n.surface==='wizard'&&['document_id','workflow_id','node_id'].every(k=>typeof n[k]==='string'&&n[k]===binding.node[k]);
