@@ -98,7 +98,7 @@ export async function readGraph(page, task) {
         if(renderedPort.getAttribute('data-tid')===ptid && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && [...exact(ptid)].filter(e=>containers[0].contains(e)).length===1)portIdentities.set(p,{graph,node:n,cell:p.FCell,guid:p.FGuid,data:p.data,nodeTid:tid,type:p.FType,subtype:p.FSubType,tid:ptid});
         const suffix = ptid.slice(tid.length + 1), m = /^(Input|Output)_Data-(\d+)$/.exec(suffix);
-        if(type==='programming.javascript' && m && (p.FType!==1 || p.FSubType!==1))fail('JavaScript data port has a foreign native type');
+        if(type==='programming.javascript' && m && (p.FType!==(m[1]==='Input'?0:1) || p.FSubType!==1))fail('JavaScript data port has a foreign native type');
         allPorts.push(suffix);
         if (/^(Input|Output)_Connection-0$/.test(suffix) && p.parent===n && p.FCell.parent===n.FCell
           && [...exact(ptid)].filter(e=>containers[0].contains(e)).length===1)
