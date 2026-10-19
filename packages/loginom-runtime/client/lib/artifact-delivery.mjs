@@ -139,8 +139,21 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    if(!r.ui.elements.some(e=>e.tid?.includes(';FileStorageForm;'))) {
     // Global all-scope scans can fall back to roots on a populated graph.
     // Read the already observed toolbar directly to retain complete controls.
-    const toolbar=one(r.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'Main toolbar root unavailable');
-    const full=await detail(r,toolbar);
+    const readToolbar=async root=>{
+     const sameOwner=s=>s.dom_epoch?.document===r.dom_epoch.document
+       &&JSON.stringify(s.workflow_ref)===JSON.stringify(r.workflow_ref)&&s.active_tab_ref===r.active_tab_ref;
+     requireValue(sameOwner(root),'Delivery toolbar owner changed');
+     const toolbar=one(root.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar'),'Main toolbar root unavailable');
+     const full=await detail(root,toolbar);
+     requireValue(sameOwner(full),'Delivery toolbar owner changed');
+     return full;
+    };
+    const reachable=s=>s.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'
+      &&e.enabled===true&&e.visible===true&&e.allowed_actions.includes('click')&&e.interaction?.state==='point_observed').length===1;
+    let full=await readToolbar(r);
+    // Preparation can return while the toolbar is still outside the viewport.
+    // Wait for a fresh owned hit point; never send the known offscreen click.
+    if(!reachable(full))full=await ready('Files workspace control reachable',async()=>readToolbar(await roots()),reachable);
     const files=one(full.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'&&e.allowed_actions.includes('click')),'Files workspace control unavailable');
     await click(full,files);
    }
