@@ -2,10 +2,106 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
 import { chmod, mkdir, mkdtemp, readdir, rm, stat, symlink } from "node:fs/promises"
-import { cleanupSlotStorage, readDeliveredStorage, requireServerFilesClosed } from "../src/slot-storage"
+import { archiveSlotWorkspaces, cleanupSlotStorage, readDeliveredStorage, requireServerFilesClosed } from "../src/slot-storage"
 import { acquireEnvironmentLeases } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
+
+test("slot workspace archive preserves inputs outside the next attempt's mounted workspace", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-workspace-archive-")), fixture = await parallelFixture(root)
+  const slot = fixture.slots.slots[0]!, run = "run-owned", task = "analytic-task"
+  const out = path.join(root, "results", run, task, "1"), workspace = path.join(slot.workspaceRoot, run, task, "1")
+  const archive = await mkdtemp(path.join(slot.historyDir, "archive-"))
+  await mkdir(out, { recursive: true })
+  await Bun.write(path.join(workspace, "dataset.csv"), "Amount\n10\n20\n")
+  await Bun.write(path.join(slot.workspaceRoot, "foreign-run/keep.txt"), "keep")
+  try {
+    await archiveSlotWorkspaces(slot, archive, [`eval-${run}-${task}-1`], [out])
+    expect(await Bun.file(path.join(workspace, "dataset.csv")).exists()).toBe(false)
+    expect(await Bun.file(path.join(archive, "workspace", run, task, "1/dataset.csv")).text()).toBe("Amount\n10\n20\n")
+    expect(await Bun.file(path.join(slot.workspaceRoot, "foreign-run/keep.txt")).text()).toBe("keep")
+  } finally { await rm(root, { recursive: true }) }
+})
+
+test("startup workspace archive handles multiple attempts and already archived sources", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-workspace-startup-")), fixture = await parallelFixture(root)
+  const slot = fixture.slots.slots[0]!, run = "run-owned"
+  const attempts = ["task-a/1", "task-b/2"], prefixes = [`eval-${run}-task-a-1`, `eval-${run}-task-b-2`]
+  const outputs = attempts.map(attempt => path.join(root, "results", run, attempt))
+  const first = await mkdtemp(path.join(slot.historyDir, "normal-")), startup = await mkdtemp(path.join(slot.historyDir, "startup-"))
+  try {
+    for (const attempt of attempts) await Bun.write(path.join(slot.workspaceRoot, run, attempt, "input.csv"), attempt)
+    await archiveSlotWorkspaces(slot, first, [prefixes[0]!], [outputs[0]!])
+    await archiveSlotWorkspaces(slot, startup, prefixes, outputs)
+    await archiveSlotWorkspaces(slot, startup, prefixes, outputs)
+    expect(await Bun.file(path.join(first, "workspace", run, "task-a/1/input.csv")).text()).toBe("task-a/1")
+    expect(await Bun.file(path.join(startup, "workspace", run, "task-b/2/input.csv")).text()).toBe("task-b/2")
+    expect(await Bun.file(path.join(slot.workspaceRoot, run, "task-b/2/input.csv")).exists()).toBe(false)
+  } finally { await rm(root, { recursive: true }) }
+})
+
+for (const invalid of ["prefix", "run", "task", "attempt"]) test(`workspace archive preserves the whole batch on an invalid ${invalid} binding`, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-workspace-refusal-")), fixture = await parallelFixture(root)
+  const slot = fixture.slots.slots[0]!, archive = await mkdtemp(path.join(slot.historyDir, "archive-"))
+  const own = path.join(slot.workspaceRoot, "own-run/task/1/input.csv"), foreign = path.join(root, "foreign")
+  const bad = path.join(slot.workspaceRoot, "bad-run/task/1")
+  await Bun.write(own, "preserve own")
+  await Bun.write(path.join(foreign, "keep.txt"), "preserve foreign")
+  if (invalid === "prefix") await Bun.write(path.join(bad, "input.csv"), "preserve bad")
+  if (invalid !== "prefix") {
+    const alias = invalid === "run" ? path.join(slot.workspaceRoot, "bad-run") : invalid === "task" ? path.dirname(bad) : bad
+    await mkdir(path.dirname(alias), { recursive: true })
+    await symlink(foreign, alias)
+  }
+  try {
+    await expect(archiveSlotWorkspaces(slot, archive, ["eval-own-run-task-1", invalid === "prefix" ? "eval-unrelated-task-1" : "eval-bad-run-task-1"],
+      [path.join(root, "results/own-run/task/1"), path.join(root, "results/bad-run/task/1")])).rejects.toThrow("SLOT_WORKSPACE_OWNERSHIP_UNCONFIRMED")
+    expect(await Bun.file(own).text()).toBe("preserve own")
+    expect(await Bun.file(path.join(foreign, "keep.txt")).text()).toBe("preserve foreign")
+    expect(await readdir(archive)).toEqual([])
+  } finally { await rm(root, { recursive: true }) }
+})
+
+for (const existing of ["directory", "symlink"]) test(`workspace archive refuses an agent-created destination ${existing}`, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-workspace-destination-")), fixture = await parallelFixture(root)
+  const slot = fixture.slots.slots[0]!, archive = await mkdtemp(path.join(slot.historyDir, "archive-"))
+  const source = path.join(slot.workspaceRoot, "run-owned/task/1/input.csv"), foreign = path.join(root, "foreign")
+  await Bun.write(source, "preserve input")
+  await Bun.write(path.join(foreign, "keep.txt"), "preserve foreign")
+  if (existing === "directory") await Bun.write(path.join(archive, "workspace/keep.txt"), "preserve archived")
+  if (existing === "symlink") await symlink(foreign, path.join(archive, "workspace"))
+  try {
+    await expect(archiveSlotWorkspaces(slot, archive, ["eval-run-owned-task-1"], [path.join(root, "results/run-owned/task/1")])).rejects.toThrow()
+    expect(await Bun.file(source).text()).toBe("preserve input")
+    expect(await Bun.file(path.join(foreign, "keep.txt")).text()).toBe("preserve foreign")
+    expect(await readdir(foreign)).toEqual(["keep.txt"])
+  } finally { await rm(root, { recursive: true }) }
+})
+
+test("workspace archive requires the slot's own private history destination", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-workspace-history-")), fixture = await parallelFixture(root)
+  const slot = fixture.slots.slots[0]!, archive = await mkdtemp(path.join(root, "foreign-archive-"))
+  const source = path.join(slot.workspaceRoot, "run-owned/task/1/input.csv")
+  await Bun.write(source, "preserve input")
+  try {
+    await expect(archiveSlotWorkspaces(slot, archive, ["eval-run-owned-task-1"], [path.join(root, "results/run-owned/task/1")]))
+      .rejects.toThrow("SLOT_WORKSPACE_OWNERSHIP_UNCONFIRMED")
+    expect(await Bun.file(source).text()).toBe("preserve input")
+    expect(await readdir(archive)).toEqual([])
+  } finally { await rm(root, { recursive: true }) }
+})
+
+test("workspace archive with no admitted attempts leaves every workspace untouched", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-workspace-empty-")), fixture = await parallelFixture(root)
+  const slot = fixture.slots.slots[0]!, archive = await mkdtemp(path.join(slot.historyDir, "archive-"))
+  const source = path.join(slot.workspaceRoot, "run-owned/task/1/input.csv")
+  await Bun.write(source, "preserve input")
+  try {
+    await archiveSlotWorkspaces(slot, archive, [], [])
+    expect(await Bun.file(source).text()).toBe("preserve input")
+    expect(await readdir(archive)).toEqual([])
+  } finally { await rm(root, { recursive: true }) }
+})
 
 test("slot deletion refuses unconfirmed or unknown processes before native calls and preserves files", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-slot-delete-guard-")), fixture = await parallelFixture(root)
@@ -14,7 +110,8 @@ test("slot deletion refuses unconfirmed or unknown processes before native calls
   const journal = path.join(fixture.slots.controller.stateDir, "command.json")
   await writeLeaseReceipt(journal, { commandId: "cleanup-guard" })
   const environment = await acquireEnvironmentLeases(fixture.slots, 1, identity, journal, fixture.lockRoot)
-  const canary = path.join(fixture.slots.slots[0]!.workspaceRoot, "canary")
+  const out = path.join(root, "results/run-owned/task/1")
+  const canary = path.join(fixture.slots.slots[0]!.workspaceRoot, "run-owned/task/1/input.csv")
   await Bun.write(canary, "preserve")
   const process = { pid: 123, starttime: "1", uid: 1001, parent: 1, group: 1, session: 1, executable: "/unknown", device: 1, inode: 1 }
   try {
@@ -23,7 +120,7 @@ test("slot deletion refuses unconfirmed or unknown processes before native calls
         identity,
         async inspectSessionInventory() { throw Error("Native must not be called") },
         async closeUserSession() { throw Error("Native must not be called") },
-      }, { ...processes, processes: [], runtimeDirectories: [], writer: null, error: null, capture_complete: true }, ["eval-owned"]))
+      }, { ...processes, processes: [], runtimeDirectories: [], writer: null, error: null, capture_complete: true }, ["eval-run-owned-task-1"], [out]))
         .rejects.toThrow("SLOT_PROCESS_CLEANUP_UNCONFIRMED")
       expect(await Bun.file(canary).text()).toBe("preserve")
     }
