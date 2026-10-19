@@ -3655,7 +3655,7 @@ test('input port overflow caption requires native binding and the exact hidden c
 });
 
 async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
-  const caption=port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
+  const caption=vendor==='group'?'Входной источник данных':port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
   const {page,panel,crumbs}=await inputPortContextFixture();
   // Loginom 7.4.2 native diagnostic: 1280x800, input1 and Настройка hidden
   // by breadcrumb overflow; node/input/wizard icons remain in the same DOM.
@@ -3670,7 +3670,7 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
     if(i>=7)c.style.display='none';
     for(const icon of c.children)icon.box={x:c.box.x+1,y:c.box.y+1,width:16,height:16};
   }
-  crumbs[5].children[0].attrs.class=vendor==='union'?'bg-vendor-icon-uniondata':'bg-vendor-icon-joindata';
+  crumbs[5].children[0].attrs.class=vendor==='union'?'bg-vendor-icon-uniondata':vendor==='group'?'bg-vendor-icon-groupdata':'bg-vendor-icon-joindata';
   page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[7]).attrs.class='bg-vendor-icon-tunedatasourcesocketdef';
   if(mode==='wrong_icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
   if(mode==='wrong_caption')for(const c of crumbs.slice(7)) {
@@ -3718,9 +3718,9 @@ test('owned Union input observes its numbered hidden appended-table breadcrumb',
   assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
 });
 
-test('owned Union input keeps its exact hidden input folder and main-table breadcrumb',async()=>{
- for(const port of [0,1,2])for(const mode of ['valid','unnumbered','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','wrong_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
-  const {page}=await joinInputPortOverflowFixture(mode,port,'union');
+test('owned Union and Grouping inputs keep their exact hidden input folder and captions',async()=>{
+ for(const vendor of ['union','group'])for(const port of (vendor==='union'?[0,1,2]:[0]))for(const mode of ['valid','unnumbered','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','wrong_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
+  const {page}=await joinInputPortOverflowFixture(mode,port,vendor);
   const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
   const accepted=mode==='valid'||mode==='unnumbered'&&port===1;
   if(mode==='unnumbered')for(const [i,c] of crumbs.entries())if(i>=7){

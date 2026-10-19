@@ -762,12 +762,14 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       else if(panels.length===1&&inside(panels[0],panels[0])) {
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
         if(crumbs.length>32)context.status='bounded';
-        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||(i>=7||i===6&&crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1)&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
+        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
+              ||preparedInputPort?.port===0&&preparedInputPort.native_index===0&&crumbs[5].querySelectorAll('.bg-vendor-icon-groupdata').length===1))&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
           // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
           // Join input roles have fixed captions; retain the native port and node icon binding.
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
             &&(i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
-              &&crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
+              &&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
+              ||preparedInputPort?.port===0&&preparedInputPort.native_index===0&&crumbs[5].querySelectorAll('.bg-vendor-icon-groupdata').length===1)
               ||i===8&&e.textContent.trim()==='Настройка'||i===7&&(e.textContent.trim()==='Входной источник данных'
               ||preparedInputPort.port===0&&e.textContent.trim()==='Источник данных'
               ||preparedInputPort.port===0&&preparedInputPort.native_index===2&&e.textContent.trim()==='Источник данных запроса'
