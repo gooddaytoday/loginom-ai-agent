@@ -22,18 +22,18 @@ function fixture() {
   const page={evaluate:(fn,arg)=>vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context)};
   const enterWizard=()=>{class WizardModelComponentForm{};controller.FController=Object.assign(new WizardModelComponentForm(),{FModelNode:nodeTree.FModelNode});controller.Node.data.node={ParentNode:nodeTree};activeElements=[tab,wizard];};
   const enterViews=()=>{class ViewsForm{};const root=element('MF;TF-1;ViewsForm');controller.FController=Object.assign(new ViewsForm(),{FModelNode:nodeTree.FModelNode,FView:{el:{dom:root}}});controller.Node.data.node={ParentNode:nodeTree};activeElements=[tab,root];};
-  const enterPortWizard=()=>{
-    class WizardTreeNode{};class ModelPortTreeNode{};class ModelOutputPortsTreeNode{};class WizardModelComponentForm{};
-    Object.assign(app,{WizardTreeNode,ModelPortTreeNode,ModelOutputPortsTreeNode});
-    const group=Object.assign(new ModelOutputPortsTreeNode(),{ParentNode:nodeTree});
+  const enterPortWizard=(input=false)=>{
+    class WizardTreeNode{};class ModelPortTreeNode{};class ModelOutputPortsTreeNode{};class ModelInputPortsTreeNode{};class WizardModelComponentForm{};
+    Object.assign(app,{WizardTreeNode,ModelPortTreeNode,ModelOutputPortsTreeNode,ModelInputPortsTreeNode});
+    const group=Object.assign(input?new ModelInputPortsTreeNode():new ModelOutputPortsTreeNode(),{ParentNode:nodeTree});
     const portTree=Object.assign(new ModelPortTreeNode(),{ParentNode:group,FIndex:0,FModelNodePort:{}});
-    const w=Object.assign(new WizardTreeNode(),{ParentNode:portTree}),model=Object.assign(new WizardModelComponentForm(),{FModelEnginePort:{},FView:{el:{dom:wizard}}});
+    const w=Object.assign(new WizardTreeNode(),{ParentNode:portTree}),model=Object.assign(new WizardModelComponentForm(),{[input?'FModelSocket':'FModelEnginePort']:{},FView:{el:{dom:wizard}}});
     controller.Node.data.node=w;controller.FController=model;activeElements=[tab,wizard];
     const node={data:nodeTree.FModelNode,FGuid:'node'},port={data:portTree.FModelNodePort,parent:node,FPortIndex:0,FGuid:'port-guid'};
     const opening={phase:'verified',document_id:'doc',workflow_id:'flow',node_id:'node',wizard:model,nodeTree,portTree,
       workflow:workflowNode,packageNode,node,port,nodeData:node.data,portData:port.data,portGuid:port.FGuid,
-      nativeIndex:0,portIndex:0,enginePort:model.FModelEnginePort,operation_id:'open-port'};
-    preparation.outputPortOpenReceipts=new Map([['open-port',opening]]);return {opening,model,portTree,group};
+      nativeIndex:0,portIndex:0,enginePort:model[input?'FModelSocket':'FModelEnginePort'],operation_id:'open-port',...(input?{direction:'input'}:{})};
+    preparation[input?'inputPortOpenReceipts':'outputPortOpenReceipts']=new Map([['open-port',opening]]);return {opening,model,portTree,group};
   };
   return{binding,page,controller,enterPendingWizard:()=>{class WizardTreeNode{};app.WizardTreeNode=WizardTreeNode;
       const nt=nodeTree,wt=Object.assign(new WizardTreeNode(),{ParentNode:nt});graph.FDiagram.FNodes.FCollection[0].data=nt.FModelNode;
@@ -91,6 +91,15 @@ test('separate output wizard requires its verified opening receipt and exact nat
  for(const [i,change] of changes.entries()){const f=fixture(),p=f.enterPortWizard();change(f,p);assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false,String(i));}
 });
 
+
+test('port context reports the icon from the same verified native port owner',async()=>{
+ for(const input of [true,false])for(const icon of ['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata']) {
+  const f=fixture(),p=f.enterPortWizard(input);p.opening.node.FIconCls=icon;
+  const result=await readPreparedNodeContext(f.page,f.binding);
+  assert.equal(result.verified,true);assert.equal(result[input?'input_port':'output_port'].node_icon_class,icon);
+  p.opening.node.data={};assert.equal((await readPreparedNodeContext(f.page,f.binding)).verified,false);
+ }
+});
 
 test('overview breadcrumb identity comes from the same cached node tree GUID',async()=>{
  const f=fixture();assert.equal((await readPreparedNodeContext(f.page,f.binding)).navigation_node,undefined);

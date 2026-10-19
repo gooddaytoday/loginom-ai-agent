@@ -85,7 +85,7 @@ export async function readPreparedNodeContext(page, binding) {
           ||o.port.data!==portTree.FModelNodePort||o.port.parent!==o.node||o.port.FPortIndex!==undefined&&o.port.FPortIndex!==o.nativeIndex
           ||portTree.FIndex!==o.nativeIndex||!o.enginePort||(input?model.FModelSocket:model.FModelEnginePort)!==o.enginePort||model.FModelNode
           ||roots.length!==1||model.FView?.el?.dom!==roots[0])return reject('wizard_model');
-        outputPort={direction:input?'input':'output',port:o.portIndex,native_index:o.nativeIndex,port_guid:o.port.FGuid,opening_operation_id:o.operation_id};
+        outputPort={direction:input?'input':'output',port:o.portIndex,native_index:o.nativeIndex,port_guid:o.port.FGuid,opening_operation_id:o.operation_id,node_icon_class:o.node.FIconCls};
       }
       tid=b.workflow_ref.prefix+';WizrdMCF'; surface='wizard';
     } else if(model?.constructor?.name==='ViewsForm') {
