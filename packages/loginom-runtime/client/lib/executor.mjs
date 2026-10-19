@@ -24,7 +24,12 @@ import {createJavascriptSourceReadRegistry} from './javascript-source-read-regis
 import {createJavascriptSourceReadSession,validateJavascriptSourceReadRequest} from './javascript-source-read-session.mjs';
 import {createJavascriptContextReadSession,validateJavascriptContextReadRequest} from './javascript-context-read.mjs';
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
-import {classifyBrowserRecovery,browserRecoveryNextStep,browserRecoveryStepKey} from './browser-recovery-basis.mjs';
+import {readNativeExportFile} from './text-export-output.mjs';
+import {makeSavedPackageStateCode,parseSavedPackageState} from './package-persistence.mjs';
+import {proveNodeRestsQuiet} from './node-pending-release.mjs';
+import {createNodeExecutionProcedure} from './node-execution-procedure.mjs';
+import {openOwnedNativePreview,closeOwnedNativePreview} from './collapse-native-output.mjs';
+import {classifyBrowserRecovery,browserRecoveryNextStep,browserRecoveryStepKey,decideBrowserRecovery,BROWSER_RECOVERY_VERIFY_MS} from './browser-recovery-basis.mjs';
 import { configureTextImportDraft, validateTextImportRequest } from './text-import-procedure.mjs';
 import selectorCatalog from '../../executor/catalog/selectors.json' with { type: 'json' };
 
@@ -1575,7 +1580,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       deadline_at: operation.deadline ?? null, ...(outcome ? { outcome: structuredClone(outcome) } : {}) });
   };
   const recoveryBasis = (operation,allowRunning=false) => {
-    if(!browserRecovery||!operation?.outcome||pending&&pending!==operation||running&&!allowRunning
+    if(!browserRecovery||!operation?.outcome||pending&&pending!==operation&&pending.recoveryOperation!==operation||running&&!allowRunning
       ||nodeJobs?.busy&&nodeJobs.active?.operation_id!==operation.id||sourceReads?.unsettled||delivery?.unsettled)return null;
     const output=operation.outcome.output??{};
     const advice=recoveryAdvice(operation);
@@ -1583,7 +1588,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const request=operation.nodeApply?.request??operation.parameters;
     const storage=['package.save_checkpoint','package.save_as'].includes(operation.action.action_key)?getStorageBinding():null;
     const snapshot={operation_id:operation.id,capability:operation.action.capability,action_key:operation.action.action_key,
-      state:pending===operation?'pending':'settled',status:operation.outcome.status,
+      state:pending===operation||pending?.recoveryOperation===operation&&pending.originalPending?'pending':'settled',status:operation.outcome.status,
       effect_possible:operation.outcome.effect_possible,error_code:operation.outcome.error?.code,
       cause_code:operation.outcome.error?.cause?.code,stopped_error:operation.stoppedError,
       pending_phase:operation.nodeApply?.pending?.phase??output.pending_phase??null,
@@ -1823,6 +1828,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   };
   const reconcilePending = async () => {
     const operation = pending;
+    // Browser receipts prove gestures; only the durable recovery receipt may release this gate.
+    if(operation.recoveryOperation)return operation.outcome;
     if(['package.save_checkpoint','package.save_as'].includes(operation.action.action_key))operation.browserRecoveryReconciled=null;
     if(operation.action.capability==='node.apply')return inspectApply(operation);
     if(operation.action.capability==='node.target.internal'){try{return await inspectTarget(operation);}catch(error){return failed(operation,'RECONCILIATION_FAILED',String(error.message));}}
@@ -2135,6 +2142,81 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return result;
     },
     browserRecoveryBasis:id=>recoveryBasis(operations.get(id)),
+    async verifyBrowserRecovery(operationId,{attemptId,sequence}) {
+      checkId(attemptId);
+      if(!Number.isSafeInteger(sequence)||sequence<1)throw Error('Positive verification sequence required');
+      const operation=operations.get(operationId),basis=recoveryBasis(operation);
+      if(pending?.recoveryOperation&&(pending.recoveryOperation!==operation||pending.attemptId!==attemptId
+        ||!pending.verificationConfirmed))throw Error('Previous verification remains unsettled');
+      if(!basis)throw Error('Browser recovery basis unavailable');
+      const request=operation.nodeApply?.request??operation.parameters;
+      const node=basis.input.node;
+      const verification={id:attemptId+':v'+sequence,action:{action_key:'browser.recovery.verify',revision:'1'},
+        checkpoint:{document_id:basis.input.document_id,workflow_ref:request.workflow_ref},
+        nodeApply:{request},deadline:now()+BROWSER_RECOVERY_VERIFY_MS,recoveryOperation:operation,attemptId,
+        originalPending:pending===operation||pending?.originalPending===true};
+      checkId(verification.id);
+      if(operations.has(verification.id)||auxiliary.has(verification.id)||nodeJobs.has(verification.id))throw Error('Verification identity is already used');
+      verification.outcome=failed(verification,'BROWSER_RECOVERY_PENDING','Recovery verification awaits its durable receipt');
+      operations.set(verification.id,verification);pending=verification;running=true;observations.clear();
+      try{
+        const executeVerificationScript=async(code,options)=>{
+          const wrapped='async page => {const base={action_key:"browser.recovery.transport",action_revision:"1",operation_id:'
+            +JSON.stringify(verification.id)+',phase:"transport",effect_possible:true,trace:[]};try{return {...base,status:"SUCCEEDED",error:null,output:{value:await ('
+            +code+')(page)}};}catch(error){return {...base,status:"FAILED",cleanup_complete:false,output:{},error:{code:"BROWSER_RECOVERY_TRANSPORT",message:String(error.message).slice(0,500)}};}}';
+          const response=await execute(wrapped,{timeout:Math.max(1,verification.deadline-now()),...options});
+          if(response.status!=='SUCCEEDED')throw Error(response.error?.message??'Browser recovery transport failed');
+          return response.output.value;
+        };
+        const facts={};
+        const observe=async read=>{try{return await read();}catch(error){return {verified:false,reason:String(error.message??error)};}};
+        if(basis.step.kind==='save')facts.saved_package=await observe(async()=>{
+          const storage=getStorageBinding();
+          const binding={sessionId:storage?.session_id,documentId:storage?.document_id,account:storage?.loginom_account,
+            loginomUrl:storage?.origin,loginomBuild:storage?.loginom_build,packagePath:operation.parameters.path};
+          const raw=await executeVerificationScript(makeSavedPackageStateCode(binding));
+          const saved=parseSavedPackageState({content:[{type:'text',text:JSON.stringify(raw)}]},binding);
+          return {...saved,verified:saved.modified===false};
+        });
+        else{
+          verification.nodeTargetAdapter=targetAdapter(verification);
+          const channel=createNodeProcedure({operation:verification,execute:executeVerificationScript,record:onRecord,
+            targetOrigin,targetBuild,now,preparedNodeContext:{document_id:request.document_id,workflow_ref:request.workflow_ref,node},maxSteps:4096,
+            wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{
+              ...receiptOptions(verification,r.id,r.action_key,r.signature),operation_id:r.id})});
+          facts.workspace=await observe(()=>proveNodeRestsQuiet({operation:verification,channel,node}));
+          if(facts.workspace.verified){
+            if(basis.goal.execution)facts.execution=operation.nodeApply.execution_baseline
+              ?await createNodeExecutionProcedure(channel,node,{baseline:operation.nodeApply.execution_baseline}).verifyCompletion()
+              :{verified:false,reason:'NO_BASELINE'};
+            if(basis.goal.output_schema&&facts.execution?.verified)facts.output_schema=await observe(async()=>{
+              const ports=[];
+              for(const index of basis.goal.ports){
+                const handle=await openOwnedNativePreview(channel,{node},index);
+                await closeOwnedNativePreview(channel,{node},handle.port,handle.preview.root_tid);
+                ports.push(handle.preview);
+              }
+              return {verified:true,ports};
+            });
+            if(basis.goal.file)facts.export_file=await observe(async()=>{
+              const result=await readNativeExportFile({operation:verification,execute:executeVerificationScript,onRecord,
+                artifactStore,targetOrigin,targetBuild,storageDirectories:getStorageBinding()?.directories,
+                receiptOptions:(id,key,signature)=>receiptOptions(verification,id,key,signature)},
+              {document_id:request.document_id,workflow_ref:request.workflow_ref,node,deadline:verification.deadline,execution:facts.execution},
+              {destination:request.parameters.destination,configured:{destination_check:operation.nodeApply.phases
+                .find(phase=>phase.phase==='configure')?.value?.configuration?.configured?.destination_check}},facts.execution);
+              return {verified:true,...result};
+            });
+            facts.workspace=await observe(()=>proveNodeRestsQuiet({operation:verification,channel,node}));
+          }
+        }
+        const receipt=verification.lastReceipt&&now()<verification.deadline
+          ?await readReceipt(verification,verification.lastReceipt,Math.min(10000,verification.deadline-now())).catch(()=>null):null;
+        const unconfirmed=!!verification.lastReceipt&&(now()>=verification.deadline||receipt?.state!=='completed'||receipt.receipt?.cleanup_complete!==true);
+        verification.verificationConfirmed=!unconfirmed;
+        return {basis,facts,decision:decideBrowserRecovery(basis,facts),verification_id:verification.id,unconfirmed};
+      }finally{running=false;}
+    },
     async browserRecoveryHandoff(id,{signal,pollMs=250}={}){
       signal?.throwIfAborted();
       const operation=operations.get(id);
@@ -2252,6 +2334,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (operations.has(recoveryOperationId)) throw new Error('Recovery ID conflicts with an existing operation');
       const operation = operations.get(operationId);
       if (!operation || pending !== operation) throw new Error('Recovery requires the pending operation of this session');
+      if(operation.recoveryOperation)throw Error('Recovery verification awaits its durable receipt');
       if(operation.action.capability==='node.target.internal')throw new Error('Use the enclosing node procedure to resume this internal phase');
       if(operation.action.capability==='node.apply')return releaseApply(operation,{strategy,recoveryOperationId,signature,signal});
       if(operation.action.capability==='artifact.upload')throw new Error('Upload requires server transfer verification before recovery or abandonment');
@@ -2379,6 +2462,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return structuredClone(previous.outcome);
       }
       if (operations.has(operationId)) throw new Error('UI operation ID conflicts with an existing operation');
+      if(pending?.recoveryOperation)throw Error('Recovery verification awaits its durable receipt');
       if(pending?.action.capability==='node.apply')throw new Error('The original node phase must be verified before any UI repair');
       if(pending?.action.capability==='artifact.upload') {
         if(running || pending.transportUncertain || !pending.cleanupConfirmed)

@@ -5,15 +5,19 @@ import {fixture,request,stop} from './support/stopped-node-fixture.mjs';
 import {proved} from './support/stopped-node-fixture.mjs';
 import {browserRecoveryStepKey} from '../lib/browser-recovery-basis.mjs';
 import {actions,Page,runtime} from './support/executor-fixture.mjs';
+import {storageTidSuffix} from '../lib/storage-policy.mjs';
+import {createActionRuntime,parseCapabilityResult} from '../lib/executor.mjs';
 import {compactNodeResult} from '../lib/user-results.mjs';
 
 const full={remaining:()=>({calls_remaining:30,ms_remaining:600000})};
 const refuse=()=>{throw new NodeReleaseBlocked('A Loginom wizard of another node is open','Ask the user to close it with Cancel.');};
-const saveWithReceipt=({receipt,now=Date.now,deadlineAt,onRecord,status='AMBIGUOUS'}={})=>{
+const saveWithReceipt=({receipt,now=Date.now,deadlineAt,onRecord,status='AMBIGUOUS',savedState}={})=>{
   const key='package.save_checkpoint',revision=actions.get(key).revision;
   const outcome={status,action_key:key,action_revision:revision,operation_id:'save',
     phase:'applied',effect_possible:true,cleanup_complete:true,error:null,trace:[],output:{}};
-  const engine=runtime(new Page(),{now,onRecord,browserRecovery:full,getStorageBinding:()=>({document_id:'doc'}),execute:async code=>{
+  const engine=runtime(new Page(),{now,onRecord,browserRecovery:full,getStorageBinding:()=>({session_id:'session',document_id:'doc',loginom_account:'user',origin:'http://example.test',loginom_build:'7.4.2'}),execute:async code=>{
+    if(code.includes('action_key:"browser.recovery.transport"'))return typedBoundaryResult(code,savedState);
+    if(savedState&&code.includes('\"mode\":\"reconcile\"'))return outcome;
     const other=code.includes('"operation_id":"other"');
     if(code.includes('"receipt_read":true'))return {status:'SUCCEEDED',action_key:'operation.inspect',
       action_revision:'1',operation_id:'save',phase:'observed',effect_possible:false,error:null,trace:[],
@@ -357,4 +361,249 @@ test('Save loses its basis during a second reconcile and regains it after comple
   assert.equal(after.output.browser_recovery.next_step.effect,'save');
   assert.equal(engine.browserRecoveryBasis('save').trigger,'T4');
   assert.equal(calls,4);
+});
+
+async function typedBoundaryResult(code,value) {
+ const start=code.indexOf('output:{value:await ('),suffix=code.lastIndexOf(')(page)}};');
+ assert.ok(start>=0&&suffix>start,'fixed readers must use the typed transport');
+ const wrapped=code.slice(0,start)+'output:{value:await (async()=>value'+code.slice(suffix);
+ const response=await new Function('value','return ('+wrapped+')(null)')(value);
+ return parseCapabilityResult({content:[{type:'text',text:JSON.stringify(response)}]});
+}
+
+// Transport-boundary fixture: the real channel, console and Preview procedures
+// consume the same observations as their focused procedure tests.
+async function verificationFixture({receiptExpired=false,lostPreview=false,previewRefused=false,busy=false,changedAfterPreview=false,released=false,exportFile=false,exportCheck={verified:true,destination:'/user/result.csv',existed:false}}={}) {
+ const node={document_id:'doc',workflow_id:'wf',node_id:'new'},workflow=request().workflow_ref;
+ const context={...node,verified:true,surface:'graph',locked:false,tid:'graph-node'};
+ const calls=[],events=[],gestures=[],receipts=new Map();
+ let opened=false,selected=false,shown=false,preview=false,operation,files=false,exportBinding,closedPreview=false;
+ const retained=[];let clockOffset=0;
+ const el=(tid,allowed_actions=['click'])=>({tid,ref:'ui-'+Buffer.from(tid).toString('hex'),allowed_actions,signature:{tid}});
+ const port={index:0,port_guid:'port-0',tid:'MF;TF-1;Graph;Source;Output_Data-0',active:true};
+ const state=()=>({origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:files?{workflow_id:'files',prefix:'MF;TF-2',tab_tid:'files-tab'}:workflow,authenticated:true,
+  file_storage:files?{status:'observed',directory:'/user'}:undefined,
+  dom_epoch:{document:'doc',revision:1},scan:{complete:true},prepared_node_context:context,
+  wizard:{status:'absent'},nodes:[{node_ref:{workflow_ref:workflow,node_label:'Source'},bounding_box:{x:0,y:0,width:10,height:10},ports:[{tid:port.tid,ui_ref:el(port.tid).ref}]}],navigation_context:{status:'observed'},ui:{masks:[],dialogs:busy?[{ref:'ui-foreign',identity:{anchor_tid:'foreign'}}]:[],
+   truncated:{elements:false,masks:false,dialogs:false},elements:[el('MF;TF-1;ModelForm;cmpDiagram'),el('MF;cntMain;tlbMainToolbar'),
+    el('MF;cntMain;tlbMainToolbar;btnFilestorage'),el('MF;cntMain;cntWorkspace;Workspace;t.br'),el(workflow.tab_tid),el('files-tab'),
+    el('MF;TF-2;NavigationBar;NavigationPanel'),el('MF;TF-2;FileStorageForm;btnRefresh'),
+    el('MF;TF-2;FileStorageForm;pnlFileStorage;tbl'),
+    {...el('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix('result.csv'),['click','double_click']),label:'result.csv',storage_entry:{bytes:57}},
+    el('MF;TF-1;NavigationBar;NavigationPanel'),el('MF;cntMain;tlbMainToolbar;btnProgress'),{...el(port.tid,['click','press']),kind:'port'},
+    ...(opened?[el('ConsoleForm'),el('ConsoleForm;ProgressForm;trpProgress;grd;tbl',['right_click']),
+     el('ConsoleForm;btnClose'),el('child-row',['right_click'])]:[]),
+    ...(selected?[el('mnContextMenu;mniShowNodeToProcess',['show_process_node'])]:[]),
+    ...(preview?[el('MF;TF-1;ModelForm;PreviewWindow'),el('MF;TF-1;ModelForm;PreviewWindow;p.h;close')]:[])]}});
+ const outcome=(output,operation_id='read',action_key='workspace.observe')=>({status:'SUCCEEDED',action_key,
+  action_revision:'1',operation_id,phase:'observed',effect_possible:false,cleanup_complete:true,error:null,trace:[],output});
+ const execute=async code=>{
+  if(code.includes('"receipt_read":true')){
+   if(receiptExpired)clockOffset=240001;
+   const id=JSON.parse(code.match(/"receipt_id":("[^"]+")/)[1]);
+   return parseCapabilityResult({content:[{type:'text',text:JSON.stringify(outcome(receipts.has(id)?{state:'completed',receipt:receipts.get(id)}:{state:'running'}))}]});
+  }
+  const start=code.indexOf('output:{value:await (');
+  assert.ok(start>=0,'fixed readers must use the typed transport');
+  let value;
+  const action=code.match(/"action":(\{"verb":[^}]+\})/);
+  if(code.includes('async function browserArtifactDownload')){
+   const id=JSON.parse(code.match(/\"receipt_id\":(\"[^\"]+\")/)[1]);
+   value=outcome({destination:'/user/result.csv',artifact_id:'artifact',download_completed:true,output_binding:exportBinding,suggested_name:'result.csv'},id,'artifact.download');
+   receipts.set(id,value);
+  }else if(action){
+   const a=JSON.parse(action[1]);a.ref=Buffer.from(a.ref.slice(3),'hex').toString();gestures.push(a);
+   if(a.ref==='MF;cntMain;tlbMainToolbar;btnFilestorage')files=true;
+   if(a.ref===workflow.tab_tid)files=false;
+   if(a.ref==='MF;cntMain;tlbMainToolbar;btnProgress')opened=true;
+   if(a.ref==='ConsoleForm;btnClose')opened=false;
+   if(a.ref==='child-row')selected=true;
+   if(a.verb==='show_process_node')shown=true;
+   if(a.key==='F3'){preview=true;if(lostPreview)throw Error('Preview transport lost');}
+   if(a.ref.endsWith(';p.h;close')){preview=false;closedPreview=true;}
+   const id=JSON.parse(code.match(/"receipt_id":("[^"]+")/)[1]);
+   value=outcome(state(),id,'ui.act');
+   if(a.key==='F3'&&previewRefused){preview=false;value={...value,status:'NOT_APPLIED',error:{code:'PREVIEW_NOT_OPEN',message:'Preview did not open'}};}
+   receipts.set(id,value);
+  }else if(code.includes('function readNodeProcesses('))value={verified:true,inventory_complete:true,show_completed:true,
+   root_id:'root',node_context:context,processes:[
+    {process_id:'1',record_id:'group',parent_id:null,state:'completed',error:false,children_loaded:true,expanded:true,rendered:true},
+    {process_id:'1.1',record_id:'child',parent_id:'1',state:'completed',error:false,rendered:true,selected,process_tid:'child-row'}]};
+  else if(code.includes('function readOutputContext('))value={verified:true,node_selected:shown,ports:[port]};
+  else if(code.includes('function readNodePreviewSchema('))value={verified:preview,inventory_complete:true,port:0,
+   port_guid:port.port_guid,node_id:node.node_id,root_tid:'MF;TF-1;ModelForm;PreviewWindow',fields:[{name:'value',type:'integer'}]};
+  else if(code.includes('output:{value:await (async page=>(async function readPreparedNodeContext'))value=files?{verified:false}:context;
+  else value=outcome(state());
+  return typedBoundaryResult(code,value);
+ };
+ const ok=name=>async()=>{calls.push(name);return {verified:true,cleanup_complete:true,effect_possible:false};};
+ const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[{ref:node,type:'imports.text',label:'Source',position:{x:320,y:280},inputs:[],outputs:[0]}],links:[],foreign_links:[]};
+ const engine=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,browserRecovery:full,now:()=>Date.now()+clockOffset,
+  getStorageBinding:()=>({directories:{packages:'/user',inputs:'/user',exports:'/user'}}),
+  artifactStore:{outputSessionId:'session',stageOutput:async binding=>{exportBinding=binding;return {artifact_id:'artifact',path:'/private/result.csv',
+   verify:async(name,bytes)=>{assert.equal(name,'result.csv');assert.equal(bytes,57);return {artifact_id:'artifact',bytes,sha256:'abc'};},
+   retain:async()=>retained.push(binding),release:async()=>{}};}},
+  execute,targetOrigin:'http://example.test',targetBuild:'7.4.2',onRecord:async e=>{events.push(e);return e;},
+  nodeTargetAdapterFactory:()=>({observe:async()=>{if(changedAfterPreview&&closedPreview)throw Error('Final graph changed');return structuredClone(graph);},preflight:async()=>{}}),
+  nodeApplyHandlers:new Map([[exportFile?'exports.text':'imports.text',{revision:'1',modes:['delimited'],validate:()=>{},
+   configure:exportFile?async()=>({verified:true,cleanup_complete:true,configuration:{configured:{destination_check:exportCheck}}}):ok('configure')}]]),
+  nodeApplyDriverFactory:options=>{operation=options.operation;return {verifySource:ok('source'),mapPorts:ok('mapping'),openWizard:ok('open'),waitExecution:ok('execute'),readOutput:ok('read'),verifyContinuation:async()=>true,...(released?{releasePending:async()=>proved()()}:{}),
+   finish:async()=>{calls.push('finish');operation.nodeApply.execution_baseline={root_id:'root',node,roots:[]};throw Error('Local node cancellation requested');}};}});
+ if(exportFile)graph.nodes[0].type='exports.text';
+ await engine.runNodeApply({...request(),target:{kind:'existing',type:exportFile?'exports.text':'imports.text',ref:node},
+  ...(exportFile?{parameters:{destination:'/user/result.csv',overwrite:exportCheck?.overwrite??'reject'}}:{})});
+ if(released)await engine.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'released'});
+ return {runtime:engine,calls,events,gestures,operation,retained,receipts};
+}
+
+test('an executed step is completed only with its verified schema',async()=>{
+ const f=await verificationFixture();
+ const before=[...f.calls];
+ const result=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-1',sequence:1});
+ assert.deepEqual([result.facts.execution?.verified,result.facts.output_schema?.verified,result.decision.result],
+  [true,true,'completed'],JSON.stringify(result));
+ assert.deepEqual(f.calls,before);
+ assert.equal(result.verification_id,'br-1:v1');
+});
+
+test('a released T4 keeps the pending gate after an unconfirmed verification gesture',async()=>{
+ const f=await verificationFixture({lostPreview:true,released:true});
+ assert.equal(f.runtime.hasUnsettledWork(),false);
+ const result=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-1',sequence:1});
+ assert.equal(result.unconfirmed,true);
+ assert.equal(f.runtime.hasUnsettledWork(),true);
+ const count=f.gestures.length;
+ await assert.rejects(f.runtime.recover(result.verification_id,{strategy:'abandon_operation',recoveryOperationId:'verify-release'}),/durable receipt/);
+ await assert.rejects(f.runtime.uiAct({verb:'click',ref:'ui-unused'},{operationId:'repair',recoveryOperationId:result.verification_id}),/durable receipt/);
+ await f.runtime.run('package.save_checkpoint',{path:'/user/a.lgp',conflict_policy:'replace'},{operationId:'new-save'});
+ await assert.rejects(f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'again'}));
+ await f.runtime.inspect();
+ assert.equal(f.runtime.hasUnsettledWork(),true);
+ assert.equal(f.gestures.length,count);
+ await assert.rejects(f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-1',sequence:2}));
+});
+
+test('Save verifies the bound package through typed transport and MCP parsing without gestures',async()=>{
+ const savedState={version:1,session_id:'session',document_id:'doc',account:'user',package_path:'/user/a.lgp',
+  modified:false,observation:'after_confirmed_save',read_only:true,persisted_content_verified:false};
+ const engine=await saveWithReceipt({savedState,receipt:outcome=>({state:'completed',receipt:outcome})});
+ await engine.inspect({operationId:'save'});
+ const result=await engine.verifyBrowserRecovery('save',{attemptId:'br-save',sequence:1});
+ assert.deepEqual([result.facts.saved_package.verified,result.unconfirmed,result.decision.result],[true,false,'completed']);
+ assert.equal(engine.hasUnsettledWork(),true);
+ assert.throws(()=>parseCapabilityResult({content:[{type:'text',text:JSON.stringify(savedState)}]}),/no typed result/);
+});
+
+test('export verifies the file with this pass execution and fresh deadline through typed transport',async()=>{
+ const f=await verificationFixture({exportFile:true});
+ f.operation.deadline=Date.now()-1;
+ const result=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-export',sequence:1});
+ assert.equal(result.facts.execution.verified,true,JSON.stringify(result.facts));
+ assert.equal(result.facts.export_file?.verified,true,JSON.stringify(result.facts));
+ assert.equal(result.decision.result,'completed');
+ assert.equal(result.unconfirmed,false);
+ assert.equal(f.retained[0].execution_id,result.facts.execution.execution_id);
+ assert.equal(result.facts.export_file.verification_id,'br-export:v1:export-download');
+});
+
+test('an executed step whose Preview did not open stays unresolved',async()=>{
+ const f=await verificationFixture({previewRefused:true});
+ const result=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-1',sequence:1});
+ assert.deepEqual([result.facts.execution.verified,result.facts.output_schema.verified,result.decision.result,result.unconfirmed],
+  [true,false,'unresolved',false]);
+ assert.equal(f.gestures.filter(a=>a.key==='F3').length,1);
+});
+
+test('an older execution group never completes a step',async()=>{
+ const f=await verificationFixture();
+ f.operation.nodeApply.execution_baseline.roots=[{process_id:'1',record_id:'group',completed:true}];
+ const result=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-old',sequence:1});
+ assert.deepEqual([result.facts.execution.reason,result.decision.result],['NO_NEW_EXECUTION','continuable']);
+ assert.equal(f.gestures.some(a=>a.key==='F3'),false);
+});
+
+test('a busy workspace does no verification gestures and remains unresolved',async()=>{
+ const f=await verificationFixture({busy:true});
+ const result=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-busy',sequence:1});
+ assert.deepEqual([result.facts.workspace.verified,result.unconfirmed,result.decision.result],[false,false,'unresolved']);
+ assert.equal(result.facts.workspace.user_action,undefined);
+ assert.deepEqual(f.gestures,[]);
+ assert.equal(f.runtime.hasUnsettledWork(),true);
+});
+
+for(const released of [false,true])test('repeated finish replaces only its confirmed verification without replaying failed drivers: '+released,async()=>{
+ const f=await verificationFixture({released});
+ const before=[...f.calls];
+ const first=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-repeat',sequence:1});
+ assert.equal(f.runtime.hasUnsettledWork(),true);
+ await assert.rejects(f.runtime.verifyBrowserRecovery('apply',{attemptId:'another',sequence:2}));
+ await assert.rejects(f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-repeat',sequence:1}));
+ const second=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-repeat',sequence:2});
+ assert.deepEqual([first.verification_id,second.verification_id],['br-repeat:v1','br-repeat:v2']);
+ assert.deepEqual([first.decision.result,second.decision.result],['completed','completed']);
+ assert.deepEqual(f.calls,before);
+ assert.ok([...f.receipts.keys()].some(id=>id.startsWith('br-repeat:v1:')));
+ assert.ok([...f.receipts.keys()].some(id=>id.startsWith('br-repeat:v2:')));
+ await f.runtime.inspect();
+ assert.equal(f.runtime.hasUnsettledWork(),true);
+});
+
+for(const [name,exportCheck,result] of [
+ ['existing reject',{verified:true,destination:'/user/result.csv',existed:true,overwrite:'reject'},'unresolved'],
+ ['missing reject',null,'unresolved'],['missing replace',{overwrite:'replace'},'continuable'],
+])test('unproved export destination is not fresh: '+name,async()=>{
+ const f=await verificationFixture({exportFile:true,exportCheck});
+ const checked=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-export',sequence:1});
+ assert.deepEqual([checked.facts.export_file.verified,checked.decision.result],[false,result]);
+ assert.equal(f.gestures.some(a=>a.ref.endsWith('btnFilestorage')),false);
+ assert.deepEqual(f.retained,[]);
+});
+
+test('a missing baseline permits no execution or Preview gestures',async()=>{
+ const f=await verificationFixture();
+ delete f.operation.nodeApply.execution_baseline;
+ const result=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-empty',sequence:1});
+ assert.deepEqual([result.facts.execution.reason,result.decision.result],['NO_BASELINE','continuable']);
+ assert.deepEqual(f.gestures,[]);
+});
+
+test('the final workspace proof overrides the quiet graph before the passes',async()=>{
+ const f=await verificationFixture({changedAfterPreview:true});
+ const result=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-changed',sequence:1});
+ assert.deepEqual([result.facts.execution.verified,result.facts.output_schema.verified,result.facts.workspace.verified,result.decision.result],
+  [true,true,false,'unresolved']);
+});
+
+test('every requested output port must have a verified schema',async()=>{
+ const f=await verificationFixture();
+ f.operation.nodeApply.request.read.ports=[0,1];
+ const result=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-ports',sequence:1});
+ assert.deepEqual([result.facts.execution.verified,result.facts.output_schema.verified,result.decision.result],[true,false,'unresolved']);
+ assert.match(result.facts.output_schema.reason,/Active exact output required/);
+});
+
+for(const mutation of [{modified:true},{package_path:'/user/other.lgp'}])test('Save cannot complete with '+JSON.stringify(mutation),async()=>{
+ const savedState={version:1,session_id:'session',document_id:'doc',account:'user',package_path:'/user/a.lgp',
+  modified:false,observation:'after_confirmed_save',read_only:true,persisted_content_verified:false,...mutation};
+ const engine=await saveWithReceipt({savedState,receipt:outcome=>({state:'completed',receipt:outcome})});
+ await engine.inspect({operationId:'save'});
+ const result=await engine.verifyBrowserRecovery('save',{attemptId:'br-save',sequence:1});
+ assert.deepEqual([result.facts.saved_package.verified,result.unconfirmed,result.decision.result],[false,false,'unresolved']);
+});
+
+test('verification never crosses a newer pending operation',async()=>{
+ const f=fixture({release:proved(),browserRecovery:full});
+ await stop(f,'finish');
+ await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-1'});
+ await stop(f,'finish',{operationId:'other',target:{kind:'existing',type:'imports.text',ref:{document_id:'doc',workflow_id:'wf',node_id:'new'}}});
+ const before=f.runtime.nodeApplyStatus('other');
+ await assert.rejects(f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-1',sequence:1}),/basis unavailable/);
+ assert.deepEqual(f.runtime.nodeApplyStatus('other'),before);
+});
+
+test('a receipt arriving after the verification deadline cannot confirm its gesture',async()=>{
+ const f=await verificationFixture({receiptExpired:true,released:true});
+ const result=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-late',sequence:1});
+ assert.equal(result.unconfirmed,true);
+ assert.equal(f.runtime.hasUnsettledWork(),true);
 });
