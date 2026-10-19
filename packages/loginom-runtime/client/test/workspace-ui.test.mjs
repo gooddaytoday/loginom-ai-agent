@@ -4160,6 +4160,17 @@ test('native process console joins bounded grids and keeps ownership and executi
   }
 });
 
+function lostLinksPrompt(page,mode='lost_links') {
+  const prompt=page.add('div',null,'',{x:410,y:331,width:459,height:138});prompt.attrs.class='x-window';
+  page.add('h1',null,mode==='lost_links_title'?'Другой вопрос':'Loginom '+build,undefined,prompt).attrs.role='heading';
+  page.add('span',null,mode==='lost_links_text'?'Удалить выбранные поля?':'Обнаружены связи с несуществующими объектами. Вы хотите удалить все потерянные связи и продолжить?',undefined,prompt);
+  for(const [name,label,x] of [['yes','Удалить и продолжить',480],['no','Не удалять и продолжить',620],['cancel','Отмена',780]]){
+    const button=page.add('button','msgbox;tlb;'+name,mode==='lost_links_button'&&name==='yes'?'Продолжить':label,{x,y:430,width:120,height:28},prompt);
+    if(mode==='lost_links_disabled'&&name==='yes')button.disabled=true;
+    if(mode==='lost_links_duplicate'&&name==='yes')page.add('button','msgbox;tlb;yes',label,button.box,prompt);
+  }
+  return prompt;
+}
 async function inputPortFinishFixture(mode='valid') {
   const clock=fixtureClock(),f=await inputMappingLiveFixture(false,clock.Date),{page,owner,base,nodes}=f;
   const {inputPortBreadcrumbs}=await import('./input-port-breadcrumbs.fixture.mjs');
@@ -4172,9 +4183,20 @@ async function inputPortFinishFixture(mode='valid') {
   if(mode==='missing_context')crumbs[7].remove();
   if(mode==='missing_mapping')nodes.get(base+'colSourceName_Region').remove();
   if(mode==='duplicate_done')page.add('button',done.attrs['data-tid'],'Готово',done.box,owner);
-  let graph,node,label,toast,loading,waits=0;
+  let graph,node,label,toast,loading,prompt,waits=0;
   const click=page.mouse.click;page.mouse.click=async(...args)=>{
     await click(...args);if(mode==='still_open')return;
+    if(mode.startsWith('lost_links')){
+      if(!prompt){
+        prompt=lostLinksPrompt(page,mode);
+        if(mode==='lost_links_workflow')crumbs[4].ownText='Другой сценарий';
+        if(mode==='lost_links_mask')page.add('div',null,'Загрузка').attrs.class='x-mask-msg';
+        return;
+      }
+      if(mode==='lost_links_lost_reply')throw Error('Lost confirmation reply');
+      if(mode==='lost_links_repeat')return;
+      prompt.remove();
+    }
     owner.remove();for(const c of crumbs.slice(5))c.remove();
     if(mode==='wrong_workflow')crumbs[4].ownText='Другой сценарий';
     graph=page.add('div','MF;TF-5;ModelForm;cmpDiagram','',{x:48,y:71,width:1392,height:929});
@@ -4194,9 +4216,9 @@ async function inputPortFinishFixture(mode='valid') {
     if(mode==='churn')page.mutationObserver.pending.push({type:'attributes',target:node,attributeName:'style'});
     if(mode==='late_tab'&&waits===2)page.tab.attrs['data-tid']='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';
   };
-  if((mode.startsWith('ellipsis')&&mode!=='ellipsis_unbound')||mode.startsWith('suffix')||mode.startsWith('late_loading'))page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  if((mode.startsWith('ellipsis')&&mode!=='ellipsis_unbound')||mode.startsWith('suffix')||mode.startsWith('late_loading')||mode.startsWith('lost_links_native'))page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
     {expected_build:build,expected_origin:origin,...(mode==='late_loading_long'?{settlement_timeout_ms:120000}:{}),prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},
-    async()=>({verified:true,node_id:mode==='suffix_wrong_id'||mode==='late_loading_foreign_node'&&waits>=3?'other':'node',surface:graph?'graph':'wizard',tid:graph?(mode==='ellipsis_wrong_body'?'foreign':node.attrs['data-tid']):'MF;TF-5;WizrdMCF',...(!graph?{input_port:{direction:'input',port:0}}:{})})));
+    async()=>({verified:true,node_id:mode==='suffix_wrong_id'||mode==='late_loading_foreign_node'&&waits>=3||mode==='lost_links_native_foreign'&&prompt?'other':'node',surface:graph?'graph':'wizard',tid:graph?(mode==='ellipsis_wrong_body'?'foreign':node.attrs['data-tid']):'MF;TF-5;WizrdMCF',...(!graph?{input_port:{direction:'input',port:0}}:{})})));
   return {...f,done,waits:()=>waits};
 }
 
@@ -4230,6 +4252,38 @@ test('typed input-port finish uses one gesture and quiet exact graph return with
   }
 });
 
+test('input-port Done confirms the exact lost-links question once and retains all refusal cases',async()=>{
+  for(const mode of ['lost_links','lost_links_native','lost_links_text','lost_links_title','lost_links_button','lost_links_disabled','lost_links_duplicate','lost_links_workflow','lost_links_mask','lost_links_native_foreign','lost_links_repeat','lost_links_lost_reply']){
+    const {page}=await inputPortFinishFixture(mode),snapshot=await page.observe();
+    const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');assert.ok(done,mode);
+    const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot),success=['lost_links','lost_links_native'].includes(mode);
+    assert.equal(result.status,success?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+    assert.equal(page.events.filter(e=>e==='click').length,success||['lost_links_repeat','lost_links_lost_reply'].includes(mode)?2:1,mode);
+    assert.equal(result.trace.filter(e=>e.event==='wizard_lost_links_deleted').length,success||mode==='lost_links_repeat'?1:0,mode);
+    if(success)assert.ok(result.trace.some(e=>e.event==='input_port_finish_verified'));
+  }
+});
+test('ordinary input Done click never confirms a lost-links question',async()=>{
+  const {page}=await inputPortFinishFixture('lost_links'),snapshot=await page.observe();
+  const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');
+  const result=await page.act({verb:'click',ref:done.ref},snapshot);
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  assert.ok(!result.trace.some(e=>e.event==='wizard_lost_links_deleted'));
+});
+test('lost-links confirmation refuses a mutation after its final checked target',async()=>{
+  const {page}=await inputPortFinishFixture('lost_links'),snapshot=await page.observe();
+  const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port'),evaluate=page.evaluate.bind(page);
+  page.evaluate=(fn,arg)=>{
+    const yes=page.document.querySelectorAll('[data-tid="msgbox;tlb;yes"]')[0];
+    if(yes&&fn.toString().includes('state.captureMutations(state.observer.takeRecords());')&&fn.toString().includes('return {document:state.epoch')){
+      yes.ownText='Другой ответ';page.mutationObserver.pending.push({type:'childList',target:yes});
+    }
+    return evaluate(fn,arg);
+  };
+  const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot);
+  assert.equal(result.status,'AMBIGUOUS');assert.equal(result.error.code,'UI_EPOCH_CHANGED');
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+});
 test('input-port finish retries a timed graph read once without repeating Done',async()=>{
  for(const persistent of [false,true]) {
   const {page}=await inputPortFinishFixture('ellipsis'),snapshot=await page.observe();
@@ -4508,7 +4562,7 @@ function outputPortFinishFixture(mode='valid') {
   if(mode==='duplicate_done')page.add('button',done.attrs['data-tid'],'Готово',done.box,c.form);
   if(mode==='missing_auto')c.auto.remove();
   const click=page.mouse.click;let node,waits=0;
-  page.mouse.click=async(...args)=>{await click(...args);if(mode==='still_open')return;c.form.remove();for(const crumb of crumbs.slice(2))crumb.remove();
+  page.mouse.click=async(...args)=>{await click(...args);if(mode==='still_open')return;if(mode==='lost_links'){lostLinksPrompt(page);return;}c.form.remove();for(const crumb of crumbs.slice(2))crumb.remove();
     if(mode==='wrong_workflow')crumbs[1].ownText='Other';
     const graph=page.add('div','MF;TF-1;ModelForm;cmpDiagram','',{x:20,y:70,width:850,height:650});
     const key=mode==='wrong_node'?'Other':'Calc';node=page.add('g','MF;TF-1;Graph;'+key,'',{x:100,y:200,width:150,height:80},graph);
@@ -4519,6 +4573,13 @@ function outputPortFinishFixture(mode='valid') {
   return {page,waits:()=>waits};
 }
 
+test('output-port Done never confirms the input lost-links question',async()=>{
+  const {page}=outputPortFinishFixture('lost_links'),snapshot=await page.observe();
+  const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='output_port');assert.ok(done);
+  const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot);
+  assert.equal(result.status,'AMBIGUOUS');assert.equal(page.events.filter(e=>e==='click').length,1);
+  assert.ok(!result.trace.some(e=>e.event==='wizard_lost_links_deleted'));
+});
 test('typed output-port finish requires complete output mapping and its own port owner',async()=>{
   for(const mode of ['valid','missing_context','filtered','duplicate_done','missing_auto']){
     const {page}=outputPortFinishFixture(mode),s=await page.observe();const controls=s.ui.elements.filter(e=>e.wizard_finish?.mode==='output_port');

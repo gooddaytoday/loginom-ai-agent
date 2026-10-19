@@ -48,7 +48,7 @@ export function nodePlacementOverflow(view,occupied,min,max) {
  if(x<min||y<min||x>max||y>max)return null;
  return {x,y};
 }
-export async function revealNodePlacement({page,root,position,prefix,guard,remaining,readViewport,project,nodeId}) {
+export async function revealNodePlacement({page,root,position,prefix,guard,remaining,readViewport,project,nodeId,scrollNode=false}) {
  const within=(v,p)=>{
   const bounds=nodeId===undefined?{x:p.x,y:p.y,width:0,height:0}:v.node_bounds;
   if(!bounds||!Object.values(bounds).every(Number.isFinite))throw Error('Placement footprint unavailable');
@@ -95,6 +95,16 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
  // Loginom allocates outline IDs per form (cnt, cnt-1, ...). A global
  // cnt lookup can select a hidden outline belonging to another workflow.
  try {
+  // Existing targets can already have native scrollable canvas space. Reveal
+  // that exact drawing before zooming, preserving model-grid drag coordinates.
+  if(scrollNode&&nodeId!==undefined&&!within(view,point)){
+   await guard();remaining();
+   const b=view.node_bounds;
+   await gesture(()=>root.evaluate((e,delta)=>{e.scrollLeft+=delta.x;e.scrollTop+=delta.y;},
+    {x:b.x+b.width/2-(Math.max(view.x,0)+Math.min(view.x+view.width,view.viewportWidth))/2,
+     y:b.y+b.height/2-(Math.max(view.y,0)+Math.min(view.y+view.height,view.viewportHeight))/2}));
+   await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
+  }
   if(!within(view,point)) {
    await guard();remaining();
    const owner=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;cntDiagram')+']');

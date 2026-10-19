@@ -129,6 +129,24 @@ test('created node without verified rendered bounds cannot silently use a point'
  await assert.rejects(revealNodePlacement(f.args),/footprint unavailable/);assert.equal(f.state().clicks,0);
 });
 
+for(const fault of [null,'foreign','lost'])test('existing target scroll preserves native scale and refuses '+(fault??'no owner change'),async()=>{
+ const f=fixture();f.args.nodeId='existing';f.args.scrollNode=true;let scrolled=false;
+ const canvas={scrollLeft:0,scrollTop:0};
+ f.args.root.evaluate=async(fn,arg)=>{
+  if(typeof arg==='object'){
+   scrolled=true;fn(canvas,arg);
+   if(fault==='lost')throw Error('Lost native scroll reply');
+   return;
+  }
+  const v=structuredClone(f.state().v);
+  return {...v,scroll:{x:canvas.scrollLeft,y:canvas.scrollTop},node_bounds:{x:1600-canvas.scrollLeft,y:228-canvas.scrollTop,width:100,height:120}};
+ };
+ f.args.guard=async()=>{if(scrolled&&fault==='foreign')throw Error('Graph changed');};
+ if(fault){await assert.rejects(revealNodePlacement(f.args),e=>fault==='lost'?e.placement_navigation_unverified===true:e.message==='Graph changed');}
+ else {const r=await revealNodePlacement(f.args);assert.equal(r.fully_visible,true);assert.equal(r.view.scale,1);assert.equal(r.zoom_steps,0);}
+ assert.equal(f.state().clicks,0);assert.ok(canvas.scrollLeft>0);
+});
+
 function overflowFixture({foreign=false,missing=false,wrongIcon=false,ambiguous=false,changed=false,buffered=false}={}){
  const f=fixture();let menuOpen=false,triggers=0,items=0,clock=1000,lastHide=-Infinity,suppressed=0;
  const old=f.args.page.locator;
