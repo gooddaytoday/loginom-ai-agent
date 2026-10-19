@@ -104,10 +104,13 @@ export async function restConnectionCapability(page,t){
    await guard();need(await page.evaluate(b=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return c.FController===b.wizard&&c.Node.data.node.ParentNode===b.node&&b.wizard.FModelNode===b.node.FConnectionNode;},connectionOwner),'connection wizard owner changed');
    const value=name=>find(fields+name).locator('input').inputValue();
    return {name:await value('fldLabel'),base_url:await value('pedURL;ValueControl'),method:await value('pedVerb;ValueControl'),url_mode:await value('pedFieldType;ValueControl'),authentication:await value('txtAuth'),ignore_certificate:await find(fields+'pedIgnoreCertificateErrors;ValueControl').evaluate(e=>e.classList.contains('x-form-cb-checked')),
+    ...(t.connection.response_content_type!==undefined?{response_content_type:await value('pedResponseContentType;ValueControl')}:{}),
     parameters:await find(fields+'grdParams;tbl').locator('[data-tid^='+JSON.stringify(fields+'colName_')+']').evaluateAll(es=>es.filter(e=>e.getBoundingClientRect().width>0).map(e=>({name:e.textContent.trim(),tid:e.getAttribute('data-tid'),type:e.parentElement.querySelector('[data-columnid="colDataType"]')?.textContent.trim()})))};
   };
   let observed=await read();
   need(observed.method==='GET'&&observed.url_mode==='Строка запроса'&&observed.authentication==='Не требуется'&&!observed.ignore_certificate,'only GET/query without authentication and with certificate verification is supported');
+  if(t.connection.response_content_type!==undefined&&observed.response_content_type!==t.connection.response_content_type)
+   await fill(fields+'pedResponseContentType;ValueControl',t.connection.response_content_type);
   if(!existing.length){
    need(observed.parameters.length===0,'new connection unexpectedly has parameters');
    await fill(fields+'pedURL;ValueControl',t.connection.base_url);await fill(fields+'fldLabel',t.connection.name);
@@ -121,6 +124,7 @@ export async function restConnectionCapability(page,t){
    }
   }
   observed=await read();
+  need(t.connection.response_content_type===undefined||observed.response_content_type===t.connection.response_content_type,'allowed response Content-Type differs');
   need(observed.name===t.connection.name&&(!t.connection.base_url||observed.base_url===t.connection.base_url),'connection label or URL differs');
   need(JSON.stringify(observed.parameters.map(p=>p.name))===JSON.stringify(t.query_parameters.map(p=>p.name))&&observed.parameters.every(p=>p.type==='Строковый'),'saved query parameters differ');
   await click(wizard+';btnDone');await wait('connection wizard committed',()=>find(form+';cntTile;ListView;tbl').isVisible());await quiet();
@@ -130,6 +134,7 @@ export async function restConnectionCapability(page,t){
   need(await page.evaluate(b=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return c.Node.data.node.ParentNode===b.node&&c.FController.FModelNode===b.node.FConnectionNode;},connectionOwner),'saved connection owner differs');
   await connectionOwner.dispose();
   const persisted={name:await find(fields+'fldLabel').locator('input').inputValue(),base_url:await find(fields+'pedURL;ValueControl').locator('input').inputValue(),method:await find(fields+'pedVerb;ValueControl').locator('input').inputValue(),url_mode:await find(fields+'pedFieldType;ValueControl').locator('input').inputValue(),authentication:await find(fields+'txtAuth').locator('input').inputValue(),ignore_certificate:await find(fields+'pedIgnoreCertificateErrors;ValueControl').evaluate(e=>e.classList.contains('x-form-cb-checked')),
+   ...(t.connection.response_content_type!==undefined?{response_content_type:await find(fields+'pedResponseContentType;ValueControl').locator('input').inputValue()}:{}),
    parameters:await find(fields+'grdParams;tbl').locator('[data-tid^='+JSON.stringify(fields+'colName_')+']').evaluateAll(es=>es.filter(e=>e.getBoundingClientRect().width>0).map(e=>({name:e.textContent.trim(),tid:e.getAttribute('data-tid'),type:e.parentElement.querySelector('[data-columnid="colDataType"]')?.textContent.trim()})))};
   need(JSON.stringify(persisted)===JSON.stringify(observed),'saved connection readback differs');
   await click(wizard+';btnDone');await wait('connection readback closed',()=>find(form+';cntTile;ListView;tbl').isVisible());
@@ -150,9 +155,9 @@ export async function restConnectionCapability(page,t){
   const target=await find(graphTid).evaluate((e,y)=>{const m=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController,g=m.FDiagram.FmxGraph,r=e.getBoundingClientRect();const x=r.x+128*g.view.scale+g.view.translate.x*g.view.scale-e.scrollLeft;const py=r.y+y*g.view.scale+g.view.translate.y*g.view.scale-e.scrollTop;const hit=document.elementFromPoint(x,py);if(x<r.x||x>=r.right||py<r.y||py>=r.bottom||!hit||!(e===hit||e.contains(hit)))throw Error('Connection placement is outside visible graph');return{x,y:py};},Math.max(64,...beforeGraph.map(n=>n.y))+150);
   const source=await wait('reachable connection palette item',async()=>{try{return await point(find(item));}catch{return null;}});await guard();effect=true;await page.mouse.move(source.x,source.y);await page.mouse.down();
   try{await page.mouse.move(target.x,target.y,{steps:12});}finally{await page.mouse.up();}
-  const reference=await wait('connection graph reference',()=>page.evaluate(before=>{const m=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;const added=m.FDiagram.FNodes.FCollection.filter(n=>!before.some(b=>b.id===n.FGuid));if(added.length>1)throw Error('Unexpected graph additions');const n=added[0];if(!n)return null;const ports=(n.FPorts??[]).flatMap(p=>p.FCollection??[]);if(ports.length!==1||!m.FDiagram.FmxGraph.view.getState(ports[0].FCell)?.shape?.node?.getAttribute('data-tid')?.endsWith(';Output_Connection-0'))throw Error('New node is not a connection reference');return {node_id:n.FGuid};},beforeGraph));
+  const reference=await wait('connection graph reference',()=>page.evaluate(before=>{const m=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;const added=m.FDiagram.FNodes.FCollection.filter(n=>!before.some(b=>b.id===n.FGuid));if(added.length>1)throw Error('Unexpected graph additions');const n=added[0];if(!n)return null;const ports=(n.FPorts??[]).flatMap(p=>p.FCollection??[]);if(ports.length!==1)throw Error('New node is not a connection reference');const tid=m.FDiagram.FmxGraph.view.getState(ports[0].FCell)?.shape?.node?.getAttribute('data-tid');if(!tid)return null;if(!tid.endsWith(';Output_Connection-0'))throw Error('New node is not a connection reference');return {node_id:n.FGuid};},beforeGraph));
   await click(t.workflow_ref.prefix+';ModelForm;pnlVendorsContainer;p.h;p.t');await quiet();
-  return {verified:true,cleanup_complete:true,effect_possible:true,connection:{name:persisted.name,base_url:persisted.base_url,method:'GET',url_mode:'query',authentication:'none',verify_server_certificate:true,query_parameters:persisted.parameters.map(p=>p.name),reference_node_id:reference.node_id},document_id:t.document_id,workflow_id:t.workflow_ref.workflow_id};
+  return {verified:true,cleanup_complete:true,effect_possible:true,connection:{name:persisted.name,base_url:persisted.base_url,method:'GET',url_mode:'query',authentication:'none',verify_server_certificate:true,...(t.connection.response_content_type!==undefined?{response_content_type:persisted.response_content_type}:{}),query_parameters:persisted.parameters.map(p=>p.name),reference_node_id:reference.node_id},document_id:t.document_id,workflow_id:t.workflow_ref.workflow_id};
  }catch(error){return {verified:false,cleanup_complete:!effect,effect_possible:effect,error:String(error.message).slice(0,1000)};}
  finally{await owner.dispose();}
 }
