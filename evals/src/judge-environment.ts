@@ -28,6 +28,7 @@ export async function runOfflineJudge(config: EvalConfig, lockRoot = globalLockR
   await writeLeaseReceipt(journal, { ...record, state: "intent" })
   const lease = await acquireJudgeLease({ codexHome: environment.codexHome, journal, commandId, lockRoot })
   const scoped: EvalConfig = { ...config, judge: { ...config.judge,
+    systemd: config.judge.systemd || path.basename(config.judge.command[0] ?? "") === "codex",
     env: { ...config.judge.env, CODEX_HOME: environment.codexHome } } }
   let released = false
   let runDir: string | null = null
