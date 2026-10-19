@@ -56,12 +56,27 @@ typecheck/sh-n/diff PASS, Review Approved. Native judge100 и startup cleanup
 подтверждены; исходные результаты не менялись.
 Исходные результаты и карантин сохранены, подробности — в едином архиве.
 
-Текущий блокер — внешние inspector/CDP установленного Desktop из другого чата.
+Закрытый блокер — внешние inspector/CDP установленного Desktop из другого чата.
 В s9821T первая задача завершилась с judge100/cleanup confirmed; вторая не запущена
 из-за guard `assertNoDebuggers`. Новый процесс не создавался;71 прежний process
 из6 подтверждённых receipts завершены. Fresh admin/Pool/backup/sessions/root/FD/
 profile checks подтвердили чистое состояние; только a20 server/profile holds сняты
 существующим CAS, без удаления и без создания отсутствующего cleanup.json.
-Evidence: `evidence/n1-debugger-settlement-20261019.json`. Нужен период без внешних
-inspector/CDP для полного N1/N2; чужой Desktop не трогать, guard не отключать.
-Вопрос владельцу отправлен только о согласовании окна с чатом «Выпустить версию 0.2.2».
+Evidence: `evidence/n1-debugger-settlement-20261019.json`. Порты и процесс закрылись
+своим владельцем до полного N1; сообщение другому чату не требовалось и не отправлялось.
+
+Полный N1 DE1Srz завершён exit0:3/3 judge100/cleanup confirmed, leftovers[],
+resources/limits passed,840 samples/0 missed. Технических блокеров нет.
+Владелец2026-10-19 явно утвердил предусмотренный контрактом п.28 бюджет N2:
+host CPU95%/MemAvailable8GiB, Server2 cores/256MiB, Studio6 cores/1GiB,
+все обязательные FS5GiB/10000 inodes, swap free0. Файл предложения —
+`/home/kiselev/.local/state/loginom-evals/acceptance-20261016/n2-budget-proposed-20261019.json`,
+SHA2567b43211ba891232286e05e61c1844534cc7306ce03aa29aaa26077ce651380d7.
+Точная копия записана как `n2-budget-approved-20261019.json` до dispatch;
+private approval evidence сохранён. Source/CLI/catalog/task/rubric/judge pins
+сохраняются; изменения после N1 ограничены документацией при HEAD50b28da4db.
+Первый N2 qAdMiN не принят: A SESSION_STILL_PRESENT после CloseSession15ms,
+CPU хоста95.9253%>95%; B обе задачи100/cleanup confirmed. Fresh startup успешно
+подтвердил отсутствие сессии (closed[]) и очистил ровно два своих файла; server/
+profile брони released. Исходные результаты сохранены. Далее ограниченное ожидание
+readback после CloseSession по TDD и повторный N2 с тем же утверждённым бюджетом.
