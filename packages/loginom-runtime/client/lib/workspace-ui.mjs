@@ -663,11 +663,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&(tids.get(getTid(e)+'>Настройка')??[]).filter(child=>panels[0].contains(child)
             &&child.querySelectorAll('.maptree-icon-wizard').length===1).length===1;
         const overflowOutputFolder=e=>boundOutputOverflow&&preparedOutputPort.port===0
+          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-uniondata','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata'].includes(preparedOutputPort.node_icon_class)
           &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
           &&e.textContent.trim()==='Выходные порты'&&(getTid(e)??'').endsWith('>Выходные_порты')
           &&e.querySelectorAll('.maptree-icon-modeloutputports').length===1
           &&(tids.get((getTid(e)??'').slice(0,-'>Выходные_порты'.length))??[]).filter(parent=>panels[0].contains(parent)
-            &&visible(parent)&&parent.querySelectorAll('.bg-vendor-icon-groupdata,.bg-vendor-icon-sorting,.bg-vendor-icon-uniondata').length===1).length===1;
+            &&visible(parent)&&parent.querySelectorAll('.'+preparedOutputPort.node_icon_class).length===1).length===1;
         const overflowNodeSettings=e=>preparedNodeWizard===true&&getComputedStyle(e).display==='none'
           &&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
           &&e.textContent.trim()==='Настройка'&&(getTid(e)??'').endsWith('>Настройка')
@@ -776,16 +777,19 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if(panels.length>1)context.status='ambiguous';
       else if(panels.length===1&&inside(panels[0],panels[0])) {
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
+        const singleInputOverflow=preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===0
+          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata'].includes(preparedInputPort.node_icon_class)
+          &&crumbs.length===9&&crumbs[5].querySelectorAll('.'+preparedInputPort.node_icon_class).length===1;
         if(crumbs.length>32)context.status='bounded';
         else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
-              ||preparedInputPort?.port===0&&preparedInputPort.native_index===0&&crumbs[5].querySelectorAll('.bg-vendor-icon-groupdata,.bg-vendor-icon-sorting').length===1
+              ||singleInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1))&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
           // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
           // Join input roles have fixed captions; retain the native port and node icon binding.
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
             &&(i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
               &&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
-              ||preparedInputPort?.port===0&&preparedInputPort.native_index===0&&crumbs[5].querySelectorAll('.bg-vendor-icon-groupdata,.bg-vendor-icon-sorting').length===1
+              ||singleInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1)
               ||i===8&&e.textContent.trim()==='Настройка'||i===7&&(e.textContent.trim()==='Входной источник данных'
               ||preparedInputPort.port===0&&e.textContent.trim()==='Источник данных'
