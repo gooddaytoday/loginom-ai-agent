@@ -64,7 +64,7 @@
   - `classifyBrowserRecovery(view, history = []) → Basis | null`
   - `browserRecoveryStepKey(step) → string` (формат — общий контракт)
   - `browserRecoveryNextStep(basis, {calls_remaining, ms_remaining}) → object` (формат — общий контракт)
-  - `decideBrowserRecovery(basis, facts) → {result, verified, missing: string[]}`; конкретный `next_step` формирует executor в Task 6 из исходного request и фактического `attemptId`, после подтверждённой записи квитанции.
+  - `decideBrowserRecovery(basis, facts) → {result, verified, missing: string[]}`; конкретный `next_step` формирует executor в Task 6 из исходного request и фактического `attemptId`. Для `completed`/`continuable` он выдаётся после ACK квитанции; для `unresolved` — инструкция с missing без ссылки на несуществующую квитанцию.
 - `view` — срез операции, который собирает Task 2: `operation_id, capability, action_key, state ('pending'|'running'|'settled'), status, effect_possible, error_code, cause_code, pending_phase, released_phase, checkpoint_kind, execution_status, export_download_unconfirmed, export_overwrite, node {document_id, workflow_id, node_id} | null, target {kind, type}, request_finish, read_ports, transport_uncertain, recovery_options, next_tools, internal_resume_available, user_action, release_refused, stopped_error {code, cause_code}, browser_recovery_stopped, recovery_receipt_id, reconciled, document_id, package_path`.
 - Фаза шага в `step` — `pending_phase`; для T4 `execution` — `released_phase`, для T4 `export` — `read`. Так бюджет T4 делится с T1–T3 того же шага.
 - `Basis`: `{trigger, reason_code, effect, operation_id, step, goal: {execution, output_schema, ports, file, saved_package}, idempotent_retry}`.
