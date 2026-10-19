@@ -9,10 +9,14 @@ export function watchAttemptIncidents(directory: string, onIncident: (code: stri
         if (error.code === "ENOENT") return ""
         return "INCIDENT_OBSERVATION_UNCONFIRMED"
       })))).join("\n")
+    const retry = output.split("\n").some(line => {
+      try { const event = JSON.parse(line); return event?.type === "session.status" && event.status?.type === "retry" }
+      catch { return false }
+    })
     const observed = [
       ...(/\bLICEN[CS]E_(?:[A-Z]+_)*(?:DENIED|EXCEEDED|EXPIRED|ERROR)\b|\bE\w*Licen[cs]e\w*(?:Error|Limit|Exception)\b|лицензи[^\n"}]{0,120}(?:отказ|превыш|недоступ)|(?:отказ|превыш|недостат)[^\n"}]{0,120}лицензи/i.test(output) ? ["LICENCE_DENIED"] : []),
       ...(/"name"\s*:\s*"(?:APIError|ProviderAuthError|ProviderModelNotFoundError|ProviderInitError)"|"statusCode"\s*:\s*429\b|\bHTTP\s+429\b|(?:rate|usage)[_ -]?limit[_ -]?(?:exceeded|reached|error)|rate[_ -]?limited|too many requests|quota[_ -]?(?:exceeded|exhausted)|insufficient[_ -]?quota/i.test(output)
-        ? ["PROVIDER_ERROR_OBSERVED"] : []),
+        || retry ? ["PROVIDER_ERROR_OBSERVED"] : []),
       ...(output.includes("INCIDENT_OBSERVATION_UNCONFIRMED") ? ["INCIDENT_OBSERVATION_UNCONFIRMED"] : []),
     ]
     for (const code of observed.filter(code => !codes.has(code))) { codes.add(code); onIncident(code) }

@@ -210,9 +210,10 @@
   d2de003bf5c13a3ad7d9ee2256e8b7f1f05d64776d03dd3beb528f6d5133be41.
   Установленный бинарник: локальный HTTP429→200,2 запроса, busy/retry/idle,
   exit0/cleanup confirmed; private evidence `acceptance-20261016/evidence/cli-retry-20261019/`.
-- [ ] Подключить JSON status к проверке provider errors: busy→idle основной
+- [x] Подключить JSON status к проверке provider errors: busy→idle основной
   сессии, любой retry сохраняет отказ; старый/оборванный JSON и task tool не дают
   полного покрытия. Непустой существующий --title исключает запрос автозаголовка.
+  RED→GREEN: targeted CLI10/44, acceptance/incidents39/196 PASS; typecheck/diff PASS.
 - [ ] Отключить внутренние повторы выбранного provider судьи существующими
   request_max_retries/stream_max_retries=0; проверить локальным HTTP429 без модели.
 Новый Protocol/HTTP, сырой transport trace и новая система телеметрии не нужны.

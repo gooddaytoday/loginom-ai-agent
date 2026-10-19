@@ -146,6 +146,31 @@ test("parseEvents retains an explicit provider HTTP 429 without claiming complet
     finalText: "completed after retry", errors: ["APIError"] })
 })
 
+test("parseEvents preserves a recovered session retry as a provider failure without retaining its message", () => {
+  const parsed = parseEvents([
+    { type: "session.status", sessionID: "own", status: { type: "busy" } },
+    { type: "session.status", sessionID: "own", status: { type: "retry", attempt: 1, message: "private-canary" } },
+    { type: "text", sessionID: "own", part: { text: "recovered" } },
+    { type: "session.status", sessionID: "own", status: { type: "idle" } },
+  ].map(event => JSON.stringify(event)).join("\n"))
+  expect(parsed.limitEvidence.events).toEqual([{ source: "provider", kind: "retry" }])
+  expect(assessParallelLimits(parsed.limitEvidence)).toMatchObject({ status: "failed", codes: expect.arrayContaining(["PROVIDER_RETRY"]) })
+  expect(JSON.stringify(parsed.limitEvidence)).not.toContain("private-canary")
+  expect(parsed.finalText).toBe("recovered")
+})
+
+test("provider coverage requires a complete main session without delegated model work", () => {
+  const busy = { type: "session.status", sessionID: "own", status: { type: "busy" } }
+  const idle = { type: "session.status", sessionID: "own", status: { type: "idle" } }
+  const text = { type: "text", sessionID: "own", part: { text: "done" } }
+  const parse = (events: unknown[]) => parseEvents(events.map(event => JSON.stringify(event)).join("\n")).limitEvidence.coverage.provider
+  expect(parse([busy, text, idle])).toBe("complete")
+  for (const events of [[text], [busy, text], [idle, busy], [busy, text, { ...idle, sessionID: "foreign" }],
+    [busy, { type: "tool_use", sessionID: "own", part: { type: "tool", tool: "task" } }, idle]])
+    expect(parse(events)).toBe("unavailable")
+  expect(parseEvents([JSON.stringify(busy), "broken JSON", JSON.stringify(idle)].join("\n")).limitEvidence.coverage.provider).toBe("unavailable")
+})
+
 test("provider limit evidence keeps absent, textual and malformed observations incomplete", () => {
   for (const events of [[], [{ type: "text", part: { text: "APIError status 429" } }],
     [{ type: "error", error: { name: "CLI_TOOL_FAILED", data: { statusCode: 429 } } }],
@@ -361,7 +386,7 @@ test("runAgent: no_artifact закрывает наблюдённого detached
   }
 }, 15_000)
 
-test("runAgent: явно передаёт выбранный reasoning variant", async () => {
+test("runAgent: передаёт reasoning variant и непустой title без модельной генерации", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-variant-"))
   const command = fakeCommand()
   const argsFile = path.join(outDir, "args.json")
@@ -370,6 +395,7 @@ test("runAgent: явно передаёт выбранный reasoning variant",
     workdir: outDir, timeoutMs: 30_000, outDir, profileDir: outDir })
   const args = await Bun.file(argsFile).json()
   expect(args.slice(args.indexOf("--variant"), args.indexOf("--variant") + 2)).toEqual(["--variant", "low"])
+  expect(args.slice(args.indexOf("--title"), args.indexOf("--title") + 2)).toEqual(["--title", "eval-group-sum-qty"])
 })
 
 test("runAgent: недоступный /proc постороннего процесса не мешает cleanup", async () => {
