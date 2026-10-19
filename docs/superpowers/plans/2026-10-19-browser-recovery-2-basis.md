@@ -441,7 +441,7 @@ git commit -m "refactor(runtime): share quiet proof, keep execution baseline, op
 - Ошибка прохода оставляет факт `verified: false` с причиной; жесты не повторяются.
 - Если проверка делала жесты (`verification.lastReceipt` задан), метод перед возвратом сверяет эту квитанцию. Не `completed` с cleanup — `unconfirmed: true`: решение не применяется, `hasUnsettledWork()` остаётся истинным. Без жестов (нетихий граф, проверка Save) `unconfirmed: false`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Поверхность фикстуры — консоль и Preview из Task 4; базовая линия хранится в `operation.nodeApply.execution_baseline`.
 
@@ -487,13 +487,13 @@ test('an export file that existed before without replace is not fresh', async ()
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail** (`--test test/browser-recovery-executor.test.mjs`; Expected: FAIL)
+- [x] **Step 2: Run tests to verify they fail** (`--test test/browser-recovery-executor.test.mjs`; Expected: FAIL)
 
-- [ ] **Step 3: Implement** метод и канал проверки по Interfaces.
+- [x] **Step 3: Implement** метод и канал проверки по Interfaces.
 
-- [ ] **Step 4: Run tests to verify they pass** (команда Step 2 и `bun run test:upstream`; Expected: PASS)
+- [x] **Step 4: Run tests to verify they pass** (команда Step 2 и `bun run test:upstream`; Expected: PASS)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/loginom-runtime/client
