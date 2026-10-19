@@ -302,6 +302,7 @@ export async function verifyProfile(config: EvalConfig, command: AgentCommand) {
     view.url !== config.loginom.url || view.username !== config.loginom.username)
     throw new EvalFailure("PROFILE_NOT_PREPARED", 2)
   const saved = await Bun.file(path.join(config.profileDir, "config/loginom-ai-agent.json")).json().catch(() => undefined)
+  if (saved?.$schema === "urn:loginom-ai-agent:config") delete saved.$schema
   if (JSON.stringify(saved) !== JSON.stringify(agentConfigJson(config))) throw new EvalFailure("PROFILE_CONFIGURATION_DRIFT", 2)
   return view.state === "starting" ? checkStarting(command, 2) : observed
 }
