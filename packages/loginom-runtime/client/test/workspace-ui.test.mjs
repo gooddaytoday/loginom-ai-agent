@@ -1316,7 +1316,27 @@ function calculatorKeyboard(page,c,{corrupt=false,loseFocus=false}={}) {
     if(loseFocus && key==='ControlOrMeta+A')page.document.activeElement=page.document.body;
   };
   page.keyboard.type=async text=>{page.events.push('keyboard_type');c.state.text+=corrupt?'wrong':text;};
+  page.keyboard.insertText=async text=>{page.events.push('keyboard_insert_text');c.state.text+=corrupt?'wrong':text;};
 }
+
+test('Calculator replacement inserts literal quotes brackets and parentheses without an auto-close suffix',async()=>{
+  for(const text of ['RegExMatchedSubExp(Concat("args[^}]*",Chr(34),"Code",Chr(34),"[[:space:]]*:[[:space:]]*",Chr(34),"([^",Chr(34),"]*)"),Response,1)',
+    'Round(Revenue / Products, 2)']) {
+    const page=new Page(),c=calculatorDocument(page);calculatorKeyboard(page,c);
+    // The observed CodeMirror auto-close keymap leaves this suffix when the
+    // regex formula is typed character by character. Literal input avoids it.
+    page.keyboard.type=async value=>{page.events.push('keyboard_type');c.state.text+=value+(value.includes('[')?'"))':'');};
+    const snapshot=await page.observe(),record=snapshot.ui.elements.find(e=>e.tid===c.base+'cmpExpression');
+    const result=await page.act({verb:'replace_expression',ref:record.ref,text},snapshot);
+    assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+    assert.equal(c.state.text,text);
+    assert.equal(result.output.ui.elements.find(e=>e.ref===record.ref).calculator_editor.document.text,text);
+    assert.equal(page.events.filter(e=>e==='keyboard_insert_text').length,1);
+    assert.equal(page.events.filter(e=>e==='keyboard_type').length,0);
+    assert.equal(page.events.filter(e=>e==='Backspace').length,1);
+    assert.ok(result.trace.some(e=>e.event==='expression_text_verified' && e.settings_applied===false));
+  }
+});
 
 test('typed Calculator replacement confirms exact multiline and empty document via keyboard',async()=>{
   for(const text of ['Quantity * UnitPrice','a\n\n b','']) {
