@@ -78,7 +78,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    const ports=[];let restoration,returned;
    for(const port of read.ports){
     const schema=operation.parameters.parameters.schemas.find(s=>s.port===port)?.schema;
-    need(schema,'Retained output schema missing');
+    need(schema||schema===null&&operation.parameters.parameters.observed_schema===true,'Retained output schema missing');
     const table=await openNewOutputTable(channel,port,javascript?{openViews:({output})=>openManagedJavascriptOutputViews({
      prepared:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},node:ctx.node,output,
      deadline:ctx.deadline,targetOrigin,execute,record:onRecord,receiptOptions,

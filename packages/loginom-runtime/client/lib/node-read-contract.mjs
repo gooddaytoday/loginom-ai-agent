@@ -37,6 +37,7 @@ function retainedMappingSchemas(node,sourceId){
  });
 }
 export function buildNodeReadRequest(args,source){
+ if(source?.kind==='browser_recovery')return buildRecoveredReadRequest(args,source);
  const outcome=source?.outcome,node=outcome?.output,request=source?.parameters;
  // A release after a stopped read keeps the verified configuration and the
  // completed execution; only its output was not refreshed.
@@ -69,6 +70,24 @@ export function buildNodeReadRequest(args,source){
   mappings:[],finish:'execute',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
   budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
 }
+// A browser recovery receipt carries only runtime-proven release facts and the
+// model's attested settings. No schema is trusted from it: the read executes the
+// node fresh and returns the observed output schema as its own evidence.
+function buildRecoveredReadRequest(args,receipt){
+ const request=receipt.request;
+ need(receipt.status==='continuable'&&receipt.facts?.includes('node_released_on_quiet_graph')&&receipt.node&&request?.target
+  &&!['programming.javascript','exports.text'].includes(request.target.type),
+  'Invalid parameters.source_operation_id: this browser recovery receipt has no readable table node');
+ const ports=args.read?.ports??[0];
+ const budget=args.budget_ms??300000;
+ return {operation_id:args.operation_id,contract_revision:request.contract_revision,
+  document_id:receipt.node.document_id,workflow_ref:structuredClone(request.workflow_ref),
+  target:{kind:'existing',type:request.target.type,label:request.target.label,ref:structuredClone(receipt.node)},inputs:[],
+  mode:NODE_READ_MODE,parameters:{source_operation_id:args.source_operation_id,observed_schema:true,
+   schemas:ports.map(port=>({port,schema:null}))},
+  mappings:[],finish:'execute',read:{ports:structuredClone(ports),sample_rows:args.read?.sample_rows??10,require_exact_numbers:args.read?.require_exact_numbers??false},
+  budgets:{configure_ms:budget,execute_ms:budget,total_ms:budget}};
+}
 export function nodeReadHandler(handler){
  return {revision:handler.revision+':read-existing-v1',modes:[NODE_READ_MODE],
   validate(parameters,mode,request){
@@ -76,7 +95,8 @@ export function nodeReadHandler(handler){
     &&request.finish==='execute'&&request.read.coverage!== 'full'&&handler.fileOutput!==true,
     'Existing-output reads cannot create nodes, configure ports or export files');
    const javascript=request.target.type==='programming.javascript';
-   need(parameters&&Object.keys(parameters).sort().join(',')===(javascript?'javascript_source,schemas,source_operation_id':parameters.cross_table_policy?'cross_table_policy,schemas,source_operation_id':'schemas,source_operation_id')
+   const observed=parameters?.observed_schema===true;
+   need(parameters&&Object.keys(parameters).sort().join(',')===(javascript?'javascript_source,schemas,source_operation_id':parameters.cross_table_policy?'cross_table_policy,schemas,source_operation_id':observed?'observed_schema,schemas,source_operation_id':'schemas,source_operation_id')
     &&typeof parameters.source_operation_id==='string'
     &&Array.isArray(parameters.schemas)&&parameters.schemas.length===request.read.ports.length&&parameters.schemas.length>0,
     'Verified local output schemas required');
@@ -90,6 +110,11 @@ export function nodeReadHandler(handler){
      utf8_bytes:parameters.javascript_source?.source_utf8_bytes,lf_lines:parameters.javascript_source?.source_lf_lines});
     need(Object.keys(parameters.javascript_source).sort().join(',')==='source_lf_lines,source_sha256,source_utf8_bytes'
      &&parameters.schemas.length===1&&parameters.schemas[0].port===0,'Source-bound JavaScript output 0 required');
+   }
+   if(observed){
+    need(!javascript&&request.read.ports.every(port=>parameters.schemas.filter(s=>s.port===port&&s.schema===null).length===1),
+     'Observed-schema reads bind every read port without a retained schema');
+    return;
    }
    for(const port of request.read.ports){
     const matches=parameters.schemas.filter(s=>s.port===port);
@@ -111,6 +136,11 @@ function javascriptReadSourceBinding(source){
  return {source_sha256:source.sha256,source_utf8_bytes:source.utf8_bytes,source_lf_lines:source.lf_lines};
 }
 export function alignReadSchema(actual,expected){
+ // Observed-schema reads (browser recovery receipts) take the fresh schema as evidence.
+ if(expected===null){
+  need(actual.length>0&&new Set(actual.map(f=>f.name)).size===actual.length,'Observed output schema is empty or ambiguous');
+  return actual.map((field,index)=>({...field,index}));
+ }
  const changed=message=>{
   const error=Error(message+'. Observed field names: '+JSON.stringify(actual.map(f=>f.name)).slice(0,220)
    +'. The source_operation_id is stale. Cancel this stopped read with dock_node_cancel and confirm cleanup_complete:true. '

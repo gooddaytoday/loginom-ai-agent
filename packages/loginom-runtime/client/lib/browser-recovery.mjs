@@ -6,11 +6,13 @@ import { createHash, randomUUID } from 'node:crypto';
 // leaks into the model's catalog (design 2026-10-19-browser-recovery, §6-§9).
 export const browserRecoveryToolName = 'dock_browser_recovery';
 
+// Playwright MCP 0.0.82 marks browser_press_sequentially, browser_check and
+// browser_uncheck skill-only, so MCP never lists them; browser_type (slowly),
+// browser_click and browser_fill_form cover the same gestures.
 export const recoveryBrowserTools = Object.freeze([
   'browser_snapshot', 'browser_find', 'browser_take_screenshot', 'browser_click', 'browser_hover', 'browser_type',
-  'browser_press_sequentially', 'browser_press_key', 'browser_fill_form', 'browser_select_option', 'browser_check',
-  'browser_uncheck', 'browser_drag', 'browser_mouse_click_xy', 'browser_mouse_drag_xy', 'browser_mouse_move_xy',
-  'browser_mouse_wheel', 'browser_handle_dialog', 'browser_wait_for',
+  'browser_press_key', 'browser_fill_form', 'browser_select_option', 'browser_drag', 'browser_mouse_click_xy',
+  'browser_mouse_drag_xy', 'browser_mouse_move_xy', 'browser_mouse_wheel', 'browser_handle_dialog', 'browser_wait_for',
 ]);
 
 const recoveryBrowserToolSet = new Set(recoveryBrowserTools);
