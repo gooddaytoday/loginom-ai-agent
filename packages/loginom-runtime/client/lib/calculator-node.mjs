@@ -298,6 +298,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
      // existing pinned console before launch, rather than opening it afterward.
      executionDriver=createNodeExecutionProcedure(channel,ctx.node);
      await executionDriver.prepare({keepConsoleOpen:true});
+     await channel.revealGraphNode();
     }
     let training;
     if(mode==='execute'&&implementation?.beforeGraphExecute){
