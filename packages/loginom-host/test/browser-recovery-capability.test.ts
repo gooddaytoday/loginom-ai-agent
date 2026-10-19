@@ -87,8 +87,8 @@ test.each([undefined, false, true])(
         .split("\n")
         .map((line) => JSON.parse(line))
       // An environment variable never enables the capability.
-      expect(starts.filter((value) => value.chat === "chat")).toEqual([
-        { chat: "chat", browserRecovery: capability === true },
+      expect(starts.filter((value) => value.chat !== "readiness").map((value) => value.browserRecovery)).toEqual([
+        capability === true,
       ])
       await rm(directory, { recursive: true, force: true })
     }
