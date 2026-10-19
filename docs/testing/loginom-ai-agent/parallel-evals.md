@@ -8,9 +8,9 @@
 ## Текущая доступность
 
 Production run с `EVAL_SLOTS_FILE` подключён и требует записанный ресурсный бюджет.
-Native prepare/verify двух пользователей на новом стенде прошли. Старый binary
-не выводит provider retry в JSON: наблюдения лимитов остаются incomplete,
-успешная приёмка N=2 закрыта до исправления и квалификации CLI.
+Native prepare/verify двух пользователей на новом стенде прошли. Отдельный
+установленный CLI8b2ba2bf9b квалифицирован локальным HTTP429→200: JSON содержит
+retry, exit0/cleanup confirmed. Подключение наблюдений в harness ещё не завершено.
 Команды ниже не подтверждают A/B или модельную готовность. Не запускать старый `recover` для новой
 процедуры: адресный recover и цепочка эпох больше не входят в рабочий путь.
 [Перечень удержанных стендов и инцидентов](2026-10-16-evals-parallel-retained.md)
@@ -43,7 +43,7 @@ Native prepare/verify двух пользователей на новом сте
 ```bash
 export EVAL_SLOTS_FILE=/home/kiselev/.local/state/loginom-evals/acceptance-20261016/slots.json
 export EVAL_CLI_MODE=binary
-export EVAL_CLI_BIN=/home/kiselev/.local/state/loginom-evals/parallel/candidate-home/.local/share/loginom-ai-agent-cli/0.0.0-dev-202610140002-dev/bin/loginom-ai-agent-cli
+export EVAL_CLI_BIN=/home/kiselev/.local/state/loginom-evals/acceptance-20261016/candidate-home-retry/.local/share/loginom-ai-agent-cli/0.0.0-dev-202610190530-dev/bin/loginom-ai-agent-cli
 export EVAL_AGENT_MODEL=openai/gpt-6-luna
 export EVAL_AGENT_VARIANT=high
 export EVAL_JUDGE_COMMAND=/home/kiselev/git/codex-vpn-lockdown/bin/codex

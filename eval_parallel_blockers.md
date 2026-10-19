@@ -23,11 +23,8 @@ status lease освобождён. Проверка не заменяет реа
 Иной блокер сквозного пути или изменение требования — вопрос и ожидание ответа,
 без обхода через запись в blockers и переход к другой задаче.
 
-Текущий блокер: установленный CLI поглощает session.status/retry, поэтому скрытый
-provider429 нельзя исключить по headless JSON. Новый run сохраняет incomplete/exit1.
-Минимальная правка зеркалирует существующий status через JSON emit; process-тест
-429→200 включён в private proposal
-`/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/cli-retry-output-proposal.patch`.
-Владелец2026-10-19 разрешил эту правку вне evals/: CLI и его process-тест,
-затем отдельные сборка/квалификация. Блокер согласования снят; сам retry output
-ещё не исправлен/не проверен. Порядок продолжения — в текущем плане.
+CLI retry output исправлен в8b2ba2bf9b по разрешению владельца2026-10-19.
+Process suite19 PASS; отдельный установленный candidate квалифицирован локальным
+HTTP429→200:2 запроса, busy/retry/idle, exit0/cleanup confirmed. Evidence:
+`/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/cli-retry-20261019/`.
+Далее подключение наблюдений в harness, четыре A/B и модельный N=1 по плану.
