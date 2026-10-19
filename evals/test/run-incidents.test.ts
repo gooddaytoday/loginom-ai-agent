@@ -21,7 +21,7 @@ test("final observation retains a judge rate error even after a successful retry
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-retry-incident-")), codes: string[] = []
   const watcher = watchAttemptIncidents(root, code => { codes.push(code) })
   try {
-    await Bun.write(path.join(root, "judge-events-1.jsonl"), '{"type":"error","error":{"code":"rate_limit_exceeded"}}\n')
+    await Bun.write(path.join(root, "judge-events-1.jsonl"), '{"type":"error","message":"exceeded retry limit, last status: 429 Too Many Requests"}\n')
     await Bun.write(path.join(root, "judge-events-2.jsonl"), '{"type":"turn.completed"}\n')
     await watcher.stop()
     expect(codes).toEqual(["PROVIDER_ERROR_OBSERVED"])
@@ -33,6 +33,17 @@ test("a live session retry stops admission even when its provider message is unc
   const watcher = watchAttemptIncidents(root, code => { codes.push(code) })
   try {
     await Bun.write(path.join(root, "events.jsonl"), JSON.stringify({ type: "session.status", status: { type: "retry", message: "temporary issue" } }) + "\n")
+    await watcher.stop()
+    expect(codes).toEqual(["PROVIDER_ERROR_OBSERVED"])
+  } finally { await watcher.stop(); await rm(root, { recursive: true }) }
+})
+
+test("a generic failed judge turn remains an infrastructure incident after a successful retry", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-failed-turn-")), codes: string[] = []
+  const watcher = watchAttemptIncidents(root, code => { codes.push(code) })
+  try {
+    await Bun.write(path.join(root, "judge-events-1.jsonl"), JSON.stringify({ type: "turn.failed", error: { message: "temporary issue" } }) + "\n")
+    await Bun.write(path.join(root, "judge-events-2.jsonl"), '{"type":"turn.completed"}\n')
     await watcher.stop()
     expect(codes).toEqual(["PROVIDER_ERROR_OBSERVED"])
   } finally { await watcher.stop(); await rm(root, { recursive: true }) }
