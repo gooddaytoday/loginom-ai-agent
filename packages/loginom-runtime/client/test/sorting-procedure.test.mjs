@@ -1,6 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {configureSorting} from '../lib/sorting-procedure.mjs';
+import {configureSorting,advanceSortingInputColumns} from '../lib/sorting-procedure.mjs';
+
+function inputColumnsFixture(change=()=>{},lost=false){
+ const node={verified:true,surface:'wizard',document_id:'doc',workflow_id:'flow',node_id:'sort'};
+ const s={prepared_node_context:node,wizard:{status:'observed',stage:'input_mapping',title_status:'observed',title:'Настройка входных столбцов',root_ref:'wizard',root_tid:'root',
+  owner_context:{status:'observed',node:{tid:'workflow>Sort'},path:[]},controls:{btnNext:{status:'observed',enabled:true},btnPrev:{status:'observed',enabled:false}}},ui:{elements:[
+   {tid:'root;TuneDataSourceInputPortWizard;btnAddMappingColumn'},
+   {tid:'root;btnNext',ref:'ui-next',allowed_actions:['wizard_step']}
+  ]}};
+ const request={target:{kind:'existing',ref:{document_id:'doc',workflow_id:'flow',node_id:'sort'}}},actions=[];
+ change(s,request);
+ const channel={observe:async spec=>{assert.equal(spec.readSorting,true);if(!spec.ready(s))throw Error('Readiness refused');return structuredClone(s);},
+  perform:async spec=>{assert.ok(spec.ready(s));assert.deepEqual(spec.identity(s),{node_context:s.prepared_node_context,owner:s.wizard.owner_context,root_ref:s.wizard.root_ref});
+   const a=spec.resolve(s);actions.push(a);if(lost)throw Error('Lost Next reply');s.wizard.stage='sorting';}};
+ return {s,request,actions,run:()=>advanceSortingInputColumns(channel,request)};
+}
+test('existing Sorting advances only its owned initial input columns once to sorting',async()=>{
+ const f=inputColumnsFixture();await f.run();assert.deepEqual(f.actions,[{verb:'wizard_step',ref:'ui-next',expected_stage:'sorting'}]);
+});
+test('Sorting already on its verified configuration page does not click Next',async()=>{
+ const f=inputColumnsFixture(s=>{s.wizard.stage='sorting';s.node_sorting={verified:true};});await f.run();assert.deepEqual(f.actions,[]);
+});
+test('Sorting input-columns transition refuses other owners, ports, pages and unavailable controls',async()=>{
+ for(const change of [s=>s.prepared_node_context.node_id='other',s=>s.prepared_node_context.workflow_id='other',s=>s.prepared_node_context.document_id='other',
+  s=>s.prepared_node_context.verified=false,s=>s.prepared_node_context.surface='graph',s=>s.prepared_node_context.input_port={},s=>s.prepared_node_context.output_port={},
+  s=>s.wizard.input_port_context={status:'observed'},s=>s.wizard.port_context={status:'observed'},s=>s.wizard.owner_context.status='unobserved',
+  s=>s.wizard.title='Другой мастер',s=>s.wizard.title_status='ambiguous',s=>s.wizard.stage=null,s=>s.wizard.controls.btnNext.enabled=false,
+  s=>s.wizard.controls.btnPrev.enabled=true,s=>s.ui.elements.shift(),(_s,r)=>r.target.kind='new']){
+  const f=inputColumnsFixture(change);await assert.rejects(f.run(),/Readiness refused/);assert.deepEqual(f.actions,[]);
+ }
+ const f=inputColumnsFixture(s=>s.ui.elements[1].allowed_actions=[]);await assert.rejects(f.run(),/Next unavailable/);assert.deepEqual(f.actions,[]);
+});
+test('lost Sorting initial Next reply is never replayed',async()=>{
+ const f=inputColumnsFixture(()=>{},true);await assert.rejects(f.run(),/Lost Next reply/);assert.equal(f.actions.length,1);
+});
 
 function fixture({newNode=false,locale=true}={}) {
  const fields=[{name:'Amount',label:'Сумма',type:'real'},{name:'Name',label:'Имя',type:'string'}];
