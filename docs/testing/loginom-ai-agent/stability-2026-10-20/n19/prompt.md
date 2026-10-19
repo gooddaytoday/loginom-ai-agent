@@ -1,0 +1,1 @@
+Раздели мастерские из workshops.csv на три похожие группы по Hours и Materials, без учёта ID. Сохрани workshop-groups.csv с колонками ID, Hours, Materials, Group: по строке на каждую мастерскую, обозначения групп любые.

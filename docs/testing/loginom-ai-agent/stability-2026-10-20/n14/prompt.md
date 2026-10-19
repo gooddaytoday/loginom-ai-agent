@@ -1,0 +1,1 @@
+К orders.csv подбери цену UnitFee из fees.csv только при совпадении и товара Product, и склада Warehouse, затем посчитай Fee как Quantity × UnitFee. Все заказы оставь, даже если цены нет — тогда UnitFee и Fee пустые; сохрани order-fees.csv с колонками OrderID, Product, Warehouse, Quantity, UnitFee, Fee по возрастанию OrderID.

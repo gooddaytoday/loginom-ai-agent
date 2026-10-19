@@ -1,0 +1,1 @@
+В returns.csv посчитай DaysLate — сколько календарных дней прошло от Due до Returned, но для досрочного возврата поставь ноль. Сделай Label из имени Reader без пробелов по краям, заглавными буквами, затем дефис и месяц Due в виде YYYYMM; сохрани late-books.csv с колонками LoanID, DaysLate, Label по возрастанию LoanID.
