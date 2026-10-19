@@ -1,5 +1,6 @@
 import { EvalFailure } from "./fail"
 import path from "node:path"
+import { lstat, mkdir, realpath, rename } from "node:fs/promises"
 import { childEnvironment } from "./child-environment"
 import { readLeaseReceipt, type acquireResourceLease } from "./lease"
 import { closeUserSessions, type AdminConnection } from "./loginom-admin"
@@ -49,7 +50,45 @@ export async function cleanupSlotStorage(file: SlotFile, server: Awaited<ReturnT
     throw new EvalFailure("SLOT_STORAGE_DELETE_UNCONFIRMED", 2)
   const after = await inspectUserStorage(file, lease.identity, lease.slot, prepared.nonce)
   if (after.entries.length) throw new EvalFailure("SLOT_STORAGE_NOT_EMPTY", 2)
+  await server.assertHeld()
+  await lease.assertHeld()
+  await archiveSlotWorkspaces(lease.slot, archive, prefixes, attemptDirs)
   return { archive, closed, removed: storage.entries.map(entry => entry.name) }
+}
+
+export async function archiveSlotWorkspaces(slot: SlotLease["slot"], archive: string, prefixes: string[], attemptDirs: string[]) {
+  if (!attemptDirs.length) return
+  if (path.dirname(archive) !== slot.historyDir) throw new EvalFailure("SLOT_WORKSPACE_OWNERSHIP_UNCONFIRMED", 2)
+  for (const directory of [slot.workspaceRoot, slot.historyDir, archive]) {
+    const info = await lstat(directory)
+    if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || (info.mode & 0o077) ||
+      await realpath(directory) !== directory) throw new EvalFailure("SLOT_WORKSPACE_OWNERSHIP_UNCONFIRMED", 2)
+  }
+  const workspaces = (await Promise.all([...new Set(attemptDirs)].map(async directory => {
+    const attempt = path.basename(directory), task = path.basename(path.dirname(directory)), run = path.basename(path.dirname(path.dirname(directory)))
+    if (!path.isAbsolute(directory) || path.resolve(directory) !== directory || !/^[1-9][0-9]*$/.test(attempt) || !Number.isSafeInteger(Number(attempt)) ||
+      !/^[a-z0-9_-]+$/i.test(task) || !/^[a-z0-9][a-z0-9._-]*$/i.test(run) || !prefixes.includes(`eval-${run}-${task}-${attempt}`))
+      throw new EvalFailure("SLOT_WORKSPACE_OWNERSHIP_UNCONFIRMED", 2)
+    let source = slot.workspaceRoot
+    for (const component of [run, task, attempt]) {
+      source = path.join(source, component)
+      const info = await lstat(source).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error })
+      if (!info) return undefined
+      if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || await realpath(source) !== source)
+        throw new EvalFailure("SLOT_WORKSPACE_OWNERSHIP_UNCONFIRMED", 2)
+    }
+    return { source, run, task, attempt }
+  }))).filter(workspace => workspace !== undefined)
+  if (!workspaces.length) return
+  if (new Set(workspaces.map(workspace => workspace.source)).size !== workspaces.length)
+    throw new EvalFailure("SLOT_WORKSPACE_OWNERSHIP_UNCONFIRMED", 2)
+  // Profile history may contain agent-created entries; never reuse its workspace path.
+  await mkdir(path.join(archive, "workspace"), { mode: 0o700 })
+  for (const workspace of workspaces) {
+    const destination = path.join(archive, "workspace", workspace.run, workspace.task)
+    await mkdir(destination, { recursive: true, mode: 0o700 })
+    await rename(workspace.source, path.join(destination, workspace.attempt))
+  }
 }
 
 export async function readDeliveredStorage(attemptDirs: string[], username: string) {
