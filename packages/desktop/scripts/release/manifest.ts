@@ -9,6 +9,7 @@ const nullable = Schema.Union([text, Schema.Null])
 const flag = Schema.Boolean
 export const Manifest = Schema.Struct({
   schemaVersion: Schema.Literal(1),
+  browserRecovery: Schema.optional(flag),
   version: text,
   channel: Schema.Literals(["dev", "beta", "prod"]),
   builtAt: text,
