@@ -326,10 +326,11 @@ private config/budget/results вне Git; операторские команд�
   подтвердил отсутствие сессии (closed[]) и удалил два своих файла после guards;
   брони освобождены, исходный failed результат сохранён. CPU host95.9253%>95%;
   прочие24 границы, timeline/0miss/limits passed. Бюджет не менять.
-- [ ] Исправить преждевременный SESSION_STILL_PRESENT: после подтверждённого
+- [x] Исправить преждевременный SESSION_STILL_PRESENT: после подтверждённого
   CloseSession ограниченно ждать исчезновения точного имени с повторным чтением;
   PendingDisconnect/ownership guards и unknown при остатке сохраняются. Один
-  behavioral RED→GREEN delayed readback, targeted unit/typecheck, независимое ревью.
+  behavioral RED→GREEN delayed readback,15/89 targeted PASS8.26s/typecheck/diff,
+  независимое ревью Approved; четыре native A/B повторно PASS.
 - [ ] Выполнить реальный N=2 на тех же tasks/
   models/pins. Проверить перекрытие двух слотов, judge settings, полную summary,
   только свою очистку, отсутствие обязательных ресурсных/лицензионных/provider отказов.

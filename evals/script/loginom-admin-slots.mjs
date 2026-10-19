@@ -24,11 +24,17 @@ export async function closeSlotUserSession(input) {
       applied = true
       if (!await manager.CloseSession(matches[0], 5000)) throw Error("close")
     }
-    await manager.UpdateSessionInfos()
-    for (let index = 0; index < await manager.Count; index++) {
-      if (await (await manager.SessionInfo(index)).Name === input.name)
-        return { outcome: "unknown", data: { code: "SESSION_STILL_PRESENT" } }
+    // CloseSession may acknowledge before the server removes the session row.
+    const deadline = Date.now() + 5000
+    while (true) {
+      await manager.UpdateSessionInfos()
+      let present = false
+      for (let index = 0; index < await manager.Count; index++) {
+        if (await (await manager.SessionInfo(index)).Name === input.name) present = true
+      }
+      if (!present) return { outcome: "confirmed", data: { closed: true } }
+      if (Date.now() >= deadline) return { outcome: "unknown", data: { code: "SESSION_STILL_PRESENT" } }
+      await new Promise(resolve => setTimeout(resolve, 100))
     }
-    return { outcome: "confirmed", data: { closed: true } }
   } catch { return { outcome: applied ? "unknown" : "not_applied", data: { code: "SESSION_CLOSE_UNKNOWN" } } }
 }
