@@ -201,7 +201,17 @@ export async function hasOwnedAncestry(pid: number, owners: Pick<ProcessIdentity
   while (current) {
     if (seen.has(current)) throw Error("Process parent chain changed")
     seen.add(current)
-    const raw = await readFile(`/proc/${current}/stat`, "utf8")
+    const raw = await readFile(`/proc/${current}/stat`, "utf8").catch(async error => {
+      if (!gone(error)) throw error
+      const candidate = await stat(`/proc/${pid}`).catch(error => {
+        if (gone(error)) return undefined
+        throw error
+      })
+      // A vanished ancestor is still a refusal while the original candidate lives.
+      if (candidate) throw error
+      return undefined
+    })
+    if (raw === undefined) return false
     const fields = raw.slice(raw.lastIndexOf(")") + 2).split(" ")
     const parent = Number(fields[1])
     if (!Number.isSafeInteger(parent) || parent < 0 || !/^\d+$/.test(fields[19] ?? "")) throw Error("Process parent chain unavailable")
