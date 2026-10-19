@@ -1,5 +1,20 @@
 # Архив parallel evals до решений владельца от 2026-10-16
 
+## N1 от 2026-10-19: первый завершённый агент, ещё без полной приёмки
+
+- `20261019-073105-1b2fd99c36-dirty-Vh3uUV`: provider overload/retry остановил
+  первый запрос, cleanup confirmed,18 проб ресурсов без пропусков. Повтор после паузы.
+- `20261019-073306-1b2fd99c36-dirty-iLakZJ`: calc-data-double completed,
+  249554ms,21 tools/0 errors/0 retries, артефакт получен. Judge64: новая глобальная
+  desktop.conversationDetailMode отсутствовала в private home. Home синхронизирован
+  под lease с сохранением прежнего config в private evidence, login status0/unit clean.
+- Очистка отказала без удаления: input загружен Dock как hash-0-amounts.csv,
+  существующая successful artifact_deliver квитанция даёт destination/13 bytes/SHA256.
+  Prefix-only guard сохранил root и бронь. Решение — использовать ту же квитанцию
+  normal cleanup/startup, без новой durable описи. Оба failed results неизменны.
+- Wrapper096f18e: local bunfig preload canary RED→GREEN,11 tests PASS/bash-n PASS,
+  независимое ревью Approved. Чужие изменения wrapper repo сохранены.
+
 Это исторические снимки, а не действующие требования или разрешение на очистку.
 Новый дизайн и короткий план имеют приоритет. Нерешённые инциденты остаются
 сохранёнными; перенос записи сюда не означает их разрешения.
