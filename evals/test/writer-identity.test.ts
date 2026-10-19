@@ -35,7 +35,7 @@ test("writer identity refuses a persistently ownerless original directory", asyn
   } finally { await rm(profile, { recursive: true, force: true }) }
 })
 
-test("supervisor persists the exact writer refusal without granting closure", async () => {
+test("supervisor persists the exact writer refusal after confirmed process cleanup", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-writer-refusal-"))
   const profile = path.join(root, "profile")
   try {
@@ -44,7 +44,7 @@ test("supervisor persists the exact writer refusal without granting closure", as
     const info = await stat(path.join(profile, ".writer"))
     const result = await superviseProcess({ cmd: [process.execPath, path.resolve(import.meta.dir, "../fixtures/fake-cli.ts"), "loginom", "status"], cwd: root,
       env: { PATH: process.env.PATH ?? "", EVAL_FAKE_EXIT_DELAY_MS: "500" }, profileDir: profile, outDir: root, timeoutMs: 5000 })
-    expect(result.processCleanup).toMatchObject({ status: "failed", error: "Writer owner unavailable", writerRefusal: {
+    expect(result.processCleanup).toMatchObject({ status: "confirmed", error: null, capture_complete: true, unknownProcesses: [], writerRefusal: {
       operation: "transition", phase: "acquiring", code: null,
       directory: { device: info.dev, inode: info.ino, uid: info.uid, mode: 0o700 }, observedAt: expect.any(String),
     } })
