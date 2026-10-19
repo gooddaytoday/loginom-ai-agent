@@ -32,7 +32,7 @@ function run(root: string, ...args: string[]) {
 }
 
 function invoke(root: string, args: string[], input = "", env: Record<string, string> = {}) {
-  const result = Bun.spawnSync([process.execPath, cli, ...args], {
+  const result = Bun.spawnSync([process.execPath, "--no-install", cli, ...args], {
     cwd: root,
     stdin: Buffer.from(input),
     env: { ...process.env, ...env },
