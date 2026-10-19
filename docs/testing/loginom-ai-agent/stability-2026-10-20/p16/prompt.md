@@ -1,0 +1,1 @@
+В sensors.csv возьми только Mode=work, вычти Background из Signal в Net и подбери по всем оставшимся строкам прямую Net = a + b × Load с прогнозом PredictedNet. Выгрузи исходные колонки вместе с Net и PredictedNet в sensors-predicted.csv и сохрани сценарий.

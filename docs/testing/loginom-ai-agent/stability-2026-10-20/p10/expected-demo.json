@@ -1,0 +1,64 @@
+{
+  "package_path": "/stability-2026-10-20/p10.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.clustering"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/shop-segments.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Shops",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "MeanFootfall",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "MeanBasket",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Shops": 5,
+          "MeanFootfall": 9.95,
+          "MeanBasket": 19.95
+        },
+        {
+          "Shops": 7,
+          "MeanFootfall": 100.03571428571429,
+          "MeanBasket": 200.03571428571428
+        },
+        {
+          "Shops": 6,
+          "MeanFootfall": 220.0,
+          "MeanBasket": 440.0
+        }
+      ]
+    }
+  ]
+}
