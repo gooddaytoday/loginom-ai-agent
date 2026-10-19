@@ -209,7 +209,7 @@ Expected: FAIL — `run` и `tui` пишут `null`; `verifyCliManifest` отв�
 - [x] **Step 4: Run tests to verify they pass**
 
 Run: команды Step 2, затем `bun typecheck` в `packages/agent`, `packages/core` и `packages/loginom-host`
-Expected: PASS. Ветка «проверенный установленный bundle и флаг» требует собранного бинаря и проверяется в плане 5, Task 4.
+Expected: PASS. Ветка «проверенный установленный bundle и флаг» требует собранного бинаря и проверяется в плане 5, Task 3.
 
 - [x] **Step 5: Commit**
 
@@ -234,7 +234,7 @@ git commit -m "feat(cli): embed browser recovery build flag"
 - Consumes: `createLoginomHost({browserRecovery})` из Task 2.
 - Produces: `BROWSER_RECOVERY = app.isPackaged && import.meta.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1"` (по образцу `UPDATER_ENABLED`); `release-manifest.json` поле `browserRecovery?: boolean`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 test("release manifest keeps the browser recovery build flag and decodes older manifests", () => {
@@ -244,21 +244,21 @@ test("release manifest keeps the browser recovery build flag and decodes older m
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd packages/desktop && bun test scripts/release/artifact.test.ts`
 Expected: FAIL — строгая схема отвергает поле.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `electron.vite.config.ts` добавляет `define` из входа сборки (`"1"` или `"0"`). `env.d.ts` объявляет `LOGINOM_AI_AGENT_BROWSER_RECOVERY: string` в `ImportMetaEnv`. `desktopLoginom()` передаёт `browserRecovery: BROWSER_RECOVERY`. `write-manifest.ts` пишет `browserRecovery: process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1"`. Зависимость от `app.isPackaged` проверяется на упакованном артефакте в плане 5 без мока Electron, как и `UPDATER_ENABLED`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd packages/desktop && bun test scripts/release/artifact.test.ts && bun typecheck`
 Expected: PASS.
 
-- [ ] **Step 5: Commit and checkpoint**
+- [x] **Step 5: Commit and checkpoint**
 
 ```bash
 git add packages/desktop
