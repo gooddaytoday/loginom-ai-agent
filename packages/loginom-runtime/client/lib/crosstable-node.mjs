@@ -10,11 +10,15 @@ import {completedCrossTableCollapses,validateCrossTableNativeSources} from './cr
 import {prepareCrossTableAncestorExecution} from './crosstable-ancestor-execution.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {prepareCrossTableAutosync} from './crosstable-autosync.mjs';
+import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 const need=(v,m)=>{if(!v)throw Error('CrossTable: '+m);};
 export function createCrossTableNodeSupport(config){return createTabularTransformNodeSupport(config,{
  nativeFullOutput:true,type:'transform.cross_table',mode:'pivot',revision:'crosstable-v3-internal-1',readback:crossTableConfigurationReadback,
  parameterSchema:crossTableParametersSchema,validate:validateCrossTableParameters,preflight:preflightCrossTableSource,
- beforeInput:prepareCrossTableAutosync,
+ async beforeInput(options,ctx,helpers){
+  await prepareCrossTableInput(options,ctx,helpers);
+  return prepareCrossTableAutosync(options,ctx,helpers);
+ },
  async beforeGraphExecute(options,ctx,configuration){
   if(options.operation.parameters.read?.coverage!=='full')return;
   const imports=completedStaticImports(options.nodeHistory?.(),options.verifiedUploads?.(),ctx,options.uploadHistory?.());
@@ -35,6 +39,26 @@ export function createCrossTableNodeSupport(config){return createTabularTransfor
  },
  materializedSchema:materializeCrossTableOutput,
 });}
+
+export async function prepareCrossTableInput(options,ctx,{channel}){
+ const request=options.operation.nodeApply.request;
+ if(request.target.kind!=='existing'||request.finish!=='execute'||request.inputs.length!==0)return;
+ const state=await channel.observe({condition:'existing CrossTable before input schema refresh',readOutputs:true,
+  ready:s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
+   &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===ctx.node[k])
+   &&s.wizard?.status==='absent'&&s.node_outputs?.verified===true});
+ need(state.node_outputs.ports.length===1&&state.node_outputs.ports[0].index===0&&typeof state.node_outputs.ports[0].active==='boolean',
+  'existing output activity is incomplete');
+ if(state.node_outputs.ports[0].active)return;
+ // Materialize the unchanged saved pivot and its ancestors before input or
+ // retained-output autosync settings; keep their ordinary verification below.
+ const execution=createNodeExecutionProcedure(channel,ctx.node);
+ await execution.prepare();
+ await finishConfiguredGraph(channel,execution,'execute',ctx.node);
+ const completed=await execution.waitCompleted({signal:ctx.signal,stopSignal:ctx.stopSignal});
+ need(completed.verified===true&&completed.owner_verified===true&&completed.status==='completed'&&completed.cleanup_complete===true,
+  'existing schema execution is unconfirmed');
+}
 
 // CrossTable output fields are materialized only by Execute. A new inline
 // mapping has no rows: its absence is not a verified inventory. Preserve native
