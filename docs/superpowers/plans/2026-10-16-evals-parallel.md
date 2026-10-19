@@ -295,6 +295,10 @@ private config/budget/results вне Git; операторские команд�
   только точные server/profile holds сняты через CAS. Log/DB/точный старый marker
   сохранены в owner-recheck-4fb6d039-W6OLKv; исходный failed receipt неизменен.
   RED→GREEN reaped child,9/48 targeted PASS51.84s, typecheck/diff PASS, Review Approved.
+- [x] Устранить повторную синхронизацию judge config из-за меняющихся глобальных
+  model defaults: wrapper e149811 сравнивает разобранный TOML без только двух
+  корневых строковых model/reasoning defaults, все protection/nested поля строго.
+  RED→GREEN,10 wrapper tests PASS/bash-n/diff PASS; чужие hunks не включены.
 - [ ] Реальный N=1 с агентом/судьёй на трёх задачах; по замеру предложить числовые
   пороги CPU/RAM/диска и **дождаться утверждения владельца до N=2**.
 - [ ] Записать утверждённый бюджет до реального N=2, выполнить run на тех же tasks/

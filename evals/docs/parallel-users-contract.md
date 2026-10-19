@@ -109,8 +109,11 @@
 26. Home судьи — `/home/kiselev/.local/state/loginom-evals/parallel/judge-codex`.
     Разрешено снять только его удержанную бронь команды
     `585940be-5c1b-4bff-a7c6-00459a4f7fa3`, сохраняя incident A00yuH.
-    VPN launcher сохраняет caller home только при том же lockdown-конфиге;
-    canonical path проверяется, symlink/выход за разрешённый root не допускается.
+    VPN launcher сохраняет caller home только при том же разобранном TOML lockdown-конфиге;
+    исключаются лишь корневые строковые defaults model/model_reasoning_effort,
+    заданные явно в judge command. Все остальные/вложенные настройки сравниваются
+    строго; ошибка разбора — отказ. Canonical path проверяется,
+    symlink/выход за разрешённый root не допускается.
     VPN и ограничения сети сохраняются, глобальный home не подменяет выделенный.
     Проверяется login status через исправленный launcher без model calls; нет
     действительного входа — остановка с просьбой владельцу выполнить вход.
