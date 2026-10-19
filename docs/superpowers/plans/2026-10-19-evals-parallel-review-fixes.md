@@ -16,7 +16,7 @@
   передать её через настройки версии/исполнения. Проверить calibration и
   judge-only, сохранение home и его освобождение; legacy fake-путь сохранить.
   Один RED/GREEN-сценарий за раз. Коммит `fix(evals): supervise offline judges through bounded units`.
-- [ ] 2. Native evidence (`profile-archive.ts`, при необходимости `prepared-run.ts`,
+- [x] 2. Native evidence (`profile-archive.ts`, при необходимости `prepared-run.ts`,
   `node-native.ts`/`text-import.ts` и соответствующие тесты).
   Воспроизвести отказ на реальном формате prepared cleanup и настоящем
   архиве `archiveProfileHistory`, затем согласовать writer/reader минимально:
@@ -52,6 +52,10 @@ Root ведёт этот план и коммиты; каждому worker вы�
   в шести связанных файлах прошли: 368 утверждений. Private home, unit timeout,
   завершение unit и release проверены subprocess fixtures; legacy fake сохранён.
   Production diff — три строки. Независимое ревью одобрило исправление.
+- Native evidence: RED на фактическом prepared формате и настоящем архиве,
+  затем 29 связанных тестов прошли: 213 утверждений, включая legacy import.
+  Чужой profile/archive, path escape, неизвестные процессы и неполный cleanup
+  отвергаются. Независимое ревью одобрило исправление.
 - Частичное освобождение: RED — `RECOVERY_FINALIZATION_REQUIRED` при новом
   admission после startup; GREEN — 52 теста slots/startup/lease, 177 утверждений.
   Независимое ревью не нашло обязательных замечаний. При подмене cleanup,
