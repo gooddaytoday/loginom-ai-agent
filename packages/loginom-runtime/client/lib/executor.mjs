@@ -279,13 +279,34 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       return result(gesture?'AMBIGUOUS':'NOT_APPLIED','DOWNLOAD_OUTPUT_SIZE_CHANGED');
     // Register BEFORE the checked gesture; native download may fire before
     // the click promise settles. Only this Page's event is eligible.
-    event=page.waitForEvent('download',{timeout:15000}).then(value=>value,error=>{
+    let eventPending=true;
+    event=page.waitForEvent('download',{timeout:15000}).then(value=>{eventPending=false;return value;},error=>{
+      eventPending=false;
       trace.push({event:'download_event_failure',...failureEvidence(error),step:'download.event'});return null;
     });
     phase='requesting';gesture=true;
     completed=false;
     browserStep='download.gesture';
-    const action=await act(page,before.output);
+    let action;const epochRefreshes=[];
+    for(let attempt=0;attempt<3;attempt++) {
+      action=await act(page,before.output);
+      // Reobserve only after the checked action proves its epoch refusal
+      // happened before applying, including when the file was already visible.
+      // Keep the single listener/deadline and never repeat reveal or a gesture.
+      if(!task.output_binding||attempt===2||!eventPending||action.phase!=='preconditions'
+        ||action.status!=='NOT_APPLIED'||action.effect_possible!==false||action.cleanup_complete!==true
+        ||action.error?.code!=='UI_EPOCH_CHANGED')break;
+      const previous=target(before.output),fresh=await observe(page);
+      const file=fresh.status==='SUCCEEDED'&&contextMatches(fresh.output)&&target(fresh.output);
+      if(!eventPending||!file||!previous?.scroll?.ref||!same(file.scroll,previous.scroll)
+        ||!same(file.identity,previous.identity)||!same(file.signature,previous.signature)
+        ||file.storage_entry?.kind!=='file'||file.storage_entry.bytes!==task.expected_bytes
+        ||file.interaction?.state!=='point_observed'||!file.allowed_actions?.includes('double_click'))break;
+      epochRefreshes.push({from:before.output.dom_epoch.revision,to:fresh.output.dom_epoch.revision,
+        mutation_delta:Object.fromEntries(['cursor_style','other_style','attributes','child_list','text','other','unclassified','ignored_cursor_blink']
+          .map(key=>[key,(fresh.output.scan?.mutation_counts?.[key]??0)-(before.output.scan?.mutation_counts?.[key]??0)]))});
+      before=fresh;
+    }
     gesture=revealed || action.effect_possible===true;
     const refusal=action.trace?.find(e=>e.event==='ui_reference_precondition_refused')?.checks;
     const referenceChecks=refusal?Object.fromEntries(['present','identity_matches','signature_matches','action_allowed']
@@ -297,6 +318,7 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       'Observed control geometry changed':'geometry_changed'};
     trace.push({event:'download_gesture_result',status:action.status,effect_possible:action.effect_possible===true,
       cleanup_complete:action.cleanup_complete===true,
+      ...(epochRefreshes.length?{epoch_refreshes:epochRefreshes}:{}),
       error_code:/^[A-Z][A-Z0-9_]{0,79}$/.test(action.error?.code??'')?action.error.code:null,
       ...(action.error?.code==='UI_REFERENCE_STALE'?{reference_reason:referenceReasons[action.error.message]??'unclassified',
         ...(referenceChecks?{reference_checks:referenceChecks}:{})}:{})});

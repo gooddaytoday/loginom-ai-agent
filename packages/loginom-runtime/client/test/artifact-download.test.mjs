@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {Page,build} from './support/executor-fixture.mjs';
-import {makeArtifactDownloadCode} from '../lib/executor.mjs';
+import {makeArtifactDownloadCode,makeNativeOutputDownloadCode} from '../lib/executor.mjs';
 
 function fixture(name = 'sales.csv') {
   const page=new Page(),elements=page.elements.bind(page),snapshot=page.uiSnapshot.bind(page);
@@ -177,6 +177,67 @@ test('verification reveals its original clipped or offscreen file owner once bef
     assert.equal(result.trace.find(t=>t.event==='download_file_revealed').delta,50);
     assert.equal(result.trace.find(t=>t.event==='download_reveal_confirmed').interaction,'point_observed');
     assert.equal(f.waitCount(),mode==='delayed_repaint'?4:2);
+  }
+});
+
+function nativeRevealEpochFixture(mode='once') {
+  const f=revealFixture(),snapshot=f.page.uiSnapshot.bind(f.page),evaluate=f.page.evaluate.bind(f.page);
+  let revision=0,checks=0,resolveEvent;
+  const elements=f.page.elements.bind(f.page);
+  f.page.elements=()=>elements().map(e=>e.kind==='file'?{...e,box:{x:30,y:825-f.owner.scrollTop,width:100,height:25}}:e);
+  if(mode==='visible')f.owner.scrollTop=50;
+  f.page.directory='/test-2';
+  f.page.uiSnapshot=()=>{
+    const s=snapshot(),file=s.ui.elements.find(e=>e.ref===f.options.file_ref);
+    s.dom_epoch.revision=revision;s.scan={mutation_counts:{other_style:revision}};
+    file.storage_entry={kind:'file',bytes:revision&&mode==='size_changed'?4:3};
+    if(revision) {
+      if(mode==='owner_changed')file.scroll.ref='different-owner';
+      if(mode==='scroll_changed')file.scroll.top++;
+      if(mode==='file_changed')file.label='different.csv';
+      if(mode==='identity_changed')file.identity={...file.identity,tid:'different'};
+      if(mode==='signature_changed')file.signature={...file.signature,label:'different'};
+      if(mode==='document_changed')s.dom_epoch.document='different';
+      if(mode==='context_changed')s.file_storage.directory='/other';
+      if(mode==='blocked')s.ui.masks=[{kind:'busy'}];
+    }
+    return s;
+  };
+  f.options={...f.options,artifact:{artifact_id:'output',name:'sales.csv'},snapshot:f.page.uiSnapshot(),expected_bytes:3,
+    output_binding:{session_id:'session',node_id:'node',execution_id:'execution',directory:'/test-2',destination:'/test-2/sales.csv'}};
+  f.page.waitForEvent=type=>{
+    assert.equal(type,'download');f.calls.push('listen');
+    return new Promise((resolve,reject)=>{resolveEvent=resolve;setImmediate(()=>reject(Object.assign(Error('timeout'),{name:'TimeoutError'})));});
+  };
+  const click=f.page.mouse.click;
+  f.page.mouse.click=async(...args)=>{await click(...args);resolveEvent(f.download);if(mode==='applied_failure')throw Error('click failed');};
+  f.page.evaluate=async(fn,arg)=>{
+    if(fn.toString().includes('return {document:state.epoch,revision:state.revision}')) {
+      checks++;if(checks===1||mode==='persistent')revision++;
+      if(mode==='event_arrived')resolveEvent(f.download);
+    }
+    return evaluate(fn,arg);
+  };
+  return {...f,checks:()=>checks,run:()=>f.page.execute(makeNativeOutputDownloadCode(f.options))};
+}
+
+test('native pre-gesture epoch refusal reobserves the same owner before exactly one download gesture',async()=>{
+ for(const mode of ['once','visible']) {
+  const f=nativeRevealEpochFixture(mode),result=await f.run();
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+  assert.deepEqual(f.calls,mode==='visible'?['listen','click','save']:['reveal','listen','click','save']);assert.equal(f.checks(),2);
+  const step=result.trace.find(e=>e.event==='download_gesture_result');
+  assert.equal(step.epoch_refreshes.length,1);assert.equal(step.epoch_refreshes[0].mutation_delta.other_style,1);
+ }
+});
+
+test('native epoch refresh never redirects the revealed file or repeats an applied gesture',async()=>{
+  for(const mode of ['owner_changed','scroll_changed','file_changed','identity_changed','signature_changed','size_changed','document_changed','context_changed','blocked','event_arrived','applied_failure','persistent']) {
+    const f=nativeRevealEpochFixture(mode),result=await f.run();
+    assert.equal(result.status,'AMBIGUOUS',mode+JSON.stringify(result));assert.equal(result.output.download_completed,undefined,mode);
+    assert.equal(f.calls.filter(c=>c==='reveal').length,1,mode);assert.equal(f.calls.filter(c=>c==='listen').length,1,mode);
+    assert.equal(f.calls.filter(c=>c==='click').length,mode==='applied_failure'?1:0,mode);
+    assert.equal(f.checks(),mode==='persistent'?3:mode==='applied_failure'?2:1,mode);
   }
 });
 
