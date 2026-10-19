@@ -28,7 +28,7 @@ async function execution({fault,offscreen=true,selectedInitially=false}={}) {
 
 // ST4b n12: training completed, then two strictly pre-gesture epoch refusals
 // preceded a native graph-body redraw. Only graph_execution.node_ref changed.
-async function launchRecovery(fault) {
+async function launchRecovery(fault,{code:refusalCode='UI_EPOCH_CHANGED',...receipt}={}) {
  const f=await execution({offscreen:false,selectedInitially:true});await f.driver.launchGraph();
  const workflow={prefix:'MF;TF-1',tab_tid:'tab'},records=[];
  let attempts=0,gestures=0;
@@ -50,22 +50,27 @@ async function launchRecovery(fault) {
    }
    attempts++;
    if(attempts<3)return {status:'NOT_APPLIED',operation_id:code.options.id,action_key:'ui.act',phase:'preconditions',
-    effect_possible:false,cleanup_complete:true,error:{code:'UI_EPOCH_CHANGED'},trace:[]};
+    effect_possible:false,cleanup_complete:true,error:{code:refusalCode},trace:[],...receipt};
    gestures++;
    return {status:'SUCCEEDED',operation_id:code.options.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true};
   }});
  return {run:()=>channel.perform({...f.launchRequest,initialObservation:undefined}),records,operation,
   get attempts(){return attempts},get gestures(){return gestures}};
 }
-test('regression launch rebinds a redrawn body only after proved no-effect epoch refusals',async()=>{
- const f=await launchRecovery();await f.run();
+for(const code of ['UI_EPOCH_CHANGED','GRAPH_EXECUTION_CONTEXT_CHANGED'])test('regression launch rebinds a redrawn body only after proved no-effect '+code,async()=>{
+ const f=await launchRecovery(undefined,{code});await f.run();
  assert.equal(f.attempts,3);assert.equal(f.gestures,1);assert.equal(f.operation.deadline,10000);
  assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,2);
  assert.deepEqual(f.records.filter(e=>e.phase==='node_step_prepared').map(e=>e.action.ref),['ui-launch-0','ui-launch-1','ui-launch-2']);
 });
-for(const fault of ['node','mode','source'])test('regression launch refuses a changed '+fault+' after epoch refresh',async()=>{
- const f=await launchRecovery(fault);await assert.rejects(f.run());
+for(const code of ['UI_EPOCH_CHANGED','GRAPH_EXECUTION_CONTEXT_CHANGED'])for(const fault of ['node','mode','source'])test('regression launch refuses a changed '+fault+' after '+code,async()=>{
+ const f=await launchRecovery(fault,{code});await assert.rejects(f.run());
  assert.equal(f.attempts,2);assert.equal(f.gestures,0);
+});
+for(const [name,receipt] of Object.entries({effect:{effect_possible:true},cleanup:{cleanup_complete:false},ambiguous:{status:'AMBIGUOUS'},phase:{phase:'applying'},preconditions:{trace:[{event:'ui_preconditions_verified'}]},gesture:{trace:[{event:'ui_gesture_applied'}]}}))test('graph launch context refresh refuses '+name,async()=>{
+ const f=await launchRecovery(undefined,{code:'GRAPH_EXECUTION_CONTEXT_CHANGED',...receipt});await assert.rejects(f.run());
+ assert.equal(f.attempts,1);assert.equal(f.gestures,0);
+ assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,0);
 });
 for(const selectedInitially of [false,true])test('offscreen saved node is revealed before selection/launch, selected: '+selectedInitially,async()=>{
  const f=await execution({selectedInitially});await f.driver.launchGraph();
