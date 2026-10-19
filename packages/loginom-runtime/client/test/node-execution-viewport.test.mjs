@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createNodeExecutionProcedure} from '../lib/node-execution-procedure.mjs';
 import {revealPreparedGraphNode,samePlacementGraph} from '../lib/node-placement.mjs';
+import {createNodeProcedure} from '../lib/node-procedure.mjs';
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
 
 async function execution({fault,offscreen=true,selectedInitially=false}={}) {
- let opened=true,menu=false,selected=selectedInitially,revealed=!offscreen;
+ let opened=true,menu=false,selected=selectedInitially,revealed=!offscreen,launchRequest;
  const calls=[],el=(tid,allowed_actions=['click'],extra={})=>({tid,ref:tid,allowed_actions,...extra});
  const state=()=>({prepared_node_context:{...node,node_id:revealed&&fault==='owner'?'foreign':'node',verified:true,surface:'graph',locked:false,tid:'body'},wizard:{status:'absent'},
   node_outputs:{verified:true,node_selected:selected},node_processes:{node_context:{...node,verified:true,surface:'graph'},verified:opened,inventory_complete:true,root_id:'root',show_completed:true,processes:[]},
@@ -16,13 +17,56 @@ async function execution({fault,offscreen=true,selectedInitially=false}={}) {
  const channel={observe:async o=>{const s=state();assert.ok(o.ready(s),o.condition);return s;},
   revealGraphNode:async()=>{calls.push('reveal');if(fault==='unknown')throw Error('unknown viewport receipt');revealed=true;},
   perform:async o=>{const s=state();assert.ok(o.ready(s));const a=o.resolve(s);calls.push(a.verb+':'+a.ref);
+   if(a.verb==='execute_graph_node')launchRequest=o;
    if(a.verb==='right_click')menu=true;if(a.verb==='press')menu=false;
    if(a.ref==='ConsoleForm;btnClose')opened=false;
    if(a.ref==='body'){assert.equal(revealed,true);selected=true;}
    return {status:'SUCCEEDED'};}};
  const driver=createNodeExecutionProcedure(channel,node);await driver.prepare();calls.length=0;
- return {driver,calls};
+ return {driver,calls,snapshot:state,get launchRequest(){return launchRequest}};
 }
+
+// ST4b n12: training completed, then two strictly pre-gesture epoch refusals
+// preceded a native graph-body redraw. Only graph_execution.node_ref changed.
+async function launchRecovery(fault) {
+ const f=await execution({offscreen:false,selectedInitially:true});await f.driver.launchGraph();
+ const workflow={prefix:'MF;TF-1',tab_tid:'tab'},records=[];
+ let attempts=0,gestures=0;
+ const operation={id:'regression',action:{action_key:'node.apply',revision:'1'},deadline:10000,
+  checkpoint:{document_id:'doc',workflow_ref:workflow}};
+ const channel=createNodeProcedure({operation,now:()=>1,wait:async()=>{},targetOrigin:'http://example.test',targetBuild:'7.4.2',
+  record:async e=>{records.push(e);return structuredClone(e)},wrapMutation:(code,options)=>({options}),
+  execute:async code=>{
+   if(typeof code==='string') {
+    const s=f.snapshot();Object.assign(s,{origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:workflow,
+     dom_epoch:{document:'doc',revision:attempts+1},scan:{complete:true}});
+    Object.assign(s.ui,{masks:[],dialogs:[],truncated:{elements:false,masks:false,dialogs:false}});
+    const control=s.ui.elements.find(e=>e.tid==='launch');control.ref='ui-launch-'+attempts;
+    control.graph_execution={node_id:'node',node_ref:attempts===2?'ui-body-new':'ui-body-old',mode:'execute',source:'native_selected_graph_node'};
+    if(attempts===2&&fault==='node')control.graph_execution.node_id='foreign';
+    if(attempts===2&&fault==='mode')control.graph_execution.mode='deactivate';
+    if(attempts===2&&fault==='source')control.graph_execution.source='foreign';
+    return {status:'SUCCEEDED',output:s};
+   }
+   attempts++;
+   if(attempts<3)return {status:'NOT_APPLIED',operation_id:code.options.id,action_key:'ui.act',phase:'preconditions',
+    effect_possible:false,cleanup_complete:true,error:{code:'UI_EPOCH_CHANGED'},trace:[]};
+   gestures++;
+   return {status:'SUCCEEDED',operation_id:code.options.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true};
+  }});
+ return {run:()=>channel.perform({...f.launchRequest,initialObservation:undefined}),records,operation,
+  get attempts(){return attempts},get gestures(){return gestures}};
+}
+test('regression launch rebinds a redrawn body only after proved no-effect epoch refusals',async()=>{
+ const f=await launchRecovery();await f.run();
+ assert.equal(f.attempts,3);assert.equal(f.gestures,1);assert.equal(f.operation.deadline,10000);
+ assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,2);
+ assert.deepEqual(f.records.filter(e=>e.phase==='node_step_prepared').map(e=>e.action.ref),['ui-launch-0','ui-launch-1','ui-launch-2']);
+});
+for(const fault of ['node','mode','source'])test('regression launch refuses a changed '+fault+' after epoch refresh',async()=>{
+ const f=await launchRecovery(fault);await assert.rejects(f.run());
+ assert.equal(f.attempts,2);assert.equal(f.gestures,0);
+});
 for(const selectedInitially of [false,true])test('offscreen saved node is revealed before selection/launch, selected: '+selectedInitially,async()=>{
  const f=await execution({selectedInitially});await f.driver.launchGraph();
  assert.deepEqual(f.calls,selectedInitially?['reveal','execute_graph_node:launch']:['reveal','click:body','execute_graph_node:launch']);
