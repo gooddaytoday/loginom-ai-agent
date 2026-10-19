@@ -290,16 +290,7 @@ export async function excludeOutputField(channel,sourceRecordId) {
   await channel.perform({condition:'exclude the selected optional output field',initialObservation:state,
     ready:s=>ready(s)&&s.wizard.root_ref===root&&rowOf(s)?.selected===true&&same(semantic(s.node_mapping),semantic(baseline)),
     identity:()=>({source:source[0],field}),resolve:s=>{
-      const prefix=s.wizard.root_tid+';DerivedDataSourceOutputSocketWizard;';
-      const toolbar=s.ui.elements.filter(e=>e.tid===prefix+'btnAddMappingToExcluded');
-      let controls=toolbar.filter(e=>e.allowed_actions.includes('click'));
-      if(!toolbar.length&&s.wizard.output_columns.page?.status==='complete_definition_page'){
-        // Table view exposes exclusion on the selected row, not its toolbar.
-        const names=s.ui.elements.filter(e=>e.ref===rowOf(s).name_ref&&e.tid?.startsWith(prefix+'colName_'));
-        if(names.length===1)controls=s.ui.elements.filter(e=>e.identity?.anchor_tid===prefix+'colTargetDelete_'+names[0].tid.slice((prefix+'colName_').length)
-          &&same(e.identity.path,[0,0])&&e.signature?.tag==='img'&&e.role==='button'&&e.visible===true&&e.enabled===true
-          &&e.interaction?.state==='point_observed'&&e.allowed_actions.includes('click'));
-      }
+      const controls=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';DerivedDataSourceOutputSocketWizard;btnAddMappingToExcluded'&&e.allowed_actions.includes('click'));
       if(controls.length!==1)throw Error('Optional output exclusion action unavailable');return {verb:'click',ref:controls[0].ref};}});
   const after=(await channel.observe({condition:'native excluded source and preserved mappings',readMappings:true,ready})).node_mapping;
   if(!same(after.source_fields,baseline.source_fields)||after.autosync!==baseline.autosync||after.target_fields.length!==baseline.target_fields.length)

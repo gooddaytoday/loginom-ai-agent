@@ -1087,6 +1087,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       const roleGrid=forms[0]==='TuneDataSourceInputPortWizard';
       const auto=unique('btnAutoSyncThroughColumns');
       wizard.output_columns.auto_sync=auto?{status:'observed',value:auto.classList.contains('x-btn-pressed'),ref:refOf(auto)}:{status:'unobserved'};
+      if(forms[0]==='DerivedDataSourceOutputSocketWizard'){
+        const buttonTid=base+'btnAddMappingToExcluded',buttons=(tids.get(buttonTid)??[]).filter(e=>wizardForms[0].contains(e)&&!sensitive(e));
+        wizard.output_columns.exclusion_toolbar={status:!buttons.length?'absent':buttons.length>1?'ambiguous':!visible(buttons[0])?'hidden':!enabled(buttons[0])?'disabled':'available',
+          buttons:buttons.slice(0,2).map(e=>({tid:buttonTid,visible:visible(e),enabled:enabled(e),display:getComputedStyle(e).display,
+            visibility:getComputedStyle(e).visibility,hidden_ancestor:!visibleAncestors(e)}))};
+      }
       if(body && filter && tableMode && linksMode) {
         const containers=[...body.querySelectorAll('.x-grid-item-container')];charge();
         const rows=[...body.querySelectorAll('table.x-grid-item')];charge();

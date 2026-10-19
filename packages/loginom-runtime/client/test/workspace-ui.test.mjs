@@ -4630,6 +4630,23 @@ function outputPortFinishFixture(mode='valid') {
   return {page,waits:()=>waits};
 }
 
+test('output exclusion toolbar diagnostics distinguish absent hidden disabled and duplicate controls',async()=>{
+ for(const mode of ['absent','hidden','disabled','visible','duplicate']){
+  const {page}=outputPortFinishFixture();
+  const form=page.document.all().find(e=>e.attrs['data-tid']==='MF;TF-1;WizrdMCF');
+  if(mode!=='absent'){
+   const e=page.add('button','MF;TF-1;WizrdMCF;DerivedDataSourceOutputSocketWizard;btnAddMappingToExcluded','',{x:650,y:100,width:20,height:20},form);
+   if(mode==='hidden')e.style.display='none';
+   if(mode==='disabled')e.disabled=true;
+   if(mode==='duplicate')page.add('button',e.attrs['data-tid'],'',e.box,form);
+  }
+  const s=await page.observe(),d=s.wizard.output_columns.exclusion_toolbar;
+  assert.equal(d.status,mode==='visible'?'available':mode==='duplicate'?'ambiguous':mode,mode);
+  assert.ok(!JSON.stringify(d).includes('ui-'),'diagnostics do not issue hidden action refs');
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('output-port Done never confirms the input lost-links question',async()=>{
   const {page}=outputPortFinishFixture('lost_links'),snapshot=await page.observe();
   const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='output_port');assert.ok(done);

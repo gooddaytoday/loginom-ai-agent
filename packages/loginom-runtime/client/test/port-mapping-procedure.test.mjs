@@ -220,13 +220,12 @@ test('optional exclusion creates one source exclusion, preserves all other field
  assert.equal((await excludeOutputField(f.channel,'s1')).effect_possible,false);assert.equal(f.count(),2);
 });
 
-test('optional exclusion uses the observed Table row delete icon without a toolbar button',async()=>{
+test('optional exclusion never substitutes the distinct Table row delete action',async()=>{
  const {excludeOutputField}=await import('../lib/port-mapping-procedure.mjs');
  const f=exclusionFixture({rowDelete:true});
  f.native.source_fields[1].label=f.native.target_fields[1].label='Расстояние до центра кластера';
- const result=await excludeOutputField(f.channel,'s1');
- assert.equal(result.verified,true);assert.equal(f.count(),2);
- assert.equal(result.excluded_source.record_id,'s1');assert.deepEqual(result.definition.target_fields.map(f=>[f.name,f.excluded]),[['A',false],['C',false],['B',true]]);
+ await assert.rejects(excludeOutputField(f.channel,'s1'),/Optional output exclusion action unavailable/);
+ assert.equal(f.count(),1,'selection only; no destructive row delete');
  for(const deleteMode of ['foreign_wizard','foreign_field','foreign_path','wrong_tag','disabled','hidden','no_point','duplicate','disabled_toolbar']){
   const bad=exclusionFixture({rowDelete:true,deleteMode});
   await assert.rejects(excludeOutputField(bad.channel,'s1'),/Optional output exclusion action unavailable/);
