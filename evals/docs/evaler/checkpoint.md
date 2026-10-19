@@ -1,20 +1,20 @@
-# LAB61 checkpoint — REJECT19 / explicit OFFLINE rework19
-Formal Ben01a152d5 exact4506571e/checker7c11fea8/testfadbf135, completedBen01a1527a-3855; parent012baa3f, one commit verified.
-Native report→blocked/review19/reject19/cap18 readback774; separate owner-neededlimit18→19/completed18/fresh19 readback775 BEFORE effects.
-Ownerf705/249ed1ea/canonical10table already applied; no new TASK/criteria/leader/table/physical-budget assignment.
-One formal ground: positive TRUE over mixed-sign predicates propagates sibling negative polarity; formal4/5/8/9 fail on4 full fixtures.
-E own19288/192=20FP84FF;followup24=16/24=2FP6FF;full96=64/96=8FP24FF; no E full768 repeat; samples overlap/synthetic.
-General hypothesis: evaluate each owned inner predicate locally, then compose truth over complete argument; positive TRUE preserves content.
-Explicit bounded scope: FALSE(P AND Q)=NOT(P AND Q), not NOT(P) AND NOT(Q); local signs retained; no general Boolean/NLU expansion.
-Preserve uncertainty decision16, speech versus argument, native/literal/count/governor/relative/reception/initial/inspect/owner/effect/cleanup guards.
-Rich MODEL+FINAL ownpositive-negative compositions→completed unchanged450 parent RED/source-test gate BEFORE FIRST edit/no parallel prototype.
-Minimal general fix/same-byte GREEN/new combinations/all mandatory19+54groups2580sevenwrappers+192/24/768/96/full30s/typecheck/replay30/ownedcleanup.
-Ben current1174/15/0/33434/1189tests59files/1742.864s, typecheck0; clean atomic launch/finish/existingdeps proven, unchanged1800s/30s bounds.
-No unchanged450 full rerun; old TIMEOUT/tail/stopped runs/nonatomic prior launch/Rich devdependency preparation remain separate history.
-ZIP92da84bf/23955736bytes6parts2372payload/REPORTcdaf6e4f/145Git/73groups7wrappers/raw20members3jobs independently hashverified.
-Preserved3717materials1163ledger865raw22pins5389CLI1700helper140case20TASKinput30Lunahigh proofs; E DBqueryfalse/fullsuitefalse.
-Genuine30ref10PASS/Rich8PASS2FAIL/Ben8PASS2FAIL/ERROR0; four productFAIL allowed, rawRich3-7/Ben2-8/wrapperERROR0 preserved.
-Usage reference15/Rich10/Ben10/recovery1/probes0/cap19; once-ledger-ordinals-reservation1/history/counters noreset; metadata8KB compaction fully archived.
-E readonlyhealthyFREE06:32:24.408/helperFREE; af1→ordinaryRELEASED historical; no new lease/live/model/build/install/OS/integration/62–63.
-Decision docs2026-10-19-lab61-checker-rework19-decision.md/json; MDc38e4693/JSON79335b71; actual receipts in Estate/Eworkdir.
-One intentLAB61-RICH-CHECKER-REWORK19-4506571e-01a152d5; native continue bound to actual decision comment/current report/exact SHA, no manual phase rewrite.
+# LAB61 checkpoint — independent ACCEPT / in_review
+Ben01a153ec-0e39 completed task01a15380-4606; accepted clean exacta0218e41029e51c8bf4134a8594e4dfe598e1b35, parent4506571e.
+Checker e82d3637/testb12056b9/treedb231f3f/bundleae35f6bc/diff7d4ce100; complete delta independently accepted.
+Native ACCEPT reducer→in_review/executor null/frozena021/readback828; review20/reject19/cap19, processedIDs and usage/history unchanged.
+Canonical owner249ed1ea/all10 already applied; final requirement/evidence/correct/actual/text_required mapping closure93b0cc74, no new table assignment.
+Last REJECT19 positiveTRUE mixed-sign ownership closed on frozen192/24/768/96; bounded FALSE=NOT(conjunction) decision19 retained.
+88mandatorygroups/legacy2580/equivalence2458/7wrappers/nativeinitial18+18/negative96/positive9 independentlyGREEN on final bytes.
+Ben ownreader1024/full512 allmatch/0falsePASS0falseFAIL; parent720/1024→1024/1024,304improvements0regressions; overlapping synthetic sensitivity.
+E independently replayed1024/192/full512 allmatch0errors; E fullsuitefalse/privateDBqueryfalse; own foreground collected/no source edits.
+Ben full1198PASS15SKIP0FAIL33810assertions1213tests59files/exit0/1768.278853s within1800s/30s;typecheck0; pinnedNode24.19/Bun1.3.14.
+Completed bootstrap→cleanHEADtreehashesbefore/after; fullsoleheavyjob/wrappersafter; Ben install0; four TDD same-test pairs independently reproduced.
+Fourgates/unpublished338/rawerrors/oldTIMEOUTtail/stopped/nonatomiclaunch/Richdevpreparation preserved; no current technical uncertainty.
+BenZIP2d64a056/31063058bytes8parts2995payload+manifestc88b89cf/REPORT744d4f8f/145Git; packaged31members3jobs checked.
+Preserved3717materials1163ledger865raw22pins5389CLI1700helper140case20TASKinput30archivedLunahighproofs; no criterion changes.
+Genuine30ref10PASS/Rich8PASS2FAIL/Ben8PASS2FAIL/ERROR0; products16PASS4FAIL; rawRich3-7/Ben2-8/wrapperERROR0 unchanged.
+Four validproductFAIL RichApply2/Richdelivery2/Benprepare2delivery3/Benmissing explicit delivered settings.source.source_path; no productfixforPASS.
+Usage reference15/Rich10/Ben10/recovery1Rich0Ben/probes0; once-ledger-ordinals/reservation1-priorcalls0-noreset/provenance preserved.
+Historical af1 genuinecompletion→ordinaryRELEASED2026-10-17T23:13:39.197Z; BenfreshFREE11:27:37.657/EreadonlyFREE11:35:05.390/helperFREE.
+6profilesclean/leaseabsent/browser0/storageempty/originalcontainerHTTP200; installed producta2ba/helperf2aa/config/pins/AppArmor/OS unchanged.
+Canonical acceptance docs2026-10-19-lab61-eval-acceptance.md/json; verifiedreceipt938772df/Everification63117922; done/merge/release/integration/62–63 not executed.
