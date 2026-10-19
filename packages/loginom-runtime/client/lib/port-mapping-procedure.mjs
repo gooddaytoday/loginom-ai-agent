@@ -175,7 +175,14 @@ export async function reorderOutputFields(channel,recordIds) {
         return {...f,index:i,...(grouped?{group_index:groupIndex}:{})};
       });moves++;
       state=await channel.observe({condition:'native output order after one move',readMappings:true,ready});
-      if(!same(semantic(state.node_mapping),semantic(expected)))throw Error('Output reorder changed unrelated native mapping state');
+      const observed=semantic(state.node_mapping),wanted=semantic(expected),selection=wanted.source_selection;
+      // Moving an output row can remove the confirmed empty source selection.
+      // No selected source or other mapping property may change with the move.
+      if(!Object.hasOwn(observed,'source_selection')&&selection?.verified===true
+        &&Object.keys(selection).sort().join(',')==='record_ids,verified'
+        &&Array.isArray(selection.record_ids)&&selection.record_ids.length===0)
+        delete wanted.source_selection;
+      if(!same(observed,wanted))throw Error('Output reorder changed unrelated native mapping state');
     }
   }
   return {verified:true,cleanup_complete:true,effect_possible:moves>0,moves,definition:state.node_mapping??expected,
