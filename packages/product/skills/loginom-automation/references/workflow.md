@@ -134,6 +134,12 @@ CSV по умолчанию: UTF-8, запятая, header=names, bom=false, LF,
 Загрузи input_artifacts через loginom_dock_artifact_deliver, сохрани подтверждённую identity
 источника для импорта. Каждый node.apply сам проверяет настройки и выполнение.
 Для loginom_dock_node_resume передавай только исходный operation_id; запрос хранится в Dock.
+Если нужны только HTTP-статусы и ошибки REST, выполняй с read.ports:[1]:
+HttpStatusCode, ErrorCode и ErrorDesc находятся на порту 1. Порт 0 читай,
+когда задаче нужны тело ответа или его разбор; код 200 не подтверждает тело.
+Промежуточные выходы читай лишь для следующего решения или диагностики.
+Если успешный apply/wait уже вернул нужные строки и схему с sample_complete=true,
+используй этот результат; не вызывай node_read повторно без изменения источника.
 Для повторного чтения выхода без изменения вычислений используй loginom_dock_node_read
 с новым operation_id, source_operation_id успешной локальной операции и read
 (например, sample_rows:100, require_exact_numbers:true). Dock выполняет существующий
