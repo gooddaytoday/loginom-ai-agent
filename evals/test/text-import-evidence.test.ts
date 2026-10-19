@@ -4778,3 +4778,363 @@ test("eighteenth outer question scope ownership 2", async () => {
     }
   } finally { await rm(f.root, { recursive: true, force: true }) }
 }, 30000)
+
+
+test("nineteenth truth argument owns predicates 0", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["own19-pair-136", false, "In this run, It is true that “The engine issued warning W_BETA and The engine issued warning W_ALPHA.”", []], ["own19-pair-400", true, "Now, It is false that \"The engine issued warning W_ALPHA and The engine issued warning W_BETA.\"", []], ["own19-pair-1016", true, "«The engine issued warning W_BETA and The engine issued warning W_ALPHA.» is not true.", []], ["own19-pair-1176", false, "Now, It is not false that \"The engine issued warning W_BETA and The engine issued warning W_ALPHA.\"", []], ["own19-pair-1672", false, "In this run, It is true that “The engine issued warning W_BETA and The engine issued warning W_ALPHA.”", [{"code": "W_ALPHA"}]], ["own19-pair-1936", true, "Now, It is false that \"The engine issued warning W_ALPHA and The engine issued warning W_BETA.\"", [{"code": "W_ALPHA"}]], ["own19-pair-2552", true, "«The engine issued warning W_BETA and The engine issued warning W_ALPHA.» is not true.", [{"code": "W_ALPHA"}]], ["own19-pair-2712", false, "Now, It is not false that \"The engine issued warning W_BETA and The engine issued warning W_ALPHA.\"", [{"code": "W_ALPHA"}]], ["own19-pair-3208", false, "In this run, It is true that “The engine issued warning W_BETA and The engine issued warning W_ALPHA.”", [{"code": "W_BETA"}]], ["own19-pair-3472", true, "Now, It is false that \"The engine issued warning W_ALPHA and The engine issued warning W_BETA.\"", [{"code": "W_BETA"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth truth argument owns predicates 1", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["own19-pair-4088", true, "«The engine issued warning W_BETA and The engine issued warning W_ALPHA.» is not true.", [{"code": "W_BETA"}]], ["own19-pair-4248", false, "Now, It is not false that \"The engine issued warning W_BETA and The engine issued warning W_ALPHA.\"", [{"code": "W_BETA"}]], ["own19-pair-4744", true, "In this run, It is true that “The engine issued warning W_BETA and The engine issued warning W_ALPHA.”", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-pair-5008", false, "Now, It is false that \"The engine issued warning W_ALPHA and The engine issued warning W_BETA.\"", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-pair-5624", false, "«The engine issued warning W_BETA and The engine issued warning W_ALPHA.» is not true.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-pair-5784", true, "Now, It is not false that \"The engine issued warning W_BETA and The engine issued warning W_ALPHA.\"", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-pair-6520", false, "In this run, 'The engine did not issue warning W_BETA and The engine issued warning W_ALPHA.' is true.", []], ["own19-pair-6784", true, "Now, «The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.» is false.", []], ["own19-pair-7104", true, "\"The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.\" is not true.", []], ["own19-pair-7320", false, "Now, It is not false that \"The engine did not issue warning W_BETA and The engine issued warning W_ALPHA.\"", []]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth truth argument owns predicates 2", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["own19-pair-8056", true, "In this run, 'The engine did not issue warning W_BETA and The engine issued warning W_ALPHA.' is true.", [{"code": "W_ALPHA"}]], ["own19-pair-8320", false, "Now, «The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.» is false.", [{"code": "W_ALPHA"}]], ["own19-pair-8640", false, "\"The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.\" is not true.", [{"code": "W_ALPHA"}]], ["own19-pair-8856", true, "Now, It is not false that \"The engine did not issue warning W_BETA and The engine issued warning W_ALPHA.\"", [{"code": "W_ALPHA"}]], ["own19-pair-9592", false, "In this run, 'The engine did not issue warning W_BETA and The engine issued warning W_ALPHA.' is true.", [{"code": "W_BETA"}]], ["own19-pair-9856", true, "Now, «The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.» is false.", [{"code": "W_BETA"}]], ["own19-pair-10176", true, "\"The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.\" is not true.", [{"code": "W_BETA"}]], ["own19-pair-10392", false, "Now, It is not false that \"The engine did not issue warning W_BETA and The engine issued warning W_ALPHA.\"", [{"code": "W_BETA"}]], ["own19-pair-11128", false, "In this run, 'The engine did not issue warning W_BETA and The engine issued warning W_ALPHA.' is true.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-pair-11392", true, "Now, «The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.» is false.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth truth argument owns predicates 3", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["own19-pair-11712", true, "\"The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.\" is not true.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-pair-11928", false, "Now, It is not false that \"The engine did not issue warning W_BETA and The engine issued warning W_ALPHA.\"", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-pair-12616", false, "In this run, “The engine issued warning W_BETA and The engine did not issue warning W_ALPHA.” is true.", []], ["own19-pair-13016", true, "'The engine issued warning W_BETA and The engine did not issue warning W_ALPHA.' is false.", []], ["own19-pair-13256", true, "\"The engine issued warning W_BETA and The engine did not issue warning W_ALPHA.\" is not true.", []], ["own19-pair-13488", false, "It is not false that «The engine did not issue warning W_ALPHA and The engine issued warning W_BETA.»", []], ["own19-pair-14152", false, "In this run, “The engine issued warning W_BETA and The engine did not issue warning W_ALPHA.” is true.", [{"code": "W_ALPHA"}]], ["own19-pair-14552", true, "'The engine issued warning W_BETA and The engine did not issue warning W_ALPHA.' is false.", [{"code": "W_ALPHA"}]], ["own19-pair-14792", true, "\"The engine issued warning W_BETA and The engine did not issue warning W_ALPHA.\" is not true.", [{"code": "W_ALPHA"}]], ["own19-pair-15024", false, "It is not false that «The engine did not issue warning W_ALPHA and The engine issued warning W_BETA.»", [{"code": "W_ALPHA"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth truth argument owns predicates 4", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["own19-pair-15688", true, "In this run, “The engine issued warning W_BETA and The engine did not issue warning W_ALPHA.” is true.", [{"code": "W_BETA"}]], ["own19-pair-16088", false, "'The engine issued warning W_BETA and The engine did not issue warning W_ALPHA.' is false.", [{"code": "W_BETA"}]], ["own19-pair-16328", false, "\"The engine issued warning W_BETA and The engine did not issue warning W_ALPHA.\" is not true.", [{"code": "W_BETA"}]], ["own19-pair-16560", true, "It is not false that «The engine did not issue warning W_ALPHA and The engine issued warning W_BETA.»", [{"code": "W_BETA"}]], ["own19-pair-17224", false, "In this run, “The engine issued warning W_BETA and The engine did not issue warning W_ALPHA.” is true.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-pair-17624", true, "'The engine issued warning W_BETA and The engine did not issue warning W_ALPHA.' is false.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-pair-17864", true, "\"The engine issued warning W_BETA and The engine did not issue warning W_ALPHA.\" is not true.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-pair-18096", false, "It is not false that «The engine did not issue warning W_ALPHA and The engine issued warning W_BETA.»", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-pair-18496", true, "Now, It is true that «The engine did not issue warning W_ALPHA and The engine did not issue warning W_BETA.»", []], ["own19-pair-18856", false, "In this run, It is false that \"The engine did not issue warning W_BETA and The engine did not issue warning W_ALPHA.\"", []]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth truth argument owns predicates 5", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["own19-pair-19336", false, "In this run, It is not true that “The engine did not issue warning W_BETA and The engine did not issue warning W_ALPHA.”", []], ["own19-pair-19952", true, "In this run, 'The engine did not issue warning W_ALPHA and The engine did not issue warning W_BETA.' is not false.", []], ["own19-pair-20032", false, "Now, It is true that «The engine did not issue warning W_ALPHA and The engine did not issue warning W_BETA.»", [{"code": "W_ALPHA"}]], ["own19-pair-20392", true, "In this run, It is false that \"The engine did not issue warning W_BETA and The engine did not issue warning W_ALPHA.\"", [{"code": "W_ALPHA"}]], ["own19-pair-20872", true, "In this run, It is not true that “The engine did not issue warning W_BETA and The engine did not issue warning W_ALPHA.”", [{"code": "W_ALPHA"}]], ["own19-pair-21488", false, "In this run, 'The engine did not issue warning W_ALPHA and The engine did not issue warning W_BETA.' is not false.", [{"code": "W_ALPHA"}]], ["own19-pair-21568", false, "Now, It is true that «The engine did not issue warning W_ALPHA and The engine did not issue warning W_BETA.»", [{"code": "W_BETA"}]], ["own19-pair-21928", true, "In this run, It is false that \"The engine did not issue warning W_BETA and The engine did not issue warning W_ALPHA.\"", [{"code": "W_BETA"}]], ["own19-pair-22408", true, "In this run, It is not true that “The engine did not issue warning W_BETA and The engine did not issue warning W_ALPHA.”", [{"code": "W_BETA"}]], ["own19-pair-23024", false, "In this run, 'The engine did not issue warning W_ALPHA and The engine did not issue warning W_BETA.' is not false.", [{"code": "W_BETA"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth truth argument owns predicates 6", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["own19-pair-23104", false, "Now, It is true that «The engine did not issue warning W_ALPHA and The engine did not issue warning W_BETA.»", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-pair-23464", true, "In this run, It is false that \"The engine did not issue warning W_BETA and The engine did not issue warning W_ALPHA.\"", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-pair-23944", true, "In this run, It is not true that “The engine did not issue warning W_BETA and The engine did not issue warning W_ALPHA.”", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-pair-24560", false, "In this run, 'The engine did not issue warning W_ALPHA and The engine did not issue warning W_BETA.' is not false.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-boundary-720", false, "It is not true that \"The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.\"; The engine issued warning W_GAMMA.", []], ["own19-boundary-880", false, "It is not true that \"The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.\"; The engine issued warning W_GAMMA.", [{"code": "W_ALPHA"}]], ["own19-boundary-1040", false, "It is not true that \"The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.\"; The engine issued warning W_GAMMA.", [{"code": "W_BETA"}]], ["own19-boundary-1200", false, "It is not true that \"The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.\"; The engine issued warning W_GAMMA.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-boundary-83", true, "The engine did not issue warning W_GAMMA.\nIt is not true that \"The engine issued warning W_ALPHA and The engine issued warning W_BETA.\"", []], ["own19-boundary-243", true, "The engine did not issue warning W_GAMMA.\nIt is not true that \"The engine issued warning W_ALPHA and The engine issued warning W_BETA.\"", [{"code": "W_ALPHA"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth truth argument owns predicates 7", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["own19-boundary-403", true, "The engine did not issue warning W_GAMMA.\nIt is not true that \"The engine issued warning W_ALPHA and The engine issued warning W_BETA.\"", [{"code": "W_BETA"}]], ["own19-boundary-563", false, "The engine did not issue warning W_GAMMA.\nIt is not true that \"The engine issued warning W_ALPHA and The engine issued warning W_BETA.\"", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-boundary-1931", true, "The engine did not issue warning W_GAMMA.\nThe user said that It is true that \"The engine did not issue warning W_ALPHA and The engine did not issue warning W_BETA.\"", []], ["own19-boundary-2091", true, "The engine did not issue warning W_GAMMA.\nThe user said that It is true that \"The engine did not issue warning W_ALPHA and The engine did not issue warning W_BETA.\"", [{"code": "W_ALPHA"}]], ["own19-boundary-2251", true, "The engine did not issue warning W_GAMMA.\nThe user said that It is true that \"The engine did not issue warning W_ALPHA and The engine did not issue warning W_BETA.\"", [{"code": "W_BETA"}]], ["own19-boundary-2411", true, "The engine did not issue warning W_GAMMA.\nThe user said that It is true that \"The engine did not issue warning W_ALPHA and The engine did not issue warning W_BETA.\"", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["own19-boundary-688", false, "The user said that It is false that \"The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.\"; The engine issued warning W_GAMMA.", []], ["own19-boundary-848", false, "The user said that It is false that \"The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.\"; The engine issued warning W_GAMMA.", [{"code": "W_ALPHA"}]], ["own19-boundary-1008", false, "The user said that It is false that \"The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.\"; The engine issued warning W_GAMMA.", [{"code": "W_BETA"}]], ["own19-boundary-1168", false, "The user said that It is false that \"The engine issued warning W_ALPHA and The engine did not issue warning W_BETA.\"; The engine issued warning W_GAMMA.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth complete predicate scope 0", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["public-scope19-question-semicolon-18", true, "It is true that \"The engine issued warning W_ALPHA and The engine issued warning W_BETA.\"?; The engine did not issue warning W_GAMMA.", []], ["public-scope19-question-newline-18", true, "It is true that \"The engine issued warning W_ALPHA and The engine issued warning W_BETA.\"?\nThe engine did not issue warning W_GAMMA.", []], ["public-scope19-question-semicolon-16", false, "It is true that \"The engine issued warning W_ALPHA and The engine issued warning W_BETA.\"?; The engine issued warning W_GAMMA.", []], ["public-scope19-question-newline-16", false, "It is true that \"The engine issued warning W_ALPHA and The engine issued warning W_BETA.\"?\nThe engine issued warning W_GAMMA.", []]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth complete predicate scope 1", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["public-scope19-example-semicolon-24", false, "Example: «The engine issued warning W_ALPHA and The engine issued warning W_BETA.» is true; The engine issued warning W_GAMMA.", []], ["public-scope19-example-newline-24", false, "Example: «The engine issued warning W_ALPHA and The engine issued warning W_BETA.» is true.\nThe engine issued warning W_GAMMA.", []], ["public-scope19-example-semicolon-26", true, "Example: «The engine issued warning W_ALPHA and The engine issued warning W_BETA.» is true; The engine did not issue warning W_GAMMA.", []], ["public-scope19-example-newline-26", true, "Example: «The engine issued warning W_ALPHA and The engine issued warning W_BETA.» is true.\nThe engine did not issue warning W_GAMMA.", []]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth complete predicate scope 2", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["public-scope19-user-semicolon-28", false, "The user said that «The engine issued warning W_ALPHA and The engine issued warning W_BETA.» is true; The engine issued warning W_GAMMA.", []], ["public-scope19-user-newline-28", false, "The user said that «The engine issued warning W_ALPHA and The engine issued warning W_BETA.» is true.\nThe engine issued warning W_GAMMA.", []], ["public-scope19-user-semicolon-30", true, "The user said that «The engine issued warning W_ALPHA and The engine issued warning W_BETA.» is true; The engine did not issue warning W_GAMMA.", []], ["public-scope19-user-newline-30", true, "The user said that «The engine issued warning W_ALPHA and The engine issued warning W_BETA.» is true.\nThe engine did not issue warning W_GAMMA.", []]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth complete predicate scope 3", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["public-scope19-uncertain-semicolon-34", true, "Perhaps «The engine issued warning W_ALPHA and The engine issued warning W_BETA.» is true; The engine did not issue warning W_GAMMA.", []], ["public-scope19-uncertain-newline-34", true, "Perhaps «The engine issued warning W_ALPHA and The engine issued warning W_BETA.» is true.\nThe engine did not issue warning W_GAMMA.", []], ["public-scope19-uncertain-semicolon-32", false, "Perhaps «The engine issued warning W_ALPHA and The engine issued warning W_BETA.» is true; The engine issued warning W_GAMMA.", []], ["public-scope19-uncertain-newline-32", false, "Perhaps «The engine issued warning W_ALPHA and The engine issued warning W_BETA.» is true.\nThe engine issued warning W_GAMMA.", []]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth argument representation 0", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["argument19-list-6162", true, "It is false that «The engine issued warnings W_LEFT and W_RIGHT.»", []], ["argument19-list-6226", true, "It is false that «The engine issued warnings W_LEFT and W_RIGHT.»", [{"code": "W_LEFT"}]], ["argument19-list-6290", true, "It is false that «The engine issued warnings W_LEFT and W_RIGHT.»", [{"code": "W_RIGHT"}]], ["argument19-list-6354", false, "It is false that «The engine issued warnings W_LEFT and W_RIGHT.»", [{"code": "W_LEFT"}, {"code": "W_RIGHT"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth argument representation 1", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["argument19-join-134", true, "It is false that 'The engine issued warning W_LEFT; The engine issued warning W_RIGHT.'", []], ["argument19-join-518", true, "It is false that 'The engine issued warning W_LEFT; The engine issued warning W_RIGHT.'", [{"code": "W_LEFT"}]], ["argument19-join-902", true, "It is false that 'The engine issued warning W_LEFT; The engine issued warning W_RIGHT.'", [{"code": "W_RIGHT"}]], ["argument19-join-1286", false, "It is false that 'The engine issued warning W_LEFT; The engine issued warning W_RIGHT.'", [{"code": "W_LEFT"}, {"code": "W_RIGHT"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth argument representation 2", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["argument19-matrix-7243", true, "It is false that 'The engine issued warning W_LEFT that the engine did not issue.'", []], ["argument19-matrix-7275", true, "It is false that 'The engine issued warning W_LEFT that the engine did not issue.'", [{"code": "W_LEFT"}]], ["argument19-matrix-7243", true, "It is false that 'The engine issued warning W_LEFT that the engine did not issue.'", []], ["argument19-matrix-7275", true, "It is false that 'The engine issued warning W_LEFT that the engine did not issue.'", [{"code": "W_LEFT"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth argument representation 3", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["argument19-unsupported-OR-7431", true, "'The engine issued warning W_LEFT or the engine issued warning W_RIGHT.' is false.", []], ["argument19-unsupported-OR-7439", false, "'The engine issued warning W_LEFT or the engine issued warning W_RIGHT.' is false.", [{"code": "W_LEFT"}]], ["argument19-unsupported-OR-7447", false, "'The engine issued warning W_LEFT or the engine issued warning W_RIGHT.' is false.", [{"code": "W_RIGHT"}]], ["argument19-unsupported-OR-7455", false, "'The engine issued warning W_LEFT or the engine issued warning W_RIGHT.' is false.", [{"code": "W_LEFT"}, {"code": "W_RIGHT"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth existing native role 0", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["role19-5", false, "«Warning W_ALPHA was issued and Warning W_BETA was issued.» is true.", []], ["role19-13", true, "«Warning W_ALPHA was issued and Warning W_BETA was issued.» is false.", []], ["role19-16", true, "It is not true that \"Warning W_ALPHA was issued and Warning W_BETA was issued.\"", []], ["role19-27", false, "It is not false that 'Warning W_ALPHA was issued and Warning W_BETA was issued.'", []], ["role19-37", false, "«Warning W_ALPHA was issued and Warning W_BETA was issued.» is true.", [{"code": "W_ALPHA"}]], ["role19-45", true, "«Warning W_ALPHA was issued and Warning W_BETA was issued.» is false.", [{"code": "W_ALPHA"}]], ["role19-48", true, "It is not true that \"Warning W_ALPHA was issued and Warning W_BETA was issued.\"", [{"code": "W_ALPHA"}]], ["role19-59", false, "It is not false that 'Warning W_ALPHA was issued and Warning W_BETA was issued.'", [{"code": "W_ALPHA"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth existing native role 1", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["role19-69", false, "«Warning W_ALPHA was issued and Warning W_BETA was issued.» is true.", [{"code": "W_BETA"}]], ["role19-77", true, "«Warning W_ALPHA was issued and Warning W_BETA was issued.» is false.", [{"code": "W_BETA"}]], ["role19-80", true, "It is not true that \"Warning W_ALPHA was issued and Warning W_BETA was issued.\"", [{"code": "W_BETA"}]], ["role19-91", false, "It is not false that 'Warning W_ALPHA was issued and Warning W_BETA was issued.'", [{"code": "W_BETA"}]], ["role19-101", true, "«Warning W_ALPHA was issued and Warning W_BETA was issued.» is true.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["role19-109", false, "«Warning W_ALPHA was issued and Warning W_BETA was issued.» is false.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["role19-112", false, "It is not true that \"Warning W_ALPHA was issued and Warning W_BETA was issued.\"", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["role19-123", true, "It is not false that 'Warning W_ALPHA was issued and Warning W_BETA was issued.'", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth existing native role 2", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["role19-135", false, "'Warning W_ALPHA was issued and Warning W_BETA was not issued.' is true.", []], ["role19-138", true, "It is false that “Warning W_ALPHA was issued and Warning W_BETA was not issued.”", []], ["role19-149", true, "«Warning W_ALPHA was issued and Warning W_BETA was not issued.» is not true.", []], ["role19-157", false, "«Warning W_ALPHA was issued and Warning W_BETA was not issued.» is not false.", []], ["role19-167", true, "'Warning W_ALPHA was issued and Warning W_BETA was not issued.' is true.", [{"code": "W_ALPHA"}]], ["role19-170", false, "It is false that “Warning W_ALPHA was issued and Warning W_BETA was not issued.”", [{"code": "W_ALPHA"}]], ["role19-181", false, "«Warning W_ALPHA was issued and Warning W_BETA was not issued.» is not true.", [{"code": "W_ALPHA"}]], ["role19-189", true, "«Warning W_ALPHA was issued and Warning W_BETA was not issued.» is not false.", [{"code": "W_ALPHA"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth existing native role 3", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["role19-199", false, "'Warning W_ALPHA was issued and Warning W_BETA was not issued.' is true.", [{"code": "W_BETA"}]], ["role19-202", true, "It is false that “Warning W_ALPHA was issued and Warning W_BETA was not issued.”", [{"code": "W_BETA"}]], ["role19-213", true, "«Warning W_ALPHA was issued and Warning W_BETA was not issued.» is not true.", [{"code": "W_BETA"}]], ["role19-221", false, "«Warning W_ALPHA was issued and Warning W_BETA was not issued.» is not false.", [{"code": "W_BETA"}]], ["role19-231", false, "'Warning W_ALPHA was issued and Warning W_BETA was not issued.' is true.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["role19-234", true, "It is false that “Warning W_ALPHA was issued and Warning W_BETA was not issued.”", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["role19-245", true, "«Warning W_ALPHA was issued and Warning W_BETA was not issued.» is not true.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["role19-253", false, "«Warning W_ALPHA was issued and Warning W_BETA was not issued.» is not false.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth existing native role 4", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["role19-258", false, "It is true that “Warning W_ALPHA was not issued and Warning W_BETA was issued.”", []], ["role19-264", true, "It is false that \"Warning W_ALPHA was not issued and Warning W_BETA was issued.\"", []], ["role19-278", true, "“Warning W_ALPHA was not issued and Warning W_BETA was issued.” is not true.", []], ["role19-280", false, "It is not false that \"Warning W_ALPHA was not issued and Warning W_BETA was issued.\"", []], ["role19-290", false, "It is true that “Warning W_ALPHA was not issued and Warning W_BETA was issued.”", [{"code": "W_ALPHA"}]], ["role19-296", true, "It is false that \"Warning W_ALPHA was not issued and Warning W_BETA was issued.\"", [{"code": "W_ALPHA"}]], ["role19-310", true, "“Warning W_ALPHA was not issued and Warning W_BETA was issued.” is not true.", [{"code": "W_ALPHA"}]], ["role19-312", false, "It is not false that \"Warning W_ALPHA was not issued and Warning W_BETA was issued.\"", [{"code": "W_ALPHA"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth existing native role 5", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["role19-322", true, "It is true that “Warning W_ALPHA was not issued and Warning W_BETA was issued.”", [{"code": "W_BETA"}]], ["role19-328", false, "It is false that \"Warning W_ALPHA was not issued and Warning W_BETA was issued.\"", [{"code": "W_BETA"}]], ["role19-342", false, "“Warning W_ALPHA was not issued and Warning W_BETA was issued.” is not true.", [{"code": "W_BETA"}]], ["role19-344", true, "It is not false that \"Warning W_ALPHA was not issued and Warning W_BETA was issued.\"", [{"code": "W_BETA"}]], ["role19-354", false, "It is true that “Warning W_ALPHA was not issued and Warning W_BETA was issued.”", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["role19-360", true, "It is false that \"Warning W_ALPHA was not issued and Warning W_BETA was issued.\"", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["role19-374", true, "“Warning W_ALPHA was not issued and Warning W_BETA was issued.” is not true.", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["role19-376", false, "It is not false that \"Warning W_ALPHA was not issued and Warning W_BETA was issued.\"", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth existing native role 6", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["role19-387", true, "It is true that 'Warning W_ALPHA was not issued and Warning W_BETA was not issued.'", []], ["role19-395", false, "It is false that 'Warning W_ALPHA was not issued and Warning W_BETA was not issued.'", []], ["role19-402", false, "It is not true that “Warning W_ALPHA was not issued and Warning W_BETA was not issued.”", []], ["role19-411", true, "It is not false that 'Warning W_ALPHA was not issued and Warning W_BETA was not issued.'", []], ["role19-419", false, "It is true that 'Warning W_ALPHA was not issued and Warning W_BETA was not issued.'", [{"code": "W_ALPHA"}]], ["role19-427", true, "It is false that 'Warning W_ALPHA was not issued and Warning W_BETA was not issued.'", [{"code": "W_ALPHA"}]], ["role19-434", true, "It is not true that “Warning W_ALPHA was not issued and Warning W_BETA was not issued.”", [{"code": "W_ALPHA"}]], ["role19-443", false, "It is not false that 'Warning W_ALPHA was not issued and Warning W_BETA was not issued.'", [{"code": "W_ALPHA"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
+
+
+test("nineteenth existing native role 7", async () => {
+  const f = await damagedFixture("txt-wrong-encoding")
+  try {
+    const receipt = f.events.find(event => event.receipt?.phase === "configure")!.receipt!
+    for (const [name, accepted, text, warnings] of [["role19-451", false, "It is true that 'Warning W_ALPHA was not issued and Warning W_BETA was not issued.'", [{"code": "W_BETA"}]], ["role19-459", true, "It is false that 'Warning W_ALPHA was not issued and Warning W_BETA was not issued.'", [{"code": "W_BETA"}]], ["role19-466", true, "It is not true that “Warning W_ALPHA was not issued and Warning W_BETA was not issued.”", [{"code": "W_BETA"}]], ["role19-475", false, "It is not false that 'Warning W_ALPHA was not issued and Warning W_BETA was not issued.'", [{"code": "W_BETA"}]], ["role19-483", false, "It is true that 'Warning W_ALPHA was not issued and Warning W_BETA was not issued.'", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["role19-491", true, "It is false that 'Warning W_ALPHA was not issued and Warning W_BETA was not issued.'", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["role19-498", true, "It is not true that “Warning W_ALPHA was not issued and Warning W_BETA was not issued.”", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]], ["role19-507", false, "It is not false that 'Warning W_ALPHA was not issued and Warning W_BETA was not issued.'", [{"code": "W_ALPHA"}, {"code": "W_BETA"}]]] as const) {
+      Object.assign(receipt.value!, { warnings })
+      await f.write(`Data is corrupted. ${text}`)
+      const result = await validateNodeAttempt(f.task, f.attempt)
+      expect({ name, errors: result.errors }).toEqual({ name, errors: [] })
+      expect({ name, accepted: result.failures.length === 0 }).toEqual({ name, accepted })
+    }
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+}, 30000)
