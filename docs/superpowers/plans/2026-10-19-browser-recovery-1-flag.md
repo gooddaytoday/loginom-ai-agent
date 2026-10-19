@@ -174,7 +174,7 @@ git commit -m "feat(host): forward private browser recovery capability"
 - Consumes: `launchNodeHost({browserRecovery})` из Task 2.
 - Produces: `InstallationBrowserRecovery: boolean`; `standaloneBundle(): Promise<{resources: string; node: string; entry: string; verified: boolean}>`, где `verified` — `false` для `LOGINOM_AI_AGENT_CLI_BUNDLE`; `run` и `tui` передают `browserRecovery: InstallationBrowserRecovery && bundle.verified`, команды `loginom ...` поле не передают; `metadata.browserRecovery?: boolean` в `cli-manifest.json`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `standalone-browser-recovery.test.ts` повторяет `standalone-saved-package-policy.test.ts`. Фиктивный `host/node-host.mjs` пишет `{browserRecovery: m.input.browserRecovery ?? null}`. Окружение дополнительно содержит `LOGINOM_AI_AGENT_BROWSER_RECOVERY: "1"` и `LOGINOM_AI_AGENT_CHANNEL: "prod"`:
 
@@ -197,21 +197,21 @@ test("CLI manifest records the browser recovery build flag and verifies manifest
 })
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd packages/agent && LOGINOM_AI_AGENT_TEST_NODE=<pinned node> bun test test/cli/standalone-browser-recovery.test.ts`; `cd packages/loginom-host && LOGINOM_AI_AGENT_TEST_NODE=<pinned node> bun test test/cli-manifest.test.ts`
 Expected: FAIL — `run` и `tui` пишут `null`; `verifyCliManifest` отвергает лишнее поле (`onExcessProperty: "error"`).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `build.ts` добавляет в `define` значение `'1'` только при `process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1"`, иначе `'0'`. `version.ts` объявляет глобал по образцу `LOGINOM_AI_AGENT_CHANNEL`; без `define` (запуск из исходников) — `false`. `build-cli.ts` пишет `browserRecovery` из того же входа сборки; окружение в агентскую сборку уже передаётся через `...process.env` (строка 58). В схеме `metadata` поле `Schema.optional(Schema.Boolean)`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: команды Step 2, затем `bun typecheck` в `packages/agent`, `packages/core` и `packages/loginom-host`
 Expected: PASS. Ветка «проверенный установленный bundle и флаг» требует собранного бинаря и проверяется в плане 5, Task 4.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/agent packages/core packages/loginom-host
