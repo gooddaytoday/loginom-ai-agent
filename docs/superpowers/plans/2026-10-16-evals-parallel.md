@@ -331,6 +331,13 @@ private config/budget/results вне Git; операторские команд�
   PendingDisconnect/ownership guards и unknown при остатке сохраняются. Один
   behavioral RED→GREEN delayed readback,15/89 targeted PASS8.26s/typecheck/diff,
   независимое ревью Approved; четыре native A/B повторно PASS.
+- [x] Устранить transient неполноту direct FD scan без изменения guards:
+  повторить только readonly scan до3раз/100ms; complete snapshot с открытым своим
+  файлом сразу запрещает delete. Постоянная неполнота/ошибка сохраняет unknown.
+  RED→GREEN на сыром несовпадающем before/after frame, затем полном; проверить
+  постоянную неполноту и запрет повторов после полного снимка. Независимый план
+  Approved;18/99 targeted PASS8.71s/typecheck/diff, четыре native A/B PASS30.05s;
+  чужие PID не сигналить, весь cleanup не повторять.
 - [ ] Выполнить реальный N=2 на тех же tasks/
   models/pins. Проверить перекрытие двух слотов, judge settings, полную summary,
   только свою очистку, отсутствие обязательных ресурсных/лицензионных/provider отказов.
