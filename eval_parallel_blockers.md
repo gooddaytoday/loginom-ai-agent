@@ -82,3 +82,9 @@ profile брони released. Исходные результаты сохран�
 readback после CloseSession исправлено по TDD:15/89 targeted PASS/typecheck/diff,
 Review Approved; четыре native A/B повторно PASS. Далее повторный N2
 с тем же утверждённым бюджетом и неизменными evaluation/CLI pins.
+
+N2 dOMERK прошёл25/25 ресурсных границ, limits/timeline/623 samples/0miss.
+A calc/group100/cleanup confirmed; B no_artifact/FDscan unknown. Штатный startup
+подтвердил cleanup/release. Transient неполнота scan воспроизведена на чтение;
+ограниченный повтор одного IO-чтения исправлен по TDD,18/99 unit PASS/TC/diff,
+Review Approved и четыре native A/B PASS30.05s. Далее повтор с тем же бюджетом.

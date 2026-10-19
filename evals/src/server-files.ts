@@ -38,16 +38,27 @@ export async function readServerFiles(file: SlotFile, server: Awaited<ReturnType
 }
 
 /** Read-only collector; research controls also use this without cleanup authority. */
-export async function serverFileObservation(containerId: string) {
+export async function serverFileObservation(containerId: string, read = scanServerFiles) {
   if (!/^[a-f0-9]{64}$/.test(containerId)) throw new EvalFailure("SERVER_FILE_CONTAINER_ID", 2)
-  const startedAt = new Date().toISOString()
+  for (const attempt of [0, 1, 2]) {
+    const startedAt = new Date().toISOString()
+    const result = await read(containerId)
+    if (result.code === 0) {
+      const snapshot = parseSnapshot(containerId, startedAt, new Date().toISOString(), result.output)
+      if (snapshot.complete) return snapshot
+    }
+    if (attempt < 2) await Bun.sleep(100)
+  }
+  throw new EvalFailure("SERVER_FILE_SCAN_UNCONFIRMED", 2)
+}
+
+async function scanServerFiles(containerId: string) {
   const child = Bun.spawn(["docker", "--host", "unix:///var/run/docker.sock", "exec", "-i", containerId,
     "env", "-i", "PATH=/usr/bin:/bin", "LC_ALL=C", "sh", "-s"], { stdin: "pipe", stdout: "pipe", stderr: "pipe", timeout: 5000 })
   child.stdin.write(await Bun.file(path.resolve(import.meta.dir, "../fixtures/server-files.sh")).text())
   child.stdin.end()
   const [code, output] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
-  if (code !== 0) throw new EvalFailure("SERVER_FILE_SCAN_UNCONFIRMED", 2)
-  return parseSnapshot(containerId, startedAt, new Date().toISOString(), output)
+  return { code, output }
 }
 
 function parseSnapshot(containerId: string, startedAt: string, finishedAt: string, output: string) {

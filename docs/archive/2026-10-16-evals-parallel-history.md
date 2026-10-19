@@ -8143,3 +8143,14 @@ incidents/provider+judge limits passed. Утверждённый бюджет н
 Private evidence: acceptance-20261016/evidence/reconciled-n2-quarantine-20261019.json
 и results/20261019-083618-50b28da4db-dirty-qAdMiN. Следующий шаг — unit TDD
 ограниченного ожидания exact readback после acknowledged close, затем повтор N2.
+
+## 2026-10-19: N2 после ожидания закрытия сессии
+
+После fix adadb1469e run dOMERK завершился сводкой, resources25/25 и limits
+passed,623samples/0miss. A calc/group100/cleanup confirmed; B filter no_artifact
+и SERVER_FILE_SCAN_UNCONFIRMED. Существующий readonly scanner воспроизвёл
+transient неполноту: exit0, before PID1, after PID1+52291; два соседних снимка
+полные. Принадлежность временного PID не установлена, сигналы не посылались.
+Штатный startup завершён, все holds released; failed receipts/results сохранены.
+Private evidence: acceptance-20261016/evidence/fd-readback-n2-20261019/,
+reconciled-n2-readback-quarantine-20261019.json и results/20261019-085326-adadb1469e-dirty-dOMERK.
