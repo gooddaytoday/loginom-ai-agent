@@ -3803,7 +3803,7 @@ test('input port overflow caption requires native binding and the exact hidden c
 });
 
 async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
-  const caption=['group','sorting','crosstable','calculator','reform'].includes(vendor)?'Входной источник данных':port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
+  const caption=['group','sorting','crosstable','calculator','reform','filter'].includes(vendor)?'Входной источник данных':port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
   const {page,panel,crumbs}=await inputPortContextFixture();
   // Loginom 7.4.2 native diagnostic: 1280x800, input1 and Настройка hidden
   // by breadcrumb overflow; node/input/wizard icons remain in the same DOM.
@@ -3818,7 +3818,7 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
     if(i>=7)c.style.display='none';
     for(const icon of c.children)icon.box={x:c.box.x+1,y:c.box.y+1,width:16,height:16};
   }
-  const nodeIcon={calculator:'bg-vendor-icon-calcdata',crosstable:'bg-vendor-icon-crosstab',sorting:'bg-vendor-icon-sorting',union:'bg-vendor-icon-uniondata',group:'bg-vendor-icon-groupdata',join:'bg-vendor-icon-joindata',reform:'bg-vendor-icon-reformcolumns'}[vendor];
+  const nodeIcon={calculator:'bg-vendor-icon-calcdata',crosstable:'bg-vendor-icon-crosstab',sorting:'bg-vendor-icon-sorting',union:'bg-vendor-icon-uniondata',group:'bg-vendor-icon-groupdata',join:'bg-vendor-icon-joindata',reform:'bg-vendor-icon-reformcolumns',filter:'bg-vendor-icon-filterdata'}[vendor];
   crumbs[5].children[0].attrs.class=nodeIcon;
   page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[7]).attrs.class='bg-vendor-icon-tunedatasourcesocketdef';
   if(mode==='wrong_icon')crumbs[5].children[0].attrs.class=vendor==='calculator'?'bg-vendor-icon-groupdata':'bg-vendor-icon-calcdata';
@@ -3899,7 +3899,7 @@ test('owned Union and Grouping inputs keep their exact hidden input folder and c
 });
 
 test('tabular input0 keeps Done and close bound to the native node icon when its input folder overflows',async()=>{
- for(const vendor of ['group','sorting','crosstable','calculator','reform'])for(const mode of ['valid','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','unknown_port','wrong_native_index','wrong_icon','missing_native_icon','wrong_native_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
+ for(const vendor of ['group','sorting','crosstable','calculator','reform','filter'])for(const mode of ['valid','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','unknown_port','wrong_native_index','wrong_icon','missing_native_icon','wrong_native_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
   const {page}=await joinInputPortOverflowFixture(mode,0,vendor);
   const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
   crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};

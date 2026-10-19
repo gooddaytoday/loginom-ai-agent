@@ -784,7 +784,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       else if(panels.length===1&&inside(panels[0],panels[0])) {
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
         const singleInputOverflow=preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===0
-          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns'].includes(preparedInputPort.node_icon_class)
+          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata'].includes(preparedInputPort.node_icon_class)
           &&crumbs.length===9&&crumbs[5].querySelectorAll('.'+preparedInputPort.node_icon_class).length===1;
         if(crumbs.length>32)context.status='bounded';
         else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
