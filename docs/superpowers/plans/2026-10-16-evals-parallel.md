@@ -204,8 +204,17 @@
 - [x] Проверить затронутый process suite и typecheck, сохранить отдельным коммитом.
   Process suite19 PASS, package typecheck/diff PASS; новый retry/busy/idle виден,
   прежний порядок остальных событий сохраняется. Независимое мини-ревью Approved.
-- [ ] Собрать отдельный private installed CLI, закрепить SHA и квалифицировать
+- [x] Собрать отдельный private installed CLI, закрепить SHA и квалифицировать
   retry output до A/B и N=1. Пользовательскую установку/старый candidate не менять.
+  Candidate8b2ba2bf9b, version0.0.0-dev-202610190530, binary SHA
+  d2de003bf5c13a3ad7d9ee2256e8b7f1f05d64776d03dd3beb528f6d5133be41.
+  Установленный бинарник: локальный HTTP429→200,2 запроса, busy/retry/idle,
+  exit0/cleanup confirmed; private evidence `acceptance-20261016/evidence/cli-retry-20261019/`.
+- [ ] Подключить JSON status к проверке provider errors: busy→idle основной
+  сессии, любой retry сохраняет отказ; старый/оборванный JSON и task tool не дают
+  полного покрытия. Непустой существующий --title исключает запрос автозаголовка.
+- [ ] Отключить внутренние повторы выбранного provider судьи существующими
+  request_max_retries/stream_max_retries=0; проверить локальным HTTP429 без модели.
 Новый Protocol/HTTP, сырой transport trace и новая система телеметрии не нужны.
 
 ## 6. Четыре live A/B сценария, затем N=1 → утверждение → N=2
@@ -285,4 +294,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20. Acceptance: prepare92c5ac16…/verify08bb7493… ready=true/0models; startup62/225,runtime134/751 PASS+typecheck.19.10 разрешена CLI retry правка; далее TDD,candidate,4 A/B,N=1,пороги,N=2.
+20. Acceptance: prepare/verify ready/0models; installed CLI8b2ba2bf9b HTTP429→200 qualified/cleanup confirmed. Далее provider/judge observations,4 A/B,N=1,пороги,N=2.
