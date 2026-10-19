@@ -570,6 +570,9 @@ def warning_receiver_spans(text, identifiers=(), surface=None):
 
 def warning_predicate_polarity(clause, start, end):
     """Compose an emission's own negative auxiliary with its governing scope."""
+    if getattr(clause, 'scope', None) is None and (argument := report_truth_argument(clause, start, end)):
+        inner, left, right, sign = argument
+        return sign * warning_predicate_polarity(inner, left, right)
     emission = re.search(r'\b(?:(?P<negative>not|never|не)\s+(?:(?:been|ever|был\w*)\s+)*)?'
         r'(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b', clause)
     if not emission or emission['negative'] is None:
@@ -733,7 +736,16 @@ def report_complements(sentence, atoms=()):
             if any(outside(match.end() + boundary.start()) for boundary in boundaries): break
             link_end = match.end() + link.end()
             break
-        if link_end is None: continue
+        if link_end is None:
+            # A postposed truth predicate still takes its quoted body as the
+            # governor's complement ("perhaps <quote> is true"). Its internal
+            # siblings cannot shed that governor at a later clause cut.
+            end = next((match.end() + boundary.start() for boundary in
+                re.finditer(r';|[.!?](?=\s|$)', sentence[match.end():])
+                if outside(match.end() + boundary.start())), len(sentence))
+            if not report_truth_argument(sentence[match.end():end].strip()):
+                continue
+            link_end = match.end()
         end = len(sentence)
         for boundary in re.finditer(r';|[.!?](?=\s|$)|\b(?:но|однако|but|however)\b', sentence[link_end:]):
             position = link_end + boundary.start()
@@ -830,12 +842,13 @@ def report_sentences(text, atoms=(), identifiers=None):
         # Scalar code/field objects and atomic native reasons keep their owner.
         value = match.group()
         body = value[1:-1]
-        speech_object = (not cut and re.fullmatch(quote, value)
+        proposition = (not cut and re.fullmatch(quote, value)
             and not literal_quote(value)
             # Modality/history can precede an active head, and a passive or
             # copular predicate need not start with the active engine subject.
             and (any(report_predicate_head(body[token.start():]) for token in re.finditer(r'\b\w', body))
-                or re.search(r'\b(?:is|are|was|were|был\w*|явля\w*)\b', body))
+                or re.search(r'\b(?:is|are|was|were|был\w*|явля\w*)\b', body)))
+        speech_object = (proposition
             # A following subjectless auxiliary still predicates this quoted
             # argument (e.g. its truth), rather than starting another report.
             and not re.match(r'\s*[,—-]?\s*(?:is|are|was|were|has|have|had|did|does|do|can|could|may|might|should|would|must|will|not|true|false|был\w*|будет|явля\w*)\b', text[match.end():]))
@@ -847,12 +860,23 @@ def report_sentences(text, atoms=(), identifiers=None):
                 sentences.append((part, part.start, carry))
             start, carry = match.start(), None
         speech_end = speech_object and re.match(r'[\s;,:.!?—-]+\S', text[match.end():])
-        if cut or speech_end:
-            part = ReportClause(text[start:match.start() if cut else match.end()], carry, start)
+        truth_suffix = re.match(r'\s+(?:is\s+)?(?:not\s+)?(?:true|false)\b[.!?]*', text[match.end():]) if proposition else None
+        truth_finish = match.end() + truth_suffix.end() if truth_suffix else match.end()
+        following = text[truth_finish:]
+        separator = re.match(r'[\s;.!?—-]+', following)
+        truth_end = (truth_suffix and separator
+            and (';' in separator.group() or '\n' in separator.group()
+                or re.search(r'[.!?]$', truth_suffix.group()))
+            and report_predicate_head(following[separator.end():]))
+        if cut or speech_end or truth_end:
+            # The closing punctuation belongs to this complete predicate;
+            # leaving a question mark behind would turn its body into a fact.
+            finish = match.start() if cut else truth_finish if truth_end else match.end() + re.match(r'[.!?]*', text[match.end():]).end()
+            part = ReportClause(text[start:finish], carry, start)
             if part:
                 sentences.append((part, part.start, carry))
                 carry = report_regions(part, atoms=atoms)[-1][2] if part.endswith(':') else None
-            start = match.end()
+            start = match.end() if cut else finish
     if text[start:].strip():
         part = ReportClause(text[start:], carry, start)
         sentences.append((part, part.start, carry))
@@ -966,7 +990,7 @@ def report_sentences(text, atoms=(), identifiers=None):
     return rows
 
 
-def report_truth_argument(clause, start, end):
+def report_truth_argument(clause, start=None, end=None):
     """Bind one explicit truth operator to its complete quoted argument."""
     quoted = r'(?P<open>[«“"\[])(?P<body>.*)(?P<close>[»”"\]])'
     operator = r'(?P<negative>not\s+)?(?P<truth>true|false)'
@@ -976,14 +1000,27 @@ def report_truth_argument(clause, start, end):
         if not frame or frame['close'] != {'«': '»', '“': '”', '"': '"', '[': ']'}[frame['open']]:
             continue
         left, right = frame.span('body')
-        if not left <= start <= end <= right:
+        if start is not None and not left <= start <= end <= right:
             continue
         body = frame['body']
         offset = left + len(body) - len(body.lstrip())
         argument = ReportClause(body, None, getattr(clause, 'start', 0) + left,
             getattr(clause, 'identifiers', ()))
+        if hasattr(clause, 'surface'):
+            argument.surface = clause.surface[left:right].strip()
         sign = -1 if (frame['truth'].casefold() == 'false') != bool(frame['negative']) else 1
-        return argument, start - offset, end - offset, sign
+        if start is None:
+            return argument, None, None, sign
+        begin, finish = start - offset, end - offset
+        # Keep the complete owning argument, but do not borrow an auxiliary or
+        # qualifier from another predicate when projecting one candidate span.
+        for local in report_sentences(argument):
+            origin = local.start
+            if origin <= begin <= finish <= origin + len(local):
+                local.identifiers = argument.identifiers
+                local.start += argument.start
+                return local, begin-origin, finish-origin, sign
+        return argument, begin, finish, sign
 
 
 def claim_status(clause, start, end):
@@ -1450,7 +1487,37 @@ def report_truth(text, result, events, refusal=False, spec=None):
     warning_codes = {str(warning['code']).casefold() for warning in warnings
         if isinstance(warning, dict) and isinstance(warning.get('code'), str)}
     for sentence in sentences:
-        for fact in warning_facts(sentence):
+        facts = list(warning_facts(sentence))
+        argument = report_truth_argument(sentence) if sentence.scope is None else None
+        if argument:
+            body, _, _, sign = argument
+            parts = report_sentences(body)
+            for part in parts:
+                part.identifiers = body.identifiers
+                if hasattr(body, 'surface'):
+                    part.surface = body.surface[part.start:part.start+len(part)]
+            groups = [list(warning_facts(part)) for part in parts]
+            conjunction = all(re.fullmatch(_REPORT_FRAMING + '*',
+                body[left.start+len(left):right.start]) for left, right in zip(parts, parts[1:]))
+            recognized = groups and all(group and all(fact.polarity
+                and (fact.role == 'engine' or not report_predicate_head(part))
+                for fact in group) for part, group in zip(parts, groups))
+            # This is the existing explicit native-warning form, not a new
+            # Boolean language. Unknown/non-warning constituents keep their
+            # original path. Each local group must share its owned warning
+            # object; unrelated markers inside an unsupported connective do
+            # not acquire conjunction semantics merely by sharing a clause.
+            owned = all(len({fact.source_span for fact in group}) == 1 for group in groups)
+            if recognized and conjunction and owned:
+                facts = [fact for group in groups for fact in group]
+                if sign == -1 and len(facts) > 1:
+                    truth = [(all(code in warning_codes for code in fact.value) if fact.value else bool(warnings))
+                        == (fact.polarity == 1) for fact in facts]
+                    require(not all(truth), 'diagnostic: report denies verified native warning')
+                    continue
+                for fact in facts:
+                    fact.polarity *= sign
+        for fact in facts:
             if not fact.polarity:
                 continue
             present = [code in warning_codes for code in fact.value]
