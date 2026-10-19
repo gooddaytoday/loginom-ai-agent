@@ -48,7 +48,7 @@
 **Interfaces:**
 - Produces: `validateStartInput(input) → {acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery: boolean}`; bridge получает `config.browserRecovery: boolean`; `session.metadata.browserRecovery: boolean`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 В `start-input.test.mjs` обновить все три существующих `deepEqual` (в первых двух тестах), добавив `browserRecovery: false`, и добавить:
 
@@ -79,21 +79,21 @@ test('session metadata records the private browser recovery capability', async t
 
 В `managed-work-entry.test.ts` фиктивный `bridge.mjs` пишет полученный `config.browserRecovery` в файл; тест стартует с `browserRecovery: true` и проверяет записанное `true`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd packages/loginom-runtime && "$LOGINOM_AI_AGENT_TEST_NODE" --test test/start-input.test.mjs`, затем `cd client && "$LOGINOM_AI_AGENT_TEST_NODE" --test test/session-browser-config.test.mjs`
 Expected: FAIL — нет поля `browserRecovery`, строковое значение не отклоняется.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `validateStartInput` проверяет поле как `closeSavedPackageOnShutdown`: `undefined` → `false`, иначе только boolean; `true` вместе с `validation === true` или `chat === "readiness"` → `LOGINOM_START_INVALID`. `managed-entry.mjs` кладёт результат в `config.browserRecovery`. `createSession` пишет `browserRecovery: config.browserRecovery === true` в `metadata`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: команды Step 2 и `cd packages/loginom-host && LOGINOM_AI_AGENT_TEST_NODE=<pinned node> bun test test/managed-work-entry.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/loginom-runtime packages/loginom-host/test/managed-work-entry.test.ts
