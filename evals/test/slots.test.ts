@@ -2,8 +2,8 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { loadSlots, parseSlots, reopenEnvironmentLeases } from "../src/slots"
-import { globalLockRoot, readLeaseReceipt, readResourceReservation } from "../src/lease"
+import { acquireEnvironmentLeases, loadSlots, parseSlots, reopenEnvironmentLeases } from "../src/slots"
+import { globalLockRoot, readLeaseReceipt, readResourceReservation, writeLeaseReceipt } from "../src/lease"
 
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
@@ -277,3 +277,80 @@ test("environment leases: run owns only server and profiles and slots require th
     await rm(item.root, { recursive: true, force: true })
   }
 })
+
+test("admission finalizes a confirmed profile release interrupted before its slot receipt", async () => {
+  const item = await interruptedSlotRelease()
+  try {
+    const previous = (await readResourceReservation({ key: `profile:${item.file.slots[0]!.profileDir}`, lockRoot: item.lockRoot }))!
+    const proof = await Bun.file(previous.releaseEvidence!.path).text()
+    await releaseFixtureServer(item)
+    expect(await reopenEnvironmentLeases(item.file, identity, item.lockRoot)).toBeUndefined()
+    const next = await acquireEnvironmentLeases(item.file, 1, identity, item.journal, item.lockRoot)
+    try {
+      await next.slots[0]!.assertHeld()
+      expect(await readLeaseReceipt(item.receipt)).toMatchObject({ state: "released", cleanupReceipt: item.cleanup })
+      expect(await Bun.file(previous.releaseEvidence!.path).text()).toBe(proof)
+      expect(await readResourceReservation({ key: previous.key, lockRoot: item.lockRoot })).toMatchObject({
+        state: "retained", revision: previous.revision + 1, lineage: [],
+      })
+    } finally { await Promise.all([next.server.close(), ...next.slots.map(slot => slot.close())]) }
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("admission preserves an interrupted slot when its cleanup or release binding is unconfirmed", async () => {
+  const item = await interruptedSlotRelease()
+  try {
+    await releaseFixtureServer(item)
+    const previous = (await readResourceReservation({ key: `profile:${item.file.slots[0]!.profileDir}`, lockRoot: item.lockRoot }))!
+    const reservation = path.join(item.lockRoot, `${new Bun.CryptoHasher("sha256").update(previous.key).digest("hex")}.reservation.json`)
+    const proof = await readLeaseReceipt(previous.releaseEvidence!.path) as Record<string, unknown>
+    const cleanup = await readLeaseReceipt(item.cleanup) as Record<string, unknown>
+    const composite = await Bun.file(item.receipt).text()
+    for (const change of [{ cleanup: { ...cleanup, processes: "unknown" }, proof }, { cleanup, proof: { ...proof, token: "foreign" } },
+      { cleanup: { ...cleanup, leaseToken: "foreign" }, proof }, { cleanup, proof: { ...proof, serverEpoch: "foreign" } }]) {
+      await writeLeaseReceipt(item.cleanup, change.cleanup)
+      const changed = { ...change.proof, cleanupReceiptHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(change.cleanup)).digest("hex") }
+      await writeLeaseReceipt(previous.releaseEvidence!.path, changed)
+      await writeLeaseReceipt(reservation, { ...previous, releaseEvidence: { path: previous.releaseEvidence!.path,
+        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(changed)).digest("hex") } })
+      await expect(acquireEnvironmentLeases(item.file, 1, identity, item.journal, item.lockRoot)).rejects.toThrow("RECOVERY_FINALIZATION_REQUIRED")
+      expect(await Bun.file(item.receipt).text()).toBe(composite)
+      expect(await readResourceReservation({ key: `server:${identity.containerId}`, lockRoot: item.lockRoot })).toMatchObject({ state: "released" })
+    }
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+async function releaseFixtureServer(item: Awaited<ReturnType<typeof interruptedSlotRelease>>) {
+  const reopened = (await reopenEnvironmentLeases(item.file, identity, item.lockRoot))!
+  try {
+    expect(reopened.slots).toEqual([])
+    // No native actors were admitted; exercise the same release used after startup cleanup.
+    const cleanup = path.join(item.file.controller.stateDir, "startup-server.json")
+    await writeLeaseReceipt(cleanup, { version: 2, status: "confirmed", key: reopened.server.reservation.key,
+      token: reopened.server.reservation.token, revision: reopened.server.reservation.revision, serverEpoch: identity.serverEpoch })
+    await reopened.server.release(cleanup)
+  } finally { await reopened.server.close() }
+}
+
+async function interruptedSlotRelease() {
+  const item = await fixture(), file = parseSlots(item.value, 1), lockRoot = path.join(item.root, "locks")
+  const journal = path.join(file.controller.stateDir, "prepare-command.json")
+  const cleanup = path.join(file.controller.stateDir, "slot-cleanup.json")
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "interrupted-release", identity, slotIds: ["a"] })
+  const child = Bun.spawn([process.execPath, "-e", `
+    const {acquireEnvironmentLeases}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))});
+    const {readLeaseReceipt,writeLeaseReceipt}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+    const environment=await acquireEnvironmentLeases(${JSON.stringify(file)},1,${JSON.stringify(identity)},${JSON.stringify(journal)},${JSON.stringify(lockRoot)});
+    const slot=environment.slots[0], retained=await readLeaseReceipt(slot.receipt);
+    await writeLeaseReceipt(${JSON.stringify(cleanup)},{status:"confirmed",slotId:slot.slot.id,leaseToken:slot.token,serverEpoch:slot.identity.serverEpoch,
+      processes:"confirmed",serverSessions:"confirmed",archive:"committed",storageDeletionAllowed:true,nextAdmissionAllowed:true});
+    await slot.release(${JSON.stringify(cleanup)});
+    // Restore the last slot snapshot durable before a crash between resource.release and the final slot write.
+    await writeLeaseReceipt(slot.receipt,retained);
+    await environment.server.close();
+    console.log(JSON.stringify({receipt:slot.receipt}));
+  `], { stdout: "pipe", stderr: "pipe" })
+  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+  return { ...item, file, lockRoot, journal, cleanup, receipt: (JSON.parse(stdout) as { receipt: string }).receipt }
+}

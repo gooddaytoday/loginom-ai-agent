@@ -25,7 +25,7 @@
   Проверить crosstable/text-import, отказ чужому архиву и неподтверждённому cleanup,
   сохранить legacy/durable формат. Не подключать неиспользуемые цепочки архивирования.
   Коммит `fix(evals): read prepared slot archives for native evidence`.
-- [ ] 3. Частичное освобождение (`slots.ts`, `slots.test.ts`).
+- [x] 3. Частичное освобождение (`slots.ts`, `slots.test.ts`).
   Воспроизвести промежуток между profile reservation released и составной
   квитанцией retained, используя реальные leases и отдельный дочерний процесс.
   Guarded admission в `requireFinalizedSlotRelease` завершает ранее
@@ -48,4 +48,7 @@ Root ведёт этот план и коммиты; каждому worker вы�
 
 ## Результат
 
-Проверки и SHA будут записываться по мере завершения каждого исправления.
+- Частичное освобождение: RED — `RECOVERY_FINALIZATION_REQUIRED` при новом
+  admission после startup; GREEN — 52 теста slots/startup/lease, 177 утверждений.
+  Независимое ревью не нашло обязательных замечаний. При подмене cleanup,
+  token или serverEpoch составная квитанция сохраняется и новый owner не появляется.

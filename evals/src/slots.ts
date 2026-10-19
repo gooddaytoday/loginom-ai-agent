@@ -180,14 +180,28 @@ async function requireFinalizedSlotRelease(previous: Reservation | undefined) {
   if (typeof proof.slotReceipt !== "string" || typeof proof.cleanupReceipt !== "string" || typeof proof.cleanupReceiptHash !== "string")
     throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
   const composite = record(await readLeaseReceipt(proof.slotReceipt))
-  if (composite.version !== 2 || composite.state !== "released" || composite.cleanupReceipt !== proof.cleanupReceipt ||
-    composite.commandId !== previous.commandId || JSON.stringify(composite.identity) !== JSON.stringify(previous.identity) ||
+  const cleanup = record(await readLeaseReceipt(proof.cleanupReceipt))
+  if (proof.version !== 2 || proof.status !== "confirmed" || proof.key !== previous.key || proof.token !== previous.token ||
+    proof.revision !== previous.revision || proof.serverEpoch !== previous.identity?.serverEpoch ||
+    composite.version !== 2 || !["retained", "released"].includes(String(composite.state)) ||
+    (composite.state === "released" ? composite.cleanupReceipt !== proof.cleanupReceipt : composite.cleanupReceipt !== undefined) ||
+    composite.commandId !== previous.commandId || composite.journal !== previous.journal || JSON.stringify(composite.identity) !== JSON.stringify(previous.identity) ||
     !Array.isArray(composite.resources) || !composite.resources.some(value => {
       const resource = record(value)
       return resource.key === previous.key && resource.token === previous.token && resource.revision === previous.revision
-    }) || new Bun.CryptoHasher("sha256").update(JSON.stringify(await readLeaseReceipt(proof.cleanupReceipt))).digest("hex") !== proof.cleanupReceiptHash)
+    }) || new Bun.CryptoHasher("sha256").update(JSON.stringify(cleanup)).digest("hex") !== proof.cleanupReceiptHash)
     throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
   if (composite.kind === "slot-recovery") throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
+  if (composite.state === "retained") {
+    const slot = record(composite.slot)
+    if (composite.resources.length !== 1 || previous.key !== `profile:${slot.profileDir}` ||
+      cleanup.status !== "confirmed" || cleanup.slotId !== slot.id || cleanup.leaseToken !== composite.token ||
+      cleanup.serverEpoch !== previous.identity?.serverEpoch || cleanup.processes !== "confirmed" || cleanup.serverSessions !== "confirmed" ||
+      cleanup.archive !== "committed" || cleanup.storageDeletionAllowed !== true || cleanup.nextAdmissionAllowed !== true)
+      throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
+    // Admission holds every resource guard; only the final slot write was interrupted.
+    await writeLeaseReceipt(proof.slotReceipt, { ...composite, state: "released", cleanupReceipt: proof.cleanupReceipt })
+  }
 }
 
 function slotLease(receipt: string, manifest: { version: number; token: string; slot: SlotDefinition; identity: ServerIdentity; commandId: string;
