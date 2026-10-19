@@ -206,8 +206,56 @@ export async function createBridge(config, session, { browserTransport: managedB
     }
     await session.save(catalog);
     // The recovery lease is a temporary part of the catalog outside its hashed static tools.
+    // T4 for saves: a confirmed Save whose package state could not be read. The
+    // runtime rereads path and dirty state itself after the model's browser work.
+    const saveRecoveries = new Map();
+    const readSavedState = async save => {
+      const prepared = session.metadata.workspacePreparation?.state;
+      const options = { sessionId: session.metadata.sessionId, documentId: prepared?.document_id,
+        account: prepared?.loginom_account ?? config.replayLoginUser, packagePath: save.path,
+        loginomUrl: config.loginomUrl, loginomBuild: session.metadata.targetIdentity.loginom_build };
+      const response = await browser.callTool({ name: 'browser_run_code_unsafe',
+        arguments: { code: makeSavedPackageStateCode(options) } }, undefined, { timeout: 15000 });
+      return parseSavedPackageState(response, options);
+    };
+    const recoveryExecutor = actionRuntime && {
+      browserRecoveryBasis(operationId) {
+        const save = saveRecoveries.get(operationId);
+        if (!save) return actionRuntime.browserRecoveryBasis(operationId);
+        if (actionRuntime.hasUnsettledWork()) throw new Error('Another Dock operation is unsettled; resolve it before browser recovery');
+        return { reason: 'SAVE_STATE_UNCONFIRMED', step: { key: ['save', save.document_id, save.path].join('|'), kind: 'save',
+          document_id: save.document_id, path: save.path }, goal: { package_path: save.path,
+          required_result: 'The save receipt is valid, but the open package state could not be read. Remove what blocks the '
+            + 'scenario (dialogs, masks, notifications) and return to the saved package graph. Do not save or change the package.' } };
+      },
+      async browserRecoveryHandoff(operationId) {
+        if (!saveRecoveries.has(operationId)) return actionRuntime.browserRecoveryHandoff(operationId);
+        return actionRuntime.hasUnsettledWork() ? { stopped: false, reason: 'Another Dock operation is unsettled' }
+          : { stopped: true, proof: { receipt_state: 'save_settled' } };
+      },
+      async verifyBrowserRecovery(input) {
+        const save = saveRecoveries.get(input.operationId);
+        if (input.step.kind !== 'save' || !save) return actionRuntime.verifyBrowserRecovery(input);
+        const state = await readSavedState(save).catch(error => ({ error: String(error.message).slice(0, 500) }));
+        if (state.error || typeof state.modified !== 'boolean')
+          return { status: 'unresolved', facts: [], reason: state.error ?? 'Saved package state unavailable' };
+        const receipt = { id: input.operationId + ':br-save', kind: 'browser_recovery', status: state.modified ? 'continuable' : 'completed',
+          source_operation_id: input.operationId, step: structuredClone(input.step), state, attested_by_model: input.attested,
+          facts: ['saved_package_path_observed', state.modified ? 'package_modified_after_save' : 'package_unmodified_after_save'] };
+        await recordExecution({ phase: 'browser_recovery_receipt', operation_id: input.operationId, receipt });
+        saveRecoveries.delete(input.operationId);
+        return { status: receipt.status, facts: receipt.facts, receipt_id: receipt.id, state,
+          next_step: state.modified ? { tool: 'dock_action_run', instruction: 'The open package has changes after the save. '
+            + 'Save it again with package.save_checkpoint, the same path and a NEW operation_id.' }
+            : { tool: 'dock_action_run', instruction: 'The saved package is confirmed unmodified. Continue the task.' } };
+      },
+      stopBrowserRecovery(input) {
+        return saveRecoveries.has(input.operationId) ? { state: 'retained', reason: 'The save receipt remains valid; its package state stays unconfirmed.' }
+          : actionRuntime.stopBrowserRecovery(input);
+      },
+    };
     const recovery = createBrowserRecovery({ enabled: config.browserRecovery === true && !!actionRuntime && userProfile,
-      browser, executor: actionRuntime, gate: browserGate, record: recordExecution,
+      browser, executor: recoveryExecutor, gate: browserGate, record: recordExecution,
       async probe() {
         const binding = { origin: new URL(config.loginomUrl).origin,
           documentId: session.metadata.workspacePreparation?.state?.document_id };
@@ -433,9 +481,13 @@ export async function createBridge(config, session, { browserTransport: managedB
               }catch{
                 // A read failure must not erase the completed save or invite
                 // a retry of an uncertain save gesture.
+                if(recovery.enabled)saveRecoveries.set(outcome.operation_id,{path:outcome.output.package_ref.path,
+                  document_id:session.metadata.workspacePreparation?.state?.document_id});
                 reply.content.push({type:'text',text:JSON.stringify({kind:'dock_saved_package_state',save_operation_id:outcome.operation_id,
                   package_path:outcome.output.package_ref.path,modified:null,state:'unavailable',
-                  instruction:'The save receipt remains valid, but the current open package dirty state could not be verified. Do not claim that session cleanup is confirmed.'})});
+                  instruction:'The save receipt remains valid, but the current open package dirty state could not be verified. Do not claim that session cleanup is confirmed.',
+                  ...(recovery.enabled?{next_step:{tool:'dock_browser_recovery',arguments:{action:'start',operation_id:outcome.operation_id},
+                    reason:'SAVE_STATE_UNCONFIRMED',instruction:'Start browser recovery for this save yourself; do not ask the user to act in the interface.'}}:{})})});
               }
             }
             try {

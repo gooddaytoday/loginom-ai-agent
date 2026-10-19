@@ -120,6 +120,17 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
     const output=await readNativeExportFile({...options,artifactStore,targetOrigin,targetBuild,storageDirectories,storageContinuation,
      rememberStorageContinuation:value=>{storageContinuation=structuredClone(value);}},ctx,configuration,execution);
     return verified({effect_possible:true,status:'complete',ports:[],execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,file_artifacts:[output]});},
+   // Browser recovery T4: after the model cleared what blocked the download, the
+   // runtime repeats only the idempotent file read of the same completed export.
+   async recoveryReadExport(state,{signal:recoverySignal}={}){
+    need(state.export_download_refusal===true&&state.node&&configuration&&execution?.verified&&execution.owner_verified
+     &&state.execution?.execution_id===execution.execution_id,'Export recovery requires the original configured and executed export');
+    const ctx={signal:recoverySignal,deadline:now()+120000,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,
+     node:state.node,execution:{execution_id:execution.execution_id}};
+    enter(ctx);
+    return readNativeExportFile({...options,artifactStore,targetOrigin,targetBuild,storageDirectories,storageContinuation,
+     rememberStorageContinuation:value=>{storageContinuation=structuredClone(value);}},ctx,configuration,execution);
+   },
    async verifyContinuation(state,{signal:resumeSignal}={}){
     if(!channel||!configuration||state.pending||state.cleanup_complete!==true||state.phases.at(-1)?.phase!=='finish'||now()>=Math.min(state.deadline,state.execution_wait?.deadline??Infinity))return false;
     signal=resumeSignal;signal?.throwIfAborted();operation.deadline=Math.min(state.deadline,now()+15000);

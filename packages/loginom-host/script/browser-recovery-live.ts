@@ -74,7 +74,7 @@ try {
     await call("dock_artifact_deliver", {
       operation_id: "deliver-1",
       artifact_id: artifact.artifact_id,
-      upload_grant_id: artifact.upload_grant_id,
+      upload_grant_id: artifact.upload.grant_id,
       budget_ms: 60_000,
     }),
   )

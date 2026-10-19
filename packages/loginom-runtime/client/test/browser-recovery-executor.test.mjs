@@ -186,3 +186,49 @@ test('unconfirmed calls are never a trigger and stop keeps the original gate', a
   assert.throws(() => f.runtime.assertPreparationAllowed(), /uncertain/);
   assert.equal(f.runtime.hasUnsettledWork(), true);
 });
+
+test('T4: an unconfirmed export download is recovered by a verified re-read without a new export', async () => {
+  const events = [], reads = [];
+  const graph = { complete: true, document_id: 'doc', workflow_ref: workflow, nodes: [], links: [], foreign_links: [] };
+  const adapter = { observe: async () => structuredClone(graph), preflight: async () => {},
+    positionMatches: (n, p) => JSON.stringify(n.position) === JSON.stringify(p),
+    reconcile: async () => ({ verified: true, cleanup_complete: true }),
+    mutate: async e => { if (e.kind === 'create') graph.nodes.push({ ref: node, type: e.parameters.type, label: 'Export',
+      position: e.parameters.position, inputs: [], outputs: [] }); return { status: 'SUCCEEDED', cleanup_complete: true }; } };
+  const ok = async () => ({ verified: true, cleanup_complete: true, effect_possible: false });
+  let operationRef;
+  const refusal = operationId => Object.assign(Error('Download was not confirmed'), { nodePhaseRefusal: { phase: 'read', status: 'FAILED',
+    effect_possible: true, cleanup_complete: true, settings_unchanged: true, verification: 'text_export_read_refused_restored',
+    proof: { navigation_only: true, operation_id: operationId, lease_released: true,
+      binding: { ...node, execution_id: 'exec', destination: '/user/out.csv', session_id: 'out' },
+      restored: { verified: true, cleanup_complete: true, quiet: true, node_context: { ...node, verified: true, surface: 'graph', locked: false } } } } });
+  const drivers = { verifySource: ok, mapPorts: ok, openWizard: ok,
+    finish: async mode => ({ verified: true, cleanup_complete: true, mode, effect_possible: true, execution_id: 'exec', execution_started: true }),
+    waitExecution: async () => ({ verified: true, cleanup_complete: true, status: 'completed', execution_id: 'exec' }),
+    readOutput: async () => { operationRef.cleanupConfirmed = true; throw refusal('export'); },
+    verifyContinuation: async () => true,
+    releasePending: async () => { throw Error('not used'); },
+    recoveryReadExport: async state => { reads.push(state.node.node_id);
+      return { artifact_id: 'file-1', destination: '/user/out.csv', bytes: 42, sha256: 'a'.repeat(64), execution_id: 'exec' }; } };
+  const handler = { revision: '1', fileOutput: true, modes: ['delimited'], validate: () => {}, configure: ok };
+  const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery: true,
+    execute: async () => { throw Error('Unexpected public transport'); },
+    nodeTargetAdapterFactory: () => adapter, nodeApplyHandlers: new Map([['exports.text', handler]]),
+    nodeApplyDriverFactory: ({ operation }) => { operationRef = operation; return drivers; },
+    onRecord: async e => { events.push(e); return e; } });
+  runtime.startNodeApply({ ...request('export'), target: { kind: 'new', type: 'exports.text', label: 'Export', position: { x: 320, y: 280 } } });
+  const job = await runtime.waitNodeApply('export', { timeoutMs: 1000 });
+  assert.equal(job.outcome.status, 'FAILED', JSON.stringify(job.outcome.error));
+  assert.equal(job.outcome.output.next_step.tool, 'dock_browser_recovery');
+  assert.equal(job.outcome.output.next_step.alternative_next_step.tool, 'dock_action_run');
+  const basis = runtime.browserRecoveryBasis('export');
+  assert.equal(basis.reason, 'EXPORT_DOWNLOAD_UNCONFIRMED');
+  assert.equal((await runtime.browserRecoveryHandoff('export')).stopped, true);
+  const verified = await runtime.verifyBrowserRecovery({ operationId: 'export', step: basis.step, attested: { actions_performed: ['Closed a dialog'] } });
+  assert.equal(verified.status, 'completed');
+  assert.deepEqual(verified.facts, ['export_file_storage_row_observed', 'export_file_bytes_verified']);
+  assert.equal(verified.file_artifacts[0].sha256, 'a'.repeat(64));
+  assert.deepEqual(reads, ['new']);
+  assert.throws(() => runtime.browserRecoveryBasis('export'), /No browser recovery trigger/);
+  assert.equal(runtime.nodeApplyStatus('export').outcome.status, 'FAILED');
+});

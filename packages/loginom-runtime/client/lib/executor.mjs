@@ -1948,7 +1948,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       node_type: state.request.target.type, phase: state.pending.phase };
   };
   const failureCode = operation => operation?.outcome?.error?.cause?.code ?? operation?.outcome?.error?.code ?? null;
+  function exportRecoveryTrigger(operation) {
+    const state = operation?.nodeApply;
+    if (!browserRecovery || !operation || pending || operation.action.capability !== 'node.apply' || operation.transportUncertain
+      || !state?.export_download_refusal || !state.node || operation.exportRecovered
+      || typeof operation.nodeApplyDrivers?.recoveryReadExport !== 'function') return null;
+    return { reason: 'EXPORT_DOWNLOAD_UNCONFIRMED', step: { key: ['export', state.node.document_id, state.node.workflow_id,
+      state.node.node_id, state.execution?.execution_id].join('|'), kind: 'export', document_id: state.node.document_id,
+      workflow_id: state.node.workflow_id, node_id: state.node.node_id, node_type: state.request.target.type, phase: 'read' } };
+  }
   function browserRecoveryTrigger(operation, advice) {
+    const exported = exportRecoveryTrigger(operation);
+    if (exported) return exported;
     if (!browserRecovery || !operation || pending !== operation || operation.action.capability !== 'node.apply'
       || operation.transportUncertain || typeof operation.nodeApplyDrivers?.releasePending !== 'function') return null;
     const step = nodeRecoveryStep(operation);
@@ -1977,6 +1988,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (!trigger) throw new Error('No browser recovery trigger for this operation; follow its Dock next_step');
       operation.browserRecoveryReason = trigger.reason;
       const request = operation.nodeApply.request;
+      if (trigger.step.kind === 'export') return { ...trigger, goal: { node: structuredClone(operation.nodeApply.node),
+        node_type: request.target.type, destination: operation.nodeApply.request.parameters?.destination ?? null,
+        execution: structuredClone(operation.nodeApply.execution),
+        required_result: 'The export already completed; its download was not confirmed. Remove what blocks the file storage '
+          + 'view or download (dialogs, masks, notifications) and return to the scenario graph. Do not export again; the '
+          + 'runtime repeats only the file read and verifies its bytes.' } };
       return { ...trigger, goal: { node: structuredClone(operation.nodeApply.node), node_type: request.target.type,
         stopped_phase: trigger.step.phase, verified_phases: operation.nodeApply.phases.map(p => p.phase),
         requested_finish: request.finish, error: structuredClone(operation.outcome?.error ?? null),
@@ -1987,7 +2004,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     },
     async browserRecoveryHandoff(operationId) {
       const operation = operations.get(operationId);
-      if (!operation || pending !== operation) return { stopped: false, reason: 'The operation is no longer pending' };
+      if (!operation || pending !== operation && !exportRecoveryTrigger(operation))
+        return { stopped: false, reason: 'The operation is no longer eligible for browser recovery' };
       if (running || nodeJobs.busy || delivery.busy || sourceReads.busy) return { stopped: false, reason: 'A Dock action is still running' };
       if (operation.transportUncertain) return { stopped: false, reason: 'The last browser call of this operation is unconfirmed' };
       // A sent abort or an expired timeout is not proof: only the page ledger is.
@@ -2000,7 +2018,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     },
     async verifyBrowserRecovery({ operationId, step, attested, signal }) {
       const operation = operations.get(operationId);
-      if (!operation || leased !== operationId || pending !== operation) throw new Error('The browser lease does not belong to this pending operation');
+      if (!operation || leased !== operationId) throw new Error('The browser lease does not belong to this operation');
+      if (step.kind === 'export') return verifyRecoveredExport(operation, step, attested, signal);
+      if (pending !== operation) throw new Error('The browser lease does not belong to this pending operation');
       const code = failureCode(operation), reason = operation.browserRecoveryReason;
       running = true;
       let result;
@@ -2047,6 +2067,34 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       return { state: 'retained', reason: 'The original operation keeps its gate; inspect it for the next Dock step.' };
     },
   };
+  // The original export stays FAILED; the recovery receipt carries the byte-verified file.
+  async function verifyRecoveredExport(operation, step, attested, signal) {
+    running = true;
+    let file;
+    try {
+      observations.clear();
+      file = await operation.nodeApplyDrivers.recoveryReadExport(operation.nodeApply, { signal });
+    } catch (error) {
+      return { status: 'unresolved', facts: [], reason: String(error?.message ?? error).slice(0, 1000) };
+    } finally { running = false; }
+    const receipt = { id: operation.id + ':br' + (++recoverySequence), kind: 'browser_recovery', status: 'completed',
+      source_operation_id: operation.id, step: structuredClone(step), reason: operation.browserRecoveryReason,
+      facts: ['export_file_storage_row_observed', 'export_file_bytes_verified'], attested_by_model: structuredClone(attested),
+      node: structuredClone(operation.nodeApply.node), file_artifacts: [structuredClone(file)] };
+    receipt.next_step = { tool: 'dock_action_run', original_operation_id: operation.id,
+      instruction: 'The exported file is now downloaded and byte-verified (file_artifacts). Do not export again. Save the '
+        + 'package with package.save_checkpoint and a NEW operation_id if it is not saved yet, then report the file.' };
+    const event = { operation_id: operation.id, action_key: 'node.apply', action_revision: operation.nodeApply.request.contract_revision,
+      phase: 'browser_recovery_receipt', receipt };
+    const ack = await onRecord(event);
+    if (!ack || fingerprint('ack', Object.fromEntries(Object.keys(event).map(k => [k, ack[k]]))) !== fingerprint('ack', event))
+      throw new Error('Browser recovery receipt journal acknowledgement differs');
+    operation.exportRecovered = true;
+    recoveryReceipts.set(receipt.id, receipt);
+    leased = null;
+    return { status: 'completed', facts: receipt.facts, receipt_id: receipt.id, file_artifacts: receipt.file_artifacts,
+      next_step: receipt.next_step, original_operation: { operation_id: operation.id, status: operation.outcome?.status } };
+  }
   const view = (operation, outcome) => ({ status: 'SUCCEEDED', action_key: 'operation.inspect', action_revision: '1',
     operation_id: operation?.id, phase: 'observed', effect_possible: false, error: null, trace: [], output: {
       operation_id: operation?.id ?? null, state: !operation ? 'idle' : pending === operation ? 'pending' : 'resolved',
@@ -2750,6 +2798,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           return structuredClone(operation.outcome);
         }
         if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)pending=null;
+        // T4: an unconfirmed export download is offered to browser recovery first;
+        // the plain save-and-report continuation stays available as the alternative.
+        const exported=exportRecoveryTrigger(operation);
+        if(exported&&operation.outcome.output)operation.outcome.output.next_step={...browserRecoveryNext(operation,exported),
+          alternative_next_step:operation.outcome.output.next_step??null};
         return structuredClone(operation.outcome);
       }finally{running=false;}
     },
