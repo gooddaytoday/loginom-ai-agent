@@ -752,12 +752,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const epochRefusal=r.phase==='preconditions'&&r.error?.code==='UI_EPOCH_CHANGED'
             ||r.phase==='observing'&&r.error?.code==='UI_ROOT_STALE';
           const scanRefusal=timeScanRefusal(r,'ui.act');
+          const graphRefusal=action.verb==='execute_graph_node'&&r.phase==='preconditions'
+            &&r.error?.code==='GRAPH_EXECUTION_CONTEXT_CHANGED';
           // Only an opting-in source selector can prove a replaced native body.
           // This remains a new observation and bound attempt, never a raw retry.
           const bodyRefusal=r.phase==='preconditions'&&['UI_REFERENCE_STALE','UI_REFERENCE_OBSCURED'].includes(r.error?.code)
             &&bodyRefreshes===0&&typeof refreshReplacedBody==='function'
             &&refreshReplacedBody({receipt:r,observation:observed,action})===true;
-          if(!epochRefusal&&!bodyRefusal&&!scanRefusal)throw error;
+          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal)throw error;
           if(bodyRefusal)bodyRefreshes++;
           const event = await entry('node_step_refresh_authorized', {
             step:operation.nodeStepSequence,internal_operation_id:r.operation_id,
@@ -766,6 +768,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             effect_possible: false,
             ...(bodyRefusal?{reason:'prepared_graph_body_replaced'}:{}),
             ...(scanRefusal?{reason:'read_scan_time_limit'}:{}),
+            ...(graphRefusal?{reason:'graph_execution_context_changed'}:{}),
           });
           if (event?.rejected_operation_id !== r.operation_id || event.retry !== attempt + 1
             || event.binding_sha256 !== binding || event.intent_sha256 !== intent) {
