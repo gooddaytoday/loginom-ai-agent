@@ -225,6 +225,10 @@
   controller/management-<command>-<slot>. Проверяется тот же supervisor producer.
   RED→GREEN, startup/slots36/142 PASS27.90s; targeted4/10/typecheck/diff PASS.
   Native разбор первого admission-отказа подтверждён, прежняя бронь освобождена.
+- [x] Сохранить флаг systemd в preflight version probe судьи. RED→GREEN,
+  preflight25/51 PASS5.79s, typecheck/diff PASS. Второй admission-отказ до модели:
+  прежний version-only unit найден по точному home/команде в systemd journal;
+  run-u17489.service завершён, MainPID=0. Без сигналов root и без новых механизмов.
 - [x] Подключить JSON status к проверке provider errors: busy→idle основной
   сессии, любой retry сохраняет отказ; старый/оборванный JSON и task tool не дают
   полного покрытия. Непустой существующий --title исключает запрос автозаголовка.
