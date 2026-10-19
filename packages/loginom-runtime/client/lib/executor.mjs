@@ -304,13 +304,18 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       }
       const previous=target(before.output),fresh=await observe(page);
       const file=fresh.status==='SUCCEEDED'&&contextMatches(fresh.output)&&target(fresh.output);
-      if(!eventPending||!file||!previous?.scroll?.ref||!same(file.scroll,previous.scroll)
+      // A visible file need not have a scrollable ancestor. In that case
+      // require its original DOM row, issued by the same native file read.
+      const owner=!!previous?.scroll?.ref||(!previous?.scroll&&!file?.scroll
+        &&typeof previous?.storage_entry?.row_ref==='string'&&previous.storage_entry.row_ref.length>0
+        &&file?.storage_entry?.row_ref===previous.storage_entry.row_ref);
+      if(!eventPending||!file||!owner||!same(file.scroll,previous.scroll)
         ||!same(file.identity,previous.identity)||!same(file.signature,previous.signature)
         ||file.storage_entry?.kind!=='file'||file.storage_entry.bytes!==task.expected_bytes
         ||file.interaction?.state!=='point_observed'||!file.allowed_actions?.includes('double_click')) {
         trace.push({event:'download_epoch_refresh_refused',stage:'observation',checks:{event_pending:eventPending,
           observation:fresh.status==='SUCCEEDED',context:fresh.status==='SUCCEEDED'&&contextMatches(fresh.output),
-          file:!!file,owner:!!previous?.scroll?.ref,scroll:!!file&&same(file.scroll,previous?.scroll),
+          file:!!file,owner,scroll:!!file&&same(file.scroll,previous?.scroll),
           identity:!!file&&same(file.identity,previous?.identity),signature:!!file&&same(file.signature,previous?.signature),
           file_kind:file?.storage_entry?.kind==='file',bytes:file?.storage_entry?.bytes===task.expected_bytes,
           point_observed:file?.interaction?.state==='point_observed',double_click:file?.allowed_actions?.includes('double_click')===true}});

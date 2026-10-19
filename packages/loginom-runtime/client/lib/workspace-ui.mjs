@@ -2933,6 +2933,7 @@ function readRenderedInputMapping(observation) {
             &&data.id===data.FilePath&&data.FilePath.startsWith('/')
             &&data.FilePath.endsWith('/'+data.FileName)
             &&Number.isSafeInteger(data.Size)&&data.Size>=0) {
+            storageEntry.kind='file';
             storageEntry.bytes=data.Size;
             storageEntry.bytes_source='native_file_store';
           }

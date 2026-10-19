@@ -2799,6 +2799,7 @@ test('storage byte identity uses the same cached native file record regardless o
     const read=async()=> (await page.observe()).ui.elements.find(e=>e.tid===cell.getAttribute('data-tid')).storage_entry;
     const entry=await read();
     assert.equal(entry.bytes,mode==='valid'?1702:undefined,mode);
+    assert.equal(entry.kind,mode==='valid'?'file':'unknown',mode);
     if(mode==='valid') {
       assert.equal(entry.bytes_source,'native_file_store');
       for(const bytes of [0,900,1023,1024,1025,1536,1937,3072,1048576]) {
