@@ -23,6 +23,15 @@ CSV с генераторами и seed, независимые oracle и expect
 в `demo-022`, срок — 19.10.2026 08:00 PT. Поставка только статическая,
 без модельных/native/cold-check прогонов; независимая приёмка — Ловец.
 
+Дополнение D7f (LAB-115): [подплан p9–p16](short-plan.md#d7f-p9-p16-lab-115),
+[назначение](acceptance/short/task.md#d7f-lab-115),
+[checkpoint](p9-p16-checkpoint.md). Две кластеризации, две регрессии, HTTP,
+Excel и две смешанные короткие просьбы; [покрытие и команды](#d7f-короткие-просьбы-p9-p16).
+Ветка `audience-wave2` от `04da034ea1cd4ad7843ca9c7cf50b1ef146806ed`,
+один docs PR в `demo-022`, срок — 19.10.2026 10:00 PT.
+Генератор готовит сам, независимая статическая приёмка — Ловец-3;
+модельные/native/cold-check прогоны не входят в поставку.
+
 В строках s1–s6 каждый из трёх вариантов использует одни и те же исходные CSV и
 демо-ожидания D1. Копий данных, oracle и эталонов D1 здесь нет. В n1–n6 — новые
 бизнес-вопросы, входы и самостоятельные расчёты. Все девять узлов показа покрыты;
@@ -315,3 +324,103 @@ cold-check требуют отдельного живого прогона; ус
 `parseExpectedOutputs` 8/8. Результаты всех восьми расчётов дополнительно
 сопоставлены с независимыми SQL-запросами в SQLite по тем же CSV;
 144 локальные ссылки и якоря комплекта, формат CSV и `git diff --check` — PASS.
+
+## D7f: короткие просьбы p9-p16
+
+Каждой будущей модели передаются только две фразы `prompt.md` и входные данные.
+Для p14 — XLSX, без операторской CSV-копии. README, генераторы, oracle,
+expected и подплан остаются у оператора. Ожидаемые сочетания ниже — покрытие,
+не обязательная топология графа; подготовку и итог можно выполнить эквивалентно.
+
+| Задача | Покрытие | Данные → результат | Допустимая свобода |
+|---|---|---|---|
+| [p9](p9/): клиенты | Кластеризация → сводка | 14 клиентов → две группы по 5/9, средние Visits/Spend | Метки, порядок строк/колонок, номера групп |
+| [p10](p10/): магазины | Кластеризация → сводка | 18 магазинов → три группы по 5/7/6, средние Footfall/Basket | Метки, порядок строк/колонок, номера групп |
+| [p11](p11/): рассада | Линейная регрессия | 16 наблюдений → Height от Light, 16 прогнозов | Метки, порядок строк/колонок; схема коэффициентов не задана |
+| [p12](p12/): панели | Линейная регрессия | 18 измерений → Loss от Thickness, 18 прогнозов | Метки, порядок строк/колонок; схема коэффициентов не задана |
+| [p13](p13/): маршруты | REST-запрос → стабильные поля | 12 пар → отражённые Code/Route, Method=GET, HTTP 200 | Метки, порядок строк/колонок; без IP/времени/заголовков |
+| [p14](p14/): экспонаты | Импорт Excel | 15 строк первого листа → Id integer, Gallery string, Weight real | Метки, порядок строк/колонок; имена/типы заданы просьбой |
+| [p15](p15/): ульи | Фильтр → Кластеризация → Группировка | 18 строк → 14 summer → две группы 6/8, среднее и сумма | Метки, порядок строк/колонок, номера групп; TotalPollen real |
+| [p16](p16/): датчики | Фильтр → Калькулятор → Линейная регрессия | 20 строк → 16 work → Net и прогноз PredictedNet | Метки, порядок строк/колонок; промежуточные имена свободны |
+
+Seed 2209–2216; все CSV — 10–40 строк, UTF-8 без BOM, запятая, LF.
+Генератор p14 воспроизводит и CSV-копию, и XLSX, включая timestamps ZIP.
+Oracle p14 читает именно XLSX, остальные — свои CSV, без сети/expected/модели.
+Кластеры проверяются без номеров по размерам и средним/сумме, с устойчивостью
+к исходному масштабу, нормированию диапазоном и z-score. Прогнозы вычисляются
+МНК со свободным членом по всем указанным строкам; ненулевые остатки исключают
+подстановку точной генерирующей прямой. Прогнозы на разных X определяют зависимость,
+поэтому отдельная неоговорённая таблица коэффициентов не фиксируется.
+HTTP-эталон — контракт успешного ответа [httpbin](https://httpbin.org/),
+не свидетельство доступности сервиса или выполнения запросов.
+
+Все новые expected имеют `label_any: true`, `column_order: any`, `ordered: false`.
+Имена полей взяты из просьб и входных заголовков; `label_any` освобождает только
+подписи. Real сравниваются с допуском `max(1e-8, 1e-10 × |expected|)`;
+счётчики — integer, сумма Группировки TotalPollen — real. Matcher не выражает
+свободу числового типа: численно равный иной тип требует операторского разбора.
+Имена узлов, промежуточные поля и метки кластеров не зажаты эталоном.
+
+Во всех просьбах задано имя экспорта. `/stability-2026-10-20/` в expected —
+заранее объявленная оператором папка окружения будущего запуска; в другом
+окружении её меняют в копии expected, сохраняя имя файла. Аргумент oracle
+меняет только `package_path`, не `export_destination`.
+
+Проверить из корня репозитория все входы и oracle из двух cwd:
+
+```sh
+python3 -B - <<'PY'
+from pathlib import Path
+import csv
+import json
+import subprocess
+import sys
+repo = Path.cwd()
+root = repo / 'docs/testing/loginom-ai-agent/stability-2026-10-20'
+for number in range(9, 17):
+    case = root / f'p{number}'
+    before = {p.name: p.read_bytes() for p in (case / 'data').iterdir()}
+    for cwd in (case, repo):
+        subprocess.run([sys.executable, '-B', str(case / 'generate.py')], cwd=cwd, check=True)
+        assert before == {p.name: p.read_bytes() for p in (case / 'data').iterdir()}
+        actual = subprocess.check_output([sys.executable, '-B', str(case / 'oracle.py')], cwd=cwd)
+        assert actual == (case / 'expected-demo.json').read_bytes()
+    for path in (case / 'data').glob('*.csv'):
+        content = path.read_bytes()
+        assert not content.startswith(b'\xef\xbb\xbf') and b'\r' not in content
+        with path.open(encoding='utf-8', newline='') as stream:
+            assert 10 <= len(list(csv.DictReader(stream))) <= 40
+    changed = json.loads(subprocess.check_output([
+        sys.executable, '-B', str(case / 'oracle.py'), '/operator/d7f-run.lgp'
+    ], cwd=repo))
+    original = json.loads((case / 'expected-demo.json').read_text(encoding='utf-8'))
+    assert changed.pop('package_path') == '/operator/d7f-run.lgp'
+    original.pop('package_path')
+    assert changed == original
+    print(f'{case.name}: inputs, oracle bytes (2 cwd), package-only change PASS')
+PY
+```
+
+Реальный вызов существующего парсера (Node.js или Bun):
+
+```sh
+node --input-type=module - <<'JS'
+import { readFileSync } from 'node:fs';
+import { parseExpectedOutputs } from './scripts/node-acceptance/expected-outputs.mjs';
+const root = 'docs/testing/loginom-ai-agent/stability-2026-10-20';
+for (let i = 9; i <= 16; i++) {
+  parseExpectedOutputs(JSON.parse(readFileSync(`${root}/p${i}/expected-demo.json`, 'utf8')));
+  console.log(`p${i}: parseExpectedOutputs PASS`);
+}
+JS
+```
+
+Проверено: генераторы/входы 8/8 побайтно, oracle 8/8 побайтно из двух cwd,
+смена только `package_path` 8/8, реальный `parseExpectedOutputs` 8/8.
+Сводки p9/p10/p15 совпали с независимым перебором разбиений с минимальной
+суммой квадратов расстояний; прогнозы p11/p12/p16 — с решением нормальных
+уравнений по исходным суммам SQLite. Книга p14 прочитана независимым
+SheetJS 0.18.5: первый лист Exhibits, все 15 строк и типы ячеек совпали.
+Две фразы каждого prompt, 188 локальных ссылок/якорей и `git diff --check` — PASS.
+Эти проверки не доказывают выполнение модели, доставку XLSX, происхождение HTTP,
+сохранение, экспорт или cold-check; их PASS здесь не заявляется.

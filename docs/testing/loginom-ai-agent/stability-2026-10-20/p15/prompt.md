@@ -1,0 +1,1 @@
+Возьми из hives.csv только Season=summer и раздели ульи на две естественные группы по Flight и Pollen; по каждой нужны число ульев Hives, среднее MeanFlight и сумма TotalPollen, без номеров групп. Выгрузи summer-hives.csv и сохрани сценарий.
