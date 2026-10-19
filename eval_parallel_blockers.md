@@ -78,5 +78,7 @@ private approval evidence сохранён. Source/CLI/catalog/task/rubric/judge
 Первый N2 qAdMiN не принят: A SESSION_STILL_PRESENT после CloseSession15ms,
 CPU хоста95.9253%>95%; B обе задачи100/cleanup confirmed. Fresh startup успешно
 подтвердил отсутствие сессии (closed[]) и очистил ровно два своих файла; server/
-profile брони released. Исходные результаты сохранены. Далее ограниченное ожидание
-readback после CloseSession по TDD и повторный N2 с тем же утверждённым бюджетом.
+profile брони released. Исходные результаты сохранены. Ограниченное ожидание
+readback после CloseSession исправлено по TDD:15/89 targeted PASS/typecheck/diff,
+Review Approved; четыре native A/B повторно PASS. Далее повторный N2
+с тем же утверждённым бюджетом и неизменными evaluation/CLI pins.
