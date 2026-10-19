@@ -1,102 +1,33 @@
 import type { ServerIdentity } from "./slots"
-import type { readResourceAgentInventories, readResourceJudgeInventory, readResourceNativeCensus, readResourceProcessWindows } from "./parallel-resource-evidence"
 import type { summarizeResourceSamples } from "./parallel-resource-summary"
 import path from "node:path"
 import { validResourceBound } from "./parallel-resource-budget"
 import { serverStorageBinding } from "./parallel-resource-storage"
 
-type ResourceOwner = { kind: string; id: string; producerPid?: number; launcher: { pid: number; starttime: string } }
-
-export function assessProcessResourceTimeline(input: { samples: readonly unknown[]; intervalMs: number; owners: (ResourceOwner & { startedAt: string; finishedAt: string })[] }) {
-  const checks = input.owners.map(owner => {
-    const timeline = assessResourceTimeline({ samples: input.samples, intervalMs: input.intervalMs, startedAt: owner.startedAt, finishedAt: owner.finishedAt })
-    if (timeline.status !== "passed") return timeline
-    const active = input.samples.filter(value => {
-      const time = Date.parse(String(acceptanceObject(acceptanceObject(value).host).observed_at))
-      return time >= Date.parse(owner.startedAt) && time <= Date.parse(owner.finishedAt)
-    })
-    return active.length && active.every(sample => processOwnerObserved(sample, owner))
-      ? { status: "passed" as const, codes: [] } : { status: "incomplete" as const, codes: ["PROCESS_RESOURCE_TIMELINE_INCOMPLETE"] }
-  })
-  return { status: checks.some(check => check.status === "failed") ? "failed" as const : checks.some(check => check.status === "incomplete") ? "incomplete" as const : "passed" as const,
-    codes: [...new Set(checks.flatMap(check => check.codes))] }
-}
-
-// Checks the caller's declared resource scopes; full live admission also requires the frozen manifest and other gates.
+// Checks the declared host/container scopes against the frozen evidence.
 export async function checkResourceEvidence(input: {
   file: string; samplesFile: string; runId: string; startedAt: string; finishedAt: string
   coverage: Omit<Parameters<typeof assessResourceCoverage>[0], "samples">
-  processWindows: Parameters<typeof assessProcessResourceTimeline>[0]["owners"]
   view: Parameters<typeof assessCgroupCoverage>[0]["view"]; budget: { file: string; sha256: string } | null
-  manifest?: { file: string; sha256: string }
-  processProofs?: Parameters<typeof readResourceProcessWindows>[0]
-  agentInventories?: Parameters<typeof readResourceAgentInventories>[0]["sources"]
-  judgeInventory?: Parameters<typeof readResourceJudgeInventory>[0]["source"]
-  nativeCensus?: Parameters<typeof readResourceNativeCensus>[0]["source"]
 }) {
-  const { readResourceAgentInventories, readResourceJudgeInventory, readResourceNativeCensus, readResourceProcessWindows, readFrozenResourceManifest, readFrozenResourceBudget, readResourceEvidence } = await import("./parallel-resource-evidence")
+  const { readFrozenResourceBudget, readResourceEvidence } = await import("./parallel-resource-evidence")
   const evidence = await readResourceEvidence({ file: input.file, samplesFile: input.samplesFile, runId: input.runId, phase: "run" })
-  const manifest = input.manifest ? await readFrozenResourceManifest({ ...input.manifest, runId: input.runId, startedAt: input.startedAt }) : null
-  const coverage = { ...input.coverage, ...(manifest?.coverage ?? {}) }
-  const inventories = manifest && input.agentInventories ? await readResourceAgentInventories({ manifest, sources: input.agentInventories }) : null
-  const judgeInventory = manifest ? await readResourceJudgeInventory({ manifest, source: input.judgeInventory }) : null
-  const nativeCensus = manifest && input.nativeCensus ? await readResourceNativeCensus({ manifest, source: input.nativeCensus }) : null
-  const processProofs = inventories || judgeInventory || nativeCensus ? [...(inventories?.flatMap(inventory => inventory.proofs) ?? []),
-    ...(judgeInventory?.proofs ?? []), ...(nativeCensus?.proofs ?? []), ...(input.processProofs ?? [])] : input.processProofs
-  const processWindows = [...(processProofs ? await readResourceProcessWindows(processProofs) : input.processWindows), ...(nativeCensus?.adminWindows ?? [])]
-  const budgetSource = manifest?.budget ?? input.budget
-  const budget = budgetSource ? await readFrozenResourceBudget({ ...budgetSource, runId: input.runId, startedAt: input.startedAt }) : null
+  const budget = input.budget ? await readFrozenResourceBudget({ ...input.budget, runId: input.runId, startedAt: input.startedAt }) : null
   const groups = evidence.samples.flatMap(value => {
-    const sample = acceptanceObject(value), host = acceptanceObject(sample.host), processes = acceptanceObject(sample.processes)
-    return [host.collector_cgroup,
-      ...(Array.isArray(sample.containers) ? sample.containers.map(value => acceptanceObject(value).cgroup) : []),
-      ...(Array.isArray(processes.scopes) ? processes.scopes.flatMap(value => {
-        const scope = acceptanceObject(value)
-        return Array.isArray(scope.processes) ? scope.processes.map(value => acceptanceObject(value).cgroup) : []
-      }) : [])]
+    const sample = acceptanceObject(value)
+    return [acceptanceObject(sample.host).collector_cgroup,
+      ...(Array.isArray(sample.containers) ? sample.containers.map(value => acceptanceObject(value).cgroup) : [])]
   })
   const checks = {
-    nativeCensus: manifest && !nativeCensus ? { status: "incomplete" as const, codes: ["RESOURCE_NATIVE_CENSUS_INCOMPLETE"] }
-      : { status: "passed" as const, codes: [] },
     timeline: assessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, startedAt: input.startedAt, finishedAt: input.finishedAt }),
-    coverage: assessResourceCoverage({ ...coverage, samples: evidence.samples }),
-    processTimeline: manifest && (!inventories || manifest.slots.some(slot => !inventories.some(inventory => inventory.slotId === slot.id)))
-      ? { status: "incomplete" as const, codes: ["RESOURCE_AGENT_INVENTORIES_INCOMPLETE"] }
-      : manifest?.judge.enabled && !judgeInventory
-      ? { status: "incomplete" as const, codes: ["RESOURCE_JUDGE_INVENTORY_INCOMPLETE"] }
-      : manifest && !manifest.judge.enabled && processWindows.some(window => window.kind === "judge")
-      ? { status: "failed" as const, codes: ["RESOURCE_JUDGE_MODE_MISMATCH"] }
-      : manifest && (!processProofs || manifest.slots.some(slot =>
-      !processWindows.some(window => window.kind === "slot" && window.id === slot.id)))
-      ? { status: "incomplete" as const, codes: ["RESOURCE_SLOT_PROCESS_PROOFS_INCOMPLETE"] }
-      : manifest && evidence.samples.some(value => {
-        const processes = acceptanceObject(acceptanceObject(value).processes)
-        return Array.isArray(processes.scopes) && processes.scopes.some(value => {
-          const scope = acceptanceObject(value), owner = acceptanceObject(scope.owner), launcher = acceptanceObject(scope.launcher)
-          return !processWindows.some(window => window.producerPid === processes.producer_pid && window.kind === owner.kind && window.id === owner.id &&
-            window.launcher.pid === launcher.pid && window.launcher.starttime === launcher.starttime)
-        })
-      }) ? { status: "incomplete" as const, codes: ["RESOURCE_OBSERVED_PROCESS_PROOFS_INCOMPLETE"] }
-      : manifest && processWindows.some(window => Date.parse(window.startedAt) < Date.parse(input.startedAt) ||
-        Date.parse(window.finishedAt) > Date.parse(input.finishedAt))
-      ? { status: "failed" as const, codes: ["RESOURCE_PROCESS_RUN_WINDOW_MISMATCH"] }
-      : processWindows.length === input.coverage.owners.length && input.coverage.owners.every(owner =>
-      processWindows.filter(window => window.kind === owner.kind && window.id === owner.id &&
-        window.launcher.pid === owner.launcher.pid && window.launcher.starttime === owner.launcher.starttime).length === 1) &&
-      new Set(input.coverage.owners.map(owner => JSON.stringify([owner.kind, owner.id, owner.launcher.pid, owner.launcher.starttime]))).size === input.coverage.owners.length
-      ? assessProcessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, owners: processWindows })
-      : { status: "incomplete" as const, codes: ["PROCESS_RESOURCE_WINDOWS_INCOMPLETE"] },
-    cgroups: assessCgroupCoverage({ groups, view: manifest?.view ?? input.view }),
+    coverage: assessResourceCoverage({ ...input.coverage, samples: evidence.samples }),
+    cgroups: assessCgroupCoverage({ groups, view: input.view }),
     budget: assessResourceBudget({ runId: input.runId, startedAt: input.startedAt, budget, summary: evidence.receipt.summary }),
     incidents: assessResourceIncidents({ samples: evidence.samples, summary: evidence.receipt.summary }),
   }
   const results = Object.values(checks)
   return { status: results.some(result => result.status === "failed") ? "failed" as const : results.some(result => result.status === "incomplete") ? "incomplete" as const : "passed" as const,
-    codes: [...new Set(results.flatMap(result => result.codes))], checks, source: evidence.receipt.source, budget_source: budgetSource, ...(input.manifest ? { manifest_source: input.manifest } : {}),
-    ...(processProofs ? { process_sources: processProofs } : {}),
-    ...(inventories ? { agent_inventory_sources: inventories.map(inventory => inventory.source) } : {}),
-    ...(judgeInventory ? { judge_inventory_source: judgeInventory.source } : {}),
-    ...(nativeCensus ? { native_census_source: nativeCensus.source, admin_process_sources: nativeCensus.adminSources } : {}) }
+    codes: [...new Set(results.flatMap(result => result.codes))], checks, source: evidence.receipt.source, budget_source: input.budget }
 }
 
 export function assessResourceIncidents(input: { samples: readonly unknown[]; summary: ReturnType<typeof summarizeResourceSamples> }) {
@@ -142,7 +73,7 @@ export function assessResourceTimeline(input: { samples: readonly unknown[]; int
   return { status: "passed" as const, codes: [] }
 }
 
-// The expected view must be qualified outside actor namespaces and fixed in the manifest.
+// The expected view must be qualified outside actor namespaces and fixed before dispatch.
 export function assessCgroupCoverage(input: { groups: readonly unknown[]; view: { namespace: string; root: { device: number; inode: number } } }) {
   if (!input.groups.length)
     return { status: "incomplete" as const, codes: ["CGROUP_RESOURCE_COVERAGE_INCOMPLETE"] }
@@ -184,7 +115,6 @@ export function assessCgroupCoverage(input: { groups: readonly unknown[]; view: 
 export function assessResourceCoverage(input: {
   samples: readonly unknown[]; paths: string[]
   containers: { role: "server" | "studio"; id: string; image: string; startedAt: string; name: string; nonce: string; purpose: string }[]
-  owners: ResourceOwner[]
 }) {
   if (!input.samples.length) return { status: "incomplete" as const, codes: ["RESOURCE_SAMPLES_MISSING"] }
   if (input.samples.some(value => {
@@ -223,8 +153,6 @@ export function assessResourceCoverage(input: {
   if (containers.some(entry => entry.storageMismatch)) return { status: "failed" as const, codes: ["SERVER_STORAGE_IDENTITY_MISMATCH"] }
   if (containers.some(entry => entry.missing)) return { status: "incomplete" as const, codes: ["CONTAINER_RESOURCE_COVERAGE_INCOMPLETE"] }
   if (containers.some(entry => entry.storageMissing)) return { status: "incomplete" as const, codes: ["SERVER_FILESYSTEM_COVERAGE_INCOMPLETE"] }
-  if (input.owners.some(owner => !input.samples.some(sample => processOwnerObserved(sample, owner))))
-    return { status: "incomplete" as const, codes: ["PROCESS_RESOURCE_COVERAGE_INCOMPLETE"] }
   return { status: "passed" as const, codes: [] }
 }
 
@@ -306,22 +234,6 @@ export function assessParallelLimits(input: unknown, requiredSources: readonly (
 function resourceNumbersObserved(value: unknown, keys: string[]) {
   const counters = acceptanceObject(value)
   return keys.every(key => Number.isSafeInteger(counters[key]) && Number(counters[key]) >= 0)
-}
-
-function processOwnerObserved(value: unknown, owner: ResourceOwner) {
-  const producer = acceptanceObject(acceptanceObject(value).processes)
-  return (owner.producerPid === undefined || producer.producer_pid === owner.producerPid) && Array.isArray(producer.scopes) && producer.scopes.some(value => {
-    const scope = acceptanceObject(value), observed = acceptanceObject(scope.owner), launcher = acceptanceObject(scope.launcher)
-    if (observed.kind !== owner.kind || observed.id !== owner.id || launcher.pid !== owner.launcher.pid || launcher.starttime !== owner.launcher.starttime ||
-      scope.status !== "observed" || !Array.isArray(scope.processes) || !scope.processes.length) return false
-    return scope.processes.every(value => {
-      const process = acceptanceObject(value)
-      return process.verified === true && resourceNumbersObserved(process, ["rss_bytes"]) && resourceNumbersObserved(process.cpu, ["user_ticks", "system_ticks"])
-    }) && scope.processes.some(value => {
-      const identity = acceptanceObject(acceptanceObject(value).identity)
-      return identity.pid === owner.launcher.pid && identity.starttime === owner.launcher.starttime
-    })
-  })
 }
 
 function validLimitEvent(value: unknown) {

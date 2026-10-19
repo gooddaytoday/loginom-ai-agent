@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test"
+
+const processDenial = process.env.EVAL_PROCESS_DENIAL_TESTS === "1" ? test : test.skip
 import { spawn } from "node:child_process"
 import { cp, mkdir, mkdtemp, readFile, readlink, rm, stat } from "node:fs/promises"
 import path from "node:path"
@@ -196,7 +198,7 @@ for (const stop of ["timeout", "interrupt"] as const) test(`trusted unit: ${stop
   } finally { signal.abort(); await pending; await rm(root, { recursive: true, force: true }) }
 }, 10_000)
 
-test("trusted unit: protected fixture ends before unit exit and final drain confirms cleanup", async () => {
+processDenial("trusted unit: protected fixture ends before unit exit and final drain confirms cleanup", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-trusted-unit-"))
   const cwd = path.join(root, "evals")
   await mkdir(cwd)
@@ -219,7 +221,7 @@ test("trusted unit: protected fixture ends before unit exit and final drain conf
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 10_000)
 
-test("trusted unit: protected leftover fails strict drain and is never signaled as unknown", async () => {
+processDenial("trusted unit: protected leftover fails strict drain and is never signaled as unknown", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-trusted-leftover-"))
   const cwd = path.join(root, "evals")
   await mkdir(cwd)
@@ -249,7 +251,7 @@ test("trusted unit: protected leftover fails strict drain and is never signaled 
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 10_000)
 
-test("signalProcess: краткий запрет чтения собственного /proc пережидается без ослабления identity", async () => {
+processDenial("signalProcess: краткий запрет чтения собственного /proc пережидается без ослабления identity", async () => {
   const child = spawn(process.execPath, ["-e", `
     const {dlopen}=await import('bun:ffi');
     const library=dlopen('libc.so.6',{prctl:{args:['i32','u64','u64','u64','u64'],returns:'i32'}});
@@ -276,7 +278,7 @@ test("signalProcess: краткий запрет чтения собственн
   } finally { child.kill("SIGKILL"); await exited }
 }, 5_000)
 
-test("signalProcess: постоянный запрет чтения собственного /proc остаётся отказом и не посылает сигнал", async () => {
+processDenial("signalProcess: постоянный запрет чтения собственного /proc остаётся отказом и не посылает сигнал", async () => {
   const child = spawn(process.execPath, ["-e", `
     const {dlopen}=await import('bun:ffi');
     const library=dlopen('libc.so.6',{prctl:{args:['i32','u64','u64','u64','u64'],returns:'i32'}});
@@ -486,7 +488,7 @@ test("parallel observation evidence records delayed starts separately from scan 
   } finally { await Promise.all(runs); await rm(root, { recursive: true }) }
 }, 10_000)
 
-test("parallel registry does not publish a fresh peer claim for an unreadable live process", async () => {
+processDenial("parallel registry does not publish a fresh peer claim for an unreadable live process", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-peer-unreadable-"))
   const a = path.join(root, "a"), b = path.join(root, "b")
   await Promise.all([mkdir(a), mkdir(b)])

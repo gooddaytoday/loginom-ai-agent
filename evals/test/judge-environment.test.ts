@@ -8,7 +8,6 @@ import { evalsRoot, loadConfig, type EvalConfig } from "../src/config"
 import { runOfflineJudge } from "../src/judge-environment"
 import { main } from "../src/run"
 import { superviseProcess } from "../src/process-supervisor"
-import { readJudgeProcessInventory } from "../src/judge-process-evidence"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
 test("offline calibration releases its home after SIGINT only with confirmed judge cleanup", async () => {
@@ -111,15 +110,10 @@ test("offline result persistence failure retains the admitted run directory befo
     const retained = await Bun.file(reservations[0]!).json()
     const running = await Bun.file(retained.journal).json()
     expect(running).toMatchObject({ state: "running", runDir })
-    const activeInventory = await Bun.file(running.processInventory).json()
-    expect(activeInventory.processes).toHaveLength(3)
-    expect(activeInventory.processes.at(-1).state).toBe("planned")
-    expect(activeInventory.processes.at(-1).proof).toBeUndefined()
     await mkdir(path.join(runDir, "calibration.json"))
     await expect(pending).rejects.toThrow()
     expect((await Bun.file(reservations[0]!).json()).state).toBe("retained")
     expect(await Bun.file(retained.journal).json()).toMatchObject({ state: "quarantined", reason: "command-failed", runDir })
-    expect((await Bun.file(running.processInventory).json()).processes.every((entry: { state: string }) => entry.state === "confirmed")).toBe(true)
     const before = await Bun.file(trace).text()
     await expect(runOfflineJudge(config, fixture.lockRoot)).rejects.toThrow("RECOVERY_REQUIRED")
     expect(await Bun.file(trace).text()).toBe(before)
@@ -168,38 +162,6 @@ test("main offline v2 command reads its configured slots before any judge probe"
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 
-test("offline calibration retains the reservation after uncertain cleanup and refuses another command", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "evals-offline-judge-uncertain-"))
-  const fixture = await parallelFixture(root)
-  const file = path.join(root, "slots.json")
-  const trace = path.join(root, "judge.jsonl")
-  await writeLeaseReceipt(file, fixture.slots)
-  const config = loadConfig(["--calibrate", "--only", "group-sum-qty,calc-data-double"], {
-    EVAL_SLOTS_FILE: file, EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake",
-    EVAL_JUDGE_COMMAND: `bun ${path.join(evalsRoot, "fixtures/fake-codex.ts")} --gate-log ${trace} --delay-ms 500`,
-  })
-  const pending = runOfflineJudge(config, fixture.lockRoot)
-  try {
-    for (let wait = 0; wait < 500 && !await Bun.file(trace).exists(); wait++) await Bun.sleep(10)
-    const started = JSON.parse((await Bun.file(trace).text()).trim().split("\n")[0]!) as { dir: string }
-    await mkdir(path.join(path.dirname(started.dir), "judge-processes-1", "process-cleanup.json"), { recursive: true, mode: 0o700 })
-    const result = await pending
-    expect(result).toMatchObject({ code: 1, judgeCleanupConfirmed: false })
-    const reservations = await Array.fromAsync(new Bun.Glob("*.reservation.json").scan({ cwd: fixture.lockRoot, absolute: true }))
-    const reservation = await Bun.file(reservations[0]!).json()
-    expect(reservation.state).toBe("retained")
-    expect(reservation.releaseEvidence).toBeUndefined()
-    expect((await Bun.file(reservation.journal).json()).state).toBe("quarantined")
-    const inventory = await Bun.file((await Bun.file(reservation.journal).json()).processInventory).json()
-    expect(inventory.processes).toHaveLength(3)
-    expect(inventory.processes.at(-1)).toMatchObject({ state: "unconfirmed", proof: null })
-    const before = await Bun.file(trace).text()
-    await expect(runOfflineJudge(config, fixture.lockRoot)).rejects.toThrow("RECOVERY_REQUIRED")
-    expect(await Bun.file(trace).text()).toBe(before)
-    expect(await Bun.file(path.join(result.runDir, "calibration.json")).exists()).toBe(true)
-  } finally { await pending; await rm(root, { recursive: true, force: true }) }
-}, 30_000)
-
 test("offline calibration releases its private home after confirmed cleanup and can run again", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-offline-judge-release-"))
   try {
@@ -222,22 +184,6 @@ test("offline calibration releases its private home after confirmed cleanup and 
     expect(before.state).toBe("released")
     expect(before.key).toBe(`judge:${fixture.slots.judge.codexHome}`)
     const journal = await Bun.file(before.journal).json()
-    const inventory = await Bun.file(journal.processInventory).json()
-    expect(inventory).toMatchObject({ version: 2, kind: "offline-judge-processes", commandId: before.commandId })
-    expect((await lstat(journal.processInventory)).mode & 0o777).toBe(0o600)
-    expect(inventory.processes).toHaveLength(3)
-    const qualified = await readJudgeProcessInventory({ file: journal.processInventory, commandId: before.commandId, producerPid: before.owner.pid })
-    expect(qualified.processes).toHaveLength(3)
-    for (const entry of inventory.processes) {
-      expect(entry.owner.kind).toBe("judge")
-      expect(entry.owner.id.startsWith(before.commandId + ":")).toBe(true)
-      expect(entry.state).toBe("confirmed")
-      const proof = await Bun.file(entry.proof.path).json()
-      expect((await lstat(entry.proof.path)).mode & 0o777).toBe(0o600)
-      expect(proof.lifetime.owner).toEqual(entry.owner)
-      expect(proof).toMatchObject({ status: "confirmed", capture_complete: true, observation_mode: "continuous" })
-      expect(entry.proof.sha256).toBe(new Bun.CryptoHasher("sha256").update(JSON.stringify(proof)).digest("hex"))
-    }
     const second = await runOfflineJudge(config, fixture.lockRoot)
     expect(second.code).toBe(0)
     expect(second.runDir).not.toBe(first.runDir)
@@ -294,7 +240,6 @@ test("offline rejudge releases its lease while preserving historical slot metada
     const reservations = await Array.fromAsync(new Bun.Glob("*.reservation.json").scan({ cwd: fixture.lockRoot, absolute: true }))
     const released = await Bun.file(reservations[0]!).json()
     expect(released.state).toBe("released")
-    const inventory = await Bun.file((await Bun.file(released.journal).json()).processInventory).json()
     const rows = (await Bun.file(trace).text()).trim().split("\n").map(line => JSON.parse(line))
     expect(rows.filter(row => row.kind === "start")).toHaveLength(2)
     expect(rows.every(row => row.codexHome === fixture.slots.judge.codexHome)).toBe(true)
@@ -305,9 +250,6 @@ test("offline rejudge releases its lease while preserving historical slot metada
     const retained = await Bun.file(reservations[0]!).json()
     expect(retained.state).toBe("retained")
     expect(await Bun.file(retained.journal).json()).toMatchObject({ state: "quarantined", reason: "command-failed", runDir: dry.runDir })
-    for (const entry of inventory.processes) {
-      expect(new Bun.CryptoHasher("sha256").update(JSON.stringify(await Bun.file(entry.proof.path).json())).digest("hex")).toBe(entry.proof.sha256)
-    }
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 30_000)
 

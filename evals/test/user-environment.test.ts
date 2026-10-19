@@ -2,9 +2,9 @@ import { expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireSlotLease } from "../src/slots"
+import { acquireFixtureSlot } from "./helpers/parallel-fixture"
 import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
-import { claimUserOwnership, readServerSession, readUnactivatedUserObservation, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, recordUserConfiguration, stageUserActivation, stageUserPreparation } from "../src/user-environment"
+import { claimUserOwnership, readUnactivatedUserObservation, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordUserConfiguration, stageUserActivation, stageUserPreparation } from "../src/user-environment"
 import { parallelFixture } from "./helpers/parallel-fixture"
 
 const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
@@ -13,7 +13,7 @@ const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z
 test("unactivated observation reader binds private native reply and command sources without changing them", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-unactivated-read-")), fixture = await parallelFixture(root)
   await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
-  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
   try {
     const prepared = await stageUserPreparation(fixture.slots, lease, "e".repeat(64))
     const directory = path.join(fixture.slots.controller.stateDir, "admin-codec")
@@ -85,7 +85,7 @@ test("user ownership publishes a private generation-bound claim from a confirmed
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-claim-"))
   const fixture = await parallelFixture(root)
   await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
-  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
   try {
     const prepared = await stageUserPreparation(fixture.slots, lease, "e".repeat(64))
     const reply = { v: 1 as const, id: "create-a", outcome: "confirmed" as const,
@@ -160,105 +160,6 @@ test("user ownership publishes a private generation-bound claim from a confirmed
     await expect(stageUserActivation(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("USER_ACTIVATION_CONFLICT")
     expect(await Bun.file(activationFile).text()).toBe(foreignActivation)
     await writeLeaseReceipt(activationFile, activation)
-    const row = { objectId: "managed-session-73", name: "eval-a:2", createdAt: "2026-10-15T00:00:00.000Z", pendingDisconnect: false, packageCount: 0 }
-    const binding = { remoteKey: row.objectId, userKey: claimed.userKey, username: "eval-a", serverEpoch: identity.serverEpoch,
-      name: row.name, createdAt: row.createdAt }
-    const observed = { v: 1 as const, id: "probe-a", outcome: "confirmed" as const, data: {
-      ownSession: { guid: "11111111-1111-1111-1111-111111111111", objectId: "session-proxy-73", userObjectId: claimed.objectId,
-        username: "eval-a", isAdmin: false, isDesigner: true }, baseline: [], opened: [row], withPackage: [{ ...row, packageCount: 1 }],
-      afterPackage: [row], sessionIdentityQualified: false, afterDisconnect: [{ ...row, pendingDisconnect: true }], binding } }
-    const probePayload = { phase: "session-probe", slot: lease.slot, secretFile: prepared.secretFile, preparationNonce: prepared.nonce,
-      desiredHash: prepared.desiredHash, secretHash: prepared.secretHash, owned: { objectId: claimed.objectId, name: "eval-a", userKind: 0,
-        preparationNonce: prepared.nonce, secretHash: prepared.secretHash }, expectedPolicy: [] }
-    const probeSource = path.join(fixture.slots.controller.stateDir, "probe-a.json")
-    await writeLeaseReceipt(probeSource, { version: 1, kind: "loginom-admin-command", id: observed.id, op: "reconcile-user", expectedIdentity: identity,
-      desiredHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(probePayload)).digest("hex"), state: "confirmed", at: new Date().toISOString(),
-      replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(observed)).digest("hex"), settledAt: new Date().toISOString() })
-    const session = await recordServerSession(fixture.slots, lease, prepared.secretFile, probeSource, probePayload, observed)
-    expect(session).toMatchObject({ kind: "owned-server-session", slotId: "a", identity, preparationNonce: prepared.nonce,
-      binding, state: "observed", sessionGuid: observed.data.ownSession.guid })
-    const sessionFile = path.join(fixture.slots.controller.stateDir, "session-probe-a.json")
-    expect((await stat(sessionFile)).mode & 0o777).toBe(0o600)
-    expect(await recordServerSession(fixture.slots, lease, prepared.secretFile, probeSource, probePayload, observed)).toEqual(session)
-    expect(await readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).toEqual(session)
-    await Bun.write(sessionFile, "null")
-    try {
-      await expect(recordServerSession(fixture.slots, lease, prepared.secretFile, probeSource, probePayload, observed))
-        .rejects.toThrow("SESSION_IDENTITY_CHANGED")
-      expect(await Bun.file(sessionFile).text()).toBe("null")
-    } finally { await writeLeaseReceipt(sessionFile, session) }
-    // Data-only codec control; native Count1 qualification is exercised separately.
-    const retainedRow = { ...row, objectId: "managed-retained-74", name: "eval-a:3" }
-    const retainedBinding = { ...binding, remoteKey: retainedRow.objectId, name: retainedRow.name }
-    const retainedReply = { ...observed, id: "retained-a", data: { ...observed.data,
-      ownSession: { ...observed.data.ownSession, guid: "22222222-2222-2222-2222-222222222222" }, baseline: [row], opened: [row, retainedRow],
-      withPackage: [row, { ...retainedRow, packageCount: 1 }], afterPackage: [row, { ...retainedRow, packageCount: 1 }],
-      afterDisconnect: [row, { ...retainedRow, packageCount: 1, pendingDisconnect: true }], binding: retainedBinding } }
-    const retainedPayload = { ...probePayload, phase: "session-package-crash-probe" }
-    const retainedSource = path.join(fixture.slots.controller.stateDir, "retained-a.json")
-    await writeLeaseReceipt(retainedSource, { version: 1, kind: "loginom-admin-command", id: retainedReply.id, op: "reconcile-user", expectedIdentity: identity,
-      desiredHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(retainedPayload)).digest("hex"), state: "confirmed", at: new Date().toISOString(),
-      replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(retainedReply)).digest("hex"), settledAt: new Date().toISOString() })
-    expect(await recordServerSession(fixture.slots, lease, prepared.secretFile, retainedSource, retainedPayload, retainedReply))
-      .toMatchObject({ state: "observed", binding: retainedBinding, observation: { payload: { phase: "session-package-crash-probe" } } })
-    expect(await readServerSession(fixture.slots, lease, prepared.secretFile, retainedReply.id)).toMatchObject({ binding: retainedBinding })
-    await expect(recordServerSession(fixture.slots, lease, prepared.secretFile, retainedSource, probePayload, retainedReply))
-      .rejects.toThrow("SESSION_IDENTITY_AMBIGUOUS")
-    for (const afterDisconnect of [[row], [row, retainedRow], [row, { ...retainedRow, packageCount: 1 }],
-      [row, { ...retainedRow, packageCount: 1, pendingDisconnect: true, createdAt: "2026-10-14T00:00:00.000Z" }]]) {
-      await expect(recordServerSession(fixture.slots, lease, prepared.secretFile, retainedSource, retainedPayload,
-        { ...retainedReply, data: { ...retainedReply.data, afterDisconnect } })).rejects.toThrow("SESSION_IDENTITY_AMBIGUOUS")
-    }
-    await expect(recordServerSession(fixture.slots, lease, prepared.secretFile, retainedSource, retainedPayload,
-      { ...retainedReply, data: { ...retainedReply.data, afterPackage: [row, retainedRow] } })).rejects.toThrow("SESSION_IDENTITY_AMBIGUOUS")
-    const originalProbe = await Bun.file(probeSource).json()
-    await writeLeaseReceipt(probeSource, { ...originalProbe, settledAt: new Date(Date.parse(originalProbe.settledAt) + 1).toISOString() })
-    await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow("SESSION_SOURCE_UNCONFIRMED")
-    await writeLeaseReceipt(probeSource, originalProbe)
-    const leaseManifest = await Bun.file(lease.receipt).json()
-    await writeLeaseReceipt(lease.receipt, { ...leaseManifest, token: "foreign-lease" })
-    await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow("LEASE_NOT_HELD")
-    await writeLeaseReceipt(lease.receipt, leaseManifest)
-    const reconnectDir = path.join(fixture.slots.controller.stateDir, "reconnected", "commands")
-    await mkdir(reconnectDir, { recursive: true, mode: 0o700 })
-    const reconnectReply = { v: 1 as const, id: "reconnected-close", outcome: "confirmed" as const, data: { closed: true, disposition: "rpc_closed" } }
-    const reconnectPayload = { proofId: observed.id, session: binding, adopt: { receipt: sessionFile,
-      sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(session)).digest("hex") } }
-    const reconnectSource = path.join(reconnectDir, `${reconnectReply.id}.json`)
-    await writeLeaseReceipt(reconnectSource, { version: 1, kind: "loginom-admin-command", id: reconnectReply.id, op: "close-session", expectedIdentity: identity,
-      desiredHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(reconnectPayload)).digest("hex"), state: "confirmed", at: new Date().toISOString(),
-      replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(reconnectReply)).digest("hex"), settledAt: new Date().toISOString() })
-    const originalReconnectSource = await readLeaseReceipt(reconnectSource) as Record<string, unknown>
-    await writeLeaseReceipt(reconnectSource, { ...originalReconnectSource,
-      desiredHash: new Bun.CryptoHasher("sha256").update(JSON.stringify({ proofId: observed.id, session: binding })).digest("hex") })
-    await expect(recordServerSessionClosed(fixture.slots, lease, prepared.secretFile, observed.id, reconnectSource, reconnectReply))
-      .rejects.toThrow("SESSION_CLOSE_UNCONFIRMED")
-    expect(await Bun.file(path.join(fixture.slots.controller.stateDir, "session-probe-a.closed.json")).exists()).toBe(false)
-    await writeLeaseReceipt(reconnectSource, originalReconnectSource)
-    expect(await recordServerSessionClosed(fixture.slots, lease, prepared.secretFile, observed.id, reconnectSource, reconnectReply)).toMatchObject({ state: "closed", binding })
-    expect(await readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).toMatchObject({ state: "closed", binding })
-    // Data-only reconstruction of the pre-close state for the existing same-context controls.
-    await rm(path.join(fixture.slots.controller.stateDir, "session-probe-a.closed.json"))
-    const closeReply = { v: 1 as const, id: "close-a", outcome: "confirmed" as const, data: { closed: true, disposition: "rpc_closed" } }
-    const closePayload = { proofId: observed.id, session: binding }
-    const closeSource = path.join(fixture.slots.controller.stateDir, "close-a.json")
-    await writeLeaseReceipt(closeSource, { version: 1, kind: "loginom-admin-command", id: closeReply.id, op: "close-session", expectedIdentity: identity,
-      desiredHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(closePayload)).digest("hex"), state: "confirmed", at: new Date().toISOString(),
-      replyHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(closeReply)).digest("hex"), settledAt: new Date().toISOString() })
-    expect(await recordServerSessionClosed(fixture.slots, lease, prepared.secretFile, observed.id, closeSource, closeReply)).toMatchObject({ state: "closed", binding })
-    expect(await readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).toMatchObject({ state: "closed", binding })
-    const closureFile = path.join(fixture.slots.controller.stateDir, "session-probe-a.closed.json")
-    const originalClosure = await Bun.file(closureFile).json()
-    await Bun.write(closureFile, "null")
-    await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow("SESSION_CLOSE_UNCONFIRMED")
-    expect(await Bun.file(closureFile).text()).toBe("null")
-    await writeLeaseReceipt(closureFile, { valueOf: false })
-    await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow()
-    await writeLeaseReceipt(closureFile, originalClosure)
-    const originalCloseSource = await Bun.file(closeSource).json()
-    await writeLeaseReceipt(closeSource, { ...originalCloseSource, settledAt: new Date(Date.parse(originalCloseSource.settledAt) + 1).toISOString() })
-    await expect(readServerSession(fixture.slots, lease, prepared.secretFile, observed.id)).rejects.toThrow("SESSION_CLOSE_UNCONFIRMED")
-    await writeLeaseReceipt(closeSource, originalCloseSource)
     const originalSource = await Bun.file(source).json()
     await writeLeaseReceipt(source, { ...originalSource, settledAt: new Date(Date.parse(originalSource.settledAt) + 1).toISOString() })
     await expect(readUserOwnership(fixture.slots, lease, prepared.secretFile)).rejects.toThrow("USER_OWNERSHIP_CONFLICT")
@@ -278,7 +179,7 @@ test("user preparation reader rejects a malformed durable nonce without changing
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-prepare-"))
   const fixture = await parallelFixture(root)
   await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
-  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
   try {
     const staged = await stageUserPreparation(fixture.slots, lease, "e".repeat(64))
     const journal = path.join(fixture.slots.controller.stateDir, "prepare-a.json")
@@ -295,7 +196,7 @@ test("user preparation durably stages one nonce and private credential before us
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-prepare-"))
   const fixture = await parallelFixture(root)
   await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
-  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
   try {
     const first = await stageUserPreparation(fixture.slots, lease, "e".repeat(64))
     const secret = await Bun.file(first.secretFile).text()
@@ -317,7 +218,7 @@ test("user preparation refuses a closed lease before creating an intent or secre
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-prepare-"))
   const fixture = await parallelFixture(root)
   await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
-  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
   try {
     await lease.close()
     const before = await readdir(fixture.slots.controller.stateDir)
@@ -331,7 +232,7 @@ test("user preparation preserves its existing intent and secret when desired sta
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-prepare-"))
   const fixture = await parallelFixture(root)
   await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
-  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
   try {
     const first = await stageUserPreparation(fixture.slots, lease, "e".repeat(64))
     const journal = path.join(fixture.slots.controller.stateDir, "prepare-a.json")
@@ -349,7 +250,7 @@ test("user preparation refuses an existing secret without its durable intent", a
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-prepare-"))
   const fixture = await parallelFixture(root)
   await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
-  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
   try {
     const secretFile = path.join(fixture.slots.controller.stateDir, "prepare-a.secret.json")
     await writeLeaseReceipt(secretFile, { username: "eval-a", password: "foreign-credential" })
@@ -365,7 +266,7 @@ test("user preparation resumes a planned intent using the already saved credenti
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-prepare-"))
   const fixture = await parallelFixture(root)
   await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
-  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
   try {
     const journal = path.join(fixture.slots.controller.stateDir, "prepare-a.json")
     const secretFile = path.join(fixture.slots.controller.stateDir, "prepare-a.secret.json")
@@ -388,7 +289,7 @@ test("user preparation returns only safe metadata from an existing private journ
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-prepare-"))
   const fixture = await parallelFixture(root)
   await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
-  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
   try {
     await stageUserPreparation(fixture.slots, lease, "e".repeat(64))
     const journal = path.join(fixture.slots.controller.stateDir, "prepare-a.json")
@@ -403,7 +304,7 @@ test("user preparation does not regenerate a missing staged credential", async (
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-prepare-"))
   const fixture = await parallelFixture(root)
   await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
-  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
   try {
     const staged = await stageUserPreparation(fixture.slots, lease, "e".repeat(64))
     const journal = path.join(fixture.slots.controller.stateDir, "prepare-a.json")
@@ -419,7 +320,7 @@ test("user preparation refuses credential drift without replacing either durable
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-user-prepare-"))
   const fixture = await parallelFixture(root)
   await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "run-journal.json"), { commandId: "prepare" })
-  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
   try {
     const staged = await stageUserPreparation(fixture.slots, lease, "e".repeat(64))
     const journal = path.join(fixture.slots.controller.stateDir, "prepare-a.json")

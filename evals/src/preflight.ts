@@ -61,7 +61,6 @@ export type SlotStorageContext = { file: SlotFile; lease: SlotLease; secretFile:
 export async function checkIsolatedLoginom(source: ArtifactSource, slot?: SlotStorageContext) {
   if (slot) {
     await slot.lease.assertHeld()
-    if (slot.lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
     const prepared = await readUserPreparation(slot.file, slot.lease, slot.secretFile)
     const owned = await readUserOwnership(slot.file, slot.lease, slot.secretFile)
     const root = `${slot.file.server.storageRoot}/${slot.lease.slot.username}`
@@ -251,7 +250,7 @@ export async function gitInfo() {
   return { sha: sha.text().trim(), dirty: status.text().trim().length > 0 }
 }
 
-async function codexInfo(judge: Pick<JudgeSettings, "command" | "env" | "processEvidence" | "systemd">, signal?: AbortSignal) {
+async function codexInfo(judge: Pick<JudgeSettings, "command" | "env" | "systemd">, signal?: AbortSignal) {
   const env = judgeEnvironment(judge.env)
   const version = await judgeVersion({ ...judge, env }, signal)
   if (version.exitCode !== 0)

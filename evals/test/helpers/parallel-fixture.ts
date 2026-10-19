@@ -2,7 +2,7 @@ import path from "node:path"
 import { mkdir } from "node:fs/promises"
 import type { SlotFile } from "../../src/slots"
 
-export async function parallelFixture(root: string, taskIds = ["parallel-fast", "parallel-slow"], withArtifact = false) {
+export async function parallelFixture(root: string) {
   const slots: SlotFile = {
     version: 2,
     server: { container: "fixture-server", studioContainer: "fixture-studio", url: "http://127.0.0.1/app/",
@@ -18,16 +18,16 @@ export async function parallelFixture(root: string, taskIds = ["parallel-fast", 
     ...slots.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir, path.join(storage, slot.id)])]
     .map(dir => mkdir(dir, { recursive: true, mode: 0o700 })))
   await Promise.all(slots.slots.map(slot => Bun.write(path.join(slot.profileDir, "data/auth.json"), '{"fake":{"type":"api","key":"fixture"}}')))
-  await Promise.all(taskIds.map(async id => {
-    await Bun.write(path.join(root, "tasks", id, "spec.md"), "Fixture diagnostic")
-    if (withArtifact) {
-      await Bun.write(path.join(root, "tasks", id, "reference.lgp"), Bun.file(path.resolve(import.meta.dir, "../../fixtures/storage/fixture-group-sum-qty.lgp")))
-      await Bun.write(path.join(root, "tasks", id, "parallel-package.json"), "{}")
-    }
-    await Bun.write(path.join(root, "tasks", id, "task.json"), JSON.stringify({ id, title: id, prompt: id,
-      ...(withArtifact ? { reference: "reference.lgp", inputs: ["parallel-package.json"] } : { output_mode: "diagnostic" }),
-      spec: "spec.md", expected_output: "diagnostic", checklist: [{ id: "diagnostic", text: "Returns diagnostic", weight: 1, required: true }] }))
-  }))
-  return { slots, lockRoot, env: { EVAL_CLI_MODE: "fake", EVAL_ARTIFACT_SOURCE: `dir:${storage}`,
-    EVAL_AGENT_MODEL: "fake/fake-model", LOGINOM_DOCK_API_KEY: "fixture-dock", EVAL_RESULTS_DIR: path.join(root, "results") } }
+  return { slots, lockRoot }
+}
+
+// Exercises the current server/profile lease path for data-only codec tests.
+export async function acquireFixtureSlot(file: SlotFile, slot: SlotFile["slots"][number], identity: import("../../src/slots").ServerIdentity, lockRoot: string) {
+  const { acquireEnvironmentLeases } = await import("../../src/slots")
+  const { writeLeaseReceipt } = await import("../../src/lease")
+  const commandId = crypto.randomUUID(), journal = path.join(file.controller.stateDir, `unit-command-${commandId}.json`)
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId, identity, phase: "unactivated", slotIds: [slot.id] })
+  const environment = await acquireEnvironmentLeases({ ...file, slots: [slot] }, 1, identity, journal, lockRoot)
+  const lease = environment.slots[0]!
+  return { ...lease, async close() { await Promise.all([lease.close(), environment.server.close()]) } }
 }

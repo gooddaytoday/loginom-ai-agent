@@ -84,16 +84,7 @@ export async function acquireJudgeLease(input: { codexHome: string; journal: str
     const proof = await readLeaseReceipt(previous.releaseEvidence!.path).catch(() => { throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2) })
     if (!jsonObject(proof) || new Bun.CryptoHasher("sha256").update(JSON.stringify(proof)).digest("hex") !== previous.releaseEvidence!.sha256)
       throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
-    if (proof.reason !== "qualified-closed-judge-proofs") return
-    const source = await readLeaseReceipt(previous.journal).catch(() => { throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2) })
-    if (!jsonObject(source) || source.kind !== "offline-judge-recovery" || typeof source.incidentJournal !== "string")
-      throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
-    const original = await readLeaseReceipt(source.incidentJournal).catch(() => { throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2) })
-    const marker = jsonObject(original) && jsonObject(original.recovery) ? original.recovery : undefined
-    if (!marker || marker.status !== "released" || marker.key !== previous.key || marker.journal !== previous.journal ||
-      marker.incidentToken !== source.incidentToken || !jsonObject(marker.released) || marker.released.token !== previous.token || marker.released.revision !== previous.revision ||
-      !jsonObject(marker.proof) || marker.proof.path !== previous.releaseEvidence!.path || marker.proof.sha256 !== previous.releaseEvidence!.sha256)
-      throw new EvalFailure("RECOVERY_FINALIZATION_REQUIRED", 2)
+
   })
 }
 
@@ -167,17 +158,6 @@ function resourceLease(reservation: Reservation, receipt: string, guard: Awaited
       await writeLeaseReceipt(receipt, { ...reservation, state: "released", releaseEvidence: { path: proof, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(evidence)).digest("hex") } })
       await guard.close()
     } }
-}
-
-export async function withResourceReservationGuards<T>(keys: string[], lockRoot: string, use: (rows: { key: string; reservation: Reservation | undefined }[]) => Promise<T>) {
-  if (!keys.length || new Set(keys).size !== keys.length) throw new EvalFailure("LEASE_KEYS_INVALID", 2)
-  const guards = [] as Awaited<ReturnType<typeof resourceGuard>>[]
-  try {
-    for (const key of [...keys].sort()) guards.push(await resourceGuard(key, lockRoot))
-    const result = await use(await Promise.all(keys.map(async key => ({ key, reservation: await readResourceReservation({ key, lockRoot }) }))))
-    await Promise.all(guards.map(guard => guard.checkGuard()))
-    return result
-  } finally { await Promise.all(guards.map(guard => guard.close())) }
 }
 
 async function resourceGuard(key: string, lockRoot: string) {
