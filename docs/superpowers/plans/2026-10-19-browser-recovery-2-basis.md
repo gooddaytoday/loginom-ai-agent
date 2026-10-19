@@ -97,7 +97,7 @@
 
 `next_step` формирует `settleBrowserRecovery` (Task 6), имеющий исходный request, тип узла и `attemptId`; pure decision его не вычисляет. Для `completed` узла — `dock_node_read` с `source_operation_id` квитанции, кроме `exports.text` (инструкция продолжать сценарий: файл уже проверен) и `programming.javascript` (инструкция: выполнение и схема проверены, данные выхода читаются только новой операцией над `existing`-узлом, потому что `dock_node_read` требует readback исходной процедуры, `node-read-contract.mjs:44-49`); для `completed` Save — инструкция продолжать и в конце сохранить пакет через Dock (`package.save_checkpoint`); для `continuable` — `next_step` освобождённой операции (`node-apply.mjs:504-510`: новая операция над `existing`-узлом с полными настройками). Для `unresolved` — инструкция с перечнем `missing`; при выполнении без схемы — «выполнение подтверждено, схема выхода не прочитана: не меняй узел, закрой посторонние окна и снова вызови finish».
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 const view = patch => ({ operation_id: 'apply', capability: 'node.apply', state: 'pending', status: 'AMBIGUOUS',
@@ -163,16 +163,16 @@ test('verification result follows the step goal and verified facts', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd packages/loginom-runtime/client && "$LOGINOM_AI_AGENT_TEST_NODE" --test test/browser-recovery-basis.test.mjs`
 Expected: FAIL — модуль отсутствует.
 
-- [ ] **Step 3: Implement the module per the tables**
+- [x] **Step 3: Implement the module per the tables**
 
-- [ ] **Step 4: Run tests to verify they pass** (команда Step 2; Expected: PASS)
+- [x] **Step 4: Run tests to verify they pass** (команда Step 2; Expected: PASS)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/loginom-runtime/client/lib/browser-recovery-basis.mjs packages/loginom-runtime/client/test/browser-recovery-basis.test.mjs
