@@ -32,11 +32,11 @@
   подтверждённое освобождение после startup reconciliation;
   отсутствие/подмена proof сохраняют отказ. Проверить повторный startup и
   новый admission без сброса token/revision или чужих reservations.
-  Коммит `fix(evals): finalize interrupted slot releases during startup`.
-- [ ] 4. Проверить общий diff другим агентом; выполнить связанные тесты,
+  Коммит `fix(evals): finalize interrupted slot releases during admission`.
+- [x] 4. Проверить общий diff другим агентом; выполнить связанные тесты,
   `bun typecheck`, `git diff --check`. Proc-denial отключён. Полный unit-набор
   повторять при непокрытых зависимостях или новых отказах.
-- [ ] Обновить checkpoint основного плана и результаты этого плана.
+- [x] Обновить checkpoint основного плана и результаты этого плана.
 
 ## Границы работы
 
@@ -60,3 +60,10 @@ Root ведёт этот план и коммиты; каждому worker вы�
   admission после startup; GREEN — 52 теста slots/startup/lease, 177 утверждений.
   Независимое ревью не нашло обязательных замечаний. При подмене cleanup,
   token или serverEpoch составная квитанция сохраняется и новый owner не появляется.
+- Дополнительно node-evals/node-runner: 23 pass, 61 утверждение. Итоговые
+  `bun typecheck` и `git diff --check` прошли; независимый reviewer одобрил все три diff.
+  Проверки использовали private subprocess/filesystem fixtures без моделей,
+  Docker, настоящих systemd units или изменений удержанных ресурсов.
+  Полный unit-набор 910 тестов повторно не запускался: проверены связанные пути.
+- Коммиты: partial release `d32e182da2`, offline judge `28799f2679`,
+  native evidence `23962b6a1c`. Исходные N1/N2 evidence не переписывались.
