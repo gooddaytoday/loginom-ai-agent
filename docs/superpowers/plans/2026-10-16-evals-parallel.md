@@ -219,6 +219,10 @@
   Квалифицировать одновременно retry output и shared status до повторного N=1.
   Независимое ревью переноса Approved: оба файла базы побайтно совпадают с родителем
   патча8b2ba2bf9b. Auth-код не меняется; RED на OAuth-базе воспроизведён.
+- [x] Исправить обнаруженный путь startup после отказа до dispatch: management
+  cleanup обычного run находится в run/preparation/<slot>, prepare/verify — в
+  controller/management-<command>-<slot>. Проверяется тот же supervisor producer.
+  RED→GREEN, startup/slots36/142 PASS27.90s; targeted4/10/typecheck/diff PASS.
 - [x] Подключить JSON status к проверке provider errors: busy→idle основной
   сессии, любой retry сохраняет отказ; старый/оборванный JSON и task tool не дают
   полного покрытия. Непустой существующий --title исключает запрос автозаголовка.
