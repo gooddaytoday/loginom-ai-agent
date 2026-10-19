@@ -214,8 +214,12 @@
   сессии, любой retry сохраняет отказ; старый/оборванный JSON и task tool не дают
   полного покрытия. Непустой существующий --title исключает запрос автозаголовка.
   RED→GREEN: targeted CLI10/44, acceptance/incidents39/196 PASS; typecheck/diff PASS.
-- [ ] Отключить внутренние повторы выбранного provider судьи существующими
+- [x] Отключить внутренние повторы выбранного provider судьи существующими
   request_max_retries/stream_max_retries=0; проверить локальным HTTP429 без модели.
+  Codex0.157 запрещает override встроенного openai: выбран evals-openai с name=OpenAI,
+  requires_openai_auth=true и прежним auth-dependent URL. Независимое ревью Approved.
+  VPN/local429: ровно1 POST, exit1, unit cleanup confirmed,0 model calls;
+  judge/incidents46/140 PASS43.24s, typecheck/diff PASS. Evidence `evidence/judge-retry-20261019/`.
 Новый Protocol/HTTP, сырой transport trace и новая система телеметрии не нужны.
 
 ## 6. Четыре live A/B сценария, затем N=1 → утверждение → N=2

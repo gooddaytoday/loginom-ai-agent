@@ -4,15 +4,19 @@ export function watchAttemptIncidents(directory: string, onIncident: (code: stri
   const codes = new Set<string>()
   const controller = new AbortController()
   const inspect = async () => {
-    const output = (await Promise.all(["events.jsonl", "stderr.txt", "judge-events-1.jsonl", "judge-events-2.jsonl", "judge-stderr-1.txt", "judge-stderr-2.txt"]
+    const captured = await Promise.all(["events.jsonl", "stderr.txt", "judge-events-1.jsonl", "judge-events-2.jsonl", "judge-stderr-1.txt", "judge-stderr-2.txt"]
       .map(name => Bun.file(path.join(directory, name)).text().catch((error: NodeJS.ErrnoException) => {
         if (error.code === "ENOENT") return ""
         return "INCIDENT_OBSERVATION_UNCONFIRMED"
-      })))).join("\n")
-    const retry = output.split("\n").some(line => {
-      try { const event = JSON.parse(line); return event?.type === "session.status" && event.status?.type === "retry" }
+      })))
+    const output = captured.join("\n")
+    const retry = captured.some((text, index) => text.split("\n").some(line => {
+      try {
+        const event = JSON.parse(line)
+        return event?.type === "session.status" && event.status?.type === "retry" || index >= 2 && ["error", "turn.failed"].includes(event?.type)
+      }
       catch { return false }
-    })
+    }))
     const observed = [
       ...(/\bLICEN[CS]E_(?:[A-Z]+_)*(?:DENIED|EXCEEDED|EXPIRED|ERROR)\b|\bE\w*Licen[cs]e\w*(?:Error|Limit|Exception)\b|лицензи[^\n"}]{0,120}(?:отказ|превыш|недоступ)|(?:отказ|превыш|недостат)[^\n"}]{0,120}лицензи/i.test(output) ? ["LICENCE_DENIED"] : []),
       ...(/"name"\s*:\s*"(?:APIError|ProviderAuthError|ProviderModelNotFoundError|ProviderInitError)"|"statusCode"\s*:\s*429\b|\bHTTP\s+429\b|(?:rate|usage)[_ -]?limit[_ -]?(?:exceeded|reached|error)|rate[_ -]?limited|too many requests|quota[_ -]?(?:exceeded|exhausted)|insufficient[_ -]?quota/i.test(output)
