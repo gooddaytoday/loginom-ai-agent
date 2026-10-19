@@ -7,7 +7,7 @@ const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
 
 async function execution({fault,offscreen=true,selectedInitially=false}={}) {
  let opened=true,menu=false,selected=selectedInitially,revealed=!offscreen,launchRequest;
- const calls=[],el=(tid,allowed_actions=['click'],extra={})=>({tid,ref:tid,allowed_actions,...extra});
+ const calls=[],el=(tid,allowed_actions=['click'],extra={})=>({tid,ref:tid,signature:{tid},enabled:true,allowed_actions,...extra});
  const state=()=>({prepared_node_context:{...node,node_id:revealed&&fault==='owner'?'foreign':'node',verified:true,surface:'graph',locked:false,tid:'body'},wizard:{status:'absent'},
   node_outputs:{verified:true,node_selected:selected},node_processes:{node_context:{...node,verified:true,surface:'graph'},verified:opened,inventory_complete:true,root_id:'root',show_completed:true,processes:[]},
   ui:{elements:[el('MF;cntMain;tlbMainToolbar;btnProgress'),...(opened?[el('ConsoleForm;ProgressForm;trpProgress;grd;tbl',['right_click']),el('ConsoleForm;btnClose')]:[]),
@@ -23,7 +23,7 @@ async function execution({fault,offscreen=true,selectedInitially=false}={}) {
    if(a.ref==='body'){assert.equal(revealed,true);selected=true;}
    return {status:'SUCCEEDED'};}};
  const driver=createNodeExecutionProcedure(channel,node);await driver.prepare();calls.length=0;
- return {driver,calls,snapshot:state,get launchRequest(){return launchRequest}};
+ return {driver,channel,calls,snapshot:state,get launchRequest(){return launchRequest}};
 }
 
 // ST4b n12: training completed, then two strictly pre-gesture epoch refusals
@@ -123,4 +123,15 @@ test('actual serialized viewport step returns a valid durable capability receipt
  assert.equal(result.output.fully_visible,true);assert.equal(operation.cleanupConfirmed,true);
  assert.equal(events.at(-1).phase,'node_step_completed');assert.deepEqual(events.at(-1).outcome,result);
  await assert.rejects(channel.act({verb:'click',ref:'old'}),/fresh internal observation/);
+});
+
+for(const launched of [false,true])test('console settlement requires a succeeded launch: '+launched,async()=>{
+ const f=await execution({offscreen:false,selectedInitially:true});
+ if(launched)await f.driver.launchGraph();
+ f.channel.observe=async o=>{
+  assert.equal(!!o.settleProcessConsole,launched);
+  if(launched)assert.deepEqual(o.settleProcessConsole,{ref:'MF;cntMain;tlbMainToolbar;btnProgress',signature:{tid:'MF;cntMain;tlbMainToolbar;btnProgress'}});
+  throw Error('admission checked');
+ };
+ await assert.rejects(f.driver.identify(),/admission checked/);
 });
