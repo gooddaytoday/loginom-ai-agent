@@ -288,6 +288,20 @@ test("agentCommand: real slots inherit only operational environment, never unrel
   expect(command.env.CODEX_HOME).toBeUndefined()
 })
 
+test("agentCommand: real slots preserve credential-free proxy routing", () => {
+  const config = loadConfig([], { EVAL_SLOTS_FILE: "private-slots.json", EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/pinned/cli",
+    EVAL_AGENT_MODEL: "openai/gpt-6-luna", JUDGE_MODEL: "gpt-6-sol", LOGINOM_DOCK_API_KEY: "dock-private" })
+  const routing = { HTTP_PROXY: "http://127.0.0.1:10808", https_proxy: "http://127.0.0.1:10808",
+    ALL_PROXY: "socks5://127.0.0.1:10808", NO_PROXY: "localhost,127.0.0.1", no_proxy: "localhost,127.0.0.1" }
+  const command = agentCommand(config, { ...routing, HTTPS_PROXY: "http://user:proxy-private@127.0.0.1:10808",
+    all_proxy: "http://127.0.0.1:10808?token=proxy-private", OPENAI_API_KEY: "openai-private" })
+  expect(command.env).toMatchObject(routing)
+  expect(command.env.HTTPS_PROXY).toBeUndefined()
+  expect(command.env.all_proxy).toBeUndefined()
+  expect(agentCommand(config, { HTTP_PROXY: "http://127.0.0.1:10808/proxy-private" }).env.HTTP_PROXY).toBeUndefined()
+  expect(Object.values(command.env).join("\n")).not.toContain("-private")
+})
+
 test("agentCommand: only configured slot auth can grant the shared directory", () => {
   const config = loadConfig(["--dry-run"], { EVAL_SLOTS_FILE: "fixture-programmatic-only" })
   const inherited = { LOGINOM_AI_AGENT_SHARED_AUTH_DIR: "/untrusted/inherited" }
