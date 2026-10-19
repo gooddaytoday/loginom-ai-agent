@@ -411,7 +411,8 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
     observe:observeGraph,
     async choosePosition(value,graph,deadline,signal){
       signal?.throwIfAborted();
-      if(JSON.stringify(await observeGraph(value,deadline))!==JSON.stringify(graph))throw Error('Graph changed before automatic placement');
+      if(JSON.stringify(await observeGraph(value,deadline))!==JSON.stringify(graph))
+        throw Object.assign(Error('Graph changed before automatic placement'),{code:'NODE_PLACEMENT_GRAPH_CHANGED'});
       const tid=value.workflow_ref.prefix+';ModelForm;cmpDiagram';
       return call(`async page=>page.locator('[data-tid='+${JSON.stringify(JSON.stringify(tid))}+']').evaluate(e=>{
         const b=e.getBoundingClientRect(),width=Math.min(b.right,innerWidth)-b.x,height=Math.min(b.bottom,innerHeight)-b.y;
