@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {restConnectionCapability} from '../lib/rest-connection.mjs';
 import vm from 'node:vm';
 
-const cases={mime:'REST explicitly writes and rereads the saved allowed response Content-Type',mime_stale:'REST refuses an allowed response Content-Type that did not persist',input:'a retained visible REST container cannot authorize filling its zero-sized input',parameter:'REST waits for the added parameter type before checking string bindings',palette:'REST waits for the newly expanded palette item before its single drag',animation:'REST does not start a drag from a hit-testable row inside its native tree animation',expander:'REST expands the moving connection tree with one stable locator click',confirm:'REST confirms one owned active-connection deactivation',foreign:'REST refuses a deactivation question belonging to another connection tree'};
+const cases={render_wait:'REST waits for the created connection port to render without repeating the drag',wrongref:'REST rejects a rendered port belonging to another node type',mime:'REST explicitly writes and rereads the saved allowed response Content-Type',mime_stale:'REST refuses an allowed response Content-Type that did not persist',input:'a retained visible REST container cannot authorize filling its zero-sized input',parameter:'REST waits for the added parameter type before checking string bindings',palette:'REST waits for the newly expanded palette item before its single drag',animation:'REST does not start a drag from a hit-testable row inside its native tree animation',expander:'REST expands the moving connection tree with one stable locator click',confirm:'REST confirms one owned active-connection deactivation',foreign:'REST refuses a deactivation question belonging to another connection tree'};
 for(const [stage,title]of Object.entries(cases))test(title,async()=>{
  const prefix='MF;TF-1',fields=prefix+';WizardModelConnectionForm;ConnectionWizard;';
  const item=prefix+';ModelForm;pnlConnections;headercontainer;text_Root>Текущий_модуль>Echo;TreeText';
  let urlPoints=0,tileReads=0,fills=0,visibleChecks=0,parameterReads=0,queryFills=0,palettePoints=0,added=false,label='REST-сервис',url='',paramName='param0',lastSelector='';
  let held=false,dragMoves=0,downCount=0,upCount=0,expanded=stage!=='expander',expansions=0;
- let opening=false,confirmations=0,responseType='application/json',responseFills=0,wizardCloses=0;
+ let opening=false,confirmations=0,responseType='application/json',responseFills=0,wizardCloses=0,referenceReads=0;
  const form=prefix+';ConnectionsViewWizard',root={isConnected:true},tree={},connection={ParentNode:stage==='foreign'?{}:tree},wizardNode={ParentNode:connection};
  const controls=Object.fromEntries(Object.entries({yes:'Да',no:'Да, больше не спрашивать',cancel:'Нет'}).map(([key,textContent])=>['msgbox;tlb;'+key,{id:key,textContent,checkVisibility:()=>true,isConnected:true}]));
  const nodeElement={id:'connection',textContent:'Echo'},wizardElement={id:'wizard',textContent:'Настройка'};
@@ -72,7 +72,10 @@ for(const [stage,title]of Object.entries(cases))test(title,async()=>{
   evaluate:async(fn,arg)=>{
    const code=fn.toString();if(code.includes('FNodes.FCollection.map'))return [{id:'existing',y:100}];
    if(code.includes('q.dialog.isConnected'))return nativeRead(fn,arg);
-   if(code.includes('Unexpected graph additions')){assert.equal(dragMoves,1);assert.equal(downCount,1);assert.equal(upCount,1);return {node_id:'rest-reference'};}
+   if(code.includes('Unexpected graph additions')){assert.equal(dragMoves,1);assert.equal(downCount,1);assert.equal(upCount,1);if(['render_wait','wrongref'].includes(stage)){
+    const graph={FNodes:{FCollection:[{FGuid:'existing'},{FGuid:'rest-reference',FPorts:[{FCollection:[{FCell:{}}]}]}]},FmxGraph:{view:{getState:()=>++referenceReads<3?null:{shape:{node:{getAttribute:()=>stage==='wrongref'?'node;Output_Table-0':'node;Output_Connection-0'}}}}}};
+    return vm.runInNewContext('('+code+')',{bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:{FDiagram:graph}}})}}}}}}}})(arg);
+   }return {node_id:'rest-reference'};}
    return true;
   },evaluateHandle:async(fn,arg)=>{
    if(!['confirm','foreign'].includes(stage)||!fn.toString().includes('Connection list owner differs')&&!fn.toString().includes('Connection deactivation question differs'))return {dispose:async()=>{}};
@@ -82,13 +85,15 @@ for(const [stage,title]of Object.entries(cases))test(title,async()=>{
   const result=await restConnectionCapability(page,{deadline:Date.now()+10000,document_id:'doc',origin:'http://example.test',build:'7.4.2',
    workflow_ref:{workflow_id:'flow',tab_tid:'tab',prefix,navigation_path:[{tid:'module'},{label:'Сценарий'}]},
    connection:{name:'Echo',base_url:'https://httpbin.org/anything',...(['mime','mime_stale'].includes(stage)?{response_content_type:'text/html'}:{})},query_parameters:[{name:'Key',field:'Key'}]});
-  assert.equal(result.verified,['animation','expander','confirm','mime'].includes(stage),result.error);
-  if(['animation','expander','confirm','mime'].includes(stage)){assert.equal(result.connection.reference_node_id,'rest-reference');assert.equal(result.cleanup_complete,true);}
+  assert.equal(result.verified,['animation','expander','confirm','mime','render_wait'].includes(stage),result.error);
+  if(['animation','expander','confirm','mime','render_wait'].includes(stage)){assert.equal(result.connection.reference_node_id,'rest-reference');assert.equal(result.cleanup_complete,true);}
+  else if(stage==='wrongref'){assert.match(result.error,/New node is not a connection reference/);assert.equal(referenceReads,3);return;}
   else if(stage==='mime_stale'){assert.match(result.error,/saved connection readback differs/);assert.equal(responseFills,1);assert.equal(wizardCloses,1);return;}
   else if(stage==='foreign'){assert.match(result.error,/Pending connection wizard owner differs/);assert.equal(confirmations,0);return;}
   else assert.equal(result.error,stage==='input'?'fixture stopped after the sole reachable fill':stage==='parameter'?'fixture stopped after the typed parameter editor':'fixture stopped before the sole palette drag');
+  if(stage==='render_wait')assert.equal(referenceReads,3);
   if(stage==='expander')assert.equal(expansions,1);
-  assert.equal(fills,1);assert.equal(urlPoints,['palette','animation','expander','confirm','mime'].includes(stage)?6:4);assert.ok(visibleChecks>0);
+  assert.equal(fills,1);assert.equal(urlPoints,['palette','animation','expander','confirm','mime','render_wait'].includes(stage)?6:4);assert.ok(visibleChecks>0);
   if(stage==='confirm')assert.equal(confirmations,1);
   if(stage==='mime'){assert.equal(responseFills,1);assert.equal(wizardCloses,2);assert.equal(result.connection.response_content_type,'text/html');}
   if(!['mime','mime_stale'].includes(stage)){assert.equal(responseFills,0);assert.equal(Object.hasOwn(result.connection??{},'response_content_type'),false);}
