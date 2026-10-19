@@ -16,9 +16,24 @@ Id — integer, код экспоната; Gallery — string, зал; Weight �
 
 Объём — как у imports-excel/acceptance/stage1: XLSX, первый лист, заголовки,
 явные integer/string/real, без автоопределения, named ranges и нескольких книг.
-Книга — минимальный OOXML с inlineStr; генератор фиксирует порядок ZIP-записей
-и timestamps, воспроизводя XLSX побайтно. Oracle независимо разрешает связи
-книги/первого листа и читает XML из XLSX стандартной библиотекой, не читает CSV.
+Книга записана XlsxWriter 3.2.9, как принятый корпус Excel stage1, со styles
+и shared strings; порядок ZIP-записей, даты книги и timestamps фиксированы.
+Прежний самописный минимальный OOXML с inlineStr читался XML/SheetJS, но в
+Loginom 7.4.2 давал единственное поле COL1 и отказ configure вместо трёх полей.
+Исходные 15 строк, их порядок, seed, prompt и expected сохранены.
+Oracle независимо разрешает связи книги, первого листа и shared strings,
+читает XML из XLSX стандартной библиотекой, не читает CSV.
+
+Перед генерацией/тестом установить зависимости из `requirements.txt`:
+
+```sh
+python3 -m pip install -r requirements.txt
+python3 -m unittest discover -s . -p 'test_*.py'
+```
+
+Регрессия проверяет воспроизводимость из другого cwd, состав книги и все
+значения через OpenPyXL, CSV-копию и XML oracle. Совместимость с Loginom
+подтверждается отдельно живыми CLI/cold прогонами.
 exhibits.csv — операторская исходная копия (15 строк), её модели не передавать:
 она не заменяет проверяемый Excel-вход. Живой аудит доставки бинарного XLSX
 и работы импорта остаётся отдельной проверкой.
