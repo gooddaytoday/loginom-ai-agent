@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {parseExpectedOutputs,resolveExportInput,matchExpectedOutputs} from '../expected-outputs.mjs';
 
 const output={output_node_type:'export_input',columns:[{name:'Code',type:'string'}],rows:[{Code:'A'}],ordered:true};
@@ -8,6 +9,40 @@ const graph=()=>({complete:true,nodes:[node('filter','transform.filter_data'),no
  links:[{source:'filter',output:0,target:'rename',input:0},{source:'rename',output:1,target:'export',input:0}]});
 const actual=(id,port,name='Code')=>({node:{node_id:id},type:id==='filter'?'transform.filter_data':'transform.reform_columns',output_port:port,
  data:{schema:[{name,label:name,type:'string'}],row_count:1,sample_complete:true,precision:{numbers_verified:true},sample:[[{type:'string',is_null:false,value:'A'}]]}});
+
+test('cold inspects saved export mapping after execution restores the complete dynamic schema',async()=>{
+ const source=await readFile(new URL('../cold-check.mjs',import.meta.url),'utf8');
+ // Run the actual orchestration with a REST-dependent source whose schema is
+ // incomplete until cold execution. The mapping observer itself is tested below.
+ const body=source.slice(source.indexOf('  const types=new Set'),source.indexOf('  const matched=correspondence.map'));
+ const run=new (Object.getPrototypeOf(async function(){}).constructor)('f',
+  `const {${['expectedOutputs','expected','graph','load','channelFor','execute','record','saved','prepared','origin','multiple',
+   'createNodeProcedure','withBrowserReceipt','session','createNodeExecutionProcedure','performColdNodeAction',
+   'runColdExecution','staticSources','openNewOutputTable','configureTablePrecision','prepareTableRead',
+   'readTableOutputPages','decodeTableOutput','returnFromOutputTable','writeFile','join','args','config',
+   'loginPassword','matchExpectedOutputs','resolveExportInput','observeExportDestinations','openColdOutputViews'].join(',')}}=f;\n${body}\nreturn correspondence;`);
+ const fields=[{name:'Code',source_name:'Code',type:'string'},{name:'Status',source_name:'Status',type:'integer'}];
+ const data=actual('rename',1).data;
+ data.schema.push({name:'Status',label:'Status',type:'integer'});
+ data.sample[0].push({type:'integer',is_null:false,value:'200'});
+ const want={...output,column_order:'exact',columns:fields.map(({name,type})=>({name,type})),rows:[{Code:'A',Status:200}]};
+ for(const completeAfterExecution of [true,false]){
+  let restored=false;const calls=[];
+  const result=run({expectedOutputs:[want],expected:{nodes:[]},graph:graph(),load:async()=>({}),
+   channelFor:()=>({}),execute:async()=>({}),record:async()=>{},saved:{path:'/own/export.lgp'},
+   prepared:{document_id:'doc',workflow_ref:{}},origin:'https://app.loginom.ai',multiple:false,createNodeProcedure:()=>({}),withBrowserReceipt:()=>'',session:'cold',
+   createNodeExecutionProcedure:()=>({}),performColdNodeAction:async()=>{},staticSources:undefined,
+   runColdExecution:async()=>{calls.push('execute');restored=completeAfterExecution;return {status:'completed',verified:true,owner_verified:true};},
+   openNewOutputTable:async()=>({table:{}}),configureTablePrecision:async()=>({fields:data.schema.map(f=>({...f,key:f.name}))}),
+   prepareTableRead:async()=>({}),readTableOutputPages:async()=>structuredClone(data),decodeTableOutput:raw=>raw,
+   returnFromOutputTable:async()=>{},writeFile:async()=>{},join:()=>'',args:{output:''},config:{},loginPassword:'',
+   matchExpectedOutputs,resolveExportInput,openColdOutputViews:async()=>{},
+   observeExportDestinations:async()=>{calls.push('mapping');return [{node_id:'export',input_fields:restored?fields:fields.slice(1)}];}});
+  if(completeAfterExecution)assert.equal((await result).length,1);
+  else await assert.rejects(result,/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
+  assert.deepEqual(calls,['execute','mapping']);
+ }
+});
 
 test('export_input parses in both forms and forbids explicit output ports or labels',()=>{
  const base={package_path:'/own/export.lgp',nodes:[]};

@@ -146,13 +146,6 @@ try {
   const destinations=destination===undefined?undefined:await observeExportDestinations({load,graph,channelFor,execute});
   if(destinations)await record({phase:'cold_export_destinations',destinations,settings_applied:false});
   const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations}):null;
-  if(exportInput){
-   const [savedExport]=await observeExportDestinations({load,channelFor,execute,includeInputFields:true,
-    graph:{...graph,nodes:graph.nodes.filter(n=>n.ref.node_id===exportInput.export_node_id)}});
-   if(savedExport.node_id!==exportInput.export_node_id)throw Error('COLD_EXPORT_INPUT_MAPPING_CHANGED');
-   exportInput.input_fields=savedExport.input_fields;
-   await record({phase:'cold_export_input_mapping',...savedExport,settings_applied:false});
-  }
   for (const want of expected.nodes) {
     if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
@@ -302,6 +295,15 @@ try {
   if([config.api_key,loginPassword].filter(Boolean).some(secret=>checkpoint.includes(secret)))throw Error('SECRET_IN_RESULT');
   await writeFile(join(args.output,'actual-readback.json'),checkpoint+'\n');
   }
+  }
+  // REST-dependent schemas are restored by cold execution. Inspect the saved
+  // export input only after its source has executed and its output was read.
+  if(exportInput){
+   const [savedExport]=await observeExportDestinations({load,channelFor,execute,includeInputFields:true,
+    graph:{...graph,nodes:graph.nodes.filter(n=>n.ref.node_id===exportInput.export_node_id)}});
+   if(savedExport.node_id!==exportInput.export_node_id)throw Error('COLD_EXPORT_INPUT_MAPPING_CHANGED');
+   exportInput.input_fields=savedExport.input_fields;
+   await record({phase:'cold_export_input_mapping',...savedExport,settings_applied:false});
   }
   const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
