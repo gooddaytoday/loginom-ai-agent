@@ -1,23 +1,4 @@
-export type ServerSession = {
-  remoteKey: string
-  userKey: string
-  username: string
-  serverEpoch: string
-  pendingDisconnect: boolean
-  activeOperations: number | null
-}
 
-export function selectOwnedSessions(observed: ServerSession[], owned: ServerSession[]): ServerSession[] {
-  if ([observed, owned].some(rows => new Set(rows.map(row => row.remoteKey)).size !== rows.length))
-    throw new EvalFailure("SESSION_IDENTITY_AMBIGUOUS", 2)
-  return observed.filter(row => {
-    const session = owned.find(session => session.remoteKey === row.remoteKey)
-    if (!session) return false
-    if (row.serverEpoch !== session.serverEpoch) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
-    if (row.userKey !== session.userKey || row.username !== session.username) throw new EvalFailure("SESSION_IDENTITY_CHANGED", 2)
-    return true
-  })
-}
 
 export async function closeUserSessions(admin: {
   inspectSessionInventory(): Promise<{ sessions: { name: string }[] }>
@@ -48,9 +29,6 @@ export function requireSlotUserPolicy(observed: unknown, username: string) {
   return user
 }
 import { EvalFailure } from "./fail"
-import { readManagementSession, recordManagementSessionClosed } from "./management-sessions"
-import { readAgentArchive, readAgentSession, recordAgentSessionClosed } from "./agent-sessions"
-import { readAdminPackageInventory } from "./package-inventory"
 import type { ServerIdentity, SlotFile, SlotLease } from "./slots"
 import path from "node:path"
 import { constants } from "node:fs"
@@ -59,10 +37,9 @@ import { acquireResourceLease, readLeaseReceipt, writeLeaseReceipt } from "./lea
 import { verifyAdminRuntime } from "./preflight"
 import { inspectUserStorage, readServerIdentity, reserveUserStorage, verifyParallelPair } from "./parallel-pair"
 import { superviseProcess, type ProcessCleanup } from "./process-supervisor"
-import { qualifyClosedProcessEvidence } from "./closed-process-evidence"
-import { claimUserOwnership, readServerSession, readUnactivatedUserObservation, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordServerSession, recordServerSessionClosed, recordUserConfiguration, stageUserActivation } from "./user-environment"
+import { claimUserOwnership, readUnactivatedUserObservation, readUserActivation, readUserConfiguration, readUserOwnership, readUserPreparation, recordUserConfiguration, stageUserActivation } from "./user-environment"
 
-export type AdminOperation = "init" | "inspect" | "reconcile-user" | "configure-pool" | "close-session" | "confirm-session-absent" | "dispose"
+export type AdminOperation = "init" | "inspect" | "reconcile-user" | "configure-pool" | "close-session" | "dispose"
 export type AdminRequest = { v: 1; id: string; op: AdminOperation; expectedIdentity: ServerIdentity; deadline: number; payload: unknown }
 export type AdminReply = { v: 1; id: string; outcome: "confirmed" | "not_applied" | "unknown"; data: unknown }
 const frameLimit = 1024 * 1024
@@ -77,10 +54,8 @@ export type AdminConnection = {
   inspectPoolPolicy(): Promise<Awaited<ReturnType<typeof readAdminPoolPolicy>>>
   inspectPolicy(): Promise<{ identity: ServerIdentity; sharedDirectories: SharedDirectoryPolicy }>
   verifySlotUser(username: string): Promise<void>
-  inspectPackageInventory(): Promise<Awaited<ReturnType<typeof readAdminPackageInventory>>>
   inspectSessionInventory(): Promise<{ identity: ServerIdentity; sessionIdentityQualified: false; sessions: AdminSessionRow[];
     observation: { startedAt: string; finishedAt: string }; source: { path: string; sha256: string } }>
-  inspect(): Promise<{ identity: ServerIdentity; sessions: ServerSession[]; configurationHash: string }>
   inspectUnactivatedUser(lease: SlotLease, secretFile: string): Promise<{ identity: ServerIdentity; username: string;
     account: { objectId: string; name: string; blocked: boolean } | null; serverSessions: "absent";
     source: { path: string; sha256: string } }>
@@ -88,31 +63,22 @@ export type AdminConnection = {
   configureOwnedUser(lease: SlotLease, secretFile: string): Promise<Awaited<ReturnType<typeof recordUserConfiguration>>>
   reconcileOwnedAcl(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string; policy: SharedDirectoryPolicy;
     source: { path: string; id: string; sha256: string } }>
-  observeOwnedSession(lease: SlotLease, secretFile: string, policy: unknown, mode?: "retained-package"): Promise<Awaited<ReturnType<typeof recordServerSession>>>
-  closeOwnedSession(lease: SlotLease, secretFile: string, proofId: string): Promise<void>
-  closeManagementSession(lease: SlotLease, secretFile: string, id: string, mode?: "confirm-absent"): Promise<void>
-  closeAgentSession(lease: SlotLease, secretFile: string, id: string, archive: { path: string; sha256: string }, mode?: "confirm-absent"): Promise<void>
   activateOwnedUser(lease: SlotLease, secretFile: string): Promise<{ activated: boolean; userKey: string; source: { path: string; id: string; sha256: string } }>
   reconcileUser(lease: SlotLease, secretFile: string): Promise<{ userKey: string; aclHash: string }>
   closeUserSession(username: string, name: string): Promise<void>
-  closeSession(session: ServerSession): Promise<void>
   dispose(): Promise<void>
 }
 
-const inventoryWrites = new Map<string, Promise<void>>()
-
 export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity, options: {
-  binary?: string; signal?: AbortSignal; serverLease?: Awaited<ReturnType<typeof acquireResourceLease>>; processInventory?: string; research?: boolean
+  binary?: string; signal?: AbortSignal; serverLease?: Awaited<ReturnType<typeof acquireResourceLease>>
 } = {}): Promise<AdminConnection> {
   if (options.signal?.aborted) throw new EvalFailure("ADMIN_INTERRUPTED", 2)
   if (options.serverLease) {
     const command = await readLeaseReceipt(options.serverLease.reservation.journal)
     if (jsonObject(command) && ["unactivated-preparation", "unactivated-recovery"].includes(String(command.kind))) {
       await options.serverLease.assertHeld()
-      if ((options.processInventory !== undefined || command.processInventory !== undefined) &&
-        (options.processInventory !== command.processInventory || typeof options.processInventory !== "string") ||
-        command.commandId !== options.serverLease.reservation.commandId || JSON.stringify(command.identity) !== JSON.stringify(identity))
-        throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
+      if (command.commandId !== options.serverLease.reservation.commandId || JSON.stringify(command.identity) !== JSON.stringify(identity))
+        throw new EvalFailure("SERVER_FENCE_UNCONFIRMED", 2)
       if (command.phase !== "unactivated" && (command.kind !== "unactivated-preparation" || command.phase !== "cli_admitted"))
         throw new EvalFailure("ADMIN_PROCESS_INVENTORY_SEALED", 2)
     }
@@ -130,28 +96,11 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
   const driver = path.resolve(import.meta.dir, "../script/loginom-admin-driver.mjs")
   const receipt = { version: 1, kind: "loginom-admin-connection", identity, status: "starting", initialization: "not_started", dispose: "not_started",
     finalization: null as { reply: AdminReply; command: { path: string; sha256: string } } | null,
-    processInventory: options.processInventory && options.serverLease ? { file: options.processInventory,
-      journal: options.serverLease.reservation.journal, commandId: options.serverLease.reservation.commandId } : null,
     transportDisconnect: null as "confirmed" | "unknown" | null,
     initializationCode: null as string | null, initializationStage: null as string | null, passwordState: null as string | null, disposeCode: null as string | null,
     runtimeManifestHash: runtime.manifestHash, driverHash: new Bun.CryptoHasher("sha256").update(await Bun.file(driver).bytes()).digest("hex"),
     processes: null as ProcessCleanup | null }
   await writeLeaseReceipt(path.join(directory, "connection.json"), receipt)
-  if (options.processInventory) {
-    const inventory = options.processInventory, lease = options.serverLease
-    if (!lease || lease.reservation.key !== `server:${identity.containerId}` || JSON.stringify(lease.reservation.identity) !== JSON.stringify(identity))
-      throw new EvalFailure("SERVER_FENCE_UNCONFIRMED", 2)
-    await withAdminInventoryWrite(inventory, async () => {
-      await lease.assertHeld()
-      const current = await readAdminInventory(file, identity, { file: inventory, journal: lease.reservation.journal, commandId: lease.reservation.commandId })
-      const command = await readLeaseReceipt(lease.reservation.journal)
-      if (jsonObject(command) && ["unactivated-preparation", "unactivated-recovery"].includes(String(command.kind)) &&
-        command.phase !== "unactivated" && (command.kind !== "unactivated-preparation" || command.phase !== "cli_admitted"))
-        throw new EvalFailure("ADMIN_PROCESS_INVENTORY_SEALED", 2)
-      await writeLeaseReceipt(inventory, { ...current, connections: [...current.connections, { directory, producerPid: process.pid }] })
-      await lease.assertHeld()
-    })
-  }
   let stopInput = (_error: EvalFailure) => {}, stopOutput = (_error: EvalFailure) => {}
   const input = new TransformStream<Uint8Array, Uint8Array>({ start(controller) { stopInput = error => controller.error(error) } })
   const output = new TransformStream<Uint8Array, Uint8Array>({ start(controller) { stopOutput = error => controller.error(error) } })
@@ -160,8 +109,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
   options.signal?.addEventListener("abort", stop, { once: true })
   if (options.signal?.aborted) stop()
   const pending = superviseProcess({ cmd: [runtime.node, driver], cwd: directory,
-    env: { PATH: "/usr/bin:/bin", HOME: directory, LANG: "C.UTF-8", LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources,
-      ...(options.research ? { LOGINOM_EVALS_ADMIN_RESEARCH: "1" } : {}) },
+    env: { PATH: "/usr/bin:/bin", HOME: directory, LANG: "C.UTF-8", LOGINOM_AI_AGENT_CLI_BUNDLE: runtime.resources },
     timeoutMs: null, profileDir: path.join(directory, "profile"), stdin: input.readable, stdout: output.writable, signal: abort.signal,
     owner: { kind: "admin", id: directory } })
   void pending.catch(() => { stopInput(new EvalFailure("ADMIN_PROCESS_UNKNOWN", 2)); stopOutput(new EvalFailure("ADMIN_PROCESS_UNKNOWN", 2)) })
@@ -171,7 +119,7 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
     const result = sequence.then(async () => {
       if (op !== "dispose" && JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
       if (op === "reconcile-user" || op === "configure-pool") await verifyParallelPair(file, identity)
-      if (op === "reconcile-user" || op === "configure-pool" || op === "close-session" || op === "confirm-session-absent") {
+      if (op === "reconcile-user" || op === "configure-pool" || op === "close-session") {
         if (!options.serverLease || options.serverLease.reservation.key !== `server:${identity.containerId}` ||
           JSON.stringify(options.serverLease.reservation.identity) !== JSON.stringify(identity) ||
           (op === "reconcile-user" || op === "configure-pool") && options.serverLease.reservation.state !== "retained") throw new EvalFailure("SERVER_FENCE_UNCONFIRMED", 2)
@@ -253,11 +201,6 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
         throw new EvalFailure("ADMIN_IDENTITY_CHANGED", 2)
       requireSlotUserPolicy(data, username)
     },
-    async inspect() {
-      const data = (await observe()).data
-      if (!jsonObject(data) || data.sessionIdentityQualified !== true || !Array.isArray(data.sessions)) throw new EvalFailure("SESSION_IDENTITY_UNSUPPORTED", 2)
-      return { identity, sessions: data.sessions as ServerSession[], configurationHash: identity.configurationHash }
-    },
     async inspectSessionInventory() {
       const observation = await observe()
       const data = observation.data
@@ -273,16 +216,6 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       const target = path.join(directory, `session-inventory-${observation.reply.id}.json`)
       await writeLeaseReceipt(target, receipt)
       return readAdminSessionInventory(file, identity, { path: target, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") })
-    },
-    async inspectPackageInventory() {
-      const reply = await request("inspect", { packages: true })
-      requireAdminReply(reply)
-      const commandFile = path.join(directory, "commands", `${reply.id}.json`)
-      const receipt = { version: 2, kind: "admin-package-inventory", identity, reply,
-        command: { path: commandFile, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(await readLeaseReceipt(commandFile))).digest("hex") } }
-      const target = path.join(directory, `package-inventory-${reply.id}.json`)
-      await writeLeaseReceipt(target, receipt)
-      return readAdminPackageInventory(file, identity, { path: target, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") })
     },
     async inspectUnactivatedUser(lease, secretFile) {
       const current = async () => {
@@ -346,7 +279,6 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
     },
     async createBlockedUser(lease, secretFile) {
       await lease.assertHeld()
-      if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
       const prepared = await readUserPreparation(file, lease, secretFile)
       if (JSON.stringify(prepared.identity) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
       const info = await lstat(path.join(file.controller.stateDir, `user-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
@@ -384,7 +316,6 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
     },
     async configureOwnedUser(lease, secretFile) {
       await lease.assertHeld()
-      if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
       const prepared = await readUserPreparation(file, lease, secretFile)
       const owned = await readUserOwnership(file, lease, secretFile)
       if (owned.everActivated) throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
@@ -404,7 +335,6 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
     },
     async reconcileOwnedAcl(lease, secretFile) {
       await lease.assertHeld()
-      if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
       const prepared = await readUserPreparation(file, lease, secretFile)
       const owned = await readUserOwnership(file, lease, secretFile)
       if (owned.everActivated) throw new EvalFailure("USER_IDLE_UNCONFIRMED", 2)
@@ -442,7 +372,6 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
     },
     async activateOwnedUser(lease, secretFile) {
       await lease.assertHeld()
-      if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
       const sources = async () => {
         const prepared = await readUserPreparation(file, lease, secretFile), owned = await readUserOwnership(file, lease, secretFile)
         const configured = await readUserConfiguration(file, lease, secretFile)
@@ -488,88 +417,11 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
       if (JSON.stringify(await readLeaseReceipt(target)) !== JSON.stringify(receipt)) throw new EvalFailure("USER_ACTIVATION_UNCONFIRMED", 2)
       return { activated: data.activated, userKey: before.owned.userKey, source }
     },
-    async observeOwnedSession(lease, secretFile, policy, mode) {
-      await lease.assertHeld()
-      if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
-      const prepared = await readUserPreparation(file, lease, secretFile)
-      const owned = await readUserOwnership(file, lease, secretFile)
-      const activation = await readUserActivation(file, lease, secretFile)
-      if (!activation) throw new EvalFailure("SESSION_ADMISSION_UNCONFIRMED", 2)
-      if (JSON.stringify(prepared.identity) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
-      const payload = { phase: mode === "retained-package" ? "session-package-crash-probe" : "session-probe", slot: lease.slot, secretFile, preparationNonce: prepared.nonce,
-        desiredHash: prepared.desiredHash, secretHash: prepared.secretHash, owned: { objectId: owned.objectId, name: owned.username,
-          userKind: owned.userKind, preparationNonce: owned.preparationNonce, secretHash: prepared.secretHash }, expectedPolicy: structuredClone(policy) }
-      const reply = await request("reconcile-user", payload, async () => {
-        if (JSON.stringify(await readUserPreparation(file, lease, secretFile)) !== JSON.stringify(prepared) ||
-          JSON.stringify(await readUserOwnership(file, lease, secretFile)) !== JSON.stringify(owned) ||
-          JSON.stringify(await readUserActivation(file, lease, secretFile)) !== JSON.stringify(activation))
-          throw new EvalFailure("SESSION_ADMISSION_UNCONFIRMED", 2)
-      })
-      requireAdminReply(reply)
-      return recordServerSession(file, lease, secretFile, path.join(directory, "commands", `${reply.id}.json`), payload, reply)
-    },
-    async closeOwnedSession(lease, secretFile, proofId) {
-      const entry = await readServerSession(file, lease, secretFile, proofId)
-      if (JSON.stringify(entry.identity) !== JSON.stringify(identity) || JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity))
-        throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
-      if (entry.state === "closed") return
-      const adopt = path.dirname(entry.source.path) === path.join(directory, "commands") ? undefined : {
-        receipt: path.join(file.controller.stateDir, `session-${proofId}.json`),
-        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(entry)).digest("hex"),
-      }
-      const reply = await request("close-session", { proofId: entry.source.id, session: entry.binding, ...(adopt ? { adopt } : {}) }, async () => {
-        if (JSON.stringify(await readServerSession(file, lease, secretFile, proofId)) !== JSON.stringify(entry))
-          throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
-        await verifyParallelPair(file, identity)
-      })
-      requireAdminReply(reply)
-      await recordServerSessionClosed(file, lease, secretFile, proofId, path.join(directory, "commands", `${reply.id}.json`), reply)
-    },
-    async closeManagementSession(lease, secretFile, id, mode) {
-      const entry = await readManagementSession(file, lease, secretFile, id)
-      if (entry.state === "closed") return
-      if (JSON.stringify(entry.identity) !== JSON.stringify(identity) || JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity))
-        throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
-      const adopt = { receipt: path.join(file.controller.stateDir, `management-session-${id}.json`),
-        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(entry)).digest("hex") }
-      const reply = await request(mode === "confirm-absent" ? "confirm-session-absent" : "close-session", { proofId: id, session: entry.binding, adopt }, async () => {
-        if (JSON.stringify(await readManagementSession(file, lease, secretFile, id)) !== JSON.stringify(entry))
-          throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
-        await verifyParallelPair(file, identity)
-      })
-      requireAdminReply(reply)
-      await recordManagementSessionClosed(file, lease, secretFile, id, path.join(directory, "commands", `${reply.id}.json`), reply)
-    },
-    async closeAgentSession(lease, secretFile, id, archive, mode) {
-      const entry = await readAgentSession(file, lease, secretFile, id)
-      if (entry.state === "closed") {
-        if (JSON.stringify(entry.archive) !== JSON.stringify(archive)) throw new EvalFailure("AGENT_ARCHIVE_UNCONFIRMED", 2)
-        return
-      }
-      if (JSON.stringify(entry.identity) !== JSON.stringify(identity) || JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity))
-        throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
-      const adopt = { receipt: path.join(file.controller.stateDir, `agent-session-${id}.json`),
-        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(entry)).digest("hex"),
-        archive: await readAgentArchive(file, lease, secretFile, id, archive) }
-      const reply = await request(mode === "confirm-absent" ? "confirm-session-absent" : "close-session", { proofId: id, session: entry.binding, adopt }, async () => {
-        if (JSON.stringify(await readAgentSession(file, lease, secretFile, id)) !== JSON.stringify(entry))
-          throw new EvalFailure("SESSION_SOURCE_UNCONFIRMED", 2)
-        await readAgentArchive(file, lease, secretFile, id, archive)
-        await verifyParallelPair(file, identity)
-      })
-      requireAdminReply(reply)
-      await recordAgentSessionClosed(file, lease, secretFile, id, archive, path.join(directory, "commands", `${reply.id}.json`), reply)
-    },
     async closeUserSession(username, name) {
       if (!file.slots.some(slot => slot.username === username) || !name.startsWith(username + ":"))
         throw new EvalFailure("SESSION_OWNERSHIP_UNCONFIRMED", 2)
       const data = requireAdminReply(await request("close-session", { username, name }))
       if (!jsonObject(data) || data.closed !== true) throw new EvalFailure("ADMIN_CLOSE_UNCONFIRMED", 2)
-    },
-    async closeSession(session) {
-      const data = requireAdminReply(await request("close-session", { session }))
-      if (!jsonObject(data) || data.closed !== true || selectOwnedSessions((await connection.inspect()).sessions, [session]).length)
-        throw new EvalFailure("ADMIN_CLOSE_UNCONFIRMED", 2)
     },
     dispose() {
       disposal ??= (async () => {
@@ -622,36 +474,6 @@ export async function openLoginomAdmin(file: SlotFile, identity: ServerIdentity,
 function requireAdminReply(reply: AdminReply): unknown {
   if (reply.outcome === "confirmed") return reply.data
   throw new EvalFailure(adminReplyCode(reply), 2)
-}
-
-export async function sealAdminProcessInventory(file: SlotFile, server: Awaited<ReturnType<typeof acquireResourceLease>>, expectedHash: string, slots?: SlotLease[]) {
-  await server.assertHeld()
-  const initial = await readLeaseReceipt(server.reservation.journal)
-  const identity = server.reservation.identity
-  if (!identity || server.reservation.key !== `server:${identity.containerId}` || !jsonObject(initial) || typeof initial.processInventory !== "string")
-    throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
-  return withAdminInventoryWrite(initial.processInventory, async () => {
-    await readAdminInventory(file, identity, { file: initial.processInventory as string, journal: server.reservation.journal, commandId: server.reservation.commandId })
-    const command = await readLeaseReceipt(server.reservation.journal)
-    if (jsonObject(command) && command.phase === "cli_admitted" && slots) {
-      const { sealManagementProcessInventories } = await import("./management-process-evidence")
-      return sealManagementProcessInventories(file, server, slots, expectedHash)
-    }
-    if (!jsonObject(command) || !["unactivated-preparation", "unactivated-recovery"].includes(String(command.kind)) || command.phase !== "unactivated" ||
-      new Bun.CryptoHasher("sha256").update(JSON.stringify(command)).digest("hex") !== expectedHash)
-      throw new EvalFailure("ADMIN_PROCESS_INVENTORY_SEALED", 2)
-    const sealed = { ...command, phase: "finalizing" }
-    await server.assertHeld()
-    await writeLeaseReceipt(server.reservation.journal, sealed)
-    return sealed
-  })
-}
-
-async function withAdminInventoryWrite<T>(file: string, callback: () => Promise<T>) {
-  const pending = (inventoryWrites.get(file) ?? Promise.resolve()).then(callback)
-  const settled = pending.then(() => {}, () => {})
-  inventoryWrites.set(file, settled)
-  try { return await pending } finally { if (inventoryWrites.get(file) === settled) inventoryWrites.delete(file) }
 }
 
 /** Immutable native observations; this reader grants no session ownership or cleanup authority. */
@@ -726,73 +548,6 @@ export async function readAdminSessionInventory(file: { controller: { stateDir: 
     observation: { startedAt: command.at, finishedAt: command.settledAt }, source }
 }
 
-export async function readAdminProcessInventory(file: { controller: { stateDir: string } }, identity: ServerIdentity, input: { file: string; journal: string; commandId: string; producerPid: number }) {
-  const inventory = await readAdminInventory(file, identity, input)
-  const connections = []
-  for (const entry of inventory.connections) {
-    if (entry.producerPid !== input.producerPid) throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
-    const finalization = await readAdminFinalization(file, identity, entry.directory, input.producerPid)
-    const receipt = await readLeaseReceipt(finalization.source.path)
-    if (!jsonObject(receipt) || JSON.stringify(receipt.processInventory) !== JSON.stringify({ file: input.file, journal: input.journal, commandId: input.commandId }) ||
-      new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") !== finalization.source.sha256)
-      throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
-    connections.push(finalization)
-  }
-  if (JSON.stringify(await readAdminInventory(file, identity, input)) !== JSON.stringify(inventory))
-    throw new EvalFailure("ADMIN_PROCESS_INVENTORY_CHANGED", 2)
-  return { commandId: input.commandId, connections,
-    source: { path: input.file, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(inventory)).digest("hex") } }
-}
-
-async function readAdminInventory(file: { controller: { stateDir: string } }, identity: ServerIdentity, input: { file: string; journal: string; commandId: string }) {
-  if (path.dirname(input.file) !== file.controller.stateDir || !input.journal.startsWith(file.controller.stateDir + path.sep) ||
-    path.resolve(input.journal) !== input.journal) throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
-  const journal = await readLeaseReceipt(input.journal).catch(() => null)
-  const inventory = await readLeaseReceipt(input.file).catch(() => null)
-  if (!jsonObject(journal) || journal.commandId !== input.commandId || !input.commandId || !jsonObject(inventory) || Object.keys(inventory).length !== 6 ||
-    inventory.version !== 2 || inventory.kind !== "admin-processes" || inventory.commandId !== input.commandId || inventory.journal !== input.journal ||
-    JSON.stringify(inventory.identity) !== JSON.stringify(identity) || !Array.isArray(inventory.connections) || inventory.connections.some(entry =>
-      !jsonObject(entry) || Object.keys(entry).length !== 2 || typeof entry.directory !== "string" || path.dirname(entry.directory) !== file.controller.stateDir ||
-      !/^admin-[a-zA-Z0-9_-]+$/.test(path.basename(entry.directory)) || !Number.isSafeInteger(entry.producerPid) || Number(entry.producerPid) < 1) ||
-    new Set(inventory.connections.map(entry => entry.directory)).size !== inventory.connections.length)
-    throw new EvalFailure("ADMIN_PROCESS_INVENTORY_UNCONFIRMED", 2)
-  return inventory as Record<string, unknown> & { connections: { directory: string; producerPid: number }[] }
-}
-
-export async function readAdminFinalization(file: { controller: { stateDir: string } }, identity: ServerIdentity, directory: string, producerPid: number) {
-  const root = await lstat(directory).catch(() => undefined)
-  if (path.dirname(directory) !== file.controller.stateDir || !/^admin-[a-zA-Z0-9_-]+$/.test(path.basename(directory)) ||
-    !root?.isDirectory() || root.isSymbolicLink() || root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 ||
-    await realpath(directory).catch(() => undefined) !== directory) throw new EvalFailure("ADMIN_FINALIZATION_UNCONFIRMED", 2)
-  const source = path.join(directory, "connection.json")
-  const receipt = await readLeaseReceipt(source).catch(() => null)
-  if (!jsonObject(receipt) || receipt.version !== 1 || receipt.kind !== "loginom-admin-connection" ||
-    JSON.stringify(receipt.identity) !== JSON.stringify(identity) || receipt.status !== "disposed" || receipt.initialization !== "confirmed" ||
-    receipt.dispose !== "confirmed" || receipt.transportDisconnect !== "confirmed" || !jsonObject(receipt.finalization) ||
-    !jsonObject(receipt.finalization.reply) || !jsonObject(receipt.finalization.command))
-    throw new EvalFailure("ADMIN_FINALIZATION_UNCONFIRMED", 2)
-  const processes = qualifyClosedProcessEvidence(receipt.processes, { owner: { kind: "admin", id: directory }, producerPid })
-  if (!processes) throw new EvalFailure("ADMIN_FINALIZATION_UNCONFIRMED", 2)
-  const reply = receipt.finalization.reply, command = receipt.finalization.command
-  if (reply.v !== 1 || reply.outcome !== "confirmed" || typeof reply.id !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(reply.id) ||
-    !jsonObject(reply.data) || reply.data.disposed !== true || reply.data.transportDisconnect !== "confirmed" ||
-    command.path !== path.join(directory, "commands", `${reply.id}.json`) || typeof command.sha256 !== "string")
-    throw new EvalFailure("ADMIN_FINALIZATION_UNCONFIRMED", 2)
-  const recorded = await readLeaseReceipt(command.path).catch(() => null)
-  if (!jsonObject(recorded) || Object.keys(recorded).length !== 10 || recorded.version !== 1 || recorded.kind !== "loginom-admin-command" ||
-    recorded.id !== reply.id || recorded.op !== "dispose" || recorded.state !== "confirmed" ||
-    JSON.stringify(recorded.expectedIdentity) !== JSON.stringify(identity) ||
-    recorded.desiredHash !== new Bun.CryptoHasher("sha256").update("{}").digest("hex") ||
-    recorded.replyHash !== new Bun.CryptoHasher("sha256").update(JSON.stringify(reply)).digest("hex") ||
-    new Bun.CryptoHasher("sha256").update(JSON.stringify(recorded)).digest("hex") !== command.sha256 ||
-    typeof recorded.at !== "string" || typeof recorded.settledAt !== "string" || !Number.isFinite(Date.parse(recorded.at)) ||
-    !Number.isFinite(Date.parse(recorded.settledAt)) || Date.parse(recorded.at) > Date.parse(recorded.settledAt) ||
-    Date.parse(recorded.at) < Date.parse(processes.startedAt) || Date.parse(recorded.settledAt) > Date.parse(processes.finishedAt))
-    throw new EvalFailure("ADMIN_FINALIZATION_UNCONFIRMED", 2)
-  return { status: "confirmed" as const, identity, transportDisconnect: "confirmed" as const, processes: "confirmed" as const,
-    identities: processes.identities, source: { path: source, sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(receipt)).digest("hex") } }
-}
-
 function adminReplyCode(reply: AdminReply) {
   return jsonObject(reply.data) && typeof reply.data.code === "string" && /^(ADMIN|SESSION|SERVER|POOL_POLICY)_[A-Z_]{1,64}$/.test(reply.data.code)
     ? reply.data.code : "ADMIN_OPERATION_UNKNOWN"
@@ -822,7 +577,7 @@ export function createJournaledAdminChannel(input: ReadableStream<Uint8Array>, o
     request(input: unknown) {
       const result = sequence.then(async () => {
         const request = requireAdminRequest(input)
-        if (unresolved && request.op !== "inspect" && request.op !== "confirm-session-absent" && request.op !== "dispose")
+        if (unresolved && request.op !== "inspect" && request.op !== "dispose")
           return { v: 1 as const, id: request.id, outcome: "not_applied" as const, data: { code: "ADMIN_RECONCILIATION_REQUIRED" } }
         const info = await lstat(journalDir).catch(() => { throw new EvalFailure("ADMIN_JOURNAL_PRIVATE", 2) })
         if (!path.isAbsolute(journalDir) || await realpath(journalDir) !== journalDir || !info.isDirectory() || info.isSymbolicLink() ||
@@ -843,7 +598,7 @@ export function createJournaledAdminChannel(input: ReadableStream<Uint8Array>, o
           }))).some(Boolean)
           reconciled = true
         }
-        if (unresolved && request.op !== "inspect" && request.op !== "confirm-session-absent" && request.op !== "dispose")
+        if (unresolved && request.op !== "inspect" && request.op !== "dispose")
           return { v: 1 as const, id: request.id, outcome: "not_applied" as const, data: { code: "ADMIN_RECONCILIATION_REQUIRED" } }
         const file = path.join(journalDir, `${request.id}.json`)
         const journal = { version: 1, kind: "loginom-admin-command", id: request.id, op: request.op, expectedIdentity: request.expectedIdentity,
@@ -935,7 +690,7 @@ export function createAdminChannel(input: ReadableStream<Uint8Array>, output: Wr
 
 function requireAdminRequest(value: unknown): AdminRequest {
   if (!jsonObject(value) || Object.keys(value).length !== 6 || value.v !== 1 || typeof value.id !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(value.id) ||
-    typeof value.op !== "string" || !["init", "inspect", "reconcile-user", "configure-pool", "close-session", "confirm-session-absent", "dispose"].includes(value.op) ||
+    typeof value.op !== "string" || !["init", "inspect", "reconcile-user", "configure-pool", "close-session", "dispose"].includes(value.op) ||
     typeof value.deadline !== "number" || !Number.isSafeInteger(value.deadline) || !Object.hasOwn(value, "payload") ||
     !jsonObject(value.expectedIdentity) || Object.keys(value.expectedIdentity).length !== 6)
     throw new EvalFailure("ADMIN_REQUEST_INVALID", 2)

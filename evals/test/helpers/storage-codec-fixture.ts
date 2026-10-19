@@ -1,8 +1,8 @@
 import path from "node:path"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { acquireSlotLease, parseSlots } from "../../src/slots"
-import { acquireResourceLease, writeLeaseReceipt } from "../../src/lease"
+import { acquireEnvironmentLeases, parseSlots } from "../../src/slots"
+import { writeLeaseReceipt } from "../../src/lease"
 import { createPair, destroyPair } from "../../src/parallel-pair"
 import { claimUserOwnership, stageUserPreparation } from "../../src/user-environment"
 import { parallelFixture } from "./parallel-fixture"
@@ -20,9 +20,9 @@ export async function storageCodecFixture() {
   const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: fixture.lockRoot }
   const pair = await createPair(file, options)
   const journal = path.join(file.controller.stateDir, "run-journal.json")
-  await writeLeaseReceipt(journal, { commandId: "storage-codec-control" })
-  const server = await acquireResourceLease({ key: `server:${pair.identity.containerId}`, identity: pair.identity, journal, commandId: "storage-codec-control", lockRoot: fixture.lockRoot })
-  const lease = await acquireSlotLease(file, file.slots[0]!, pair.identity, fixture.lockRoot)
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "storage-codec-control", phase: "unactivated", identity: pair.identity, slotIds: [file.slots[0]!.id] })
+  const environment = await acquireEnvironmentLeases(file, 1, pair.identity, journal, fixture.lockRoot)
+  const server = environment.server, lease = environment.slots[0]!
   const prepared = await stageUserPreparation(file, lease, "e".repeat(64))
   // Data-only protected ownership codec. No native user or session is simulated.
   const reply = { v: 1 as const, id: "storage-create", outcome: "confirmed" as const,

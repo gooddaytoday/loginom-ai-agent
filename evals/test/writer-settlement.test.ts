@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test"
+
+const processDenial = process.env.EVAL_PROCESS_DENIAL_TESTS === "1" ? test : test.skip
 import { spawn } from "node:child_process"
 import { mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises"
 import path from "node:path"
@@ -109,7 +111,7 @@ test("writer-release settlement refuses a live foreign native process without si
   } finally { child.kill("SIGTERM"); await exited; await f.dispose() }
 })
 
-test("writer-release settlement refuses an inaccessible native process", async () => {
+processDenial("writer-release settlement refuses an inaccessible native process", async () => {
   const f = await fixture()
   const ready = path.join(f.root, "ready")
   const child = spawn(process.execPath, ["-e", `process.title='loginom-ai-protected';

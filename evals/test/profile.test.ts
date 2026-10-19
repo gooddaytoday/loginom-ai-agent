@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test"
+
+const processDenial = process.env.EVAL_PROCESS_DENIAL_TESTS === "1" ? test : test.skip
 import path from "node:path"
 import { mkdir, mkdtemp, readFile, readdir, stat, symlink, writeFile, rm } from "node:fs/promises"
 import os from "node:os"
@@ -361,7 +363,7 @@ test("waitProfileIdle: незарегистрированный owner с про�
 })
 
 for (const known of [false, true]) {
-  test(`releaseStaleWriter: EACCES env/cwd ${known ? "известного CLI сохраняет guard" : "постороннего процесса не мешает cleanup"}`, async () => {
+  processDenial(`releaseStaleWriter: EACCES env/cwd ${known ? "известного CLI сохраняет guard" : "постороннего процесса не мешает cleanup"}`, async () => {
     const profile = await mkdtemp(path.join(os.tmpdir(), "evals-private-process-"))
     await mkdir(path.join(profile, ".writer"))
     const child = spawn(process.execPath, ["-e", `

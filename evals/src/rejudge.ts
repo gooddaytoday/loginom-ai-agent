@@ -36,7 +36,6 @@ export async function rejudge(config: EvalConfig, runId: string, onRunDirectory?
       model: config.judge.model,
       reasoning: config.judge.reasoning,
       env: config.judge.env,
-      processEvidence: config.judge.processEvidence,
       timeoutMs: config.judgeTimeoutMs,
       passThreshold: config.passThreshold,
     }

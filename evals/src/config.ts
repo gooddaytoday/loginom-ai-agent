@@ -2,7 +2,6 @@ import path from "node:path"
 import os from "node:os"
 import { parseArgs } from "node:util"
 import { EvalFailure } from "./fail"
-import type { JudgeProcessEvidence } from "./judge-process-evidence"
 
 export const evalsRoot = path.resolve(import.meta.dir, "..")
 export const repoRoot = path.resolve(evalsRoot, "..")
@@ -120,7 +119,7 @@ export function loadConfig(argv: string[], env: Env = process.env) {
   }
 }
 
-export type EvalConfig = ReturnType<typeof loadConfig> & { auth?: { sharedDir: string }; judge: { env?: Record<string, string>; processEvidence?: JudgeProcessEvidence; systemd?: boolean } }
+export type EvalConfig = ReturnType<typeof loadConfig> & { auth?: { sharedDir: string }; judge: { env?: Record<string, string>; systemd?: boolean } }
 
 function parseEvalArgs(argv: string[]) {
   try {

@@ -7,8 +7,7 @@ import type { AgentRun } from "./cli"
 import { unzip } from "./artifact"
 import { EvalFailure } from "./fail"
 import { checkOracle } from "./oracle"
-import { superviseJudgeProcess } from "./judge-process-evidence"
-import type { JudgeProcessEvidence } from "./judge-process-evidence"
+import { superviseProcess } from "./process-supervisor"
 import { runJudgeUnit } from "./judge-unit"
 
 export const judgePromptFile = path.join(evalsRoot, "src", "judge-prompt.md")
@@ -26,7 +25,6 @@ export type JudgeSettings = {
   timeoutMs: number
   passThreshold: number
   env?: Record<string, string>
-  processEvidence?: JudgeProcessEvidence
   systemd?: boolean
 }
 type RunView = Pick<AgentRun, "finalText" | "tools" | "nodeReceipts" | "nodeReceiptsDropped">
@@ -79,7 +77,7 @@ function parseJson(text: string): unknown {
   }
 }
 
-export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" | "model" | "reasoning" | "env" | "processEvidence" | "systemd"> }, signal?: AbortSignal) {
+export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" | "model" | "reasoning" | "env" | "systemd"> }, signal?: AbortSignal) {
   const version = await judgeVersion(config.judge, signal)
   return {
     backend: "codex" as const,
@@ -92,7 +90,7 @@ export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" |
 }
 export type JudgeInfo = Awaited<ReturnType<typeof judgeInfo>>
 
-export async function judgeVersion(judge: Pick<JudgeSettings, "command" | "env" | "processEvidence" | "systemd">, signal?: AbortSignal) {
+export async function judgeVersion(judge: Pick<JudgeSettings, "command" | "env" | "systemd">, signal?: AbortSignal) {
   const version = await runJudge({ cmd: [...judge.command, "--version"], cwd: evalsRoot,
     env: judgeEnvironment(judge.env), timeoutMs: 10_000, signal, owner: { kind: "judge", id: "version" } }, judge)
     .catch(() => { throw new EvalFailure("Судья недоступен: проверка версии не подтверждена", 2) })
@@ -318,11 +316,11 @@ async function invoke(
   return { ...scored, verdict }
 }
 
-async function runJudge(input: Parameters<typeof superviseJudgeProcess>[0] & { timeoutMs: number; stdin?: string },
-  judge: Pick<JudgeSettings, "processEvidence" | "systemd">) {
+async function runJudge(input: Parameters<typeof superviseProcess>[0] & { timeoutMs: number; stdin?: string },
+  judge: Pick<JudgeSettings, "systemd">) {
   if (judge.systemd) return runJudgeUnit({ ...input, env: { ...childEnvironment(input.env),
     ...(input.env.CODEX_HOME ? { CODEX_HOME: input.env.CODEX_HOME } : {}) } })
-  const result = await superviseJudgeProcess(input, judge.processEvidence)
+  const result = await superviseProcess(input)
   return { ...result, cleanupConfirmed: result.processCleanup.status === "confirmed" && result.processCleanup.capture_complete,
     cleanupError: result.processCleanup.error }
 }

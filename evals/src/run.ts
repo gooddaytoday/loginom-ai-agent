@@ -6,7 +6,7 @@ import { evaluationContractHash, rubricSnapshot } from "./evaluation"
 import { agentInputsHash, buildAgentPrompt, loadTasks, rubricHash, taskTimeoutMs, type Task } from "./task"
 import { agentCommand, runAgent, type AgentCommand } from "./cli"
 import { cleanupArtifact, cleanupIsolatedStorage, cleanupOrphanResult, fetchArtifact, listStorage, parseArtifactSource, storageEntryExists, type ArtifactSource } from "./artifact"
-import { checkIsolatedLoginom, gitInfo, preflight, type SlotStorageContext } from "./preflight"
+import { checkIsolatedLoginom, preflight, type SlotStorageContext } from "./preflight"
 import { archiveProfileHistory, assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
 import { createJudgeGate, judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { archiveDiagnostics } from "./diagnostics"
@@ -15,19 +15,10 @@ import type { ProcessCleanup } from "./process-supervisor"
 import { acquireRunHarnessLease } from "./node-eval-ops"
 import { SandboxFailure } from "./sandbox"
 import { reserveRunDirectory } from "./run-directory"
-import { buildJobs, runSlotQueue } from "./scheduler"
-import { beginFixtureAttempt, finishFixtureAttempt, finishFixtureJudge, inspectFixtureStorage, fenceFixtureStorage, prepareFixture, validateFixture, type ParallelFixture } from "./parallel-fixture"
-import { sealAgentProcessInventory } from "./agent-process-evidence"
 import { aggregate, aggregateLimits, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
-export async function main(argv: string[], env: Record<string, string | undefined> = process.env, options?: { fixture: ParallelFixture }) {
-  const config: EvalConfig = loadConfig(argv, options?.fixture ? { ...env, EVAL_SLOTS_FILE: env.EVAL_SLOTS_FILE ?? "fixture-programmatic-only" } : env)
-  const fixture = options?.fixture ? await validateFixture(config, options.fixture, env) : undefined
-  if (fixture) {
-    config.artifactSource = `dir:${fixture.storage}`
-    config.judge.env = { CODEX_HOME: fixture.file.judge.codexHome }
-    return executeRun(config, fixture)
-  }
+export async function main(argv: string[], env: Record<string, string | undefined> = process.env) {
+  const config = loadConfig(argv, env)
   if (config.slotsFile && (config.judgeOnly !== undefined || config.calibrate)) {
     const { runOfflineJudge } = await import("./judge-environment")
     return runOfflineJudge(config)
@@ -53,38 +44,28 @@ export async function main(argv: string[], env: Record<string, string | undefine
   return result
 }
 
-async function executeRun(config: EvalConfig, fixture?: Awaited<ReturnType<typeof validateFixture>>) {
+async function executeRun(config: EvalConfig) {
   const controller = new AbortController()
   const removeSigint = installSigint(controller)
-  return executeRunBody(config, fixture, controller).finally(removeSigint)
+  return executeRunBody(config, controller).finally(removeSigint)
 }
 
-async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<typeof validateFixture>> | undefined, controller: AbortController) {
+async function executeRunBody(config: EvalConfig, controller: AbortController) {
   const tasks = await loadTasks(config.tasksDir, config.only)
   if (!config.skipJudge && tasks.some(task => task.outputMode === "diagnostic"))
     throw new EvalFailure("diagnostic tasks require --skip-judge", 2)
   const source = parseArtifactSource(config.artifactSource, config.loginom)
-  const environment = fixture
-    ? { git: await gitInfo(), agent: null, codex: null, dock: null, loginom: null }
-    : await preflight(config, source, controller.signal)
+  const environment = await preflight(config, source, controller.signal)
   const startedAt = new Date()
   const runDir = await reserveRunDirectory(config.resultsDir,
     `${stamp(startedAt)}-${environment.git?.sha ?? "nogit"}${environment.git?.dirty ? "-dirty" : ""}`)
   const runId = path.basename(runDir)
   await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2))
-  if (fixture && config.dryRun) await Bun.write(path.join(runDir, "fixture-plan.json"), JSON.stringify({
-    liveQualified: false, ready: false, jobs: buildJobs(tasks.map(task => task.id), config.repeat),
-  }, null, 2))
   const command: AgentCommand = { ...agentCommand(config), cleanupDir: path.join(runDir, "preparation"),
     cleanupSecrets: [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""] }
   const inputsHash = await agentInputsHash(tasks)
   const rubric = await rubricHash(tasks)
-  const contexts = fixture && !config.dryRun ? await prepareFixture(config, fixture, runId, runDir) : undefined
-  const processEvidence = contexts?.[0]?.judgeEvidence ?? config.judge.processEvidence
-  const judge = config.skipJudge ? null : await judgeInfo({ judge: { ...config.judge, processEvidence } }, controller.signal).catch(async (error: unknown) => {
-    if (contexts) await Promise.all([...contexts.map(context => context.lease.close()), contexts[0]!.judgeLease?.close()])
-    throw error
-  })
+  const judge = config.skipJudge ? null : await judgeInfo(config, controller.signal)
   const settings: JudgeSettings | undefined = judge
     ? {
         command: config.judge.command,
@@ -93,81 +74,17 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
         timeoutMs: config.judgeTimeoutMs,
         passThreshold: config.passThreshold,
         env: config.judge.env,
-        processEvidence,
         systemd: config.judge.systemd,
       }
     : undefined
   const judgeGate = createJudgeGate()
   const evaluationHash = evaluationContractHash({ rubric_hash: rubric, judge, pass_threshold: config.passThreshold })
   const attempts: AttemptResult[] = []
-  const slotStates = new Map<string, { state: "closed" | "quarantined"; lease_receipt: string; cleanup_receipt: string; storage_root: string; storage_leftovers: string[] | null; storage_error: string | null }>()
   const state: { stopped: string | null } = { stopped: null }
-  if (contexts) {
-    const unconfirmed = new Set<string>()
-    try {
-      const queued = await runSlotQueue({ jobs: buildJobs(tasks.map(task => task.id), config.repeat),
-        slots: contexts.map(context => context.lease.slot.id), signal: controller.signal,
-        async execute(slotId, job) {
-          const context = contexts.find(context => context.lease.slot.id === slotId)!
-          const out = path.join(runDir, job.taskId, String(job.attempt))
-          const perform = async (initialInfraAttempt?: AttemptResult) => {
-            unconfirmed.add(slotId)
-            await beginFixtureAttempt(context)
-            const completed = await runAttempt({ config: context.config, command: context.command,
-              source: parseArtifactSource(context.config.artifactSource, context.config.loginom),
-              task: tasks.find(task => task.id === job.taskId)!, attempt: job.attempt, runId, runDir,
-              signal: controller.signal, profileRecovered: false, slotId, judge: settings,
-              initialInfraAttempt, skipJudge: config.skipJudge, evaluationHash, judgeGate })
-            attempts[job.index] = completed.result
-            if (completed.result.judge_cleanup_unconfirmed)
-              throw Error(completed.result.environment_cleanup?.error ?? "Judge process cleanup unconfirmed")
-            const cleanup = await finishFixtureAttempt(context, completed.result, out).then(() => true, async (error: unknown) => {
-              completed.result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error: describe(error) }
-              await Bun.write(path.join(out, "result.json"), JSON.stringify(completed.result, null, 2))
-              return false
-            })
-            if (cleanup) unconfirmed.delete(slotId)
-            return { result: completed.result, quarantine: !cleanup, stop: completed.stop && completed.result.status !== "interrupted" }
-          }
-          const first = await perform()
-          if (first.result.status !== "infra_error" || first.quarantine || first.stop || controller.signal.aborted) return first
-          await archiveInfraAttempt(out).catch(async (error: unknown) => {
-            unconfirmed.add(slotId)
-            first.result.environment_cleanup = { status: "failed", evidence: "infra-error", error: describe(error) }
-            await Bun.write(path.join(out, "result.json"), JSON.stringify(first.result, null, 2))
-            throw error
-          })
-          return perform(first.result)
-        } })
-      const stopped = [...queued.quarantined, ...(queued.stopped ?? [])]
-      if (stopped.length) state.stopped = `Stopped slots: ${stopped.join(", ")}`
-    } catch (error) { state.stopped = error instanceof AggregateError ? error.errors.map(describe).join("; ") : describe(error) }
-    finally {
-      for (const context of contexts) {
-        const storage = await inspectFixtureStorage(context, runId)
-        slotStates.set(context.lease.slot.id, { state: "quarantined", lease_receipt: context.lease.receipt, cleanup_receipt: context.cleanup,
-          storage_root: context.storage.path, storage_leftovers: storage.names, storage_error: storage.error })
-        if (storage.names === null || storage.names.length) {
-          unconfirmed.add(context.lease.slot.id)
-          state.stopped ??= storage.error ?? `Slot storage not empty: ${context.lease.slot.id}`
-          await fenceFixtureStorage(context, storage).catch((error: unknown) => { state.stopped ??= describe(error) })
-        }
-        if (unconfirmed.has(context.lease.slot.id)) continue
-        await sealAgentProcessInventory(context.command.agentEvidence).then(() => context.lease.release(context.cleanup))
-          .then(() => { slotStates.get(context.lease.slot.id)!.state = "closed" },
-          (error: unknown) => { state.stopped ??= describe(error) })
-      }
-      await Promise.all(contexts.map(context => context.lease.close()))
-      if (attempts.some(result => result.judge_cleanup_unconfirmed)) await contexts[0]!.judgeLease?.close()
-      if (!attempts.some(result => result.judge_cleanup_unconfirmed))
-        await finishFixtureJudge(contexts[0]!, runDir).catch((error: unknown) => { state.stopped ??= describe(error) })
-    }
-  }
-  if (!fixture && !config.dryRun) await prepareProfile(config, command, runId).catch((error) => { state.stopped = describe(error) })
+  if (!config.dryRun) await prepareProfile(config, command, runId).catch((error) => { state.stopped = describe(error) })
   // Round-robin: сбой окружения размазывается по задачам, Ctrl+C после первого круга оставляет полное покрытие.
   outer: for (const attempt of Array.from({ length: config.repeat }, (_, index) => index + 1)) {
     for (const task of tasks) {
-      if (fixture) break outer
       if (controller.signal.aborted || state.stopped) break outer
       const history: { initial?: AttemptResult } = {}
       for (const retry of [0, 1]) {
@@ -226,9 +143,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
   const interruptedAttempts = attempts.filter(result => result.status === "interrupted")
   const summary: RunSummary = {
     run_id: runId,
-    slots: fixture ? fixture.file.slots.slice(0, config.parallel).map(slot => ({ ...slot,
-      liveQualified: false, ...(config.dryRun ? { state: "planned" as const, storage_root: path.join(fixture.storage, slot.id) } : slotStates.get(slot.id)!) }))
-      : [{ id: "default", username: config.loginom.username, profileDir: config.profileDir,
+    slots: [{ id: "default", username: config.loginom.username, profileDir: config.profileDir,
         historyDir: `${config.profileDir}.history`, workspaceRoot: path.resolve(config.agent.workspaceRoot), liveQualified: false,
         state: config.dryRun ? "planned" : state.stopped || attempts.some(result => result.environment_cleanup?.status !== "confirmed") ? "quarantined" : "closed",
         ...(attempts.at(-1) ? { cleanup_receipt: path.join(runDir, attempts.at(-1)!.task_id, String(attempts.at(-1)!.attempt), "cleanup.json") } : {}) }],
@@ -261,8 +176,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
     loginom: {
       image_digest: environment.loginom?.imageDigest ?? null,
       container: source.kind === "dir" ? null : config.loginom.container,
-      storage_dir: fixture ? config.parallel === 1 ? path.join(fixture.storage, fixture.file.slots[0]!.id) : null
-        : source.kind === "dir" ? null : config.loginom.storageDir,
+      storage_dir: source.kind === "dir" ? null : config.loginom.storageDir,
     },
     agent_inputs_hash: inputsHash,
     rubric_hash: rubric,
@@ -283,10 +197,7 @@ async function executeRunBody(config: EvalConfig, fixture: Awaited<ReturnType<ty
       const own = attempts.filter((item) => item.task_id === task.id)
       return { id: task.id, rubric_snapshot: rubricSnapshot(task), metrics: aggregateTask(own, config.skipJudge), attempts: own }
     }),
-    storage_leftovers: config.dryRun ? [] : fixture
-      ? [...slotStates.values()].some(slot => slot.storage_leftovers === null) ? null
-        : [...slotStates].flatMap(([id, slot]) => slot.storage_leftovers!.map(name => `${id}/${name}`)).sort()
-      : await leftovers(source, runId),
+    storage_leftovers: config.dryRun ? [] : await leftovers(source, runId),
   }
   await writeSummary(runDir, summary)
   console.log(renderReport(summary))
@@ -561,7 +472,7 @@ export function redact(config: EvalConfig) {
     loginom: { ...config.loginom, password: config.loginom.password ? "<set>" : "<unset>" },
     dock: { ...config.dock, apiKey: config.dock.apiKey ? "<set>" : "<unset>" },
     agent: { ...config.agent, provider: config.agent.provider ? { ...config.agent.provider, apiKey: "<set>" } : undefined },
-    judge: { ...config.judge, processEvidence: undefined, env: config.judge.env && Object.fromEntries(
+    judge: { ...config.judge, env: config.judge.env && Object.fromEntries(
       Object.entries(config.judge.env).map(([key, value]) => [key, value ? "<set>" : "<unset>"]),
     ) },
   }, [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""])

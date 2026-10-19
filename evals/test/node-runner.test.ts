@@ -4,7 +4,7 @@ import path from "node:path"
 import { cp, mkdtemp, rm } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
 import { runNodeEvals } from "../src/node-runner"
-import { parallelFixture } from "./helpers/parallel-fixture"
+
 
 test("runner вызывает штатный fake harness без судьи и пишет FAIL при no_artifact вместо generic code=0", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-runner-"))
@@ -53,80 +53,6 @@ test("node runner CLI: help documents slots and strict parser refuses unknown fl
   expect(await new Response(bad.stderr).text()).toContain("unexpected")
   await new Response(bad.stdout).text()
 })
-
-test("runNodeEvals: programmatic slots use the common parallel admission without a judge", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "node-runner-parallel-"))
-  try {
-    const input = await parallelFixture(root, ["crosstable-fixed-sum", "crosstable-sliding-average"], true)
-    for (const id of ["crosstable-fixed-sum", "crosstable-sliding-average"]) {
-      const file = path.join(root, "tasks", id, "task.json")
-      await Bun.write(file, JSON.stringify({ ...await Bun.file(file).json(), inputs: [],
-        checklist: [{ id: "crosstable", text: "real CrossTable", required: true }] }))
-    }
-    const run = await runNodeEvals(["--tasks", path.join(root, "tasks"), "--parallel", "2"], input.env,
-      { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
-    expect(run.code).toBe(1)
-    expect(run.runDir).not.toBeNull()
-    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json()
-    expect(summary.config.parallel).toBe(2)
-    expect(summary.judge).toBeNull()
-    expect(summary.tasks.flatMap((task: { attempts: { slot_id: string; status: string }[] }) => task.attempts)
-      .map((attempt: { slot_id: string; status: string }) => [attempt.slot_id, attempt.status])).toEqual([["a", "no_artifact"], ["b", "no_artifact"]])
-    expect(await Bun.file(path.join(run.runDir!, "code-verdict.json")).json()).toMatchObject({ verdict: "FAIL", code: 1 })
-  } finally { await rm(root, { recursive: true, force: true }) }
-}, 30_000)
-
-test("runNodeEvals: matching session filenames are collected only from the attempt's slot archive", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "node-runner-slot-evidence-"))
-  try {
-    const ids = ["crosstable-min-max", "crosstable-string-counts-null"]
-    const input = await parallelFixture(root, ids, true)
-    for (const id of ids) {
-      const file = path.join(root, "tasks", id, "task.json")
-      await Bun.write(path.join(root, "tasks", id, "parallel-native.json"), "{}")
-      await Bun.write(file, JSON.stringify({ ...await Bun.file(file).json(), inputs: ["parallel-package.json", "parallel-native.json"],
-        checklist: [{ id: "crosstable", text: "real CrossTable", required: true }] }))
-    }
-    const run = await runNodeEvals(["--tasks", path.join(root, "tasks"), "--parallel", "2"], input.env,
-      { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
-    expect(run.runDir).not.toBeNull()
-    const file = path.join(run.runDir!, "summary.json")
-    const original = await Bun.file(file).text()
-    const summary = JSON.parse(original)
-    const evidence = await Promise.all(summary.tasks.map(async (task: { id: string; attempts: { slot_id: string }[] }) => {
-      const slot = input.slots.slots.find(slot => slot.id === task.attempts[0]!.slot_id)!
-      const proof = await Bun.file(path.join(run.runDir!, task.id, "1/native-crosstable.json")).json()
-      expect(proof.archive.startsWith(slot.historyDir + path.sep)).toBe(true)
-      expect(proof.observations).toHaveLength(1)
-      return proof.observations[0].node_crosstable.input_fields[0].name
-    }))
-    expect(evidence).toEqual(["eval-a", "eval-b"])
-    expect(await Bun.file(file).text()).toBe(original)
-    expect(run.code).toBe(1)
-  } finally { await rm(root, { recursive: true, force: true }) }
-}, 30_000)
-
-test("runNodeEvals: evidence write failure returns the completed run directory for recovery", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "node-runner-output-failure-"))
-  try {
-    const input = await parallelFixture(root, ["crosstable-min-max"], true)
-    const directory = path.join(root, "tasks/crosstable-min-max")
-    const task = await Bun.file(path.join(directory, "task.json")).json()
-    await Bun.write(path.join(directory, "parallel-native.json"), "{}")
-    await Bun.write(path.join(directory, "node-output-collision.json"), JSON.stringify({ resultsDir: input.env.EVAL_RESULTS_DIR }))
-    await Bun.write(path.join(directory, "task.json"), JSON.stringify({ ...task,
-      inputs: [...task.inputs, "parallel-native.json", "node-output-collision.json"],
-      checklist: [{ id: "crosstable", text: "real CrossTable", required: true }] }))
-    const run = await runNodeEvals(["--tasks", path.join(root, "tasks")], input.env,
-      { fixture: { slots: input.slots, lockRoot: input.lockRoot } })
-    expect(run.code).toBe(2)
-    expect("error" in run ? run.error : "").toContain("native-crosstable.json")
-    expect(run.runDir).not.toBeNull()
-    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json()
-    expect(summary.tasks[0].attempts[0]).toMatchObject({ status: "completed", slot_id: "a", environment_cleanup: { status: "confirmed" } })
-    expect(await Bun.file(path.join(run.runDir!, "code-verdict.json")).exists()).toBe(false)
-  } finally { await rm(root, { recursive: true, force: true }) }
-}, 30_000)
 
 test("text import diagnostic pipeline completes without a package but does not certify missing refusal evidence", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "import-runner-"))

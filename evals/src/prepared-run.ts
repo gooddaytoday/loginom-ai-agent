@@ -71,7 +71,7 @@ export async function runPreparedSlots(config: EvalConfig) {
   try {
     admin = await openLoginomAdmin(file, identity, { serverLease: environment.server, binary: config.agent.cliBin })
     judgeLease = await acquireJudgeLease({ codexHome: file.judge.codexHome, journal, commandId })
-    const scopedJudge = { ...config.judge, env: { CODEX_HOME: file.judge.codexHome }, systemd: true, processEvidence: undefined }
+    const scopedJudge = { ...config.judge, env: { CODEX_HOME: file.judge.codexHome }, systemd: true }
     await assertSessionBackupEmpty(file, identity)
     await admin.inspectPoolPolicy()
     for (const lease of environment.slots) {
