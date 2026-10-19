@@ -3480,9 +3480,9 @@ function readRenderedInputMapping(observation) {
     const selector=anchor + identity.path.map(index => ` > :nth-child(${index + 1})`).join('');
     return graph?page.locator('[data-tid='+JSON.stringify(graph.container_tid)+']').locator(selector):page.locator(selector);
   };
-  const checkedHandle = async (before, current) => {
+  const checkedHandle = async (before, current, verb = task.action.verb) => {
     const referenceChecks={present:!!current,identity_matches:!!current&&same(before.identity,current.identity),
-      signature_matches:!!current&&same(before.signature,current.signature),action_allowed:!!current&&current.allowed_actions.includes(task.action.verb)};
+      signature_matches:!!current&&same(before.signature,current.signature),action_allowed:!!current&&current.allowed_actions.includes(verb)};
     if(!Object.values(referenceChecks).every(Boolean))record('ui_reference_precondition_refused',{checks:referenceChecks});
     if (!Object.values(referenceChecks).every(Boolean)
       || task.action.verb==='replace_expression' && !same(before.calculator_editor,current.calculator_editor)
@@ -3789,7 +3789,42 @@ function readRenderedInputMapping(observation) {
           && !!current.dom_epoch?.document && fresh.dom_epoch?.document===current.dom_epoch.document
           && (fresh.ui.dialogs.length===0 || task.action.verb==='begin_wizard' && exactDeactivation(fresh)
             || allowToasts && fresh.ui.dialogs.every(d=>d.identity?.anchor_tid==='toast'));
-        let staleOpeningRoots=0,transientToastReads=0;
+        let staleOpeningRoots=0,transientToastReads=0,lostLinksDeleted=false;
+        // Loginom asks this after an input-port Done whose mapping still links
+        // fields that no longer exist upstream. Deleting only those lost links
+        // completes the same Done; the caller still verifies the mapping.
+        const deleteLostLinks=async fresh=>{
+          const finish=current.ui.elements.find(e=>e.ref===task.action.ref)?.wizard_finish,dialog=fresh.ui.dialogs.length===1?fresh.ui.dialogs[0]:null;
+          const owned=s=>lifecycleContextMatches({...s,ui:{...s.ui,dialogs:[]}})
+            &&s.wizard.root_ref===current.wizard.root_ref&&same(s.wizard.input_port_context,current.wizard.input_port_context)
+            &&s.ui.masks.every(m=>m.kind==='modal_background'&&m.dialog_ref===null&&m.target_tid===current.wizard.root_tid);
+          if(task.action.verb!=='finish_wizard'||finish?.mode!=='input_port'||lostLinksDeleted||!dialog
+            ||!owned(fresh))return false;
+          const wizardRoot=postActionRoot;postActionRoot=dialog.ref;
+          try{
+            const prompt=await readUi();
+            const title='Loginom '+current.loginom_build,shown=prompt.ui.dialogs;
+            const buttons=Object.entries({yes:'Удалить и продолжить',no:'Не удалять и продолжить',cancel:'Отмена'}).map(([name,label])=>
+              prompt.ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name&&e.label===label&&e.signature?.dialog_ref===dialog.ref&&e.allowed_actions.includes('click')));
+            if(!owned(prompt)||shown.length!==1||shown[0].ref!==dialog.ref||shown[0].title!==title||buttons.some(b=>b.length!==1)
+              ||shown[0].text!==title+' Обнаружены связи с несуществующими объектами. Вы хотите удалить все потерянные связи и продолжить? Удалить и продолжить Не удалять и продолжить Отмена')return false;
+            const checked=await readUi();
+            if(!owned(checked)||!same(prompt.ui.dialogs,checked.ui.dialogs)||!same(prompt.dom_epoch,checked.dom_epoch))return false;
+            const target=await checkedHandle(buttons[0][0],checked.ui.elements.find(e=>e.ref===buttons[0][0].ref),'click');
+            if(task.prepared_node_context&&!same(await boundNode(),current.prepared_node_context))return false;
+            const epoch=await page.evaluate(()=>{
+              const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+              if(!state?.observer)return null;state.captureMutations(state.observer.takeRecords());
+              return {document:state.epoch,revision:state.revision};
+            });
+            if(!same(checked.dom_epoch,epoch))fail('UI_EPOCH_CHANGED','The lost-links question changed before confirmation');
+            lostLinksDeleted=true;timeout();mouseHeld=true;
+            await page.mouse.click(target.point.x,target.point.y,{clickCount:1,button:'left'});
+            mouseHeld=false;
+            record('wizard_lost_links_deleted',{dialog_ref:dialog.ref,button:'msgbox;tlb;yes'});
+            return true;
+          }finally{postActionRoot=wizardRoot;}
+        };
         const readOpeningUi=async()=>{
           for(;;) {
             const roots=await readUi(true);
@@ -3805,6 +3840,7 @@ function readRenderedInputMapping(observation) {
             try {
               const fresh=await readUi();
               if(!lifecycleContextMatches(fresh)){
+                if(await deleteLostLinks(fresh))continue;
                 if(['finish_wizard','execute_wizard'].includes(task.action.verb) && lifecycleContextMatches(fresh,true) && transientToastReads<50){
                   transientToastReads++;record('wizard_toast_wait',{attempt:transientToastReads});
                   await page.waitForTimeout(Math.min(100,timeout()));continue;

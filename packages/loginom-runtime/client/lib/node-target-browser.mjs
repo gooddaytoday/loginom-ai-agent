@@ -167,6 +167,16 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     const before=await read(page,task);
     if(JSON.stringify(before)!==JSON.stringify(task.effect.before) || !before.interaction_ready)throw new Error('Graph changed before gesture');
     const p=task.effect.parameters,kind=task.effect.kind;
+    if(kind==='rename'||kind==='move'){
+      const node=before.nodes.find(n=>n.ref.node_id===p.ref.node_id);
+      if(!node||node.locked)throw Error('Exact unlocked target node required');
+      const canvas=find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram');
+      placementNavigation=await revealPosition({page,root:canvas,nodeId:p.ref.node_id,position:node.position,prefix:task.request.workflow_ref.prefix,
+        remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();if(!sameGraph(before,await read(page,task)))throw Error('Graph changed during target navigation');}});
+      if(!placementNavigation.fully_visible)throw Error('Target node and ports are not fully visible');
+      gestureBefore=await read(page,task);
+      if(!sameGraph(before,gestureBefore))throw Error('Graph changed after target navigation');
+    }
     if(kind==='create'){
       const title=task.types[p.type].title.replace(/\s/g,'_');
       const palette=task.request.workflow_ref.prefix+';ModelForm;colVendors_Компоненты>'+task.types[p.type].palette_group+'>'+title+';TreeText';
@@ -224,7 +234,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       });
       effectPossible=true;await page.mouse.click(blank.x,blank.y);
       await wait('node_selection_controls_closed',()=>page.evaluate(()=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FmxGraph.getSelectionCells().length===0));
-      if(JSON.stringify(await read(page,task))!==JSON.stringify(before))throw new Error('Graph changed while deselecting');
+      if(JSON.stringify(await read(page,task))!==JSON.stringify(gestureBefore))throw new Error('Graph changed while deselecting');
       const source=find(tid),from=await point(source);
       const scale=await page.evaluate(()=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;return d.FmxGraph.view.scale/d.FInitialScale;});
       await drag(source,{x:from.x+(p.position.x-old.x)*scale,y:from.y+(p.position.y-old.y)*scale});
