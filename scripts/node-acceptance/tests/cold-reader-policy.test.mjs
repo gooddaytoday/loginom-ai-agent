@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {coldNativeEligible,coldGraphExecutionIdentity,performColdNodeAction,runColdExecution} from '../cold-reader-policy.mjs';
+import {coldNativeEligible,coldGraphExecutionIdentity,performColdNodeAction,runColdExecution,openColdOutputViews} from '../cold-reader-policy.mjs';
 import {createNodeProcedure} from '../../../packages/loginom-runtime/client/lib/node-procedure.mjs';
 const node={document_id:'doc',workflow_id:'wf',node_id:'cross'};
 const configuration={node_context:node};
@@ -165,4 +165,47 @@ test('incomplete, foreign or wrong-port definitions cannot select native',()=>{
   o=>o.port=1,o=>o.fields=[],o=>o.fields[0].type='unknown']){
   const o=output(['real']);mutate(o);assert.equal(coldNativeEligible(configuration,o),false);
  }
+});
+
+function openingFixture(change=()=>{}){
+ const operation={id:'cold',deadline:Date.now()+60000},records=[];
+ const output={port_guid:'port',active:true,index:0};
+ const state={prepared_node_context:{...node,verified:true,surface:'graph'},node_outputs:{node_selected:true},
+  ui:{elements:[{ref:'views',allowed_actions:['open_node_views']}],dialogs:[],masks:[]}};
+ const after={...state,prepared_node_context:{...state.prepared_node_context,surface:'views'},
+  node_outputs:{verified:true,port_panels:[{port_guid:'port'}]}};
+ const receipt={operation_id:'cold:n1',action_key:'ui.act',status:'AMBIGUOUS',phase:'observing',effect_possible:true,
+  cleanup_complete:true,error:{code:'UI_DEADLINE_EXCEEDED'},trace:[
+   {event:'ui_preconditions_verified',verb:'open_node_views',refs:['views']},
+   {event:'ui_gesture_applied',verb:'open_node_views'}]};
+ let gestures=0,reads=0,inspections=0;
+ const step={internal_operation_id:receipt.operation_id,signature:'signature',action:{verb:'open_node_views',ref:'views'}};
+ const fixture={receipt,operation,after,step,inspection:{state:'completed',receipt:structuredClone(receipt)}};
+ change(fixture);
+ const channel={lastPreparedStep:step,perform:async options=>{
+  assert.equal(options.ready(state),true);assert.deepEqual(options.resolve(state),{verb:'open_node_views',ref:'views'});
+  gestures++;throw Object.assign(Error('original opening timeout'),{receipt});
+ },observe:async options=>{reads++;if(!options.ready(after))throw Error('Views do not own the original output');return after;}};
+ return {run:()=>openColdOutputViews(channel,{state,output},{node,operation,record:async e=>records.push(e),
+  readReceipt:async ref=>{inspections++;assert.equal(ref.signature,'signature');return fixture.inspection;}}),
+  records,counts:()=>({gestures,reads,inspections})};
+}
+test('completed timed-out Views opening settles read-only without repeating its possible gesture',async()=>{
+ const f=openingFixture();await f.run();assert.deepEqual(f.counts(),{gestures:1,reads:1,inspections:1});
+ assert.equal(f.records[0].phase,'cold_output_views_settled');assert.equal(f.records[0].effect_possible,true);
+});
+for(const [name,change] of Object.entries({
+ transport:f=>f.operation.transportUncertain=true,expired:f=>f.operation.deadline=Date.now(),
+ unissued:f=>f.receipt.effect_possible=false,noCleanup:f=>f.receipt.cleanup_complete=false,
+ wrongStatus:f=>f.receipt.status='NOT_APPLIED',wrongCode:f=>f.receipt.error.code='OTHER',
+ noTrace:f=>f.receipt.trace=[],noGesture:f=>f.receipt.trace.pop(),
+ duplicateGesture:f=>f.receipt.trace.push(f.receipt.trace[1]),
+ foreignRef:f=>f.receipt.trace[0].refs=['other'],foreignReceipt:f=>f.receipt.operation_id='other',
+ unconfirmed:f=>f.inspection.state='pending',changedReceipt:f=>f.inspection.receipt.cleanup_complete=false,
+ foreignNode:f=>f.after.prepared_node_context.node_id='other',
+ foreignPort:f=>f.after.node_outputs.port_panels[0].port_guid='other',
+ dialog:f=>f.after.ui.dialogs=[{}],mask:f=>f.after.ui.masks=[{}],
+}))test('cold Views settlement refuses '+name,async()=>{
+ const f=openingFixture(change);await assert.rejects(f.run());assert.equal(f.counts().gestures,1);
+ assert.equal(f.records.length,0);
 });
