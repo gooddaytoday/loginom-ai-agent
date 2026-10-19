@@ -195,6 +195,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     return structuredClone(result.output);
   };
   const channel = {
+    rememberExecutionBaseline(baseline) {
+      if(operation.nodeApply)operation.nodeApply.execution_baseline=structuredClone(baseline);
+    },
     async openJavascriptPreview(port){
       checkBudget();
       if(!preparedNodeContext||!['transform.group_data','transform.sorting','transform.join_data'].includes(operation.parameters?.target?.type))

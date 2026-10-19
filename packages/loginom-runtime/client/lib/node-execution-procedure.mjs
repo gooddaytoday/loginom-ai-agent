@@ -76,8 +76,8 @@ export async function revealExecutionControl(channel,node,initial,process,tid,ve
   throw new Error('Process reveal exceeded bounded scroll steps');
 }
 
-export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false,verifyFailedChild=false,retainReadWait=false}={}) {
-  let baseline,execution,stopPromise,readWaitBinding,consoleControl,launchSucceeded=false,launchAttempted=false,deactivationAttempted=false,failedChildAttempted=false;
+export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false,verifyFailedChild=false,retainReadWait=false,baseline:adoptedBaseline}={}) {
+  let baseline=adoptedBaseline&&structuredClone(adoptedBaseline),execution,stopPromise,readWaitBinding,consoleControl,launchSucceeded=false,launchAttempted=false,deactivationAttempted=false,failedChildAttempted=false;
   const observe=(condition,ready=()=>true,extra={})=>channel.observe({condition,readProcesses:true,ready,...extra});
   const control=(s,tid,verb='click')=>{const current=typeof tid==='function'?tid(s):tid;
     return typeof current==='string'&&current.length?s.ui.elements.filter(e=>consoleTid(e.tid,current)&&e.allowed_actions.includes(verb)):[];};
@@ -170,6 +170,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         }
       }
       baseline=captureExecutionBaseline(s.node_processes,node);
+      channel.rememberExecutionBaseline?.(baseline);
       if(!keepConsoleOpen)await closeConsole(s);
       return structuredClone(baseline);
     },
@@ -236,6 +237,25 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       });
       execution=identifyNewExecution(baseline,s.node_processes);
       return structuredClone(execution);
+    },
+    async verifyCompletion({signal}={}) {
+      try {
+        requireValue(baseline,'A pre-launch baseline is required');
+        const s=await openConsole();
+        requireValue(processes(s),'Complete process history is required');
+        const old=new Set(baseline.roots.map(p=>p.process_id));
+        const fresh=s.node_processes.processes.filter(p=>p.parent_id===null&&!old.has(p.process_id));
+        if(fresh.length!==1) {
+          await closeConsole(s);
+          return {verified:false,reason:fresh.length?'AMBIGUOUS_EXECUTION':'NO_NEW_EXECUTION'};
+        }
+        execution=identifyNewExecution(baseline,s.node_processes);
+        const receipt=await this.waitCompleted({signal});
+        if(receipt.status==='completed'&&receipt.verified===true&&receipt.owner_verified===true)return receipt;
+        return {...receipt,verified:false,reason:receipt.status==='failed'?'EXECUTION_FAILED':'EXECUTION_UNVERIFIED'};
+      } catch(error) {
+        return {verified:false,reason:String(error.message??error)};
+      }
     },
     stop() {
       // Even an unknown receipt or failed terminal wait must not cause a

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
-import {releasePendingNode,proveFinishLaunchRefused,NodeReleaseBlocked} from '../lib/node-pending-release.mjs';
+import {releasePendingNode,proveNodeRestsQuiet,proveFinishLaunchRefused,NodeReleaseBlocked} from '../lib/node-pending-release.mjs';
 import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
 import {releaseNodeApply} from '../lib/node-apply.mjs';
 import {nodeJobResultSchema} from '../lib/node-result-schema.mjs';
@@ -33,6 +33,14 @@ const stopped=({graph=graphOf,receipt={state:'completed',receipt:{cleanup_comple
  nodeApply:{pending:{phase:'configure'},node,request:{document_id:'doc',workflow_ref:workflow}},
  nodeTargetAdapter:{observe:async()=>graph()},receipt});
 const release=(operation,channel,restoreRead)=>releasePendingNode({operation,channel,restoreRead,readReceipt:async()=>operation.receipt});
+
+test('quiet-node proof reads twice and performs no gesture',async()=>{
+ const blocked=surface({wizard:true});
+ await assert.rejects(proveNodeRestsQuiet({operation:stopped(),channel:blocked.channel,node}));
+ assert.deepEqual(blocked.gestures,[]);
+ const quiet=surface(),proof=await proveNodeRestsQuiet({operation:stopped(),channel:quiet.channel,node});
+ assert.equal(proof.verified,true);assert.deepEqual(quiet.gestures,[]);
+});
 
 test('release proves a quiet unchanged graph without a gesture',async()=>{
  const s=surface(),proof=await release(stopped(),s.channel);
