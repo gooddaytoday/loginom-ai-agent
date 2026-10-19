@@ -467,6 +467,40 @@ test('output port opening uses the parent journal and receipt wrapper before any
  }
 });
 
+for(const direction of ['input','output'])test('offscreen '+direction+' port reveals its owned node before opening and refuses changed or uncertain navigation',async()=>{
+ for(const fault of [null,'owner','transport','journal']) {
+  const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
+  const node={document_id:'doc',workflow_id:'flow',node_id:'node'},binding={document_id:'doc',workflow_ref,node};
+  const records=[],effects=[];let revealed=false;
+  const operation={id:'port',deadline:100000,action:{action_key:'node.apply',revision:'1'}};
+  const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:'http://example.test',targetBuild:'7.4.2',now:()=>1,wait:async()=>{},
+   record:async e=>{records.push(e);if(fault==='journal'&&e.phase==='node_step_prepared')throw Error('disk');return structuredClone(e);},
+   wrapMutation:(code,r)=>({code,r}),execute:async code=>{
+    if(typeof code==='string')return {status:'SUCCEEDED',output:{origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+     prepared_node_context:{...node,node_id:revealed&&fault==='owner'?'foreign':'node',verified:true,surface:'graph',locked:false,tid:'body'},wizard:{status:'absent'},
+     ui:{elements:[{tid:'body',ref:'body',graph_node:{part:'body'},interaction:{state:revealed?'point_observed':'outside_viewport'}}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}}};
+    assert.equal(records.at(-1).phase,'node_step_prepared');effects.push(code.r.action_key);
+    if(code.r.action_key==='node.viewport.reveal.internal'){
+     if(fault==='transport')throw Error('unknown viewport reply');revealed=true;
+     return {status:'SUCCEEDED',operation_id:code.r.id,action_key:code.r.action_key,effect_possible:true,cleanup_complete:true,
+      output:{verified:true,node,graph_unchanged:true,fully_visible:true,settings_applied:false}};
+    }
+    assert.equal(revealed,true);
+    return {status:'SUCCEEDED',operation_id:code.r.id,action_key:code.r.action_key,effect_possible:true,cleanup_complete:true,
+     output:{verified:true,direction,port:0,opening_operation_id:code.r.id,...node}};
+   }});
+  if(!fault){
+   assert.equal((await channel.openPort(direction,0)).status,'SUCCEEDED');
+   assert.deepEqual(effects,['node.viewport.reveal.internal','node.'+direction+'_port.open.internal']);
+   assert.deepEqual(records.filter(e=>e.phase==='node_step_prepared').map(e=>e.action.verb),['reveal_prepared_node','open_'+direction+'_port']);
+  }else{
+   await assert.rejects(channel.openPort(direction,0));
+   assert.deepEqual(effects,fault==='journal'?[]:['node.viewport.reveal.internal']);
+   if(fault==='transport'){assert.equal(operation.transportUncertain,true);assert.equal(operation.cleanupConfirmed,false);}
+  }
+ }
+});
+
 test('calculator parameter portal admits only its bound modal background',async()=>{
  for(const mode of ['bound','foreign_dialog','foreign_selection','foreign_mask','busy','extra_dialog']) {
   const base='MF;TF-1;WizrdMCF';
