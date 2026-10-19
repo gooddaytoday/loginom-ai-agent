@@ -65,7 +65,8 @@ export function createCandidateNodeSupport(config) {
   if(type==='transform.calculator')return calculator.nodeApplyDriverFactory(options);
   if(type==='programming.javascript'){
    if(!javascript)throw Error('JavaScript requires the validated 7.4.2 target and origin');
-   return javascript.nodeApplyDriverFactory(options);
+   const drivers=javascript.nodeApplyDriverFactory(options);
+   return {...drivers,readOutput:async(...args)=>nodeOutputForJournal(await drivers.readOutput(...args),redactor)};
   }
   throw Error('No candidate driver for '+type);
  }};
