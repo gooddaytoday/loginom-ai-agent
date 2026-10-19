@@ -39,7 +39,7 @@ function fixture(){
   const tid='MF;TF-1;Graph;connection|Output_Connection-0|rest|Input_Connection-0',dom=element(tid),edge={source:source.port.FCell,target:target.port.FCell};
   source.port.FCell.edges=[edge];inside.push(dom);extraStates.set(edge,{shape:{node:dom}});return {source,target,edge,tid};
  };
- return {restLink,binding:()=>readGraph(page,{request,types:{},origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
+ return {restLink,binding:()=>readGraph(page,{request,types:{},origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
 }
 test('REST service edge is identified by native node/port types and the exact rendered edge, never labels',async()=>{
  const f=fixture(),link=f.restLink(),g=await f.read();
@@ -113,4 +113,15 @@ test('rendered REST client identity is accepted as the requested REST node after
  assert.equal(after.nodes[0].type,'integration.rest_request');
  const result=verifyNodeTargetEffect({kind:'create',before,parameters:{type:'integration.rest_request'}},after);
  assert.equal(result.node_id,'n');
+});
+
+test('JavaScript tabular DOM identity cannot hide a foreign native port type',async()=>{
+ const good=fixture();good.node.FIconCls='bg-vendor-icon-javascript';
+ assert.deepEqual(Array.from((await good.read()).nodes[0].outputs),[0]);
+ const input=fixture();input.node.FIconCls='bg-vendor-icon-javascript';input.input();
+ assert.deepEqual(Array.from((await input.read()).nodes[0].inputs),[0]);
+ for(const change of [f=>{f.port.FType=0;},f=>{f.port.FSubType=10;}]){
+  const f=fixture();f.node.FIconCls='bg-vendor-icon-javascript';change(f);
+  await assert.rejects(f.read(),/foreign native type/);
+ }
 });
