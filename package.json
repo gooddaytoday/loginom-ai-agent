@@ -6,6 +6,8 @@
   "type": "module",
   "packageManager": "bun@1.3.14",
   "scripts": {
+    "secrets": "bun packages/script/src/secret-scan.ts",
+    "secrets:install": "bun packages/script/src/install-gitleaks.ts",
     "dev": "bun run --cwd packages/agent src/index.ts",
     "dev:desktop": "bun --cwd packages/desktop dev",
     "dev:web": "bun --cwd packages/app dev",
