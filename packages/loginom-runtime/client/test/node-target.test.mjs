@@ -51,6 +51,60 @@ test('no free visible position refuses before creating a node',async()=>{
  f.adapter.choosePosition=async()=>{throw Error('no free visible position');};
  assert.equal((await f.run(r)).status,'NOT_APPLIED');assert.deepEqual(f.calls,[]);
 });
+test('automatic placement reobserves and revalidates before its first graph gesture',async()=>{
+ const f=fixture(),r=request();delete r.target.position;let choices=0;const admitted=[],deadline=f.operation.deadline;
+ f.adapter.preflight=async(_,graph,limit)=>{admitted.push(graph.nodes[0].position.x);assert.equal(limit,deadline);};
+ f.adapter.choosePosition=async(_,graph,limit)=>{
+  assert.equal(limit,deadline);assert.deepEqual(f.calls,[]);assert.equal(graph.nodes[0].position.x,choices*8);
+  if(++choices<3){f.graph.nodes[0].position.x=choices*8;throw Object.assign(Error('Graph changed before automatic placement'),{code:'NODE_PLACEMENT_GRAPH_CHANGED'});}
+  return {x:320,y:256};
+ };
+ f.graph.nodes[0].position.x=0;
+ const result=await f.run(r);assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.deepEqual(admitted,[0,8,16]);assert.equal(f.calls.filter(k=>k==='create').length,1);
+ assert.equal(f.operation.targetPhase.baseline.nodes[0].position.x,16);assert.equal(f.operation.deadline,deadline);
+});
+test('placement refresh refuses a missing source before any creation',async()=>{
+ const f=fixture(),r=request();delete r.target.position;let choices=0;
+ f.adapter.choosePosition=async()=>{choices++;f.graph.nodes=[];throw Object.assign(Error('Graph changed before automatic placement'),{code:'NODE_PLACEMENT_GRAPH_CHANGED'});};
+ const result=await f.run(r);assert.equal(result.status,'NOT_APPLIED');assert.match(result.error,/Node identity is absent/);
+ assert.equal(choices,1);assert.deepEqual(f.calls,[]);
+});
+for(const changed of ['workflow','source output'])test('placement refresh keeps original '+changed+' admission',async()=>{
+ const f=fixture(),r=request();delete r.target.position;let choices=0;
+ f.adapter.choosePosition=async()=>{
+  choices++;
+  if(changed==='workflow')f.graph.workflow_ref={...f.graph.workflow_ref,workflow_id:'foreign'};
+  else f.graph.nodes[0].outputs=[];
+  throw Object.assign(Error('Graph changed before automatic placement'),{code:'NODE_PLACEMENT_GRAPH_CHANGED'});
+ };
+ const result=await f.run(r);assert.equal(result.status,'NOT_APPLIED');assert.equal(choices,1);assert.deepEqual(f.calls,[]);
+ assert.match(result.error,changed==='workflow'?/original prepared workflow/:/Source tabular output does not exist/);
+});
+test('placement graph refresh is bounded and retains the original deadline',async t=>{
+ t.mock.timers.enable({apis:['Date'],now:10000});
+ for(const expire of [false,true]){
+  const f=fixture(),r=request();delete r.target.position;let choices=0;
+  const deadline=f.operation.deadline;
+  f.adapter.choosePosition=async()=>{choices++;if(expire)t.mock.timers.tick(10001);throw Object.assign(Error('Graph changed before automatic placement'),{code:'NODE_PLACEMENT_GRAPH_CHANGED'});};
+  const result=await f.run(r);assert.equal(result.status,'NOT_APPLIED');assert.equal(choices,expire?1:3);assert.deepEqual(f.calls,[]);
+  assert.equal(f.operation.deadline,deadline);
+  assert.match(result.error,expire?/deadline exceeded/:/Graph changed before automatic placement/);
+ }
+});
+test('an unclassified placement error never authorizes observation retry',async()=>{
+ const f=fixture(),r=request();delete r.target.position;let choices=0;
+ f.adapter.choosePosition=async()=>{choices++;throw Error('Graph changed before automatic placement');};
+ assert.equal((await f.run(r)).status,'NOT_APPLIED');assert.equal(choices,1);assert.deepEqual(f.calls,[]);
+});
+test('native placement mismatch is a classified read-only refusal',async()=>{
+ const {createNodeTargetBrowserAdapter}=await import('../lib/node-target-browser.mjs');let calls=0;
+ const adapter=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',execute:async code=>{
+  calls++;assert.ok(code.includes('async function readGraph'));return {complete:true,nodes:[]};
+ }});
+ await assert.rejects(adapter.choosePosition(request(),{complete:true,nodes:['old']},Date.now()+1000),{code:'NODE_PLACEMENT_GRAPH_CHANGED'});
+ assert.equal(calls,1);
+});
 test('unrelated graph mutation cannot be accepted as successful creation',async()=>{
  const f=fixture(),mutate=f.adapter.mutate;f.adapter.mutate=async e=>{const r=await mutate(e);f.graph.nodes[0].label='unexpected';return r;};
  assert.equal((await f.run()).status,'AMBIGUOUS');assert.equal(f.calls.length,1);
