@@ -22,7 +22,7 @@
 
 - Готово, когда Tasks 1–4 закрыты, тесты из задач зелёные, `bun typecheck` в изменённых Bun-пакетах чистый.
 - Первый проверяемый результат — Task 2: настоящий Node host передаёт task runtime `true`, а validation runtime — `false`.
-- Объём: ~18 файлов, ~+450 / −20 строк (код ~150, тесты ~280, документация ~20).
+- Объём: ~19 файлов, ~+450 / −20 строк (код ~150, тесты ~280, документация ~20).
 - Исключения: поведение recovery, `release.yml`, скрипты сборки Windows и macOS (флаг приходит им через окружение задачи CI в плане 5).
 
 ## Review Focus
@@ -50,7 +50,7 @@
 
 - [ ] **Step 1: Write the failing tests**
 
-В `start-input.test.mjs` обновить два существующих `deepEqual` (строки 8–15), добавив `browserRecovery: false`, и добавить:
+В `start-input.test.mjs` обновить все три существующих `deepEqual` (в первых двух тестах), добавив `browserRecovery: false`, и добавить:
 
 ```js
 test("private browser recovery capability accepts only an explicit boolean", () => {
@@ -223,6 +223,7 @@ git commit -m "feat(cli): embed browser recovery build flag"
 **Files:**
 - Modify: `packages/desktop/electron.vite.config.ts:34-37`
 - Modify: `packages/desktop/src/main/constants.ts:4-8`
+- Modify: `packages/desktop/src/main/env.d.ts`
 - Modify: `packages/desktop/src/main/loginom/desktop-service.ts:12-20`
 - Modify: `packages/desktop/scripts/release/manifest.ts:10-58`
 - Modify: `packages/desktop/scripts/release/write-manifest.ts:92-96`
@@ -250,7 +251,7 @@ Expected: FAIL — строгая схема отвергает поле.
 
 - [ ] **Step 3: Implement**
 
-`electron.vite.config.ts` добавляет `define` из входа сборки (`"1"` или `"0"`). `desktopLoginom()` передаёт `browserRecovery: BROWSER_RECOVERY`. `write-manifest.ts` пишет `browserRecovery: process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1"`. Зависимость от `app.isPackaged` проверяется на упакованном артефакте в плане 5 без мока Electron, как и `UPDATER_ENABLED`.
+`electron.vite.config.ts` добавляет `define` из входа сборки (`"1"` или `"0"`). `env.d.ts` объявляет `LOGINOM_AI_AGENT_BROWSER_RECOVERY: string` в `ImportMetaEnv`. `desktopLoginom()` передаёт `browserRecovery: BROWSER_RECOVERY`. `write-manifest.ts` пишет `browserRecovery: process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1"`. Зависимость от `app.isPackaged` проверяется на упакованном артефакте в плане 5 без мока Electron, как и `UPDATER_ENABLED`.
 
 - [ ] **Step 4: Run test to verify it passes**
 
