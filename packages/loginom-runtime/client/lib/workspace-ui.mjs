@@ -3734,7 +3734,7 @@ function readRenderedInputMapping(observation) {
           if(!await ownsFocus())fail('EXPRESSION_FOCUS_CHANGED','The Calculator input lost focus before replacement');
           await page.keyboard.press('Backspace');
           if(!await ownsFocus(''))fail('EXPRESSION_FOCUS_CHANGED','The Calculator input lost focus or did not clear');
-          timeout();if(task.action.text)await page.keyboard.type(task.action.text,{delay:0});
+          timeout();if(task.action.text)await page.keyboard.insertText(task.action.text);
         }
         else if (task.action.verb === 'set_wizard_field') {
           const before=current.ui.elements.find(item=>item.ref===task.action.ref);
