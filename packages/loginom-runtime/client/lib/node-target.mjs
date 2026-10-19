@@ -55,6 +55,18 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
   const state = operation.targetPhase ??= { signature, receipts: [], baseline: null, targetId: null, effect_possible: false };
   if (state.signature !== signature) throw new Error('Operation ID reused with a different node target');
   const budget = () => { signal?.throwIfAborted(); if (!(now() < operation.deadline)) throw new Error('Node target deadline exceeded'); };
+  // Non-empty inputs explicitly request this one sink's new source. Only its
+  // single observed baseline edge may be replaced; package membership alone
+  // never authorizes deleting other existing links.
+  const exportInputReplacement = (graph,edge) => request.target.kind==='existing' && request.target.type==='exports.text'
+    && request.inputs.length===1 && request.inputs[0].input===0
+    && edge.target===request.target.ref.node_id && edge.input===0 && graph.foreign_links?.length===0
+    && graph.links.filter(e=>e.target===edge.target&&e.input===edge.input).length===1
+    && graph.links.some(e=>edgeKey(e)===edgeKey(edge))
+    && node(graph,edge.target).type==='exports.text' && node(graph,edge.target).locked!==true
+    && same(node(graph,edge.target).inputs,[0]) && node(graph,edge.target).outputs.length===0
+    && node(graph,request.inputs[0].source.node_id).outputs.includes(request.inputs[0].output)
+    && node(graph,edge.source).outputs.includes(edge.output);
   const save = async (phase, detail) => {
     const event = { operation_id: operation.id, phase, internal_provenance: 'node_target_v1', ...structuredClone(detail) };
     const ack = await record(event);
@@ -78,6 +90,8 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       budget();
       const before=refresh===0?original:await observe();
       if(!same(before,original))throw new Error('Graph target changed before local refresh');
+      if(kind==='remove_link' && request.target.kind==='existing' && !exportInputReplacement(before,parameters.edge))
+        throw new Error('Existing export input changed before replacement');
       const effect = { id: operation.id + ':graph:' + (state.receipts.length+(state.refusals?.length??0)), kind, parameters: structuredClone(parameters), before };
       await save('node_target_effect_prepared', { effect });
       budget();
@@ -156,7 +170,8 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         if (existing.type !== request.target.type) throw new Error('Existing node has a different component type');
         for(const input of request.inputs){
           const occupied=graph.links.find(e=>e.target===existing.ref.node_id&&e.input===input.input);
-          if(occupied&&(occupied.source!==input.source.node_id||occupied.output!==input.output))throw new Error('Requested input is occupied by an unowned link');
+          if(occupied&&(occupied.source!==input.source.node_id||occupied.output!==input.output)
+            && !exportInputReplacement(graph,occupied))throw new Error('Requested input is occupied by an unowned link');
         }
         state.targetId = existing.ref.node_id;
       }
@@ -211,9 +226,9 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     }
     const desired = request.inputs.map(i => ({ source: i.source.node_id, output: i.output, target: state.targetId, input: i.input }));
     for (const edge of graph.links.filter(e => e.target === state.targetId && !desired.some(d => edgeKey(d) === edgeKey(e)))) {
-      const owned = (state.auto_created_links ?? []).some(a => edgeKey(a) === edgeKey(edge));
-      // Existing links not mentioned by the caller are preserved. Conflicting
-      // existing links require an explicit future edit contract, never deletion.
+      const owned = (state.auto_created_links ?? []).some(a => edgeKey(a) === edgeKey(edge))
+        || (state.baseline && exportInputReplacement(state.baseline,edge) && exportInputReplacement(graph,edge));
+      // Preserve unrequested existing links and occupied inputs of other types.
       if (!owned) {
         if (desired.some(d => d.input === edge.input)) throw new Error('Requested input is occupied by an unowned link');
         continue;

@@ -114,6 +114,73 @@ test('existing identity preserves unrequested properties and correct links witho
  const op={id:'existing',deadline:Date.now()+10000};const result=await prepareNodeTarget({request:r,operation:op,adapter:f.adapter,record:async e=>e});
  assert.equal(result.status,'SUCCEEDED',result.error);assert.equal(f.calls.length,6);
 });
+function existingExportFixture(){
+ const f=fixture();f.graph.foreign_links=[];f.graph.nodes[0].type='transform.sorting';
+ f.graph.nodes.push({...structuredClone(source),ref:ref('filter'),type:'transform.filter_data',inputs:[0]},
+  {...structuredClone(source),ref:ref('export'),type:'exports.text',inputs:[0],outputs:[]});
+ f.graph.links.push({source:'source',output:0,target:'filter',input:0},{source:'source',output:0,target:'export',input:0});
+ const r={document_id:'doc',workflow_ref:workflow,target:{kind:'existing',type:'exports.text',ref:ref('export')},inputs:[{source:ref('filter'),output:0,input:0}]};
+ return {f,r};
+}
+test('explicit existing text export input replaces its baseline link and preserves the rest of s1',async()=>{
+ const {f,r}=existingExportFixture(),deadline=f.operation.deadline;
+ const result=await f.run(r);assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.deepEqual(f.calls,['remove_link','connect']);
+ assert.deepEqual(f.graph.links,[{source:'source',output:0,target:'filter',input:0},{source:'filter',output:0,target:'export',input:0}]);
+ assert.equal(f.graph.nodes.length,3);assert.equal(f.operation.deadline,deadline);
+ assert.equal((await f.run(r)).replayed,true);assert.deepEqual(f.calls,['remove_link','connect']);
+});
+test('empty or already matching existing export inputs preserve every link without gestures',async()=>{
+ for(const inputs of [[],[{source:ref('source'),output:0,input:0}]]){
+  const {f,r}=existingExportFixture(),before=structuredClone(f.graph);r.inputs=inputs;
+  assert.equal((await f.run(r)).status,'SUCCEEDED');assert.deepEqual(f.calls,[]);assert.deepEqual(f.graph,before);
+ }
+});
+for(const invalid of ['other type','foreign inventory','missing inventory','two input ports','ambiguous occupied input','missing old source','missing old output','foreign node'])test('existing export replacement refuses '+invalid+' before gestures',async()=>{
+ const {f,r}=existingExportFixture();
+ if(invalid==='other type'){r.target.type='transform.sorting';f.graph.nodes[2].type=r.target.type;}
+ if(invalid==='foreign inventory')f.graph.foreign_links=['foreign'];
+ if(invalid==='missing inventory')delete f.graph.foreign_links;
+ if(invalid==='two input ports')f.graph.nodes[2].inputs.push(1);
+ if(invalid==='ambiguous occupied input')f.graph.links.push({source:'filter',output:0,target:'export',input:0});
+ if(invalid==='missing old source')f.graph.nodes.shift();
+ if(invalid==='missing old output')f.graph.nodes[0].outputs=[];
+ if(invalid==='foreign node')f.graph.nodes[0].ref.workflow_id='foreign';
+ const result=await f.run(r);assert.equal(result.status,'NOT_APPLIED',result.error);assert.deepEqual(f.calls,[]);
+});
+test('a changed occupied export link after baseline is not deleted',async()=>{
+ const {f,r}=existingExportFixture();let changed=false;
+ const result=await prepareNodeTarget({request:r,operation:f.operation,adapter:f.adapter,record:async e=>{
+  if(!changed&&e.phase==='node_target_checkpoint'&&e.target_state.baseline){changed=true;f.graph.links[1]={source:'filter',output:0,target:'export',input:0};}
+  return e;
+ }});
+ assert.equal(result.status,'NOT_APPLIED',result.error);assert.deepEqual(f.calls,[]);
+ assert.equal(f.graph.links[1].source,'filter');
+});
+for(const changed of ['new source missing','new output missing','target type','target lock','foreign link'])test('export replacement rechecks '+changed+' before deletion',async()=>{
+ const {f,r}=existingExportFixture();let modified=false;
+ const result=await prepareNodeTarget({request:r,operation:f.operation,adapter:f.adapter,record:async e=>{
+  if(!modified&&e.phase==='node_target_checkpoint'&&e.target_state.baseline){
+   modified=true;
+   if(changed==='new source missing')f.graph.nodes.splice(1,1);
+   if(changed==='new output missing')f.graph.nodes[1].outputs=[];
+   if(changed==='target type')f.graph.nodes[2].type='transform.sorting';
+   if(changed==='target lock')f.graph.nodes[2].locked=true;
+   if(changed==='foreign link')f.graph.foreign_links.push('foreign');
+  }
+  return e;
+ }});
+ assert.equal(result.status,'NOT_APPLIED',result.error);assert.deepEqual(f.calls,[]);
+ assert.ok(f.graph.links.some(e=>e.source==='source'&&e.target==='export'));
+});
+test('a lost export unlink reply remains pending and recovery never repeats deletion',async()=>{
+ const {f,r}=existingExportFixture(),mutate=f.adapter.mutate;let lost=true;
+ f.adapter.mutate=async e=>{const result=await mutate(e);if(e.kind==='remove_link'&&lost){lost=false;throw Error('lost reply');}return result;};
+ assert.equal((await f.run(r)).status,'AMBIGUOUS');assert.equal(f.operation.targetPhase.pending.kind,'remove_link');
+ assert.equal((await f.run(r)).status,'AMBIGUOUS');assert.deepEqual(f.calls,['remove_link']);
+ f.adapter.reconcile=async()=>({verified:true,cleanup_complete:true});
+ assert.equal((await f.run(r)).status,'SUCCEEDED');assert.deepEqual(f.calls,['remove_link','connect']);
+});
 test('duplicate labels never resolve an existing target by label',async()=>{
  const f=fixture();f.graph.nodes.push({...structuredClone(source),ref:ref('different')});
  const r=request();r.target={kind:'existing',type:'imports.text',ref:ref('absent')};r.inputs=[];
