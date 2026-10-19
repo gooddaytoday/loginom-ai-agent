@@ -24,6 +24,7 @@ import {createJavascriptSourceReadRegistry} from './javascript-source-read-regis
 import {createJavascriptSourceReadSession,validateJavascriptSourceReadRequest} from './javascript-source-read-session.mjs';
 import {createJavascriptContextReadSession,validateJavascriptContextReadRequest} from './javascript-context-read.mjs';
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
+import {classifyBrowserRecovery,browserRecoveryNextStep,browserRecoveryStepKey} from './browser-recovery-basis.mjs';
 import { configureTextImportDraft, validateTextImportRequest } from './text-import-procedure.mjs';
 import selectorCatalog from '../../executor/catalog/selectors.json' with { type: 'json' };
 
@@ -1459,7 +1460,7 @@ export function parseCapabilityResult(response) {
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   let pending = null;
   let running = false;
@@ -1572,6 +1573,56 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     await onRecord({ operation_id: operation.id, action_key: operation.action.action_key, action_revision: operation.action.revision,
       phase, parameters: structuredClone(operation.parameters), checkpoint: structuredClone(operation.checkpoint ?? null),
       deadline_at: operation.deadline ?? null, ...(outcome ? { outcome: structuredClone(outcome) } : {}) });
+  };
+  const recoveryBasis = (operation,allowRunning=false) => {
+    if(!browserRecovery||!operation?.outcome||pending&&pending!==operation||running&&!allowRunning
+      ||nodeJobs?.busy&&nodeJobs.active?.operation_id!==operation.id||sourceReads?.unsettled||delivery?.unsettled)return null;
+    const output=operation.outcome.output??{};
+    const advice=recoveryAdvice(operation);
+    const node=output.node??operation.nodeApply?.node??operation.parameters?.target?.ref??null;
+    const request=operation.nodeApply?.request??operation.parameters;
+    const storage=['package.save_checkpoint','package.save_as'].includes(operation.action.action_key)?getStorageBinding():null;
+    const snapshot={operation_id:operation.id,capability:operation.action.capability,action_key:operation.action.action_key,
+      state:pending===operation?'pending':'settled',status:operation.outcome.status,
+      effect_possible:operation.outcome.effect_possible,error_code:operation.outcome.error?.code,
+      cause_code:operation.outcome.error?.cause?.code,stopped_error:operation.stoppedError,
+      pending_phase:operation.nodeApply?.pending?.phase??output.pending_phase??null,
+      released_phase:output.released_phase,checkpoint_kind:output.checkpoint_kind,
+      execution_status:output.execution?.status,node,target:request?.target,
+      request_finish:request?.finish,read_ports:request?.read?.ports,
+      export_overwrite:request?.parameters?.overwrite,export_download_unconfirmed:Boolean(operation.nodeApply?.export_download_refusal),
+      document_id:storage?.document_id??operation.checkpoint?.document_id??request?.document_id,
+      package_path:request?.path,reconciled:operation.browserRecoveryReconciled===operation.outcome,
+      release_refused:operation.releaseRefused,transport_uncertain:operation.transportUncertain,
+      recovery_options:advice.recovery_options,next_tools:advice.next_steps.map(step=>step.tool),
+      internal_resume_available:advice.internal_resume_available,user_action:operation.releaseRefused?.user_action,
+      browser_recovery_stopped:operation.browserRecoveryStopped,recovery_receipt_id:operation.browserRecoveryReceiptId};
+    const history=[...operations.values()].filter(item=>item!==operation&&item.action.capability==='node.apply')
+      .map(item=>({node:item.outcome?.output?.node??item.nodeApply?.node,
+        checkpoint_kind:item.outcome?.output?.checkpoint_kind,released_phase:item.outcome?.output?.released_phase,
+        stopped_error:item.stoppedError}));
+    const basis=classifyBrowserRecovery(snapshot,history);
+    if(!basis)return null;
+    const input={original_operation_id:operation.id,request,document_id:snapshot.document_id,
+      workflow_ref:request?.workflow_ref,node,package_path:snapshot.package_path,
+      phase:basis.step.phase,confirmed_phases:output.phases??operation.nodeApply?.phases??[],
+      possible_effects:{effect_possible:operation.outcome.effect_possible,execution:output.execution,
+        export_download_unconfirmed:snapshot.export_download_unconfirmed},
+      used_recovery:operation.usedRecovery??[],goal:basis.goal};
+    if(Buffer.byteLength(JSON.stringify(request??null))>16384){delete input.request;input.request_omitted=true;}
+    return structuredClone({...basis,input});
+  };
+  const recoveryOffer=(operation,allowRunning=false)=>{
+    const basis=recoveryBasis(operation,allowRunning);
+    return basis?{basis,next_step:browserRecoveryNextStep(basis,browserRecovery.remaining(browserRecoveryStepKey(basis.step)))}:null;
+  };
+  const recordRecoveryBasis=async(operation,allowRunning=false)=>{
+    const offer=recoveryOffer(operation,allowRunning);
+    if(!offer||operation.browserRecoveryLogged?.has(offer.basis.trigger))return;
+    try{await onRecord({operation_id:operation.id,action_key:operation.action.action_key,
+      action_revision:operation.action.revision,phase:'browser_recovery_basis',basis:offer.basis});}
+    catch(error){return String(error?.message??error).slice(0,1000);}
+    (operation.browserRecoveryLogged??=new Set()).add(offer.basis.trigger);
   };
   const readReceipt = async (operation,reference=operation.lastReceipt) => {
     if (!reference) return { state: 'missing' };
@@ -1809,7 +1860,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   // Release never continues the stopped phase. Its driver proves that the node
   // rests unlocked on a quiet unchanged graph and reports unverified settings or
   // execution as unknown; no observation_id is taken from the caller.
-  const nodeReleaseStep=operation=>!operation.transportUncertain&&!nodeJobs.busy&&operation.nodeApply?.pending
+  const nodeReleaseStep=operation=>!operation.transportUncertain&&(!nodeJobs.busy||!running&&nodeJobs.active?.operation_id===operation.id)&&operation.nodeApply?.pending
     &&(!operation.nodeApplyDrivers?.releasePendingPhases||operation.nodeApplyDrivers.releasePendingPhases.includes(operation.nodeApply.pending.phase))
     &&operation.nodeApply.node&&typeof operation.nodeApplyDrivers?.releasePending==='function'?{tool:'dock_operation_recover',
       arguments:{operation_id:operation.id,strategy:'abandon_operation'},required_fields:['recovery_operation_id'],
@@ -1824,11 +1875,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     try{
       const record={...operation,id:recoveryOperationId,parameters:{original_operation_id:operation.id,strategy}};
       await remember(record,'recovery_prepared');
+      (operation.usedRecovery??=[]).push(strategy);
       observations.clear();
       let returned;
       try{
         const result=await releaseNodeApply({operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,record:onRecord,signal});
+        operation.releaseRefused=null;
         operation.outcome=nodeApplyOutcome(operation,result);operation.cleanupConfirmed=true;
+        const offer=recoveryOffer(operation,true);
+        if(offer)operation.outcome.output.browser_recovery=offer;
         await remember(operation,'operation_abandoned',operation.outcome);
         pending=null;nodeJobs.settle(operation.id,operation.outcome);
         returned={status:'SUCCEEDED',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'resolved',
@@ -1837,10 +1892,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }catch(error){
         // The original operation keeps its gate. A blocker the user can clear is
         // named explicitly instead of leaving an empty recovery list.
+        if(error?.userAction)operation.releaseRefused={user_action:error.userAction,phase:operation.nodeApply?.pending?.phase};
+        const offer=recoveryOffer(operation,true);
         returned={status:'AMBIGUOUS',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'release_refused',
           effect_possible:true,trace:[],recovery_operation_id:recoveryOperationId,
           error:{code:'NODE_RELEASE_REFUSED',message:String(error?.message??error).slice(0,1000)},
-          output:{original_operation_pending:pending===operation,...(error?.userAction?{user_action:error.userAction}:{})}};
+          output:{original_operation_pending:pending===operation,...(error?.userAction&&!offer?{user_action:error.userAction}:{}),
+            ...(offer?{browser_recovery:offer}:{})}};
+      }
+      const journalError=await recordRecoveryBasis(operation,true);
+      if(journalError){
+        const offered=returned.output.original_outcome?.output?.browser_recovery??returned.output.browser_recovery;
+        if(offered)offered.journal_error=journalError;
       }
       await remember(record,'recovery_completed',returned);
       auxiliary.set(recoveryOperationId,{signature,outcome:structuredClone(returned)});
@@ -1927,7 +1990,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       outcome: outcome ?? operation?.outcome ?? null, cleanup_confirmed: operation ? operation.cleanupConfirmed === true : true,
       effect_state: !operation ? 'none' : operation.transportUncertain ? 'unknown' : pending === operation ? 'partial_or_unverified'
         : operation.outcome?.resolution ? 'observed_unverified' : 'verified',
-      ...recoveryAdvice(operation),
+      ...recoveryAdvice(operation),...(operation&&recoveryOffer(operation)?{browser_recovery:recoveryOffer(operation)}:{}),
     } });
   const retainObservation = outcome => {
     try { return observations.retain(outcome); }
@@ -1943,8 +2006,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     signal?.throwIfAborted();
     const operation = operationId ? operations.get(operationId) : pending;
     if (operationId && !operation) throw new Error('Operation is not known in this session');
-    if (!operation || pending !== operation) return view(operation);
-    return view(operation, await reconcilePending());
+    if (!operation || pending !== operation){
+      const journalError=await recordRecoveryBasis(operation);
+      const result=view(operation);
+      if(journalError&&result.output.browser_recovery)result.output.browser_recovery.journal_error=journalError;
+      return result;
+    }
+    const outcome=await reconcilePending();
+    if(['package.save_checkpoint','package.save_as'].includes(operation.action.action_key)
+      &&operation.outcome?.status==='AMBIGUOUS')operation.browserRecoveryReconciled=operation.outcome;
+    const journalError=await recordRecoveryBasis(operation);
+    const result=view(operation,outcome);
+    if(journalError&&result.output.browser_recovery)result.output.browser_recovery.journal_error=journalError;
+    return result;
   };
   const nodeResumeRefusal='Resume requires the original inspected node checkpoint without an unresolved phase';
   const nodeResumeBlocked=operation=>{
@@ -2040,8 +2114,24 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       try{return await sourceReads.read(args,options);}
       finally{running=false;}
     },
-    nodeApplyStatus:id=>sourceReads.has(id)?sourceReads.status(id):nodeJobs.status(id),
-    waitNodeApply:(id,options)=>sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options),
+    nodeApplyStatus:id=>{
+      const result=sourceReads.has(id)?sourceReads.status(id):nodeJobs.status(id);
+      const offer=recoveryOffer(operations.get(id));
+      if(offer&&result?.outcome?.output)result.outcome.output.browser_recovery=offer;
+      return result;
+    },
+    browserRecoveryBasis:id=>recoveryBasis(operations.get(id)),
+    waitNodeApply:async(id,options)=>{
+      const result=await (sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options));
+      const operation=operations.get(id);
+      const offer=recoveryOffer(operation);
+      if(offer&&result?.outcome?.output){
+        result.outcome.output.browser_recovery=offer;
+        const journalError=await recordRecoveryBasis(operation);
+        if(journalError)offer.journal_error=journalError;
+      }
+      return result;
+    },
     cancelNodeApply:id=>sourceReads.has(id)?sourceReads.cancel(id):nodeJobs.cancel(id),
     stopNodeApply:id=>nodeJobs.stop(id),
     tools: [...executorTools,...(allowCandidate && artifactStore ? [artifactUploadTool,artifactVerifyTool,...deliveryApiTools] : []),
@@ -2495,6 +2585,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(resume&&['workflow','target'].includes(operation?.nodeApply?.pending?.phase))await inspectApply(operation);
       if(resume&&nodeResumeBlocked(operation))throw new Error(nodeResumeRefusal);
       running=true;
+      let completedOutcome;
       try {
         if(!operation){
           operation={id:operationId,signature,parameters:request,
@@ -2614,6 +2705,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             error:{code:'NODE_APPLY_STOPPED',message:String(error.message).slice(0,1000)}};
         }
         operation.outcome=nodeApplyOutcome(operation,result);operation.cleanupConfirmed=result.cleanup_complete===true;
+        operation.stoppedError=result.error?{code:result.error.code,cause_code:result.error.cause?.code}:null;
+        operation.releaseRefused=null;
         try{await remember(operation,'completed',operation.outcome);}
         catch(error){
           // Failure to journal delivery must retain the configured node, accepted
@@ -2624,8 +2717,15 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           return structuredClone(operation.outcome);
         }
         if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)pending=null;
-        return structuredClone(operation.outcome);
+        completedOutcome=structuredClone(operation.outcome);
       }finally{running=false;}
+      const offer=recoveryOffer(operation);
+      if(offer){
+        completedOutcome.output.browser_recovery=offer;
+        const journalError=await recordRecoveryBasis(operation);
+        if(journalError)offer.journal_error=journalError;
+      }
+      return completedOutcome;
     },
     async run(actionKey, parameters, { signal, operationId, deadlineAt } = {}) {
       signal?.throwIfAborted();
@@ -2720,7 +2820,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }});
   // Internal delivery calls retain the original runtime methods. The returned
   // facade prevents a second caller from changing UI between transfer stages.
-  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','waitNodeApply']);
+  const readOnly=new Set(['describe','requestFailure','nodeApplyStatus','waitNodeApply','browserRecoveryBasis','browserRecoveryHandoff']);
   const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{

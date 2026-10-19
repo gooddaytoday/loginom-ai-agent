@@ -153,3 +153,9 @@ test('verified calculator rejection exposes its concrete corrected-request conti
   output:{node:{document_id:'d',workflow_id:'w',node_id:'n'},next_step:next,output:{status:'not_refreshed',ports:[]}}}});
  assert.deepEqual(r.next_step,next);assert.equal(validate(r).valid,true);
 });
+test('user-v1 replies put the browser recovery next_step first',()=>{
+  const next={tool:'dock_browser_recovery'};
+  assert.equal(compactNodeResult({operation_id:'apply',state:'settled',outcome:{status:'AMBIGUOUS',
+    output:{next_step:{tool:'dock_operation_inspect'},browser_recovery:{next_step:next}}}}).next_step.tool,'dock_browser_recovery');
+  assert.equal(compactActionResult({status:'AMBIGUOUS',action_key:'operation.recover',output:{browser_recovery:{next_step:next}}}).next_step.tool,'dock_browser_recovery');
+});
