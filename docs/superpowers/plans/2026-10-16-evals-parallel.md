@@ -231,8 +231,9 @@
   run-u17489.service завершён, MainPID=0. Без сигналов root и без новых механизмов.
   Judge hold освобождён; admin proof сохранил failed из-за чужого setuid peer.
   Повторные прямые проверки чистые, но штатного settlement нет (независимое ревью).
-  N=1 ждёт разового решения по server/profile holds c21be2f8…;
-  [блокер и evidence](../../../eval_parallel_blockers.md). Реальных model calls ещё нет.
+  Владелец разрешил разовое снятие server/profile holds c21be2f8…; повторные
+  прямые проверки прошли, существующий CAS освободил только эти брони, без удаления.
+  Исходный failed admin receipt сохранён; [evidence](../../../eval_parallel_blockers.md).
 - [x] Подключить JSON status к проверке provider errors: busy→idle основной
   сессии, любой retry сохраняет отказ; старый/оборванный JSON и task tool не дают
   полного покрытия. Непустой существующий --title исключает запрос автозаголовка.
@@ -329,4 +330,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20. Native A/B4/4 PASS; CLIc8 retry+sharedOAuth/judge429 qualified; N=1 до dispatch блокирует failed admin proof c21be2f8…; прямые проверки чистые, нужно разовое решение владельца по броням.
+20. Native A/B4/4 PASS; CLIc8 retry+sharedOAuth/judge429 qualified; по разрешению владельца c21be2f8… server/profile holds сняты через CAS после прямых проверок; failed receipt сохранён, далее N=1.
