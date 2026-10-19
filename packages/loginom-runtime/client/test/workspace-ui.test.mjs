@@ -2035,9 +2035,19 @@ test('typed wizard opening verifies node and workflow path after one settings cl
 });
 
 test('prepared wizard opening retries one refused sample and preserves native owner guards',async()=>{
- for(const fault of [null,'node','owner','path','absent']) {
+ for(const fault of [null,'node','owner','path','absent','loading','loading_foreign','loading_dialog','loading_owner','loading_node','loading_expired']) {
   const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
-  page.waitForTimeout=async ms=>clock.advance(ms);
+  const loading=fault?.startsWith('loading');let mask,secondary,waits=0;
+  page.waitForTimeout=async ms=>{
+   clock.advance(ms);waits++;
+   if(loading&&fault!=='loading_expired'&&waits===3)mask.attrs.class='';
+   if(fault==='loading_foreign'&&waits===1)page.add('div','foreign-mask','Loading').attrs.class='x-mask-msg';
+   if(fault==='loading_dialog'&&waits===1)page.add('div','foreign-dialog','Other').attrs.class='x-window';
+   if(fault==='loading_owner'&&waits===1){
+    const crumb=page.document.querySelectorAll('[data-tid="'+base+'cnrNaviMode;b.s_'+path+'>REST"]')[0];
+    crumb.attrs['data-tid']=base+'cnrNaviMode;b.s_'+path+'>Other';
+   }
+  };
   let path='';
   for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий']) {
    path+=(path?'>':'')+label;
@@ -2049,13 +2059,18 @@ test('prepared wizard opening retries one refused sample and preserves native ow
   page.add('g',base+'Graph;REST;Setting','',{x:500,y:300,width:30,height:30},graph);
   let reads=0;
   const binding=async()=>({verified:true,document_id:'doc',workflow_id:'workflow',
-   node_id:fault==='node'&&reads>=26?'foreign':'node',surface:page.events.includes('click')?'wizard':'graph',
+   node_id:fault==='node'&&reads>=26||fault==='loading_node'&&waits>=1?'foreign':'node',surface:page.events.includes('click')?'wizard':'graph',
    tid:base+(page.events.includes('click')?'WizrdMCF':'Graph;REST'),...(!page.events.includes('click')?{locked:false}:{})});
   page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
    {expected_build:build,expected_origin:origin,kind:'workspace-ui',prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},binding));
   const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_open),click=page.mouse.click;
   page.mouse.click=async(...args)=>{await click(...args);graph.remove();
    const wizard=page.add('div',base+'WizrdMCF');page.add('button',base+'WizrdMCF;RESTRequestWizard;btnHelp','',undefined,wizard);
+   if(loading){
+    mask=wizard;mask.attrs.class='bg-mask-message';
+    page.add('table',base+'WizrdMCF;JoinDataWizard;grdSourceColumns;tbl','',undefined,wizard);
+    secondary=page.add('div',null,'Загрузка...',undefined,wizard);secondary.attrs.class='x-mask-msg';
+   }
    const ownerPath=fault==='path'?path.replace('Модуль1','Модуль2'):path,owner=fault==='owner'?'Other':'REST';
    const node=page.add('a',base+'cnrNaviMode;b.s_'+ownerPath+'>'+owner,owner,undefined,panel);
    page.add('span',null,'',undefined,node).attrs.class='bg-vendor-icon-restclient';
@@ -2068,16 +2083,24 @@ test('prepared wizard opening retries one refused sample and preserves native ow
     reads++;
     // The native controller has switched while the rendered wizard read is
     // still absent. Exhaust the existing bounded observations before retry.
-    if(reads<=25||fault==='absent')out.wizard={status:'absent'};
+    if(!loading&&(reads<=25||fault==='absent'))out.wizard={status:'absent'};
+    // mas2: the first sample includes an unbound grid loading message. The
+    // confirmation reread sees only the exact wizard mask, still loading.
+    if(loading&&reads===1)secondary.remove();
    }
    return out;
   };
   const result=await page.act({verb:'begin_wizard',ref:button.ref},snapshot);
-  assert.equal(result.status,fault?'AMBIGUOUS':'SUCCEEDED',fault+JSON.stringify({error:result.error,trace:result.trace}));
+  assert.equal(result.status,!fault||fault==='loading'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify({error:result.error,trace:result.trace}));
   const retry=result.trace.filter(e=>e.event==='wizard_open_confirmation_read_retried');
-  assert.equal(retry.length,1,fault+JSON.stringify(result.error));assert.equal(retry[0].initial_observation.wizard.status,'absent');
+  assert.equal(retry.length,1,fault+JSON.stringify(result.error));assert.equal(retry[0].initial_observation.wizard.status,loading?'observed':'absent');
   assert.equal(page.events.filter(e=>e==='click').length,1);
-  if(fault)assert.equal(result.error.code,fault==='node'?'PREPARED_NODE_CONTEXT_CHANGED':'WIZARD_OPEN_NOT_CONFIRMED');
+  if(loading){
+   assert.equal(retry[0].initial_observation.ui.masks.length,2);
+   assert.equal(retry[0].initial_observation.ui.masks[1].target_tid,null);
+  }
+  if(fault&&fault!=='loading')assert.equal(result.error.code,
+   fault==='node'?'PREPARED_NODE_CONTEXT_CHANGED':fault==='loading_expired'?'UI_DEADLINE_EXCEEDED':fault==='loading_dialog'?'WIZARD_CONTEXT_CHANGED':'WIZARD_OPEN_NOT_CONFIRMED',fault);
  }
 });
 
