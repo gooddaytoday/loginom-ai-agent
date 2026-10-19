@@ -1001,6 +1001,30 @@ test('navigation root reads the directory without traversing a large storage tab
   assert.equal(detail.output.file_storage.listing_complete,false);assert.equal(walkedTable,false);
 });
 
+test('virtual storage table shares ancestor checks only within each fresh read', async () => {
+  const page=new Page({clock:fixtureClock().Date}),tid='MF;TF-1;FileStorageForm;pnlFileStorage;tbl';
+  const table=page.add('div',tid),rows=[];
+  for(let i=0;i<40;i++) {
+    const row=page.add('table',null,'',undefined,table);rows.push(row);
+    for(let j=0;j<6;j++)page.add('td',j===0?'MF;TF-1;FileStorageForm;colName_file'+i:null,'file'+i,undefined,row);
+  }
+  const roots=await page.execute({mode:'observe',discover_roots:true});
+  const ref=roots.output.ui.elements.find(e=>e.tid===tid).ref;
+  const computed=page.context.getComputedStyle;let tableStyles=0;
+  page.context.getComputedStyle=element=>{if(element===table)tableStyles++;return computed(element);};
+  const read=()=>page.execute({mode:'observe',root_ref:ref});
+  let result=await read();
+  assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.ui.table_cells.length,120);
+  assert.ok(tableStyles<=3,'shared table ancestor was recomputed '+tableStyles+' times');
+  tableStyles=0;rows[0].style.visibility='hidden';rows[1].attrs['aria-label']='credential';
+  result=await read();assert.equal(result.status,'SUCCEEDED');
+  assert.equal(result.output.ui.elements.some(e=>e.tid?.endsWith('colName_file0')||e.tid?.endsWith('colName_file1')),false);
+  assert.ok(!result.output.ui.table_cells.some(c=>c.text==='file0'||c.text==='file1'));
+  assert.ok(tableStyles>0&&tableStyles<=3,'fresh read must recompute ancestor visibility');
+  table.style.visibility='hidden';
+  assert.equal((await read()).error.code,'UI_ROOT_STALE');
+});
+
 test('storage-name discovery uses escaped fixed lookup and no table traversal', async () => {
   const page=new Page({ clock: fixtureClock().Date }),name='data, " ]';
   const cell=page.add('td','MF;TF-1;FileStorageForm;colName_data_"_]','data, " ]');

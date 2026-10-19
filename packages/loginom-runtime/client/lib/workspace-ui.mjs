@@ -378,6 +378,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       && geometryCheck(b.x+b.width,p.x+p.width,'right_containment',element,rightTolerance,false)
       && geometryCheck(b.y+b.height,p.y+p.height,'bottom_containment',element,geometryEpsilon,false);
 
+    // File search scans the same virtual table before and after a scroll.
+    // Its rows share ancestors too; reuse only this synchronous read's checks.
+    cacheReadPredicates ||= /^MF;TF(?:-\d+)?;FileStorageForm;pnlFileStorage;tbl$/.test(getTid(requestedRoot)??'');
     // One evaluate is synchronous: no gesture or event-loop yield occurs in
     // this scan. Reusing native visibility/sensitivity checks within this read
     // avoids repeatedly walking the same ancestors for every definition cell.
