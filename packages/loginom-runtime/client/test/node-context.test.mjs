@@ -93,7 +93,7 @@ test('separate output wizard requires its verified opening receipt and exact nat
 
 
 test('port context reports the icon from the same verified native port owner',async()=>{
- for(const input of [true,false])for(const icon of ['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata']) {
+ for(const input of [true,false])for(const icon of ['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns']) {
   const f=fixture(),p=f.enterPortWizard(input);p.opening.node.FIconCls=icon;
   const result=await readPreparedNodeContext(f.page,f.binding);
   assert.equal(result.verified,true);assert.equal(result[input?'input_port':'output_port'].node_icon_class,icon);
