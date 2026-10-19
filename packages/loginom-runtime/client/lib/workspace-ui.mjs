@@ -615,7 +615,13 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       const form=wizardForms[0],base=getTid(form);
       const matching=suffix=>(tids.get(base+suffix)??[]).filter(element=>form.contains(element) && visible(element) && !sensitive(element));
       const titles=matching(';cardWizardPanel;p.h;p.t');
-      const stages=Object.entries(wizardMarkers).flatMap(([key,suffixes])=>[suffixes].flat().flatMap(suffix=>matching(suffix).map(()=>key)));
+      const stages=Object.entries(wizardMarkers).flatMap(([key,suffixes])=>{
+        const counts=[suffixes].flat().map(suffix=>matching(suffix).length);
+        // The same input card can show both its grid and Add button. Neither
+        // duplicate markers nor a second native card establish a unique stage.
+        if(key==='input_mapping'&&counts[0]===1&&counts[1]===1)counts[1]=0;
+        return counts.flatMap(count=>Array(count).fill(key));
+      });
       wizard={status:'observed',root_tid:base,root_ref:refOf(form),title:titles.length===1?textOf(titles[0],true):null,
         title_status:titles.length===1?'observed':titles.length?'ambiguous':'unobserved',
         stage:stages.length===1?stages[0]:null,stage_status:stages.length===1?'observed':stages.length?'ambiguous':'unrecognized',
