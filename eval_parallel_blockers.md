@@ -28,7 +28,6 @@ provider429 нельзя исключить по headless JSON. Новый run �
 Минимальная правка зеркалирует существующий status через JSON emit; process-тест
 429→200 включён в private proposal
 `/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/cli-retry-output-proposal.patch`.
-Diff не применён/не проверен. Он затрагивает packages/agent/src/cli/cmd/run.ts и
-его process-тест, а evals/AGENTS.md разрешает вне evals только документы и judge
-launcher. Требуется точное исключение этой границы владельцем; до ответа модельные
-прогоны и дальнейшая реализация приостановлены. Это не новое согласование плана.
+Владелец2026-10-19 разрешил эту правку вне evals/: CLI и его process-тест,
+затем отдельные сборка/квалификация. Блокер согласования снят; сам retry output
+ещё не исправлен/не проверен. Порядок продолжения — в текущем плане.
