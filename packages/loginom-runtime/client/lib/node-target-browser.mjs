@@ -140,7 +140,7 @@ export async function readGraph(page, task) {
 // pre-effect snapshot must still match immediately before the gesture.
 export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph) {
   let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false;
-  let gestureBefore=task.effect.before;
+  let gestureBefore=task.effect.before,targetStage='before_graph',lastPortError;
   const remaining=()=>{if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw new Error('Node target cancelled');const value=task.deadline-Date.now();if(value<=0)throw new Error('Graph deadline');return value;};
   const ensureContext=()=>page.evaluate(({request,epoch})=>{
     const p=globalThis.__loginomDockPreparationV1;
@@ -179,6 +179,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       if(!sameGraph(before,gestureBefore))throw Error('Graph changed after target navigation');
     }
     if(kind==='create'){
+      targetStage='placement_navigation';
       const title=task.types[p.type].title.replace(/\s/g,'_');
       const palette=task.request.workflow_ref.prefix+';ModelForm;colVendors_Компоненты>'+task.types[p.type].palette_group+'>'+title+';TreeText';
       const canvas=find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram');
@@ -213,7 +214,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         const currentOrigin=await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').boundingBox();
         if(JSON.stringify(currentOrigin)!==JSON.stringify(origin)||!await find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram').evaluate((e,p)=>{const b=e.getBoundingClientRect(),hit=document.elementFromPoint(p.x,p.y);return p.x>=b.x&&p.x<b.right&&p.y>=b.y&&p.y<b.bottom&&p.x>=0&&p.y>=0&&p.x<innerWidth&&p.y<innerHeight&&!!hit&&(hit===e||e.contains(hit));},target))throw Error('Export drop changed after palette reveal');
       }
-      await drag(find(palette),target);
+      targetStage='create_drag';await drag(find(palette),target);
     }else if(kind==='rename'){
       const tid=await targetTid(p.ref);await point(find(tid+';Label;Label'));effectPossible=true;
       await find(tid+';Label;Label').dblclick({timeout:remaining()});transient=true;
@@ -282,13 +283,15 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       if((await message.textContent()).trim()!=='Удалить выделенную связь?')throw new Error('Single-link confirmation changed');
       await yes.click({timeout:remaining()});transient=false;
     }else throw new Error('Graph primitive is not implemented: '+kind);
-    await page.mouse.move(10,10);
+    targetStage='pointer_leave';await page.mouse.move(10,10);
     const settleJavascript=kind==='create' && p.type==='programming.javascript';
     const maskDeadline=Math.min(task.deadline,Date.now()+15000);
     let pendingNode;
+    targetStage='graph_settlement';
     let after=await wait('graph_effect_visible_and_drag_idle',async()=>{
       try{const g=await read(page,task);return g.interaction_ready&&JSON.stringify(g)!==JSON.stringify(before)?g:null;}
       catch(error){
+        if(String(error.message).includes('Visible port identity is not rendered'))lastPortError=String(error.message);
         if(!settleJavascript)return null;
         if(String(error.message).includes('Graph is blocked') && Date.now()<maskDeadline)return null;
         if(!String(error.message).includes('Visible port identity is not rendered'))throw error;
@@ -305,6 +308,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       }
     },0,settleJavascript);
     if(kind==='create'){
+      targetStage='created_node_visibility';
       const created=after.nodes.filter(n=>!before.nodes.some(b=>b.ref.node_id===n.ref.node_id));
       if(created.length!==1)throw Error('Created node visibility owner is ambiguous');
       const baseline=after,node=created[0],canvas=find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram');
@@ -313,15 +317,17 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();if(!sameGraph(baseline,await read(page,task)))throw Error('Graph changed while revealing created node');}});
       placementNavigation.node_visibility=visibility;
       if(!visibility.fully_visible)throw Error('Created node and ports are not fully visible');
-      after=await read(page,task);
+      targetStage='final_graph';after=await read(page,task);
       if(!sameGraph(baseline,after))throw Error('Created node graph changed after viewport navigation');
     }
-    outcome={status:'SUCCEEDED',effect_possible:true,after};
+    targetStage='verified';outcome={status:'SUCCEEDED',effect_possible:true,after};
   }catch(error){if(error.placement_navigation_unverified){effectPossible=true;placementNavigationUncertain=true;}outcome={status:effectPossible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:effectPossible,error:String(error.message),...(placementRefusal?{placement_refusal:placementRefusal}:{})};}
   finally{try{if(held){await page.mouse.up();held=false;}if(transient==='delete'){const cancel=find('msgbox;tlb;no');if(await cancel.isVisible())await cancel.click({timeout:3000});}else if(transient)await page.keyboard.press('Escape');transient=false;outcome.cleanup_complete=true;}catch(error){outcome={...outcome,status:'AMBIGUOUS',cleanup_complete:false,cleanup_error:String(error.message)};}}
   if(paletteScroll)outcome.palette_scroll=paletteScroll;
   if(placementNavigation)outcome.placement_navigation=placementNavigation;
   if(paletteScrollUncertain||placementNavigationUncertain)outcome.cleanup_complete=false;
+  outcome.target_stage=targetStage;
+  if(lastPortError)outcome.last_port_error=lastPortError;
   return outcome;
 }
 
@@ -438,17 +444,27 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
       return call(`async page=>page.locator('[data-tid='+${JSON.stringify(JSON.stringify(tid))}+']').evaluate(e=>{
         const b=e.getBoundingClientRect(),width=Math.min(b.right,innerWidth)-b.x,height=Math.min(b.bottom,innerHeight)-b.y;
         const view=(${nodePlacementViewport.toString()})(e);
+        const javascript=${JSON.stringify(value.target.type)}==='programming.javascript';
         const occupied=[...e.querySelectorAll('[data-tid*=";Graph;"]')].map(n=>n.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
         for(let y=80;y<height-80;y+=128)for(let x=80;x<width-96;x+=160){
-          const position=(${nodePlacementPosition.toString()})(view,{x:b.x+x,y:b.y+y});
+          const screenY=javascript?Math.min(b.y+y,Math.min(b.bottom,innerHeight)-8-108*view.scale-.1):b.y+y;
+          const position=(${nodePlacementPosition.toString()})(view,{x:b.x+x,y:screenY});
           if(position.x<${NODE_POSITION_MIN}||position.y<${NODE_POSITION_MIN}||position.x>10000||position.y>10000)continue;
           const screen=(${nodePlacementPoint.toString()})(view,position),px=screen.x,py=screen.y,hit=document.elementFromPoint(px,py);
+          // Initial JavaScript includes Add ports: its observed 7.4.2 drawing
+          // is 88x129, offset -16/-21 from the drop point (Group Data: 85 high).
+          // Reject the whole footprint before the single create gesture.
+          if(javascript && (px-16*view.scale<Math.max(b.x,0)+8
+            ||py-21*view.scale<Math.max(b.y,0)+8||px+72*view.scale>=Math.min(b.right,innerWidth)-8
+            ||py+108*view.scale>=Math.min(b.bottom,innerHeight)-8))continue;
           if(px<0||py<0||!hit||!(hit===e||e.contains(hit)))continue;
           if(occupied.some(r=>px>r.left-72&&px<r.right+96&&py>r.top-56&&py<r.bottom+72))continue;
           return position;
         }
         const overflow=(${nodePlacementOverflow.toString()})(view,occupied,${NODE_POSITION_MIN},10000);
-        if(overflow)return overflow;
+        // An offscreen point cannot certify the taller JavaScript's ports.
+        // Other components retain their existing overflow placement path.
+        if(overflow && !javascript)return overflow;
         throw Error('target.position: no free visible canvas position or bounded model position; enlarge the canvas or supply an explicit position');
       })`,deadline);
     },

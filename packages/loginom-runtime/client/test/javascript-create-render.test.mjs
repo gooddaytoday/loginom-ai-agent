@@ -43,6 +43,7 @@ function fixture(t, fault) {
 test('one JavaScript create waits read-only past 15s for its port under the original deadline',async t=>{
  const f=fixture(t),r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);
  assert.equal(r.after.nodes[0].ref.node_id,'new-js');assert.equal(f.counts().drags,1);assert.ok(f.now()>=26000&&f.now()<40000);assert.equal(r.cleanup_complete,true);
+ assert.equal(r.target_stage,'verified');assert.match(r.last_port_error,/Visible port identity is not rendered/);
 });
 test('the existing short loading-mask wait can precede JavaScript port settlement',async t=>{
  const f=fixture(t,'mask'),r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(f.counts().drags,1);assert.ok(f.now()>=26000);
@@ -53,5 +54,8 @@ for(const fault of ['foreign_type','foreign_owner','changed_owner','deadline','c
  if(fault.endsWith('owner'))assert.match(r.error,/owner changed/);
  if(fault==='deadline')assert.equal(f.now(),40000);
  if(fault==='cancel')assert.match(r.error,/cancelled/);
+ if(fault==='deadline'||fault==='cancel'){
+  assert.equal(r.target_stage,'graph_settlement');assert.match(r.last_port_error,/Visible port identity is not rendered/);
+ }
  if(fault==='persistent_mask'){assert.match(r.error,/Graph is blocked/);assert.ok(f.now()>=25000&&f.now()<26000);}
 });

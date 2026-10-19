@@ -48,15 +48,32 @@ test('crowded automatic placement chooses a bounded row beyond all observed draw
  assert.equal((await revealNodePlacement(f.args)).fully_visible,true);
  assert.ok(f.state().clicks>0);assert.equal(f.state().open,false);
 });
-test('browser automatic placement retains overflow coordinates in its serialized evaluator',async()=>{
- const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type:'imports.text'},inputs:[]};
+for(const type of ['imports.text','programming.javascript'])test('browser automatic placement retains safe overflow policy for '+type,async()=>{
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type},inputs:[]};
  const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
  const box={x:0,y:0,left:0,right:800,top:0,bottom:600,width:800,height:600};
  const canvas={getBoundingClientRect:()=>box,querySelectorAll:()=>[{getBoundingClientRect:()=>box}],scrollLeft:0,scrollTop:0};
  const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:1,translate:{x:0,y:0}}}}}};
  const context={innerWidth:800,innerHeight:600,document:{elementFromPoint:()=>canvas},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
  let calls=0;const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>++calls===1?graph:runInNewContext('('+code+')',context)({locator:()=>({evaluate:async fn=>fn(canvas)})})});
- assert.deepEqual(structuredClone(await adapter.choosePosition(request,graph,Date.now()+10000)),{x:80,y:728});
+ if(type==='programming.javascript')await assert.rejects(adapter.choosePosition(request,graph,Date.now()+10000),/no free visible canvas position/);
+ else assert.deepEqual(structuredClone(await adapter.choosePosition(request,graph,Date.now()+10000)),{x:80,y:728});
+});
+for(const type of ['programming.javascript','transform.group_data'])test('automatic placement fits the initial '+type+' ports before any drag',async()=>{
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type},inputs:[]};
+ const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
+ const box={x:324,y:100,left:324,right:1274,top:100,bottom:794,width:950,height:694};
+ const canvas={getBoundingClientRect:()=>box,querySelectorAll:()=>[],scrollLeft:0,scrollTop:0};
+ const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:1,translate:{x:0,y:0}}}}}};
+ // Only the original bottom point and a slightly higher position are free.
+ // At y592 JS reaches screen y800 (outside canvas794); Group Data ends at756.
+ const context={innerWidth:1280,innerHeight:800,document:{elementFromPoint:(x,y)=>x===404&&[692,676].includes(y)?canvas:null},
+  bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
+ let calls=0;const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>++calls===1?graph:runInNewContext('('+code+')',context)({locator:()=>({evaluate:async fn=>fn(canvas)})})});
+ const position=structuredClone(await adapter.choosePosition(request,graph,Date.now()+10000));
+ assert.deepEqual(position,{x:80,y:type==='programming.javascript'?576:592});
+ const bottom=100+position.y-21+(type==='programming.javascript'?129:85);
+ assert.ok(bottom<794-8);
 });
 test('overflow remains beyond occupied drawings under zoom, translation and scroll',()=>{
  for(const scale of [.5,1,2]){
