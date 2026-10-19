@@ -3892,6 +3892,22 @@ test('owned text export input observes its actual hidden data-source caption',as
   assert.deepEqual(page.events,[]);
 });
 
+test('text export input0 retains its hidden folder only with native input1 ownership',async()=>{
+  for(const mode of ['valid','wrong_folder','wrong_icon','wrong_type','wrong_index','wrong_port','unbound','hidden_panel']) {
+    const {page,binding,crumbs,panel,opening}=await exportInputPortOverflowFixture();
+    crumbs[5].children[0].attrs.class=mode==='wrong_type'?'bg-vendor-icon-calcdata':'bg-vendor-icon-exporttextfile';
+    crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
+    page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class=mode==='wrong_icon'?'maptree-icon-modeloutputports':'maptree-icon-modelinputports';
+    if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
+    if(mode==='wrong_index')opening.nativeIndex=0;
+    if(mode==='wrong_port')opening.portIndex=1;
+    if(mode==='hidden_panel')panel.style.display='none';
+    const result=await page.execute({mode:'observe',...(mode==='unbound'?{}:{prepared_node_context:binding})});
+    assert.equal(result.output?.wizard?.input_port_context?.status==='observed',mode==='valid',mode);
+    assert.deepEqual(page.events,[],mode);
+  }
+});
+
 test('hidden export input caption cannot replace native ownership or exact breadcrumb evidence',async()=>{
   for(const mode of ['unbound','missing_opening','duplicate_opening','foreign_node','foreign_port','foreign_workflow','foreign_engine',
     'wrong_port','wrong_caption','foreign_path','duplicate_crumb','duplicate_panel','hidden_panel','missing_icon','sensitive']) {
