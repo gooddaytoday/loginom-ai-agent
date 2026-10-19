@@ -1915,7 +1915,7 @@ test('wizard owner context uses bounded active-tab breadcrumbs and survives narr
 });
 
 test('typed wizard opening verifies node and workflow path after one settings click',async()=>{
-  for(const mode of ['bound_begin_busy_import_preview','bound_begin_busy_import_preview_only','bound_begin_busy_import_preview_unbound','bound_begin_busy_import_preview_outside','bound_begin_busy_import_preview_duplicate','bound_begin_busy_import_preview_foreign','bound_begin_busy_import_preview_expired','bound_begin_busy_import_preview_wrong_owner','bound_begin_busy_import_preview_changed_stage','bound_begin_pending_long','bound_begin_busy_long','bound_begin_busy_expired','bound_begin_busy_foreign','bound_begin_busy_dialog','bound_begin_busy_wrong_owner','bound_begin_suffix','bound_begin_pending','bound_begin_lock','bound_begin_foreign','bound_begin_churn','success','clipped_settings','clipped_settings_covered','formatted_name','same_label_wrong_key','renamed_tab','replaced_tab','wrong_node','wrong_workflow','dialog','lost_reply',
+  for(const mode of ['bound_begin_overflow','bound_begin_overflow_unbound','bound_begin_overflow_foreign','bound_begin_overflow_hidden','bound_begin_overflow_opacity','bound_begin_overflow_wrong_caption','bound_begin_overflow_no_icon','bound_begin_overflow_input_port','bound_begin_busy_import_preview','bound_begin_busy_import_preview_only','bound_begin_busy_import_preview_unbound','bound_begin_busy_import_preview_outside','bound_begin_busy_import_preview_duplicate','bound_begin_busy_import_preview_foreign','bound_begin_busy_import_preview_expired','bound_begin_busy_import_preview_wrong_owner','bound_begin_busy_import_preview_changed_stage','bound_begin_pending_long','bound_begin_busy_long','bound_begin_busy_expired','bound_begin_busy_foreign','bound_begin_busy_dialog','bound_begin_busy_wrong_owner','bound_begin_suffix','bound_begin_pending','bound_begin_lock','bound_begin_foreign','bound_begin_churn','success','clipped_settings','clipped_settings_covered','formatted_name','same_label_wrong_key','renamed_tab','replaced_tab','wrong_node','wrong_workflow','dialog','lost_reply',
     'stale_region','stale_origin','stale_document','stale_tab','stale_wrong_owner','stale_exhausted']) {
     const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
     let path='';
@@ -1936,8 +1936,8 @@ test('typed wizard opening verifies node and workflow path after one settings cl
       const reader=async()=>{const clicked=page.events.includes('click');if(clicked)post++;
         if(clicked&&(mode==='bound_begin_pending'&&post<=90||mode==='bound_begin_pending_long'&&post<=1300))return {verified:false,surface_pending:true};
         const graph=!clicked||mode==='bound_begin_churn'||post<=2;
-        return {verified:true,document_id:'doc',workflow_id:'workflow',node_id:mode==='bound_begin_foreign'&&post>=2||['bound_begin_busy_wrong_owner','bound_begin_busy_import_preview_wrong_owner'].includes(mode)&&waits>=2?'foreign':'node',
-          surface:graph?'graph':'wizard',tid:base+(graph?'Graph;'+nodeKey:'WizrdMCF'),...(graph?{locked:clicked&&post%2===0}:{})};};
+        return {verified:true,document_id:'doc',workflow_id:'workflow',node_id:['bound_begin_foreign','bound_begin_overflow_foreign'].includes(mode)&&post>=2||['bound_begin_busy_wrong_owner','bound_begin_busy_import_preview_wrong_owner'].includes(mode)&&waits>=2?'foreign':'node',
+          surface:graph?'graph':'wizard',tid:base+(graph?'Graph;'+nodeKey:'WizrdMCF'),...(graph?{locked:clicked&&post%2===0}:mode==='bound_begin_overflow_input_port'?{input_port:{direction:'input',port:0,native_index:0,port_guid:'input',opening_operation_id:'input-open'}}:{})};};
       page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
         {expected_build:build,expected_origin:origin,kind:'workspace-ui',...(mode.startsWith('bound_begin_busy_')||mode==='bound_begin_pending_long'?{opening_timeout_ms:120000}:{}),...(mode.endsWith('_unbound')?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}}),...options},reader));
     }
@@ -1963,6 +1963,13 @@ test('typed wizard opening verifies node and workflow path after one settings cl
       page.add('span',null,'',undefined,node).attrs.class='bg-vendor-icon-calcdata';
       const last=page.add('a',base+'cnrNaviMode;b.s_'+path+'>'+name+'>Настройка','Настройка',undefined,panel);
       page.add('span',null,'',undefined,last).attrs.class='maptree-icon-wizard';
+      if(mode.startsWith('bound_begin_overflow')){
+        last.style.display='none';
+        if(mode.endsWith('_hidden'))last.attrs.hidden='';
+        if(mode.endsWith('_opacity'))last.style.opacity='0';
+        if(mode.endsWith('_wrong_caption'))last.ownText='Other';
+        if(mode.endsWith('_no_icon'))last.children[0].remove();
+      }
       if(mode==='dialog')page.add('div','msgbox','Подтвердить').attrs.class='x-window';
       if(mode==='lost_reply')throw new Error('reply lost');
     };
@@ -2004,7 +2011,7 @@ test('typed wizard opening verifies node and workflow path after one settings cl
     };
     if(mode==='clipped_settings_covered')page.document.querySelectorAll('[data-tid="GraphTopToolbar"]')[0].box.height=115;
     const result=await page.act({verb:mode.startsWith('bound_begin_')?'begin_wizard':'open_wizard',ref:button.ref},snapshot);
-    const success=['bound_begin_busy_import_preview','bound_begin_busy_import_preview_only','bound_begin_pending_long','bound_begin_busy_long','bound_begin_suffix','bound_begin_pending','bound_begin_lock','success','clipped_settings','formatted_name','renamed_tab','stale_region'].includes(mode);
+    const success=['bound_begin_overflow','bound_begin_busy_import_preview','bound_begin_busy_import_preview_only','bound_begin_pending_long','bound_begin_busy_long','bound_begin_suffix','bound_begin_pending','bound_begin_lock','success','clipped_settings','formatted_name','renamed_tab','stale_region'].includes(mode);
     assert.equal(result.status,success?'SUCCEEDED':mode==='clipped_settings_covered'?'NOT_APPLIED':'AMBIGUOUS',mode+JSON.stringify(result.error));
     assert.equal(page.events.filter(e=>e==='click').length,mode==='clipped_settings_covered'?0:1);
     assert.equal(result.trace.some(e=>e.event==='wizard_open_verified'),success);
@@ -3699,7 +3706,7 @@ test('input port overflow caption requires native binding and the exact hidden c
 });
 
 async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
-  const caption=port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
+  const caption=['group','sorting'].includes(vendor)?'Входной источник данных':port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
   const {page,panel,crumbs}=await inputPortContextFixture();
   // Loginom 7.4.2 native diagnostic: 1280x800, input1 and Настройка hidden
   // by breadcrumb overflow; node/input/wizard icons remain in the same DOM.
@@ -3714,7 +3721,7 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
     if(i>=7)c.style.display='none';
     for(const icon of c.children)icon.box={x:c.box.x+1,y:c.box.y+1,width:16,height:16};
   }
-  crumbs[5].children[0].attrs.class=vendor==='union'?'bg-vendor-icon-uniondata':'bg-vendor-icon-joindata';
+  crumbs[5].children[0].attrs.class=vendor==='sorting'?'bg-vendor-icon-sorting':vendor==='union'?'bg-vendor-icon-uniondata':vendor==='group'?'bg-vendor-icon-groupdata':'bg-vendor-icon-joindata';
   page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[7]).attrs.class='bg-vendor-icon-tunedatasourcesocketdef';
   if(mode==='wrong_icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
   if(mode==='wrong_caption')for(const c of crumbs.slice(7)) {
@@ -3725,7 +3732,7 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
   if(mode==='hidden_ancestor')panel.style.display='none';
   if(mode==='missing_wizard_icon')crumbs[8].children[0].remove();
   const binding={verified:true,surface:'wizard',document_id:'doc',workflow_id:'flow',node_id:'node',
-    input_port:{direction:'input',port:mode==='wrong_port'?1-port:mode==='unknown_port'?2:port,native_index:port,port_guid:'input-'+port,opening_operation_id:'join-open-'+port}};
+    input_port:{direction:'input',port:mode==='wrong_port'?1-port:mode==='unknown_port'?2:port,native_index:mode==='wrong_native_index'?1-port:port,port_guid:'input-'+port,opening_operation_id:'join-open-'+port}};
   let reads=0;
   if(mode!=='unbound')page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
     {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},async()=>{
@@ -3760,6 +3767,68 @@ test('owned Union input observes its numbered hidden appended-table breadcrumb',
   assert.equal(full.wizard.input_port_context.status,'observed');
   assert.equal(full.wizard.input_port_context.port_display_label,'Присоединяемая таблица 2');
   assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
+});
+
+test('owned Union and Grouping inputs keep their exact hidden input folder and captions',async()=>{
+ for(const vendor of ['union','group'])for(const port of (vendor==='union'?[0,1,2]:[0]))for(const mode of ['valid','unnumbered','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','wrong_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
+  const {page}=await joinInputPortOverflowFixture(mode,port,vendor);
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  const accepted=mode==='valid'||mode==='unnumbered'&&port===1;
+  if(mode==='unnumbered')for(const [i,c] of crumbs.entries())if(i>=7){
+   c.attrs['data-tid']=c.attrs['data-tid'].replace((port===0?'Главная таблица':'Присоединяемая таблица '+port).replaceAll(' ','_'),'Присоединяемая_таблица');
+   if(i===7)c.ownText='Присоединяемая таблица';
+  }
+  crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
+  if(mode==='wrong_folder_icon')crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  const observed=await page.execute({mode:'observe'});
+  if(observed.status!=='SUCCEEDED'){assert.equal(accepted,false);assert.deepEqual(page.events,[]);continue;}
+  const full=observed.output,narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+  assert.equal(full.wizard.input_port_context.status==='observed',accepted,port+':'+mode);
+  assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const close=await page.execute({mode:'observe'});
+  assert.equal(close.output.ui?.elements?.some(e=>e.allowed_actions.includes('confirm_wizard_close'))===true,accepted,port+':'+mode);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+test('Sorting input0 keeps Done and close bound when its input folder overflows',async()=>{
+ for(const mode of ['valid','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','unknown_port','wrong_native_index','wrong_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
+  const {page}=await joinInputPortOverflowFixture(mode,0,'sorting');
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
+  if(mode==='wrong_folder_icon')crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0];
+  const c=mappingCoverageFixture(page,4);page.context.innerWidth=1280;
+  for(const child of [...c.form.children]) {
+   if(child.attrs['data-tid']?.endsWith(';btnAddMappingColumn')){child.remove();continue;}
+   for(const e of [child,...child.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid']
+    .replace('MF;TF-1;','MF;TF-5;').replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard')
+    .replace('colDefaultUsageType_','colUsageType_');
+   wizard.append(child);
+  }
+  c.form.remove();page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1208,y:380,width:64,height:64},wizard);
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  assert.equal(r.output.ui?.elements?.some(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone'&&e.allowed_actions.includes('finish_wizard'))===true,mode==='valid',mode);
+  if(r.status!=='SUCCEEDED')continue;
+  assert.equal(r.output.wizard.input_port_context.status==='observed',mode==='valid',mode);
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const close=await page.execute({mode:'observe'});
+  assert.equal(close.output.ui?.elements?.some(e=>e.allowed_actions.includes('confirm_wizard_close'))===true,mode==='valid',mode);
+  assert.deepEqual(page.events,[]);
+ }
 });
 
 test('three-input Union offers Done and owned close only with its exact numbered overflow owner',async()=>{
@@ -3865,6 +3934,22 @@ test('owned text export input observes its actual hidden data-source caption',as
   assert.deepEqual(narrow.output.wizard.input_port_context,full.output.wizard.input_port_context);
   assert.equal(narrow.output.wizard.input_port_context.opening_verified,false);
   assert.deepEqual(page.events,[]);
+});
+
+test('text export input0 retains its hidden folder only with native input1 ownership',async()=>{
+  for(const mode of ['valid','wrong_folder','wrong_icon','wrong_type','wrong_index','wrong_port','unbound','hidden_panel']) {
+    const {page,binding,crumbs,panel,opening}=await exportInputPortOverflowFixture();
+    crumbs[5].children[0].attrs.class=mode==='wrong_type'?'bg-vendor-icon-calcdata':'bg-vendor-icon-exporttextfile';
+    crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
+    page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class=mode==='wrong_icon'?'maptree-icon-modeloutputports':'maptree-icon-modelinputports';
+    if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
+    if(mode==='wrong_index')opening.nativeIndex=0;
+    if(mode==='wrong_port')opening.portIndex=1;
+    if(mode==='hidden_panel')panel.style.display='none';
+    const result=await page.execute({mode:'observe',...(mode==='unbound'?{}:{prepared_node_context:binding})});
+    assert.equal(result.output?.wizard?.input_port_context?.status==='observed',mode==='valid',mode);
+    assert.deepEqual(page.events,[],mode);
+  }
 });
 
 test('hidden export input caption cannot replace native ownership or exact breadcrumb evidence',async()=>{
@@ -4363,7 +4448,7 @@ test('typed output-port finish requires complete output mapping and its own port
 });
 
 test('overflow output socket requires a current native owner and visible actionable Done',async()=>{
-  for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
+  for(const vendor of ['groupdata','sorting'])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_unbound','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
     'duplicate_socket','wrong_socket_icon','missing_settings','hidden_ancestor','hidden_visibility','disabled_done','hidden_done']){
     const {page}=outputPortFinishFixture();
     const find=suffix=>page.document.all().find(e=>e.attrs['data-tid']?.endsWith(suffix));
@@ -4371,6 +4456,13 @@ test('overflow output socket requires a current native owner and visible actiona
     socket.children[0].attrs.class='bg-vendor-icon-'+socketIcon;
     settings.attrs['data-tid']=settings.attrs['data-tid'].replace('>Settings','>Настройка');settings.ownText='Настройка';
     socket.style.display='none';settings.style.display='none';
+    if(mode.startsWith('bound_folder')){
+      const folder=find('>Outputs');
+      for(const e of page.document.all())if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('>Outputs','>Выходные_порты');
+      folder.ownText=mode==='bound_folder_wrong_caption'?'Other':'Выходные порты';folder.style.display='none';
+      find('>Calc').children[0].attrs.class=mode==='bound_folder_wrong_type'?'bg-vendor-icon-calcdata':'bg-vendor-icon-'+vendor;
+      if(mode==='bound_folder_wrong_icon')folder.children[0].attrs.class='maptree-icon-modelinputports';
+    }
     const port={direction:'output',port:0,native_index:0,port_guid:'out-guid',opening_operation_id:'open-output'};
     if(mode==='foreign_port')port.direction='input';
     if(mode==='missing_guid')delete port.port_guid;
@@ -4387,14 +4479,14 @@ test('overflow output socket requires a current native owner and visible actiona
     if(mode==='disabled_done')done.disabled=true;
     if(mode==='hidden_done')done.style.display='none';
     page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
-      {expected_build:build,expected_origin:origin,...(mode==='unbound'?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}}),...options},
+      {expected_build:build,expected_origin:origin,...(['unbound','bound_folder_unbound'].includes(mode)?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}}),...options},
       async()=>mode==='stale_owner'?{verified:false,reason:'node'}:{verified:true,surface:'wizard',node_id:'node',output_port:port}));
     const raw=await page.execute({mode:'observe'});
     if(mode==='stale_owner'){assert.notEqual(raw.status,'SUCCEEDED');assert.equal(raw.error.code,'PREPARED_NODE_CONTEXT_CHANGED');continue;}
     assert.equal(raw.status,'SUCCEEDED',mode);
     const controls=raw.output.ui.elements.filter(e=>e.allowed_actions.includes('finish_wizard'));
-    assert.equal(controls.length,mode==='valid'?1:0,socketIcon+': '+mode);
-    if(mode==='valid'){assert.equal(raw.output.wizard.port_context.status,'observed');assert.equal(controls[0].wizard_finish.mode,'output_port');}
+    assert.equal(controls.length,['valid','bound_folder'].includes(mode)?1:0,vendor+': '+socketIcon+': '+mode);
+    if(['valid','bound_folder'].includes(mode)){assert.equal(raw.output.wizard.port_context.status,'observed');assert.equal(controls[0].wizard_finish.mode,'output_port');}
     assert.equal(page.events.filter(e=>e==='click').length,0,mode);
   }
 });
