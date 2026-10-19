@@ -310,7 +310,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readLinRegression = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, releaseWizard = false } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readLinRegression = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -319,6 +319,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(settleOutputPort!==undefined&&(!readOutputs||!preparedNodeContext||tablePage||tableDialog
         ||typeof settleOutputPort!=='string'||!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(settleOutputPort)))
         throw Error('Output settlement requires a prepared native port');
+      if(settleProcessConsole!==undefined&&(!readProcessControls||readProcesses||!preparedNodeContext
+        ||typeof settleProcessConsole.ref!=='string'||!settleProcessConsole.signature))
+        throw Error('Process console settlement requires its prepared control');
       readOutputs ||= !!tablePage || !!tableDialog;
       if(wizardConfirmation && (!preparedNodeContext || !['close','deactivation'].includes(wizardConfirmation.kind)))throw Error('A prepared wizard confirmation binding is required');
       if(releaseWizard&&!preparedNodeContext)throw Error('Wizard release requires its prepared node');
@@ -340,11 +343,11 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       // Wall time binds the parent deadline once; elapsed waits must survive clock corrections.
       const started = now(), monotonicStarted = monotonicNow();
       const observationNow = () => started + monotonicNow() - monotonicStarted;
-      const deadline = settleOutputPort?operation.deadline:Math.min(operation.deadline, started + timeoutMs);
+      let deadline = settleOutputPort?operation.deadline:Math.min(operation.deadline, started + timeoutMs);
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
+      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false;
       try {
-      for (let sample = 0; settleOutputPort || sample < 80; sample++) {
+      for (let sample = 0; settleOutputPort || settleProcessConsole || sample < 80; sample++) {
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         if (sample) await wait(Math.min(200, Math.max(0, deadline - observationNow())));
@@ -554,6 +557,20 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           if(result.output.node_outputs?.verified!==true || tables.filter(t=>t.active&&t.view_guid===tableDialog.table.view_guid
             &&t.port_guid===tableDialog.table.port_guid&&t.table_tid===tableDialog.table.table_tid).length!==1)throw new Error('Table dialog owner changed');
           result.output.node_table_dialog=structuredClone(tableDialog);
+        }
+        if(settleProcessConsole&&(settlingConsole||result.output.ui.masks.length
+          &&result.output.ui.elements.some(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress'))){
+          const state=result.output,buttons=state.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress');
+          const owned=state.prepared_node_context?.surface==='graph'&&state.ui.dialogs.length===0
+            &&state.wizard?.status==='absent'&&buttons.length===1&&buttons[0].ref===settleProcessConsole.ref
+            &&buttons[0].enabled===true&&buttons[0].allowed_actions.includes('click')
+            &&JSON.stringify(canonical(buttons[0].signature))===JSON.stringify(canonical(settleProcessConsole.signature))
+            &&state.ui.masks.every(m=>m.kind==='busy'&&!m.dialog_ref
+              &&m.target_tid===preparedNodeContext.workflow_ref.prefix+';ModelForm');
+          if(!owned)throw Error('Owned process console settlement context changed');
+          // Only the confirmed launch's own loading mask may outlive the local
+          // readiness window. Keep the parent deadline and authorize no action.
+          if(state.ui.masks.length){settlingConsole=true;deadline=operation.deadline;}
         }
         if(settleOutputPort){
           const state=result.output,context=state.prepared_node_context;
