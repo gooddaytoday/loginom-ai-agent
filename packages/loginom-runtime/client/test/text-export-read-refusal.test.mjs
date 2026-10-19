@@ -97,8 +97,10 @@ for(const fault of ['binding','execution','lease','restore','cleanup','transport
 
 for(const kind of ['success','download_refusal','ambiguous_download','download_transport','open_files','root_stale',
  'return_tab_observation','download_select','directory_navigation','storage_scroll','unknown_scroll','unclean_scroll','changed_scroll','scroll_unobserved','foreign_storage',
- 'mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure'])test('native export read and real save: '+kind,async()=>{
+ 'mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure',
+ 'verified_return_observation','retain_failure','retain_private'])test('native export read and real save: '+kind,async()=>{
  const success=kind==='success',storage=kind.includes('scroll')||kind==='foreign_storage';
+ const downloadSucceeded=success||['verified_return_observation','retain_failure','retain_private'].includes(kind);
  const blocked=['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure'].includes(kind);
  let files=false,downloads=0,releases=0,retained=0,failed=false;const gestures=[],records=[];
  let scrollTop=0,observationFailed=false,directory=kind==='directory_navigation'?'/':'/user';
@@ -120,12 +122,15 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
  const options={operation:{id:'export-op'},targetOrigin,targetBuild:'7.4',storageDirectories:{packages:'/user',inputs:'/user',exports:'/user'},
   onRecord:async e=>{records.push(e);if(kind==='journal_failure'&&e.phase==='export_file_read_refused_restored')throw Error('journal unavailable');return e;},receiptOptions:()=>({}),
   artifactStore:{outputSessionId:'session',stageOutput:async b=>{assert.deepEqual(b,binding);return {artifact_id:'artifact',path:'/private/download.csv',
-   release:async()=>{if(kind==='lease_failure')throw Error('lease unavailable');releases++;},retain:async()=>{assert.ok(success);retained++;},
-   verify:async()=>{assert.ok(success);return {artifact_id:'artifact',bytes:57,sha256:'abc'};}};}},
+   release:async()=>{if(kind==='lease_failure')throw Error('lease unavailable');releases++;},retain:async()=>{
+    if(kind==='retain_failure')throw Error('Artifact size or SHA does not match the admitted identity');
+    if(kind==='retain_private')throw Object.assign(new TypeError('private /token/path'),{code:'private-unsafe'});
+    assert.ok(success);retained++;},
+   verify:async()=>{assert.ok(downloadSucceeded);return {artifact_id:'artifact',bytes:57,sha256:'abc'};}};}},
   execute:async code=>{
    if(code.includes('async function browserArtifactDownload')){
     downloads++;if(kind==='download_transport'){failed=true;throw Error('download call unconfirmed');}
-    if(success)return {operation_id:'export-op:export-download',action_key:'artifact.download',status:'SUCCEEDED',cleanup_complete:true,
+    if(downloadSucceeded)return {operation_id:'export-op:export-download',action_key:'artifact.download',status:'SUCCEEDED',cleanup_complete:true,
      output:{destination:binding.destination,artifact_id:'artifact',download_completed:true,output_binding:binding,suggested_name:'result.csv'}};
     failed=true;const d=download();if(['ambiguous_download','download_select'].includes(kind)){d.status='AMBIGUOUS';d.effect_possible=true;d.cleanup_complete=false;}
     if(kind==='download_select'){d.phase='selecting';d.error.code='UI_SCAN_LIMIT';}
@@ -155,6 +160,9 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
     return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};
    }
    if(files&&!failed&&kind==='root_stale'){failed=true;return {status:'FAILED',error:{code:'UI_ROOT_STALE'}};}
+   if(files&&downloads&&!failed&&kind==='verified_return_observation'){
+    failed=true;return {status:'FAILED',error:{code:'UI_SCAN_LIMIT',message:'private /token/path'}};
+   }
    if(files&&failed&&kind==='scroll_unobserved'&&!observationFailed){observationFailed=true;throw Error('Export scroll outcome is not freshly observed');}
    const output=snapshot();
    output.observation_kind=task.discover_roots?'roots':'region';output.ui.truncated={dialogs:!!task.discover_roots,masks:!!task.discover_roots};
@@ -186,6 +194,15 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
   assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));assert.equal(page.packagePath,'/user/data/packages/read-refusal.lgp');
  }
  assert.equal(records.some(r=>r.phase==='export_file_read_refused_restored'),!success&&!['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','lease_failure'].includes(kind));
- assert.equal(records.some(r=>r.phase==='export_file_bytes_verified'),success);
+ assert.equal(records.some(r=>r.phase==='export_file_bytes_verified'),downloadSucceeded);
  assert.equal(records.some(r=>r.phase==='export_file_read_completed'),success);
+ if(downloadSucceeded&&!success){
+  const failure=result.nodePhaseRefusal.proof.failure;
+  assert.equal(failure.step,kind==='verified_return_observation'?'return_workspace_roots':'retain_file');
+  assert.equal(failure.code,kind==='verified_return_observation'?'UI_SCAN_LIMIT':null);
+  assert.equal(failure.kind,kind==='retain_private'?'TypeError':'Error');
+  assert.equal(failure.reason,kind==='retain_failure'?'Artifact size or SHA does not match the admitted identity':null);
+  assert.deepEqual(records.find(r=>r.phase==='export_file_read_refused_restored').proof.failure,failure);
+  assert.ok(!JSON.stringify(result.nodePhaseRefusal).includes('/token/path'));
+ }
 });

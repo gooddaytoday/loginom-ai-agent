@@ -9,6 +9,18 @@
 
 ## Покрытие
 
+Дополнение LAB-118: [n13–n20 и условия приёмки](n13-n20-plan.md),
+[операторское назначение](acceptance/n13-n20/task.md).
+Восемь коротких просьб: Кросс-таблица, Join по двум ключам, Union с разными
+колонками, даты и строки, сортировка по двум полям, JavaScript, одна
+кластеризация и одна линейная регрессия; REST отсутствует.
+В каждой папке — `prompt.md`, `data/`, `oracle.py`, `expected/`, README.
+Эти oracle принимают **путь к фактическому CSV экспорта**, в отличие от n1–n12,
+где oracle генерирует JSON-ожидания. Эталоны pandas и отрицательные контроли:
+`acceptance/n13-n20/reference.py`; генератор: `acceptance/n13-n20/generate.py`.
+Ветка `stability-n13`, PR в `demo-022`. Поставка статическая,
+модельные/native/cold-check прогоны не входят в неё.
+
 Дополнение D7b (LAB-98): [подплан n7–n12](v2-plan.md),
 [операторское назначение](acceptance/v2/task.md). Задачи n7–n12, синтетические CSV,
 генераторы с seed, независимые oracle и эталоны входят в статическую поставку.
@@ -424,3 +436,98 @@ SheetJS 0.18.5: первый лист Exhibits, все 15 строк и типы
 Две фразы каждого prompt, 188 локальных ссылок/якорей и `git diff --check` — PASS.
 Эти проверки не доказывают выполнение модели, доставку XLSX, происхождение HTTP,
 сохранение, экспорт или cold-check; их PASS здесь не заявляется.
+
+## LAB-119: короткие варианты p17-p24
+
+Восемь просьб для тех же s1–s8 на базе `demo-022` @
+`9f2d305e32e841d206bf8d04d25ebd039156cd29`. В каждом каталоге — короткий
+`prompt.md`, объяснение одной опечатки, побайтные копии исходных данных,
+`oracle.py`, `expected.json` и, где есть в источнике, `expected-demo.json`.
+Новых правил расчёта, данных, генераторов и кода продукта нет.
+Просьбы содержат 16–19 слов по пробельным границам; максимум 20 соблюдён
+и при раздельном подсчёте трёх категорий через `/` в p21.
+
+| Задача / исходный сценарий | Единственная неточность | Проверяемый бизнес-результат |
+|---|---|---|
+| [p17](p17/README.md) / s1-revenue | Quanity → Quantity | 6 групп, сумма 216781.00, выручка по убыванию |
+| [p18](p18/README.md) / s2-customers | clent_code → client_code | 8 активных, коды C-NNN, числовой лимит, исходный порядок |
+| [p19](p19/README.md) / s3-reconcile | OderID → OrderID | 8 долгов на 40502.50, отсутствие оплаты = 0 |
+| [p20](p20/README.md) / s4-branches | Catgory → Category | 6 групп на 203009.00, повторы учтены |
+| [p21](p21/README.md) / s5-pivot | Amout → Amount | 3 региона, суммы Office/Warehouse/Tech, 180847.50 |
+| [p22](p22/README.md) / s6-abc | Reveneu → Revenue | A: 3/80000; B: 2/15000; C: 7/5000 |
+| [p23](p23/README.md) / s7-refine | Regoin → Region | Север: 54400 и 6182, прежние поля и порядок |
+| [p24](p24/README.md) / s8-rename | Catgory → Category | 6 строк s1 с русскими названиями, прежние значения/типы/порядок |
+
+p17–p22 заменяют исходную просьбу соответствующего сценария; модели передаются
+только просьба и CSV. p23 и p24 начинаются **каждый с исходного s1** в том же
+чате/пакете, без повторной передачи CSV. Цепочка p23 → p24 не эквивалентна s8.
+Oracle, expected, README и технические схемы модели не передаются.
+Исходные схемы/селекторы проверки сохранены; краткая просьба однозначно задаёт
+бизнес-таблицу, но сама по себе не задаёт все технические имена и типы эталона.
+Несовпадение только технического оформления требует операторской оценки.
+
+У s8 исходный oracle выдаёт русские **имена**, тогда как оба исходных expected
+содержат английские имена и русские **подписи**, а также другой селектор выхода
+и сокращённый список обязательных узлов. Эти файлы не исправлены в LAB-119.
+p24 проверяется на эталонной бизнес-таблице по уникальным подписям, типам и всем
+значениям в исходном порядке. Нельзя объявлять его stdout побайтно равным expected
+или использовать вместо `expected-demo.json` для cold-check.
+
+Воспроизведение из корня репозитория (Python 3, стандартная библиотека):
+
+```sh
+python3 -B - <<'PY'
+from pathlib import Path
+import json, subprocess, sys
+
+root = Path('docs/testing/loginom-ai-agent').resolve()
+for i, source in enumerate(sorted((root / 'demo-2026-10-22').glob('s[1-8]-*')), 17):
+    case = root / 'stability-2026-10-20' / f'p{i}'
+    assert len((case / 'prompt.md').read_text().split()) <= 20
+    for file in [*source.glob('data/*.csv'), source / 'oracle.py', *source.glob('expected*.json')]:
+        assert file.read_bytes() == (case / file.relative_to(source)).read_bytes()
+    run = [sys.executable, '-B', str(case / 'oracle.py')]
+    actual = subprocess.check_output(run, cwd=root)
+    assert actual == subprocess.check_output(run, cwd=case)
+    changed = json.loads(subprocess.check_output(run + ['/personal/personal.lgp']))
+    assert changed.pop('package_path') == '/personal/personal.lgp'
+    original = json.loads(actual)
+    original.pop('package_path')
+    assert changed == original
+    reference = (case / 'expected.json').read_bytes()
+    if i != 24:
+        assert actual == reference
+        print(f'p{i}: oracle/reference PASS (byte-for-byte)')
+        continue
+    def table(document):
+        output = document['outputs'][0]
+        columns = output['columns']
+        labels = [c.get('label', c['name']) for c in columns]
+        assert len(set(labels)) == len(labels)
+        return (output['ordered'], [(label, c['type']) for label, c in zip(labels, columns)],
+                [[row[c['name']] for c in columns] for row in output['rows']])
+    for file in case.glob('expected*.json'):
+        assert table(json.loads(actual)) == table(json.loads(file.read_bytes()))
+    print('p24: oracle/reference PASS (labels, types, ordered values; not byte-for-byte)')
+PY
+```
+
+Реальный разбор всех 15 исходных файлов ожиданий:
+
+```sh
+bun --input-type=module - <<'JS'
+import { readFileSync, readdirSync } from 'node:fs';
+import { parseExpectedOutputs } from './scripts/node-acceptance/expected-outputs.mjs';
+for (let i = 17; i <= 24; i++) {
+  const directory = `docs/testing/loginom-ai-agent/stability-2026-10-20/p${i}`;
+  for (const name of readdirSync(directory).filter(name => /^expected.*\.json$/.test(name))) {
+    parseExpectedOutputs(JSON.parse(readFileSync(`${directory}/${name}`, 'utf8')));
+    console.log(`p${i}/${name}: PASS`);
+  }
+}
+JS
+```
+
+Это офлайн-проверка расчётов на эталонах, не PASS выполнения агента или Loginom.
+Аккаунты, сборки, живые сеансы, модельные/native/cold-check прогоны не требуются.
+Ветка `stability-p17`, один docs PR в `demo-022`; merge и Done остаются владельцу.
