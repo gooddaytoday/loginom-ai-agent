@@ -1098,6 +1098,30 @@ test('wizard context exposes the current step and lifecycle states on a narrow r
   assert.equal(mixed.output.wizard.stage,null);assert.equal(mixed.output.wizard.stage_status,'ambiguous');
 });
 
+test('cold export input card treats its grid and Add button as one stage without accepting conflicting markers',async()=>{
+  for(const fault of ['none','duplicate_grid','duplicate_add','foreign_card','other_stage','hidden_other_stage']) {
+    const page=new Page({clock:fixtureClock().Date}),base='MF;TF-1;WizrdMCF',form=page.add('div',base);
+    const grid=';TuneDataSourceInputPortWizard;grdTargetColumns',add=';TuneDataSourceInputPortWizard;btnAddMappingColumn';
+    page.add('div',base+';cardWizardPanel;p.h;p.t','Настройка входных столбцов',undefined,form);
+    page.add('div',base+grid,'',undefined,form);page.add('button',base+add,'',undefined,form);
+    if(fault==='duplicate_grid')page.add('div',base+grid,'',undefined,form);
+    if(fault==='duplicate_add')page.add('button',base+add,'',undefined,form);
+    if(fault==='foreign_card')page.add('button',base+';TuneDataSourceMappingWizard;btnAddMappingColumn','',undefined,form);
+    if(fault==='other_stage'||fault==='hidden_other_stage') {
+      const other=page.add('input',base+';ExportTextFileParamsWizard;edtFileName','',undefined,form);
+      if(fault==='hidden_other_stage')other.style.display='none';
+    }
+    const expected=['none','hidden_other_stage'].includes(fault)?'input_mapping':null;
+    const full=await page.observe();assert.equal(full.wizard.stage,expected,fault);
+    assert.equal(full.wizard.stage_status,expected?'observed':'ambiguous',fault);
+    const ref=full.wizard.root_ref;
+    const narrow=await page.execute({mode:'observe',root_ref:ref});
+    assert.equal(narrow.output.wizard.stage,expected,fault);
+    const roots=await page.execute({mode:'observe',discover_roots:true});
+    assert.equal(roots.output.wizard.stage,expected,fault);
+  }
+});
+
 test('wizard metadata excludes hidden and inactive forms and redacts sensitive title children',async()=>{
   const page=new Page(),base='MF;TF-1;WizrdMCF';
   const inactive=page.add('div','MF;TF-2;WizrdMCF');
