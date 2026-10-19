@@ -761,8 +761,18 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if(panels.length>1)context.status='ambiguous';
       else if(panels.length===1&&inside(panels[0],panels[0])) {
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
+        // Long package/node captions also push the input folder into Ext's
+        // overflow. Keep the visible node/workflow and native opening binding.
+        const overflowFolder=(e,i)=>i===6&&preparedInputPort?.direction==='input'
+          &&Number.isInteger(preparedInputPort.port)&&preparedInputPort.port>=0&&preparedInputPort.port<100
+          &&Number.isInteger(preparedInputPort.native_index)&&preparedInputPort.native_index>=0
+          &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+          &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+          &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'
+          &&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')&&!sensitive(e)&&visibleAncestors(e.parentElement)
+          &&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1;
         if(crumbs.length>32)context.status='bounded';
-        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||i>=7&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
+        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||overflowFolder(e,i)||i>=7&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
           // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
           // Join input roles have fixed captions; retain the native port and node icon binding.
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
@@ -776,7 +786,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
               // Union numbers each appended input by its native tabular port.
               ||preparedInputPort.port>=1&&e.textContent.trim()==='Присоединяемая таблица '+preparedInputPort.port
                 &&crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1));
-          const items=crumbs.map((e,i)=>({ref:refOf(e),tid:getTid(e),label:hiddenCaption(e,i)?e.textContent.trim():textOf(e,true)}));
+          const items=crumbs.map((e,i)=>({ref:refOf(e),tid:getTid(e),label:overflowFolder(e,i)||hiddenCaption(e,i)?e.textContent.trim():textOf(e,true)}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const bounded=items.every(i=>i.tid.length<=2048&&i.label.length<240)&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096;
           const chain=items.every((i,n)=>i.tid.slice(prefix.length).split('>').length===n+1&&(!n||i.tid.startsWith(items[n-1].tid+'>')));

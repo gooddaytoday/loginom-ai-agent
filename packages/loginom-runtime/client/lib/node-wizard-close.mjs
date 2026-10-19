@@ -32,7 +32,7 @@ export function boundWizardCloseConfirmation(state,binding,requireControls=true)
  if(!requireControls)return true;
  return ['yes','no'].every(name=>ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name
   &&e.signature?.dialog_ref===dialog.ref&&e.label===(name==='yes'?'Да':'Нет')
-  &&e.allowed_actions?.includes('click')).length===1);
+  &&e.allowed_actions?.includes('click')&&(name!=='yes'||e.allowed_actions.includes('confirm_wizard_close'))).length===1);
 }
 
 export function boundInputMappingConflict(state,binding,requireControls=true) {

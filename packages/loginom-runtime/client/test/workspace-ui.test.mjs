@@ -3675,6 +3675,39 @@ test('input port overflow caption requires native binding and the exact hidden c
  }
 });
 
+test('native-bound input folder overflow retains the exact DOM owner and refuses unrelated hiding',async()=>{
+ for(const mode of ['valid','unbound','missing_guid','missing_opening','missing_index','wrong_caption','wrong_path','wrong_icon','visibility_hidden','opacity_zero','hidden_attribute','hidden_parent','visible_clipped','hidden_node']) {
+  const {page,panel,crumbs}=await inputPortContextFixture();
+  // Fresh s4 native observation, 1280x800: node stays visible, while folder,
+  // input0 and Settings have display:none and zero geometry in the same panel.
+  for(const crumb of crumbs.slice(6)){crumb.style.display='none';crumb.box={x:0,y:0,width:0,height:0};}
+  const icon=page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]);icon.attrs.class='maptree-icon-modelinputports';
+  const binding={verified:true,surface:'wizard',node_id:'node',input_port:{direction:'input',port:0,native_index:0,port_guid:'input0',opening_operation_id:'open-input0'}};
+  if(mode==='missing_guid')delete binding.input_port.port_guid;
+  if(mode==='missing_opening')delete binding.input_port.opening_operation_id;
+  if(mode==='missing_index')delete binding.input_port.native_index;
+  if(mode==='wrong_caption')crumbs[6].ownText='Выходные порты';
+  if(mode==='wrong_path')crumbs[6].attrs['data-tid']+='>foreign';
+  if(mode==='wrong_icon')icon.attrs.class='maptree-icon-modeloutputports';
+  if(mode==='visibility_hidden')crumbs[6].style.visibility='hidden';
+  if(mode==='opacity_zero')crumbs[6].style.opacity='0';
+  if(mode==='hidden_attribute')crumbs[6].attrs.hidden='';
+  if(mode==='hidden_parent')panel.style.visibility='hidden';
+  if(mode==='visible_clipped'){crumbs[6].style.display='block';crumbs[6].box={x:1430,y:41,width:100,height:24};}
+  if(mode==='hidden_node')crumbs[5].style.display='none';
+  if(mode!=='unbound')page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},async()=>structuredClone(binding)));
+  const full=await page.observe();
+  assert.equal(full.wizard.input_port_context?.status==='observed',mode==='valid',mode);
+  if(mode==='valid'){
+   const narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+   assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
+   assert.equal(full.wizard.input_port_context.path[6].label,'Входные порты');
+  }
+  assert.deepEqual(page.events,[],mode);
+ }
+});
+
 async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
   const caption=port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
   const {page,panel,crumbs}=await inputPortContextFixture();

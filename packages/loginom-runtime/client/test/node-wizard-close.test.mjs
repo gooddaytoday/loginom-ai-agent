@@ -8,7 +8,7 @@ const fixture=()=>{
  const binding=wizardCloseBinding(state);
  state.ui.dialogs=[{ref:'dialog',title:'Подтвердить',text:'Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет'}];
  state.ui.masks=[{ref:'wizard',kind:'modal_background'}];
- state.ui.elements=['yes','no'].map(name=>({ref:name,tid:'msgbox;tlb;'+name,label:name==='yes'?'Да':'Нет',signature:{dialog_ref:'dialog'},allowed_actions:['click']}));
+ state.ui.elements=['yes','no'].map(name=>({ref:name,tid:'msgbox;tlb;'+name,label:name==='yes'?'Да':'Нет',signature:{dialog_ref:'dialog'},allowed_actions:name==='yes'?['click','confirm_wizard_close']:['click']}));
  return {state,binding};
 };
 test('Close waits for the same unlocked node, not merely a visible graph',()=>{
@@ -64,6 +64,19 @@ test('second input cancellation binds its own opening receipt',()=>{
  state.prepared_node_context.input_port={direction:'input',port:1,native_index:1,port_guid:'right',opening_operation_id:'right-open'};
  const binding=wizardCloseBinding(state);assert.equal(boundWizardCloseConfirmation(state,binding),true);
  state.prepared_node_context.input_port.port=0;assert.equal(boundWizardCloseConfirmation(state,binding),false);
+});
+
+test('owned second input dialog is not ready until its affirmative close capability is available',()=>{
+ const {state}=fixture();state.wizard.stage='input_mapping';state.wizard.owner_context={status:'unobserved'};
+ state.prepared_node_context.input_port={direction:'input',port:1,native_index:1,port_guid:'right',opening_operation_id:'right-open'};
+ const binding=wizardCloseBinding(state),yes=state.ui.elements.find(e=>e.tid==='msgbox;tlb;yes');
+ yes.allowed_actions=['click'];
+ assert.equal(boundWizardCloseConfirmation(state,binding,false),true,'portal discovery can still find the exact dialog');
+ assert.equal(boundWizardCloseConfirmation(state,binding),false,'generic click does not authorize owned confirmation');
+ yes.allowed_actions.push('confirm_wizard_close');
+ assert.equal(boundWizardCloseConfirmation(state,binding),true);
+ state.prepared_node_context.input_port.opening_operation_id='foreign';
+ assert.equal(boundWizardCloseConfirmation(state,binding),false);
 });
 
 test('output-port cancellation binds both the native opening receipt and observed breadcrumb owner',()=>{
