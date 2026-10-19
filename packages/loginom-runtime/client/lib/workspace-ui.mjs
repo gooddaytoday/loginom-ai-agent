@@ -3393,10 +3393,11 @@ function readRenderedInputMapping(observation) {
       if(!same(nodeContext,after)) {
         // A read can straddle native unlock after Close or a completed wizard
         // gesture. Discard the mixed snapshot; pre-gesture guards stay strict.
-        if((task.mode==='observe'||effectPossible&&['finish_wizard','execute_wizard','begin_wizard','confirm_wizard_deactivation'].includes(task.action?.verb))
+        if((task.mode==='observe'||effectPossible&&['finish_wizard','execute_wizard','begin_wizard','confirm_wizard_deactivation','confirm_wizard_close'].includes(task.action?.verb))
           && nodeContext.surface==='graph' && after.surface==='graph'
           && typeof nodeContext.locked==='boolean' && typeof after.locked==='boolean'
           && nodeContext.locked!==after.locked && same({...nodeContext,locked:false},{...after,locked:false})
+          && (task.action?.verb!=='confirm_wizard_close'||nodeContext.locked===true&&after.locked===false)
           && graphLockReads<2) {
           record('node_graph_lock_rediscovery',{attempt:++graphLockReads,node_id:after.node_id});
           return readUi(rediscover);
