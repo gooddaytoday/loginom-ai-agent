@@ -177,6 +177,23 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
    need(quiet(fresh)&&JSON.stringify(fresh.workflow_ref)===JSON.stringify(original.workflow)&&fresh.file_storage?.directory===original.directory&&JSON.stringify(fresh.package_identity)===JSON.stringify(original.package)&&matches.length===1,'Export control changed during pre-gesture refresh');
    s=fresh;e=matches[0];continue;
   }
+  if(verb==='scroll'&&r.status==='AMBIGUOUS'&&r.phase==='observing'&&r.effect_possible===true&&!uncertain&&r.error?.code==='UI_SCAN_LIMIT'){
+   const moves=r.trace?.filter(t=>t.event==='ui_scroll_applied')??[],scroll=e.scroll;
+   need(original.root&&moves.length===1&&moves[0].owner_ref===scroll.ref&&moves[0].from===scroll.top
+    &&moves[0].to===Math.max(0,Math.min(scroll.max_top,scroll.top+extra.delta_y))&&moves[0].to!==scroll.top,'Export scroll effect is not proven');
+   // The gesture already happened. Re-observe its stable table, never scroll
+   // again to recover a failed post-observation of a virtual row.
+   for(let observation=0;observation<2;observation++){
+    let fresh;try{fresh=await read({root_ref:original.root});}
+    catch(error){if(error.code==='UI_SCAN_LIMIT'&&observation===0)continue;throw error;}
+    const owners=fresh.ui.elements.filter(x=>x.tid?.startsWith(original.workflow.prefix+';FileStorageForm;colName_')&&x.scroll).map(x=>x.scroll);
+    need(quiet(fresh)&&fresh.observation_root?.ref===original.root&&fresh.file_storage?.status==='observed'
+     &&JSON.stringify(fresh.workflow_ref)===JSON.stringify(original.workflow)&&fresh.file_storage.directory===original.directory
+     &&JSON.stringify(fresh.package_identity)===JSON.stringify(original.package)&&owners.length>0
+     &&owners.every(x=>x.ref===scroll.ref&&x.top===moves[0].to&&x.max_top===scroll.max_top),'Export scroll context changed during observation');
+    await record('export_file_scroll_observed',{id,owner_ref:scroll.ref,from:scroll.top,to:moves[0].to,observation:observation+1});return;
+   }
+  }
   need(r.status==='SUCCEEDED'&&!uncertain,'Export storage gesture requires inspection');
   return;
   }
