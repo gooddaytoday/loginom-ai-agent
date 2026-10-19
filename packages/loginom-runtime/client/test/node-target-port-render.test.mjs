@@ -114,3 +114,12 @@ test('rendered REST client identity is accepted as the requested REST node after
  const result=verifyNodeTargetEffect({kind:'create',before,parameters:{type:'integration.rest_request'}},after);
  assert.equal(result.node_id,'n');
 });
+
+test('JavaScript tabular DOM identity cannot hide a foreign native port type',async()=>{
+ const good=fixture();good.node.FIconCls='bg-vendor-icon-javascript';
+ assert.deepEqual(Array.from((await good.read()).nodes[0].outputs),[0]);
+ for(const change of [f=>{f.port.FType=0;},f=>{f.port.FSubType=10;}]){
+  const f=fixture();f.node.FIconCls='bg-vendor-icon-javascript';change(f);
+  await assert.rejects(f.read(),/foreign native type/);
+ }
+});
