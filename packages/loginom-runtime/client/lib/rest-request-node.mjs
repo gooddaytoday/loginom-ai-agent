@@ -46,7 +46,8 @@ async function prepareQueryEncoder(options,ctx,config){
  const request=restQueryEncoderRequest(options.operation.parameters,ctx.deadline,options.now());
  const operation={id:request.operation_id,parameters:request,action:options.operation.action,
   deadline:ctx.deadline,nodeTargetAdapter:options.operation.nodeTargetAdapter};
- const support=createJavascriptCodeNodeSupport({...config,redactor:config.redactor??createRedactor()});
+ const redactor=config.redactor??createRedactor();
+ const support=createJavascriptCodeNodeSupport({...config,redactor});
  const drivers=support.nodeApplyDriverFactory({...options,operation});
  const {graph}=validateNodeApplyRequest(request,support.nodeApplyHandlers);
  const result=await applyNode({request,operation,handlers:support.nodeApplyHandlers,
@@ -60,7 +61,14 @@ async function prepareQueryEncoder(options,ctx,config){
    }},record:options.onRecord,signal:ctx.signal,stopSignal:ctx.stopSignal,now:options.now});
  options.operation.nodeEffectPossible ||= result.effect_possible===true;
  if(operation.transportUncertain||result.cleanup_complete!==true){options.operation.transportUncertain ||= operation.transportUncertain===true;options.operation.cleanupConfirmed=false;}
- need(result.status==='SUCCEEDED'&&result.cleanup_complete===true&&result.execution.status==='completed','query encoder did not complete');
+ if(result.status!=='SUCCEEDED'||result.cleanup_complete!==true||result.execution.status!=='completed'){
+  const cause=result.error?.cause??result.error;
+  const message=typeof cause?.message==='string'?redactor.text(cause.message):null;
+  const error=Error('REST request: query encoder did not complete at '+(result.pending_phase??result.execution.status)
+   +(message?': '+message:''));
+  if(typeof cause?.code==='string'&&message)error.receipt={error:{code:cause.code,message}};
+  throw error;
+ }
  return {source:result.node,output:0,input:0};
 }
 async function readRestOutputs(channel,read,ctx){
