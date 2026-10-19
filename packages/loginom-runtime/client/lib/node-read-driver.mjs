@@ -122,6 +122,13 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
      workflow_ref:state.request.workflow_ref,node:state.node});
     return releasePendingNode({operation,channel,readReceipt:options.readReceipt});
    },
+   // Browser recovery runs the same proof for any stopped phase: the model, not
+   // this driver, restored the page, and the proof rechecks the quiet graph.
+   async recoveryReleasePending(state,{signal}={}){
+    enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
+     workflow_ref:state.request.workflow_ref,node:state.node});
+    return releasePendingNode({operation,channel,readReceipt:options.readReceipt});
+   },
   }:{}),
  };
 }

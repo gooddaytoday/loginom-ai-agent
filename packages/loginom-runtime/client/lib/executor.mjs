@@ -2008,7 +2008,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         observations.clear();
         // Release-proof runs even when the stopped phase has no own verifier;
         // the stopped procedure and its predicate are not called again (§8).
-        result = await releaseNodeApply({ operation, handlers: nodeApplyHandlers, drivers: operation.nodeApplyDrivers, record: onRecord, signal });
+        const drivers = operation.nodeApplyDrivers;
+        result = await releaseNodeApply({ operation, handlers: nodeApplyHandlers, record: onRecord, signal,
+          drivers: { ...drivers, releasePending: drivers.recoveryReleasePending ?? drivers.releasePending } });
       } catch (error) {
         return { status: 'unresolved', facts: [], reason: String(error?.message ?? error).slice(0, 1000) };
       } finally { running = false; }
