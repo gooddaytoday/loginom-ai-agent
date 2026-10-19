@@ -51,6 +51,26 @@ test('generated child request uses the installed JavaScript contract and bounded
  assert.notEqual(child.operation_id,restQueryEncoderRequest({...r,operation_id:'y'.repeat(128)},2500,1000).operation_id);
 });
 
+for(const secret of ['', 'private-test-credential'])test('REST retains the failing query encoder phase with redacted child error: '+!!secret,async()=>{
+ const r={...request(),target:{kind:'new',type:'integration.rest_request',label:'Echo'},
+  mode:'request',finish:'execute',mappings:[],read:{ports:[],sample_rows:0,require_exact_numbers:false},
+  budgets:{configure_ms:600000,execute_ms:600000,total_ms:600000}};
+ r.parameters.connection={name:'Echo',base_url:'https://echo.test/anything'};
+ const reason='Exact child workflow unavailable'+(secret?' '+secret:'');
+ const message='Exact child workflow unavailable'+(secret?' [redacted]':'');
+ const operation={id:r.operation_id,parameters:r,nodeTargetAdapter:{activateWorkflow:async()=>{throw Error(reason);}}};
+ const support=createRestRequestNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2',redactor:createRedactor([secret])});
+ const drivers=support.nodeApplyDriverFactory({operation,now:Date.now,onRecord:async e=>e,receiptOptions:()=>({}),
+  execute:async()=>assert.fail('A refused workflow must not create or execute a node')});
+ const result=await applyNode({request:r,operation,handlers:support.nodeApplyHandlers,
+  drivers:{...drivers,prepareTarget:async(_,ctx)=>drivers.beforeTarget(ctx)},record:async e=>e});
+ assert.equal(result.error.message,'REST request: query encoder did not complete at workflow: '+message);
+ assert.deepEqual(result.error.cause,{code:'NODE_APPLY_STOPPED',message});
+ assert.equal(result.pending_phase,'target');
+ assert.equal(result.node,null);
+ assert.equal(result.execution.status,'not_requested');
+});
+
 test('existing connected REST refuses before creating another codec or connection and points to the same node',async()=>{
  for(const source of ['owned-encoder','foreign-source']) {
   const r={...request(),target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'flow',node_id:'rest'}},
