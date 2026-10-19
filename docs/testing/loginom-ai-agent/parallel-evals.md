@@ -29,6 +29,10 @@ canary preload и остальные wrapper tests прошли (11/11).
 Карантин4fb завершён по разрешению, log/DB сохранены в закрытом history;
 ancestry gone-PID fix прошёл unit checks/typecheck/review. Текущее состояние —
 в [блокерах](../../../eval_parallel_blockers.md).
+Сквозной путь первой задачи подтверждён в s9821T: агент completed, judge100,
+cleanup confirmed. Полный N=1 не получен из-за внешнего Desktop inspector/CDP;
+для повторения нужно окно без таких listener-ов (guard `sandbox.assertNoDebuggers`).
+Чужие debug-процессы самостоятельно не останавливать и guard не отключать.
 Не запускать старый `recover` для новой
 процедуры: адресный recover и цепочка эпох больше не входят в рабочий путь.
 [Перечень удержанных стендов и инцидентов](2026-10-16-evals-parallel-retained.md)

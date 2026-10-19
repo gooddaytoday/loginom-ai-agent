@@ -68,8 +68,10 @@
 - [x] RED→GREEN: один server guard/reservation и два profile locks, без user lock;
   потеря server guard отзывает slot authority. Slots31 PASS/127 assertions33.22s,
   typecheck/diff PASS; обновлены три проверки нового режима вместо epoch recovery.
-- [ ] Подключить judge-home lock к общему run (primitive/статусная проверка уже работают);
+- [x] Подключить judge-home lock к общему run (primitive/статусная проверка уже работают);
   проверить весь prepare/verify/run путь без создания пользователей во время run.
+  Native s9821T: первая задача completed/judge100/cleanup confirmed, home released;
+  полный N=1 прерван позднее внешним CDP, не засчитывается как замер трёх задач.
 - [x] RED: prepare создаёт только недостающее/проверяет права; verify/run отказывают
   на missing user, ACL drift, Pool!=0 и непустой SessionBackup без исправлений/delete.
   Свежая read-only проверка пользователя/ролей/ACL подключена к prepare/verify/run,
@@ -175,9 +177,11 @@
   allowlist; judge home явный. Canary/env/VPN10/33 PASS +typecheck/diff;
   вывод уже покрывается существующими redaction tests. Один старый CLI proc-denial
   тест обновлён под foreign ancestry; повторно не запускался ради других агентов.
-- [ ] RED: запись бюджета до dispatch, host/container CPU/RAM, диск/OOM,
+- [x] RED: запись бюджета до dispatch, host/container CPU/RAM, диск/OOM,
   licence/provider errors определяют приёмку; процессная телеметрия не gate;
   missing mandatory sample не PASS, скрытый 429/успешный retry не скрывает отказ.
+  Unit evidence ниже: report/acceptance64/293, runtime/resources105/555,
+  CLI retry19/61; native provider retry останавливает run с сохранённой сводкой.
 - [x] GREEN: подключить подготовленные слоты к существующим runSlotQueue и judge
   gate, убрать `SLOTS_ADMISSION_UNAVAILABLE` для этого пути. Run не вызывает
   создание/исправление пользователей; использовать прежний home/VPN wrapper.
@@ -368,4 +372,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20.N1 iLakZJ: агент completed21tools/0errors/0retry. Private judge config синхронизирован; input cleanup fix по delivery receipt12/72 PASS/TC/Review. Следом native judge/штатный startup и полный повтор N1; бюджетN2 утверждает владелец.
+20.e468064b1c: delivery cleanup12/72 PASS/TC/Review; native judge100, startup убрал только своё. N1 s9821T: первая задача100/cleanup confirmed, следующая не запущена из-за чужого Desktop CDP. a20 holds сняты прямой проверкой без удаления/подделки missing cleanup; ждём безопасного окна, затем полный N1.
