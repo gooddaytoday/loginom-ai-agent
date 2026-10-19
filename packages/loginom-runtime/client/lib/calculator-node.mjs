@@ -122,6 +122,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     const s=await channel.observe({condition:'calculator graph before opening',ready:s=>s.prepared_node_context?.surface==='graph'});
     await selectPreparedGraphNode(channel,s,'select calculator graph node');
     await openPreparedWizard(channel);
+    if(implementation?.afterOpen)await implementation.afterOpen(channel,operation.nodeApply.request);
     const opened=await channel.observe(implementation?.configurationObservation??{condition:'calculator expression page',readCalculator:true,ready:s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true});
     return verified({effect_possible:true,node_context:opened.prepared_node_context,...(preconfiguration?{preconfiguration}: {})});
    },
