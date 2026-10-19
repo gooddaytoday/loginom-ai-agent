@@ -30,6 +30,7 @@ function fixture(t, fault) {
  const read=async()=>{
   if(!created)return structuredClone(before);
   reads++;
+  if(fault==='mask' && reads===1 || fault==='persistent_mask')throw Error('page.evaluate: Error: Graph is blocked');
   if(fault==='foreign_type')throw Error('JavaScript data port has a foreign native type');
   if(fault==='foreign_owner')native.FIconCls=NODE_TYPES['transform.sorting'].icon_class;
   if(fault==='changed_owner' && reads>1)native.FGuid='other-js';
@@ -43,10 +44,14 @@ test('one JavaScript create waits read-only past 15s for its port under the orig
  const f=fixture(t),r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);
  assert.equal(r.after.nodes[0].ref.node_id,'new-js');assert.equal(f.counts().drags,1);assert.ok(f.now()>=26000&&f.now()<40000);assert.equal(r.cleanup_complete,true);
 });
-for(const fault of ['foreign_type','foreign_owner','changed_owner','deadline','cancel'])test('JavaScript port settlement preserves possible effect on '+fault,async t=>{
+test('the existing short loading-mask wait can precede JavaScript port settlement',async t=>{
+ const f=fixture(t,'mask'),r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(f.counts().drags,1);assert.ok(f.now()>=26000);
+});
+for(const fault of ['foreign_type','foreign_owner','changed_owner','deadline','cancel','persistent_mask'])test('JavaScript port settlement preserves possible effect on '+fault,async t=>{
  const f=fixture(t,fault),r=await f.run();assert.equal(r.status,'AMBIGUOUS');assert.equal(r.effect_possible,true);assert.equal(f.counts().drags,1);assert.equal(r.cleanup_complete,true);
  if(fault==='foreign_type')assert.match(r.error,/foreign native type/);
  if(fault.endsWith('owner'))assert.match(r.error,/owner changed/);
  if(fault==='deadline')assert.equal(f.now(),40000);
  if(fault==='cancel')assert.match(r.error,/cancelled/);
+ if(fault==='persistent_mask'){assert.match(r.error,/Graph is blocked/);assert.ok(f.now()>=25000&&f.now()<26000);}
 });

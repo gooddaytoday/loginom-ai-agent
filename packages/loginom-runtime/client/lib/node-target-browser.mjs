@@ -284,11 +284,13 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     }else throw new Error('Graph primitive is not implemented: '+kind);
     await page.mouse.move(10,10);
     const settleJavascript=kind==='create' && p.type==='programming.javascript';
+    const maskDeadline=Math.min(task.deadline,Date.now()+15000);
     let pendingNode;
     let after=await wait('graph_effect_visible_and_drag_idle',async()=>{
       try{const g=await read(page,task);return g.interaction_ready&&JSON.stringify(g)!==JSON.stringify(before)?g:null;}
       catch(error){
         if(!settleJavascript)return null;
+        if(String(error.message).includes('Graph is blocked') && Date.now()<maskDeadline)return null;
         if(!String(error.message).includes('Visible port identity is not rendered'))throw error;
         // One create already happened. Wait only for that native JavaScript's
         // port rendering, under the original deadline; never repeat the drag.
