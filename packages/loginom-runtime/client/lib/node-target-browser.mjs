@@ -171,7 +171,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const node=before.nodes.find(n=>n.ref.node_id===p.ref.node_id);
       if(!node||node.locked)throw Error('Exact unlocked target node required');
       const canvas=find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram');
-      placementNavigation=await revealPosition({page,root:canvas,nodeId:p.ref.node_id,position:node.position,prefix:task.request.workflow_ref.prefix,
+      placementNavigation=await revealPosition({page,root:canvas,nodeId:p.ref.node_id,position:node.position,prefix:task.request.workflow_ref.prefix,scrollNode:true,
         remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();if(!sameGraph(before,await read(page,task)))throw Error('Graph changed during target navigation');}});
       if(!placementNavigation.fully_visible)throw Error('Target node and ports are not fully visible');
       gestureBefore=await read(page,task);
