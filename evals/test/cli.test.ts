@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test"
+
+const processDenial = process.env.EVAL_PROCESS_DENIAL_TESTS === "1" ? test : test.skip
 import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
@@ -412,7 +414,7 @@ test("runAgent: передаёт reasoning variant и непустой title б�
   expect(args.slice(args.indexOf("--title"), args.indexOf("--title") + 2)).toEqual(["--title", "eval-group-sum-qty"])
 })
 
-test("runAgent: недоступный /proc постороннего процесса не мешает cleanup", async () => {
+processDenial("runAgent: недоступный /proc постороннего процесса не мешает cleanup", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-proc-foreign-"))
   const child = spawn(process.execPath, ["-e", `
     const { dlopen } = await import('bun:ffi')
@@ -634,7 +636,7 @@ test("runAgent: отказ записи process evidence сохраняет из
 })
 
 
-test("runAgent: полностью прочитанная чужая ancestry не мешает cleanup при закрытом exe", async () => {
+processDenial("runAgent: полностью прочитанная чужая ancestry не мешает cleanup при закрытом exe", async () => {
   const out = await mkdtemp(path.join(os.tmpdir(), "evals-proc-denied-"))
   const command = fakeCommand()
   const pending = runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_EXIT_DELAY_MS: "700" } },

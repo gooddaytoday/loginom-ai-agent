@@ -31,7 +31,6 @@ async function calibrateBody(config: EvalConfig, corpusDir: string, signal: Abor
     model: config.judge.model,
     reasoning: config.judge.reasoning,
     env: config.judge.env,
-    processEvidence: config.judge.processEvidence,
     timeoutMs: config.judgeTimeoutMs,
     passThreshold: config.passThreshold,
   }

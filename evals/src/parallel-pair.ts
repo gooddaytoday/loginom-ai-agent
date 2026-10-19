@@ -231,7 +231,6 @@ export async function reserveUserStorage(file: SlotFile, lease: SlotLease, secre
 
 async function assertUserStorageHeld(file: SlotFile, lease: SlotLease, serverLease: Awaited<ReturnType<typeof acquireResourceLease>>) {
   await lease.assertHeld()
-  if (lease.recoveryOnly) throw new EvalFailure("SLOT_RECOVERY_ONLY", 2)
   if (serverLease.reservation.key !== `server:${lease.identity.containerId}` || serverLease.reservation.state !== "retained" ||
     JSON.stringify(serverLease.reservation.identity) !== JSON.stringify(lease.identity)) throw new EvalFailure("SERVER_FENCE_UNCONFIRMED", 2)
   await serverLease.assertHeld()

@@ -8,13 +8,13 @@ import { collectNodeNativeEvidence } from "./node-native"
 import { textImportIds, textImportChecks, collectTextImportEvidence, assertTextImportModel } from "./text-import"
 import type { RunSummary } from "./report"
 
-export async function runNodeEvals(argv: string[], env: Record<string, string | undefined>, options?: Parameters<typeof main>[2]) {
+export async function runNodeEvals(argv: string[], env: Record<string, string | undefined>) {
   const state = { runDir: null as string | null }
-  try { return await executeNodeEvals(argv, options?.fixture ? { ...env, EVAL_SLOTS_FILE: env.EVAL_SLOTS_FILE ?? "fixture-programmatic-only" } : env, options, state) }
+  try { return await executeNodeEvals(argv, env, state) }
   catch (error) { return { code: 2, runDir: state.runDir, error: error instanceof Error ? error.message : String(error) } }
 }
 
-async function executeNodeEvals(argv: string[], env: Record<string, string | undefined>, options: Parameters<typeof main>[2], state: { runDir: string | null }) {
+async function executeNodeEvals(argv: string[], env: Record<string, string | undefined>, state: { runDir: string | null }) {
   if (argv.some((arg) => ["--calibrate", "--judge-only", "--keep-storage", "--dry-run", "--reset-profile"].includes(arg.split("=")[0]!)))
     return { code: 2, runDir: null, error: "unsupported mode: code-only live runner" }
   const args = ["--tasks", path.join(evalsRoot, "tasks/node-evals"), ...argv, "--skip-judge", "--repeat", "1"]
@@ -26,7 +26,7 @@ async function executeNodeEvals(argv: string[], env: Record<string, string | und
     for (const item of task.checklist) if (item.required && !(textImportIds.includes(task.id) ? textImportChecks : ["input", "crosstable", "graph", "export", "result", "sequence"]).includes(item.id))
       throw Error(`unknown required ID: ${item.id}`)
   }
-  const run = await main(args, env, options)
+  const run = await main(args, env)
   state.runDir = run.runDir
   const summary=await Bun.file(path.join(run.runDir,"summary.json")).json() as RunSummary
   for (const task of summary.tasks) for (const attempt of task.attempts) {

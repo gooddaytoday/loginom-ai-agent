@@ -1,41 +1,9 @@
 import path from "node:path"
-import { lstat, realpath } from "node:fs/promises"
+
 import { EvalFailure } from "./fail"
-import { readLeaseReceipt, writeLeaseReceipt, type acquireResourceLease } from "./lease"
-import { readServerIdentity } from "./parallel-pair"
-import type { SlotFile, SlotLease } from "./slots"
 
-/** Publishes a same-epoch kernel snapshot under the current server/slot fences. */
-export async function captureServerFiles(file: SlotFile, server: Awaited<ReturnType<typeof acquireResourceLease>>, lease: SlotLease) {
-  const context = await requireFence(file, server, lease)
-  const snapshot = await serverFileObservation(lease.identity.containerId)
-  if (!snapshot.complete) throw new EvalFailure("SERVER_FILE_SCAN_UNCONFIRMED", 2)
-  if (hash(await requireFence(file, server, lease)) !== hash(context)) throw new EvalFailure("SERVER_FILE_SOURCE_UNCONFIRMED", 2)
-  const receipt = { version: 1, kind: "server-file-observation", context, frame: snapshot.frame }
-  const target = path.join(file.controller.stateDir, `server-files-${crypto.randomUUID()}.json`)
-  await writeLeaseReceipt(target, receipt)
-  return readServerFiles(file, server, lease, { path: target, sha256: hash(receipt) })
-}
 
-/** Replays raw data; a complete snapshot alone grants no cleanup or admission. */
-export async function readServerFiles(file: SlotFile, server: Awaited<ReturnType<typeof acquireResourceLease>>, lease: SlotLease, source: { path: string; sha256: string }) {
-  const context = await requireFence(file, server, lease)
-  if (path.dirname(source.path) !== file.controller.stateDir || path.resolve(source.path) !== source.path ||
-    !/^server-files-[a-f0-9-]{36}\.json$/.test(path.basename(source.path)) || !/^[a-f0-9]{64}$/.test(source.sha256))
-    throw new EvalFailure("SERVER_FILE_SOURCE_UNCONFIRMED", 2)
-  const receipt = record(await readLeaseReceipt(source.path))
-  if (Object.keys(receipt).length !== 4 || receipt.version !== 1 || receipt.kind !== "server-file-observation" ||
-    hash(receipt) !== source.sha256 || hash(receipt.context) !== hash(context)) throw new EvalFailure("SERVER_FILE_SOURCE_UNCONFIRMED", 2)
-  const frame = record(receipt.frame)
-  if (Object.keys(frame).length !== 4 || frame.containerId !== lease.identity.containerId || typeof frame.output !== "string" ||
-    typeof frame.startedAt !== "string" || typeof frame.finishedAt !== "string" || !Number.isFinite(Date.parse(frame.startedAt)) ||
-    !Number.isFinite(Date.parse(frame.finishedAt)) || Date.parse(frame.startedAt) > Date.parse(frame.finishedAt))
-    throw new EvalFailure("SERVER_FILE_SOURCE_UNCONFIRMED", 2)
-  const snapshot = parseSnapshot(frame.containerId, frame.startedAt, frame.finishedAt, frame.output)
-  if (!snapshot.complete || hash(await requireFence(file, server, lease)) !== hash(context) || hash(await readLeaseReceipt(source.path)) !== source.sha256)
-    throw new EvalFailure("SERVER_FILE_SOURCE_UNCONFIRMED", 2)
-  return { identity: lease.identity, slotId: lease.slot.id, leaseToken: lease.token, snapshot, source, storageDeletionAllowed: false as const, nextAdmissionAllowed: false as const }
-}
+
 
 /** Read-only collector; research controls also use this without cleanup authority. */
 export async function serverFileObservation(containerId: string, read = scanServerFiles) {
@@ -85,28 +53,4 @@ function parseSnapshot(containerId: string, startedAt: string, finishedAt: strin
 
 function birth(stat: string) {
   return stat.slice(stat.lastIndexOf(")") + 2).trim().split(/\s+/)[19]
-}
-
-async function requireFence(file: SlotFile, server: Awaited<ReturnType<typeof acquireResourceLease>>, lease: SlotLease) {
-  await server.assertHeld()
-  await lease.assertHeld()
-  const root = await lstat(file.controller.stateDir)
-  if (!root.isDirectory() || root.uid !== process.getuid?.() || (root.mode & 0o777) !== 0o700 ||
-    await realpath(file.controller.stateDir) !== file.controller.stateDir || path.dirname(lease.receipt) !== file.controller.stateDir ||
-    !file.slots.some(slot => JSON.stringify(slot) === JSON.stringify(lease.slot)) ||
-    server.reservation.key !== `server:${lease.identity.containerId}` || hash(server.reservation.identity) !== hash(lease.identity))
-    throw new EvalFailure("SERVER_FILE_FENCE_UNCONFIRMED", 2)
-  if (hash(await readServerIdentity(file)) !== hash(lease.identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
-  return { identity: lease.identity, slotId: lease.slot.id, leaseToken: lease.token, server: { token: server.reservation.token,
-    revision: server.reservation.revision, commandId: server.reservation.commandId, journal: server.reservation.journal },
-    scriptSha256: new Bun.CryptoHasher("sha256").update(await Bun.file(path.resolve(import.meta.dir, "../fixtures/server-files.sh")).bytes()).digest("hex") }
-}
-
-function record(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new EvalFailure("SERVER_FILE_SOURCE_UNCONFIRMED", 2)
-  return value as Record<string, unknown>
-}
-
-function hash(value: unknown) {
-  return new Bun.CryptoHasher("sha256").update(JSON.stringify(value)).digest("hex")
 }

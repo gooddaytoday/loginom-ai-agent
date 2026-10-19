@@ -8,7 +8,6 @@ import { groupProcesses } from "./process-group"
 import { superviseProcess, verifyOwnedRegistration, writerIdentity, type OwnedRegistration, type ProcessCleanup, type WriterIdentity } from "./process-supervisor"
 import { archiveDiagnostics } from "./diagnostics"
 import { sandboxCommand, assertNoDebuggers } from "./sandbox"
-import { superviseManagementProcess } from "./management-process-evidence"
 
 type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean; url?: string; username?: string }
 
@@ -98,11 +97,6 @@ const exists = (file: string) =>
   )
 
 export async function management(command: AgentCommand, args: string[], stdin?: string, timeoutMs = 120_000, signal?: AbortSignal) {
-  if (command.managementEvidence) {
-    await command.managementEvidence.lease.assertHeld()
-    if (!command.cleanupDir || command.env.LOGINOM_AI_AGENT_CLI_PROFILE !== command.managementEvidence.lease.slot.profileDir)
-      throw new EvalFailure("MANAGEMENT_PROCESS_SCOPE_INVALID", 2)
-  }
   const out = command.cleanupDir ? path.join(command.cleanupDir, `${Date.now()}-${crypto.randomUUID()}`) : undefined
   if (out) await mkdir(out, { recursive: true, mode: 0o700 })
   const workdir = command.mode === "binary" && args[0] === "loginom" && args[1] === "check"
@@ -113,8 +107,7 @@ export async function management(command: AgentCommand, args: string[], stdin?: 
   const input = { cmd: [...command.cmd, ...args], cwd: boundary?.cwd ?? command.cwd,
     env: boundary?.env ?? command.env, sandbox: boundary?.cmd,
     profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs, signal }
-  const result = command.managementEvidence ? await superviseManagementProcess(input,
-    { ...command.managementEvidence, directory: out!, operation: args.slice(0, 2) }) : await superviseProcess(input)
+  const result = await superviseProcess(input)
   if (out) await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ command: args.slice(0, 2), processes: result.processCleanup }, null, 2))
   if (result.processCleanup.status !== "confirmed")
     throw new EvalFailure(`Management cleanup failed: ${result.processCleanup.error ?? "unconfirmed"}`, 1)

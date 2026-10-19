@@ -4,9 +4,9 @@ import os from "node:os"
 import path from "node:path"
 import { evalsRoot, loadConfig } from "../src/config"
 import { readEnvironmentStatus } from "../src/parallel-status"
-import { acquireEnvironmentLeases, acquireSlotLease } from "../src/slots"
+import { acquireEnvironmentLeases } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
-import { parallelFixture } from "./helpers/parallel-fixture"
+import { acquireFixtureSlot, parallelFixture } from "./helpers/parallel-fixture"
 import { prepareEnvironment, scopedSlotConfig, verifyEnvironment } from "../src/environment-preparation"
 import { stageUserPreparation } from "../src/user-environment"
 import { agentCommand } from "../src/cli"
@@ -74,14 +74,14 @@ test("status reads retained ownership without guards, credentials or file change
   await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "pair.json"), { version: 2, kind: "pair-provision", nonce: crypto.randomUUID(),
     purpose: "research", daemonId: "daemon", server: fixture.slots.server, images: {}, resources: { server: identity.containerId,
       studio: identity.studioContainerId, network: "e".repeat(64) }, phase: "ready" })
-  const lease = await acquireSlotLease(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
+  const lease = await acquireFixtureSlot(fixture.slots, fixture.slots.slots[0]!, identity, fixture.lockRoot)
   try {
     const names = await readdir(fixture.lockRoot)
     const before = await Promise.all(names.map(name => Bun.file(path.join(fixture.lockRoot, name)).text()))
     const status = await readEnvironmentStatus(fixture.slots, fixture.lockRoot)
     expect(status).toMatchObject({ version: 2, kind: "parallel-environment-status", snapshotChanged: false, admission: "not_verified" })
     expect(status.slots).toHaveLength(2)
-    expect(status.slots[0]).toMatchObject({ id: "a", username: "eval-a", user: { state: "retained" }, profile: { state: "retained" } })
+    expect(status.slots[0]).toMatchObject({ id: "a", username: "eval-a", user: null, profile: { state: "retained" } })
     expect(status.slots[1]).toMatchObject({ id: "b", user: null, profile: null })
     expect(await readdir(fixture.lockRoot)).toEqual(names)
     expect(await Promise.all(names.map(name => Bun.file(path.join(fixture.lockRoot, name)).text()))).toEqual(before)
@@ -164,7 +164,7 @@ test("verify CLI records an admission failure without preparing or modifying use
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
-test("recover CLI routes a pre-CLI preparation incident and records an unconfirmed admission failure", async () => {
+test("removed recover CLI refuses complete arguments before filesystem effects", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-recover-preparation-cli-")), fixture = await parallelFixture(root)
   const config = path.join(root, "slots.json"), out = path.join(root, "output"), incident = path.join(fixture.slots.controller.stateDir, "prepare-command.json")
   await writeLeaseReceipt(config, fixture.slots)
@@ -173,10 +173,9 @@ test("recover CLI routes a pre-CLI preparation incident and records an unconfirm
     const child = Bun.spawn([process.execPath, path.join(evalsRoot, "script/parallel-env.ts"), "recover", "--config", config, "--incident", incident, "--out", out],
       { cwd: evalsRoot, env: { PATH: process.env.PATH ?? "", HOME: root }, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
-    expect({ code, stdout, stderr: stderr.trim() }).toEqual({ code: 2, stdout: "", stderr: "SLOT_PATH_PRIVATE" })
-    expect(await Bun.file(path.join(out, "receipt.json")).json()).toMatchObject({ version: 2, kind: "preparation-recovery", ready: false,
-      status: "failed", finalization: { status: "unconfirmed" } })
-    expect(await readdir(out)).toEqual(["receipt.json"])
+    expect({ code, stdout, stderr: stderr.trim() }).toEqual({ code: 2, stdout: "", stderr: "PARALLEL_ENV_ARGUMENTS" })
+    expect(await Bun.file(path.join(out, "receipt.json")).exists()).toBe(false)
+    expect(await readdir(root)).not.toContain("output")
     expect(await readdir(fixture.lockRoot)).toEqual([])
   } finally { await rm(root, { recursive: true, force: true }) }
 })

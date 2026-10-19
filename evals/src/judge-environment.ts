@@ -24,13 +24,10 @@ export async function runOfflineJudge(config: EvalConfig, lockRoot = globalLockR
   const directory = await mkdtemp(path.join(environment.stateDir, "judge-command-"))
   const commandId = crypto.randomUUID()
   const journal = path.join(directory, "journal.json")
-  const processInventory = path.join(directory, "processes.json")
-  const record = { version: 2, kind: "offline-judge-command", commandId, processInventory }
-  await writeLeaseReceipt(processInventory, { version: 2, kind: "offline-judge-processes", commandId, processes: [] })
+  const record = { version: 2, kind: "offline-judge-command", commandId }
   await writeLeaseReceipt(journal, { ...record, state: "intent" })
   const lease = await acquireJudgeLease({ codexHome: environment.codexHome, journal, commandId, lockRoot })
   const scoped: EvalConfig = { ...config, judge: { ...config.judge,
-    processEvidence: { file: processInventory, commandId, assertHeld: lease.assertHeld },
     env: { ...config.judge.env, CODEX_HOME: environment.codexHome } } }
   let released = false
   let runDir: string | null = null

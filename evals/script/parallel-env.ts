@@ -4,7 +4,6 @@ import { lstat, mkdir, realpath } from "node:fs/promises"
 import { EvalFailure } from "../src/fail"
 import { globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { loadResourceSlots } from "../src/slots"
-import { recoverOfflineJudgeIncident } from "../src/judge-recovery"
 import { readEnvironmentStatus } from "../src/parallel-status"
 
 try {
@@ -12,8 +11,7 @@ try {
     config: { type: "string" }, incident: { type: "string" }, out: { type: "string" }, parallel: { type: "string" },
   } })
   const command = args.positionals[0]
-  if (args.positionals.length !== 1 || !["status", "recover", "prepare", "verify"].includes(command ?? "") || !args.values.config ||
-    command === "recover" && (!args.values.incident || !args.values.out || args.values.parallel) ||
+  if (args.positionals.length !== 1 || !["status", "prepare", "verify"].includes(command ?? "") || !args.values.config ||
     (command === "prepare" || command === "verify") && (!args.values.out || args.values.incident || args.values.parallel !== undefined &&
       (!/^[1-9][0-9]*$/.test(args.values.parallel) || !Number.isSafeInteger(Number(args.values.parallel)))) ||
     command === "status" && (args.values.incident || args.values.out || args.values.parallel))
@@ -31,29 +29,6 @@ try {
     if (!parent.isDirectory() || parent.uid !== process.getuid?.() || (parent.mode & 0o777) !== 0o700 || await realpath(path.dirname(out)) !== path.dirname(out))
       throw new EvalFailure("PARALLEL_ENV_OUTPUT_PRIVATE", 2)
     await mkdir(out, { mode: 0o700 }).catch(() => { throw new EvalFailure("PARALLEL_ENV_OUTPUT_PRIVATE", 2) })
-    if (command === "recover") {
-      const incident = path.resolve(args.values.incident!), original = await readLeaseReceipt(incident)
-      const preparation = original && typeof original === "object" && "kind" in original && original.kind === "unactivated-preparation"
-      if (preparation) {
-        const { recoverUnactivatedPreparation } = await import("../src/preparation-recovery")
-        const { EnvironmentFailure } = await import("../src/environment-preparation")
-        const receipt = await recoverUnactivatedPreparation({ slotsFile, incident }).catch(async error => {
-          const failure = error instanceof EnvironmentFailure ? await readLeaseReceipt(error.receipt) : { version: 2, kind: "preparation-recovery",
-            status: "failed", ready: false, reason: error instanceof EvalFailure ? error.message : "PREPARATION_RECOVERY_FAILED",
-            finalization: { status: "unconfirmed" } }
-          if (!failure || typeof failure !== "object" || Array.isArray(failure)) throw new EvalFailure("PREPARATION_RECEIPT_UNCONFIRMED", 2)
-          await writeLeaseReceipt(path.join(out, "receipt.json"), failure)
-          throw error
-        })
-        await writeLeaseReceipt(path.join(out, "receipt.json"), receipt)
-        console.log(JSON.stringify(receipt))
-      }
-      if (!preparation) {
-        const receipt = await recoverOfflineJudgeIncident({ slotsFile, journal: incident })
-        await writeLeaseReceipt(path.join(out, "receipt.json"), { version: 2, kind: "offline-judge-recovery-result", ...receipt })
-        console.log(JSON.stringify(receipt))
-      }
-    }
     if (command === "prepare" || command === "verify") {
       const { prepareEnvironment, verifyEnvironment, EnvironmentFailure } = await import("../src/environment-preparation")
       const check = command === "prepare" ? prepareEnvironment : verifyEnvironment
