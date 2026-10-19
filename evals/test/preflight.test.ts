@@ -2,13 +2,25 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import { chmod, mkdtemp, mkdir, symlink, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
-import { evalsRoot, loadConfig } from "../src/config"
+import { evalsRoot, loadConfig, type EvalConfig } from "../src/config"
 import { parseArtifactSource } from "../src/artifact"
 import { EvalFailure } from "../src/fail"
 import { agentInfo, checkFreeSpace, checkStorage, checkSandbox, dockSkillRevision, preflight, verifyAdminRuntime } from "../src/preflight"
 import { probeJudgeEnvironment } from "./helpers/judge-probe"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
+
+test("preflight preserves the judge systemd boundary for its version probe", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-preflight-unit-"))
+  try {
+    const wrapper = path.join(root, "judge-wrapper"), systemctl = path.join(root, "systemctl")
+    await writeFile(wrapper, '#!/bin/sh\ntest -n "$LOGINOM_EVALS_JUDGE_UNIT" || exit 64\nprintf "unit-codex 1.0\\n"\n', { mode: 0o700 })
+    await writeFile(systemctl, '#!/bin/sh\nprintf "LoadState=not-found\\nActiveState=inactive\\nMainPID=0\\n"\nexit 4\n', { mode: 0o700 })
+    const config: EvalConfig = loadConfig(["--judge-only", "fixture"], { JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: wrapper })
+    config.judge = { ...config.judge, systemd: true, env: { PATH: root + ":" + process.env.PATH! } }
+    expect((await preflight(config, parseArtifactSource("docker", config.loginom))).codex).toEqual({ version: "unit-codex 1.0" })
+  } finally { await rm(root, { recursive: true }) }
+})
 
 test("preflight: a cancelled admission does not start the judge version probe", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-preflight-cancelled-"))
