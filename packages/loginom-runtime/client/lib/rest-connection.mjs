@@ -140,7 +140,33 @@ export async function restConnectionCapability(page,t){
   await click(workflow,true);const graphTid=t.workflow_ref.prefix+';ModelForm;cmpDiagram';await wait('original workflow graph',()=>find(graphTid).isVisible());await quiet();
   const header=t.workflow_ref.prefix+';ModelForm;pnlConnectionsContainer;p.h;p.t';
   const itemPrefix=t.workflow_ref.prefix+';ModelForm;pnlConnections;headercontainer;text_Root>Текущий_модуль';
-  if(!await find(itemPrefix+';TreeText').isVisible()){await click(header);await wait('connection palette',()=>find(itemPrefix+';TreeText').isVisible());}
+  if(!await find(itemPrefix+';TreeText').isVisible()){
+   await click(header);let refreshed=false;
+   await wait('connection palette',async()=>{
+    if(await find(itemPrefix+';TreeText').isVisible())return true;
+    if(!refreshed){
+     await guard();
+     // With a slow server, Ext can retain loaded Root children without drawing
+     // any rows after accordion expansion. Refresh only that owned empty view,
+     // once; never repeat connection creation, expansion clicks or the drag.
+     refreshed=await page.evaluate(({b,t})=>{
+      const active=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+      const forms=document.querySelectorAll('[data-tid='+JSON.stringify(t.workflow_ref.prefix+';ModelForm')+']');
+      const trees=document.querySelectorAll('[data-tid='+JSON.stringify(t.workflow_ref.prefix+';ModelForm;pnlConnections;tree')+']');
+      if(globalThis.__loginomDockPreparationV1!==b.p||b.p.document!==document||b.p.id!==t.document_id
+       ||active?.Controller?.Node?.data?.node!==b.workflow||active.Controller.FController?.constructor?.name!=='ModelForm'
+       ||forms.length!==1||trees.length!==1||!forms[0].contains(trees[0]))throw Error('REST connection: connection palette owner changed');
+      const tree=trees[0],view=Ext.getCmp(tree.id),store=view?.getStore?.(),root=store?.getRoot?.(),r=tree.getBoundingClientRect();
+      if(!tree.isConnected||view?.el?.dom!==tree)throw Error('REST connection: connection palette view changed');
+      if([...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message,.x-window')].some(e=>e.checkVisibility({checkVisibilityCSS:true})))return false;
+      if(r.width<=0||r.height<=0||!root?.data?.loaded||!root.data.expanded||!root.childNodes?.length
+       ||tree.querySelector('[data-tid$=";TreeText"]'))return false;
+      view.refresh();return true;
+     },{b:owner,t});
+    }
+    return find(itemPrefix+';TreeText').isVisible();
+   });
+  }
   if(!await page.locator('[data-tid^='+JSON.stringify(itemPrefix+'>')+'][data-tid$=";TreeText"]').count())await click(itemPrefix+';TreeExpander');
   const item=await wait('saved connection palette item',async()=>{
    const es=await page.locator('[data-tid^='+JSON.stringify(itemPrefix+'>')+'][data-tid$=";TreeText"]').evaluateAll((es,name)=>es.filter(e=>e.textContent.trim()===name).map(e=>e.getAttribute('data-tid')),t.connection.name);return es.length===1?es[0]:null;
