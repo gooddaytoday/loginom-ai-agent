@@ -189,7 +189,7 @@ try {
    await prepareCrossTableAncestorExecution({graph,node,sources:staticSources,operation,execute,record,targetOrigin:origin,targetBuild:'7.4.2',
     wrapMutation:(code,r)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})});
   }
-  const driver = createNodeExecutionProcedure(channel, node)
+  const driver = createNodeExecutionProcedure(channel, node, { allowDeactivate: true })
   await driver.prepare()
   await driver.launchGraph()
   await driver.identify()

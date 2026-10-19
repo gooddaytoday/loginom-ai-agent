@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from '../lib/node-execution-procedure.mjs';
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
-function fixture({selected=false,fail=false,active=false,allowDeactivate=false,loseDeactivation=false}={}){
+function fixture({selected=false,fail=false,active=false,allowDeactivate=false,loseDeactivation=false,createDriver=createNodeExecutionProcedure}={}){
  const actions=[],observations=[];let consoleOpen=false;
  const element=(tid,actions,extra={})=>({tid,ref:tid,allowed_actions:actions,...extra});
  const state=()=>({prepared_node_context:{verified:true,...node,surface:'graph',locked:false,tid:'graph-node'},wizard:{status:'absent'},
@@ -17,8 +18,20 @@ function fixture({selected=false,fail=false,active=false,allowDeactivate=false,l
  if(a.verb==='deactivate_graph_node'){active=false;if(loseDeactivation)throw Error('lost deactivation reply');}
  if(a.verb==='execute_graph_node'&&fail)throw Error('lost launch reply');
  return {status:'SUCCEEDED'};}};
- return {driver:createNodeExecutionProcedure(channel,node,{allowDeactivate}),actions,observations};
+ return {driver:createDriver(channel,node,{allowDeactivate}),actions,observations};
 }
+for(const loseDeactivation of [false,true])test('cold caller handles an ancestor already activated by its descendant; lost reply: '+loseDeactivation,async()=>{
+ // Execute the real CLI caller's initializer: importing its entry point would
+ // otherwise start browser login. The execution driver below is unchanged.
+ const source=await readFile(new URL('../../../../scripts/node-acceptance/cold-check.mjs',import.meta.url),'utf8');
+ const initializer=source.match(/const driver = (createNodeExecutionProcedure\(channel, node[^\n]*\))/);
+ assert.ok(initializer);
+ const createDriver=(channel,node)=>Function('createNodeExecutionProcedure','channel','node','return '+initializer[1])(createNodeExecutionProcedure,channel,node);
+ const f=fixture({active:true,loseDeactivation,createDriver});await f.driver.prepare();
+ if(loseDeactivation){await assert.rejects(f.driver.launchGraph(),/lost deactivation/);await assert.rejects(f.driver.launchGraph());}
+ else await f.driver.launchGraph();
+ assert.deepEqual(f.actions.filter(a=>a.verb.endsWith('_graph_node')).map(a=>a.verb),loseDeactivation?['deactivate_graph_node']:['deactivate_graph_node','execute_graph_node']);
+});
 for(const selected of [false,true])test('graph launch selects only when needed and issues one typed launch: '+selected,async()=>{
  const f=fixture({selected});await f.driver.prepare();const r=await f.driver.launchGraph();
  assert.equal(r.launch_gesture_verified,true);assert.equal(r.execution_completed,false);
