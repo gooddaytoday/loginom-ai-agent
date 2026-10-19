@@ -193,7 +193,7 @@ export async function runPreparedSlots(config: EvalConfig) {
   } catch (error) { resourceChecks.push({ status: "incomplete", codes: [describe(error)] }) }
   if (resourceChecks.some(check => check.status !== "passed")) stopped ??= resourceChecks.flatMap(check => check.codes).join(", ")
   const measured = attempts.filter((attempt): attempt is AttemptResult => attempt !== undefined)
-  const limits = aggregateLimits(measured)
+  const limits = aggregateLimits(measured, ["provider", "judge"])
   if (limits.status !== "passed") stopped ??= limits.codes.join(", ")
   const summary: RunSummary = {
     run_id: runId, label: config.label, started_at: started.toISOString(), finished_at: new Date().toISOString(), interrupted: controller.signal.aborted,
@@ -211,7 +211,7 @@ export async function runPreparedSlots(config: EvalConfig) {
     agent_inputs_hash: inputsHash, rubric_hash: rubric, task_ids: tasks.map(task => task.id),
     config: { parallel: config.parallel, repeat: config.repeat, tasks_dir: config.tasksDir, task_timeout_ms: Object.fromEntries(tasks.map(task => [task.id, taskTimeoutMs(config, task)])),
       timeout_ms: config.timeoutMs ?? config.taskTimeoutMs, judge_timeout_ms: config.judgeTimeoutMs, pass_threshold: config.passThreshold, keep_storage: false },
-    metrics: aggregate(measured, config.skipJudge), parallel_limits: limits,
+    metrics: aggregate(measured, config.skipJudge), parallel_limits: { ...limits, required_sources: ["provider", "judge"] },
     resources: { status: resourceChecks.some(check => check.status === "failed") ? "failed" : resourceChecks.some(check => check.status !== "passed") ? "incomplete" : "passed",
       evidence: "resource-acceptance.json", codes: resourceChecks.flatMap(check => check.codes) },
     tasks: tasks.map(task => ({ id: task.id, rubric_snapshot: rubricSnapshot(task), metrics: aggregateTask(measured.filter(result => result.task_id === task.id), config.skipJudge),
