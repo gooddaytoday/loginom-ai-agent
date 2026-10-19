@@ -115,7 +115,7 @@ git commit -m "feat(runtime): accept private browser recovery capability"
 - Consumes: runtime start input из Task 1.
 - Produces: `launchNodeHost({..., browserRecovery?: boolean})`; handshake `start.browserRecovery?: boolean`; `createLoginomHost({..., browserRecovery?: boolean})`; `Launch.browserRecovery?: boolean`; runtime `start` всегда получает boolean `!validation && options.browserRecovery === true`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 В `node-host.test.ts` — копия теста `a non-boolean saved-package cleanup policy is rejected before the host starts` (строка 395) с `browserRecovery: "true"`:
 
@@ -136,21 +136,21 @@ test.each([true, false])("browser recovery capability reaches only the task runt
 })
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd packages/loginom-host && LOGINOM_AI_AGENT_TEST_NODE=<pinned node> bun test test/node-host.test.ts test/browser-recovery-capability.test.ts`
 Expected: FAIL — строка проходит handshake, task runtime получает `undefined`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Повторить цепочку `closeSavedPackageOnShutdown` (`node-entry.ts:95-96,105`, `host.ts:21,87`, `supervisor.ts:24`, `node-client.ts:166-168`). Validation runtime получает `false`. Переменные окружения и аргументы вызова не читаются.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: команда Step 2 и `bun typecheck`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/loginom-host
