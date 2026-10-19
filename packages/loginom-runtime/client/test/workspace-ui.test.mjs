@@ -206,6 +206,32 @@ test('observation supplies real graph references, visible editor settings, dialo
   assert.equal(snapshot.ui.table_cells[0].text, '42');
 });
 
+test('storage table observation inventories headers once while preserving per-table redaction',async()=>{
+  const clock=fixtureClock(),page=new Page({clock:clock.Date});
+  const root=page.add('div','MF;TF-1;FileStorageForm;pnlFileStorage;tbl');
+  for(const [label,value] of [['Filename','result.csv'],['Password','private-value']]) {
+    const table=page.add('table',null,'',undefined,root);
+    page.add('th',null,label,undefined,table);
+    for(let i=0;i<80;i++)page.add('td',null,value,undefined,table).cellIndex=0;
+  }
+  let headerTests=0;
+  for(const cell of root.descendants().filter(e=>['TD','TH'].includes(e.tagName))) {
+    const matches=cell.matches.bind(cell);
+    cell.matches=selector=>{
+      if(selector==='th,[role="columnheader"]'){headerTests++;clock.advance(1);}
+      return matches(selector);
+    };
+  }
+  const result=await page.execute({mode:'observe'});
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.equal(result.output.scan.max_ms,500);
+  assert.equal(headerTests,162);
+  assert.equal(result.output.ui.table_cells.length,120);
+  assert.equal(result.output.ui.table_cells[1].text,'result.csv');
+  assert.equal(result.output.ui.table_cells[82].text,'[REDACTED]');
+  assert.deepEqual(page.events,[]);
+});
+
 function deleteConfirmation(page, { id = 'msgbox-1', y = 340, z = 19000 } = {}) {
   const dialog = page.add('div', null, 'Удалить выделенную связь?', { x: 460, y, width: 280, height: 140 });
   dialog.attrs.class = 'x-window x-message-box'; dialog.style.zIndex = String(z);

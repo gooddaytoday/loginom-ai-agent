@@ -3006,10 +3006,13 @@ function readRenderedInputMapping(observation) {
       }
       return {text,complete};
     };
+    // Header identity is invariant during this synchronous observation. Files
+    // rows must not rescan every cell for each of the 120 reported values.
+    const headerCells=allCells.filter(item=>{charge();return item.matches('th,[role="columnheader"]');});
     const tableCells = cells.slice(0, 120).map(element => {
       const column = element.getAttribute('aria-colindex');
       const table = element.closest('table,[role="grid"]');
-      const headers = table ? allCells.filter(item => { charge(); return item.matches('th,[role="columnheader"]') && table.contains(item); }) : [];
+      const headers = table ? headerCells.filter(item => { charge(); return table.contains(item); }) : [];
       const index = element.cellIndex ?? (column ? Number(column) - 1 : -1);
       const header = index >= 0 ? textOf(headers[index] ?? element) : '';
       const data=dataIdentity(element);
