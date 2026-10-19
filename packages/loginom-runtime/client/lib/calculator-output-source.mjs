@@ -18,6 +18,10 @@ export async function readCalculatorOutputMapping(channel) {
    identity:()=>({root}),resolve:s=>{const xs=links(s);need(xs.length===1,'links changed');return {verb:'click',ref:xs[0].ref};}});
   state=await channel.observe({condition:'calculator source fetch controls visible',ready:s=>bound(s)&&fetchVisible(s)});
  }
+ // A populated owned cache needs no source-fetch gesture (the button can be disabled).
+ state=await channel.observe({condition:'calculator cached output mapping',readMappings:true,ready:bound});
+ if(state.node_mapping?.verified===true&&state.node_mapping.inventory_complete===true
+  &&state.node_mapping.source_identity_verified===true)return state;
  const buttons=s=>controls(s,'btnGetSourceColumns').filter(e=>e.visible===true&&e.enabled===true&&e.allowed_actions?.includes('click'));
  need(buttons(state).length===1,'source fetch unavailable');
  await channel.perform({condition:'get calculator output source columns once',initialObservation:state,ready:bound,

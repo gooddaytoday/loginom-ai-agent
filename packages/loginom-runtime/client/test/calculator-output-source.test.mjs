@@ -6,12 +6,12 @@ import {outputMappingState} from '../lib/node-output-mapping-recovery.mjs';
 
 // Production orchestration, mapping wrapper and strict checkpoint classifier;
 // Page/cache, context reader and server dirty state are doubles, not native proof.
-function fixture({visible=false,disabled=false,foreign=false,failure=false,empty=false}={}) {
+function fixture({visible=false,disabled=false,foreign=false,failure=false,empty=false,cached=false,incomplete=false}={}) {
  const events=[],node={document_id:'doc',workflow_id:'flow',node_id:'calculator'},root='wizard';
  const context={...node,verified:true,surface:'wizard',tid:'W',output_port:{direction:'output',port:0,native_index:0,port_guid:'port'}};
  const source={record_id:'source',field_id:'4',index:0,name:'Region',label:'Region',type:'string'};
- let links=visible,fetched=false;
- const mapping=()=>({verified:true,inventory_complete:true,source_identity_verified:fetched&&!empty,
+ let links=visible,fetched=cached;
+ const mapping=()=>({verified:true,inventory_complete:!incomplete,source_identity_verified:fetched&&!empty,
   mapping_wizard:'DerivedDataSourceOutputSocketWizard',state_source:'cached_mapping_stores',autosync:true,
   source_fields:fetched&&!empty?[source]:[],target_fields:[{record_id:'target',field_id:'4',name:'Region',label:'Region display',excluded:false,source:fetched&&!empty?source:null}],
   settings_applied:false,package_saved:false});
@@ -34,17 +34,29 @@ for(const visible of [false,true])test('one fetch precedes production reader and
  assert.equal(m.verified,true);assert.equal(m.source_identity_verified,true);assert.equal(m.source_fields.length,1);
  assert.equal(m.target_fields[0].source.name,'Region');assert.equal(m.target_fields[0].excluded,false);
  assert.equal(outputMappingState(m,f.node).source_fields[0].name,'Region');
- assert.deepEqual(f.events,visible?['open','fetch','reader']:['open','links','fetch','reader']);
+ assert.deepEqual(f.events,visible?['open','reader','fetch','reader']:['open','links','reader','fetch','reader']);
  assert.equal(f.modified,false);assert.equal(f.persisted_content_verified,false);
  assert.equal(m.settings_applied,false);assert.equal(m.package_saved,false);assert.equal(m.persisted_content_verified,undefined);
 });
-for(const fault of ['disabled','foreign','failure'])test('source retrieval refuses '+fault+' without another gesture or mapping read',async()=>{
+for(const fault of ['disabled','foreign','failure'])test('source retrieval refuses '+fault+' without another gesture or accepted mapping',async()=>{
  const f=fixture({[fault]:true});await assert.rejects(readCalculatorOutputMapping(f.channel));
- assert.ok(!f.events.includes('reader'));assert.ok(f.events.filter(x=>x==='fetch').length<=1);
+ assert.deepEqual(f.events,fault==='foreign'?['links']:fault==='disabled'?['links','reader']:['links','reader','fetch']);
  assert.equal(f.modified,false);assert.equal(f.persisted_content_verified,false);
+});
+for(const fault of ['empty','incomplete'])test('disabled fetch cannot accept '+fault+' cached sources',async()=>{
+ const f=fixture({visible:true,disabled:true,cached:true,[fault]:true});
+ await assert.rejects(readCalculatorOutputMapping(f.channel),/source fetch unavailable/);
+ assert.deepEqual(f.events,['reader']);
 });
 test('successful fetch with an empty source cannot pass unchanged outputMappingState',async()=>{
  const f=fixture({empty:true});const s=await readCalculatorOutputMapping(f.channel);
  assert.equal(s.node_mapping.source_identity_verified,false);
  assert.throws(()=>outputMappingState(s.node_mapping,f.node),/complete owned output mapping required/);
+});
+for(const visible of [false,true])test('complete cached sources pass the strict checkpoint with disabled fetch, visible='+visible,async()=>{
+ const f=fixture({visible,disabled:true,cached:true});
+ const s=await readCalculatorOutputMapping(f.channel);
+ assert.equal(outputMappingState(s.node_mapping,f.node).source_fields[0].name,'Region');
+ assert.deepEqual(f.events,visible?['reader']:['links','reader']);
+ assert.equal(f.modified,false);assert.equal(f.persisted_content_verified,false);
 });
