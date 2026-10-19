@@ -558,7 +558,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             &&t.port_guid===tableDialog.table.port_guid&&t.table_tid===tableDialog.table.table_tid).length!==1)throw new Error('Table dialog owner changed');
           result.output.node_table_dialog=structuredClone(tableDialog);
         }
-        if(settleProcessConsole&&(settlingConsole||result.output.ui.masks.length)){
+        if(settleProcessConsole&&(settlingConsole||result.output.ui.masks.length
+          &&result.output.ui.elements.some(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress'))){
           const state=result.output,buttons=state.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress');
           const owned=state.prepared_node_context?.surface==='graph'&&state.ui.dialogs.length===0
             &&state.wizard?.status==='absent'&&buttons.length===1&&buttons[0].ref===settleProcessConsole.ref

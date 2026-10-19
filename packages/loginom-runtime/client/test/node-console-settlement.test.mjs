@@ -44,3 +44,8 @@ test('own loading still stops at the original deadline without a usable observat
 test('an already visible unmasked console retains its existing read path without a toolbar button',async()=>{
  const f=fixture('open',{until:0});await f.read();assert.equal(f.clock,0);
 });
+
+test('a busy pinned console whose scope omits the toolbar retains its ordinary wait',async()=>{
+ const f=fixture('open',{until:2000});await f.read();assert.equal(f.clock,2000);
+ const long=fixture('open');await assert.rejects(long.read(),/readiness timeout/);assert.equal(long.clock,15000);
+});
