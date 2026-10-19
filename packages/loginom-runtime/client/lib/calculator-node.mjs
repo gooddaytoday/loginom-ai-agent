@@ -293,6 +293,13 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
    async finishGraph(mode,ctx){
     enter(ctx);
     finishStart??=operation.nodeStepSequence??0;
+    if(mode==='execute'&&implementation?.keepExecutionConsoleOpen===true){
+     // REST progress repaints the toolbar while HTTP is running. Prepare the
+     // existing pinned console before launch, rather than opening it afterward.
+     executionDriver=createNodeExecutionProcedure(channel,ctx.node);
+     await executionDriver.prepare({keepConsoleOpen:true});
+     await channel.revealGraphNode();
+    }
     let training;
     if(mode==='execute'&&implementation?.beforeGraphExecute){
      const result=await implementation.beforeGraphExecute(options,ctx,configured,channel);
