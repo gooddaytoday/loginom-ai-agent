@@ -146,6 +146,12 @@ try {
   const destinations=destination===undefined?undefined:await observeExportDestinations({load,graph,channelFor,execute});
   if(destinations)await record({phase:'cold_export_destinations',destinations,settings_applied:false});
   const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations}):null;
+  if(exportInput){
+   // Snapshot the saved mapping before executing upstream: autosync can change
+   // the export's cached input order when native output is rematerialized.
+   exportInput.mapping=await observeExportInputMapping({load,target:exportInput.export_node,channelFor});
+   await record({phase:'cold_export_input_mapping',node:exportInput.export_node.ref,mapping:exportInput.mapping,settings_applied:false});
+  }
   for (const want of expected.nodes) {
     if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
@@ -256,10 +262,6 @@ try {
   if([config.api_key,loginPassword].filter(Boolean).some(secret=>checkpoint.includes(secret)))throw Error('SECRET_IN_RESULT');
   await writeFile(join(args.output,'actual-readback.json'),checkpoint+'\n');
   }
-  }
-  if(exportInput){
-   exportInput.mapping=await observeExportInputMapping({load,target:exportInput.export_node,channelFor});
-   await record({phase:'cold_export_input_mapping',node:exportInput.export_node.ref,mapping:exportInput.mapping,settings_applied:false});
   }
   const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput});
   const matched=correspondence.map(m=>{
