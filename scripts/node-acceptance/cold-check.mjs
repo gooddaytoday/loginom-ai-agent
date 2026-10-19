@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
-import {coldNativeEligible} from './cold-reader-policy.mjs'
+import {coldNativeEligible,performColdNodeAction,runColdExecution} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -166,7 +166,7 @@ try {
     action: { action_key: "acceptance.cold_read", revision: "1" },
     deadline: Date.now() + 540_000,
   }
-  const channel = createNodeProcedure({
+  const procedure = createNodeProcedure({
     operation,
     execute,
     record,
@@ -182,6 +182,8 @@ try {
         operation_id: receipt.id,
       }),
   })
+  const channel={...procedure,get lastPreparedStep(){return procedure.lastPreparedStep;},
+    get steps(){return procedure.steps;},perform:options=>performColdNodeAction(procedure,options,{node,operation,record})};
   const nativeSource=staticSources?.crossTables.find(c=>c.node_id===node.node_id);
   const nativeConfiguration=nativeSource?.configuration;
   if(nativeConfiguration){
@@ -190,10 +192,19 @@ try {
     wrapMutation:(code,r)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})});
   }
   const driver = createNodeExecutionProcedure(channel, node, { allowDeactivate: true })
-  await driver.prepare()
-  await driver.launchGraph()
-  await driver.identify()
-  const execution = await driver.waitCompleted({})
+  const readReceipt=async reference=>{
+    const observed=await execute(withBrowserReceipt('null',{
+      receipt_namespace:session,receipt_id:reference.id,receipt_signature:reference.signature,
+      operation_id:reference.operation_id,receipt_read:true,
+    }));
+    if(observed.status!=='SUCCEEDED'||observed.action_key!=='operation.inspect'
+      ||observed.operation_id!==reference.operation_id)throw Error('COLD_RECEIPT_IDENTITY_CHANGED');
+    const result=observed.output;
+    if(result?.state==='completed'&&(result.receipt?.operation_id!==reference.operation_id
+      ||result.receipt?.action_key!==reference.action_key))throw Error('COLD_RECEIPT_IDENTITY_CHANGED');
+    return result;
+  };
+  const execution = await runColdExecution({driver,channel,node,operation,readReceipt,record})
   if (execution.status !== "completed" || !execution.verified || !execution.owner_verified)
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
   ownedExecutions.push(execution);
