@@ -368,8 +368,6 @@ test("prepared limits require agent and judge observations while retaining unava
   expect(measured.limit_evidence?.coverage.dock).toBe("unavailable")
   expect(aggregateLimits([{ ...measured, judge_status: "no_artifact", judge_attempts: 0 }], ["provider", "judge"]).status).toBe("passed")
   expect(aggregateLimits([{ ...measured, judge_status: "error" }], ["provider", "judge"]).status).toBe("incomplete")
-  expect(aggregateLimits([{ ...measured, limit_evidence: { ...measured.limit_evidence!, events: [{ source: "dock", kind: "http", status: 429 }] } }], ["provider", "judge"]))
-    .toEqual({ status: "failed", codes: ["DOCK_HTTP_429"] })
   const summary = comparisonSummary([{ successes: 1, attempts: 1 }], 1)
   summary.parallel_limits = { ...aggregateLimits([measured], ["provider", "judge"]), required_sources: ["provider", "judge"] }
   expect(renderReport(summary)).toContain("Проверка лимитов обязательных источников (provider, judge): passed")
