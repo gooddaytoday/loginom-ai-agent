@@ -60,7 +60,7 @@ export interface TextImportConfigurationReadback {
   kind: 'text_import'; scope: 'observed_before_verified_finish'; node: NodeRef;
   receipt_ids: string[]; values_are: 'observed_ui_values'; package_persistence_verified: false;
   source: {source_path: string; connection: string; encoding: string; rows_to_skip: string; first_line_as_title: boolean};
-  format: {delimiter: string; text_qualifier: string; null_marker: string; decimal_separator: string};
+  format: {delimiter: string; text_qualifier: string; null_marker: string; decimal_separator: string; multiple_delimiters?: boolean; date_format?: 'dd/mm/yyyy'|'mm/dd/yyyy'|'yyyy/mm/dd'|'dd/mm/yy'|'mm/dd/yy'|'yy/mm/dd'; date_separator?: '.'|'/'|'\\'|'-'};
   columns: Array<{index: number; name: string; label: string; type: string; data_kind: string; used: boolean}>;
   output_mapping: {port: 0; autosync: boolean;
     fields: Array<{index: number; name: string; label: string; type: string; data_kind: string; source_name: string}>};

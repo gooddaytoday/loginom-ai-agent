@@ -48,9 +48,17 @@ function validateSettings(p,maxColumns) {
   requireValue(typeof p.source.encoding === 'string' && p.source.encoding.length > 0 && p.source.encoding.length <= 100, 'Encoding is required');
   requireValue(typeof p.source.first_line_as_title === 'boolean' && Number.isInteger(p.source.rows_to_skip)
     && p.source.rows_to_skip >= 0 && p.source.rows_to_skip <= 1000000, 'Invalid source row settings');
-  requireValue(p.format && Object.keys(p.format).sort().join(',') === 'decimal_separator,delimiter,null_marker,text_qualifier', 'Format parameters are incomplete');
-  for (const [name, value] of Object.entries(p.format)) requireValue(typeof value === 'string'
-    && value.length <= (name === 'null_marker' ? 256 : 1) && !/[\x00\r\n]/.test(value), 'Invalid format value: ' + name);
+  const formatKeys=['delimiter','decimal_separator','null_marker','text_qualifier'];
+  requireValue(p.format && formatKeys.every(k=>Object.hasOwn(p.format,k))
+    &&Object.keys(p.format).every(k=>[...formatKeys,'multiple_delimiters','date_format','date_separator'].includes(k)), 'Format parameters are incomplete');
+  for (const name of formatKeys) {
+    const value=p.format[name];
+    requireValue(typeof value === 'string' && value.length <= (name === 'null_marker' ? 256 : 1)
+      && !/[\x00\r\n]/.test(value), 'Invalid format value: ' + name);
+  }
+  if(Object.hasOwn(p.format,'multiple_delimiters'))requireValue(typeof p.format.multiple_delimiters==='boolean','Invalid multiple_delimiters');
+  if(Object.hasOwn(p.format,'date_format'))requireValue(['dd/mm/yyyy','mm/dd/yyyy','yyyy/mm/dd','dd/mm/yy','mm/dd/yy','yy/mm/dd'].includes(p.format.date_format),'Invalid date_format');
+  if(Object.hasOwn(p.format,'date_separator'))requireValue(['.','/','\\','-'].includes(p.format.date_separator),'Invalid date_separator');
   requireValue(p.format.delimiter.length === 1 && ['.', ','].includes(p.format.decimal_separator), 'Explicit delimiters are required');
   requireValue(Array.isArray(p.columns) && p.columns.length >= 1 && p.columns.length <= maxColumns,
     maxColumns===8?'The current reader supports 1–8 fully visible configured columns':'Delimited import supports 1–1000 explicitly configured columns');
@@ -95,7 +103,7 @@ export function validateTextImportPatch(p) {
   const format={delimiter:';',decimal_separator:'.',null_marker:'?',text_qualifier:'"'};
   for(const [name,defaults] of Object.entries({source,format})) {
     if(!Object.hasOwn(p,name))continue;
-    requireValue(object(p[name]) && Object.keys(p[name]).every(k=>Object.hasOwn(defaults,k)), 'Unknown import patch '+name);
+    requireValue(object(p[name]) && Object.keys(p[name]).every(k=>Object.hasOwn(defaults,k)||name==='format'&&['multiple_delimiters','date_format','date_separator'].includes(k)), 'Unknown import patch '+name);
     Object.assign(defaults,p[name]);
   }
   requireValue(!Object.hasOwn(p,'columns') || Array.isArray(p.columns)&&p.columns.length<=1000,'Invalid column patch list');
@@ -361,6 +369,11 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
   for (const [name, text] of Object.entries(parameters.format)) {
     let s = await read('text_import_format'); const f = field(s, name);
     if (f.value === text) continue;
+    if(name==='multiple_delimiters'){
+      await act(s,{verb:'set_checked',ref:f.display_ref,checked:text});
+      await read('text_import_format','multiple delimiters applied',state=>state.wizard.settings?.fields[name]?.value===text);
+      continue;
+    }
     // Native editable combo resolves typed NULL to the first case-insensitive
     // match (null) on blur. Select the exact observed built-in, never retype it.
     if (name === 'null_marker' && ['null', 'NULL'].includes(text)) {
@@ -380,7 +393,7 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
         state.wizard.settings.fields[name]?.value === text), name);
       requireValue(after.value === text && after.owner_ref === f.owner_ref && after.input_ref === f.input_ref,
         'Null marker field or case changed after selection');
-    } else await act(s, { verb: 'set_wizard_field', ref: f.input_ref, text });
+    } else await act(s, { verb: 'set_wizard_field', ref: f.input_ref, text:name==='date_separator'?{'.':'Точка (.)','/':'Слэш (/)','\\':'Обратный слэш (\\)','-':'Дефис (-)'}[text]:text });
   }
   let parsedColumns;
   if(patch) {

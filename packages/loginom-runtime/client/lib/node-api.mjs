@@ -14,7 +14,7 @@ const array=(items,maxItems,minItems=0)=>({type:'array',items,maxItems,minItems}
 const ref=object({document_id:id,workflow_id:id,node_id:id});
 const sourceSettings=object({source_path:text(2048),encoding:text(80),rows_to_skip:integer(0,1000000),first_line_as_title:boolean},[]);
 const format=object({delimiter:{type:'string',minLength:1,maxLength:1},decimal_separator:choice('.',','),
- null_marker:{type:'string',maxLength:256},text_qualifier:{type:'string',maxLength:1}},[]);
+ null_marker:{type:'string',maxLength:256},text_qualifier:{type:'string',maxLength:1},multiple_delimiters:boolean,date_format:choice('dd/mm/yyyy','mm/dd/yyyy','yyyy/mm/dd','dd/mm/yy','mm/dd/yy','yy/mm/dd'),date_separator:choice('.','/','\\','-')},[]);
 const column=object({source_name:{...text(120),description:'Original observed technical name or an unambiguous original CSV header/label. Do not guess transliteration. name selects the resulting technical name; label selects its display title.'},name:{...fieldName,maxLength:120},label:text(120),
  type:choice('integer','real','string','boolean','datetime'),data_kind:choice('Неопределенное','Непрерывный','Дискретный'),used:boolean},[]);
 export const duplicatesParametersSchema=object({input_fields:array(text(128),1000,1),output_fields:array(text(128),1000)});
@@ -92,7 +92,7 @@ export const textImportParametersSchema=object({
  source:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.source),
   description:'Use artifact_id and upload_operation_id from the completed, verified artifact delivery. Optional bytes and sha256 must match that receipt.'},
  settings:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.settings),
-  description:'For target.kind=new supply all three objects: source, format, columns. source requires source_path (the verified delivery destination), encoding, rows_to_skip, first_line_as_title. format requires delimiter, decimal_separator, null_marker, text_qualifier. columns must describe every CSV field with name, label, type, data_kind, used; source_name optionally identifies an original field when renaming. At least one field must be used. For target.kind=existing settings is a patch: omitted settings are preserved, and settings:{} reuses the saved configuration. A column patch identifies its field by source_name or name.'},
+  description:'Optional settings.format.multiple_delimiters is boolean; date_format is an explicit dd/mm/yyyy, mm/dd/yyyy, yyyy/mm/dd, dd/mm/yy, mm/dd/yy or yy/mm/dd order and date_separator is ., /, backslash or -. Omission preserves native settings, including on partial existing-node patches; no automatic encoding or date substitution. For target.kind=new supply all three objects: source, format, columns. source requires source_path (the verified delivery destination), encoding, rows_to_skip, first_line_as_title. format requires delimiter, decimal_separator, null_marker, text_qualifier. columns must describe every CSV field with name, label, type, data_kind, used; source_name optionally identifies an original field when renaming. At least one field must be used. For target.kind=existing settings is a patch: omitted settings are preserved, and settings:{} reuses the saved configuration. A column patch identifies its field by source_name or name.'},
 });
 // Cross-field restrictions survive the compact user envelope. Runtime guards
 // remain authoritative after optional defaults are expanded.
