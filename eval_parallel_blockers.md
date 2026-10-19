@@ -36,4 +36,26 @@ shared status qualified, refreshRequired=false. Evidence:
 после штатного refresh квалифицировали gpt-6-luna/high, одинаковый cache SHA256
 59bcb39e…; model calls0. Подробности и private evidence — в
 [едином архиве](docs/archive/2026-10-16-evals-parallel-history.md).
-Следующий шаг — повтор N=1. Модельный замер трёх задач и N=2 ещё не завершены.
+Schema-only drift исправлен в5c93dafea9 (18/65 PASS/TC/Review), потерянный
+proxy route восстановлен вf88ce89f9c (CLI8/28+sandbox1/2 PASS/TC/Review).
+Штатный startup852/071 подтвердил cleanup/release. Модельный N=1/N=2 не завершён.
+
+Текущий блокер: command `4fb6d039-4d27-412a-82c3-4fc091eb4739`, run
+`20261019-070313-f88ce89f9c-dirty-Dt4nwP` до dispatch получил ENOENT ancestry
+`/proc/2446906/stat` при providers status. PID не входит в два own management
+processes; original failed proof: capture=true/unknown[]/два final owned_remaining0.
+Admin dispose/process cleanup confirmed. Failed receipt не переписывался.
+Прямые проверки под прежними locks:2 management+13 admin PID/starttime отсутствуют
+в двух пробах, профиль idle, сессий A/серверных файлов/FD нет, SessionBackup пуст,
+identity/Pool подтверждены. Собственные `data/log`, `data/loginom-ai-agent.db`
+сохранены в профиле и ожидают переноса в закрытый history; ничего не удалено,
+server/profile holds не сняты. Новое read-only admin соединение закрыто штатно.
+Evidence:
+`/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/n1-proc-race-quarantine-diagnostics-20261019.json`.
+Review Approved для минимального исправления: при ENOENT/ESRCH отдельно подтвердить,
+что исходный PID уже отсутствует, тогда false без ownership/signals. Живой исходный
+PID при исчезнувшем ancestor и EACCES/EPERM по-прежнему дают отказ. Новых inventories/
+протоколов нет. Сам фикс пока не реализован: по правилу остановки на блокере
+запрошено разовое разрешение сохранить собственные log/DB в archive и снять только
+точные server/profile holds4fb существующим CAS; после ответа TDD fix и повтор N=1.
+Старые стенды/инциденты не трогать; до ответа работу не продолжать.
