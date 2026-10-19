@@ -1804,6 +1804,7 @@ const layer = Layer.effect(
         options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
           const fetchFn = customFetch ?? fetch
           const opts = init ?? {}
+          const callerSignal = opts.signal
           const chunkAbortCtl = typeof chunkTimeout === "number" && chunkTimeout > 0 ? new AbortController() : undefined
           const headerTimeoutMs = headerTimeout === false ? undefined : headerTimeout
           const headerTimeoutCtl = typeof headerTimeoutMs === "number" ? timeoutController(headerTimeoutMs) : undefined
@@ -1822,7 +1823,22 @@ const layer = Layer.effect(
             ...opts,
             // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
             timeout: false,
-          }).finally(() => headerTimeoutCtl?.clear())
+          })
+            .catch((error: unknown) => {
+              // Some transports erase the abort reason. Only restore our own
+              // pre-header timeout; caller cancellation must remain cancellation.
+              if (
+                error instanceof DOMException &&
+                error.name === "AbortError" &&
+                !callerSignal?.aborted &&
+                headerTimeoutCtl?.signal.aborted &&
+                headerTimeoutCtl.signal.reason instanceof ProviderError.HeaderTimeoutError &&
+                combined?.reason === headerTimeoutCtl.signal.reason
+              )
+                throw headerTimeoutCtl.signal.reason
+              throw error
+            })
+            .finally(() => headerTimeoutCtl?.clear())
 
           if (!chunkAbortCtl) return res
           return wrapSSE(res, chunkTimeout, chunkAbortCtl)

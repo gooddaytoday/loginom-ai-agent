@@ -184,6 +184,92 @@ it.live("headerTimeout aborts when response headers do not arrive", () =>
   }),
 )
 
+for (const mode of ["typed", "generic", "caller", "caller-after-header", "unowned"] as const) {
+  it.live(`pre-header ${mode} abort preserves timeout retries and caller cancellation`, () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const provider = yield* Provider.Service
+          const providerID = ProviderV2.ID.make("test")
+          const configured = yield* provider.getProvider(providerID)
+          const caller = new AbortController()
+          const cancellation = new DOMException("Aborted", "AbortError")
+          let calls = 0
+          configured.options.fetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
+            calls++
+            if (calls > 1)
+              return new Response('data: {"choices":[{"delta":{"content":"recovered"}}]}\n\ndata: [DONE]\n\n', {
+                headers: { "content-type": "text/event-stream" },
+              })
+            if (mode === "unowned") throw cancellation
+            const signal = init?.signal
+            if (!signal) throw new Error("expected provider signal")
+            return new Promise<Response>((_resolve, reject) => {
+              signal.addEventListener(
+                "abort",
+                () => {
+                  if (mode === "caller-after-header") caller.abort(cancellation)
+                  reject(mode === "typed" ? signal.reason : cancellation)
+                },
+                { once: true },
+              )
+              if (mode === "caller") caller.abort(cancellation)
+            })
+          }
+          const model = yield* provider.getModel(providerID, ModelV2.ID.make("test-model"))
+          const language = yield* provider.getLanguage(model)
+          const retries: number[] = []
+          const errors: ReturnType<typeof MessageV2.fromError>[] = []
+          const result = yield* Effect.tryPromise({
+            try: async () => {
+              const result = streamText({
+                model: language,
+                abortSignal: caller.signal,
+                maxRetries: 0,
+                onError() {},
+                messages: [{ role: "user", content: "hello" }],
+              })
+              for await (const part of result.fullStream) {
+                if (part.type === "error") throw part.error
+                if (part.type === "abort") throw cancellation
+              }
+              return result.text
+            },
+            catch: (error) => {
+              errors.push(MessageV2.fromError(error, { providerID }))
+              return error
+            },
+          }).pipe(
+            Effect.retry(
+              SessionRetry.policy({
+                provider: providerID,
+                parse: (error) => MessageV2.fromError(error, { providerID }),
+                set: (info) =>
+                  Effect.sync(() => {
+                    retries.push(info.attempt)
+                  }),
+              }),
+            ),
+            Effect.result,
+          )
+          if (mode === "typed" || mode === "generic") {
+            expect(result).toMatchObject({ _tag: "Success", success: "recovered" })
+            expect(calls).toBe(2)
+            expect(retries).toEqual([1])
+            expect(errors).toHaveLength(1)
+            expect(errors[0]).toMatchObject({ name: "APIError", data: { isRetryable: true } })
+            return
+          }
+          expect(result._tag).toBe("Failure")
+          expect(calls).toBe(1)
+          expect(retries).toEqual([])
+          expect(errors).toMatchObject([{ name: "MessageAbortedError" }])
+        }),
+      { config: providerConfig("http://127.0.0.1/unused", { headerTimeout: 50, chunkTimeout: false }) },
+    ),
+  )
+}
+
 it.live("headerTimeout can be disabled with false for non-OpenAI providers", () =>
   Effect.gen(function* () {
     const server = yield* Effect.acquireRelease(
