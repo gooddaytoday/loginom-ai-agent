@@ -9,7 +9,7 @@
 
 Production run с `EVAL_SLOTS_FILE` подключён и требует записанный ресурсный бюджет.
 Native prepare/verify двух пользователей на новом стенде прошли. Отдельный
-установленный CLI8b2ba2bf9b квалифицирован локальным HTTP429→200: JSON содержит
+установленный CLIc8a85da728 на OAuth-базе eb85403ce4 квалифицирован локальным HTTP429→200: JSON содержит
 retry, exit0/cleanup confirmed. Harness учитывает session retries и отдельно
 подписывает обязательные источники provider/judge; Dock transport остаётся
 unavailable в диагностике, наблюдаемый Dock429 исключает успешную приёмку.
@@ -48,7 +48,7 @@ VPN/local429 квалификация дала ровно1 запрос и за�
 ```bash
 export EVAL_SLOTS_FILE=/home/kiselev/.local/state/loginom-evals/acceptance-20261016/slots.json
 export EVAL_CLI_MODE=binary
-export EVAL_CLI_BIN=/home/kiselev/.local/state/loginom-evals/acceptance-20261016/candidate-home-retry/.local/share/loginom-ai-agent-cli/0.0.0-dev-202610190530-dev/bin/loginom-ai-agent-cli
+export EVAL_CLI_BIN=/home/kiselev/.local/state/loginom-evals/acceptance-20261016/candidate-home-oauth-retry/.local/share/loginom-ai-agent-cli/0.0.0-dev-202610190559-dev/bin/loginom-ai-agent-cli
 export EVAL_AGENT_MODEL=openai/gpt-6-luna
 export EVAL_AGENT_VARIANT=high
 export EVAL_JUDGE_COMMAND=/home/kiselev/git/codex-vpn-lockdown/bin/codex
