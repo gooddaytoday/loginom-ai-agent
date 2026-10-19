@@ -192,7 +192,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
       }
       const importClosed=refusal?.proof?.closed;
       if(name==='configure'&&request.target.type==='imports.text'
-        &&['text_import_binding_draft_discarded','text_import_readiness_draft_discarded'].includes(refusal?.verification)&&refusal.phase===name
+        &&['text_import_binding_draft_discarded','text_import_readiness_draft_discarded','text_import_initial_settings_draft_discarded'].includes(refusal?.verification)&&refusal.phase===name
         &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
         &&refusal.settings_unchanged===true&&importClosed?.verified===true&&importClosed.cleanup_complete===true
         &&importClosed.draft_discarded===true&&importClosed.settings_applied===false
@@ -201,7 +201,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&['document_id','workflow_id','node_id'].every(k=>importClosed.node_context[k]===state.node?.[k])) {
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
-        state.correctable_import_request=refusal.verification==='text_import_readiness_draft_discarded'?'readiness':'binding';
+        state.correctable_import_request=refusal.verification==='text_import_initial_settings_draft_discarded'?'initial_settings':refusal.verification==='text_import_readiness_draft_discarded'?'readiness':'binding';
       }
       if(name==='configure'&&request.target.type==='transform.calculator'
         &&(request.target.kind==='existing'&&request.inputs.length===0&&request.mappings.length===0
@@ -363,7 +363,9 @@ export async function applyNode({request, operation, handlers, drivers, record,
         ?{next_step:state.native_read_refusal?{tool:'dock_node_apply',original_operation_id:operation.id,
           instruction:'Full native reading was refused by the unchanged 50x8 limit. The owned Preview is closed, workflow restored and execution retained. No operation remains unresolved; saving or another action is allowed. Do not recreate or reconfigure the node. For a scalar report use a NEW operation_id with the SAME existing target, parameters:{}, inputs:[], mappings:[], finish:"execute" and read:{ports:[0],sample_rows:100,require_exact_numbers:true} without full coverage. This does not authorize ordinary reading of Variant values.'}:correctNodeRequest(request,state.node)}:{}),
       ...(state.correctable_import_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
-        instruction:'The import wizard draft was discarded and the SAME node is back in the graph. '+(state.correctable_import_request==='readiness'
+        instruction:'The import wizard draft was discarded and the SAME node is back in the graph. '+(state.correctable_import_request==='initial_settings'
+          ?'This node has no saved source. Supply complete settings.source with explicit source_path equal to the verified upload destination, encoding, rows_to_skip and first_line_as_title, complete settings.format and nonempty settings.columns with at least one used field. Submit a NEW operation_id with target:'
+          :state.correctable_import_request==='readiness'
           ?'The wizard did not reach an expected state, so no setting was saved. Submit a NEW operation_id with the SAME settings and target:'
           :'Correct settings using the observed source names/labels and submit a NEW operation_id with target:')+JSON.stringify({kind:'existing',type:'imports.text',ref:state.node})+'. Keep the verified upload source, inputs:[] and mappings:[]. Supply source, format and columns again because the rejected draft was not saved. Do not recreate the node or reupload the file.'}}:{}),
       ...(state.correctable_calculator_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,

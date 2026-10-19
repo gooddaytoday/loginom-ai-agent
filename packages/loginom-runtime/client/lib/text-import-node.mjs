@@ -2,7 +2,7 @@ import {verifyUploadLineage} from './upload-lineage.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
 import {resolveTextImportEncoding} from './text-import-encoding.mjs';
 import {createNodeProcedure,NodeReadinessTimeout} from './node-procedure.mjs';
-import {configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError} from './text-import-procedure.mjs';
+import {configureTextImportFields,configureTextImportPatch,validateTextImportFieldsRequest,validateTextImportPatch,isTextImportSourceReady,ImportColumnBindingError,ImportInitialSettingsError} from './text-import-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {readOutputDefinitionPages,readImportDefinitionPages} from './import-definition-pages.mjs';
 import {makeRetainedImportSourceCode,makeRetainedImportFormatCode,verifyConfiguredImportContinuation,verifyMappedImportContinuation,finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from './node-import-continuation.mjs';
@@ -167,10 +167,11 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
           // Таймаут готовности — чтение без мутаций после подтверждённых жестов;
           // закрытие черновика не сохраняет его частичную настройку.
           const readiness=error instanceof NodeReadinessTimeout;
-          if(!(error instanceof ImportColumnBindingError||readiness)||operation.transportUncertain)throw error;
+          const initialSettings=error instanceof ImportInitialSettingsError;
+          if(!(error instanceof ImportColumnBindingError||readiness||initialSettings)||operation.transportUncertain)throw error;
           const closed=await closePreparedWizard(channel);
           error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
-            verification:readiness?'text_import_readiness_draft_discarded':'text_import_binding_draft_discarded',proof:{closed}};
+            verification:initialSettings?'text_import_initial_settings_draft_discarded':readiness?'text_import_readiness_draft_discarded':'text_import_binding_draft_discarded',proof:{closed}};
           throw error;
         }
       },

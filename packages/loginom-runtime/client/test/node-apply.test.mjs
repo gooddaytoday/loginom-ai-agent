@@ -178,6 +178,36 @@ test('import source binding refusal releases only a verified discarded draft of 
  }
 });
 
+test('unconfigured import settings refusal releases only a verified discarded draft of the same node',async()=>{
+ for(const invalid of [null,'owner','applied','execution','cleanup','journal']) {
+  const f=fixture(invalid==='journal'?{failJournal:'node_phase_refused'}:{});
+  f.handlers.get('imports.text').configure=async()=>{
+   const error=new Error('Existing import has no saved source. Supply complete settings.source including explicit source_path');
+   const closed={verified:true,cleanup_complete:true,draft_discarded:true,settings_applied:false,
+    execution_started:false,node_context:{verified:true,surface:'graph',document_id:'doc',workflow_id:'workflow',node_id:'node1'}};
+   if(invalid==='owner')closed.node_context.node_id='foreign';
+   if(invalid==='applied')closed.settings_applied=true;
+   if(invalid==='execution')closed.execution_started=true;
+   if(invalid==='cleanup')closed.cleanup_complete=false;
+   error.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,
+    settings_unchanged:true,verification:'text_import_initial_settings_draft_discarded',proof:{closed}};
+   throw error;
+  };
+  const result=await f.run();
+  assert.equal(result.status,invalid?'AMBIGUOUS':'FAILED');
+  assert.equal(result.cleanup_complete,!invalid);
+  assert.equal(result.pending_phase,invalid?'configure':null);
+  assert.ok(!f.calls.includes('finish')&&!f.calls.includes('execute'));
+  if(!invalid) {
+   assert.equal(result.next_step.tool,'dock_node_apply');
+   assert.match(result.next_step.instruction,/NEW operation_id/);
+   assert.match(result.next_step.instruction,/explicit source_path equal to the verified upload destination/);
+   assert.match(result.next_step.instruction,/complete settings.format/);
+   assert.ok(result.next_step.instruction.includes(JSON.stringify({kind:'existing',type:'imports.text',ref:result.node})));
+  }
+ }
+});
+
 test('import readiness timeout releases only a verified discarded draft and asks to repeat the same settings',async()=>{
  for(const invalid of [null,'owner','applied','cleanup','verification']) {
   const f=fixture();
