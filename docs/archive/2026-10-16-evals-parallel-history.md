@@ -2,6 +2,21 @@
 
 ## N1 от 2026-10-19: первый завершённый агент, ещё без полной приёмки
 
+- e468064b1c добавил cleanup загруженных inputs по существующим tool receipts,
+  unit12/72 PASS/typecheck/sh-n/diff PASS, независимое ревью Approved.
+  Native judge отдельно: `evidence/judge-native-MlEzbc`, первая попытка100,
+  unit завершён/home released. Startup97e… убрал ровно3 своих файла, включая input.
+- `20261019-075047-e468064b1c-dirty-s9821T`: calc-data-double179s,14 tools,
+  score100/cleanup confirmed. Filter-active-rows не запускался: появились чужие
+  inspector/CDP34969/46455 Desktop PID2680928 из чата «Выпустить версию 0.2.2».
+  Полный N1 не состоялся. Из-за записи admission до pre-spawn guard нет cleanup.json
+  второй попытки; он не создавался задним числом. Source guard до supervisor,
+ 6 прежних receipts/71 PID+birth gone2passes, fresh native admin проверил Pool0,
+  backup empty, нет сессий/файлов/FD/maps в root, profile clean; dispose confirmed.
+  Только точные a20b86de… holds освобождены существующим CAS без удаления,
+  result unchanged: `evidence/n1-debugger-settlement-20261019.json`.
+  Независимое ревью плана operator settlement: достаточно после прямых проверок.
+
 - `20261019-073105-1b2fd99c36-dirty-Vh3uUV`: provider overload/retry остановил
   первый запрос, cleanup confirmed,18 проб ресурсов без пропусков. Повтор после паузы.
 - `20261019-073306-1b2fd99c36-dirty-iLakZJ`: calc-data-double completed,
