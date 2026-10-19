@@ -9,6 +9,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "managed-work-entry-"))
   const work = join(directory, "work.json")
+  const recovery = join(directory, "browser-recovery.json")
   const src = join(directory, "runtime/src")
   const files = {
     "runtime/src/managed-entry.mjs": await readFile(
@@ -43,9 +44,11 @@ test("actual managed entry reads live bridge work and dispatching over private I
     "runtime/client/lib/artifacts.mjs":
       'export async function admitStartupArtifacts() { throw Error("unexpected admission") }',
     "runtime/client/lib/bridge.mjs": `
-      import { readFileSync } from 'node:fs';
+      import { readFileSync, writeFileSync } from 'node:fs';
       const work = () => JSON.parse(readFileSync(${JSON.stringify(work)}, 'utf8'));
-      export async function createBridge() { return {
+      export async function createBridge(config) {
+        writeFileSync(${JSON.stringify(recovery)}, JSON.stringify({ browserRecovery: config.browserRecovery }));
+        return {
         server: { connect: async () => {} }, close: async () => ({
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
@@ -75,7 +78,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
     await Bun.write(target, contents)
   }
   await Bun.write(work, JSON.stringify({ activeWork: false, unsettledWork: false }))
-  const runtime = await supervise({
+  const launch = {
     node,
     entry: join(src, "managed-entry.mjs"),
     resources: directory,
@@ -85,8 +88,11 @@ test("actual managed entry reads live bridge work and dispatching over private I
     endpoint: "http://example.test",
     connection: { url: "http://example.test", username: "user", apiKey: "fixture", password: "" },
     environment: {},
-  })
+    browserRecovery: true,
+  }
+  const runtime = await supervise(launch)
   try {
+    expect(JSON.parse(await readFile(recovery, "utf8")).browserRecovery).toBe(true)
     expect(await readFile(join(src, "managed-entry.mjs"), "utf8")).toBe(
       await readFile(new URL("../../loginom-runtime/src/managed-entry.mjs", import.meta.url), "utf8"),
     )

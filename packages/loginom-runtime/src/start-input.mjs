@@ -20,6 +20,10 @@ export function validateStartInput(input) {
   // Acceptance-only: the exact saved package the bridge closes during shutdown.
   const cleanup = input.acceptanceCleanupPackage ?? null
   const closeSavedPackageOnShutdown = input.closeSavedPackageOnShutdown === undefined ? false : input.closeSavedPackageOnShutdown
+  const browserRecovery = input.browserRecovery === undefined ? false : input.browserRecovery
+  if (typeof browserRecovery !== "boolean" ||
+      (browserRecovery && (input.validation === true || input.chat === "readiness")))
+    throw Error("LOGINOM_START_INVALID")
   if (typeof closeSavedPackageOnShutdown !== "boolean" ||
       (closeSavedPackageOnShutdown && (cleanup !== null || input.validation === true || input.chat === "readiness")))
     throw Error("LOGINOM_START_INVALID")
@@ -31,5 +35,5 @@ export function validateStartInput(input) {
       cleanup.split("/").some((segment) => segment === "." || segment === ".."))
   )
     throw Error("LOGINOM_START_INVALID")
-  return { acceptanceCleanupPackage: cleanup, closeSavedPackageOnShutdown }
+  return { acceptanceCleanupPackage: cleanup, closeSavedPackageOnShutdown, browserRecovery }
 }

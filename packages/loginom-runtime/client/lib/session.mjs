@@ -90,6 +90,7 @@ export async function createSession(config, { headless = false, managed = null }
     playwright: core.version, sdk: sdk.version,
     chromiumRevision: chromiumRevision.revision, chromiumVersion: chromiumRevision.browserVersion, browserViewport, browserWindowMode,
     profile, artifacts, archiveActive: false, skillRevision: null, workspaceReady: false, targetIdentity: null,
+    browserRecovery: config.browserRecovery === true,
   };
   return {
     directory, metadata, browserRoot, browserConfig,
