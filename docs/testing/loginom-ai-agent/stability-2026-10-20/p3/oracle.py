@@ -28,7 +28,7 @@ expected = {
         "ordered": False,
         "column_order": "any",
         "columns": [{"name": name, "type": kind, "label_any": True}
-                    for name, kind in [('Hall', 'string'), ('Visits', 'integer')]],
+                    for name, kind in [('Hall', 'string'), ('Visits', 'real')]],
         "rows": rows,
     }],
 }
