@@ -235,3 +235,32 @@ export async function observeExportDestinations({load,graph,channelFor,execute})
  }
  return destinations;
 }
+
+export async function observeExportInputMapping({load,target,channelFor}){
+ const {closePreparedWizard}=await load('client/lib/node-wizard-close.mjs');
+ const {selectPreparedGraphNode}=await load('client/lib/node-graph-selection.mjs');
+ const channel=channelFor(target.ref,'export-input-'+target.ref.node_id);
+ await channel.revealGraphNode();
+ const selected=await channel.observe({condition:'cold export input selection',
+  ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
+ await selectPreparedGraphNode(channel,selected,'cold select export input',{refreshReplacedBody:true});
+ await channel.observe({condition:'cold export input scenario title settled',
+  ready:s=>s.prepared_node_context?.surface==='graph'&&s.workflow_navigation?.status==='observed'
+   &&s.active_identity===s.workflow_navigation.path.at(-1)?.label});
+ try{
+  await channel.openInputPort(0);
+  const s=await channel.observe({condition:'cold saved export input mapping',readMappings:true,
+   ready:s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified===true});
+  const mapping=s.node_mapping,owner=mapping.node_context;
+  need(mapping.inventory_complete===true&&mapping.settings_applied===false&&owner?.verified===true
+   &&owner.surface==='wizard'&&owner.input_port?.direction==='input'&&owner.input_port.port===0
+   &&['document_id','workflow_id','node_id'].every(k=>owner[k]===target.ref[k]),'export input mapping unavailable');
+  return mapping;
+ }finally{
+  const current=await channel.observe({condition:'cold export input cancellation surface',ready:()=>true});
+  if(current.wizard?.status==='observed'){
+   const closed=await closePreparedWizard(channel);
+   need(closed.verified===true&&closed.settings_applied===false,'export input mapping cancel');
+  }
+ }
+}

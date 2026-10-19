@@ -55,7 +55,31 @@ export function resolveExportInput(graph,{destination,destinations}={}){
  need(incoming.length===1&&incoming[0].input===0&&Number.isSafeInteger(incoming[0].output)&&incoming[0].output>=0,error);
  const sources=graph.nodes.filter(n=>n.ref.node_id===incoming[0].source);
  need(sources.length===1&&Array.isArray(sources[0].outputs)&&sources[0].outputs.includes(incoming[0].output),error);
- return {node:sources[0],output_port:incoming[0].output};
+ return {node:sources[0],output_port:incoming[0].output,export_node:exports[0]};
+}
+export function mapExportInput(data,mapping){
+ const error='COLD_EXPORT_INPUT_MAPPING_INVALID';
+ need(mapping?.verified===true&&mapping.inventory_complete===true&&mapping.settings_applied===false
+  &&Array.isArray(mapping.source_fields)&&Array.isArray(mapping.target_fields)
+  &&mapping.source_fields.length===data.schema.length&&mapping.target_fields.length>0,error);
+ const keys=['name','label','type'];
+ need(new Set(data.schema.map(f=>f.name)).size===data.schema.length
+  &&new Set(mapping.source_fields.map(f=>f.record_id)).size===mapping.source_fields.length
+  &&new Set(mapping.source_fields.map(f=>f.name)).size===mapping.source_fields.length
+  &&mapping.source_fields.every(f=>data.schema.some(s=>keys.every(k=>s[k]===f[k])))
+  &&new Set(mapping.target_fields.map(f=>f.name)).size===mapping.target_fields.length,error);
+ const indices=mapping.target_fields.map((f,i)=>{
+  need(f.index===i&&!f.excluded&&f.source&&f.type===f.source.type,error);
+  const sources=mapping.source_fields.filter(s=>s.record_id===f.source.record_id
+   &&['field_id',...keys].every(k=>s[k]===f.source[k]));
+  need(sources.length===1,error);
+  return data.schema.findIndex(s=>keys.every(k=>s[k]===sources[0][k]));
+ });
+ need(data.sample.every(row=>row.length===data.schema.length),error);
+ // Only the saved export mapping chooses order and names; expectations never do.
+ return {...data,schema:mapping.target_fields.map((f,i)=>({...data.schema[indices[i]],index:i,
+  name:f.name,label:f.label,type:f.type,data_kind:f.data_kind})),
+  sample:data.sample.map(row=>indices.map(i=>row[i]))};
 }
 export function matchesExpectedOutput(data,expected){
  if(data.row_count!==expected.rows.length||!data.sample_complete||!data.precision?.numbers_verified
@@ -127,7 +151,8 @@ export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,e
   const candidates=actual.filter(a=>(want.output_node_type==='export_input'
    ?exportInput&&a.node.node_id===exportInput.node.ref.node_id&&(a.output_port??0)===exportInput.output_port
    :a.type===want.output_node_type&&(a.output_port??0)===port
-    &&(want.output_node_label===undefined||a.label===want.output_node_label))&&matchesExpectedOutput(a.data,want));
+    &&(want.output_node_label===undefined||a.label===want.output_node_label))&&matchesExpectedOutput(
+     want.output_node_type==='export_input'&&exportInput.mapping?mapExportInput(a.data,exportInput.mapping):a.data,want));
   const key=candidates.length===1?JSON.stringify([candidates[0].node.node_id,port]):undefined;
   need(candidates.length===1&&!used.has(key),'COLD_OUTPUT_NOT_UNIQUELY_MATCHED');
   used.add(key);matches.push({expected_index:index,node:candidates[0].node,output_port:port,execution:candidates[0].execution});

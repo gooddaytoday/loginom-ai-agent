@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseExpectedOutputs,resolveExportInput,matchExpectedOutputs} from '../expected-outputs.mjs';
+import {parseExpectedOutputs,resolveExportInput,matchExpectedOutputs,mapExportInput,matchesExpectedOutput} from '../expected-outputs.mjs';
+import {readFile} from 'node:fs/promises';
 
 const output={output_node_type:'export_input',columns:[{name:'Code',type:'string'}],rows:[{Code:'A'}],ordered:true};
 const node=(id,type,outputs=[0])=>({ref:{node_id:id},type,label:id,outputs});
@@ -16,6 +17,68 @@ test('export_input parses in both forms and forbids explicit output ports or lab
   assert.equal(parseExpectedOutputs(wrap(output)).outputs[0].output_node_type,'export_input');
   for(const options of [{output_port:0},{output_port:1},{output_node_label:'rename'},{output_port:undefined},{output_node_label:undefined}])
    assert.throws(()=>parseExpectedOutputs(wrap({...output,...options})));
+ }
+});
+
+for(const [scenario,type,order] of [
+ ['q7','transform.calculator',['Total','Office','Warehouse','Tech','Region']],
+ ['q8','transform.reform_columns',['Office','Warehouse','Tech','Region']],
+])test(`${scenario}: ${type} native order is projected through the saved export input, exact comparison stays strict`,async()=>{
+ const expected=JSON.parse(await readFile(new URL(`../../../docs/testing/loginom-ai-agent/stability-2026-10-20/followups/${scenario}/expected-demo.json`,import.meta.url),'utf8')).outputs[0];
+ assert.equal(expected.column_order,'exact');
+ const schema=order.map((name,index)=>({...expected.columns.find(f=>f.name===name),index,
+  label:expected.columns.find(f=>f.name===name).label??name}));
+ const data={schema,row_count:expected.rows.length,sample_complete:true,precision:{numbers_verified:true},
+  sample:expected.rows.map(row=>schema.map(f=>({type:f.type,is_null:false,value:f.type==='integer'?String(row[f.name]):row[f.name]})))};
+ const source_fields=schema.map((f,i)=>({...f,record_id:'source-'+i,field_id:String(i)}));
+ const mapping={verified:true,inventory_complete:true,settings_applied:false,source_fields,
+  target_fields:expected.columns.map((f,index)=>({...f,index,label:f.label??f.name,source:source_fields.find(s=>s.name===f.name)}))};
+ const g={complete:true,nodes:[node('report',type),node('export','exports.text',[])],links:[{source:'report',target:'export',input:0,output:0}]};
+ const binding={...resolveExportInput(g),mapping};
+ const actual={node:{node_id:'report'},type,output_port:0,data};
+ assert.equal(matchesExpectedOutput(data,expected),false);
+ const original=structuredClone(data),mapped=mapExportInput(data,mapping);
+ assert.equal(matchesExpectedOutput(mapped,expected),true);
+ assert.deepEqual(data,original);
+ assert.deepEqual(mapped.schema.map(f=>f.name),expected.columns.map(f=>f.name));
+ assert.equal(matchExpectedOutputs([actual],[expected],{exportInput:binding}).length,1);
+ assert.throws(()=>matchExpectedOutputs([actual],[{...expected,output_node_type:type}],{exportInput:binding}),/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
+ for(const mutate of [m=>{m.target_fields.reverse();m.target_fields.forEach((f,i)=>f.index=i)},
+  m=>m.target_fields[0].label='Wrong',m=>m.target_fields[0].name='Wrong',m=>m.target_fields.pop()]){
+  const wrong=structuredClone(mapping);mutate(wrong);
+  assert.throws(()=>matchExpectedOutputs([actual],[expected],{exportInput:{...binding,mapping:wrong}}),/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
+ }
+ for(const mutate of [d=>d.sample[0][0].value=999999,d=>d.sample[0][0].type='boolean',d=>d.row_count++]){
+  const wrong=structuredClone(actual);mutate(wrong.data);
+  assert.throws(()=>matchExpectedOutputs([wrong],[expected],{exportInput:binding}),/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
+ }
+ for(const mutate of [m=>m.verified=false,m=>m.inventory_complete=false,m=>m.settings_applied=true,
+  m=>m.source_fields.pop(),m=>m.source_fields[0].type='boolean',m=>m.target_fields[0].source=null,
+  m=>m.target_fields[0].source={...m.target_fields[0].source,record_id:'foreign'},m=>m.target_fields[0].excluded=true,
+  m=>m.target_fields[0].type='boolean',m=>m.target_fields[0].index=99,
+  m=>m.target_fields[1].name=m.target_fields[0].name]){
+  const wrong=structuredClone(mapping);mutate(wrong);
+  assert.throws(()=>mapExportInput(data,wrong),/COLD_EXPORT_INPUT_MAPPING_INVALID/);
+ }
+});
+
+test('cold reads only the selected export input and cancels its wizard on success and refusal',async()=>{
+ const {observeExportInputMapping}=await import('../static-source-proof.mjs');
+ const target={ref:{document_id:'doc',workflow_id:'wf',node_id:'export'}};
+ for(const fault of [null,'foreign','direction','incomplete','applied','cleanup']){
+  const actions=[];let opened=false;
+  const mapping={verified:true,inventory_complete:fault!=='incomplete',settings_applied:fault==='applied',
+   node_context:{...target.ref,node_id:fault==='foreign'?'other':'export',verified:true,surface:'wizard',
+    input_port:{direction:fault==='direction'?'output':'input',port:0}}};
+  const channel={revealGraphNode:async()=>actions.push('reveal'),openInputPort:async port=>{assert.equal(port,0);opened=true;actions.push('open')},
+   observe:async request=>{const s={prepared_node_context:{surface:opened?'wizard':'graph'},wizard:opened?{status:'observed',stage:'input_mapping'}:{status:'absent'},
+    workflow_navigation:{status:'observed',path:[{label:'Scenario'}]},active_identity:'Scenario',node_mapping:mapping};
+    assert.ok(request.ready(s),request.condition);return s;}};
+  const helpers={selectPreparedGraphNode:async()=>actions.push('select'),closePreparedWizard:async()=>{opened=false;actions.push('cancel');return {verified:fault!=='cleanup',settings_applied:false}}};
+  const result=observeExportInputMapping({load:async()=>helpers,target,channelFor:ref=>{assert.deepEqual(ref,target.ref);return channel}});
+  if(fault)await assert.rejects(result,/COLD_SOURCE/);
+  else assert.deepEqual(await result,mapping);
+  assert.deepEqual(actions,['reveal','select','open','cancel']);
  }
 });
 

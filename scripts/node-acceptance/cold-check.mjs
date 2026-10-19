@@ -1,10 +1,10 @@
-import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput} from "./expected-outputs.mjs"
+import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput,mapExportInput} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
 import { readFile, mkdir, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
-import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
+import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations,observeExportInputMapping} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
 import {coldNativeEligible} from './cold-reader-policy.mjs'
 
@@ -257,8 +257,15 @@ try {
   await writeFile(join(args.output,'actual-readback.json'),checkpoint+'\n');
   }
   }
+  if(exportInput){
+   exportInput.mapping=await observeExportInputMapping({load,target:exportInput.export_node,channelFor});
+   await record({phase:'cold_export_input_mapping',node:exportInput.export_node.ref,mapping:exportInput.mapping,settings_applied:false});
+  }
   const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput});
-  const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
+  const matched=correspondence.map(m=>{
+   const a=actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port);
+   return expectedOutputs[m.expected_index].output_node_type==='export_input'?{...a,data:mapExportInput(a.data,exportInput.mapping)}:a;
+  });
 
   // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.
   // Cleanup проверяет точное владение пакетом/аккаунтом перед discard.
