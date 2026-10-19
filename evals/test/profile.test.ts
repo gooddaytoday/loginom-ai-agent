@@ -525,6 +525,25 @@ test("verifyProfile checks a starting standalone host without setup or recovery"
   } finally { await rm(context.profileDir, { recursive: true }) }
 })
 
+test("verifyProfile accepts the native schema annotation while preserving permissions and file bytes", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json"), settings = path.join(context.profileDir, "config/loginom-ai-agent.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state } }
+  const saved = JSON.stringify({ $schema: "urn:loginom-ai-agent:config", ...agentConfigJson(config) }, null, 2)
+  try {
+    await Bun.write(settings, saved)
+    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }))
+    expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
+    expect(await Bun.file(settings).text()).toBe(saved)
+    await Bun.write(settings, JSON.stringify({ $schema: "urn:loginom-ai-agent:config", permission: { "*": "allow" } }))
+    await expect(verifyProfile(config, command)).rejects.toThrow("PROFILE_CONFIGURATION_DRIFT")
+    await Bun.write(settings, JSON.stringify({ $schema: "urn:other:config", ...agentConfigJson(config) }))
+    await expect(verifyProfile(config, command)).rejects.toThrow("PROFILE_CONFIGURATION_DRIFT")
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+  } finally { await rm(context.profileDir, { recursive: true }) }
+})
+
 test("verifyProfile checks readiness and saved configuration without setup or replacement", async () => {
   const context = await fakeProfile()
   const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),

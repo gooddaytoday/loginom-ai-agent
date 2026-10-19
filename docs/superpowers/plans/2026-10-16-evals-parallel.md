@@ -278,6 +278,10 @@ private config/budget/results вне Git; операторские команд�
   0 model calls, cleanup/release confirmed; одинаковый catalog SHA256
   `59bcb39e34656fe40d3007de30361919dcbaff738a342f1f30f763e8cf4617bc`.
   Startup не менялся; [evidence и закрытые отказы](../../archive/2026-10-16-evals-parallel-history.md).
+- [x] Допустить штатный `$schema: urn:loginom-ai-agent:config`, который CLI
+  добавляет при models refresh: только in-memory нормализация перед прежним
+  строгим compare, без изменения файла/прав. RED→GREEN;18/65 targeted PASS21.47s,
+  typecheck/diff PASS, независимое ревью Approved. Другой schema/permission — drift.
 - [ ] Реальный N=1 с агентом/судьёй на трёх задачах; по замеру предложить числовые
   пороги CPU/RAM/диска и **дождаться утверждения владельца до N=2**.
 - [ ] Записать утверждённый бюджет до реального N=2, выполнить run на тех же tasks/
@@ -339,4 +343,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20. c21 admin перенесён по разрешению без изменения1394 entries; штатный startup14c5/release подтверждён. Catalog59bcb39e… вA/B квалифицировал gpt-6-luna/high без модели; следующий шаг — повтор N=1.
+20. c21 move/startup14c5 и catalog59bcb39e… A/B qualified; schema-only drift исправлен unit TDD18/65 PASS/TC/Review. Перед следующим N=1 штатно разобрать8528019f… (до dispatch), модельные задачи ещё не выполнены.
