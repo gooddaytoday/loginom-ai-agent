@@ -615,7 +615,16 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       const form=wizardForms[0],base=getTid(form);
       const matching=suffix=>(tids.get(base+suffix)??[]).filter(element=>form.contains(element) && visible(element) && !sensitive(element));
       const titles=matching(';cardWizardPanel;p.h;p.t');
-      const stages=Object.entries(wizardMarkers).flatMap(([key,suffixes])=>[suffixes].flat().flatMap(suffix=>matching(suffix).map(()=>key)));
+      const stages=Object.entries(wizardMarkers).flatMap(([key,suffixes])=>{
+        // A card can expose both its grid and toolbar marker. Count that card
+        // once, retaining ambiguity for duplicate controls or different cards.
+        const cards=new Map();
+        for(const suffix of [suffixes].flat()) {
+          const card=suffix.split(';')[1];
+          cards.set(card,Math.max(cards.get(card)??0,matching(suffix).length));
+        }
+        return [...cards.values()].flatMap(count=>Array.from({length:count},()=>key));
+      });
       wizard={status:'observed',root_tid:base,root_ref:refOf(form),title:titles.length===1?textOf(titles[0],true):null,
         title_status:titles.length===1?'observed':titles.length?'ambiguous':'unobserved',
         stage:stages.length===1?stages[0]:null,stage_status:stages.length===1?'observed':stages.length?'ambiguous':'unrecognized',

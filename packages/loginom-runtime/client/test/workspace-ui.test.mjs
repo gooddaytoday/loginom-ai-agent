@@ -1098,6 +1098,25 @@ test('wizard context exposes the current step and lifecycle states on a narrow r
   assert.equal(mixed.output.wizard.stage,null);assert.equal(mixed.output.wizard.stage_status,'ambiguous');
 });
 
+test('saved export input mapping counts grid and button on one card as one stage',async()=>{
+  for(const conflict of [null,'duplicate_grid','duplicate_button','other_input_card','export_params']) {
+    const page=new Page(),base='MF;TF-1;WizrdMCF',form=page.add('div',base);
+    const grid=base+';TuneDataSourceInputPortWizard;grdTargetColumns';
+    const button=base+';TuneDataSourceInputPortWizard;btnAddMappingColumn';
+    page.add('div',grid,'',undefined,form);
+    page.add('button',button,'',undefined,form);
+    if(conflict)page.add('div',conflict==='duplicate_grid'?grid:conflict==='duplicate_button'?button:
+      base+(conflict==='other_input_card'?';TuneDataSourceMappingWizard;btnAddMappingColumn':';ExportTextFileParamsWizard;edtFileName'),'',undefined,form);
+    const full=await page.observe();
+    const roots=await page.execute({mode:'observe',discover_roots:true});
+    const narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+    for(const snapshot of [full,roots.output,narrow.output]) {
+      assert.equal(snapshot.wizard.stage,conflict?null:'input_mapping',conflict);
+      assert.equal(snapshot.wizard.stage_status,conflict?'ambiguous':'observed',conflict);
+    }
+  }
+});
+
 test('wizard metadata excludes hidden and inactive forms and redacts sensitive title children',async()=>{
   const page=new Page(),base='MF;TF-1;WizrdMCF';
   const inactive=page.add('div','MF;TF-2;WizrdMCF');
