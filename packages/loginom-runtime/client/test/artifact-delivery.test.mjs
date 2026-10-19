@@ -37,7 +37,7 @@ test('cancellation after a no-effect stale refusal prevents the next navigation 
  const result=await f.service.deliver(request,{signal:controller.signal});
  assert.equal(attempts,1);assert.equal(result.outcome.status,'AMBIGUOUS');assert.ok(!f.calls.includes('upload'));
 });
-function fixture(fault,initialDirectory='/') {
+function fixture(fault,initialDirectory='/',options={}) {
  const artifact={artifact_id:'artifact',name:'input.csv',bytes:3,sha256:'a'.repeat(64),upload:{grant_id:'grant',directory:'/user/dock-p3',destination:'/user/dock-p3/input.csv',overwrite:'replace'}};
  const calls=[],events=[];let directory=initialDirectory,verified=false;
  const prefix='MF;TF-2',nav=prefix+';NavigationBar;NavigationPanel';
@@ -47,9 +47,49 @@ function fixture(fault,initialDirectory='/') {
   uploadDeliveredArtifact:async()=>{calls.push('upload');if(fault==='upload')throw Error('Lost browser response');return {status:'AMBIGUOUS',cleanup_complete:true,output:{upload_submitted:true}};},
   inspect:async()=>{calls.push('inspect');return {output:{state:verified?'resolved':'pending',cleanup_confirmed:true,outcome:{status:verified?'SUCCEEDED':'AMBIGUOUS',output:{upload_submitted:true,server_copy_verification:{bytes_verified:true,upload_completion_verified:true,destination:artifact.upload.destination,bytes:3,sha256:fault==='digest'?'b'.repeat(64):artifact.sha256,verification_id:'delivery:verify'}}}}};},
   verifyDeliveredArtifact:async({onDispatched}={})=>{onDispatched?.();calls.push('verify');if(fault==='verify')throw Error('Lost download receipt');verified=true;return {status:'SUCCEEDED',cleanup_complete:true,output:{bytes_verified:true}};}};
- const service=createArtifactDelivery({runtime,artifactStore:{getUploadGrant:(id,grant)=>{assert.equal(id,'artifact');assert.equal(grant,'grant');return artifact;}},admit:()=>{},record:async e=>{events.push(e);if(fault==='journal'&&e.phase==='artifact_delivery_completed')throw Error('Disk unavailable');return e;}});
+ const service=createArtifactDelivery({runtime,artifactStore:{getUploadGrant:(id,grant)=>{assert.equal(id,'artifact');assert.equal(grant,'grant');return artifact;}},admit:()=>{},record:async e=>{events.push(e);if(fault==='journal'&&e.phase==='artifact_delivery_completed')throw Error('Disk unavailable');return e;},...options});
  return {service,artifact,calls,events,runtime};
 }
+for(const fault of [null,'document','workflow','tab','offscreen','disabled','masked'])test('Files navigation waits for an owned reachable toolbar before delivery: '+fault,async()=>{
+ let clock=0,opened=false,reads=0;
+ const f=fixture(undefined,'/',{now:()=>clock}),observe=f.runtime.observe,act=f.runtime.uiAct;
+ f.runtime.observe=async options=>{
+  const result=await observe(options);
+  if(opened)return result;
+  const s=result.output;s.file_storage={status:'unobserved'};
+  const narrow=!!options.rootRef;
+  if(!narrow)delete s.active_tab_ref;
+  if(narrow)reads++;
+  if(reads>=2){
+   if(fault==='document')s.dom_epoch.document='foreign';
+   if(fault==='workflow')s.workflow_ref={prefix:'foreign'};
+   if(fault==='tab')s.active_tab_ref='foreign';
+   if(fault==='masked')s.ui.masks=[{ref:'mask'}];
+   if(['offscreen','disabled','masked'].includes(fault))clock+=16000;
+  }
+  s.observation_id='toolbar-observation-'+reads;
+  s.ui.elements=[{tid:'MF;cntMain;tlbMainToolbar',ref:'toolbar'},
+   ...(narrow?[{tid:'MF;cntMain;tlbMainToolbar;btnFilestorage',ref:'files-'+reads,enabled:fault!=='disabled',visible:true,
+    allowed_actions:['click'],interaction:{state:reads>=2&&fault!=='offscreen'?'point_observed':'outside_viewport'}}]:[])];
+  return result;
+ };
+ f.runtime.uiAct=async(a,o)=>{
+  if(!opened){
+   assert.equal(a.ref,'files-2');assert.equal(o.observationId,'toolbar-observation-2');
+   opened=true;f.calls.push('Files');return {status:'SUCCEEDED',cleanup_complete:true};
+  }
+  return act(a,o);
+ };
+ const result=await f.service.deliver(request);
+ assert.ok(reads>=2);
+ if(fault){
+  assert.equal(result.outcome.status,'NOT_APPLIED');assert.equal(result.outcome.upload_submitted_or_unknown,false);
+  assert.equal(f.calls.length,0);assert.equal(f.service.unsettled,false);
+ }else{
+  assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(f.calls[0],'Files');
+  assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
+ }
+});
 test('delivery navigates exact authorized folders and reuses upload and byte verification once',async()=>{
  const f=fixture(),first=f.service.deliver(request),second=f.service.deliver(request);assert.equal(first,second);assert.equal(f.service.busy,true);
  const result=await first;assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(result.outcome.destination,'/user/dock-p3/input.csv');
@@ -300,8 +340,8 @@ test('delivery reads the observed toolbar when a populated graph only yields roo
   assert.notEqual(options?.scope,'all','a global scan can fall back to roots');
   const root=options?.scope==='roots';
   if(!root)assert.deepEqual(options,{rootRef:'toolbar',observationId:'graph-observation'});
-  return {status:'SUCCEEDED',output:{observation_id:root?'graph-observation':'toolbar-observation',dom_epoch:{document:'doc',revision:1},
-   ui:{elements:root?[{ref:'toolbar',tid:'MF;cntMain;tlbMainToolbar',allowed_actions:[]}]:[{ref:'files',tid:'MF;cntMain;tlbMainToolbar;btnFilestorage',allowed_actions:['click']}],dialogs:[],masks:[]}}};
+  return {status:'SUCCEEDED',output:{observation_id:root?'graph-observation':'toolbar-observation',dom_epoch:{document:'doc',revision:1},...(root?{}:{active_tab_ref:'tab'}),
+   ui:{elements:root?[{ref:'toolbar',tid:'MF;cntMain;tlbMainToolbar',allowed_actions:[]}]:[{ref:'files',tid:'MF;cntMain;tlbMainToolbar;btnFilestorage',enabled:true,visible:true,interaction:{state:'point_observed'},allowed_actions:['click']}],dialogs:[],masks:[]}}};
  };
  f.runtime.uiAct=async(a,o)=>{if(a.ref==='files'){assert.equal(o.observationId,'toolbar-observation');opened=true;return {status:'SUCCEEDED',cleanup_complete:true};}return act(a,o);};
  const result=await f.service.deliver(request);assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(opened,true);
