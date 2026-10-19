@@ -925,6 +925,42 @@ test('storage filename code tokens are data, not editor identity: native-input-p
   }
 });
 
+for(const fault of ['transient','persistent','before','work','elements','traversal','other_stage','directory','owner','position','expired'])test('file-list scroll retries only its timed controls read without replay: '+fault,async()=>{
+ const {page,table,cell}=scriptNamedStorageFixture('anchor.csv'),clock=fixtureClock();page.context.Date=clock.Date;
+ page.context.innerWidth=1000;page.context.innerHeight=800;page.waitForTimeout=async()=>{};
+ Object.assign(table,{scrollTop:0,scrollHeight:2400,clientHeight:400});table.style.overflowY='auto';
+ const bar=page.add('div','MF;TF-1;NavigationBar;NavigationPanel');let folder;
+ for(const [i,text] of ['Файлы','user'].entries()){
+  const button=page.add('div','MF;TF-1;cnrNaviMode;b.s_Сервер>Файлы'+(i?'>user':''),'',undefined,bar);
+  const label=page.add('span',null,text,undefined,button);label.attrs.class='x-btn-inner-default-toolbar-small';if(i)folder=label;
+ }
+ const roots=await page.execute({mode:'observe',discover_roots:true});
+ const root=roots.output.ui.elements.find(e=>e.tid===table.attrs['data-tid']);
+ const before=await page.execute({mode:'observe',root_ref:root.ref});
+ const target=before.output.ui.elements.find(e=>e.tid===cell.attrs['data-tid']);
+ assert.ok(target.allowed_actions.includes('scroll'),JSON.stringify(target));assert.equal(before.output.file_storage.directory,'/user',JSON.stringify(before.output.file_storage));
+ const evaluate=page.evaluate.bind(page);let failures=0;
+ page.evaluate=async(fn,arg)=>{
+  if(arg&&Object.hasOwn(arg,'discoverRoots')){
+   if((fault==='before'&&table.scrollTop===0)||(table.scrollTop===1000&&(failures===0||fault==='persistent'))){
+    failures++;if(fault==='expired')clock.advance(16000);
+    return {ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:['work','elements','traversal'].includes(fault)?fault:'time',scan_stage:fault==='other_stage'?'collect':'controls'}};
+   }
+   if(failures){if(fault==='directory')folder.ownText='foreign';if(fault==='owner')table.style.overflowY='hidden';if(fault==='position')table.scrollTop=999;}
+  }
+  return evaluate(fn,arg);
+ };
+ const result=await page.act({verb:'scroll',ref:target.ref,delta_y:1000},before.output);
+ const retry=['transient','persistent','directory','owner','position'].includes(fault);
+ assert.equal(result.status,fault==='transient'?'SUCCEEDED':fault==='before'?'NOT_APPLIED':'AMBIGUOUS',JSON.stringify(result.error));
+ assert.equal(result.trace.filter(e=>e.event==='ui_scroll_applied').length,fault==='before'?0:1);
+ assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,retry?1:0);
+ assert.equal(result.effect_possible,fault!=='before');assert.equal(result.cleanup_complete,true);
+ assert.equal(failures,fault==='persistent'?2:1);
+ if(['directory','owner','position'].includes(fault))assert.equal(result.error.code,'UI_SCROLL_NOT_CONFIRMED');
+ if(fault==='expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+});
+
 test('storage filename exception preserves code-editor, link, secret and active-row guards',async()=>{
   for(const mode of ['name','id','editor','href','secret','foreign','detached_row','wrong_label','wrong_tag','editable','duplicate']){
     const f=scriptNamedStorageFixture(),{page,cell,table,row}=f;
