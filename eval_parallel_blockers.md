@@ -1,90 +1,17 @@
-# Состояние блокеров parallel evals
+# Состояние parallel evals
 
-[План](docs/superpowers/plans/2026-10-16-evals-parallel.md) утверждён владельцем
-с поправками. Повторное согласование не требуется. Нормативные правила —
-[контракт](evals/docs/parallel-users-contract.md), особенно п.20/24/26.
-Прежняя диагностика — в [едином архиве](docs/archive/2026-10-16-evals-parallel-history.md),
-[удержанные ресурсы](docs/testing/loginom-ai-agent/2026-10-16-evals-parallel-retained.md)
-не трогать до успешного N=2 и решения владельца одним списком.
+Технических блокеров сквозного пути нет. N1 и N2 J5IglH приняты: exit0,
+resources/limits PASS, три cleanup confirmed, оба слота закрыты, остатков нет.
+Качество N2 отражено честно: calc0(no_artifact), filter100, group100.
+Удаление неиспользуемого кода завершено; все обязательные проверки прошли.
+Результаты — в [выполненном плане](docs/superpowers/plans/2026-10-16-evals-parallel.md).
 
-Harness автоматически очищает своё и доказанно свои остатки на новом стенде
-после обязательных проверок. Ограничение временными файлами текущего хода
-относится к работе исполнителя; оно не запрещает штатную очистку harness.
-Разрешены сохранение одного private diff/откат двух незакоммиченных archive-правок
-Снята ровно judge reservation585940be-5c1b-4bff-a7c6-00459a4f7fa3; A00yuH
-не удалён. Проверка входа через исправленную repo-обёртку успешна (0 model calls),
-status lease освобождён. Проверка не заменяет реальный N=1/N=2.
+Нормативны [контракт](evals/docs/parallel-users-contract.md), в частности
+п.20/24/26/33. Команды — [runbook](docs/testing/loginom-ai-agent/parallel-evals.md).
+Закрытые отказы и исходные evidence сохранены в
+[истории](docs/archive/2026-10-16-evals-parallel-history.md).
 
-Известное ограничение: после аварии новый admin может получить SESSION_NOT_IDLE;
-такой слот остаётся в карантине до решения владельца. Для первого нового стенда
-старые incidents не используются. Нет действительного входа в прежнем judge home
-через исправленный VPN launcher — остановка с просьбой владельцу выполнить вход.
-Недостаточно MemAvailable для бюджета N=1 — остановка и сообщение владельцу.
-По решению владельца2026-10-19 технические блокеры решать самостоятельно;
-вопрос только при действительной необходимости по контракту п.33.
-
-CLI retry output исправлен по разрешению владельца2026-10-19; установленный
-candidatec8a85da728 сохраняет прежнюю OAuth-базу eb85403ce4. Process suite19 PASS,
-typecheck PASS; HTTP429→200:2 запроса, busy/retry/idle, exit0/cleanup confirmed;
-shared status qualified, refreshRequired=false. Evidence:
-`/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/cli-retry-20261019/`.
-Наблюдения подключены; четыре native A/B прошли. Первый admission-отказ (без модели)
-разобран startup, бронь освобождена.
-
-Блокеры c21/14c5 закрыты по разрешениям владельца: settled admin перенесён
-с неизменным содержимым, штатный startup подтвердил cleanup/release. Оба профиля
-после штатного refresh квалифицировали gpt-6-luna/high, одинаковый cache SHA256
-59bcb39e…; model calls0. Подробности и private evidence — в
-[едином архиве](docs/archive/2026-10-16-evals-parallel-history.md).
-Schema-only drift исправлен в5c93dafea9 (18/65 PASS/TC/Review), потерянный
-proxy route восстановлен вf88ce89f9c (CLI8/28+sandbox1/2 PASS/TC/Review).
-Штатный startup852/071 подтвердил cleanup/release. Модельный N=1/N=2 не завершён.
-
-Карантин4fb завершён по разрешению владельца: собственные log/DB/точный marker
-сохранены в закрытом history; original failed receipt неизменен, CAS holds released,
-данные не удалялись. Ancestry gone-PID fix прошёл9/48 targeted PASS/TC/Review.
-Evidence: `evidence/n1-proc-race-owner-release-20261019.json` в acceptance state,
-подробности — в едином архиве. Технические блокеры решать самостоятельно;
-утверждение бюджета N=2 сохраняется.
-
-N1 iLakZJ дошёл до завершённой задачи:21 tools/0 errors/0 retry. Судья получил64
-из-за добавленной глобальной desktop-настройки; private config синхронизирован
-под judge lease, вход подтверждён без модели. Cleanup сохранил root из-за
-хешированного имени своего input. Проверка существующей delivery-квитанции
-(точное имя/размер/hash) подключена в normal cleanup и startup:12/72 unit PASS,
-typecheck/sh-n/diff PASS, Review Approved. Native judge100 и startup cleanup
-подтверждены; исходные результаты не менялись.
-Исходные результаты и карантин сохранены, подробности — в едином архиве.
-
-Закрытый блокер — внешние inspector/CDP установленного Desktop из другого чата.
-В s9821T первая задача завершилась с judge100/cleanup confirmed; вторая не запущена
-из-за guard `assertNoDebuggers`. Новый процесс не создавался;71 прежний process
-из6 подтверждённых receipts завершены. Fresh admin/Pool/backup/sessions/root/FD/
-profile checks подтвердили чистое состояние; только a20 server/profile holds сняты
-существующим CAS, без удаления и без создания отсутствующего cleanup.json.
-Evidence: `evidence/n1-debugger-settlement-20261019.json`. Порты и процесс закрылись
-своим владельцем до полного N1; сообщение другому чату не требовалось и не отправлялось.
-
-Полный N1 DE1Srz завершён exit0:3/3 judge100/cleanup confirmed, leftovers[],
-resources/limits passed,840 samples/0 missed. Технических блокеров нет.
-Владелец2026-10-19 явно утвердил предусмотренный контрактом п.28 бюджет N2:
-host CPU95%/MemAvailable8GiB, Server2 cores/256MiB, Studio6 cores/1GiB,
-все обязательные FS5GiB/10000 inodes, swap free0. Файл предложения —
-`/home/kiselev/.local/state/loginom-evals/acceptance-20261016/n2-budget-proposed-20261019.json`,
-SHA2567b43211ba891232286e05e61c1844534cc7306ce03aa29aaa26077ce651380d7.
-Точная копия записана как `n2-budget-approved-20261019.json` до dispatch;
-private approval evidence сохранён. Source/CLI/catalog/task/rubric/judge pins
-сохраняются; изменения после N1 ограничены документацией при HEAD50b28da4db.
-Первый N2 qAdMiN не принят: A SESSION_STILL_PRESENT после CloseSession15ms,
-CPU хоста95.9253%>95%; B обе задачи100/cleanup confirmed. Fresh startup успешно
-подтвердил отсутствие сессии (closed[]) и очистил ровно два своих файла; server/
-profile брони released. Исходные результаты сохранены. Ограниченное ожидание
-readback после CloseSession исправлено по TDD:15/89 targeted PASS/typecheck/diff,
-Review Approved; четыре native A/B повторно PASS. Далее повторный N2
-с тем же утверждённым бюджетом и неизменными evaluation/CLI pins.
-
-N2 dOMERK прошёл25/25 ресурсных границ, limits/timeline/623 samples/0miss.
-A calc/group100/cleanup confirmed; B no_artifact/FDscan unknown. Штатный startup
-подтвердил cleanup/release. Transient неполнота scan воспроизведена на чтение;
-ограниченный повтор одного IO-чтения исправлен по TDD,18/99 unit PASS/TC/diff,
-Review Approved и четыре native A/B PASS30.05s. Далее повтор с тем же бюджетом.
+Старые стенды/инциденты, включая A00yuH, сохранены по
+[единому списку](docs/testing/loginom-ai-agent/2026-10-16-evals-parallel-retained.md).
+Их удаление — отдельное решение владельца. Известное ограничение после аварии:
+`SESSION_NOT_IDLE` у нового admin оставляет слот в карантине; действия — контракт п.24.
