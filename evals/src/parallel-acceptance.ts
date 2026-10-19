@@ -290,6 +290,7 @@ export function assessParallelLimits(input: unknown) {
     if (["provider", "dock", "judge"].includes(String(event.source))) {
       if (event.status === 429) return [`${String(event.source).toUpperCase()}_HTTP_429`]
       if (event.kind === "rate_limit" || event.kind === "quota_limit") return [`${String(event.source).toUpperCase()}_${event.kind.toUpperCase()}`]
+      if (event.kind === "retry") return [`${String(event.source).toUpperCase()}_RETRY`]
     }
     if (event.source === "loginom" && (event.kind === "licence_denied" || event.kind === "session_limit")) return [`LOGINOM_${event.kind.toUpperCase()}`]
     if (event.source === "host" && (event.kind === "oom" || event.kind === "enospc")) return [`HOST_${event.kind.toUpperCase()}`]
@@ -328,7 +329,7 @@ function validLimitEvent(value: unknown) {
   if (["provider", "dock", "judge"].includes(String(event.source))) {
     if (event.status !== undefined && (!Number.isInteger(event.status) || Number(event.status) < 100 || Number(event.status) > 599)) return false
     if (event.kind === "http") return Number.isInteger(event.status) && Number(event.status) >= 100 && Number(event.status) <= 599
-    return ["rate_limit", "quota_limit", "other"].includes(String(event.kind))
+    return ["rate_limit", "quota_limit", "retry", "other"].includes(String(event.kind))
   }
   if (event.source === "loginom") return ["licence_denied", "session_limit", "other"].includes(String(event.kind))
   if (event.source === "host") return ["oom", "enospc", "other"].includes(String(event.kind))

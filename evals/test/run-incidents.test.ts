@@ -28,6 +28,16 @@ test("final observation retains a judge rate error even after a successful retry
   } finally { await watcher.stop(); await rm(root, { recursive: true }) }
 })
 
+test("a live session retry stops admission even when its provider message is unclassified", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-session-retry-")), codes: string[] = []
+  const watcher = watchAttemptIncidents(root, code => { codes.push(code) })
+  try {
+    await Bun.write(path.join(root, "events.jsonl"), JSON.stringify({ type: "session.status", status: { type: "retry", message: "temporary issue" } }) + "\n")
+    await watcher.stop()
+    expect(codes).toEqual(["PROVIDER_ERROR_OBSERVED"])
+  } finally { await watcher.stop(); await rm(root, { recursive: true }) }
+})
+
 test("ordinary licence and remaining quota metadata do not stop a healthy attempt", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-healthy-incident-")), codes: string[] = []
   const watcher = watchAttemptIncidents(root, code => { codes.push(code) })

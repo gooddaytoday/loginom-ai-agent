@@ -25,7 +25,7 @@ type Part = {
   tokens?: { input?: number; output?: number; reasoning?: number }
   state?: { status?: string; input?: Record<string, unknown>; output?: string; error?: string }
 }
-type Event = { type?: string; sessionID?: string; part?: Part; error?: { name?: string; data?: { message?: string; statusCode?: number } } }
+type Event = { type?: string; sessionID?: string; part?: Part; status?: { type?: string }; error?: { name?: string; data?: { message?: string; statusCode?: number } } }
 
 export function parseEvents(text: string, secrets: string[] = []) {
   const events = text.split("\n").flatMap((line) => {
@@ -53,11 +53,16 @@ export function parseEvents(text: string, secrets: string[] = []) {
   const prepare = tools.find((part) => part.tool === "loginom_dock_prepare" && completed(part))
   const preparation = firstJsonObject(prepare?.state?.output ?? "") as { skillRevision?: unknown } | undefined
   const errorEvents = events.filter((event) => event.type === "error")
+  const sessionId = events.find(event => typeof event.sessionID === "string")?.sessionID
+  const statuses = events.filter(event => event.type === "session.status")
+  const providerComplete = Boolean(sessionId) && statuses[0]?.status?.type === "busy" && statuses.at(-1)?.status?.type === "idle" &&
+    events.every(event => event.sessionID === undefined || event.sessionID === sessionId) && !tools.some(part => part.tool === "task") &&
+    events.length === text.split("\n").filter(line => line.trim()).length
   const steps = events.filter((event) => event.type === "step_finish").map((event) => event.part)
   const sum = (pick: (part: Part | undefined) => number | undefined) =>
     steps.reduce((acc, part) => acc + (pick(part) ?? 0), 0)
   return {
-    sessionId: events.find((event) => typeof event.sessionID === "string")?.sessionID,
+    sessionId,
     saveReceipts,
     nodeReceipts: receipts.kept,
     nodeReceiptsDropped: receipts.dropped,
@@ -71,10 +76,14 @@ export function parseEvents(text: string, secrets: string[] = []) {
       reasoning: sum((part) => part?.tokens?.reasoning),
     },
     limitEvidence: {
-      // Headless JSON does not expose every retry or transport diagnostic.
-      coverage: { provider: "unavailable", dock: "unavailable", judge: "unavailable" },
-      events: errorEvents.flatMap(event => event.error?.name === "APIError" && event.error.data?.statusCode === 429
-        ? [{ source: "provider" as const, kind: "http" as const, status: 429 as const }] : []),
+      // runAgent supplies a title; delegated sessions and older/partial streams stay unqualified.
+      coverage: { provider: providerComplete ? "complete" : "unavailable", dock: "unavailable", judge: "unavailable" },
+      events: [
+        ...errorEvents.flatMap(event => event.error?.name === "APIError" && event.error.data?.statusCode === 429
+          ? [{ source: "provider" as const, kind: "http" as const, status: 429 as const }] : []),
+        ...events.filter(event => event.type === "session.status" && event.status?.type === "retry")
+          .map(() => ({ source: "provider" as const, kind: "retry" as const })),
+      ],
     },
     errors: errorEvents.flatMap((event) => (event.error?.name ? [event.error.name] : [])),
     errorTexts: errorEvents.map((event) => `${event.error?.name ?? ""} ${event.error?.data?.message ?? ""}`),
@@ -159,6 +168,8 @@ export async function runAgent(input: {
     input.model,
     "--variant",
     input.variant ?? "default",
+    "--title",
+    `eval-${input.taskId}`,
     ...input.files.flatMap((file) => ["--file", file]),
     "--dir",
     input.workdir,
