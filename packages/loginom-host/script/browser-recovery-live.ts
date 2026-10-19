@@ -90,7 +90,10 @@ try {
     mode: "delimited",
     parameters: {
       source: { artifact_id: artifact.artifact_id, upload_operation_id: "deliver-1:upload" },
-      settings: JSON.parse(await readFile(csv + ".settings.json", "utf8")),
+      settings: await readFile(csv + ".settings.json", "utf8").then((text) => {
+        const settings = JSON.parse(text)
+        return { ...settings, source: { ...settings.source, source_path: delivered.output.destination } }
+      }),
     },
     finish: "execute",
     read: { sample_rows: 5 },
