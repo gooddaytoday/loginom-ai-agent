@@ -213,6 +213,7 @@ export async function hasOwnedAncestry(pid: number, owners: Pick<ProcessIdentity
     })
     if (raw === undefined) return false
     const fields = raw.slice(raw.lastIndexOf(")") + 2).split(" ")
+    if (current === pid && ["Z", "X"].includes(fields[0] ?? "")) return false
     const parent = Number(fields[1])
     if (!Number.isSafeInteger(parent) || parent < 0 || !/^\d+$/.test(fields[19] ?? "")) throw Error("Process parent chain unavailable")
     if (owners.some(owner => owner.pid === current && owner.starttime === fields[19])) return true

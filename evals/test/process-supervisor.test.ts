@@ -803,3 +803,32 @@ test("supervisor ancestry: a reaped candidate is absent rather than an unreadabl
   expect(await child.exited).toBe(0)
   expect(await hasOwnedAncestry(child.pid, [owner])).toBe(false)
 })
+
+test("supervisor ancestry: an unreaped zombie is not a live owned candidate", async () => {
+  const parent = spawn(Bun.which("python3")!, ["-c", `import os, sys
+child = os.fork()
+if child == 0:
+    os._exit(0)
+print(child, flush=True)
+sys.stdin.readline()
+os.waitpid(child, 0)
+`], { stdio: ["pipe", "pipe", "ignore"] })
+  const exited = new Promise(resolve => parent.once("exit", resolve))
+  try {
+    const pid = Number(await new Promise<Buffer>(resolve => parent.stdout!.once("data", resolve)))
+    const deadline = Date.now() + 2_000
+    let state = ""
+    while (state !== "Z" && Date.now() < deadline) {
+      const raw = await readFile(`/proc/${pid}/stat`, "utf8")
+      state = raw.slice(raw.lastIndexOf(")") + 2).split(" ")[0]!
+      if (state !== "Z") await Bun.sleep(10)
+    }
+    expect(state).toBe("Z")
+    const raw = await readFile(`/proc/${process.pid}/stat`, "utf8")
+    const owner = { pid: process.pid, starttime: raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19]! }
+    expect(await hasOwnedAncestry(pid, [owner])).toBe(false)
+  } finally {
+    parent.stdin!.end("\n")
+    await exited
+  }
+})
