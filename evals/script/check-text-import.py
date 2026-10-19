@@ -484,6 +484,11 @@ _REPORT_NUMERALS = {
 }
 _REPORT_NUMBER = r'\d+|' + '|'.join(_REPORT_NUMERALS.values())
 _REPORT_UNKNOWN = r'\b(?:не\s+(?:исключен\w*|установлен\w*|доказан\w*|подтвержден\w*)|not\s+confirmed|no\s+evidence|without\s+evidence|unproven|unconfirmed)\b'
+_REPORT_CURRENT_CONTEXT = (r'фактически|actually|in\s+fact|сейчас|now'
+    r'|в\s+текущ\w*\s+(?:запуск\w*|попытк\w*|запрос\w*|источник\w*)'
+    r'|in\s+(?:the\s+current|this)\s+(?:run|attempt|request|source)')
+_REPORT_FRAMING = (r'(?:[\s,;:.!?—-]|(?:and|but|however|и|но|однако|'
+    + _REPORT_CURRENT_CONTEXT + r')\b)')
 _WARNING_PASSIVE = (r'\b(?:is|are|was|were|has|have|had|был\w*)\s+(?:(?:not|never|не|been)\s+)*'
     r'(?:issu\w*|emit\w*|rais\w*|выда\w*|выдал\w*)\b\s+(?:(?:by|from)\s+(?:the\s+)?(?:engine|loginom)\b|движ\w*\b)')
 
@@ -769,9 +774,7 @@ def report_regions(sentence, inherited=None, atoms=()):
             regions.append((match.start('history'), len(sentence), 0))
     # A clearly factual sibling exits a speech/example/attempt scope. A colon
     # complement alone never does. Quoted occurrences cannot exit their scope.
-    current = (r'в\s+текущ\w*\s+(?:запуск\w*|попытк\w*|запрос\w*|источник\w*)'
-        r'|in\s+(?:the\s+current|this)\s+(?:run|attempt|request|source)')
-    for match in re.finditer(r'[,;]\s*(?P<actual>фактически|actually|in\s+fact|сейчас|now|(?:the\s+)?actual\s+(?:result|reason)|фактическ\w*\s+(?:результат|причин\w*)|' + current + r')\b', sentence):
+    for match in re.finditer(r'[,;]\s*(?P<actual>(?:the\s+)?actual\s+(?:result|reason)|фактическ\w*\s+(?:результат|причин\w*)|' + _REPORT_CURRENT_CONTEXT + r')\b', sentence):
         if outside(match.start('actual')) and not any(left <= match.start('actual') < right for left, right in complements):
             regions.append((match.start('actual'), len(sentence), None))
     return sorted(regions, key=lambda row: row[0])
@@ -814,6 +817,11 @@ def report_sentences(text, atoms=(), identifiers=None):
     quoted += ''.join('|' + re.escape(text[row['span'][0]:row['span'][1]]) for row in warning_receiver_spans(text, identifiers, surface))
     def literal_quote(value):
         return any(value[1:-1].strip() == ' '.join(atom.casefold().split()) for atom in atoms)
+    def clause_scope(value, inherited):
+        # A cut changes grouping, not the ownership of a complete speech
+        # object. Native literal witnesses retain their surrounding owner.
+        standalone = re.fullmatch(_REPORT_FRAMING + r'*(?P<object>' + quote + r')[.!?]*', value)
+        return 0 if standalone and not literal_quote(standalone['object']) else inherited
     sentences, start, carry = [], 0, None
     for match in re.finditer(quoted + r'|(?P<cut>(?<=[.!?])\s+|\n+)', text):
         cut = match.group('cut') is not None
@@ -822,16 +830,23 @@ def report_sentences(text, atoms=(), identifiers=None):
         # Scalar code/field objects and atomic native reasons keep their owner.
         value = match.group()
         body = value[1:-1]
-        speech_end = (not cut and re.fullmatch(quote, value)
-            and re.search(r'[.!?][»”"]$', value) and not literal_quote(value)
+        speech_object = (not cut and re.fullmatch(quote, value)
+            and not literal_quote(value)
             # Modality/history can precede an active head, and a passive or
             # copular predicate need not start with the active engine subject.
             and (any(report_predicate_head(body[token.start():]) for token in re.finditer(r'\b\w', body))
                 or re.search(r'\b(?:is|are|was|were|был\w*|явля\w*)\b', body))
             # A following subjectless auxiliary still predicates this quoted
             # argument (e.g. its truth), rather than starting another report.
-            and not re.match(r'\s*[,—-]?\s*(?:is|are|was|were|has|have|had|can|could|may|might|should|would|must|will|был\w*|будет|явля\w*)\b', text[match.end():])
-            and re.match(r'\s+\S', text[match.end():]))
+            and not re.match(r'\s*[,—-]?\s*(?:is|are|was|were|has|have|had|did|does|do|can|could|may|might|should|would|must|will|not|true|false|был\w*|будет|явля\w*)\b', text[match.end():]))
+        # A completed utterance before a speech object owns its own polarity.
+        # Additional punctuation/connectives cannot donate it to the quote.
+        if speech_object and re.search(r'[.!?]' + _REPORT_FRAMING + r'*$', text[start:match.start()]):
+            part = ReportClause(text[start:match.start()], carry, start)
+            if part:
+                sentences.append((part, part.start, carry))
+            start, carry = match.start(), None
+        speech_end = speech_object and re.match(r'[\s;,:.!?—-]+\S', text[match.end():])
         if cut or speech_end:
             part = ReportClause(text[start:match.start() if cut else match.end()], carry, start)
             if part:
@@ -846,9 +861,7 @@ def report_sentences(text, atoms=(), identifiers=None):
         # A standalone quoted proposition is a speech object, whereas quoted
         # arguments of a current predicate and literal native witnesses remain
         # available to that predicate's existing validation.
-        standalone = re.fullmatch(r'(?P<object>' + quote + r')[.!?]*', sentence)
-        if standalone and not literal_quote(standalone['object']):
-            scope = 0
+        scope = clause_scope(sentence, scope)
         if re.match(r'^(?:пример|образец|example|template|предполож\w*|допустим|task)\b'
             r'|^(?:the\s+)?(?:оператор|пользователь|someone|operator|user)\b.{0,20}'
             r'\b(?:утвержда\w*|сказ\w*|предполож\w*|claims?|said|suggest\w*)\b', sentence):
@@ -907,7 +920,7 @@ def report_sentences(text, atoms=(), identifiers=None):
             nonlocal role, field_role, warning_subject
             part = sentence[left:right]
             position = left + len(part) - len(part.lstrip())
-            clause = ReportClause(part, scope_at(position), origin + left, identifiers)
+            clause = ReportClause(part, clause_scope(part.strip(), scope_at(position)), origin + left, identifiers)
             head = report_predicate_head(clause)
             subject = head.groupdict().get('subject') if head else None
             warning_subject = subject or (warning_subject if inherited_role else None)
@@ -953,6 +966,26 @@ def report_sentences(text, atoms=(), identifiers=None):
     return rows
 
 
+def report_truth_argument(clause, start, end):
+    """Bind one explicit truth operator to its complete quoted argument."""
+    quoted = r'(?P<open>[«“"\[])(?P<body>.*)(?P<close>[»”"\]])'
+    operator = r'(?P<negative>not\s+)?(?P<truth>true|false)'
+    for pattern in [r'(?:it\s+is\s+)?' + operator + r'\s+that\s+' + quoted + r'[.!]*',
+                    quoted + r'\s+(?:is\s+)?' + operator + r'[.!]*']:
+        frame = re.fullmatch(_REPORT_FRAMING + '*' + pattern, clause, re.I | re.S)
+        if not frame or frame['close'] != {'«': '»', '“': '”', '"': '"', '[': ']'}[frame['open']]:
+            continue
+        left, right = frame.span('body')
+        if not left <= start <= end <= right:
+            continue
+        body = frame['body']
+        offset = left + len(body) - len(body.lstrip())
+        argument = ReportClause(body, None, getattr(clause, 'start', 0) + left,
+            getattr(clause, 'identifiers', ()))
+        sign = -1 if (frame['truth'].casefold() == 'false') != bool(frame['negative']) else 1
+        return argument, start - offset, end - offset, sign
+
+
 def claim_status(clause, start, end):
     """+1 asserted, -1 negated, 0 directive/example/question/hypothesis.
 
@@ -963,6 +996,12 @@ def claim_status(clause, start, end):
     """
     if getattr(clause, 'scope', None) is not None:
         return clause.scope
+    # Truth belongs to the whole proposition. Compose its sign with the local
+    # predicate instead of finding an operator in a bounded token window.
+    argument = report_truth_argument(clause, start, end)
+    if argument:
+        inner, left, right, sign = argument
+        return sign * claim_status(inner, left, right)
     prefixes, suffixes = report_sentences(clause[:start]), report_sentences(clause[end:])
     prefix = prefixes[-1] if prefixes else ''
     suffix = suffixes[0] if suffixes else ''
