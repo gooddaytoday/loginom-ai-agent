@@ -208,21 +208,23 @@
   прежний порядок остальных событий сохраняется. Независимое мини-ревью Approved.
 - [x] Собрать отдельный private installed CLI, закрепить SHA и квалифицировать
   retry output до A/B и N=1. Пользовательскую установку/старый candidate не менять.
-  Candidate8b2ba2bf9b, version0.0.0-dev-202610190530, binary SHA
-  d2de003bf5c13a3ad7d9ee2256e8b7f1f05d64776d03dd3beb528f6d5133be41.
+  Candidatec8a85da728 на прежней OAuth-базе eb85403ce4, version0.0.0-dev-202610190559,
+  binary SHA364dd428b29df745d5f8392f6f90c4b725de4879a958eb4824daee5a33e67552.
   Установленный бинарник: локальный HTTP429→200,2 запроса, busy/retry/idle,
   exit0/cleanup confirmed; private evidence `acceptance-20261016/evidence/cli-retry-20261019/`.
-  Первый N=1 остановлен до dispatch: этот build из evals-parallel не содержит
-  shared-oauth-v1. Прежний candidate чистый eb85403ce4 эту capability имеет.
-- [ ] Пересобрать тот же разрешённый patch двух agent-файлов на точной базе
+- [x] Пересобрать тот же разрешённый patch двух agent-файлов на точной базе
   eb85403ce4 в собственном временном detached checkout; чужой evals-oauth не менять.
   Квалифицировать одновременно retry output и shared status до повторного N=1.
   Независимое ревью переноса Approved: оба файла базы побайтно совпадают с родителем
-  патча8b2ba2bf9b. Auth-код не меняется; RED на OAuth-базе воспроизведён.
+  патча8b2ba2bf9b. Auth-код не меняется; RED→GREEN19/61, typecheck/diff PASS.
+  Installed retry и shared status qualified: generation/principal проверены,
+  refreshRequired=false,0 model calls. Payload manifest/installed inventory проверены;
+  installer замороженной базы выполнен Bun (его Node-entry использует Bun.Glob).
 - [x] Исправить обнаруженный путь startup после отказа до dispatch: management
   cleanup обычного run находится в run/preparation/<slot>, prepare/verify — в
   controller/management-<command>-<slot>. Проверяется тот же supervisor producer.
   RED→GREEN, startup/slots36/142 PASS27.90s; targeted4/10/typecheck/diff PASS.
+  Native разбор первого admission-отказа подтверждён, прежняя бронь освобождена.
 - [x] Подключить JSON status к проверке provider errors: busy→idle основной
   сессии, любой retry сохраняет отказ; старый/оборванный JSON и task tool не дают
   полного покрытия. Непустой существующий --title исключает запрос автозаголовка.
@@ -319,4 +321,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20. Acceptance: prepare/verify ready; installed CLI8b2ba2bf9b и judge429 qualified; native A/B4/4 PASS/clean releases. Далее N=1,утверждение порогов,N=2.
+20. Acceptance: native A/B4/4 PASS/clean releases; installed CLIc8a85da728 retry+sharedOAuth и judge429 qualified; startup после admission отказа подтверждён. Далее N=1,пороги,N=2.
