@@ -13,6 +13,8 @@ export function validateReformParameters(p,mode,r){
  need(r.target.kind==='existing'||r.inputs.length===1,'New reform requires one explicit input');
  need(r.inputs.length<=1&&r.inputs.every(i=>i.input===0)&&r.read.ports.every(p=>p===0),'Reform has one table input/output');
  need(r.mappings.every(m=>m.port===0&&(m.fields??[]).every(f=>f.source?.kind==='configured_field'&&(m.direction==='output'||f.excluded!==true))),'Reform mappings require configured names and no input exclusion');
+ need(r.target.kind!=='new'||r.mappings.every(m=>m.direction!=='output'||[...(m.fields??[]),...(m.changes??[])].every(f=>f.excluded!==true)),
+  'New Reform exclusions require parameters.changes with input_field and excluded:true; omit those fields from output mappings');
  need(r.finish!=='close'||r.mappings.every(m=>m.direction!=='input'),'Close cannot commit input mappings');
 }
 export function validateReformInlineSources(c,m){

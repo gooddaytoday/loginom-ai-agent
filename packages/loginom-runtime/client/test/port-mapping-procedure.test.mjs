@@ -196,7 +196,7 @@ function exclusionFixture({links=false,rowDelete=false,deleteMode='valid'}={}) {
    const groups=new Map();native.target_fields=native.target_fields.filter(f=>f!==field).map((f,index)=>{
     const group_index=groups.get(f.excluded)??0;groups.set(f.excluded,group_index+1);return {...f,index,group_index};
    });
-   native.target_fields.push({...source,label:source.name,record_id:'excluded'+count,field_id:String(99+count),index:2,group_index:groups.get(true)??0,excluded:true,inherited:false,source:null,exclusion_source:source,data_kind:'Неопределенное'});
+   if(a.ref==='exclude')native.target_fields.push({...source,label:source.name,record_id:'excluded'+count,field_id:String(99+count),index:2,group_index:groups.get(true)??0,excluded:true,inherited:false,source:null,exclusion_source:source,data_kind:'Неопределенное'});
    selected=null;channel.afterExclude?.(native);
   }else {selected=a.ref;channel.afterSelection?.(native);}
  }};
