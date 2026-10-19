@@ -856,12 +856,9 @@ export const RunCommand = effectCmd({
               break
             }
 
-            if (
-              event.type === "session.status" &&
-              event.properties.sessionID === sessionID &&
-              event.properties.status.type === "idle"
-            ) {
-              break
+            if (event.type === "session.status" && event.properties.sessionID === sessionID) {
+              emit("session.status", { status: event.properties.status })
+              if (event.properties.status.type === "idle") break
             }
 
             if (event.type === "permission.asked") {

@@ -198,10 +198,12 @@
   Approved; fixture-проверки не доказывают native N=1/N=2.
 
 Владелец2026-10-19 разрешил точечную правку packages/agent вне evals/:
-- [ ] RED→GREEN process-тест: локальный HTTP429→200 сохраняет успешный exit,
+- [x] RED→GREEN process-тест: локальный HTTP429→200 сохраняет успешный exit,
   но JSON содержит существующий session.status/retry; зеркалировать status через
   прежний emit, сохранить idle-break, адаптировать прежнее JSON-ожидание.
-- [ ] Проверить затронутый process suite и typecheck, сохранить отдельным коммитом.
+- [x] Проверить затронутый process suite и typecheck, сохранить отдельным коммитом.
+  Process suite19 PASS, package typecheck/diff PASS; новый retry/busy/idle виден,
+  прежний порядок остальных событий сохраняется. Независимое мини-ревью Approved.
 - [ ] Собрать отдельный private installed CLI, закрепить SHA и квалифицировать
   retry output до A/B и N=1. Пользовательскую установку/старый candidate не менять.
 Новый Protocol/HTTP, сырой transport trace и новая система телеметрии не нужны.
