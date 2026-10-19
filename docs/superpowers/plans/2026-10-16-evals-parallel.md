@@ -23,7 +23,8 @@
 - Никаких новых эпох, процессных описей/телеметрии, FD/kernel receipts,
   server-storage archives и исследовательских операций в рабочем admin-драйвере.
 - Subreaper, pid+starttime перед сигналом, marker v2, изоляция секретов сохраняются.
-- Блокер сквозного пути/изменение требования — запрос владельцу и ожидание.
+- Блокеры решать самостоятельно; вопросы только при действительной необходимости
+  по контракту п.33. Бюджет N=2 отдельно утверждает владелец.
   Harness автоматически удаляет только своё на новом стенде после обязательных
   проверок; старые стенды/инциденты и созданное не этим harness требуют разрешения.
   Ограничение временными файлами текущего хода относится к работе исполнителя.
@@ -287,11 +288,11 @@ private config/budget/results вне Git; операторские команд�
   HEAD без модели: direct403/proxy405; sandbox сохраняет routing и Node env proxy.
   RED→GREEN; CLI8/28 +sandbox1/2 PASS, typecheck/diff PASS, Review Approved.
   Provider retry первого HTTP403 корректно остановил run; pass модели ещё не доказан.
-- [ ] После решения по карантину4fb6d039… исправить ancestry-read race по unit TDD:
+- [ ] По разрешению владельца завершить карантин4fb6d039… и исправить ancestry-read race по unit TDD:
   ENOENT/ESRCH допускает false только если исходный PID отдельно подтверждён
   отсутствующим; живая/нечитаемая цепочка остаётся отказом. Review Approved.
   Не переписывать исходный failed proof; собственные log/DB сохранить в архив,
-  только точные server/profile holds снять через CAS по разовому разрешению.
+  только точные server/profile holds снять через CAS по полученному разрешению.
 - [ ] Реальный N=1 с агентом/судьёй на трёх задачах; по замеру предложить числовые
   пороги CPU/RAM/диска и **дождаться утверждения владельца до N=2**.
 - [ ] Записать утверждённый бюджет до реального N=2, выполнить run на тех же tasks/
@@ -353,4 +354,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20. Proxy f88ce89f9c/9 PASS/TC/Review; startup071 released. До dispatch4fb: ENOENT в ancestry,15 прежних процессов gone/slot пуст. Failed proof сохранён, log/DB pending archive; запрос owner archive+CAS, затем unit fix/rerun N=1.
+20. Владелец разрешил archive/CAS4fb и автономное решение следующих блокеров; гарантии/утверждение бюджетаN2 сохраняются. Следом archive/release, TDD ancestry gone PID fix, повтор N=1.
