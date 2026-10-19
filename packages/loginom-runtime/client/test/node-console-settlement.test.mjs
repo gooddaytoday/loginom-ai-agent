@@ -17,12 +17,12 @@ function fixture(fault,{settle=true,until=20000}={}) {
    const output={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,
     dom_epoch:{document:fault==='document'&&clock>=5000?'other':'browser',revision:clock},
     prepared_node_context:{...node,verified:true,surface:'graph',locked:false},wizard:{status:'absent'},scan:{complete:true},
-    ui:{elements:clock>=5000&&fault==='missing'?[]:[current],dialogs:[],truncated:{masks:false,dialogs:false,elements:false},
+    ui:{elements:fault==='open'?[{tid:'ConsoleForm;ProgressForm;trpProgress;grd;tbl'}]:clock>=5000&&fault==='missing'?[]:[current],dialogs:[],truncated:{masks:false,dialogs:false,elements:false},
      masks:clock<until?[{kind:'busy',target_tid:fault==='foreign'?'MF;TF-2;ModelForm':fault==='unknown'?undefined:'MF;TF-1;ModelForm',dialog_ref:null}]:[]}};
    return {status:'SUCCEEDED',output};
   }});
  return {operation,records,channel,get clock(){return clock},read:()=>channel.observe({condition:'prepared node available for process console',
-  readProcessControls:true,...(settle?{settleProcessConsole:{ref:button.ref,signature:button.signature}}:{}),ready:s=>s.ui.elements.some(e=>e.tid===tid)})};
+  readProcessControls:true,...(settle?{settleProcessConsole:{ref:button.ref,signature:button.signature}}:{}),ready:s=>s.ui.elements.some(e=>e.tid===tid||e.tid==='ConsoleForm;ProgressForm;trpProgress;grd;tbl')})};
 }
 test('confirmed own graph loading may settle after 20 seconds without any gesture or deadline change',async()=>{
  const f=fixture();await f.read();assert.equal(f.clock,20000);assert.equal(f.operation.deadline,30000);
@@ -39,4 +39,8 @@ for(const fault of ['foreign','unknown','document','button','missing'])test('con
 test('own loading still stops at the original deadline without a usable observation',async()=>{
  const f=fixture(undefined,{until:40000});await assert.rejects(f.read(),/readiness timeout/);assert.equal(f.clock,30000);
  await assert.rejects(f.channel.act({verb:'click',ref:'console-button'}));
+});
+
+test('an already visible unmasked console retains its existing read path without a toolbar button',async()=>{
+ const f=fixture('open',{until:0});await f.read();assert.equal(f.clock,0);
 });

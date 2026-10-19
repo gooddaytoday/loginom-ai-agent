@@ -345,7 +345,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const observationNow = () => started + monotonicNow() - monotonicStarted;
       let deadline = settleOutputPort?operation.deadline:Math.min(operation.deadline, started + timeoutMs);
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
+      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false;
       try {
       for (let sample = 0; settleOutputPort || settleProcessConsole || sample < 80; sample++) {
         signal?.throwIfAborted();
@@ -558,7 +558,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             &&t.port_guid===tableDialog.table.port_guid&&t.table_tid===tableDialog.table.table_tid).length!==1)throw new Error('Table dialog owner changed');
           result.output.node_table_dialog=structuredClone(tableDialog);
         }
-        if(settleProcessConsole){
+        if(settleProcessConsole&&(settlingConsole||result.output.ui.masks.length)){
           const state=result.output,buttons=state.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress');
           const owned=state.prepared_node_context?.surface==='graph'&&state.ui.dialogs.length===0
             &&state.wizard?.status==='absent'&&buttons.length===1&&buttons[0].ref===settleProcessConsole.ref
@@ -569,7 +569,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           if(!owned)throw Error('Owned process console settlement context changed');
           // Only the confirmed launch's own loading mask may outlive the local
           // readiness window. Keep the parent deadline and authorize no action.
-          if(state.ui.masks.length)deadline=operation.deadline;
+          if(state.ui.masks.length){settlingConsole=true;deadline=operation.deadline;}
         }
         if(settleOutputPort){
           const state=result.output,context=state.prepared_node_context;
