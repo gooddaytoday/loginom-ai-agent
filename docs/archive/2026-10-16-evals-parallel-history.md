@@ -8065,3 +8065,21 @@ Private evidence в `/home/kiselev/.local/state/loginom-evals/acceptance-2026101
 `settled-admin-c21-relocation.json`, `reconciled-model-quarantine-20261019.json`,
 `model-catalog-qualification-20261019.json`. Native admin/slot receipts сохранены.
 Независимое ревью отклонило PID-only фильтр admin; frozen механизмы не развивались.
+
+### N=1: служебная схема и потерянный proxy
+
+Отказ до dispatch `20261019-065130-5af679f128-dirty-lEYoun`: models CLI добавил
+только канонический `$schema`, verifyProfile ошибочно считал это drift.
+5c93dafea9 нормализует только эту аннотацию in-memory;18/65 targeted PASS/TC,
+независимое ревью Approved, другое schema/права по-прежнему дают drift.
+Штатный startup8528019f… подтвердил cleanup и освободил брони.
+Run `20261019-065630-5c93dafea9-dirty-A4xC5o` дошёл до агента и остановлен
+по первому session.retry Forbidden/gateway. Summary честно содержит PROVIDER_RETRY,
+resources passed, judge skipped; это не полный N=1. Slot/admin cleanup confirmed,
+unknown[], архив истории сохранён. Новый child allowlist терял существующие
+proxy settings; HEAD без auth/model: direct403, через local proxy405.
+Восстановлен прежний sandbox proxy route с исключением URL credentials/query/hash/path;
+CLI8/28+Linux sandbox1/2 unit PASS, typecheck/diff PASS, независимое ревью Approved.
+Модельный доступ ещё проверяет следующий N=1. Старые incidents не затрагивались.
+Private evidence: `profile-schema-*-20261019.log`, `proxy-routing-*-20261019.log`,
+`reconciled-schema-quarantine-20261019.json`; результаты run и архивы сохранены.
