@@ -143,15 +143,18 @@ try {
   }
   const types=new Set(expectedOutputs.map(o=>o.output_node_type));
   const destination=expectedOutputs.find(o=>o.output_node_type==='export_input')?.export_destination;
+  const exportMappings=new Map();
+  if(types.has('export_input'))for(const target of graph.nodes.filter(n=>n.type==='exports.text')){
+   // Capture before opening any export parameter wizard: its native schema
+   // initialization can refresh cached mappings even when later cancelled.
+   const mapping=await observeExportInputMapping({load,target,channelFor});
+   exportMappings.set(target.ref.node_id,mapping);
+   await record({phase:'cold_export_input_mapping',node:target.ref,mapping,settings_applied:false});
+  }
   const destinations=destination===undefined?undefined:await observeExportDestinations({load,graph,channelFor,execute});
   if(destinations)await record({phase:'cold_export_destinations',destinations,settings_applied:false});
   const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations}):null;
-  if(exportInput){
-   // Snapshot the saved mapping before executing upstream: autosync can change
-   // the export's cached input order when native output is rematerialized.
-   exportInput.mapping=await observeExportInputMapping({load,target:exportInput.export_node,channelFor});
-   await record({phase:'cold_export_input_mapping',node:exportInput.export_node.ref,mapping:exportInput.mapping,settings_applied:false});
-  }
+  if(exportInput)exportInput.mapping=exportMappings.get(exportInput.export_node.ref.node_id);
   for (const want of expected.nodes) {
     if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
