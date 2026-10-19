@@ -62,7 +62,10 @@ export function createCandidateNodeSupport(config) {
   if(type==='transform.sorting')return sorting.nodeApplyDriverFactory(options);
   if(type==='transform.group_data')return grouping.nodeApplyDriverFactory(options);
   if(type==='transform.cross_table')return crosstable.nodeApplyDriverFactory(options);
-  if(type==='transform.calculator')return calculator.nodeApplyDriverFactory(options);
+  if(type==='transform.calculator'){
+   const drivers=calculator.nodeApplyDriverFactory(options);
+   return {...drivers,readOutput:async(...args)=>nodeOutputForJournal(await drivers.readOutput(...args),redactor)};
+  }
   if(type==='programming.javascript'){
    if(!javascript)throw Error('JavaScript requires the validated 7.4.2 target and origin');
    const drivers=javascript.nodeApplyDriverFactory(options);
