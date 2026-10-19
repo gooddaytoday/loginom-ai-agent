@@ -306,7 +306,7 @@ git commit -m "feat(runtime): offer browser recovery as a structured next step"
 - Produces: `runtime.browserRecoveryHandoff(operationId, {signal, pollMs = 250}) → Promise<{verified: true, receipt_id: string, waited_ms: number} | {verified: false, reason: 'EXECUTOR_STILL_RUNNING'|'RECEIPT_UNSETTLED'|'RECEIPT_MISSING'|'RECEIPT_IDENTITY_MISMATCH'|'UNRELATED_UNSETTLED_WORK'}>`.
 - Поведение: ждёт, пока `running`, `nodeJobs.busy`, `sourceReads.busy`, `delivery.busy` не станут ложными, но не дольше `min(operation.deadline - now(), BROWSER_RECOVERY_HANDOFF_MS)`: живой executor дольше минуты после остановки фазы — аномалия, и попытка честно уходит в `stopped`. Затем читает `operation.lastReceipt` (даже при ложном `transportUncertain`) и требует `state === "completed"` и `receipt.cleanup_complete === true`. Без квитанции — `RECEIPT_MISSING` (дизайн, §6: иначе `stopped`). До ожидания и перед успешным возвратом метод сверяет существующее владение pending/node/source/delivery работой: неопределённая работа другой операции даёт `UNRELATED_UNSETTLED_WORK`, даже если старая квитанция выбранной операции завершена. Метод ничего не отменяет и не прерывает. Журнал — `browser_recovery_handoff` с результатом.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 test('handoff waits for the running browser call and never aborts it', async () => {
@@ -329,13 +329,13 @@ test('an operation without a browser receipt is not handed off', async () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail** (`--test test/browser-recovery-executor.test.mjs`; Expected: FAIL — метода нет)
+- [x] **Step 2: Run tests to verify they fail** (`--test test/browser-recovery-executor.test.mjs`; Expected: FAIL — метода нет)
 
-- [ ] **Step 3: Implement** `browserRecoveryHandoff` по описанию Interfaces.
+- [x] **Step 3: Implement** `browserRecoveryHandoff` по описанию Interfaces.
 
-- [ ] **Step 4: Run tests to verify they pass** (Expected: PASS)
+- [x] **Step 4: Run tests to verify they pass** (Expected: PASS)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/loginom-runtime/client
