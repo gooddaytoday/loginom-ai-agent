@@ -22,6 +22,8 @@ VPN/local429 квалификация дала ровно1 запрос и за�
 `openai/gpt-6-luna/high`, cache SHA256
 `59bcb39e34656fe40d3007de30361919dcbaff738a342f1f30f763e8cf4617bc`.
 Доказательства закрытых отказов — [единый архив](../../archive/2026-10-16-evals-parallel-history.md).
+Wrapper e149811 допускает разницу только корневых model defaults; правила
+сравнения TOML и защиты home — контракт п.26. Копировать меняющиеся defaults не нужно.
 Карантин4fb завершён по разрешению, log/DB сохранены в закрытом history;
 ancestry gone-PID fix прошёл unit checks/typecheck/review. Текущее состояние —
 в [блокерах](../../../eval_parallel_blockers.md).
