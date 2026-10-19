@@ -3420,7 +3420,7 @@ function readRenderedInputMapping(observation) {
       const moved=effectPossible&&scroll?.scroll&&trace.find(t=>t.event==='ui_scroll_applied'
         &&t.owner_ref===scroll.scroll.ref&&t.from===scroll.scroll.top
         &&t.to===Math.max(0,Math.min(scroll.scroll.max_top,t.from+task.action.delta_y)));
-      const storageScroll=moved&&observed.ui_read_failure.scan_stage==='controls'
+      const storageScroll=moved&&['controls','data_views'].includes(observed.ui_read_failure.scan_stage)
         &&before.file_storage?.status==='observed'&&typeof before.active_tab_ref==='string'
         &&before.observation_root?.identity?.anchor_tid===before.workflow_ref.prefix+';FileStorageForm;pnlFileStorage;tbl'
         &&scroll.tid?.startsWith(before.workflow_ref.prefix+';FileStorageForm;colName_');

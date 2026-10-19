@@ -925,7 +925,7 @@ test('storage filename code tokens are data, not editor identity: native-input-p
   }
 });
 
-for(const fault of ['transient','persistent','before','work','elements','traversal','other_stage','directory','owner','position','expired'])test('file-list scroll retries only its timed controls read without replay: '+fault,async()=>{
+for(const stage of ['controls','data_views'])for(const fault of ['transient','persistent','before','work','elements','traversal','other_stage','directory','owner','position','expired'])test('file-list scroll retries only its timed '+stage+' read without replay: '+fault,async()=>{
  const {page,table,cell}=scriptNamedStorageFixture('anchor.csv'),clock=fixtureClock();page.context.Date=clock.Date;
  page.context.innerWidth=1000;page.context.innerHeight=800;page.waitForTimeout=async()=>{};
  Object.assign(table,{scrollTop:0,scrollHeight:2400,clientHeight:400});table.style.overflowY='auto';
@@ -944,7 +944,7 @@ for(const fault of ['transient','persistent','before','work','elements','travers
   if(arg&&Object.hasOwn(arg,'discoverRoots')){
    if((fault==='before'&&table.scrollTop===0)||(table.scrollTop===1000&&(failures===0||fault==='persistent'))){
     failures++;if(fault==='expired')clock.advance(16000);
-    return {ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:['work','elements','traversal'].includes(fault)?fault:'time',scan_stage:fault==='other_stage'?'collect':'controls'}};
+    return {ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:['work','elements','traversal'].includes(fault)?fault:'time',scan_stage:fault==='other_stage'?'collect':stage}};
    }
    if(failures){if(fault==='directory')folder.ownText='foreign';if(fault==='owner')table.style.overflowY='hidden';if(fault==='position')table.scrollTop=999;}
   }
