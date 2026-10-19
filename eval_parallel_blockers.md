@@ -39,4 +39,29 @@ server/profile A; исходный failed admin receipt сохранён с пр
 Никакие данные не удалялись, старые стенды/инциденты не затрагивались. Evidence:
 `/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/n1-quarantine-owner-release-20261019.json`.
 Исходная диагностика `evidence/n1-quarantine-diagnostics.json` сохранена.
-Следующий шаг — N=1; модельных вызовов и ресурсного замера пока нет.
+N=1 `20261019-063523-9d19375bf1-dirty-ZpDChg` остановлен на первом dispatch:
+`ProviderModelNotFoundError: openai/gpt-6-luna`, до исполнения модели/судьи.
+Встроенный каталог CLI устарел; актуальный публичный models.opencode.ai/api.json
+содержит точную модель и reasoning high. CLI менять не требуется: следующий шаг —
+штатный `models openai --refresh` под server/profile locks, затем закрепить каталог
+для N=1/N=2. Короткий сбор ресурсов завершён с PASS, но не заменяет замер трёх задач.
+
+Текущий карантин: server/profile A команды
+`14c5b7c6-2437-496f-b4a1-f5b14be70bc0`. Cleanup слота и admin подтверждён,
+архив истории сохранён, judge hold released. Повторные прямые проверки:
+13 прежних процессов отсутствуют (две пробы PID+starttime), профиль чист/idle,
+сессий A/файлов/FD нет, SessionBackup пуст, identity/Pool подтверждены.
+Брони не сняты, данные не удалялись. Evidence:
+`/home/kiselev/.local/state/loginom-evals/acceptance-20261016/evidence/n1-model-quarantine-diagnostics-20261019.json`.
+Автоматический startup всё ещё проверяет исторический failed admin c21;
+фильтр только по producer PID небезопасен для startup-admin нового процесса
+(независимое ревью). Независимое ревью подтвердило простой путь без изменения кода: с явного разрешения
+владельца переместить только уже урегулированный `controller/admin-5w8Hht` в
+`evidence/settled-admin-c21be2f8-5w8Hht`, сохранив все байты/хеши и соответствие
+путей в relocation note. Внешние ссылки только в двух прежних owner-release proofs;
+admission проверяет сами proofs/хеши и не разыменовывает originalAdminReceipt.
+Действующими admin-proof перемещённые записи больше не являются. A00yuH и другие
+incidents не затрагиваются. Затем существующий startup штатно разбирает текущий14c5
+с confirmed admin/slot cleanup; refresh каталога и повтор N=1. Это исключение из
+запрета трогать старые incidents до N=2 требует решения владельца. Без разрешения
+не перемещать/не снимать текущие брони и не продолжать работу.
