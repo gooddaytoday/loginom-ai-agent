@@ -192,6 +192,15 @@ export class ImportColumnBindingError extends Error {
   }
 }
 
+// Only a complete, owned native definition may produce this binding refusal.
+export class ImportColumnCountError extends ImportColumnBindingError {
+  constructor(requestedCount,observed) {
+    super(null,[],observed);
+    this.name='ImportColumnCountError';
+    this.message='Import definition count differs: requested '+requestedCount+', observed '+observed.length;
+  }
+}
+
 function resolveImportSourceColumns(requested,observed) {
   const bound=requested.map(column=>{
     const key=column.source_name??column.name;
@@ -438,8 +447,10 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
     parameters.columns=reconcileImportColumnPatch(columnBaseline.fields,parsedSchema.fields,parameters.columns,{schemaChangeRequested:
       Object.keys(parameters.source).length>0||Object.keys(parameters.format).length>0});
   } else if(fieldsOnly) {
-    const parsed=await readImportDefinitionPages(channel,{expectedCount:parameters.columns.length,
+    const parsed=await readImportDefinitionPages(channel,{
       ready:state=>same(identity(state.wizard?.owner_context),identity(currentOwner))});
+    if(parsed.total_columns!==parameters.columns.length)
+      throw new ImportColumnCountError(parameters.columns.length,parsed.fields);
     parsedColumns=parsed.fields;
     parameters.columns=bindImportSourceColumns(parameters.columns,parsed.fields);
   }
