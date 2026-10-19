@@ -5,6 +5,7 @@ import {fixture,request,stop} from './support/stopped-node-fixture.mjs';
 import {proved} from './support/stopped-node-fixture.mjs';
 import {browserRecoveryStepKey} from '../lib/browser-recovery-basis.mjs';
 import {actions,Page,runtime} from './support/executor-fixture.mjs';
+import {compactNodeResult} from '../lib/user-results.mjs';
 
 const full={remaining:()=>({calls_remaining:30,ms_remaining:600000})};
 const refuse=()=>{throw new NodeReleaseBlocked('A Loginom wizard of another node is open','Ask the user to close it with Cancel.');};
@@ -111,6 +112,22 @@ test('a successful release supersedes an earlier refusal on the same phase',asyn
   assert.equal(f.runtime.browserRecoveryBasis('apply').trigger,'T4');
 });
 
+test('a pending second node removes historical recovery offers from every reply',async()=>{
+  const f=fixture({release:proved(),browserRecovery:full});
+  await stop(f,'finish');
+  await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-1'});
+  await stop(f,'finish',{operationId:'again',target:{kind:'existing',type:'imports.text',
+    ref:{document_id:'doc',workflow_id:'wf',node_id:'new'}}});
+  assert.equal(f.runtime.browserRecoveryBasis('apply'),null);
+  const status=f.runtime.nodeApplyStatus('apply');
+  const waited=await f.runtime.waitNodeApply('apply',{timeoutMs:0});
+  const inspected=(await f.runtime.inspect({operationId:'apply'})).output;
+  assert.equal(status.outcome.output.browser_recovery,undefined);
+  assert.equal(waited.outcome.output.browser_recovery,undefined);
+  assert.equal(inspected.outcome.output.browser_recovery,undefined);
+  assert.notEqual(compactNodeResult(status).next_step?.tool,'dock_browser_recovery');
+});
+
 test('an exhausted step budget leaves an instruction without a tool',async()=>{
   const f=fixture({browserRecovery:{remaining:()=>({calls_remaining:0,ms_remaining:120000})}});
   await stop(f,'finish');
@@ -135,4 +152,31 @@ test('an ambiguous Save gains T4 only after inspect and keeps it for start',asyn
   assert.equal(inspected.next_step.effect,'save');
   assert.deepEqual(engine.browserRecoveryBasis('save').step,inspected.basis.step);
   assert.equal(calls,3);
+});
+
+test('Save loses its basis during a second reconcile and regains it after completion',async()=>{
+  const key='package.save_checkpoint',revision=actions.get(key).revision;
+  let calls=0,entered,finish;
+  const browserEntered=new Promise(resolve=>{entered=resolve;});
+  const engine=runtime(new Page(),{browserRecovery:full,getStorageBinding:()=>({document_id:'doc'}),
+    execute:async()=>{
+      const call=++calls;
+      if(call===4){entered();await new Promise(resolve=>{finish=resolve;});}
+      return {status:call===1?'NOT_APPLIED':'AMBIGUOUS',action_key:key,action_revision:revision,
+        operation_id:'save',phase:call===1?'prepared':'reconciled',effect_possible:call!==1,
+        cleanup_complete:true,error:null,trace:[],output:{},
+        ...(call===1?{checkpoint:{document_id:'doc',workflow_ref:{workflow_id:'wf'}}}:{})};
+    }});
+  await engine.run(key,{path:'/user/a.lgp',conflict_policy:'replace'},{operationId:'save'});
+  await engine.inspect({operationId:'save'});
+  assert.equal(engine.browserRecoveryBasis('save').trigger,'T4');
+  const inspecting=engine.inspect({operationId:'save'});
+  await browserEntered;
+  const during=engine.browserRecoveryBasis('save');
+  finish();
+  const after=await inspecting;
+  assert.equal(during,null);
+  assert.equal(after.output.browser_recovery.next_step.effect,'save');
+  assert.equal(engine.browserRecoveryBasis('save').trigger,'T4');
+  assert.equal(calls,4);
 });

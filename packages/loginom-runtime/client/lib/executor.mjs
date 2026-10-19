@@ -1616,6 +1616,23 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const basis=recoveryBasis(operation,allowRunning);
     return basis?{basis,next_step:browserRecoveryNextStep(basis,browserRecovery.remaining(browserRecoveryStepKey(basis.step)))}:null;
   };
+  const recoveryReply=(operation,outcome,allowRunning=false)=>{
+    if(!outcome)return outcome;
+    const reply=structuredClone(outcome);
+    if(!reply.output)return reply;
+    const previous=reply.output.browser_recovery;
+    delete reply.output.browser_recovery;
+    if(reply.output.outcome)reply.output.outcome=recoveryReply(operation,reply.output.outcome,allowRunning);
+    if(reply.output.original_outcome)reply.output.original_outcome=recoveryReply(operation,reply.output.original_outcome,allowRunning);
+    if(!['node.apply','operation.inspect'].includes(reply.action_key)
+      &&!(reply.action_key==='operation.recover'&&!reply.output.original_outcome))return reply;
+    const offer=recoveryOffer(operation,allowRunning);
+    if(!offer)return reply;
+    if(previous?.basis?.trigger===offer.basis.trigger&&previous.journal_error)offer.journal_error=previous.journal_error;
+    reply.output.browser_recovery=offer;
+    if(reply.action_key==='operation.recover')delete reply.output.user_action;
+    return reply;
+  };
   const recordRecoveryBasis=async(operation,allowRunning=false)=>{
     const offer=recoveryOffer(operation,allowRunning);
     if(!offer||operation.browserRecoveryLogged?.has(offer.basis.trigger))return;
@@ -1806,6 +1823,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   };
   const reconcilePending = async () => {
     const operation = pending;
+    if(['package.save_checkpoint','package.save_as'].includes(operation.action.action_key))operation.browserRecoveryReconciled=null;
     if(operation.action.capability==='node.apply')return inspectApply(operation);
     if(operation.action.capability==='node.target.internal'){try{return await inspectTarget(operation);}catch(error){return failed(operation,'RECONCILIATION_FAILED',String(error.message));}}
     if (running && operation.action.capability === 'node.configure_text_import.v1') {
@@ -1882,8 +1900,6 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const result=await releaseNodeApply({operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,record:onRecord,signal});
         operation.releaseRefused=null;
         operation.outcome=nodeApplyOutcome(operation,result);operation.cleanupConfirmed=true;
-        const offer=recoveryOffer(operation,true);
-        if(offer)operation.outcome.output.browser_recovery=offer;
         await remember(operation,'operation_abandoned',operation.outcome);
         pending=null;nodeJobs.settle(operation.id,operation.outcome);
         returned={status:'SUCCEEDED',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'resolved',
@@ -1893,21 +1909,20 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         // The original operation keeps its gate. A blocker the user can clear is
         // named explicitly instead of leaving an empty recovery list.
         if(error?.userAction)operation.releaseRefused={user_action:error.userAction,phase:operation.nodeApply?.pending?.phase};
-        const offer=recoveryOffer(operation,true);
         returned={status:'AMBIGUOUS',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'release_refused',
           effect_possible:true,trace:[],recovery_operation_id:recoveryOperationId,
           error:{code:'NODE_RELEASE_REFUSED',message:String(error?.message??error).slice(0,1000)},
-          output:{original_operation_pending:pending===operation,...(error?.userAction&&!offer?{user_action:error.userAction}:{}),
-            ...(offer?{browser_recovery:offer}:{})}};
+          output:{original_operation_pending:pending===operation,...(error?.userAction?{user_action:error.userAction}:{})}};
       }
+      const reply=recoveryReply(operation,returned,true);
       const journalError=await recordRecoveryBasis(operation,true);
       if(journalError){
-        const offered=returned.output.original_outcome?.output?.browser_recovery??returned.output.browser_recovery;
+        const offered=reply.output.original_outcome?.output?.browser_recovery??reply.output.browser_recovery;
         if(offered)offered.journal_error=journalError;
       }
       await remember(record,'recovery_completed',returned);
-      auxiliary.set(recoveryOperationId,{signature,outcome:structuredClone(returned)});
-      return structuredClone(returned);
+      auxiliary.set(recoveryOperationId,{signature,outcome:structuredClone(reply)});
+      return reply;
     }finally{running=false;}
   };
   const recoveryAdvice = operation => {
@@ -1984,13 +1999,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       provides: ['gesture_receipt', 'reconciliation'] });
     return { recovery_options: strategies, next_steps: base };
   };
-  const view = (operation, outcome) => ({ status: 'SUCCEEDED', action_key: 'operation.inspect', action_revision: '1',
+  const view = (operation, outcome) => recoveryReply(operation,{ status: 'SUCCEEDED', action_key: 'operation.inspect', action_revision: '1',
     operation_id: operation?.id, phase: 'observed', effect_possible: false, error: null, trace: [], output: {
       operation_id: operation?.id ?? null, state: !operation ? 'idle' : pending === operation ? 'pending' : 'resolved',
       outcome: outcome ?? operation?.outcome ?? null, cleanup_confirmed: operation ? operation.cleanupConfirmed === true : true,
       effect_state: !operation ? 'none' : operation.transportUncertain ? 'unknown' : pending === operation ? 'partial_or_unverified'
         : operation.outcome?.resolution ? 'observed_unverified' : 'verified',
-      ...recoveryAdvice(operation),...(operation&&recoveryOffer(operation)?{browser_recovery:recoveryOffer(operation)}:{}),
+      ...recoveryAdvice(operation),
     } });
   const retainObservation = outcome => {
     try { return observations.retain(outcome); }
@@ -2014,7 +2029,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }
     const outcome=await reconcilePending();
     if(['package.save_checkpoint','package.save_as'].includes(operation.action.action_key)
-      &&operation.outcome?.status==='AMBIGUOUS')operation.browserRecoveryReconciled=operation.outcome;
+      &&outcome===operation.outcome&&outcome.status==='AMBIGUOUS')operation.browserRecoveryReconciled=outcome;
     const journalError=await recordRecoveryBasis(operation);
     const result=view(operation,outcome);
     if(journalError&&result.output.browser_recovery)result.output.browser_recovery.journal_error=journalError;
@@ -2116,19 +2131,17 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     },
     nodeApplyStatus:id=>{
       const result=sourceReads.has(id)?sourceReads.status(id):nodeJobs.status(id);
-      const offer=recoveryOffer(operations.get(id));
-      if(offer&&result?.outcome?.output)result.outcome.output.browser_recovery=offer;
+      result.outcome=recoveryReply(operations.get(id),result.outcome);
       return result;
     },
     browserRecoveryBasis:id=>recoveryBasis(operations.get(id)),
     waitNodeApply:async(id,options)=>{
       const result=await (sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options));
       const operation=operations.get(id);
-      const offer=recoveryOffer(operation);
-      if(offer&&result?.outcome?.output){
-        result.outcome.output.browser_recovery=offer;
+      result.outcome=recoveryReply(operation,result.outcome);
+      if(result.outcome?.output?.browser_recovery){
         const journalError=await recordRecoveryBasis(operation);
-        if(journalError)offer.journal_error=journalError;
+        if(journalError)result.outcome.output.browser_recovery.journal_error=journalError;
       }
       return result;
     },
@@ -2177,7 +2190,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (auxiliary.has(recoveryOperationId)) {
         const previous = auxiliary.get(recoveryOperationId);
         if (previous.signature !== signature) throw new Error('Recovery operation ID was already used with different parameters');
-        return structuredClone(previous.outcome);
+        return recoveryReply(operations.get(operationId),previous.outcome);
       }
       if (operations.has(recoveryOperationId)) throw new Error('Recovery ID conflicts with an existing operation');
       const operation = operations.get(operationId);
@@ -2719,11 +2732,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)pending=null;
         completedOutcome=structuredClone(operation.outcome);
       }finally{running=false;}
-      const offer=recoveryOffer(operation);
-      if(offer){
-        completedOutcome.output.browser_recovery=offer;
+      completedOutcome=recoveryReply(operation,completedOutcome);
+      if(completedOutcome.output?.browser_recovery){
         const journalError=await recordRecoveryBasis(operation);
-        if(journalError)offer.journal_error=journalError;
+        if(journalError)completedOutcome.output.browser_recovery.journal_error=journalError;
       }
       return completedOutcome;
     },
