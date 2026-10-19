@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
 import { chmod, mkdir, mkdtemp, readdir, rm, stat, symlink } from "node:fs/promises"
-import { cleanupSlotStorage, requireServerFilesClosed } from "../src/slot-storage"
+import { cleanupSlotStorage, readDeliveredStorage, requireServerFilesClosed } from "../src/slot-storage"
 import { acquireEnvironmentLeases } from "../src/slots"
 import { writeLeaseReceipt } from "../src/lease"
 import { parallelFixture } from "./helpers/parallel-fixture"
@@ -72,7 +72,7 @@ test("own-root deletion validates every namespace before changing any file and p
   const before = await stat(root)
   const identity = `${before.dev} ${before.ino} ${before.uid} ${before.gid}`
   const check = async (expected = identity, prefixes = ["eval-own-run"]) => {
-    const child = Bun.spawn(["sh", script, root, expected, ...prefixes], { env: { PATH: "/usr/bin:/bin" }, stdout: "pipe", stderr: "pipe" })
+    const child = Bun.spawn(["sh", script, root, expected, String(prefixes.length), ...prefixes], { env: { PATH: "/usr/bin:/bin" }, stdout: "pipe", stderr: "pipe" })
     return (await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]))[0]
   }
   try {
@@ -88,5 +88,88 @@ test("own-root deletion validates every namespace before changing any file and p
     expect(await check()).toBe(0)
     expect(await readdir(root)).toEqual([])
     expect((await stat(root)).ino).toBe(before.ino)
+  } finally { await rm(root, { recursive: true }) }
+})
+
+test("own-root deletion accepts a delivered input only by its exact name, size and hash", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-delivered-delete-"))
+  const script = path.resolve(import.meta.dir, "../fixtures/cleanup-slot-storage.sh")
+  const before = await stat(root), content = "Amount\n10\n20\n", name = "a".repeat(64) + "-0-amounts.csv"
+  const hash = new Bun.CryptoHasher("sha256").update(content).digest("hex")
+  try {
+    await Bun.write(path.join(root, "eval-own-run.lgp"), "package")
+    await Bun.write(path.join(root, name), content)
+    const child = Bun.spawn(["sh", script, root, `${before.dev} ${before.ino} ${before.uid} ${before.gid}`,
+      "1", "eval-own-run", hash, String(Buffer.byteLength(content)), name], { stdout: "pipe", stderr: "pipe" })
+    expect((await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]))[0]).toBe(0)
+    expect(await readdir(root)).toEqual([])
+    expect((await stat(root)).ino).toBe(before.ino)
+  } finally { await rm(root, { recursive: true }) }
+})
+
+test("delivered storage comes from a successful final tool receipt in the slot username", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-delivery-receipt-"))
+  const output = { result_version: "user-v1", state: "settled", status: "SUCCEEDED", cleanup_complete: true,
+    output: { status: "SUCCEEDED", destination: "/eval-a/input.csv", bytes: 13, sha256: "a".repeat(64),
+      upload_completion_verified: true, cleanup_complete: true } }
+  try {
+    await Bun.write(path.join(root, "events.jsonl"), JSON.stringify({ type: "tool_use", part: { type: "tool",
+      tool: "loginom_dock_artifact_deliver", state: { status: "completed", output: JSON.stringify(output) } } }) + "\n")
+    expect(await readDeliveredStorage([root], "eval-a")).toEqual([{ name: "input.csv", bytes: 13, sha256: "a".repeat(64) }])
+    expect(await readDeliveredStorage([root], "eval-b")).toEqual([])
+  } finally { await rm(root, { recursive: true }) }
+})
+
+test("unreceipted or changed uploads preserve every child before deletion", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-delivery-delete-refusal-"))
+  const script = path.resolve(import.meta.dir, "../fixtures/cleanup-slot-storage.sh")
+  const before = await stat(root), content = "Amount\n10\n20\n", hash = new Bun.CryptoHasher("sha256").update(content).digest("hex")
+  const check = async (claims: string[]) => {
+    const child = Bun.spawn(["sh", script, root, `${before.dev} ${before.ino} ${before.uid} ${before.gid}`,
+      "1", "eval-own-run", ...claims], { stdout: "pipe", stderr: "pipe" })
+    return (await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]))[0]
+  }
+  try {
+    await Bun.write(path.join(root, "eval-own-run.lgp"), "package")
+    await Bun.write(path.join(root, "input.csv"), content)
+    for (const claims of [[], ["b".repeat(64), "13", "input.csv"], [hash, "14", "input.csv"], [hash, "13", "../input.csv"]]) {
+      expect(await check(claims)).not.toBe(0)
+      expect(await Bun.file(path.join(root, "eval-own-run.lgp")).text()).toBe("package")
+      expect(await Bun.file(path.join(root, "input.csv")).text()).toBe(content)
+    }
+    await Bun.write(path.join(root, "foreign-canary"), "keep")
+    expect(await check([hash, "13", "input.csv"])).not.toBe(0)
+    expect(await Bun.file(path.join(root, "input.csv")).text()).toBe(content)
+    expect(await Bun.file(path.join(root, "eval-own-run.lgp")).text()).toBe("package")
+    expect(await Bun.file(path.join(root, "foreign-canary")).text()).toBe("keep")
+    await rm(path.join(root, "foreign-canary"))
+    await rm(path.join(root, "input.csv"))
+    await symlink(path.join(root, "eval-own-run.lgp"), path.join(root, "input.csv"))
+    expect(await check([hash, "13", "input.csv"])).not.toBe(0)
+    expect(await Bun.file(path.join(root, "eval-own-run.lgp")).text()).toBe("package")
+  } finally { await rm(root, { recursive: true }) }
+})
+
+test("delivery cleanup does not claim incomplete, failed, unrelated or escaping receipts", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-delivery-invalid-"))
+  const receipt = { state: "settled", status: "SUCCEEDED", cleanup_complete: true,
+    output: { status: "SUCCEEDED", destination: "/eval-a/input.csv", bytes: 13, sha256: "a".repeat(64),
+      upload_completion_verified: true, cleanup_complete: true } }
+  const event = (output: unknown, tool = "loginom_dock_artifact_deliver", status = "completed") => ({
+    type: "tool_use", part: { tool, state: { status, output: JSON.stringify(output) } },
+  })
+  try {
+    for (const invalid of [event({ ...receipt, state: "running" }), event({ ...receipt, status: "FAILED" }),
+      event({ ...receipt, output: { ...receipt.output, upload_completion_verified: false } }),
+      event({ ...receipt, output: { ...receipt.output, destination: "/eval-a/../eval-b/input.csv" } }),
+      event({ ...receipt, output: { ...receipt.output, bytes: -1 } }),
+      event({ ...receipt, output: { ...receipt.output, sha256: "bad" } }), event(receipt, "read"),
+      event(receipt, "loginom_dock_artifact_deliver", "error")]) {
+      await Bun.write(path.join(root, "events.jsonl"), JSON.stringify(invalid) + "\n")
+      expect(await readDeliveredStorage([root], "eval-a")).toEqual([])
+    }
+    expect(await readDeliveredStorage([path.join(root, "missing")], "eval-a")).toEqual([])
+    await Bun.write(path.join(root, "events.jsonl"), "{truncated")
+    await expect(readDeliveredStorage([root], "eval-a")).rejects.toThrow()
   } finally { await rm(root, { recursive: true }) }
 })
