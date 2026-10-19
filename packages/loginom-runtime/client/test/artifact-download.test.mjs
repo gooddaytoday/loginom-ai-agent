@@ -185,12 +185,13 @@ function nativeRevealEpochFixture(mode='once') {
   let revision=0,checks=0,resolveEvent;
   const elements=f.page.elements.bind(f.page);
   f.page.elements=()=>elements().map(e=>e.kind==='file'?{...e,box:{x:30,y:825-f.owner.scrollTop,width:100,height:25}}:e);
-  if(mode==='visible')f.owner.scrollTop=50;
+  if(mode==='visible'||mode==='visible_no_scroll')f.owner.scrollTop=50;
   f.page.directory='/test-2';
   f.page.uiSnapshot=()=>{
     const s=snapshot(),file=s.ui.elements.find(e=>e.ref===f.options.file_ref);
     s.dom_epoch.revision=revision;s.scan={mutation_counts:{other_style:revision}};
     file.storage_entry={kind:'file',bytes:revision&&mode==='size_changed'?4:3};
+    if(mode==='visible_no_scroll')file.scroll=null;
     if(revision) {
       if(mode==='owner_changed')file.scroll.ref='different-owner';
       if(mode==='scroll_changed')file.scroll.top++;
@@ -238,6 +239,27 @@ test('native epoch refresh never redirects the revealed file or repeats an appli
     assert.equal(f.calls.filter(c=>c==='reveal').length,1,mode);assert.equal(f.calls.filter(c=>c==='listen').length,1,mode);
     assert.equal(f.calls.filter(c=>c==='click').length,mode==='applied_failure'?1:0,mode);
     assert.equal(f.checks(),mode==='persistent'?3:mode==='applied_failure'?2:1,mode);
+  }
+});
+
+test('epoch refusal reports the rejected reobservation guard without changing its decision',async()=>{
+  const cases={owner_changed:['scroll'],scroll_changed:['scroll'],identity_changed:['identity'],signature_changed:['signature'],
+    size_changed:['bytes'],document_changed:['context'],context_changed:['context'],blocked:['context'],
+    event_arrived:['event_pending'],persistent:['attempt_available'],visible_no_scroll:['owner']};
+  for(const [mode,failed] of Object.entries(cases)) {
+    const f=nativeRevealEpochFixture(mode),result=await f.run();
+    const refusal=result.trace.find(e=>e.event==='download_epoch_refresh_refused');
+    assert.ok(refusal,mode);assert.equal(refusal.stage,['event_arrived','persistent'].includes(mode)?'eligibility':'observation',mode);
+    for(const key of failed)assert.equal(refusal.checks[key],false,mode+':'+key);
+    assert.ok(Object.values(refusal.checks).every(v=>typeof v==='boolean'),mode);
+    assert.equal(result.error.code,'DOWNLOAD_GESTURE_NOT_CONFIRMED',mode);
+    assert.equal(f.calls.filter(c=>c==='click').length,0,mode);assert.equal(f.calls.filter(c=>c==='listen').length,1,mode);
+    if(mode==='visible_no_scroll') {
+      // LAB-109:3048's public failure alone cannot distinguish this guard
+      // from identity/signature/context changes; preserve the missing evidence.
+      assert.equal(result.status,'NOT_APPLIED');assert.equal(result.effect_possible,false);assert.equal(result.cleanup_complete,true);
+      assert.deepEqual(Object.entries(refusal.checks).filter(([,value])=>!value).map(([key])=>key),['owner']);
+    }
   }
 });
 
