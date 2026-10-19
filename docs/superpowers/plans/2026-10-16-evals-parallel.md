@@ -269,6 +269,14 @@ private config/budget/results вне Git; операторские команд�
   Перед dispatch2026-10-19 доступно17GiB при исходном minimum8GiB; private N=1
   budget/conditions записаны, judge login status0/loggedIn/closed unit под home lock.
   Эти исходные границы не являются утверждением бюджета N=2.
+- [x] Разобрать первый dispatch N=1: встроенный каталог CLI не содержит
+  openai/gpt-6-luna; актуальный публичный каталог содержит точную модель/high.
+  Cleanup слота/admin и ресурсы confirmed/PASS; это не замер трёх задач.
+- [ ] После разрешения переместить только урегулированный admin c21 в private
+  evidence выполнить штатный startup14c5 и обновить models cache под locks;
+  проверить точную модель/high без model calls и закрепить каталог.
+  Startup не менять: независимое ревью отклонило небезопасный PID-фильтр;
+  [текущий блокер/прямые проверки](../../../eval_parallel_blockers.md).
 - [ ] Реальный N=1 с агентом/судьёй на трёх задачах; по замеру предложить числовые
   пороги CPU/RAM/диска и **дождаться утверждения владельца до N=2**.
 - [ ] Записать утверждённый бюджет до реального N=2, выполнить run на тех же tasks/
@@ -330,4 +338,4 @@ private config/budget/results вне Git; операторские команд�
 17. Read-only user policy/research gate:32/131 unit PASS10.82s +typecheck/diff.
 18. Child env allowlist:10/33 targeted PASS +typecheck; старый proc-denial assertion обновлён без повторного запуска.
 19. Guards4/29; prepare/leases68/264; verifyProfile1/5; sampler/memory3/11 unit PASS +typecheck/diff; native ещё не проверен.
-20. Native A/B4/4 PASS; CLIc8 retry+sharedOAuth/judge429 qualified; по разрешению владельца c21be2f8… server/profile holds сняты через CAS после прямых проверок; failed receipt сохранён, далее N=1.
+20. c21 holds released; N=1 отказал из-за старого models cache.14c5 cleanup/direct checks confirmed; запрошен move только settled admin c21 в private evidence, затем штатный startup/models refresh и повтор N=1.
