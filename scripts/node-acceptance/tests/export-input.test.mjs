@@ -109,12 +109,13 @@ test('cold observes both destinations through cancelled owned wizards without ex
  const owner=id=>({document_id:'doc',workflow_id:'wf',node_id:id,verified:true,surface:'wizard'});
  const g=graph();g.workflow_ref={workflow_id:'wf'};g.nodes.push(node('old-export','exports.text',[]));
  for(const n of g.nodes)Object.assign(n.ref,{document_id:'doc',workflow_id:'wf'});
- for(const startParameters of [false,true])for(const includeInputFields of [false,true])for(const fault of [null,'foreign','missing','cleanup',...(includeInputFields?['mapping-owner','mapping-source','mapping-incomplete']:[])]){
+ for(const startParameters of [false,true])for(const includeInputFields of [false,true])for(const fault of includeInputFields?[null,'cleanup','mapping-owner','mapping-source','mapping-incomplete']:[null,'foreign','missing','cleanup']){
   const actions=[],channels=new Map();
   const channelFor=ref=>{
    let stage=null;const c={ref,setStage:s=>{stage=s},revealGraphNode:async()=>actions.push(['reveal',ref.node_id]),
+    openInputPort:async port=>{assert.equal(port,0);actions.push(['open-input',ref.node_id]);stage='input_mapping';},
     observe:async o=>{const s={prepared_node_context:{...owner(ref.node_id),surface:stage?'wizard':'graph'},wizard:stage?{status:'observed',stage,root_tid:'wizard'}:{status:'absent'},
-     active_identity:'Scenario',workflow_navigation:{status:'observed',path:[{label:'Scenario'}]},ui:{elements:['Next','Prev'].map(b=>({tid:'wizard;btn'+b,ref:b,allowed_actions:['wizard_step']}))},
+     active_identity:'Scenario',workflow_navigation:{status:'observed',path:[{label:'Scenario'}]},ui:{elements:[{tid:'wizard;btnNext',ref:'Next',allowed_actions:['wizard_step']}]},
      node_mapping:{verified:true,inventory_complete:fault!=='mapping-incomplete',source_identity_verified:true,settings_applied:false,mapping_wizard:'TuneDataSourceMappingWizard',
       node_context:{...owner(fault==='mapping-owner'?'other':ref.node_id),input_port:{port:0}},
       source_fields:[{name:'Code',type:'string',record_id:'source',field_id:'0'}],
@@ -131,9 +132,10 @@ test('cold observes both destinations through cancelled owned wizards without ex
    node_context:owner(fault==='foreign'?'other':b.node.node_id),values:{destination:{value:b.node.node_id==='export'?'/own/revenue-ru.csv':'/own/revenue.csv'}}});
   const result=observeExportDestinations({load,graph:g,channelFor,execute,includeInputFields});
   if(fault)await assert.rejects(result,/COLD_SOURCE/);
-  else assert.deepEqual(await result,[{node_id:'export',destination:'/own/revenue-ru.csv'},{node_id:'old-export',destination:'/own/revenue.csv'}]
-   .map(x=>({...x,...(includeInputFields?{input_fields:[{name:'Code',source_name:'Code',type:'string'}]}:{})})));
-  assert.equal(actions.filter(a=>a[0]==='open').length,actions.filter(a=>a[0]==='cancel').length);
-  assert.ok(actions.every(a=>['reveal','select','open','next','prev','cancel'].includes(a[0])));
+  else assert.deepEqual(await result,includeInputFields?['export','old-export'].map(node_id=>({node_id,input_fields:[{name:'Code',source_name:'Code',type:'string'}]}))
+   :[{node_id:'export',destination:'/own/revenue-ru.csv'},{node_id:'old-export',destination:'/own/revenue.csv'}]);
+  assert.equal(actions.filter(a=>['open','open-input'].includes(a[0])).length,actions.filter(a=>a[0]==='cancel').length);
+  assert.ok(actions.every(a=>['reveal','select','open','open-input','next','cancel'].includes(a[0])));
+  if(includeInputFields)assert.ok(actions.every(a=>!['open','next'].includes(a[0])));
  }
 });

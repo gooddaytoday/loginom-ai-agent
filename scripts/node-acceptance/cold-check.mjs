@@ -149,7 +149,7 @@ try {
   if(exportInput){
    const [savedExport]=await observeExportDestinations({load,channelFor,execute,includeInputFields:true,
     graph:{...graph,nodes:graph.nodes.filter(n=>n.ref.node_id===exportInput.export_node_id)}});
-   if(destination!==undefined&&savedExport.destination!==destination)throw Error('COLD_EXPORT_DESTINATION_CHANGED');
+   if(savedExport.node_id!==exportInput.export_node_id)throw Error('COLD_EXPORT_INPUT_MAPPING_CHANGED');
    exportInput.input_fields=savedExport.input_fields;
    await record({phase:'cold_export_input_mapping',...savedExport,settings_applied:false});
   }

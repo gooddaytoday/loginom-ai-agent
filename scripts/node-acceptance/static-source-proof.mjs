@@ -213,13 +213,10 @@ export async function observeExportDestinations({load,graph,channelFor,execute,i
    ready:s=>s.prepared_node_context?.surface==='graph'&&s.workflow_navigation?.status==='observed'
     &&s.active_identity===s.workflow_navigation.path.at(-1)?.label});
   try{
-   await openPreparedWizard(channel);
+   if(includeInputFields)await channel.openInputPort(0);else await openPreparedWizard(channel);
    let s=await channel.observe({condition:'cold saved export destination page',ready:s=>['input_mapping','text_export_params'].includes(s.wizard?.stage)});
    let input_fields;
    if(includeInputFields){
-    if(s.wizard.stage==='text_export_params')await channel.perform({condition:'cold readonly export input page',initialObservation:s,
-     ready:s=>s.wizard?.stage==='text_export_params',identity:()=>target.ref,
-     resolve:s=>({verb:'wizard_step',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnPrev'&&e.allowed_actions.includes('wizard_step')),'export Previous').ref,expected_stage:'input_mapping'})});
     s=await channel.observe({condition:'cold saved export input mapping',readMappings:true,
      ready:s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified===true});
     const m=s.node_mapping;
@@ -231,6 +228,8 @@ export async function observeExportDestinations({load,graph,channelFor,execute,i
       &&m.source_fields.filter(source=>['record_id','field_id','name','type'].every(k=>source[k]===f.source[k])).length===1)
      &&new Set(m.target_fields.map(f=>f.source.name)).size===m.source_fields.length,'export input mapping unavailable');
     input_fields=m.target_fields.map(f=>({name:f.name,source_name:f.source.name,type:f.type}));
+    destinations.push({node_id:target.ref.node_id,input_fields});
+    continue;
    }
    if(s.wizard.stage==='input_mapping')await channel.perform({condition:'cold readonly export parameters page',initialObservation:s,
     ready:s=>s.wizard?.stage==='input_mapping',identity:()=>target.ref,
