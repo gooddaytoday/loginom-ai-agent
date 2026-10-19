@@ -128,7 +128,7 @@ export async function runPreparedSlots(config: EvalConfig) {
           const cleanup = await cleanupSlotStorage(file, environment.server, context.lease, admin!, processes, [`eval-${runId}-${job.taskId}-${job.attempt}`], [out])
           await writeSlotCleanup(context, cleanup)
           result.environment_cleanup = { status: "confirmed", evidence: "cleanup.json", error: null }
-          await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ processes, ...cleanup, slotId, serverEpoch: identity.serverEpoch,
+          await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ processes, ...cleanup, slotId, profileDir: context.lease.slot.profileDir, serverEpoch: identity.serverEpoch,
             serverSessions: "confirmed", storageDeletionAllowed: true, nextAdmissionAllowed: true }, null, 2))
         } catch (error) {
           context.confirmed = false
