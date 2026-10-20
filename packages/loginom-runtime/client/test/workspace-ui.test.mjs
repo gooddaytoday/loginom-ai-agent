@@ -3361,8 +3361,9 @@ function calculatorOutputMetadataFixture(name='Token') {
     cell.attrs['data-tid']=cell.attrs['data-tid'].replace(/Field0$/,name);
     if(cell.ownText==='Field0')cell.ownText=name;
   }
-  // Only name/label are under review. A source value must remain redacted.
-  row.children[2].ownText='PRIVATE_DATA_VALUE';
+  // Source is definition metadata; actual dataset cells remain outside it.
+  row.children[2].ownText='Items';
+  page.add('td','MF;TF-1;ViewsForm;BrowseView;grdData;grd-1;tbl;col_Token','PRIVATE_DATA_VALUE');
   const port={direction:'output',port:0,native_index:0,port_guid:'output-guid',
     opening_operation_id:'calculator:output',node_icon_class:'bg-vendor-icon-calcdata'};
   const binding={node:{node_id:'calculator-guid'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
@@ -3372,18 +3373,20 @@ function calculatorOutputMetadataFixture(name='Token') {
   return {page,...c,row,port,binding,read};
 }
 
-test('Calculator output definition exposes the owned Token name/label pair without exposing other row values',async()=>{
+test('Calculator output definition completes Token metadata without exposing dataset values',async()=>{
   for(const name of ['OrdinaryName','Token']) {
-    const f=calculatorOutputMetadataFixture(name),result=await f.read();
+    const f=calculatorOutputMetadataFixture(name),result=await f.read({output_column_page:{offset:0,limit:8}});
     assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
     const columns=result.output.wizard.output_columns;
+    assert.equal(columns.page.status,'complete_definition_page',name);
     assert.equal(columns.fields[0]?.name,name);
     assert.equal(columns.fields[0]?.label,name);
     assert.equal(columns.settings_applied,false);assert.equal(columns.complete,false);
-    if(name==='Token') {
-      assert.equal(columns.fields[0].source.status,'unobserved');
-      assert.ok(!JSON.stringify(result).includes('PRIVATE_DATA_VALUE'));
-    }
+    assert.equal(columns.fields[0].data_kind,'Непрерывный');
+    assert.equal(columns.fields[0].usage,'Не задано');
+    assert.equal(columns.fields[0].source.status,'rendered_source');
+    assert.equal(columns.fields[0].source.label,'Items');
+    assert.ok(!JSON.stringify(result).includes('PRIVATE_DATA_VALUE'));
     assert.deepEqual(f.page.events,[]);
   }
 });
@@ -3419,7 +3422,32 @@ test('Calculator output metadata exception requires the native Calculator output
     assert.ok(!result.output.wizard.output_columns?.fields?.some(f=>f.name==='Token'),mode);
     assert.ok(!JSON.stringify(result).includes('PRIVATE_DATA_VALUE'),mode);
     assert.ok(!JSON.stringify(result).includes('PRIVATE_CHILD'),mode);
+    const paged=await f.read({...(mode==='unbound'?{prepared_node_context:undefined}:{}),output_column_page:{offset:0,limit:8}});
+    assert.notEqual(paged.output.wizard.output_columns?.page?.status,'complete_definition_page',mode);
     assert.deepEqual(f.page.events,[],mode);
+  }
+});
+
+test('Calculator output metadata retains secret and row identity guards for all three added definition cells',async()=>{
+  for(const index of [2,3,4])for(const mode of ['name','id','aria','autocomplete','child','editable','input','link','duplicate','foreign_row','wrong_tag','missing']) {
+    const f=calculatorOutputMetadataFixture(),cell=f.row.children[index];
+    cell.ownText='PRIVATE_EXCLUDED';
+    if(['name','id','aria','autocomplete'].includes(mode))cell.attrs[mode==='aria'?'aria-label':mode]='secret';
+    if(mode==='child')f.page.add('span','secret','PRIVATE_CHILD',undefined,cell);
+    if(mode==='editable')cell.attrs.contenteditable='true';
+    if(mode==='input')f.page.add('input',null,'',undefined,cell).attrs.type='password';
+    if(mode==='link')f.page.add('a',null,'',undefined,cell).attrs.href='https://outside.test';
+    if(mode==='duplicate')f.page.add('td',cell.attrs['data-tid'],'PRIVATE_EXCLUDED',cell.box,f.row);
+    if(mode==='foreign_row'){cell.remove();f.page.add('table',null,'',f.row.box,f.container).append(cell);}
+    if(mode==='wrong_tag')cell.tagName='INPUT';
+    if(mode==='missing')cell.remove();
+    const result=await f.read({output_column_page:{offset:0,limit:8}}),message=index+':'+mode;
+    assert.equal(result.status,'SUCCEEDED',message+JSON.stringify(result.error));
+    assert.notEqual(result.output.wizard.output_columns?.page?.status,'complete_definition_page',message);
+    assert.ok(!JSON.stringify(result).includes('PRIVATE_EXCLUDED'),message);
+    assert.ok(!JSON.stringify(result).includes('PRIVATE_CHILD'),message);
+    assert.ok(!JSON.stringify(result).includes('PRIVATE_DATA_VALUE'),message);
+    assert.deepEqual(f.page.events,[],message);
   }
 });
 

@@ -426,10 +426,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const sensitivePattern = /password|passwd|\bpwd\b|secret|token|credential|authorization|api[_ -]?key|private[_ -]?key|one[_ -]?time|\botp\b|парол|секрет|токен/i;
     const calculatorMetadataTid=memoRead(element=>{
       const tid=getTid(element)??'';
-      const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
+      const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_|colDataKind_|colDefaultUsageType_|colSourceDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
       if(!match || element.tagName!=='TD' || !sensitivePattern.test(tid))return tid;
       const output=match[2]==='ColumnsMappingEngineOutputPortWizard';
-      if(output ? !['colName_','colDisplayName_'].includes(match[3])
+      if(output ? !['colName_','colDisplayName_','colDataKind_','colDefaultUsageType_','colSourceDisplayName_'].includes(match[3])
         || definitionPrefix!==match[1] || preparedOutputPort?.direction!=='output'
         || preparedOutputPort.node_icon_class!=='bg-vendor-icon-calcdata'
         || preparedOutputPort.port!==0 || preparedOutputPort.native_index!==0
@@ -447,9 +447,15 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         || !grids[0].getAttribute('id') || row.getAttribute('data-boundview')!==grids[0].getAttribute('id')
         || names.length!==1 || labels.length!==1 || names[0].closest('table')!==row || labels[0].closest('table')!==row
         || names[0].tagName!=='TD' || labels[0].tagName!=='TD')return tid;
-      // Only the technical-name suffix of two owned definition cells is data.
+      const metadata=[names[0],labels[0]];
+      if(output)for(const key of ['colDataKind_','colDefaultUsageType_','colSourceDisplayName_']) {
+        const cells=tids.get(prefix+key+match[4])??[];
+        if(cells.length!==1 || cells[0].tagName!=='TD' || cells[0].closest('table')!==row)return tid;
+        metadata.push(cells[0]);
+      }
+      // Only technical-name suffixes of the owned definition cells are data.
       // Never exempt secret attributes, ancestors, editors or dataset values.
-      for(const cell of [names[0],labels[0]]) {
+      for(const cell of metadata) {
         const children=[...cell.querySelectorAll('*')];charge();
         if(children.length>16 || [cell,...children].some(child=>{
           charge();return child.isContentEditable || child.closest('[contenteditable="true"],a[href],.monaco-editor,.CodeMirror,.ace_editor')
