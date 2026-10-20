@@ -90,3 +90,16 @@ manifest,series1-audit.json,results,build/tests logs и eval_parallel_blockers.m
 пересборки CLI с writer fix; результаты серий не объединяются.
 Удержанные пары и их recovery/receipts сохраняются до отдельного решения.
 Окно остаётся07:28:25–15:28:25UTC; новые pins/gates обязательны.
+
+## Серия2: готовность
+
+CLI4593a1396bc780aafafebb56ce6d1a43ec31d320,treeb448862b4f7fcc049c0a68ac5f264c84e491a34d5a13094b413ff637c4f6a53e,
+prod, установлен отдельно и candidate verified. Новый Serverae288d3753ad,
+Studioebe9872b15e0,порт52067. Private root:
+`/home/kiselev/storage/tmp/analytic10-branch-r2-20261020-3zm1mmp9/`.
+Preparec29d7423,verify750de3b8,cold browser/model medium a/b,judge login и4liveA/B прошли.
+Перед dispatch:16.62GiB MemAvailable,2661GiB disk,241M inode,OAuth102ч,
+2чистых профиля/4освобождённых брони. Новые cleanup receipts имеют mode0600.
+Первичный PAIR_PORT_BUSY обнаружен до создания ресурсов; пустой журнал сохранён,
+создание повторено со свободным портом и отдельным controller-ready.
+Результат новой серии пока не получен; исходный восьмичасовой deadline15:28:25UTC сохранён.
