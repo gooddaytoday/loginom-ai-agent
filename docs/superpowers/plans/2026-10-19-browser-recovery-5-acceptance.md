@@ -201,6 +201,8 @@ git add docs/testing/loginom-ai-agent
 git commit -m "docs(testing): record packaged browser recovery acceptance"
 ```
 
+**Текущее выполнение Task3:** [уточнённый подплан](2026-10-20-browser-recovery-packaged.md), independent preflight review GO до build/install/live. На диске проверяется верхнеуровневое `session.json.browserRecovery`. Read-only поиск исходных кейсов нашёл только частичные LAB-91 IDs; четыре класса без ID, авторский investigations каталог отсутствует, указанные архивы требуют авторизацию (HTTP401). Модельные строки остаются BLOCKED до подтверждения кейсов; availability ещё не запускалась. S5/Task2 остаются отложенными/open.
+
 ### Task 4: Включение флага в release
 
 **Гейт до Step 1:** BR-S1–BR-S6 — PASS (план 3, Task 5; Task 2); host-тест BR-S7 зелёный (план 4, Task 1); матрица доступности — PASS (Task 3); строки естественных отказов — PASS или `BLOCKED` с ID прогонов (Task 3). Иначе остановиться.

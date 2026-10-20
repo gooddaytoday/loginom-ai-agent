@@ -133,3 +133,10 @@ Evidence run `42c9b70d-b313-4c5c-822f-b1ea3b66c574`: MCP09 execute fault×1/rema
 Harness exit1; единственный existing close: native BLOCKED/UNSAVED_CHANGES, package_closed/logged_out/unsaved_changes_discarded:false, last Save own-save-as. Managed ACKfalse, LOGINOM_RUNTIME_CLEANUP_FAILED, exit1/no signal; bridge_ack rejected. Read-only own-process snapshots до/после cleanup: все13 exact PID отсутствуют, PGID2580772/2580802 пусты в11:13:00Z; OS absence не доказывает logout. Дополнительных Save/Export/read/cleanup/kill не было, runtime source после результата не менялся.
 
 Ruling: минимальный существующий enum дал недостающий факт без capture bootstrap, readiness/retry или ослабления acceptance; цена — причина no_scroll_owner остаётся неустановленной. Исходный S5 остаётся FAIL/deferred, Task2 открыт, исторические UNKNOWN и принятый S6 неизменны. Raw evidence, exact commands, source/stage identity и self-review сохранены в ignored storage-reason task-1-report; independent review/checkpoint принадлежат root. Installed/models/merge/release не выполнялись. STOP.
+
+
+## S5: source/saved-data разбор после storage reason
+
+В NativeC сохранённые post-scroll snapshots615/617 содержат одинаковые65 строк/refs: после top1000→2000 все bounding boxes сдвинулись на−1000px, все65 строк стали outside_viewport, actionable anchors24→0. Это не потеря строк по лимиту240: table-root содержит66 элементов, scan complete, mutation counts/root прежние. Для snapshot617 hit-test также не причина отказа — outside_viewport определяется раньше. Почему native virtualizer не заменил видимое окно строк, эти данные не устанавливают; wrong owner, необходимость wheel или transient repaint не доказаны.
+
+Existing fixtures используют статические rectangles либо вручную заменяют строки; достоверного causal reproducer не получено. Новых live calls/production changes/wait/retry не было. S5 остаётся FAIL/deferred с исходными file/Save/native cleanup критериями; следующий независимый путь — [packaged Task3](../../../../superpowers/plans/2026-10-20-browser-recovery-packaged.md). NativeC cleanup и все исторические UNKNOWN остаются прежними.
