@@ -3424,15 +3424,34 @@ function readRenderedInputMapping(observation) {
         &&before.file_storage?.status==='observed'&&typeof before.active_tab_ref==='string'
         &&before.observation_root?.identity?.anchor_tid===before.workflow_ref.prefix+';FileStorageForm;pnlFileStorage;tbl'
         &&scroll.tid?.startsWith(before.workflow_ref.prefix+';FileStorageForm;colName_');
+      const grid=task.mode==='act'&&task.action?.verb==='right_click'
+        ?before?.ui.elements.find(e=>e.ref===task.action.ref):null;
+      const consoleMenu=observed.ui_read_failure.scan_stage==='data_views'&&nodeContext?.surface==='graph'
+        &&same(nodeContext,before?.prepared_node_context)&&effectPossible
+        &&trace.some(t=>t.event==='ui_gesture_applied'&&t.verb==='right_click')
+        &&!trace.some(t=>t.event==='ui_scan_read_retried')
+        &&['ConsoleForm','MF;ConsoleForm'].includes(before.observation_root?.identity?.anchor_tid)
+        &&grid?.tid===before.observation_root.identity.anchor_tid+';ProgressForm;trpProgress;grd;tbl'
+        &&grid.process_grid?.panel_ref===before.observation_root.ref&&typeof grid.process_grid.grid_id==='string'
+        &&same(grid.signature?.process_grid,grid.process_grid)
+        &&before.wizard?.status==='absent'&&!before.ui.dialogs.length&&!before.ui.masks.length;
       // A normal owned wizard can exceed 500 ms under contention, including
       // the read after a completed gesture. The same bounded read retry covers
-      // a confirmed file-list scroll; its exact owner/position is checked below.
+      // a confirmed file-list scroll or Console grid right-click; their exact
+      // owner/position or grid identity is checked below.
       // Never replay the gesture or extend the enclosing action deadline.
       if(code==='UI_SCAN_LIMIT'&&observed.ui_read_failure.limit_kind==='time'
         &&(nodeContext?.surface==='wizard'||nodeContext?.surface==='graph'&&effectPossible
-          &&['finish_wizard','execute_wizard'].includes(task.action?.verb)||storageScroll)&&!scanRetried) {
+          &&['finish_wizard','execute_wizard'].includes(task.action?.verb)||storageScroll||consoleMenu)&&!scanRetried) {
         timeout();record('ui_scan_read_retried',{attempt:1});
-        const fresh=await readUi(rediscover,true);
+        let fresh;
+        try {fresh=await readUi(rediscover,true);}
+        catch(error){
+          // A lost Console root cannot use the generic popup-close discovery
+          // path: this retry still owes proof of the original grid owner.
+          if(consoleMenu&&error?.code==='UI_ROOT_STALE')fail('UI_CONTEXT_CHANGED','Console root changed after its completed right-click');
+          throw error;
+        }
         if(storageScroll){
           timeout();
           if(!fresh.authenticated||fresh.origin!==before.origin||fresh.loginom_build!==before.loginom_build
@@ -3442,6 +3461,18 @@ function readRenderedInputMapping(observation) {
             ||fresh.file_storage.directory!==before.file_storage.directory||fresh.ui.dialogs.length||fresh.ui.masks.length
             ||!fresh.ui.elements.some(e=>e.scroll?.ref===moved.owner_ref&&e.scroll.top===moved.to&&e.scroll.max_top===scroll.scroll.max_top))
             fail('UI_SCROLL_NOT_CONFIRMED','File-list context or scroll owner changed after its completed scroll');
+        }
+        if(consoleMenu){
+          timeout();
+          const grids=fresh.ui.elements.filter(e=>e.ref===grid.ref);
+          if(!fresh.authenticated||fresh.origin!==before.origin||fresh.loginom_build!==before.loginom_build
+            ||fresh.dom_epoch.document!==before.dom_epoch.document||!same(fresh.workflow_ref,before.workflow_ref)
+            ||fresh.active_tab_ref!==before.active_tab_ref||!same(fresh.package_identity,before.package_identity)
+            ||!same(fresh.prepared_node_context,nodeContext)||!same(fresh.observation_root,before.observation_root)
+            ||fresh.wizard?.status!=='absent'||fresh.ui.dialogs.length||fresh.ui.masks.length
+            ||grids.length!==1||!same(grids[0].identity,grid.identity)||!same(grids[0].signature,grid.signature)
+            ||!same(grids[0].process_grid,grid.process_grid))
+            fail('UI_CONTEXT_CHANGED','Console grid or prepared context changed after its completed right-click');
         }
         return fresh;
       }
