@@ -79,9 +79,14 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   if(outcome?.status==='SUCCEEDED')limitations.push(...calculatorPrecisionWarnings(node));
   // Delivery jobs carry their byte-verified destination in outcome directly.
   if (!node && outcome) Object.assign(output, outcome);
+  const inactiveSorting=result.state==='settled'&&outcome?.status==='NOT_APPLIED'&&outcome.effect_possible===false
+    &&outcome.cleanup_complete===true&&outcome.error?.code==='NODE_APPLY_STOPPED'
+    &&outcome.error.message==='sorting preflight requires an active source output';
   const next=outcome?.next_step??node?.next_step??(outcome&&['FAILED','AMBIGUOUS','NOT_APPLIED'].includes(outcome.status)&&!result.upload_operation_id
     ?outcome.effect_possible===false&&outcome.cleanup_complete===true
-      ?{tool:'dock_node_apply',original_operation_id:result.operation_id,instruction:'Correct the request and submit with a NEW operation_id. No node mutation or browser recovery is required.'}
+      ?{tool:'dock_node_apply',original_operation_id:result.operation_id,instruction:inactiveSorting
+        ?'No sorting node was created. First execute/read the SAME upstream node referenced by the rejected inputs[].source and output. Use dock_node_read with a successful local source_operation_id from this preparation; if none exists, use dock_node_apply with its exact existing ref, original type/mode, inputs:[], an empty settings patch from its parameter_schema and finish:"execute". Wait for confirmed success and the needed output, then submit the original sorting request with a NEW operation_id. Do not recreate the source, guess its identity or automatically run REST/JavaScript/export side effects outside the user request. No browser recovery is required.'
+        :'Correct the request and submit with a NEW operation_id. No node mutation or browser recovery is required.'}
       :{tool:'dock_operation_inspect',arguments:{operation_id:result.operation_id},instruction:'Inspect the original operation; do not repeat an unresolved effect.'}
     :null);
   const reply={
