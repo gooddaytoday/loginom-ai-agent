@@ -1,6 +1,6 @@
 # Browser recovery: остальные source-сценарии
 
-Статус: подготовительный обычный Export и BR-S2 — PASS. BR-S4 — FAIL в проверке harness после completed; read/Save не достигнуты, native cleanup BLOCKED. BR-S5/S6 — NOT_RUN. Harness расширен для BR-S2/S4; перед повтором S4 нужна поправка ошибочного budget assertion. Это scripted source acceptance; установленный продукт и качество модели здесь не проверяются.
+Статус: подготовительный обычный Export, BR-S2 и новая попытка BR-S4 — PASS. Первый S4 FAIL и его native cleanup UNKNOWN сохранены ниже. BR-S5/S6 — NOT_RUN. Это scripted source acceptance; установленный продукт и качество модели здесь не проверяются.
 
 ## Обычный Export без fault — 20.10.2026
 
@@ -46,3 +46,16 @@ Evidence: `/home/george/.cache/loginom-ai-agent/browser-recovery-20261020-fixtur
 Existing close вызван один раз: package-cleanup BLOCKED/reason UNSAVED_CHANGES, package_closed:false/logged_out:false/unsaved_changes_discarded:false, последняя Save-квитанция own-save-as. Managed close request_error LOGINOM_RUNTIME_CLEANUP_FAILED, closed_ack:false, exit_code1/exit_signal:null. resource-close bridge_ack rejected. Все12 наблюдённых own PID отсутствуют и обе own PGID пусты; это не подтверждает native Close/logout. Ручного kill/повторной очистки не было. Сохранились три journal phases (fault/handoff/verified), dock_resumed отсутствует из-за раннего assert.
 
 При первом неожиданном FAIL работа остановлена; код и live запуск не повторялись. Для возобновления требуется root review и допуск минимальной поправки check. Неизвестная native очистка этой попытки остаётся отдельной записью; последующий PASS её не закроет. Исторические unknown также неизменны.
+
+
+## BR-S4 — 20.10.2026: новая попытка PASS
+
+После root review удалён только лишний post-completed assert29 и соответствующая фраза runbook; expected30 не добавлен. Pre-live source `3e3d6afeea6714299e14a2d525a700f354b000b2`, поправка двух файлов +1/−2. Syntax transpile, Desktop package-local pinned `bun typecheck` и diffcheck PASS. Stage origin/hash прежние; production/runtime не менялись. Один новый запуск, новая собственная SaveAs/fail-копия и текущие refs; старые копия/сеанс не открывались и не очищались.
+
+Evidence: `/home/george/.cache/loginom-ai-agent/browser-recovery-20261020-fixture-proof/evidence/b8b91582-0470-4425-ad1f-daa15d588d2a`; launcher `/home/george/.cache/loginom-ai-agent/browser-recovery-20261020-fixture-proof/br-s4-fix-launch-e54dd04c-da66-4929-9f14-c7741ed439b1`. Каталог0700, public receipts0600, stderr пуст, harness exit0/PASS.
+
+MCP01–05: own SaveAs/fresh prepare/Group Alpha35/Beta20. MCP07: execute fault×1/remaining0, calculator AMBIGUOUS. MCP09: обычный Dock release, T4/effect execution. MCP10→11: start→finish actions[], browser calls0, dock/completed; execution verified/owner_verified/status completed и output_schema verified. MCP12→13: read по текущей br-1:receipt, SUCCEEDED, output0 fresh:true, execution binding совпал. Numeric70/40 и budget-after-completed критерии не добавлялись. Все четыре требуемые journal phases присутствуют.
+
+MCP14: Save текущей собственной копии, modified:false. Native package-cleanup SUCCEEDED/package_closed:true/logged_out:true/unsaved_changes_discarded:false, точные path/save_operation_id=save совпали с текущим Save. Managed close один раз: ACKtrue/exit0/no signal, request_error:null; resource-close complete fulfilled. Все12 зафиксированных own PID отсутствуют, обе PGID пусты; ручного kill не было. Это отдельные подтверждения native cleanup и OS shutdown.
+
+Ruling: убрать внутреннее числовое ожидание, не менять критерий пользовательского результата и runtime. Стоимость: −1 assertion и правка одной строки документации; один новый native run по согласованной гипотезе. Новых механизмов нет. Гипотеза подтверждена до read/Save/cleanup. Первый FAIL и его native cleanup UNKNOWN не закрыты этим PASS; прежние unknown upload/cleanup сохраняются. S5/S6 NOT_RUN; STOP до проверки root, Task2 целиком не завершён.
