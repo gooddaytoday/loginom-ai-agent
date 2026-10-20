@@ -3,12 +3,30 @@ import { chmod, link, lstat, mkdir, mkdtemp, rm, symlink, writeFile } from "node
 import os from "node:os"
 import path from "node:path"
 import { loadJudgeEnvironment } from "../src/slots"
-import { acquireJudgeLease, writeLeaseReceipt } from "../src/lease"
+import { acquireJudgeLease, readResourceReservation, writeLeaseReceipt } from "../src/lease"
 import { evalsRoot, loadConfig, type EvalConfig } from "../src/config"
 import { runOfflineJudge } from "../src/judge-environment"
 import { main } from "../src/run"
 import { superviseProcess } from "../src/process-supervisor"
 import { parallelFixture } from "./helpers/parallel-fixture"
+
+test("offline missing run leaves its judge home available to the next command", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-offline-missing-run-"))
+  try {
+    const fixture = await parallelFixture(root)
+    const file = path.join(root, "slots.json"), probe = path.join(root, "version.json")
+    await writeLeaseReceipt(file, fixture.slots)
+    const env = { EVAL_SLOTS_FILE: file, EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake",
+      EVAL_JUDGE_COMMAND: `bun ${path.join(evalsRoot, "fixtures/fake-codex.ts")} --version-home-file ${probe}` }
+    await expect(runOfflineJudge(loadConfig(["--judge-only", "missing-run"], env), fixture.lockRoot)).rejects.toMatchObject({
+      exitCode: 2, message: `Нет прогона missing-run: ${env.EVAL_RESULTS_DIR}/missing-run/summary.json не найден`,
+    })
+    expect(await Bun.file(probe).exists()).toBe(false)
+    expect(await readResourceReservation({ key: `judge:${fixture.slots.judge.codexHome}`, lockRoot: fixture.lockRoot })).toBeUndefined()
+    expect(await runOfflineJudge(loadConfig(["--calibrate", "--only", "group-sum-qty"], env), fixture.lockRoot))
+      .toMatchObject({ code: 0, judgeCleanupConfirmed: true })
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
 
 test("offline calibration releases its home after SIGINT only with confirmed judge cleanup", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-offline-sigint-"))
