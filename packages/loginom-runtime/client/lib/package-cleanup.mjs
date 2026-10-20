@@ -3,15 +3,17 @@
 // Loginom's own close guard remains
 // enabled: CloseAllPackages(true, false) from E2E would bypass that guard.
 export function makePackageCleanupCode(options) {
-  const {sessionId, documentId, account, packagePath, loginomUrl, loginomBuild, tabTid, timeoutMs = 8000, diagnosticDiscard = false, diagnosticReadOnly = false} = options;
+  const {sessionId, documentId, account, packagePath, loginomUrl, loginomBuild, tabTid, timeoutMs = 8000, diagnosticDiscard = false, diagnosticReadOnly = false, diagnosticWaitForIdle = false} = options;
   if (![sessionId, documentId, account, tabTid].every(v => typeof v === 'string' && v.length > 0 && v.length <= 200)
       || typeof packagePath !== 'string' || !/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+\.lgp$/.test(packagePath)
       || packagePath.split('/').some(p => p === '.' || p === '..') || loginomBuild !== '7.4.2'
-      || typeof diagnosticReadOnly !== 'boolean' || typeof diagnosticDiscard !== 'boolean' || !Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 15000) throw Error('Exact isolated cleanup identity required');
+      || typeof diagnosticReadOnly !== 'boolean' || typeof diagnosticDiscard !== 'boolean'
+      || typeof diagnosticWaitForIdle !== 'boolean' || diagnosticWaitForIdle && !diagnosticDiscard
+      || !Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 15000) throw Error('Exact isolated cleanup identity required');
   const url = new URL(loginomUrl);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw Error('Invalid cleanup origin');
   // Match the existing bridge cleanup call's 30000 ms budget, including dispatch.
-  return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, diagnosticDiscard, diagnosticReadOnly})},${Date.now()+30000})`;
+  return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, diagnosticDiscard, diagnosticReadOnly, diagnosticWaitForIdle})},${Date.now()+30000})`;
 }
 
 export function parsePackageCleanupResult(response, expected) {
@@ -44,7 +46,7 @@ async function closeOwnedPackage(page, options, deadline) {
     return ms;
   };
   try {
-    const before = await page.evaluate(async o => {
+    const beginClose = () => page.evaluate(async ({options:o, deadline}) => {
       const app = globalThis.bg?.app, f = app?.Application?.FInstance?.FMainForm, m = f?.FMapTree;
       const prep = globalThis.__loginomDockPreparationV1;
       const identity = JSON.stringify(o);
@@ -77,26 +79,43 @@ async function closeOwnedPackage(page, options, deadline) {
       if (m.PackageNodes.Count !== 1 || m.PackageNodes.Items(0) !== node || normalized(node.PackageFileName) !== o.packagePath
           || node.ReadOnly !== o.diagnosticReadOnly || m.FServerConnection.UserName !== o.account || node.HasRunningNodes() !== false) return {reason:'PACKAGE_CHANGED_DURING_CHECK'};
       if (!tabBound()) return {reason:'TAB_IDENTITY_CHANGED'};
+      if (o.diagnosticWaitForIdle) {
+        if (Date.now() >= deadline) return {reason:'CLEANUP_DEADLINE_EXCEEDED'};
+        if ([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)) return {reason:'DIALOG_OR_OPERATION_OPEN'};
+      }
       const state = globalThis.__loginomDockCleanupV1 = {identity, document, done:false, closed:false};
       Promise.resolve().then(() => m.ClosePackage(node, false, true)).then(value => {
         state.closed = value === true && m.PackageNodes.Count === 0;
         state.done = true;
       }, () => { state.done = true; state.failed = true; });
       return {started:true, packages_before:1, modified, display_name:node.DisplayName};
-    }, options);
+    }, {options, deadline});
+    let before = await beginClose();
+    const idleDeadline = Math.min(deadline, Date.now()+timeoutMs);
+    // Cold owns an isolated diagnostic session. Wait only for a blocked gate;
+    // every read repeats the original guards and never dismisses a dialog.
+    while (options.diagnosticWaitForIdle && before.reason === 'DIALOG_OR_OPERATION_OPEN') {
+      receipt.stage = 'idle_wait';
+      const left = idleDeadline-Date.now();
+      if (left <= 0) return finish('BLOCKED', before.reason);
+      await page.waitForTimeout(Math.min(100, left));
+      if (Date.now() >= idleDeadline) return finish('BLOCKED', before.reason);
+      receipt.stage = 'close_request';
+      before = await beginClose();
+    }
     if (!before.started) return finish('BLOCKED', before.reason);
     receipt.stage = 'close_wait';
     await page.waitForFunction(() => {
       const state = globalThis.__loginomDockCleanupV1;
       const visible = e => !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height && getComputedStyle(e).visibility !== 'hidden';
       return state?.done || [...document.querySelectorAll('[role="dialog"],.x-message-box')].some(visible);
-    }, undefined, {timeout:timeoutMs});
+    }, undefined, {timeout:remaining()});
     if (options.diagnosticDiscard === true && before.modified === true) {
       receipt.stage = 'discard_prompt';
       const message = page.locator('[data-tid^="msgbox"][data-tid$="cnt;cnt;cmp"]:visible');
       const no = page.locator('[data-tid^="msgbox"][data-tid$="tlb;no"]:visible');
       if (await message.count() !== 1 || await no.count() !== 1) return finish('BLOCKED','DIAGNOSTIC_SAVE_PROMPT_MISSING');
-      const text = (await message.innerText()).trim();
+      const text = (await message.innerText({timeout:remaining()})).trim();
       if (!/сохранить изменения в пакете/i.test(text) || typeof before.display_name !== 'string'
           || !text.includes(before.display_name) || /заблокирован|отменить активные процессы/i.test(text))
         return finish('BLOCKED','DIAGNOSTIC_SAVE_PROMPT_CHANGED');
@@ -109,10 +128,10 @@ async function closeOwnedPackage(page, options, deadline) {
           && m.FServerConnection.UserName === o.account && n.HasRunningNodes() === false;
       }, options)) return finish('BLOCKED','DIAGNOSTIC_PACKAGE_CHANGED');
       receipt.stage = 'discard_click';
-      await no.click({timeout:timeoutMs});
+      await no.click({timeout:remaining()});
       receipt.unsaved_changes_discarded = true;
       receipt.stage = 'discard_close_wait';
-      await page.waitForFunction(() => globalThis.__loginomDockCleanupV1?.done === true, undefined, {timeout:timeoutMs});
+      await page.waitForFunction(() => globalThis.__loginomDockCleanupV1?.done === true, undefined, {timeout:remaining()});
     }
     receipt.stage = 'close_readback';
     const closed = await page.evaluate(() => {
@@ -122,7 +141,7 @@ async function closeOwnedPackage(page, options, deadline) {
     });
     if (!closed.done || !closed.closed || closed.remaining !== 0) return finish('BLOCKED', 'NATIVE_CLOSE_UNCONFIRMED');
     receipt.stage = 'tab_detach';
-    await at(tabTid).waitFor({state:'detached', timeout:timeoutMs});
+    await at(tabTid).waitFor({state:'detached', timeout:remaining()});
     receipt.package_closed = true;
     receipt.stage = 'logout_menu_open';
     try {
@@ -151,7 +170,7 @@ async function closeOwnedPackage(page, options, deadline) {
       if (!state.menu) await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:remaining()});
     }
     receipt.stage = 'logout_account_readback';
-    if ((await at('MF;AppMenuForm;p.h;p.t').innerText()).trim() !== account) return finish('BLOCKED', 'LOGOUT_ACCOUNT_CHANGED');
+    if ((await at('MF;AppMenuForm;p.h;p.t').innerText({timeout:remaining()})).trim() !== account) return finish('BLOCKED', 'LOGOUT_ACCOUNT_CHANGED');
     // Native close already removed every package; logout cannot discard work.
     receipt.stage = 'logout_inventory_readback';
     if (!await page.evaluate(expected => {

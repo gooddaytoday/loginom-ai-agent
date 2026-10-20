@@ -322,6 +322,7 @@ try {
       loginomBuild: "7.4.2",
       tabTid: prepared.workflow_ref.tab_tid,
       diagnosticDiscard: true,
+      diagnosticWaitForIdle: true,
     }),
   )
   await writeFile(join(args.output, "cleanup.json"), JSON.stringify(cleanup, null, 2) + "\n")
@@ -370,6 +371,7 @@ try {
         loginomBuild: "7.4.2",
         tabTid: state.prepared.workflow_ref.tab_tid,
         diagnosticDiscard: true,
+        diagnosticWaitForIdle: true,
       }),
     )
       .then((result) => {state.cleanup=result;return writeFile(join(args.output, "cleanup.json"), JSON.stringify(result, null, 2) + "\n")})
