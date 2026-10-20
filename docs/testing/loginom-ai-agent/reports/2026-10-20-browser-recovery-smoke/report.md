@@ -158,3 +158,57 @@ Final checkpoint `save-cold-group` SUCCEEDED/save_completed/workflow_preserved, 
 Ключевые private доказательства: `prep12-fresh/step2.json`; `prep3-fresh-cold/fresh-group-proof.json`, `05-dock_action_run.json`, `result.json` и связанная nested cleanup/close receipt. Ресурсы — тот же проверенный stage; runtime bytes не менялись. Успешный новый cleanup не закрывает исторические TAB_IDENTITY_CHANGED, UNSAVED_CHANGES, CONFIRMED_SAVE_REQUIRED и CLEANUP_OR_OPERATION_UNCONFIRMED. Причина readonly старой копии остаётся неизвестной.
 
 По действующему критерию шаг 3 PASS снимает setup blocker и разрешает заменить только setup harness. BR-S1/BR-S3 ещё не запускались на этой заготовке, Task5 не завершена; release-гейт закрыт.
+
+
+## Исходные BR-S1 и BR-S3 — native PASS
+
+Harness/runbook зафиксированы до запуска: `3bcfcca05b`. Изменён только setup:
+обязательный private saved-A manifest → seed → собственная UUID SaveAs-копия/fail →
+fresh prepare → public existing Group с пустым patch → свежие Alpha35/Beta20.
+Calculator использует Group и `Total*2`, прежний integer target/no output mapping.
+Checkpoint/replace ограничен точным путём собственной SaveAs-копии. Production,
+fault counts, T1/T3, browser operator, fresh read и исходные критерии не менялись.
+
+Повторно использован проверенный свежий stage с исходной идентичностью builder,
+указанной выше; manifest hash проверен перед BR. Новый harness SHA не приписан
+staging. Обе команды выполнены из `packages/desktop` pinned Bun, DISPLAY=:1,
+sandbox ON; child использовал фактический `resources/bin/node`. Аргументы:
+`test/loginom/browser-recovery-acceptance.ts BR-S1 <private saved-A-fresh.json>`,
+затем тот же вызов с `BR-S3`, только после полного первого PASS. Config/resources
+переданы штатными `LOGINOM_AI_AGENT_TEST_CONFIG`/`LOGINOM_AI_AGENT_TEST_RESOURCES`.
+
+Evidence root: `/home/george/.cache/loginom-ai-agent/browser-recovery-20261020-fixture-proof/evidence`.
+
+| Сценарий | Private subdirectory | Подтверждённые исходы |
+| --- | --- | --- |
+| BR-S1 | `2f0a10f2-2419-4584-b9fe-d7dab995504f` | Group fresh exact PASS; T1; own cancel с наблюдённым подтверждением; continuable; calculator-corrected SUCCEEDED; fresh read SUCCEEDED; configure/release по одному, remaining0 |
+| BR-S3 | `7d0af26a-14e4-4594-8db3-7194a3b2f03e` | Group fresh exact PASS; T3 после release; own execute/wait; completed с verified console execution и Preview schema; read source br-1:receipt SUCCEEDED; configure два раза, remaining1 |
+
+BR-S1 receipts: `05-dock_node_wait.json` Group; `09-dock_operation_recover.json` T1;
+`22-dock_browser_recovery.json` continuable; `24-dock_node_wait.json` новая existing
+операция; `26-dock_node_wait.json` read; `27-dock_action_run.json` Save.
+BR-S3: `05-dock_node_wait.json` Group; `11-dock_node_wait.json` T3;
+`18-dock_browser_recovery.json` completed; `20-dock_node_wait.json` read;
+`21-dock_action_run.json` Save. Каждый `result.json` — PASS, все четыре требуемые
+journal phases присутствуют, `user_action` отсутствует во всех ответах.
+
+В обоих сценариях `save` SUCCEEDED/save_completed/workflow_preserved, exact own
+path, modified:false. Native package-cleanup SUCCEEDED, package_closed/logged_out
+true, no discard, packages_before1/after0; path и save_operation_id совпали с
+собственным admission/final Save. Managed close ACK:true/request_error:null/exit0
+без signal, parent exit0. Runtime children2081199 и2087547 использовали staged
+Node; parent/PGID2081186 и2087534 и оба child после выхода отсутствуют, exact
+profile-process matches отсутствуют (`stop-resource-observation.json`). Logout
+подтверждён native receipts, а не отсутствием процессов.
+
+До native: syntax transpile PASS, Desktop package-local `bun typecheck` PASS с
+pinned PATH/TEST_NODE, `git diff --check` PASS. Source suites не повторялись:
+production/runtime не менялись. Smoke проверяет scripted operator; installed
+Desktop/release и качество модели не проверены. Дополнительный numeric/schema
+acceptance gate Calculator не добавлен: BR-S3 Preview фактически содержит также
+Expr1:real; исходный критерий требует verified schema/read и выполнен. Это
+наблюдение не объявляет настройки модели полностью независимо проверенными.
+Исторические TAB_IDENTITY_CHANGED, UNSAVED_CHANGES, CONFIRMED_SAVE_REQUIRED,
+CLEANUP_OR_OPERATION_UNCONFIRMED и unknown upload остаются неподтверждёнными.
+Task5 metadata/checkboxes оставлены root до независимого review; merge/release
+не выполнялись.

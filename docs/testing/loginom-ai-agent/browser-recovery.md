@@ -4,9 +4,9 @@
 аутентифицированным Chromium и scripted operator. Это не приёмка установленного
 Desktop и не оценка качества модели.
 
-Подготовка сохранённой Group-заготовки и её cold public execution подтверждены.
-Harness использует обязательный private saved-A manifest; BR-S1/BR-S3 ещё ожидают
-нового прогона. [Отчёт 2026-10-20](reports/2026-10-20-browser-recovery-smoke/report.md)
+BR-S1 и BR-S3 прошли native smoke на сохранённой Group-заготовке.
+Harness использует обязательный private saved-A manifest; оба сценария подтвердили
+свежий read, final Save и собственный cleanup. [Отчёт 2026-10-20](reports/2026-10-20-browser-recovery-smoke/report.md)
 сохраняет все исторические unknown upload/cleanup. Они не закрываются новым PASS.
 
 ## Окружение и запуск
