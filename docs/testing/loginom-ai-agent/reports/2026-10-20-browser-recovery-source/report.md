@@ -16,4 +16,4 @@ Private evidence: `/home/george/.cache/loginom-ai-agent/browser-recovery-2026102
 
 Это доказательство обычного Export, не BR PASS и не вход/fixture для следующих сценариев. Каждый BR получит собственный UUID destination и текущие квитанции. Исторические unknown upload/cleanup и readonly из smoke-отчёта этим результатом не закрыты.
 
-Следующий native шаг — BR-S2 по уточнённому плану5Task2 после текущего CI fixture follow-up. BR-S6 учитывается как отрицательная проверка, отдельно от native cleanup/shutdown.
+Следующий native шаг — BR-S2 по уточнённому плану5Task2; [CI fixture follow-up](../../../../superpowers/plans/2026-10-20-browser-recovery-native-fixtures.md) принят по native Source checks. BR-S6 учитывается как отрицательная проверка, отдельно от native cleanup/shutdown.
