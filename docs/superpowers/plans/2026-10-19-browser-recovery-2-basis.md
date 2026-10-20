@@ -525,7 +525,7 @@ git commit -m "feat(runtime): verify a recovered step with runtime console and P
   - `buildNodeReadRequest(args, source)` принимает квитанцию, только если `checkpoint_kind === 'browser_recovery_verified'`, `result === 'completed'`, проверены `execution` и `output_schema`, `cleanup_complete`; схемы — из `verified.output_schema.ports`: native Preview `fields` проецируются в `{port, schema: [{index, name, label, type}]}` без выдуманных полей, исходные факты остаются в journal event. JavaScript и `exports.text` отклоняются, как и для обычной операции.
   - `compactNodeResult` переносит `released_by` и `recovery_receipt_id` в `output`: верхний уровень `userResultSchema` закрыт (`user-results.mjs:5-6`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 test('the recovery receipt is journaled before the original operation is released', async () => {
@@ -586,13 +586,13 @@ test('dock_node_read refuses continuable or attested-only recovery receipts', ()
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail** (`--test test/browser-recovery-executor.test.mjs test/node-read.test.mjs test/user-results.test.mjs`; Expected: FAIL)
+- [x] **Step 2: Run tests to verify they fail** (`--test test/browser-recovery-executor.test.mjs test/node-read.test.mjs test/user-results.test.mjs`; Expected: FAIL)
 
-- [ ] **Step 3: Implement** по Interfaces.
+- [x] **Step 3: Implement** по Interfaces.
 
-- [ ] **Step 4: Run tests to verify they pass** (команда Step 2 и `bun run test:upstream`; Expected: PASS)
+- [x] **Step 4: Run tests to verify they pass** (команда Step 2 и `bun run test:upstream`; Expected: PASS)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/loginom-runtime
