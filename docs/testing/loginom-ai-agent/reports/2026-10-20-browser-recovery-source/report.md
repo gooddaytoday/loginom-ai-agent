@@ -213,3 +213,28 @@ Syntax/static/diff checks и source audit — ignored task report/отдельн
 Busy duration/причина и virtualizer не исследованы; четвёртого live не было.
 Root пересматривает подход по stop-signal; product fix не выполнялся.
 S5 FAIL/deferred, первая native UNKNOWN и вторая native PASS сохраняются.
+
+
+## 2026-10-20 — causal scroll slice: DONE_WITH_CONCERNS
+
+Одна fresh source attempt после scoped GO; stock stage/pinned catalog/Save route PASS.
+Штатные preparation helpers довели own пакет до ready filegrid; roots/detail и native
+identity guards сохранены. Два confirmed scroll0→1000→2000: те же65 row tids/refs,
+сдвиг−1000px, всеoutside_viewport/anchors0 при прежних root/folder/workflow/owner.
+Первый passive UI read252.518–360.351ms от trigger: те же65 rows/anchors0.
+Второй UI read1003.391–1111.997ms:65 новых row identities/35 anchors, binding прежний.
+Это window update без промежуточного native жеста, не только возврат геометрии.
+В measurement readiness не вызывался; только штатные50ms/post-read и два passive reads.
+Concern: first whole-chain start249.772604ms, на0.227396ms раньше strict250;
+сам UI read начался после250. Raw timings сохранены без округления в private report,
+literal timing criterion не назван PASS; новую попытку/компенсацию не выполняли.
+Native отдельно PASS: Save confirmed; initial/final saved-state modified=false,
+single cleanup SUCCEEDED/package_closed/logged_out/noDiscard, final Save не нужен.
+Context отдельно CLOSED/close event/pages0. OS отдельно NOT_CONFIRMED:
+currentPID/lineage сохранены, exact-profile candidates0; absence не заменяет attribution.
+Own diagnostic server package сохранён. Private evidence:
+`/home/george/.cache/loginom-ai-agent/browser-recovery-scroll4-O5izmAHY/evidence`.
+Причина/точное время native update и historical S5 целиком этим не доказаны;
+S5 FAIL/deferred, first native UNKNOWN/second PASS/third BLOCKED сохранены.
+Source audit/commands/checks — ignored task report и отдельный artifact; product fix,
+новый API/hook, recovery, пятый live, commit/merge/release не выполнялись.

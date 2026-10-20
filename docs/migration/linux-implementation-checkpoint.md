@@ -2,15 +2,16 @@
 
 ## 2026-10-20 — preparatory browser scroll probe
 
-Latest attempt3: fresh source stage/catalog/Save PASS; initial saved-state modified=false.
-Единственный Files click SUCCEEDED, post-read busy MF → BLOCKED до filegrid/scroll.
-Direct native cleanup1 BLOCKED/DIALOG_OR_OPERATION_OPEN; Close/logout UNKNOWN.
-Context closed/pages0; OS attribution NOT_CONFIRMED (exact-profile candidates0).
-Own diagnostic packages/profiles сохранены; новых native попыток нет.
-First native cleanup UNKNOWN и attempt2 native cleanup PASS сохраняются явно.
-Causal scroll timing не получен; S5 FAIL/deferred и historical UNKNOWN неизменны.
-Production без правок; следующий шаг — root reassessment подхода по stop-signal.
-[Фактический отчёт и история попыток](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md).
+Latest attempt4 DONE_WITH_CONCERNS: two confirmed scroll0→1000→2000, anchors0.
+UI read252–360ms: same65 rows/anchors0;1003–1112ms: new65 row IDs/35anchors.
+Binding сохранён, промежуточных жестов/readiness в measurement не было.
+Timing concern: whole-chain249.772604ms раньше250 на0.227396ms; UI read после250.
+Native cleanup PASS/Close/logout/noDiscard; saved-state modified=false, context closed/pages0.
+OS attribution NOT_CONFIRMED; own diagnostic packages сохранены.
+First native UNKNOWN/second PASS/third BLOCKED — история в source report, без переоценки.
+S5 FAIL/deferred; exact native update cause/time не установлены; production неизменён.
+Следующий шаг — независимый task review causal slice и concerns; новых live нет.
+[Фактический отчёт и история](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md).
 
 ## 2026-10-20 — browser recovery, Linux packaged/model срез
 
