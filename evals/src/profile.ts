@@ -8,6 +8,7 @@ import { groupProcesses } from "./process-group"
 import { superviseProcess, verifyOwnedRegistration, writerIdentity, type OwnedRegistration, type ProcessCleanup, type WriterIdentity } from "./process-supervisor"
 import { archiveDiagnostics } from "./diagnostics"
 import { sandboxCommand, assertNoDebuggers } from "./sandbox"
+import { writeLeaseReceipt } from "./lease"
 
 type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean; url?: string; username?: string }
 
@@ -109,7 +110,7 @@ export async function management(command: AgentCommand, args: string[], stdin?: 
     env: boundary?.env ?? command.env, sandbox: boundary?.cmd,
     profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs, signal }
   const result = await superviseProcess(input)
-  if (out) await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ command: args.slice(0, 2), processes: result.processCleanup }, null, 2))
+  if (out) await writeLeaseReceipt(path.join(out, "cleanup.json"), { command: args.slice(0, 2), processes: result.processCleanup })
   if (result.processCleanup.status !== "confirmed")
     throw new EvalFailure(`Management cleanup failed: ${result.processCleanup.error ?? "unconfirmed"}`, 1)
   if (out && command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
