@@ -190,3 +190,15 @@ aggregateprovider/judge evidenceincomplete из-за прерванных зад
 использует новый свой стенд,тот же установленный CLI и прежний deadline15:28:25UTC;
 измеряемый код не менялся,пересборка не требуется. RAM≥8GiB проверяется перед dispatch;
 остальные gates,границы и критерии сохраняются. Старые результаты не склеиваются.
+
+
+## Серия4: готовность
+
+Private root `/home/kiselev/storage/tmp/analytic10-branch-r4-20261020-bgrox9gn`.
+Новые Server551c2efca21b/Studio5fcac22c5ef4,порт52889;identity/epoch/config pinned.
+Preparee04729d6/verifye811dfc2 ready/code0,coldbrowser/modelmedium a/b,
+judge version/login без модели и4живых A/B прошли.2profilesclean/4reservationsreleased.
+Две новые localOAuthcopies;sourceauth/catalogue/inputs/rubric/task hashes прежние.
+CLI установленный b5ad7c602ea1 из private root3,тот жеbinaryhash;с тех пор в ветке
+менялись только два документа,поэтому measuredcode и evidence тестов сохраняются.
+Новый budget имеет прежние25границ с новыми scopes;RAMиdeadline проверяются перед dispatch.

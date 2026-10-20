@@ -216,9 +216,16 @@ trial-dosage-outcomes
   Стенд/receipts/recovery сохраняются без manual repair;judge released.
 - [x] Независимое review продолжения No findings:RAM≥8GiB непосредственно перед
   dispatch и прежние gates достаточны;не вводить новые критерии/collector/исключения.
-- [ ] Новый свой стенд/2local auth copies,prepare/verify/coldbrowser/modelmedium,
-  judge login/version и4liveA/B;переиспользовать CLIb5ad7c602ea1 без rebuild:
-  измеряемый код не менялся. Новые identity/budget/pins;старые данные не менять.
+- [x] Новый свой Server551c2efca21b/Studio5fcac22c5ef4,порт52889,identity pinned.
+- [x] Две новые local auth copies,private config;прежние input/rubric/catalogue hashes,
+  budget25bounds с новыми path/container scopes. CLIb5ad7c602ea1 переиспользуется:
+  измеряемый код не менялся,старые данные не меняются.
+- [x] Preparee04729d6 ready/code0 для a/b.
+- [x] Verifye811dfc2 --parallel2 ready/code0.
+- [x] Строгий coldbrowser/modelmedium a/b:ready/verified/cleanupconfirmed.
+- [x] Judge version/login без модели exit0/units completed/home released.
+- [x] Четыре liveA/B:4pass/0fail;2profilesclean/4reservationsreleased,auth/pins unchanged.
+- [ ] RAM≥8GiB непосредственно перед dispatch и новая полнаясерия4.
 - [ ] Та же полная10 в новой серии4;исходныйdeadline15:28:25Z,наблюдение/приёмка прежние.
 
 ## Приёмка и завершение
@@ -246,13 +253,13 @@ trial-dosage-outcomes
 
 ## Checkpoint
 
-1. Harness0b749879a1;CLI b5ad7c602ea1 installed/verified;после watcherbecff измеряемый код не менялся.
-2. Старые acceptance1065633c/Sp38yS/root2stand теперь retained;manual repair/удаление запрещены.
-3. gMHr5j root3k9rcj844 завершена09:17:42Z/exit1:4attempts/6unassigned,3cleanupconfirmed/basketrecoveryfailed.
-4. articles100/oraclePASS,abc0/noartifact;basket/budgetinterrupted после одного SIGINTиз-заRAM7.65GiB<8.
+1. HEAD79b2753d4f;CLI b5ad7c602ea1 installed/verified/hashunchanged;measuredcode не менялся после watcherbecff.
+2. Старые acceptance/Sp38yS/root2standretained не менять;root1w6kidhm4/eval_parallel_blockers.md.
+3. Серия3gMHr5j root3k9rcj844 завершена09:17:42Z/exit1:4attempts/6unassigned,3cleanupconfirmed/basketrecoveryfailed.
+4. articles100/oraclePASS,abc0/noartifact;basket/budgetinterrupted одним SIGINTиз-заRAM7.65GiB<8(3пробы).
 5. Resources1121/0missed/max1.39s;CPU99.92разрешён,новыхOOM/licence/providerlimitнет;budgetfailed.
-6. Judgearticles unitterminated/MainPID0;home released;провайдеры первых2complete,aggregateincompleteиз-заinterrupt.
-7. Postverifyexit2/незавершённыйprofile;root2standиreceiptsне менять. Observer163MiB,источникmemoryburstне установлен.
-8. Root4 /home/kiselev/storage/tmp/analytic10-branch-r4-20261020-bgrox9gn;новыйownstand,прежнийinstalledCLIroot3,modelwindow07:28:25Z–15:28:25Z.
-9. Review continuation No findings:штатныеgates+RAM≥8GiB;следующийшагpaircreate/initialize/prepare/verify/cold/A-B.
-10. Sourceauth/выборка/seed/inputs/rubric прежние;результаты не объединять,foreignstaged/untrackedсохранены.
+6. Judgeunitterminated/home released;postverifyexit2/незавершённыйprofile:старыйстенд/receipts/recovery сохранены.
+7. Root4 /home/kiselev/storage/tmp/analytic10-branch-r4-20261020-bgrox9gn;новаяпара551c2efca21b/5fcac22c5ef4:52889.
+8. Preparee04729d6/verifye811dfc2 ready,coldbrowser/model a/b,judge login/version,4liveA/Bpass.
+9. Finalgate2profilesclean/4leasesreleased;новыеlocalOAuthcopies/pins/budget25bounds. Следующий шагRAMиdispatchfull10.
+10. Modelwindow07:28:25Z–15:28:25Z;выборка/seed/authsource/inputs/rubricпрежние;seriesне склеивать/foreignсохранить.
