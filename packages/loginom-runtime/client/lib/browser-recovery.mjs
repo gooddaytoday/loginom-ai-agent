@@ -244,7 +244,7 @@ export function createBrowserRecovery({runtime, definitions, callBrowser, probeP
         if (exhausted(current)) return stop(current, 'budget_exhausted', {error: {code: 'BROWSER_RECOVERY_BUDGET_EXHAUSTED'}});
         budgets.get(current.key).calls++;
         let result;
-        const status = await accepted(current, async () => {
+        let status = await accepted(current, async () => {
           const started = now();
           let page, failure;
           try {
@@ -271,6 +271,9 @@ export function createBrowserRecovery({runtime, definitions, callBrowser, probeP
           }
           return reply();
         }, signal);
+        if (status.structuredContent.state !== 'stopped' && (signal?.aborted || current.stopReason)) {
+          status = await stop(current, current.stopReason ?? 'cancelled');
+        }
         if (status.structuredContent.state === 'stopped') return {...status,
           content: [...(result?.content ?? []), ...status.content],
           structuredContent: {...status.structuredContent, browser_result: result?.structuredContent ?? null},

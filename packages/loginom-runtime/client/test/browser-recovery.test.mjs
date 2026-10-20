@@ -161,6 +161,32 @@ test('release at the final journal await boundary preserves a confirmed native b
   }
 });
 
+test('abort after accepted settles but before the public browser call returns stops ownership', async () => {
+  const journal = deferred(), entered = deferred(), controller = new AbortController();
+  const native = {content: [{type: 'text', text: 'Confirmed click'}], structuredContent: {receipt: 'native'}};
+  const r = recovery({callBrowser: async () => native, record: async event => {
+    if (event.phase === 'browser_recovery_call') { entered.resolve(); await journal.promise; }
+  }});
+  await start(r);
+  let returned = false;
+  const called = click(r, controller.signal);
+  called.then(() => { returned = true; });
+  await entered.promise;
+  journal.resolve();
+  for (let i = 0; i < 4; i++) await Promise.resolve();
+  assert.equal(returned, false);
+  controller.abort();
+  const reply = await called;
+  assert.equal(meta(reply).state, 'stopped');
+  assert.equal(reply.structuredContent.stop_reason, 'cancelled');
+  assert.equal(r.active(), false);
+  assert.equal(r.hasUnsettledWork(), true);
+  assert.notEqual(reply.isError, true);
+  assert.ok(reply.content.some(block => block.text === native.content[0].text));
+  assert.deepEqual(reply.structuredContent.browser_result, native.structuredContent);
+  assert.equal((await click(r)).structuredContent.error.code, 'BROWSER_RECOVERY_INACTIVE');
+});
+
 test('the call journal counts UTF8 bytes, elapsed browser time and image digests without image data', async () => {
   let clock = 0;
   const data = 'iVBORw0KGgo=', text = 'Привет 👋';
