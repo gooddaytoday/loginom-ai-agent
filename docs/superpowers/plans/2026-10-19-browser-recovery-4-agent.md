@@ -103,7 +103,7 @@ git commit -m "feat(host): tell the runtime when an agent run ends"
   - В `tools.ts` `browser_take_screenshot` пропускается, если `!input.model.capabilities.input.image`.
   - `loginomBrowserRecovery = BrowserRecovery.state(result._meta?.["loginom/browser_recovery"])` попадает в metadata части `loginom_*`, если значение определено: при успехе — в `output.metadata`, в ветке ошибки — в `ctx.metadata` перед `throw` (`tools.ts:652-658`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Использовать поддельный `loginom` из `tools.test.ts` (`tools()`/`call()`); результат вызова проходит настоящий `CallToolResultSchema.parse`. `resolveWith({catalog, image, result})` — помощник теста вокруг `SessionTools.resolve` с моделью `capabilities.input.image = image`; `run(tools, name)` выполняет инструмент и возвращает его вывод или ошибку. Процессор фикстуры записывает `updateToolCall` в массив `metadataWrites` вместо `Effect.die` (`tools.test.ts:329`).
 
@@ -142,16 +142,16 @@ it.effect("keeps browser recovery state of a failed recovery reply", () =>
   }))
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd packages/agent && bun test test/session/tools.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement** по Interfaces.
+- [x] **Step 3: Implement** по Interfaces.
 
-- [ ] **Step 4: Run tests to verify they pass** (команда Step 2 и `bun typecheck`; Expected: PASS)
+- [x] **Step 4: Run tests to verify they pass** (команда Step 2 и `bun typecheck`; Expected: PASS)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/agent
