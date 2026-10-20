@@ -11,7 +11,7 @@ const catalog = [...recoveryBrowserTools, 'browser_navigate', 'browser_run_code_
 function harness({ basis = () => ({ step, reason: 'NODE_RELEASE_REFUSED', goal: 'Close the wizard' }),
   handoff = () => ({ stopped: true, proof: { receipt: 'completed' } }), verify = () => ({ status: 'completed', facts: ['released'] }),
   probe = () => ({ ok: true }), callTool, now, record } = {}) {
-  const events = [], calls = [], stops = [];
+  const events = [], calls = [], stops = [], verifies = [];
   const clock = { value: 1_000 };
   const recovery = createBrowserRecovery({
     enabled: true, gate: createSerialGate(), now: now ?? (() => clock.value),
@@ -22,11 +22,11 @@ function harness({ basis = () => ({ step, reason: 'NODE_RELEASE_REFUSED', goal: 
     executor: {
       browserRecoveryBasis: operationId => basis(operationId),
       browserRecoveryHandoff: async () => handoff(),
-      verifyBrowserRecovery: async input => verify(input),
+      verifyBrowserRecovery: async input => { verifies.push(input); return verify(input); },
       stopBrowserRecovery: async input => { stops.push(input); return { state: 'retained', reason: 'pending kept' }; },
     },
   });
-  return { recovery, events, calls, stops, clock };
+  return { recovery, events, calls, stops, verifies, clock };
 }
 
 const body = reply => JSON.parse(reply.content[0].text);
@@ -330,4 +330,66 @@ test('stopping keeps Dock blocked until the dispatched action settles', async ()
   release();
   await Promise.all([action, stopping]);
   assert.equal(h.recovery.refusesDock('dock_action_run'), false);
+});
+
+const failingJournal = async event => { if (event.phase === 'browser_recovery_action') throw Error('disk full'); return event; };
+
+for (const failure of ['transport', 'page'])
+  test('after a ' + failure + ' failure and a failed journal neither a gesture nor finish runs', async () => {
+    let calls = 0;
+    const h = harness({ record: failingJournal,
+      callTool: async () => { calls++; if (failure === 'transport') throw Error('transport closed'); return { content: [{ type: 'text', text: 'ok' }] }; },
+      probe: () => (failure === 'page' ? { ok: false, reason: 'second page opened' } : { ok: true }) });
+    await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+    await assert.rejects(h.recovery.call('browser_click', { target: 'e1' }), /disk full/);
+    assert.equal((await h.recovery.call('browser_click', { target: 'e2' })).isError, true);
+    assert.equal((await h.recovery.call('dock_browser_recovery', { action: 'finish', operation_id: 'op-1',
+      actions_performed: ['Clicked'] })).isError, true);
+    assert.equal(calls, 1);
+    assert.deepEqual(h.verifies, []);
+    assert.equal(h.recovery.refusesDock('dock_node_apply'), true);
+  });
+
+for (const failure of ['transport', 'page'])
+  test('a gesture and a finish queued behind a ' + failure + ' failure are refused inside the gate', async () => {
+    let release, calls = 0;
+    const blockedCall = new Promise(resolve => { release = resolve; });
+    const h = harness({
+      callTool: async () => { calls++; if (calls > 1) return { content: [{ type: 'text', text: 'ran' }] };
+        await blockedCall; if (failure === 'transport') throw Error('transport closed'); return { content: [{ type: 'text', text: 'ok' }] }; },
+      probe: () => (failure === 'page' && calls === 1 ? { ok: false, reason: 'origin changed' } : { ok: true }) });
+    await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+    const a = h.recovery.call('browser_click', { target: 'e1' });
+    const b = h.recovery.call('browser_click', { target: 'e2' });
+    await new Promise(resolve => setImmediate(resolve));
+    release();
+    const [, queued] = await Promise.all([a, b]);
+    assert.equal(queued.isError, true);
+    assert.equal(calls, 1);
+    assert.deepEqual(h.verifies, []);
+  });
+
+test('a finish queued behind an unknown outcome stops without running the verifier', async () => {
+  let release;
+  const pending = new Promise((_, reject) => { release = () => reject(Error('transport closed')); });
+  const h = harness({ callTool: () => pending });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const action = h.recovery.call('browser_click', { target: 'e1' });
+  await new Promise(resolve => setImmediate(resolve));
+  const finishing = h.recovery.call('dock_browser_recovery', { action: 'finish', operation_id: 'op-1', actions_performed: ['Clicked'] });
+  await new Promise(resolve => setImmediate(resolve));
+  release();
+  const [, finished] = await Promise.all([action, finishing]);
+  assert.deepEqual(h.verifies, []);
+  assert.equal(body(finished).stopped.code, 'browser_unavailable');
+  assert.equal(h.stops.at(-1).uncertain, true);
+});
+
+test('finish stays available after a failed gesture; the verifier reads the facts', async () => {
+  const h = harness({ callTool: async () => ({ isError: true, content: [{ type: 'text', text: 'Timeout after click' }] }) });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  await h.recovery.call('browser_click', { target: 'e1' });
+  const finished = body(await h.recovery.call('dock_browser_recovery', { action: 'finish', operation_id: 'op-1', actions_performed: ['Clicked'] }));
+  assert.equal(finished.phase, 'dock');
+  assert.equal(h.verifies.length, 1);
 });

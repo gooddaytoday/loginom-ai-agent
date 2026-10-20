@@ -147,6 +147,8 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
         ? current.observationRequired && response.value.isError === true : response.value.isError === true;
       // The page check runs even after a failed action: its effect may still have landed.
       const page = await Promise.resolve().then(probe).catch(error => ({ ok: false, reason: error.message }));
+      // Latch a lost page boundary before the gate is released, like an unknown outcome.
+      if (page.ok !== true) current.pageLost ??= String(page.reason ?? 'page check failed').slice(0, 500);
       return { ...response, page };
     });
     inflight = call;
@@ -160,25 +162,29 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     if (attempt !== current || current.phase !== 'browser')
       return refusal('This browser action finished after the recovery attempt ended; its result is not evidence.', view());
     if (outcome.error) return stopAttempt('browser_unavailable', 'The browser action outcome is unknown: ' + outcome.error.message);
-    if (outcome.page.ok !== true)
-      return stopAttempt('page_changed', `The Loginom page changed outside recovery bounds: ${outcome.page.reason}.`);
+    if (current.pageLost) return stopAttempt('page_changed', `The Loginom page changed outside recovery bounds: ${current.pageLost}.`);
     const result = boundText(outcome.value, limits.textBytes);
     result.content.push({ type: 'text', text: JSON.stringify({ browser_recovery: remaining(current.budget) }) });
     return result;
   }
 
   async function finish(input, extra) {
-    if (attempt?.phase !== 'browser' || attempt.operation_id !== input.operation_id)
-      return refusal('finish requires the browser phase of this operation.', view());
+    const refused = admission(browserRecoveryToolName, attempt);
+    if (refused) return refused;
+    if (attempt.operation_id !== input.operation_id) return refusal('finish requires the browser phase of this operation.', view());
     const current = attempt;
     current.phase = 'verify';
     const attested = { actions_performed: input.actions_performed ?? [], expected_result: input.expected_result ?? null,
       browser_settings: input.browser_settings ?? [] };
     await record({ phase: 'browser_recovery_attested', attempt_id: current.id, operation_id: current.operation_id,
       attested_by_model: attested });
-    const verification = await gate(() => executor.verifyBrowserRecovery({ operationId: current.operation_id,
-      step: current.step, attested, signal: extra?.signal })).catch(error => ({ status: 'unresolved',
-      facts: [], reason: error.message }));
+    // A finish queued behind an unknown outcome or a lost page never runs the verifier or its release.
+    const verification = await gate(() => blocked(current) ? { blocked: true }
+      : executor.verifyBrowserRecovery({ operationId: current.operation_id, step: current.step, attested, signal: extra?.signal }))
+      .catch(error => ({ status: 'unresolved', facts: [], reason: error.message }));
+    if (verification.blocked) return uncertain
+      ? stopAttempt('browser_unavailable', 'A browser action outcome is unknown: ' + uncertain.reason)
+      : stopAttempt('page_changed', `The Loginom page changed outside recovery bounds: ${current.pageLost}.`);
     const status = ['completed', 'continuable'].includes(verification.status) ? verification.status : 'unresolved';
     await record({ phase: 'browser_recovery_verified', attempt_id: current.id, operation_id: current.operation_id,
       status, facts: verification.facts ?? [], receipt_id: verification.receipt_id ?? null });
@@ -223,12 +229,18 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     return ['handoff', 'browser', 'verify', 'stopping'].includes(attempt?.phase);
   }
 
-  // Shared admission for browser actions, checked before queueing and again inside the gate.
+  // One rule for every entry: an unknown outcome or a lost page boundary admits nothing more.
+  function blocked(current) {
+    return !!uncertain || !!current?.pageLost || attempt !== current;
+  }
+
+  // Shared admission for gestures and finish, checked before queueing and again inside the gate.
   function admission(name, current) {
     if (uncertain) return refusal('A browser recovery action has an unknown outcome; no further gesture is allowed.', { uncertain });
+    if (current?.pageLost) return refusal('The Loginom page left recovery bounds; only stop is allowed.', { page: current.pageLost });
     if (attempt !== current || current?.phase !== 'browser')
       return refusal(`${name} is available only during the browser phase of dock_browser_recovery.`);
-    if (current.observationRequired && !readOnlyBrowserTools.has(name))
+    if (name !== browserRecoveryToolName && current.observationRequired && !readOnlyBrowserTools.has(name))
       return refusal('The last browser gesture failed after it may have taken effect. Observe the page with browser_snapshot '
         + 'or browser_find before another gesture.');
     return null;
