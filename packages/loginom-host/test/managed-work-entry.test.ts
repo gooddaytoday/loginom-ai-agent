@@ -9,6 +9,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "managed-work-entry-"))
   const work = join(directory, "work.json")
+  const released = join(directory, "run-released.json")
   const recovery = join(directory, "browser-recovery.json")
   const src = join(directory, "runtime/src")
   const files = {
@@ -26,6 +27,10 @@ test("actual managed entry reads live bridge work and dispatching over private I
     ),
     "runtime/src/call-timeout.mjs": await readFile(
       new URL("../../loginom-runtime/src/call-timeout.mjs", import.meta.url),
+      "utf8",
+    ),
+    "runtime/client/lib/browser-recovery-basis.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/browser-recovery-basis.mjs", import.meta.url),
       "utf8",
     ),
     "runtime/src/resources.mjs": "export async function verifyResources() { return {} }",
@@ -49,6 +54,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
       export async function createBridge(config) {
         writeFileSync(${JSON.stringify(recovery)}, JSON.stringify({ browserRecovery: config.browserRecovery }));
         return {
+        releaseRun: async () => { writeFileSync(${JSON.stringify(released)}, "released"); },
         server: { connect: async () => {} }, close: async () => ({
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
@@ -114,6 +120,9 @@ test("actual managed entry reads live bridge work and dispatching over private I
     const call = runtime
       .request("call", { name: "fixture", arguments: { hold: true } })
       .catch((error: unknown) => error)
+    expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: true })
+    expect(await runtime.request("run-released")).toEqual({ released: true })
+    expect(await readFile(released, "utf8")).toBe("released")
     expect(await runtime.request("work")).toEqual({ activeWork: false, unsettledWork: false, dispatching: true })
     expect(await runtime.request("interrupt")).toEqual({ interrupted: true })
     expect(await call).toMatchObject({ message: "LOGINOM_RUNTIME_FAILED" })

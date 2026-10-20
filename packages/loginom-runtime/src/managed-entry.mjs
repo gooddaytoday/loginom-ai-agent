@@ -186,6 +186,11 @@ async function handle(message) {
     }
     if (state.closing) throw Error("LOGINOM_RUNTIME_CLOSING")
     if (!state.client) throw Error("LOGINOM_NOT_READY")
+    if (message.operation === "run-released") {
+      await state.bridge.releaseRun()
+      send({ id: message.id, result: { released: true } })
+      return
+    }
     if (message.operation === "work") {
       send({
         id: message.id,

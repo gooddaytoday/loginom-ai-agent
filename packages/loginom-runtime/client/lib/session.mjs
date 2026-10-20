@@ -75,6 +75,7 @@ export async function createSession(config, { headless = false, managed = null }
         args: ['--no-proxy-server', ...launch.args] }, contextOptions: { viewport: browserViewport } },
     // Keep the browser catalog independent of page-provided WebMCP tools.
     webmcp: false,
+    ...(executorMode && config.browserRecovery === true ? {snapshot: {mode: 'none'}} : {}),
     capabilities: ['core', 'vision'], outputDir: artifacts,
     saveSession: false, timeouts: { action: 15000, navigation: 120000, ...(executorMode ? { settle: 0 } : {}) },
   }), { mode: 0o600 });

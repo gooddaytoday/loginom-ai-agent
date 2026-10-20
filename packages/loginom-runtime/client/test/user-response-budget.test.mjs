@@ -130,3 +130,16 @@ test('real bridge MCP protocol retains knowledge after a refused prepare and con
  assert.match(result.stdout,/# pass 1/);
  assert.match(result.stdout,/# fail 0/);
 });
+
+test('recovery budgets exclude images, retain metadata and suggest focused browser reads', async () => {
+ const {boundedRecoveryReply} = await import('../lib/user-response-budget.mjs');
+ const image={type:'image',mimeType:'image/png',data:'A'.repeat(200000)};
+ const small={content:[{type:'text',text:'ok'},image],_meta:{'loginom/browser_recovery':{calls_remaining:29}}};
+ assert.equal(boundedRecoveryReply(small,{tool:'browser_take_screenshot'}),small);
+ for(const text of ['x'.repeat(47000),Array(2001).fill('x').join('\n')]){
+  const big=boundedRecoveryReply({...small,content:[{type:'text',text},image]},{tool:'browser_snapshot'});
+  assert.equal(big.isError,true);assert.deepEqual(big._meta,small._meta);
+  const value=JSON.parse(big.content[0].text);assert.equal(value.error.code,'USER_RESPONSE_BUDGET');
+  assert.match(value.next_step.instruction,/target.*depth.*browser_find/);
+ }
+});

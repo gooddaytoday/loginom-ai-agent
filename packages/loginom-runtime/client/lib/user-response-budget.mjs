@@ -29,3 +29,12 @@ export function boundedUserToolReply(reply,{tool,operationId}={}) {
        :{instruction:'Request a smaller reply. This delivery refusal does not establish the state of any browser effect.'}};
  return {...textReply(refusal),isError:true};
 }
+
+export function boundedRecoveryReply(reply, {tool} = {}) {
+ const measured = {...reply, content: reply.content.filter(block => block.type !== 'image')};
+ if (boundedUserToolReply(measured, {tool}) === measured) return reply;
+ return {...textReply({result_delivery:'refused', error:{code:'USER_RESPONSE_BUDGET',
+   message:'The browser reply exceeds the delivery budget. The browser call was counted; this refusal does not establish its effect.'},
+   next_step:{instruction:'Request a smaller snapshot with target/depth, or use browser_find to locate the relevant element.'}}),
+   isError:true, ...(reply._meta ? {_meta:reply._meta} : {})};
+}
