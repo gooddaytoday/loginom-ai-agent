@@ -178,7 +178,7 @@ git commit -m "feat(agent): publish recovery screenshots only to image models"
 Browser recovery attempt {attempt_id} is still active. Continue the failed step with the allowed loginom_browser_* tools and call loginom_dock_browser_recovery with action "finish" when its result is reached. If no justified action remains, call it with action "stop", follow its next_step and report what was done in the browser, what the runtime verified, what only you attested and what remains unknown. Do not ask the user to fix the Loginom UI. Ending the turn again stops this attempt.
 ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 В `browser-recovery.test.ts` — истории сообщений из фикстур `SessionV1`; `input(patch)` содержит sessionID, полную messages и при необходимости revert:
 
@@ -214,16 +214,16 @@ it.instance("a text-only turn during an active attempt gets exactly one reminder
   }))
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd packages/agent && bun test test/session/browser-recovery.test.ts test/session/prompt.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement** по Interfaces.
+- [x] **Step 3: Implement** по Interfaces.
 
-- [ ] **Step 4: Run tests to verify they pass** (команда Step 2 и `bun typecheck`; Expected: PASS)
+- [x] **Step 4: Run tests to verify they pass** (команда Step 2 и `bun typecheck`; Expected: PASS)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/agent

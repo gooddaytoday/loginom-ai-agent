@@ -153,7 +153,7 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 
 ## Checkpoint — 20.10.2026
 
-- База реализации: `0afb4c483a`; текущий принятый код: `5b4fe36a43` (план 4, Task 2).
+- База реализации: `0afb4c483a`; текущий принятый код: `fc5c0b6cb1` (план 4, Task 3).
 - План 1, Tasks 1–4, и план 2, Tasks 0–7: выполнены и отмечены в подпланах; task reviews и итоговое whole-branch review приняты; четыре итоговых замечания исправлены и подтверждены scoped re-review.
 - Последние source-проверки: полный runtime client 4468 PASS / 14 SKIP / 0 FAIL; focused 133/133, timeout 4/4; Host managed IPC 1/1 (16 assertions), Host typecheck и `git diff --check` — PASS.
 - Task 0 на Loginom: реальный Calculator, новое успешное выполнение и схема Preview независимо подтверждены; итоговый собственный пакет, transport и браузер закрыты.
@@ -163,5 +163,5 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 - План 3 прошёл preflight и scoped review уточнений; Tasks 1–4 выполнены и приняты независимыми reviews; 1/1 реальная Chromium-проба PASS; замечание о final-await abort исправлено и подтверждено scoped re-review. CI опубликованного checkpoint плана 2 — PASS.
 - Ограничение локального общего browser runner: отсутствует xvfb-run; новая headless Chromium-проба с sandbox выполнена напрямую.
 - План 3, Task 5 отложен по указанию владельца о блокерах; условие возобновления — штатная проверенная доставка входа, затем BR-S1 по текущему ref собственной кнопки и BR-S3. Product-код доставки не меняется.
-- План 4: preflight/scoped re-review GO; Tasks 1–2 приняты независимыми reviews. Agent tools: 8/8 и typecheck PASS. Host: focused 59/59, typecheck, полный охват 370 PASS / 7 SKIP двумя процессами; единый Bun suite ограничен loader `EISDIR`.
-- Следующий шаг — план 4, Task 3 (одно напоминание в текущей видимой задаче); завершение живой приёмки и release-гейт остаются обязательными.
+- План 4: preflight/scoped re-review GO; Tasks 1–3 приняты независимыми reviews. Agent focused: 107 PASS / 1 SKIP; полный suite: 3842 PASS / 25 SKIP / 1 TODO / 0 FAIL в subshell umask 0022, typecheck PASS; исходный mode failure воспроизведён и изолирован. Host: focused 59/59, typecheck, полный охват 370 PASS / 7 SKIP двумя процессами; единый Bun suite ограничен loader `EISDIR`.
+- Следующий шаг — план 4, Task 4 (инструкции навыка и Agent); завершение живой приёмки и release-гейт остаются обязательными.
