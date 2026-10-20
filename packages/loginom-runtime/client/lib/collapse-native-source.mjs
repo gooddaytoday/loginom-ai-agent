@@ -49,7 +49,10 @@ export function completedStaticImports(history,uploads,ctx,uploadHistory) {
    ...(reread?{readonly_reexecution_operation_id:reread.request.operation_id}:{}),
    source:verified,configuration:c});
  }
- need(accepted.length>0,'Exact full read requires a same-session byte-verified completed local import');
+ need(accepted.length>0,'Exact full read requires a same-session byte-verified completed local import. '
+  +'A later failed or unfinished source/read can invalidate that proof; a successful reread or browser recovery alone does not restore it. '
+  +'For ordinary dock_node_apply construction/export when full exact output is not required, omit read.coverage or set it to "sample"; a sample is not full-output proof. '
+  +'Follow next_step to resolve the stopped operation before a new request. If full exact output is required, keep "full" and report the unavailable proof.');
  return accepted;
 }
 
