@@ -1,0 +1,13 @@
+contract_type,payment_method,customers,churned,churn_pct,avg_monthly_charges
+Month-to-month,Credit card,52,28,53.846154,66.272885
+Month-to-month,Bank transfer,50,26,52.000000,67.801200
+Month-to-month,Electronic check,48,22,45.833333,73.015417
+Month-to-month,Mailed check,57,26,45.614035,67.366842
+One year,Credit card,41,8,19.512195,64.949024
+Two year,Mailed check,26,5,19.230769,56.568462
+One year,Mailed check,49,9,18.367347,71.232245
+Two year,Bank transfer,39,4,10.256410,68.544615
+One year,Electronic check,34,3,8.823529,74.817647
+One year,Bank transfer,38,3,7.894737,69.852895
+Two year,Electronic check,29,2,6.896552,74.159655
+Two year,Credit card,37,2,5.405405,74.507297

@@ -1,0 +1,5 @@
+segment,predicted_0,predicted_1,predicted_2,predicted_3
+0,125,0,0,0
+1,0,0,125,0
+2,0,0,0,125
+3,0,125,0,0

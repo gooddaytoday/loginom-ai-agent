@@ -1,0 +1,4 @@
+treatment,patients,events,censored,censored_pct,avg_time_months
+Drug_A,121,94,27,22.314050,23.958678
+Drug_B,108,79,29,26.851852,27.707407
+Placebo,121,87,34,28.099174,26.621488

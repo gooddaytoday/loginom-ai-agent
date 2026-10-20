@@ -1,0 +1,57 @@
+{
+  "id": "campaign-region-loss-share",
+  "title": "Доля отрицательного ROI по типу кампании и региону",
+  "prompt": "По campaign_type и region посчитай campaigns, negative_roi_count как число строк с исходным roi<0, negative_roi_pct=100*negative_roi_count/campaigns, total_cost=сумма cost, total_conversions=сумма conversions, cpa=total_cost/total_conversions и mean_roi как арифметическое среднее предоставленного roi. Не пересчитывай roi из других полей и не умножай mean_roi на 100; отрицательные значения сохраняй. Упорядочь по negative_roi_pct по убыванию, затем total_cost по убыванию, затем campaign_type и region по возрастанию. Вход — dataset.csv; учитывай все строки без изменения исходных значений. Создай ровно одну итоговую выгрузку CSV с заголовком, разделителем-запятой и десятичной точкой. Счётчики выгружай целыми; все остальные числовые результаты округляй только в конце до шести знаков после точки. Порядок строк определяй по неокруглённым значениям; равенства расчётных показателей разрешай ключами группы по возрастанию. Точные имена колонок результата: campaign_type, region, campaigns, negative_roi_count, negative_roi_pct, total_cost, total_conversions, cpa, mean_roi.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "16 строк данных; точные колонки: campaign_type, region, campaigns, negative_roi_count, negative_roi_pct, total_cost, total_conversions, cpa, mean_roi. Полный ожидаемый CSV приведён в обязательном пункте result. Допуск чисел ±0.000001.",
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06,
+  "checklist": [
+    {
+      "id": "input",
+      "required": true,
+      "text": "Пакет читает dataset.csv с заголовком и все его строки; поля roi, cost, conversions доступны для числовых вычислений. Итог не подставлен константами вместо расчёта из входа."
+    },
+    {
+      "id": "grouping",
+      "required": true,
+      "text": "Группировка по campaign_type и region: количество campaigns, число negative_roi_count по строгому roi<0, суммы cost и conversions. Используется предоставленное поле roi."
+    },
+    {
+      "id": "metrics",
+      "required": true,
+      "text": "negative_roi_pct=100*negative_roi_count/campaigns; cpa=total_cost/total_conversions; mean_roi — среднее исходных roi без пересчёта и без умножения на 100. Отрицательные roi остаются отрицательными."
+    },
+    {
+      "id": "ordering",
+      "required": true,
+      "text": "Строки отсортированы по negative_roi_pct ↓, total_cost ↓, campaign_type ↑, region ↑. Сортировка по расчётным величинам предшествует округлению до шести знаков."
+    },
+    {
+      "id": "export",
+      "required": true,
+      "text": "Настроена ровно одна итоговая выгрузка текстового CSV с заголовком, запятой и десятичной точкой. Колонки: campaign_type, region, campaigns, negative_roi_count, negative_roi_pct, total_cost, total_conversions, cpa, mean_roi. Счётчики целые, остальные числовые результаты округлены до шести знаков после точки. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "connected-calculation",
+      "required": true,
+      "text": "Есть связный путь от чтения dataset.csv через описанные вычисления до итоговой выгрузки; результат действительно получен из исходных записей, а не из вручную введённых итоговых строк."
+    },
+    {
+      "id": "result",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2,
+      "text": "Файл результата содержит ровно 16 строк данных и 9 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.000001. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\ncampaign_type,region,campaigns,negative_roi_count,negative_roi_pct,total_cost,total_conversions,cpa,mean_roi\nsearch,SPb,8,5,62.500000,523145.580000,146,3583.188904,-0.091250\ndynamic,Regional,20,12,60.000000,1268913.480000,376,3374.769894,0.375000\nsearch,Moscow,15,9,60.000000,732238.040000,275,2662.683782,0.902667\nnative,All,12,6,50.000000,633938.690000,234,2709.139701,2.817500\ndisplay,Regional,13,6,46.153846,690775.530000,255,2708.923647,0.672308\ndisplay,Moscow,22,10,45.454545,1174703.950000,459,2559.267865,2.722273\ndynamic,Moscow,25,11,44.000000,1292378.870000,517,2499.765706,2.326000\ndisplay,All,15,6,40.000000,667334.560000,310,2152.692129,2.629333\nsearch,Regional,18,7,38.888889,806237.710000,383,2105.059295,3.379444\nnative,SPb,8,3,37.500000,414023.740000,150,2760.158267,1.483750\nsearch,All,24,8,33.333333,1356755.680000,473,2868.405243,1.668333\nnative,Regional,16,5,31.250000,791799.460000,302,2621.852517,0.901875\ndisplay,SPb,20,6,30.000000,913576.750000,427,2139.524005,1.843500\nnative,Moscow,19,4,21.052632,785635.320000,377,2083.913316,2.096842\ndynamic,All,7,1,14.285714,301273.100000,131,2299.794656,1.182857\ndynamic,SPb,8,1,12.500000,284667.970000,171,1664.724971,7.770000\n"
+    },
+    {
+      "id": "honest-report",
+      "requires_run": true,
+      "text": "Финальный ответ не заявляет выполнение, сохранение или проверку результата без соответствующих артефактов."
+    }
+  ]
+}

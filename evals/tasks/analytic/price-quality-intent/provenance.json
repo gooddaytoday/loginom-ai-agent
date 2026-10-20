@@ -1,0 +1,126 @@
+{
+  "task_id": "price-quality-intent",
+  "dataset_sha256": {
+    "dataset.csv": "4b3dbe505cdb2ec083848b54c8005c84b803d168527d8e8bcd8af35e36e197af"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "6967eab28cad975195c5c009b94ba4161b43e141e82d971bd45e2559b346d577"
+  },
+  "reference_sha256": "6b44cab5ce0fea447728f80c7c3518357c01e42284a0ee8841fda637ad82afb7",
+  "cli": {
+    "binary": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/runtime/bin/loginom-ai-agent-cli",
+    "version": "0.2.2",
+    "profile": "profile"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-price-quality-intent-2.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/4cd1058278c83dd91eb6cd6da0c0da71bd51deeb66e5dd48ff57caf66d6b5cdf-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 2,
+    "total": 2,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_eab2b8405ffeOkmViXJVLdqO3T",
+    "skill_revision": "8afb17d6a2c247fa0fb8fc6e2285e6ed05e6bf475a1a9d88ae7b760a29260dfc",
+    "exit_code": 0,
+    "started_at": "2026-10-19T18:42:49+03:00",
+    "duration_s": 1188,
+    "tokens": {
+      "input": 128215,
+      "output": 6172,
+      "reasoning": 3993
+    },
+    "tool_calls": 47,
+    "tool_errors": 2,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-price-quality-intent-2/Unit1/workflow",
+  "source_task": "analitic-tasks/task20-conjoint-analysis",
+  "runtime_pin": {
+    "version": "0.2.2",
+    "ci_run": 39210148809,
+    "ci_artifact": {
+      "id": 12168030843,
+      "name": "loginom-linux",
+      "sha256": "bf0e29fd686cb5ec50477a8e36775359486f6aafb93897dce363082fa879c86c"
+    },
+    "archive": {
+      "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/downloads/loginom-ai-agent-cli-0.2.2-linux-x64.tar.gz",
+      "sha256": "c612eab428e5dc16b9a6105cb4fd401a00c04a25dee6390644b50e86044283b9"
+    },
+    "source_commit": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "source_tree_sha256": "92f2bf27f7771109634d33bb8ce6ab1be4f84a74209a45936e0a18d430b57bff",
+    "cli_manifest_sha256": "26c94fe7d3d6f975cc2d60d99eb5f7b2b6fcb377c753c6de3079c155f41ac28c",
+    "resource_manifest_sha256": "0642015ac67c8f569e7b4d1ac158973d514ae39d72b77cacae10d48810fddd34",
+    "harness_sha": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "harness_clean": true
+  },
+  "independent_oracle_check": {
+    "pass": true,
+    "method": "blind SQLite SQL, author oracle not provided",
+    "independent_csv_sha256": "6967eab28cad975195c5c009b94ba4161b43e141e82d971bd45e2559b346d577",
+    "query_sha256": "5698b5a61300b680c031364c5273882ef0bd34f7023e00af45ef68683bc88d80",
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/independent/a/price-quality-intent/report.json",
+    "comparison": {
+      "passed": true,
+      "error": null
+    }
+  },
+  "browser_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/price-quality-intent/attempt-2/browser-rerun.json",
+    "screenshot": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/price-quality-intent/attempt-2/browser-rerun.png",
+    "all_nodes_active": true,
+    "closed_without_save": true,
+    "rounding_verified_in_exported_path": true
+  },
+  "fallback_used": false,
+  "attempt_history": [
+    {
+      "number": 1,
+      "classification": "technical-ui-blocker",
+      "exit_code": 1,
+      "content_failure_counted": false,
+      "analytic_revision": "primary",
+      "operation_id": "pq-project-1",
+      "phase": "target",
+      "reason": "Exact upstream reform port required; inspect offered no recovery; final export/package absent",
+      "cleanup": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/price-quality-intent/attempt-1/cleanup.json",
+      "evidence": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/price-quality-intent/attempt-1/cleanup-evidence",
+      "next": "repeat unchanged primary prompt as attempt2 without hint; no analytic fallback",
+      "diagnosis": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/reports/diagnosis-t20-exact-upstream-port.md",
+      "cleanup_pass": true
+    },
+    {
+      "number": 2,
+      "classification": "accepted",
+      "analytic_revision": "primary",
+      "exit_code": 0,
+      "assisted": false,
+      "cli_check": true,
+      "browser_rerun_check": true
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "id": "tenure-churn-profile",
+  "title": "Отток по диапазонам стажа",
+  "prompt": "Построй в Loginom воспроизводимый сценарий по прикреплённому dataset.csv. Все строки входного файла сохраняют исходный смысл; не используй внешние данные. Назначь каждой строке tenure_band: 01_le12, если tenure_months<=12; 02_13_36, если 12<tenure_months<=36; 03_gt36, если tenure_months>36. Для каждой непустой группы вычисли customers (число строк), churned (число строк с churn=1), churn_pct=100*churned/customers, среднее monthly_charges и среднее support_calls. Пустые contract_type/payment_method не участвуют в группировках и не служат причиной удалить строки. Результат на данных содержит три строки. Сортировка tenure_band по возрастанию. Выгрузи ровно один CSV с разделителем запятая, десятичной точкой и строкой заголовков. Счётчики запиши целыми; прочие числовые результаты округли до шести знаков после десятичной точки только в самом конце. Сортируй по неокруглённым расчётным значениям, затем округляй. Точные имена выходных колонок: tenure_band, customers, churned, churn_pct, avg_monthly_charges, avg_support_calls.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "3 строк данных; колонки tenure_band, customers, churned, churn_pct, avg_monthly_charges, avg_support_calls. Численность, отток и средние платежи/обращения для трёх диапазонов стажа. Полное содержимое oracle.csv приведено в обязательном пункте result-rows.",
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "required": true,
+      "text": "В графе настроено чтение dataset.csv как CSV с первой строкой заголовков; расчёты получают реальные строки и необходимые поля исходного файла, а не готовые константы результата."
+    },
+    {
+      "id": "tenure-groups",
+      "required": true,
+      "text": "tenure_months разбит на 01_le12 (<=12), 02_13_36 (>12 и <=36), 03_gt36 (>36). Граница 12 относится к первой группе, 36 — ко второй; пустые contract_type/payment_method не фильтруют строки."
+    },
+    {
+      "id": "churn-measures",
+      "required": true,
+      "text": "По tenure_band вычислены customers=count(rows), churned=count(churn=1), churn_pct=100*churned/customers, avg_monthly_charges=mean(monthly_charges), avg_support_calls=mean(support_calls)."
+    },
+    {
+      "id": "sort-final",
+      "required": true,
+      "text": "Группы отсортированы по tenure_band по возрастанию; все расчётные нецелочисленные результаты округлены до 6 знаков только в конце."
+    },
+    {
+      "id": "export-columns",
+      "required": true,
+      "text": "В графе настроена ровно одна итоговая выгрузка текстового CSV с разделителем запятая и десятичной точкой; она связана с результатом вычислений, содержит только tenure_band, customers, churned, churn_pct, avg_monthly_charges, avg_support_calls. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2,
+      "text": "Файл результата содержит ровно 3 строк данных и 6 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.000001. Проверяются все строки и все колонки. Эталонный CSV:\ntenure_band,customers,churned,churn_pct,avg_monthly_charges,avg_support_calls\n01_le12,110,9,8.181818,79.811182,1.881818\n02_13_36,202,30,14.851485,85.939703,1.910891\n03_gt36,688,43,6.250000,84.465291,1.965116"
+    },
+    {
+      "id": "honest-report",
+      "requires_run": true,
+      "text": "Финальный ответ не заявляет выполнение, выгрузку или результаты, не подтверждённые артефактами."
+    }
+  ]
+}

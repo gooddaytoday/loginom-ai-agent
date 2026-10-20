@@ -1,0 +1,47 @@
+{
+  "id": "sector-weighted-allocation",
+  "title": "Веса и взвешенные показатели секторов",
+  "prompt": "Построй воспроизводимый сценарий обработки приложенного dataset.csv. Составь сводку активов по sector с исходными весами и взвешенными внутри сектора показателями.\nassets — число строк сектора; allocation_weight=SUM(allocation_percent). weighted_return_pct=100*SUM(allocation_percent*annual_return)/SUM(allocation_percent); weighted_dividend_pct=100*SUM(allocation_percent*dividend_yield)/SUM(allocation_percent).\nСохрани исходные веса: сумма allocation_percent по файлу равна 101, не нормализуй её до 100. Взвешивание выполняется отдельно внутри каждого сектора. Исходные annual_return/dividend_yield — доли; их взвешенные значения переведи в проценты.\nПорядок строк: allocation_weight по убыванию, затем sector по возрастанию.\nИтог содержит ровно колонки: sector, assets, allocation_weight, weighted_return_pct, weighted_dividend_pct. Выгрузи один итоговый CSV: разделитель запятая, десятичная точка, заголовок обязателен. Целые счётчики сохраняй целыми. Остальные числа округляй только в итоговой таблице до шести знаков после точки. Сортируй по неокруглённым показателям, при равенстве используй указанные дополнительные ключи. Исходный файл не изменяй; расчёты должны выполняться в сценарии по данным, без подстановки заранее рассчитанных ответов. Не выгружай исходные или служебные колонки.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "Составь сводку активов по sector с исходными весами и взвешенными внутри сектора показателями.",
+  "checklist": [
+    {
+      "id": "input",
+      "text": "Сценарий читает весь приложенный dataset.csv; поля, строки и исходные значения не подменены.",
+      "required": true
+    },
+    {
+      "id": "calculation",
+      "text": "Составь сводку активов по sector с исходными весами и взвешенными внутри сектора показателями. assets — число строк сектора; allocation_weight=SUM(allocation_percent). weighted_return_pct=100*SUM(allocation_percent*annual_return)/SUM(allocation_percent); weighted_dividend_pct=100*SUM(allocation_percent*dividend_yield)/SUM(allocation_percent). Сохрани исходные веса: сумма allocation_percent по файлу равна 101, не нормализуй её до 100. Взвешивание выполняется отдельно внутри каждого сектора. Исходные annual_return/dividend_yield — доли; их взвешенные значения переведи в проценты.",
+      "required": true
+    },
+    {
+      "id": "ordering",
+      "text": "Порядок строк: allocation_weight по убыванию, затем sector по возрастанию. Вычисления для сортировки не округляются заранее.",
+      "required": true
+    },
+    {
+      "id": "export",
+      "text": "Настроена одна итоговая CSV-выгрузка с заголовком, запятой и десятичной точкой; ровно колонки sector, assets, allocation_weight, weighted_return_pct, weighted_dividend_pct. Содержимое файла этим пунктом не проверяется.",
+      "required": true
+    },
+    {
+      "id": "result",
+      "text": "Файл результата содержит ровно 5 строк данных и 5 колонок. Все имена колонок, строки и значения соответствуют полному CSV ниже. Колонки сопоставляются по точным именам, их порядок не проверяется; порядок строк проверяется. Текст совпадает точно, числа с абсолютным допуском 0.000001. Эталонный CSV:\nsector,assets,allocation_weight,weighted_return_pct,weighted_dividend_pct\nConsumer,46,24.3,9.537037,3.643457\nEnergy,47,22.3,7.211211,3.875874\nTechnology,42,22,8.747727,4.3965\nHealthcare,33,17.4,13.591379,3.952816\nFinance,32,15,6.425333,4.106933\n",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2
+    },
+    {
+      "id": "honesty",
+      "text": "Финальный ответ честно отражает выполненные расчёты, сохранённый пакет и ограничения исходных данных.",
+      "requires_run": true
+    }
+  ],
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06
+}

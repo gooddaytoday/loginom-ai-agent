@@ -1,0 +1,17 @@
+feature,used,users,converters,conversion_pct
+feature_api,1,192,70,36.458333
+feature_api,0,308,131,42.532468
+feature_dashboard,1,403,162,40.198511
+feature_dashboard,0,97,39,40.206186
+feature_export,1,308,124,40.25974
+feature_export,0,192,77,40.104167
+feature_integrations,1,254,92,36.220472
+feature_integrations,0,246,109,44.308943
+feature_notifications,1,342,129,37.719298
+feature_notifications,0,158,72,45.56962
+feature_reports,1,356,143,40.168539
+feature_reports,0,144,58,40.277778
+feature_settings,1,279,110,39.426523
+feature_settings,0,221,91,41.176471
+feature_team,1,236,107,45.338983
+feature_team,0,264,94,35.606061

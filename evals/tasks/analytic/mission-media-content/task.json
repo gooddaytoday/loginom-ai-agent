@@ -1,0 +1,47 @@
+{
+  "id": "mission-media-content",
+  "title": "Миссии и типы опубликованного контента",
+  "prompt": "Построй воспроизводимый сценарий обработки приложенного dataset.csv. По каждой паре mission,media_type составь сводку предоставленных записей.\nevents — число строк; images=SUM(image_count); hd_events=SUM(hd_image); hd_event_pct=100*hd_events/events; mean_keywords=AVG(keywords_count).\nhd_image — исходный флаг записи для любого media_type, включая video/article; не умножай его на image_count и не фильтруй по типу контента.\nПорядок строк: mission по возрастанию, затем media_type по возрастанию.\nИтог содержит ровно колонки: mission, media_type, events, images, hd_events, hd_event_pct, mean_keywords. Выгрузи один итоговый CSV: разделитель запятая, десятичная точка, заголовок обязателен. Целые счётчики сохраняй целыми. Остальные числа округляй только в итоговой таблице до шести знаков после точки. Сортируй по неокруглённым показателям, при равенстве используй указанные дополнительные ключи. Исходный файл не изменяй; расчёты должны выполняться в сценарии по данным, без подстановки заранее рассчитанных ответов. Не выгружай исходные или служебные колонки.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "По каждой паре mission,media_type составь сводку предоставленных записей.",
+  "checklist": [
+    {
+      "id": "input",
+      "text": "Сценарий читает весь приложенный dataset.csv; поля, строки и исходные значения не подменены.",
+      "required": true
+    },
+    {
+      "id": "calculation",
+      "text": "По каждой паре mission,media_type составь сводку предоставленных записей. events — число строк; images=SUM(image_count); hd_events=SUM(hd_image); hd_event_pct=100*hd_events/events; mean_keywords=AVG(keywords_count). hd_image — исходный флаг записи для любого media_type, включая video/article; не умножай его на image_count и не фильтруй по типу контента.",
+      "required": true
+    },
+    {
+      "id": "ordering",
+      "text": "Порядок строк: mission по возрастанию, затем media_type по возрастанию. Вычисления для сортировки не округляются заранее.",
+      "required": true
+    },
+    {
+      "id": "export",
+      "text": "Настроена одна итоговая CSV-выгрузка с заголовком, запятой и десятичной точкой; ровно колонки mission, media_type, events, images, hd_events, hd_event_pct, mean_keywords. Содержимое файла этим пунктом не проверяется.",
+      "required": true
+    },
+    {
+      "id": "result",
+      "text": "Файл результата содержит ровно 18 строк данных и 7 колонок. Все имена колонок, строки и значения соответствуют полному CSV ниже. Колонки сопоставляются по точным именам, их порядок не проверяется; порядок строк проверяется. Текст совпадает точно, числа с абсолютным допуском 0.000001. Эталонный CSV:\nmission,media_type,events,images,hd_events,hd_event_pct,mean_keywords\nApollo,article,3,17,2,66.666667,10.333333\nApollo,image,15,64,13,86.666667,12.2\nApollo,video,4,21,4,100,13\nArtemis,article,2,9,2,100,12\nArtemis,image,11,59,7,63.636364,9.090909\nArtemis,video,1,3,0,0,13\nGemini,article,3,11,2,66.666667,12.666667\nGemini,image,12,63,11,91.666667,9.5\nGemini,video,3,10,2,66.666667,8.333333\nISS,article,4,19,4,100,12.5\nISS,image,7,30,3,42.857143,12.142857\nISS,video,1,7,0,0,7\nMercury,article,4,19,3,75,11.5\nMercury,image,9,47,7,77.777778,13.333333\nMercury,video,2,11,1,50,9\nSpace Shuttle,article,2,9,1,50,12\nSpace Shuttle,image,13,73,7,53.846154,9.923077\nSpace Shuttle,video,4,19,3,75,12.75\n",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2
+    },
+    {
+      "id": "honesty",
+      "text": "Финальный ответ честно отражает выполненные расчёты, сохранённый пакет и ограничения исходных данных.",
+      "requires_run": true
+    }
+  ],
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06
+}

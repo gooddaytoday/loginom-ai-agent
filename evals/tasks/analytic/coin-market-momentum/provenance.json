@@ -1,0 +1,289 @@
+{
+  "task_id": "coin-market-momentum",
+  "dataset_sha256": {
+    "dataset.csv": "89152fb4a622490d24989828d01c4813386d53eb21fa7f30d39c49b01b2bb199"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "a99764a28a8ecfbb056b5b796becb1930515dfd35a52c2d2968126392d78d6ad"
+  },
+  "reference_sha256": "ae545b11286363eba00b87fc43e8749f62b7c34789177b1dfc59d800124fc04b",
+  "cli": {
+    "binary": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/runtime/bin/loginom-ai-agent-cli",
+    "version": "0.2.2",
+    "profile": "profile"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-coin-market-momentum-2.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/0990d2eabcf4dd63adafb47fab72786aea814939fd69d4696e8117af860c182c-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 2,
+    "total": 2,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_ea9a77e36ffeYPhsSOmSMblAqe",
+    "skill_revision": "8afb17d6a2c247fa0fb8fc6e2285e6ed05e6bf475a1a9d88ae7b760a29260dfc",
+    "exit_code": 0,
+    "started_at": "2026-10-20T01:46:40+03:00",
+    "duration_s": 2106,
+    "tokens": {
+      "input": 192198,
+      "output": 13434,
+      "reasoning": 8863
+    },
+    "tool_calls": 91,
+    "tool_errors": 8,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true,
+    "strict_decimal_cli_check": true,
+    "strict_decimal_rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-coin-market-momentum-2/Unit1/workflow",
+  "source_task": "analitic-tasks/task60-coingecko",
+  "runtime_pin": {
+    "version": "0.2.2",
+    "ci_run": 39210148809,
+    "ci_artifact": {
+      "id": 12168030843,
+      "name": "loginom-linux",
+      "sha256": "bf0e29fd686cb5ec50477a8e36775359486f6aafb93897dce363082fa879c86c"
+    },
+    "archive": {
+      "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/downloads/loginom-ai-agent-cli-0.2.2-linux-x64.tar.gz",
+      "sha256": "c612eab428e5dc16b9a6105cb4fd401a00c04a25dee6390644b50e86044283b9"
+    },
+    "source_commit": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "source_tree_sha256": "92f2bf27f7771109634d33bb8ce6ab1be4f84a74209a45936e0a18d430b57bff",
+    "cli_manifest_sha256": "26c94fe7d3d6f975cc2d60d99eb5f7b2b6fcb377c753c6de3079c155f41ac28c",
+    "resource_manifest_sha256": "0642015ac67c8f569e7b4d1ac158973d514ae39d72b77cacae10d48810fddd34",
+    "harness_sha": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "harness_clean": true
+  },
+  "independent_oracle_check": {
+    "pass": true,
+    "method": "blind Python stdlib csv + in-memory SQLite independent SQL; author oracle not provided",
+    "independent_csv_sha256": "2fdfd523bd2c565aed4a97502a95fc87072194cdd313d05b14d29b44c2de85f5",
+    "query_sha256": "f9ceaa22525072d88e36600081c370107e50eb9d1cd6516b16c372b80ee77e43",
+    "solver_sha256": "eae9569a56fb4abc8fe3cfe0078f438dd1cfd3759f7e31a3ce83d9ba82fb7da3",
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/independent/root/coin-market-momentum/report.json",
+    "comparison": {
+      "passed": true,
+      "error": null
+    }
+  },
+  "browser_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-2/browser-rerun.json",
+    "screenshot": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-2/browser-rerun.png",
+    "all_nodes_active": true,
+    "closed_without_save": true,
+    "rounding_verified_in_exported_path": true
+  },
+  "graph_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-2/graph-inspection.json",
+    "node_count": 7,
+    "connected": true,
+    "strict_positive_flag": true,
+    "original_percent_changes_no_rescale": true,
+    "signed_fraction_Round6_with_carry_after_raw_sort": true,
+    "Expr1_helper_not_exported": true
+  },
+  "strict_decimal_validation": {
+    "absolute_tolerance": "0.000001",
+    "scaled_epsilon": false,
+    "reports": [
+      {
+        "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/reports/t60-exact-decimal-oracle-check.json",
+        "sha256": "97f31c2e91396fe4e6fa4f57cd068d75571eecff4e4bb5d239b26658c76afa1c",
+        "pass": true
+      },
+      {
+        "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/reports/t60-strict-cli-csv-check.json",
+        "sha256": "28d9fedb28b75b9786822b64c0d61f08d8e75ec459696c608fcf1dd439587c5f",
+        "pass": true
+      },
+      {
+        "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/reports/t60-strict-browser-csv-check.json",
+        "sha256": "6867bd2f1bb59be1c4dc2d0bb4e8ebea0acd9ead1bd4d9df88535ec992815dc6",
+        "pass": true
+      }
+    ]
+  },
+  "fallback_used": false,
+  "attempt_history": [
+    {
+      "number": 1,
+      "assisted": false,
+      "classification": "technical-ui-blocker-partial-save",
+      "exit_code": 0,
+      "accepted": false,
+      "content_failure_counted": false,
+      "analytic_revision": "primary",
+      "reason": "repeated final-calculator output_mapping/open WIZARD_OPEN_NOT_CONFIRMED prevented final execution/export; model honestly saved only partial5node checkpoint; official check no ExportTextFile/path/resultCSV",
+      "partial_package": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-1/package.lgp",
+      "official_check": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-1/check.json",
+      "cleanup": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-1/cleanup.json",
+      "evidence": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-1/cleanup-evidence",
+      "next": "unchanged primary attempt2 without hint; no analytic fallback",
+      "classification_evidence": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-1/attempt-classification.json",
+      "cleanup_verified": {
+        "pass": true,
+        "at": "2026-10-19T22:46:22.695929+00:00",
+        "runtime_pid": 1062925,
+        "cli_pids": [
+          1062434,
+          1062435
+        ],
+        "process_close_proof": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-1/cleanup-evidence/process-close-proof.json",
+        "resource_close": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-1/cleanup-evidence/native/resource-close.jsonl",
+        "saved_package_cleanup": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-1/cleanup-evidence/native/saved-package-cleanup.json",
+        "browser_close": "fulfilled 2026-10-19T22:44:35.580Z",
+        "release_stale_writer": {
+          "required": false,
+          "reason": "native cleanup SUCCEEDED, profile writer already absent"
+        },
+        "status": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-1/cleanup-evidence/status.json",
+        "recovery_ids": [],
+        "connection_check": {
+          "ok": true,
+          "code": "LOGINOM_CONNECTION_VALID",
+          "help": {
+            "state": "ready"
+          },
+          "browser": {
+            "state": "verified"
+          }
+        },
+        "writer_absent": true
+      }
+    },
+    {
+      "number": 2,
+      "classification": "accepted",
+      "analytic_revision": "primary",
+      "assisted": false,
+      "exit_code": 0,
+      "cli_check": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-2/check.json",
+      "rerun_check": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-2/check-rerun.json",
+      "technical_diagnosis": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/reports/diagnosis-t60-final-fields.md",
+      "in_attempt_errors": [
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "final-market-001",
+          "phase": "node_incomplete",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Graph gesture refused before effect: Canvas outline control unavailable"
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "final-market-002",
+          "phase": "open",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Node procedure step did not confirm completion; inspect before retry: The intended node wizard was not confirmed after one click; inspect the current view before retry",
+            "cause": {
+              "code": "WIZARD_OPEN_NOT_CONFIRMED",
+              "message": "The intended node wizard was not confirmed after one click; inspect the current view before retry"
+            }
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "final-market-003",
+          "phase": "output_mapping",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Mapping must account for every configured source field"
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "final-market-004",
+          "phase": "open",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Node procedure step did not confirm completion; inspect before retry: The intended node wizard was not confirmed after one click; inspect the current view before retry",
+            "cause": {
+              "code": "WIZARD_OPEN_NOT_CONFIRMED",
+              "message": "The intended node wizard was not confirmed after one click; inspect the current view before retry"
+            }
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "final-market-005",
+          "phase": "output_mapping",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Required or unverified output fields cannot be excluded"
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "round-final-007",
+          "phase": "open",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Node procedure step did not confirm completion; inspect before retry: The intended node wizard was not confirmed after one click; inspect the current view before retry",
+            "cause": {
+              "code": "WIZARD_OPEN_NOT_CONFIRMED",
+              "message": "The intended node wizard was not confirmed after one click; inspect the current view before retry"
+            }
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "format-csv-001",
+          "phase": "open",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Node procedure step did not confirm completion; inspect before retry: The intended node wizard was not confirmed after one click; inspect the current view before retry",
+            "cause": {
+              "code": "WIZARD_OPEN_NOT_CONFIRMED",
+              "message": "The intended node wizard was not confirmed after one click; inspect the current view before retry"
+            }
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "format-csv-002",
+          "phase": "open",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Node procedure step did not confirm completion; inspect before retry: The intended node wizard was not confirmed after one click; inspect the current view before retry",
+            "cause": {
+              "code": "WIZARD_OPEN_NOT_CONFIRMED",
+              "message": "The intended node wizard was not confirmed after one click; inspect the current view before retry"
+            }
+          }
+        }
+      ],
+      "resolution": "supported inspect/release and existing-node reconfiguration; required Expr1 retained as helper, excluded downstream; final signed fractional rounding and one export completed",
+      "hint_used": false,
+      "content_failure_counted": false,
+      "events": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/coin-market-momentum/attempt-2/events.jsonl"
+    }
+  ]
+}
