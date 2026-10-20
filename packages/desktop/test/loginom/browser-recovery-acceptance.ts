@@ -7,10 +7,12 @@ import assert from "node:assert/strict"
 process.umask(0o077)
 const scenario = process.argv[2]
 assert.ok(
-  scenario === "BR-S1" || scenario === "BR-S2" || scenario === "BR-S3" || scenario === "BR-S4",
-  "Expected BR-S1, BR-S2, BR-S3 or BR-S4",
+  scenario === "BR-S1" || scenario === "BR-S2" || scenario === "BR-S3" || scenario === "BR-S4" || scenario === "BR-S5",
+  "Expected BR-S1, BR-S2, BR-S3, BR-S4 or BR-S5",
 )
 assert.equal(process.argv.length, 4, "Expected scenario and one private saved-A manifest path")
+const exportsFile = scenario === "BR-S2" || scenario === "BR-S5"
+const noBrowserCalls = scenario === "BR-S4" || scenario === "BR-S5"
 const seed = await Bun.file(resolve(process.argv[3]!)).json()
 assert.equal(seed.label, "A")
 assert.equal(typeof seed.path, "string")
@@ -51,8 +53,8 @@ const child = await supervise({
   acceptanceFault: [
     {
       kind: "phase_stop",
-      node_type: scenario === "BR-S2" ? "exports.text" : "transform.calculator",
-      phase: scenario === "BR-S4" ? "execute" : "configure",
+      node_type: exportsFile ? "exports.text" : "transform.calculator",
+      phase: noBrowserCalls ? "execute" : "configure",
       code: "UI_SCAN_LIMIT",
       times: scenario === "BR-S3" ? 3 : 1,
     },
@@ -200,58 +202,57 @@ try {
     port.sample.map((row: Array<{ value: string | number }>) => [row[category].value, row[total].value]).sort(),
     Object.entries(seed.expected).sort(),
   )
-  const destination = scenario === "BR-S2" ? `${prepared.storage_directories.exports}/browser-recovery-${run}.csv` : ""
-  const parameters =
-    scenario === "BR-S2"
-      ? {
-          destination,
-          overwrite: "replace",
-          encoding: "UTF-8",
-          delimiter: ";",
-          header: "names",
-          bom: false,
-          line_ending: "LF",
-          decimal_separator: ".",
-          null_marker: "",
-          text_qualifier: '"',
-        }
-      : {
-          expressions: [
-            {
-              target: { kind: "new" },
-              name: "DoubleAmount",
-              label: "DoubleAmount",
-              type: "integer",
-              formula: "Total*2",
-              replace: false,
-            },
-          ],
-        }
+  const destination = exportsFile ? `${prepared.storage_directories.exports}/browser-recovery-${run}.csv` : ""
+  const parameters = exportsFile
+    ? {
+        destination,
+        overwrite: "replace",
+        encoding: "UTF-8",
+        delimiter: ";",
+        header: "names",
+        bom: false,
+        line_ending: "LF",
+        decimal_separator: ".",
+        null_marker: "",
+        text_qualifier: '"',
+      }
+    : {
+        expressions: [
+          {
+            target: { kind: "new" },
+            name: "DoubleAmount",
+            label: "DoubleAmount",
+            type: "integer",
+            formula: "Total*2",
+            replace: false,
+          },
+        ],
+      }
   const request = {
     ...identity,
     ...policy,
-    ...(scenario === "BR-S2" ? { read: { ports: [], sample_rows: 0, require_exact_numbers: false } } : {}),
-    operation_id: scenario === "BR-S2" ? "export" : "calculator",
+    ...(exportsFile ? { read: { ports: [], sample_rows: 0, require_exact_numbers: false } } : {}),
+    operation_id: exportsFile ? "export" : "calculator",
     target: {
       kind: "new",
-      type: scenario === "BR-S2" ? "exports.text" : "transform.calculator",
+      type: exportsFile ? "exports.text" : "transform.calculator",
       label: `Recovery ${scenario}`,
       position: { x: 520, y: 160 },
     },
     inputs: [{ source: grouped.node, output: 0, input: 0 }],
-    mode: scenario === "BR-S2" ? "delimited" : "expression",
+    mode: exportsFile ? "delimited" : "expression",
     parameters,
   }
   let stopped = await apply(request)
   assert.notEqual(stopped.status, "SUCCEEDED")
   const inspected = await call("dock_operation_inspect", { operation_id: request.operation_id })
-  if (scenario === "BR-S2") {
+  if (exportsFile) {
     assert.deepEqual(inspected.output.recovery_options, [])
     assert.equal(inspected.next_step?.trigger, "T2")
     assert.equal(inspected.next_step?.reason_code, "NO_RECOVERY_OPTIONS")
   }
   const released =
-    scenario === "BR-S2"
+    exportsFile
       ? undefined
       : await call("dock_operation_recover", {
           operation_id: request.operation_id,
@@ -276,7 +277,7 @@ try {
   if (scenario !== "BR-S4") {
     assert.equal(
       scenario === "BR-S1" ? released.output?.browser_recovery?.basis?.trigger : stopped.next_step?.trigger,
-      scenario === "BR-S1" ? "T1" : scenario === "BR-S2" ? "T2" : "T3",
+      scenario === "BR-S1" ? "T1" : exportsFile ? "T2" : "T3",
     )
   }
   const operation = scenario === "BR-S3" ? "calculator-again" : request.operation_id
@@ -285,7 +286,7 @@ try {
   if (scenario === "BR-S2" || scenario === "BR-S4") assert.equal(started.budget.calls_remaining, 30)
   assert.equal(started.recovery_input.node.node_id, stopped.node.node_id)
   const label = scenario === "BR-S3" ? "Выполнить" : "Отмена"
-  if (scenario !== "BR-S4") {
+  if (!noBrowserCalls) {
     const wizard = `[data-tid="${started.recovery_input.workflow_ref.prefix};WizrdMCF"]`
     // Canonical controls from node-wizard-close/calculator-node; refs are freshly observed, never inferred from position.
     const button = scenario === "BR-S3" ? "btnExecute" : "btnClose"
@@ -313,17 +314,24 @@ try {
   const recovered = await call("dock_browser_recovery", {
     action: "finish",
     report: {
-      actions: scenario === "BR-S4" ? [] : [`Clicked ${label} in the owned wizard`],
-      result: scenario === "BR-S4" ? "No browser actions; verify the released execution" : "Wizard closed",
+      actions: noBrowserCalls ? [] : [`Clicked ${label} in the owned wizard`],
+      result:
+        scenario === "BR-S4"
+          ? "No browser actions; verify the released execution"
+          : scenario === "BR-S5"
+            ? "No browser actions; verify the current export file"
+            : "Wizard closed",
       settings: [
         scenario === "BR-S2"
           ? "Export draft cancelled; intended UTF-8 CSV settings will be reapplied through Dock"
-          : "DoubleAmount = Total*2; integer; no output mapping",
+          : scenario === "BR-S5"
+            ? "Export UTF-8 CSV settings unchanged; verify the current file"
+            : "DoubleAmount = Total*2; integer; no output mapping",
       ],
     },
   })
   assert.equal(recovered.state, "dock")
-  assert.equal(recovered.result, scenario === "BR-S3" || scenario === "BR-S4" ? "completed" : "continuable")
+  assert.equal(recovered.result, scenario === "BR-S3" || noBrowserCalls ? "completed" : "continuable")
   if (scenario === "BR-S4") {
     assert.equal(recovered.verified.execution.verified, true)
     assert.equal(recovered.verified.execution.owner_verified, true)
@@ -332,6 +340,13 @@ try {
     assert.equal(recovered.next_step.tool, "dock_node_read")
     assert.equal(recovered.next_step.arguments.source_operation_id, recovered.receipt_id)
   }
+  if (scenario === "BR-S5") {
+    assert.equal(recovered.verified.execution.verified, true)
+    assert.equal(recovered.verified.execution.owner_verified, true)
+    assert.equal(recovered.verified.execution.status, "completed")
+    assert.equal(recovered.next_step.tool, undefined)
+    assert.ok(recovered.next_step.instruction.includes(destination))
+  }
   status.recovery = recovered
   let source = recovered.receipt_id
   if (scenario === "BR-S2") {
@@ -339,119 +354,138 @@ try {
     assert.equal(original.output.released_by, "browser_recovery")
     assert.equal(original.output.recovery_receipt_id, recovered.receipt_id)
   }
-  if (scenario === "BR-S1" || scenario === "BR-S2") {
-    const resumed = await apply({
-      ...request,
-      operation_id: scenario === "BR-S2" ? "export-corrected" : "calculator-corrected",
-      target: { kind: "existing", type: request.target.type, ref: stopped.node },
-      inputs: [],
-      mappings: [],
-    })
+  const resumed =
+    scenario === "BR-S1" || scenario === "BR-S2"
+      ? await apply({
+          ...request,
+          operation_id: scenario === "BR-S2" ? "export-corrected" : "calculator-corrected",
+          target: { kind: "existing", type: request.target.type, ref: stopped.node },
+          inputs: [],
+          mappings: [],
+        })
+      : undefined
+  if (resumed) {
     assert.equal(resumed.status, "SUCCEEDED")
     assert.equal(resumed.cleanup_complete, true)
     source = scenario === "BR-S2" ? "export-corrected" : "calculator-corrected"
+  }
+  if (exportsFile) {
     if (scenario === "BR-S2") {
       assert.deepEqual(resumed.node, stopped.node)
       assert.equal(resumed.execution.status, "completed")
       assert.equal(resumed.output.file_artifacts.length, 1)
-      const artifact = resumed.output.file_artifacts[0]
-      assert.equal(artifact.destination, destination)
-      assert.equal(artifact.execution_id, resumed.execution.execution_id)
-      assert.equal(artifact.freshness_basis, "native_absence_check_and_completed_execution")
-      const attempts = join(directory, "generations/1/chats", run, "attempts")
-      const names = await readdir(attempts)
-      assert.equal(names.length, 1)
-      const attempt = join(attempts, names[0])
-      const session = await Bun.file(join(attempt, "session.json")).json()
-      const events = (await Bun.file(join(attempt, "execution-events.jsonl")).text())
-        .split("\n")
-        .filter(Boolean)
-        .map((line) => JSON.parse(line))
-      const browserCalls = events.filter((event) => event.phase === "browser_recovery_call")
-      assert.equal(recovered.budget.calls_remaining, started.budget.calls_remaining - browserCalls.length - 1)
-      const configured = events.filter(
-        (event) =>
-          event.operation_id === source &&
-          event.phase === "node_phase_completed" &&
-          event.receipt?.phase === "configure",
-      )
-      assert.equal(configured.length, 1)
-      const check = configured[0].receipt.value.configuration.configured.destination_check
-      assert.equal(check.verified, true)
-      assert.equal(check.destination, destination)
-      assert.equal(check.existed, false)
-      const verified = events.filter(
-        (event) => event.operation_id === source && event.phase === "export_file_bytes_verified",
-      )
-      assert.equal(verified.length, 1)
-      assert.deepEqual(verified[0].result, artifact)
-      const binding = {
-        session_id: session.sessionId,
-        document_id: identity.document_id,
-        workflow_id: identity.workflow_ref.workflow_id,
-        node_id: resumed.node.node_id,
-        execution_id: resumed.execution.execution_id,
-        destination,
-      }
-      assert.deepEqual(verified[0].binding, binding)
-      const download = events.filter(
-        (event) => event.operation_id === source && event.phase === "export_file_download_completed",
-      )
-      assert.equal(download.length, 1)
-      assert.equal(download[0].id, artifact.verification_id)
-      assert.equal(download[0].outcome.status, "SUCCEEDED")
-      assert.equal(download[0].outcome.cleanup_complete, true)
-      assert.equal(download[0].outcome.output.artifact_id, artifact.artifact_id)
-      assert.equal(download[0].outcome.output.download_completed, true)
-      for (const [key, value] of Object.entries(binding))
-        assert.equal(download[0].outcome.output.output_binding[key], value)
-      const completed = events.filter(
-        (event) => event.operation_id === source && event.phase === "export_file_read_completed",
-      )
-      assert.equal(completed.length, 1)
-      assert.equal(completed[0].workflow_return_verified, true)
-      assert.deepEqual(completed[0].result, artifact)
-      const bytes = Buffer.from(
-        await Bun.file(
-          join(attempt, "artifacts/input", `output-${artifact.artifact_id}`, basename(destination)),
-        ).arrayBuffer(),
-      )
-      assert.equal(bytes.length, artifact.bytes)
-      assert.equal(createHash("sha256").update(bytes).digest("hex"), artifact.sha256)
-      const csv = new TextDecoder("utf-8", { fatal: true }).decode(bytes)
-      assert.equal(bytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf])), false)
-      assert.equal(csv.includes("\r"), false)
-      assert.equal(csv.endsWith("\n"), true)
-      // This fixture has only plain Category/Total fields; other CSV syntax must fail, not be normalized.
-      const rows = csv
-        .slice(0, -1)
-        .split("\n")
-        .map((line) =>
-          line.split(";").map((field) => {
-            const match = /^(?:"([^";]*)"|([^";]*))$/.exec(field)
-            assert.ok(match, "Unexpected CSV field syntax")
-            return match[1] ?? match[2]!
-          }),
-        )
-      assert.equal(rows.length, 3)
-      const headers = rows[0]!
-      assert.deepEqual([...headers].sort(), port.schema.map((field: { name: string }) => field.name).sort())
-      assert.ok(rows.every((row) => row.length === headers.length))
-      assert.deepEqual(
-        rows
-          .slice(1)
-          .map((row) => {
-            const number = row[headers.indexOf("Total")]!
-            assert.match(number, /^[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$/)
-            return [row[headers.indexOf("Category")], Number(number)]
-          })
-          .sort(),
-        port.sample.map((row: Array<{ value: string | number }>) => [row[category].value, row[total].value]).sort(),
-      )
-      status.file = { artifact, lineageVerified: true, semanticVerified: true, rawBytesVerified: true }
     }
+    const { verified: fileVerified, ...recoveredArtifact } = recovered.verified?.export_file ?? {}
+    if (scenario === "BR-S5") assert.equal(fileVerified, true)
+    const artifact = scenario === "BR-S2" ? resumed.output.file_artifacts[0] : recoveredArtifact
+    const execution = scenario === "BR-S2" ? resumed.execution : recovered.verified.execution
+    assert.equal(artifact.destination, destination)
+    assert.equal(artifact.execution_id, execution.execution_id)
+    assert.equal(artifact.freshness_basis, "native_absence_check_and_completed_execution")
+    const attempts = join(directory, "generations/1/chats", run, "attempts")
+    const names = await readdir(attempts)
+    assert.equal(names.length, 1)
+    const attempt = join(attempts, names[0])
+    const session = await Bun.file(join(attempt, "session.json")).json()
+    const events = (await Bun.file(join(attempt, "execution-events.jsonl")).text())
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+    const browserCalls = events.filter((event) => event.phase === "browser_recovery_call")
+    if (scenario === "BR-S2")
+      assert.equal(recovered.budget.calls_remaining, started.budget.calls_remaining - browserCalls.length - 1)
+    const configured = events.filter(
+      (event) =>
+        event.operation_id === (scenario === "BR-S2" ? source : operation) &&
+        event.phase === "node_phase_completed" &&
+        event.receipt?.phase === "configure",
+    )
+    assert.equal(configured.length, 1)
+    const check = configured[0].receipt.value.configuration.configured.destination_check
+    assert.equal(check.verified, true)
+    assert.equal(check.destination, destination)
+    assert.equal(check.existed, false)
+    const verified = events.filter(
+      (event) => event.phase === "export_file_bytes_verified" && event.result.verification_id === artifact.verification_id,
+    )
+    assert.equal(verified.length, 1)
+    assert.deepEqual(verified[0].result, artifact)
+    if (scenario === "BR-S2") assert.equal(verified[0].operation_id, source)
+    if (scenario === "BR-S5") {
+      const receipt = events.filter(
+        (event) => event.operation_id === recovered.receipt_id && event.phase === "browser_recovery_verified",
+      )
+      assert.equal(receipt.length, 1)
+      assert.equal(receipt[0].result.original_operation_id, operation)
+      assert.deepEqual(receipt[0].result.node, stopped.node)
+      assert.deepEqual(receipt[0].facts.export_file, recovered.verified.export_file)
+    }
+    const binding = {
+      session_id: session.sessionId,
+      document_id: identity.document_id,
+      workflow_id: identity.workflow_ref.workflow_id,
+      node_id: stopped.node.node_id,
+      execution_id: execution.execution_id,
+      destination,
+    }
+    assert.deepEqual(verified[0].binding, binding)
+    const download = events.filter(
+      (event) => event.operation_id === verified[0].operation_id && event.phase === "export_file_download_completed",
+    )
+    assert.equal(download.length, 1)
+    assert.equal(download[0].id, artifact.verification_id)
+    assert.equal(download[0].outcome.status, "SUCCEEDED")
+    assert.equal(download[0].outcome.cleanup_complete, true)
+    assert.equal(download[0].outcome.output.artifact_id, artifact.artifact_id)
+    assert.equal(download[0].outcome.output.download_completed, true)
+    for (const [key, value] of Object.entries(binding))
+      assert.equal(download[0].outcome.output.output_binding[key], value)
+    const completed = events.filter(
+      (event) => event.operation_id === verified[0].operation_id && event.phase === "export_file_read_completed",
+    )
+    assert.equal(completed.length, 1)
+    assert.equal(completed[0].workflow_return_verified, true)
+    assert.deepEqual(completed[0].result, artifact)
+    const bytes = Buffer.from(
+      await Bun.file(
+        join(attempt, "artifacts/input", `output-${artifact.artifact_id}`, basename(destination)),
+      ).arrayBuffer(),
+    )
+    assert.equal(bytes.length, artifact.bytes)
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), artifact.sha256)
+    const csv = new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+    assert.equal(bytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf])), false)
+    assert.equal(csv.includes("\r"), false)
+    assert.equal(csv.endsWith("\n"), true)
+    // This fixture has only plain Category/Total fields; other CSV syntax must fail, not be normalized.
+    const rows = csv
+      .slice(0, -1)
+      .split("\n")
+      .map((line) =>
+        line.split(";").map((field) => {
+          const match = /^(?:"([^";]*)"|([^";]*))$/.exec(field)
+          assert.ok(match, "Unexpected CSV field syntax")
+          return match[1] ?? match[2]!
+        }),
+      )
+    assert.equal(rows.length, 3)
+    const headers = rows[0]!
+    assert.deepEqual([...headers].sort(), port.schema.map((field: { name: string }) => field.name).sort())
+    assert.ok(rows.every((row) => row.length === headers.length))
+    assert.deepEqual(
+      rows
+        .slice(1)
+        .map((row) => {
+          const number = row[headers.indexOf("Total")]!
+          assert.match(number, /^[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$/)
+          return [row[headers.indexOf("Category")], Number(number)]
+        })
+        .sort(),
+      port.sample.map((row: Array<{ value: string | number }>) => [row[category].value, row[total].value]).sort(),
+    )
+    status.file = { artifact, lineageVerified: true, semanticVerified: true, rawBytesVerified: true }
   }
-  if (scenario !== "BR-S2") {
+  if (!exportsFile) {
     let read = await call("dock_node_read", {
       source_operation_id: source,
       operation_id: "read",
@@ -529,9 +563,9 @@ try {
     .filter((event) => event.phase === "acceptance_fault_injected")
   status.faults = faults.map((event) => ({ kind: event.kind, phase: event.target_phase, remaining: event.remaining }))
   const phaseFaults = faults.filter(
-    (event) => event.kind === "phase_stop" && event.target_phase === (scenario === "BR-S4" ? "execute" : "configure"),
+    (event) => event.kind === "phase_stop" && event.target_phase === (noBrowserCalls ? "execute" : "configure"),
   )
-  if (scenario === "BR-S4" && journal.includes('"phase":"browser_recovery_call"')) status.status = "FAIL"
+  if (noBrowserCalls && journal.includes('"phase":"browser_recovery_call"')) status.status = "FAIL"
   if (
     phaseFaults.length !== (scenario === "BR-S3" ? 2 : 1) ||
     phaseFaults.at(-1)?.remaining !== (scenario === "BR-S3" ? 1 : 0)

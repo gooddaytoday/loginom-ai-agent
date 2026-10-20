@@ -43,6 +43,10 @@ LOGINOM_AI_AGENT_TEST_RESOURCES=<fresh-resources> \
 DISPLAY=:1 LOGINOM_AI_AGENT_TEST_CONFIG=<private-config> \
 LOGINOM_AI_AGENT_TEST_RESOURCES=<fresh-resources> \
 <absolute-pinned-bun> test/loginom/browser-recovery-acceptance.ts BR-S4 <private-saved-A.json>
+# Только после чтения и принятия квитанций BR-S4:
+DISPLAY=:1 LOGINOM_AI_AGENT_TEST_CONFIG=<private-config> \
+LOGINOM_AI_AGENT_TEST_RESOURCES=<fresh-resources> \
+<absolute-pinned-bun> test/loginom/browser-recovery-acceptance.ts BR-S5 <private-saved-A.json>
 ```
 
 Manifest существующей формы `{label,path,node,expected}` содержит `label:"A"`,
@@ -70,6 +74,7 @@ Category:string/Total:real, полная точная выборка Alpha/35, B
 | BR-S2 | Export configure ×1 | T2 без Dock release; observed owned Cancel, finish, новая existing-операция того же узла | continuable; исходный output released_by/receipt; текущий файл/данные/bytes/SHA; Save/cleanup |
 | BR-S3 | configure ×3                     | Dock освобождает первый сбой; повторный existing configure даёт T3; найти текущий ref собственной btnExecute, click, ждать закрытия мастера, finish | completed, runtime проверяет console execution и Preview schema; node read использует recovery receipt; configure fault remaining=1 |
 | BR-S4 | Calculator execute ×1 | Dock release → T4 execution; start → finish actions[] без browser tools | completed, verified execution/schema, fresh node read по recovery receipt, Save/cleanup |
+| BR-S5 | Export execute ×1 | T2 без Dock release; start → finish actions[] без browser tools | completed, текущий файл/данные/bytes/SHA/lineage; далее сразу Save/cleanup |
 
 Calculator: `DoubleAmount = Total*2`, integer, без output mapping,
 `finish: execute`, `read.ports: []`. Browser оператор использует только публичные
@@ -106,7 +111,14 @@ BR-S4 сохраняет тот же Calculator-запрос, но inject сра
 и output schema; следующий read использует именно текущую recovery receipt и даёт
 fresh output. Numeric gate70/40 не добавляется.
 
-Все четыре сценария завершаются Dock `package.save_checkpoint` с `conflict_policy:replace`
+BR-S5 использует тот же Export-запрос и собственный UUID destination, но fault после
+execute. Требуется строго completed с verified execution и export_file, next_step
+указывает текущий файл без dock_node_read. Общая с S2 проверка связывает текущую
+recovery receipt, native configure, execution/download/bytes и retained файл.
+Сразу после finish и локальной проверки файла первым Dock вызовом идёт final Save;
+повторный Export не выполняется. После completed числовой budget gate не задаётся.
+
+Все пять сценариев завершаются Dock `package.save_checkpoint` с `conflict_policy:replace`
 только по точному собственному пути, созданному SaveAs, и native `modified:false`.
 При modified:true сохраняются проверки runtime next_step и новый checkpoint ID.
 Журнал должен содержать `acceptance_fault_injected`, `browser_recovery_handoff`,
