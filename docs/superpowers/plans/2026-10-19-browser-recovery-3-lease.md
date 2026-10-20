@@ -199,6 +199,7 @@ git commit -m "feat(runtime): lease the browser for one recovery attempt"
 **Files:**
 - Modify: `packages/loginom-runtime/client/lib/browser-recovery.mjs`
 - Create: `packages/loginom-runtime/client/test/browser-recovery-probe.integration.test.mjs` (по образцу `browser-geometry.integration.test.mjs` и `support/run-direct-browser-tests.mjs`)
+- Modify: `packages/loginom-runtime/client/test/support/run-direct-browser-tests.mjs` — добавить новый integration test в существующий фиксированный список; аргументы CLI этот runner не принимает.
 - Test: `packages/loginom-runtime/client/test/browser-recovery.test.mjs`
 
 **Interfaces:**
