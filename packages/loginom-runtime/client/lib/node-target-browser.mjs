@@ -252,7 +252,22 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         const rebound={...deselected,nodes:deselected.nodes.map(n=>n===current?{...n,dom_epoch:node?.dom_epoch}:n)};
         if(node?.type!=='programming.javascript' || !Number.isSafeInteger(node.dom_epoch)
           || !Number.isSafeInteger(current?.dom_epoch) || current.dom_epoch<=node.dom_epoch
-          || JSON.stringify(rebound)!==JSON.stringify(gestureBefore))throw new Error('Graph changed while deselecting');
+          || JSON.stringify(rebound)!==JSON.stringify(gestureBefore)){
+          const differences=[],pending=[{path:'$',expected:gestureBefore,observed:deselected}];
+          let inspected=0;
+          while(pending.length&&differences.length<32&&inspected++<512){
+            const item=pending.pop();
+            if(JSON.stringify(item.expected)===JSON.stringify(item.observed))continue;
+            if(item.expected&&item.observed&&typeof item.expected==='object'&&typeof item.observed==='object'){
+              const keys=[...new Set([...Object.keys(item.expected),...Object.keys(item.observed)])].slice(0,128);
+              for(const key of keys.reverse())pending.push({path:(item.path+'.'+key).slice(0,240),expected:item.expected[key],observed:item.observed[key]});
+            }else{
+              const bounded=value=>value===undefined?'[undefined]':typeof value==='string'?value.slice(0,128):value===null||typeof value==='boolean'||typeof value==='number'?value:'[object]';
+              differences.push({path:item.path,expected:bounded(item.expected),observed:bounded(item.observed)});
+            }
+          }
+          throw new Error('Graph changed while deselecting: '+JSON.stringify({differences,truncated:pending.length>0}));
+        }
         remaining();await ensureContext();
         if(JSON.stringify(await read(page,task))!==JSON.stringify(deselected))throw new Error('Graph changed after deselection redraw');
         gestureBefore=deselected;
