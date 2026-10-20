@@ -4,6 +4,18 @@ import path from "node:path"
 import { mkdtemp, rm } from "node:fs/promises"
 import { watchAttemptIncidents } from "../src/run-incidents"
 
+test("a judge lockdown mismatch interrupts admission before another task starts", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-config-incident-")), codes: string[] = []
+  const controller = new AbortController()
+  const watcher = watchAttemptIncidents(root, code => { codes.push(code); controller.abort() })
+  try {
+    await Bun.write(path.join(root, "judge-stderr-1.txt"), "CODEX_HOME must contain the same lockdown config.\n")
+    await watcher.stop()
+    expect(controller.signal.aborted).toBe(true)
+    expect(codes).toEqual(["JUDGE_CONFIGURATION_MISMATCH"])
+  } finally { await watcher.stop(); await rm(root, { recursive: true }) }
+})
+
 test("a live licence denial interrupts the run before the attempt completes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-live-incident-"))
   const controller = new AbortController(), codes: string[] = []
@@ -14,6 +26,17 @@ test("a live licence denial interrupts the run before the attempt completes", as
     while (!controller.signal.aborted && Date.now() < deadline) await Bun.sleep(10)
     expect(controller.signal.aborted).toBe(true)
     expect(codes).toContain("LICENCE_DENIED")
+  } finally { await watcher.stop(); await rm(root, { recursive: true }) }
+})
+
+test("ordinary judge stderr and agent text do not report a judge configuration mismatch", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-config-source-")), codes: string[] = []
+  const watcher = watchAttemptIncidents(root, code => { codes.push(code) })
+  try {
+    await Bun.write(path.join(root, "stderr.txt"), "CODEX_HOME must contain the same lockdown config.\n")
+    await Bun.write(path.join(root, "judge-stderr-1.txt"), "Judge did not produce a verdict.\n")
+    await watcher.stop()
+    expect(codes).toEqual([])
   } finally { await watcher.stop(); await rm(root, { recursive: true }) }
 })
 
