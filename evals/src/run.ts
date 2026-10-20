@@ -252,6 +252,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const early = statusFor(run, false)
   // This measured checkpoint survives failures in artifact/judge/evidence persistence.
   Object.assign(base, { status: early.status, exit_code: run.exitCode, timed_out: run.timedOut, interrupted: run.interrupted,
+    browser_recovery: run.browserRecoveryStarted,
     duration_ms: run.durationMs, cost: run.cost, tokens: run.tokens, counters: run.counters,
     session_id: run.sessionId ?? null, errors: run.errors, stderr_head: run.stderrHead })
   const fetched =
@@ -457,6 +458,7 @@ function emptyResult(taskId: string, attempt: number, profileRecovered: boolean)
     structural_score: null,
     score: null,
     pass: null,
+    browser_recovery: false,
     judge_status: "skipped",
     judge_attempts: 0,
     judge_confidence: null,

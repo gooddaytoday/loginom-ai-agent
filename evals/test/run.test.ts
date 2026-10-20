@@ -198,6 +198,25 @@ test("main --dry-run --only: подмножество задач", async () => {
   }
 }, 30_000)
 
+test("main: browser recovery event проходит в result, count и report", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-browser-recovered-"))
+  try {
+    const tasksDir = path.join(directory, "tasks")
+    await cp(path.join(evalsRoot, "tasks/group-sum-qty"), path.join(tasksDir, "browser-recovered"), { recursive: true })
+    const taskFile = path.join(tasksDir, "browser-recovered/task.json")
+    await Bun.write(taskFile, JSON.stringify({ ...await Bun.file(taskFile).json(), id: "browser-recovered" }))
+    const run = await main(["--dry-run", "--tasks", tasksDir], {
+      EVAL_RESULTS_DIR: path.join(directory, "results"), EVAL_WORKSPACE_ROOT: path.join(directory, "workspace"),
+    })
+    expect(run.code).toBe(0)
+    const summary = await Bun.file(path.join(run.runDir, "summary.json")).json() as RunSummary
+    expect(summary.tasks[0]!.attempts[0]!.browser_recovery).toBe(true)
+    expect((await Bun.file(path.join(run.runDir, "browser-recovered/1/result.json")).json()).browser_recovery).toBe(true)
+    expect(summary.metrics.recovered_via_browser_count).toBe(1)
+    expect(await Bun.file(path.join(run.runDir, "report.md")).text()).toContain("recovered_via_browser_count: 1")
+  } finally { await rm(directory, { recursive: true, force: true }) }
+}, 30_000)
+
 test("redact: password, dock.apiKey и provider.apiKey не попадают в JSON", () => {
   const loaded = loadConfig([], {
     LOGINOM_DOCK_API_KEY: "dock-env",

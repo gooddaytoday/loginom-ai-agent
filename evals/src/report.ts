@@ -44,6 +44,7 @@ export type AttemptResult = {
   evaluation_contract_hash?: string
   score: number | null
   pass: boolean | null
+  browser_recovery?: boolean
   oracle_pass?: boolean | null
   oracle_error?: string | null
   judge_status: JudgeStatus
@@ -93,6 +94,8 @@ export function aggregate(attempts: AttemptResult[], skipJudge: boolean) {
     mean_score: skipJudge ? null : mean(scoresOf(scored)),
     mean_score_completed: skipJudge ? null : mean(scoresOf(completed)),
     pass_rate: skipJudge || !evaluated.length ? null : round(evaluated.filter((item) => item.pass === true).length / evaluated.length, 3),
+    recovered_via_browser_count: counted.filter((item) => item.browser_recovery === true &&
+      (skipJudge ? item.status === "completed" : item.pass === true)).length,
     pass_evaluated_count: evaluated.length,
     oracle_checked_count: oracleChecked.length,
     oracle_pass_rate: oracleChecked.length ? round(oracleChecked.filter((item) => item.oracle_pass).length / oracleChecked.length, 3) : null,
@@ -196,6 +199,7 @@ export function renderReport(summary: RunSummary) {
     `- mean_score: ${fmt(m.mean_score)} (scored ${m.scored_count}, excluded ${m.excluded_count})`,
     `- mean_score_completed: ${fmt(m.mean_score_completed)}`,
     `- pass_rate: ${pct(m.pass_rate)} (оценено ${m.pass_evaluated_count ?? m.scored_count})`,
+    `- recovered_via_browser_count: ${m.recovered_via_browser_count ?? 0}`,
     `- oracle_pass_rate: ${pct(m.oracle_pass_rate ?? null)} (проверено ${m.oracle_checked_count ?? 0})`,
     `- infra_error: ${m.infra_error_count ?? 0}, harness_error: ${m.harness_error_count ?? 0}, judge_error: ${m.judge_error_count ?? 0}`,
     `- environment_cleanup: ошибок ${m.environment_cleanup_error_count ?? 0}, проверено ${m.environment_cleanup_checked_count ?? 0}`,
