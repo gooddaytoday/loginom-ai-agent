@@ -103,6 +103,23 @@ test("aggregate: --skip-judge обнуляет метрики судьи, но �
   expect(metrics.pass_rate).toBeNull()
 })
 
+test("aggregate: browser recovery учитывается только среди успешных counted попыток", () => {
+  const attempts = [
+    attempt({ browser_recovery: true, pass: true }),
+    attempt({ browser_recovery: true, pass: false, oracle_pass: false }),
+    attempt({ browser_recovery: true, pass: null, judge_status: "error" }),
+    attempt({ browser_recovery: true, status: "failed", pass: true }),
+    attempt({ browser_recovery: true, status: "harness_error", pass: true }),
+    attempt({ pass: true }), // исторический результат без поля
+  ]
+  expect(aggregate(attempts, false)).toMatchObject({
+    recovered_via_browser_count: 2, pass_rate: 0.75, completion_rate: 0.8,
+  })
+  expect(aggregate(attempts, true)).toMatchObject({
+    recovered_via_browser_count: 3, pass_rate: null, completion_rate: 0.8,
+  })
+})
+
 test("aggregate: ошибка harness исключена из качества и разброса, расходы сохраняются", () => {
   const attempts = [
     attempt({ score: 100, pass: true }),
@@ -190,6 +207,12 @@ test("renderReport: метрики, задачи, попытки, отказы �
   expect(report).toContain("provider")
   expect(report).toContain("APIError")
   expect(report).toContain("Остатки в хранилище")
+})
+
+test("renderReport: старый summary без счётчика не выводит undefined", () => {
+  const previous = summary()
+  Reflect.deleteProperty(previous.metrics, "recovered_via_browser_count")
+  expect(renderReport(previous)).toContain("recovered_via_browser_count: 0")
 })
 
 test("renderReport: cleanup отдельно, включая completed failure и старую непроверенную попытку", () => {

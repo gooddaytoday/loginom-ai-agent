@@ -13,6 +13,12 @@ test("parseEvents: завершённый browser recovery start отмечае�
   const event = { type: "tool_use", part: { type: "tool", tool: "loginom_dock_browser_recovery",
     state: { status: "completed", input: { action: "start" } } } }
   expect(parseEvents(JSON.stringify(event)).browserRecoveryStarted).toBe(true)
+  expect(parseEvents([JSON.stringify(event), JSON.stringify(event)].join("\n")).browserRecoveryStarted).toBe(true)
+  expect(parseEvents("").browserRecoveryStarted).toBe(false)
+  for (const [status, action] of [["completed", "finish"], ["running", "start"], ["error", "start"]]) {
+    expect(parseEvents(JSON.stringify({ ...event, part: { ...event.part,
+      state: { status, input: { action } } } })).browserRecoveryStarted).toBe(false)
+  }
 })
 
 test("parseEvents: квитанция сохранения читается из последовательности JSON-документов", () => {
