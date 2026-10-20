@@ -153,7 +153,7 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 
 ## Checkpoint — 20.10.2026, работа возобновлена
 
-- Статус: ACTIVE; планы 1–4 выполнены и приняты. План 3, Task 5: подготовка 1–4 и BR-S1/BR-S3 native PASS, independent review Approved. Следующий шаг — изолировать Host Bun loader failure, затем план 5, Task 2.
+- Статус: ACTIVE; планы 1–4 выполнены и приняты. План 3, Task 5: подготовка 1–4 и BR-S1/BR-S3 native PASS, independent review Approved. Следующий шаг — [Host loader follow-up](2026-10-20-browser-recovery-host-loader.md), затем план 5, Task 2.
 - Рабочая ветка `recovery-build-flag`, worktree `/home/george/.codex/worktrees/browser-recovery/loginom-ai-agent`; исходная база `0afb4c483a`. Draft PR224 в `demo-022`; merge и release требуют отдельной команды владельца.
 - Task 5: harness использует одну обязательную private saved-A ссылку, собственную SaveAs-копию каждого сценария и публичный cold Group. Свежие Alpha35/Beta20, сохранённые settings/bindings, final Save modified:false, native cleanup без discard и ACK/exit0 подтверждены. Версии и evidence — в smoke-отчёте.
 - BR-S1: T1 → continuable → новая calculator-corrected SUCCEEDED → fresh read; BR-S3: T3 → completed с execution/Preview → fresh br-1:receipt read, configure remaining1. user_action отсутствует; собственные PID/PGID завершены.
