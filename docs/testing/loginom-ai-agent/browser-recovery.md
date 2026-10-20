@@ -104,7 +104,7 @@ BR-S4 сохраняет тот же Calculator-запрос, но inject сра
 После штатного release требуется T4/effect execution; start сразу переходит к finish
 с actions[] без browser tools. Runtime должен подтвердить completed, execution
 и output schema; следующий read использует именно текущую recovery receipt и даёт
-fresh output. Остаток29 учитывает единственный finish. Numeric gate70/40 не добавляется.
+fresh output. Numeric gate70/40 не добавляется.
 
 Все четыре сценария завершаются Dock `package.save_checkpoint` с `conflict_policy:replace`
 только по точному собственному пути, созданному SaveAs, и native `modified:false`.

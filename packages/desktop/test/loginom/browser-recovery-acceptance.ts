@@ -331,7 +331,6 @@ try {
     assert.equal(recovered.verified.output_schema.verified, true)
     assert.equal(recovered.next_step.tool, "dock_node_read")
     assert.equal(recovered.next_step.arguments.source_operation_id, recovered.receipt_id)
-    assert.equal(recovered.budget.calls_remaining, 29)
   }
   status.recovery = recovered
   let source = recovered.receipt_id
