@@ -72,7 +72,7 @@ export function validateNodeTargetRequest(request) {
     if (target.ref.document_id !== request.document_id || target.ref.workflow_id !== request.workflow_ref.workflow_id) throw new Error('Target belongs to another workflow');
   } else throw new Error('Choose exactly one new or existing node target');
   if (target.label !== undefined && (typeof target.label !== 'string' || !target.label.trim() || target.label.length > 200
-    || /[;|<>"'\\\x00-\x1f]/.test(target.label))) throw new Error('Unsupported node label');
+    || /[;|<>"'\\\x00-\x1f]/.test(target.label))) throw new Error('Invalid parameters.target.label: expected nonblank text of at most 200 UTF-16 code units without semicolon, vertical bar, angle brackets, single/double quotes, backslash or control characters U+0000..U+001F. Omit target.label or use a plain-language caption; keep comparison operators in parameters, not in the node label');
   if (target.position !== undefined) {
     object(target.position, ['x', 'y']);
     for(const axis of ['x','y'])if(!Number.isFinite(target.position[axis]) || target.position[axis]<NODE_POSITION_MIN || target.position[axis]>10000)

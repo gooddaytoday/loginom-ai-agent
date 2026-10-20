@@ -54,7 +54,9 @@ export function compactNodeRequestFailure(outcome,request={}) {
         ?{tool:'dock_action_describe',arguments:{node_types:[request.target.type]},original_operation_id:requestedId,
           instruction:'Read the parameter_schema for this exact node type. Then correct the rejected parameters and submit dock_node_apply with a NEW operation_id. No browser recovery is required.'}
         :{tool:'dock_node_apply',original_operation_id:requestedId,
-          instruction:repairHint?repairHint+' No browser recovery is required.':'Correct the indicated request using its schema and submit it with a NEW operation_id. No browser recovery is required.'}};
+          instruction:repairHint?repairHint+' No browser recovery is required.':path==='target.label'
+            ?message+'. Keep all other request fields and submit with a NEW operation_id. No browser recovery is required.'
+            :'Correct the indicated request using its schema and submit it with a NEW operation_id. No browser recovery is required.'}};
 }
 
 export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
