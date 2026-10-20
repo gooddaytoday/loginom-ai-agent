@@ -384,9 +384,7 @@ git commit -m "feat(runtime): wire the browser recovery lease into the bridge"
 
 **Предусловия:** как у плана 2, Task 0; resources заново stage из текущего принятого HEAD существующим builder. Старый bundle живой пробы Task 0 для проверки новой реализации не используется.
 
-**Подготовка входа после блокера delivery:** сначала одна временная живая проба вне Git: открыть подтверждённый собственный сохранённый Import из Task 0, сделать `package.save_as` в уникальную собственную копию, заново prepare и через штатный Group получить Category / sum(amount) → Total. Используются точный сохранённый node ID и новый document/workflow, старые UI ref не переносятся. Проба успешна только при свежем полном результате Alpha=35/Beta=20, финальном Dock Save `modified:false` и подтверждённой собственной очистке. Исходный seed не изменяется; любой FAIL или неопределённость — STOP/defer без повтора и setup fallback.
-
-Только после полного PASS пробы заменить прежнюю attachment/delivery/import подготовку одним обязательным приватным saved-A manifest аргументом существующей формы `{path,node,expected}`. Каждый BR-сценарий делает собственную SaveAs-копию Group seed, получает свежую identity, исполняет existing Group с `parameters:{}` и проверяет результат до recovery. Calculator использует `Total * 2`; его acceptanceFault не расходуется подготовкой Group. Никаких delivery product fixes, выдуманной upload-lineage, нового runtime API или альтернативных setup ветвей. Временный probe script удаляется; приватные доказательства остаются. Стоимость замены — около четырёх существующих файлов, +100/−60 строк; риск reopen/identity/активации upstream проверяется первой пробой. Критерии BR-S1/BR-S3 ниже сохраняются.
+**Текущий блокер подготовки:** однократная независимо проверенная проба сохранённого Import → Group не дала активный source output0; свежего Group результата нет. Открытие, собственная SaveAs-копия и fresh prepare успешны, отказ Group — `NOT_APPLIED`, без эффекта; собственные package/logout/managed cleanup подтверждены. Повтор этой подготовки и изменение harness не разрешены её результатом. Task 5 отложен до реально проверенного активного входа в текущем runtime; delivery product и import-lineage контракт не меняются. Подробности и исторические ограничения — в smoke-отчёте; критерии BR-S1/BR-S3 ниже сохраняются.
 
 **Files:**
 - Create: `packages/desktop/test/loginom/browser-recovery-acceptance.ts` (по образцу `runtime-acceptance.ts:88-140`: `supervise({..., browserRecovery: true, acceptanceFault})`, `invoke()` сохраняет каждую квитанцию)
@@ -409,7 +407,7 @@ git commit -m "feat(runtime): wire the browser recovery lease into the bridge"
 
 - [ ] **Step 2: Run the scenarios**
 
-Run: `cd packages/desktop && LOGINOM_AI_AGENT_TEST_CONFIG=<private config> LOGINOM_AI_AGENT_TEST_RESOURCES=<staged resources> bun test/loginom/browser-recovery-acceptance.ts BR-S1 <private-saved-A-manifest>` (затем `BR-S3` с тем же manifest)
+Run: `cd packages/desktop && LOGINOM_AI_AGENT_TEST_CONFIG=<private config> LOGINOM_AI_AGENT_TEST_RESOURCES=<staged resources> bun test/loginom/browser-recovery-acceptance.ts BR-S1` (затем `BR-S3`)
 Expected: оба PASS; в журналах есть `acceptance_fault_injected`, `browser_recovery_handoff`, `browser_recovery_verified`, `browser_recovery_dock_resumed`. При провале — остановиться, записать в checkpoint и не начинать план 4 до исправления.
 
 - [ ] **Step 3: Write the report**

@@ -99,3 +99,16 @@ find пока не проверены нативно. Ref-поиск собст�
 тот же существующий flow, затем пройти BR-S1 с ref/owner проверкой и BR-S3.
 До этого release gate остаётся закрыт. Все три приватных evidence-каталога сохранены;
 отсутствие подтверждённого cleanup каждой попытки не подменяется успехом другого запуска.
+
+## Последующая однократная setup-проба — BLOCKED
+
+После независимого GO проверена возможность использовать собственный сохранённый Import как вход штатного Group. Harness и production не менялись; BR-S1/BR-S3 в этой пробе не запускались. Исходники: `677e5ece918b236baa21980ffd0bd5e5d3db89fd`; свежий staging текущим builder, 4753 inventory entries, resource manifest SHA-256 `ba5c5af9aa1728812d4732b849f6ecaa829560d27923404c12a3c0b3ad9beec3`.
+
+Приватный evidence: `/home/george/.cache/loginom-ai-agent/browser-recovery-20261020-resume-pilot/evidence/ffe039af-6894-499e-8dd4-e6db308eb730`; resources — соседний `browser-recovery-20261020-resume-pilot/resources`. Config и сырые журналы в Git не внесены.
+
+- Open seed, уникальная собственная SaveAs-копия (`SUCCEEDED`, `reopened:true`) и fresh prepare — успешны. Исходный seed не изменялся; старые UI refs не переносились.
+- Одна Group-операция завершена `NOT_APPLIED`, `effect_possible:false`, `cleanup_complete:true`, `NODE_APPLY_STOPPED`: `Grouping preflight requires an active source output zero`. Свежий результат Alpha=35/Beta=20 и финальный Group Save не достигнуты; saved-A manifest не создан. Историческая выборка seed не выдана за свежий результат.
+- Текущая собственная копия закрыта: package cleanup `SUCCEEDED`, `package_closed:true`, `logged_out:true`, `unsaved_changes_discarded:false`, `save_operation_id:copy-seed`; managed close `closed_ack:true`, `exit_code:0`, `request_error:null`. Это не подтверждает cleanup предыдущих неудачных попыток.
+- Временный probe script удалён; повторов, вызовов Calculator/imports.text/delivery и изменения harness не было. Разрешение на замену setup не открыто; подготовка с неактивным source output0 не повторяется.
+
+Task 5 остаётся отложен до реально проверенного активного входа текущего runtime. Приёмочные критерии и release-гейт сохраняются; независимая работа над evals может продолжаться по указанию владельца об отложенных блокерах.
