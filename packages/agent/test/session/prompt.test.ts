@@ -43,6 +43,7 @@ import { Instruction } from "../../src/session/instruction"
 import { SessionProcessor } from "../../src/session/processor"
 import { SessionPrompt } from "../../src/session/prompt"
 import { TaskScope } from "../../src/session/task-scope"
+import { BrowserRecovery } from "../../src/session/browser-recovery"
 import { SessionRevert } from "../../src/session/revert"
 import { SessionRunState } from "../../src/session/run-state"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
@@ -3550,4 +3551,71 @@ noLLMServer.instance(
       yield* sessions.remove(session.id)
     }),
   { config: cfg },
+)
+
+it.instance("an active browser recovery gets one persisted reminder before the loop exits", () =>
+  Effect.gen(function* () {
+    const { llm } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const chat = yield* sessions.create({
+      title: "Pinned",
+      permission: [{ permission: "*", pattern: "*", action: "allow" }],
+    })
+    const task = yield* user(chat.id, "build the scenario")
+    const assistant = (finish: string) =>
+      ({
+        id: MessageID.ascending(),
+        role: "assistant",
+        parentID: task.id,
+        sessionID: chat.id,
+        mode: "build",
+        agent: "build",
+        cost: 0,
+        path: { cwd: "/tmp", root: "/tmp" },
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        modelID: ref.modelID,
+        providerID: ref.providerID,
+        time: { created: Date.now(), completed: Date.now() },
+        finish,
+      }) satisfies SessionV1.Assistant
+    const started = yield* sessions.updateMessage(assistant("tool-calls"))
+    yield* sessions.updatePart({
+      id: PartID.ascending(),
+      messageID: started.id,
+      sessionID: chat.id,
+      type: "tool",
+      callID: "start-1",
+      tool: "loginom_dock_browser_recovery",
+      state: {
+        status: "completed",
+        input: { action: "start", operation_id: "op-1" },
+        output: JSON.stringify({ phase: "browser", operation_id: "op-1" }),
+        title: "dock_browser_recovery",
+        metadata: {},
+        time: { start: 1, end: 2 },
+      },
+    })
+    const ended = yield* sessions.updateMessage(assistant("stop"))
+    yield* sessions.updatePart({
+      id: PartID.ascending(),
+      messageID: ended.id,
+      sessionID: chat.id,
+      type: "text",
+      text: "I will continue later.",
+    })
+    yield* llm.text("Still nothing to do.")
+
+    yield* prompt.loop({ sessionID: chat.id })
+    // One reminder reaches the model; the second end of turn exits instead of repeating it.
+    expect(yield* llm.hits).toHaveLength(1)
+    const history = yield* sessions.messages({ sessionID: chat.id })
+    const reminders = history.flatMap((message) =>
+      message.parts.filter(
+        (part) => part.type === "text" && part.synthetic === true && part.metadata?.browser_recovery_reminder === "start-1",
+      ),
+    )
+    expect(reminders).toHaveLength(1)
+    expect(BrowserRecovery.active(history)).toEqual({ operationID: "op-1", attempt: "start-1", reminded: true })
+  }),
 )

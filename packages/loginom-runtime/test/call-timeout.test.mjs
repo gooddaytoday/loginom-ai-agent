@@ -25,3 +25,8 @@ test("invalid budgets cannot turn private timeouts into an unbounded wait", () =
   }
   assert.equal(runtimeCallTimeout("dock_node_wait", { kind: "source", budget_ms: 1_800_000 }), 105_000)
 })
+
+test("browser recovery control covers handoff and composed verification; its browser actions keep the default", () => {
+  assert.equal(runtimeCallTimeout("dock_browser_recovery", { action: "finish" }), 300_000)
+  assert.equal(runtimeCallTimeout("browser_click", { target: "e1" }), 105_000)
+})

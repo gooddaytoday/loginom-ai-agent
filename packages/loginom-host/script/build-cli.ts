@@ -141,6 +141,7 @@ try {
     writeCliManifest(artifact, {
       version: pkg.version,
       channel: process.env.LOGINOM_AI_AGENT_CHANNEL ?? "dev",
+      browserRecovery: process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1",
       platform: process.platform,
       arch: process.arch,
       ...source,

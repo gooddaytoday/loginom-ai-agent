@@ -5,13 +5,13 @@ import { validateStartInput } from "../src/start-input.mjs"
 const base = { protocol: 1, generation: 1, chat: "chat-1", stateDir: "/tmp/state" }
 
 test("managed start without cleanup input stays a product launch", () => {
-  assert.deepEqual(validateStartInput(base), { acceptanceCleanupPackage: null, closeSavedPackageOnShutdown: false })
-  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: undefined }), { acceptanceCleanupPackage: null, closeSavedPackageOnShutdown: false })
+  assert.deepEqual(validateStartInput(base), { acceptanceCleanupPackage: null, closeSavedPackageOnShutdown: false, browserRecovery: false })
+  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: undefined }), { acceptanceCleanupPackage: null, closeSavedPackageOnShutdown: false, browserRecovery: false })
 })
 
 test("managed start accepts an exact saved package path for acceptance cleanup", () => {
   const path = "/user/loginom-ai-agent-acceptance-run-A.lgp"
-  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: path }), { acceptanceCleanupPackage: path, closeSavedPackageOnShutdown: false })
+  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: path }), { acceptanceCleanupPackage: path, closeSavedPackageOnShutdown: false, browserRecovery: false })
   assert.equal(validateStartInput({ ...base, acceptanceCleanupPackage: "/a b/пакет.lgp" }).acceptanceCleanupPackage, "/a b/пакет.lgp")
 })
 
@@ -53,3 +53,16 @@ for (const [label, patch] of [
   test("managed start rejects invalid " + label, () => {
     assert.throws(() => validateStartInput({ ...base, ...patch }), /^Error: LOGINOM_START_INVALID$/)
   })
+
+test("private browser recovery capability accepts only an explicit boolean", () => {
+  for (const value of [undefined, false, true])
+    assert.equal(validateStartInput({ ...base, browserRecovery: value }).browserRecovery, value === true)
+  for (const value of [null, "true", 1, {}, []])
+    assert.throws(() => validateStartInput({ ...base, browserRecovery: value }), /^Error: LOGINOM_START_INVALID$/)
+})
+
+test("browser recovery never reaches validation or Help readiness", () => {
+  for (const patch of [{ validation: true }, { chat: "readiness" }])
+    assert.throws(() => validateStartInput({ ...base, ...patch, browserRecovery: true }), /^Error: LOGINOM_START_INVALID$/)
+  assert.equal(validateStartInput({ ...base, validation: true, browserRecovery: false }).browserRecovery, false)
+})

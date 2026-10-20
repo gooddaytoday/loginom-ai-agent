@@ -78,7 +78,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    const ports=[];let restoration,returned;
    for(const port of read.ports){
     const schema=operation.parameters.parameters.schemas.find(s=>s.port===port)?.schema;
-    need(schema,'Retained output schema missing');
+    need(schema||schema===null&&operation.parameters.parameters.observed_schema===true,'Retained output schema missing');
     const table=await openNewOutputTable(channel,port,javascript?{openViews:({output})=>openManagedJavascriptOutputViews({
      prepared:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},node:ctx.node,output,
      deadline:ctx.deadline,targetOrigin,execute,record:onRecord,receiptOptions,
@@ -118,6 +118,13 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    releasePendingPhases:['finish'],
    async releasePending(state,{signal}={}){
     need(state.pending?.phase==='finish','Only a stopped output-read graph finish can be released here');
+    enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
+     workflow_ref:state.request.workflow_ref,node:state.node});
+    return releasePendingNode({operation,channel,readReceipt:options.readReceipt});
+   },
+   // Browser recovery runs the same proof for any stopped phase: the model, not
+   // this driver, restored the page, and the proof rechecks the quiet graph.
+   async recoveryReleasePending(state,{signal}={}){
     enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
      workflow_ref:state.request.workflow_ref,node:state.node});
     return releasePendingNode({operation,channel,readReceipt:options.readReceipt});

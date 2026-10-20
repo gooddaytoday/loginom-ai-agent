@@ -21,7 +21,8 @@ test.each(["run", "tui", "status"])("actual standalone entry enables package tea
       process.on('message', m=>{
         if(m.method==='start') {
           writeFileSync(${JSON.stringify(join(directory, "policy.json"))},JSON.stringify({
-            policy:m.input.closeSavedPackageOnShutdown??null,headless:m.input.headless
+            policy:m.input.closeSavedPackageOnShutdown??null,headless:m.input.headless,
+            browserRecovery:m.input.browserRecovery??null
           }));
           process.send({id:m.id,result:{protocol:1,ready:true,pid:process.pid}});
         }
@@ -50,7 +51,12 @@ test.each(["run", "tui", "status"])("actual standalone entry enables package tea
       if (mode === "run") expect(stdout).toContain("LOGINOM_CONFIG_REQUIRED")
       if (mode === "tui") expect(stderr).toContain("CLI_RUN_FAILED")
       expect(JSON.parse(await readFile(join(directory, "policy.json"), "utf8")))
-        .toEqual({ policy: mode === "run" ? true : mode === "tui" ? false : null, headless: false })
+        .toEqual({
+          policy: mode === "run" ? true : mode === "tui" ? false : null,
+          headless: false,
+          // A development bundle override is never a verified release bundle.
+          browserRecovery: mode === "status" ? null : false,
+        })
       expect(await readdir(join(directory, "profile"))).not.toContain(".writer")
     } finally {
       clearTimeout(timer)

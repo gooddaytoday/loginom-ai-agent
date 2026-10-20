@@ -405,6 +405,19 @@ test("a non-boolean saved-package cleanup policy is rejected before the host sta
   ).rejects.toMatchObject({ message: "LOGINOM_HANDSHAKE_INVALID", cleanupConfirmed: true })
 }, 15_000)
 
+test("a non-boolean browser recovery capability is rejected before the host starts", async () => {
+  await expect(
+    launchNodeHost({
+      node: fixture.node,
+      entry: fixture.entry,
+      root: join(fixture.directory, "bad-recovery"),
+      resources: join(fixture.directory, "absent-runtime"),
+      headless: false,
+      browserRecovery: "true" as unknown as boolean,
+    }),
+  ).rejects.toMatchObject({ message: "LOGINOM_HANDSHAKE_INVALID", cleanupConfirmed: true })
+}, 15_000)
+
 test.each(["ack-without-exit", "disconnect-without-exit", "bad-ack", "missing-ack", "exit-without-ack", "bad-exit"])(
   "host shutdown is bounded and never accepts incomplete cleanup: %s",
   async (mode) => {

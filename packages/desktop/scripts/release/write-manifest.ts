@@ -94,6 +94,7 @@ const manifest = decodeManifest({
   schemaVersion: 1,
   version: args.version,
   channel,
+  browserRecovery: process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1",
   builtAt: new Date().toISOString(),
   source: {
     commit: (await $`git rev-parse HEAD`.cwd(root).text()).trim(),
