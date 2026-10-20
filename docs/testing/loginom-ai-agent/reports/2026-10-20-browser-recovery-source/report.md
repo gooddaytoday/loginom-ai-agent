@@ -1,6 +1,6 @@
 # Browser recovery: остальные source-сценарии
 
-Статус: ordinary Export, BR-S2 и новая попытка BR-S4 — native PASS. BR-S6 — negative assertions PASS, cleanup BLOCKED/ACKfalse/managed exit1; это не recovered/export/Save success. BR-S5 отложен: FAIL на storage verification, текущие файл/Save/native cleanup не подтверждены. Независимое review кода Task2 Approved, Task2 открыт из-за S5. Исторические FAIL/UNKNOWN сохранены ниже. Это scripted source acceptance; установленный продукт и качество модели здесь не проверяются.
+Статус: ordinary Export, BR-S2 и новая попытка BR-S4 — native PASS. BR-S6 — negative assertions PASS, cleanup BLOCKED/ACKfalse/managed exit1; это не recovered/export/Save success. BR-S5 отложен: последний FAIL на storage verification подтвердил no_scroll_owner; причина отсутствия anchors не установлена, текущие файл/Save/native cleanup не подтверждены. Независимое review кода Task2 Approved, Task2 открыт из-за S5. Исторические FAIL/UNKNOWN сохранены ниже. Это scripted source acceptance; установленный продукт и качество модели здесь не проверяются.
 
 ## Обычный Export без fault — 20.10.2026
 
