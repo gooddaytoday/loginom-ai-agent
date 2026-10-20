@@ -143,6 +143,47 @@ try {
   // Dock continues the step and saves.
   await call("dock_node_read", { operation_id: "read-2", source_operation_id: "import-1", read: { ports: [0], sample_rows: 5 } })
   check((await settle("read-2")).status === "SUCCEEDED", "Dock continued with a fresh read")
+  // T3: the same phase of the same node fails again after a recovery. Finish now
+  // continues through a fresh observed-schema read of the recovery receipt.
+  const cancelRead = async (id: string) => {
+    await call("dock_node_read", { operation_id: id, source_operation_id: "import-1", read: { ports: [0], sample_rows: 5 } })
+    for (let i = 0; i < 600; i++) {
+      const status = json(await call("dock_node_status", { operation_id: id }))
+      if (status.progress?.pending_phase === "read" || status.state === "settled") break
+      await Bun.sleep(100)
+    }
+    await call("dock_node_cancel", { operation_id: id })
+    return settle(id)
+  }
+  await cancelRead("read-3")
+  const repeated = json(await call("dock_operation_inspect", { operation_id: "read-3" }))
+  await record("t3-trigger", { browser_recovery: repeated.output?.browser_recovery, next: repeated.output?.next_steps?.[0] })
+  check(repeated.output?.browser_recovery === "REPEATED_PHASE_FAILURE", "T3 trigger")
+  check((await call("dock_browser_recovery", { action: "start", operation_id: "read-3" })).structuredContent?.phase === "browser", "T3 lease")
+  let t3 = await call("dock_browser_recovery", {
+    action: "finish",
+    operation_id: "read-3",
+    actions_performed: ["Inspected the page after the repeated cancelled read"],
+  })
+  if (t3.structuredContent?.phase === "browser" && path.length) {
+    await call("browser_click", { target: `[data-tid="${path.at(-1).tid}"]`, element: "scenario breadcrumb" })
+    t3 = await call("dock_browser_recovery", {
+      action: "finish",
+      operation_id: "read-3",
+      actions_performed: ["Returned from the output view to the scenario"],
+    })
+  }
+  const t3Verified = t3.structuredContent?.verification as { receipt_id?: string; next_step?: { tool?: string } }
+  check(t3Verified?.next_step?.tool === "dock_node_read" && t3Verified.receipt_id, "T3 continues through the receipt read")
+  await call("dock_node_read", {
+    operation_id: "read-4",
+    source_operation_id: t3Verified.receipt_id,
+    read: { ports: [0], sample_rows: 5 },
+  })
+  const observed = await settle("read-4")
+  await record("t3-read", observed)
+  check(observed.status === "SUCCEEDED" && observed.output?.ports?.[0]?.schema?.length > 0, "observed-schema read succeeded")
+
   const saved = json(
     await call("dock_action_run", {
       action_key: "package.save_checkpoint",
