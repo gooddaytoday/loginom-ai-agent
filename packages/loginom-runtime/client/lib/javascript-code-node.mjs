@@ -252,11 +252,13 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       async configureJavascript(ctx,parameters){
         enter(ctx);need(handle&&adapter,'JavaScript owned Code editor unavailable');
         const baseline=await adapter.read(handle,{owner,deadline:ctx.deadline});
+        signal?.throwIfAborted();
         if(existingBaseline)need(javascriptSourceIdentity(baseline.source).source_sha256===admitted.previous_source.source_sha256,
           'JavaScript existing source changed before mutation');
         const written=await adapter.replace(handle,{owner,deadline:ctx.deadline,
           expected_source_sha256:javascriptSourceIdentity(baseline.source).source_sha256,
           source_text:parameters.source_text??baseline.source});
+        signal?.throwIfAborted();
         need(written.draft_exact===true&&written.source_sha256===expected.source_sha256,'JavaScript draft digest differs');
         return verified({effect_possible:true,draft_source_sha256:written.source_sha256,wizard_commit_verified:false});
       },
