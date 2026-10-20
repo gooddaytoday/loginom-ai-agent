@@ -2,7 +2,6 @@ import { afterAll, beforeAll, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { buildNodeHost } from "../script/build-node-host"
 import { launchNodeHost } from "../src/node-client"
 import { connectionStore } from "../src/connection/connection-store"
 import { cliCredentials } from "../src/connection/cli-credentials"
@@ -12,7 +11,13 @@ const fixture = { directory: "", entry: "", node: process.env.LOGINOM_AI_AGENT_T
 beforeAll(async () => {
   if (!fixture.node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   fixture.directory = await mkdtemp(join(tmpdir(), "loginom-browser-release-"))
-  fixture.entry = await buildNodeHost(fixture.directory)
+  const builder = Bun.spawn([process.execPath, join(import.meta.dir, "../script/build-node-host.ts"), fixture.directory], {
+    stdout: "pipe", stderr: "pipe",
+  })
+  const [code, output, errors] = await Promise.all([builder.exited,
+    new Response(builder.stdout).text(), new Response(builder.stderr).text()])
+  expect({ code, output, errors }).toEqual({ code: 0, output: "", errors: "" })
+  fixture.entry = join(fixture.directory, "node-host.mjs")
 })
 afterAll(async () => {
   await rm(fixture.directory, { recursive: true, force: true })
