@@ -1,7 +1,7 @@
 # Analytic10 на CLI ветки evals-parallel, 2026-10-20
 
 Техническая приёмка пока **не пройдена**. Первая серия остановлена на двух
-попытках, вторая — на пяти, третья — на четырёх. Данные сохранены; результаты не объединяются.
+попытках, вторая — на пяти, третья — на четырёх, четвёртая — на трёх. Данные сохранены; результаты не объединяются.
 Критерии и фиксированная десятка — в [плане](../../../superpowers/plans/2026-10-20-analytic10-branch-cli.md),
 правила — в [контракте](../../../../evals/docs/parallel-users-contract.md).
 
@@ -212,3 +212,32 @@ Rawbudget/probes/штатныйacceptance не переписываются;owne
 показывается отдельно как поправка посреди серии. Остальные контейнерные/FS/OOM/
 coverage/cadence/identity/cleanup требования не меняются. Review:No findings.
 Исторический stopсерии3 не отменяется,её6unassigned не становятся попытками.
+
+
+## Серия4: g03U7Q
+
+Run20261020-093030-959fb6050f-dirty-g03U7Q:3attempts/7unassigned,
+автоматическийstopJUDGE_CONFIGURATION_MISMATCH. Watcher остановилadmissionsдо4йзадачи.
+abc0/noartifact:Data recursionбезcache породилаerror dialog;CLIexit1/HOST_CLEANUP_FAILED,
+ноharnesscleanupconfirmed/reuse. ArticlesoraclePASS,ноjudge2×exit64доmodelcalls;
+basketinterrupted/nativeprofilerecovery запрещаетarchive/admission.
+2cleanupconfirmed/1failed;processproofsconfirmed/unknown[].Postverifyexit2,
+стендсохраняетсябезmanualrepair. Judgehomeосвобождён.
+
+Resourcespassed:880проб,0missed,maxgap1.42s;CPUmax98.91%разрешён,RAMmin10.69GiB.
+НовоеownerпослаблениеRAMтожеpassed;исходныйfrozenbudgetисырыеданные неизменны.
+НовыхOOM/ENOSPC/licence/providerlimitнет. Полнаяочередь/cleanup/providerjudgegateне пройдены.
+
+Дваguardотказа09:46:03.808/845UTC;globalconfigпозднееизменён09:46:55,
+послеэтогоsemanticdiffсprivateconfigпуст. Точнаяпричинаguardотказане установлена:
+launcherподавляетBuncheckstderrиобъединяетнесовпадение/parse/readfail.
+LauncherSHA445071e4…mtime2026-10-19 иcodex-cli0.157.0 не менялись.
+Version/login/exec--helpвточномcwd/envсPROMPTstdinиdirectBuncheckуспешны.
+Securitychecks/чужойdirtylauncherrepo не менялись.
+
+Диагностическийrejudgeзапущентольконаprivateкопиисерии:articles100/oraclePASS,
+1judge,unit2c8c4cb8…inactive/MainPID0,100исходныхфайловнеизменныпоSHA.
+Configcaptureвдиагностикепоказалстабильнуюсовместимуюпару. Этопроверкатекущей
+работоспособности,неисправлениеустановленнойпричиныинеполнаяприёмка.
+Независимоеreviewподтвердилопродолжениеполнойтойжедесяткивновойсерии,
+сprivatecaptureизмененийconfigдлядиагностикиипрежнимdeadline15:28:25UTC.
