@@ -18,6 +18,7 @@ export function watchAttemptIncidents(directory: string, onIncident: (code: stri
       catch { return false }
     }))
     const observed = [
+      ...(captured.slice(4).some(text => text.split("\n").some(line => line.trim() === "CODEX_HOME must contain the same lockdown config.")) ? ["JUDGE_CONFIGURATION_MISMATCH"] : []),
       ...(/\bLICEN[CS]E_(?:[A-Z]+_)*(?:DENIED|EXCEEDED|EXPIRED|ERROR)\b|\bE\w*Licen[cs]e\w*(?:Error|Limit|Exception)\b|лицензи[^\n"}]{0,120}(?:отказ|превыш|недоступ)|(?:отказ|превыш|недостат)[^\n"}]{0,120}лицензи/i.test(output) ? ["LICENCE_DENIED"] : []),
       ...(/"name"\s*:\s*"(?:APIError|ProviderAuthError|ProviderModelNotFoundError|ProviderInitError)"|"statusCode"\s*:\s*429\b|\bHTTP\s+429\b|(?:rate|usage)[_ -]?limit[_ -]?(?:exceeded|reached|error)|rate[_ -]?limited|too many requests|quota[_ -]?(?:exceeded|exhausted)|insufficient[_ -]?quota/i.test(output)
         || retry ? ["PROVIDER_ERROR_OBSERVED"] : []),
