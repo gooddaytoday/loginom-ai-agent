@@ -1,0 +1,201 @@
+request_id,ip,city,region,country_code,latitude,longitude,timezone,isp,org
+1,192.168.105.35,Paris,Europe,DE,35.1117,-45.3235,Europe/Berlin,AT&T,Enterprise
+2,192.168.159.44,Beijing,Americas,CN,67.9175,-88.1059,Europe/Moscow,Rostelecom,Datacenter
+3,192.168.41.52,London,Americas,RU,52.8753,-55.1731,Asia/Tokyo,MTS,Mobile
+4,192.168.109.8,Paris,Northwestern,US,42.2225,7.5522,America/New_York,Beeline,Datacenter
+5,192.168.202.86,Moscow,Asia,CN,49.821,-38.6056,Asia/Tokyo,Rostelecom,Datacenter
+6,192.168.113.74,Berlin,Central,US,50.0652,-14.529,Asia/Tokyo,AT&T,Residential
+7,192.168.176.129,Paris,Northwestern,CN,30.9315,173.0823,Europe/Moscow,MTS,Mobile
+8,192.168.194.10,Moscow,Asia,DE,44.2184,97.2336,America/New_York,MTS,Residential
+9,192.168.49.250,St Petersburg,Central,JP,59.5946,99.4137,Asia/Tokyo,Telekom,Enterprise
+10,192.168.162.121,Tokyo,Europe,GB,50.4028,-73.4881,America/New_York,MTS,Datacenter
+11,192.168.142.234,Novosibirsk,Americas,DE,39.7692,104.9875,Europe/London,MTS,Mobile
+12,192.168.74.30,London,Asia,FR,43.4044,107.0164,Asia/Tokyo,AT&T,Enterprise
+13,192.168.91.189,Paris,Central,GB,64.5222,84.7286,Asia/Tokyo,AT&T,Datacenter
+14,192.168.155.223,Tokyo,Northwestern,FR,51.022,-36.0378,America/New_York,Rostelecom,Mobile
+15,192.168.152.211,Berlin,Central,US,51.1341,18.4501,Europe/London,Beeline,Datacenter
+16,192.168.91.152,Kazan,Northwestern,RU,68.4587,136.9574,Asia/Tokyo,AT&T,Mobile
+17,192.168.74.210,St Petersburg,Americas,CN,42.8353,87.6565,Europe/Moscow,Rostelecom,Datacenter
+18,192.168.91.128,Novosibirsk,Americas,FR,49.1816,105.1753,America/New_York,MTS,Residential
+19,192.168.186.196,Berlin,Central,US,62.4685,64.4648,America/New_York,Rostelecom,Datacenter
+20,192.168.201.41,St Petersburg,Central,DE,60.3565,25.8842,Asia/Tokyo,Rostelecom,Datacenter
+21,192.168.109.161,Kazan,Northwestern,FR,40.632,112.5346,Europe/London,Rostelecom,Mobile
+22,192.168.227.193,Moscow,Northwestern,US,36.0436,-80.9808,Asia/Tokyo,Vodafone,Mobile
+23,192.168.17.76,Kazan,Asia,RU,58.0282,88.485,Europe/Berlin,Rostelecom,Residential
+24,192.168.242.132,Paris,Asia,CN,40.3062,179.2173,Asia/Tokyo,AT&T,Mobile
+25,192.168.19.193,Novosibirsk,Asia,FR,66.907,118.4537,Europe/Berlin,Vodafone,Datacenter
+26,192.168.126.74,Beijing,Central,JP,35.1699,-18.6422,Europe/Moscow,Beeline,Mobile
+27,192.168.61.221,New York,Asia,US,42.7326,-22.2105,America/New_York,Rostelecom,Mobile
+28,192.168.223.31,London,Central,FR,32.1915,86.8212,America/New_York,Telekom,Mobile
+29,192.168.185.177,London,Americas,RU,58.1322,150.8392,Europe/London,MTS,Residential
+30,192.168.253.165,Moscow,Europe,CN,65.6505,61.8259,Asia/Tokyo,MTS,Residential
+31,192.168.182.27,Berlin,Americas,FR,55.435,47.6726,Europe/Moscow,Vodafone,Enterprise
+32,192.168.73.213,Novosibirsk,Central,FR,67.5101,-55.0924,Europe/Berlin,MTS,Residential
+33,192.168.246.80,Beijing,Central,CN,35.1402,100.3279,Europe/London,MTS,Residential
+34,192.168.21.170,Moscow,Europe,JP,33.5094,96.6436,Europe/Moscow,Vodafone,Residential
+35,192.168.210.208,New York,Northwestern,US,63.5365,170.7464,Europe/Moscow,MTS,Datacenter
+36,192.168.215.163,Paris,Northwestern,GB,64.2204,-15.9462,Europe/Berlin,Rostelecom,Enterprise
+37,192.168.95.121,Paris,Northwestern,CN,63.2416,111.8047,Europe/Berlin,Beeline,Datacenter
+38,192.168.247.249,Beijing,Asia,FR,61.9586,21.5383,America/New_York,Vodafone,Residential
+39,192.168.237.122,Beijing,Northwestern,GB,44.4891,56.3724,Asia/Tokyo,Telekom,Residential
+40,192.168.51.163,Beijing,Asia,DE,38.6985,128.6071,Europe/London,Vodafone,Enterprise
+41,192.168.155.77,Kazan,Asia,FR,67.1522,-37.8414,Asia/Tokyo,AT&T,Enterprise
+42,192.168.185.163,London,Northwestern,GB,42.28,-3.9968,Europe/London,Telekom,Mobile
+43,192.168.69.253,Tokyo,Northwestern,DE,45.9363,116.5264,Europe/Moscow,AT&T,Residential
+44,192.168.136.20,Novosibirsk,Europe,JP,57.9824,59.7282,Europe/Berlin,Vodafone,Residential
+45,192.168.63.75,Tokyo,Europe,US,41.7342,-74.1216,Europe/Berlin,AT&T,Datacenter
+46,192.168.60.249,Kazan,Asia,FR,62.7652,20.452,Europe/Moscow,Telekom,Mobile
+47,192.168.221.94,Berlin,Europe,US,32.8014,64.2573,Europe/Moscow,Rostelecom,Residential
+48,192.168.39.183,Paris,Asia,DE,61.6473,154.6648,Europe/London,Vodafone,Datacenter
+49,192.168.3.30,London,Central,US,54.0741,-47.2233,Europe/Moscow,Vodafone,Enterprise
+50,192.168.154.185,Beijing,Asia,US,52.9197,125.6668,Europe/London,MTS,Datacenter
+51,192.168.248.152,New York,Asia,CN,48.3351,-63.4251,Asia/Tokyo,Vodafone,Residential
+52,192.168.68.69,New York,Europe,RU,41.0818,-32.174,Europe/Berlin,Vodafone,Datacenter
+53,192.168.4.114,New York,Central,DE,48.5628,-31.8637,Europe/Berlin,Rostelecom,Datacenter
+54,192.168.90.7,Novosibirsk,Americas,US,48.0011,145.6942,Europe/Berlin,MTS,Mobile
+55,192.168.8.14,Beijing,Americas,GB,53.3502,-44.275,Asia/Tokyo,Beeline,Mobile
+56,192.168.227.248,London,Americas,DE,41.263,120.349,Asia/Tokyo,AT&T,Enterprise
+57,192.168.104.6,Paris,Central,RU,33.1038,29.3058,America/New_York,Telekom,Mobile
+58,192.168.223.71,Tokyo,Northwestern,FR,35.8036,179.7454,Europe/London,Beeline,Datacenter
+59,192.168.238.114,Beijing,Central,JP,57.9671,134.9456,Europe/London,MTS,Mobile
+60,192.168.14.164,Beijing,Europe,US,30.8997,107.1169,America/New_York,Rostelecom,Residential
+61,192.168.82.38,Kazan,Asia,GB,64.2577,143.8034,Europe/Berlin,Telekom,Datacenter
+62,192.168.133.250,Berlin,Asia,RU,57.7759,77.5285,Europe/London,AT&T,Datacenter
+63,192.168.210.56,New York,Europe,DE,60.7235,136.2226,Europe/London,Vodafone,Datacenter
+64,192.168.91.80,Moscow,Europe,JP,63.4394,-26.8845,Europe/Berlin,Vodafone,Residential
+65,192.168.233.146,London,Asia,JP,34.9084,-72.6431,Europe/Moscow,Beeline,Datacenter
+66,192.168.126.190,Kazan,Northwestern,US,62.898,72.461,Europe/Moscow,AT&T,Mobile
+67,192.168.158.74,Berlin,Northwestern,RU,50.1857,21.7133,America/New_York,MTS,Residential
+68,192.168.78.9,Berlin,Northwestern,RU,65.421,19.4034,Asia/Tokyo,AT&T,Datacenter
+69,192.168.106.86,St Petersburg,Europe,GB,65.4635,47.4894,Europe/London,Rostelecom,Mobile
+70,192.168.66.61,New York,Asia,FR,30.9671,1.1871,Europe/London,Beeline,Mobile
+71,192.168.130.145,St Petersburg,Asia,FR,45.3146,75.2967,America/New_York,Beeline,Enterprise
+72,192.168.152.106,Kazan,Asia,CN,51.056,-91.4409,America/New_York,Rostelecom,Mobile
+73,192.168.147.185,Berlin,Central,FR,57.1344,171.5696,Europe/London,AT&T,Mobile
+74,192.168.92.85,Moscow,Central,CN,41.4474,158.9185,Europe/Berlin,Rostelecom,Enterprise
+75,192.168.177.120,London,Americas,JP,40.0857,161.8756,Europe/Berlin,Telekom,Enterprise
+76,192.168.78.230,St Petersburg,Central,JP,45.2506,2.201,Asia/Tokyo,Rostelecom,Residential
+77,192.168.9.148,Berlin,Northwestern,DE,50.0375,48.9295,Europe/London,AT&T,Mobile
+78,192.168.246.253,London,Northwestern,JP,68.0458,167.1566,Europe/London,Rostelecom,Residential
+79,192.168.243.28,New York,Northwestern,JP,60.4843,152.6569,Europe/London,MTS,Residential
+80,192.168.95.9,Tokyo,Northwestern,RU,47.1728,121.2685,Europe/London,Vodafone,Datacenter
+81,192.168.12.46,London,Americas,DE,32.1746,14.0528,America/New_York,Rostelecom,Residential
+82,192.168.150.49,Berlin,Northwestern,RU,36.7408,58.015,Europe/Moscow,Vodafone,Residential
+83,192.168.214.222,Kazan,Europe,GB,48.237,122.0155,Europe/London,Rostelecom,Residential
+84,192.168.131.115,St Petersburg,Europe,CN,62.553,-23.5566,Europe/Moscow,AT&T,Residential
+85,192.168.112.251,St Petersburg,Europe,CN,45.2278,75.4058,Europe/Berlin,Telekom,Enterprise
+86,192.168.194.84,Paris,Central,GB,51.5399,131.8216,Asia/Tokyo,Telekom,Mobile
+87,192.168.52.129,Berlin,Asia,CN,65.6722,98.0873,Europe/Berlin,Vodafone,Datacenter
+88,192.168.67.192,Paris,Americas,DE,66.5519,34.2546,Europe/London,AT&T,Enterprise
+89,192.168.78.56,Moscow,Europe,DE,38.631,63.6903,Europe/Berlin,AT&T,Datacenter
+90,192.168.96.197,Moscow,Europe,JP,31.7438,176.8292,America/New_York,AT&T,Datacenter
+91,192.168.134.146,Berlin,Northwestern,CN,42.2164,68.5566,Europe/Moscow,MTS,Enterprise
+92,192.168.171.62,St Petersburg,Europe,GB,57.8321,119.973,Europe/London,Beeline,Residential
+93,192.168.64.38,New York,Northwestern,US,68.0445,103.4493,America/New_York,Rostelecom,Enterprise
+94,192.168.210.108,Novosibirsk,Northwestern,FR,33.0813,96.4174,Europe/Moscow,AT&T,Datacenter
+95,192.168.25.171,Moscow,Asia,JP,31.1394,100.5833,America/New_York,AT&T,Datacenter
+96,192.168.11.149,St Petersburg,Central,FR,65.3659,27.2347,Europe/Berlin,AT&T,Residential
+97,192.168.76.219,Beijing,Northwestern,GB,59.9258,32.7648,Europe/London,Telekom,Enterprise
+98,192.168.141.85,Beijing,Northwestern,CN,69.6899,31.0016,Europe/Berlin,AT&T,Mobile
+99,192.168.29.171,Paris,Asia,CN,45.8717,-90.6887,Asia/Tokyo,Rostelecom,Datacenter
+100,192.168.211.235,London,Northwestern,FR,46.642,-32.5017,Europe/London,AT&T,Enterprise
+101,192.168.218.165,New York,Americas,US,36.8925,-56.7221,Europe/Berlin,Rostelecom,Residential
+102,192.168.186.169,Paris,Central,CN,34.6339,148.2046,Europe/London,MTS,Residential
+103,192.168.51.62,Beijing,Americas,US,53.1487,-23.0086,Europe/Moscow,Beeline,Mobile
+104,192.168.188.119,New York,Europe,RU,44.5714,-61.2361,Europe/London,Telekom,Datacenter
+105,192.168.104.161,Novosibirsk,Central,DE,33.2127,-66.4653,Europe/London,Rostelecom,Mobile
+106,192.168.38.40,London,Europe,FR,65.4795,95.9972,Europe/Moscow,Vodafone,Mobile
+107,192.168.120.107,Paris,Northwestern,CN,37.9343,-98.2967,Europe/Berlin,MTS,Mobile
+108,192.168.164.64,Beijing,Asia,US,59.9434,31.9652,Europe/London,Beeline,Mobile
+109,192.168.117.78,Moscow,Americas,CN,41.2891,-66.7161,America/New_York,Beeline,Residential
+110,192.168.159.7,Moscow,Europe,DE,62.5162,137.9057,Europe/London,Beeline,Datacenter
+111,192.168.96.17,Paris,Northwestern,DE,34.7359,168.3661,Europe/Berlin,Rostelecom,Mobile
+112,192.168.172.220,Novosibirsk,Americas,RU,60.2429,168.4513,Europe/Moscow,MTS,Datacenter
+113,192.168.95.32,Novosibirsk,Americas,DE,33.9248,23.75,Europe/Berlin,AT&T,Residential
+114,192.168.4.209,Berlin,Europe,DE,47.8766,80.4642,Asia/Tokyo,Vodafone,Residential
+115,192.168.239.126,London,Northwestern,JP,59.3602,67.9172,Europe/London,MTS,Enterprise
+116,192.168.249.73,St Petersburg,Asia,GB,36.9287,-1.9891,Europe/London,MTS,Enterprise
+117,192.168.125.163,Novosibirsk,Europe,CN,41.4266,24.3381,Europe/Moscow,MTS,Datacenter
+118,192.168.224.150,London,Americas,RU,64.5907,-81.9894,Europe/London,Rostelecom,Enterprise
+119,192.168.167.4,Novosibirsk,Americas,RU,65.4048,122.7957,America/New_York,Vodafone,Mobile
+120,192.168.33.23,Berlin,Central,FR,31.7974,-32.575,America/New_York,Rostelecom,Datacenter
+121,192.168.144.94,Tokyo,Northwestern,DE,36.7236,28.9477,Europe/Berlin,Vodafone,Residential
+122,192.168.70.208,Novosibirsk,Central,FR,34.6989,34.5738,Europe/Moscow,Vodafone,Residential
+123,192.168.91.229,London,Asia,JP,37.1877,56.9993,Asia/Tokyo,Rostelecom,Mobile
+124,192.168.124.21,Berlin,Europe,US,68.8075,129.0055,Europe/Berlin,Vodafone,Enterprise
+125,192.168.14.100,Berlin,Americas,DE,52.0662,93.7267,Europe/Moscow,MTS,Datacenter
+126,192.168.14.241,London,Northwestern,US,48.7245,85.6577,Europe/Moscow,Rostelecom,Datacenter
+127,192.168.241.152,London,Americas,GB,69.3787,47.4887,Europe/Berlin,Vodafone,Mobile
+128,192.168.52.148,Moscow,Central,JP,52.2782,-73.1324,Europe/Berlin,Beeline,Enterprise
+129,192.168.246.101,Tokyo,Central,DE,56.4447,12.5624,Europe/London,Rostelecom,Datacenter
+130,192.168.193.218,Berlin,Europe,FR,43.3108,168.0487,Asia/Tokyo,Telekom,Mobile
+131,192.168.112.31,Moscow,Northwestern,FR,45.2846,178.7535,America/New_York,Rostelecom,Datacenter
+132,192.168.20.195,New York,Northwestern,DE,53.7764,104.5395,Europe/London,Rostelecom,Residential
+133,192.168.171.82,Paris,Europe,CN,32.7914,-36.2958,Europe/Moscow,Rostelecom,Datacenter
+134,192.168.193.217,Paris,Central,FR,40.2353,-71.4706,Asia/Tokyo,Vodafone,Datacenter
+135,192.168.225.13,Berlin,Central,CN,37.8725,16.134,Asia/Tokyo,Rostelecom,Datacenter
+136,192.168.14.147,Moscow,Central,DE,30.6357,139.8401,Europe/Berlin,Telekom,Enterprise
+137,192.168.33.163,Tokyo,Americas,RU,51.4761,102.122,Asia/Tokyo,AT&T,Enterprise
+138,192.168.82.8,Tokyo,Asia,FR,52.4421,147.4898,Asia/Tokyo,Rostelecom,Mobile
+139,192.168.198.157,New York,Central,CN,45.3576,72.4174,Europe/Moscow,Beeline,Enterprise
+140,192.168.76.218,Berlin,Asia,DE,40.7491,-63.5081,Europe/London,Telekom,Datacenter
+141,192.168.190.235,Novosibirsk,Asia,DE,56.0824,-67.8571,Asia/Tokyo,AT&T,Datacenter
+142,192.168.162.140,New York,Northwestern,CN,35.3864,-86.5594,Europe/Berlin,Vodafone,Enterprise
+143,192.168.206.173,Moscow,Europe,FR,50.7446,58.7824,Europe/London,Rostelecom,Enterprise
+144,192.168.183.8,Novosibirsk,Americas,RU,60.723,-31.9919,Europe/Berlin,AT&T,Datacenter
+145,192.168.236.214,Paris,Asia,FR,36.5719,105.6274,Asia/Tokyo,Beeline,Datacenter
+146,192.168.245.35,Kazan,Americas,DE,60.1304,92.15,Europe/London,Telekom,Residential
+147,192.168.116.231,Paris,Northwestern,RU,60.4318,-10.929,Asia/Tokyo,Telekom,Mobile
+148,192.168.2.225,Berlin,Central,US,32.3971,-50.4955,Europe/Moscow,Vodafone,Enterprise
+149,192.168.18.155,London,Asia,GB,30.7514,-71.3279,Europe/London,Vodafone,Mobile
+150,192.168.22.103,Paris,Europe,FR,68.9574,106.4483,Europe/Berlin,Vodafone,Datacenter
+151,192.168.240.236,Beijing,Northwestern,JP,37.7353,26.1235,Europe/Moscow,AT&T,Mobile
+152,192.168.134.104,Paris,Americas,DE,62.8856,-9.4116,America/New_York,Rostelecom,Enterprise
+153,192.168.203.252,Paris,Central,RU,52.474,139.8628,Europe/Berlin,MTS,Enterprise
+154,192.168.141.45,Paris,Americas,CN,40.5789,66.2117,Asia/Tokyo,Telekom,Mobile
+155,192.168.142.194,Paris,Europe,CN,35.1988,45.0407,Europe/Berlin,MTS,Enterprise
+156,192.168.14.50,Novosibirsk,Asia,CN,49.8671,108.1462,America/New_York,Telekom,Residential
+157,192.168.215.243,Novosibirsk,Europe,RU,46.2942,128.3633,Europe/Berlin,Vodafone,Datacenter
+158,192.168.109.7,Paris,Americas,US,57.9554,92.1005,Europe/Moscow,Rostelecom,Datacenter
+159,192.168.68.189,St Petersburg,Americas,FR,66.1667,23.2018,Europe/Berlin,Rostelecom,Enterprise
+160,192.168.178.62,St Petersburg,Europe,JP,62.2099,6.2037,Europe/London,Telekom,Datacenter
+161,192.168.67.205,Novosibirsk,Europe,CN,40.9781,116.0662,America/New_York,AT&T,Residential
+162,192.168.143.211,Kazan,Europe,RU,65.1573,45.014,Europe/Berlin,Vodafone,Enterprise
+163,192.168.151.5,London,Central,CN,63.3357,97.2281,America/New_York,Rostelecom,Residential
+164,192.168.118.56,New York,Americas,US,67.1654,149.3117,Europe/Moscow,Rostelecom,Residential
+165,192.168.30.5,Beijing,Northwestern,DE,48.3464,156.4494,Europe/London,Beeline,Datacenter
+166,192.168.226.206,Beijing,Central,CN,60.743,-22.2396,Asia/Tokyo,Rostelecom,Datacenter
+167,192.168.156.66,Paris,Central,US,53.6663,-47.3908,Europe/Berlin,Beeline,Mobile
+168,192.168.202.130,Kazan,Central,FR,42.4201,-26.8395,Europe/Moscow,Rostelecom,Residential
+169,192.168.155.73,St Petersburg,Northwestern,CN,69.7772,110.3841,America/New_York,Rostelecom,Datacenter
+170,192.168.113.96,St Petersburg,Europe,US,31.5323,3.6163,America/New_York,AT&T,Residential
+171,192.168.175.79,Kazan,Americas,RU,36.4909,-51.451,Europe/Moscow,AT&T,Mobile
+172,192.168.122.137,London,Asia,RU,65.7017,-72.4521,Europe/Berlin,Vodafone,Residential
+173,192.168.32.227,Novosibirsk,Asia,GB,32.4225,-8.3523,Asia/Tokyo,Rostelecom,Enterprise
+174,192.168.194.196,London,Americas,US,65.4728,-61.8818,Europe/Berlin,Vodafone,Mobile
+175,192.168.139.184,Berlin,Northwestern,DE,58.6089,-56.2154,Europe/London,Vodafone,Mobile
+176,192.168.43.12,Berlin,Asia,CN,31.4674,91.4875,Europe/Berlin,Vodafone,Residential
+177,192.168.151.171,St Petersburg,Central,JP,47.1728,-94.475,Europe/London,Vodafone,Residential
+178,192.168.56.95,New York,Asia,JP,60.1789,-67.0851,America/New_York,Telekom,Datacenter
+179,192.168.143.223,Berlin,Americas,FR,53.324,136.4223,Europe/London,Telekom,Enterprise
+180,192.168.108.228,St Petersburg,Central,GB,67.4349,136.5759,Asia/Tokyo,Rostelecom,Mobile
+181,192.168.119.99,Paris,Asia,US,64.7058,-7.8118,Europe/Moscow,Telekom,Mobile
+182,192.168.148.110,Tokyo,Americas,DE,43.3059,-75.3732,Europe/London,Rostelecom,Mobile
+183,192.168.203.50,Tokyo,Northwestern,GB,33.3851,97.3917,Europe/Berlin,AT&T,Datacenter
+184,192.168.20.59,Moscow,Americas,RU,67.7703,0.8369,Europe/London,MTS,Enterprise
+185,192.168.178.20,Paris,Northwestern,FR,50.6915,-87.2699,America/New_York,Beeline,Mobile
+186,192.168.106.125,Tokyo,Central,CN,32.9759,-55.8084,Europe/London,Telekom,Mobile
+187,192.168.244.133,London,Americas,CN,62.663,-61.5799,Asia/Tokyo,Telekom,Datacenter
+188,192.168.72.192,Moscow,Europe,CN,64.7403,64.9526,Europe/London,AT&T,Residential
+189,192.168.75.185,St Petersburg,Europe,US,55.577,151.4729,Asia/Tokyo,Telekom,Mobile
+190,192.168.77.133,Kazan,Europe,JP,47.9004,122.0602,Europe/Berlin,Rostelecom,Enterprise
+191,192.168.64.85,Kazan,Europe,DE,56.4869,53.0245,America/New_York,Rostelecom,Enterprise
+192,192.168.33.55,St Petersburg,Europe,CN,58.2673,18.2034,Europe/Moscow,MTS,Enterprise
+193,192.168.74.2,New York,Northwestern,CN,65.7212,73.2295,Europe/Berlin,MTS,Enterprise
+194,192.168.169.189,St Petersburg,Americas,RU,68.2345,24.2676,Europe/Berlin,MTS,Datacenter
+195,192.168.5.5,Novosibirsk,Central,GB,50.5728,-31.0922,Europe/Moscow,Rostelecom,Mobile
+196,192.168.190.147,Kazan,Europe,CN,61.9398,90.1753,Europe/London,Vodafone,Datacenter
+197,192.168.148.1,Tokyo,Europe,FR,68.5804,144.5083,Europe/London,Vodafone,Enterprise
+198,192.168.217.222,Beijing,Central,GB,36.0497,4.4037,Europe/London,MTS,Enterprise
+199,192.168.89.55,Moscow,Central,JP,30.7307,135.6308,America/New_York,MTS,Enterprise
+200,192.168.95.9,New York,Europe,GB,64.7586,20.703,Europe/Berlin,Rostelecom,Datacenter

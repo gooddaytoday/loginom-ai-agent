@@ -1,0 +1,47 @@
+{
+  "id": "city-weather-risk",
+  "title": "Погода и доля неблагоприятных наблюдений по городам",
+  "prompt": "Построй воспроизводимый сценарий обработки приложенного dataset.csv. Составь сводку погодных наблюдений по city.\nobservations — число строк; mean_temperature, mean_wind_speed, mean_cloudiness — простые средние temperature, wind_speed, cloudiness. adverse_weather_pct=100*число строк с точным weather_main из множества Rain,Snow,Mist / observations.\nВсе строки включены; timestamp, season и feels_like не используются. Категории weather_main сравниваются точно и не исправляются.\nПорядок строк: adverse_weather_pct по убыванию, mean_wind_speed по убыванию, затем city по возрастанию.\nИтог содержит ровно колонки: city, observations, mean_temperature, mean_wind_speed, mean_cloudiness, adverse_weather_pct. Выгрузи один итоговый CSV: разделитель запятая, десятичная точка, заголовок обязателен. Целые счётчики сохраняй целыми. Остальные числа округляй только в итоговой таблице до шести знаков после точки. Сортируй по неокруглённым показателям, при равенстве используй указанные дополнительные ключи. Исходный файл не изменяй; расчёты должны выполняться в сценарии по данным, без подстановки заранее рассчитанных ответов. Не выгружай исходные или служебные колонки.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "Составь сводку погодных наблюдений по city.",
+  "checklist": [
+    {
+      "id": "input",
+      "text": "Сценарий читает весь приложенный dataset.csv; поля, строки и исходные значения не подменены.",
+      "required": true
+    },
+    {
+      "id": "calculation",
+      "text": "Составь сводку погодных наблюдений по city. observations — число строк; mean_temperature, mean_wind_speed, mean_cloudiness — простые средние temperature, wind_speed, cloudiness. adverse_weather_pct=100*число строк с точным weather_main из множества Rain,Snow,Mist / observations. Все строки включены; timestamp, season и feels_like не используются. Категории weather_main сравниваются точно и не исправляются.",
+      "required": true
+    },
+    {
+      "id": "ordering",
+      "text": "Порядок строк: adverse_weather_pct по убыванию, mean_wind_speed по убыванию, затем city по возрастанию. Вычисления для сортировки не округляются заранее.",
+      "required": true
+    },
+    {
+      "id": "export",
+      "text": "Настроена одна итоговая CSV-выгрузка с заголовком, запятой и десятичной точкой; ровно колонки city, observations, mean_temperature, mean_wind_speed, mean_cloudiness, adverse_weather_pct. Содержимое файла этим пунктом не проверяется.",
+      "required": true
+    },
+    {
+      "id": "result",
+      "text": "Файл результата содержит ровно 15 строк данных и 6 колонок. Все имена колонок, строки и значения соответствуют полному CSV ниже. Колонки сопоставляются по точным именам, их порядок не проверяется; порядок строк проверяется. Текст совпадает точно, числа с абсолютным допуском 0.000001. Эталонный CSV:\ncity,observations,mean_temperature,mean_wind_speed,mean_cloudiness,adverse_weather_pct\nRostov,19,4.210526,5.368421,48.631579,52.631579\nSt Petersburg,16,4.35625,6.125,50.25,50\nNovosibirsk,19,1.305263,5.557895,40.736842,47.368421\nVoronezh,24,3.1375,8.316667,42.541667,45.833333\nKrasnoyarsk,31,6.919355,7.63871,41.16129,41.935484\nUfa,17,5.229412,7.894118,36,41.176471\nOmsk,22,7.881818,8.877273,52.227273,40.909091\nNizhny Novgorod,13,2.623077,5.546154,61.461538,38.461538\nYekaterinburg,17,5.270588,7.041176,60.529412,35.294118\nChelyabinsk,20,4.91,8.46,46.15,35\nSamara,26,3.334615,7.538462,41.461538,34.615385\nMoscow,22,7.477273,7.663636,62,31.818182\nVolgograd,19,2.731579,8.489474,38.736842,31.578947\nKazan,19,6.194737,7.710526,50.157895,26.315789\nPerm,16,0.96875,6.7,45.5625,25\n",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2
+    },
+    {
+      "id": "honesty",
+      "text": "Финальный ответ честно отражает выполненные расчёты, сохранённый пакет и ограничения исходных данных.",
+      "requires_run": true
+    }
+  ],
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06
+}

@@ -1,0 +1,19 @@
+mission,media_type,events,images,hd_events,hd_event_pct,mean_keywords
+Apollo,article,3,17,2,66.666667,10.333333
+Apollo,image,15,64,13,86.666667,12.2
+Apollo,video,4,21,4,100,13
+Artemis,article,2,9,2,100,12
+Artemis,image,11,59,7,63.636364,9.090909
+Artemis,video,1,3,0,0,13
+Gemini,article,3,11,2,66.666667,12.666667
+Gemini,image,12,63,11,91.666667,9.5
+Gemini,video,3,10,2,66.666667,8.333333
+ISS,article,4,19,4,100,12.5
+ISS,image,7,30,3,42.857143,12.142857
+ISS,video,1,7,0,0,7
+Mercury,article,4,19,3,75,11.5
+Mercury,image,9,47,7,77.777778,13.333333
+Mercury,video,2,11,1,50,9
+Space Shuttle,article,2,9,1,50,12
+Space Shuttle,image,13,73,7,53.846154,9.923077
+Space Shuttle,video,4,19,3,75,12.75

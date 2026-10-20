@@ -1,0 +1,1501 @@
+transaction_id,items,total_amount,store,hour_of_day
+1,Butter | Eggs | Flour | Onions | Pasta | Tomatoes | Yogurt,13.87,Store_A,19
+2,Apples | Bread | Butter | Cheese | Rice | Sugar,91.44,Store_A,12
+3,Apples | Coffee | Eggs | Onions | Rice | Sugar,40.51,Store_C,22
+4,Bread | Chicken | Eggs | Flour | Milk | Yogurt,128.29,Store_B,16
+5,Butter | Flour | Onions | Pasta | Rice | Tomatoes | Yogurt,75.23,Store_C,21
+6,Butter | Coffee | Flour | Onions | Pasta | Rice | Sugar,127.28,Store_B,10
+7,Butter | Cheese | Pasta | Rice | Sugar,87.78,Store_A,6
+8,Bread | Butter | Pasta | Rice | Sugar | Yogurt,121.46,Store_C,2
+9,Pasta | Yogurt,62.06,Store_A,2
+10,Coffee | Milk,142.36,Store_B,1
+11,Flour | Sugar,103.4,Store_C,20
+12,Onions | Tomatoes | Yogurt,93.37,Store_C,15
+13,Apples | Butter | Chicken | Flour | Milk | Pasta,59.33,Store_B,22
+14,Apples | Butter | Chicken | Flour | Milk | Sugar | Tomatoes,141.21,Store_B,10
+15,Bread | Flour | Pasta | Sugar | Tomatoes,57.28,Store_C,13
+16,Apples | Cheese | Milk,127.02,Store_C,2
+17,Apples | Coffee | Flour | Milk | Yogurt,66.6,Store_C,6
+18,Bread | Butter | Coffee | Onions | Sugar | Tomatoes,117.41,Store_B,7
+19,Apples | Bread | Coffee | Flour | Tomatoes,137.66,Store_A,12
+20,Chicken | Rice | Yogurt,75.18,Store_C,18
+21,Bread | Butter | Chicken | Eggs | Milk | Rice | Yogurt,83.66,Store_B,10
+22,Eggs | Milk | Onions | Pasta | Rice | Yogurt,56.25,Store_C,0
+23,Bread | Butter | Flour | Sugar | Tomatoes,17.66,Store_B,18
+24,Chicken | Coffee | Flour | Rice,101.35,Store_C,12
+25,Butter | Eggs,26.75,Store_B,21
+26,Onions | Pasta | Yogurt,59.57,Store_B,16
+27,Butter | Cheese | Coffee | Yogurt,58.93,Store_C,8
+28,Apples | Chicken | Coffee | Eggs | Flour | Onions | Sugar,31.14,Store_B,18
+29,Apples | Coffee | Flour | Milk | Pasta,103.34,Store_B,18
+30,Cheese | Coffee | Rice | Tomatoes,34.44,Store_B,22
+31,Apples | Tomatoes,118.97,Store_B,22
+32,Onions | Tomatoes,44.9,Store_B,5
+33,Cheese | Chicken | Milk,50.22,Store_B,6
+34,Cheese | Eggs | Flour | Pasta,58.12,Store_B,4
+35,Cheese | Onions,31.39,Store_B,7
+36,Flour | Sugar | Tomatoes,70.8,Store_C,13
+37,Bread | Pasta | Sugar,21.25,Store_B,17
+38,Chicken | Pasta,69.8,Store_A,20
+39,Apples | Yogurt,57.59,Store_C,19
+40,Apples | Cheese | Chicken | Flour | Milk | Yogurt,57.36,Store_C,23
+41,Apples | Bread | Flour | Onions | Pasta | Yogurt,102.49,Store_A,2
+42,Apples | Cheese | Eggs | Milk | Rice,117.66,Store_B,21
+43,Apples | Cheese | Flour | Milk | Pasta | Sugar,59.84,Store_A,7
+44,Flour | Rice,46.68,Store_A,13
+45,Apples | Butter | Cheese | Chicken | Coffee | Sugar | Yogurt,79.21,Store_A,13
+46,Bread | Chicken | Flour | Onions | Pasta | Sugar | Yogurt,120.28,Store_C,6
+47,Butter | Cheese | Chicken | Coffee | Flour | Milk | Tomatoes,100.24,Store_B,5
+48,Butter | Flour | Onions | Pasta | Yogurt,15.32,Store_C,5
+49,Apples | Cheese | Coffee | Onions | Pasta | Rice | Tomatoes,77.19,Store_B,11
+50,Milk | Onions | Rice | Yogurt,148.74,Store_A,21
+51,Bread | Butter | Coffee | Flour,59.44,Store_C,14
+52,Apples | Cheese | Pasta | Tomatoes,71.7,Store_B,18
+53,Butter | Eggs | Sugar | Tomatoes,50.24,Store_B,3
+54,Bread | Butter | Flour | Pasta,79.68,Store_A,2
+55,Apples | Coffee,32.53,Store_C,12
+56,Chicken | Coffee | Rice | Sugar | Yogurt,44.58,Store_C,15
+57,Apples | Chicken | Milk | Tomatoes,109.64,Store_C,12
+58,Chicken | Flour | Onions | Pasta | Rice,29.36,Store_C,20
+59,Chicken | Eggs | Onions | Pasta | Sugar,139.66,Store_C,9
+60,Pasta | Yogurt,53.11,Store_C,12
+61,Flour | Pasta | Yogurt,90.5,Store_C,7
+62,Cheese | Coffee | Milk,55.06,Store_A,11
+63,Bread | Coffee | Flour | Milk | Onions | Pasta | Yogurt,76.92,Store_B,7
+64,Bread | Cheese | Coffee | Flour | Milk | Onions | Sugar,136.53,Store_A,8
+65,Bread | Rice | Sugar,19.6,Store_B,9
+66,Butter | Coffee | Onions | Sugar,129.89,Store_B,6
+67,Coffee | Eggs | Sugar,88.06,Store_B,2
+68,Chicken | Coffee | Eggs | Pasta,103.11,Store_C,4
+69,Milk | Pasta | Rice | Sugar,17.82,Store_C,2
+70,Butter | Milk | Onions | Yogurt,116.6,Store_B,17
+71,Cheese | Chicken | Flour | Milk | Onions | Rice,27.89,Store_B,18
+72,Flour | Milk,145.07,Store_C,9
+73,Chicken | Eggs,121.9,Store_C,8
+74,Cheese | Flour | Yogurt,79.0,Store_B,23
+75,Rice | Tomatoes,139.38,Store_B,6
+76,Butter | Chicken | Flour | Yogurt,33.67,Store_A,0
+77,Bread | Chicken | Coffee | Eggs | Milk | Sugar | Tomatoes,148.83,Store_C,9
+78,Bread | Eggs | Flour | Pasta | Sugar | Tomatoes,110.35,Store_C,1
+79,Onions | Pasta | Yogurt,23.77,Store_B,5
+80,Apples | Tomatoes,85.12,Store_A,20
+81,Bread | Milk | Onions | Rice | Yogurt,109.52,Store_C,5
+82,Apples | Bread | Eggs | Milk | Rice | Tomatoes,95.82,Store_A,23
+83,Coffee | Sugar,69.35,Store_A,7
+84,Apples | Butter | Chicken | Coffee | Flour | Pasta | Sugar,44.74,Store_C,17
+85,Bread | Chicken | Coffee | Onions,43.35,Store_B,6
+86,Butter | Chicken | Coffee,139.77,Store_A,17
+87,Bread | Butter | Coffee | Flour | Milk | Pasta | Sugar,42.86,Store_B,0
+88,Flour | Milk | Rice | Yogurt,144.74,Store_C,23
+89,Apples | Coffee | Onions | Pasta | Sugar | Tomatoes,39.43,Store_A,13
+90,Bread | Flour,63.8,Store_B,22
+91,Apples | Tomatoes,11.73,Store_A,19
+92,Bread | Cheese | Milk | Pasta | Rice | Yogurt,136.44,Store_A,6
+93,Bread | Cheese | Milk,24.61,Store_A,19
+94,Bread | Chicken | Milk | Tomatoes,60.03,Store_C,6
+95,Butter | Rice | Tomatoes,127.95,Store_B,3
+96,Apples | Cheese | Sugar | Tomatoes,120.87,Store_A,4
+97,Apples | Bread | Chicken | Coffee | Milk | Pasta | Tomatoes,127.81,Store_B,22
+98,Apples | Bread | Chicken | Coffee | Flour | Tomatoes,137.98,Store_C,23
+99,Cheese | Rice | Sugar,137.55,Store_A,20
+100,Bread | Coffee | Milk | Onions | Sugar | Yogurt,117.87,Store_A,0
+101,Eggs | Flour | Milk | Onions,91.54,Store_A,19
+102,Butter | Eggs | Pasta | Yogurt,88.62,Store_B,2
+103,Butter | Chicken | Eggs | Rice | Sugar | Yogurt,11.81,Store_B,12
+104,Apples | Chicken | Coffee | Flour | Milk | Rice,111.16,Store_A,6
+105,Chicken | Sugar,41.73,Store_B,5
+106,Apples | Butter | Coffee | Flour | Milk | Rice,126.02,Store_B,5
+107,Coffee | Sugar | Tomatoes,87.53,Store_A,1
+108,Bread | Coffee | Flour | Onions | Pasta | Tomatoes | Yogurt,148.21,Store_A,15
+109,Apples | Coffee | Eggs | Flour | Onions | Pasta | Rice,39.44,Store_A,5
+110,Bread | Coffee | Eggs,111.29,Store_C,7
+111,Apples | Coffee | Milk,86.65,Store_A,20
+112,Cheese | Sugar | Tomatoes,140.45,Store_A,10
+113,Apples | Bread | Coffee | Flour | Onions | Pasta | Yogurt,47.24,Store_A,17
+114,Onions | Tomatoes,18.32,Store_A,22
+115,Bread | Butter | Coffee | Flour | Pasta | Rice | Sugar,86.14,Store_A,5
+116,Bread | Coffee | Onions | Pasta,83.03,Store_A,13
+117,Milk | Pasta,53.64,Store_A,14
+118,Chicken | Eggs | Onions,148.12,Store_A,10
+119,Butter | Flour | Onions | Yogurt,19.76,Store_C,14
+120,Apples | Butter | Chicken | Flour | Milk | Onions,89.73,Store_B,12
+121,Apples | Butter | Flour | Sugar,46.43,Store_C,5
+122,Butter | Cheese | Milk | Sugar,10.27,Store_C,3
+123,Apples | Bread | Cheese | Coffee | Flour | Milk | Pasta,148.3,Store_A,13
+124,Bread | Butter | Chicken | Flour | Milk | Pasta,77.43,Store_A,12
+125,Bread | Cheese | Chicken | Rice | Sugar | Yogurt,130.01,Store_A,9
+126,Apples | Coffee,127.61,Store_A,21
+127,Butter | Coffee | Flour | Yogurt,123.72,Store_B,11
+128,Eggs | Flour | Onions,74.26,Store_B,23
+129,Apples | Cheese | Chicken | Flour | Milk | Pasta | Tomatoes,135.43,Store_C,7
+130,Cheese | Chicken | Tomatoes,61.42,Store_B,19
+131,Onions | Sugar,67.17,Store_C,4
+132,Cheese | Chicken | Onions | Pasta | Rice | Yogurt,45.8,Store_A,1
+133,Bread | Cheese | Milk | Onions | Pasta,72.73,Store_C,19
+134,Bread | Sugar | Yogurt,148.11,Store_C,11
+135,Cheese | Eggs | Rice | Yogurt,90.25,Store_B,5
+136,Bread | Butter | Coffee | Milk | Rice | Sugar,126.35,Store_C,14
+137,Cheese | Flour | Onions | Pasta,46.87,Store_A,17
+138,Chicken | Onions | Pasta | Rice | Tomatoes,143.83,Store_A,17
+139,Chicken | Sugar | Tomatoes,11.84,Store_A,9
+140,Apples | Cheese | Pasta | Yogurt,140.23,Store_A,6
+141,Bread | Coffee,135.72,Store_B,9
+142,Coffee | Eggs | Onions | Rice | Sugar | Yogurt,19.43,Store_C,4
+143,Chicken | Coffee | Tomatoes | Yogurt,94.68,Store_C,15
+144,Eggs | Yogurt,119.93,Store_C,18
+145,Apples | Chicken | Coffee | Pasta | Yogurt,66.53,Store_C,2
+146,Apples | Bread | Pasta | Yogurt,22.86,Store_A,6
+147,Bread | Flour | Pasta | Sugar,126.12,Store_B,18
+148,Bread | Coffee | Flour,75.31,Store_C,11
+149,Apples | Coffee | Onions | Rice | Sugar | Yogurt,46.86,Store_C,9
+150,Cheese | Coffee | Yogurt,19.92,Store_B,4
+151,Eggs | Pasta | Rice | Yogurt,99.62,Store_C,1
+152,Apples | Butter | Cheese | Coffee | Flour | Milk | Yogurt,15.92,Store_B,2
+153,Butter | Cheese | Coffee | Milk,120.75,Store_C,13
+154,Apples | Butter | Cheese | Tomatoes,117.91,Store_B,14
+155,Butter | Cheese | Coffee | Flour | Onions | Rice | Tomatoes,55.21,Store_C,19
+156,Apples | Flour,76.12,Store_A,12
+157,Bread | Butter | Eggs | Onions | Pasta | Rice | Yogurt,103.69,Store_C,16
+158,Apples | Cheese | Milk | Pasta | Tomatoes,144.28,Store_A,19
+159,Coffee | Eggs | Yogurt,82.82,Store_B,3
+160,Coffee | Sugar,149.54,Store_A,18
+161,Chicken | Flour | Onions,55.51,Store_C,14
+162,Eggs | Flour | Milk | Onions | Yogurt,83.71,Store_A,14
+163,Bread | Butter | Cheese | Flour | Rice | Sugar | Tomatoes,26.19,Store_A,8
+164,Bread | Coffee | Onions | Pasta | Sugar,87.9,Store_C,2
+165,Apples | Flour | Onions,85.08,Store_B,1
+166,Apples | Cheese | Flour | Milk | Onions | Rice | Sugar,128.83,Store_A,6
+167,Coffee | Onions | Rice | Tomatoes | Yogurt,149.52,Store_C,8
+168,Apples | Bread | Milk | Onions | Sugar | Tomatoes | Yogurt,148.06,Store_A,21
+169,Apples | Eggs | Sugar | Yogurt,43.08,Store_B,4
+170,Bread | Butter | Coffee | Flour | Pasta | Sugar,57.38,Store_B,16
+171,Bread | Coffee | Pasta | Rice | Tomatoes,48.45,Store_B,2
+172,Bread | Chicken | Eggs | Flour | Milk,37.96,Store_A,8
+173,Apples | Butter | Milk | Onions | Sugar | Yogurt,31.02,Store_C,7
+174,Apples | Bread | Cheese | Coffee | Flour | Pasta | Rice,81.64,Store_B,8
+175,Butter | Cheese | Flour | Rice | Sugar | Tomatoes | Yogurt,132.15,Store_C,23
+176,Bread | Butter | Sugar,92.58,Store_B,16
+177,Butter | Milk | Pasta | Rice | Sugar | Tomatoes | Yogurt,132.17,Store_A,23
+178,Butter | Pasta | Sugar | Yogurt,144.33,Store_A,7
+179,Chicken | Eggs,63.64,Store_B,20
+180,Bread | Butter | Eggs | Milk | Pasta | Sugar,126.99,Store_C,13
+181,Bread | Butter | Tomatoes,17.33,Store_C,21
+182,Bread | Butter | Eggs | Flour | Onions | Tomatoes | Yogurt,77.35,Store_B,15
+183,Bread | Butter | Coffee | Eggs | Pasta | Tomatoes,61.56,Store_A,17
+184,Apples | Cheese | Chicken | Coffee | Eggs | Flour | Pasta,38.68,Store_C,16
+185,Apples | Butter | Chicken | Eggs | Milk | Onions | Pasta,71.37,Store_C,23
+186,Bread | Coffee | Pasta | Rice | Sugar | Yogurt,72.12,Store_A,6
+187,Apples | Coffee | Pasta,123.2,Store_C,19
+188,Apples | Eggs | Rice | Tomatoes | Yogurt,131.65,Store_B,14
+189,Coffee | Milk | Tomatoes,101.97,Store_A,6
+190,Butter | Chicken | Eggs | Milk | Sugar | Yogurt,98.67,Store_B,1
+191,Apples | Cheese | Chicken,25.43,Store_A,1
+192,Apples | Coffee | Milk | Rice | Sugar | Yogurt,90.54,Store_B,6
+193,Bread | Butter | Chicken | Coffee | Flour | Milk | Onions,48.42,Store_B,18
+194,Butter | Cheese | Eggs | Milk,51.27,Store_B,5
+195,Milk | Onions | Pasta | Yogurt,23.27,Store_C,11
+196,Coffee | Eggs | Flour | Pasta | Sugar | Tomatoes | Yogurt,99.02,Store_C,14
+197,Cheese | Flour,91.73,Store_B,12
+198,Eggs | Yogurt,40.84,Store_B,6
+199,Bread | Cheese | Flour | Milk | Pasta | Sugar | Tomatoes,46.83,Store_A,6
+200,Apples | Bread | Butter | Cheese | Flour | Rice,118.22,Store_C,14
+201,Bread | Milk | Onions | Pasta | Sugar | Yogurt,121.01,Store_B,3
+202,Apples | Cheese | Eggs | Flour | Milk | Sugar | Tomatoes,79.03,Store_C,2
+203,Apples | Bread | Butter | Sugar | Tomatoes,30.86,Store_A,0
+204,Cheese | Chicken | Eggs | Onions | Pasta | Sugar | Tomatoes,17.78,Store_B,6
+205,Chicken | Onions | Tomatoes | Yogurt,48.01,Store_C,8
+206,Bread | Cheese | Chicken | Eggs | Milk | Onions | Yogurt,112.37,Store_A,0
+207,Bread | Eggs,94.11,Store_B,4
+208,Bread | Milk | Pasta,110.53,Store_C,14
+209,Apples | Chicken | Milk | Rice | Yogurt,76.04,Store_A,3
+210,Flour | Onions | Sugar | Tomatoes,115.66,Store_A,9
+211,Chicken | Eggs | Flour | Milk | Yogurt,77.31,Store_C,1
+212,Chicken | Pasta,21.76,Store_B,22
+213,Apples | Bread,21.18,Store_C,6
+214,Apples | Flour,126.41,Store_A,23
+215,Butter | Sugar,98.15,Store_A,18
+216,Butter | Coffee | Pasta,49.08,Store_B,5
+217,Bread | Chicken | Rice | Sugar | Tomatoes,116.0,Store_C,14
+218,Apples | Bread | Butter | Cheese | Coffee | Eggs | Rice,29.0,Store_B,19
+219,Bread | Milk | Onions | Rice | Tomatoes,100.33,Store_B,11
+220,Apples | Chicken | Eggs,148.53,Store_A,10
+221,Bread | Milk | Sugar,31.0,Store_C,2
+222,Apples | Bread | Cheese | Chicken | Tomatoes,29.87,Store_C,19
+223,Butter | Chicken | Rice,75.5,Store_A,16
+224,Apples | Cheese | Coffee | Flour | Milk | Tomatoes | Yogurt,99.97,Store_A,6
+225,Butter | Yogurt,13.72,Store_C,22
+226,Apples | Bread | Cheese | Onions | Sugar | Tomatoes | Yogurt,79.95,Store_B,22
+227,Bread | Chicken | Coffee | Onions | Pasta | Sugar,21.64,Store_B,17
+228,Apples | Bread | Flour | Rice,43.79,Store_C,16
+229,Bread | Flour | Pasta | Sugar,109.74,Store_B,15
+230,Butter | Cheese | Coffee | Tomatoes | Yogurt,113.44,Store_B,1
+231,Butter | Chicken | Eggs | Onions | Rice | Sugar,112.16,Store_A,4
+232,Bread | Cheese | Flour | Milk | Sugar | Yogurt,19.12,Store_B,20
+233,Cheese | Chicken | Coffee | Milk | Pasta,120.15,Store_A,12
+234,Onions | Yogurt,70.51,Store_B,10
+235,Coffee | Milk,76.54,Store_C,23
+236,Bread | Cheese | Chicken | Eggs | Milk | Rice,68.76,Store_A,0
+237,Bread | Cheese | Eggs,129.98,Store_C,22
+238,Coffee | Flour | Sugar,105.2,Store_A,2
+239,Bread | Butter | Chicken | Coffee | Sugar,80.0,Store_B,17
+240,Butter | Cheese | Coffee | Eggs | Flour | Pasta | Sugar,126.8,Store_C,20
+241,Apples | Bread | Coffee | Flour | Sugar | Tomatoes,122.75,Store_A,3
+242,Coffee | Eggs | Milk | Rice | Yogurt,10.71,Store_C,8
+243,Apples | Coffee | Sugar,77.04,Store_C,10
+244,Apples | Butter | Chicken | Eggs | Milk | Onions | Pasta,15.91,Store_B,16
+245,Eggs | Onions | Rice | Tomatoes,53.01,Store_A,10
+246,Butter | Milk | Onions | Tomatoes | Yogurt,122.54,Store_B,2
+247,Bread | Butter | Cheese | Coffee | Flour,142.17,Store_C,18
+248,Bread | Butter | Cheese | Flour | Onions | Sugar | Tomatoes,43.89,Store_A,19
+249,Coffee | Flour | Pasta,13.0,Store_C,22
+250,Apples | Butter | Milk | Onions,66.33,Store_C,20
+251,Apples | Milk | Sugar | Yogurt,56.92,Store_A,10
+252,Apples | Butter | Eggs | Milk,104.78,Store_C,13
+253,Apples | Cheese | Coffee | Flour,79.31,Store_A,5
+254,Bread | Chicken | Eggs | Sugar,65.84,Store_A,18
+255,Bread | Chicken | Eggs | Flour | Tomatoes,42.14,Store_A,20
+256,Cheese | Eggs | Onions | Pasta | Rice | Sugar,125.99,Store_C,14
+257,Bread | Butter | Cheese | Eggs | Rice | Sugar | Tomatoes,44.77,Store_B,10
+258,Chicken | Pasta,17.66,Store_C,17
+259,Cheese | Chicken | Flour | Onions | Pasta | Yogurt,89.05,Store_C,3
+260,Apples | Chicken | Sugar | Yogurt,54.43,Store_A,18
+261,Bread | Chicken | Flour | Onions,109.74,Store_B,2
+262,Eggs | Pasta,21.32,Store_A,11
+263,Apples | Tomatoes,145.28,Store_C,3
+264,Chicken | Pasta | Sugar | Tomatoes | Yogurt,36.16,Store_B,23
+265,Milk | Pasta,59.99,Store_A,11
+266,Chicken | Milk,77.33,Store_C,23
+267,Apples | Bread | Butter | Cheese | Chicken | Coffee | Onions,134.62,Store_C,0
+268,Butter | Eggs | Onions,111.16,Store_B,15
+269,Bread | Pasta | Rice | Yogurt,30.28,Store_C,20
+270,Chicken | Flour | Pasta | Tomatoes,71.41,Store_C,1
+271,Butter | Chicken,86.01,Store_C,21
+272,Apples | Bread | Cheese | Coffee | Onions | Rice | Yogurt,108.3,Store_C,2
+273,Chicken | Flour,90.05,Store_B,15
+274,Apples | Onions,74.03,Store_C,9
+275,Apples | Bread | Butter | Cheese | Flour | Milk | Sugar,117.18,Store_C,8
+276,Apples | Eggs | Flour | Milk | Sugar | Tomatoes,62.93,Store_C,13
+277,Bread | Butter,148.2,Store_B,7
+278,Bread | Chicken | Eggs | Pasta | Rice,142.69,Store_B,1
+279,Chicken | Sugar,109.03,Store_A,10
+280,Eggs | Milk | Sugar | Yogurt,133.57,Store_B,1
+281,Bread | Cheese | Coffee | Flour,65.04,Store_C,14
+282,Butter | Eggs | Milk | Pasta | Yogurt,91.41,Store_B,17
+283,Apples | Rice | Yogurt,48.17,Store_B,4
+284,Bread | Coffee | Flour | Sugar | Tomatoes | Yogurt,133.99,Store_B,6
+285,Flour | Onions | Tomatoes,75.94,Store_C,22
+286,Bread | Butter | Cheese | Flour | Milk | Rice,85.06,Store_A,18
+287,Apples | Bread | Chicken | Flour | Milk | Pasta,131.04,Store_A,18
+288,Bread | Butter | Cheese | Chicken | Onions | Pasta | Yogurt,121.62,Store_A,15
+289,Butter | Chicken | Rice | Tomatoes,55.04,Store_A,18
+290,Bread | Cheese | Chicken | Coffee | Tomatoes | Yogurt,22.24,Store_B,16
+291,Apples | Pasta | Rice | Yogurt,32.69,Store_A,12
+292,Bread | Butter | Pasta,57.47,Store_B,7
+293,Butter | Chicken | Coffee | Flour,52.74,Store_B,10
+294,Apples | Cheese | Flour | Sugar | Tomatoes | Yogurt,15.36,Store_A,17
+295,Butter | Tomatoes,70.49,Store_C,10
+296,Butter | Chicken | Flour | Milk | Yogurt,24.82,Store_A,22
+297,Bread | Cheese | Eggs | Milk | Pasta | Sugar,40.92,Store_A,8
+298,Butter | Cheese | Onions | Sugar | Tomatoes,120.25,Store_B,13
+299,Bread | Chicken | Milk | Onions | Pasta | Rice,79.28,Store_B,1
+300,Cheese | Milk | Onions,62.21,Store_A,16
+301,Cheese | Sugar,35.96,Store_A,20
+302,Apples | Bread | Butter | Coffee | Eggs | Sugar | Tomatoes,131.28,Store_C,15
+303,Bread | Butter | Onions,136.52,Store_C,4
+304,Chicken | Coffee | Milk | Onions,82.61,Store_C,0
+305,Bread | Chicken,138.98,Store_B,8
+306,Bread | Chicken | Coffee | Eggs | Milk | Onions | Sugar,75.07,Store_C,2
+307,Cheese | Eggs,25.01,Store_B,13
+308,Bread | Chicken | Milk | Rice | Tomatoes | Yogurt,12.39,Store_B,17
+309,Apples | Bread | Milk | Onions | Sugar | Yogurt,27.97,Store_A,11
+310,Butter | Coffee | Onions | Rice | Sugar | Tomatoes | Yogurt,97.17,Store_C,22
+311,Bread | Butter | Cheese | Chicken | Flour | Sugar,54.93,Store_A,13
+312,Pasta | Rice | Tomatoes | Yogurt,100.76,Store_A,15
+313,Bread | Chicken | Eggs | Milk,81.12,Store_B,4
+314,Apples | Chicken | Rice,56.62,Store_C,19
+315,Apples | Chicken | Flour | Milk | Rice | Sugar | Yogurt,40.62,Store_A,19
+316,Apples | Butter | Milk | Pasta | Sugar | Yogurt,21.35,Store_B,14
+317,Bread | Coffee | Flour | Onions | Pasta,119.53,Store_A,8
+318,Cheese | Coffee | Yogurt,124.66,Store_C,16
+319,Bread | Butter,85.8,Store_B,11
+320,Apples | Cheese,31.99,Store_C,12
+321,Cheese | Coffee | Flour | Milk,46.89,Store_A,9
+322,Apples | Yogurt,143.72,Store_B,6
+323,Butter | Coffee | Flour | Milk | Pasta | Sugar,41.63,Store_A,23
+324,Bread | Butter | Cheese | Milk | Tomatoes | Yogurt,17.95,Store_A,20
+325,Milk | Pasta | Rice,87.01,Store_C,6
+326,Bread | Butter | Flour | Onions | Pasta | Sugar,46.67,Store_B,7
+327,Bread | Coffee | Flour | Tomatoes,144.04,Store_A,23
+328,Cheese | Chicken | Onions,90.47,Store_C,14
+329,Apples | Tomatoes,145.21,Store_C,20
+330,Apples | Chicken | Flour | Rice | Sugar,119.98,Store_B,17
+331,Milk | Onions | Pasta | Sugar | Tomatoes,111.23,Store_A,21
+332,Cheese | Milk | Onions | Yogurt,126.25,Store_B,0
+333,Apples | Coffee | Eggs,94.68,Store_B,9
+334,Bread | Cheese | Milk | Yogurt,11.56,Store_A,21
+335,Apples | Butter | Flour | Tomatoes,64.95,Store_B,18
+336,Bread | Chicken | Coffee | Milk | Pasta | Rice | Yogurt,40.66,Store_B,2
+337,Butter | Cheese | Milk | Pasta | Rice | Tomatoes,70.8,Store_B,6
+338,Butter | Chicken | Flour | Milk | Onions | Rice | Sugar,75.88,Store_C,3
+339,Chicken | Rice,27.9,Store_A,4
+340,Butter | Cheese | Chicken | Eggs,13.28,Store_B,5
+341,Butter | Tomatoes,29.35,Store_C,9
+342,Apples | Bread | Butter | Cheese | Coffee | Onions | Pasta,130.04,Store_C,11
+343,Cheese | Flour | Tomatoes | Yogurt,115.82,Store_B,13
+344,Bread | Butter | Chicken | Coffee | Eggs | Tomatoes,121.85,Store_A,21
+345,Bread | Coffee | Flour | Yogurt,48.68,Store_C,1
+346,Coffee | Rice | Sugar | Tomatoes,43.05,Store_B,2
+347,Bread | Butter | Eggs | Onions | Pasta | Sugar | Yogurt,15.23,Store_A,0
+348,Butter | Eggs | Milk | Onions,76.12,Store_A,2
+349,Cheese | Coffee | Flour | Onions | Rice | Sugar,63.54,Store_B,23
+350,Bread | Flour | Onions | Rice | Sugar,127.02,Store_C,14
+351,Sugar | Tomatoes,105.46,Store_A,15
+352,Eggs | Tomatoes,30.2,Store_A,19
+353,Pasta | Sugar,148.2,Store_A,1
+354,Butter | Chicken | Milk | Rice | Sugar,117.89,Store_A,19
+355,Flour | Milk | Pasta,110.83,Store_C,15
+356,Bread | Flour | Onions | Pasta | Tomatoes,40.33,Store_C,14
+357,Butter | Pasta | Rice | Sugar,136.72,Store_B,6
+358,Chicken | Yogurt,76.35,Store_B,4
+359,Butter | Cheese | Flour | Milk | Sugar | Tomatoes,51.67,Store_C,4
+360,Bread | Coffee | Rice,101.68,Store_B,20
+361,Apples | Butter | Flour | Milk | Onions | Yogurt,39.65,Store_A,8
+362,Apples | Tomatoes,137.06,Store_C,22
+363,Milk | Onions | Rice | Sugar,129.61,Store_A,13
+364,Apples | Coffee | Eggs | Flour | Pasta | Rice,75.09,Store_C,18
+365,Bread | Coffee,36.69,Store_C,17
+366,Coffee | Flour | Sugar,79.51,Store_B,8
+367,Coffee | Onions,30.88,Store_C,2
+368,Bread | Butter | Rice,47.78,Store_B,10
+369,Sugar | Tomatoes,77.58,Store_C,23
+370,Butter | Cheese | Chicken | Yogurt,12.96,Store_A,14
+371,Butter | Yogurt,117.2,Store_A,3
+372,Butter | Coffee | Eggs | Sugar,37.57,Store_A,20
+373,Apples | Bread | Onions | Pasta | Tomatoes | Yogurt,131.33,Store_A,23
+374,Apples | Eggs | Flour | Sugar,13.12,Store_A,4
+375,Butter | Onions,84.5,Store_A,17
+376,Apples | Chicken | Eggs | Onions | Sugar,118.73,Store_C,21
+377,Bread | Cheese | Chicken | Coffee | Pasta | Rice,43.31,Store_B,22
+378,Bread | Onions | Sugar | Yogurt,109.06,Store_C,11
+379,Bread | Chicken | Eggs | Milk | Onions | Rice,110.92,Store_A,0
+380,Bread | Eggs | Flour | Onions,99.3,Store_A,21
+381,Apples | Bread | Butter,61.0,Store_C,19
+382,Eggs | Milk,119.91,Store_B,1
+383,Cheese | Chicken | Coffee | Eggs | Onions | Pasta | Tomatoes,97.98,Store_B,8
+384,Bread | Milk,92.65,Store_B,21
+385,Eggs | Flour | Onions | Pasta | Rice,124.68,Store_B,17
+386,Onions | Rice | Sugar,44.25,Store_A,4
+387,Eggs | Sugar | Yogurt,42.55,Store_A,21
+388,Apples | Eggs | Rice | Yogurt,64.1,Store_B,13
+389,Bread | Butter | Cheese | Eggs | Onions | Rice | Sugar,20.24,Store_C,10
+390,Apples | Bread | Coffee | Onions,57.24,Store_C,20
+391,Bread | Butter | Cheese | Coffee | Milk | Onions,66.88,Store_A,21
+392,Cheese | Chicken | Coffee | Eggs | Flour | Tomatoes | Yogurt,79.31,Store_C,2
+393,Butter | Onions | Pasta | Tomatoes,45.56,Store_A,8
+394,Apples | Coffee | Sugar,136.96,Store_A,1
+395,Apples | Bread | Coffee | Rice | Yogurt,49.91,Store_B,13
+396,Flour | Milk | Tomatoes | Yogurt,129.22,Store_B,1
+397,Butter | Rice | Sugar | Yogurt,72.29,Store_B,20
+398,Eggs | Onions,110.54,Store_B,9
+399,Apples | Chicken | Coffee | Eggs | Onions | Pasta | Tomatoes,25.53,Store_B,18
+400,Apples | Butter | Coffee | Pasta | Rice | Sugar,86.25,Store_B,1
+401,Cheese | Flour | Onions | Rice | Sugar,144.52,Store_C,15
+402,Butter | Chicken | Flour | Onions | Sugar,103.28,Store_B,5
+403,Butter | Cheese,124.84,Store_B,11
+404,Cheese | Eggs | Tomatoes | Yogurt,46.55,Store_A,21
+405,Butter | Chicken | Coffee | Milk | Onions | Rice | Sugar,122.02,Store_A,6
+406,Bread | Eggs | Flour | Milk | Onions | Rice | Tomatoes,59.18,Store_B,3
+407,Butter | Eggs | Milk | Pasta | Rice | Yogurt,77.91,Store_A,7
+408,Apples | Bread | Cheese | Eggs | Sugar | Tomatoes,36.31,Store_C,18
+409,Butter | Cheese | Flour | Sugar,78.0,Store_C,9
+410,Apples | Cheese,82.2,Store_C,0
+411,Cheese | Milk | Pasta,97.13,Store_C,4
+412,Flour | Pasta,131.61,Store_B,5
+413,Apples | Butter | Cheese | Eggs | Onions | Yogurt,52.68,Store_C,18
+414,Cheese | Coffee | Flour | Milk | Onions | Sugar,147.78,Store_C,17
+415,Apples | Bread | Onions | Sugar | Yogurt,128.68,Store_C,18
+416,Bread | Coffee | Rice | Sugar,66.41,Store_C,18
+417,Chicken | Pasta,41.73,Store_A,22
+418,Apples | Chicken,20.01,Store_C,0
+419,Apples | Butter,42.81,Store_C,19
+420,Bread | Chicken | Flour | Pasta | Sugar | Yogurt,133.83,Store_A,10
+421,Chicken | Milk | Onions | Sugar,50.88,Store_A,2
+422,Chicken | Eggs | Milk | Onions | Pasta | Sugar | Tomatoes,29.32,Store_B,9
+423,Apples | Bread | Butter | Cheese | Onions | Sugar,13.17,Store_A,6
+424,Onions | Pasta,51.68,Store_A,16
+425,Eggs | Flour,40.26,Store_A,23
+426,Flour | Milk,24.31,Store_C,15
+427,Apples | Tomatoes,143.15,Store_B,6
+428,Bread | Butter | Pasta | Rice,47.47,Store_B,12
+429,Chicken | Eggs | Flour | Onions | Rice | Sugar,10.86,Store_C,11
+430,Apples | Chicken | Coffee | Eggs,142.2,Store_B,11
+431,Bread | Cheese | Chicken | Rice | Yogurt,90.99,Store_C,7
+432,Bread | Tomatoes,21.59,Store_A,7
+433,Chicken | Flour | Milk,14.4,Store_C,12
+434,Cheese | Flour | Rice | Sugar,25.1,Store_C,10
+435,Butter | Cheese | Eggs | Milk | Pasta | Rice | Sugar,92.81,Store_A,0
+436,Butter | Pasta | Rice,18.66,Store_A,16
+437,Apples | Cheese | Flour | Milk | Onions | Pasta | Tomatoes,89.54,Store_B,18
+438,Apples | Bread | Coffee | Onions | Rice | Sugar,101.36,Store_C,12
+439,Apples | Butter | Eggs | Flour | Yogurt,30.66,Store_A,22
+440,Bread | Rice,78.38,Store_B,14
+441,Bread | Butter | Chicken | Yogurt,144.94,Store_C,23
+442,Apples | Bread | Milk | Pasta | Rice | Sugar | Tomatoes,127.11,Store_A,11
+443,Apples | Coffee | Eggs | Flour,111.27,Store_A,20
+444,Cheese | Chicken | Eggs | Sugar,82.48,Store_C,16
+445,Bread | Coffee | Sugar,65.2,Store_A,2
+446,Apples | Butter | Coffee | Flour | Milk | Onions | Rice,73.2,Store_C,6
+447,Apples | Butter | Eggs | Flour | Milk | Onions | Rice,117.05,Store_C,1
+448,Butter | Onions,87.6,Store_C,1
+449,Chicken | Onions | Tomatoes,117.05,Store_A,5
+450,Butter | Cheese | Coffee | Milk | Pasta,145.78,Store_A,3
+451,Bread | Chicken | Eggs | Milk | Onions | Rice | Tomatoes,99.67,Store_C,15
+452,Bread | Cheese | Eggs | Flour | Onions | Rice,94.43,Store_B,14
+453,Apples | Rice | Yogurt,66.86,Store_C,9
+454,Apples | Bread | Cheese | Flour | Rice,37.55,Store_C,13
+455,Eggs | Milk | Sugar | Yogurt,62.39,Store_C,8
+456,Chicken | Tomatoes,82.81,Store_B,14
+457,Apples | Eggs | Flour | Onions,14.88,Store_A,6
+458,Apples | Butter | Coffee | Onions | Sugar,76.61,Store_A,6
+459,Apples | Bread | Cheese | Chicken | Rice | Sugar,130.7,Store_C,7
+460,Apples | Onions,146.73,Store_C,18
+461,Apples | Rice | Tomatoes,129.78,Store_A,17
+462,Chicken | Eggs | Flour,34.08,Store_C,16
+463,Cheese | Pasta | Sugar | Tomatoes,31.7,Store_A,17
+464,Onions | Rice,65.06,Store_B,18
+465,Cheese | Pasta | Sugar,41.56,Store_C,20
+466,Coffee | Eggs,104.64,Store_A,7
+467,Bread | Eggs | Sugar,21.84,Store_A,12
+468,Onions | Rice | Yogurt,72.12,Store_B,10
+469,Apples | Chicken | Pasta | Rice | Tomatoes,49.25,Store_C,18
+470,Bread | Coffee | Pasta,93.36,Store_B,6
+471,Butter | Milk | Onions | Yogurt,121.59,Store_A,4
+472,Cheese | Chicken | Flour | Rice | Yogurt,139.3,Store_A,4
+473,Butter | Cheese | Flour | Sugar | Tomatoes | Yogurt,144.94,Store_B,7
+474,Apples | Bread | Butter | Eggs | Onions | Rice | Tomatoes,59.17,Store_B,9
+475,Apples | Coffee | Rice | Tomatoes | Yogurt,129.82,Store_B,4
+476,Bread | Butter | Cheese | Eggs | Flour | Milk | Yogurt,92.87,Store_C,14
+477,Butter | Chicken | Eggs | Milk | Pasta | Rice,106.92,Store_A,22
+478,Cheese | Yogurt,129.16,Store_C,15
+479,Butter | Coffee | Eggs | Pasta | Sugar | Tomatoes,28.22,Store_C,9
+480,Cheese | Milk | Onions | Pasta | Yogurt,142.64,Store_B,23
+481,Apples | Chicken | Eggs | Pasta | Yogurt,86.64,Store_C,7
+482,Onions | Tomatoes,57.04,Store_C,18
+483,Bread | Onions | Pasta | Tomatoes,57.42,Store_B,3
+484,Coffee | Flour | Rice | Tomatoes,115.14,Store_B,13
+485,Cheese | Chicken | Coffee | Eggs | Milk | Tomatoes,105.01,Store_B,7
+486,Apples | Cheese | Coffee | Flour | Sugar,112.13,Store_A,20
+487,Chicken | Flour,45.42,Store_A,13
+488,Coffee | Rice,33.83,Store_C,11
+489,Flour | Pasta | Rice,111.06,Store_C,0
+490,Bread | Flour | Onions,51.79,Store_A,22
+491,Butter | Flour | Rice | Tomatoes,41.14,Store_C,18
+492,Butter | Cheese | Eggs,40.05,Store_B,17
+493,Apples | Butter | Cheese,30.78,Store_A,11
+494,Bread | Chicken | Coffee | Flour | Milk | Pasta | Yogurt,69.75,Store_C,9
+495,Butter | Cheese | Coffee | Sugar | Tomatoes | Yogurt,46.53,Store_C,20
+496,Butter | Cheese | Milk | Onions | Pasta | Rice | Yogurt,135.14,Store_C,0
+497,Cheese | Chicken | Onions | Rice | Yogurt,106.48,Store_A,13
+498,Apples | Bread | Milk | Onions | Rice,114.14,Store_A,8
+499,Eggs | Sugar,66.51,Store_A,14
+500,Apples | Tomatoes,94.03,Store_B,20
+501,Coffee | Rice | Sugar | Yogurt,80.11,Store_C,21
+502,Bread | Onions | Yogurt,33.44,Store_C,22
+503,Butter | Chicken | Flour | Onions | Pasta | Sugar,16.7,Store_B,13
+504,Bread | Butter | Coffee | Flour | Pasta | Yogurt,105.69,Store_A,8
+505,Apples | Butter | Milk | Pasta,26.96,Store_A,10
+506,Butter | Cheese | Milk | Onions | Pasta | Rice,18.03,Store_A,4
+507,Apples | Bread | Cheese | Eggs | Flour | Pasta | Yogurt,71.86,Store_B,11
+508,Bread | Butter | Eggs | Flour | Milk | Pasta | Tomatoes,113.32,Store_C,15
+509,Coffee | Eggs | Flour | Sugar,117.64,Store_B,19
+510,Apples | Bread | Cheese | Coffee | Eggs | Flour,132.29,Store_C,2
+511,Apples | Chicken | Pasta | Tomatoes,37.89,Store_C,4
+512,Bread | Butter | Cheese | Flour | Milk | Tomatoes,147.99,Store_C,18
+513,Bread | Cheese | Chicken | Coffee | Onions | Rice | Sugar,116.85,Store_B,4
+514,Apples | Bread | Cheese | Coffee | Eggs | Onions,32.01,Store_A,23
+515,Milk | Pasta | Yogurt,127.7,Store_A,17
+516,Apples | Bread | Yogurt,79.85,Store_B,3
+517,Apples | Butter | Chicken | Eggs | Yogurt,19.32,Store_C,23
+518,Bread | Butter | Chicken | Coffee | Eggs,28.49,Store_B,14
+519,Cheese | Flour,70.75,Store_A,4
+520,Chicken | Milk | Yogurt,84.27,Store_B,7
+521,Bread | Cheese | Chicken | Rice | Sugar,142.65,Store_C,15
+522,Rice | Yogurt,40.2,Store_A,21
+523,Bread | Eggs | Pasta,76.37,Store_C,0
+524,Apples | Bread | Rice | Tomatoes | Yogurt,41.62,Store_B,4
+525,Cheese | Flour | Milk | Sugar,88.18,Store_C,17
+526,Bread | Flour,137.3,Store_B,15
+527,Apples | Butter | Eggs | Flour | Onions | Rice | Sugar,89.49,Store_A,22
+528,Apples | Bread | Butter | Coffee | Flour | Milk | Tomatoes,81.41,Store_A,9
+529,Cheese | Chicken,115.02,Store_A,3
+530,Cheese | Milk | Onions,30.67,Store_C,17
+531,Bread | Cheese | Eggs | Flour | Onions | Pasta | Sugar,136.79,Store_B,16
+532,Apples | Cheese | Coffee | Eggs | Onions,90.87,Store_B,20
+533,Butter | Yogurt,106.08,Store_B,12
+534,Apples | Butter | Chicken | Coffee | Onions | Pasta | Yogurt,124.65,Store_C,7
+535,Butter | Coffee | Eggs,98.91,Store_B,7
+536,Bread | Butter | Eggs | Pasta | Yogurt,99.77,Store_A,11
+537,Coffee | Eggs | Pasta | Rice,112.15,Store_B,17
+538,Butter | Cheese | Chicken | Onions | Tomatoes,17.31,Store_C,5
+539,Flour | Onions | Yogurt,63.51,Store_A,6
+540,Eggs | Flour | Rice | Yogurt,144.81,Store_A,16
+541,Coffee | Eggs | Onions | Tomatoes,46.11,Store_C,4
+542,Apples | Bread | Butter | Coffee | Sugar,85.92,Store_A,21
+543,Cheese | Pasta,34.56,Store_B,22
+544,Cheese | Pasta | Tomatoes,55.26,Store_C,18
+545,Eggs | Milk | Onions | Pasta | Rice | Yogurt,110.39,Store_B,7
+546,Chicken | Coffee | Flour | Milk | Onions | Pasta,100.03,Store_C,18
+547,Cheese | Chicken | Eggs | Onions | Yogurt,68.0,Store_C,7
+548,Bread | Butter | Cheese | Chicken | Milk | Rice | Sugar,141.33,Store_C,20
+549,Cheese | Pasta | Rice | Yogurt,118.51,Store_B,18
+550,Bread | Flour | Pasta,47.51,Store_C,6
+551,Chicken | Eggs | Milk | Onions | Pasta | Tomatoes,75.16,Store_A,2
+552,Bread | Coffee | Flour | Onions | Rice | Tomatoes,132.92,Store_B,5
+553,Cheese | Coffee | Eggs | Rice | Tomatoes,13.14,Store_C,7
+554,Apples | Cheese | Flour | Milk | Pasta | Sugar,91.41,Store_C,17
+555,Apples | Butter | Eggs | Sugar | Tomatoes | Yogurt,42.47,Store_B,14
+556,Bread | Butter | Flour | Sugar | Tomatoes,18.93,Store_A,23
+557,Apples | Chicken | Coffee | Onions | Rice | Sugar,137.8,Store_A,16
+558,Butter | Chicken | Eggs | Flour | Onions | Yogurt,124.28,Store_C,3
+559,Coffee | Pasta | Rice,35.94,Store_C,6
+560,Bread | Milk,127.17,Store_A,16
+561,Cheese | Pasta | Sugar | Tomatoes,30.5,Store_C,21
+562,Bread | Chicken | Coffee | Eggs | Onions | Rice,76.66,Store_A,5
+563,Butter | Cheese | Flour | Tomatoes,111.61,Store_A,12
+564,Bread | Chicken | Flour | Milk | Pasta | Rice | Sugar,84.73,Store_A,6
+565,Cheese | Chicken | Milk | Onions | Pasta | Sugar | Yogurt,129.11,Store_A,8
+566,Apples | Butter | Flour,96.36,Store_C,22
+567,Rice | Sugar | Tomatoes,70.47,Store_B,18
+568,Chicken | Coffee | Eggs | Milk | Tomatoes,139.52,Store_B,19
+569,Bread | Butter | Cheese | Chicken | Milk | Sugar | Yogurt,15.08,Store_A,12
+570,Bread | Cheese | Coffee | Milk | Tomatoes | Yogurt,78.38,Store_C,14
+571,Milk | Onions,102.51,Store_B,16
+572,Apples | Cheese | Chicken | Coffee | Onions | Sugar | Tomatoes,127.05,Store_B,4
+573,Eggs | Sugar,85.76,Store_A,22
+574,Eggs | Milk | Pasta | Sugar | Yogurt,133.97,Store_A,18
+575,Bread | Chicken | Eggs | Flour | Pasta,69.68,Store_C,5
+576,Flour | Onions | Rice,54.4,Store_B,11
+577,Cheese | Chicken | Milk | Yogurt,146.33,Store_A,14
+578,Chicken | Rice,103.41,Store_A,14
+579,Bread | Coffee | Milk | Rice | Sugar,69.61,Store_C,2
+580,Apples | Bread | Cheese | Chicken | Eggs | Flour | Onions,132.95,Store_A,3
+581,Bread | Chicken | Pasta,105.63,Store_A,4
+582,Cheese | Chicken | Flour | Milk | Pasta | Tomatoes,99.31,Store_A,5
+583,Apples | Bread | Cheese | Chicken | Milk | Tomatoes,112.0,Store_A,5
+584,Chicken | Eggs | Pasta | Sugar,113.36,Store_A,16
+585,Eggs | Flour | Pasta | Tomatoes | Yogurt,79.02,Store_C,7
+586,Bread | Pasta | Sugar | Yogurt,68.7,Store_A,18
+587,Bread | Cheese | Chicken | Eggs | Flour | Onions | Pasta,137.3,Store_B,19
+588,Cheese | Chicken | Coffee | Flour | Pasta | Sugar | Yogurt,79.61,Store_A,23
+589,Apples | Eggs | Milk | Rice | Tomatoes | Yogurt,40.22,Store_A,20
+590,Sugar | Tomatoes,83.02,Store_B,21
+591,Cheese | Onions | Rice | Sugar | Yogurt,14.82,Store_B,12
+592,Butter | Chicken | Eggs | Onions | Pasta,111.26,Store_A,14
+593,Apples | Cheese | Eggs | Onions | Tomatoes,27.78,Store_C,16
+594,Bread | Butter | Cheese | Chicken | Coffee | Flour | Onions,25.64,Store_B,23
+595,Chicken | Flour | Milk | Sugar,142.49,Store_C,20
+596,Cheese | Eggs | Flour | Onions | Pasta | Tomatoes,118.16,Store_A,16
+597,Coffee | Eggs | Tomatoes,67.99,Store_A,22
+598,Apples | Cheese | Flour | Rice | Yogurt,43.54,Store_B,1
+599,Bread | Eggs | Flour | Sugar | Tomatoes | Yogurt,128.09,Store_B,21
+600,Butter | Cheese | Chicken | Flour | Milk | Sugar | Yogurt,145.6,Store_C,2
+601,Bread | Butter | Cheese | Chicken | Flour | Tomatoes,81.17,Store_A,21
+602,Cheese | Milk | Onions | Pasta | Tomatoes,91.21,Store_B,8
+603,Butter | Chicken | Coffee | Flour | Rice | Sugar,44.03,Store_B,5
+604,Milk | Sugar,92.5,Store_B,0
+605,Apples | Butter | Cheese | Milk | Pasta | Rice | Sugar,66.08,Store_C,21
+606,Chicken | Eggs | Flour | Milk | Onions | Rice | Sugar,128.38,Store_A,18
+607,Bread | Yogurt,62.8,Store_B,3
+608,Apples | Flour | Milk | Tomatoes,100.83,Store_B,12
+609,Coffee | Milk | Yogurt,38.49,Store_B,19
+610,Butter | Rice | Sugar | Tomatoes | Yogurt,22.69,Store_A,7
+611,Milk | Pasta | Rice,15.65,Store_C,22
+612,Bread | Butter | Sugar,68.19,Store_C,4
+613,Coffee | Eggs | Flour | Milk | Tomatoes,32.89,Store_A,9
+614,Apples | Bread | Cheese | Flour,149.09,Store_C,19
+615,Butter | Coffee | Eggs | Flour | Rice | Tomatoes,121.77,Store_C,18
+616,Apples | Chicken,107.07,Store_B,11
+617,Apples | Butter | Coffee | Eggs | Flour | Milk | Pasta,122.46,Store_C,0
+618,Cheese | Eggs | Rice,46.78,Store_B,8
+619,Butter | Chicken | Eggs | Flour | Milk,133.1,Store_C,23
+620,Apples | Chicken | Eggs | Pasta,149.39,Store_B,15
+621,Cheese | Rice,50.58,Store_A,16
+622,Chicken | Onions | Rice | Yogurt,147.85,Store_A,17
+623,Butter | Coffee,54.86,Store_C,13
+624,Chicken | Eggs | Flour | Onions,11.64,Store_B,16
+625,Apples | Cheese | Chicken | Milk | Pasta | Rice | Sugar,61.41,Store_A,0
+626,Butter | Chicken | Milk | Yogurt,149.65,Store_A,20
+627,Apples | Cheese | Coffee,98.92,Store_C,14
+628,Apples | Bread | Sugar,107.37,Store_B,18
+629,Butter | Chicken | Onions | Pasta,43.37,Store_B,1
+630,Apples | Butter | Chicken | Eggs | Onions | Pasta,30.43,Store_A,23
+631,Apples | Bread | Butter | Cheese | Milk | Pasta | Sugar,133.97,Store_C,23
+632,Cheese | Flour | Milk,67.87,Store_A,13
+633,Butter | Cheese | Onions | Pasta | Rice | Sugar | Yogurt,10.58,Store_A,21
+634,Bread | Coffee | Flour | Milk | Onions | Sugar,51.19,Store_C,1
+635,Flour | Onions,37.4,Store_C,14
+636,Bread | Cheese | Coffee | Rice | Sugar | Tomatoes,94.53,Store_C,0
+637,Chicken | Coffee | Eggs | Flour | Onions | Tomatoes | Yogurt,115.86,Store_B,21
+638,Apples | Bread | Butter | Chicken | Coffee | Eggs | Pasta,79.65,Store_C,0
+639,Milk | Rice,36.03,Store_C,11
+640,Apples | Cheese | Milk | Pasta,18.12,Store_A,21
+641,Cheese | Eggs | Onions,53.89,Store_C,14
+642,Apples | Tomatoes,122.83,Store_C,17
+643,Cheese | Coffee | Eggs | Onions | Sugar | Tomatoes | Yogurt,68.73,Store_A,14
+644,Apples | Bread | Chicken | Flour | Pasta | Sugar | Tomatoes,45.32,Store_B,6
+645,Apples | Milk | Onions | Sugar | Tomatoes | Yogurt,12.9,Store_C,11
+646,Apples | Bread | Cheese | Sugar | Yogurt,79.45,Store_A,9
+647,Chicken | Eggs | Flour | Pasta | Rice | Tomatoes,105.88,Store_B,1
+648,Butter | Cheese | Coffee | Flour | Onions | Sugar | Tomatoes,36.65,Store_B,1
+649,Apples | Eggs | Onions,85.21,Store_C,5
+650,Apples | Bread | Cheese | Flour | Rice | Tomatoes | Yogurt,68.9,Store_B,19
+651,Apples | Cheese | Eggs | Onions | Pasta | Rice | Tomatoes,108.55,Store_C,5
+652,Butter | Cheese | Coffee | Onions,130.48,Store_B,23
+653,Apples | Eggs | Milk | Tomatoes | Yogurt,52.99,Store_B,9
+654,Apples | Bread | Eggs | Flour | Pasta | Rice | Yogurt,136.67,Store_B,2
+655,Milk | Yogurt,108.97,Store_C,15
+656,Chicken | Eggs | Flour | Onions | Pasta | Rice | Sugar,15.2,Store_B,4
+657,Flour | Pasta,120.77,Store_A,4
+658,Butter | Chicken | Flour | Tomatoes | Yogurt,79.25,Store_A,9
+659,Bread | Sugar,142.36,Store_B,22
+660,Apples | Bread | Eggs | Pasta | Rice | Tomatoes,55.31,Store_C,12
+661,Bread | Coffee | Eggs | Pasta | Rice | Sugar | Tomatoes,92.77,Store_A,23
+662,Butter | Sugar,143.86,Store_B,2
+663,Cheese | Chicken,47.96,Store_A,17
+664,Apples | Butter | Eggs | Flour | Milk | Sugar,76.07,Store_A,18
+665,Butter | Onions,115.35,Store_A,5
+666,Cheese | Chicken | Coffee | Yogurt,106.75,Store_A,19
+667,Apples | Bread | Flour | Onions | Rice | Sugar,127.42,Store_A,0
+668,Coffee | Eggs | Onions | Rice | Sugar | Tomatoes,82.77,Store_B,9
+669,Apples | Bread | Butter | Chicken | Rice | Yogurt,54.65,Store_A,9
+670,Bread | Chicken | Coffee | Eggs | Milk | Onions | Tomatoes,84.91,Store_B,21
+671,Butter | Coffee | Flour | Rice | Tomatoes,58.99,Store_A,0
+672,Eggs | Onions | Pasta,34.7,Store_C,18
+673,Apples | Bread | Sugar | Yogurt,87.7,Store_B,10
+674,Apples | Butter | Chicken | Flour | Milk,16.77,Store_C,12
+675,Bread | Butter | Chicken | Eggs | Milk | Sugar | Yogurt,15.12,Store_C,16
+676,Coffee | Tomatoes,19.04,Store_A,19
+677,Milk | Rice,104.17,Store_A,17
+678,Bread | Flour | Milk | Pasta | Sugar | Yogurt,66.98,Store_A,3
+679,Rice | Sugar,79.18,Store_A,14
+680,Butter | Flour | Milk | Onions | Rice | Sugar,58.08,Store_A,1
+681,Apples | Chicken | Flour,45.51,Store_C,5
+682,Butter | Cheese | Chicken | Flour | Onions | Rice | Sugar,60.16,Store_C,21
+683,Eggs | Sugar | Tomatoes | Yogurt,37.07,Store_A,22
+684,Bread | Chicken | Eggs | Pasta | Rice | Tomatoes | Yogurt,105.03,Store_A,8
+685,Bread | Cheese | Coffee | Milk | Onions | Pasta | Yogurt,24.24,Store_B,10
+686,Bread | Butter | Cheese | Coffee | Milk | Rice | Tomatoes,82.37,Store_B,19
+687,Butter | Cheese | Coffee | Eggs | Flour | Pasta | Sugar,76.76,Store_C,15
+688,Bread | Butter | Eggs | Sugar | Tomatoes,52.27,Store_C,7
+689,Apples | Bread | Chicken | Milk | Onions | Yogurt,24.32,Store_C,16
+690,Apples | Bread | Chicken | Eggs | Rice | Sugar,108.47,Store_A,22
+691,Apples | Cheese | Chicken | Eggs | Pasta | Sugar,89.74,Store_C,22
+692,Butter | Chicken,123.33,Store_C,3
+693,Apples | Butter | Cheese,42.97,Store_C,6
+694,Apples | Bread | Butter | Cheese | Milk | Pasta,120.82,Store_B,10
+695,Butter | Cheese | Milk | Sugar,50.87,Store_C,10
+696,Coffee | Eggs | Onions | Pasta | Rice | Sugar | Yogurt,25.76,Store_C,10
+697,Apples | Milk | Sugar | Tomatoes,28.89,Store_B,20
+698,Apples | Bread | Butter | Rice | Tomatoes,40.95,Store_C,20
+699,Apples | Bread | Cheese | Chicken | Eggs | Onions | Tomatoes,105.54,Store_A,14
+700,Eggs | Milk | Pasta,44.15,Store_B,4
+701,Chicken | Eggs | Onions | Yogurt,94.54,Store_C,5
+702,Bread | Flour | Milk | Onions,45.91,Store_B,22
+703,Bread | Cheese | Milk,61.13,Store_C,4
+704,Eggs | Sugar | Yogurt,134.56,Store_C,8
+705,Apples | Flour | Pasta,80.05,Store_B,10
+706,Pasta | Sugar,94.04,Store_A,22
+707,Cheese | Milk | Onions,36.5,Store_B,2
+708,Bread | Butter | Chicken | Rice | Sugar | Yogurt,28.41,Store_A,19
+709,Butter | Chicken | Sugar | Tomatoes | Yogurt,67.85,Store_A,3
+710,Chicken | Eggs | Milk | Onions | Yogurt,129.75,Store_B,22
+711,Apples | Bread | Flour | Milk | Onions | Rice,43.73,Store_C,14
+712,Cheese | Coffee | Milk | Sugar,97.04,Store_A,17
+713,Apples | Eggs | Flour | Rice,132.09,Store_B,4
+714,Apples | Cheese | Eggs | Milk | Rice | Sugar,140.82,Store_C,10
+715,Apples | Flour | Milk | Onions | Sugar | Tomatoes,149.13,Store_C,10
+716,Butter | Coffee | Eggs | Yogurt,116.81,Store_C,3
+717,Apples | Cheese,20.5,Store_B,15
+718,Bread | Cheese | Milk | Sugar,132.0,Store_B,10
+719,Butter | Chicken | Milk | Sugar,133.99,Store_C,0
+720,Butter | Chicken | Yogurt,88.02,Store_C,12
+721,Butter | Chicken | Coffee | Milk | Onions | Sugar | Yogurt,19.44,Store_C,18
+722,Chicken | Coffee | Flour | Milk | Onions | Pasta | Rice,76.73,Store_C,5
+723,Butter | Chicken | Milk | Rice,39.5,Store_B,19
+724,Butter | Chicken | Milk | Onions | Pasta | Sugar,71.89,Store_C,18
+725,Butter | Flour | Onions | Rice | Sugar | Tomatoes | Yogurt,111.38,Store_A,5
+726,Apples | Chicken | Eggs | Milk | Pasta | Yogurt,103.46,Store_A,12
+727,Apples | Butter | Milk | Rice | Sugar,119.2,Store_B,10
+728,Flour | Yogurt,76.71,Store_A,18
+729,Apples | Butter | Onions,81.51,Store_A,6
+730,Chicken | Milk | Yogurt,141.0,Store_A,11
+731,Coffee | Onions | Sugar,98.37,Store_B,15
+732,Chicken | Flour | Milk | Onions | Tomatoes | Yogurt,114.66,Store_A,0
+733,Bread | Chicken | Coffee | Flour,103.03,Store_C,14
+734,Apples | Bread | Cheese | Flour | Rice,99.67,Store_A,12
+735,Eggs | Rice | Yogurt,137.9,Store_A,9
+736,Chicken | Coffee | Flour | Onions | Pasta,59.91,Store_A,17
+737,Apples | Bread | Coffee | Tomatoes,69.88,Store_C,3
+738,Bread | Chicken | Coffee | Flour | Pasta | Sugar,63.17,Store_B,21
+739,Butter | Cheese | Chicken | Pasta | Rice | Tomatoes | Yogurt,117.13,Store_B,5
+740,Apples | Bread | Chicken | Milk | Pasta | Tomatoes,131.58,Store_A,7
+741,Bread | Butter | Coffee | Flour | Pasta | Tomatoes,60.05,Store_C,23
+742,Eggs | Flour | Rice | Sugar | Tomatoes | Yogurt,29.93,Store_A,19
+743,Apples | Bread | Coffee | Flour | Onions | Pasta | Rice,79.17,Store_B,21
+744,Bread | Cheese | Onions | Sugar | Tomatoes | Yogurt,147.81,Store_B,8
+745,Apples | Bread | Chicken | Onions,38.52,Store_C,22
+746,Apples | Coffee | Milk | Onions | Pasta | Rice | Tomatoes,73.28,Store_C,7
+747,Apples | Coffee,47.99,Store_B,23
+748,Chicken | Milk | Pasta,139.18,Store_B,17
+749,Apples | Cheese | Eggs | Flour,87.13,Store_B,6
+750,Cheese | Milk | Onions | Rice | Tomatoes | Yogurt,91.02,Store_A,18
+751,Butter | Cheese | Tomatoes,11.16,Store_B,22
+752,Apples | Cheese | Eggs | Flour | Rice | Sugar,101.39,Store_B,17
+753,Apples | Bread | Butter | Milk | Pasta | Yogurt,52.89,Store_C,0
+754,Apples | Eggs | Rice | Sugar,81.88,Store_B,10
+755,Bread | Chicken | Milk | Onions | Sugar,84.35,Store_B,8
+756,Apples | Coffee | Eggs | Sugar | Yogurt,92.91,Store_C,9
+757,Coffee | Flour | Rice,125.3,Store_B,9
+758,Butter | Cheese | Flour | Milk | Onions | Pasta | Yogurt,51.85,Store_C,0
+759,Cheese | Coffee | Eggs | Flour | Onions,45.86,Store_C,16
+760,Eggs | Milk | Onions | Rice,121.41,Store_C,11
+761,Butter | Cheese | Eggs | Pasta | Sugar | Yogurt,110.62,Store_C,11
+762,Bread | Butter | Cheese | Coffee | Flour | Onions | Yogurt,41.59,Store_C,18
+763,Apples | Flour | Pasta | Rice | Sugar,10.12,Store_C,16
+764,Cheese | Eggs | Flour | Milk | Sugar | Yogurt,103.23,Store_C,6
+765,Apples | Eggs | Sugar,32.0,Store_B,22
+766,Eggs | Pasta | Tomatoes,143.98,Store_A,10
+767,Chicken | Onions | Rice | Yogurt,94.62,Store_B,23
+768,Bread | Butter | Flour | Milk | Onions | Pasta | Sugar,128.95,Store_C,1
+769,Bread | Butter | Coffee | Flour | Rice | Tomatoes | Yogurt,122.79,Store_C,15
+770,Butter | Coffee | Eggs | Milk | Pasta | Tomatoes | Yogurt,88.09,Store_B,22
+771,Apples | Butter | Flour | Rice | Tomatoes,71.37,Store_A,8
+772,Milk | Onions | Pasta | Tomatoes,79.55,Store_B,9
+773,Flour | Tomatoes,122.42,Store_B,20
+774,Butter | Pasta,99.66,Store_B,9
+775,Apples | Chicken | Coffee | Yogurt,38.8,Store_A,2
+776,Cheese | Eggs | Milk | Rice,95.31,Store_C,16
+777,Apples | Bread | Cheese | Eggs | Milk | Sugar | Yogurt,66.65,Store_A,13
+778,Apples | Cheese | Chicken | Flour | Milk | Yogurt,18.58,Store_B,18
+779,Chicken | Flour | Milk | Onions | Rice | Sugar,63.38,Store_B,17
+780,Apples | Eggs | Flour | Milk | Onions,41.86,Store_A,17
+781,Bread | Butter | Coffee | Eggs | Flour | Milk,127.4,Store_A,13
+782,Bread | Butter | Tomatoes,24.7,Store_C,2
+783,Bread | Rice | Sugar,60.49,Store_C,9
+784,Bread | Coffee | Pasta | Rice | Sugar,107.37,Store_A,22
+785,Apples | Bread | Butter | Cheese | Eggs | Sugar | Yogurt,135.63,Store_C,12
+786,Coffee | Flour | Rice,56.94,Store_B,21
+787,Sugar | Tomatoes,94.9,Store_A,11
+788,Cheese | Tomatoes,62.31,Store_C,8
+789,Bread | Tomatoes,38.4,Store_B,9
+790,Apples | Butter | Chicken | Coffee | Flour | Milk | Sugar,55.6,Store_A,18
+791,Apples | Butter | Cheese | Flour | Rice | Tomatoes,99.03,Store_C,15
+792,Pasta | Rice | Tomatoes,110.29,Store_B,20
+793,Cheese | Chicken | Coffee | Eggs | Milk | Tomatoes,61.88,Store_A,2
+794,Butter | Flour,31.35,Store_C,11
+795,Bread | Butter | Cheese | Coffee | Onions | Pasta | Rice,29.54,Store_B,7
+796,Apples | Butter | Cheese | Flour | Milk | Rice | Sugar,123.77,Store_B,14
+797,Flour | Sugar,101.46,Store_B,10
+798,Butter | Onions | Rice,111.92,Store_B,22
+799,Cheese | Eggs | Milk | Onions | Tomatoes,78.36,Store_A,12
+800,Cheese | Coffee | Eggs | Rice | Yogurt,74.02,Store_B,5
+801,Apples | Bread | Butter | Cheese | Eggs | Pasta,39.56,Store_A,12
+802,Cheese | Rice | Sugar,33.57,Store_A,10
+803,Apples | Bread,31.55,Store_C,5
+804,Apples | Bread | Butter | Coffee | Tomatoes | Yogurt,148.85,Store_A,5
+805,Apples | Cheese | Eggs | Milk | Pasta,124.92,Store_B,4
+806,Butter | Chicken | Flour | Tomatoes,97.66,Store_A,6
+807,Butter | Milk,40.02,Store_A,22
+808,Pasta | Tomatoes,57.27,Store_C,22
+809,Chicken | Pasta | Yogurt,59.11,Store_A,18
+810,Apples | Chicken | Coffee | Milk | Pasta | Yogurt,76.87,Store_C,10
+811,Butter | Chicken | Pasta | Tomatoes,69.08,Store_A,5
+812,Apples | Flour,140.78,Store_C,8
+813,Chicken | Eggs | Onions | Yogurt,110.91,Store_A,19
+814,Cheese | Chicken | Coffee | Rice | Tomatoes | Yogurt,21.4,Store_B,17
+815,Apples | Butter | Cheese | Milk | Yogurt,60.39,Store_A,7
+816,Cheese | Coffee | Milk,28.61,Store_C,17
+817,Apples | Butter | Flour | Onions | Yogurt,49.11,Store_C,4
+818,Eggs | Flour | Milk | Onions | Pasta | Tomatoes | Yogurt,144.25,Store_B,5
+819,Coffee | Milk | Pasta,108.74,Store_B,1
+820,Butter | Chicken | Coffee | Onions,11.1,Store_C,21
+821,Chicken | Eggs | Onions | Pasta,56.04,Store_B,23
+822,Bread | Cheese | Onions | Sugar | Yogurt,71.42,Store_A,3
+823,Apples | Butter | Coffee | Flour | Milk | Onions,94.35,Store_A,18
+824,Apples | Coffee | Flour | Sugar | Tomatoes | Yogurt,79.96,Store_B,3
+825,Eggs | Flour | Onions | Sugar,19.77,Store_A,15
+826,Apples | Coffee | Flour | Milk | Pasta | Rice | Sugar,82.18,Store_A,0
+827,Bread | Eggs,28.24,Store_B,15
+828,Cheese | Onions | Rice | Tomatoes | Yogurt,82.69,Store_C,0
+829,Butter | Eggs,44.45,Store_A,23
+830,Apples | Chicken | Pasta | Rice | Sugar,30.19,Store_B,16
+831,Apples | Bread | Eggs | Milk | Pasta | Tomatoes | Yogurt,50.31,Store_C,4
+832,Butter | Cheese | Pasta | Tomatoes | Yogurt,23.95,Store_A,15
+833,Bread | Cheese | Milk | Pasta | Rice | Sugar,49.76,Store_A,2
+834,Cheese | Chicken | Eggs | Sugar,131.37,Store_B,9
+835,Butter | Flour | Yogurt,53.0,Store_A,17
+836,Bread | Coffee | Flour | Rice,75.83,Store_C,20
+837,Bread | Eggs | Milk,82.77,Store_B,17
+838,Apples | Coffee | Milk | Tomatoes,34.96,Store_B,16
+839,Butter | Cheese | Chicken | Milk | Pasta | Tomatoes | Yogurt,71.85,Store_B,10
+840,Butter | Cheese | Eggs | Flour,129.42,Store_B,8
+841,Butter | Cheese | Flour | Onions | Tomatoes | Yogurt,21.27,Store_C,10
+842,Chicken | Coffee | Onions,139.19,Store_C,8
+843,Apples | Bread | Coffee | Eggs | Flour | Sugar | Tomatoes,131.96,Store_C,16
+844,Apples | Bread | Chicken | Flour | Pasta,129.82,Store_C,19
+845,Cheese | Flour | Onions | Tomatoes | Yogurt,37.8,Store_C,4
+846,Bread | Cheese | Chicken | Eggs | Onions | Rice | Tomatoes,77.8,Store_C,11
+847,Cheese | Flour | Onions | Rice | Yogurt,96.26,Store_B,17
+848,Apples | Bread | Coffee | Eggs | Flour | Rice | Tomatoes,23.99,Store_B,15
+849,Apples | Cheese | Coffee | Pasta | Sugar | Tomatoes,87.96,Store_B,8
+850,Coffee | Onions,127.61,Store_C,7
+851,Eggs | Sugar,141.12,Store_B,5
+852,Apples | Cheese | Flour | Rice | Sugar | Tomatoes,48.97,Store_C,16
+853,Cheese | Coffee | Flour | Milk | Rice,50.42,Store_B,13
+854,Coffee | Pasta,47.9,Store_C,20
+855,Apples | Butter | Eggs | Sugar | Tomatoes,31.48,Store_C,23
+856,Bread | Chicken | Flour | Rice | Tomatoes | Yogurt,70.3,Store_C,13
+857,Sugar | Yogurt,119.83,Store_A,3
+858,Apples | Cheese | Chicken | Coffee | Eggs | Flour,109.69,Store_A,7
+859,Bread | Flour | Milk | Onions | Pasta | Sugar,136.04,Store_C,21
+860,Butter | Flour | Rice,59.8,Store_B,16
+861,Butter | Chicken | Onions | Pasta | Yogurt,90.11,Store_C,0
+862,Bread | Coffee | Flour | Milk | Onions | Sugar,117.31,Store_C,2
+863,Butter | Cheese | Rice,135.74,Store_A,16
+864,Bread | Chicken | Sugar | Tomatoes | Yogurt,132.05,Store_C,19
+865,Cheese | Milk | Onions,75.17,Store_A,2
+866,Cheese | Milk,136.96,Store_B,6
+867,Butter | Cheese | Milk | Rice | Sugar,72.17,Store_B,10
+868,Bread | Coffee | Rice,136.4,Store_B,14
+869,Butter | Chicken | Coffee | Flour | Onions | Pasta | Sugar,118.78,Store_C,6
+870,Butter | Pasta,41.03,Store_A,4
+871,Cheese | Coffee,140.15,Store_C,16
+872,Cheese | Onions,43.95,Store_B,4
+873,Butter | Coffee | Milk | Onions | Yogurt,137.18,Store_C,0
+874,Rice | Sugar,96.12,Store_A,21
+875,Apples | Flour | Onions | Pasta | Rice | Sugar | Tomatoes,103.43,Store_A,23
+876,Apples | Butter | Cheese | Pasta,25.31,Store_B,6
+877,Coffee | Flour | Onions | Tomatoes,19.2,Store_B,16
+878,Eggs | Flour | Milk | Onions | Pasta | Tomatoes,145.57,Store_B,7
+879,Milk | Onions | Sugar | Tomatoes,57.17,Store_C,11
+880,Butter | Eggs | Flour | Onions | Sugar | Yogurt,128.21,Store_A,1
+881,Apples | Milk,108.63,Store_C,16
+882,Apples | Bread | Cheese | Eggs | Tomatoes,94.58,Store_B,21
+883,Milk | Pasta,105.93,Store_A,19
+884,Bread | Cheese | Chicken | Coffee | Milk | Pasta | Sugar,22.51,Store_B,13
+885,Apples | Pasta | Yogurt,67.74,Store_A,22
+886,Coffee | Rice | Yogurt,94.99,Store_A,2
+887,Cheese | Milk | Onions | Rice | Tomatoes | Yogurt,131.46,Store_B,18
+888,Bread | Eggs | Onions | Rice,110.06,Store_A,13
+889,Apples | Cheese | Coffee,45.39,Store_A,7
+890,Apples | Butter | Chicken | Eggs | Rice | Yogurt,147.89,Store_B,6
+891,Bread | Butter | Coffee | Milk | Pasta | Sugar | Tomatoes,100.03,Store_A,4
+892,Bread | Butter | Chicken | Eggs | Yogurt,80.18,Store_B,2
+893,Chicken | Eggs | Milk | Pasta,119.39,Store_C,0
+894,Chicken | Milk | Onions | Sugar | Tomatoes | Yogurt,94.38,Store_C,18
+895,Bread | Cheese | Pasta | Rice | Tomatoes,109.4,Store_B,14
+896,Eggs | Flour | Milk | Pasta | Rice | Sugar,96.4,Store_A,0
+897,Eggs | Flour | Onions | Pasta | Sugar,35.04,Store_C,4
+898,Bread | Butter | Coffee | Flour | Sugar | Yogurt,86.07,Store_B,19
+899,Bread | Flour | Milk | Onions | Pasta,49.63,Store_B,10
+900,Bread | Chicken | Eggs,89.84,Store_A,13
+901,Chicken | Eggs | Onions | Pasta | Sugar | Tomatoes | Yogurt,27.57,Store_A,21
+902,Butter | Flour | Onions | Tomatoes | Yogurt,42.48,Store_A,17
+903,Butter | Coffee | Flour | Rice | Sugar | Yogurt,123.22,Store_B,19
+904,Cheese | Coffee | Eggs | Flour | Onions,66.74,Store_C,8
+905,Cheese | Coffee | Flour | Milk,104.33,Store_B,14
+906,Apples | Butter | Chicken | Coffee | Onions | Pasta | Tomatoes,79.7,Store_A,10
+907,Bread | Butter | Chicken | Milk | Onions | Sugar | Yogurt,57.7,Store_A,4
+908,Apples | Rice | Sugar,79.32,Store_B,14
+909,Apples | Chicken | Eggs | Flour | Pasta | Rice | Sugar,123.92,Store_A,23
+910,Eggs | Flour | Onions | Pasta | Yogurt,49.42,Store_A,1
+911,Bread | Flour | Onions | Rice | Sugar,69.0,Store_B,11
+912,Butter | Chicken | Eggs | Pasta | Sugar,38.36,Store_C,22
+913,Eggs | Flour | Milk | Yogurt,59.17,Store_A,6
+914,Bread | Cheese | Eggs | Onions | Rice | Sugar | Yogurt,133.92,Store_C,1
+915,Apples | Cheese | Coffee | Eggs | Pasta | Rice | Yogurt,120.0,Store_C,7
+916,Sugar | Yogurt,62.31,Store_C,8
+917,Apples | Eggs | Rice,28.54,Store_C,4
+918,Apples | Cheese | Flour | Rice | Sugar | Tomatoes,68.8,Store_A,14
+919,Chicken | Eggs,118.04,Store_A,18
+920,Cheese | Coffee | Flour | Onions | Pasta | Rice | Yogurt,16.13,Store_B,18
+921,Apples | Butter | Rice,114.35,Store_A,12
+922,Bread | Flour | Yogurt,105.19,Store_B,12
+923,Bread | Cheese | Eggs | Milk | Rice,19.05,Store_C,5
+924,Eggs | Milk | Rice | Tomatoes,98.99,Store_B,0
+925,Bread | Tomatoes,51.81,Store_B,9
+926,Bread | Cheese | Coffee | Flour | Rice | Tomatoes | Yogurt,34.82,Store_A,5
+927,Apples | Chicken | Coffee | Eggs | Rice | Sugar | Tomatoes,63.88,Store_B,2
+928,Chicken | Eggs | Flour | Onions | Yogurt,38.75,Store_C,12
+929,Apples | Bread | Coffee | Milk | Yogurt,125.44,Store_A,18
+930,Apples | Bread | Rice | Yogurt,113.88,Store_A,9
+931,Apples | Chicken | Coffee | Eggs | Flour | Sugar | Yogurt,147.31,Store_A,12
+932,Apples | Coffee | Flour | Pasta | Sugar,84.77,Store_C,6
+933,Coffee | Milk | Onions | Rice | Sugar,22.49,Store_B,14
+934,Coffee | Sugar,61.49,Store_A,22
+935,Coffee | Eggs | Flour | Tomatoes,127.41,Store_B,3
+936,Bread | Coffee | Flour | Yogurt,65.56,Store_C,10
+937,Apples | Bread | Onions | Tomatoes | Yogurt,73.79,Store_C,7
+938,Apples | Bread | Chicken | Coffee | Milk | Onions | Yogurt,67.68,Store_C,1
+939,Cheese | Chicken | Onions | Pasta | Yogurt,42.95,Store_A,0
+940,Bread | Tomatoes,20.25,Store_A,0
+941,Butter | Cheese | Eggs | Milk,35.28,Store_B,15
+942,Bread | Butter | Cheese | Milk | Pasta,60.95,Store_B,17
+943,Bread | Flour,44.36,Store_A,10
+944,Butter | Cheese | Coffee | Milk,90.18,Store_C,21
+945,Apples | Cheese | Flour | Pasta | Rice,95.95,Store_C,7
+946,Bread | Milk,89.81,Store_A,18
+947,Butter | Cheese | Chicken | Coffee | Rice,21.89,Store_B,11
+948,Bread | Coffee | Onions | Pasta | Rice,103.36,Store_C,5
+949,Apples | Butter | Chicken | Milk | Tomatoes,63.84,Store_A,23
+950,Apples | Butter | Cheese | Flour | Milk | Onions | Sugar,132.94,Store_B,15
+951,Chicken | Tomatoes,83.59,Store_B,7
+952,Eggs | Flour | Onions | Rice,21.83,Store_C,6
+953,Apples | Chicken | Coffee | Flour | Onions | Yogurt,11.29,Store_C,19
+954,Apples | Bread | Eggs | Onions | Pasta,108.35,Store_C,2
+955,Butter | Coffee | Flour | Milk | Rice | Sugar,66.07,Store_C,22
+956,Chicken | Milk | Onions | Sugar | Tomatoes | Yogurt,50.32,Store_B,0
+957,Bread | Cheese | Eggs | Flour | Onions | Pasta | Yogurt,72.61,Store_A,22
+958,Cheese | Milk | Pasta,20.14,Store_B,5
+959,Chicken | Milk | Sugar,64.88,Store_C,2
+960,Apples | Coffee | Eggs | Flour | Milk | Pasta | Yogurt,54.06,Store_A,18
+961,Bread | Coffee | Flour | Sugar,122.03,Store_B,1
+962,Bread | Eggs | Milk | Rice,34.48,Store_A,16
+963,Apples | Rice,115.88,Store_B,15
+964,Butter | Chicken,80.06,Store_A,20
+965,Eggs | Yogurt,21.46,Store_B,6
+966,Apples | Milk | Tomatoes,145.75,Store_B,22
+967,Cheese | Chicken | Sugar | Tomatoes,112.79,Store_C,5
+968,Cheese | Chicken | Eggs,46.41,Store_B,10
+969,Apples | Chicken | Onions,91.45,Store_C,14
+970,Bread | Butter | Cheese | Chicken | Pasta | Sugar | Tomatoes,135.99,Store_B,21
+971,Bread | Coffee | Onions | Pasta | Yogurt,140.31,Store_A,10
+972,Apples | Chicken | Flour | Milk,112.36,Store_A,6
+973,Chicken | Pasta,111.87,Store_C,14
+974,Chicken | Onions,48.83,Store_B,15
+975,Butter | Eggs | Flour | Onions,148.57,Store_C,7
+976,Chicken | Coffee | Eggs | Milk | Tomatoes | Yogurt,44.09,Store_A,4
+977,Butter | Chicken | Rice,22.52,Store_B,16
+978,Apples | Coffee,146.83,Store_C,22
+979,Apples | Chicken | Coffee | Rice | Sugar | Tomatoes | Yogurt,31.4,Store_A,1
+980,Apples | Bread | Cheese | Onions | Sugar | Tomatoes | Yogurt,83.03,Store_A,20
+981,Butter | Onions | Rice,75.55,Store_B,6
+982,Bread | Chicken | Onions | Rice,128.75,Store_B,22
+983,Apples | Bread | Chicken | Eggs | Flour | Milk | Yogurt,65.53,Store_B,20
+984,Bread | Butter | Coffee | Onions | Pasta | Sugar,80.31,Store_C,5
+985,Pasta | Sugar,16.12,Store_C,11
+986,Bread | Onions | Tomatoes,39.1,Store_B,15
+987,Apples | Flour | Onions | Rice | Sugar | Yogurt,126.62,Store_B,10
+988,Bread | Cheese | Eggs | Onions,76.97,Store_B,21
+989,Bread | Chicken | Tomatoes,42.33,Store_A,16
+990,Flour | Tomatoes,61.65,Store_B,9
+991,Pasta | Yogurt,49.91,Store_C,22
+992,Bread | Cheese | Chicken | Milk | Pasta | Rice,87.87,Store_A,15
+993,Apples | Bread | Chicken | Flour | Onions | Tomatoes,17.2,Store_B,15
+994,Bread | Cheese | Onions | Sugar | Tomatoes | Yogurt,41.5,Store_C,14
+995,Apples | Chicken | Onions | Pasta | Sugar | Tomatoes,59.7,Store_A,14
+996,Bread | Chicken | Pasta,139.95,Store_A,22
+997,Butter | Flour | Onions | Yogurt,97.26,Store_C,19
+998,Apples | Cheese,80.6,Store_C,3
+999,Eggs | Pasta | Sugar | Tomatoes,36.72,Store_A,21
+1000,Butter | Sugar | Yogurt,88.1,Store_C,2
+1001,Apples | Onions | Yogurt,140.06,Store_A,13
+1002,Bread | Coffee | Flour | Onions | Pasta | Rice,89.28,Store_A,9
+1003,Coffee | Eggs | Milk | Tomatoes,33.07,Store_A,5
+1004,Apples | Bread | Cheese | Eggs | Milk | Sugar,149.6,Store_A,10
+1005,Bread | Cheese | Chicken | Yogurt,79.84,Store_B,3
+1006,Apples | Bread | Coffee | Rice | Sugar | Tomatoes,54.74,Store_C,9
+1007,Apples | Butter | Pasta | Tomatoes | Yogurt,80.47,Store_B,15
+1008,Butter | Cheese | Chicken | Eggs | Rice | Tomatoes | Yogurt,46.92,Store_B,23
+1009,Apples | Butter | Chicken | Onions | Rice,14.25,Store_B,20
+1010,Apples | Cheese | Chicken | Eggs | Pasta | Tomatoes,134.53,Store_B,7
+1011,Chicken | Eggs,70.04,Store_A,8
+1012,Apples | Bread | Cheese | Flour | Milk | Onions | Sugar,115.4,Store_A,3
+1013,Eggs | Onions,145.98,Store_A,16
+1014,Eggs | Milk | Onions | Tomatoes,98.56,Store_A,9
+1015,Eggs | Flour | Yogurt,106.83,Store_B,22
+1016,Eggs | Pasta | Rice,142.05,Store_A,12
+1017,Eggs | Pasta,82.32,Store_B,22
+1018,Butter | Onions | Sugar,54.79,Store_A,20
+1019,Butter | Cheese | Pasta | Sugar | Yogurt,138.99,Store_C,20
+1020,Rice | Sugar,19.66,Store_C,16
+1021,Bread | Coffee | Onions | Rice | Sugar | Tomatoes | Yogurt,40.05,Store_C,18
+1022,Apples | Cheese | Coffee | Pasta,57.78,Store_C,16
+1023,Bread | Coffee | Sugar | Yogurt,119.5,Store_A,22
+1024,Cheese | Onions | Rice | Sugar,136.55,Store_C,20
+1025,Apples | Chicken | Pasta | Sugar | Tomatoes,73.25,Store_C,3
+1026,Flour | Onions | Rice | Tomatoes | Yogurt,50.06,Store_B,22
+1027,Coffee | Flour | Rice,59.45,Store_C,5
+1028,Milk | Pasta | Sugar | Tomatoes,101.92,Store_A,13
+1029,Bread | Butter | Chicken | Coffee | Onions | Rice,32.12,Store_B,8
+1030,Bread | Butter | Onions | Sugar | Tomatoes | Yogurt,86.64,Store_A,5
+1031,Rice | Sugar | Tomatoes | Yogurt,92.38,Store_B,9
+1032,Butter | Chicken | Coffee | Eggs | Milk | Pasta,109.1,Store_A,5
+1033,Chicken | Coffee | Flour | Rice | Sugar | Tomatoes,94.55,Store_C,8
+1034,Eggs | Pasta | Sugar,23.57,Store_B,12
+1035,Apples | Chicken | Flour | Milk,106.43,Store_C,15
+1036,Butter | Cheese | Chicken | Coffee | Milk | Sugar | Tomatoes,13.04,Store_A,15
+1037,Apples | Eggs | Flour,64.64,Store_A,18
+1038,Eggs | Flour | Tomatoes,68.39,Store_B,4
+1039,Apples | Eggs | Flour | Sugar | Yogurt,26.33,Store_A,10
+1040,Butter | Cheese | Coffee | Eggs | Onions | Rice | Yogurt,11.38,Store_A,20
+1041,Chicken | Milk | Onions | Pasta | Rice | Sugar,19.96,Store_B,14
+1042,Cheese | Milk,72.48,Store_C,7
+1043,Butter | Milk | Pasta,43.65,Store_B,14
+1044,Bread | Onions | Rice,19.66,Store_A,10
+1045,Apples | Butter | Cheese | Pasta | Rice | Tomatoes | Yogurt,45.9,Store_A,12
+1046,Apples | Bread | Cheese | Flour | Rice | Tomatoes | Yogurt,84.04,Store_B,22
+1047,Coffee | Milk | Onions | Rice | Sugar | Tomatoes | Yogurt,113.9,Store_B,1
+1048,Eggs | Tomatoes,67.68,Store_C,1
+1049,Bread | Butter | Chicken | Coffee | Eggs | Flour | Tomatoes,95.84,Store_A,22
+1050,Eggs | Onions | Pasta,93.55,Store_A,11
+1051,Bread | Cheese | Coffee | Flour | Pasta | Rice,135.48,Store_C,19
+1052,Coffee | Flour | Rice | Tomatoes | Yogurt,35.12,Store_B,21
+1053,Eggs | Milk | Rice,76.7,Store_B,8
+1054,Butter | Chicken | Coffee | Pasta | Rice,98.46,Store_C,19
+1055,Apples | Butter | Cheese | Eggs | Pasta | Rice | Yogurt,82.76,Store_B,14
+1056,Butter | Yogurt,73.05,Store_C,6
+1057,Apples | Bread | Butter | Chicken | Eggs | Milk | Pasta,146.28,Store_B,13
+1058,Bread | Chicken | Tomatoes | Yogurt,141.88,Store_B,16
+1059,Apples | Cheese,95.6,Store_B,1
+1060,Apples | Eggs | Tomatoes,71.54,Store_C,8
+1061,Bread | Coffee | Eggs | Sugar,115.75,Store_C,12
+1062,Butter | Cheese | Chicken | Coffee | Milk | Pasta | Yogurt,81.81,Store_C,4
+1063,Cheese | Coffee | Pasta,149.38,Store_A,3
+1064,Apples | Butter | Cheese | Pasta | Rice | Tomatoes,106.03,Store_A,22
+1065,Pasta | Yogurt,19.54,Store_C,20
+1066,Cheese | Milk,66.27,Store_A,0
+1067,Onions | Pasta | Sugar | Tomatoes,112.24,Store_A,8
+1068,Bread | Chicken | Coffee | Rice,127.93,Store_B,23
+1069,Bread | Cheese | Chicken | Tomatoes,123.87,Store_B,15
+1070,Cheese | Chicken | Eggs | Onions | Pasta | Sugar | Yogurt,146.81,Store_B,18
+1071,Bread | Cheese | Chicken | Eggs | Flour | Sugar | Tomatoes,78.48,Store_A,2
+1072,Flour | Milk | Pasta | Yogurt,29.61,Store_A,2
+1073,Chicken | Coffee | Eggs | Flour | Pasta,101.31,Store_C,6
+1074,Bread | Chicken | Onions | Sugar,19.9,Store_A,17
+1075,Cheese | Milk | Yogurt,146.29,Store_A,19
+1076,Apples | Cheese | Onions | Pasta | Rice,116.19,Store_C,6
+1077,Butter | Chicken | Flour | Pasta | Tomatoes,147.5,Store_C,23
+1078,Bread | Butter | Chicken | Flour | Sugar,62.82,Store_C,15
+1079,Apples | Butter | Cheese,12.21,Store_B,20
+1080,Butter | Chicken,82.98,Store_C,23
+1081,Cheese | Onions,26.97,Store_B,3
+1082,Butter | Coffee | Rice | Sugar,105.15,Store_A,12
+1083,Chicken | Eggs | Flour | Tomatoes,79.66,Store_A,9
+1084,Bread | Butter | Cheese | Chicken | Coffee | Pasta,115.48,Store_B,1
+1085,Butter | Cheese | Pasta,50.75,Store_B,18
+1086,Apples | Bread | Coffee | Rice,126.08,Store_B,13
+1087,Cheese | Flour | Milk | Tomatoes | Yogurt,101.11,Store_A,5
+1088,Apples | Chicken | Pasta | Sugar,148.28,Store_A,12
+1089,Butter | Cheese | Coffee | Flour | Rice | Yogurt,35.0,Store_C,21
+1090,Milk | Tomatoes,17.16,Store_C,11
+1091,Bread | Chicken | Flour | Onions | Sugar | Tomatoes | Yogurt,129.15,Store_A,11
+1092,Apples | Cheese | Chicken | Coffee | Eggs | Pasta | Sugar,57.38,Store_C,22
+1093,Apples | Cheese | Eggs | Pasta | Rice | Tomatoes | Yogurt,70.37,Store_C,11
+1094,Apples | Butter | Milk | Onions | Pasta,139.59,Store_B,10
+1095,Apples | Bread | Butter | Flour | Onions | Rice | Sugar,71.7,Store_A,13
+1096,Cheese | Rice,51.72,Store_B,3
+1097,Apples | Butter | Cheese | Coffee | Eggs | Onions | Pasta,18.33,Store_A,12
+1098,Butter | Coffee | Sugar,72.01,Store_A,7
+1099,Chicken | Eggs | Milk | Onions | Pasta | Rice | Yogurt,101.69,Store_B,23
+1100,Bread | Cheese | Chicken | Pasta | Sugar | Tomatoes,47.68,Store_A,22
+1101,Coffee | Eggs,110.49,Store_B,2
+1102,Onions | Tomatoes,76.96,Store_B,13
+1103,Bread | Rice | Yogurt,130.14,Store_A,18
+1104,Bread | Butter | Coffee | Flour | Milk | Pasta,32.64,Store_A,17
+1105,Bread | Chicken | Eggs | Milk | Onions | Rice | Tomatoes,115.99,Store_B,10
+1106,Bread | Milk | Onions,140.56,Store_C,12
+1107,Pasta | Sugar | Yogurt,113.8,Store_C,22
+1108,Coffee | Eggs,66.83,Store_A,5
+1109,Bread | Chicken | Coffee | Milk | Pasta | Rice | Yogurt,42.26,Store_A,22
+1110,Chicken | Milk | Onions | Tomatoes | Yogurt,23.77,Store_C,17
+1111,Eggs | Milk | Rice | Sugar,99.93,Store_A,19
+1112,Butter | Flour | Onions | Pasta | Rice | Sugar | Yogurt,30.0,Store_A,0
+1113,Apples | Bread | Cheese | Eggs | Milk | Tomatoes,127.36,Store_C,1
+1114,Butter | Chicken | Coffee | Milk | Pasta | Rice | Sugar,144.5,Store_A,6
+1115,Apples | Bread | Cheese | Sugar | Yogurt,29.01,Store_C,4
+1116,Coffee | Tomatoes | Yogurt,62.65,Store_C,18
+1117,Butter | Eggs | Tomatoes | Yogurt,141.22,Store_C,1
+1118,Apples | Bread | Rice,75.9,Store_A,2
+1119,Apples | Butter | Flour | Milk | Onions | Sugar | Tomatoes,84.96,Store_B,19
+1120,Apples | Chicken | Coffee | Pasta | Rice | Tomatoes,114.65,Store_B,9
+1121,Butter | Flour | Yogurt,39.47,Store_B,9
+1122,Coffee | Tomatoes,147.08,Store_A,20
+1123,Apples | Bread | Cheese | Coffee | Flour | Onions | Sugar,119.32,Store_A,7
+1124,Bread | Butter | Milk | Rice,32.59,Store_A,8
+1125,Milk | Onions,25.55,Store_A,1
+1126,Butter | Cheese | Eggs | Milk,140.89,Store_B,2
+1127,Cheese | Chicken | Onions,105.9,Store_C,15
+1128,Flour | Pasta,15.4,Store_A,3
+1129,Coffee | Tomatoes | Yogurt,29.88,Store_A,22
+1130,Cheese | Chicken | Coffee | Pasta | Sugar | Tomatoes | Yogurt,16.7,Store_A,5
+1131,Bread | Butter | Onions | Rice | Sugar,146.37,Store_C,12
+1132,Bread | Butter | Pasta | Yogurt,79.7,Store_B,5
+1133,Bread | Cheese | Pasta | Tomatoes,74.7,Store_A,9
+1134,Apples | Butter | Chicken | Flour | Rice | Sugar,143.81,Store_B,22
+1135,Flour | Rice,80.65,Store_A,16
+1136,Butter | Cheese | Chicken | Rice | Sugar | Yogurt,82.49,Store_B,7
+1137,Butter | Yogurt,147.77,Store_A,8
+1138,Butter | Chicken | Milk | Pasta | Rice | Sugar,25.6,Store_B,1
+1139,Bread | Coffee,148.01,Store_A,16
+1140,Chicken | Eggs | Milk | Onions | Rice | Sugar,33.19,Store_A,19
+1141,Eggs | Milk | Onions | Pasta,76.21,Store_B,10
+1142,Cheese | Chicken | Milk | Onions | Rice | Tomatoes,57.27,Store_B,17
+1143,Apples | Bread | Cheese | Chicken | Eggs | Flour | Tomatoes,143.76,Store_C,21
+1144,Milk | Pasta,77.97,Store_C,2
+1145,Bread | Chicken | Coffee | Pasta | Sugar | Yogurt,13.22,Store_C,8
+1146,Butter | Chicken | Pasta,41.04,Store_C,7
+1147,Butter | Cheese | Milk | Onions | Yogurt,70.31,Store_B,6
+1148,Apples | Flour,104.69,Store_C,6
+1149,Apples | Rice,88.67,Store_A,22
+1150,Apples | Chicken | Coffee | Rice | Tomatoes,128.99,Store_B,20
+1151,Bread | Cheese | Rice | Yogurt,125.98,Store_A,7
+1152,Bread | Butter | Chicken | Milk | Onions | Rice | Sugar,92.67,Store_C,19
+1153,Butter | Cheese | Chicken | Flour | Onions | Pasta | Rice,89.98,Store_C,4
+1154,Chicken | Milk | Rice | Yogurt,48.94,Store_C,2
+1155,Butter | Chicken | Coffee | Flour | Milk,144.11,Store_B,18
+1156,Apples | Eggs | Milk | Onions | Tomatoes,20.76,Store_A,1
+1157,Cheese | Onions | Pasta,65.58,Store_A,13
+1158,Cheese | Chicken | Eggs | Onions | Pasta | Sugar | Yogurt,102.52,Store_B,20
+1159,Chicken | Tomatoes,142.39,Store_C,1
+1160,Butter | Cheese | Coffee | Milk | Pasta | Rice | Sugar,80.21,Store_C,9
+1161,Cheese | Coffee | Onions | Pasta | Rice,135.43,Store_B,19
+1162,Cheese | Milk | Tomatoes | Yogurt,24.67,Store_A,9
+1163,Apples | Chicken | Rice | Tomatoes,84.42,Store_A,16
+1164,Bread | Chicken | Flour | Milk | Rice,54.25,Store_A,1
+1165,Pasta | Sugar,121.4,Store_A,0
+1166,Cheese | Chicken | Milk | Onions | Pasta | Rice | Sugar,72.3,Store_C,17
+1167,Apples | Coffee | Onions | Pasta | Sugar | Yogurt,76.54,Store_C,3
+1168,Apples | Sugar | Yogurt,19.07,Store_B,0
+1169,Chicken | Flour | Milk,71.32,Store_B,21
+1170,Flour | Pasta,21.32,Store_B,16
+1171,Bread | Chicken | Coffee | Milk | Rice | Yogurt,51.94,Store_C,2
+1172,Butter | Flour,27.76,Store_C,1
+1173,Coffee | Rice | Tomatoes | Yogurt,56.83,Store_C,17
+1174,Bread | Cheese | Pasta | Rice | Sugar | Yogurt,41.83,Store_B,3
+1175,Bread | Cheese | Eggs | Onions | Pasta | Sugar | Tomatoes,49.93,Store_C,2
+1176,Chicken | Eggs | Milk | Onions | Tomatoes | Yogurt,30.77,Store_A,11
+1177,Bread | Rice,71.55,Store_C,21
+1178,Apples | Butter | Cheese | Coffee | Onions | Sugar | Yogurt,79.66,Store_A,15
+1179,Apples | Flour | Sugar,127.13,Store_A,10
+1180,Bread | Butter | Cheese | Coffee | Eggs | Onions | Pasta,85.44,Store_A,9
+1181,Cheese | Milk | Onions | Rice | Sugar,42.03,Store_C,18
+1182,Butter | Cheese | Coffee | Eggs | Flour | Pasta | Tomatoes,113.03,Store_B,9
+1183,Butter | Cheese | Coffee | Onions | Pasta | Rice | Tomatoes,51.61,Store_A,20
+1184,Bread | Milk | Rice,115.9,Store_A,2
+1185,Bread | Chicken | Coffee,64.2,Store_C,23
+1186,Apples | Bread | Butter | Cheese | Chicken | Flour | Sugar,81.91,Store_C,5
+1187,Bread | Flour | Sugar | Tomatoes,80.53,Store_A,13
+1188,Apples | Bread | Eggs | Onions | Tomatoes | Yogurt,143.79,Store_B,11
+1189,Apples | Bread | Rice,31.51,Store_C,7
+1190,Apples | Eggs | Tomatoes,141.4,Store_A,1
+1191,Chicken | Eggs | Flour | Tomatoes,88.68,Store_B,8
+1192,Apples | Bread | Eggs | Tomatoes,149.12,Store_C,13
+1193,Bread | Coffee | Eggs | Pasta | Sugar | Tomatoes,90.24,Store_B,0
+1194,Bread | Chicken | Onions,101.89,Store_A,2
+1195,Flour | Pasta | Sugar,114.94,Store_B,19
+1196,Bread | Cheese | Rice,125.05,Store_A,5
+1197,Apples | Bread | Cheese | Chicken | Eggs | Flour | Milk,76.86,Store_C,19
+1198,Butter | Sugar,105.0,Store_A,12
+1199,Coffee | Milk | Pasta | Rice | Sugar,96.08,Store_A,10
+1200,Bread | Eggs,66.99,Store_C,14
+1201,Apples | Bread | Chicken | Eggs | Milk | Pasta | Rice,124.91,Store_A,17
+1202,Cheese | Onions | Rice | Yogurt,36.94,Store_B,18
+1203,Apples | Butter | Cheese | Chicken | Sugar,33.4,Store_C,18
+1204,Onions | Rice | Tomatoes,113.1,Store_B,5
+1205,Eggs | Flour | Onions | Yogurt,99.25,Store_C,14
+1206,Milk | Pasta | Yogurt,54.47,Store_A,20
+1207,Bread | Eggs | Onions | Pasta,98.92,Store_B,13
+1208,Eggs | Rice | Sugar | Yogurt,117.89,Store_C,4
+1209,Chicken | Flour | Pasta | Yogurt,40.38,Store_B,10
+1210,Butter | Chicken | Eggs | Milk | Pasta,91.4,Store_C,19
+1211,Flour | Milk | Onions,125.45,Store_C,12
+1212,Milk | Rice,67.57,Store_B,12
+1213,Bread | Chicken | Milk | Sugar | Tomatoes,90.04,Store_B,3
+1214,Bread | Butter | Chicken | Eggs | Onions | Pasta,20.99,Store_B,8
+1215,Chicken | Milk | Sugar | Tomatoes,126.27,Store_B,22
+1216,Apples | Cheese | Chicken | Eggs | Tomatoes,121.46,Store_C,12
+1217,Chicken | Coffee | Eggs | Milk | Onions,73.88,Store_B,7
+1218,Chicken | Eggs | Flour | Milk | Onions | Pasta,26.69,Store_B,19
+1219,Chicken | Coffee | Eggs | Rice,102.46,Store_B,10
+1220,Apples | Bread | Cheese | Coffee | Milk | Yogurt,90.22,Store_B,18
+1221,Bread | Butter | Onions | Pasta | Sugar,138.73,Store_B,0
+1222,Cheese | Chicken | Coffee | Pasta | Sugar,49.17,Store_B,8
+1223,Cheese | Chicken | Pasta,14.53,Store_A,1
+1224,Apples | Butter | Cheese | Chicken | Milk | Onions | Tomatoes,45.66,Store_A,3
+1225,Bread | Cheese | Chicken | Milk | Rice | Sugar,69.91,Store_C,3
+1226,Chicken | Coffee | Flour | Rice | Sugar,31.76,Store_B,0
+1227,Butter | Onions | Pasta | Tomatoes,147.16,Store_B,17
+1228,Chicken | Coffee,41.13,Store_C,13
+1229,Coffee | Eggs | Milk | Rice | Sugar,104.9,Store_B,12
+1230,Butter | Chicken | Onions | Pasta | Sugar | Yogurt,73.58,Store_B,7
+1231,Apples | Coffee | Flour | Sugar,87.72,Store_B,5
+1232,Butter | Chicken | Milk | Tomatoes,140.58,Store_A,16
+1233,Apples | Bread | Butter | Chicken | Onions | Rice | Yogurt,84.42,Store_B,22
+1234,Chicken | Milk | Onions | Pasta | Rice | Yogurt,52.73,Store_A,10
+1235,Apples | Bread | Coffee | Eggs | Tomatoes,40.91,Store_B,14
+1236,Apples | Coffee | Flour | Milk | Tomatoes,134.88,Store_B,6
+1237,Bread | Butter | Chicken | Onions | Pasta,148.14,Store_C,21
+1238,Cheese | Chicken | Coffee | Flour | Milk | Pasta,45.26,Store_C,7
+1239,Cheese | Coffee | Eggs | Flour,111.07,Store_B,10
+1240,Apples | Bread | Coffee | Tomatoes,80.81,Store_B,20
+1241,Bread | Cheese | Eggs | Milk | Onions | Sugar,107.8,Store_B,1
+1242,Bread | Cheese | Coffee | Flour | Pasta | Tomatoes | Yogurt,144.99,Store_A,19
+1243,Butter | Pasta | Sugar,48.65,Store_B,10
+1244,Cheese | Onions | Tomatoes,113.59,Store_C,13
+1245,Bread | Butter | Tomatoes,71.31,Store_A,23
+1246,Cheese | Flour | Onions | Pasta | Tomatoes,101.35,Store_B,12
+1247,Apples | Bread | Cheese | Flour | Milk | Onions | Yogurt,66.93,Store_A,7
+1248,Butter | Cheese | Chicken | Milk | Pasta | Yogurt,109.17,Store_A,11
+1249,Apples | Cheese | Rice | Sugar,57.25,Store_A,20
+1250,Bread | Flour | Onions,78.37,Store_A,21
+1251,Chicken | Coffee | Eggs | Onions | Yogurt,109.23,Store_B,8
+1252,Apples | Bread | Yogurt,15.98,Store_C,9
+1253,Bread | Eggs | Flour | Pasta | Rice | Tomatoes,55.93,Store_A,10
+1254,Bread | Flour | Milk | Sugar,86.47,Store_C,10
+1255,Flour | Sugar,20.38,Store_A,15
+1256,Coffee | Eggs | Yogurt,108.44,Store_C,17
+1257,Butter | Flour | Rice,123.86,Store_A,20
+1258,Eggs | Flour | Onions,32.87,Store_A,8
+1259,Butter | Coffee,112.68,Store_B,2
+1260,Cheese | Flour | Milk | Rice | Tomatoes,100.47,Store_B,21
+1261,Chicken | Flour | Onions,67.52,Store_A,3
+1262,Apples | Bread | Butter,33.1,Store_C,19
+1263,Butter | Flour,143.68,Store_B,18
+1264,Bread | Cheese | Coffee | Eggs | Flour | Milk | Onions,74.96,Store_B,9
+1265,Bread | Cheese | Flour | Milk | Yogurt,35.71,Store_B,12
+1266,Apples | Butter | Cheese | Pasta | Tomatoes | Yogurt,110.54,Store_B,0
+1267,Cheese | Chicken,95.11,Store_A,11
+1268,Apples | Butter | Milk,124.27,Store_C,10
+1269,Apples | Butter | Chicken | Coffee | Milk,149.45,Store_B,23
+1270,Butter | Flour | Tomatoes,16.28,Store_B,4
+1271,Apples | Butter | Flour,113.5,Store_C,1
+1272,Apples | Milk | Onions | Pasta | Sugar,148.48,Store_B,16
+1273,Flour | Milk | Onions | Pasta | Rice | Sugar | Yogurt,85.35,Store_C,16
+1274,Apples | Cheese | Flour | Milk | Onions | Rice | Yogurt,110.2,Store_A,19
+1275,Pasta | Yogurt,71.76,Store_B,14
+1276,Eggs | Rice,59.95,Store_C,3
+1277,Apples | Butter | Chicken | Coffee | Onions | Sugar | Tomatoes,107.5,Store_B,21
+1278,Coffee | Onions,148.33,Store_A,10
+1279,Bread | Eggs,22.83,Store_C,22
+1280,Apples | Eggs | Flour | Pasta | Tomatoes,69.1,Store_C,0
+1281,Butter | Eggs | Pasta,141.69,Store_C,9
+1282,Apples | Cheese | Coffee | Eggs | Flour | Onions | Yogurt,25.79,Store_B,17
+1283,Coffee | Yogurt,101.13,Store_C,14
+1284,Bread | Coffee | Pasta | Yogurt,70.22,Store_C,18
+1285,Bread | Cheese | Eggs | Flour | Pasta,62.76,Store_C,3
+1286,Bread | Cheese | Chicken | Coffee | Eggs | Milk | Yogurt,39.32,Store_A,5
+1287,Butter | Chicken | Eggs | Onions | Yogurt,34.69,Store_C,1
+1288,Chicken | Coffee | Flour | Onions | Pasta | Yogurt,82.28,Store_C,12
+1289,Coffee | Sugar,62.84,Store_C,1
+1290,Bread | Cheese | Eggs | Milk | Onions | Pasta | Tomatoes,78.82,Store_A,12
+1291,Cheese | Eggs,37.43,Store_C,14
+1292,Apples | Flour | Rice | Tomatoes,59.03,Store_B,17
+1293,Eggs | Onions | Pasta | Rice | Yogurt,149.5,Store_C,10
+1294,Bread | Chicken | Milk | Onions | Rice | Sugar | Yogurt,61.53,Store_B,4
+1295,Apples | Coffee | Onions | Rice | Tomatoes | Yogurt,67.78,Store_A,13
+1296,Bread | Onions | Rice,12.78,Store_A,21
+1297,Bread | Cheese | Flour | Tomatoes | Yogurt,63.32,Store_C,15
+1298,Apples | Bread | Butter | Flour | Onions | Sugar,116.87,Store_C,13
+1299,Eggs | Pasta | Rice,82.18,Store_A,8
+1300,Bread | Butter | Onions | Pasta,101.99,Store_A,5
+1301,Butter | Cheese | Milk | Sugar,87.92,Store_A,8
+1302,Flour | Rice,24.77,Store_B,4
+1303,Butter | Coffee | Milk | Pasta | Sugar | Yogurt,56.5,Store_B,10
+1304,Eggs | Flour,107.19,Store_C,11
+1305,Butter | Sugar | Yogurt,86.71,Store_B,16
+1306,Chicken | Milk | Rice | Tomatoes,104.49,Store_A,5
+1307,Milk | Onions | Rice | Yogurt,60.43,Store_C,19
+1308,Bread | Tomatoes,37.12,Store_B,5
+1309,Bread | Butter | Coffee,126.17,Store_C,14
+1310,Bread | Cheese | Eggs | Onions | Pasta | Yogurt,62.68,Store_B,16
+1311,Butter | Cheese | Eggs | Flour | Pasta,101.7,Store_C,21
+1312,Butter | Cheese | Pasta | Sugar | Tomatoes | Yogurt,63.37,Store_A,2
+1313,Cheese | Chicken,139.82,Store_A,18
+1314,Cheese | Eggs | Onions | Rice | Yogurt,148.87,Store_A,22
+1315,Coffee | Eggs | Milk,100.85,Store_B,1
+1316,Eggs | Flour | Onions,94.3,Store_C,8
+1317,Butter | Coffee | Flour | Onions | Rice | Tomatoes,127.72,Store_C,8
+1318,Butter | Cheese | Eggs | Flour | Tomatoes,82.27,Store_C,6
+1319,Milk | Tomatoes,131.73,Store_B,15
+1320,Bread | Butter | Chicken | Flour | Milk,67.81,Store_A,5
+1321,Butter | Chicken | Eggs | Milk | Onions | Yogurt,14.47,Store_A,8
+1322,Milk | Pasta | Yogurt,139.72,Store_C,12
+1323,Butter | Cheese | Chicken | Pasta,111.01,Store_C,1
+1324,Butter | Cheese | Coffee | Flour | Milk | Sugar | Tomatoes,81.51,Store_B,13
+1325,Bread | Cheese | Flour | Milk | Pasta | Rice,142.29,Store_C,4
+1326,Apples | Chicken | Rice | Yogurt,134.15,Store_C,10
+1327,Cheese | Flour | Pasta,25.18,Store_B,14
+1328,Apples | Chicken | Coffee | Milk | Onions | Sugar,97.42,Store_C,5
+1329,Butter | Onions | Tomatoes,85.33,Store_A,5
+1330,Butter | Cheese | Eggs | Flour | Milk | Sugar,118.71,Store_B,15
+1331,Apples | Milk | Tomatoes | Yogurt,52.11,Store_A,19
+1332,Apples | Cheese | Flour | Milk | Rice | Sugar | Tomatoes,11.14,Store_C,3
+1333,Apples | Butter | Cheese | Onions | Sugar | Tomatoes,35.96,Store_C,4
+1334,Eggs | Onions | Sugar | Tomatoes,39.53,Store_B,5
+1335,Butter | Eggs | Tomatoes,50.8,Store_B,12
+1336,Apples | Butter | Cheese | Flour | Tomatoes,61.85,Store_B,13
+1337,Coffee | Tomatoes,108.92,Store_B,23
+1338,Apples | Butter | Coffee | Eggs | Onions | Tomatoes | Yogurt,20.39,Store_C,12
+1339,Chicken | Milk | Tomatoes,78.12,Store_C,9
+1340,Butter | Yogurt,79.81,Store_A,16
+1341,Apples | Cheese | Chicken | Coffee | Pasta,96.22,Store_A,23
+1342,Flour | Sugar,53.48,Store_B,17
+1343,Apples | Onions | Yogurt,46.37,Store_C,6
+1344,Flour | Milk | Rice,77.74,Store_B,3
+1345,Cheese | Milk | Pasta,102.35,Store_B,23
+1346,Apples | Bread | Butter | Cheese | Pasta | Sugar | Yogurt,16.24,Store_B,21
+1347,Flour | Milk | Rice | Tomatoes,51.1,Store_B,20
+1348,Pasta | Rice,120.22,Store_B,15
+1349,Coffee | Eggs | Milk | Pasta | Sugar | Tomatoes,77.79,Store_C,9
+1350,Cheese | Chicken,143.26,Store_A,20
+1351,Bread | Chicken | Coffee | Milk | Pasta | Tomatoes,131.46,Store_B,19
+1352,Apples | Bread | Onions,58.15,Store_C,18
+1353,Apples | Chicken | Pasta,111.68,Store_B,2
+1354,Bread | Cheese | Eggs,48.4,Store_C,18
+1355,Apples | Bread | Butter | Cheese | Tomatoes | Yogurt,34.54,Store_A,22
+1356,Apples | Bread | Onions | Rice | Tomatoes | Yogurt,133.34,Store_A,23
+1357,Bread | Eggs | Onions | Rice | Sugar | Tomatoes | Yogurt,59.03,Store_C,12
+1358,Chicken | Eggs | Sugar | Yogurt,38.48,Store_B,7
+1359,Bread | Butter | Coffee | Tomatoes,145.1,Store_A,17
+1360,Butter | Flour | Yogurt,14.34,Store_B,18
+1361,Bread | Flour | Pasta,61.37,Store_B,17
+1362,Bread | Eggs | Yogurt,15.38,Store_C,21
+1363,Chicken | Yogurt,80.57,Store_B,18
+1364,Rice | Sugar | Yogurt,66.16,Store_C,21
+1365,Cheese | Chicken | Coffee | Eggs | Flour | Sugar | Yogurt,110.89,Store_C,3
+1366,Chicken | Coffee | Eggs | Pasta | Sugar,143.56,Store_C,12
+1367,Apples | Bread | Pasta,82.76,Store_A,11
+1368,Flour | Onions,49.96,Store_B,14
+1369,Bread | Butter | Chicken | Milk | Rice | Sugar | Tomatoes,132.1,Store_C,14
+1370,Apples | Milk,94.64,Store_C,9
+1371,Flour | Milk | Onions | Sugar,87.49,Store_B,21
+1372,Butter | Chicken | Milk | Onions | Rice | Sugar,36.4,Store_A,18
+1373,Apples | Cheese | Chicken | Coffee | Eggs | Pasta | Yogurt,15.68,Store_C,20
+1374,Bread | Butter | Chicken | Milk | Pasta,74.6,Store_C,7
+1375,Butter | Coffee | Flour | Milk | Sugar | Yogurt,83.93,Store_C,18
+1376,Butter | Eggs,27.79,Store_C,8
+1377,Cheese | Coffee | Flour | Onions | Pasta | Tomatoes,18.32,Store_B,6
+1378,Flour | Yogurt,40.25,Store_C,7
+1379,Apples | Butter | Coffee | Onions | Yogurt,18.83,Store_A,8
+1380,Bread | Butter | Chicken | Coffee | Tomatoes | Yogurt,17.86,Store_B,16
+1381,Milk | Pasta | Sugar | Yogurt,72.18,Store_A,14
+1382,Apples | Eggs | Milk | Sugar | Yogurt,123.43,Store_B,15
+1383,Rice | Yogurt,102.96,Store_B,6
+1384,Coffee | Milk,105.12,Store_B,9
+1385,Apples | Bread | Coffee | Eggs | Pasta | Rice | Yogurt,46.74,Store_A,18
+1386,Butter | Milk | Tomatoes,11.55,Store_A,5
+1387,Chicken | Milk | Rice,73.09,Store_C,11
+1388,Apples | Chicken | Pasta | Sugar | Tomatoes,62.8,Store_A,14
+1389,Apples | Bread | Cheese | Eggs | Tomatoes,142.61,Store_C,9
+1390,Flour | Milk | Rice,20.08,Store_B,23
+1391,Bread | Butter | Chicken | Coffee | Onions | Rice | Yogurt,118.7,Store_C,17
+1392,Apples | Onions | Sugar,63.96,Store_A,3
+1393,Butter | Cheese | Flour | Onions | Tomatoes | Yogurt,126.15,Store_B,10
+1394,Coffee | Milk | Rice | Tomatoes | Yogurt,79.29,Store_B,4
+1395,Butter | Chicken | Rice | Sugar | Yogurt,124.87,Store_C,12
+1396,Cheese | Eggs | Milk | Tomatoes,75.36,Store_C,9
+1397,Butter | Cheese | Chicken | Eggs | Flour | Onions | Pasta,66.26,Store_A,21
+1398,Apples | Bread | Chicken | Eggs,144.92,Store_B,6
+1399,Bread | Chicken | Flour | Onions | Sugar | Tomatoes,61.64,Store_C,10
+1400,Eggs | Pasta | Rice,122.74,Store_B,3
+1401,Butter | Cheese | Eggs | Milk | Onions | Rice | Yogurt,19.38,Store_A,3
+1402,Butter | Cheese | Coffee | Flour | Milk | Rice,18.77,Store_B,4
+1403,Eggs | Rice | Yogurt,71.34,Store_C,8
+1404,Butter | Chicken | Coffee | Flour | Milk | Onions,91.98,Store_A,0
+1405,Apples | Eggs | Milk | Yogurt,95.19,Store_A,15
+1406,Apples | Bread | Eggs | Milk | Onions | Yogurt,15.09,Store_B,4
+1407,Butter | Flour | Milk | Onions | Pasta | Yogurt,107.54,Store_C,4
+1408,Chicken | Coffee | Eggs | Flour | Milk | Onions,28.19,Store_B,6
+1409,Cheese | Chicken | Coffee | Onions | Pasta,143.75,Store_B,7
+1410,Apples | Cheese | Flour | Sugar | Tomatoes | Yogurt,56.7,Store_B,18
+1411,Apples | Cheese | Eggs | Onions | Pasta,46.6,Store_C,0
+1412,Apples | Cheese | Chicken | Rice | Tomatoes,50.78,Store_B,17
+1413,Flour | Onions | Rice | Tomatoes,141.23,Store_B,21
+1414,Bread | Coffee | Milk | Onions | Sugar,77.6,Store_A,10
+1415,Apples | Bread | Chicken | Tomatoes,70.86,Store_A,21
+1416,Butter | Eggs | Rice | Sugar | Tomatoes,89.23,Store_A,15
+1417,Eggs | Milk | Pasta | Rice | Tomatoes,140.31,Store_C,20
+1418,Bread | Chicken | Coffee | Eggs | Milk | Pasta,53.17,Store_B,10
+1419,Apples | Bread | Cheese | Milk | Yogurt,35.31,Store_B,20
+1420,Cheese | Coffee | Pasta | Tomatoes,93.37,Store_A,8
+1421,Apples | Flour | Milk | Onions | Pasta,78.83,Store_B,6
+1422,Apples | Cheese | Chicken | Coffee | Sugar | Tomatoes,18.68,Store_C,21
+1423,Butter | Cheese | Chicken | Milk | Onions | Pasta | Yogurt,83.07,Store_B,14
+1424,Bread | Butter,88.74,Store_A,10
+1425,Cheese | Onions | Pasta | Sugar,107.18,Store_C,22
+1426,Coffee | Rice,149.38,Store_B,18
+1427,Apples | Bread | Cheese | Chicken | Milk | Onions,69.02,Store_B,6
+1428,Apples | Sugar,81.43,Store_B,15
+1429,Cheese | Chicken | Coffee | Pasta | Sugar,20.5,Store_C,2
+1430,Butter | Coffee | Eggs | Flour | Sugar | Yogurt,126.42,Store_B,15
+1431,Apples | Cheese | Milk | Rice | Tomatoes,23.74,Store_A,7
+1432,Butter | Cheese | Chicken | Coffee | Onions | Pasta | Sugar,140.74,Store_A,9
+1433,Apples | Cheese | Chicken | Eggs | Flour | Tomatoes | Yogurt,58.79,Store_A,8
+1434,Bread | Butter | Chicken | Eggs,57.26,Store_A,2
+1435,Bread | Milk | Pasta | Tomatoes | Yogurt,56.01,Store_C,6
+1436,Butter | Chicken | Coffee,143.07,Store_A,7
+1437,Butter | Coffee | Flour | Pasta | Rice | Yogurt,147.22,Store_A,2
+1438,Butter | Chicken | Coffee | Eggs | Sugar | Yogurt,146.25,Store_A,15
+1439,Cheese | Chicken | Tomatoes | Yogurt,108.67,Store_C,21
+1440,Bread | Butter | Eggs | Sugar | Yogurt,25.55,Store_C,13
+1441,Cheese | Pasta,64.09,Store_B,6
+1442,Coffee | Eggs | Pasta | Rice | Sugar | Tomatoes,50.5,Store_A,3
+1443,Tomatoes | Yogurt,109.17,Store_B,5
+1444,Cheese | Onions,78.97,Store_C,6
+1445,Chicken | Milk | Pasta | Sugar,96.31,Store_B,11
+1446,Apples | Bread | Butter | Eggs | Rice,11.22,Store_C,6
+1447,Chicken | Eggs | Rice | Sugar | Tomatoes,119.6,Store_B,0
+1448,Apples | Butter | Chicken | Coffee | Eggs | Milk | Rice,143.29,Store_A,17
+1449,Butter | Coffee | Milk | Sugar | Tomatoes,103.71,Store_C,10
+1450,Butter | Chicken | Onions | Pasta,129.27,Store_C,10
+1451,Cheese | Rice,76.96,Store_C,16
+1452,Apples | Coffee | Eggs | Pasta | Rice | Tomatoes,12.83,Store_A,11
+1453,Apples | Coffee | Eggs | Flour | Pasta | Sugar,148.67,Store_A,22
+1454,Cheese | Coffee | Onions | Tomatoes,18.24,Store_C,22
+1455,Butter | Cheese | Coffee | Eggs | Milk | Rice | Yogurt,36.99,Store_C,18
+1456,Bread | Chicken | Sugar,17.34,Store_A,20
+1457,Butter | Cheese | Flour,97.49,Store_A,17
+1458,Coffee | Rice | Sugar,91.65,Store_A,20
+1459,Apples | Onions,39.35,Store_A,23
+1460,Apples | Butter | Chicken | Onions,143.93,Store_A,12
+1461,Cheese | Chicken | Milk | Sugar,137.89,Store_A,9
+1462,Apples | Eggs | Flour | Rice | Tomatoes,49.17,Store_B,18
+1463,Apples | Bread | Butter | Chicken | Milk | Pasta | Yogurt,102.24,Store_A,3
+1464,Eggs | Flour | Tomatoes | Yogurt,129.73,Store_A,23
+1465,Bread | Coffee | Rice,60.37,Store_C,14
+1466,Bread | Butter | Coffee | Flour | Milk | Onions | Rice,45.5,Store_C,17
+1467,Apples | Bread,45.87,Store_B,0
+1468,Butter | Eggs | Flour | Sugar,124.86,Store_A,18
+1469,Bread | Chicken | Flour | Milk | Pasta | Tomatoes,74.83,Store_C,1
+1470,Bread | Chicken | Tomatoes,110.15,Store_C,9
+1471,Cheese | Eggs | Flour | Tomatoes | Yogurt,101.04,Store_B,17
+1472,Apples | Onions | Pasta,52.87,Store_A,3
+1473,Butter | Cheese | Chicken | Eggs | Flour | Pasta,39.13,Store_C,21
+1474,Cheese | Chicken | Coffee | Pasta | Tomatoes,27.61,Store_A,9
+1475,Apples | Butter | Chicken | Eggs | Pasta,13.34,Store_B,20
+1476,Cheese | Eggs | Rice | Yogurt,21.38,Store_B,3
+1477,Chicken | Onions,45.87,Store_A,23
+1478,Coffee | Milk | Pasta | Sugar | Yogurt,109.9,Store_B,20
+1479,Bread | Onions | Pasta,31.69,Store_C,17
+1480,Bread | Cheese | Chicken | Eggs | Onions | Sugar | Tomatoes,83.28,Store_B,19
+1481,Apples | Chicken | Coffee | Eggs | Flour | Onions | Tomatoes,44.32,Store_B,22
+1482,Apples | Chicken | Milk | Rice | Tomatoes,81.65,Store_A,3
+1483,Butter | Eggs,115.0,Store_C,14
+1484,Bread | Sugar,47.24,Store_A,21
+1485,Apples | Cheese | Coffee,58.71,Store_A,17
+1486,Apples | Chicken | Coffee | Eggs | Flour | Pasta,111.22,Store_A,8
+1487,Chicken | Coffee | Milk | Pasta | Sugar,86.49,Store_B,19
+1488,Cheese | Tomatoes,23.24,Store_B,16
+1489,Butter | Cheese | Eggs | Milk | Yogurt,116.14,Store_A,2
+1490,Butter | Cheese | Coffee | Milk | Onions | Tomatoes | Yogurt,48.84,Store_B,12
+1491,Apples | Chicken | Coffee | Milk | Onions | Pasta | Yogurt,63.91,Store_B,6
+1492,Apples | Bread | Butter | Chicken | Milk | Sugar | Tomatoes,44.32,Store_A,13
+1493,Cheese | Coffee | Pasta,86.07,Store_C,5
+1494,Chicken | Flour,109.09,Store_C,13
+1495,Onions | Yogurt,122.45,Store_B,13
+1496,Cheese | Eggs | Flour | Milk | Onions | Pasta | Yogurt,139.1,Store_C,13
+1497,Milk | Sugar | Yogurt,60.29,Store_C,19
+1498,Apples | Cheese | Chicken | Sugar | Yogurt,140.57,Store_B,17
+1499,Bread | Coffee | Sugar | Tomatoes,96.37,Store_C,8
+1500,Eggs | Flour | Milk | Onions | Rice,64.54,Store_B,11

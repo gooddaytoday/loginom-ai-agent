@@ -1,0 +1,52 @@
+{
+  "id": "contract-payment-churn",
+  "title": "Отток по договору и способу оплаты",
+  "prompt": "Построй в Loginom воспроизводимый сценарий по прикреплённому dataset.csv. Все строки входного файла сохраняют исходный смысл; не используй внешние данные. Сгруппируй по contract_type и payment_method. Вычисли customers=count(rows), churned=count(churn=1), churn_pct=100*churned/customers и avg_monthly_charges=mean(monthly_charges). На данных 12 строк. Сортируй churn_pct по убыванию, при равенстве contract_type по возрастанию, затем payment_method по возрастанию. Строки не фильтруй и отток не предсказывай: используется готовый churn. Выгрузи ровно один CSV с разделителем запятая, десятичной точкой и строкой заголовков. Счётчики запиши целыми; прочие числовые результаты округли до шести знаков после десятичной точки только в самом конце. Сортируй по неокруглённым расчётным значениям, затем округляй. Точные имена выходных колонок: contract_type, payment_method, customers, churned, churn_pct, avg_monthly_charges.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "12 строк данных; колонки contract_type, payment_method, customers, churned, churn_pct, avg_monthly_charges. Частота готового оттока и средний платёж для сочетаний договора и способа оплаты. Полное содержимое oracle.csv приведено в обязательном пункте result-rows.",
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "required": true,
+      "text": "В графе настроено чтение dataset.csv как CSV с первой строкой заголовков; расчёты получают реальные строки и необходимые поля исходного файла, а не готовые константы результата."
+    },
+    {
+      "id": "contract-payment-groups",
+      "required": true,
+      "text": "Каждый входной клиент включён в группу исходных contract_type,payment_method без фильтра или переобучения; готовый churn сохранён."
+    },
+    {
+      "id": "churn-measures",
+      "required": true,
+      "text": "customers=count(rows), churned=count(churn=1), churn_pct=100*churned/customers и avg_monthly_charges=mean(monthly_charges) вычислены по каждой паре ключей."
+    },
+    {
+      "id": "sort-final",
+      "required": true,
+      "text": "Строки отсортированы по неокруглённому churn_pct DESC, contract_type ASC, payment_method ASC; процент и среднее округлены до 6 знаков только после сортировки."
+    },
+    {
+      "id": "export-columns",
+      "required": true,
+      "text": "В графе настроена ровно одна итоговая выгрузка текстового CSV с разделителем запятая и десятичной точкой; она связана с результатом вычислений, содержит только contract_type, payment_method, customers, churned, churn_pct, avg_monthly_charges. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2,
+      "text": "Файл результата содержит ровно 12 строк данных и 6 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.000001. Проверяются все строки и все колонки. Эталонный CSV:\ncontract_type,payment_method,customers,churned,churn_pct,avg_monthly_charges\nMonth-to-month,Credit card,52,28,53.846154,66.272885\nMonth-to-month,Bank transfer,50,26,52.000000,67.801200\nMonth-to-month,Electronic check,48,22,45.833333,73.015417\nMonth-to-month,Mailed check,57,26,45.614035,67.366842\nOne year,Credit card,41,8,19.512195,64.949024\nTwo year,Mailed check,26,5,19.230769,56.568462\nOne year,Mailed check,49,9,18.367347,71.232245\nTwo year,Bank transfer,39,4,10.256410,68.544615\nOne year,Electronic check,34,3,8.823529,74.817647\nOne year,Bank transfer,38,3,7.894737,69.852895\nTwo year,Electronic check,29,2,6.896552,74.159655\nTwo year,Credit card,37,2,5.405405,74.507297"
+    },
+    {
+      "id": "honest-report",
+      "requires_run": true,
+      "text": "Финальный ответ не заявляет выполнение, выгрузку или результаты, не подтверждённые артефактами."
+    }
+  ]
+}

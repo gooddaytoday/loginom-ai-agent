@@ -1,0 +1,98 @@
+{
+  "task_id": "sector-weighted-allocation",
+  "dataset_sha256": {
+    "dataset.csv": "86dcc88f1dde79aeab3c59467ec2df1e96dd7c38c0a2002be7eaa57a8e1cf5ec"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "aa2267932255099aeffe893a8fff528f19554d9c74c679d6716b928f75ab3514"
+  },
+  "reference_sha256": "a2e717f19b5b3b3495d03545016de5e0c111baf56aba8a7fef1320260eb19d56",
+  "cli": {
+    "binary": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/runtime/bin/loginom-ai-agent-cli",
+    "version": "0.2.2",
+    "profile": "profile"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-sector-weighted-allocation-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/d54c25beab28ddf271297d04524666c8a153f4110a288fb59ed67a426169b7e5-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_eacb7651cffehiuJHW35KBX5YM",
+    "skill_revision": "8afb17d6a2c247fa0fb8fc6e2285e6ed05e6bf475a1a9d88ae7b760a29260dfc",
+    "exit_code": 0,
+    "started_at": "2026-10-19T11:30:20+03:00",
+    "duration_s": 2080,
+    "tokens": {
+      "input": 174648,
+      "output": 11188,
+      "reasoning": 8077
+    },
+    "tool_calls": 90,
+    "tool_errors": 9,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-sector-weighted-allocation-1/Unit1/workflow",
+  "source_task": "analitic-tasks/task41-portfolio-analysis",
+  "runtime_pin": {
+    "version": "0.2.2",
+    "ci_run": 39210148809,
+    "ci_artifact": {
+      "id": 12168030843,
+      "name": "loginom-linux",
+      "sha256": "bf0e29fd686cb5ec50477a8e36775359486f6aafb93897dce363082fa879c86c"
+    },
+    "archive": {
+      "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/downloads/loginom-ai-agent-cli-0.2.2-linux-x64.tar.gz",
+      "sha256": "c612eab428e5dc16b9a6105cb4fd401a00c04a25dee6390644b50e86044283b9"
+    },
+    "source_commit": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "source_tree_sha256": "92f2bf27f7771109634d33bb8ce6ab1be4f84a74209a45936e0a18d430b57bff",
+    "cli_manifest_sha256": "26c94fe7d3d6f975cc2d60d99eb5f7b2b6fcb377c753c6de3079c155f41ac28c",
+    "resource_manifest_sha256": "0642015ac67c8f569e7b4d1ac158973d514ae39d72b77cacae10d48810fddd34",
+    "harness_sha": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "harness_clean": true
+  },
+  "independent_oracle_check": {
+    "pass": true,
+    "method": "blind SQLite SQL, author oracle not provided",
+    "independent_csv_sha256": "5596d61d231e17bf091d5280fa09fde9edd96434e2f506ce9a6d9bbe2648cbf8",
+    "query_sha256": "6b790c52d10073b268b39f7c8e9af06f1ad954a13f1e07e295594fd6d9e7b3cb",
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/independent/root/sector-weighted-allocation/report.json",
+    "comparison": {
+      "passed": true,
+      "error": null
+    }
+  },
+  "browser_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/sector-weighted-allocation/attempt-1/browser-rerun.json",
+    "screenshot": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/sector-weighted-allocation/attempt-1/browser-rerun.png",
+    "all_nodes_active": true,
+    "closed_without_save": true
+  }
+}

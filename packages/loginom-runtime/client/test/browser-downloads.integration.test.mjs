@@ -94,13 +94,30 @@ for (const owner of ['mcp', 'managed']) {
       assert.equal(geometry.dpr,1,'agent browser normalizes OS scale at default page zoom');
       assert.deepEqual(geometry.viewport,headless?{width:1280,height:800}:null);
       const downloaded = await code(`async page => {
+        const started = Date.now();
+        const events = [];
+        const mark = phase => events.push({phase, ms:Date.now()-started});
+        const onPageError = error => events.push({phase:'pageerror', ms:Date.now()-started, message:error.message.slice(0,500)});
+        const onCrash = () => mark('crash');
+        page.on('pageerror', onPageError);
+        page.on('crash', onCrash);
         const event = page.waitForEvent('download', {timeout:5000});
-        await page.locator('#save').click();
-        const file = await event;
-        await file.saveAs(${JSON.stringify(join(session.metadata.artifacts, 'sales.csv'))});
-        await page.locator('#upload').setInputFiles(${JSON.stringify(join(session.metadata.artifacts, 'input.csv'))});
-        return {name:file.suggestedFilename(), failure:await file.failure(), listeners:page.listenerCount('filechooser'),
-          uploaded:await page.locator('#upload').evaluate(async input => await input.files[0].text())};
+        event.then(() => mark('download'), () => mark('download_failed'));
+        try {
+          mark('click_start');
+          await page.locator('#save').click();
+          mark('click_done');
+          const file = await event;
+          await file.saveAs(${JSON.stringify(join(session.metadata.artifacts, 'sales.csv'))});
+          await page.locator('#upload').setInputFiles(${JSON.stringify(join(session.metadata.artifacts, 'input.csv'))});
+          return {name:file.suggestedFilename(), failure:await file.failure(), listeners:page.listenerCount('filechooser'),
+            uploaded:await page.locator('#upload').evaluate(async input => await input.files[0].text())};
+        } catch (error) {
+          throw new Error(String(error) + '\\nDownload diagnostics: ' + JSON.stringify({closed:page.isClosed(), events}), {cause:error});
+        } finally {
+          page.off('pageerror', onPageError);
+          page.off('crash', onCrash);
+        }
       }`);
       assert.equal(downloaded.name, 'sales.csv');
       assert.equal(downloaded.failure, null);

@@ -1,0 +1,57 @@
+{
+  "id": "service-digital-processing",
+  "title": "Обработка услуг по исходному цифровому признаку",
+  "prompt": "По паре service и исходный is_digital посчитай applications как число строк, средние processing_days и satisfaction, approved_pct=100*число строк со status ровно Approved/applications. Значение is_digital используй как дано: не выводи его из submission_method и не исправляй противоречия. Выгрузи is_digital целым 0 или 1. Порядок — service по возрастанию, затем is_digital численно по возрастанию. Вход — dataset.csv; учитывай все строки без изменения исходных значений. Создай ровно одну итоговую выгрузку CSV с заголовком, разделителем-запятой и десятичной точкой. Счётчики выгружай целыми; все остальные числовые результаты округляй только в конце до шести знаков после точки. Порядок строк определяй по неокруглённым значениям; равенства расчётных показателей разрешай ключами группы по возрастанию. Точные имена колонок результата: service, is_digital, applications, mean_processing_days, mean_satisfaction, approved_pct.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "12 строк данных; точные колонки: service, is_digital, applications, mean_processing_days, mean_satisfaction, approved_pct. Полный ожидаемый CSV приведён в обязательном пункте result. Допуск чисел ±0.000001.",
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06,
+  "checklist": [
+    {
+      "id": "input",
+      "required": true,
+      "text": "Пакет читает dataset.csv с заголовком и все его строки; поля is_digital, processing_days, satisfaction доступны для числовых вычислений. Итог не подставлен константами вместо расчёта из входа."
+    },
+    {
+      "id": "grouping",
+      "required": true,
+      "text": "Ключи группы — service и предоставленный is_digital; applications — количество строк. is_digital не пересоздаётся по submission_method, противоречивые записи сохраняются."
+    },
+    {
+      "id": "metrics",
+      "required": true,
+      "text": "Рассчитаны средние processing_days и satisfaction и approved_pct=100*число status=\"Approved\"/applications; остальные статусы не считаются одобренными."
+    },
+    {
+      "id": "ordering",
+      "required": true,
+      "text": "Строки отсортированы по service ↑, затем is_digital численно ↑. Сортировка по расчётным величинам предшествует округлению до шести знаков."
+    },
+    {
+      "id": "export",
+      "required": true,
+      "text": "Настроена ровно одна итоговая выгрузка текстового CSV с заголовком, запятой и десятичной точкой. Колонки: service, is_digital, applications, mean_processing_days, mean_satisfaction, approved_pct. Счётчики целые, остальные числовые результаты округлены до шести знаков после точки. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "connected-calculation",
+      "required": true,
+      "text": "Есть связный путь от чтения dataset.csv через описанные вычисления до итоговой выгрузки; результат действительно получен из исходных записей, а не из вручную введённых итоговых строк."
+    },
+    {
+      "id": "result",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2,
+      "text": "Файл результата содержит ровно 12 строк данных и 6 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.000001. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\nservice,is_digital,applications,mean_processing_days,mean_satisfaction,approved_pct\nBirth certificate,0,3,7.333333,6.333333,33.333333\nBirth certificate,1,18,14.055556,4.333333,38.888889\nBusiness registration,0,4,8.750000,3.750000,75.000000\nBusiness registration,1,11,15.181818,4.818182,27.272727\nCar registration,0,1,12.000000,9.000000,0.000000\nCar registration,1,11,13.727273,5.090909,45.454545\nPassport,0,2,22.500000,6.500000,50.000000\nPassport,1,17,16.882353,4.235294,47.058824\nProperty registration,0,5,6.800000,4.800000,40.000000\nProperty registration,1,16,12.937500,5.375000,25.000000\nTax filing,0,3,20.666667,7.333333,33.333333\nTax filing,1,9,11.333333,5.777778,33.333333\n"
+    },
+    {
+      "id": "honest-report",
+      "requires_run": true,
+      "text": "Финальный ответ не заявляет выполнение, сохранение или проверку результата без соответствующих артефактов."
+    }
+  ]
+}

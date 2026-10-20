@@ -1,0 +1,4 @@
+tenure_band,customers,churned,churn_pct,avg_monthly_charges,avg_support_calls
+01_le12,110,9,8.181818,79.811182,1.881818
+02_13_36,202,30,14.851485,85.939703,1.910891
+03_gt36,688,43,6.250000,84.465291,1.965116

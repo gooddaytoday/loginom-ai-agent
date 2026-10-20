@@ -1,0 +1,52 @@
+{
+  "id": "price-quality-intent",
+  "title": "Намерение покупки по цене и качеству",
+  "prompt": "Построй в Loginom воспроизводимый сценарий по прикреплённому dataset.csv. Все строки входного файла сохраняют исходный смысл; не используй внешние данные. Сгруппируй по исходным строковым price_level и quality. Вычисли respondents=count(rows), avg_purchase_intent=mean(purchase_intent), avg_rating=mean(rating), high_intent_pct=100*count(purchase_intent>=7)/respondents, включая значение 7. На данных девять строк. Упорядочь avg_purchase_intent по убыванию, при равенстве price_level по возрастанию, затем quality по возрастанию. Текстовые категории сортируются лексикографически, без смыслового ранжирования High/Medium/Low. Выгрузи ровно один CSV с разделителем запятая, десятичной точкой и строкой заголовков. Счётчики запиши целыми; прочие числовые результаты округли до шести знаков после десятичной точки только в самом конце. Сортируй по неокруглённым расчётным значениям, затем округляй. Точные имена выходных колонок: price_level, quality, respondents, avg_purchase_intent, avg_rating, high_intent_pct.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "9 строк данных; колонки price_level, quality, respondents, avg_purchase_intent, avg_rating, high_intent_pct. Намерение покупки, рейтинг и доля высоких намерений для сочетаний цены и качества. Полное содержимое oracle.csv приведено в обязательном пункте result-rows.",
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "required": true,
+      "text": "В графе настроено чтение dataset.csv как CSV с первой строкой заголовков; расчёты получают реальные строки и необходимые поля исходного файла, а не готовые константы результата."
+    },
+    {
+      "id": "price-quality-groups",
+      "required": true,
+      "text": "Все респонденты сгруппированы по исходной паре price_level,quality; brand/warranty/возраст не добавлены в ключ и не используются для фильтра."
+    },
+    {
+      "id": "intent-measures",
+      "required": true,
+      "text": "respondents=count(rows), avg_purchase_intent=mean(purchase_intent), avg_rating=mean(rating), high_intent_pct=100*count(purchase_intent>=7)/respondents. Порог включает 7."
+    },
+    {
+      "id": "sort-final",
+      "required": true,
+      "text": "Строки сортируются по неокруглённому avg_purchase_intent DESC, price_level ASC, quality ASC лексикографически; средние и процент округляются после сортировки до 6 знаков."
+    },
+    {
+      "id": "export-columns",
+      "required": true,
+      "text": "В графе настроена ровно одна итоговая выгрузка текстового CSV с разделителем запятая и десятичной точкой; она связана с результатом вычислений, содержит только price_level, quality, respondents, avg_purchase_intent, avg_rating, high_intent_pct. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2,
+      "text": "Файл результата содержит ровно 9 строк данных и 6 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.000001. Проверяются все строки и все колонки. Эталонный CSV:\nprice_level,quality,respondents,avg_purchase_intent,avg_rating,high_intent_pct\nMedium,Premium,34,5.794118,5.888235,44.117647\nHigh,Premium,29,5.620690,5.555172,48.275862\nLow,Standard,27,5.222222,5.729630,29.629630\nMedium,Basic,27,5.222222,4.814815,40.740741\nHigh,Standard,39,5.025641,4.823077,30.769231\nMedium,Standard,33,4.818182,6.190909,30.303030\nHigh,Basic,39,4.692308,6.171795,28.205128\nLow,Premium,25,4.360000,5.604000,16.000000\nLow,Basic,47,4.170213,5.808511,25.531915"
+    },
+    {
+      "id": "honest-report",
+      "requires_run": true,
+      "text": "Финальный ответ не заявляет выполнение, выгрузку или результаты, не подтверждённые артефактами."
+    }
+  ]
+}

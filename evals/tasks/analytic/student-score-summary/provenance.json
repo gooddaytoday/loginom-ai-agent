@@ -1,0 +1,100 @@
+{
+  "task_id": "student-score-summary",
+  "dataset_sha256": {
+    "dataset.csv": "a99e2d32ef250e997094fda3eb3c43f85a72c427c5afe98ae696d09a070cc6a6"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "8cdd1b32d42b8e02e7ac3e263dfae7d4567981f02147a11742588b0989eacca6"
+  },
+  "reference_sha256": "95e8ebf53a95c2fff03e351fc64d713f211ff008044295a24e720e29beff5e4c",
+  "cli": {
+    "binary": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/runtime/bin/loginom-ai-agent-cli",
+    "version": "0.2.2",
+    "profile": "profile"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-student-score-summary-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/c86c79e460cadef1b4675837842f69bb750a00090194d72f741779b879505664-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_eac2a81f6ffeNWgYvZI8RIz3T0",
+    "skill_revision": "8afb17d6a2c247fa0fb8fc6e2285e6ed05e6bf475a1a9d88ae7b760a29260dfc",
+    "exit_code": 0,
+    "started_at": "2026-10-19T14:04:15+03:00",
+    "duration_s": 1420,
+    "tokens": {
+      "input": 129370,
+      "output": 7108,
+      "reasoning": 3916
+    },
+    "tool_calls": 61,
+    "tool_errors": 3,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-student-score-summary-1/Unit1/workflow",
+  "source_task": "analitic-tasks/task01-basic-statistics",
+  "runtime_pin": {
+    "version": "0.2.2",
+    "ci_run": 39210148809,
+    "ci_artifact": {
+      "id": 12168030843,
+      "name": "loginom-linux",
+      "sha256": "bf0e29fd686cb5ec50477a8e36775359486f6aafb93897dce363082fa879c86c"
+    },
+    "archive": {
+      "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/downloads/loginom-ai-agent-cli-0.2.2-linux-x64.tar.gz",
+      "sha256": "c612eab428e5dc16b9a6105cb4fd401a00c04a25dee6390644b50e86044283b9"
+    },
+    "source_commit": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "source_tree_sha256": "92f2bf27f7771109634d33bb8ce6ab1be4f84a74209a45936e0a18d430b57bff",
+    "cli_manifest_sha256": "26c94fe7d3d6f975cc2d60d99eb5f7b2b6fcb377c753c6de3079c155f41ac28c",
+    "resource_manifest_sha256": "0642015ac67c8f569e7b4d1ac158973d514ae39d72b77cacae10d48810fddd34",
+    "harness_sha": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "harness_clean": true
+  },
+  "independent_oracle_check": {
+    "pass": true,
+    "method": "blind SQLite SQL, author oracle not provided",
+    "independent_csv_sha256": "8cdd1b32d42b8e02e7ac3e263dfae7d4567981f02147a11742588b0989eacca6",
+    "query_sha256": "0703cd5ccb63e56d00fcca3cb2b8cfc7dbf1581337937b49e0351eb231e74fb7",
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/independent/a/student-score-summary/report.json",
+    "comparison": {
+      "passed": true,
+      "error": null
+    }
+  },
+  "browser_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/student-score-summary/attempt-1/browser-rerun.json",
+    "screenshot": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/student-score-summary/attempt-1/browser-rerun.png",
+    "all_nodes_active": true,
+    "closed_without_save": true,
+    "rounding_verified_in_exported_path": true
+  },
+  "fallback_used": false
+}

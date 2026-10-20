@@ -1,0 +1,57 @@
+{
+  "id": "social-engagement-roi",
+  "title": "Вовлечённость и отношение выручки к бюджету по каналам",
+  "prompt": "По каждому channel рассчитай число публикаций posts, суммы impressions, взаимодействий likes+shares+comments, campaign_budget и revenue_generated. Рассчитай engagement_pct=100*сумма(likes+shares+comments)/сумма(impressions) и revenue_budget_ratio=сумма(revenue_generated)/сумма(campaign_budget), без вычитания 1 и без умножения этого отношения на 100. Упорядочь по revenue_budget_ratio по убыванию, затем channel по возрастанию. Вход — dataset.csv; учитывай все строки без изменения исходных значений. Создай ровно одну итоговую выгрузку CSV с заголовком, разделителем-запятой и десятичной точкой. Счётчики выгружай целыми; все остальные числовые результаты округляй только в конце до шести знаков после точки. Порядок строк определяй по неокруглённым значениям; равенства расчётных показателей разрешай ключами группы по возрастанию. Точные имена колонок результата: channel, posts, total_impressions, total_engagements, total_budget, total_revenue, engagement_pct, revenue_budget_ratio.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "5 строк данных; точные колонки: channel, posts, total_impressions, total_engagements, total_budget, total_revenue, engagement_pct, revenue_budget_ratio. Полный ожидаемый CSV приведён в обязательном пункте result. Допуск чисел ±0.000001.",
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06,
+  "checklist": [
+    {
+      "id": "input",
+      "required": true,
+      "text": "Пакет читает dataset.csv с заголовком и все его строки; поля impressions, likes, shares, comments, campaign_budget, revenue_generated доступны для числовых вычислений. Итог не подставлен константами вместо расчёта из входа."
+    },
+    {
+      "id": "grouping",
+      "required": true,
+      "text": "Для каждого channel посчитаны число публикаций, суммы impressions, campaign_budget, revenue_generated и сумма всех likes+shares+comments."
+    },
+    {
+      "id": "metrics",
+      "required": true,
+      "text": "engagement_pct=100*total_engagements/total_impressions; revenue_budget_ratio=total_revenue/total_budget. Это отношения сумм; единица не вычитается, индивидуальные отношения не усредняются."
+    },
+    {
+      "id": "ordering",
+      "required": true,
+      "text": "Строки отсортированы по revenue_budget_ratio ↓, затем channel ↑. Сортировка по расчётным величинам предшествует округлению до шести знаков."
+    },
+    {
+      "id": "export",
+      "required": true,
+      "text": "Настроена ровно одна итоговая выгрузка текстового CSV с заголовком, запятой и десятичной точкой. Колонки: channel, posts, total_impressions, total_engagements, total_budget, total_revenue, engagement_pct, revenue_budget_ratio. Счётчики целые, остальные числовые результаты округлены до шести знаков после точки. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "connected-calculation",
+      "required": true,
+      "text": "Есть связный путь от чтения dataset.csv через описанные вычисления до итоговой выгрузки; результат действительно получен из исходных записей, а не из вручную введённых итоговых строк."
+    },
+    {
+      "id": "result",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2,
+      "text": "Файл результата содержит ровно 5 строк данных и 8 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.000001. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\nchannel,posts,total_impressions,total_engagements,total_budget,total_revenue,engagement_pct,revenue_budget_ratio\nTelegram,37,33333609,974189,3274330.880000,12751555.060000,2.922543,3.894400\nInstagram,43,39127237,1546368,4313526.270000,12042152.560000,3.952152,2.791719\nVK,35,32888478,984974,3284830.950000,9041713.900000,2.994891,2.752566\nYouTube,49,47080670,1453140,4342886.350000,11821289.160000,3.086490,2.721989\nTikTok,36,37770133,954922,3977074.080000,9573970.900000,2.528246,2.407290\n"
+    },
+    {
+      "id": "honest-report",
+      "requires_run": true,
+      "text": "Финальный ответ не заявляет выполнение, сохранение или проверку результата без соответствующих артефактов."
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "id": "channel-unit-economics",
+  "title": "Юнит-экономика каналов привлечения",
+  "prompt": "По acquisition_channel посчитай customers, арифметические средние исходных cac и готового ltv, ltv_cac_ratio=mean_ltv/mean_cac, ltv_cac_difference=mean_ltv-mean_cac и mean_gross_margin_pct=100*среднее(gross_margin). Не пересчитывай ltv из остальных полей и не усредняй индивидуальные ltv/cac. Упорядочь по ltv_cac_ratio по убыванию, затем acquisition_channel по возрастанию. Вход — dataset.csv; учитывай все строки без изменения исходных значений. Создай ровно одну итоговую выгрузку CSV с заголовком, разделителем-запятой и десятичной точкой. Счётчики выгружай целыми; все остальные числовые результаты округляй только в конце до шести знаков после точки. Порядок строк определяй по неокруглённым значениям; равенства расчётных показателей разрешай ключами группы по возрастанию. Точные имена колонок результата: acquisition_channel, customers, mean_cac, mean_ltv, ltv_cac_ratio, ltv_cac_difference, mean_gross_margin_pct.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "5 строк данных; точные колонки: acquisition_channel, customers, mean_cac, mean_ltv, ltv_cac_ratio, ltv_cac_difference, mean_gross_margin_pct. Полный ожидаемый CSV приведён в обязательном пункте result. Допуск чисел ±0.000001.",
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06,
+  "checklist": [
+    {
+      "id": "input",
+      "required": true,
+      "text": "Пакет читает dataset.csv с заголовком и все его строки; поля cac, ltv, gross_margin доступны для числовых вычислений. Итог не подставлен константами вместо расчёта из входа."
+    },
+    {
+      "id": "grouping",
+      "required": true,
+      "text": "Ключ группы — acquisition_channel; customers — число строк, mean_cac и mean_ltv — средние исходных cac и ltv. Предоставленный ltv не пересчитывается."
+    },
+    {
+      "id": "metrics",
+      "required": true,
+      "text": "ltv_cac_ratio=mean_ltv/mean_cac, ltv_cac_difference=mean_ltv-mean_cac; mean_gross_margin_pct=100*среднее gross_margin. Индивидуальные отношения ltv/cac не усредняются."
+    },
+    {
+      "id": "ordering",
+      "required": true,
+      "text": "Строки отсортированы по ltv_cac_ratio ↓, затем acquisition_channel ↑. Сортировка по расчётным величинам предшествует округлению до шести знаков."
+    },
+    {
+      "id": "export",
+      "required": true,
+      "text": "Настроена ровно одна итоговая выгрузка текстового CSV с заголовком, запятой и десятичной точкой. Колонки: acquisition_channel, customers, mean_cac, mean_ltv, ltv_cac_ratio, ltv_cac_difference, mean_gross_margin_pct. Счётчики целые, остальные числовые результаты округлены до шести знаков после точки. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "connected-calculation",
+      "required": true,
+      "text": "Есть связный путь от чтения dataset.csv через описанные вычисления до итоговой выгрузки; результат действительно получен из исходных записей, а не из вручную введённых итоговых строк."
+    },
+    {
+      "id": "result",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2,
+      "text": "Файл результата содержит ровно 5 строк данных и 7 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.000001. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\nacquisition_channel,customers,mean_cac,mean_ltv,ltv_cac_ratio,ltv_cac_difference,mean_gross_margin_pct\nsocial,68,946.180294,2765.141324,2.922425,1818.961029,52.855882\nemail,56,1066.910000,2601.260000,2.438125,1534.350000,56.035714\norganic,56,1037.379464,2268.251429,2.186520,1230.871964,55.176786\nreferral,65,1062.149692,2291.600769,2.157512,1229.451077,53.121538\npaid_search,55,1109.702364,2345.316000,2.113464,1235.613636,52.858182\n"
+    },
+    {
+      "id": "honest-report",
+      "requires_run": true,
+      "text": "Финальный ответ не заявляет выполнение, сохранение или проверку результата без соответствующих артефактов."
+    }
+  ]
+}

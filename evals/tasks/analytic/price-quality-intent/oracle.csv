@@ -1,0 +1,10 @@
+price_level,quality,respondents,avg_purchase_intent,avg_rating,high_intent_pct
+Medium,Premium,34,5.794118,5.888235,44.117647
+High,Premium,29,5.620690,5.555172,48.275862
+Low,Standard,27,5.222222,5.729630,29.629630
+Medium,Basic,27,5.222222,4.814815,40.740741
+High,Standard,39,5.025641,4.823077,30.769231
+Medium,Standard,33,4.818182,6.190909,30.303030
+High,Basic,39,4.692308,6.171795,28.205128
+Low,Premium,25,4.360000,5.604000,16.000000
+Low,Basic,47,4.170213,5.808511,25.531915
