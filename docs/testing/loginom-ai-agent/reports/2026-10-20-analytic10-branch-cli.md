@@ -1,7 +1,7 @@
 # Analytic10 на CLI ветки evals-parallel, 2026-10-20
 
 Техническая приёмка пока **не пройдена**. Первая серия остановлена на двух
-попытках, вторая — на пяти. Обе сохранены целиком; результаты не объединяются.
+попытках, вторая — на пяти, третья — на четырёх. Данные сохранены; результаты не объединяются.
 Критерии и фиксированная десятка — в [плане](../../../superpowers/plans/2026-10-20-analytic10-branch-cli.md),
 правила — в [контракте](../../../../evals/docs/parallel-users-contract.md).
 
@@ -159,3 +159,34 @@ Manifest закрепляет binary/resource/CLI/task/config hashes и зави
 judge version/login без модели и4живых A/B. Final gate:2profilesclean/4leasesreleased.
 Local OAuth запас101ч,исходныйauth-store неизменён. Лишние свои неустановленные payload удалены;
 установленные кандидаты,логи,старые результаты и инциденты сохранены.
+
+
+## Серия3: gMHr5j
+
+Run20261020-085726-0b749879a1-dirty-gMHr5j,08:57:26–09:17:42UTC,exit1.
+4attempts/6unassigned. A:abc-pareto-groups0/noartifact,затемbasketinterrupted;
+B:articles-by-author100/oraclePASS,затемbudgetinterrupted.
+Оба первых authenticated/READY под своими users,provider coveragecomplete.
+У abc мастер/диалог блокировал node.apply и operation.recover;CLIexit1/
+LOGINOM_HOST_CLEANUP_FAILED без timeout/interrupt,но harness cleanupconfirmed и reuse.
+Articles:agentexit0,29turns/31tools/0errors,judge1,oracletrue,score100,cleanupconfirmed.
+Judge unit0a227c1e-efd8-49c2-b73d-b21121cabbd7 после вызова inactive/MainPID0,
+home released. Оба слота независимо получили следующие задачи после своего cleanup.
+
+В09:16:00–02UTC три пробы MemAvailable7.97/7.69/7.65GiB нарушили minimum8GiB.
+CPUpeak99.92% разрешён и не стал причиной остановки. Контроллеру отправлен один
+SIGINT;новых admissions не было. Budget cleanupconfirmed,basket cleanupfailed:
+processproofconfirmed/unknown=[],но незавершённыйnativeprofile запрещаетarchive/admission.
+Штатный post verifyexit2 с тем же запретом;стенд/receipts/recovery сохранены.
+Все4slotstatesquarantined;serverиprofilea retained,judge released.
+
+1121resourceprobes,0missed,maxgap1391.35ms. Resourceacceptancefailed поRAM;
+aggregateprovider/judge evidenceincomplete из-за прерванных задач.
+Новых OOM/ENOSPC/licence/providerlimit нет. Источник краткого memoryburst не установлен.
+Контрольный observer на полном файле16.73MiB:0.23с,maxRSS163MiB;этого недостаточно
+для объяснения падения на несколькоGiB. Нет основания менять codecollector.
+
+Независимое review разрешённого продолжения:No findings. Полная следующая серия
+использует новый свой стенд,тот же установленный CLI и прежний deadline15:28:25UTC;
+измеряемый код не менялся,пересборка не требуется. RAM≥8GiB проверяется перед dispatch;
+остальные gates,границы и критерии сохраняются. Старые результаты не склеиваются.
