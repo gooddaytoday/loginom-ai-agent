@@ -539,6 +539,15 @@ export async function createBridge(config, session, { browserTransport: managedB
         });
       } catch (error) {
         const message = String(error.message).replaceAll(config.apiKey, '[redacted]');
+        if(userProfile&&request.params.name==='dock_prepare'&&message.startsWith('UNKNOWN_PREPARED_WORKFLOW:')
+          &&!clipboardUncertain&&heldLeases.size===0&&!actionRuntime?.hasUnsettledWork()) {
+          const next_step={tool:'dock_prepare',arguments:{intent:'open_package',
+            ...(lastSavedPackage?{package_path:lastSavedPackage.path}:{})},
+            instruction:'The chat history does not prepare this runtime. Open the same saved package and use the freshly issued references. '
+              +(lastSavedPackage?'The path is from this runtime\'s last confirmed Save.':
+                'Supply the exact path from this chat\'s confirmed Save; this runtime does not know it. Do not guess a path or create a new draft.')};
+          return {isError:true,content:[{type:'text',text:JSON.stringify({code:'UNKNOWN_PREPARED_WORKFLOW',message,next_step})}]};
+        }
         if (owner === 'action') {
           const failure=actionRuntime.requestFailure(new Error(message));
           if(userProfile)failure.output=userActionInventory(failure.output);
