@@ -158,7 +158,8 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 - Последние source-проверки: полный runtime client 4468 PASS / 14 SKIP / 0 FAIL; focused 133/133, timeout 4/4; Host managed IPC 1/1 (16 assertions), Host typecheck и `git diff --check` — PASS.
 - Task 0 на Loginom: реальный Calculator, новое успешное выполнение и схема Preview независимо подтверждены; итоговый собственный пакет, transport и браузер закрыты.
 - Ограничение пробы: закрытие несохранённого пакета первой неудачной попытки осталось неподтверждённым.
-- Проверки установленных артефактов и живого recovery ещё впереди; release-флаг в CI не включён.
+- BR-S1 дошёл до T1 handoff, но остановлен до клика: у icon-кнопок нет accessibility-имени, find по «Отмена» вернул известный NoMatches; очистка этого несохранённого тестового пакета BLOCKED, закрытие не подтверждено.
+- Установленные артефакты и завершённый живой recovery ещё не приняты; release-флаг в CI не включён.
 - План 3 прошёл preflight и scoped review уточнений; Tasks 1–4 выполнены и приняты независимыми reviews; 1/1 реальная Chromium-проба PASS; замечание о final-await abort исправлено и подтверждено scoped re-review. CI опубликованного checkpoint плана 2 — PASS.
 - Ограничение локального общего browser runner: отсутствует xvfb-run; новая headless Chromium-проба с sandbox выполнена напрямую.
-- Следующий шаг: план 3, Task 5 — свежий staging принятого HEAD и BR-S1/BR-S3 на живом Loginom.
+- Следующий шаг: план 3, Task 5 — BR-S1 по текущему ref из узкого snapshot канонической собственной кнопки, затем BR-S3. Свежий staging выполнен; product-код не менялся.
