@@ -106,7 +106,7 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     const previous = attempt;
     const current = attempt = { id: randomUUID(), operation_id: input.operation_id, phase: 'handoff', step: null, reason: null,
       budget: { calls: 0, started_at: null, closed: false } };
-    const outcome = await gate(async () => {
+    const outcome = await track(gate(async () => {
       if (attempt !== current || uncertain) return { refused: refusal('Browser recovery state changed before its start.') };
       const basis = await Promise.resolve().then(() => executor.browserRecoveryBasis(input.operation_id)).catch(error => error);
       if (basis instanceof Error) return { refused: refusal(basis.message) };
@@ -123,20 +123,24 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
       // Only a confirmed stop of the original executor hands the page over.
       const handoff = await Promise.resolve().then(() => executor.browserRecoveryHandoff(input.operation_id, { signal: extra?.signal }))
         .catch(error => ({ stopped: false, reason: error.message }));
+      await journal({ phase: 'browser_recovery_started', attempt_id: current.id, operation_id: current.operation_id,
+        reason: current.reason, step: current.step, budget: remaining(current.budget) });
+      await journal({ phase: 'browser_recovery_handoff', attempt_id: current.id, operation_id: current.operation_id,
+        stopped: handoff.stopped === true, proof: handoff.proof ?? null, reason: handoff.reason ?? null });
+      // Activation belongs to the same gate turn and only to an attempt nobody stopped meanwhile.
+      if (handoff.stopped === true && attempt === current && current.phase === 'handoff') {
+        current.phase = 'browser';
+        current.budget.started_at ??= now();
+      }
       return { basis, handoff };
-    });
+    }));
     if (outcome.refused) {
       if (attempt === current) attempt = previous;
       return outcome.refused;
     }
-    await journal({ phase: 'browser_recovery_started', attempt_id: current.id, operation_id: current.operation_id,
-      reason: current.reason, step: current.step, budget: remaining(current.budget) });
-    await journal({ phase: 'browser_recovery_handoff', attempt_id: current.id, operation_id: current.operation_id,
-      stopped: outcome.handoff.stopped === true, proof: outcome.handoff.proof ?? null, reason: outcome.handoff.reason ?? null });
+    if (attempt !== current || current.phase === 'stopping' || current.phase === 'stopped') return reply(view());
     if (outcome.handoff.stopped !== true)
       return stopAttempt('executor_not_stopped', outcome.handoff.reason ?? 'The original executor stop was not confirmed.');
-    current.phase = 'browser';
-    current.budget.started_at ??= now();
     return reply({ ...view(), instruction: 'The browser tools are available on your next step. Complete only this step in the '
       + 'current Loginom tab, then call dock_browser_recovery finish. Leave a node view or visualizer through the scenario '
       + 'breadcrumb (Сценарий) in the navigation path; never close workspace tabs, the package or Loginom windows: that '
@@ -171,13 +175,14 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
         reason: 'Page check failed: ' + String(page.reason).slice(0, 400) };
       // Latch a lost page boundary before the gate is released, like an unknown outcome.
       if (page.ok !== true) current.pageLost ??= String(page.reason ?? 'page check failed').slice(0, 500);
+      // The evidence is durable before the next queued entry is admitted.
+      await journal({ phase: 'browser_recovery_action', attempt_id: current.id, operation_id: current.operation_id, tool: name,
+        arguments_sha256: sha256(JSON.stringify(args)), is_error: response.error ? null : response.value?.isError === true,
+        transport_error: response.error ? String(response.error.message) : null, page,
+        content: describeContent(response.value?.content), budget: remaining(current.budget) });
       return { ...response, page };
     }));
     if (outcome.refused) return outcome.refused;
-    await journal({ phase: 'browser_recovery_action', attempt_id: current.id, operation_id: current.operation_id, tool: name,
-      arguments_sha256: sha256(JSON.stringify(args)), is_error: outcome.error ? null : outcome.value?.isError === true,
-      transport_error: outcome.error ? String(outcome.error.message) : null, page: outcome.page,
-      content: describeContent(outcome.value?.content), budget: remaining(current.budget) });
     // A late reply belongs to an attempt that already ended: it never regains the page.
     if (attempt !== current || current.phase !== 'browser')
       return refusal('This browser action finished after the recovery attempt ended; its result is not evidence.', view());
@@ -205,28 +210,34 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
         attested_by_model: attested });
       const verification = await Promise.resolve().then(() => executor.verifyBrowserRecovery({ operationId: current.operation_id,
         step: current.step, attested, signal: extra?.signal })).catch(error => ({ status: 'unresolved', facts: [], reason: error.message }));
-      return { verification };
+      // The verifier's own release gestures may end with an unknown outcome too.
+      if (verification.uncertain) uncertain ??= { operation_id: current.operation_id, tool: browserRecoveryToolName,
+        reason: 'Verification outcome is unknown: ' + String(verification.reason ?? '').slice(0, 400) };
+      const status = ['completed', 'continuable'].includes(verification.status) ? verification.status : 'unresolved';
+      await journal({ phase: 'browser_recovery_verified', attempt_id: current.id, operation_id: current.operation_id,
+        status, facts: verification.facts ?? [], receipt_id: verification.receipt_id ?? null });
+      // Only a verification nobody stopped meanwhile moves the phase.
+      if (attempt === current && current.phase === 'verify' && !uncertain) {
+        if (status !== 'unresolved') {
+          current.phase = 'dock';
+          if (status === 'completed') current.budget.closed = true;
+        } else if (!exhausted(current.budget)) current.phase = 'browser';
+      }
+      return { verification, status };
     }));
     if (outcome.late) {
       if (attempt !== current || !(uncertain || current.pageLost)) return outcome.late;
       return uncertain ? stopAttempt('browser_unavailable', 'A browser action outcome is unknown: ' + uncertain.reason)
         : stopAttempt('page_changed', `The Loginom page changed outside recovery bounds: ${current.pageLost}.`);
     }
-    const verification = outcome.verification;
-    const status = ['completed', 'continuable'].includes(verification.status) ? verification.status : 'unresolved';
+    const { verification, status } = outcome;
     const result = { ...verification, status, attested_by_model: attested };
     // A stop during verification already decided the lease; report what verification found.
-    if (attempt !== current || current.phase !== 'verify') return reply({ ...view(), verification: result });
-    await journal({ phase: 'browser_recovery_verified', attempt_id: current.id, operation_id: current.operation_id,
-      status, facts: verification.facts ?? [], receipt_id: verification.receipt_id ?? null });
-    if (status !== 'unresolved') {
-      current.phase = 'dock';
-      if (status === 'completed') current.budget.closed = true;
-      return reply({ ...view(), verification: result });
-    }
-    if (exhausted(current.budget))
+    if (attempt !== current || ['stopping', 'stopped'].includes(current.phase)) return reply({ ...view(), verification: result });
+    if (uncertain) return stopAttempt('browser_unavailable', uncertain.reason, { verification: result });
+    if (current.phase === 'dock') return reply({ ...view(), verification: result });
+    if (current.phase === 'verify')
       return stopAttempt('unresolved', verification.reason ?? 'The verification did not establish the step result.', { verification: result });
-    current.phase = 'browser';
     return reply({ ...view(), verification: result,
       instruction: 'The step result is not established yet. Continue in the browser within the remaining budget, or call stop.' });
   }

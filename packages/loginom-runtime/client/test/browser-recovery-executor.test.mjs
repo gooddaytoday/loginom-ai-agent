@@ -52,7 +52,7 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
         effect_possible: false, error: null, trace: [], output: { state: 'completed', receipt } };
     },
     nodeTargetAdapterFactory: () => adapter, nodeApplyHandlers: new Map([['imports.text', handler]]),
-    nodeApplyDriverFactory: ({ receiptOptions }) => { state.receiptOptions = receiptOptions; return drivers; },
+    nodeApplyDriverFactory: ({ operation, receiptOptions }) => { state.receiptOptions = receiptOptions; state.operation = operation; return drivers; },
     onRecord: async e => { events.push(e); return e; } });
   return { runtime, calls, events, state };
 }
@@ -292,4 +292,16 @@ test('T4: a later export to the same file leaves the earlier download unconfirme
   assert.equal(second.outcome.status, 'FAILED');
   assert.throws(() => first.runtime.browserRecoveryBasis('export'), /No browser recovery trigger/);
   assert.deepEqual(first.reads, []);
+});
+
+test('a release gesture with an unconfirmed browser call reports an unknown verification outcome', async () => {
+  const f = fixture();
+  await stopAtFinish(f);
+  await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+  const basis = f.runtime.browserRecoveryBasis('apply');
+  await f.runtime.browserRecoveryHandoff('apply');
+  f.state.release = () => { f.state.operation.transportUncertain = true; throw Error('Cancel click timed out'); };
+  const verified = await f.runtime.verifyBrowserRecovery({ operationId: 'apply', step: basis.step, attested: { actions_performed: ['Clicked'] } });
+  assert.equal(verified.status, 'unresolved');
+  assert.equal(verified.uncertain, true);
 });

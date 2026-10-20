@@ -80,7 +80,7 @@ for (const [name, failure] of Object.entries(failures)) {
     }
   });
 
-  if (!failure.journal) test('queued entries behind ' + name, async () => {
+  test('queued entries behind ' + name, async () => {
     for (const [entry, run] of Object.entries(entries)) {
       const h = harness(failure, { hold: true });
       await start(h);
@@ -89,7 +89,7 @@ for (const [name, failure] of Object.entries(failures)) {
       await new Promise(resolve => setImmediate(resolve));
       assert.equal(h.recovery.refusesDock('dock_node_apply'), true, entry + ' while in flight');
       h.release();
-      const [, reply] = await Promise.all([first, queued]);
+      const [, reply] = await Promise.all([first.catch(error => assert.match(error.message, /disk full/)), queued]);
       if (failure.blocking) {
         assert.equal(reply.isError === true || phase(reply) === 'stopped', true, entry + ': ' + JSON.stringify(reply));
         assert.deepEqual({ calls: h.counts.calls, verifies: h.counts.verifies }, { calls: 1, verifies: 0 }, entry);

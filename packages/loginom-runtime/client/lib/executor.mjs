@@ -2045,7 +2045,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         result = await releaseNodeApply({ operation, handlers: nodeApplyHandlers, record: onRecord, signal,
           drivers: { ...drivers, releasePending: drivers.recoveryReleasePending ?? drivers.releasePending } });
       } catch (error) {
-        return { status: 'unresolved', facts: [], reason: String(error?.message ?? error).slice(0, 1000) };
+        // A release gesture whose browser call did not confirm completion leaves the outcome unknown.
+        return { status: 'unresolved', facts: [], reason: String(error?.message ?? error).slice(0, 1000),
+          uncertain: operation.transportUncertain === true };
       } finally { running = false; }
       const request = operation.nodeApply.request;
       const readable = reason === 'REPEATED_PHASE_FAILURE' && !['programming.javascript', 'exports.text'].includes(request.target.type);
@@ -2091,7 +2093,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       observations.clear();
       file = await operation.nodeApplyDrivers.recoveryReadExport(operation.nodeApply, { signal });
     } catch (error) {
-      return { status: 'unresolved', facts: [], reason: String(error?.message ?? error).slice(0, 1000) };
+      // Only a refusal that restored the quiet graph is settled; any other failure leaves storage gestures unknown.
+      return { status: 'unresolved', facts: [], reason: String(error?.message ?? error).slice(0, 1000),
+        uncertain: error?.nodePhaseRefusal?.cleanup_complete !== true };
     } finally { running = false; }
     const receipt = { id: operation.id + ':br' + (++recoverySequence), kind: 'browser_recovery', status: 'completed',
       source_operation_id: operation.id, step: structuredClone(step), reason: operation.browserRecoveryReason,

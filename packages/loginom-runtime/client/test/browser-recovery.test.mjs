@@ -440,3 +440,44 @@ test('closing the prepared scenario tab is a lost page boundary', () => {
   assert.deepEqual(parseRecoveryPageProbe(reply({ ...base, tab_present: true }), binding), { ok: true });
   assert.deepEqual(parseRecoveryPageProbe(reply({ ...base, tab_present: false }), binding), { ok: false, reason: 'prepared scenario tab closed' });
 });
+
+test('a stop during handoff wins: the late handoff never activates the attempt', async () => {
+  let release;
+  const handoff = new Promise(resolve => { release = resolve; });
+  const h = harness({ handoff: () => handoff.then(() => ({ stopped: true, proof: {} })) });
+  const starting = h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  await new Promise(resolve => setImmediate(resolve));
+  const stopping = h.recovery.call('dock_browser_recovery', { action: 'stop', operation_id: 'op-1', reason: 'cancelled' });
+  release();
+  const [, stopped] = await Promise.all([starting, stopping]);
+  assert.equal(body(stopped).phase, 'stopped');
+  assert.equal(h.recovery.active(), false);
+  assert.deepEqual(h.recovery.listTools([{ name: 'browser_click', inputSchema: { type: 'object' } }]).map(t => t.name), ['dock_browser_recovery']);
+});
+
+test('a stop during the final finish journal is not undone by the verification', async () => {
+  let release;
+  const delayed = new Promise(resolve => { release = resolve; });
+  const h = harness({ record: async event => { if (event.phase === 'browser_recovery_verified') await delayed; return event; } });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const finishing = h.recovery.call('dock_browser_recovery', { action: 'finish', operation_id: 'op-1', actions_performed: ['Clicked'] });
+  await new Promise(resolve => setImmediate(resolve));
+  const stopping = h.recovery.call('dock_browser_recovery', { action: 'stop', operation_id: 'op-1', reason: 'cancelled' });
+  release();
+  await Promise.all([finishing, stopping]);
+  assert.equal(h.recovery.active(), false);
+  assert.equal(JSON.parse((await h.recovery.call('browser_click', { target: 'e1' })).content[0].text).refused !== undefined, true);
+});
+
+test('an unknown outcome inside verification blocks like an unknown browser action', async () => {
+  let calls = 0;
+  const h = harness({ verify: () => ({ status: 'unresolved', facts: [], reason: 'Cancel call timed out', uncertain: true }),
+    callTool: async () => { calls++; return { content: [{ type: 'text', text: 'ok' }] }; } });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const finished = body(await h.recovery.call('dock_browser_recovery', { action: 'finish', operation_id: 'op-1', actions_performed: ['Clicked'] }));
+  assert.equal(finished.stopped.code, 'browser_unavailable');
+  assert.equal(h.stops.at(-1).uncertain, true);
+  assert.equal(h.recovery.refusesDock('dock_node_apply'), true);
+  assert.equal((await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' })).isError, true);
+  assert.equal(calls, 0);
+});
