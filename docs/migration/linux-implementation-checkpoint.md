@@ -1,5 +1,16 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-20 — v0.3.0 опубликован
+
+Release source: `992fd1c34ad41b541c045d67c552b36e86160141`, ветка `loginom` (PR #240: demo-022 + #185/#237).
+Новый annotated tag `v0.3.0`; существующие теги не менялись. Канал prod, `browserRecovery=true` на трёх ОС.
+CI39406706038 PASS на попытке2: попытка1 — macOS source checks зависли (EPERM в build-command, правка #242).
+Linux DEB offline non-root matrix5/5; static/native отчёты PASS.
+Все30 assets скачаны: 29 SHA256SUMS entries и все GitHub digests сверены; три manifests согласованы.
+Published2026-10-20T11:11:11Z, pre-release=true, latest=false, ID418302931; 30 URLs HTTP200.
+Installed/live приёмка: Linux CLI — сквады на mas3; macOS/Windows — живые тестировщики.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-20-v0.3.0-release.md).
+
 ## 2026-10-19 — Desktop и CLI v0.2.2 установлены
 
 Точные опубликованные DEB/CLI из `a0c3eb758bd5b2d492aa525815f0e9009b3d8835`:
