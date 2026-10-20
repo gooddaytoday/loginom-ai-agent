@@ -26,6 +26,7 @@ for(const tool of [full,userNodeTool(full)])test('node caption rule reaches '+(t
  const groups=full.inputSchema.properties.parameters.properties.groups;
  assert.ok(JSON.stringify(groups).includes('>'));assert.ok(JSON.stringify(groups).includes('>='));
  assert.ok(label.description.length<500);assert.ok(Buffer.byteLength(JSON.stringify(label))<2000);
+ assert.ok(Buffer.byteLength(JSON.stringify(tool.inputSchema))<46000);
  assert.deepEqual(label,full.inputSchema.properties.target.properties.label);
 });
 
