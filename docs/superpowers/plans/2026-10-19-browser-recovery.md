@@ -153,9 +153,9 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 
 ## Checkpoint — 20.10.2026, работа возобновлена
 
-- Статус: ACTIVE; план 5, Task 1 выполнена и принята. Следующий шаг — Desktop fixture compatibility из CI, затем отложенная подготовка Task 5 плана 3.
+- Статус: ACTIVE; план 5, Task 1 выполнена и принята. Desktop fixture follow-up принят; следующий шаг — отложенная подготовка Task 5 плана 3 по назначению владельца.
 - Рабочая ветка `recovery-build-flag`, worktree `/home/george/.codex/worktrees/browser-recovery/loginom-ai-agent`; исходная база `0afb4c483a`, коммит безопасной паузы `ba5ac875fc`.
-- Планы 1–2 выполнены; основные задачи плана 4 и план 3, Tasks 1–4 приняты. Для плана 4 открыт узкий CI follow-up Desktop fixture. Task reviews и итоговое source integration review планов 3–4 — Approved, обязательных замечаний нет.
+- Планы 1–2 выполнены; основные задачи плана 4 и план 3, Tasks 1–4 приняты. CI follow-up Desktop fixture принят scoped review: 4/4, connection suite 36/36 и typecheck PASS. Task reviews и итоговое source integration review планов 3–4 — Approved, обязательных замечаний нет.
 - Runtime: 4468 PASS / 14 SKIP / 0 FAIL, focused 133/133, timeout 4/4; настоящая Chromium-проба 1/1 и Host managed IPC 1/1 (16 assertions) PASS.
 - Agent: focused 107 PASS / 1 SKIP, полный suite 3842 PASS / 25 SKIP / 1 TODO / 0 FAIL в subshell umask 0022, typecheck PASS. Исходный mode failure при umask 0002 изолирован; ожидаемый/прежний диагностический шум не скрыт.
 - Host: typecheck PASS; полный охват 370 PASS / 7 SKIP двумя процессами, единая команда Bun ограничена loader EISDIR. Product 5/5, bundled skills 7/7 и Product typecheck PASS.
@@ -163,5 +163,5 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 - Harness после пилота не менялся. Владелец дал отложенную гипотезу: internal Import execute/read → Group/Save/cleanup → новый сеанс и публичный Dock Group. Перед запуском нужен минимальный план/review; блокер снят только после последнего шага, затем BR-S1/BR-S3. Подробности в плане 3 и smoke-отчёте.
 - План 5, Task 1: код `37b6ec072e`, independent review Approved; fake/dir → persisted boolean → count/report подтверждён. Focused 79/79, typecheck и full 766 PASS / 17 SKIP / 0 FAIL. xmllint установлен; временный inotify 131072 восстановлен до 65536, исходный FAIL сохранён.
 - План 5, Task 2 отложена до успешного native main path; установленные артефакты и модели ещё не приняты. Release-флаг выключен; merge и release требуют отдельной команды владельца.
-- Draft PR224 содержит опубликованный `0da6732785`; последующие коммиты пока локальны. CI: macOS Source checks FAIL — четыре Desktop fixture timeouts без run-released ACK и Bun loader EISDIR; исправление после текущей задачи. Новый статус push/PR test не получен из-за transport/TLS ошибок. Это не общий CI PASS.
+- Draft PR224 содержит опубликованный `0da6732785`; последующие коммиты пока локальны. CI: четыре Desktop fixture timeouts исправлены (`19714b4299`), Bun loader EISDIR остаётся отдельным наблюдением; нового общего CI PASS пока нет. Новый статус push/PR test не получен из-за transport/TLS ошибок. Это не общий CI PASS.
 - На границе возобновления все прежние subagents завершены, временный probe удалён. Приватные evidence и ignored SDD ledgers/reviews сохранены; основной пользовательский checkout и его три untracked документа не изменены.
