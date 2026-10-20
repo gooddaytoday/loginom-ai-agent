@@ -68,6 +68,8 @@ function signal(group: number, value: NodeJS.Signals) {
   try {
     process.kill(-group, value)
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error
+    // macOS reports EPERM instead of ESRCH when only zombies remain in the
+    // group. Throwing here would escape the exit handler and hang the build.
+    if (!["ESRCH", "EPERM"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error
   }
 }
