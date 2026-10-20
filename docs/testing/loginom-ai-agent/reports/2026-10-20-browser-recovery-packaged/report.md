@@ -1,11 +1,12 @@
-# Packaged browser recovery: CLI availability
+# Packaged browser recovery: CLI и Desktop availability
 
 Канонический installed flag1 CLI путь прошёл: current capability true,
 save_checkpoint, native Close/logout/noDiscard, ACK/exit0 и освобождение writer.
 Первая SaveAs/reopen попытка завершилась cleanup FAIL и сохранена отдельно.
 Три отрицательные CLI строки также PASS; контрольная установка штатно удалена.
 Task 1 принята независимым spec+quality review без обязательных замечаний.
-Desktop, модели и acceptance gate открыты.
+Desktop availability технически проверена ниже; независимый Task2 review ещё не завершён.
+Модели и acceptance gate открыты.
 
 ## Проверенная поставка
 
@@ -139,3 +140,50 @@ guard сохранены. Ручного удаления и новых runtime-
 не изменились. Итоговый независимый spec review compliant, quality Approved; обязательных
 замечаний нет. Root проверил raw evidence и разрешил границы review по прежним
 проверкам исходных Task2/S5, CI и natural-case IDs; их новый PASS не заявляется.
+
+## Desktop Task2: installed true, unpackaged false
+
+Оба DEB собраны из clean source `703ed55875a71ab0d1187325bdc81ffcc27e4c1e`:
+flag1/flag0 manifest boolean true/false; full static verifier — 4753 resources PASS
+каждый. Полные source archive совпали. Версия 0.2.1/prod/Linux x64/backend v1,
+Bun1.3.14/Node24.19.0/Electron42.3.3/Chromium1246.
+
+На исходно свободный product path штатно установлен flag1 DEB. Проверены dpkg,
+launcher/desktop Exec, installed ASAR equality и все runtime hashes. Installed
+non-root/sandbox current task `browserRecovery:true`; тот же flag1 build через
+development Electron — actual current `false`. В обеих строках публичная цепочка
+skill → new_draft → describe/save_checkpoint сохранила собственный UUID-пакет;
+Save SUCCEEDED, workflow_preserved:true/reopened:false/modified:false.
+
+Обычный quit подтвердил current native Close/logout/noDiscard/packages_after0,
+отдельно task ACK/exit0, app/Node exit0 и отсутствие 34/35 наблюдавшихся процессов.
+Desktop пишет `package-cleanup.json`/event `saved_package_cleanup`; это его штатная
+ветка single saved package, без private acceptance input. CLI basename отличается.
+Save не доказывает persisted-content/readback или goal: outcome goal not_verified,
+arrangement result_unconfirmed остаётся предупреждением.
+
+Первая попытка Playwright под Bun завершилась launch timeout 120s до connection,
+сессий и tools. Профиль/ошибка сохранены, 10 дочерних процессов завершены; capability
+и native cleanup по ней не заявляются. Одна новая попытка использовала существующую
+схему Bun oracle parent → pinned Node GUI driver и прошла. Production не менялся.
+Сохранены также initial missing TEST_NODE, отсутствующий Electron postinstall,
+отклонённый subtree source archive и ошибочный CLI-basename read-only probe.
+
+Desktop typecheck PASS; packaging tests 14 PASS/2 platform SKIP/0 FAIL; crash-logging
+после каждой сборки — 6 PASS. Flag0 только static control, не устанавливался.
+Flag1 остаётся установленным для Task3; uninstall ещё не выполнен, чужие profiles
+не удалялись. AppImage/другие ОС/модели/recovery gate не проверялись. Временные drivers
+удалены, все profiles/raw attempts сохранены. Независимый Task2 review — следующий шаг.
+Private evidence сохранён в `/tmp/loginom-desktop-recovery-task2-935el_n_`;
+`flag1`/`flag0` содержат manifests/static/source, `evidence` — команды/exit/logs,
+`installed-node`/`unpackaged` — разные profiles и полные public replies.
+
+| Row | Backend session | Runtime session / attempt |
+|---|---|---|
+| installed-node | `ses_ea6a1614fffep4EwAUTvtNdt20` | `5364f456-2603-43e2-944d-4c0f46878d4c` / `37f679db-b9c3-4fa1-96e9-99917b93be2e` |
+| unpackaged | `ses_ea69ea77cffeUk72mu7vhZKGB3` | `10adfb2e-1972-47f7-ac75-52c736bdc5a1` / `643309eb-044d-4a17-8bde-9dbee3dd0553` |
+
+Current `session.json` и `package-cleanup.json` находятся под соответствующим
+`<row>/profile/desktop/loginom/runtime/generations/1/chats/<SHA256 backend session>/attempts/<attempt>`.
+Transport receipts лежат в runtime root; `evidence/verified-summary.json` связывает
+их с текущими native/Save/OS фактами. Исторический `installed` Bun-timeout отделён.

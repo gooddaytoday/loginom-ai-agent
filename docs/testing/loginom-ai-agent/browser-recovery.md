@@ -146,3 +146,23 @@ Existing child.close вызывается один раз. `assertions:PASS` о�
 
 Отчёт фиксирует SHA исходников, SHA-256 resource manifest (с inventory файлов),
 PASS/FAIL по сценарию, ключевые очищенные выдержки и приватные evidence-пути.
+
+## Packaged availability: Desktop, 2026-10-20
+
+[Текущий packaged отчёт](reports/2026-10-20-browser-recovery-packaged/report.md)
+подтверждает installed flag1 `true` и unpackaged flag1 `false` в текущих task
+session.json. Два DEB flag1/flag0 имеют соответствующие manifests и full static PASS.
+Это availability; модели, persisted readback и browser recovery gate не закрыты.
+Task2 ожидает независимого review; исходные S1–S6 имеют собственные статусы выше.
+
+Для Electron driver использовать существующую схему `desktop-oracle-transport.ts`:
+Bun oracleProvider parent и pinned Node GUI child, private stdinJSON. Первый запуск
+Playwright внутри Bun получил launch timeout до task; его evidence сохраняется.
+Public canonical chain: skill → new_draft → describe package.save_checkpoint →
+один Save собственного UUID с conflict_policy fail → finish → обычный quit. Проверять полный
+Save advice, flat capability именно текущего task, backend chat hash и runtime ID.
+Desktop native receipt называется `package-cleanup.json`/`saved_package_cleanup`;
+CLI run использует `saved-package-cleanup.json`. Native Close/logout/noDiscard,
+task ACK/exit и OS absence подтверждать отдельно. Не заменять absent session на false.
+Установленный flag1 оставлен для Task3; после последнего необходимого запуска
+восстановить исходное отсутствие Desktop штатным remove без purge/user-profile cleanup.
