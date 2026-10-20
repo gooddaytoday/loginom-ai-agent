@@ -263,6 +263,12 @@ export async function createBridge(config, session, { browserTransport: managedB
           arguments: { code: makeRecoveryPageProbeCode() } }, undefined, { timeout: 15000 });
         return parseRecoveryPageProbe(response, binding);
       } });
+    // A Dock request may wait in the gate while a recovery action settles: recheck the lease inside it.
+    const dockGate = (name, operation) => browserGate(async () => {
+      if (recovery.refusesDock(name))
+        throw new Error('Browser recovery holds the page. Finish or stop dock_browser_recovery before further Dock actions.');
+      return operation();
+    });
     const server = new Server({ name: 'loginom-dock', version: session.metadata.client }, {
       capabilities: { tools: {} },
       instructions: 'To create, change or execute a scenario, first activate the bundled loginom-automation skill. Browser Loginom tools are available after activation. Help, diagnostics, and package reports do not require dock_prepare; use package-docs for local package reports. ' + (userProfile ? 'Call dock_prepare, then get the selected node parameter schema with dock_action_describe. Use dock_artifact_deliver for attachments and dock_node_apply for each complete node lifecycle. Keep issued identities and wait on the original operation_id. Follow next_step on failure; inspect uncertain effects before continuing. Save the package at the end. Low-level UI actions are unavailable in this profile.' : ['executor-preview', 'executor-replay'].includes(config.mode)
@@ -321,7 +327,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           session.metadata.skillPath = prepared.directory;
           let workspace = null;
           if (actionRuntime) {
-            workspace = await browserGate(async () => {
+            workspace = await dockGate(request.params.name, async () => {
               const state = await prepareWorkspaceSession({ metadata: session.metadata,
               request: preparationRequest, signal: extra.signal,
               assertAllowed() { extra.signal.throwIfAborted(); actionRuntime.assertPreparationAllowed(); },
@@ -398,7 +404,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             // Local lifecycle calls must remain available while another request is
             // awaiting browser work. The runtime owns exclusion through cleanup.
             const local=['dock_node_status','dock_node_wait','dock_node_cancel','dock_node_stop','dock_artifact_delivery_status'].includes(request.params.name);
-            return await (local?invoke():browserGate(invoke));
+            return await (local?invoke():dockGate(request.params.name,invoke));
           }
           if (request.params.name === 'dock_action_describe') {
             if(userProfile){
@@ -408,7 +414,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             const description=actionRuntime.describe(request.params.arguments ?? {});
             return { content: [{ type: 'text', text: JSON.stringify(userProfile?userActionInventory(description):description) }] };
           }
-          return await browserGate(async () => {
+          return await dockGate(request.params.name, async () => {
             extra.signal.throwIfAborted();
             const args = request.params.arguments ?? {};
             if(userProfile&&request.params.name==='dock_action_run'&&!['package.save_as','package.save_checkpoint'].includes(args.action_key))

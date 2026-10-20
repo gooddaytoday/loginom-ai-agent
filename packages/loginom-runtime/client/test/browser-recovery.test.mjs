@@ -280,3 +280,54 @@ test('a failed gesture requires an observation before the next gesture', async (
   assert.equal((await h.recovery.call('browser_click', { target: 'e1' })).isError, undefined);
   assert.equal(calls, 3);
 });
+
+test('after an unknown outcome and a failed journal no further gesture reaches the browser', async () => {
+  let calls = 0;
+  const h = harness({ callTool: async () => { calls++; throw Error('transport closed'); },
+    record: async event => { if (event.phase === 'browser_recovery_action') throw Error('disk full'); return event; } });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  await assert.rejects(h.recovery.call('browser_click', { target: 'e1' }), /disk full/);
+  const next = await h.recovery.call('browser_click', { target: 'e2' });
+  assert.equal(next.isError, true);
+  assert.match(next.content[0].text, /unknown outcome/);
+  assert.equal(calls, 1);
+});
+
+for (const first of ['isError', 'transport'])
+  test('a gesture queued behind a failed one (' + first + ') is rechecked inside the gate', async () => {
+    let release, calls = 0;
+    const blocked = new Promise(resolve => { release = resolve; });
+    const h = harness({ callTool: async () => {
+      calls++;
+      if (calls > 1) return { content: [{ type: 'text', text: 'second gesture ran' }] };
+      await blocked;
+      if (first === 'transport') throw Error('transport closed');
+      return { isError: true, content: [{ type: 'text', text: 'Timeout after click' }] };
+    } });
+    await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+    const a = h.recovery.call('browser_click', { target: 'e1' });
+    const b = h.recovery.call('browser_click', { target: 'e2' });
+    await new Promise(resolve => setImmediate(resolve));
+    release();
+    await a;
+    const queued = await b;
+    assert.equal(queued.isError, true, JSON.stringify(queued));
+    assert.equal(calls, 1);
+  });
+
+test('stopping keeps Dock blocked until the dispatched action settles', async () => {
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  const h = harness({ callTool: () => pending.then(() => ({ content: [{ type: 'text', text: 'done' }] })) });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const action = h.recovery.call('browser_click', { target: 'e1' });
+  await new Promise(resolve => setImmediate(resolve));
+  const stopping = h.recovery.call('dock_browser_recovery', { action: 'stop', operation_id: 'op-1', reason: 'cancelled' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.recovery.refusesDock('dock_action_run'), true);
+  assert.equal(h.recovery.unsettled(), true);
+  assert.equal((await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-2' })).isError, true);
+  release();
+  await Promise.all([action, stopping]);
+  assert.equal(h.recovery.refusesDock('dock_action_run'), false);
+});

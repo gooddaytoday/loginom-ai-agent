@@ -75,13 +75,13 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     },
     // Dock may not drive the page while the lease is held or verified.
     refusesDock(name) {
-      return (!!uncertain || ['handoff', 'browser', 'verify'].includes(attempt?.phase)) && !leaseReadOnlyTools.has(name);
+      return (!!uncertain || holding()) && !leaseReadOnlyTools.has(name);
     },
     active() {
-      return ['handoff', 'browser', 'verify'].includes(attempt?.phase);
+      return holding();
     },
     unsettled() {
-      return !!uncertain || ['handoff', 'browser', 'verify'].includes(attempt?.phase);
+      return !!uncertain || holding();
     },
     async call(name, args, extra) {
       if (!enabled) return refusal('Browser recovery is unavailable in this build.');
@@ -100,7 +100,7 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
 
   async function start(input, extra) {
     if (uncertain) return refusal('A browser recovery action has an unknown outcome; Dock stays blocked in this session.', { uncertain });
-    if (['handoff', 'browser', 'verify'].includes(attempt?.phase))
+    if (holding())
       return refusal(`Browser recovery for operation ${attempt.operation_id} is already in phase ${attempt.phase}.`, view());
     const basis = await Promise.resolve().then(() => executor.browserRecoveryBasis(input.operation_id)).catch(error => error);
     if (basis instanceof Error) return refusal(basis.message);
@@ -126,31 +126,32 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
   }
 
   async function browserCall(name, args, extra) {
-    if (attempt?.phase !== 'browser')
-      return refusal(`${name} is available only during the browser phase of dock_browser_recovery.`);
     if (!recoveryBrowserToolSet.has(name)) return refusal(`${name} is outside the browser recovery allowlist.`);
-    if (exhausted(attempt.budget)) return stopAttempt('budget_exhausted', 'The browser recovery budget for this step is exhausted.');
     if (Object.hasOwn(args, 'filename')) return refusal('Browser recovery does not write files; omit filename.');
-    if (attempt.observationRequired && !readOnlyBrowserTools.has(name))
-      return refusal('The last browser gesture failed after it may have taken effect. Observe the page with browser_snapshot '
-        + 'or browser_find before another gesture.');
+    const refused = admission(name, attempt);
+    if (refused) return refused;
+    if (exhausted(attempt.budget)) return stopAttempt('budget_exhausted', 'The browser recovery budget for this step is exhausted.');
     const current = attempt;
-    current.budget.calls++;
     const call = gate(async () => {
+      // A gesture queued behind another one is admitted only against the state that one left.
+      const late = admission(name, current) ?? (exhausted(current.budget) ? refusal('The browser recovery budget for this step is exhausted.') : null);
+      if (late) return { refused: late };
+      current.budget.calls++;
       const response = await browser.callTool({ name, arguments: args }, undefined, { signal: extra?.signal, timeout: 60_000 })
         .then(value => ({ value }), error => ({ error }));
       // Latch an unknown outcome before the page check, the journal or any early return can intervene.
       if (response.error) uncertain ??= { operation_id: current.operation_id, tool: name,
         reason: String(response.error.message).slice(0, 500) };
+      // A failed gesture may still have landed: the next gesture waits for an observation.
+      if (response.value) current.observationRequired = readOnlyBrowserTools.has(name)
+        ? current.observationRequired && response.value.isError === true : response.value.isError === true;
       // The page check runs even after a failed action: its effect may still have landed.
       const page = await Promise.resolve().then(probe).catch(error => ({ ok: false, reason: error.message }));
       return { ...response, page };
     });
     inflight = call;
     const outcome = await call.finally(() => { if (inflight === call) inflight = null; });
-    // A failed gesture may still have landed: the next gesture waits for an observation.
-    if (outcome.value) current.observationRequired = readOnlyBrowserTools.has(name)
-      ? current.observationRequired && outcome.value.isError === true : outcome.value.isError === true;
+    if (outcome.refused) return outcome.refused;
     await record({ phase: 'browser_recovery_action', attempt_id: current.id, operation_id: current.operation_id, tool: name,
       arguments_sha256: sha256(JSON.stringify(args)), is_error: outcome.error ? null : outcome.value?.isError === true,
       transport_error: outcome.error ? String(outcome.error.message) : null, page: outcome.page,
@@ -202,9 +203,10 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
 
   async function stopAttempt(code, reason, extra = {}) {
     const current = attempt;
-    current.phase = 'stopped';
-    // A dispatched action settles first: its outcome decides whether the page may return to Dock.
+    // Still holding: a dispatched action settles first and decides whether the page may return to Dock.
+    current.phase = 'stopping';
     if (inflight) await inflight.catch(() => undefined);
+    current.phase = 'stopped';
     // Safe completion only: the runtime may cancel its own unapplied draft; unknown effects stay locked.
     const cleanup = await Promise.resolve().then(() => executor.stopBrowserRecovery({ operationId: current.operation_id,
       step: current.step, reason: code, uncertain: !!uncertain })).catch(error => ({ state: 'retained', reason: error.message }));
@@ -215,6 +217,21 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     return reply({ ...view(), stopped: { code, reason, cleanup }, ...extra,
       instruction: 'Browser recovery stopped. Report what was done, what the runtime confirmed, what only you attested, '
         + 'whether the package was saved, and what remains unknown. Do not claim success for an unknown result.' });
+  }
+
+  function holding() {
+    return ['handoff', 'browser', 'verify', 'stopping'].includes(attempt?.phase);
+  }
+
+  // Shared admission for browser actions, checked before queueing and again inside the gate.
+  function admission(name, current) {
+    if (uncertain) return refusal('A browser recovery action has an unknown outcome; no further gesture is allowed.', { uncertain });
+    if (attempt !== current || current?.phase !== 'browser')
+      return refusal(`${name} is available only during the browser phase of dock_browser_recovery.`);
+    if (current.observationRequired && !readOnlyBrowserTools.has(name))
+      return refusal('The last browser gesture failed after it may have taken effect. Observe the page with browser_snapshot '
+        + 'or browser_find before another gesture.');
+    return null;
   }
 
   function view() {
