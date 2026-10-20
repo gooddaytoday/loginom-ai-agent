@@ -240,7 +240,7 @@ git commit -m "feat(agent): remind once during an active browser recovery"
 **Interfaces:**
 - Consumes: инструменты и поля ответов из общего контракта.
 
-- [ ] **Step 1: Заменить тупики в `browser.md`**
+- [x] **Step 1: Заменить тупики в `browser.md`**
 
 Абзац «Не проси пользователя закрывать мастер…» и фразу «Если `recovery_options` пуст и `user_action` нет, сообщи… и остановись» заменить: не просить пользователя закрывать мастер, диалог или исправлять сценарий; при пустых `recovery_options` следовать `next_step` ответа. Добавить раздел «Временный режим восстановления»:
 
@@ -267,16 +267,16 @@ Dock со свежими наблюдениями; continuable — выполн�
 
 Навык общий для всех сборок, поэтому сохранить одну фразу для сборки без режима: если Dock вернул `user_action` и нет `next_step` на `dock_browser_recovery`, действовать по `user_action`; если нет ни того ни другого — сообщить `operation_id`, фазу и причину.
 
-- [ ] **Step 2: Уточнить запрет обхода в `SKILL.md`**
+- [x] **Step 2: Уточнить запрет обхода в `SKILL.md`**
 
 К запрету Playwright и raw UI (строки 62–66) добавить: исключение — временный режим, который runtime открывает через `next_step` (ссылка на `references/browser.md`); внутри него `loginom_browser_*` из каталога — штатная работа.
 
-- [ ] **Step 3: Run checks**
+- [x] **Step 3: Run checks**
 
 Run: `cd packages/product && bun test`; `cd packages/agent && bun test test/cli/bundled-skills.test.ts`; `rg -n "dock_browser_recovery" packages/product/skills/loginom-automation`
 Expected: PASS; `rg` находит `references/browser.md` и `SKILL.md`.
 
-- [ ] **Step 4: Commit and checkpoint**
+- [x] **Step 4: Commit and checkpoint**
 
 ```bash
 git add packages/product/skills packages/agent/AGENTS.md
