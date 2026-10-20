@@ -1999,7 +1999,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       && operation.nodeApply.pending?.phase === 'read') return null;
     const step = nodeRecoveryStep(operation);
     if (!step) return null;
-    if (operation.nodeApplyDrivers.releasePendingPhases
+    if (step.kind === 'node' && operation.nodeApplyDrivers.releasePendingPhases
       && !operation.nodeApplyDrivers.releasePendingPhases.includes(step.phase)
       && typeof operation.nodeApplyDrivers.recoveryReleasePending !== 'function') return null;
     if (operation.releaseRefused) return { reason: 'NODE_RELEASE_REFUSED', step };
