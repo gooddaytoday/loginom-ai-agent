@@ -381,6 +381,7 @@ test.each(["setup-recovery", "permissions", "outcomes", "cancellation"])(
             : { isError: args.fail === true, content: [{ type: 'text', text: args.fail ? 'private host probe failed' : 'private host probe completed' }] } } });
         }
         if (message.operation === 'admit') process.send({ id: message.id, result: { files: [] } });
+        if (message.operation === 'run-released') process.send({ id: message.id, result: { released: true } });
         if (message.operation === 'close') process.send({ id: message.id, result: { closed: true } }, () => process.disconnect());
       });
     `,
