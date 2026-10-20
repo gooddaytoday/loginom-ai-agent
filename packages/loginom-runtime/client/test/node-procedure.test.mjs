@@ -186,6 +186,45 @@ test('an unexpected dialog fails immediately without a mutation', async () => {
   assert.ok(!f.events.includes('mutated'));
 });
 
+test('a blocker outside the selected root is inspected for the journal without authorizing a gesture', async () => {
+  for(const mode of ['detail','stale','transport','budget']) {
+    const records=[];let inspections=0,mutations=0,readinessCalls=0;
+    const operation={id:'blocked',action:{action_key:'node.apply',revision:'1'},deadline:10000,
+      checkpoint:{workflow_ref:{prefix:'MF;TF-1',tab_tid:'tab'},document_id:'doc'}};
+    if(mode==='budget')operation.deadline=5000;
+    const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:operation.checkpoint.workflow_ref,
+      dom_epoch:{document:'doc',revision:1},scan:{complete:true},wizard:{status:'absent'},
+      observation_root:{ref:'ui-node'},ui:{masks:[],dialogs:[{ref:'ui-blocker',text:'[outside selected root]',identity:{anchor_tid:null,path:[1,7]}}],
+        elements:[],truncated:{dialogs:false,masks:false}}};
+    const channel=createNodeProcedure({operation,now:()=>1,targetOrigin:state.origin,targetBuild:'7.4.2',
+      record:async e=>{records.push(structuredClone(e));return e},wrapMutation:code=>({code}),
+      execute:async code=>{
+        if(typeof code!=='string'){mutations++;throw Error('Unexpected mutation')}
+        if(code.includes('"root_ref":"ui-blocker"')) {
+          inspections++;
+          if(mode==='transport')throw Error('Disconnected');
+          if(mode==='stale')return {status:'NOT_APPLIED',effect_possible:false,error:{code:'UI_ROOT_STALE'}};
+          const detail=structuredClone(state);detail.observation_root.ref='ui-blocker';
+          detail.ui.dialogs[0].text='Connection was interrupted';
+          detail.ui.elements=[{tid:'msgbox;cnt;cnt;txt',label:'Connection was interrupted'},
+            {tid:'msgbox;tlb;ok',ref:'ui-ok',allowed_actions:['click']}];
+          return {status:'SUCCEEDED',output:detail};
+        }
+        return {status:'SUCCEEDED',output:structuredClone(state)};
+      }});
+    await assert.rejects(channel.observe({condition:'prepared port visualizer cards',ready:()=>{readinessCalls++;return true}}),/blocked by a mask or dialog/);
+    assert.equal(inspections,mode==='budget'?0:1,mode);assert.equal(readinessCalls,0,mode);
+    assert.equal(records.find(r=>r.phase==='node_observation_context_refused').outcome.output.ui.dialogs[0].text,'[outside selected root]');
+    if(mode==='detail') {
+      const detail=records.find(r=>r.phase==='node_blocking_dialog_observed');
+      assert.equal(detail.outcome.output.ui.dialogs[0].text,'Connection was interrupted');
+      assert.equal(detail.outcome.output.ui.elements[0].tid,'msgbox;cnt;cnt;txt');
+    } else if(mode!=='budget')assert.ok(records.some(r=>r.phase===(mode==='stale'?'node_blocking_dialog_observed':'node_blocking_dialog_observation_failed')));
+    await assert.rejects(channel.act({verb:'click',ref:'ui-ok'}),/fresh internal observation/);
+    assert.equal(mutations,0,mode);
+  }
+});
+
 test('target incarnation confirmation waits for the same identity twice', async () => {
   const f = fixture(); let reads = 0;
   await f.channel.observe({ condition: 'saved node incarnation', ready: () => true,
