@@ -106,7 +106,7 @@ trial-dosage-outcomes
 
 ## Серия и наблюдение
 
-- [ ] Единый штатный `src/run.ts --tasks tasks/analytic --only <10 IDs через запятую>
+- [x] Единый штатный `src/run.ts --tasks tasks/analytic --only <10 IDs через запятую>
   --parallel 2 --repeat 1 --timeout-ms 1800000 --label analytic10-branch-61-medium`.
   Явные абсолютные binary/config/budget/results paths, controlled controller env,
   без случайного dotenv. Только binary из новой private installation.
@@ -130,6 +130,22 @@ trial-dosage-outcomes
   SIGINT, если harness ещё не abort. CPU>95 только информация. Возраст события
   не доказывает hang; соблюдать timeout. Resource checks автоматические в конце,
   поэтому во время run пробы читает исполнитель.
+
+## Остановка первой серии и обнаруженный дефект
+
+- [x] Сохранить серию Sp38yS без изменения receipts:2 interrupted,8 unassigned,
+  provider socket retry вызвал общий abort; process cleanup confirmed/unknown=[],
+  native cleanup BLOCKED/CLEANUP_OR_OPERATION_UNCONFIRMED, recovery и карантин обоих слотов.
+- [x] Проверить после серии verify:exit2/LEASE_FILE_PRIVATE. Независимое ревью подтвердило
+  несовместимость Bun.write(mode0664) с readLeaseReceipt(mode0600); старые receipts не менять.
+- [x] По TDD проверить настоящие writers через startup readers и заменить запись
+  management/attempt/prepared cleanup на существующий writeLeaseReceipt. Без изменения
+  критериев retry/recovery и без новой процедуры восстановления. Два RED→GREEN;
+ 138pass/2proc-denialskip/0fail,593assertions; typecheck и независимое review pass.
+- [ ] Сохранить blocker и отчёт о частичной серии. Prepared startup не acknowledges recovery;
+  его восстановление требует отдельного решения; новая полная серия после writer fix
+  выполняется на ещё одном свежем своём стенде в том же окне07:28:25Z–15:28:25Z.
+  Независимое ревью подтвердило соответствие авторизации. Техническая приёмка пока не пройдена.
 
 ## Приёмка и завершение
 
@@ -156,12 +172,13 @@ trial-dosage-outcomes
 
 ## Checkpoint
 
-1. Новый стенд3463cae565ca/d84925713c74 создан по разрешению владельца; старый incident1065633c retained.
-2. Private root выше; final CLI8f1808e9804e built/installed/verified, sourceTree15b69fc3….
-3. Prepare29dc2d41, final verify2b8641b9 ready/code0; cold browser verified/cleanup confirmed обоих слотов.
-4. Публичный CLI подтвердил gpt-6.1-sol/medium для обоих слотов; catalogue59bcb39e….
-5. Headless routing уточнён: только binary loginom, после args; models/providers selector сохранён.
-6. RED→GREEN;104pass/2proc-denialskip/0fail,typecheck и независимое review pass.
-7. Четыре live A/B:4pass/0fail;20.51GiB RAM,4reservations released,2profiles clean. Следующий шаг — run.
-8. Source auth сохранён; inputs/rubric hashes прежние. Model window ещё не началось.
-9. Native cancellation2s tests:2 pre-existing failures reproduced on original code.
+1. CLI8f1808e9804e installed/verified; harnessa1986c18fd, sourceDirty=true(сохранённые чужие документы).
+2. Новый стенд3463cae565ca/d84925713c74; старый incident1065633c не менялся.
+3. Final verify2b8641b9/cold browser обоих слотов pass;4liveA/B pass, pre-dispatch20.54GiB RAM.
+4. Серия20261020-072725-a1986c18fd-dirty-Sp38yS:2 interrupted/8 unassigned/0 judge calls.
+5. Model window07:28:25Z–15:28:25Z; B network socket retry вызвал abort обоих агентов.
+6. Process cleanup2confirmed/unknown=[]; native cleanup BLOCKED/unconfirmed, recovery и карантин2слотов.
+7. Post verify exit2/LEASE_FILE_PRIVATE:cleanup receipts0664, private reader требует0600.
+8. Writer fix:2RED→GREEN;138pass/2skip/0fail, typecheck/review pass; следующий шаг rebuild и свежий стенд.
+9. Старые receipts не менять; штатного recovery acknowledgement в prepared startup нет.
+10. Source auth/inputs/rubric сохранены; native cancellation2s:2 baseline failures вне этой задачи.

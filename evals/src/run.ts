@@ -15,6 +15,7 @@ import type { ProcessCleanup } from "./process-supervisor"
 import { acquireRunHarnessLease } from "./node-eval-ops"
 import { SandboxFailure } from "./sandbox"
 import { reserveRunDirectory } from "./run-directory"
+import { writeLeaseReceipt } from "./lease"
 import { aggregate, aggregateLimits, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
 export async function main(argv: string[], env: Record<string, string | undefined> = process.env) {
@@ -381,9 +382,9 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
         : null),
   }
   Object.assign(base, result)
-  await Bun.write(path.join(outDir, "cleanup.json"), JSON.stringify({ processes: run.processCleanup,
+  await writeLeaseReceipt(path.join(outDir, "cleanup.json"), { processes: run.processCleanup,
     ...(input.slot ? { slotId: input.slot.lease.slot.id, serverEpoch: input.slot.lease.identity.serverEpoch,
-      serverSessions: "unknown", storageDeletionAllowed: false, nextAdmissionAllowed: false } : {}) }, null, 2))
+      serverSessions: "unknown", storageDeletionAllowed: false, nextAdmissionAllowed: false } : {}) })
   await Bun.write(path.join(outDir, "result.json"), JSON.stringify(result, null, 2))
   return { result, stop: stop || run.processCleanup.status === "failed" || Boolean(judgeCleanupFailed) }
 }
