@@ -4,7 +4,8 @@
 save_checkpoint, native Close/logout/noDiscard, ACK/exit0 и освобождение writer.
 Первая SaveAs/reopen попытка завершилась cleanup FAIL и сохранена отдельно.
 Три отрицательные CLI строки также PASS; контрольная установка штатно удалена.
-Task 1 ожидает независимого review; Desktop, модели и acceptance gate открыты.
+Task 1 принята независимым spec+quality review без обязательных замечаний.
+Desktop, модели и acceptance gate открыты.
 
 ## Проверенная поставка
 
@@ -135,4 +136,6 @@ launcher, установленный payload и current receipt отсутств
 три control profile и raw evidence сохранены. Флаговая установка и исходный failed
 guard сохранены. Ручного удаления и новых runtime-запусков не было.
 Техническая очистка контрольной установки завершена; результаты availability
-не изменились. Итоговый независимый review выполняется отдельно.
+не изменились. Итоговый независимый spec review compliant, quality Approved; обязательных
+замечаний нет. Root проверил raw evidence и разрешил границы review по прежним
+проверкам исходных Task2/S5, CI и natural-case IDs; их новый PASS не заявляется.

@@ -8,8 +8,8 @@ CLIexit0/writer release и отсутствие собственных проц�
 Flag1/flag0 archive/roundtrip/install PASS; контрольная установка штатно удалена,
 flag1 сохранена для моделей. Пользовательская установка/profiles не заменялись.
 Первый SaveAs/reopen cleanup FAIL/guard сохранён отдельно; production не менялся.
-Далее независимый task review CLI, затем Desktop. Desktop/models и полная матрица
-не приняты; merge/release не выполнялись.
+CLI Task1 принята независимым spec+quality review без обязательных замечаний.
+Далее Desktop. Desktop/models и полная матрица не приняты; merge/release не выполнялись.
 [Фактические identities и ограничения](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md).
 
 ## 2026-10-16 — v0.2.1 опубликован
