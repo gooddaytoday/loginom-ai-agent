@@ -540,9 +540,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       for(const e of nativeGraphElements){charge();const tid=getTid(e);if(!scoped.has(tid))scoped.set(tid,[]);scoped.get(tid).push(e);}
       const unique=e=>e&&graphContainer.contains(e)&&scoped.get(getTid(e))?.length===1&&scoped.get(getTid(e))[0]===e;
       const bindings=new Map();
-      const retain=(element,objects,icon)=>{
+      const retain=(element,objects,icon,nodeId)=>{
         if(!unique(element))return;
-        const receipt={status:icon==='bg-vendor-icon-javascript'?'script':'non_script',identity:objects.map(o=>refOf(o,false)),icon};
+        const receipt={status:icon==='bg-vendor-icon-javascript'?'script':'non_script',identity:objects.map(o=>refOf(o,false)),icon,
+          ...(typeof nodeId==='string'&&/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(nodeId)?{node_id:nodeId}:{})};
         if(bindings.has(element))nativeGraphControls.set(element,{status:'unconfirmed'});
         else {bindings.set(element,true);nativeGraphControls.set(element,receipt);}
       };
@@ -557,7 +558,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           if(!unique(shape)||!tid?.startsWith(graphPrefix))continue;
           const identity=[model,diagram,graph,view,node,cell];
           const data=value(node,'data');if(data&&typeof data==='object')identity.push(data);
-          retain(shape,identity,icon);
+          retain(shape,identity,icon,guid);
           const label=value(node,'FLabel'),labelCell=value(label,'FCell');
           if(value(label,'parent')===node&&labelCell&&value(labelCell,'parent')===cell){
             const text=value(value(getState.call(view,labelCell),'text'),'node');
@@ -2971,7 +2972,11 @@ function readRenderedInputMapping(observation) {
     scanStage='data_views';
     const nodes = labels.slice(0, 200).map(label => {
       const nodeTid = graphPrefix + label, matches=graphElements.filter(e=>getTid(e)===nodeTid),node=matches.length===1?matches[0]:null;
+      // A saved node's GUID comes only from the existing native/DOM binding,
+      // never from its editable label or an arbitrary DOM attribute.
+      const native=node&&nativeGraphControl(node);
       return { node_ref: { kind: 'node', node_label: label, workflow_ref: workflow }, bounding_box: node ? boxOf(node) : null,
+        ...(native?.node_id?{node_id:native.node_id}:{}),
         ports: graphElements.filter(element => (getTid(element) ?? '').startsWith(nodeTid + ';') && /;(?:Input|Output)_[^;]+$/.test(getTid(element)))
           .slice(0, 100).map(element => ({ tid: getTid(element), bounding_box: boxOf(element), ui_ref: refOf(element) })) };
     });
