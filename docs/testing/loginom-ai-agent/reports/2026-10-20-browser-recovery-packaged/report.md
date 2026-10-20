@@ -1,6 +1,6 @@
 # Packaged browser recovery: первый installed CLI
 
-Проверка 2026-10-20 остановлена после первой флаговой Linux CLI строки.
+Первая попытка 2026-10-20 остановлена после флаговой Linux CLI строки с SaveAs.
 Capability и Save подтверждены; обычная очистка пакета отказала.
 Полная Task 1 и acceptance gate остаются открытыми.
 
@@ -58,3 +58,32 @@ Scoped independent review GO для одной новой попытки в fres
 с новым UUID и тем же verified artifact; production inputs не менялись.
 Первый SaveAs FAIL/guard/evidence сохраняются; новый путь не чинит SaveAs и
 не будет заявлен как reopen или проверка persisted content.
+
+
+## Вторая попытка: канонический Save, полный lifecycle PASS
+
+После scoped independent review выполнена одна новая попытка с
+`package.save_checkpoint` на той же проверенной установленной сборке. Изменения
+после её source SHA ограничены документацией; повторная проверка installed
+manifest и launcher прошла. Использованы новые HOME/XDG/profile/workspace и
+UUID-пакет, `PURE=1`, без `CLI_BUNDLE`. Первый профиль и его guard сохранены.
+
+| Проверка | Наблюдение второй попытки |
+|---|---|
+| Public путь | Setup → skill → prepare new_draft → describe save_checkpoint → save_checkpoint → finish |
+| Capability / prepare | Текущая task `session.json.browserRecovery:true`, привязка к CLI session подтверждена; `prepared:true / READY` |
+| Save | `SUCCEEDED`, `reopened:false`, `workflow_preserved:true`, `save_completed:true`, `persisted_content_verified:false` |
+| Same open workflow | После Save подтверждены тот же tab/prefix, точный путь и пустой граф; `modified:false` |
+| Native cleanup | `SUCCEEDED`, `package_closed:true`, `logged_out:true`, `unsaved_changes_discarded:false`, `packages_after:0`; привязан к текущему `availability-save` |
+| Task runtime transport | `closed_ack:true`, exit0/no signal, request_error:null |
+| CLI/profile | Exit0/no signal, stderr пуст, новый `.writer` освобождён |
+| OS | Все15 наблюдавшихся собственных PID отсутствуют; оставшихся процессов нового профиля нет |
+
+Успех подтверждает канонический Save без переоткрытия и обычный native lifecycle.
+`persisted_content_verified:false` сохранён как ограничение; arrangement warning
+`result_unconfirmed` не выдан за успех. Дополнительного Save не потребовалось.
+Этот результат не исправляет и не отменяет отдельный отказ SaveAs первой попытки.
+Production и cleanup policy не менялись. Одноразовый driver удалён, обе private
+попытки и установленный payload сохранены. Выполнение остановлено перед
+отрицательными controls; Desktop, модельные кейсы и recovery quality остаются
+открытыми.
