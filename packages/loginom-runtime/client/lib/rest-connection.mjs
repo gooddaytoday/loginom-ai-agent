@@ -178,7 +178,29 @@ export async function restConnectionCapability(page,t){
   });
   const beforeGraph=await page.evaluate(b=>{const m=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;if(m?.constructor.name!=='ModelForm')throw Error('Original graph is unavailable');return m.FDiagram.FNodes.FCollection.map(n=>({id:n.FGuid,y:n.FCell.geometry.y}));},owner);
   need(beforeGraph.length<50,'graph exceeds stage-1 bound');
-  const target=await find(graphTid).evaluate((e,y)=>{const m=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController,g=m.FDiagram.FmxGraph,r=e.getBoundingClientRect();const x=r.x+128*g.view.scale+g.view.translate.x*g.view.scale-e.scrollLeft;const py=r.y+y*g.view.scale+g.view.translate.y*g.view.scale-e.scrollTop;const hit=document.elementFromPoint(x,py);if(x<r.x||x>=r.right||py<r.y||py>=r.bottom||!hit||!(e===hit||e.contains(hit)))throw Error('Connection placement is outside visible graph');return{x,y:py};},Math.max(64,...beforeGraph.map(n=>n.y))+150);
+  const target=await find(graphTid).evaluate((e,y)=>{
+   const m=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController,g=m.FDiagram.FmxGraph,r=e.getBoundingClientRect();
+   if(g.container!==e||!Number.isFinite(g.view.scale)||g.view.scale<=0||![g.view.translate.x,g.view.translate.y,e.scrollLeft,e.scrollTop].every(Number.isFinite))throw Error('Native canvas transform unavailable');
+   const occupied=[...e.querySelectorAll('[data-tid*=";Graph;"]')].map(n=>n.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
+   const project=(x,y)=>({x:r.x+(x+g.view.translate.x)*g.view.scale-e.scrollLeft,y:r.y+(y+g.view.translate.y)*g.view.scale-e.scrollTop});
+   const free=p=>{
+    if(p.x<Math.max(0,r.x)+72||p.x>=Math.min(r.right,innerWidth)-96||p.y<Math.max(0,r.y)+56||p.y>=Math.min(r.bottom,innerHeight)-72)return false;
+    const hit=document.elementFromPoint(p.x,p.y);
+    return !!hit&&(hit===e||e.contains(hit))&&!occupied.some(r=>p.x>r.left-72&&p.x<r.right+96&&p.y>r.top-56&&p.y<r.bottom+72);
+   };
+   // The preferred row below all nodes can be outside a reopened/scrolled
+   // graph. Find free visible space before the sole drag, without navigation
+   // or replaying connection creation when the graph grows.
+   if(y<=10000&&free(project(128,y)))return project(128,y);
+   for(let py=Math.max(0,r.y)+80;py<Math.min(r.bottom,innerHeight)-80;py+=128)
+    for(let px=Math.max(0,r.x)+80;px<Math.min(r.right,innerWidth)-96;px+=160){
+     const x=Math.round(((px-r.x+e.scrollLeft)/g.view.scale-g.view.translate.x)/8)*8;
+     const y=Math.round(((py-r.y+e.scrollTop)/g.view.scale-g.view.translate.y)/8)*8;
+     if(x<64||y<64||x>10000||y>10000)continue;
+     const p=project(x,y);if(free(p))return p;
+    }
+   throw Error('REST connection: no free visible connection position');
+  },Math.max(64,...beforeGraph.map(n=>n.y))+150);
   const source=await wait('reachable connection palette item',async()=>{try{return await point(find(item));}catch{return null;}});await guard();effect=true;await page.mouse.move(source.x,source.y);await page.mouse.down();
   try{await page.mouse.move(target.x,target.y,{steps:12});}finally{await page.mouse.up();}
   const reference=await wait('connection graph reference',()=>page.evaluate(before=>{const m=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;const added=m.FDiagram.FNodes.FCollection.filter(n=>!before.some(b=>b.id===n.FGuid));if(added.length>1)throw Error('Unexpected graph additions');const n=added[0];if(!n)return null;const ports=(n.FPorts??[]).flatMap(p=>p.FCollection??[]);if(ports.length!==1)throw Error('New node is not a connection reference');const tid=m.FDiagram.FmxGraph.view.getState(ports[0].FCell)?.shape?.node?.getAttribute('data-tid');if(!tid)return null;if(!tid.endsWith(';Output_Connection-0'))throw Error('New node is not a connection reference');return {node_id:n.FGuid};},beforeGraph));
