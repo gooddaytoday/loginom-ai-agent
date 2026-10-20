@@ -10,6 +10,7 @@ import {configureTextExport} from './text-export-procedure.mjs';
 import {textExportParametersSchema} from './node-api.mjs';
 import {readNativeExportFile} from './text-export-output.mjs';
 import {exportContinuationSurface,verifyExportContinuation} from './text-export-continuation.mjs';
+import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);},one=xs=>{need(xs.length===1,'Unique export control required');return xs[0];};
 const verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
 export function textExportReadback({node,phases}){
@@ -120,6 +121,15 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
     const output=await readNativeExportFile({...options,artifactStore,targetOrigin,targetBuild,storageDirectories,storageContinuation,
      rememberStorageContinuation:value=>{storageContinuation=structuredClone(value);}},ctx,configuration,execution);
     return verified({effect_possible:true,status:'complete',ports:[],execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,file_artifacts:[output]});},
+   releasePendingPhases:['input_mapping','open','configure','output_mapping','finish','execute'],
+   async releasePending(state,{signal:releaseSignal}={}){
+    need(['input_mapping','open','configure','output_mapping','finish','execute'].includes(state.pending?.phase),
+     'Only a stopped text export phase before file reading can be released here');
+    releaseSignal?.throwIfAborted();
+    enter({signal:releaseSignal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
+     workflow_ref:state.request.workflow_ref,node:state.node});
+    return releasePendingNode({operation,channel,readReceipt:options.readReceipt});
+   },
    // Browser recovery T4: after the model cleared what blocked the download, the
    // runtime repeats only the idempotent file read of the same completed export.
    async recoveryReadExport(state,{signal:recoverySignal}={}){
