@@ -24,13 +24,15 @@ beforeAll(async () => {
 })
 afterAll(async () => {
   try {
-    await Promise.all(keychainRoots.map(async (root) => {
+    const results = await Promise.allSettled(keychainRoots.map(async (root) => {
       const child = Bun.spawn([
         "/usr/bin/security", "delete-generic-password", "-s", "com.loginom.aiagent.cli.profile-key.v1",
         "-a", createHash("sha256").update(await realpath(root)).digest("hex"),
       ], { stdout: "ignore", stderr: "ignore" })
       expect([0, 44]).toContain(await child.exited)
     }))
+    const failures = results.flatMap((result) => result.status === "rejected" ? [result.reason] : [])
+    if (failures.length) throw new AggregateError(failures, "LOGINOM_KEYCHAIN_CLEANUP_FAILED")
   } finally {
     await rm(fixture.directory, { recursive: true, force: true })
   }
