@@ -45,6 +45,20 @@ support-by-priority
 trial-dosage-outcomes
 ```
 
+## Поправка владельца по ресурсам, серия4
+
+- [x] Во время g03U7Q владелец разрешил использовать RAM/CPU хоста до99.9%.
+  RAM usage=100×(1−MemAvailable/MemTotal);новый minimum=ceil(MemTotal×0.001).
+  На этом хосте MemTotal38.473GiB,minimum39.397MiB вместо8GiB.
+  Прежний CPUmaximum100% сохраняется:99.9% уже разрешены и предел не ужесточается.
+- [x] Независимое review:No findings. Private amendment с фактическим временем,
+  исходнымbudgetSHA и новымиRAMbounds;manifest содержит ссылку/sha.
+  Это разрешённая поправка посреди серии,не предварительно замороженный порог.
+  Raw budget/probes/acceptance не менять;отдельно показывать owner-amended оценку.
+- [x] Текущую серию продолжать;падениеRAMниже8GiB само по себе больше не стоп.
+  Container/FS/OOM/coverage/cadence/identity/cleanup требования и deadline прежние.
+  Историческая остановка серии3 и её незавершённая очередь сохраняются как факты.
+
 ## Подготовка и CLI
 
 - [x] Сохранить план отдельным коммитом; private backup чужих изменений и baseline.
@@ -225,8 +239,9 @@ trial-dosage-outcomes
 - [x] Строгий coldbrowser/modelmedium a/b:ready/verified/cleanupconfirmed.
 - [x] Judge version/login без модели exit0/units completed/home released.
 - [x] Четыре liveA/B:4pass/0fail;2profilesclean/4reservationsreleased,auth/pins unchanged.
-- [ ] RAM≥8GiB непосредственно перед dispatch и новая полнаясерия4.
-- [ ] Та же полная10 в новой серии4;исходныйdeadline15:28:25Z,наблюдение/приёмка прежние.
+- [x] Непосредственно перед dispatch RAM16.97GiB,FS2658GiB/241M inode;binary/task pins unchanged.
+- [x] Та же полная10 запущена:20261020-093030-959fb6050f-dirty-g03U7Q,
+  первые2dispatch09:31:38Z;исходныйdeadline15:28:25Z,наблюдение/приёмка прежние.
 
 ## Приёмка и завершение
 
@@ -253,7 +268,7 @@ trial-dosage-outcomes
 
 ## Checkpoint
 
-1. HEAD79b2753d4f;CLI b5ad7c602ea1 installed/verified/hashunchanged;measuredcode не менялся после watcherbecff.
+1. Harness959fb6050f;CLI b5ad7c602ea1 installed/verified/hashunchanged;measuredcode не менялся после watcherbecff.
 2. Старые acceptance/Sp38yS/root2standretained не менять;root1w6kidhm4/eval_parallel_blockers.md.
 3. Серия3gMHr5j root3k9rcj844 завершена09:17:42Z/exit1:4attempts/6unassigned,3cleanupconfirmed/basketrecoveryfailed.
 4. articles100/oraclePASS,abc0/noartifact;basket/budgetinterrupted одним SIGINTиз-заRAM7.65GiB<8(3пробы).
@@ -261,5 +276,5 @@ trial-dosage-outcomes
 6. Judgeunitterminated/home released;postverifyexit2/незавершённыйprofile:старыйстенд/receipts/recovery сохранены.
 7. Root4 /home/kiselev/storage/tmp/analytic10-branch-r4-20261020-bgrox9gn;новаяпара551c2efca21b/5fcac22c5ef4:52889.
 8. Preparee04729d6/verifye811dfc2 ready,coldbrowser/model a/b,judge login/version,4liveA/Bpass.
-9. Finalgate2profilesclean/4leasesreleased;новыеlocalOAuthcopies/pins/budget25bounds. Следующий шагRAMиdispatchfull10.
-10. Modelwindow07:28:25Z–15:28:25Z;выборка/seed/authsource/inputs/rubricпрежние;seriesне склеивать/foreignсохранить.
+9. g03U7Q активен:2dispatch09:31:38Z/8queued;RAMпередrun16.97GiB;наблюдение30–60sдо завершения.
+10. Modelwindowдо15:28:25Z;owneramendmentRAM99.9%(remaining≥39.397MiB),CPU100сохранён;rawbudgetне менять.
