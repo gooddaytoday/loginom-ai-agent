@@ -194,9 +194,32 @@ trial-dosage-outcomes
   правильные URL/users,model medium и cleanup confirmed.
 - [x] Четыре liveA/B нового runtime:4pass/0fail;judge version/login exit0,units completed.
   Final gate:2profiles clean/4reservations released; память повторить непосредственно перед dispatch.
-- [ ] Новая полная та же десятка в отдельном private root3/results,
+- [x] Новая полная та же десятка запущена:20261020-085726-0b749879a1-dirty-gMHr5j;
+  отдельный private root3/results,первые dispatch08:58:32Z,два active/8queued.
+  Предварительно RAM16.98GiB,FS2659GiB/241M inode;
   тот же deadline15:28:25Z; gates и live наблюдение прежние.
   Повтор нужен для технической проверки,задача budget с нулём не исключается.
+
+- [x] Root3 ранняя контрольная точка:оба первых authenticated/READY под своими users,
+  фактическая provider coverage complete;Aexit1/no artifact/cleanup confirmed,Bexit0→judge.
+  Качество первого результата не заменяет технические проверки.
+
+## Остановка серии3 и полная серия4
+
+- [x] gMHr5j сохранена:4attempts/6unassigned;abc0/noartifact,articles100/oraclePASS,
+  basket/budget interrupted одним SIGINT после нарушения RAM;3cleanup confirmed,
+  basket recovery запрещает archive/admission при processproof confirmed/unknown[].
+- [x] Resources:1121samples/0missed,maxgap1.39s;RAM7.65GiB<8 в3пробах09:16:00–02Z.
+  CPU99.92% разрешён;OOM/license/provider limit нет. Source spike не установлен;
+  отдельная проба observer maxRSS163MiB не объясняет падение на несколькоGiB.
+- [x] Штатный verify после серии exit2:профиль имеет незавершённое состояние.
+  Стенд/receipts/recovery сохраняются без manual repair;judge released.
+- [x] Независимое review продолжения No findings:RAM≥8GiB непосредственно перед
+  dispatch и прежние gates достаточны;не вводить новые критерии/collector/исключения.
+- [ ] Новый свой стенд/2local auth copies,prepare/verify/coldbrowser/modelmedium,
+  judge login/version и4liveA/B;переиспользовать CLIb5ad7c602ea1 без rebuild:
+  измеряемый код не менялся. Новые identity/budget/pins;старые данные не менять.
+- [ ] Та же полная10 в новой серии4;исходныйdeadline15:28:25Z,наблюдение/приёмка прежние.
 
 ## Приёмка и завершение
 
@@ -223,13 +246,13 @@ trial-dosage-outcomes
 
 ## Checkpoint
 
-1. HEADb5ad7c602e;watcher fixbecff0a541 RED→GREEN,77pass/0fail/374assertions,typecheck/review pass.
-2. CLIb5ad7c602ea1 installed/candidate verified,tree5bb3938896a1…,sourceDirty=true;foreign changes сохранены.
-3. Старые acceptance1065633c/Sp38yS не меняются;root1w6kidhm4/eval_parallel_blockers.md.
-4. Серияu6JJ0p:5attempts/5cleanup confirmed;2по100/oraclePASS,basket judge64/oraclePASS,budget0,categoryinterrupted.
-5. Серия2resources incomplete:2missed/maxgap2.13s;измеренные bounds/OOM pass. Данные серий не склеиваются.
-6. Штатный post verify1eca1c6b подтвердил reuse парыae288d3753ad/ebe9872b15e0 без manual repair.
-7. Root3 /home/kiselev/storage/tmp/analytic10-branch-r3-20261020-k9rcj844;new results,existingroot2stand/config.
-8. Новый CLI verify5d07638b,coldbrowser/modelsa/b,judge version/login,4liveA/B pass;2profilesclean/4leasesreleased.
-9. Следующий шаг:RAM≥8GiB непосредственно перед dispatch,обновить pins;полная10,live monitoring30–60s.
-10. Model window07:28:25Z–15:28:25Z;source auth unchanged/local101h,выборка/seed/inputs/rubric прежние.
+1. Harness0b749879a1;CLI b5ad7c602ea1 installed/verified;после watcherbecff измеряемый код не менялся.
+2. Старые acceptance1065633c/Sp38yS/root2stand теперь retained;manual repair/удаление запрещены.
+3. gMHr5j root3k9rcj844 завершена09:17:42Z/exit1:4attempts/6unassigned,3cleanupconfirmed/basketrecoveryfailed.
+4. articles100/oraclePASS,abc0/noartifact;basket/budgetinterrupted после одного SIGINTиз-заRAM7.65GiB<8.
+5. Resources1121/0missed/max1.39s;CPU99.92разрешён,новыхOOM/licence/providerlimitнет;budgetfailed.
+6. Judgearticles unitterminated/MainPID0;home released;провайдеры первых2complete,aggregateincompleteиз-заinterrupt.
+7. Postverifyexit2/незавершённыйprofile;root2standиreceiptsне менять. Observer163MiB,источникmemoryburstне установлен.
+8. Root4 /home/kiselev/storage/tmp/analytic10-branch-r4-20261020-bgrox9gn;новыйownstand,прежнийinstalledCLIroot3,modelwindow07:28:25Z–15:28:25Z.
+9. Review continuation No findings:штатныеgates+RAM≥8GiB;следующийшагpaircreate/initialize/prepare/verify/cold/A-B.
+10. Sourceauth/выборка/seed/inputs/rubric прежние;результаты не объединять,foreignstaged/untrackedсохранены.
