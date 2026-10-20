@@ -3458,6 +3458,37 @@ test('Calculator output metadata retains secret and row identity guards for all 
   }
 });
 
+test('observed Calculator derived output TD layout keeps null source and the delete control protected',async()=>{
+  // LAB-113 token-output-snapshot.json: same record205, five metadata TDs,
+  // nested x-grid-cell-inner DIVs and a separate non-metadata delete column.
+  const f=calculatorOutputMetadataFixture('Token','DerivedDataSourceOutputSocketWizard');
+  f.body.attrs.id='tableview-1644';
+  for(const row of f.rows)row.attrs['data-boundview']='tableview-1644';
+  f.row.attrs['data-recordid']='205';
+  const cells=[...f.row.children],tbody=f.page.add('tbody',null,'',f.row.box,f.row);
+  const tr=f.page.add('tr',null,'',f.row.box,tbody);tr.attrs.class='bg-gridrow-bold x-grid-row';
+  for(const cell of cells){cell.remove();tr.append(cell);cell.attrs.tabindex='-1';cell.ownText='';
+    for(const child of [...cell.children])child.remove();
+  }
+  for(const [cell,text,icon] of [[cells[0],'Token'],[cells[1],'Token','bg-TBGDataType-dtString bg-grid-icon'],
+    [cells[2],''],[cells[3],'Дискретный','bg-TBGDataKind-dkDiscrete bg-grid-icon'],
+    [cells[4],'Не задано','bg-TBGUsageType-utUnspecified bg-grid-icon']]) {
+    f.page.add('div',null,text,cell.box,cell).attrs.class='x-grid-cell-inner'+(cell===cells[2]?' bg-cell-null-value':'');
+    if(icon)f.page.add('div',null,'',cell.box,cell).attrs.class=icon;
+  }
+  const deleted=f.page.add('td',f.base+'colTargetDelete_Token','PRIVATE_DELETE_CONTROL',f.row.box,tr);
+  f.page.add('img',null,'',deleted.box,deleted).attrs.role='button';
+  const result=await f.read({output_column_page:{offset:0,limit:8}}),columns=result.output.wizard.output_columns;
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.equal(columns.page.status,'complete_definition_page');
+  assert.equal(columns.fields[0].name,'Token');assert.equal(columns.fields[0].type,'string');
+  assert.equal(columns.fields[0].source.status,'unmapped');
+  assert.equal(columns.fields[0].data_kind,'Дискретный');
+  assert.ok(!JSON.stringify(result).includes('PRIVATE_DELETE_CONTROL'));
+  assert.ok(!JSON.stringify(result).includes('PRIVATE_DATA_VALUE'));
+  assert.deepEqual(f.page.events,[]);
+});
+
 test('configured mapping coverage rejects clipped filtered virtualized or unmatched rows',async()=>{
   for(const mode of ['valid','hidden_extra','gap','overflow','spacer','filter','mode','duplicate','offset','unmatched','wrong_boundview','clipped_cell','editor','mask','container_gap','body_extra','missing_dimensions','column_editor','horizontal_offset']) {
     const page=new Page(),c=mappingCoverageFixture(page);
