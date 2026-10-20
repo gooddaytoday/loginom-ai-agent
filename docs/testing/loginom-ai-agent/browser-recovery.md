@@ -153,7 +153,7 @@ PASS/FAIL по сценарию, ключевые очищенные выдер�
 подтверждает installed flag1 `true` и unpackaged flag1 `false` в текущих task
 session.json. Два DEB flag1/flag0 имеют соответствующие manifests и full static PASS.
 Это availability; модели, persisted readback и browser recovery gate не закрыты.
-Task2 ожидает независимого review; исходные S1–S6 имеют собственные статусы выше.
+Task2 принята независимым spec+quality review; исходные S1–S6 имеют собственные статусы выше.
 
 Для Electron driver использовать существующую схему `desktop-oracle-transport.ts`:
 Bun oracleProvider parent и pinned Node GUI child, private stdinJSON. Первый запуск

@@ -10,8 +10,8 @@ Desktop typecheck/packaging14 PASS/2 SKIP; crash-logging6 PASS на каждой
 CLI control штатно удалён; flag1 CLI/Desktop сохранены для моделей. Пользовательские
 profiles не затрагивались. Первый CLI SaveAs cleanup FAIL/guard, Desktop pre-task
 Bun timeout и проверочные ошибки сохранены отдельно. Production не менялся.
-Далее независимый Desktop Task2 review, затем модели; полная матрица/release gate
-открыты. Merge/release не было.
+Desktop Task2 принята независимым spec+quality review без обязательных замечаний.
+Далее модели; полная приёмка/release gate открыты. Merge/release не было.
 [Фактические identities, evidence и ограничения](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md).
 
 ## 2026-10-16 — v0.2.1 опубликован

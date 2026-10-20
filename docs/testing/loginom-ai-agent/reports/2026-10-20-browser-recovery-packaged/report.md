@@ -5,7 +5,7 @@ save_checkpoint, native Close/logout/noDiscard, ACK/exit0 и освобожде�
 Первая SaveAs/reopen попытка завершилась cleanup FAIL и сохранена отдельно.
 Три отрицательные CLI строки также PASS; контрольная установка штатно удалена.
 Task 1 принята независимым spec+quality review без обязательных замечаний.
-Desktop availability технически проверена ниже; независимый Task2 review ещё не завершён.
+Desktop Task2 принята независимым spec+quality review без обязательных замечаний.
 Модели и acceptance gate открыты.
 
 ## Проверенная поставка
@@ -173,7 +173,7 @@ Desktop typecheck PASS; packaging tests 14 PASS/2 platform SKIP/0 FAIL; crash-lo
 после каждой сборки — 6 PASS. Flag0 только static control, не устанавливался.
 Flag1 остаётся установленным для Task3; uninstall ещё не выполнен, чужие profiles
 не удалялись. AppImage/другие ОС/модели/recovery gate не проверялись. Временные drivers
-удалены, все profiles/raw attempts сохранены. Независимый Task2 review — следующий шаг.
+удалены, все profiles/raw attempts сохранены. Независимый Task2 review: spec compliant, quality Approved; обязательных замечаний нет.
 Private evidence сохранён в `/tmp/loginom-desktop-recovery-task2-935el_n_`;
 `flag1`/`flag0` содержат manifests/static/source, `evidence` — команды/exit/logs,
 `installed-node`/`unpackaged` — разные profiles и полные public replies.

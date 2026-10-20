@@ -170,11 +170,11 @@ git commit -m "test(desktop): accept browser recovery on Loginom with induced fa
 **Interfaces:**
 - Consumes: `session.json` попытки runtime (`browserRecovery`), `cli-manifest.json`, Desktop `release-manifest.json`, счётчик evals из Task 1.
 
-- [ ] **Step 1: Build artifacts**
+- [x] **Step 1: Build artifacts**
 
 Приёмочные артефакты с флагом: `LOGINOM_AI_AGENT_BROWSER_RECOVERY=1 LOGINOM_AI_AGENT_CHANNEL=prod bun packages/loginom-host/script/build-cli.ts <new dir>` и Desktop DEB по `docs/testing/loginom-ai-agent/linux.md` с тем же окружением. Контрольные — без флага. Каждый артефакт — в новом каталоге; манифесты фиксируют фактический SHA.
 
-- [ ] **Step 2: Availability matrix**
+- [x] **Step 2: Availability matrix**
 
 | Запуск | Ожидаемое `browserRecovery` в `session.json` |
 | --- | --- |
@@ -201,7 +201,7 @@ git add docs/testing/loginom-ai-agent
 git commit -m "docs(testing): record packaged browser recovery acceptance"
 ```
 
-**Текущее выполнение Task3:** [уточнённый подплан](2026-10-20-browser-recovery-packaged.md), CLI Task1 принята independent spec+quality review. Root подтвердил Desktop current installed true/unpackaged false, canonical Save/native Close/logout/noDiscard/ACKexit0/app0 и оба flag DEB/static/source archive; Desktop Task2 ожидает независимого review. [Отчёт](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md). Флаговые CLI/Desktop сохранены для моделей; контрольный CLI штатно удалён. Первый CLI SaveAs/reopen cleanup FAIL/guard и Desktop Bun launch timeout до task сохранены отдельно, production не менялся. После review — natural WIZARD LAB-91/103006-r3 на подтверждённом REST GET task/CSV и доступных моделях; четыре класса без ID и непроверенный slow-host download ограничивают свои строки. Полная Task3 не принята, моделей ещё не было; S5/Task2 отложен/open.
+**Текущее выполнение Task3:** [уточнённый подплан](2026-10-20-browser-recovery-packaged.md), CLI Task1 принята independent spec+quality review. Root подтвердил Desktop current installed true/unpackaged false, canonical Save/native Close/logout/noDiscard/ACKexit0/app0 и оба flag DEB/static/source archive; Desktop Task2 принята independent spec+quality review, обязательных замечаний нет; build/availability matrix приняты. [Отчёт](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md). Флаговые CLI/Desktop сохранены для моделей; контрольный CLI штатно удалён. Первый CLI SaveAs/reopen cleanup FAIL/guard и Desktop Bun launch timeout до task сохранены отдельно, production не менялся. Следующий шаг — natural WIZARD LAB-91/103006-r3 на подтверждённом REST GET task/CSV и доступных моделях; четыре класса без ID и непроверенный slow-host download ограничивают свои строки. Полная Task3 не принята, моделей ещё не было; S5/Task2 отложен/open.
 
 ### Task 4: Включение флага в release
 
