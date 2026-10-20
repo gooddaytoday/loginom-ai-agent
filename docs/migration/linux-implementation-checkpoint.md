@@ -11,7 +11,8 @@ OS attribution NOT_CONFIRMED; own diagnostic packages сохранены.
 First native UNKNOWN/second PASS/third BLOCKED — история в source report, без переоценки.
 S5 FAIL/deferred; exact native update cause/time не установлены; production неизменён.
 Causal report принят independent review/DONE_WITH_CONCERNS, полный protocol PASS не дан.
-Следующий шаг — отдельный reviewed TDD-план минимальной правки чтения; новых live нет.
+Следующий шаг — [одна boundary-проба](../superpowers/plans/2026-10-20-browser-recovery-rendered-window.md), plan review GO; новых live нет.
+Runtime DESIGN_BLOCKED до end geometry и отдельного review точного predicate; S5 не принят.
 [Фактический отчёт и история](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md).
 
 ## 2026-10-20 — browser recovery, Linux packaged/model срез
