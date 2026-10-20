@@ -281,6 +281,7 @@ git commit -m "feat(runtime): check the page after every recovery browser call"
 - Modify: `packages/loginom-runtime/client/lib/session.mjs:72-80`
 - Modify: `packages/loginom-runtime/src/managed-entry.mjs:180-222`
 - Modify: `packages/loginom-runtime/src/call-timeout.mjs:3-10`
+- Modify: `packages/loginom-runtime/client/test/support/stopped-node-fixture.mjs` — явные test-only зависимости `execute`, `onRecord`, `nodeApplyDriverFactory(context, existingDrivers)` с прежними defaults; никаких production hooks.
 - Create: `packages/loginom-runtime/client/test/support/browser-recovery-bridge.mjs` (по образцу `support/package-cleanup-bridge.mjs`)
 - Create: `packages/loginom-runtime/client/test/browser-recovery-bridge.test.mjs`
 - Test: `packages/loginom-runtime/client/test/user-response-budget.test.mjs`, `packages/loginom-runtime/client/test/session-browser-config.test.mjs`, `packages/loginom-runtime/test/call-timeout.test.mjs`, `packages/loginom-host/test/managed-work-entry.test.ts`
@@ -355,6 +356,8 @@ test('browser recovery calls get the verification deadline', () => {   // test/c
 ```
 
 Дополнительные регрессии bridge: ABA раннего допуска A → release → новый B → queued A (один capture на invocation, A не dispatch); settled T4 → browser timeout/`isError:true` → stale Dock mutation и package cleanup запрещены; queued Dock, допущенный до start, повторно проверяется внутри gate; stopped-safe-release отклоняет другую operation/strategy и снимает запрет только после подтверждённого собственного proof/ACK.
+
+Для node safe-release и settled T4 используется реальный runtime существующего stopped-node fixture: его factory получает явные transport/record/driver зависимости, а штатные `receiptOptions` и `execute` создают проверяемую fake-native квитанцию. Runtime methods, proof и ACK не подменяются. Импорт fixture до module mock сохраняет исходный executor binding; bridge получает готовый реальный runtime без вложенного factory interception и состояния construction. Прежние defaults fixture не меняются. Основной Save-путь использует обычный `createActionRuntime` без подмены.
 
 В `managed-work-entry.test.ts` фиктивный bridge получает `releaseRun`, который пишет файл; тест шлёт `run-released` и проверяет ответ `{released: true}` и файл.
 
