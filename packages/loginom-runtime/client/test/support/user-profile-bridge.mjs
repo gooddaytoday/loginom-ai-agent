@@ -70,5 +70,15 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.deepEqual(result.input_artifacts, []);
     assert.ok(result.knowledge.node_types.length > 0);
     assert.ok(result.knowledge.actions.some(action => action.action_key === 'package.save_checkpoint'));
+    const rejected=await client.callTool({name:'dock_action_describe',arguments:{action_key:'package.save_checkpoint',node_types:['imports.text','transform.join_data','exports.text']}});
+    const failure=JSON.parse(rejected.content[0].text);
+    assert.equal(failure.request_rejected,true);
+    assert.equal(failure.next_step.tool,'dock_action_describe');
+    const example=JSON.parse(/For example: (\{.*\})\./.exec(failure.next_step.instruction)[1]);
+    const corrected=await client.callTool({name:'dock_action_describe',arguments:example});
+    assert.notEqual(corrected.isError,true);
+    const description=JSON.parse(corrected.content[0].text);
+    assert.deepEqual(description.actions.map(a=>a.action_key),['package.save_checkpoint']);
+    assert.deepEqual(description.node_types.map(n=>n.type),example.node_types);
   } finally { await client.close(); await bridge.close(); }
 });
