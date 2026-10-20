@@ -1837,6 +1837,21 @@ describe("ProviderTransform.schema - openai supported schema subset", () => {
     expect(definition).toEqual(before)
   })
 
+  test("OpenAI retains Loginom caption restrictions in full and compact field descriptions", async () => {
+    const { nodeApiTools } = await import("../../../loginom-runtime/client/lib/node-api.mjs")
+    const { userNodeTool } = await import("../../../loginom-runtime/client/lib/user-workflow.mjs")
+    const source = nodeApiTools.find((tool) => tool.name === "dock_node_apply")!
+    for (const tool of [source, userNodeTool(source)]) {
+      const schema = ProviderTransform.schema(openaiModel, tool.inputSchema)
+      const target = schema.properties!.target as import("@ai-sdk/provider").JSONSchema7
+      const label = target.properties!.label as import("@ai-sdk/provider").JSONSchema7
+      expect(label.description).toBe(tool.inputSchema.properties.target.properties.label.description)
+      expect(label.description).toContain("No ; | < >")
+      expect(label.description).toContain("conditions and formulas in parameters")
+      expect(target.required).not.toContain("label")
+    }
+  })
+
   test("keeps the actual Dock wizard stage array constant compatible with its inferred type", async () => {
     const source = (await import(
       new URL("../../../loginom-runtime/client/lib/workspace-ui.mjs", import.meta.url).href
