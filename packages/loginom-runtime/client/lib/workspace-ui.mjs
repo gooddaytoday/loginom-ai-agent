@@ -426,9 +426,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const sensitivePattern = /password|passwd|\bpwd\b|secret|token|credential|authorization|api[_ -]?key|private[_ -]?key|one[_ -]?time|\botp\b|парол|секрет|токен/i;
     const calculatorMetadataTid=memoRead(element=>{
       const tid=getTid(element)??'';
-      const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_|colDataKind_|colDefaultUsageType_|colSourceDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
+      const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard|DerivedDataSourceOutputSocketWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_|colDataKind_|colDefaultUsageType_|colSourceDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
       if(!match || element.tagName!=='TD' || !sensitivePattern.test(tid))return tid;
-      const output=match[2]==='ColumnsMappingEngineOutputPortWizard';
+      const output=match[2]!=='CalcDataWizard';
       if(output ? !['colName_','colDisplayName_','colDataKind_','colDefaultUsageType_','colSourceDisplayName_'].includes(match[3])
         || definitionPrefix!==match[1] || preparedOutputPort?.direction!=='output'
         || preparedOutputPort.node_icon_class!=='bg-vendor-icon-calcdata'

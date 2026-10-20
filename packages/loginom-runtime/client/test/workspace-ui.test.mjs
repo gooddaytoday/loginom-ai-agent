@@ -3355,8 +3355,15 @@ function mappingCoverageFixture(page,count=2) {
   return {form,base,body,container,filter,input,tableMode,linksMode,auto,rows};
 }
 
-function calculatorOutputMetadataFixture(name='Token') {
-  const page=new Page(),c=mappingCoverageFixture(page,1),row=c.rows[0];
+function calculatorOutputMetadataFixture(name='Token',family='ColumnsMappingEngineOutputPortWizard') {
+  // An ordinary neighbour keeps a partially redacted page observable, as in
+  // the live Calculator output, rather than removing output_columns entirely.
+  const page=new Page(),c=mappingCoverageFixture(page,2),row=c.rows[0];
+  if(family!=='ColumnsMappingEngineOutputPortWizard') {
+    for(const e of [c.form,...c.form.descendants()])if(e.attrs['data-tid'])
+      e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard',family);
+    c.base=c.base.replace('ColumnsMappingEngineOutputPortWizard',family);
+  }
   for(const cell of row.children) {
     cell.attrs['data-tid']=cell.attrs['data-tid'].replace(/Field0$/,name);
     if(cell.ownText==='Field0')cell.ownText=name;
@@ -3374,11 +3381,11 @@ function calculatorOutputMetadataFixture(name='Token') {
 }
 
 test('Calculator output definition completes Token metadata without exposing dataset values',async()=>{
-  for(const name of ['OrdinaryName','Token']) {
-    const f=calculatorOutputMetadataFixture(name),result=await f.read({output_column_page:{offset:0,limit:8}});
+  for(const family of ['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard'])for(const name of ['OrdinaryName','Token']) {
+    const f=calculatorOutputMetadataFixture(name,family),result=await f.read({output_column_page:{offset:0,limit:8}});
     assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
     const columns=result.output.wizard.output_columns;
-    assert.equal(columns.page.status,'complete_definition_page',name);
+    assert.equal(columns?.page?.status,'complete_definition_page',family+':'+name);
     assert.equal(columns.fields[0]?.name,name);
     assert.equal(columns.fields[0]?.label,name);
     assert.equal(columns.settings_applied,false);assert.equal(columns.complete,false);
@@ -3392,10 +3399,10 @@ test('Calculator output definition completes Token metadata without exposing dat
 });
 
 test('Calculator output metadata exception requires the native Calculator output and retains all secret guards',async()=>{
-  for(const mode of ['name','id','aria','autocomplete','ancestor','child','editable','input','link',
+  for(const family of ['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard'])for(const mode of ['name','id','aria','autocomplete','ancestor','child','editable','input','link',
     'foreign_grid','foreign_view','foreign_tab','duplicate','wrong_key','wrong_tag',
     'unbound','foreign_node','input_port','wrong_port','wrong_native_index','missing_guid','missing_opening','foreign_workflow','foreign_page']) {
-    const f=calculatorOutputMetadataFixture(),name=f.row.children[0],label=f.row.children[1];
+    const f=calculatorOutputMetadataFixture('Token',family),name=f.row.children[0],label=f.row.children[1];
     if(['name','id','aria','autocomplete'].includes(mode))name.attrs[mode==='aria'?'aria-label':mode]='secret';
     if(mode==='ancestor')f.row.attrs.name='password';
     if(mode==='child')f.page.add('span','secret','PRIVATE_CHILD',undefined,name);
@@ -3416,7 +3423,7 @@ test('Calculator output metadata exception requires the native Calculator output
     if(mode==='missing_opening')delete f.port.opening_operation_id;
     if(mode==='foreign_workflow')f.binding.workflow_ref.prefix='MF;TF-2';
     if(mode==='foreign_page')for(const e of [f.form,...f.form.descendants()])if(e.attrs['data-tid'])
-      e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard');
+      e.attrs['data-tid']=e.attrs['data-tid'].replace(family,'TuneDataSourceMappingWizard');
     const result=await f.read(mode==='unbound'?{prepared_node_context:undefined}:{});
     assert.equal(result.status,'SUCCEEDED',mode+JSON.stringify(result.error));
     assert.ok(!result.output.wizard.output_columns?.fields?.some(f=>f.name==='Token'),mode);
@@ -3429,8 +3436,8 @@ test('Calculator output metadata exception requires the native Calculator output
 });
 
 test('Calculator output metadata retains secret and row identity guards for all three added definition cells',async()=>{
-  for(const index of [2,3,4])for(const mode of ['name','id','aria','autocomplete','child','editable','input','link','duplicate','foreign_row','wrong_tag','missing']) {
-    const f=calculatorOutputMetadataFixture(),cell=f.row.children[index];
+  for(const family of ['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard'])for(const index of [2,3,4])for(const mode of ['name','id','aria','autocomplete','child','editable','input','link','duplicate','foreign_row','wrong_tag','missing']) {
+    const f=calculatorOutputMetadataFixture('Token',family),cell=f.row.children[index];
     cell.ownText='PRIVATE_EXCLUDED';
     if(['name','id','aria','autocomplete'].includes(mode))cell.attrs[mode==='aria'?'aria-label':mode]='secret';
     if(mode==='child')f.page.add('span','secret','PRIVATE_CHILD',undefined,cell);
