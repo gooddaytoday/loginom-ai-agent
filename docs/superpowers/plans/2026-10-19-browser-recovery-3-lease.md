@@ -384,14 +384,14 @@ git commit -m "feat(runtime): wire the browser recovery lease into the bridge"
 
 **Предусловия:** как у плана 2, Task 0; resources заново stage из текущего принятого HEAD существующим builder. Старый bundle живой пробы Task 0 для проверки новой реализации не используется.
 
-**Подготовка подтверждена:** свежие Import и Group, сохранение новой собственной заготовки и её native cleanup — PASS. Новый managed-сеанс выполнил existing Group обычным публичным Dock с пустым patch, свежими Alpha/35, Beta/20 и сохранёнными требуемыми settings/bindings; final Save modified:false, native cleanup без discard и managed ACK/exit0 — PASS. Блокер подготовки снят только этим полным шагом 3. Следующий шаг — подготовка 4; BR-S1/BR-S3 ещё не пройдены. Исторические unknown upload/cleanup и наблюдавшийся readonly сохранены в smoke-отчёте; причина readonly не установлена.
+**Подготовка подтверждена:** свежие Import и Group, сохранение новой собственной заготовки и её native cleanup — PASS. Новый managed-сеанс выполнил existing Group обычным публичным Dock с пустым patch, свежими Alpha/35, Beta/20 и сохранёнными требуемыми settings/bindings; final Save modified:false, native cleanup без discard и managed ACK/exit0 — PASS. Блокер подготовки снят только этим полным шагом 3. Подготовка 4, BR-S1 и BR-S3 завершены PASS; независимое task review — Approved, обязательных замечаний нет. Исторические unknown upload/cleanup и наблюдавшийся readonly сохранены в smoke-отчёте; причина readonly не установлена.
 
 **Уточнённый план подготовки по назначению владельца от 20.10 — independent review GO.** Подготовки 1–3 подтверждены живыми квитанциями; исходные критерии BR ниже сохраняются. Используются существующие `cold-readback.mjs`, композиция `loginBrowser`/`createSession`/`createConnection`/`createBridge` из `managed-entry.mjs` и обычный `supervise`. Runtime hooks, API, новое хранилище заготовок и production-изменения не нужны.
 
 - [x] **Подготовка 1 — свежий Import.** Штатно stage текущий принятый HEAD в новый private каталог. В отдельной временной пробе открыть известный сохранённый Task0 seed, сделать уникальную собственную SaveAs-копию с `conflict_policy:fail` и fresh prepare. На том же authenticated context штатного bridge выполнить existing Import внутренними execution/read/restore helpers по образцу `cold-readback.mjs`, без открытия и изменения настроек. Свежие completed/verified/owner-verified receipts и полная exact выборка: Category:string/amount:integer, Alpha/10, Beta/20, Alpha/25. После PASS сохранить receipt и сразу продолжить подготовку 2 в той же сессии: активность входа нельзя заменять историческим read.
 - [x] **Подготовка 2 — Group/Save/cleanup.** На том же bridge/page публично создать Group Category / sum(amount) → Total, проверить свежую полную выборку Alpha/35, Beta/20 и схему Category/Total. Сохранить публичным checkpoint с `conflict_policy:replace` только по точному собственному пути, уже созданному SaveAs (`SaveAs` сохраняет `fail`), подтвердить `modified:false`, собственные package close/logout без discard и закрытие ресурсов. Сохранить private manifest существующей формы saved-A `{label,path,node,expected}`; удалить временный probe после завершения. Успех этого шага ещё не снимает блокер.
 - [x] **Подготовка 3 — cold public Group.** Новый `supervise`/chat/profile, один managed browser, без fault. Открыть сохранённую заготовку, публично описать Group (`dock_action_describe` с `node_types`), выполнить `dock_node_apply` existing Group с `parameters:{}`, `inputs:[]`, `mappings:[]`, `mode:aggregate`, `finish:execute`, сохранив настройки. Подтвердить свежие execution/schema/полную exact выборку Alpha/35, Beta/20, сохранённые roles/functions/output names и все field bindings. Схема, значения и output fields сравниваются по именам: при сохранённом `autosync:true` фиксированный output layout не задан; гарантии явно запрошенного порядка в других сценариях не меняются. Затем final checkpoint с `conflict_policy:replace` по тому же собственному пути, `modified:false` и собственный cleanup с managed ACK/exit0. Только PASS этого шага снимает блокер подготовки.
-- [ ] **Подготовка 4 — замена harness и BR.** Только после подготовки 3 заменить attachment/upload/import setup одной обязательной private saved-manifest ссылкой, без fallback. Каждый BR делает свою SaveAs-копию, fresh prepare и публичный existing Group с проверкой свежего результата; downstream Calculator использует `Total*2 → DoubleAmount`. Дальше BR-S1, затем BR-S3 с исходными критериями ниже, fresh local source receipt для `dock_node_read`, final checkpoint с `replace` только собственной копии и cleanup. Внутренние helpers подготовки внутри BR не используются. Task 5 завершена только после обоих PASS.
+- [x] **Подготовка 4 — замена harness и BR.** Только после подготовки 3 заменить attachment/upload/import setup одной обязательной private saved-manifest ссылкой, без fallback. Каждый BR делает свою SaveAs-копию, fresh prepare и публичный existing Group с проверкой свежего результата; downstream Calculator использует `Total*2 → DoubleAmount`. Дальше BR-S1, затем BR-S3 с исходными критериями ниже, fresh local source receipt для `dock_node_read`, final checkpoint с `replace` только собственной копии и cleanup. Внутренние helpers подготовки внутри BR не используются. Task 5 завершена только после обоих PASS.
 
 **Порядок и остановка:** один прямой последовательный probe для подготовки 1–2, без paused process/coordinator; следующий шаг начинается только после проверенного результата предыдущего. Внутренний Import выполняется лишь между завершёнными публичными вызовами, тем же browser/context; unknown internal execution/read/restore нельзя объявлять безопасным по idle bridge. На первом отказе/неопределённости остановиться, записать точную ошибку и факты guarded cleanup собственной копии. Не закрывать исходный seed/чужие package, не повторять unknown жест или старую загрузку; последующая попытка требует новой конкретной гипотезы. Старый receipt другого сеанса не допускает `node_read`. Наличие внутреннего `execute_graph_node` не доказывает публичную доступность; выбран штатный публичный existing Group path, который обновляет предков и сохраняет пустой patch.
 
@@ -414,18 +414,18 @@ git commit -m "feat(runtime): wire the browser recovery lease into the bridge"
 
 Оба сценария заканчиваются `package.save_checkpoint` через Dock и состоянием пакета `modified: false`.
 
-- [ ] **Step 1: Write the script and runbook**
+- [x] **Step 1: Write the script and runbook**
 
-- [ ] **Step 2: Run the scenarios**
+- [x] **Step 2: Run the scenarios**
 
 Run: `cd packages/desktop && LOGINOM_AI_AGENT_TEST_CONFIG=<private config> LOGINOM_AI_AGENT_TEST_RESOURCES=<staged resources> bun test/loginom/browser-recovery-acceptance.ts BR-S1 /path/to/private/saved-A.json` (затем `BR-S3` с тем же manifest)
 Expected: оба PASS; в журналах есть `acceptance_fault_injected`, `browser_recovery_handoff`, `browser_recovery_verified`, `browser_recovery_dock_resumed`. При провале — остановиться, записать в checkpoint и не начинать план 4 до исправления.
 
-- [ ] **Step 3: Write the report**
+- [x] **Step 3: Write the report**
 
 SHA исходников, SHA-256 ресурсов, по сценарию — PASS/FAIL, ключевые квитанции (выдержки), ограничения: оператор скриптован, это не качество модели.
 
-- [ ] **Step 4: Commit and checkpoint**
+- [x] **Step 4: Commit and checkpoint**
 
 ```bash
 git add packages/desktop/test/loginom/browser-recovery-acceptance.ts docs/testing/loginom-ai-agent
@@ -433,3 +433,5 @@ git commit -m "test(desktop): run the first browser recovery scenarios on Logino
 ```
 
 Checkpoint до 20 строк. PR `feat(runtime): browser recovery lease` в `demo-022`.
+
+**Результат Task 5:** BR-S1 и BR-S3 — native PASS; полный task-scoped review исходного harness и текущей подготовки — Approved. Fresh read, final Save modified:false, собственный native cleanup без discard и managed ACK/exit0 подтверждены для каждого сценария. Дополнительный Expr1 в BR-S3 и все исторические unknown сохранены в [smoke-отчёте](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-smoke/report.md); это source-level scripted acceptance, не качество модели или установленного продукта.

@@ -99,7 +99,7 @@ git commit -m "feat(evals): count recovered_via_browser apart from clean passes"
 
 **Interfaces:**
 - Consumes: планы 1–4.
-- Оператор скриптован, как в плане 3, Task 5. Текущий статус: BR-S1 BLOCKED, BR-S3 NOT_RUN; проба сохранённого Import → Group дала NOT_APPLIED без эффекта из-за неактивного output0, собственная cleanup подтверждена. Task 2 отложена до валидированного активного входа и первого успешного native main path BR-S1/BR-S3; до этого не расширять harness или hardening заблокированного пути. Приёмочные критерии сохраняются. BR-S7 — принятый host-тест плана 4, Task 1.
+- Оператор скриптован, как в плане 3, Task 5. BR-S1 и BR-S3 — native PASS, независимое review Approved; подготовка доказана через сохранённый Group и новую собственную копию каждого сценария. Блокер активного входа снят; Task 2 может продолжаться после изоляции текущего Host CI loader failure. Приёмочные критерии сохраняются. Исторические отказы и unknown cleanup остаются в smoke-отчёте. BR-S7 — принятый host-тест плана 4, Task 1.
 
 | ID | `acceptanceFault` | Триггер | Действия оператора | Требуемый результат |
 | --- | --- | --- | --- | --- |
