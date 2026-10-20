@@ -229,7 +229,6 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       await editor.click({timeout:remaining()});await editor.press('ControlOrMeta+A',{timeout:remaining()});
       await page.keyboard.type(p.label,{delay:20});await editor.press('Enter',{timeout:remaining()});transient=false;
     }else if(kind==='move'){
-      const tid=await targetTid(p.ref);
       // Positions are logical grid coordinates; preserve the initial pointer's
       // offset within the node while moving its top-left origin.
       const old=task.effect.before.nodes.find(n=>n.ref.node_id===p.ref.node_id).position;
@@ -243,8 +242,22 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       });
       effectPossible=true;await page.mouse.click(blank.x,blank.y);
       await wait('node_selection_controls_closed',()=>page.evaluate(()=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FmxGraph.getSelectionCells().length===0));
-      if(JSON.stringify(await read(page,task))!==JSON.stringify(gestureBefore))throw new Error('Graph changed while deselecting');
-      const source=find(tid),from=await point(source);
+      const deselected=await read(page,task);
+      if(JSON.stringify(deselected)!==JSON.stringify(gestureBefore)){
+        // Deselecting an existing JavaScript can replace its SVG. Rebind only
+        // that drawing epoch: ports, links, every other node and the root stay
+        // exact. Two identical fresh reads must precede the single drag.
+        const node=gestureBefore.nodes.find(n=>n.ref.node_id===p.ref.node_id);
+        const current=deselected.nodes.find(n=>n.ref.node_id===p.ref.node_id);
+        const rebound={...deselected,nodes:deselected.nodes.map(n=>n===current?{...n,dom_epoch:node?.dom_epoch}:n)};
+        if(node?.type!=='programming.javascript' || !Number.isSafeInteger(node.dom_epoch)
+          || !Number.isSafeInteger(current?.dom_epoch) || current.dom_epoch<=node.dom_epoch
+          || JSON.stringify(rebound)!==JSON.stringify(gestureBefore))throw new Error('Graph changed while deselecting');
+        remaining();await ensureContext();
+        if(JSON.stringify(await read(page,task))!==JSON.stringify(deselected))throw new Error('Graph changed after deselection redraw');
+        gestureBefore=deselected;
+      }
+      const source=find(await targetTid(p.ref)),from=await point(source);
       const scale=await page.evaluate(()=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;return d.FmxGraph.view.scale/d.FInitialScale;});
       await drag(source,{x:from.x+(p.position.x-old.x)*scale,y:from.y+(p.position.y-old.y)*scale});
     }else if(kind==='add_input'){
