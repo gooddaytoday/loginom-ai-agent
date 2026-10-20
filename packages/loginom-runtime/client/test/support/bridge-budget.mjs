@@ -81,6 +81,7 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   // Knowledge revisions append limitations; check presence, not position.
   assert.ok(preparedJs.limitations.some(text=>/ASCII Name.*DisplayName.*schema\/readback/.test(text)));
   assert.ok(preparedJs.limitations.some(text=>/integer\/real\/datetime data_kind=Непрерывный/.test(text)));
+  assert.ok(preparedJs.limitations.some(text=>/DataType\.Float/.test(text)));
   assert.ok(size(prepared)<=46000);assert.equal(Object.hasOwn(full,'instructions'),false);
   assert.equal(full.source,'bundled');assert.match(full.skillRevision,/^[a-f0-9]{64}$/);
   assert.match(client.getInstructions(),/activate.*loginom-automation/i);
