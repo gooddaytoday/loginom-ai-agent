@@ -97,14 +97,15 @@ const exists = (file: string) =>
   )
 
 export async function management(command: AgentCommand, args: string[], stdin?: string, timeoutMs = 120_000, signal?: AbortSignal) {
+  const cmd = [...command.cmd, ...(command.mode === "binary" ? ["--headless"] : []), ...args]
   const out = command.cleanupDir ? path.join(command.cleanupDir, `${Date.now()}-${crypto.randomUUID()}`) : undefined
   if (out) await mkdir(out, { recursive: true, mode: 0o700 })
   const workdir = command.mode === "binary" && args[0] === "loginom" && args[1] === "check"
     ? await mkdtemp(path.join(os.tmpdir(), "evals-management-check-")) : undefined
   if (workdir) await assertNoDebuggers()
-  const boundary = workdir ? await sandboxCommand({ cmd: [...command.cmd, ...args],
+  const boundary = workdir ? await sandboxCommand({ cmd,
     profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE!, workdir, env: command.env }) : undefined
-  const input = { cmd: [...command.cmd, ...args], cwd: boundary?.cwd ?? command.cwd,
+  const input = { cmd, cwd: boundary?.cwd ?? command.cwd,
     env: boundary?.env ?? command.env, sandbox: boundary?.cmd,
     profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs, signal }
   const result = await superviseProcess(input)
