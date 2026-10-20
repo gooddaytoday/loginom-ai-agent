@@ -2008,6 +2008,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         stopped_phase: trigger.step.phase, verified_phases: operation.nodeApply.phases.map(p => p.phase),
         requested_finish: request.finish, error: structuredClone(operation.outcome?.error ?? null),
         ...(operation.releaseRefused ? { ui_blocker: operation.releaseRefused.ui_blocker ?? operation.releaseRefused.message } : {}),
+        how: 'Leave node views and visualizers through the scenario breadcrumb (Сценарий); never close workspace tabs or the package.',
         required_result: 'Leave this node unlocked on the quiet graph with no wizard, dialog or mask open'
           + (trigger.reason === 'REPEATED_PHASE_FAILURE' ? ', its settings and ports completed as in the original request'
             + (request.finish === 'execute' ? ' and the node executed' : '') : '') + '.' } };

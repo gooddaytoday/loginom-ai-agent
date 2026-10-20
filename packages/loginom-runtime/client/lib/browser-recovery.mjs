@@ -138,7 +138,9 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     current.phase = 'browser';
     current.budget.started_at ??= now();
     return reply({ ...view(), instruction: 'The browser tools are available on your next step. Complete only this step in the '
-      + 'current Loginom tab, then call dock_browser_recovery finish. Navigation, reload, tabs, code, storage, network and '
+      + 'current Loginom tab, then call dock_browser_recovery finish. Leave a node view or visualizer through the scenario '
+      + 'breadcrumb (Сценарий) in the navigation path; never close workspace tabs, the package or Loginom windows: that '
+      + 'changes the context Dock is bound to and ends the attempt. Navigation, reload, tabs, code, storage, network and '
       + 'file tools are refused.', goal: outcome.basis.goal ?? null });
   }
 
@@ -370,16 +372,17 @@ function refusal(message, extra = {}) {
 
 // The page check runs in the same gate after each recovery action: same origin,
 // one page, and the document prepared by Dock (design §7).
-export function makeRecoveryPageProbeCode() {
+export function makeRecoveryPageProbeCode({ tabTid = null } = {}) {
   return `async (page) => {
     const pages = page.context().pages().filter(item => !item.isClosed()).length;
-    const observed = await page.evaluate(() => ({ origin: location.origin,
-      document_id: globalThis.__loginomDockPreparationV1?.document === document ? globalThis.__loginomDockPreparationV1.id : null }));
+    const observed = await page.evaluate(tab => ({ origin: location.origin,
+      document_id: globalThis.__loginomDockPreparationV1?.document === document ? globalThis.__loginomDockPreparationV1.id : null,
+      tab_present: tab ? !!document.querySelector('[data-tid="' + CSS.escape(tab) + '"]') : null }), ${JSON.stringify(tabTid)});
     return JSON.stringify({ kind: 'browser_recovery_page', pages, ...observed });
   }`;
 }
 
-export function parseRecoveryPageProbe(response, { origin, documentId }) {
+export function parseRecoveryPageProbe(response, { origin, documentId, tabTid = null }) {
   if (response?.isError) return { ok: false, reason: 'page probe failed' };
   for (const block of response?.content ?? []) {
     if (block.type !== 'text') continue;
@@ -391,6 +394,8 @@ export function parseRecoveryPageProbe(response, { origin, documentId }) {
       if (value.pages !== 1) return { ok: false, reason: `expected one page, found ${value.pages}` };
       if (value.origin !== origin) return { ok: false, reason: 'origin changed' };
       if (value.document_id !== documentId) return { ok: false, reason: 'prepared document changed' };
+      // Closing the prepared scenario tab changes the workflow context Dock is bound to.
+      if (tabTid && value.tab_present !== true) return { ok: false, reason: 'prepared scenario tab closed' };
       return { ok: true };
     } catch { /* Only a parsed probe is evidence. */ }
   }

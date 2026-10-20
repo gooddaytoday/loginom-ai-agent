@@ -258,9 +258,10 @@ export async function createBridge(config, session, { browserTransport: managedB
       browser, executor: recoveryExecutor, gate: browserGate, record: recordExecution,
       async probe() {
         const binding = { origin: new URL(config.loginomUrl).origin,
-          documentId: session.metadata.workspacePreparation?.state?.document_id };
+          documentId: session.metadata.workspacePreparation?.state?.document_id,
+          tabTid: session.metadata.workspacePreparation?.state?.workflow_ref?.tab_tid ?? null };
         const response = await browser.callTool({ name: 'browser_run_code_unsafe',
-          arguments: { code: makeRecoveryPageProbeCode() } }, undefined, { timeout: 15000 });
+          arguments: { code: makeRecoveryPageProbeCode(binding) } }, undefined, { timeout: 15000 });
         return parseRecoveryPageProbe(response, binding);
       } });
     // A Dock request may wait in the gate while a recovery action settles: recheck the lease inside it.

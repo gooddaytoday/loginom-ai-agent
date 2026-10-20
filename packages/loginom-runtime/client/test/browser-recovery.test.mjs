@@ -432,3 +432,11 @@ test('concurrent starts admit one attempt; the second is refused while the first
   release();
   assert.equal(body(await first).operation_id, 'op-1');
 });
+
+test('closing the prepared scenario tab is a lost page boundary', () => {
+  const binding = { origin: 'https://app.loginom.ai', documentId: 'doc', tabTid: 'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1' };
+  const reply = value => ({ content: [{ type: 'text', text: '### Result\n' + JSON.stringify(JSON.stringify(value)) }] });
+  const base = { kind: 'browser_recovery_page', pages: 1, origin: 'https://app.loginom.ai', document_id: 'doc' };
+  assert.deepEqual(parseRecoveryPageProbe(reply({ ...base, tab_present: true }), binding), { ok: true });
+  assert.deepEqual(parseRecoveryPageProbe(reply({ ...base, tab_present: false }), binding), { ok: false, reason: 'prepared scenario tab closed' });
+});
