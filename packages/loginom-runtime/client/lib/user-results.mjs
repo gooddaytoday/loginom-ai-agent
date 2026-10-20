@@ -41,7 +41,9 @@ export function compactNodeRequestFailure(outcome,request={}) {
   const finishHint='Add the REQUIRED top-level field finish beside parameters, not inside it. Use "execute" to commit, execute and read output; "done" commits only; "close" discards the wizard draft. Example patch to merge into your original request: {"finish":"execute"}. Keep the other required fields and submit with a NEW operation_id.';
   const mappingConflict=!pending&&message==='Output changes and full fields are mutually exclusive';
   const mappingHint='For each output mapping choose changes (a patch) OR fields (the complete ordered layout), never both. For ordering plus exclusions, keep fields, account for every configured source field and express exclusions as excluded:true in those entries; remove changes from that mapping. Keep ALL other original request fields, including top-level finish, parameters and inputs. Submit the COMPLETE corrected request with a NEW operation_id, not just a mappings patch.';
-  const repairHint=missingFinish?finishHint:mappingConflict?mappingHint:null;
+  const exportMappings=!pending&&message==='Invalid parameters.mappings: use an empty list; text export does not support requested port mappings';
+  const exportMappingHint='For exports.text omit top-level mappings or set mappings:[], and use read:{ports:[]}. To select, rename or reorder columns, configure the upstream node output mapping or a transform.reform_columns node, execute it and connect that output to the export. Keep the remaining export settings and submit the COMPLETE request with a NEW operation_id.';
+  const repairHint=missingFinish?finishHint:mappingConflict?mappingHint:exportMappings?exportMappingHint:null;
   if(missingFinish)path='finish';
   if(mappingConflict)path='mappings';
   return {result_version:'user-v1',operation_id:operationId,state:'settled',
