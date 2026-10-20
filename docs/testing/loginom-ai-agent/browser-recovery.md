@@ -11,6 +11,7 @@
 | runtime client, все `test/*.test.mjs` на `33b2045682` | mas3 | 4371 pass, 0 fail |
 | loginom-host: capability (вкл. stop при release), host-port, node-host на `97584c129e` | mas3 | 45 pass, 0 fail; `bun typecheck` чистый |
 | agent: browser-recovery, profile-tools, prompt (вкл. одно сохранённое напоминание), CLI policy на `97584c129e` | mas3 | 108 pass, 0 fail; `bun typecheck` чистый |
+| модель `gpt-6.1-sol/medium`, s1 с принудительной отменой чтения (`s1-cancel2`), сборка `e5971b2ce6` | mas, app.loginom.ai | PASS: модель сама прошла start → find → click «Сценарий» → finish, достроила сценарий через Dock; CLI 0, cold-check PASS, итог совпадает с s1 |
 | live-харнес T2 + T3, сборка `e5971b2ce6` | mas, app.loginom.ai | PASS: T3 распознан как `REPEATED_PHASE_FAILURE`, `finish` → `dock_node_read` от квитанции с наблюдаемой схемой → SUCCEEDED |
 
 Сверка с реальными журналами отказов 18–19.10 (fail-logs сквадов):
