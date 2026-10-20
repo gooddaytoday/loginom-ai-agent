@@ -26,7 +26,7 @@
 
 - Готово, когда Tasks 1–5 закрыты, `bun run test:upstream` зелёный, BR-S1 и BR-S3 — PASS на реальном Loginom.
 - Первый сквозной результат — Task 5.
-- Объём: ~15 файлов, ~+1300 / −40 строк (модуль ~450, bridge и entry ~150, тесты ~500, скрипт приёмки ~250, runbook и отчёт ~60).
+- Объём: ~15 файлов, ~+1550 / −40 строк (модуль ~500, bridge и entry ~180, тесты ~560, скрипт приёмки ~250, runbook и отчёт ~60).
 - Исключения: агент, host, навык, evals, упакованные сборки, release.
 
 ## Review Focus
@@ -103,12 +103,14 @@ git commit -m "feat(runtime): define the browser recovery allowlist"
 
 **Interfaces:**
 - Consumes: план 2 — `browserRecoveryBasis`, `browserRecoveryHandoff`, `verifyBrowserRecovery`, `settleBrowserRecovery`, `markBrowserRecoveryStopped`, `browserRecoverySafeCompletion`, `browserRecoveryStepKey`, `BROWSER_RECOVERY_BUDGET`; Task 1.
-- Produces: `createBrowserRecovery({runtime, definitions, callBrowser, probePage, record, now = Date.now}) → {owns(name), tools(baseTools), call(name, args, {signal}), release(reason), active(), dockAllowed(name), noteDockCall(name), remaining(stepKey)}`.
+- Produces: `createBrowserRecovery({runtime, definitions, callBrowser, probePage, record, now = Date.now}) → {owns(name), tools(baseTools), call(name, args, {signal}), release(reason), active(), hasUnsettledWork(), dockAllowed(name, args), noteDockCall(name, args, outcome), remaining(stepKey)}`.
   - Бюджет — `Map` по ключу шага внутри модуля: число вызовов и накопленное время в `browser`. `remaining(stepKey)` передаётся executor как опция плана 2.
   - `attempt_id` — `br-<n>`, номер `finish` в попытке — `k` для `verifyBrowserRecovery(..., {attemptId, sequence: k})`.
-  - `tools(base)`: в `browser` — инструменты `remote`, `dock_diagnostics`, `dock_browser_recovery` и `definitions`; иначе — `base` и `dock_browser_recovery`.
-  - `dockAllowed(name)` в `handoff`, `browser` и `verifying` — только `remote`-инструменты и `dock_diagnostics`.
-  - `noteDockCall` пишет `browser_recovery_dock_resumed` для первого вызова Dock после `completed`/`continuable`.
+  - `tools(base)`: в `browser` — инструменты `remote`, `dock_diagnostics`, `dock_browser_recovery` и `definitions`; в неразрешённом `stopped` — remote, диагностика, recovery и только конкретное доступное safe-completion действие; при обычном допуске Dock — `base` и `dock_browser_recovery`.
+  - `dockAllowed(name, args)` в `handoff`, `browser` и `verifying` разрешает только remote и `dock_diagnostics`. В `stopped` обычный Dock не допускается до подтверждённого safe release. При живой странице и известном исходе допускается только конкретный `next_step` из `markBrowserRecoveryStopped` → `browserRecoverySafeCompletion`, с исходным `operation_id` и `strategy: "abandon_operation"`. Unknown browser/verification или смена страницы не допускают ни этого действия, ни нового start. Проверка повторяется непосредственно перед dispatch внутри существующего browser gate, в том числе для ранее поставленных в очередь Dock-вызовов.
+  - `noteDockCall(name, args, outcome)` получает фактический исход после существующего runtime dispatch. Он пишет `browser_recovery_dock_resumed` для первого принятого вызова Dock после `completed`/`continuable`; для разрешённого stopped-safe-release возвращает обычный допуск Dock только по matching `SUCCEEDED`/`released_after_proof` с исходной операцией, то есть после существующих native proof и durable release ACK. Сам вызов recover, отказ и запоздалый результат при утрате владения допуск не возвращают.
+  - `hasUnsettledWork()` сообщает удержанное владение попытки, включая unknown или ещё не разрешённый `stopped`; `active()` отдельно сообщает выполняющуюся аренду. Это запрос существующего состояния, используемый в bridge/cleanup, без второго реестра блокировок.
+  - Одна причина/намерение остановки хранится в текущей попытке. `release` и abort охватывают `handoff`, `browser`, `verifying`; после каждого await перед передачей владения проверяются та же попытка и это намерение. Принятый вызов не прерывается: результат и факты сохраняются, но поздний ответ не возрождает browser/dock. При stop во время verify новая settlement не начинается; при уже начатой записи сохраняется подтверждённая квитанция, активная аренда не восстанавливается. Уже отменённый до dispatch сигнал не отправляет browser-вызов.
   - Ответы — по общему контракту, с `structuredContent` и `_meta["loginom/browser_recovery"]`.
 
 Переходы:
@@ -116,10 +118,10 @@ git commit -m "feat(runtime): define the browser recovery allowlist"
 | Вызов | Переходы |
 | --- | --- |
 | `start` | нет основания → `BROWSER_RECOVERY_NOT_OFFERED`, состояние прежнее; бюджет шага исчерпан → `stopped` (`budget_exhausted`); иначе `handoff` → `browserRecoveryHandoff`; `verified: false` → `stopped` (`handoff_unverified`); иначе `browser`, время шага идёт |
-| `finish` | только из `browser`; расходует вызов (нет вызова → `stopped`, `budget_exhausted`); время шага останавливается; `verifying` → `verifyBrowserRecovery`; `unconfirmed` → `stopped` (`verification_unconfirmed`); иначе `settleBrowserRecovery`; ошибка квитанции → `stopped` (`receipt_unconfirmed`); `completed` → `dock`, ключ шага удаляется; `continuable` → `dock`; `unresolved` → `browser` при остатке бюджета, иначе `stopped` |
-| `stop`, `release` | из `browser` → `stopped` (`model_stop`, `run_released`, `runtime_closed`); без UI-жестов |
+| `finish` | только из `browser`; сначала обновляет browser-время и проверяет оба остатка (любой исчерпан → `stopped`, `budget_exhausted`, без verify); принятый finish расходует вызов, время шага останавливается; `verifying` → `verifyBrowserRecovery`; `unconfirmed` → `stopped` (`verification_unconfirmed`); иначе `settleBrowserRecovery`; ошибка квитанции → `stopped` (`receipt_unconfirmed`); `completed` → `dock`, ключ шага удаляется; `continuable` → `dock`; `unresolved` → `browser` при остатке бюджета, иначе `stopped` |
+| `stop`, `release`, abort | из `handoff`/`browser`/`verifying`: намерение остановки и `stopped` после установленного результата уже принятого вызова (`model_stop`, `run_released`, `runtime_closed`, `cancelled`); без новых UI-жестов и без восстановления владельца поздним ответом |
 
-Каждый переход в `stopped` вызывает `markBrowserRecoveryStopped` и пишет `browser_recovery_state`. Любой ответ со `state: "stopped"` содержит `stop_reason`, `summary` (вызванные инструменты, состояние исходной операции, последний результат проверки, `attested_by_model`) и `next_step`: при живой странице — `runtime.browserRecoverySafeCompletion(operationId)`, после `page_changed` и `browser_call_unconfirmed` — `{instruction}` сообщить фактическое состояние.
+Подтверждённый safe release — отдельный явный путь возврата обычного допуска Dock; он не повторяет stopped-попытку и не заявляет recovered goal. Каждый переход в `stopped` вызывает `markBrowserRecoveryStopped` и пишет `browser_recovery_state`. Любой ответ со `state: "stopped"` содержит `stop_reason`, `summary` (вызванные инструменты, состояние исходной операции, последний результат проверки, `attested_by_model`) и `next_step`: при живой странице — `runtime.browserRecoverySafeCompletion(operationId)`, после `page_changed` и `browser_call_unconfirmed` — `{instruction}` сообщить фактическое состояние.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -173,6 +175,8 @@ test('each finish consumes one call and unresolved returns to browser only with 
 });
 ```
 
+Дополнительные регрессии Task 2: `finish` при времени 600000 мс не вызывает verify даже с 30 оставшимися вызовами; release/abort во время deferred handoff и verify (confirmed/unknown) не возрождают аренду поздним ответом и сохраняют факты; начатый durable ACK сохраняет результат при stop; matching safe release разрешает Dock только после подтверждённого outcome.
+
 - [ ] **Step 2: Run tests to verify they fail** (`--test test/browser-recovery.test.mjs`; Expected: FAIL)
 
 - [ ] **Step 3: Implement** по таблице переходов.
@@ -197,7 +201,8 @@ git commit -m "feat(runtime): lease the browser for one recovery attempt"
 - Produces:
   - `makeRecoveryPageProbeCode({origin, documentId, sessionId, account, loginomBuild}) → string` — read-only код для `browser_run_code_unsafe` из проверок `readSavedPackageState` (`package-persistence.mjs:15-19`): `location.origin`, `app.Version`, `__loginomDockPreparationV1` с `document === document` и `id === documentId`, квитанция подготовки этой сессии, подключённый аккаунт; плюс `page.context().pages().length`. Значения — из `getStorageBinding()`. Проверки пакета и вкладки не используются: Save As меняет путь и может переоткрыть пакет, а открытые мастер или диалог того же документа — не смена страницы.
   - `parseRecoveryPageProbe(response) → {origin_ok: boolean, page_count: number, document_present: boolean}` — неполный ответ даёт `false`.
-  - Порядок вызова allowlist-инструмента: состояние `browser`, иначе `BROWSER_RECOVERY_INACTIVE` → `admitRecoveryBrowserCall` → расход вызова (нет вызова или времени → `stopped` (`budget_exhausted`) и `BROWSER_RECOVERY_BUDGET_EXHAUSTED`, браузер не вызывается) → `callBrowser(name, args)` без сигнала → `probePage()` → `browser_recovery_call` → ответ. После ответа: `signal.aborted` → `stopped` (`cancelled`); провал пробы → `stopped` (`page_changed`) и код `BROWSER_RECOVERY_PAGE_CHANGED`; исключение или тайм-аут вызова → `stopped` (`browser_call_unconfirmed`) и `BROWSER_CALL_UNCONFIRMED` без повтора.
+  - Порядок вызова allowlist-инструмента: состояние `browser`, иначе `BROWSER_RECOVERY_INACTIVE` → `admitRecoveryBrowserCall` → расход вызова (нет вызова или времени → `stopped` (`budget_exhausted`) и `BROWSER_RECOVERY_BUDGET_EXHAUSTED`, браузер не вызывается) → `callBrowser(name, args)` без сигнала → `probePage()` → `browser_recovery_call` → ответ. После ответа: `signal.aborted` → `stopped` (`cancelled`); провал пробы → `stopped` (`page_changed`) и код `BROWSER_RECOVERY_PAGE_CHANGED`; исключение, тайм-аут или protocol reply `isError: true` без структурированного no-effect доказательства → `stopped` (`browser_call_unconfirmed`) и `BROWSER_CALL_UNCONFIRMED` без повтора.
+  - Успешная проба страницы не подтверждает no-effect ошибочного MCP-ответа. Такой исход сохраняется в ограниченном ответе/журнале; нет повторного жеста или safe UI cleanup. Локальный отказ admission до dispatch остаётся отказом без browser-вызова.
   - `browser_recovery_call`: `{attempt_id, tool, arguments, duration_ms, is_error, text_bytes, images: [{mime, bytes, sha256}], page, calls_remaining, ms_remaining}`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -281,9 +286,9 @@ git commit -m "feat(runtime): check the page after every recovery browser call"
 - Produces:
   - Recovery создаётся только при `config.browserRecovery === true`, профиле `user-v1` и `executor-replay`. Иначе каталог, маршруты и ответы прежние.
   - `createActionRuntime({..., browserRecovery: {remaining: recovery.remaining}})`.
-  - `ListTools` возвращает `recovery.tools(catalog.tools)`. В начале `callTool`, до локальных инструментов: `recovery.owns(name)` → `browserGate(() => recovery.call(...))` и `boundedRecoveryReply`; иначе `!recovery.dockAllowed(name)` → `BROWSER_RECOVERY_ACTIVE`; иначе прежний путь и `noteDockCall`. Проверка стоит до локальной ветки, потому что `dock_node_cancel` и `dock_node_stop` обходят `browserGate` (`bridge.mjs:327-330`).
+  - `ListTools` возвращает `recovery.tools(catalog.tools)`. В начале `callTool`, до локальных инструментов: `recovery.owns(name)` → `browserGate(() => recovery.call(...))` и `boundedRecoveryReply`; иначе `!recovery.dockAllowed(name, args)` → `BROWSER_RECOVERY_ACTIVE`; иначе прежний путь с повторной проверкой допуска внутри существующего gate перед browser dispatch. Ранняя проверка сохраняется для `dock_node_cancel`/`dock_node_stop`, обходящих gate. После runtime dispatch `noteDockCall(name, args, outcome)` получает настоящий исход, без разбора текста compact reply и без второго маршрутизатора.
   - `boundedRecoveryReply(reply, {tool}) → reply` — лимиты `boundedUserToolReply` (46000 байт, 50 KiB, 2000 строк) считаются без блоков `image`; при превышении — отказ `USER_RESPONSE_BUDGET` с `next_step.instruction` про `target`/`depth` и `browser_find`; `_meta` сохраняется.
-  - `hasActiveWork()` истинно и при `recovery.active()`; `close()` сначала вызывает `recovery.release('runtime_closed')`.
+  - `hasActiveWork()` истинно и при `recovery.active()`; `hasUnsettledWork()` учитывает `recovery.hasUnsettledWork()`. `close()` сначала вызывает `recovery.release('runtime_closed')`; package cleanup проверяет этот же факт до входа и внутри существующего gate. Неизвестный browser call не очищается автоматически даже при settled T4 и пустом executor pending; обычное закрытие MCP/браузера и честный blocked cleanup result сохраняются.
   - Bridge возвращает `releaseRun()`. `managed-entry.mjs` на `{operation: "run-released"}` вызывает её и отвечает `{released: true}`; проверка `state.controller` к этой операции не применяется.
   - `session.mjs` пишет `snapshot: {mode: "none"}` в `playwright.json` только в executor-режиме при `config.browserRecovery === true`.
   - `runtimeCallTimeout('dock_browser_recovery', args) = 255000` (`BROWSER_RECOVERY_VERIFY_MS` плюс 15000). Из него выводятся срок IPC host (+15 с, `host-port.ts:427`) и срок адаптера агента (`max(180 с, +30 с)`, `adapter.ts:88`).
@@ -344,6 +349,8 @@ test('browser recovery calls get the verification deadline', () => {   // test/c
 });
 ```
 
+Дополнительные регрессии bridge: settled T4 → browser timeout/`isError:true` → stale Dock mutation и package cleanup запрещены; queued Dock, допущенный до start, повторно проверяется внутри gate; stopped-safe-release отклоняет другую operation/strategy и снимает запрет только после подтверждённого собственного proof/ACK.
+
 В `managed-work-entry.test.ts` фиктивный bridge получает `releaseRun`, который пишет файл; тест шлёт `run-released` и проверяет ответ `{released: true}` и файл.
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -367,7 +374,7 @@ git commit -m "feat(runtime): wire the browser recovery lease into the bridge"
 
 ### Task 5: Первый прогон на реальном Loginom (BR-S1, BR-S3)
 
-**Предусловия:** как у плана 2, Task 0.
+**Предусловия:** как у плана 2, Task 0; resources заново stage из текущего принятого HEAD существующим builder. Старый bundle живой пробы Task 0 для проверки новой реализации не используется.
 
 **Files:**
 - Create: `packages/desktop/test/loginom/browser-recovery-acceptance.ts` (по образцу `runtime-acceptance.ts:88-140`: `supervise({..., browserRecovery: true, acceptanceFault})`, `invoke()` сохраняет каждую квитанцию)
