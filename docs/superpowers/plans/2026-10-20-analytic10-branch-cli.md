@@ -256,10 +256,25 @@ trial-dosage-outcomes
 - [x] Диагностическийrejudge наprivateкопии:articles100/oraclePASS/1judge,unitcomplete;
   source100fileshashunchanged,configcaptureстабилен. Это не приёмка/не склеиватьрезультаты.
 - [x] Независимоеreviewпланаdiagnostic→fullrun выполнено;launcher/security checks не меняются.
-- [ ] Новыйownstand,localOAuth,pins;RAMpolicy99.9% фиксироватьдоdispatch.
-  Тотже CLIb5ad7c602ea1,измеряемыйкодне менялся. Прежниеprepare/verify/cold/A-B gates.
+- [x] Создан новый собственный стенд root5, две независимые localOAuth-копии0600,
+  прежние input/rubric/catalogue pins; RAMpolicy99.9% записана до dispatch.
+  CLIb5ad7c602ea1 не менялся. Prepare4185c3e5 ready/code0; два профиля чистые, четыре брони released.
+- [ ] Verify/cold-browser/judge-readiness/A-B для root5 ещё не выполнены: новая
+  модельная серия не запущена из-за согласованного освобождения ветки для rebase.
 - [ ] Полнаятаже10всерии5,deadline15:28:25Z;privatecaptureconfigchanges толькодиагностика,
   без2гоколлектора/новыхкритериев/решенияисходапопыток поописи.
+
+## Передача ветки для согласованного rebase
+
+- [x] Проверено прямое разрешение владельца в чате `01a1585a-e6ca-7e32-9a50-7a9f21e8b39c`:
+  «Да, скоординируй» в ответ на просьбу зафиксировать изменения и освободить ветку.
+- [x] Начатая немодельная подготовка root5 завершена штатно. Модельных процессов нет;
+  результаты root5 пусты, старые стенды/инциденты и пять чужих файлов сохранены.
+- [x] Сохранить этот checkpoint отдельным коммитом и освободить `refs/heads/evals-parallel`
+  через detached HEAD без изменения индекса/WIP. Rebase и полный baseline на EVAL_RUNNER_2
+  ведёт соседний чат. Локальную серию5 до завершения координации не запускать.
+- [ ] Локальная техническая приёмка десятки остаётся незавершённой; результаты другого
+  хоста не объединять с локальными. После изменения измеряемого кода нужна новая сборка/pins.
 
 ## Приёмка и завершение
 
@@ -286,13 +301,13 @@ trial-dosage-outcomes
 
 ## Checkpoint
 
-1. HEADa77b427db8;CLI b5ad7c602ea1 installed/hashunchanged;watcherbecfflastmeasuredcode,77tests/typecheck/reviewpass.
-2. Старые acceptance/Sp38yS/root2/root4standsretained не менять;root1w6kidhm4/eval_parallel_blockers.md.
-3. Серия4g03U7Q закончиласьJUDGE_CONFIGURATION_MISMATCH09:46:03:3attempts/7unassigned;2cleanupconfirmed/basketfailed.
-4. abc0 Data recursion безcache,articlesoraclePASS/judgeerror64×2,basketinterrupted;resource880/0missed/passed.
-5. Root4bgrox9gn сохранён;postverifyexit2/nativeprofilepending. Причинаcfgfailureне установлена;позднеесравнениесовпадает.
-6. Diagnosticprivatecopyarticles100/oraclePASS/1judge/unitcomplete/source100filesunchanged;нечастьприёмки.
-7. Root5 /home/kiselev/storage/tmp/analytic10-branch-r5-20261020-w24bg0nh;новыйownstand;установленныйCLIостаётсяroot3k9rcj844.
-8. OwnerRAMusage99.9%(remaining≥39.397MiB),CPU100сохранён;длясерии5предварительныйbudget,rawseries4не менять.
-9. Следующийшагpaircreate/init/prepare/verify/cold/A-B,полная10+live30–60s;captureconfigchangesдиагностический.
-10. Общийmodelwindow07:28:25Z–15:28:25Z;seed/IDs/sourceauth/inputs/rubricпрежние;foreignсохранены.
+1. База передачи c2f5d5026e; CLI b5ad7c602ea1 установлен, binary SHA4b528036…; последний measured change becff0a541.
+2. Owner разрешил RAMusage99.9%: MemAvailable≥41310462 bytes (39.397MiB); CPU100% сохранён. Остальные bounds прежние.
+3. Исторические frozen budgets/results не меняются; series4 amendment — отдельное evidence, серия5 бюджет задан до dispatch.
+4. Root5 /home/kiselev/storage/tmp/analytic10-branch-r5-20261020-w24bg0nh; server86949ed75e88/studio7a7a94fbbea2, порт44325.
+5. Prepare4185c3e5 ready/code0, два профиля чистые/четыре брони released; localOAuth0600/distinctinode/TTL100ч/source unchanged.
+6. Verify/cold/A-B/judge-readiness root5 не выполнены; results пусты, модельных controller нет. Техническая приёмка не пройдена.
+7. Все старые incidents/stands сохранены; private blockers root1w6kidhm4/eval_parallel_blockers.md. Никакого manual repair.
+8. Владелец разрешил координацию освобождения ветки в чате01a1585a-e6ca-7e32-9a50-7a9f21e8b39c; локальную серию5 не запускать.
+9. Сохранить docs commit, detach без потери staged/untracked; соседний чат выполняет rebase/полный baseline на EVAL_RUNNER_2.
+10. Старое модельное окно07:28:25Z–15:28:25Z не продлевается; seed/IDs/hashes прежние; пять чужих файлов сверены unchanged.
