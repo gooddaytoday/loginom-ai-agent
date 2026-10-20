@@ -375,7 +375,24 @@ export async function prepareLinkHover(page,task,read,sameGraph) {
     if(point)break;
     await page.waitForTimeout(50);
   }
-  if(!point)throw Error('Link hover source is covered');
+  if(!point){
+    // Failure-only DOM identities, never text/values or an actionable UI ref.
+    // Keep this below node.apply's existing 1000-character error-message cap.
+    const diagnostic=await page.evaluate(({sourceTid,rootTid})=>{
+      const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
+      const roots=exact(rootTid),sources=exact(sourceTid);
+      if(roots.length!==1||sources.length!==1||!roots[0].contains(sources[0]))return {source_identity_changed:true};
+      const e=sources[0],b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,hit=document.elementFromPoint(x,y);
+      const describe=n=>n?{tag:n.tagName.toLowerCase(),tid:n.getAttribute('data-tid')?.slice(0,96)??null,
+        role:n.getAttribute('role')?.slice(0,24)??null,class:n.getAttribute('class')?.slice(0,96)??null}:null;
+      const diagnostic={source_tid:sourceTid.slice(0,208),point:[x,y],reachable:hit===e||e.contains(hit),testable:new URL(location.href).searchParams.get('testable')==='true',
+        covering:describe(hit),anchor:describe(hit?.closest('[data-tid],[role="tooltip"],[role="dialog"],.x-tip,.x-menu,.x-panel,.bg-mask-message,.x-mask-msg')),ancestors:[]};
+      for(let n=hit?.parentElement;n&&diagnostic.ancestors.length<6;n=n.parentElement)diagnostic.ancestors.push(describe(n));
+      while(JSON.stringify(diagnostic).length>900&&diagnostic.ancestors.length){diagnostic.ancestors.pop();diagnostic.truncated=true;}
+      return diagnostic;
+    },{sourceTid:task.source_tid,rootTid:task.request.workflow_ref.prefix+';ModelForm;cmpDiagram'});
+    throw Error('Link hover source is covered: '+JSON.stringify(diagnostic));
+  }
   if(!sameGraph(before,await observe()))throw Error('Graph changed before link hover gesture');
   await page.mouse.move(point.x,point.y);
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
