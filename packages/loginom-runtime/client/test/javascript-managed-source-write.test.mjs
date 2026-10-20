@@ -37,7 +37,7 @@ function fixture() {
     mouse: {click: async () => {calls.push('click'); focused = true;}},
     keyboard: {press: async key => {
       calls.push(key);
-      if (key === 'Control+A') selected = true;
+      if (key === 'ControlOrMeta+A') selected = true;
       if (key === 'Backspace') text = '';
     }, insertText: async value => {calls.push('insertText'); text = value; selected = false;}}
   };
@@ -64,7 +64,7 @@ test('one owned browser action replaces exact Unicode text and journals only dig
   assert.equal(result.draft_exact, true);
   assert.equal(result.wizard_commit_verified, false);
   assert.equal(f.state.uncertain, false);
-  assert.deepEqual(f.calls, ['click', 'Control+A', 'Backspace', 'insertText']);
+  assert.deepEqual(f.calls, ['click', 'ControlOrMeta+A', 'Backspace', 'insertText']);
   assert.deepEqual(f.events.map(event => event.phase), ['javascript_source_write_prepared',
     'javascript_source_write_mutation_dispatch', 'javascript_source_write_draft_verified']);
   assert.ok(f.events.every(event => !JSON.stringify(event).includes('Привет')
