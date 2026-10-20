@@ -39,7 +39,7 @@ export function decideBrowserRecovery(basis, facts) {
 
 export function classifyBrowserRecovery(view, history = []) {
   if (view.state === 'running' || (view.status === 'NOT_APPLIED' && view.effect_possible === false) ||
-    view.execution_status === 'cancelled' || view.error_code === 'LOGIN_REQUIRED' || view.transport_uncertain ||
+    view.cancel_requested || view.execution_status === 'cancelled' || view.error_code === 'LOGIN_REQUIRED' || view.transport_uncertain ||
     view.capability === 'artifact.upload' || view.browser_recovery_stopped || view.recovery_receipt_id) return null;
   const refused = view.state === 'pending' && view.pending_phase != null &&
     view.release_refused?.user_action && view.release_refused.phase === view.pending_phase;

@@ -1600,6 +1600,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       document_id:storage?.document_id??operation.checkpoint?.document_id??request?.document_id,
       package_path:request?.path,reconciled:operation.browserRecoveryReconciled===operation.outcome,
       release_refused:operation.releaseRefused,transport_uncertain:operation.transportUncertain,
+      cancel_requested:operation.cancelRequested===true||nodeJobs.has(operation.id)&&nodeJobs.status(operation.id).cancel_requested,
       recovery_options:advice.recovery_options,next_tools:advice.next_steps.map(step=>step.tool),
       internal_resume_available:advice.internal_resume_available,user_action:operation.releaseRefused?.user_action,
       browser_recovery_stopped:operation.browserRecoveryStopped,recovery_receipt_id:operation.browserRecoveryReceiptId};
@@ -1627,7 +1628,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const reply=structuredClone(outcome);
     if(!reply.output)return reply;
     const previous=reply.output.browser_recovery;
-    delete reply.output.browser_recovery;
+    if(previous?.basis)delete reply.output.browser_recovery;
     if(reply.output.outcome)reply.output.outcome=recoveryReply(operation,reply.output.outcome,allowRunning);
     if(reply.output.original_outcome)reply.output.original_outcome=recoveryReply(operation,reply.output.original_outcome,allowRunning);
     if(!['node.apply','operation.inspect'].includes(reply.action_key)
@@ -2289,7 +2290,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const basis=recoveryBasis(operation);
       if(!basis)throw Error('Browser recovery basis unavailable');
       const decision=decideBrowserRecovery(basis,facts);
-      if(decision.result==='unresolved')return {result:'unresolved',next_step:{instruction:'Required runtime facts remain unverified. Continue recovery within its remaining budget or report the factual state.'}};
+      if(decision.result==='unresolved')return {result:'unresolved',next_step:{instruction:
+        'Required runtime facts remain unverified: '+decision.missing.join(', ')+'. '
+        +(decision.verified.execution&&decision.missing.includes('output_schema')
+          ?'Execution is verified, but the output schema was not read. Do not change or execute the node again. Close unrelated windows and call finish again within the remaining recovery budget, or report the factual state.'
+          :'Continue recovery within its remaining budget or report the factual state.')}};
       const request=operation.nodeApply?.request??operation.parameters;
       const receiptId=attemptId+':receipt';
       checkId(receiptId);
@@ -2316,6 +2321,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
             node:structuredClone(operation.nodeApply?.node),execution:structuredClone(decision.verified.execution),
             output:{ports:structuredClone(verified.output_schema?.ports??[])},verified,
             configuration:{status:'attested_by_model',attested_by_model:structuredClone(attested)},cleanup_complete:true}}};
+      const state=operation.nodeApply;
+      const linkOnly=!state||operation.outcome.output?.checkpoint_kind==='local_node_released'
+        ||basis.effect==='export'&&!state.pending&&state.cleanup_complete===true;
+      const result=linkOnly?{...operation.outcome.output,...(state?{recovery_receipt_id:receiptId}
+        :{browser_recovery:{receipt_id:receiptId,result:decision.result}})}
+        :{...operation.outcome.output,status:'FAILED',checkpoint_kind:'local_node_released',
+          released_phase:state.pending.phase,released_by:'browser_recovery',recovery_receipt_id:receiptId,
+          pending_phase:null,cleanup_complete:true,
+          error:{code:'NODE_OPERATION_RELEASED',message:'The stopped phase was released after browser recovery verification; the original Dock operation did not succeed.',cause:structuredClone(operation.outcome.error)},
+          next_step:nextStep};
+      const outcome=linkOnly?{...operation.outcome,output:structuredClone(result)}:nodeApplyOutcome(operation,result);
+      const retainedResult=state?structuredClone(result):null;
       const event={operation_id:receiptId,action_key:'browser.recovery',action_revision:'1',phase:'browser_recovery_verified',
         parameters:receipt.parameters,result:receipt.outcome.output,facts:structuredClone(facts)};
       running=true;
@@ -2327,21 +2344,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return {result:'unresolved',error:{code:'RECOVERY_RECEIPT_UNCONFIRMED',message:String(error.message??error)}};
       }finally{running=false;}
       operations.set(receiptId,receipt);
-      const state=operation.nodeApply;
-      if(!state){
-        operation.outcome.output={...operation.outcome.output,browser_recovery:{receipt_id:receiptId,result:decision.result}};
-      }else if(operation.outcome.output?.checkpoint_kind==='local_node_released'){
-        operation.outcome.output.recovery_receipt_id=receiptId;
-        state.result=structuredClone(operation.outcome.output);
-      }else{
-        const result={...operation.outcome.output,status:'FAILED',checkpoint_kind:'local_node_released',
-          released_phase:state.pending.phase,released_by:'browser_recovery',recovery_receipt_id:receiptId,
-          pending_phase:null,cleanup_complete:true,
-          error:{code:'NODE_OPERATION_RELEASED',message:'The stopped phase was released after browser recovery verification; the original Dock operation did not succeed.',cause:structuredClone(operation.outcome.error)},
-          next_step:nextStep};
-        state.pending=null;state.cleanup_complete=true;state.result=structuredClone(result);
-        operation.outcome=nodeApplyOutcome(operation,result);operation.cleanupConfirmed=true;
-      }
+      operation.outcome=outcome;
+      if(state)state.result=retainedResult;
+      if(!linkOnly){state.pending=null;state.cleanup_complete=true;operation.cleanupConfirmed=true;}
       operation.browserRecoveryReceiptId=receiptId;
       if(nodeJobs.has(operation.id))nodeJobs.settle(operation.id,operation.outcome);
       if(pending===verification)pending=null;
@@ -3004,7 +3009,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         }
         if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)pending=null;
         completedOutcome=structuredClone(operation.outcome);
-      }finally{running=false;}
+      }finally{operation.cancelRequested ||= signal?.aborted===true;running=false;}
       completedOutcome=recoveryReply(operation,completedOutcome);
       if(completedOutcome.output?.browser_recovery){
         const journalError=await recordRecoveryBasis(operation);
