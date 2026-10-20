@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
 import {ToolSchema} from '@modelcontextprotocol/sdk/types.js';
 import {createConnection} from '@playwright/mcp';
-import {createBrowserRecovery, RECOVERY_BROWSER_TOOLS, browserRecoveryTool, recoveryBrowserCatalog, admitRecoveryBrowserCall} from '../lib/browser-recovery.mjs';
+import {createBrowserRecovery, RECOVERY_BROWSER_TOOLS, browserRecoveryTool, recoveryBrowserCatalog, admitRecoveryBrowserCall, parseRecoveryPageProbe} from '../lib/browser-recovery.mjs';
 
 async function pinnedBrowserTools() {
   const server = await createConnection({capabilities: ['core', 'vision'], snapshot: {mode: 'none'}}, async () => {
@@ -118,14 +119,232 @@ function runtime(options = {}) {
 const base = ['find', 'dock_diagnostics', 'dock_node_apply', 'dock_operation_recover'].map(name => ({name}));
 function recovery(options = {}) {
   const events = [], browserCalls = [];
-  return Object.assign(createBrowserRecovery({runtime: runtime(), definitions: [{name: 'browser_click'}],
+  return Object.assign(createBrowserRecovery({runtime: runtime(), definitions: [{name: 'browser_click',
+    inputSchema: {type: 'object', additionalProperties: false, required: ['target'], properties: {target: {type: 'string'}}}}],
     callBrowser: async (...args) => { browserCalls.push(args); return {content: []}; },
-    probePage: async () => ({verified: true}), now: () => 0, record: async event => { events.push(event); }, ...options}), {events, browserCalls});
+    probePage: async () => ({origin_ok: true, page_count: 1, document_present: true}),
+    now: () => 0, record: async event => { events.push(event); }, ...options}), {events, browserCalls});
 }
 const start = (r, id = 'apply', options = {}) => r.call('dock_browser_recovery', {action: 'start', operation_id: id}, options);
 const meta = reply => reply._meta['loginom/browser_recovery'];
 const allowed = (r, name, args) => r.dockAllowed(name, args, r.captureDockAdmission());
 const noted = (r, name, args, outcome) => r.noteDockCall(name, args, outcome, r.captureDockAdmission());
+const click = (r, signal) => r.call('browser_click', {target: 'e1'}, {signal});
+
+test('a journal failure preserves a confirmed browser result and exposes the diagnostic', async () => {
+  const native = {content: [{type: 'text', text: 'Confirmed click'}]};
+  const r = recovery({callBrowser: async () => native, record: async () => { throw Error('journal unavailable'); }});
+  await start(r);
+  const reply = await click(r);
+  assert.deepEqual(reply.content, native.content);
+  assert.equal(meta(reply).state, 'browser');
+  assert.match(meta(reply).journal_error, /journal unavailable/);
+});
+
+test('release at the final journal await boundary preserves a confirmed native browser result', async () => {
+  for (let boundary = 0; boundary < 8; boundary++) {
+    const journal = deferred(), entered = deferred(), native = {content: [{type: 'text', text: 'Confirmed click'}]};
+    const r = recovery({callBrowser: async () => native, record: async event => {
+      if (event.phase === 'browser_recovery_call') { entered.resolve(); await journal.promise; }
+    }});
+    await start(r);
+    const clicked = click(r);
+    await entered.promise;
+    journal.resolve();
+    for (let i = 0; i < boundary; i++) await Promise.resolve();
+    const released = r.release('run_released');
+    const reply = await clicked;
+    await released;
+    assert.ok(reply.content.some(block => block.text === 'Confirmed click'), `boundary ${boundary}`);
+    assert.equal(r.active(), false);
+    assert.equal(r.hasUnsettledWork(), true);
+  }
+});
+
+test('the call journal counts UTF8 bytes, elapsed browser time and image digests without image data', async () => {
+  let clock = 0;
+  const data = 'iVBORw0KGgo=', text = 'Привет 👋';
+  const native = {content: [{type: 'text', text}, {type: 'image', mimeType: 'image/png', data}]};
+  const r = recovery({definitions: recoveryBrowserCatalog(await pinnedBrowserTools()), now: () => clock,
+    callBrowser: async () => { clock += 100; return native; },
+    probePage: async () => { clock += 50; return {origin_ok: true, page_count: 1, document_present: true}; }});
+  await start(r);
+  clock = 1000;
+  const reply = await r.call('browser_take_screenshot', {scale: 'css'});
+  assert.deepEqual(reply.content, native.content);
+  assert.deepEqual(r.events.find(event => event.phase === 'browser_recovery_call'), {
+    phase: 'browser_recovery_call', attempt_id: 'br-1', tool: 'browser_take_screenshot', arguments: {scale: 'css'},
+    duration_ms: 150, is_error: false, text_bytes: Buffer.byteLength(text, 'utf8'),
+    images: [{mime: 'image/png', bytes: 8, sha256: createHash('sha256').update(Buffer.from(data, 'base64')).digest('hex')}],
+    page: {origin_ok: true, page_count: 1, document_present: true}, calls_remaining: 29, ms_remaining: 598850,
+  });
+  assert.equal(JSON.stringify(r.events).includes(data), false);
+  assert.equal(meta(reply).ms_remaining, 598850);
+});
+
+test('a failed or timed out call or probe remains unconfirmed with no retry or safe UI cleanup', async () => {
+  for (const failed of ['call', 'probe', 'protocol']) {
+    let calls = 0, probes = 0;
+    const native = {content: [{type: 'text', text: 'Native detail after possible effect'}], isError: failed === 'protocol'};
+    const r = recovery({runtime: runtime({browserRecoverySafeCompletion: () => safeStep}),
+      callBrowser: async () => { calls++; if (failed === 'call') throw Error('MCP request timed out'); return native; },
+      probePage: async () => { probes++; if (failed === 'probe') throw Error('probe disconnected');
+        return {origin_ok: true, page_count: 1, document_present: true}; },
+    });
+    await start(r);
+    const reply = await click(r);
+    assert.equal(reply.structuredContent.error.code, 'BROWSER_CALL_UNCONFIRMED');
+    assert.equal(reply.structuredContent.stop_reason, 'browser_call_unconfirmed');
+    if (failed !== 'call') assert.ok(reply.content.some(block => block.text === native.content[0].text));
+    assert.equal(calls, 1);
+    assert.equal(probes, failed === 'call' ? 0 : 1);
+    assert.equal(r.active(), false);
+    assert.equal(r.hasUnsettledWork(), true);
+    assert.equal(allowed(r, 'dock_operation_recover', safeArgs), false);
+    assert.equal(reply.structuredContent.next_step.tool, undefined);
+    assert.equal((await click(r)).structuredContent.error.code, 'BROWSER_RECOVERY_INACTIVE');
+    assert.equal((await start(r, 'new')).structuredContent.error.code, 'BROWSER_RECOVERY_ACTIVE');
+    assert.equal(r.events.filter(event => event.phase === 'browser_recovery_call').length, 1);
+  }
+});
+
+test('stop during an unconfirmed browser call never permits safe release after a successful page probe', async () => {
+  for (const fail of ['timeout', 'protocol']) {
+    const pending = deferred(), entered = deferred();
+    const r = recovery({runtime: runtime({browserRecoverySafeCompletion: () => safeStep}), callBrowser: async () => {
+      entered.resolve(); await pending.promise;
+      if (fail === 'timeout') throw Error('timed out');
+      return {content: [{type: 'text', text: 'Error after gesture'}], isError: true};
+    }});
+    await start(r);
+    const clicked = click(r);
+    await entered.promise;
+    const stopped = r.release('run_released');
+    pending.resolve();
+    const reply = await clicked;
+    await stopped;
+    assert.equal(reply.structuredContent.error.code, 'BROWSER_CALL_UNCONFIRMED');
+    assert.equal(reply.structuredContent.stop_reason, 'run_released');
+    assert.equal(reply.structuredContent.next_step.tool, undefined);
+    assert.equal(allowed(r, 'dock_operation_recover', safeArgs), false);
+    assert.equal(r.hasUnsettledWork(), true);
+  }
+});
+
+test('calls from an old catalog cannot dispatch after stop', async () => {
+  const r = recovery();
+  await start(r);
+  assert.ok(r.tools(base).some(tool => tool.name === 'browser_click'));
+  await r.call('dock_browser_recovery', {action: 'stop', reason: 'done'});
+  assert.equal((await click(r)).structuredContent.error.code, 'BROWSER_RECOVERY_INACTIVE');
+  assert.equal(r.browserCalls.length, 0);
+});
+
+test('pre-aborted or exhausted calls never dispatch, and rejected arguments never spend the budget', async () => {
+  const definitions = recoveryBrowserCatalog(await pinnedBrowserTools());
+  for (const expired of ['cancelled', 'time', 'calls']) {
+    let clock = 0;
+    const r = recovery({definitions, now: () => clock});
+    await start(r);
+    for (const [name, args] of [['browser_run_code_unsafe', {}], ['browser_click', {target: 'e1', unknown: true}],
+      ['browser_snapshot', {filename: 'leak.txt'}], ['browser_take_screenshot', {scale: 'css', filename: 'leak.png'}]]) {
+      const reply = await r.call(name, args);
+      assert.match(reply.structuredContent.error.code, /^BROWSER_RECOVERY_(TOOL|ARGUMENT)_FORBIDDEN$/);
+      assert.equal(meta(reply).calls_remaining, 30);
+      assert.equal(r.browserCalls.length, 0);
+    }
+    const controller = new AbortController();
+    if (expired === 'cancelled') controller.abort();
+    if (expired === 'time') clock = 600000;
+    if (expired === 'calls') for (let i = 0; i < 30; i++) await click(r);
+    const count = r.browserCalls.length;
+    const reply = await click(r, controller.signal);
+    assert.equal(reply.structuredContent.stop_reason, expired === 'cancelled' ? 'cancelled' : 'budget_exhausted');
+    if (expired !== 'cancelled') assert.equal(reply.structuredContent.error.code, 'BROWSER_RECOVERY_BUDGET_EXHAUSTED');
+    assert.equal(r.browserCalls.length, count);
+    assert.equal(meta(reply).calls_remaining, expired === 'calls' ? 0 : 30);
+  }
+});
+
+test('cancel, stop and release drain accepted browser calls and probes without losing their native result', async () => {
+  for (const phase of ['call', 'probe']) for (const reason of ['cancelled', 'model_stop', 'run_released']) {
+    const pending = deferred(), entered = deferred(), controller = new AbortController();
+    const calls = [], native = {content: [{type: 'text', text: 'Confirmed native result'}], structuredContent: {receipt: 'native'}};
+    const r = recovery({callBrowser: async (...args) => {
+      calls.push(args);
+      if (phase === 'call') { entered.resolve(); await pending.promise; }
+      return native;
+    }, probePage: async (...args) => {
+      assert.deepEqual(args, []);
+      if (phase === 'probe') { entered.resolve(); await pending.promise; }
+      return {origin_ok: true, page_count: 1, document_present: true};
+    }});
+    await start(r);
+    const called = click(r, controller.signal);
+    await entered.promise;
+    const stopping = reason === 'cancelled' ? controller.abort() : reason === 'model_stop'
+      ? r.call('dock_browser_recovery', {action: 'stop', reason: 'done'}) : r.release(reason);
+    assert.equal(r.hasUnsettledWork(), true);
+    pending.resolve();
+    const reply = await called;
+    await stopping;
+    assert.notEqual(reply.isError, true);
+    assert.equal(meta(reply).state, 'stopped');
+    assert.equal(reply.structuredContent.stop_reason, reason);
+    assert.ok(reply.content.some(block => block.text === native.content[0].text));
+    assert.deepEqual(reply.structuredContent.browser_result, native.structuredContent);
+    assert.deepEqual(calls, [['browser_click', {target: 'e1'}]]);
+    assert.equal((await click(r)).structuredContent.error.code, 'BROWSER_RECOVERY_INACTIVE');
+  }
+});
+
+test('a navigation, a second page or a missing prepared document stops the attempt', async () => {
+  for (const page of [{origin_ok: false, page_count: 1, document_present: true},
+    {origin_ok: true, page_count: 2, document_present: true}, {origin_ok: true, page_count: 1, document_present: false}]) {
+    const r = recovery({probePage: async () => page,
+      runtime: runtime({browserRecoverySafeCompletion: () => safeStep})});
+    await start(r);
+    const reply = await click(r);
+    assert.equal(reply.structuredContent.error.code, 'BROWSER_RECOVERY_PAGE_CHANGED');
+    assert.equal(reply.structuredContent.stop_reason, 'page_changed');
+    assert.equal(reply.structuredContent.next_step.tool, undefined);
+    assert.equal(reply.structuredContent.summary.tools.length, 1);
+    assert.equal((await click(r)).structuredContent.error.code, 'BROWSER_RECOVERY_INACTIVE');
+    assert.equal(r.browserCalls.length, 1);
+    assert.equal(r.hasUnsettledWork(), true);
+    assert.equal(allowed(r, 'dock_operation_recover', safeArgs), false);
+    assert.equal((await start(r, 'new')).structuredContent.error.code, 'BROWSER_RECOVERY_ACTIVE');
+  }
+});
+
+test('accepted browser calls use published arguments, probe after the call and preserve the native result', async () => {
+  const order = [], native = {content: [{type: 'text', text: 'Clicked'}], structuredContent: {native: true}};
+  const r = recovery({
+    callBrowser: async (...args) => { order.push(['call', ...args]); return native; },
+    probePage: async (...args) => { order.push(['probe', ...args]); return {origin_ok: true, page_count: 1, document_present: true}; },
+    record: async event => { order.push(['journal', event.phase]); },
+  });
+  await start(r);
+  const reply = await click(r);
+  assert.deepEqual(reply.content, native.content);
+  assert.deepEqual(reply.structuredContent, native.structuredContent);
+  assert.deepEqual(order, [['call', 'browser_click', {target: 'e1'}], ['probe'], ['journal', 'browser_recovery_call']]);
+  assert.equal(meta(reply).state, 'browser');
+  assert.equal(meta(reply).calls_remaining, 29);
+});
+
+test('page probe parsing accepts complete MCP results and fails closed on incomplete or error replies', () => {
+  const good = {origin_ok: true, page_count: 1, document_present: true};
+  const text = value => ({content: [{type: 'text', text: JSON.stringify(value)}]});
+  assert.deepEqual(parseRecoveryPageProbe(text(good)), good);
+  assert.deepEqual(parseRecoveryPageProbe(text({...good, unrelated: 'omit from journal'})), good);
+  assert.deepEqual(parseRecoveryPageProbe({content: [{type: 'text', text: `### Result\n${JSON.stringify(good)}\n### Ran code\n...`}]}), good);
+  for (const response of [undefined, {}, {content: {}}, text({origin_ok: true}), text({...good, page_count: '1'}),
+    text({...good, document_present: 1}), text({...good, page_count: -1}), {...text(good), isError: true},
+    {content: [{type: 'text', text: 'not JSON'}]}]) {
+    assert.deepEqual(parseRecoveryPageProbe(response), {origin_ok: false, page_count: 0, document_present: false});
+  }
+});
 
 test('start enters browser only after a verified handoff', async () => {
   const r = recovery();

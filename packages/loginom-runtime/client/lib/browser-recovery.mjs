@@ -1,5 +1,6 @@
 import {BROWSER_RECOVERY_BUDGET, browserRecoveryStepKey} from './browser-recovery-basis.mjs';
 import {validateActionParameters} from './action-catalog.mjs';
+import {createHash} from 'node:crypto';
 
 export const RECOVERY_BROWSER_TOOLS = Object.freeze([
   'browser_snapshot', 'browser_find', 'browser_take_screenshot', 'browser_click',
@@ -51,9 +52,40 @@ export function admitRecoveryBrowserCall(name, args, publishedTools) {
   }
 }
 
+export function makeRecoveryPageProbeCode({origin, documentId, sessionId, account, loginomBuild}) {
+  return `async page => ({...await page.evaluate(${readRecoveryPage.toString()},
+    ${JSON.stringify({origin, documentId, sessionId, account, loginomBuild})}), page_count: page.context().pages().length})`;
+}
+
+function readRecoveryPage(expected) {
+  const app = globalThis.bg?.app, prep = globalThis.__loginomDockPreparationV1;
+  const connection = app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection;
+  return {
+    origin_ok: location.origin === expected.origin,
+    document_present: app?.Version === expected.loginomBuild && prep?.document === document && prep.id === expected.documentId
+      && prep.receipts instanceof Map && [...prep.receipts.values()].some(receipt => {
+        try { return JSON.parse(receipt.request).session === expected.sessionId; } catch { return false; }
+      }) && connection?.Connected === true && connection.UserName === expected.account,
+  };
+}
+
+export function parseRecoveryPageProbe(response) {
+  if (!response?.isError && Array.isArray(response?.content)) for (const block of response.content) {
+    if (block?.type !== 'text') continue;
+    let page;
+    try { page = JSON.parse(block.text.match(/^### Result\n([\s\S]*?)(?:\n### |$)/)?.[1] ?? block.text); }
+    catch { continue; }
+    if (typeof page?.origin_ok === 'boolean' && typeof page.document_present === 'boolean'
+      && Number.isInteger(page.page_count) && page.page_count >= 0) return {
+      origin_ok: page.origin_ok, page_count: page.page_count, document_present: page.document_present,
+    };
+  }
+  return {origin_ok: false, page_count: 0, document_present: false};
+}
+
 const remoteTools = new Set(['find', 'search', 'read', 'grep', 'glob', 'list', 'tree']);
 
-export function createBrowserRecovery({runtime, definitions, record, now = Date.now}) {
+export function createBrowserRecovery({runtime, definitions, callBrowser, probePage, record, now = Date.now}) {
   let attempt;
   let sequence = 0;
   const budgets = new Map();
@@ -80,7 +112,8 @@ export function createBrowserRecovery({runtime, definitions, record, now = Date.
         attested_by_model: attempt.attested ?? null}, next_step: safeCompletion(attempt)} : {})};
     return {content: [{type: 'text', text: JSON.stringify(structuredContent)}], structuredContent,
       ...(fields.error ? {isError: true} : {}),
-      _meta: {'loginom/browser_recovery': {attempt_id: attempt?.id ?? null, state, ...remaining(attempt?.key)}}};
+      _meta: {'loginom/browser_recovery': {attempt_id: attempt?.id ?? null, state, ...remaining(attempt?.key),
+        ...(attempt?.journalError ? {journal_error: attempt.journalError} : {})}}};
   }
   async function journal(current, event) {
     try { await record(event); }
@@ -201,8 +234,49 @@ export function createBrowserRecovery({runtime, definitions, record, now = Date.
         ...(attempt.state === 'browser' ? definitions : [])];
     },
     async call(name, args, {signal} = {}) {
-      if (name !== browserRecoveryTool.name) return reply({error: {code: RECOVERY_BROWSER_TOOLS.includes(name)
-        ? 'BROWSER_RECOVERY_INACTIVE' : 'BROWSER_RECOVERY_TOOL_FORBIDDEN'}});
+      if (name !== browserRecoveryTool.name) {
+        if (attempt?.state !== 'browser') return reply({error: {code: RECOVERY_BROWSER_TOOLS.includes(name)
+          ? 'BROWSER_RECOVERY_INACTIVE' : 'BROWSER_RECOVERY_TOOL_FORBIDDEN'}});
+        try { args = admitRecoveryBrowserCall(name, args, definitions); }
+        catch (error) { return reply({error: {code: error.message}}); }
+        const current = attempt;
+        if (signal?.aborted) return stop(current, 'cancelled');
+        if (exhausted(current)) return stop(current, 'budget_exhausted', {error: {code: 'BROWSER_RECOVERY_BUDGET_EXHAUSTED'}});
+        budgets.get(current.key).calls++;
+        let result;
+        const status = await accepted(current, async () => {
+          const started = now();
+          let page, failure;
+          try {
+            result = await callBrowser(name, args);
+            page = await probePage();
+          } catch (error) { failure = String(error.message ?? error).slice(0, 1000); }
+          // Native Playwright errors carry no trusted no-effect receipt.
+          current.unknown = failure != null || result?.isError === true;
+          current.pageChanged = !current.unknown && (page?.origin_ok !== true || page.page_count !== 1 || page.document_present !== true);
+          const event = {phase: 'browser_recovery_call', attempt_id: current.id, tool: name, arguments: args,
+            duration_ms: Math.max(0, now() - started), is_error: current.unknown,
+            text_bytes: (result?.content ?? []).filter(block => block.type === 'text')
+              .reduce((bytes, block) => bytes + Buffer.byteLength(block.text, 'utf8'), 0),
+            images: (result?.content ?? []).filter(block => block.type === 'image').map(block => {
+              const bytes = Buffer.from(block.data, 'base64');
+              return {mime: block.mimeType, bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex')};
+            }), page: page ?? null, ...remaining(current.key), ...(failure != null ? {error: failure} : {})};
+          current.tools.push(event);
+          await journal(current, event);
+          if (current.stopReason || current.unknown || current.pageChanged) {
+            return stop(current, current.stopReason ?? (current.unknown ? 'browser_call_unconfirmed' : 'page_changed'),
+              current.unknown ? {error: {code: 'BROWSER_CALL_UNCONFIRMED'}}
+                : current.pageChanged ? {error: {code: 'BROWSER_RECOVERY_PAGE_CHANGED'}} : {});
+          }
+          return reply();
+        }, signal);
+        if (status.structuredContent.state === 'stopped') return {...status,
+          content: [...(result?.content ?? []), ...status.content],
+          structuredContent: {...status.structuredContent, browser_result: result?.structuredContent ?? null},
+          _meta: {...result?._meta, ...status._meta}};
+        return {...result, _meta: {...result._meta, ...status._meta}};
+      }
       try { validateActionParameters(browserRecoveryTool.inputSchema, args); }
       catch { return reply({error: {code: 'BROWSER_RECOVERY_ARGUMENT_FORBIDDEN'}}); }
       if (args.action === 'finish') {

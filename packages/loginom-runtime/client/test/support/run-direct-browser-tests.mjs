@@ -26,7 +26,7 @@ try {
     delete environment.DBUS_SESSION_BUS_ADDRESS;
     delete environment.WAYLAND_DISPLAY;
   }
-  const args = ['--test', '--test-concurrency=1', 'test/windows-crypto-probe.test.mjs', 'test/browser-proxy.integration.test.mjs', 'test/browser-downloads.integration.test.mjs'];
+  const args = ['--test', '--test-concurrency=1', 'test/windows-crypto-probe.test.mjs', 'test/browser-proxy.integration.test.mjs', 'test/browser-downloads.integration.test.mjs', 'test/browser-recovery-probe.integration.test.mjs'];
   const child = process.platform === 'linux'
     ? spawn('dbus-run-session', ['--', 'xvfb-run', '-a', process.execPath, ...args], {env:environment, cwd:fileURLToPath(new URL('../../', import.meta.url)), stdio:'inherit'})
     : spawn(process.execPath, args, {env:environment, cwd:fileURLToPath(new URL('../../', import.meta.url)), stdio:'inherit'});
