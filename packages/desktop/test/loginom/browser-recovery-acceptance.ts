@@ -6,7 +6,10 @@ import assert from "node:assert/strict"
 
 process.umask(0o077)
 const scenario = process.argv[2]
-assert.ok(scenario === "BR-S1" || scenario === "BR-S2" || scenario === "BR-S3", "Expected BR-S1, BR-S2 or BR-S3")
+assert.ok(
+  scenario === "BR-S1" || scenario === "BR-S2" || scenario === "BR-S3" || scenario === "BR-S4",
+  "Expected BR-S1, BR-S2, BR-S3 or BR-S4",
+)
 assert.equal(process.argv.length, 4, "Expected scenario and one private saved-A manifest path")
 const seed = await Bun.file(resolve(process.argv[3]!)).json()
 assert.equal(seed.label, "A")
@@ -49,7 +52,7 @@ const child = await supervise({
     {
       kind: "phase_stop",
       node_type: scenario === "BR-S2" ? "exports.text" : "transform.calculator",
-      phase: "configure",
+      phase: scenario === "BR-S4" ? "execute" : "configure",
       code: "UI_SCAN_LIMIT",
       times: scenario === "BR-S3" ? 3 : 1,
     },
@@ -265,44 +268,53 @@ try {
       mappings: [],
     })
   }
-  assert.equal(
-    scenario === "BR-S1" ? released.output?.browser_recovery?.basis?.trigger : stopped.next_step?.trigger,
-    scenario === "BR-S1" ? "T1" : scenario === "BR-S2" ? "T2" : "T3",
-  )
+  if (scenario === "BR-S4") {
+    assert.equal(released.status, "SUCCEEDED")
+    assert.equal(released.output.original_outcome.output.browser_recovery.next_step.trigger, "T4")
+    assert.equal(released.output.original_outcome.output.browser_recovery.next_step.effect, "execution")
+  }
+  if (scenario !== "BR-S4") {
+    assert.equal(
+      scenario === "BR-S1" ? released.output?.browser_recovery?.basis?.trigger : stopped.next_step?.trigger,
+      scenario === "BR-S1" ? "T1" : scenario === "BR-S2" ? "T2" : "T3",
+    )
+  }
   const operation = scenario === "BR-S3" ? "calculator-again" : request.operation_id
   const started = await call("dock_browser_recovery", { action: "start", operation_id: operation })
   assert.equal(started.state, "browser")
-  if (scenario === "BR-S2") assert.equal(started.budget.calls_remaining, 30)
+  if (scenario === "BR-S2" || scenario === "BR-S4") assert.equal(started.budget.calls_remaining, 30)
   assert.equal(started.recovery_input.node.node_id, stopped.node.node_id)
-  const wizard = `[data-tid="${started.recovery_input.workflow_ref.prefix};WizrdMCF"]`
-  // Canonical controls from node-wizard-close/calculator-node; refs are freshly observed, never inferred from position.
   const label = scenario === "BR-S3" ? "Выполнить" : "Отмена"
-  const button = scenario === "BR-S3" ? "btnExecute" : "btnClose"
-  const owned = await findOwnedControl(
-    `${wizard} [data-tid="${started.recovery_input.workflow_ref.prefix};WizrdMCF;${button}"]`,
-    wizard,
-  )
-  assert.ok(owned.snapshot.includes("Описание узла"), "Expected observed final wizard page")
-  await invoke("browser_click", { target: owned.ref })
-  if (scenario !== "BR-S3") {
-    const question = "Вы действительно хотите закрыть мастер настройки?"
-    const confirmation = text(await invoke("browser_find", { text: question }))
-    if (!confirmation.includes("No matches found for")) {
-      const dialog = ".x-message-box:visible"
-      const snapshot = text(await invoke("browser_snapshot", { target: dialog, depth: 6 }))
-      assert.ok(snapshot.includes(question) && snapshot.includes("Подтвердить"), "Unexpected cancellation question")
-      assert.ok(snapshot.includes("Да") && snapshot.includes("Нет"), "Unexpected cancellation choices")
-      const yes = await findOwnedControl(`${dialog} [data-tid="msgbox;tlb;yes"]`, dialog)
-      assert.ok(yes.snapshot.includes(question), "Cancellation question changed")
-      await invoke("browser_click", { target: yes.ref })
+  if (scenario !== "BR-S4") {
+    const wizard = `[data-tid="${started.recovery_input.workflow_ref.prefix};WizrdMCF"]`
+    // Canonical controls from node-wizard-close/calculator-node; refs are freshly observed, never inferred from position.
+    const button = scenario === "BR-S3" ? "btnExecute" : "btnClose"
+    const owned = await findOwnedControl(
+      `${wizard} [data-tid="${started.recovery_input.workflow_ref.prefix};WizrdMCF;${button}"]`,
+      wizard,
+    )
+    assert.ok(owned.snapshot.includes("Описание узла"), "Expected observed final wizard page")
+    await invoke("browser_click", { target: owned.ref })
+    if (scenario !== "BR-S3") {
+      const question = "Вы действительно хотите закрыть мастер настройки?"
+      const confirmation = text(await invoke("browser_find", { text: question }))
+      if (!confirmation.includes("No matches found for")) {
+        const dialog = ".x-message-box:visible"
+        const snapshot = text(await invoke("browser_snapshot", { target: dialog, depth: 6 }))
+        assert.ok(snapshot.includes(question) && snapshot.includes("Подтвердить"), "Unexpected cancellation question")
+        assert.ok(snapshot.includes("Да") && snapshot.includes("Нет"), "Unexpected cancellation choices")
+        const yes = await findOwnedControl(`${dialog} [data-tid="msgbox;tlb;yes"]`, dialog)
+        assert.ok(yes.snapshot.includes(question), "Cancellation question changed")
+        await invoke("browser_click", { target: yes.ref })
+      }
     }
+    await invoke("browser_wait_for", { textGone: "Описание узла" })
   }
-  await invoke("browser_wait_for", { textGone: "Описание узла" })
   const recovered = await call("dock_browser_recovery", {
     action: "finish",
     report: {
-      actions: [`Clicked ${label} in the owned wizard`],
-      result: "Wizard closed",
+      actions: scenario === "BR-S4" ? [] : [`Clicked ${label} in the owned wizard`],
+      result: scenario === "BR-S4" ? "No browser actions; verify the released execution" : "Wizard closed",
       settings: [
         scenario === "BR-S2"
           ? "Export draft cancelled; intended UTF-8 CSV settings will be reapplied through Dock"
@@ -311,7 +323,16 @@ try {
     },
   })
   assert.equal(recovered.state, "dock")
-  assert.equal(recovered.result, scenario === "BR-S3" ? "completed" : "continuable")
+  assert.equal(recovered.result, scenario === "BR-S3" || scenario === "BR-S4" ? "completed" : "continuable")
+  if (scenario === "BR-S4") {
+    assert.equal(recovered.verified.execution.verified, true)
+    assert.equal(recovered.verified.execution.owner_verified, true)
+    assert.equal(recovered.verified.execution.status, "completed")
+    assert.equal(recovered.verified.output_schema.verified, true)
+    assert.equal(recovered.next_step.tool, "dock_node_read")
+    assert.equal(recovered.next_step.arguments.source_operation_id, recovered.receipt_id)
+    assert.equal(recovered.budget.calls_remaining, 29)
+  }
   status.recovery = recovered
   let source = recovered.receipt_id
   if (scenario === "BR-S2") {
@@ -319,7 +340,7 @@ try {
     assert.equal(original.output.released_by, "browser_recovery")
     assert.equal(original.output.recovery_receipt_id, recovered.receipt_id)
   }
-  if (scenario !== "BR-S3") {
+  if (scenario === "BR-S1" || scenario === "BR-S2") {
     const resumed = await apply({
       ...request,
       operation_id: scenario === "BR-S2" ? "export-corrected" : "calculator-corrected",
@@ -439,6 +460,11 @@ try {
     })
     if (read.state === "running") read = await waitNode("read")
     assert.equal(read.status, "SUCCEEDED")
+    if (scenario === "BR-S4") {
+      const output = read.output.ports.find((item: { port: number }) => item.port === 0)
+      assert.equal(output.fresh, true)
+      assert.equal(output.execution_id, read.execution.execution_id)
+    }
     status.readSourceOperation = source
   }
   let saved = await invoke("dock_action_run", {
@@ -503,10 +529,13 @@ try {
     .map((line) => JSON.parse(line))
     .filter((event) => event.phase === "acceptance_fault_injected")
   status.faults = faults.map((event) => ({ kind: event.kind, phase: event.target_phase, remaining: event.remaining }))
-  const configure = faults.filter((event) => event.kind === "phase_stop" && event.target_phase === "configure")
+  const phaseFaults = faults.filter(
+    (event) => event.kind === "phase_stop" && event.target_phase === (scenario === "BR-S4" ? "execute" : "configure"),
+  )
+  if (scenario === "BR-S4" && journal.includes('"phase":"browser_recovery_call"')) status.status = "FAIL"
   if (
-    configure.length !== (scenario === "BR-S3" ? 2 : 1) ||
-    configure.at(-1)?.remaining !== (scenario === "BR-S3" ? 1 : 0)
+    phaseFaults.length !== (scenario === "BR-S3" ? 2 : 1) ||
+    phaseFaults.at(-1)?.remaining !== (scenario === "BR-S3" ? 1 : 0)
   )
     status.status = "FAIL"
   status.journalPhases = [
