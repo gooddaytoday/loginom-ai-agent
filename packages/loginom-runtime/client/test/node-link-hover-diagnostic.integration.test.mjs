@@ -45,6 +45,15 @@ test('covered link refusal preserves bounded real DOM blocker identity without a
    const diagnostic=JSON.parse(error.message.slice('Link hover source is covered: '.length));
    assert.equal(diagnostic.truncated,true);assert.equal(diagnostic.source_tid.length,208);assert.equal(diagnostic.anchor.tid.length,96);return true;
   });
+  await page.locator('#layer').evaluate(e=>{
+   e.setAttribute('data-tid','\u0000'.repeat(1000));e.className='"\n\\'.repeat(1000);
+   e.firstElementChild.className='\u0000'.repeat(1000);
+  });
+  await assert.rejects(refuse(),error=>{
+   assert.ok(error.message.length<=1000);
+   const diagnostic=JSON.parse(error.message.slice('Link hover source is covered: '.length));
+   assert.equal(diagnostic.truncated,true);assert.ok(diagnostic.anchor.tid.length<96);return true;
+  });
   assert.equal(moves,0);assert.equal(clicks,0);
  }finally{await browser.close();}
 });
