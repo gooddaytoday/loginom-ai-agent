@@ -7,13 +7,14 @@ import {nodeJobResultSchema} from '../lib/node-result-schema.mjs';
 import {inspectPendingWizardOpen} from '../lib/node-wizard-open.mjs';
 import {preflightCalculatorSource} from '../lib/calculator-preflight.mjs';
 import {actions} from './support/executor-fixture.mjs';
+import {compactActionResult} from '../lib/user-results.mjs';
 const validateJob=new AjvJsonSchemaValidator().getValidator(nodeJobResultSchema);
 const assertJob=job=>{const result=validateJob(job);assert.equal(result.valid,true,result.errorMessage);};
 const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]};
 const request=()=>({operation_id:'apply',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
  target:{kind:'new',type:'imports.text',label:'Source',position:{x:320,y:280}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'done',
  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
-function fixture({execute=async()=>{throw Error('Unexpected public transport')},wrapDrivers,now=Date.now,pinnedActions=new Map()}={}){
+function fixture({execute=async()=>{throw Error('Unexpected public transport')},wrapDrivers,now=Date.now,pinnedActions=new Map(),browserRecovery=false}={}){
  const calls=[],events=[];const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[],links:[],foreign_links:[]};
  const adapter={observe:async()=>structuredClone(graph),preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),reconcile:async()=>({verified:true,cleanup_complete:true}),mutate:async e=>{calls.push(e.kind);if(e.kind==='create')graph.nodes.push({ref:{document_id:'doc',workflow_id:'wf',node_id:'new'},type:e.parameters.type,label:'Source',position:e.parameters.position,inputs:[],outputs:[0]});return {status:'SUCCEEDED',cleanup_complete:true};}};
  const ok=(name,extra={})=>async()=>{calls.push(name);return {verified:true,cleanup_complete:true,effect_possible:false,...extra}};
@@ -23,7 +24,7 @@ function fixture({execute=async()=>{throw Error('Unexpected public transport')},
  let failRecord;
  const handlers=new Map([['imports.text',handler]]);
  const runtime=createActionRuntime({pinned:{actions:pinnedActions,selectors:new Map(),pins:{}},allowCandidate:pinnedActions.size>0,execute,now,
-  nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:handlers,nodeApplyDriverFactory:context=>wrapDrivers?wrapDrivers(context,drivers):drivers,
+  browserRecovery,nodeTargetAdapterFactory:()=>adapter,nodeApplyHandlers:handlers,nodeApplyDriverFactory:context=>wrapDrivers?wrapDrivers(context,drivers):drivers,
   onRecord:async e=>{events.push(e);if(e.phase===failRecord)throw Error('disk unavailable');return e;}});
  return {runtime,adapter,calls,events,graph,drivers,handler,handlers,failRecord:p=>{failRecord=p}};
 }
@@ -129,6 +130,56 @@ test('lost finish cannot be repeated, abandoned, or repaired through generic UI'
  await assert.rejects(f.runtime.uiAct({verb:'click',ref:'ui-1'},{operationId:'gesture',observationId:'obs',recoveryOperationId:'apply'}),/original node phase/);
  await assert.rejects(f.runtime.runNodeApply({...request(),operation_id:'other'}),/pending/);
  assert.equal(f.calls.length,count);assert.throws(()=>f.runtime.assertPreparationAllowed(),/uncertain/);
+});
+for (const browserRecovery of [false,true]) test('unsupported export input checkpoint explains the next model step, recovery flag '+browserRecovery,async()=>{
+ const f=fixture({browserRecovery});
+ f.handlers.set('exports.text',{...f.handler,fileOutput:true});
+ f.drivers.mapPorts=async()=>{f.calls.push('mapping');throw Error('Initial bound observation is no longer current or ready');};
+ const r=request();r.target.type='exports.text';
+ await f.runtime.startNodeApply(r);
+ const stopped=await f.runtime.waitNodeApply(r.operation_id,{timeoutMs:1000});
+ assert.equal(stopped.outcome.status,'AMBIGUOUS');assert.equal(stopped.outcome.phase,'input_mapping');
+ const count=f.calls.length;
+ const inspected=compactActionResult(await f.runtime.inspect({operationId:r.operation_id}));
+ assert.equal(inspected.output.state,'pending');assert.equal(inspected.output.cleanup_confirmed,false);
+ assert.deepEqual(inspected.output.recovery_options,[]);assert.equal(inspected.output.internal_resume_available,false);
+ assert.equal(inspected.output.next_step.tool,undefined);
+ assert.match(inspected.output.next_step.instruction,/exports.text.*input_mapping/);
+ assert.match(inspected.output.next_step.instruction,/operation_id and error/);
+ assert.match(inspected.output.next_step.instruction,/No dock_node_resume or dock_operation_recover strategy/);
+ assert.match(inspected.output.next_step.instruction,/package persistence remain unverified/);
+ await assert.rejects(f.runtime.recover(r.operation_id,{strategy:'abandon_operation',recoveryOperationId:'repair'}),/Release proof unavailable/);
+ assert.throws(()=>f.runtime.startNodeApply({operation_id:r.operation_id},{resume:true}),/unresolved phase/);
+ await assert.rejects(f.runtime.runNodeApply({...r,operation_id:'other'}),/pending/);
+ assert.equal(f.calls.length,count);assert.throws(()=>f.runtime.assertPreparationAllowed(),/uncertain/);
+});
+test('export input guidance preserves an admitted release and browser recovery',async()=>{
+ for (const browserRecovery of [false,true]) {
+  const f=fixture({browserRecovery});
+  f.handlers.set('exports.text',{...f.handler,fileOutput:true});
+  f.drivers.mapPorts=async()=>{throw Error('Initial bound observation is no longer current or ready');};
+  f.drivers.releasePending=async()=>{throw Error('not invoked by inspection');};
+  // With no admitted release phase, enabled browser recovery is the next path.
+  if(browserRecovery)f.drivers.releasePendingPhases=['finish'];
+  const r=request();r.target.type='exports.text';
+  await f.runtime.startNodeApply(r);await f.runtime.waitNodeApply(r.operation_id,{timeoutMs:1000});
+  const inspected=await f.runtime.inspect({operationId:r.operation_id});
+  assert.equal(inspected.output.next_step,undefined);
+  assert.equal(inspected.output.next_steps[0].tool,browserRecovery?'dock_browser_recovery':'dock_operation_recover');
+  assert.deepEqual(inspected.output.recovery_options,browserRecovery?[]:['abandon_operation']);
+ }
+});
+for (const fault of ['transport','other_type','other_phase']) test('export checkpoint advice does not classify '+fault,async()=>{
+ const f=fixture({wrapDrivers:(context,drivers)=>({...drivers,mapPorts:async()=>{
+  if(fault==='other_phase')return {verified:true,cleanup_complete:true};
+  if(fault==='transport')context.operation.transportUncertain=true;
+  throw Error('stopped');
+ },openWizard:async()=>{throw Error('stopped');}})});
+ f.handlers.set('exports.text',{...f.handler,fileOutput:true});
+ const r=request();if(fault!=='other_type')r.target.type='exports.text';
+ await f.runtime.startNodeApply(r);await f.runtime.waitNodeApply(r.operation_id,{timeoutMs:1000});
+ const inspected=await f.runtime.inspect({operationId:r.operation_id});
+ assert.equal(inspected.output.state,'pending');assert.equal(inspected.output.next_step,undefined);
 });
 test('a save behind a retained ambiguous configure returns that node outcome, not a phantom active call',async()=>{
  const f=fixture({pinnedActions:actions});

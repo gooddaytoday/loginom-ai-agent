@@ -1937,8 +1937,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const recoveryAdvice = operation => {
     const advice = dockRecoveryAdvice(operation);
     const trigger = browserRecoveryTrigger(operation, advice);
-    return trigger ? { ...advice, browser_recovery: trigger.reason,
-      next_steps: [browserRecoveryNext(operation, trigger), ...advice.next_steps] } : advice;
+    if (trigger) return { ...advice, browser_recovery: trigger.reason,
+      next_steps: [browserRecoveryNext(operation, trigger), ...advice.next_steps] };
+    if (operation && pending === operation && !operation.transportUncertain && !nodeJobs.busy
+      && operation.nodeApply?.request.target.type === 'exports.text'
+      && operation.nodeApply.pending?.phase === 'input_mapping'
+      && advice.internal_resume_available === false && !advice.recovery_options.length
+      && !advice.next_steps.some(next => next.tool === 'dock_node_resume')) return { ...advice,
+      next_step: { instruction: 'Report that this exports.text operation is blocked in input_mapping, citing its operation_id and error. '
+        + 'No dock_node_resume or dock_operation_recover strategy is available for this checkpoint. '
+        + 'Do not retry either tool, reapply the export with a new operation_id, use generic UI gestures, or save through the pending operation. '
+        + 'Read-only observation can describe the UI but cannot release this operation. Settings, execution, file output and package persistence remain unverified; do not report success.' } };
+    return advice;
   };
   const nodeRecoveryStep = operation => {
     const state = operation?.nodeApply;
