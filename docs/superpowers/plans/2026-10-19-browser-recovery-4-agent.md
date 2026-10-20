@@ -22,7 +22,7 @@
 
 - Готово, когда Tasks 1–4 закрыты; `bun test` и `bun typecheck` в `packages/loginom-host` и `packages/agent`, `bun test` в `packages/product` — зелёные.
 - Первый проверяемый результат — Task 1: настоящий Node host шлёт `run-released` существующему runtime и блокирует новый чат после падения runtime.
-- Объём: ~9 файлов, ~+400 / −20 строк.
+- Объём: ~11 файлов, ~+420 / −20 строк, включая короткие ACK нового IPC в затронутых тестовых фикстурах.
 - Исключения: runtime (его сторона `run-released` — план 3, Task 4), evals, release, правила разрешений.
 
 ## Review Focus
@@ -40,11 +40,13 @@
 - Modify: `packages/loginom-host/src/host-port.ts:86-91`
 - Create: `packages/loginom-host/test/browser-recovery-release.test.ts`
 - Modify: `packages/loginom-host/test/host-port.test.ts:118-136` (BR-S7)
+- Modify: `packages/loginom-host/test/task-scope.test.ts`, `packages/loginom-host/test/saved-package-shutdown.test.ts` — ACK `run-released` в существующих фикстурах, которые освобождают run с runtime.
 - Docs: `packages/loginom-host/AGENTS.md` (один пункт)
 
 **Interfaces:**
 - Consumes: runtime IPC `run-released` из плана 3, Task 4.
 - Produces: `release(id, run)` до `abandon` и `lease.release()` при `run.lease` и `service.hasRuntime(run.lease.generation, run.chat)` отправляет `request("run-released", undefined, 5000)`; ошибки игнорируются. Без runtime запрос не отправляется и runtime не создаётся.
+- Между `hasRuntime` и получением уже существующего runtime нет промежуточного `await`. Фикстуры затронутых release/close путей отвечают `{released: true}` на новый IPC; другие фикстуры меняются только при подтверждённом аналогичном пути или сбое suite. Глобальный test timeout не повышается, общий framework фикстур не вводится.
 - BR-S7, строгий режим восстановления (`strictRecovery: true`, в CLI — `LOGINOM_AI_AGENT_STRICT_RECOVERY=1`): падение runtime во время вызова, в том числе `dock_browser_recovery`, оставляет записи журнала pending, и `acquire` любого чата профиля отклоняется `LOGINOM_RECOVERY_REQUIRED` (`host-port.ts:133-134` проверяет `journal.pending()` для всего профиля). В режиме по умолчанию журнал мягкий (`packages/loginom-host/AGENTS.md`): runtime закрывается вместе с браузером, попытка не возобновляется, новые чаты не блокируются. Автоматического возобновления нет ни в одном режиме.
 
 - [ ] **Step 1: Write the failing tests**
@@ -74,7 +76,7 @@ await expect(client.request("acquire", { run: "other", session: "another-chat" }
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd packages/loginom-host && LOGINOM_AI_AGENT_TEST_NODE=<pinned node> bun test test/browser-recovery-release.test.ts test/host-port.test.ts`
+Run: `cd packages/loginom-host && LOGINOM_AI_AGENT_TEST_NODE=<pinned node> bun test test/browser-recovery-release.test.ts test/host-port.test.ts test/task-scope.test.ts test/saved-package-shutdown.test.ts`
 Expected: FAIL — `run-released` не отправляется. Проверка BR-S7 проходит уже сейчас: она фиксирует существующее поведение, на которое опирается дизайн (§6).
 
 - [ ] **Step 3: Implement** по Interfaces.
@@ -166,10 +168,10 @@ git commit -m "feat(agent): publish recovery screenshots only to image models"
 
 **Interfaces:**
 - Consumes: Task 2.
-- Produces: `BrowserRecovery.reminder(messages) → {attemptID: string; text: string} | undefined`.
-  - Рассматриваются сообщения после последнего сообщения пользователя с несинтетической частью (текущая задача).
+- Produces: `BrowserRecovery.reminder({sessionID, messages, revert}) → {attemptID: string; text: string} | undefined`; `messages` — полная persisted `history`, `revert` — текущая граница Session. Окно `msgs` после `filterCompacted` не используется для этого решения.
+  - Текущая задача и видимые сообщения/части определяются существующими `TaskScope.visible`, `TaskScope.derive` и `TaskScope.replayOf`. Compaction-only и replay не создают новую задачу; скрытые revert части и поздние assistant-ответы с родителем из другой задачи не участвуют. Второй алгоритм идентичности задачи, registry или persisted state не добавляется.
   - Берётся последняя часть `loginom_*` в состоянии `completed` или `error` с `metadata.loginomBrowserRecovery`. Напоминание нужно, если её `state === "browser"`, у последнего ответа ассистента нет `error`, а в текущей задаче нет синтетической части пользователя с `metadata.browser_recovery_reminder === attempt_id`.
-  - В `prompt.ts`, в блоке выхода (1329–1347) до `break`: при напоминании создаётся сообщение пользователя с одной синтетической текстовой частью (по образцу 448–464) и `metadata: {browser_recovery_reminder: attemptID}`, затем `continue`. `TaskScope.derive` не начинает по нему новую задачу (синтетический текст, `task-scope.ts:49-52`).
+  - В `prompt.ts`, в блоке выхода (1329–1347) до `break`: helper получает `{sessionID, messages: history, revert: session.revert}`; при напоминании создаётся сообщение пользователя с одной синтетической текстовой частью (по образцу 448–464) и `metadata: {browser_recovery_reminder: attemptID}`, затем `continue`. `TaskScope.derive` не начинает по нему новую задачу (синтетический текст, `task-scope.ts:49-52`).
 - Текст напоминания (точно):
 
 ```text
@@ -178,21 +180,23 @@ Browser recovery attempt {attempt_id} is still active. Continue the failed step 
 
 - [ ] **Step 1: Write the failing tests**
 
-В `browser-recovery.test.ts` — истории сообщений из фикстур `SessionV1`:
+В `browser-recovery.test.ts` — истории сообщений из фикстур `SessionV1`; `input(patch)` содержит sessionID, полную messages и при необходимости revert:
 
 ```ts
 test("an active attempt in the current task needs one reminder", () => {
-  expect(BrowserRecovery.reminder(history({ state: "browser" }))).toEqual({ attemptID: "br-1", text: expect.stringContaining("loginom_dock_browser_recovery") })
+  expect(BrowserRecovery.reminder(input({ state: "browser" }))).toEqual({ attemptID: "br-1", text: expect.stringContaining("loginom_dock_browser_recovery") })
 })
 test("a reminder already sent for the attempt is not repeated", () => {
-  expect(BrowserRecovery.reminder(history({ state: "browser", reminded: "br-1" }))).toBeUndefined()
+  expect(BrowserRecovery.reminder(input({ state: "browser", reminded: "br-1" }))).toBeUndefined()
 })
 test("dock, stopped, a failed reply that stopped the attempt, provider errors and earlier tasks need no reminder", () => {
   for (const patch of [{ state: "dock" }, { state: "stopped" }, { state: "browser", lastError: { state: "stopped" } },
     { state: "browser", assistantError: true }, { state: "browser", newTask: true }])
-    expect(BrowserRecovery.reminder(history(patch))).toBeUndefined()
+    expect(BrowserRecovery.reminder(input(patch))).toBeUndefined()
 })
 ```
+
+Focused регрессии сохраняют попытку и ранее отправленный marker через compaction-only/replay, исключают скрытые revert message/part и поздний receipt старой задачи. Они проверяют существующий контракт TaskScope, не вводят новых условий завершения продукта.
 
 В `prompt.test.ts` — заглушка host по образцу 1096–1110; модель скриптована тремя шагами:
 
