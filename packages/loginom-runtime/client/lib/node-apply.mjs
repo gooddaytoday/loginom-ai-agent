@@ -517,10 +517,14 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   // Export release proves only workspace cleanup. An unconfirmed launch may
   // already have written a file; never infer its settings or offer a replay.
   const exportRelease=request.target.type==='exports.text';
-  const configuration=readingOnly?{status:'not_requested'}:exportRelease?{status:'unknown'}:committed?{status:'applied',...(verified('finish')&&handler.configurationReadback
+  // Closing a stopped script wizard proves release, not the retained source,
+  // settings or any internal JavaScript materialization effects.
+  const javascriptDraft=request.target.type==='programming.javascript'&&request.mode==='script'
+    &&['input_mapping','open','configure'].includes(pending.phase);
+  const configuration=readingOnly?{status:'not_requested'}:exportRelease||javascriptDraft?{status:'unknown'}:committed?{status:'applied',...(verified('finish')&&handler.configurationReadback
     ?{readback:handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id})}:{})}
     :{status:proof.cleanup.wizard_closed&&!verified('node_finish')?'discarded':'unknown'};
-  const execution=exportRelease?{status:'unknown',execution_id:state.execution.execution_id??null}
+  const execution=exportRelease||javascriptDraft?{status:'unknown',execution_id:state.execution.execution_id??null}
     :['completed','failed','cancelled'].includes(state.execution.status)||!launch?state.execution
     :{status:'unknown',execution_id:state.execution.execution_id??null};
   // A released reread keeps its source unless that schema was observed stale.
