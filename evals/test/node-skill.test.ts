@@ -296,7 +296,7 @@ test("node skill: Ctrl+C preserves interruption and runs cleanup", async () => {
     expect(report.result).toMatchObject({ status: "interrupted", interrupted: true })
     expect(await Bun.file(path.join(report.attempt_dir, "cleanup.json")).exists()).toBe(true)
   } finally { await f.close() }
-}, 60000)
+}, 130000)
 
 test("node skill: standalone checker accepts explicit package and CSV", async () => {
   const caseDir = path.join(evalsRoot, "tasks/node-evals/crosstable-fixed-sum")

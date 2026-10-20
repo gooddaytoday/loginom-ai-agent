@@ -801,11 +801,13 @@ export async function superviseProcess(input: {
   unitActive = false
   clearTimeout(timer)
   input.signal?.removeEventListener("abort", abort)
-  const deadline = Date.now() + 60_000
+  // Slot CLI owns up to 90s of Host teardown before external escalation.
+  const interruptGraceMs = input.owner?.kind === "slot" ? 90_000 : 30_000
+  const deadline = Date.now() + interruptGraceMs + 30_000
   if (timedOut || interrupted) {
     await signalOwned("SIGINT")
     const grace = Promise.withResolvers<void>()
-    const graceTimer = setTimeout(grace.resolve, 30_000)
+    const graceTimer = setTimeout(grace.resolve, interruptGraceMs)
     try { await Promise.race([exited, grace.promise]) }
     finally { clearTimeout(graceTimer) }
   }

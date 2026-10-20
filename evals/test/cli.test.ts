@@ -375,7 +375,7 @@ test("runAgent: события сохраняются на диск до око�
     await Bun.sleep(400)
     expect(await Bun.file(path.join(outDir, "events.jsonl")).text()).toContain("ses_fixture03")
   } finally { controller.abort(); await pending }
-}, 35_000)
+}, 125_000)
 
 test("runAgent: no_artifact закрывает наблюдённого detached потомка и сохраняет исход", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-detached-"))
@@ -462,8 +462,8 @@ test("runAgent: timeout с отказом ownership ограничен и сох
   expect(run.processCleanup.processes.every((entry) => {
     try { process.kill(entry.pid, 0); return false } catch { return true }
   })).toBe(true)
-  expect(run.durationMs).toBeLessThan(60_000)
-}, 65_000)
+  expect(run.durationMs).toBeLessThan(125_000)
+}, 130_000)
 
 test("runAgent: код выхода 1 и failureKind=tool из фикстуры", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-run-"))

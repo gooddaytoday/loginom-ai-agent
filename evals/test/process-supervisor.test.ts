@@ -51,6 +51,34 @@ test("supervisor retains an interrupted launcher lifetime and publishes none bef
   } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
 }, 10000)
 
+test.each(["SIGINT", "timeout"])("supervisor lets a slot finish cleanup after %s beyond the old grace", async (stop) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-slot-cleanup-grace-"))
+  const abort = new AbortController()
+  const output: string[] = []
+  let confirmed = false
+  try {
+    const run = await superviseProcess({
+      cmd: [process.execPath, "-e", `process.on('SIGINT', () => {
+        setTimeout(() => { console.log('cleanup-complete'); process.exit(130) }, 33_000)
+      }); console.log('ready'); setInterval(() => {}, 1000)`],
+      cwd: root, env: { PATH: process.env.PATH ?? "" }, timeoutMs: stop === "timeout" ? 1000 : 10_000, signal: abort.signal,
+      owner: { kind: "slot", id: crypto.randomUUID() },
+      stdout: new WritableStream<Uint8Array>({ write(chunk) {
+        const text = new TextDecoder().decode(chunk)
+        output.push(text)
+        if (stop === "SIGINT" && text.includes("ready")) abort.abort()
+      } }),
+    })
+    confirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    expect(run.interrupted).toBe(stop === "SIGINT")
+    expect(run.timedOut).toBe(stop === "timeout")
+    expect(run.exitCode).toBe(130)
+    expect(output.join("")).toContain("cleanup-complete")
+    expect(run.processCleanup).toMatchObject({ status: "confirmed", error: null, unknownProcesses: [] })
+    expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
+  } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
+}, 70_000)
+
 test("supervisor releases its interrupt grace timer when the owned command exits", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-interrupt-timer-"))
   let cleanupConfirmed = true
