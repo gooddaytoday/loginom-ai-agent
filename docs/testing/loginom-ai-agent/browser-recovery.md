@@ -35,6 +35,10 @@ LOGINOM_AI_AGENT_TEST_RESOURCES=<fresh-resources> \
 DISPLAY=:1 LOGINOM_AI_AGENT_TEST_CONFIG=<private-config> \
 LOGINOM_AI_AGENT_TEST_RESOURCES=<fresh-resources> \
 <absolute-pinned-bun> test/loginom/browser-recovery-acceptance.ts BR-S3 <private-saved-A.json>
+# После принятого обычного Export main path; результаты S1/S3 повторять не требуется:
+DISPLAY=:1 LOGINOM_AI_AGENT_TEST_CONFIG=<private-config> \
+LOGINOM_AI_AGENT_TEST_RESOURCES=<fresh-resources> \
+<absolute-pinned-bun> test/loginom/browser-recovery-acceptance.ts BR-S2 <private-saved-A.json>
 ```
 
 Manifest существующей формы `{label,path,node,expected}` содержит `label:"A"`,
@@ -45,7 +49,7 @@ Manifest существующей формы `{label,path,node,expected}` сод
 `conflict_policy:fail`, делает fresh prepare этой копии и проверяет отсутствие
 readonly marker. `ownership_verified:false` у open_package допустим.
 Публичный existing Group с текущими document/workflow refs и пустым patch
-выполняет сохранённые настройки и предков. До Calculator требуются свежие
+выполняет сохранённые настройки и предков. До Calculator/Export требуются свежие
 Category:string/Total:real, полная точная выборка Alpha/35, Beta/20; поля сравниваются
 по именам, фиксированный output layout не задаётся. Внутренние helpers подготовки
 и attachment/upload/import setup в BR не используются.
@@ -59,6 +63,7 @@ Category:string/Total:real, полная точная выборка Alpha/35, B
 | ID    | Fault                            | Оператор                                                                                                                                            | Проверяемый результат                                                                                                               |
 | ----- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | BR-S1 | configure ×1, release_refusal ×1 | Найти текущий ref собственной btnClose, проверить единственность/принадлежность мастеру, click, finish                                              | T1, continuable; новая existing-операция с полными настройками/пустыми inputs и mappings успешна; node read                         |
+| BR-S2 | Export configure ×1 | T2 без Dock release; observed owned Cancel, finish, новая existing-операция того же узла | continuable; исходный output released_by/receipt; текущий файл/данные/bytes/SHA; Save/cleanup |
 | BR-S3 | configure ×3                     | Dock освобождает первый сбой; повторный existing configure даёт T3; найти текущий ref собственной btnExecute, click, ждать закрытия мастера, finish | completed, runtime проверяет console execution и Preview schema; node read использует recovery receipt; configure fault remaining=1 |
 
 Calculator: `DoubleAmount = Total*2`, integer, без output mapping,
@@ -73,7 +78,24 @@ selector-target snapshot канонической собственной `btnClo
 проверяется `browser_wait_for`; итог всё равно проверяет runtime. Запрещены private evaluate,
 unsafe code и обход управления страницей. `user_action` недопустим во всех ответах.
 
-Оба сценария завершаются Dock `package.save_checkpoint` с `conflict_policy:replace`
+BR-S2 создаёт новый UUID `.csv` под текущим `dock_prepare.storage_directories.exports`;
+`exports.text`, overwrite replace, UTF-8, `;`, header names, без BOM, LF, decimal `.`,
+пустой null_marker, qualifier `"`. Input — свежий Group/output0, mappings пустые,
+finish execute, read ports[]/sample_rows0/require_exact_numbersfalse. Inspect должен
+дать T2/NO_RECOVERY_OPTIONS и пустые recovery_options: Export release не вызывается.
+После owned Cancel и continuable исходная операция должна содержать
+`output.released_by:browser_recovery` и совпавший recovery_receipt_id. Новый ID
+применяет полные настройки к тому же existing node с inputs[]/mappings[].
+
+Текущие native destination_check/execution/download/bytes receipts связываются
+с public file_artifact и retained файлом штатного artifact store. Проверяются raw
+размер/SHA, UTF-8/LF и две строки Alpha35/Beta20 по именам полей текущего Group;
+header order не фиксируется. Второго download, исторического Export receipt,
+общего destination и дополнительных аргументов нет. При неожиданно существующем
+UUID target проверка прекращается. Calls remaining учитывают browser calls и finish.
+Подготовительный Export PASS и фактический статус S2 — в [source-отчёте](reports/2026-10-20-browser-recovery-source/report.md).
+
+Все три сценария завершаются Dock `package.save_checkpoint` с `conflict_policy:replace`
 только по точному собственному пути, созданному SaveAs, и native `modified:false`.
 При modified:true сохраняются проверки runtime next_step и новый checkpoint ID.
 Журнал должен содержать `acceptance_fault_injected`, `browser_recovery_handoff`,
