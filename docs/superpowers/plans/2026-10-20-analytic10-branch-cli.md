@@ -55,7 +55,8 @@ trial-dosage-outcomes
 - [x] Создать новый private root: `/home/kiselev/storage/tmp/analytic10-branch-20261020-w6kidhm4`.
 - [ ] Из `packages/loginom-host` собрать полный payload командой
   `bun script/build-cli.ts <root>/cli-payload --no-archive`, pinned Bun1.3.14
-  revision0d9b296, Node24.19.0 из `/opt/loginom-ai-agent/resources/loginom/bin/node`,
+  revision0d9b296, Node24.19.0 из полного дистрибутива
+  `/home/kiselev/storage/tmp/evals-cli-inputs-20261019-96cd/node-v24.19.0-linux-x64/bin/node`,
   Chromium1246 из `/opt/loginom-ai-agent/resources/loginom/browsers`.
   `LOGINOM_AI_AGENT_CHANNEL=prod`, уникальная версия
   `0.0.0-evals-parallel-20261020-<source-sha>`. Это development candidate, без публикации;
@@ -137,7 +138,10 @@ trial-dosage-outcomes
 
 1. Base dca5e33d22, план утверждён владельцем и независимо проверен.
 2. Private root выше, исходный index/worktree и пять чужих файлов сохранены.
-3. Focus fix: RED→GREEN, 44 related pass, Host typecheck pass; следующий шаг build.
-4. Native cancellation baseline тоже имеет 2 failures при 2с ожидании; новых регрессий нет.
-5. Модельные вызовы не начаты; общий8ч дедлайн ещё не установлен.
-6. Run проверяет обычный N2/reuse, не аварийное восстановление/SIGINT/shared refresh.
+3. Focus fix 6548e04d2c: RED→GREEN, 44 related pass, Host typecheck pass.
+4. /opt Node не содержит npm; полный Node той же версии/хэша найден и проверен.
+5. Второй build отклонён source snapshot guard: checkpoint изменился во время сборки.
+6. Следующий build только после завершения всех изменений дерева; до verification — без edits.
+7. Native cancellation baseline тоже имеет 2 failures при 2с ожидании; новых регрессий нет.
+8. Модельные вызовы не начаты; общий8ч дедлайн ещё не установлен.
+9. Run проверяет обычный N2/reuse, не аварийное восстановление/SIGINT/shared refresh.
