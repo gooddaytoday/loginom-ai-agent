@@ -168,7 +168,15 @@ async function main() {
 }
 
 function archiveOrigin(archive: Archive, revisions: string[]) {
-  const origin = git("log", "--full-history", "--reverse", "--format=%H", `--find-object=${archive.oid}`, ...revisions)
+  const origin = git(
+    "log",
+    "--full-history",
+    "--diff-merges=first-parent",
+    "--reverse",
+    "--format=%H",
+    `--find-object=${archive.oid}`,
+    ...revisions,
+  )
     .trim()
     .split("\n")
     .filter(Boolean)

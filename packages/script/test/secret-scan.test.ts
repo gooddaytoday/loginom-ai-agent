@@ -76,6 +76,31 @@ test("range scan finds a key added and removed in intermediate commits", async (
   expect(run(root, "range", base, "HEAD").code).toBe(2)
 })
 
+test("range scan reports the source SHA of an archive first created by a merge commit", async () => {
+  const root = await repo()
+  const base = git(root, "rev-parse", "HEAD")
+  git(root, "checkout", "-qb", "side")
+  await Bun.write(join(root, "side.txt"), "side change")
+  git(root, "add", "side.txt")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "side")
+  git(root, "checkout", "-qb", "topic", base)
+  await Bun.write(join(root, "topic.txt"), "topic change")
+  git(root, "add", "topic.txt")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "topic")
+  git(root, "merge", "--no-ff", "--no-commit", "side")
+  const token = "ghp_" + "tR7mPQ2x9L4n6V1s3X5z0C8w2B7d4F6h9J1k"
+  await Bun.write(join(root, "settings.xml"), `<token>${token}</token>`)
+  expect(Bun.spawnSync(["zip", "-q", "package.lgp", "settings.xml"], { cwd: root }).exitCode).toBe(0)
+  git(root, "add", "package.lgp")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "merge with new archive")
+  const head = git(root, "rev-parse", "HEAD")
+  const result = run(root, "range", base, head)
+  expect(result.code).toBe(2)
+  expect(result.output).toContain("package.lgp!settings.xml")
+  expect(result.output).toContain(head)
+  expect(result.output).not.toContain(token)
+})
+
 test("pre-push checks all outgoing commits, using the remote SHA from stdin", async () => {
   const root = await repo()
   const base = git(root, "rev-parse", "HEAD")

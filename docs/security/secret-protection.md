@@ -62,7 +62,9 @@ Push тега запускает workflow, только если его файл
 ```sh
 git fetch --prune origin '+refs/heads/*:refs/remotes/origin/*' --tags
 umask 077
-TMPDIR=/home/kiselev/storage/tmp bun run secrets audit > /home/kiselev/storage/tmp/secret-audit-safe.jsonl
+AUDIT_TMP="${AUDIT_TMP:-$HOME/storage/tmp}"
+mkdir -p -m 700 "$AUDIT_TMP"
+TMPDIR="$AUDIT_TMP" bun run secrets audit > "$AUDIT_TMP/secret-audit-safe.jsonl"
 ```
 
 На этой машине временные данные размещаются в `/home/kiselev/storage/tmp/`, каталоги имеют режим 700, файлы 600. На CI используется `runner.temp`. Временные копии исходников и отчёты удаляются при завершении. Закрытый файл диагностики при ошибке сохраняется отдельно для локального разбора; его нельзя публиковать.
@@ -118,4 +120,8 @@ TMPDIR=/home/kiselev/storage/tmp bun run secrets audit > /home/kiselev/storage/t
 
 Два замечания: исполнение недоверенного PR scanner/config и отсутствие tag trigger. План независимо проверен; изменения ограничены workflow, его поведенческими тестами и этим описанием. RED → GREEN подтверждает отказ PR с секретом при одновременной подмене scanner/package scripts/policy и отказ нового annotated tag с секретом. Дополнительно проверяются изменение тега с промежуточным секретом, чистые push/PR и отсутствие базы. Тесты исполняют фактический shell scan step из YAML с настоящим Gitleaks во временном Git-репозитории.
 
-Checkpoint: исходный SHA `af1490095b`; локально **29/29 тестов**, package-local `bun typecheck` и `git diff --check` — PASS. Независимое ревью изменений не нашло блокирующих дефектов. Новый GitHub CI ожидается после push. Слияние #185 и включение его в #237 — отдельный следующий шаг владельца.
+Дополнительное ревью подтвердило ошибку диагностики: архив, впервые созданный merge-коммитом, блокировался с кодом 1 без SHA находки. RED → GREEN тест проверяет путь и исходный merge SHA; поиск источника теперь использует тот же `--diff-merges=first-parent`, что и inventory. Команда полного аудита использует созданный закрытый пользовательский каталог; фактические исторические пути выше сохранены.
+
+Предложенный fallback для отсутствующего `BEFORE` не принят: неполные Git objects по согласованному контракту блокируют проверку. Для non-ancestor force push `old..new` остаётся корректной разностью достижимых коммитов и не требует merge-base fallback.
+
+Checkpoint: `4dd4deb407` — два первоначальных замечания исправлены, pre-push **33/33 typecheck** и Secret scan в GitHub — PASS. Дополнительная ошибка merge-origin воспроизведена RED и исправлена: **30/30 тестов**, package-local typecheck — PASS. Независимое ревью не нашло блокирующих дефектов плана. Слияние #185 и включение его в #237 — отдельный следующий шаг владельца.
