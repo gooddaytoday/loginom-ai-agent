@@ -7,6 +7,7 @@ import { checkNodeXml, readNodeXml } from "./node-xml"
 import { checkNodeEvidence } from "./node-evidence"
 import { nodeCaseIds } from "./node-cases"
 import { textImportIds, textImportChecks, validateTextImportAttempt } from "./text-import"
+import { confirmedProfileArchive } from "./profile-archive"
 
 export async function validateNodeAttempt(taskDir: string, attemptDir: string, packagePath?: string) {
   const task = await Bun.file(path.join(taskDir, "task.json")).json() as { id: string; checklist: { id: string; required?: boolean }[] }
@@ -72,13 +73,24 @@ async function validateRun(runDir: string, taskIds: string[], tasksDir: string) 
       errors.push(`${id}: unknown required ID: ${item.id}`)
   }
   for (const task of summary.tasks) for (const attempt of task.attempts) {
-    requireNodeEvidenceSlot(summary, attempt.slot_id)
+    const slot = requireNodeEvidenceSlot(summary, attempt.slot_id)
     if (attempt.attempt !== 1 || !["completed", "failed", "timeout", "no_artifact", "infra_error", "harness_error", "interrupted"].includes(attempt.status))
       errors.push(`${task.id}: invalid attempt number/status`)
     const evidence = Bun.file(path.join(runDir, task.id, String(attempt.attempt), "cleanup.json"))
     if (!(await evidence.exists())) { errors.push(`${task.id}: cleanup.json missing`); continue }
     const cleanup = await evidence.json()
     if (cleanup.processes?.observation_mode === "unit_after_exit") errors.push(`${task.id}: unit_after_exit cleanup evidence cannot confirm node run`)
+    // The legacy runner also publishes its single, unqualified default slot.
+    if (slot && !(slot.id === "default" && slot.liveQualified === false && !slot.lease_receipt && (summary.config.parallel ?? 1) === 1)) {
+      if (slot.state !== "closed" || slot.liveQualified !== true || cleanup.slotId !== slot.id || typeof cleanup.archive !== "string" ||
+        !/^[a-f0-9]{64}$/.test(cleanup.serverEpoch ?? "") || cleanup.processes?.error !== null ||
+        cleanup.processes?.observation_mode !== "continuous") {
+        errors.push(`${task.id}: cleanup evidence unconfirmed`)
+        continue
+      }
+      await confirmedProfileArchive(path.join(runDir, task.id, String(attempt.attempt)), slot.profileDir, slot.historyDir)
+      continue
+    }
     if (cleanup.result?.status !== "confirmed" || cleanup.result?.error || cleanup.processes?.status !== "confirmed" ||
       !["processes", "diagnostics", "writer", "ready"].every(stage => cleanup.stages?.some((s: { stage: string; status: string }) => s.stage === stage && s.status === "confirmed")) ||
       !cleanup.stages?.some((s: { stage: string; status: string }) => ["pruning", "profile_history"].includes(s.stage) && s.status === "confirmed"))
