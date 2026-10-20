@@ -488,10 +488,14 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   const committed=request.finish!=='close'&&(verified('finish')||handler.output_wizard==='separate'&&verified('node_finish')&&verified('output_mapping'));
   const launch=['materialization_start','materialization_execute','execute'].includes(pending.phase)||pending.phase==='finish'&&request.finish==='execute';
   const readingOnly=request.mode===NODE_READ_MODE;
-  const configuration=readingOnly?{status:'not_requested'}:committed?{status:'applied',...(verified('finish')&&handler.configurationReadback
+  // Export release proves only workspace cleanup. An unconfirmed launch may
+  // already have written a file; never infer its settings or offer a replay.
+  const exportRelease=request.target.type==='exports.text';
+  const configuration=readingOnly?{status:'not_requested'}:exportRelease?{status:'unknown'}:committed?{status:'applied',...(verified('finish')&&handler.configurationReadback
     ?{readback:handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id})}:{})}
     :{status:proof.cleanup.wizard_closed&&!verified('node_finish')?'discarded':'unknown'};
-  const execution=['completed','failed','cancelled'].includes(state.execution.status)||!launch?state.execution
+  const execution=exportRelease?{status:'unknown',execution_id:state.execution.execution_id??null}
+    :['completed','failed','cancelled'].includes(state.execution.status)||!launch?state.execution
     :{status:'unknown',execution_id:state.execution.execution_id??null};
   // A released reread keeps its source unless that schema was observed stale.
   const readSource=readingOnly&&!state.read_schema_changed?request.parameters.source_operation_id
@@ -503,7 +507,12 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
       ...(proof.cleanup.views_returned?['The node visualizers opened for reading were left during release; a Table visualizer added by the stopped read may remain on its output port.']:[])],
     configuration,checkpoint_kind:'local_node_released',persisted_package_verified:false,pending_phase:null,released_phase:pending.phase,
     error:{code:'NODE_OPERATION_RELEASED',message:'Phase '+pending.phase+' stopped without a verified receipt. The operation was released after Dock proved the node rests unlocked on an unchanged quiet graph; nothing of the stopped phase was repeated.'},
-    next_step:readSource?{tool:'dock_node_read',original_operation_id:operation.id,
+    next_step:exportRelease?{tool:'dock_action_run',original_operation_id:operation.id,
+      instruction:'The stopped text export was released, but its settings, execution and file output remain unverified. '
+        +'Do not resume this operation, repeat the export or recreate the node: a file may already have been written. '
+        +'Save the retained scenario with dock_action_run, action_key:"package.save_checkpoint", a NEW operation_id '
+        +'and the task package path in parameters.path, or continue work on other nodes. Report export and download as unconfirmed.'}
+      :readSource?{tool:'dock_node_read',original_operation_id:operation.id,
       instruction:(readingOnly?'This output read was released. ':'The node is configured and executed; only reading its output stopped. ')
         +'To read the output, call dock_node_read with a NEW operation_id and source_operation_id:"'+readSource+'". Saving the package and work on other nodes are allowed now.'}
       :{tool:'dock_node_apply',original_operation_id:operation.id,
