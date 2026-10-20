@@ -238,3 +238,31 @@ Own diagnostic server package сохранён. Private evidence:
 S5 FAIL/deferred, first native UNKNOWN/second PASS/third BLOCKED сохранены.
 Source audit/commands/checks — ignored task report и отдельный artifact; product fix,
 новый API/hook, recovery, пятый live, commit/merge/release не выполнялись.
+
+
+## 2026-10-20 — endpoint boundary probe: BLOCKED / STOP
+
+Одна разрешённая fresh stock source-попытка; plan preflight GO, production/runtime/
+harness неизменны. Own new empty draft/UUID, canonical Save/fail и initial
+modifiedfalse PASS; catalog/stage verification и pinned Node syntax PASS.
+Начальный owner outer top128/bottom960, clientHeight832/clientTop0, borders0,
+scrollHeight15528/max_top14696;65 name cells/rows, last cell.bottom1688,
+last row.bottom=shared immediate container.bottom1689. Это start window, не end proof.
+Подтверждены три scroll0→1000→2000→3000 с тем же owner/bindings.
+Четвёртый act: NOT_APPLIED/preconditions/UI_REFERENCE_OBSCURED,
+effect_possiblefalse/cleanup_completetrue, ui_scroll_applied отсутствует.
+Accepted wrapper назвал отказ UI_GESTURE_UNCONFIRMED/uncertaintrue;
+это known no-effect refusal, не unknown native effect. Причина hit-test неизвестна.
+Первый отказ остановил measurement; жест/проба не повторялись, terminal ready
+не достигнут. End geometry/relation не подтверждены; S5 FAIL/deferred сохранён.
+Native отдельно SUCCEEDED/own Close/logout/noDiscard; final return/Save пропущены
+existing uncertain guard, initial modifiedfalse подтверждён. Context отдельно CLOSED/
+close event/pages0. OS отдельно NOT_CONFIRMED: exact-profile candidates0,
+attributionfalse/after remaining[]; process absence не превращён в attribution PASS.
+Private evidence `/home/george/.cache/loginom-ai-agent/browser-recovery-boundary-_3o_g_rg/evidence`;
+source audit/driver source/commands/raw pre-post receipts сохранены в private base.
+Временные executable удалены;210строк/+41−23 в пределах plan240/60.
+Полный Task1 report — ignored rendered-window/task-1-report.md. Runtime predicate
+не выбран; root Step5 требует дальнейшего решения по недостаточным endpoint данным.
+Исторические FAIL/UNKNOWN и native cleanup outcomes не переоценены; новых ожиданий,
+recovery, API, source fix, commit/push/merge/release не было.

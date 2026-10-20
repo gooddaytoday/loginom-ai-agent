@@ -1,19 +1,19 @@
 # Linux: завершение реализации — 2026-09-16
 
-## 2026-10-20 — preparatory browser scroll probe
+## 2026-10-20 — browser recovery: PAUSED
 
-Latest attempt4 DONE_WITH_CONCERNS: two confirmed scroll0→1000→2000, anchors0.
-UI read252–360ms: same65 rows/anchors0;1003–1112ms: new65 row IDs/35anchors.
-Binding сохранён, промежуточных жестов/readiness в measurement не было.
-Timing concern: whole-chain249.772604ms раньше250 на0.227396ms; UI read после250.
-Native cleanup PASS/Close/logout/noDiscard; saved-state modified=false, context closed/pages0.
-OS attribution NOT_CONFIRMED; own diagnostic packages сохранены.
-First native UNKNOWN/second PASS/third BLOCKED — история в source report, без переоценки.
-S5 FAIL/deferred; exact native update cause/time не установлены; production неизменён.
-Causal report принят independent review/DONE_WITH_CONCERNS, полный protocol PASS не дан.
-Следующий шаг — [одна boundary-проба](../superpowers/plans/2026-10-20-browser-recovery-rendered-window.md), plan review GO; новых live нет.
-Runtime DESIGN_BLOCKED до end geometry и отдельного review точного predicate; S5 не принят.
-[Фактический отчёт и история](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md).
+Пауза по запросу владельца; активных live-прогонов нет, runtime/harness не менялись.
+Causal scroll report принят DONE_WITH_CONCERNS; literal timing/OS ограничения сохранены.
+Единственная boundary-проба: start geometry и scroll0→1000→2000→3000 подтверждены.
+Четвёртый scroll NOT_APPLIED/UI_REFERENCE_OBSCURED/no-effect, endpoint не достигнут.
+Native Close/logout/noDiscard PASS; context CLOSED/pages0; OS_NOT_CONFIRMED.
+BLOCKED report/cleanup приняты independent spec+quality review без замечаний.
+Исходный S5 FAIL/deferred, runtime DESIGN_BLOCKED; никакого нового запуска/фикса.
+Private evidence/profile/source audit сохранены, temporary executables удалены.
+После возобновления — переоценить минимальный predicate по сохранённым данным;
+новую пробу/код назначать только с конкретной гипотезой и review.
+[Точка возобновления](../superpowers/plans/2026-10-20-browser-recovery-rendered-window.md),
+[фактический отчёт и история](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md).
 
 ## 2026-10-20 — browser recovery, Linux packaged/model срез
 
