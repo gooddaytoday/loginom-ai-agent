@@ -126,6 +126,8 @@ git commit -m "feat(evals): count recovered_via_browser apart from clean passes"
 
 **Объём/проверки/границы:** ~4–5 файлов, до +340/−45 строк с harness/runbook/report/plan/checkpoint; после удаления исторического input ожидается меньше. При ×2 пересмотреть подход. Единственная новая harness-ветвь — ожидаемые отказы и отдельный результат S6, необходимые его отрицательному критерию; runtime/API/deps/fixture stores/retries/monitoring не нужны. Native receipts каждого шага, syntax transpile, Desktop package-local bun typecheck и git diff --check; S1/S3 не повторять без изменения их поведения. Source/resource provenance указывается фактический, прежним bytes не присваивается новый source SHA. Installed acceptance, модели, workflow/merge/release и исправления Dock-процедур исключены. Исторические unknown сохраняются.
 
+**Подготовительный результат:** обычный no-fault Export — native PASS с текущими bytes/SHA/данными, Save modified:false, собственным cleanup и ACK/exit0; [source-отчёт](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md). Временный код удалён, harness ещё не расширен. Следующий шаг после CI fixture follow-up — BR-S2.
+
 - [ ] **Step 1: Extend the script and runbook**
 
 - [ ] **Step 2: Run the scenarios**
