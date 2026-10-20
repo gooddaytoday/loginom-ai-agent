@@ -155,7 +155,7 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 
 - Статус: ACTIVE; план 5, Task 1 выполнена и принята. Следующий шаг — Desktop fixture compatibility из CI, затем отложенная подготовка Task 5 плана 3.
 - Рабочая ветка `recovery-build-flag`, worktree `/home/george/.codex/worktrees/browser-recovery/loginom-ai-agent`; исходная база `0afb4c483a`, коммит безопасной паузы `ba5ac875fc`.
-- Планы 1–2 и план 4 выполнены; план 3, Tasks 1–4 приняты. Task reviews и итоговое source integration review планов 3–4 — Approved, обязательных замечаний нет.
+- Планы 1–2 выполнены; основные задачи плана 4 и план 3, Tasks 1–4 приняты. Для плана 4 открыт узкий CI follow-up Desktop fixture. Task reviews и итоговое source integration review планов 3–4 — Approved, обязательных замечаний нет.
 - Runtime: 4468 PASS / 14 SKIP / 0 FAIL, focused 133/133, timeout 4/4; настоящая Chromium-проба 1/1 и Host managed IPC 1/1 (16 assertions) PASS.
 - Agent: focused 107 PASS / 1 SKIP, полный suite 3842 PASS / 25 SKIP / 1 TODO / 0 FAIL в subshell umask 0022, typecheck PASS. Исходный mode failure при umask 0002 изолирован; ожидаемый/прежний диагностический шум не скрыт.
 - Host: typecheck PASS; полный охват 370 PASS / 7 SKIP двумя процессами, единая команда Bun ограничена loader EISDIR. Product 5/5, bundled skills 7/7 и Product typecheck PASS.

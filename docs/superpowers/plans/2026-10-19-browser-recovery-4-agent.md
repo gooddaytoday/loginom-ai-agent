@@ -90,6 +90,18 @@ git add packages/loginom-host
 git commit -m "feat(host): tell the runtime when an agent run ends"
 ```
 
+#### Follow-up Task 1: Desktop runtime fixture compatibility (CI)
+
+**Результат и первый проверяемый путь:** существующие четыре release-during-call/tools/admit/interrupt теста Desktop сохраняют исходный pending request до его фактического finish и проходят с новым IPC `run-released`.
+**Основание:** macOS CI Source checks воспроизводит четыре timeout 5000ms; Desktop fixture не обрабатывает `run-released`, он попадает в общий `pending = m` и заменяет исходный запрос. Это подтверждённый путь расширения ACK, предусмотренный Interfaces Task 1; production-контракт не меняется.
+**Файлы и объём:** `packages/desktop/src/main/loginom/host-port.test.ts`, этот план и общий checkpoint; около 3 файлов, +25/−2 строк, из них ожидается одна строка fixture. Применяются Desktop и connection lifecycle AGENTS.
+
+- [ ] Воспроизвести один существующий failing case из `packages/desktop`: pinned Bun/Node, `LOGINOM_AI_AGENT_TEST_NODE`, `bun test src/main/loginom/host-port.test.ts -t 'release during call'`. Сохранить точный RED и очистку собственных тестовых процессов.
+- [ ] Добавить в существующий message handler ACK `{released:true}` для `run-released` до общего pending; сохранить прежние проверки поколения и pending request. Получить GREEN всех четырёх случаев, затем `bun test src/main/loginom` и `bun typecheck` из Desktop.
+- [ ] Проверить diff, сделать узкий conventional commit; после независимого scoped review отметить follow-up и обновить checkpoint.
+
+**Риски/исключения:** не менять production, test timeout, зависимости, общие fixture APIs или Host/Agent/Evals ради этой совместимости. Bun loader EISDIR из того же CI — отдельное наблюдение; не маскировать его. Если новый тестовый отказ воспроизводится, сначала изолировать, затем новая гипотеза. Уже принятые package suites не повторять без новых изменений/риска. Стоимость ACK — одна ветка штатного test IPC без нового механизма; при ошибке остаётся узкая правка фикстуры. Перед реализацией — независимый review этого дополнения.
+
 ### Task 2: Скриншот по capability модели и состояние попытки
 
 **Files:**
