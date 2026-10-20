@@ -153,16 +153,16 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 
 ## Checkpoint — 20.10.2026, работа возобновлена
 
-- Статус: ACTIVE; планы 1–4 выполнены и приняты. План 3, Task 5: подготовка 1–4 и BR-S1/BR-S3 native PASS, independent review Approved. Следующий шаг — [Host loader follow-up](2026-10-20-browser-recovery-host-loader.md), затем план 5, Task 2.
+- Статус: ACTIVE; планы 1–4 выполнены и приняты. План 3, Task 5: подготовка 1–4 и BR-S1/BR-S3 native PASS, independent review Approved. [Host loader follow-up](2026-10-20-browser-recovery-host-loader.md) принят локально; следующий шаг — план 5, Task 2 и наблюдение новой CI.
 - Рабочая ветка `recovery-build-flag`, worktree `/home/george/.codex/worktrees/browser-recovery/loginom-ai-agent`; исходная база `0afb4c483a`. Draft PR224 в `demo-022`; merge и release требуют отдельной команды владельца.
 - Task 5: harness использует одну обязательную private saved-A ссылку, собственную SaveAs-копию каждого сценария и публичный cold Group. Свежие Alpha35/Beta20, сохранённые settings/bindings, final Save modified:false, native cleanup без discard и ACK/exit0 подтверждены. Версии и evidence — в smoke-отчёте.
 - BR-S1: T1 → continuable → новая calculator-corrected SUCCEEDED → fresh read; BR-S3: T3 → completed с execution/Preview → fresh br-1:receipt read, configure remaining1. user_action отсутствует; собственные PID/PGID завершены.
 - Ограничения Task5: scripted operator, не качество модели/installed acceptance; дополнительный Expr1 в BR-S3 задокументирован. Исторические unknown upload/cleanup и readonly не закрыты новыми PASS; причина readonly не установлена.
 - Runtime: 4468 PASS / 14 SKIP / 0 FAIL, focused 133/133, timeout 4/4; Chromium-проба 1/1 и Host managed IPC 1/1 (16 assertions) PASS. Source integration review планов 3–4 Approved.
 - Agent: focused 107 PASS / 1 SKIP, full 3842 PASS / 25 SKIP / 1 TODO / 0 FAIL в subshell umask0022, typecheck PASS. Исходный mode failure при umask0002 и прежний диагностический шум сохранены.
-- Host: typecheck PASS, полный охват 370 PASS / 7 SKIP двумя процессами; единая команда Bun ограничена loader EISDIR. Product 5/5, bundled skills 7/7 и Product typecheck PASS.
+- Host: штатная единая команда 370 PASS /7 SKIP /0 FAIL (377 tests/52 files), typecheck PASS после scoped RED→GREEN test-build fix; independent review Approved. Product 5/5, bundled skills 7/7 и Product typecheck PASS.
 - Desktop fixture follow-up: scoped review Approved; 4/4, connection suite 36/36 и typecheck PASS. Новый Task5: syntax transpile и Desktop package-local typecheck PASS.
 - План 5, Task 1 принята: focused79/79, typecheck и full766 PASS /17 SKIP /0 FAIL. xmllint установлен; временный inotify131072 восстановлен до65536, исходный FAIL сохранён.
 - План 5, Tasks2–4 открыты: BR-S2/S4/S5/S6, installed CLI/Desktop availability и реальные модели ещё не приняты. Release-флаг выключен.
-- На опубликованном cfa25ab5e3 Windows candidate и push/PR typecheck PASS; macOS candidate и push/PR unit FAIL на Host loader family. Desktop60 PASS /1 SKIP /0 FAIL, Agent3842 PASS /0 FAIL; общего CI PASS нет. Точная причина Host не установлена, workflow не менялся.
+- Историческая CI cfa25ab5e3: Windows candidate/typecheck PASS, macOS candidate и push/PR unit FAIL на Host loader family; Desktop60 PASS /1 SKIP /0 FAIL, Agent3842 PASS /0 FAIL. Локальный loader fix принят; свежая CI для него ещё не проверена, общего CI PASS нет, workflow не менялся.
 - Private manifests/evidence/profiles и ignored SDD ledgers сохранены; one-off prep scripts удалены. Основной пользовательский checkout и три untracked документа не изменены.
