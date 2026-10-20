@@ -577,13 +577,13 @@ export async function createBridge(config, session, { browserTransport: managedB
               // Refuse unsettled background node jobs before waiting on the
               // browser gate. Shutdown never cancels them to force a close.
               actionRuntime.assertPreparationAllowed();
-              if (actionRuntime.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
+              if (actionRuntime.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
               if (session.metadata.workspaceReady !== true || !packagePath || !saveOperationId
                   || normalCleanup && lastSavedPackage.document_id !== prepared.state?.document_id) {
                 cleanup = {status:'BLOCKED', reason:'CONFIRMED_SAVE_REQUIRED'};
               } else cleanup = await browserGate(async () => {
                 actionRuntime.assertPreparationAllowed();
-                if (actionRuntime.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
+                if (actionRuntime.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
                 const cleanupOptions = {
                   sessionId:session.metadata.sessionId, documentId:prepared.state.document_id,
                   // Managed runtimes have no replay login account; the cleanup

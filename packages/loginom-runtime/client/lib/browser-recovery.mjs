@@ -115,6 +115,11 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
       if (exhausted(budget)) return { refused: refusal('The browser recovery budget for this step is exhausted.', { budget: remaining(budget) }) };
       budgets.set(basis.step.key, budget);
       Object.assign(current, { step: basis.step, reason: basis.reason, budget });
+      // Every hand-over starts on a confirmed page: a lost boundary is never inherited by a new attempt.
+      const page = await Promise.resolve().then(probe).catch(error => ({ ok: false, reason: error.message, unknown: true }));
+      if (page.unknown) uncertain ??= { operation_id: current.operation_id, tool: null,
+        reason: 'Page check failed: ' + String(page.reason).slice(0, 400) };
+      if (page.ok !== true) return { refused: refusal('The Loginom page is outside recovery bounds: ' + page.reason) };
       // Only a confirmed stop of the original executor hands the page over.
       const handoff = await Promise.resolve().then(() => executor.browserRecoveryHandoff(input.operation_id, { signal: extra?.signal }))
         .catch(error => ({ stopped: false, reason: error.message }));
@@ -240,8 +245,9 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     // Safe completion only: the runtime may cancel its own unapplied draft; unknown effects stay locked.
     const cleanup = await Promise.resolve().then(() => executor.stopBrowserRecovery({ operationId: current.operation_id,
       step: current.step, reason: code, uncertain: !!uncertain })).catch(error => ({ state: 'retained', reason: error.message }));
-    // A lost page or document ends the step for good; other stops keep the shared budget for an explicit re-entry.
-    if (code === 'page_changed') current.budget.closed = true;
+    // A lost page or document ends the step for good, whatever stopped the attempt; other stops keep
+    // the shared budget for an explicit re-entry.
+    if (code === 'page_changed' || current.pageLost) current.budget.closed = true;
     await journal({ phase: 'browser_recovery_stopped', attempt_id: current.id, operation_id: current.operation_id,
       code, reason, cleanup, budget: remaining(current.budget) });
     return reply({ ...view(), stopped: { code, reason, cleanup }, ...extra,

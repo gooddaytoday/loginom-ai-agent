@@ -117,7 +117,8 @@ test('text output is bounded while images are not counted against the text budge
 });
 
 test('a changed page, origin or document stops the attempt and closes the step', async () => {
-  const h = harness({ probe: () => ({ ok: false, reason: 'origin changed' }) });
+  let probes = 0;
+  const h = harness({ probe: () => (++probes > 1 ? { ok: false, reason: 'origin changed' } : { ok: true }) });
   await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
   const stopped = body(await h.recovery.call('browser_click', { target: 'e1' }));
   assert.equal(stopped.phase, 'stopped');
@@ -229,7 +230,9 @@ test('a tool-level browser error keeps the lease and the browser phase', async (
 });
 
 test('an unknown outcome is latched before a failed page check can release the page', async () => {
-  const h = harness({ callTool: async () => { throw Error('transport closed'); }, probe: () => { throw Error('page gone'); } });
+  let probes = 0;
+  const h = harness({ callTool: async () => { throw Error('transport closed'); },
+    probe: () => { if (++probes > 1) throw Error('page gone'); return { ok: true }; } });
   await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
   const stopped = body(await h.recovery.call('browser_click', { target: 'e1' }));
   assert.equal(stopped.stopped.code, 'browser_unavailable');
@@ -339,7 +342,7 @@ for (const failure of ['transport', 'page'])
     let calls = 0;
     const h = harness({ record: failingJournal,
       callTool: async () => { calls++; if (failure === 'transport') throw Error('transport closed'); return { content: [{ type: 'text', text: 'ok' }] }; },
-      probe: () => (failure === 'page' ? { ok: false, reason: 'second page opened' } : { ok: true }) });
+      probe: () => (failure === 'page' && calls > 0 ? { ok: false, reason: 'second page opened' } : { ok: true }) });
     await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
     await assert.rejects(h.recovery.call('browser_click', { target: 'e1' }), /disk full/);
     assert.equal((await h.recovery.call('browser_click', { target: 'e2' })).isError, true);
@@ -392,4 +395,40 @@ test('finish stays available after a failed gesture; the verifier reads the fact
   const finished = body(await h.recovery.call('dock_browser_recovery', { action: 'finish', operation_id: 'op-1', actions_performed: ['Clicked'] }));
   assert.equal(finished.phase, 'dock');
   assert.equal(h.verifies.length, 1);
+});
+
+test('a lost page survives stop: the step stays closed and a new hand-over checks the page first', async () => {
+  let release, pageOk = true;
+  const pending = new Promise(resolve => { release = resolve; });
+  const h = harness({ callTool: () => pending.then(() => ({ content: [{ type: 'text', text: 'done' }] })),
+    probe: () => (pageOk ? { ok: true } : { ok: false, reason: 'second page opened' }) });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const action = h.recovery.call('browser_click', { target: 'e1' });
+  await new Promise(resolve => setImmediate(resolve));
+  const stopping = h.recovery.call('dock_browser_recovery', { action: 'stop', operation_id: 'op-1', reason: 'cancelled' });
+  pageOk = false;
+  release();
+  await Promise.all([action, stopping]);
+  const again = await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-2' });
+  assert.equal(again.isError, true);
+  assert.match(again.content[0].text, /already completed or stopped|outside recovery bounds/);
+});
+
+test('a new hand-over is refused while the page is outside recovery bounds', async () => {
+  const h = harness({ probe: () => ({ ok: false, reason: 'origin changed' }) });
+  const refused = await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  assert.equal(refused.isError, true);
+  assert.match(refused.content[0].text, /outside recovery bounds/);
+  assert.equal(h.recovery.active(), false);
+});
+
+test('concurrent starts admit one attempt; the second is refused while the first holds the page', async () => {
+  let release;
+  const handoff = new Promise(resolve => { release = resolve; });
+  const h = harness({ handoff: () => handoff.then(() => ({ stopped: true, proof: {} })) });
+  const first = h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const second = await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-2' });
+  assert.equal(second.isError, true);
+  release();
+  assert.equal(body(await first).operation_id, 'op-1');
 });

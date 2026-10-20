@@ -27,6 +27,8 @@ class ExternalClient {
     if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,
       target,loginom_account:'test-2',document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
     else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
+    else if(code.includes('browser_recovery_page'))
+      return {content:[{type:'text',text:JSON.stringify(JSON.stringify({kind:'browser_recovery_page',pages:1,origin:'http://loginom.invalid',document_id:'own-doc'}))}]};
     else if(code.includes('function readSavedPackageState')){
       // The first read after Save is lost; the recovery reread succeeds.
       if(f.stateReads++===0)throw Error('Read response lost');
