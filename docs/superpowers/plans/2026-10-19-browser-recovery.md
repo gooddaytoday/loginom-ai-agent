@@ -153,10 +153,11 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 
 ## Checkpoint — 20.10.2026
 
-- База реализации: `0afb4c483a`; принятый код плана 2: `cec9b645a0`.
+- База реализации: `0afb4c483a`; принятый код плана 3, Task 1: `a856b24a6b`.
 - План 1, Tasks 1–4, и план 2, Tasks 0–7: выполнены и отмечены в подпланах; task reviews и итоговое whole-branch review приняты; четыре итоговых замечания исправлены и подтверждены scoped re-review.
-- Текущие source-проверки: runtime client 4420 PASS / 13 SKIP; focused 144/144; start-input 22/22; Host capability 2/2, Host typecheck и `git diff --check` — PASS.
+- Последние полные source-проверки плана 2: runtime client 4420 PASS / 13 SKIP; focused 144/144; start-input 22/22; Host capability 2/2, Host typecheck и `git diff --check` — PASS.
 - Task 0 на Loginom: реальный Calculator, новое успешное выполнение и схема Preview независимо подтверждены; итоговый собственный пакет, transport и браузер закрыты.
 - Ограничение пробы: закрытие несохранённого пакета первой неудачной попытки осталось неподтверждённым.
 - Проверки установленных артефактов и живого recovery ещё впереди; release-флаг в CI не включён.
-- Следующий шаг после итогового review: план 3, Task 1 — allowlist и фильтр аргументов; перед реализацией независимый review плана.
+- План 3 прошёл preflight и scoped review уточнений; Task 1 выполнен, 3/3 focused PASS, независимое review без замечаний.
+- Следующий шаг: план 3, Task 2 — бюджет шага и автомат аренды.

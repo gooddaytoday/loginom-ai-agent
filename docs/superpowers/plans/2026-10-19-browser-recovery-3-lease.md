@@ -52,7 +52,7 @@
   - `recoveryBrowserCatalog(browserTools) → Tool[]` — определения allowlist из закреплённого каталога без свойства `filename`; отсутствие любого имени — `Error` с этим именем.
   - `admitRecoveryBrowserCall(name, args, publishedTools) → args` — иначе `Error('BROWSER_RECOVERY_TOOL_FORBIDDEN')` или `Error('BROWSER_RECOVERY_ARGUMENT_FORBIDDEN')`; разрешены только ключи опубликованной схемы; `publishedTools` — уже построенный результат `recoveryBrowserCatalog`, без скрытого registry или копий схем.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Каталог в тестах — настоящий: `createConnection({capabilities: ['core', 'vision'], snapshot: {mode: 'none'}}, async () => { throw Error('no browser') })` из установленного `@playwright/mcp` 0.0.82 и `listTools()` через `InMemoryTransport`, без рукописной копии.
 
@@ -80,16 +80,16 @@ test('a pinned catalog without an allowlisted tool fails closed', async () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd packages/loginom-runtime/client && "$LOGINOM_AI_AGENT_TEST_NODE" --test test/browser-recovery.test.mjs`
 Expected: FAIL — модуль отсутствует.
 
-- [ ] **Step 3: Implement per Interfaces**
+- [x] **Step 3: Implement per Interfaces**
 
-- [ ] **Step 4: Run tests to verify they pass** (команда Step 2; Expected: PASS)
+- [x] **Step 4: Run tests to verify they pass** (команда Step 2; Expected: PASS)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/loginom-runtime/client
