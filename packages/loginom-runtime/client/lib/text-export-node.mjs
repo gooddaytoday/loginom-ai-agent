@@ -26,7 +26,7 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
   validate:(p,m,r)=>validateTextExportParameters(p,m,r,storageDirectories),configurationReadback:textExportReadback,configure:(ctx,p,drivers)=>drivers.configureExport(ctx,p)}]]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const {operation,execute,onRecord,now,receiptOptions,artifactStore}=options;
-  let channel,signal,driver,execution,configuration,inputMapping;
+  let channel,signal,driver,execution,configuration,inputMapping,recoveryReads=0;
   const enter=ctx=>{signal=ctx.signal;operation.deadline=ctx.deadline;return channel??=createNodeProcedure({operation,execute,record:onRecord,now,maxSteps:4096,targetOrigin,targetBuild,
    signal:{throwIfAborted:()=>signal?.throwIfAborted(),get aborted(){return signal?.aborted;},get reason(){return signal?.reason;}},
    preparedNodeContext:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node},
@@ -128,8 +128,10 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
     const ctx={signal:recoverySignal,deadline:now()+120000,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,
      node:state.node,execution:{execution_id:execution.execution_id}};
     enter(ctx);
-    return readNativeExportFile({...options,artifactStore,targetOrigin,targetBuild,storageDirectories,storageContinuation,
-     rememberStorageContinuation:value=>{storageContinuation=structuredClone(value);}},ctx,configuration,execution);
+    // Fresh child receipt IDs: the refused read's ledger entries are never reused.
+    return readNativeExportFile({...options,operation:{id:operation.id+':br-read-'+(++recoveryReads)},artifactStore,targetOrigin,
+     targetBuild,storageDirectories,storageContinuation,rememberStorageContinuation:value=>{storageContinuation=structuredClone(value);}},
+     ctx,configuration,execution);
    },
    async verifyContinuation(state,{signal:resumeSignal}={}){
     if(!channel||!configuration||state.pending||state.cleanup_complete!==true||state.phases.at(-1)?.phase!=='finish'||now()>=Math.min(state.deadline,state.execution_wait?.deadline??Infinity))return false;

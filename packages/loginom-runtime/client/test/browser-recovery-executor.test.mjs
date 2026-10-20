@@ -32,6 +32,7 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
   const drivers = { verifySource: ok('source'), mapPorts: ok('mapping'), openWizard: ok('open'),
     finish: async mode => {
       calls.push('finish');
+      if (state.receipt) state.receiptOptions('apply:finish', 'node.finish', 'signature');
       if (state.failFinish) throw Error('Wizard Done was not confirmed');
       return { verified: true, cleanup_complete: true, mode, effect_possible: true, execution_id: 'exec', execution_started: true };
     },
@@ -42,8 +43,16 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
     ...(releasePendingPhases ? { releasePendingPhases } : {}) };
   const handler = { revision: '1', modes: ['delimited'], validate: () => {}, configure: ok('configure') };
   const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery,
-    execute: async () => { throw Error('Unexpected public transport'); },
-    nodeTargetAdapterFactory: () => adapter, nodeApplyHandlers: new Map([['imports.text', handler]]), nodeApplyDriverFactory: () => drivers,
+    // Only the page receipt ledger is read through this transport.
+    execute: async code => {
+      if (!state.receipt || !code.includes('receipt_read')) throw Error('Unexpected public transport');
+      const receipt = { status: 'SUCCEEDED', action_key: 'node.finish', action_revision: '1', operation_id: 'apply:finish', phase: 'verified',
+        effect_possible: true, output: {}, error: null, trace: [], cleanup_complete: state.receipt.cleanup };
+      return { status: 'SUCCEEDED', action_key: 'operation.receipt', action_revision: '1', operation_id: 'apply', phase: 'observed',
+        effect_possible: false, error: null, trace: [], output: { state: 'completed', receipt } };
+    },
+    nodeTargetAdapterFactory: () => adapter, nodeApplyHandlers: new Map([['imports.text', handler]]),
+    nodeApplyDriverFactory: ({ receiptOptions }) => { state.receiptOptions = receiptOptions; return drivers; },
     onRecord: async e => { events.push(e); return e; } });
   return { runtime, calls, events, state };
 }
@@ -193,7 +202,7 @@ test('unconfirmed calls are never a trigger and stop keeps the original gate', a
   assert.equal(f.runtime.hasUnsettledWork(), true);
 });
 
-test('T4: an unconfirmed export download is recovered by a verified re-read without a new export', async () => {
+function exportFixture() {
   const events = [], reads = [];
   const graph = { complete: true, document_id: 'doc', workflow_ref: workflow, nodes: [], links: [], foreign_links: [] };
   const adapter = { observe: async () => structuredClone(graph), preflight: async () => {},
@@ -211,7 +220,7 @@ test('T4: an unconfirmed export download is recovered by a verified re-read with
   const drivers = { verifySource: ok, mapPorts: ok, openWizard: ok,
     finish: async mode => ({ verified: true, cleanup_complete: true, mode, effect_possible: true, execution_id: 'exec', execution_started: true }),
     waitExecution: async () => ({ verified: true, cleanup_complete: true, status: 'completed', execution_id: 'exec' }),
-    readOutput: async () => { operationRef.cleanupConfirmed = true; throw refusal('export'); },
+    readOutput: async () => { operationRef.cleanupConfirmed = true; throw refusal(operationRef.id); },
     verifyContinuation: async () => true,
     releasePending: async () => { throw Error('not used'); },
     recoveryReadExport: async state => { reads.push(state.node.node_id);
@@ -222,6 +231,11 @@ test('T4: an unconfirmed export download is recovered by a verified re-read with
     nodeTargetAdapterFactory: () => adapter, nodeApplyHandlers: new Map([['exports.text', handler]]),
     nodeApplyDriverFactory: ({ operation }) => { operationRef = operation; return drivers; },
     onRecord: async e => { events.push(e); return e; } });
+  return { runtime, events, reads };
+}
+
+test('T4: an unconfirmed export download is recovered by a verified re-read without a new export', async () => {
+  const { runtime, reads } = exportFixture();
   runtime.startNodeApply({ ...request('export'), target: { kind: 'new', type: 'exports.text', label: 'Export', position: { x: 320, y: 280 } } });
   const job = await runtime.waitNodeApply('export', { timeoutMs: 1000 });
   assert.equal(job.outcome.status, 'FAILED', JSON.stringify(job.outcome.error));
@@ -240,4 +254,42 @@ test('T4: an unconfirmed export download is recovered by a verified re-read with
   assert.equal(settled.status, 'FAILED');
   assert.equal(settled.output.browser_recovery.file_artifacts[0].sha256, 'a'.repeat(64));
   assert.equal(settled.output.next_step.tool, 'dock_action_run');
+});
+
+test('handoff requires the same completed and cleaned-up last receipt as the node release', async () => {
+  for (const cleanup of [false, true]) {
+    const f = fixture();
+    f.state.receipt = { cleanup };
+    await stopAtFinish(f);
+    await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+    const handoff = await f.runtime.browserRecoveryHandoff('apply');
+    assert.equal(handoff.stopped, cleanup, JSON.stringify(handoff));
+    if (!cleanup) assert.match(handoff.reason, /without confirmed cleanup/);
+    if (cleanup) assert.equal(handoff.proof.cleanup_complete, true);
+  }
+});
+
+test('an unknown recovery action outcome keeps Dock mutations blocked after stop', async () => {
+  const f = fixture();
+  await stopAtFinish(f);
+  await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+  await f.runtime.browserRecoveryHandoff('apply');
+  const stopped = await f.runtime.stopBrowserRecovery({ operationId: 'apply', uncertain: true });
+  assert.equal(stopped.state, 'retained_uncertain');
+  assert.throws(() => f.runtime.startNodeApply(request('other')), /Browser recovery holds the page/);
+  assert.equal(f.runtime.hasUnsettledWork(), true);
+});
+
+test('T4: a later export to the same file leaves the earlier download unconfirmed', async () => {
+  const first = exportFixture();
+  const target = { kind: 'new', type: 'exports.text', label: 'Export', position: { x: 320, y: 280 } };
+  first.runtime.startNodeApply({ ...request('export'), target });
+  assert.equal((await first.runtime.waitNodeApply('export', { timeoutMs: 1000 })).outcome.output.next_step.tool, 'dock_browser_recovery');
+  // Another export to the same destination follows (its read is refused too, but it ran).
+  first.runtime.startNodeApply({ ...request('export-2'), target: { kind: 'existing', type: 'exports.text', label: 'Export', ref: node } });
+  const second = await first.runtime.waitNodeApply('export-2', { timeoutMs: 1000 });
+  // The later export settled on its own; only the destination overlap ends eligibility.
+  assert.equal(second.outcome.status, 'FAILED');
+  assert.throws(() => first.runtime.browserRecoveryBasis('export'), /No browser recovery trigger/);
+  assert.deepEqual(first.reads, []);
 });

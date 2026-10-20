@@ -201,3 +201,28 @@ test('the page probe accepts only one page on the prepared origin and document',
   assert.equal(parseRecoveryPageProbe(reply({ kind: 'browser_recovery_page', pages: 1, origin: 'https://app.loginom.ai', document_id: null }), binding).ok, false);
   assert.equal(parseRecoveryPageProbe({ isError: true, content: [] }, binding).ok, false);
 });
+
+test('an action whose outcome is unknown keeps Dock blocked after the attempt stops', async () => {
+  const h = harness({ callTool: async () => { throw Error('MCP request timed out'); } });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const stopped = body(await h.recovery.call('browser_click', { target: 'e1' }));
+  assert.equal(stopped.phase, 'stopped');
+  assert.equal(stopped.stopped.code, 'browser_unavailable');
+  assert.equal(h.stops.at(-1).uncertain, true);
+  assert.equal(h.recovery.unsettled(), true);
+  assert.equal(h.recovery.refusesDock('dock_node_apply'), true);
+  assert.equal(h.recovery.refusesDock('dock_node_status'), false);
+  const again = await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  assert.equal(again.isError, true);
+  assert.match(again.content[0].text, /unknown outcome/);
+});
+
+test('a tool-level browser error keeps the lease and the browser phase', async () => {
+  const h = harness({ callTool: async () => ({ isError: true, content: [{ type: 'text', text: 'Element not found' }] }) });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const failed = await h.recovery.call('browser_click', { target: 'missing' });
+  assert.equal(failed.isError, true);
+  assert.equal(h.recovery.active(), true);
+  assert.equal(h.recovery.refusesDock('dock_node_apply'), true);
+  assert.deepEqual(h.stops, []);
+});

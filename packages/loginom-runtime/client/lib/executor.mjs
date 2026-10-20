@@ -1952,10 +1952,20 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const state = operation?.nodeApply;
     if (!browserRecovery || !operation || pending || operation.action.capability !== 'node.apply' || operation.transportUncertain
       || !state?.export_download_refusal || !state.node || operation.exportRecovered
-      || typeof operation.nodeApplyDrivers?.recoveryReadExport !== 'function') return null;
+      || typeof operation.nodeApplyDrivers?.recoveryReadExport !== 'function' || laterExportToSameFile(operation)) return null;
     return { reason: 'EXPORT_DOWNLOAD_UNCONFIRMED', step: { key: ['export', state.node.document_id, state.node.workflow_id,
       state.node.node_id, state.execution?.execution_id].join('|'), kind: 'export', document_id: state.node.document_id,
       workflow_id: state.node.workflow_id, node_id: state.node.node_id, node_type: state.request.target.type, phase: 'read' } };
+  }
+  // A file read after another export to the same destination could attribute that
+  // export's bytes to this execution; such an export stays unconfirmed.
+  function laterExportToSameFile(operation) {
+    const destination = operation.nodeApply.request.parameters?.destination;
+    const ordered = [...operations.values()];
+    return ordered.slice(ordered.indexOf(operation) + 1).some(other => other.action.capability === 'node.apply'
+      && other.nodeApply?.request?.target?.type === 'exports.text' && other.outcome?.status !== 'NOT_APPLIED'
+      && (destination === undefined || other.nodeApply.request.parameters?.destination === undefined
+        || other.nodeApply.request.parameters.destination === destination));
   }
   function browserRecoveryTrigger(operation, advice) {
     const exported = exportRecoveryTrigger(operation);
@@ -2010,8 +2020,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if (operation.transportUncertain) return { stopped: false, reason: 'The last browser call of this operation is unconfirmed' };
       // A sent abort or an expired timeout is not proof: only the page ledger is.
       const state = operation.lastReceipt ? await readReceipt(operation) : { state: 'none' };
-      if (!['completed', 'none'].includes(state?.state))
-        return { stopped: false, reason: 'The last browser receipt is ' + (state?.state ?? 'unavailable') };
+      // Same proof as the node release: a completed last gesture with confirmed cleanup.
+      if (state?.state !== 'none' && (state?.state !== 'completed' || state.receipt?.cleanup_complete !== true))
+        return { stopped: false, reason: 'The last browser receipt is ' + (state?.state ?? 'unavailable')
+          + (state?.state === 'completed' ? ' without confirmed cleanup' : '') };
       leased = operation.id;
       return { stopped: true, proof: { receipt_id: operation.lastReceipt?.id ?? null, receipt_state: state.state,
         cleanup_complete: state.receipt?.cleanup_complete ?? null } };
@@ -2063,7 +2075,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         original_operation: { operation_id: operation.id, status: operation.outcome.status, phase: operation.outcome.phase,
           configuration: receipt.configuration, execution: receipt.execution } };
     },
-    async stopBrowserRecovery({ operationId }) {
+    async stopBrowserRecovery({ operationId, uncertain }) {
+      if (uncertain) return { state: 'retained_uncertain', reason: 'A browser recovery action has an unknown outcome; Dock mutations stay blocked.' };
       if (leased === operationId) leased = null;
       // Unknown effects are never discarded to clear the journal (§9).
       return { state: 'retained', reason: 'The original operation keeps its gate; inspect it for the next Dock step.' };

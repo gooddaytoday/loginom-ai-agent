@@ -54,6 +54,8 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
   limits = browserRecoveryLimits }) {
   const budgets = new Map();
   let attempt = null;
+  // A browser action with an unknown outcome blocks Dock until the session is recovered.
+  let uncertain = null;
 
   return {
     enabled,
@@ -70,10 +72,13 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     },
     // Dock may not drive the page while the lease is held or verified.
     refusesDock(name) {
-      return ['handoff', 'browser', 'verify'].includes(attempt?.phase) && !leaseReadOnlyTools.has(name);
+      return (!!uncertain || ['handoff', 'browser', 'verify'].includes(attempt?.phase)) && !leaseReadOnlyTools.has(name);
     },
     active() {
       return ['handoff', 'browser', 'verify'].includes(attempt?.phase);
+    },
+    unsettled() {
+      return !!uncertain || ['handoff', 'browser', 'verify'].includes(attempt?.phase);
     },
     async call(name, args, extra) {
       if (!enabled) return refusal('Browser recovery is unavailable in this build.');
@@ -91,6 +96,7 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
   };
 
   async function start(input, extra) {
+    if (uncertain) return refusal('A browser recovery action has an unknown outcome; Dock stays blocked in this session.', { uncertain });
     if (['handoff', 'browser', 'verify'].includes(attempt?.phase))
       return refusal(`Browser recovery for operation ${attempt.operation_id} is already in phase ${attempt.phase}.`, view());
     const basis = await Promise.resolve().then(() => executor.browserRecoveryBasis(input.operation_id)).catch(error => error);
@@ -140,7 +146,11 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
       return refusal('This browser action finished after the recovery attempt ended; its result is not evidence.', view());
     if (outcome.page.ok !== true)
       return stopAttempt('page_changed', `The Loginom page changed outside recovery bounds: ${outcome.page.reason}.`);
-    if (outcome.error) return stopAttempt('browser_unavailable', 'The browser action outcome is unknown: ' + outcome.error.message);
+    if (outcome.error) {
+      // The action may still run in the browser: never hand the page back to Dock.
+      uncertain = { operation_id: current.operation_id, tool: name, reason: String(outcome.error.message).slice(0, 500) };
+      return stopAttempt('browser_unavailable', 'The browser action outcome is unknown: ' + outcome.error.message);
+    }
     const result = boundText(outcome.value, limits.textBytes);
     result.content.push({ type: 'text', text: JSON.stringify({ browser_recovery: remaining(current.budget) }) });
     return result;
@@ -185,7 +195,7 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     current.phase = 'stopped';
     // Safe completion only: the runtime may cancel its own unapplied draft; unknown effects stay locked.
     const cleanup = await Promise.resolve().then(() => executor.stopBrowserRecovery({ operationId: current.operation_id,
-      step: current.step, reason: code })).catch(error => ({ state: 'retained', reason: error.message }));
+      step: current.step, reason: code, uncertain: !!uncertain })).catch(error => ({ state: 'retained', reason: error.message }));
     // A lost page or document ends the step for good; other stops keep the shared budget for an explicit re-entry.
     if (code === 'page_changed') current.budget.closed = true;
     await record({ phase: 'browser_recovery_stopped', attempt_id: current.id, operation_id: current.operation_id,
