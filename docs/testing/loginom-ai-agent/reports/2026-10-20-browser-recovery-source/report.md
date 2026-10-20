@@ -164,3 +164,28 @@ offline exact-source regex/NUL гипотеза опровергнута. Пов
 Private evidence: `/home/george/.cache/loginom-ai-agent/browser-recovery-scroll-0goRLMSE/evidence`;
 raw commands/source/self-review — ignored scroll-probe task report. Production
 не менялся; прежние S5 FAIL/deferred и historical cleanup UNKNOWN сохраняются.
+
+
+## 2026-10-20 — revised preparatory probe: native cleanup PASS, scroll BLOCKED
+
+Одна новая attempt после scoped preflight GO: fresh stock source stage, pinned catalog,
+selected Save route и compatibility PASS; новый own empty draft/profile/UUID package.
+Direct checkpoint Save SUCCEEDED/verified/save_completed, reopened=false и
+workflow_preserved=true, exact path/active_identity; continuation[] допустим.
+Save подтверждён в памяти до post-check/evidence. Native saved-state modified=false.
+Fresh discover_roots UI guard отказал SAVED_UI_BINDING_UNCONFIRMED до filegrid:
+tab_tid/prefix exact prepared, но package_identity key отсутствует по compact roots
+контракту. Это собственный probe assertion defect, не потеря native package identity.
+Общая ошибка двух preparation checks — требование внутренних полей, которые
+выбранный штатный path не производит. Третьего live не было; root переоценивает план.
+Files navigation/Refresh/scroll/passive250/1000ms reads не достигнуты; причинного
+временного факта нет, это BLOCKED, не NOT_REPRODUCED и не S5 PASS.
+Native отдельно PASS: повторный saved-state modified=false; direct guarded cleanup
+ровно1, SUCCEEDED/package_closed/logged_out/noDiscard. Final Save replace не нужен.
+Context отдельно CLOSED: close event/pages0. OS отдельно NOT_CONFIRMED:
+currentPID/starttime есть, own descendant lineage сохранён, exact-profile candidates0;
+after absence не доказывает полную attribution. Kill/повторных операций не было.
+Own diagnostic server package сохранён. Private evidence:
+`/home/george/.cache/loginom-ai-agent/browser-recovery-scroll2-a5FVbBUQ/evidence`.
+Syntax/static/diff проверки — в ignored task report. Production неизменён;
+первая native cleanup UNKNOWN и S5 FAIL/deferred остаются историческими фактами.
