@@ -1,5 +1,17 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-20 — browser recovery, первый собственный installed CLI
+
+Полный flag1 CLI archive/roundtrip и штатная установка в отдельный HOME PASS;
+пользовательская установка/profiles не заменялись. Current task session capability
+true, public prepare и SaveAs собственного пустого пакета подтверждены, modified:false.
+Обычный native cleanup BLOCKED/TAB_IDENTITY_CHANGED, task ACKfalse/exit1,
+.writer сохранён; собственных процессов нет, logout не подтверждён. Повторов нет.
+Отрицательные CLI строки, Desktop и модели не запускались, матрица не принята.
+Следующий шаг — source/saved-data binding diagnosis и отдельный reviewed repair.
+Merge/release не выполнялись, штатный release-флаг выключен.
+[Фактические build/run identities и ограничения](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md).
+
 ## 2026-10-16 — v0.2.1 опубликован
 
 Release source:`e98b2597492c0fcad18d3e72a8c7533ae10cfa30`,ветка `loginom`.

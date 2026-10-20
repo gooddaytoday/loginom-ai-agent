@@ -201,7 +201,7 @@ git add docs/testing/loginom-ai-agent
 git commit -m "docs(testing): record packaged browser recovery acceptance"
 ```
 
-**Текущее выполнение Task3:** [уточнённый подплан](2026-10-20-browser-recovery-packaged.md), independent preflight review GO до build/install/live. На диске проверяется верхнеуровневое `session.json.browserRecovery`. Read-only поиск исходных кейсов нашёл только частичные LAB-91 IDs; четыре класса без ID, авторский investigations каталог отсутствует, указанные архивы требуют авторизацию (HTTP401). Модельные строки остаются BLOCKED до подтверждения кейсов; availability ещё не запускалась. S5/Task2 остаются отложенными/open.
+**Текущее выполнение Task3:** [уточнённый подплан](2026-10-20-browser-recovery-packaged.md), independent preflight review GO. Первый installed flag1 CLI: archive/roundtrip/install PASS, текущий `session.json.browserRecovery:true`, prepare/SaveAs PASS/modified:false; normal cleanup BLOCKED/TAB_IDENTITY_CHANGED/ACKfalse/exit1/writer retained. [Отчёт](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md); availability boolean сохранён отдельно, первый lifecycle и полная матрица не приняты. WIZARD-кейс LAB-91/103006-r3 и существующий REST GET task/CSV подтверждены; четыре класса без ID и непроверенный slow-host download ограничивают только свои строки. Controls/Desktop/models не запускались; сначала source/saved-data binding diagnosis и reviewed repair. S5/Task2 остаются отложенными/open.
 
 ### Task 4: Включение флага в release
 
