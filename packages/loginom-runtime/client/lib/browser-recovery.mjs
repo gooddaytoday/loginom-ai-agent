@@ -93,7 +93,7 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
       return stop(input, input.reason ?? 'Stopped by the model.');
     },
     async close() {
-      if (!['handoff', 'browser', 'verify'].includes(attempt?.phase)) return;
+      if (!holding() || attempt.phase === 'stopping') return;
       await stopAttempt('runtime_closed', 'The runtime closed during browser recovery.').catch(() => undefined);
     },
   };
@@ -102,27 +102,39 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     if (uncertain) return refusal('A browser recovery action has an unknown outcome; Dock stays blocked in this session.', { uncertain });
     if (holding())
       return refusal(`Browser recovery for operation ${attempt.operation_id} is already in phase ${attempt.phase}.`, view());
-    const basis = await Promise.resolve().then(() => executor.browserRecoveryBasis(input.operation_id)).catch(error => error);
-    if (basis instanceof Error) return refusal(basis.message);
-    const budget = budgets.get(basis.step.key) ?? { calls: 0, started_at: null, closed: false };
-    budgets.set(basis.step.key, budget);
-    if (budget.closed) return refusal('This step was already completed or stopped without a safe retry; continue through Dock.');
-    if (exhausted(budget)) return refusal('The browser recovery budget for this step is exhausted.', { budget: remaining(budget) });
-    attempt = { id: randomUUID(), operation_id: input.operation_id, step: basis.step, reason: basis.reason, phase: 'handoff', budget };
-    await record({ phase: 'browser_recovery_started', attempt_id: attempt.id, operation_id: attempt.operation_id,
-      reason: basis.reason, step: basis.step, budget: remaining(budget) });
-    // Only a confirmed stop of the original executor hands the page over.
-    const handoff = await gate(() => executor.browserRecoveryHandoff(input.operation_id, { signal: extra?.signal }))
-      .catch(error => ({ stopped: false, reason: error.message }));
-    await record({ phase: 'browser_recovery_handoff', attempt_id: attempt.id, operation_id: attempt.operation_id,
-      stopped: handoff.stopped === true, proof: handoff.proof ?? null, reason: handoff.reason ?? null });
-    if (handoff.stopped !== true)
-      return stopAttempt('executor_not_stopped', handoff.reason ?? 'The original executor stop was not confirmed.');
-    attempt.phase = 'browser';
-    budget.started_at ??= now();
+    // The attempt holds the page from its first moment; basis and handoff run in one gate turn.
+    const previous = attempt;
+    const current = attempt = { id: randomUUID(), operation_id: input.operation_id, phase: 'handoff', step: null, reason: null,
+      budget: { calls: 0, started_at: null, closed: false } };
+    const outcome = await gate(async () => {
+      if (attempt !== current || uncertain) return { refused: refusal('Browser recovery state changed before its start.') };
+      const basis = await Promise.resolve().then(() => executor.browserRecoveryBasis(input.operation_id)).catch(error => error);
+      if (basis instanceof Error) return { refused: refusal(basis.message) };
+      const budget = budgets.get(basis.step.key) ?? { calls: 0, started_at: null, closed: false };
+      if (budget.closed) return { refused: refusal('This step was already completed or stopped without a safe retry; continue through Dock.') };
+      if (exhausted(budget)) return { refused: refusal('The browser recovery budget for this step is exhausted.', { budget: remaining(budget) }) };
+      budgets.set(basis.step.key, budget);
+      Object.assign(current, { step: basis.step, reason: basis.reason, budget });
+      // Only a confirmed stop of the original executor hands the page over.
+      const handoff = await Promise.resolve().then(() => executor.browserRecoveryHandoff(input.operation_id, { signal: extra?.signal }))
+        .catch(error => ({ stopped: false, reason: error.message }));
+      return { basis, handoff };
+    });
+    if (outcome.refused) {
+      if (attempt === current) attempt = previous;
+      return outcome.refused;
+    }
+    await journal({ phase: 'browser_recovery_started', attempt_id: current.id, operation_id: current.operation_id,
+      reason: current.reason, step: current.step, budget: remaining(current.budget) });
+    await journal({ phase: 'browser_recovery_handoff', attempt_id: current.id, operation_id: current.operation_id,
+      stopped: outcome.handoff.stopped === true, proof: outcome.handoff.proof ?? null, reason: outcome.handoff.reason ?? null });
+    if (outcome.handoff.stopped !== true)
+      return stopAttempt('executor_not_stopped', outcome.handoff.reason ?? 'The original executor stop was not confirmed.');
+    current.phase = 'browser';
+    current.budget.started_at ??= now();
     return reply({ ...view(), instruction: 'The browser tools are available on your next step. Complete only this step in the '
       + 'current Loginom tab, then call dock_browser_recovery finish. Navigation, reload, tabs, code, storage, network and '
-      + 'file tools are refused.', goal: basis.goal ?? null });
+      + 'file tools are refused.', goal: outcome.basis.goal ?? null });
   }
 
   async function browserCall(name, args, extra) {
@@ -132,7 +144,7 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     if (refused) return refused;
     if (exhausted(attempt.budget)) return stopAttempt('budget_exhausted', 'The browser recovery budget for this step is exhausted.');
     const current = attempt;
-    const call = gate(async () => {
+    const outcome = await track(gate(async () => {
       // A gesture queued behind another one is admitted only against the state that one left.
       const late = admission(name, current) ?? (exhausted(current.budget) ? refusal('The browser recovery budget for this step is exhausted.') : null);
       if (late) return { refused: late };
@@ -146,15 +158,16 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
       if (response.value) current.observationRequired = readOnlyBrowserTools.has(name)
         ? current.observationRequired && response.value.isError === true : response.value.isError === true;
       // The page check runs even after a failed action: its effect may still have landed.
-      const page = await Promise.resolve().then(probe).catch(error => ({ ok: false, reason: error.message }));
+      const page = await Promise.resolve().then(probe).catch(error => ({ ok: false, reason: error.message, unknown: true }));
+      // A page check that could not run leaves the page state unknown; a failed one proves it left bounds.
+      if (page.unknown) uncertain ??= { operation_id: current.operation_id, tool: name,
+        reason: 'Page check failed: ' + String(page.reason).slice(0, 400) };
       // Latch a lost page boundary before the gate is released, like an unknown outcome.
       if (page.ok !== true) current.pageLost ??= String(page.reason ?? 'page check failed').slice(0, 500);
       return { ...response, page };
-    });
-    inflight = call;
-    const outcome = await call.finally(() => { if (inflight === call) inflight = null; });
+    }));
     if (outcome.refused) return outcome.refused;
-    await record({ phase: 'browser_recovery_action', attempt_id: current.id, operation_id: current.operation_id, tool: name,
+    await journal({ phase: 'browser_recovery_action', attempt_id: current.id, operation_id: current.operation_id, tool: name,
       arguments_sha256: sha256(JSON.stringify(args)), is_error: outcome.error ? null : outcome.value?.isError === true,
       transport_error: outcome.error ? String(outcome.error.message) : null, page: outcome.page,
       content: describeContent(outcome.value?.content), budget: remaining(current.budget) });
@@ -173,43 +186,54 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     if (refused) return refused;
     if (attempt.operation_id !== input.operation_id) return refusal('finish requires the browser phase of this operation.', view());
     const current = attempt;
-    current.phase = 'verify';
     const attested = { actions_performed: input.actions_performed ?? [], expected_result: input.expected_result ?? null,
       browser_settings: input.browser_settings ?? [] };
-    await record({ phase: 'browser_recovery_attested', attempt_id: current.id, operation_id: current.operation_id,
-      attested_by_model: attested });
-    // A finish queued behind an unknown outcome or a lost page never runs the verifier or its release.
-    const verification = await gate(() => blocked(current) ? { blocked: true }
-      : executor.verifyBrowserRecovery({ operationId: current.operation_id, step: current.step, attested, signal: extra?.signal }))
-      .catch(error => ({ status: 'unresolved', facts: [], reason: error.message }));
-    if (verification.blocked) return uncertain
-      ? stopAttempt('browser_unavailable', 'A browser action outcome is unknown: ' + uncertain.reason)
-      : stopAttempt('page_changed', `The Loginom page changed outside recovery bounds: ${current.pageLost}.`);
+    // Admission, the phase change and the verifier share one gate turn: a finish queued behind an
+    // unknown outcome or a lost page never runs the verifier or its release.
+    const outcome = await track(gate(async () => {
+      const late = admission(browserRecoveryToolName, current);
+      if (late) return { late };
+      current.phase = 'verify';
+      await journal({ phase: 'browser_recovery_attested', attempt_id: current.id, operation_id: current.operation_id,
+        attested_by_model: attested });
+      const verification = await Promise.resolve().then(() => executor.verifyBrowserRecovery({ operationId: current.operation_id,
+        step: current.step, attested, signal: extra?.signal })).catch(error => ({ status: 'unresolved', facts: [], reason: error.message }));
+      return { verification };
+    }));
+    if (outcome.late) {
+      if (attempt !== current || !(uncertain || current.pageLost)) return outcome.late;
+      return uncertain ? stopAttempt('browser_unavailable', 'A browser action outcome is unknown: ' + uncertain.reason)
+        : stopAttempt('page_changed', `The Loginom page changed outside recovery bounds: ${current.pageLost}.`);
+    }
+    const verification = outcome.verification;
     const status = ['completed', 'continuable'].includes(verification.status) ? verification.status : 'unresolved';
-    await record({ phase: 'browser_recovery_verified', attempt_id: current.id, operation_id: current.operation_id,
+    const result = { ...verification, status, attested_by_model: attested };
+    // A stop during verification already decided the lease; report what verification found.
+    if (attempt !== current || current.phase !== 'verify') return reply({ ...view(), verification: result });
+    await journal({ phase: 'browser_recovery_verified', attempt_id: current.id, operation_id: current.operation_id,
       status, facts: verification.facts ?? [], receipt_id: verification.receipt_id ?? null });
     if (status !== 'unresolved') {
       current.phase = 'dock';
       if (status === 'completed') current.budget.closed = true;
-      return reply({ ...view(), verification: { ...verification, status, attested_by_model: attested } });
+      return reply({ ...view(), verification: result });
     }
     if (exhausted(current.budget))
-      return stopAttempt('unresolved', verification.reason ?? 'The verification did not establish the step result.',
-        { verification: { ...verification, status, attested_by_model: attested } });
+      return stopAttempt('unresolved', verification.reason ?? 'The verification did not establish the step result.', { verification: result });
     current.phase = 'browser';
-    return reply({ ...view(), verification: { ...verification, status, attested_by_model: attested },
+    return reply({ ...view(), verification: result,
       instruction: 'The step result is not established yet. Continue in the browser within the remaining budget, or call stop.' });
   }
 
   async function stop(input, reason) {
-    if (attempt?.phase !== 'browser' || attempt.operation_id !== input.operation_id)
-      return refusal('stop requires the browser phase of this operation.', view());
+    // Any holding phase can stop, so a failed journal write never strands the lease.
+    if (!holding() || attempt.phase === 'stopping' || attempt.operation_id !== input.operation_id)
+      return refusal('stop requires an active browser recovery attempt of this operation.', view());
     return stopAttempt('model_stopped', reason);
   }
 
   async function stopAttempt(code, reason, extra = {}) {
     const current = attempt;
-    // Still holding: a dispatched action settles first and decides whether the page may return to Dock.
+    // Still holding: a dispatched action or verification settles first and decides whether the page may return to Dock.
     current.phase = 'stopping';
     if (inflight) await inflight.catch(() => undefined);
     current.phase = 'stopped';
@@ -218,11 +242,25 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
       step: current.step, reason: code, uncertain: !!uncertain })).catch(error => ({ state: 'retained', reason: error.message }));
     // A lost page or document ends the step for good; other stops keep the shared budget for an explicit re-entry.
     if (code === 'page_changed') current.budget.closed = true;
-    await record({ phase: 'browser_recovery_stopped', attempt_id: current.id, operation_id: current.operation_id,
+    await journal({ phase: 'browser_recovery_stopped', attempt_id: current.id, operation_id: current.operation_id,
       code, reason, cleanup, budget: remaining(current.budget) });
     return reply({ ...view(), stopped: { code, reason, cleanup }, ...extra,
       instruction: 'Browser recovery stopped. Report what was done, what the runtime confirmed, what only you attested, '
         + 'whether the package was saved, and what remains unknown. Do not claim success for an unknown result.' });
+  }
+
+  // Evidence that cannot be written leaves the outcome unproven: it blocks like an unknown effect.
+  async function journal(event) {
+    try { return await record(event); }
+    catch (error) {
+      uncertain ??= { operation_id: event.operation_id, tool: null, reason: 'Journal write failed: ' + String(error.message).slice(0, 400) };
+      throw error;
+    }
+  }
+
+  function track(call) {
+    inflight = call;
+    return call.finally(() => { if (inflight === call) inflight = null; });
   }
 
   function holding() {
