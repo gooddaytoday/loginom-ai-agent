@@ -1982,6 +1982,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if (exported) return exported;
     if (!browserRecovery || !operation || pending !== operation || operation.action.capability !== 'node.apply'
       || operation.transportUncertain || typeof operation.nodeApplyDrivers?.releasePending !== 'function') return null;
+    // Export draft release must not hand an unsettled file-read lease to the
+    // generic node route. Its settled download refusal has the separate T4 path.
+    if (operation.nodeApply?.request.target.type === 'exports.text'
+      && operation.nodeApply.pending?.phase === 'read') return null;
     const step = nodeRecoveryStep(operation);
     if (!step) return null;
     if (operation.releaseRefused) return { reason: 'NODE_RELEASE_REFUSED', step };
