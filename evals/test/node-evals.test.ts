@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { validateNodeAttempt, validateNodeRun } from "../src/node-evals"
 
 test("неизвестный case ID получает ERROR до проверки артефакта", async () => {
@@ -27,6 +27,88 @@ async function writeSummary(file: string, source: string) {
     }))
   }
 }
+
+async function slotRun() {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "node-v2-evals-"))
+  const id = "crosstable-fixed-sum"
+  const profile = path.join(directory, "profile")
+  const history = path.join(directory, "history")
+  const archive = path.join(history, "attempt-1")
+  await mkdir(profile, { mode: 0o700 })
+  await mkdir(archive, { recursive: true, mode: 0o700 })
+  const summary = { config: { repeat: 1, parallel: 1 }, storage_leftovers: [],
+    slots: [{ id: "a", profileDir: profile, historyDir: history, liveQualified: true, state: "closed" }],
+    tasks: [{ id, attempts: [{ attempt: 1, status: "failed", slot_id: "a", environment_cleanup: { status: "confirmed" } }] }] }
+  const cleanup = { processes: { status: "confirmed", error: null, capture_complete: true, unknownProcesses: [], observation_mode: "continuous" },
+    archive, closed: [], removed: [], slotId: "a", profileDir: profile, serverEpoch: "a".repeat(64),
+    serverSessions: "confirmed", storageDeletionAllowed: true, nextAdmissionAllowed: true }
+  await Bun.write(path.join(directory, "summary.json"), JSON.stringify(summary))
+  await Bun.write(path.join(directory, "cases", id, "task.json"), JSON.stringify({ id, checklist: [{ id: "crosstable", required: true }] }))
+  const evidence = path.join(directory, id, "1/cleanup.json")
+  await Bun.write(evidence, JSON.stringify(cleanup))
+  return { directory, id, summary, cleanup, evidence }
+}
+
+test("v2 cleanup with its own confirmed history archive preserves a failed node result", async () => {
+  const context = await slotRun()
+  try {
+    const result = await validateNodeRun(context.directory, [context.id], path.join(context.directory, "cases"))
+    expect(result).toMatchObject({ verdict: "FAIL", code: 1, errors: [] })
+  } finally { await rm(context.directory, { recursive: true }) }
+})
+
+test.each(["slot-id", "epoch", "foreign-profile", "foreign-archive", "missing-archive", "process-error", "capture-incomplete",
+  "unknown-process", "missing-process-inventory", "deferred-observation", "sessions-unknown", "deletion-refused", "admission-refused"] as const)(
+  "v2 cleanup rejects %s despite a confirmed summary", async kind => {
+    const context = await slotRun()
+    try {
+      const changes = {
+        "slot-id": { slotId: "unknown" },
+        epoch: { serverEpoch: "unknown" },
+        "foreign-profile": { profileDir: path.join(context.directory, "other") },
+        "foreign-archive": { archive: context.directory },
+        "missing-archive": { archive: undefined },
+        "process-error": { processes: { ...context.cleanup.processes, error: "unconfirmed process" } },
+        "capture-incomplete": { processes: { ...context.cleanup.processes, capture_complete: false } },
+        "unknown-process": { processes: { ...context.cleanup.processes, unknownProcesses: [{ pid: 123 }] } },
+        "missing-process-inventory": { processes: { ...context.cleanup.processes, unknownProcesses: undefined } },
+        "deferred-observation": { processes: { ...context.cleanup.processes, observation_mode: "unit_after_exit" } },
+        "sessions-unknown": { serverSessions: "unknown" },
+        "deletion-refused": { storageDeletionAllowed: false },
+        "admission-refused": { nextAdmissionAllowed: false },
+      }
+      await Bun.write(context.evidence, JSON.stringify({ ...context.cleanup, ...changes[kind] }))
+      expect(await validateNodeRun(context.directory, [context.id], path.join(context.directory, "cases")))
+        .toMatchObject({ verdict: "ERROR", code: 2 })
+    } finally { await rm(context.directory, { recursive: true }) }
+  },
+)
+
+test("v2 confirmed cleanup still requires the completed node artifact", async () => {
+  const context = await slotRun()
+  try {
+    context.summary.tasks[0]!.attempts[0]!.status = "completed"
+    await Bun.write(path.join(context.directory, "summary.json"), JSON.stringify(context.summary))
+    const result = await validateNodeRun(context.directory, [context.id], path.join(context.directory, "cases"))
+    expect(result).toMatchObject({ verdict: "FAIL", code: 1, errors: [] })
+    expect(result.failures.join(" ")).toContain("missing artifact/package.lgp")
+  } finally { await rm(context.directory, { recursive: true }) }
+})
+
+test("v2 slots cannot replace their cleanup proof with legacy archive stages", async () => {
+  const context = await slotRun()
+  try {
+    const history = context.cleanup.profileDir + ".history"
+    const archive = path.join(history, "other-attempt")
+    await mkdir(archive, { recursive: true, mode: 0o700 })
+    context.summary.slots[0]!.historyDir = history
+    await Bun.write(path.join(context.directory, "summary.json"), JSON.stringify(context.summary))
+    await Bun.write(context.evidence, JSON.stringify({ ...context.cleanup, archive: undefined,
+      result: { status: "confirmed" }, stages: [{ stage: "profile_history", status: "confirmed", path: archive }] }))
+    expect(await validateNodeRun(context.directory, [context.id], path.join(context.directory, "cases")))
+      .toMatchObject({ verdict: "ERROR", code: 2 })
+  } finally { await rm(context.directory, { recursive: true }) }
+})
 
 test("неизвестный case ID остаётся ERROR/2 при failed попытке", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-unknown-run-"))
