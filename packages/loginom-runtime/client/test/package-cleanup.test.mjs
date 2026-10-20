@@ -19,6 +19,8 @@ function fixture(overrides = {}) {
     FServerConnection:{get UserName(){return state.account;}, Connected:true, Session:{IsPackageModified:async () => {
       events.push('modified-read'); if (state.racePath) state.path = state.racePath; if(state.raceReadOnly!==undefined)state.readonly=state.raceReadOnly;
       if(state.raceTab)state.tab=false; if(state.raceTabTid)state.tabTid=state.raceTabTid;
+      if(state.maskOnModifiedRead){state.mask=true;state.maskOnModifiedRead=false;}
+      state.clock+=state.modifiedReadElapsed??0;
       return state.modified;
     }}}, async ClosePackage(target, suppressEvents, processAfterCall) {
       events.push('close'); assert.equal(target,node); assert.equal(suppressEvents,false); assert.equal(processAfterCall,true);
@@ -68,6 +70,12 @@ function fixture(overrides = {}) {
     async isVisible(){fail('logout_readback');return !state.loggedOut;},
   });
   const page = {locator,
+    async waitForTimeout(ms){
+      assert.ok(ms>0&&ms<=100);events.push('idle-wait');state.clock+=state.idleElapsed??ms;
+      if(state.clearBlocker){state.mask=false;state.dialog=false;}
+      Object.assign(state,state.idleChange??{});
+      if(state.changePreparation)context.__loginomDockPreparationV1.id='foreign-document';
+    },
     async evaluate(fn,arg){
       if(fn.toString().includes('m.ClosePackage(node, false, true)'))fail('close_request');
       if(fn.toString().includes('remaining:globalThis'))fail('close_readback');
@@ -92,6 +100,7 @@ function fixture(overrides = {}) {
   return {state,events,context, run:changed => {
     const code=makePackageCleanupCode({...options,timeoutMs:state.timeoutMs??options.timeoutMs,...changed});
     state.clock=Date.now();
+    context.Date=Clock;
     return vm.runInNewContext('('+code+')',{Date:Clock})(page);
   }};
 }
@@ -103,6 +112,71 @@ test('saved owned package closes with native guards, tabs disappear, then logout
   assert.equal(result.unsaved_changes_discarded,false);
   assert.deepEqual(f.events,['modified-read','close','tab-detached','avatar','logout','login-visible']);
   const again=await f.run();assert.equal(again.reason,'CLEANUP_ALREADY_ATTEMPTED');assert.equal(f.events.filter(e=>e==='close').length,1);
+});
+
+for(const blocker of ['mask','dialog'])test('cold cleanup waits read-only for a transient '+blocker+' before one native close/logout',async()=>{
+ const f=fixture({[blocker]:true,clearBlocker:true,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+ assert.equal(r.status,'SUCCEEDED');assert.equal(r.package_closed,true);assert.equal(r.logged_out,true);
+ assert.deepEqual(f.events,['idle-wait','modified-read','close','tab-detached','avatar','logout','login-visible']);
+ assert.equal(r.unsaved_changes_discarded,false);
+});
+
+test('cold idle wait also rechecks blockers after the asynchronous dirty-state read',async()=>{
+ const f=fixture({maskOnModifiedRead:true,clearBlocker:true,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+ assert.equal(r.status,'SUCCEEDED');assert.equal(r.logged_out,true);
+ assert.deepEqual(f.events.slice(0,4),['modified-read','idle-wait','modified-read','close']);
+ assert.equal(f.events.filter(e=>e==='close').length,1);
+});
+
+test('cold idle wait retains the exact owned temporary-view discard confirmation',async()=>{
+ const f=fixture({mask:true,clearBlocker:true,modified:true,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+ assert.equal(r.status,'SUCCEEDED');assert.equal(r.package_closed,true);assert.equal(r.logged_out,true);
+ assert.equal(r.unsaved_changes_discarded,true);
+ assert.deepEqual(f.events,['idle-wait','modified-read','close','discard','tab-detached','avatar','logout','login-visible']);
+});
+
+test('cold idle wait never retries an unconfirmed native close',async()=>{
+ const f=fixture({mask:true,clearBlocker:true,closeResult:false,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+ assert.equal(r.reason,'NATIVE_CLOSE_UNCONFIRMED');assert.equal(r.package_closed,false);assert.equal(r.logged_out,false);
+ assert.equal(f.events.filter(e=>e==='idle-wait').length,1);assert.equal(f.events.filter(e=>e==='close').length,1);
+ assert.equal(f.events.includes('logout'),false);
+});
+
+for(const [change,reason] of [[{account:'foreign'},'ACCOUNT_CHANGED'],[{path:'/foreign/result.lgp'},'PACKAGE_IDENTITY_CHANGED'],
+ [{count:2},'PACKAGE_INVENTORY_CHANGED'],[{tab:false},'TAB_IDENTITY_CHANGED'],[{running:true},'RUNNING_NODES'],[{readonly:true},'PACKAGE_IDENTITY_CHANGED']])
+ test('cold idle wait preserves ownership and running-node refusal: '+JSON.stringify(change),async()=>{
+  const f=fixture({mask:true,clearBlocker:true,idleChange:change,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+  assert.equal(r.reason,reason);
+  assert.equal(r.status,'BLOCKED');assert.equal(r.package_closed,false);assert.equal(r.logged_out,false);
+  assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+ });
+
+test('cold idle wait refuses a changed preparation document',async()=>{
+ const f=fixture({mask:true,clearBlocker:true,changePreparation:true,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+ assert.equal(r.reason,'DOCUMENT_IDENTITY_CHANGED');assert.deepEqual(f.events,['idle-wait']);
+});
+
+for(const blocker of ['mask','dialog'])test('persistent '+blocker+' keeps cold cleanup blocked within its original wait allowance',async()=>{
+ const f=fixture({[blocker]:true}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+ assert.equal(r.reason,'DIALOG_OR_OPERATION_OPEN');assert.equal(r.stage,'idle_wait');
+ assert.equal(r.package_closed,false);assert.equal(r.logged_out,false);assert.deepEqual(f.events,['idle-wait']);
+});
+
+test('cold cleanup never closes after idle wait or server read exhausts the original deadline',async()=>{
+ for(const change of [{mask:true,clearBlocker:true,idleElapsed:30001},{modifiedReadElapsed:30001}]){
+  const f=fixture(change),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+  assert.equal(r.status,'BLOCKED');assert.equal(r.package_closed,false);assert.equal(r.logged_out,false);
+  assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+ }
+});
+
+test('idle waiting is opt-in for isolated diagnostics, ordinary cleanup still refuses immediately',async()=>{
+ for(const changed of [{},{diagnosticDiscard:true}]){
+  const f=fixture({mask:true}),r=await f.run(changed);
+  assert.equal(r.reason,'DIALOG_OR_OPERATION_OPEN');assert.deepEqual(f.events,[]);
+ }
+ for(const changed of [{diagnosticWaitForIdle:true},{diagnosticDiscard:true,diagnosticWaitForIdle:'true'}])
+  assert.throws(()=>makePackageCleanupCode({...options,...changed}));
 });
 
 test('avatar timeout observes cleared masks and retries once before confirmed logout',async()=>{
