@@ -33,6 +33,7 @@ test.each(["call", "tools", "admit", "interrupt"])(
           ? {protocol:1,generation:m.input.generation,checked:true}
           : {protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true});
         if (m.operation === 'close') return process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+        if (m.operation === 'run-released') return reply(m.id, {released:true});
         if (m.operation === 'arm') { armed = true; return reply(m.id, true); }
         if (m.operation === 'call' && m.input.name === 'dock_prepare')
           return reply(m.id, {result:{content:[]},recoveryPending:false,activeWork:false});
