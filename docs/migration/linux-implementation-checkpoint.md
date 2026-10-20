@@ -1,27 +1,18 @@
 # Linux: завершение реализации — 2026-09-16
 
-## 2026-10-20 — Desktop browser recovery availability
+## 2026-10-20 — browser recovery, Linux availability
 
-Installed flag1 current true и unpackaged flag1 current false технически подтверждены.
-Обе строки: canonical Save, native Close/logout/noDiscard, task ACK/exit0, app exit0,
-собственных процессов нет. Flag1/flag0 DEB manifests и static 4753 PASS; source один.
-Desktop typecheck/packaging 14 PASS/2 platform SKIP; crash-logging 6 PASS на обеих сборках.
-Первый Bun driver timeout до task и все проверочные ошибки сохранены отдельно.
-Installed flag1 оставлен для Task3; flag0 не устанавливался, profiles не удалялись.
-Task2 ожидает независимого review; модели/recovery gate открыты, merge/release не было.
-[Точные identities, evidence и ограничения](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md).
-
-## 2026-10-20 — browser recovery, собственный installed CLI
-
-CLI availability4/4 подтверждена: installed flag1 true, три контроля false.
-Для каждой строки canonical Save/native Close/logout/noDiscard/task ACKexit0,
-CLIexit0/writer release и отсутствие собственных процессов проверены отдельно.
-Flag1/flag0 archive/roundtrip/install PASS; контрольная установка штатно удалена,
-flag1 сохранена для моделей. Пользовательская установка/profiles не заменялись.
-Первый SaveAs/reopen cleanup FAIL/guard сохранён отдельно; production не менялся.
-CLI Task1 принята независимым spec+quality review без обязательных замечаний.
-Далее Desktop. Desktop/models и полная матрица не приняты; merge/release не выполнялись.
-[Фактические identities и ограничения](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md).
+CLI availability4/4 принята независимым spec+quality review без обязательных замечаний.
+Root подтвердил Desktop installed true/unpackaged false и flag1/flag0 DEB/static PASS.
+Для каждой положенной строки — canonical Save/native Close/logout/noDiscard,
+task ACKexit0/app0 и OS отсутствие собственных процессов, отдельными фактами.
+Desktop typecheck/packaging14 PASS/2 SKIP; crash-logging6 PASS на каждой сборке.
+CLI control штатно удалён; flag1 CLI/Desktop сохранены для моделей. Пользовательские
+profiles не затрагивались. Первый CLI SaveAs cleanup FAIL/guard, Desktop pre-task
+Bun timeout и проверочные ошибки сохранены отдельно. Production не менялся.
+Далее независимый Desktop Task2 review, затем модели; полная матрица/release gate
+открыты. Merge/release не было.
+[Фактические identities, evidence и ограничения](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md).
 
 ## 2026-10-16 — v0.2.1 опубликован
 
