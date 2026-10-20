@@ -4,7 +4,7 @@ import type { EvalConfig } from "./config"
 import { EvalFailure } from "./fail"
 import { acquireJudgeLease, globalLockRoot, writeLeaseReceipt } from "./lease"
 import { loadJudgeEnvironment } from "./slots"
-import { rejudge } from "./rejudge"
+import { rejudge, requireRejudgeRunDirectory } from "./rejudge"
 import { calibrate } from "./calibrate"
 
 export async function runOfflineJudge(config: EvalConfig, lockRoot = globalLockRoot) {
@@ -21,6 +21,7 @@ export async function runOfflineJudge(config: EvalConfig, lockRoot = globalLockR
     if (!info.isFile() || info.uid !== process.getuid?.() || info.nlink !== 1 || (info.mode & 0o777) !== 0o600)
       throw new EvalFailure("JUDGE_AUTH_PRIVATE", 2)
   }
+  if (config.judgeOnly !== undefined) await requireRejudgeRunDirectory(config.resultsDir, config.judgeOnly)
   const directory = await mkdtemp(path.join(environment.stateDir, "judge-command-"))
   const commandId = crypto.randomUUID()
   const journal = path.join(directory, "journal.json")

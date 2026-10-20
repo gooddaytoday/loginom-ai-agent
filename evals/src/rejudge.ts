@@ -15,9 +15,8 @@ export async function rejudge(config: EvalConfig, runId: string, onRunDirectory?
   const controller = new AbortController()
   const removeSigint = installSigint(controller)
   try {
-    const runDir = path.join(config.resultsDir, runId)
+    const runDir = await requireRejudgeRunDirectory(config.resultsDir, runId)
     const summaryFile = Bun.file(path.join(runDir, "summary.json"))
-    if (!(await summaryFile.exists())) throw new EvalFailure(`Нет прогона ${runId}: ${runDir}/summary.json не найден`, 2)
     await onRunDirectory?.(runDir)
     const prev = (await summaryFile.json()) as RunSummary
     const saved = await Bun.file(path.join(runDir, "config.json")).json().catch(() => undefined) as { tasksDir?: unknown } | undefined
@@ -109,4 +108,11 @@ export async function rejudge(config: EvalConfig, runId: string, onRunDirectory?
     console.log(renderReport(summary))
     return { code: 0, runDir, judgeCleanupConfirmed: !attempts.some(attempt => attempt.judge_cleanup_unconfirmed) }
   } finally { removeSigint() }
+}
+
+export async function requireRejudgeRunDirectory(resultsDir: string, runId: string) {
+  const runDir = path.join(resultsDir, runId)
+  if (!await Bun.file(path.join(runDir, "summary.json")).exists())
+    throw new EvalFailure(`Нет прогона ${runId}: ${runDir}/summary.json не найден`, 2)
+  return runDir
 }
