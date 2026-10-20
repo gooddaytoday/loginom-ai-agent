@@ -142,7 +142,8 @@ trial-dosage-outcomes
   management/attempt/prepared cleanup на существующий writeLeaseReceipt. Без изменения
   критериев retry/recovery и без новой процедуры восстановления. Два RED→GREEN;
  138pass/2proc-denialskip/0fail,593assertions; typecheck и независимое review pass.
-- [ ] Сохранить blocker и отчёт о частичной серии. Prepared startup не acknowledges recovery;
+- [x] Сохранить blocker в private root/eval_parallel_blockers.md и
+  [отчёт о частичной серии](../../testing/loginom-ai-agent/reports/2026-10-20-analytic10-branch-cli.md). Prepared startup не acknowledges recovery;
   его восстановление требует отдельного решения; новая полная серия после writer fix
   выполняется на ещё одном свежем своём стенде в том же окне07:28:25Z–15:28:25Z.
   Независимое ревью подтвердило соответствие авторизации. Техническая приёмка пока не пройдена.
@@ -180,5 +181,5 @@ trial-dosage-outcomes
 6. Process cleanup2confirmed/unknown=[]; native cleanup BLOCKED/unconfirmed, recovery и карантин2слотов.
 7. Post verify exit2/LEASE_FILE_PRIVATE:cleanup receipts0664, private reader требует0600.
 8. Writer fix:2RED→GREEN;138pass/2skip/0fail, typecheck/review pass; следующий шаг rebuild и свежий стенд.
-9. Старые receipts не менять; штатного recovery acknowledgement в prepared startup нет.
+9. Серия2:private root /home/kiselev/storage/tmp/analytic10-branch-r2-20261020-3zm1mmp9; build4593a1396b verified.
 10. Source auth/inputs/rubric сохранены; native cancellation2s:2 baseline failures вне этой задачи.
