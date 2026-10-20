@@ -109,13 +109,13 @@ async function closeOwnedPackage(page, options, deadline) {
       const state = globalThis.__loginomDockCleanupV1;
       const visible = e => !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height && getComputedStyle(e).visibility !== 'hidden';
       return state?.done || [...document.querySelectorAll('[role="dialog"],.x-message-box')].some(visible);
-    }, undefined, {timeout:timeoutMs});
+    }, undefined, {timeout:remaining()});
     if (options.diagnosticDiscard === true && before.modified === true) {
       receipt.stage = 'discard_prompt';
       const message = page.locator('[data-tid^="msgbox"][data-tid$="cnt;cnt;cmp"]:visible');
       const no = page.locator('[data-tid^="msgbox"][data-tid$="tlb;no"]:visible');
       if (await message.count() !== 1 || await no.count() !== 1) return finish('BLOCKED','DIAGNOSTIC_SAVE_PROMPT_MISSING');
-      const text = (await message.innerText()).trim();
+      const text = (await message.innerText({timeout:remaining()})).trim();
       if (!/сохранить изменения в пакете/i.test(text) || typeof before.display_name !== 'string'
           || !text.includes(before.display_name) || /заблокирован|отменить активные процессы/i.test(text))
         return finish('BLOCKED','DIAGNOSTIC_SAVE_PROMPT_CHANGED');
@@ -128,10 +128,10 @@ async function closeOwnedPackage(page, options, deadline) {
           && m.FServerConnection.UserName === o.account && n.HasRunningNodes() === false;
       }, options)) return finish('BLOCKED','DIAGNOSTIC_PACKAGE_CHANGED');
       receipt.stage = 'discard_click';
-      await no.click({timeout:timeoutMs});
+      await no.click({timeout:remaining()});
       receipt.unsaved_changes_discarded = true;
       receipt.stage = 'discard_close_wait';
-      await page.waitForFunction(() => globalThis.__loginomDockCleanupV1?.done === true, undefined, {timeout:timeoutMs});
+      await page.waitForFunction(() => globalThis.__loginomDockCleanupV1?.done === true, undefined, {timeout:remaining()});
     }
     receipt.stage = 'close_readback';
     const closed = await page.evaluate(() => {
@@ -141,7 +141,7 @@ async function closeOwnedPackage(page, options, deadline) {
     });
     if (!closed.done || !closed.closed || closed.remaining !== 0) return finish('BLOCKED', 'NATIVE_CLOSE_UNCONFIRMED');
     receipt.stage = 'tab_detach';
-    await at(tabTid).waitFor({state:'detached', timeout:timeoutMs});
+    await at(tabTid).waitFor({state:'detached', timeout:remaining()});
     receipt.package_closed = true;
     receipt.stage = 'logout_menu_open';
     try {
@@ -170,7 +170,7 @@ async function closeOwnedPackage(page, options, deadline) {
       if (!state.menu) await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:remaining()});
     }
     receipt.stage = 'logout_account_readback';
-    if ((await at('MF;AppMenuForm;p.h;p.t').innerText()).trim() !== account) return finish('BLOCKED', 'LOGOUT_ACCOUNT_CHANGED');
+    if ((await at('MF;AppMenuForm;p.h;p.t').innerText({timeout:remaining()})).trim() !== account) return finish('BLOCKED', 'LOGOUT_ACCOUNT_CHANGED');
     // Native close already removed every package; logout cannot discard work.
     receipt.stage = 'logout_inventory_readback';
     if (!await page.evaluate(expected => {

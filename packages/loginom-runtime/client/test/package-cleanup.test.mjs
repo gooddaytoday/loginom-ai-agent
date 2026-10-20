@@ -13,6 +13,12 @@ function fixture(overrides = {}) {
   const events = [], state = {clock:Date.now(), avatarClicks:0, avatarBudgets:[], menu:false, account:'test-2', path:options.packagePath, modified:false, running:false,
     count:1, tab:true, dialog:false, loggedOut:false, readonly:false, closeResult:true, ...overrides};
   const fail = stage => {if(state.failStage===stage)throw Error('private upstream failure: do not persist');};
+  const timed = (stage, settings) => {
+    (state.apiBudgets??=[]).push({stage,timeout:settings.timeout,at:state.clock});
+    const elapsed=state.apiElapsed?.[stage]??0;
+    state.clock+=Math.min(elapsed,settings.timeout);
+    if(elapsed>0&&elapsed>=settings.timeout)throw Object.assign(Error('simulated bounded UI timeout'),{name:'TimeoutError'});
+  };
   const node = {DisplayName:'result',get PackageFileName(){return state.path;}, get ReadOnly(){return state.readonly;},
     Package:{}, HasRunningNodes:() => state.running};
   const m = {PackageNodes:{get Count(){return state.count;}, Items:() => node}, HasRunningNodes:() => state.running,
@@ -46,11 +52,13 @@ function fixture(overrides = {}) {
     locator:() => locator(query+' input'),
     async waitFor(settings) {
       assert.ok(settings.timeout > 0 && settings.timeout <= (state.timeoutMs??options.timeoutMs));
+      timed(query.includes('LoginForm')?'login_form_wait':'tab_detach',settings);
       fail(query.includes('LoginForm')?'login_form_wait':'tab_detach');
       events.push(query.includes('LoginForm') ? 'login-visible' : 'tab-detached');
       if (query.includes('LoginForm') ? !state.loggedOut : state.tab) throw Error('UI wait failed');
     }, async click(settings) {
       assert.ok(settings.timeout > 0 && settings.timeout <= (state.timeoutMs??options.timeoutMs));
+      timed(query.includes('tlb;no')?'discard_click':query.includes('btnLogOut')?'logout_click':'logout_menu_open',settings);
       fail(query.includes('tlb;no')?'discard_click':query.includes('btnLogOut')?'logout_click':'logout_menu_open');
       if (query.includes('tlb;no')) {events.push('discard');state.confirm();}
       else if (query.includes('btnLogOut')) { events.push('logout'); state.loggedOut=true; }
@@ -84,6 +92,7 @@ function fixture(overrides = {}) {
     },
     async waitForFunction(fn,arg,settings){
       assert.ok(settings.timeout > 0 && settings.timeout <= (state.timeoutMs??options.timeoutMs));
+      timed(fn.toString().includes('const menu =')?'logout_observe':fn.toString().includes('globalThis.__loginomDockCleanupV1?.done === true')?'discard_close_wait':'close_wait',settings);
       if(fn.toString().includes('const menu =')){
         events.push('logout-observe'); state.observeTimeout=settings.timeout;
         for(let i=0;i<2;i++){
@@ -99,7 +108,8 @@ function fixture(overrides = {}) {
   const Clock = class extends Date {static now(){return state.clock;}};
   return {state,events,context, run:changed => {
     const code=makePackageCleanupCode({...options,timeoutMs:state.timeoutMs??options.timeoutMs,...changed});
-    state.clock=Date.now();
+    state.deadline=Number(code.match(/,(\d+)\)$/)[1]);
+    state.clock=state.deadline-30000;
     context.Date=Clock;
     return vm.runInNewContext('('+code+')',{Date:Clock})(page);
   }};
@@ -141,6 +151,27 @@ test('cold idle wait never retries an unconfirmed native close',async()=>{
  assert.equal(f.events.filter(e=>e==='idle-wait').length,1);assert.equal(f.events.filter(e=>e==='close').length,1);
  assert.equal(f.events.includes('logout'),false);
 });
+
+test('all cleanup waits and clicks share the remainder after idle and server delay',async()=>{
+ const f=fixture({mask:true,clearBlocker:true,modified:true,timeoutMs:8000,idleElapsed:7900,modifiedReadElapsed:22000,
+  apiElapsed:{close_wait:20,discard_click:20,discard_close_wait:20,tab_detach:20}});
+ const r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+ assert.equal(r.status,'SUCCEEDED');assert.equal(r.package_closed,true);assert.equal(r.logged_out,true);
+ assert.deepEqual(f.state.apiBudgets.slice(0,4).map(b=>[b.stage,b.timeout]),
+  [['close_wait',100],['discard_click',80],['discard_close_wait',60],['tab_detach',40]]);
+ assert.ok(f.state.apiBudgets.every(b=>b.timeout>0&&b.at+b.timeout<=f.state.deadline));
+ assert.ok(f.state.clock<=f.state.deadline);
+});
+
+for(const stage of ['close_wait','discard_click','discard_close_wait','tab_detach'])
+ test('cleanup stops within the absolute deadline when '+stage+' stalls after idle wait',async()=>{
+  const f=fixture({mask:true,clearBlocker:true,modified:true,timeoutMs:8000,idleElapsed:7900,modifiedReadElapsed:22000,
+   apiElapsed:{[stage]:20000}}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+  assert.equal(r.status,'BLOCKED');assert.equal(r.stage,stage);assert.equal(r.logged_out,false);
+  assert.ok(f.state.clock<=f.state.deadline);assert.ok(f.state.apiBudgets.every(b=>b.at+b.timeout<=f.state.deadline));
+  assert.equal(f.state.apiBudgets.at(-1).stage,stage);assert.equal(f.events.filter(e=>e==='close').length,1);
+  assert.equal(f.events.includes('logout'),false);
+ });
 
 for(const [change,reason] of [[{account:'foreign'},'ACCOUNT_CHANGED'],[{path:'/foreign/result.lgp'},'PACKAGE_IDENTITY_CHANGED'],
  [{count:2},'PACKAGE_INVENTORY_CHANGED'],[{tab:false},'TAB_IDENTITY_CHANGED'],[{running:true},'RUNNING_NODES'],[{readonly:true},'PACKAGE_IDENTITY_CHANGED']])
