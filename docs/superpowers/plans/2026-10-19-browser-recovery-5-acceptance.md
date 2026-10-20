@@ -22,8 +22,8 @@
 ## Результат, объём, исключения
 
 - Готово, когда Tasks 1–4 закрыты, гейт Task 4 выполнен и владелец дал команду слияния и выпуска.
-- Первый проверяемый результат — Task 2: BR-S2, BR-S4, BR-S5 и BR-S6 на реальном Loginom.
-- Объём: ~9 файлов, ~+450 / −10 строк (evals ~120, скрипт приёмки ~150, отчёты и runbook ~170, workflow ~3).
+- Первый проверяемый сквозной результат — Task 1: completed start в CLI events → сохранённый результат попытки → счётчик и строка отчёта через существующий fake/dir путь. Native Task 2 отложена до проверенного активного входа текущего runtime; это не блокирует независимую Task 1.
+- Объём: ~11 файлов, ~+500 / −10 строк (evals с интеграционной фикстурой/проверкой ~170, скрипт приёмки ~150, отчёты и runbook ~170, workflow ~3).
 - Исключения: приёмка Windows и macOS, доставка входного файла, изменения `compare`.
 - Предусловия сверх плана 3 ([preflight-отчёт](../../testing/loginom-ai-agent/reports/2026-10-19-browser-recovery-preflight.md), пункты 4–6): профили двух моделей (с изображениями и текстовой) и судьи, ID кейсов естественных отказов от 18.10, вход в GitHub для candidate.
 
@@ -43,16 +43,22 @@
 - Modify: `evals/src/report.ts:34-70,77-113,184-212`
 - Modify: `evals/src/run.ts` (`runAttempt`, 239–345: перенести поле в результат)
 - Modify: `docs/superpowers/specs/2026-09-18-evals-design.md` (раздел «Статусы, оценка и метрики», новый подраздел)
-- Test: `evals/test/cli.test.ts`, `evals/test/report.test.ts`
+- Test: `evals/test/cli.test.ts`, `evals/test/report.test.ts`, `evals/test/run.test.ts`
+- Fixture при необходимости: один CLI event-файл в существующем `evals/fixtures/fake/`; никаких новых настроек или test harness.
 
 **Interfaces:**
 - Produces:
   - `parseEvents(text).browserRecoveryStarted: boolean` — есть завершённая часть `loginom_dock_browser_recovery` с `input.action === "start"`.
-  - `AttemptResult.browser_recovery: boolean`.
+  - Новые попытки всегда записывают `AttemptResult.browser_recovery: boolean`, включая `false` в empty result. При чтении исторического summary поле может отсутствовать: это не свидетельство recovery, count не увеличивается и миграция не нужна; тип допускает историческое отсутствие. Отсутствующий старый счётчик при render не выводится как `undefined`.
   - `aggregate()`: `recovered_via_browser_count` — попытки с `browser_recovery === true` и `pass === true`; при `skipJudge` — со `status === "completed"`.
   - `renderReport` выводит строку рядом с `pass_rate`.
+  - Признак переносится в существующий измеренный `base` после `runAgent`, чтобы последующая ошибка артефакта/учёта не стирала наблюдённый факт. `aggregate` использует текущий набор `counted` и строгое `browser_recovery === true`: считает попытку один раз, не количество start. `aggregateTask`, знаменатели и `compare` не меняются.
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **Step 1: Write one failing behavior test**
+
+Последовательные вертикальные циклы: один падающий тест → минимальная реализация → GREEN → коммит, затем следующее поведение. Примеры ниже описывают контракт, а не пакет тестов перед реализацией. Проверить completed start без finish, finish без start, running/error start, несколько start как один признак; judge count требует pass=true, skipJudge — completed; историческое отсутствие поля не увеличивает count, старые rates сохраняются.
+
+Отдельный цикл через существующий public `runAttempt` или `main` и fake/dir механизм проверяет events → сохранённый `browser_recovery` → count и строку отчёта. Проверка существующего measured base также сохраняет признак при последующей ошибке bookkeeping. Нового harness, runtime hook или настройки не добавлять.
 
 ```ts
 test("parseEvents notices a browser recovery start", () => {
@@ -73,7 +79,7 @@ test("aggregate keeps recovered_via_browser apart from clean passes", () => {
 Run: `cd evals && bun test test/cli.test.ts test/report.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**; правка спеки evals идёт тем же коммитом (`evals/AGENTS.md`: при расхождении правится спека).
+- [ ] **Step 3: Implement minimally for that behavior**; повторить Steps 1–3 последовательно для оставшихся поведений, коммитить GREEN циклы. Правка соответствующего контракта в спеке evals предшествует реализации и идёт тем же коммитом (`evals/AGENTS.md`: при расхождении правится спека).
 
 - [ ] **Step 4: Run tests to verify they pass** (команда Step 2, `bun test` и `bun typecheck` в `evals`; Expected: PASS)
 
@@ -93,7 +99,7 @@ git commit -m "feat(evals): count recovered_via_browser apart from clean passes"
 
 **Interfaces:**
 - Consumes: планы 1–4.
-- Оператор скриптован, как в плане 3, Task 5. BR-S1 и BR-S3 выполнены в плане 3, Task 5; BR-S7 — host-тест плана 4, Task 1.
+- Оператор скриптован, как в плане 3, Task 5. Текущий статус: BR-S1 BLOCKED, BR-S3 NOT_RUN; проба сохранённого Import → Group дала NOT_APPLIED без эффекта из-за неактивного output0, собственная cleanup подтверждена. Task 2 отложена до валидированного активного входа и первого успешного native main path BR-S1/BR-S3; до этого не расширять harness или hardening заблокированного пути. Приёмочные критерии сохраняются. BR-S7 — принятый host-тест плана 4, Task 1.
 
 | ID | `acceptanceFault` | Триггер | Действия оператора | Требуемый результат |
 | --- | --- | --- | --- | --- |
