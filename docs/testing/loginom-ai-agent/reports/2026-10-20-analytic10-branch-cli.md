@@ -1,7 +1,7 @@
 # Analytic10 на CLI ветки evals-parallel, 2026-10-20
 
 Техническая приёмка пока **не пройдена**. Первая серия остановлена на двух
-попытках; после обнаруженного дефекта writer готовится новая полная серия.
+попытках, вторая — на пяти. Обе сохранены целиком; результаты не объединяются.
 Критерии и фиксированная десятка — в [плане](../../../superpowers/plans/2026-10-20-analytic10-branch-cli.md),
 правила — в [контракте](../../../../evals/docs/parallel-users-contract.md).
 
@@ -103,3 +103,45 @@ Preparec29d7423,verify750de3b8,cold browser/model medium a/b,judge login и4live
 Первичный PAIR_PORT_BUSY обнаружен до создания ресурсов; пустой журнал сохранён,
 создание повторено со свободным портом и отдельным controller-ready.
 Результат новой серии пока не получен; исходный восьмичасовой deadline15:28:25UTC сохранён.
+
+
+## Серия2: u6JJ0p
+
+Run `20261020-075057-46ad62c91a-dirty-u6JJ0p`,07:50:57–08:38:29UTC,
+exit1. Начато5задач,5остались без попытки. Все5cleanup подтверждены.
+
+- A:abc-pareto-groups —100,oracle=true; затем budget-variance-by-category —0,
+  oracle=false,пакет не получен,CLI exit1/LOGINOM_HOST_CLEANUP_FAILED.
+- B:articles-by-author —100,oracle=true; затем basket-category-width —oracle=true,
+  без оценки из-за отказа judge; затем category-promo-demand —interrupted.
+
+Оба слота повторно использовались независимо: B начал basket, пока A выполнял abc;
+A начал budget, пока B выполнял basket. Это подтверждает реальную общую очередь,
+но неполная серия не выполняет критерий десяти итоговых попыток.
+
+В08:25:11UTC глобальный Codex config изменил service_tier с default на priority;
+private judge config сохранил default. Других значимых отличий нет.
+VPN launcher правильно отклонил два вызова basket с exit64 и сообщением
+CODEX_HOME must contain the same lockdown config. Модель судьи в них не запускалась.
+Watcher не распознал этот общий отказ и допустил следующую задачу; контроллер получил
+один SIGINT в08:36:59UTC. После завершения Aclosed/Bquarantined,judge released.
+Исходные конфиги и точный diff сохранены private; глобальный config и launcher не ослабляются.
+Причина budget пока не сведена к SIGINT: явного CLI_CANCELLED нет, а незавершённые
+операции наблюдались до остановки. Этот нулевой результат не исключается из следующей серии.
+
+Resource acceptance **incomplete**:2723пробы,2пропущенных интервала в08:29UTC,
+max gap2127.52мс. Сбор самих соседних проб занял104–117мс; причина задержки старта
+не установлена. Отсутствующие наблюдения не считаются PASS.
+Измеренные границы соблюдены: CPU host max97.82% допустим,MemAvailable min10.75GiB,
+Server max0.535core/21.56MiB,Studio2.627cores/187.27MiB.
+OOM,ENOSPC,отказы лицензии,provider retry/rate/quota не наблюдались.
+CPU/RAM отдельных агентов штатно не измеряются; OAuth cost0 не доказывает бесплатность.
+Collector завершён. Сырьё, результаты и ручной SIGINT сохранены в private root второй серии.
+
+
+Продолжение проверено без ручного ремонта: штатный post verify1eca1c6b ready/code0,
+оба профиля clean и все4reservations released. Пара второй серии пригодна к reuse.
+Watcher исправлен в becff0a541 по RED→GREEN;77тестов/374assertions,typecheck и
+независимое review прошли. Private judge config синхронизирован только по service_tier
+под бронью; version/login без модели прошли,units завершены,home освобождён.
+Полная следующая серия сохранит ту же десятку и исходное модельное окно.

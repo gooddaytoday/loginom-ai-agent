@@ -163,9 +163,33 @@ trial-dosage-outcomes
 - [x] Четыре liveA/B final CLI второй пары:4pass/0fail.
 - [x] Final private pins, release/clean gates:2profiles clean/4reservations released;
   RAM16.62GiB,FS2661GiB/241M inode,OAuth102ч, исходный auth hash сохранён.
-- [ ] Новый полный run второй серии, прежние10IDs/2слота/модельное окно.
-- [ ] Активное наблюдение/полная приёмка/отчёт второй серии по прежним критериям;
-  не объединять с interrupted Sp38yS.
+- [x] Новый полный run второй серииu6JJ0p запущен, прежние10IDs/2слота/модельное окно.
+- [x] Первая контрольная точка:обе первые задачи authenticated/READY,provider coverage complete,
+  no retries/exit0/process cleanup confirmed; evidence/early-coverage-complete.json.
+- [x] Активное наблюдение/разбор/отчёт второй серии завершены; техническая приёмка не пройдена.
+  Не объединять с interrupted Sp38yS.
+
+## Остановка серии2 и полная серия3
+
+- [x] Серияu6JJ0p сохранена:5attempts/5cleanup confirmed,5unassigned;
+  две оценки100/oraclePASS,basket oraclePASS/judge error64,budget failed/no artifact,
+  category interrupted одним SIGINT08:36:59Z. Aclosed/Bquarantined; judge released.
+- [x] Причина общего отказа judge:global config08:25:11Z сменил только service_tier
+  default→priority,private home осталсяdefault. Strict launcher сработал правильно.
+  Два resource intervals пропущены08:29Z; max2.13s,ресурсыincomplete,не PASS.
+- [x] Независимое ревью узкого исправления/продолжения выполнено.
+- [x] По TDD распознать точную строку lockdown mismatch только в judge stderr
+  через существующий watchAttemptIncidents→abort; обычные judge retries сохранить.
+  RED→GREEN;77pass/0fail/374assertions,typecheck,независимое review No findings.
+  Commitbecff0a541. Launcher/контракт не ослабляются.
+- [x] Под judge lease сохранён private config backup, синхронизирован только
+  service_tier с текущим canonical config;version/login без модели exit0,units completed,home released.
+- [x] Штатный verify1eca1c6b ready/code0 восстановил подтверждённые остатки серии2;
+  оба профиля clean,4reservations released. Manual repair не выполнялся;
+  новая серия переиспользует эту же пару, с новым CLI и отдельными results.
+- [ ] CLI rebuild/install/verify после fix; новая полная та же десятка в отдельном
+  private root/results,тот же deadline15:28:25Z; gates и live наблюдение прежние.
+  Повтор нужен для технической проверки,задача budget с нулём не исключается.
 
 ## Приёмка и завершение
 
@@ -192,13 +216,13 @@ trial-dosage-outcomes
 
 ## Checkpoint
 
-1. CLI8f1808e9804e installed/verified; harnessa1986c18fd, sourceDirty=true(сохранённые чужие документы).
-2. Новый стенд3463cae565ca/d84925713c74; старый incident1065633c не менялся.
-3. Final verify2b8641b9/cold browser обоих слотов pass;4liveA/B pass, pre-dispatch20.54GiB RAM.
-4. Серия20261020-072725-a1986c18fd-dirty-Sp38yS:2 interrupted/8 unassigned/0 judge calls.
-5. Model window07:28:25Z–15:28:25Z; B network socket retry вызвал abort обоих агентов.
-6. Process cleanup2confirmed/unknown=[]; native cleanup BLOCKED/unconfirmed, recovery и карантин2слотов.
-7. Post verify exit2/LEASE_FILE_PRIVATE:cleanup receipts0664, private reader требует0600.
-8. Writer fix4593a1396b:2RED→GREEN;138pass/2skip/0fail,typecheck/review pass; installed candidate verified.
-9. Серия2:private root /home/kiselev/storage/tmp/analytic10-branch-r2-20261020-3zm1mmp9; все gates pass,RAM16.62GiB.
-10. Следующий шаг — серия2/активное наблюдение; source auth/inputs/rubric сохранены.
+1. HEADbecff0a541:watcher exact judge mismatch→abort;77pass/0fail/374assertions,typecheck/review pass.
+2. Старые acceptance1065633c и Sp38yS не меняются; root1 w6kidhm4/eval_parallel_blockers.md.
+3. Root2 /home/kiselev/storage/tmp/analytic10-branch-r2-20261020-3zm1mmp9; параae288d3753ad/ebe9872b15e0.
+4. Серияu6JJ0p:5attempts/5cleanup confirmed;2по100/oraclePASS,basket judge64/oraclePASS,budget0,categoryinterrupted.
+5. Resources incomplete:2missed/maxgap2.13s,числовые bounds/OOM pass; не заменять наблюдения PASS.
+6. Judge private tier синхронизирован под lease;version/login exit0,units completed,home released;global unchanged.
+7. Post verify1eca1c6b ready/code0 без manual repair;2profiles clean/4reservations released,пара пригодна к reuse.
+8. Root3 /home/kiselev/storage/tmp/analytic10-branch-r3-20261020-k9rcj844; результаты отдельно,slots/config/стенд второй серии сохраняются.
+9. Следующий шаг:rebuild/install/candidate verify без изменения исходников,повтор gates,полная10 и live monitoring.
+10. Model window07:28:25Z–15:28:25Z; source auth/выборка/seed/inputs/rubric прежние; scores серий не склеивать.
