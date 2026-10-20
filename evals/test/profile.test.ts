@@ -12,6 +12,24 @@ import { EvalFailure } from "../src/fail"
 import { writerIdentity } from "../src/process-supervisor"
 import { Database } from "bun:sqlite"
 
+test("management: binary commands explicitly select headless execution", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-headless-"))
+  let confirmed = false
+  try {
+    const driver = path.join(root, "management.ts")
+    await Bun.write(driver, `const headless = process.argv.includes("--headless")
+console.log(JSON.stringify({ state: headless ? "ready" : "headed" }))
+process.exit(headless ? 0 : 2)
+`)
+    const result = await management({ mode: "binary", cmd: [process.execPath, driver], cwd: root,
+      env: { PATH: process.env.PATH ?? "" } }, ["loginom", "status", "--format", "json"])
+    confirmed = result.processCleanup.status === "confirmed"
+    expect(result.exitCode).toBe(0)
+    expect(JSON.parse(result.stdout)).toEqual({ state: "ready" })
+    expect(confirmed).toBe(true)
+  } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
+})
+
 test("writerIdentity: observes an owner published during initial guard creation", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-writer-initialization-"))
   try {

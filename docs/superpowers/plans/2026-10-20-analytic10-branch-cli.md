@@ -14,7 +14,8 @@
 - Общее модельное окно 8 часов от первого dispatch, включая повторные серии.
   По истечении один SIGINT контроллеру и ожидание штатного cleanup без повторного
   SIGINT. Supervisor CLI слота сохраняет бюджеты 90/120 секунд.
-- Пара `acceptance-20261016`, существующие слоты a/b. Старые стенды, инциденты,
+- После verify1065633c на acceptance-20261016 владелец разрешил новый стенд
+  `loginom-evals-analytic10-20261020-w6kidhm4`, свежие слоты a/b. Старые стенды, инциденты,
   чужие процессы и данные не трогать. Общий сервер для слота не перезапускать.
 - Private config без `auth.sharedDir`, две независимые local OpenAI auth copies
   с запасом срока >=8 ч. Исходный auth-store сохраняется; shared refresh не измеряется.
@@ -53,7 +54,7 @@ trial-dosage-outcomes
   Дополнительные native cancellation tests: 1 pass/2 fail (2с ожидание), те же 2 failures
   воспроизведены на исходном HEAD без fix; не новая регрессия, вне области этого изменения.
 - [x] Создать новый private root: `/home/kiselev/storage/tmp/analytic10-branch-20261020-w6kidhm4`.
-- [ ] Из `packages/loginom-host` собрать полный payload командой
+- [x] Из `packages/loginom-host` собрать полный payload командой
   `bun script/build-cli.ts <root>/cli-payload --no-archive`, pinned Bun1.3.14
   revision0d9b296, Node24.19.0 из полного дистрибутива
   `/home/kiselev/storage/tmp/evals-cli-inputs-20261019-96cd/node-v24.19.0-linux-x64/bin/node`,
@@ -61,11 +62,26 @@ trial-dosage-outcomes
   `LOGINOM_AI_AGENT_CHANNEL=prod`, уникальная версия
   `0.0.0-evals-parallel-20261020-<source-sha>`. Это development candidate, без публикации;
   prod нужен для существующих profile markers, миграция markers не нужна.
-- [ ] Штатно установить в новый private HOME, сохранив sandbox; проверить
+- [x] Штатно установить в новый private HOME, сохранив sandbox; проверить
   `verify-cli-candidate.ts <installed-payload> <repo>`. Глобальные установки не менять.
-- [ ] Закрепить actual SHA/tree/dirty harness/CLI, binary/manifests/dependency pins,
+- [x] Закрепить actual SHA/tree/dirty harness/CLI, binary/manifests/dependency pins,
   выборку/inputs/rubric hashes, модели, параметры и бюджет в private manifest.
   Незакоммиченная чужая документация честно отражается в sourceDirty.
+
+## Дополнение после первого verify
+
+- [x] Сохранить incident1065633c: management cleanup отказал по unknown Chromium2257028/29/31;
+  server и два profile retained, judge released. Пустой /proc не заменяет исходный proof.
+- [x] Получить решение владельца: новый отдельный стенд, старую пару/квитанции не менять.
+- [x] Создать новую пару штатным createPair, закрепить identity; подготовить новые private
+  profiles/local OAuth и прежний публичный model catalogue SHA59bcb39e… с gpt-6.1-sol.
+  Inputs/rubric hashes совпали с прежней десяткой. Budget scopes перенесены на новую identity.
+- [x] Binary management должен явно передавать --headless: после rebase CLI default=false
+  сохраняется и для readiness. Независимое ревью минимальной правки выполнено;
+  RED exit2 → GREEN exit0/confirmed cleanup через публичный management. Связанные проверки:
+  103 pass/2 proc-denial skip/0 fail; typecheck и независимое final review pass.
+- [ ] Новая сборка CLI после headless fix перед модельными gates. Supervisor не менять
+  без отдельного воспроизведения: возможная потеря ancestry не объявляется устранённой.
 
 ## Gates перед dispatch
 
@@ -73,7 +89,7 @@ trial-dosage-outcomes
   отсутствие внешних клиентов, ACL, Pool=0, пустой SessionBackup.
 - [ ] Подготовить private slots config и local OAuth, подтвердить validity >=8ч,
   модель/variant и версию нового binary.
-- [ ] Проверить lockdown и login judge через прежний launcher без model calls;
+- [x] Проверить lockdown и login judge через прежний launcher без model calls;
   invalid login — stop и вход владельца. Home прежний: parallel/judge-codex.
 - [ ] Штатный verify --parallel2, отдельно cold loginom check обоих слотов под
   guards/supervisor: ok=true/code=LOGINOM_CONNECTION_VALID/help.ready/**browser.verified**,
@@ -136,12 +152,12 @@ trial-dosage-outcomes
 
 ## Checkpoint
 
-1. Base dca5e33d22, план утверждён владельцем и независимо проверен.
-2. Private root выше, исходный index/worktree и пять чужих файлов сохранены.
-3. Focus fix 6548e04d2c: RED→GREEN, 44 related pass, Host typecheck pass.
-4. /opt Node не содержит npm; полный Node той же версии/хэша найден и проверен.
-5. Второй build отклонён source snapshot guard: checkpoint изменился во время сборки.
-6. Следующий build только после завершения всех изменений дерева; до verification — без edits.
-7. Native cancellation baseline тоже имеет 2 failures при 2с ожидании; новых регрессий нет.
-8. Модельные вызовы не начаты; общий8ч дедлайн ещё не установлен.
-9. Run проверяет обычный N2/reuse, не аварийное восстановление/SIGINT/shared refresh.
+1. CLI9b6a73475cf1 verified; focus fix6548e04d2c. Private root выше.
+2. Старый verify1065633c failed unknown Chromium;3reservations retained, original receipts unchanged.
+3. Владелец разрешил новый выделенный стенд; новый server3463cae565ca/studiod84925713c74.
+4. Новые profiles/local auth готовы; публичный catalogue pinned59bcb39e…; hashes tasks unchanged.
+5. Judge login/version exit0, units terminated, home released.
+6. Headless management: RED→GREEN,103pass/2skip/0fail,typecheck и независимое review pass.
+7. Native prepare нового стенда идёт; после fix commit пересобрать CLI, затем verify/cold/4A-B.
+8. Model dispatch ещё не начат,8ч окно не началось; old incidents untouched.
+9. Native cancellation2s tests:2 pre-existing failures reproduced on original code.
