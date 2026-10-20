@@ -44,8 +44,19 @@ export function buildCommand(input: {
           )
         }
       }
-      signal(child.pid, "SIGTERM")
-      kill = setTimeout(() => signal(child.pid!, "SIGKILL"), 5_000)
+      // A refused signal fails the build now instead of waiting for an exit that may never come.
+      try {
+        signal(child.pid, "SIGTERM")
+      } catch (error) {
+        return reject(error)
+      }
+      kill = setTimeout(() => {
+        try {
+          signal(child.pid!, "SIGKILL")
+        } catch (error) {
+          reject(error)
+        }
+      }, 5_000)
     }, input.timeout)
     child.once("error", (error) => {
       clearTimeout(timer)
@@ -56,7 +67,15 @@ export function buildCommand(input: {
       clearTimeout(timer)
       clearTimeout(kill)
       // The leader can exit before its hung child; finish the owned group.
-      if (expired && child.pid) signal(child.pid, "SIGKILL")
+      // macOS refuses with EPERM when only zombies remain in the group. Report
+      // it rather than throwing out of this handler, which would hang the build.
+      if (expired && child.pid) {
+        try {
+          signal(child.pid, "SIGKILL")
+        } catch (error) {
+          console.error(`BUILD_COMMAND_GROUP_SIGNAL_FAILED: pgid=${child.pid} ${(error as NodeJS.ErrnoException).code}`)
+        }
+      }
       if (expired) return reject(Error("BUILD_COMMAND_TIMEOUT"))
       if (code !== 0) return reject(Error(`BUILD_COMMAND_FAILED: ${termination ?? code}`))
       resolve()
@@ -68,8 +87,6 @@ function signal(group: number, value: NodeJS.Signals) {
   try {
     process.kill(-group, value)
   } catch (error) {
-    // macOS reports EPERM instead of ESRCH when only zombies remain in the
-    // group. Throwing here would escape the exit handler and hang the build.
-    if (!["ESRCH", "EPERM"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error
+    if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error
   }
 }
