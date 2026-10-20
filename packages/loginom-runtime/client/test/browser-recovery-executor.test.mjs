@@ -447,6 +447,9 @@ async function verificationFixture({onRecord,nodeType,shortVerificationClock=fal
    value=outcome({destination:'/user/result.csv',artifact_id:'artifact',download_completed:true,output_binding:exportBinding,suggested_name:'result.csv'},id,'artifact.download');
    receipts.set(id,value);
   }else if(action){
+   const task=JSON.parse(code.match(/\)\(page, (\{[^\n]*\}), (?:async )?function readPreparedNodeContext/)[1]);
+   const id=JSON.parse(code.match(/"receipt_id":("[^"]+")/)[1]);
+   assert.equal(task.operation_id,id,'inner UI task must retain its prepared receipt identity');
    const a=JSON.parse(action[1]);a.ref=Buffer.from(a.ref.slice(3),'hex').toString();gestures.push(a);
    if(a.ref==='MF;cntMain;tlbMainToolbar;btnFilestorage')files=true;
    if(a.ref===workflow.tab_tid)files=false;
@@ -456,8 +459,7 @@ async function verificationFixture({onRecord,nodeType,shortVerificationClock=fal
    if(a.verb==='show_process_node')shown=true;
    if(a.key==='F3'){preview=true;if(lostPreview)throw Error('Preview transport lost');}
    if(a.ref.endsWith(';p.h;close')){preview=false;closedPreview=true;}
-   const id=JSON.parse(code.match(/"receipt_id":("[^"]+")/)[1]);
-   value=outcome(state(),id,'ui.act');
+   value=outcome(state(),task.operation_id,'ui.act');
    if(a.key==='F3'&&previewRefused){preview=false;value={...value,status:'NOT_APPLIED',error:{code:'PREVIEW_NOT_OPEN',message:'Preview did not open'}};}
    receipts.set(id,value);
   }else if(code.includes('function readNodeProcesses('))value={verified:true,inventory_complete:true,show_completed:true,
