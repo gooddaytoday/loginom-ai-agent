@@ -599,6 +599,9 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     if (task && catalog)
       for (const definition of catalog.tools) {
         if (profile !== "loginom-automation" && !LOGINOM_LOCAL_TOOLS.has(definition.name)) continue
+        // Browser recovery screenshots reach the model as real image content; a
+        // text-only model keeps working from the DOM instead of an unreadable image.
+        if (definition.name === "browser_take_screenshot" && !input.model.capabilities.input.image) continue
         const key = `loginom_${definition.name}`
         tools[key] = tool({
           description: definition.description,

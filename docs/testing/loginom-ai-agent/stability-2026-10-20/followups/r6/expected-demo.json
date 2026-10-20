@@ -1,0 +1,58 @@
+{
+  "package_path": "/stability-2026-10-20/integration-restrequest.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "integration.rest_request"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/echo-source.csv",
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "RequestId",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Key",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "Source",
+          "label_any": true,
+          "type": "string"
+        },
+        {
+          "name": "HttpStatusCode",
+          "label_any": true,
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "RequestId": "r-a",
+          "Key": "a b&я",
+          "Source": "audience",
+          "HttpStatusCode": 200
+        },
+        {
+          "RequestId": "r-b",
+          "Key": "x/y?",
+          "Source": "audience",
+          "HttpStatusCode": 200
+        }
+      ]
+    }
+  ]
+}

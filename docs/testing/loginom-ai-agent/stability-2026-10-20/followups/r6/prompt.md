@@ -1,0 +1,1 @@
+А теперь добавь к тем же запросам параметр Source со значением audience. Из ответа покажи вернувшиеся RequestId, Key и Source вместе с фактическим кодом HttpStatusCode. Расположи колонки слева направо: RequestId, Key, Source, HttpStatusCode. Выгрузи в echo-source.csv рядом с пакетом и сохрани изменения в том же сценарии.

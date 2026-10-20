@@ -2,6 +2,7 @@
   "schema_version": 1,
   "catalog_version": "2026.09.13-node14.1-candidate",
   "e2e_commit": "2cad5602158fd2e4836d821d644a2b8d92f571a2",
+  "native_save_arrangement": {"symbol": "workflow.arrange", "strategy": "data_tid", "match": "suffix", "value": "ModelForm;btnLayout", "scope": "activeWorkflow", "cardinality": "zeroOrOne", "visibility": "visible", "state": ["enabled"], "parameters": {}, "observation": {"source_build": "2cb8028e0257663cd5f2ce83c88f4ceadd7efce6", "evidence": "docs/testing/loginom-ai-agent/arrange-button-observation.md"}},
   "selectors": [
     {
       "symbol": "component.preprocessing.data_recovery",

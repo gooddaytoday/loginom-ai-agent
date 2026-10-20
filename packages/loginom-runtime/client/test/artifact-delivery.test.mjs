@@ -2,13 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createArtifactDelivery} from '../lib/artifact-delivery.mjs';
 const request={operation_id:'delivery',artifact_id:'artifact',upload_grant_id:'grant',budget_ms:120000};
+const noEffect=(id,changes={})=>({operation_id:id,action_key:'ui.act',status:'NOT_APPLIED',phase:'preconditions',
+ effect_possible:false,cleanup_complete:true,trace:[],error:{code:'UI_REFERENCE_OFFSCREEN'},...changes});
 
 test('folder navigation reobserves after a proven no-effect stale epoch with a new action ID',async()=>{
  const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;let stale=true,reads=0;const attempts=[];
  f.runtime.observe=async options=>{reads++;const r=await observe(options);r.output.observation_id='obs-'+reads;r.output.ui.elements.forEach(e=>{e.ref+=':read-'+reads;});return r;};
  f.runtime.uiAct=async(a,o)=>{
   attempts.push({id:o.operationId,observation:o.observationId,ref:a.ref});
-  if(stale){stale=false;return {operation_id:o.operationId,status:'NOT_APPLIED',phase:'preconditions',effect_possible:false,cleanup_complete:true,error:{code:'UI_EPOCH_CHANGED'}};}
+  if(stale){stale=false;return noEffect(o.operationId,{error:{code:'UI_EPOCH_CHANGED'}});}
   return act({...a,ref:a.ref.replace(/:read-\d+$/,'')},o);
  };
  const result=await f.service.deliver(request);
@@ -22,34 +24,74 @@ for(const fault of ['ambiguous','effect','missing_effect','cleanup','foreign','p
  f.runtime.observe=async options=>{const r=await observe(options);if(attempts&&fault==='owner')r.output.dom_epoch.document='foreign';if(attempts&&fault==='tab')r.output.active_tab_ref='foreign';if(attempts&&fault==='directory')r.output.file_storage.directory='/foreign';if(attempts&&fault==='kind')r.output.ui.elements.forEach(e=>{if(e.storage_entry)e.storage_entry.kind='file';});return r;};
  f.runtime.uiAct=async(a,o)=>{
   attempts++;if(fault==='throw')throw Error('Browser reply lost');
-  return {operation_id:fault==='foreign'?'foreign':o.operationId,status:fault==='ambiguous'?'AMBIGUOUS':'NOT_APPLIED',
+  return {...noEffect(o.operationId),operation_id:fault==='foreign'?'foreign':o.operationId,status:fault==='ambiguous'?'AMBIGUOUS':'NOT_APPLIED',
    phase:fault==='phase'?'execution':'preconditions',effect_possible:fault==='missing_effect'?undefined:fault==='effect',cleanup_complete:fault!=='cleanup',
    error:{code:fault==='code'?'BROWSER_CALL_UNCERTAIN':'UI_EPOCH_CHANGED'}};
  };
  const result=await f.service.deliver(request);
- assert.equal(result.outcome.status,'AMBIGUOUS');assert.equal(result.outcome.upload_submitted_or_unknown,false);
+ assert.equal(result.outcome.status,['owner','tab','directory','kind','persistent'].includes(fault)?'NOT_APPLIED':'AMBIGUOUS');assert.equal(result.outcome.upload_submitted_or_unknown,false);
  assert.equal(attempts,fault==='persistent'?3:1);assert.ok(!f.calls.includes('upload'));
 });
 
 test('cancellation after a no-effect stale refusal prevents the next navigation attempt',async()=>{
  const f=fixture(),controller=new AbortController();let attempts=0;
- f.runtime.uiAct=async(a,o)=>{attempts++;controller.abort();return {operation_id:o.operationId,status:'NOT_APPLIED',phase:'preconditions',effect_possible:false,cleanup_complete:true,error:{code:'UI_EPOCH_CHANGED'}};};
+ f.runtime.uiAct=async(a,o)=>{attempts++;controller.abort();return noEffect(o.operationId,{error:{code:'UI_EPOCH_CHANGED'}});};
  const result=await f.service.deliver(request,{signal:controller.signal});
- assert.equal(attempts,1);assert.equal(result.outcome.status,'AMBIGUOUS');assert.ok(!f.calls.includes('upload'));
+ assert.equal(attempts,1);assert.equal(result.outcome.status,'NOT_APPLIED');assert.ok(!f.calls.includes('upload'));
 });
-function fixture(fault,initialDirectory='/') {
+function fixture(fault,initialDirectory='/',options={}) {
  const artifact={artifact_id:'artifact',name:'input.csv',bytes:3,sha256:'a'.repeat(64),upload:{grant_id:'grant',directory:'/user/dock-p3',destination:'/user/dock-p3/input.csv',overwrite:'replace'}};
  const calls=[],events=[];let directory=initialDirectory,verified=false;
  const prefix='MF;TF-2',nav=prefix+';NavigationBar;NavigationPanel';
  const entry=(tid,kind)=>({tid,ref:'ui-'+tid,label:tid.split(';colName_')[1]??'',allowed_actions:['click','double_click'],...(kind?{storage_entry:{kind}}:{})});
  const state=()=>({observation_id:'obs',dom_epoch:{document:'doc',revision:1},active_tab_ref:'tab',workflow_ref:{prefix},file_storage:{status:'observed',directory},ui:{elements:[entry(nav),entry(prefix+';FileStorageForm;pnlFileStorage;tbl'),entry(prefix+';cnrNaviMode;b.s_Сервер>Файлы'),entry(prefix+';FileStorageForm;colName_'+(directory==='/'?'user':directory==='/user'?'dock-p3':'input.csv'),directory==='/user/dock-p3'?undefined:'folder')]}});
- const runtime={preflightDeliveredArtifact:()=>{},observe:async()=>({status:'SUCCEEDED',output:state()}),uiAct:async a=>{calls.push(a.verb);if(a.verb==='click'&&a.ref.endsWith(';cnrNaviMode;b.s_Сервер>Файлы'))directory='/';if(a.verb==='double_click')directory+='/'+a.ref.split('colName_')[1];directory=directory.replace('//','/');return {status:'SUCCEEDED',cleanup_complete:true}},
+ const runtime={preflightDeliveredArtifact:()=>{},observe:async()=>({status:'SUCCEEDED',output:state()}),uiAct:async(a,o)=>{calls.push(a.verb);if(a.verb==='click'&&a.ref.endsWith(';cnrNaviMode;b.s_Сервер>Файлы'))directory='/';if(a.verb==='double_click')directory+='/'+a.ref.split('colName_')[1];directory=directory.replace('//','/');return {operation_id:o.operationId,action_key:'ui.act',status:'SUCCEEDED',cleanup_complete:true}},
   uploadDeliveredArtifact:async()=>{calls.push('upload');if(fault==='upload')throw Error('Lost browser response');return {status:'AMBIGUOUS',cleanup_complete:true,output:{upload_submitted:true}};},
   inspect:async()=>{calls.push('inspect');return {output:{state:verified?'resolved':'pending',cleanup_confirmed:true,outcome:{status:verified?'SUCCEEDED':'AMBIGUOUS',output:{upload_submitted:true,server_copy_verification:{bytes_verified:true,upload_completion_verified:true,destination:artifact.upload.destination,bytes:3,sha256:fault==='digest'?'b'.repeat(64):artifact.sha256,verification_id:'delivery:verify'}}}}};},
   verifyDeliveredArtifact:async({onDispatched}={})=>{onDispatched?.();calls.push('verify');if(fault==='verify')throw Error('Lost download receipt');verified=true;return {status:'SUCCEEDED',cleanup_complete:true,output:{bytes_verified:true}};}};
- const service=createArtifactDelivery({runtime,artifactStore:{getUploadGrant:(id,grant)=>{assert.equal(id,'artifact');assert.equal(grant,'grant');return artifact;}},admit:()=>{},record:async e=>{events.push(e);if(fault==='journal'&&e.phase==='artifact_delivery_completed')throw Error('Disk unavailable');return e;}});
+ const service=createArtifactDelivery({runtime,artifactStore:{getUploadGrant:(id,grant)=>{assert.equal(id,'artifact');assert.equal(grant,'grant');return artifact;}},admit:()=>{},record:async e=>{events.push(e);if(fault==='journal'&&e.phase==='artifact_delivery_completed')throw Error('Disk unavailable');return e;},...options});
  return {service,artifact,calls,events,runtime};
 }
+for(const fault of [null,'document','workflow','tab','offscreen','disabled','masked'])test('Files navigation waits for an owned reachable toolbar before delivery: '+fault,async()=>{
+ let clock=0,opened=false,reads=0;
+ const f=fixture(undefined,'/',{now:()=>clock}),observe=f.runtime.observe,act=f.runtime.uiAct;
+ f.runtime.observe=async options=>{
+  const result=await observe(options);
+  if(opened)return result;
+  const s=result.output;s.file_storage={status:'unobserved'};
+  const narrow=!!options.rootRef;
+  if(!narrow)delete s.active_tab_ref;
+  if(narrow)reads++;
+  if(reads>=2){
+   if(fault==='document')s.dom_epoch.document='foreign';
+   if(fault==='workflow')s.workflow_ref={prefix:'foreign'};
+   if(fault==='tab')s.active_tab_ref='foreign';
+   if(fault==='masked')s.ui.masks=[{ref:'mask'}];
+   if(['offscreen','disabled','masked'].includes(fault))clock+=16000;
+  }
+  s.observation_id='toolbar-observation-'+reads;
+  s.ui.elements=[{tid:'MF;cntMain;tlbMainToolbar',ref:'toolbar'},
+   ...(narrow?[{tid:'MF;cntMain;tlbMainToolbar;btnFilestorage',ref:'files-'+reads,enabled:fault!=='disabled',visible:true,
+    allowed_actions:['click'],interaction:{state:reads>=2&&fault!=='offscreen'?'point_observed':'outside_viewport'}}]:[])];
+  return result;
+ };
+ f.runtime.uiAct=async(a,o)=>{
+  if(!opened){
+   assert.equal(a.ref,'files-2');assert.equal(o.observationId,'toolbar-observation-2');
+   opened=true;f.calls.push('Files');return {operation_id:o.operationId,action_key:'ui.act',status:'SUCCEEDED',cleanup_complete:true};
+  }
+  return act(a,o);
+ };
+ const result=await f.service.deliver(request);
+ assert.ok(reads>=2);
+ if(fault){
+  assert.equal(result.outcome.status,'NOT_APPLIED');assert.equal(result.outcome.upload_submitted_or_unknown,false);
+  assert.equal(f.calls.length,0);assert.equal(f.service.unsettled,false);
+ }else{
+  assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(f.calls[0],'Files');
+  assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
+ }
+});
 test('delivery navigates exact authorized folders and reuses upload and byte verification once',async()=>{
  const f=fixture(),first=f.service.deliver(request),second=f.service.deliver(request);assert.equal(first,second);assert.equal(f.service.busy,true);
  const result=await first;assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(result.outcome.destination,'/user/dock-p3/input.csv');
@@ -68,6 +110,7 @@ test('pre-upload read failure resumes the same attachment with fresh navigation 
  const first=await f.service.deliver(request);
  assert.equal(first.outcome.upload_submitted_or_unknown,false);assert.equal(first.outcome.next_step.tool,'dock_artifact_delivery_resume');
  assert.equal(first.outcome.effect_possible,true);assert.equal(first.outcome.cleanup_complete,true);
+ assert.equal(first.outcome.status,'NOT_APPLIED');
  assert.equal(f.service.busy,false);assert.equal(f.service.unsettled,false);
  assert.equal(f.calls.includes('upload'),false);
  const retry={operation_id:'delivery',resume_id:'resume-navigation',budget_ms:120000};
@@ -136,7 +179,7 @@ for(const change of [null,'document','tab','directory'])test('delivery scrolls a
  };
  const result=await f.service.deliver(request);
  assert.equal(f.calls.filter(c=>c==='scroll').length,1);
- assert.equal(result.outcome.status,change?'AMBIGUOUS':'SUCCEEDED');
+ assert.equal(result.outcome.status,change?'NOT_APPLIED':'SUCCEEDED');
  assert.equal(f.calls.filter(c=>c==='upload').length,change?0:1);
  if(change)assert.equal(result.outcome.upload_submitted_or_unknown,false);
 });
@@ -146,7 +189,7 @@ for(const fault of ['upload','verify','digest','journal'])test('delivery preserv
  assert.ok(f.calls.filter(c=>c==='verify').length<=1);assert.equal(result.upload_operation_id,'delivery:upload');
 });
 test('confirmed no-effect upload refusal remains NOT_APPLIED and never downloads or resubmits',async()=>{
- const f=fixture();f.runtime.uploadDeliveredArtifact=async()=>{f.calls.push('upload');return {status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true,error:{code:'UPLOAD_CONTEXT_CHANGED'}};};
+ const f=fixture();f.runtime.uploadDeliveredArtifact=async()=>{f.calls.push('upload');return noEffect('delivery:upload',{action_key:'artifact.upload',error:{code:'UPLOAD_CONTEXT_CHANGED'}});};
  const promise=f.service.deliver(request),result=await promise;
  assert.equal(result.state,'settled');assert.equal(result.phase,'not_applied');assert.equal(result.outcome.status,'NOT_APPLIED');
  assert.equal(result.outcome.effect_possible,false);assert.equal(result.outcome.upload_submitted_or_unknown,false);
@@ -287,7 +330,7 @@ test('folder navigation waits for the requested breadcrumb without repeating its
  const f=fixture(undefined,'/user/another-folder'),observe=f.runtime.observe,act=f.runtime.uiAct;
  let stale,remaining=0;
  f.runtime.observe=async(...args)=>remaining-->0?structuredClone(stale):observe(...args);
- f.runtime.uiAct=async action=>{stale=await observe();const result=await act(action);remaining=4;return result;};
+ f.runtime.uiAct=async(action,options)=>{stale=await observe();const result=await act(action,options);remaining=4;return result;};
  const result=await f.service.deliver(request);
  assert.equal(result.outcome.status,'SUCCEEDED');
  assert.deepEqual(f.calls,['click','double_click','double_click','upload','inspect','verify','inspect']);
@@ -300,10 +343,10 @@ test('delivery reads the observed toolbar when a populated graph only yields roo
   assert.notEqual(options?.scope,'all','a global scan can fall back to roots');
   const root=options?.scope==='roots';
   if(!root)assert.deepEqual(options,{rootRef:'toolbar',observationId:'graph-observation'});
-  return {status:'SUCCEEDED',output:{observation_id:root?'graph-observation':'toolbar-observation',dom_epoch:{document:'doc',revision:1},
-   ui:{elements:root?[{ref:'toolbar',tid:'MF;cntMain;tlbMainToolbar',allowed_actions:[]}]:[{ref:'files',tid:'MF;cntMain;tlbMainToolbar;btnFilestorage',allowed_actions:['click']}],dialogs:[],masks:[]}}};
+  return {status:'SUCCEEDED',output:{observation_id:root?'graph-observation':'toolbar-observation',dom_epoch:{document:'doc',revision:1},...(root?{}:{active_tab_ref:'tab'}),
+   ui:{elements:root?[{ref:'toolbar',tid:'MF;cntMain;tlbMainToolbar',allowed_actions:[]}]:[{ref:'files',tid:'MF;cntMain;tlbMainToolbar;btnFilestorage',enabled:true,visible:true,interaction:{state:'point_observed'},allowed_actions:['click']}],dialogs:[],masks:[]}}};
  };
- f.runtime.uiAct=async(a,o)=>{if(a.ref==='files'){assert.equal(o.observationId,'toolbar-observation');opened=true;return {status:'SUCCEEDED',cleanup_complete:true};}return act(a,o);};
+ f.runtime.uiAct=async(a,o)=>{if(a.ref==='files'){assert.equal(o.observationId,'toolbar-observation');opened=true;return {operation_id:o.operationId,action_key:'ui.act',status:'SUCCEEDED',cleanup_complete:true};}return act(a,o);};
  const result=await f.service.deliver(request);assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(opened,true);
 });
 
@@ -348,4 +391,121 @@ test('resume never extends the original delivery deadline',async()=>{
  await new Promise(resolve=>setTimeout(resolve,1050));
  assert.throws(()=>f.service.resume({operation_id:'delivery',resume_id:'expired',budget_ms:120000}),/deadline elapsed/);
  assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.ok(!f.calls.includes('verify'));
+});
+
+for(const completed of [0,1])test('matched offscreen refusal settles delivery after '+completed+' completed navigations',async()=>{
+ const f=fixture(),act=f.runtime.uiAct,ids=[];let refused=false;
+ f.runtime.uiAct=async(a,o)=>{
+  ids.push(o.operationId);
+  if(!refused&&ids.length===completed+1){refused=true;return noEffect(o.operationId);}
+  return act(a,o);
+ };
+ const r=await f.service.deliver(request);
+ assert.equal(r.outcome.status,'NOT_APPLIED');assert.equal(r.outcome.effect_possible,completed>0);
+ assert.equal(r.outcome.inspection_required,false);assert.equal(r.outcome.cleanup_complete,true);
+ assert.equal(r.outcome.upload_submitted_or_unknown,false);assert.equal(f.service.unsettled,false);
+ assert.equal(ids.length,completed+1);assert.ok(!f.calls.includes('upload'));
+ assert.deepEqual(await f.service.deliver(request),r);assert.equal(ids.length,completed+1);
+ const resumed=await f.service.resume({operation_id:'delivery',resume_id:'fresh-navigation',budget_ms:120000});
+ assert.equal(resumed.outcome.status,'SUCCEEDED');assert.equal(ids[completed+1],'delivery:nav'+(completed+2));
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
+});
+
+for(const fault of ['foreign','key','effect','cleanup','phase','trace_missing','gesture','verified','uncertain','success_foreign'])test('navigation keeps an unconfirmed receipt unsettled: '+fault,async()=>{
+ const f=fixture();f.runtime.uiAct=async(a,o)=>noEffect(o.operationId,{
+  ...(fault==='foreign'||fault==='success_foreign'?{operation_id:'foreign'}:{}),
+  ...(fault==='key'?{action_key:'artifact.upload'}:{}),...(fault==='effect'?{effect_possible:true}:{}),
+  ...(fault==='cleanup'?{cleanup_complete:false}:{}),...(fault==='phase'?{phase:'applying'}:{}),
+  ...(fault==='trace_missing'?{trace:undefined}:{}),...(fault==='gesture'?{trace:[{event:'ui_gesture_applied'}]}:{}),
+  ...(fault==='verified'?{trace:[{event:'ui_preconditions_verified'}]}:{}),
+  ...(fault==='uncertain'?{error:{code:'BROWSER_CALL_UNCERTAIN'}}:{}),...(fault==='success_foreign'?{status:'SUCCEEDED'}:{})});
+ const r=await f.service.deliver(request);
+ assert.equal(r.outcome.status,'AMBIGUOUS');assert.equal(r.outcome.inspection_required,true);
+ assert.equal(f.service.unsettled,true);assert.ok(!f.calls.includes('upload'));
+});
+
+for(const mode of ['direct','inspect','resume'])test('matched no-effect upload settles via '+mode+' without resubmission',async()=>{
+ const f=fixture();let inspections=0;
+ const refusal=noEffect('delivery:upload',{action_key:'artifact.upload'});
+ f.runtime.uploadDeliveredArtifact=async()=>{f.calls.push('upload');return mode==='direct'?refusal:
+  {operation_id:'delivery:upload',status:'AMBIGUOUS',error:{code:'BROWSER_CALL_UNCERTAIN'}};};
+ f.runtime.inspect=async()=>{inspections++;return {output:{operation_id:'delivery:upload',
+  cleanup_confirmed:mode!=='resume'||inspections>1,outcome:refusal}};};
+ let r=await f.service.deliver(request);
+ if(mode==='resume'){
+  assert.equal(r.outcome.status,'AMBIGUOUS');assert.equal(f.service.unsettled,true);
+  r=await f.service.resume({operation_id:'delivery',resume_id:'inspect-original',budget_ms:120000});
+ }
+ assert.equal(r.outcome.status,'NOT_APPLIED');assert.equal(r.outcome.effect_possible,false);
+ assert.equal(r.outcome.cleanup_complete,true);assert.equal(r.outcome.upload_submitted_or_unknown,false);
+ assert.equal(f.service.unsettled,false);assert.deepEqual(f.calls,['double_click','double_click','upload']);
+});
+
+for(const fault of ['foreign','key','phase','cleanup','effect','trace','submitted','uncertain'])test('inconsistent no-effect upload cannot release delivery: '+fault,async()=>{
+ const f=fixture();f.runtime.uploadDeliveredArtifact=async()=>noEffect('delivery:upload',{action_key:'artifact.upload',
+  ...(fault==='foreign'?{operation_id:'foreign'}:{}),...(fault==='key'?{action_key:'ui.act'}:{}),
+  ...(fault==='phase'?{phase:'submitted'}:{}),...(fault==='cleanup'?{cleanup_complete:false}:{}),
+  ...(fault==='effect'?{effect_possible:true}:{}),...(fault==='trace'?{trace:[{event:'upload_input_submitted'}]}:{}),
+  ...(fault==='submitted'?{output:{upload_submitted:true}}:{}),...(fault==='uncertain'?{error:{code:'BROWSER_CALL_UNCERTAIN'}}:{})});
+ const r=await f.service.deliver(request);
+ assert.equal(r.outcome.status,'AMBIGUOUS');assert.equal(f.service.unsettled,true);assert.ok(!f.calls.includes('verify'));
+});
+
+test('no-effect verification cannot erase an already submitted upload',async()=>{
+ const f=fixture();f.runtime.verifyDeliveredArtifact=async({onDispatched})=>{
+  onDispatched();f.calls.push('verify');return noEffect('delivery:verify',{action_key:'artifact.download'});
+ };
+ const r=await f.service.deliver(request);
+ assert.equal(r.outcome.status,'AMBIGUOUS');assert.equal(r.outcome.upload_submitted_or_unknown,true);
+ assert.equal(r.outcome.inspection_required,true);assert.equal(f.service.unsettled,true);
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);assert.equal(f.calls.filter(c=>c==='verify').length,1);
+});
+
+for(const mode of ['still_offscreen','offscreen_after_ready'])test('owned Files readiness and safe refusal clear the runtime delivery gate: '+mode,async()=>{
+ const vm=await import('node:vm');
+ const {createActionRuntime}=await import('../lib/executor.mjs');
+ const {Page,origin,build}=await import('./support/workspace-ui-fixture.mjs');
+ const page=new Page(),toolbar=page.add('div','MF;cntMain;tlbMainToolbar');
+ page.context.innerWidth=1000;page.context.innerHeight=800;
+ const files=page.add('button','MF;cntMain;tlbMainToolbar;btnFilestorage','Файлы',{x:2000,y:100,width:40,height:20},toolbar);
+ const f=fixture(),events=[];let clock=0,offscreenReads=0,reachableReads=0;
+ const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},allowCandidate:true,
+  targetOrigin:origin,targetBuild:build,artifactStore:{getUploadGrant:()=>f.artifact},
+  now:()=>clock,onRecord:async e=>{
+   events.push(e);
+   if(e.phase==='observation_completed'){
+    const control=e.outcome?.output?.ui?.elements.find(item=>item.tid===files.getAttribute('data-tid'));
+    if(control?.interaction?.state==='outside_viewport'){
+     offscreenReads++;
+     // The next owned observation can become reachable; the action must use it.
+     if(mode==='offscreen_after_ready')files.box.x=40;
+    }
+    if(control?.interaction?.state==='point_observed'){
+     reachableReads++;
+     // Layout changes after the readiness read but before native uiAct preflight.
+     files.box.x=2000;
+    }
+    if(mode==='still_offscreen')clock+=16000;
+   }
+   return e;
+  },execute:code=>vm.runInContext(`(${code})`,page.context)(page)});
+ const r=await runtime.deliverArtifact(request);
+ assert.equal(r.outcome.status,'NOT_APPLIED',JSON.stringify(r));assert.equal(r.outcome.effect_possible,false);
+ assert.equal(r.outcome.cleanup_complete,true);assert.equal(r.outcome.inspection_required,false);
+ assert.equal(r.outcome.upload_submitted_or_unknown,false);assert.ok(offscreenReads>=1);
+ const refusals=events.filter(e=>e.outcome?.error?.code==='UI_REFERENCE_OFFSCREEN');
+ if(mode==='offscreen_after_ready'){
+  assert.equal(reachableReads,1);assert.equal(refusals.length,1);
+  const refusal=refusals[0].outcome;
+  assert.equal(refusal.operation_id,'delivery:nav1');assert.equal(refusal.effect_possible,false);
+  assert.equal(refusal.cleanup_complete,true);assert.equal(refusal.status,'NOT_APPLIED');
+  assert.ok(!refusal.trace.some(e=>['ui_preconditions_verified','ui_gesture_applied','ui_scroll_applied'].includes(e.event)));
+ }else{
+  assert.equal(reachableReads,0);assert.equal(refusals.length,0);
+  assert.match(r.error.message,/readiness timeout: Files workspace control reachable/);
+  assert.equal(events.some(e=>e.operation_id?.startsWith('delivery:nav')),false);
+ }
+ assert.equal(events.some(e=>e.phase==='artifact_delivery_upload_receipt'),false);
+ assert.equal(runtime.hasUnsettledWork(),false);assert.equal(runtime.hasActiveWork(),false);
+ assert.doesNotThrow(()=>runtime.assertPreparationAllowed());assert.equal(page.events.includes('click'),false);
 });

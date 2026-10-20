@@ -22,6 +22,8 @@ export type Launch = {
   acceptanceCleanupPackage?: string
   // Private owner policy. The runtime derives the path from its confirmed Save.
   closeSavedPackageOnShutdown?: boolean
+  // Private launcher capability for temporary browser recovery tools.
+  browserRecovery?: boolean
 }
 
 type ProcessLaunch = Pick<Launch, "node" | "entry" | "stateDir" | "generation" | "environment">

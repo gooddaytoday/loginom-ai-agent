@@ -1,0 +1,60 @@
+{
+  "package_path": "/demo-2026-10-22/s6-abc.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.sorting"
+    },
+    {
+      "type": "transform.calculator"
+    },
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "transform.group_data",
+      "ordered": false,
+      "columns": [
+        {
+          "name": "ABCClass",
+          "label": "ABCClass",
+          "type": "string"
+        },
+        {
+          "name": "Products",
+          "label": "Products",
+          "type": "integer"
+        },
+        {
+          "name": "Revenue",
+          "label": "Revenue",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "ABCClass": "A",
+          "Products": 3,
+          "Revenue": 80000.0
+        },
+        {
+          "ABCClass": "B",
+          "Products": 2,
+          "Revenue": 15000.0
+        },
+        {
+          "ABCClass": "C",
+          "Products": 7,
+          "Revenue": 5000.0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "package_path": "/stability-2026-10-20/p4.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/ripe-grapes.csv",
+      "ordered": true,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "SampleID",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Plot",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Sugar",
+          "type": "real",
+          "label_any": true
+        },
+        {
+          "name": "Acidity",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "SampleID": "GR05",
+          "Plot": "East",
+          "Sugar": 23.0,
+          "Acidity": 4.0
+        },
+        {
+          "SampleID": "GR16",
+          "Plot": "East",
+          "Sugar": 24.25,
+          "Acidity": 4.25
+        },
+        {
+          "SampleID": "GR09",
+          "Plot": "East",
+          "Sugar": 25.0,
+          "Acidity": 4.5
+        },
+        {
+          "SampleID": "GR13",
+          "Plot": "Hill",
+          "Sugar": 23.75,
+          "Acidity": 5.0
+        },
+        {
+          "SampleID": "GR11",
+          "Plot": "River",
+          "Sugar": 22.5,
+          "Acidity": 5.25
+        },
+        {
+          "SampleID": "GR08",
+          "Plot": "River",
+          "Sugar": 24.0,
+          "Acidity": 5.5
+        },
+        {
+          "SampleID": "GR02",
+          "Plot": "East",
+          "Sugar": 22.0,
+          "Acidity": 6.5
+        },
+        {
+          "SampleID": "GR06",
+          "Plot": "Hill",
+          "Sugar": 22.0,
+          "Acidity": 6.75
+        },
+        {
+          "SampleID": "GR03",
+          "Plot": "East",
+          "Sugar": 22.25,
+          "Acidity": 7.25
+        },
+        {
+          "SampleID": "GR15",
+          "Plot": "East",
+          "Sugar": 22.0,
+          "Acidity": 7.75
+        }
+      ]
+    }
+  ]
+}

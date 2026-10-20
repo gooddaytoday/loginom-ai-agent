@@ -1,3 +1,8 @@
+import {makeLinRegressionContextCode} from './linregression-context.mjs';
+import {makeClusteringContextCode} from './clustering-context.mjs';
+import {readGraph} from './node-target-browser.mjs';
+import {NODE_TYPES} from './node-contracts.mjs';
+import {revealPreparedGraphNode,revealNodePlacement,nodePlacementViewport,nodePlacementPoint,samePlacementGraph} from './node-placement.mjs';
 import {makeJavascriptOutputPreviewCode} from './javascript-output-preview.mjs';
 import {makeCrossTableContextCode} from './crosstable-context.mjs';
 import {makeCrossTableVariablesCode,makeCrossTableBindingsCode} from './crosstable-variables.mjs';
@@ -24,9 +29,9 @@ import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode} from './no
 import {makeNodeProcessContextCode} from './node-process-context.mjs';
 import {makeNodeOutputContextCode} from './node-output-context.mjs';
 import {makeNodeTableContextCode} from './node-table-context.mjs';
-import {boundWizardCloseConfirmation,wizardCloseDialogOwner} from './node-wizard-close.mjs';
+import {boundWizardCloseConfirmation,wizardCloseDialogOwner,wizardCloseBinding,boundInputMappingConflict} from './node-wizard-close.mjs';
 import {boundWizardDeactivationConfirmation,wizardDeactivationDialogOwner} from './node-wizard-open.mjs';
-const boundWizardConfirmation=(...args)=>boundWizardCloseConfirmation(...args)||boundWizardDeactivationConfirmation(...args);
+const boundWizardConfirmation=(...args)=>boundWizardCloseConfirmation(...args)||boundWizardDeactivationConfirmation(...args)||boundInputMappingConflict(...args);
 const wizardConfirmationOwner=(...args)=>wizardCloseDialogOwner(...args)||wizardDeactivationDialogOwner(...args);
 
 export class NodeReadinessTimeout extends Error {
@@ -135,7 +140,11 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       &&c.dialogs?.filter(d=>d.tid===dialog.identity.anchor_tid&&d.name===name).length===1
       &&dialog.identity.anchor_tid===state.wizard.root_tid+';'+name;
   };
-  const allowedNodeEditor=(dialog,state)=>allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedReformEditor(dialog,state);
+  const allowedClusteringEditor=(dialog,state)=>state.wizard?.stage==='normalization'&&state.node_clustering?.verified===true
+    &&state.node_clustering.kind==='normalization'&&state.node_clustering.editor?.root_tid===state.wizard.root_tid+';ColumnsEditForm'
+    &&dialog.identity?.anchor_tid===state.node_clustering.editor.root_tid
+    &&state.node_clustering.editor.record_ids.length>0&&state.node_clustering.editor.record_ids.every(id=>state.node_clustering.selected.includes(id));
+  const allowedNodeEditor=(dialog,state)=>allowedClusteringEditor(dialog,state)||allowedCrossTableEditor(dialog,state)||allowedMissingValuesEditor(dialog,state)||allowedFilterEditor(dialog,state)||allowedExpressionEditor(dialog,state)||allowedFactorEditor(dialog,state)||allowedPreview(dialog,state)||allowedReformEditor(dialog,state);
   const assertContext = (state, allowTransient = false, tableDialog = null, rootsOnly = false, wizardConfirmation = null) => {
     if(preparedNodeContext) {
       const b=state.prepared_node_context;
@@ -188,8 +197,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   const channel = {
     async openJavascriptPreview(port){
       checkBudget();
-      if(!preparedNodeContext||!['transform.group_data','transform.sorting'].includes(operation.parameters?.target?.type))
-        throw Error('Managed preview is restricted to native Group and Sort preflight');
+      if(!preparedNodeContext||!['transform.group_data','transform.sorting','transform.calculator','transform.join_data'].includes(operation.parameters?.target?.type))
+        throw Error('Managed preview is restricted to native Group, Sort, Calculator and Join preflight');
       const task={operation_id:operation.id+':preview'+nextStep(),owner:preparedNodeContext.node,
         workflow_ref:{prefix:preparedNodeContext.workflow_ref.prefix,tab_tid:preparedNodeContext.workflow_ref.tab_tid},
         output:{index:port.index,native_index:port.native_index,active:port.active,port_guid:port.port_guid},
@@ -233,15 +242,49 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
+    async revealGraphNode() {
+      checkBudget();
+      if(!preparedNodeContext)throw Error('Viewport navigation requires a prepared node');
+      const before=await channel.observe({condition:'prepared graph before node viewport navigation',
+        ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'});
+      assertContext(before);checkBudget();
+      const step=nextStep(),id=operation.id+':n'+step,action={verb:'reveal_prepared_node'},actionKey='node.viewport.reveal.internal';
+      const signature=digest([id,action,evidenceSnapshot]),observationHash=digest(evidenceSnapshot);
+      snapshot=null;evidenceSnapshot=null;
+      const prepared=await entry('node_step_prepared',{step,internal_operation_id:id,action,observation_sha256:observationHash,signature});
+      if(prepared?.signature!==signature||JSON.stringify(prepared.action)!==JSON.stringify(action))throw Error('Node viewport navigation was not durably prepared');
+      signal?.throwIfAborted();checkBudget();
+      const code=`async page=>(${revealPreparedGraphNode.toString()})(page,${JSON.stringify({binding:preparedNodeContext,origin:targetOrigin,build:targetBuild,deadline:operation.deadline,types:NODE_TYPES})},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${samePlacementGraph.toString()})`;
+      const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'node_viewport',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:null,trace:[]}}`;
+      let result;
+      try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:Math.max(1,operation.deadline-now())});}
+      catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
+      if(result.operation_id!==id||result.action_key!==actionKey){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw Error('Node viewport receipt identity differs');}
+      operation.cleanupConfirmed=result.cleanup_complete===true;operation.nodeEffectPossible ||= result.effect_possible===true;
+      const completed=await entry('node_step_completed',{step,internal_operation_id:id,outcome:structuredClone(result)});
+      if(JSON.stringify(completed?.outcome)!==JSON.stringify(result))throw Error('Node viewport outcome was not durably preserved');
+      if(result.status!=='SUCCEEDED'||!operation.cleanupConfirmed||result.output?.verified!==true
+        ||result.output.graph_unchanged!==true||result.output.fully_visible!==true||result.output.settings_applied!==false
+        ||['document_id','workflow_id','node_id'].some(k=>result.output.node?.[k]!==preparedNodeContext.node[k]))throw new NodeProcedureStepError(result);
+      return structuredClone(result);
+    },
     async openOutputPort(port) {return channel.openPort('output',port);},
     async openInputPort(port) {return channel.openPort('input',port);},
     async openPort(direction,port) {
       if(!['input','output'].includes(direction))throw Error('Explicit port direction required');
       checkBudget();
       if(!preparedNodeContext||!Number.isInteger(port)||port<0||port>99)throw Error('A prepared output port index is required');
-      const before=await channel.observe({condition:'prepared graph before opening output port',
+      let before=await channel.observe({condition:'prepared graph before opening output port',
         ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'});
       assertContext(before);
+      const body=before.ui.elements.filter(e=>e.tid===before.prepared_node_context.tid&&e.graph_node?.part==='body');
+      if(body.length===1&&body[0].interaction?.state==='outside_viewport') {
+        await channel.revealGraphNode();
+        before=await channel.observe({condition:'prepared graph node revealed before opening port',
+          ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'
+            &&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'&&e.interaction?.state==='point_observed')});
+        assertContext(before);
+      }
       checkBudget();
       const step=nextStep(),id=operation.id+':n'+step,action={verb:'open_'+direction+'_port',port},actionKey='node.'+direction+'_port.open.internal';
       const signature=digest([id,action,evidenceSnapshot]),observationHash=digest(evidenceSnapshot);
@@ -267,7 +310,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readLinRegression = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -276,12 +319,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(settleOutputPort!==undefined&&(!readOutputs||!preparedNodeContext||tablePage||tableDialog
         ||typeof settleOutputPort!=='string'||!/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(settleOutputPort)))
         throw Error('Output settlement requires a prepared native port');
+      if(settleProcessConsole!==undefined&&(!readProcessControls||readProcesses||!preparedNodeContext
+        ||typeof settleProcessConsole.ref!=='string'||!settleProcessConsole.signature))
+        throw Error('Process console settlement requires its prepared control');
       readOutputs ||= !!tablePage || !!tableDialog;
       if(wizardConfirmation && (!preparedNodeContext || !['close','deactivation'].includes(wizardConfirmation.kind)))throw Error('A prepared wizard confirmation binding is required');
+      if(releaseWizard&&!preparedNodeContext)throw Error('Wizard release requires its prepared node');
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
       if(tableDialog)makeNodeTableContextCode(preparedNodeContext,tableDialog.table,{row_offset:0,row_limit:0,column_offset:0,column_limit:1});
-      if ((readProcesses || readProcessControls || readOutputs || readMappings || readCalculator || readJavascript || readGrouping || readCrossTable || readDateTime || readCollapse || readMissingValues || readSorting || readReplacement || readDuplicates || readReform || readFilter || readJoin || readUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
+      if ((readLinRegression || readProcesses || readProcessControls || readOutputs || readMappings || readCalculator || readJavascript || readGrouping || readCrossTable || readDateTime || readCollapse || readMissingValues || readSorting || readReplacement || readDuplicates || readReform || readFilter || readJoin || readUnion || readPreview) && !preparedNodeContext) throw new Error('Native process/output reads require a prepared node');
       if(mappingEditor!==undefined){
         if(!readMappings||!preparedNodeContext)throw Error('Owned input editor requires a prepared full mapping read');
         makeNodeMappingContextCode(preparedNodeContext,mappingEditor);
@@ -296,11 +343,11 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       // Wall time binds the parent deadline once; elapsed waits must survive clock corrections.
       const started = now(), monotonicStarted = monotonicNow();
       const observationNow = () => started + monotonicNow() - monotonicStarted;
-      const deadline = settleOutputPort?operation.deadline:Math.min(operation.deadline, started + timeoutMs);
+      let deadline = settleOutputPort?operation.deadline:Math.min(operation.deadline, started + timeoutMs);
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0;
+      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false;
       try {
-      for (let sample = 0; settleOutputPort || sample < 80; sample++) {
+      for (let sample = 0; settleOutputPort || settleProcessConsole || sample < 80; sample++) {
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         if (sample) await wait(Math.min(200, Math.max(0, deadline - observationNow())));
@@ -334,6 +381,12 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw error;
         }
         const wizard = roots.output.wizard;
+        if(releaseWizard&&wizard?.status==='observed') {
+          assertContext(roots.output,true,null,true);
+          const port=roots.output.prepared_node_context?.input_port??roots.output.prepared_node_context?.output_port;
+          if(port&&!port.opening_operation_id?.startsWith(operation.id+':n'))throw Error('Wizard port was not opened by this stopped operation');
+          wizardConfirmation??=wizardCloseBinding(roots.output);
+        }
         const portals = wizard?.status === 'observed' ? (roots.output.ui?.elements??[]).filter(e =>
           (e.tid?.startsWith(wizard.root_tid + ';') || wizard.stage==='field_parameters' && e.tid?.startsWith('EditReformColumnDefForm;') || wizard.stage==='input_mapping' && e.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist') && e.tid.endsWith(';boundlist')) : [];
         if(portals.length>1)throw new Error('Node procedure dropdown owner is ambiguous');
@@ -370,7 +423,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const rolePortal=wizard?.stage==='input_mapping'&&portals[0]?.tid==='EditTuneColumnDefForm;cbxUsageType;boundlist'?portals[0].ref:undefined;
         const produceMenus=readMappings&&wizard?.stage==='output_mapping'?(roots.output.ui?.elements??[]).filter(e=>e.tid===wizard.root_tid+';DerivedDataSourceMappingEngineOutputPortWizard;btnProduceType;mn'||e.tid===wizard.root_tid+';DerivedDataSourceOutputSocketWizard;btnProduceType;mn'):[];
         if(produceMenus.length>1)throw Error('Derived output policy menu is ambiguous');
-        const root = crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
+        const trainingRoot=readTraining?(roots.output.ui?.elements??[]).find(e=>e.tid==='mn')?.ref:undefined;
+        const normEditor=readClustering&&wizard?.stage==='normalization'?(roots.output.ui?.elements??[]).find(e=>e.tid===wizard.root_tid+';ColumnsEditForm')?.ref:undefined;
+        const normPortal=readClustering&&wizard?.stage==='normalization'&&portals[0]?.tid===wizard.root_tid+';ColumnsEditForm;cbxNormType;boundlist'?portals[0].ref:undefined;
+        const root = normPortal ?? normEditor ?? trainingRoot ?? crossTableEditors[0]?.ref ?? missingValuesDialogs[0]?.ref ?? rolePortal ?? produceMenus[0]?.ref ?? joinMenus[0]?.ref ?? filterDialogs[0]?.ref ?? previewRoot ?? dialogRoot[0]?.ref ?? outputEditors[0]?.ref ?? navigationRoot ?? processRoot ?? outputRoot ?? (portals.length===1 ? portals[0].ref : expressionEditors[0]?.ref ?? (wizard?.status === 'observed' ? wizard.root_ref : graphRoot));
         if (observationNow() >= deadline) break;
         // Polling repaints the native process console. Read its cache before
         // issuing final UI refs/epoch, so those refs do not age across the
@@ -448,6 +504,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           if(native.node_context&&JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
             throw Error('CrossTable native owner changed during observation');
         }
+        if(readLinRegression){
+          result.output.node_linregression=await execute(makeLinRegressionContextCode(preparedNodeContext),{timeout:readTimeout()});
+          if(result.output.node_linregression.node_context&&JSON.stringify(canonical(result.output.node_linregression.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Linear regression native owner changed during observation');
+        }
+        if(readClustering){
+          result.output.node_clustering=await execute(makeClusteringContextCode(preparedNodeContext),{timeout:readTimeout()});
+          if(result.output.node_clustering.node_context&&JSON.stringify(canonical(result.output.node_clustering.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Clustering native owner changed during observation');
+        }
         try {
           assertContext(result.output, true, tableDialog, false, wizardConfirmation);
         } catch (error) {
@@ -466,6 +530,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             !==JSON.stringify(canonical(result.output.prepared_node_context)))
             throw new Error('Native process/output context changed during observation');
         }
+        if(readTraining)result.output.node_training_read=true;
         if(boundWizardConfirmation(result.output,wizardConfirmation))result.output.node_wizard_confirmation=structuredClone(wizardConfirmation);
         // These are bounded reads of native UI caches and DOM, guarded by the
         // prepared node before and after. Preserve them in the same journal
@@ -492,6 +557,20 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           if(result.output.node_outputs?.verified!==true || tables.filter(t=>t.active&&t.view_guid===tableDialog.table.view_guid
             &&t.port_guid===tableDialog.table.port_guid&&t.table_tid===tableDialog.table.table_tid).length!==1)throw new Error('Table dialog owner changed');
           result.output.node_table_dialog=structuredClone(tableDialog);
+        }
+        if(settleProcessConsole&&(settlingConsole||result.output.ui.masks.length
+          &&result.output.ui.elements.some(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress'))){
+          const state=result.output,buttons=state.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress');
+          const owned=state.prepared_node_context?.surface==='graph'&&state.ui.dialogs.length===0
+            &&state.wizard?.status==='absent'&&buttons.length===1&&buttons[0].ref===settleProcessConsole.ref
+            &&buttons[0].enabled===true&&buttons[0].allowed_actions.includes('click')
+            &&JSON.stringify(canonical(buttons[0].signature))===JSON.stringify(canonical(settleProcessConsole.signature))
+            &&state.ui.masks.every(m=>m.kind==='busy'&&!m.dialog_ref
+              &&m.target_tid===preparedNodeContext.workflow_ref.prefix+';ModelForm');
+          if(!owned)throw Error('Owned process console settlement context changed');
+          // Only the confirmed launch's own loading mask may outlive the local
+          // readiness window. Keep the parent deadline and authorize no action.
+          if(state.ui.masks.length){settlingConsole=true;deadline=operation.deadline;}
         }
         if(settleOutputPort){
           const state=result.output,context=state.prepared_node_context;
@@ -559,7 +638,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (!snapshot) throw new Error('A fresh internal observation is required');
       validateUiAction(action, snapshot);
       assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);
-      if(snapshotWizardConfirmation && (action.verb!==(snapshotWizardConfirmation.kind==='close'?'confirm_wizard_close':'confirm_wizard_deactivation') || snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid!=='msgbox;tlb;yes'))throw Error('Only the bound wizard confirmation can answer this question');
+      const mappingConflict=snapshotWizardConfirmation&&boundInputMappingConflict(snapshot,snapshotWizardConfirmation);
+      if(snapshotWizardConfirmation && (action.verb!==(mappingConflict?'click':snapshotWizardConfirmation.kind==='close'?'confirm_wizard_close':'confirm_wizard_deactivation')
+        || snapshot.ui.elements.find(e=>e.ref===action.ref)?.tid!==(mappingConflict?'msgbox;tlb;cancel':'msgbox;tlb;yes')))throw Error('Only the bound wizard confirmation can answer this question');
       const step = nextStep(), id = operation.id + ':n' + step;
       const before = snapshot;
       snapshot = null;
@@ -645,6 +726,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           readNavigation:initialObservation?.node_navigation_read===true,
           readMappings:initialObservation?.node_mapping!==undefined,
           mappingEditor:initialObservation?.node_mapping_editor,
+          readLinRegression:initialObservation?.node_linregression!==undefined,
+          readClustering:initialObservation?.node_clustering!==undefined,
+          readTraining:initialObservation?.node_training_read===true,
           readCalculator:initialObservation?.node_calculator!==undefined,
           readJavascript:initialObservation?.node_javascript_schema!==undefined,
           readGrouping:initialObservation?.node_grouping!==undefined,
@@ -685,12 +769,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const epochRefusal=r.phase==='preconditions'&&r.error?.code==='UI_EPOCH_CHANGED'
             ||r.phase==='observing'&&r.error?.code==='UI_ROOT_STALE';
           const scanRefusal=timeScanRefusal(r,'ui.act');
+          const graphRefusal=action.verb==='execute_graph_node'&&r.phase==='preconditions'
+            &&r.error?.code==='GRAPH_EXECUTION_CONTEXT_CHANGED';
           // Only an opting-in source selector can prove a replaced native body.
           // This remains a new observation and bound attempt, never a raw retry.
-          const bodyRefusal=r.phase==='preconditions'&&r.error?.code==='UI_REFERENCE_STALE'
+          const bodyRefusal=r.phase==='preconditions'&&['UI_REFERENCE_STALE','UI_REFERENCE_OBSCURED'].includes(r.error?.code)
             &&bodyRefreshes===0&&typeof refreshReplacedBody==='function'
             &&refreshReplacedBody({receipt:r,observation:observed,action})===true;
-          if(!epochRefusal&&!bodyRefusal&&!scanRefusal)throw error;
+          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal)throw error;
           if(bodyRefusal)bodyRefreshes++;
           const event = await entry('node_step_refresh_authorized', {
             step:operation.nodeStepSequence,internal_operation_id:r.operation_id,
@@ -699,6 +785,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             effect_possible: false,
             ...(bodyRefusal?{reason:'prepared_graph_body_replaced'}:{}),
             ...(scanRefusal?{reason:'read_scan_time_limit'}:{}),
+            ...(graphRefusal?{reason:'graph_execution_context_changed'}:{}),
           });
           if (event?.rejected_operation_id !== r.operation_id || event.retry !== attempt + 1
             || event.binding_sha256 !== binding || event.intent_sha256 !== intent) {

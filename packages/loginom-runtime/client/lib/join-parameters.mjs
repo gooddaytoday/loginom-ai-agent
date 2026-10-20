@@ -40,7 +40,9 @@ export function resolveJoinKeys(parameters,schemas){
   return {...k,type:pair[0][0].type};
  });
 }
-export function joinOutputFields(configuration){
+export function joinOutputFields(configuration,outputMapping){
  const rightKeys=new Set(configuration.keys.map(k=>k.right));
- return [...configuration.input_fields[0],...configuration.input_fields[1].filter(f=>configuration.include_joined_keys||!rightKeys.has(f.name))].map(f=>({name:f.name,label:f.label,type:f.type,used:true}));
+ const fields=[...configuration.input_fields[0],...configuration.input_fields[1].filter(f=>configuration.include_joined_keys||!rightKeys.has(f.name))].map(f=>({name:f.name,label:f.label,type:f.type,used:true}));
+ need((outputMapping?.changes??[]).every(f=>fields.some(s=>s.name===f.source.name)),'Join output changes reference an unknown source');
+ return fields;
 }

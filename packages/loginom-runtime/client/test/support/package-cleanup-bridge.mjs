@@ -43,7 +43,8 @@ class ExternalClient {
       this.f.events.push('package-cleanup');
       if(this.f.scenario==='product-native-error')throw Error('native response lost');
       if(this.f.scenario==='product-native-malformed')return {content:[{type:'text',text:'invalid native receipt'}]};
-      const options=JSON.parse(code.slice(code.lastIndexOf(')(page,')+7,-1));
+      const [options,deadline]=JSON.parse('['+code.slice(code.lastIndexOf(')(page,')+7,-1)+']');
+      assert.ok(deadline>Date.now() && deadline<=Date.now()+30000);
       this.f.cleanupOptions=options;
       value={version:1,session_id:'own-session',document_id:'own-doc',status:this.f.scenario.endsWith('native-blocked')?'BLOCKED':'SUCCEEDED',package_closed:!this.f.scenario.endsWith('native-blocked'),
         logged_out:!this.f.scenario.endsWith('native-blocked'),account:'test-2',package_path:this.f.path,unsaved_changes_discarded:false,packages_before:1,packages_after:0,reason:null};

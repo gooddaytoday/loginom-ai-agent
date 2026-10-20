@@ -6,6 +6,7 @@ import type { cliProfile } from "@loginom-ai-agent/product/cli-profile"
 import { Product } from "@loginom-ai-agent/product"
 import { standaloneCancellation } from "./standalone-cancellation"
 import { standaloneBundle } from "./standalone-bundle"
+import { InstallationBrowserRecovery } from "@loginom-ai-agent/core/installation/version"
 
 export async function standaloneRun(args: string[], paths: ReturnType<typeof cliProfile>, mode: "run" | "tui" = "run") {
   const signal = mode === "run" ? standaloneCancellation() : undefined
@@ -57,12 +58,15 @@ export async function standaloneRun(args: string[], paths: ReturnType<typeof cli
     return
   }
   const host = await launchNodeHost({
-    ...bundle,
+    node: bundle.node,
+    entry: bundle.entry,
+    resources: bundle.resources,
     root: paths.loginom,
     headless,
     environment: process.env,
     strictRecovery: process.env.LOGINOM_AI_AGENT_STRICT_RECOVERY === "1",
     closeSavedPackageOnShutdown: mode === "run",
+    browserRecovery: InstallationBrowserRecovery && bundle.verified,
   }).catch((error: unknown) => {
     if (!(error instanceof NodeHostStartupError) || !error.cleanupConfirmed)
       throw new Error("LOGINOM_HOST_CLEANUP_FAILED", { cause: error })

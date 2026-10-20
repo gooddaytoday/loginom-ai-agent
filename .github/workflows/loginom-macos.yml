@@ -6,6 +6,10 @@ on:
       version:
         description: Candidate version (empty uses run number)
         type: string
+      browser_recovery:
+        description: Bake temporary browser recovery into this candidate (demo and acceptance builds)
+        type: boolean
+        default: false
   push:
     branches: [macos-build, loginom]
     paths: ["packages/**", "patches/**", "bun.lock", "package.json", ".github/workflows/loginom-macos.yml"]
@@ -25,6 +29,8 @@ jobs:
     timeout-minutes: 120
     env:
       LOGINOM_AI_AGENT_CHANNEL: dev
+      # Independent of the channel: an explicit candidate input bakes browser recovery.
+      LOGINOM_AI_AGENT_BROWSER_RECOVERY: ${{ inputs.browser_recovery && '1' || '0' }}
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:

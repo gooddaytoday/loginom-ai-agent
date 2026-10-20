@@ -102,7 +102,7 @@ export async function runManagedJavascriptSelectionBody(page,task,inspect) {
   const current=await page.evaluate(inspect,{held:lease.handle,task:{...task,inspectPhase:'managed_pre_select_click',afterGesture:false}});
   const sameRedraw=current.dom_replacements===task.expected.dom_replacements
     ||task.expected.dom_replacements===0&&current.dom_replacements===1
-      &&task.expected.node_selected===false&&current.node_selected===false;
+      &&current.node_selected===task.expected.node_selected;
   if(current.blocked===true||current.ready===true||!current.body_point
     ||!sameRedraw||JSON.stringify({...current,dom_replacements:task.expected.dom_replacements})!==JSON.stringify(task.expected)
     ||Date.now()>=task.deadline)

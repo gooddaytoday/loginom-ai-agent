@@ -1,0 +1,225 @@
+{
+  "package_path": "/stability-2026-10-20/p16.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.lin_regression"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/sensors-predicted.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Mode",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Load",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Signal",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Background",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Net",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "PredictedNet",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Id": 7,
+          "Mode": "work",
+          "Load": 3.5,
+          "Signal": 17.5,
+          "Background": 1.5,
+          "Net": 16.0,
+          "PredictedNet": 15.645588235294118
+        },
+        {
+          "Id": 15,
+          "Mode": "work",
+          "Load": 7.5,
+          "Signal": 30.0,
+          "Background": 2.0,
+          "Net": 28.0,
+          "PredictedNet": 27.61911764705882
+        },
+        {
+          "Id": 14,
+          "Mode": "work",
+          "Load": 7.0,
+          "Signal": 27.5,
+          "Background": 1.25,
+          "Net": 26.25,
+          "PredictedNet": 26.122426470588234
+        },
+        {
+          "Id": 2,
+          "Mode": "work",
+          "Load": 1.0,
+          "Signal": 9.25,
+          "Background": 0.75,
+          "Net": 8.5,
+          "PredictedNet": 8.162132352941176
+        },
+        {
+          "Id": 16,
+          "Mode": "work",
+          "Load": 8.0,
+          "Signal": 29.5,
+          "Background": 0.25,
+          "Net": 29.25,
+          "PredictedNet": 29.115808823529413
+        },
+        {
+          "Id": 13,
+          "Mode": "work",
+          "Load": 6.5,
+          "Signal": 24.25,
+          "Background": 0.25,
+          "Net": 24.0,
+          "PredictedNet": 24.625735294117646
+        },
+        {
+          "Id": 6,
+          "Mode": "work",
+          "Load": 3.0,
+          "Signal": 15.0,
+          "Background": 0.75,
+          "Net": 14.25,
+          "PredictedNet": 14.148897058823529
+        },
+        {
+          "Id": 10,
+          "Mode": "work",
+          "Load": 5.0,
+          "Signal": 21.0,
+          "Background": 0.5,
+          "Net": 20.5,
+          "PredictedNet": 20.135661764705883
+        },
+        {
+          "Id": 9,
+          "Mode": "work",
+          "Load": 4.5,
+          "Signal": 19.75,
+          "Background": 0.75,
+          "Net": 19.0,
+          "PredictedNet": 18.638970588235296
+        },
+        {
+          "Id": 3,
+          "Mode": "work",
+          "Load": 1.5,
+          "Signal": 11.25,
+          "Background": 2.0,
+          "Net": 9.25,
+          "PredictedNet": 9.658823529411764
+        },
+        {
+          "Id": 12,
+          "Mode": "work",
+          "Load": 6.0,
+          "Signal": 24.5,
+          "Background": 2.0,
+          "Net": 22.5,
+          "PredictedNet": 23.12904411764706
+        },
+        {
+          "Id": 5,
+          "Mode": "work",
+          "Load": 2.5,
+          "Signal": 13.75,
+          "Background": 1.5,
+          "Net": 12.25,
+          "PredictedNet": 12.652205882352941
+        },
+        {
+          "Id": 1,
+          "Mode": "work",
+          "Load": 0.5,
+          "Signal": 7.5,
+          "Background": 0.75,
+          "Net": 6.75,
+          "PredictedNet": 6.665441176470588
+        },
+        {
+          "Id": 11,
+          "Mode": "work",
+          "Load": 5.5,
+          "Signal": 23.0,
+          "Background": 1.25,
+          "Net": 21.75,
+          "PredictedNet": 21.63235294117647
+        },
+        {
+          "Id": 8,
+          "Mode": "work",
+          "Load": 4.0,
+          "Signal": 18.75,
+          "Background": 2.0,
+          "Net": 16.75,
+          "PredictedNet": 17.142279411764704
+        },
+        {
+          "Id": 4,
+          "Mode": "work",
+          "Load": 2.0,
+          "Signal": 12.5,
+          "Background": 1.25,
+          "Net": 11.25,
+          "PredictedNet": 11.155514705882354
+        }
+      ]
+    }
+  ]
+}

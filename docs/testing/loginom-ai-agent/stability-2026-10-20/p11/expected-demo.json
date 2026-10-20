@@ -1,0 +1,154 @@
+{
+  "package_path": "/stability-2026-10-20/p11.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.lin_regression"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/seedlings-predicted.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Light",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Height",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "PredictedHeight",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Id": 5,
+          "Light": 2.5,
+          "Height": 10.5,
+          "PredictedHeight": 10.296691176470588
+        },
+        {
+          "Id": 8,
+          "Light": 4.0,
+          "Height": 14.5,
+          "PredictedHeight": 14.127205882352941
+        },
+        {
+          "Id": 16,
+          "Light": 8.0,
+          "Height": 24.5,
+          "PredictedHeight": 24.341911764705884
+        },
+        {
+          "Id": 4,
+          "Light": 2.0,
+          "Height": 9.5,
+          "PredictedHeight": 9.01985294117647
+        },
+        {
+          "Id": 14,
+          "Light": 7.0,
+          "Height": 22.0,
+          "PredictedHeight": 21.788235294117648
+        },
+        {
+          "Id": 6,
+          "Light": 3.0,
+          "Height": 11.75,
+          "PredictedHeight": 11.573529411764707
+        },
+        {
+          "Id": 7,
+          "Light": 3.5,
+          "Height": 12.5,
+          "PredictedHeight": 12.850367647058823
+        },
+        {
+          "Id": 11,
+          "Light": 5.5,
+          "Height": 17.5,
+          "PredictedHeight": 17.957720588235293
+        },
+        {
+          "Id": 13,
+          "Light": 6.5,
+          "Height": 19.75,
+          "PredictedHeight": 20.51139705882353
+        },
+        {
+          "Id": 2,
+          "Light": 1.0,
+          "Height": 6.75,
+          "PredictedHeight": 6.466176470588235
+        },
+        {
+          "Id": 3,
+          "Light": 1.5,
+          "Height": 7.5,
+          "PredictedHeight": 7.743014705882353
+        },
+        {
+          "Id": 9,
+          "Light": 4.5,
+          "Height": 15.0,
+          "PredictedHeight": 15.404044117647059
+        },
+        {
+          "Id": 1,
+          "Light": 0.5,
+          "Height": 4.75,
+          "PredictedHeight": 5.189338235294118
+        },
+        {
+          "Id": 10,
+          "Light": 5.0,
+          "Height": 17.0,
+          "PredictedHeight": 16.680882352941175
+        },
+        {
+          "Id": 12,
+          "Light": 6.0,
+          "Height": 19.5,
+          "PredictedHeight": 19.23455882352941
+        },
+        {
+          "Id": 15,
+          "Light": 7.5,
+          "Height": 23.25,
+          "PredictedHeight": 23.065073529411766
+        }
+      ]
+    }
+  ]
+}

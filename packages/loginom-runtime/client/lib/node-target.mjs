@@ -141,6 +141,9 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       return { ...structuredClone(state.result), replayed: true };
     }
     if (!state.baseline) {
+     for(let refresh=0;;refresh++){
+      budget();
+      if(refresh)graph=await observe();
       // Validate all source ports, target type/license and input topology BEFORE
       // creating anything. Schema/mapping validation belongs to the type handler.
       await adapter.preflight(request, graph, operation.deadline, signal);
@@ -164,11 +167,20 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
       }
       if(request.target.kind==='new' && !request.target.position){
         if(typeof adapter.choosePosition!=='function')throw Error('target.position: automatic placement is unavailable in this driver');
-        state.newPosition=await adapter.choosePosition(request,graph,operation.deadline,signal);
+        try{state.newPosition=await adapter.choosePosition(request,graph,operation.deadline,signal);}
+        catch(error){
+          // Placement only observed the graph: re-admit the sources and palette
+          // on a fresh complete graph before preparing any effect or gesture.
+          if(error.code!=='NODE_PLACEMENT_GRAPH_CHANGED'||refresh>=2||state.pending||state.targetId
+            ||state.effect_possible||state.receipts.length)throw error;
+          continue;
+        }
         validateNodeTargetRequest({...request,target:{...request.target,position:state.newPosition}});
         if(!state.newPosition)throw Error('target.position: no verified free position available');
       }
       state.baseline = structuredClone(graph); await commit();
+      break;
+     }
     }
     if (!state.targetId) {
       const after = await change('create', {...request.target,position:request.target.position??state.newPosition}, (before, after) => {

@@ -141,18 +141,15 @@ const targets = selectedTarget
           return false
         }
 
-        // When building for the current platform, prefer a single native binary by default.
-        // Baseline binaries require additional Bun artifacts and can be flaky to download.
-        if (item.avx2 === false) {
-          return baselineFlag
-        }
-
-        // also skip abi-specific builds for the same reason
+        // Skip abi-specific builds: they require additional Bun artifacts too.
         if (item.abi !== undefined) {
           return false
         }
 
-        return true
+        // When building for the current platform, prefer a single native binary by default.
+        // Baseline binaries require additional Bun artifacts and can be flaky to download;
+        // a requested baseline single build replaces the native one.
+        return (item.avx2 === false) === baselineFlag
       })
     : allTargets
 
@@ -220,6 +217,7 @@ for (const item of targets) {
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + treeSitterWorkerPath,
       LOGINOM_AI_AGENT_WORKER_PATH: workerPath,
       LOGINOM_AI_AGENT_CHANNEL: `'${Script.channel}'`,
+      LOGINOM_AI_AGENT_BROWSER_RECOVERY: JSON.stringify(Script.browserRecovery),
       LOGINOM_AI_AGENT_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
       ...(item.os === "linux" ? { "process.env.OPENTUI_LIBC": JSON.stringify(item.abi ?? "glibc") } : {}),
     },

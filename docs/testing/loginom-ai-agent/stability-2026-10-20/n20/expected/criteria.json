@@ -1,0 +1,5 @@
+{
+  "forecast_abs_tolerance": 0.02,
+  "forecast_rel_tolerance": 1e-09,
+  "source_abs_tolerance": 1e-08
+}

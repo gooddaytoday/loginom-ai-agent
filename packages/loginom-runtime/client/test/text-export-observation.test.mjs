@@ -81,6 +81,18 @@ test('export download refreshes only a confirmed epoch-only refusal before any g
  const result=await downloadExportWithFreshObservation({...f,guard:()=>{},refresh:async()=>{refreshes++;return {...f.snapshot,dom_epoch:{document:'doc',revision:2}};},download:async(s,e,index)=>{attempts.push([index,s.dom_epoch.revision]);return index?{status:'SUCCEEDED'}:f.refusal;}});
  assert.equal(result.status,'SUCCEEDED');assert.equal(refreshes,1);assert.deepEqual(attempts,[[0,1],[1,2]]);
 });
+test('export download refreshes a no-effect epoch refusal immediately before reveal',async()=>{
+ const f=downloadFixture(),attempts=[];
+ f.refusal={status:'NOT_APPLIED',phase:'revealing',effect_possible:false,cleanup_complete:true,error:{code:'DOWNLOAD_REVEAL_EPOCH_CHANGED'},trace:[]};
+ const result=await downloadExportWithFreshObservation({...f,guard:()=>{},refresh:async()=>({...f.snapshot,dom_epoch:{document:'doc',revision:2}}),download:async(s,e,index)=>{attempts.push([index,s.dom_epoch.revision]);return index?{status:'SUCCEEDED'}:f.refusal;}});
+ assert.equal(result.status,'SUCCEEDED');assert.deepEqual(attempts,[[0,1],[1,2]]);
+ for(const change of [r=>r.status='AMBIGUOUS',r=>r.effect_possible=true,r=>r.cleanup_complete=false,r=>r.phase='downloading',r=>r.error.code='DOWNLOAD_REVEAL_TARGET_CHANGED']){
+  const refused=structuredClone(f.refusal);change(refused);let calls=0;
+  assert.equal(await downloadExportWithFreshObservation({...f,guard:()=>{},refresh:async()=>assert.fail('Unsafe refresh'),download:async()=>{calls++;return refused;}}),refused);
+  assert.equal(calls,1);
+ }
+ await assert.rejects(downloadExportWithFreshObservation({...f,guard:()=>{},refresh:async()=>({...f.snapshot,dom_epoch:{document:'foreign',revision:2}}),download:async()=>f.refusal}),/target changed/);
+});
 test('export download never repeats an unknown result, possible effect or other context change',async()=>{
  for(const change of [r=>r.status='AMBIGUOUS',r=>r.effect_possible=true,r=>r.cleanup_complete=false,r=>r.trace[0].checks.workflow=false,r=>r.trace=[],r=>r.error.code='DOWNLOAD_EVENT_MISSING']){
   const f=downloadFixture();change(f.refusal);let attempts=0;

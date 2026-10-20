@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
-import {verifiedNativeReadRefusal} from './native-read-refusal.mjs';
+import {verifiedNativeReadRefusal,verifiedExportReadRefusal} from './native-read-refusal.mjs';
 import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-schema-refusal.mjs';
 import {verifiedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
 import {verifiedJavascriptSourcePolicyRefusal} from './javascript-source-policy-refusal.mjs';
@@ -210,6 +210,12 @@ export async function applyNode({request, operation, handlers, drivers, record,
       // Explicit trusted-driver proof is required: a transport exception alone
       // never clears uncertainty, even in a nominally non-mutating phase.
       const refusal=error.nodePhaseRefusal;
+      if(name==='read'&&request.target.type==='exports.text'&&operation.cleanupConfirmed===true&&!operation.transportUncertain
+        &&verifiedExportReadRefusal(refusal,state.node,state.execution,operation.id)){
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+        state.export_download_refusal=true;
+      }
       if(name==='read'&&['transform.cross_table','transform.collapse_columns'].includes(request.target.type)
         &&operation.cleanupConfirmed===true&&!operation.transportUncertain
         &&verifiedNativeReadRefusal(refusal,state.node,state.execution,request.read)){
@@ -433,6 +439,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
   } catch(error) {
     // No automatic rollback and no repetition of an unknown upload/run/save.
     // status/wait/inspect remain the responsibility of the owning runtime.
+    if(readingOnly&&state.pending?.phase==='read'&&error.code==='NODE_READ_SCHEMA_CHANGED')state.read_schema_changed=true;
     return {operation_id:operation.id,status:state.verified_refusal?'FAILED':state.effect_possible?'AMBIGUOUS':'NOT_APPLIED',effect_possible:state.effect_possible,
       phases:state.phases.map(({value,...p})=>p),node:state.node,execution:state.execution,output:state.output,
       package_saved:false,cleanup_complete:state.cleanup_complete,warnings:[],
@@ -443,6 +450,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
           instruction:'Loginom rejected the JavaScript draft. Its dialog and draft were closed; the committed source, native settings and complete graph were independently rechecked unchanged. Correct source_text and submit a NEW operation_id on the SAME existing target '+JSON.stringify(state.node)
             +' with expected_source_sha256:'+state.javascript_wizard_refusal.retained_source.source_sha256
             +'. Preserve inputs:[] and mappings:[]. Do not recreate or save the package; no explicit Execute was sent.'}
+          :state.export_download_refusal?{tool:'dock_action_run',original_operation_id:operation.id,
+          instruction:'The native export completed, but its download was not confirmed. The original scenario is restored, its temporary download lease released and no phase remains unresolved. Save the scenario with dock_action_run, action_key:"package.save_checkpoint", a NEW operation_id and the task package path in parameters.path. Report the download as unconfirmed. Do not resume this failed operation, repeat export, or recreate the node.'}
           :state.native_read_refusal?{tool:'dock_node_apply',original_operation_id:operation.id,
           instruction:'Full native reading was refused by the unchanged 50x8 limit. The owned Preview is closed, workflow restored and execution retained. No operation remains unresolved; saving or another action is allowed. Do not recreate or reconfigure the node. For a scalar report use a NEW operation_id with the SAME existing target, parameters:{}, inputs:[], mappings:[], finish:"execute" and read:{ports:[0],sample_rows:100,require_exact_numbers:true} without full coverage. This does not authorize ordinary reading of Variant values.'}:correctNodeRequest(request,state.node)}:{}),
       ...(state.correctable_import_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
@@ -482,8 +491,8 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
     :{status:proof.cleanup.wizard_closed&&!verified('node_finish')?'discarded':'unknown'};
   const execution=['completed','failed','cancelled'].includes(state.execution.status)||!launch?state.execution
     :{status:'unknown',execution_id:state.execution.execution_id??null};
-  // A released reread points back to its own verified source operation.
-  const readSource=readingOnly?request.parameters.source_operation_id
+  // A released reread keeps its source unless that schema was observed stale.
+  const readSource=readingOnly&&!state.read_schema_changed?request.parameters.source_operation_id
     :pending.phase==='read'&&execution.status==='completed'&&configuration.readback?operation.id:null;
   const result={operation_id:operation.id,status:'FAILED',effect_possible:true,phases:state.phases.map(({value,...p})=>p),
     node:state.node,execution,output:state.output,package_saved:false,cleanup_complete:true,

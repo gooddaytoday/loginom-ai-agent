@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeJobResultSchema} from '../lib/node-result-schema.mjs';
 import {inspectPendingWizardOpen} from '../lib/node-wizard-open.mjs';
+import {preflightCalculatorSource} from '../lib/calculator-preflight.mjs';
 import {actions} from './support/executor-fixture.mjs';
 const validateJob=new AjvJsonSchemaValidator().getValidator(nodeJobResultSchema);
 const assertJob=job=>{const result=validateJob(job);assert.equal(result.valid,true,result.errorMessage);};
@@ -459,6 +460,37 @@ test('verified unchanged workflow followed by typed preflight refusal frees the 
  f.adapter.activateWorkflow=f.adapter.verifyWorkflow;
  const refused=await f.runtime.runNodeApply(request());assert.equal(refused.status,'NOT_APPLIED');assert.equal(refused.effect_possible,false);assert.equal(refused.cleanup_complete,true);assert.equal(refused.output.node,null);assert.equal(f.graph.nodes.length,0);
  invalid=false;const corrected=await f.runtime.runNodeApply({...request(),operation_id:'corrected'});assert.equal(corrected.status,'SUCCEEDED');assert.equal(f.graph.nodes.length,1);
+});
+
+for(const fault of ['denied_port','lost_observation'])test('Calculator source preflight preserves the actual pre-gesture boundary: '+fault,async()=>{
+ let invalid=true,gestures=0;
+ const source={document_id:'doc',workflow_id:'wf',node_id:'source'},port={index:0,native_index:0,active:true,port_guid:'source-output',tid:'MF;TF-1;Graph;Source;Output_Data-0'};
+ const context={...source,verified:true,surface:'graph',locked:false};
+ const state={origin:'http://localhost',loginom_build:'7.4.2',workflow_ref:workflow,dom_epoch:{document:'doc'},scan:{complete:true},wizard:{status:'absent'},prepared_node_context:context,
+  ui:{masks:[],dialogs:[],truncated:{elements:false,masks:false,dialogs:false},elements:[{tid:port.tid,ref:'source-port',allowed_actions:[]}]}};
+ const f=fixture({wrapDrivers:({operation},drivers)=>({...drivers,beforeTarget:ctx=>invalid?preflightCalculatorSource({operation,
+  onRecord:async event=>structuredClone(event),receiptOptions:()=>{gestures++;assert.fail('No gesture is authorized');},execute:async code=>{
+   if(fault==='lost_observation')throw Error('lost browser observation');
+   return code.includes('readOutputContext')?{verified:true,node_context:context,ports:[port],execution_freshness_verified:false}:{status:'SUCCEEDED',output:structuredClone(state)};
+  }},ctx,{targetOrigin:'http://localhost',targetBuild:'7.4.2'}):undefined})});
+ f.handlers.set('transform.calculator',{...f.handler,modes:['expression']});
+ f.graph.nodes.push({ref:source,type:'imports.text',inputs:[],outputs:[0]});
+ f.adapter.verifyWorkflow=async()=>({status:'SUCCEEDED',verified:true,document_id:'doc',workflow_ref:workflow,effect_possible:false,cleanup_complete:true});
+ f.adapter.activateWorkflow=f.adapter.verifyWorkflow;
+ const r={...request(),target:{kind:'new',type:'transform.calculator',label:'Parse items'},inputs:[{source,output:0,input:0}],mode:'expression',parameters:{expressions:[]}};
+ const refused=await f.runtime.runNodeApply(r);
+ assert.equal(gestures,0);assert.equal(f.graph.nodes.length,1);assert.equal(refused.output.node,null);
+ assert.equal(refused.cleanup_complete,fault==='denied_port');
+ if(fault==='denied_port'){
+  assert.equal(refused.status,'NOT_APPLIED');assert.equal(refused.effect_possible,false);assert.equal(refused.output.pending_phase,null);
+  assert.match(refused.error.message,/Upstream port is not interactable/);
+  f.runtime.assertPreparationAllowed();
+  invalid=false;const corrected=await f.runtime.runNodeApply({...request(),operation_id:'corrected'});
+  assert.equal(corrected.status,'SUCCEEDED',JSON.stringify(corrected));assert.equal(f.graph.nodes.length,2);
+ }else{
+  assert.equal(refused.status,'AMBIGUOUS');assert.equal(refused.output.pending_phase,'target');
+  assert.throws(()=>f.runtime.assertPreparationAllowed());
+ }
 });
 
 test('fresh reopened graph is bound before source schema preflight',async()=>{

@@ -1,0 +1,64 @@
+{
+  "package_path": "/stability-2026-10-20/datamining-clustering.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.clustering"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/cluster-summary.csv",
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "X",
+          "label": "X",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 0
+          }
+        },
+        {
+          "name": "Y",
+          "label": "Y",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 0
+          }
+        },
+        {
+          "name": "PointCount",
+          "label": "PointCount",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "X": 0.0,
+          "Y": 0.0,
+          "PointCount": 4
+        },
+        {
+          "X": 20.0,
+          "Y": 0.0,
+          "PointCount": 4
+        },
+        {
+          "X": 0.0,
+          "Y": 20.0,
+          "PointCount": 4
+        }
+      ]
+    }
+  ]
+}

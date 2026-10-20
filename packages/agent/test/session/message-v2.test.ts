@@ -360,7 +360,44 @@ describe("session.message-v2.toModelMessage", () => {
     }
   })
 
-  test("CSV model adaptation does not replace remote CSV or other file types", async () => {
+  test("describes inline XLSX without changing original binary admission bytes", async () => {
+    const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    const bytes = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0xff, 0xfe, 0x80])
+    for (const filename of ["sales.xlsx", "Продажи.XLSX"]) {
+      const input: SessionV1.WithParts[] = [
+        {
+          info: userInfo("xlsx-user"),
+          parts: [
+            {
+              ...basePart("xlsx-user", "xlsx-part"),
+              type: "file",
+              mime,
+              filename,
+              url: `data:${mime};base64,${bytes.toString("base64")}`,
+            },
+          ],
+        },
+      ]
+      const original = structuredClone(input)
+      expect(await MessageV2.toModelMessages(input, model)).toStrictEqual([
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `[Excel workbook attachment: ${JSON.stringify(filename)} (${mime}, ${bytes.byteLength} bytes). Original bytes retained for attachment admission and verified delivery; file contents are not decoded here.]`,
+            },
+          ],
+        },
+      ])
+      expect(input).toStrictEqual(original)
+      const part = input[0].parts[0]
+      if (part.type !== "file") throw new Error("Original file part lost")
+      expect(Buffer.from(part.url.split(",")[1], "base64")).toEqual(bytes)
+    }
+  })
+
+  test("CSV/XLSX model adaptation does not replace remote attachments or other file types", async () => {
     const input: SessionV1.WithParts[] = [
       {
         info: userInfo("files"),
@@ -379,6 +416,20 @@ describe("session.message-v2.toModelMessage", () => {
             filename: "document.pdf",
             url: "data:application/pdf;base64,JVBERg==",
           },
+          {
+            ...basePart("files", "xlsx-remote"),
+            type: "file",
+            mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename: "remote.xlsx",
+            url: "https://example.com/remote.xlsx",
+          },
+          {
+            ...basePart("files", "png"),
+            type: "file",
+            mime: "image/png",
+            filename: "image.png",
+            url: "data:image/png;base64,iVBORw==",
+          },
         ],
       },
     ]
@@ -393,6 +444,13 @@ describe("session.message-v2.toModelMessage", () => {
             filename: "document.pdf",
             data: "data:application/pdf;base64,JVBERg==",
           },
+          {
+            type: "file",
+            mediaType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename: "remote.xlsx",
+            data: "https://example.com/remote.xlsx",
+          },
+          { type: "file", mediaType: "image/png", filename: "image.png", data: "data:image/png;base64,iVBORw==" },
         ],
       },
     ])

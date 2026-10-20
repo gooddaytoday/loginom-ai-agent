@@ -1,0 +1,45 @@
+{
+  "package_path": "/stability-2026-10-20/p8.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/calm-birds.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Species",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Count",
+          "type": "real",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "Species": "Gull",
+          "Count": 20
+        },
+        {
+          "Species": "Heron",
+          "Count": 20
+        },
+        {
+          "Species": "Tern",
+          "Count": 22
+        }
+      ]
+    }
+  ]
+}

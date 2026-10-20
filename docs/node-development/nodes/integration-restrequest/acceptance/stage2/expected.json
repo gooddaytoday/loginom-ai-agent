@@ -1,0 +1,41 @@
+{
+  "package_path": "{{PACKAGE_PATH}}",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "integration.rest_request"
+    }
+  ],
+  "output_node_type": "export_input",
+  "columns": [
+    {
+      "name": "RequestId",
+      "type": "string",
+      "label_any": true
+    },
+    {
+      "name": "HttpStatusCode",
+      "type": "integer",
+      "label_any": true
+    },
+    {
+      "name": "HasError",
+      "type": "boolean",
+      "label_any": true
+    }
+  ],
+  "rows": [
+    {
+      "RequestId": "ok",
+      "HttpStatusCode": 200,
+      "HasError": false
+    },
+    {
+      "RequestId": "missing",
+      "HttpStatusCode": 404,
+      "HasError": true
+    }
+  ]
+}

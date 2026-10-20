@@ -229,6 +229,8 @@ jobs:
 
       - name: Run HttpApi exerciser gates
         working-directory: packages/agent
+        # A rare hang inside the effect run otherwise holds the job until its 60-minute limit.
+        timeout-minutes: 10
         run: bun run test:httpapi
 
   desktop:

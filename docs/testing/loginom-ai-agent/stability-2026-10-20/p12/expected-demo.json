@@ -1,0 +1,166 @@
+{
+  "package_path": "/stability-2026-10-20/p12.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.lin_regression"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/panels-predicted.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Thickness",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "Loss",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "PredictedLoss",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Id": 5,
+          "Thickness": 2.5,
+          "Loss": 9.75,
+          "PredictedLoss": 10.280099759201926
+        },
+        {
+          "Id": 11,
+          "Thickness": 5.5,
+          "Loss": 18.25,
+          "PredictedLoss": 17.77700378396973
+        },
+        {
+          "Id": 14,
+          "Thickness": 7.0,
+          "Loss": 22.0,
+          "PredictedLoss": 21.52545579635363
+        },
+        {
+          "Id": 17,
+          "Thickness": 8.5,
+          "Loss": 25.5,
+          "PredictedLoss": 25.27390780873753
+        },
+        {
+          "Id": 2,
+          "Thickness": 1.0,
+          "Loss": 6.25,
+          "PredictedLoss": 6.531647746818026
+        },
+        {
+          "Id": 18,
+          "Thickness": 9.0,
+          "Loss": 26.0,
+          "PredictedLoss": 26.523391812865498
+        },
+        {
+          "Id": 16,
+          "Thickness": 8.0,
+          "Loss": 24.25,
+          "PredictedLoss": 24.02442380460956
+        },
+        {
+          "Id": 7,
+          "Thickness": 3.5,
+          "Loss": 13.0,
+          "PredictedLoss": 12.77906776745786
+        },
+        {
+          "Id": 15,
+          "Thickness": 7.5,
+          "Loss": 23.0,
+          "PredictedLoss": 22.774939800481597
+        },
+        {
+          "Id": 8,
+          "Thickness": 4.0,
+          "Loss": 14.5,
+          "PredictedLoss": 14.028551771585827
+        },
+        {
+          "Id": 3,
+          "Thickness": 1.5,
+          "Loss": 8.25,
+          "PredictedLoss": 7.781131750945993
+        },
+        {
+          "Id": 9,
+          "Thickness": 4.5,
+          "Loss": 14.75,
+          "PredictedLoss": 15.278035775713795
+        },
+        {
+          "Id": 1,
+          "Thickness": 0.5,
+          "Loss": 5.0,
+          "PredictedLoss": 5.2821637426900585
+        },
+        {
+          "Id": 10,
+          "Thickness": 5.0,
+          "Loss": 16.0,
+          "PredictedLoss": 16.52751977984176
+        },
+        {
+          "Id": 6,
+          "Thickness": 3.0,
+          "Loss": 12.0,
+          "PredictedLoss": 11.529583763329894
+        },
+        {
+          "Id": 12,
+          "Thickness": 6.0,
+          "Loss": 18.75,
+          "PredictedLoss": 19.026487788097697
+        },
+        {
+          "Id": 4,
+          "Thickness": 2.0,
+          "Loss": 9.25,
+          "PredictedLoss": 9.03061575507396
+        },
+        {
+          "Id": 13,
+          "Thickness": 6.5,
+          "Loss": 19.75,
+          "PredictedLoss": 20.27597179222566
+        }
+      ]
+    }
+  ]
+}

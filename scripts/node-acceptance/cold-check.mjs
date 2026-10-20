@@ -1,12 +1,12 @@
-import {parseExpectedOutputs,matchExpectedOutputs} from "./expected-outputs.mjs"
+import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
 import { readFile, mkdir, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
-import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions} from './static-source-proof.mjs'
+import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
-import {coldNativeEligible} from './cold-reader-policy.mjs'
+import {coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews,coldProcessObservation} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -141,25 +141,35 @@ try {
     if(!source.source)throw Error('COLD_SOURCE_PROVENANCE_MISSING');
    }
   }
+  const types=new Set(expectedOutputs.map(o=>o.output_node_type));
+  const destination=expectedOutputs.find(o=>o.output_node_type==='export_input')?.export_destination;
+  const destinations=destination===undefined?undefined:await observeExportDestinations({load,graph,channelFor,execute});
+  if(destinations)await record({phase:'cold_export_destinations',destinations,settings_applied:false});
+  const exportInput=types.has('export_input')?resolveExportInput(graph,{destination,destinations}):null;
   for (const want of expected.nodes) {
     if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
 
-  const types=new Set(expectedOutputs.map(o=>o.output_node_type));
-  const matches=graph.nodes.filter(n=>types.has(n.type)&& (multiple||!saved.node||n.ref.node_id===saved.node));
-  if(matches.length!==expectedOutputs.length)throw Error("COLD_EXTRA_OR_MISSING_OUTPUT_NODE");
+  const matches=graph.nodes.filter(n=>types.has(n.type)&& (multiple||!saved.node||n.ref.node_id===saved.node)
+    ||exportInput&&n.ref.node_id===exportInput.node.ref.node_id);
+  if(matches.length===0||matches.length>expectedOutputs.length)throw Error("COLD_EXTRA_OR_MISSING_OUTPUT_NODE");
   const actual=[],ownedExecutions=[];
   for(const [outputIndex,target] of matches.entries()){
   const node=target.ref;
+  const ports=[...new Set(expectedOutputs.filter(o=>o.output_node_type===target.type
+    &&(o.output_node_label===undefined||o.output_node_label===target.label)).map(o=>o.output_port??0)
+    .concat(exportInput&&node.node_id===exportInput.node.ref.node_id?[exportInput.output_port]:[]))];
+  if(ports.length===0)throw Error('COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
 
   const operation = {
     id: "cold-read-expected-"+outputIndex,
     action: { action_key: "acceptance.cold_read", revision: "1" },
     deadline: Date.now() + 540_000,
   }
-  const channel = createNodeProcedure({
+  const processObservation=coldProcessObservation(execute,{node,operation,record});
+  const procedure = createNodeProcedure({
     operation,
-    execute,
+    execute:processObservation.execute,
     record,
     targetOrigin: origin,
     targetBuild: "7.4.2",
@@ -173,6 +183,8 @@ try {
         operation_id: receipt.id,
       }),
   })
+  const channel={...procedure,observe:options=>processObservation.observe(procedure,options),get lastPreparedStep(){return procedure.lastPreparedStep;},
+    get steps(){return procedure.steps;},perform:options=>performColdNodeAction(procedure,options,{node,operation,record})};
   const nativeSource=staticSources?.crossTables.find(c=>c.node_id===node.node_id);
   const nativeConfiguration=nativeSource?.configuration;
   if(nativeConfiguration){
@@ -180,18 +192,50 @@ try {
    await prepareCrossTableAncestorExecution({graph,node,sources:staticSources,operation,execute,record,targetOrigin:origin,targetBuild:'7.4.2',
     wrapMutation:(code,r)=>withBrowserReceipt(`(${code})(page)`,{receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})});
   }
-  const driver = createNodeExecutionProcedure(channel, node)
-  await driver.prepare()
-  await driver.launchGraph()
-  await driver.identify()
-  const execution = await driver.waitCompleted({})
+  const driver = createNodeExecutionProcedure(channel, node, { allowDeactivate: true })
+  const readReceipt=async reference=>{
+    const observed=await execute(withBrowserReceipt('null',{
+      receipt_namespace:session,receipt_id:reference.id,receipt_signature:reference.signature,
+      operation_id:reference.operation_id,receipt_read:true,
+    }));
+    if(observed.status!=='SUCCEEDED'||observed.action_key!=='operation.inspect'
+      ||observed.operation_id!==reference.operation_id)throw Error('COLD_RECEIPT_IDENTITY_CHANGED');
+    const result=observed.output;
+    if(result?.state==='completed'&&(result.receipt?.operation_id!==reference.operation_id
+      ||result.receipt?.action_key!==reference.action_key))throw Error('COLD_RECEIPT_IDENTITY_CHANGED');
+    return result;
+  };
+  let javascriptAdmission;
+  if(target.type==='programming.javascript'){
+   const {createJavascriptSourceAdmission}=await load('client/lib/javascript-source-admission.mjs');
+   const {createJavascriptManagedSourceAdapter}=await load('client/lib/javascript-managed-source-adapter.mjs');
+   const {createRedactor}=await load('client/lib/redact.mjs');
+   const redactor=createRedactor([config.api_key,loginPassword]);
+   const owner={...node,operation_id:operation.id,ui_epoch:Date.now()};
+   const receiptOptions=(id,action_key,signature)=>({receipt_namespace:session,receipt_id:id,
+    receipt_signature:signature,operation_id:id});
+   const admission=retained=>createJavascriptSourceAdmission({kind:'existing',owner,deadline:operation.deadline,redactor,record,
+    ...(retained?{expectedSource:Object.fromEntries(['source_sha256','source_utf8_bytes','source_lf_lines'].map(k=>[k,retained.effective_source[k]])),expectedSettings:retained.settings_sha256}:{}),
+    sourceAdapter:()=>createJavascriptManagedSourceAdapter({page:{},prepared:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},
+     node,uiEpoch:owner.ui_epoch,deadline:operation.deadline,targetOrigin:origin,execute,record,receiptOptions,redactor,
+     channel:()=>procedure,openingBudgetMs:180000})});
+   const retained=await admission().admit({});
+   javascriptAdmission=admission(retained);
+   const receipt=await javascriptAdmission.admit({});
+   javascriptAdmission={admission:javascriptAdmission,receipt,owner};
+  }
+  const run=()=>runColdExecution({driver,channel,node,operation,readReceipt,record});
+  const execution = javascriptAdmission
+   ?await javascriptAdmission.admission.withEffect({receipt:javascriptAdmission.receipt,owner:javascriptAdmission.owner},run)
+   :await run();
   if (execution.status !== "completed" || !execution.verified || !execution.owner_verified)
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
   ownedExecutions.push(execution);
 
+  for(const outputPort of ports){
   let useNative=false,ownedPreview;
   const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,execution,deadline:operation.deadline,receipt_id:operation.id};
-  if(nativeConfiguration){
+  if(nativeConfiguration&&outputPort===0){
    const {openOwnedNativePreview,closeOwnedNativePreview}=await load('client/lib/collapse-native-output.mjs');
    ownedPreview=await openOwnedNativePreview(channel,ctx);
    useNative=coldNativeEligible(nativeConfiguration,ownedPreview.preview);
@@ -218,7 +262,13 @@ try {
     data=read.ports[0];
   }
   if(!data){
-  const opened = await openNewOutputTable(channel, 0)
+  const {openManagedJavascriptOutputViews}=target.type==='programming.javascript'?await load('client/lib/javascript-managed-views.mjs'):{};
+  const opened = await openNewOutputTable(channel, outputPort,{openViews:args=>target.type==='programming.javascript'
+   ?openManagedJavascriptOutputViews({prepared:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},node,output:args.output,
+     deadline:operation.deadline,targetOrigin:origin,execute,record,receiptOptions:(id,action_key,signature)=>({receipt_namespace:session,
+      receipt_id:id,receipt_signature:signature,operation_id:id}),wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{
+      receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})})
+   :openColdOutputViews(channel,args,{node,operation,readReceipt,record})})
   const precision = await configureTablePrecision(channel, opened.table)
   const readSettings = await prepareTableRead(channel, opened.table)
   const raw = await readTableOutputPages(channel, opened.table, {
@@ -239,14 +289,25 @@ try {
   await returnFromOutputTable(channel, opened.table)
   }
 
-  actual.push({node,type:target.type,label:target.label,execution,data});
+  actual.push({node,type:target.type,label:target.label,output_port:outputPort,execution,data});
   // Preserve independently read values before correspondence can refuse. A
   // failed match is still FAIL; this private checkpoint makes it diagnosable.
   const checkpoint=JSON.stringify({phase:'independent_cold_read_checkpoint',path:saved.path,outputs:actual});
   if([config.api_key,loginPassword].filter(Boolean).some(secret=>checkpoint.includes(secret)))throw Error('SECRET_IN_RESULT');
   await writeFile(join(args.output,'actual-readback.json'),checkpoint+'\n');
   }
-  const correspondence=matchExpectedOutputs(actual,expectedOutputs);
+  }
+  // REST-dependent schemas are restored by cold execution. Inspect the saved
+  // export input only after its source has executed and its output was read.
+  if(exportInput){
+   const [savedExport]=await observeExportDestinations({load,channelFor,execute,includeInputFields:true,
+    graph:{...graph,nodes:graph.nodes.filter(n=>n.ref.node_id===exportInput.export_node_id)}});
+   if(savedExport.node_id!==exportInput.export_node_id)throw Error('COLD_EXPORT_INPUT_MAPPING_CHANGED');
+   exportInput.input_fields=savedExport.input_fields;
+   await record({phase:'cold_export_input_mapping',...savedExport,settings_applied:false});
+  }
+  const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput});
+  const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
 
   // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.
   // Cleanup проверяет точное владение пакетом/аккаунтом перед discard.
@@ -273,8 +334,8 @@ try {
     status: "PASS",
     phase: "independent_cold_reopen_readback",
     path: saved.path,
-    ...(multiple?{outputs:actual.map(a=>({node:a.node,execution:a.execution,output:{ports:[a.data]}})),correspondence}
-      :{node:actual[0].node,execution:actual[0].execution,output:{ports:[actual[0].data]}}),
+    ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
+      :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
     cleanup: {
       package_closed: cleanup.package_closed === true,

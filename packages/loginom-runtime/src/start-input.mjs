@@ -23,6 +23,11 @@ export function validateStartInput(input) {
   if (typeof closeSavedPackageOnShutdown !== "boolean" ||
       (closeSavedPackageOnShutdown && (cleanup !== null || input.validation === true || input.chat === "readiness")))
     throw Error("LOGINOM_START_INVALID")
+  // Private launcher capability for temporary browser recovery; Help readiness
+  // and validation never control a Loginom page, so they cannot carry it.
+  const browserRecovery = input.browserRecovery === undefined ? false : input.browserRecovery
+  if (typeof browserRecovery !== "boolean" || (browserRecovery && (input.validation === true || input.chat === "readiness")))
+    throw Error("LOGINOM_START_INVALID")
   if (
     cleanup !== null &&
     (typeof cleanup !== "string" ||
@@ -31,5 +36,5 @@ export function validateStartInput(input) {
       cleanup.split("/").some((segment) => segment === "." || segment === ".."))
   )
     throw Error("LOGINOM_START_INVALID")
-  return { acceptanceCleanupPackage: cleanup, closeSavedPackageOnShutdown }
+  return { acceptanceCleanupPackage: cleanup, closeSavedPackageOnShutdown, browserRecovery }
 }

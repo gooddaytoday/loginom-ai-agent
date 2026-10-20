@@ -93,15 +93,15 @@ test('output field driver preserves a matching field without opening its editor'
  assert.equal((await configureOutputField(f.channel,f.field)).effect_possible,false);assert.equal(f.mutations(),0);
 });
 
-function reorderFixture(grouped=false) {
+function reorderFixture(grouped=false,sourceSelection) {
  const sources=(grouped?['A','B','C','D']:['A','B','C']).map((name,i)=>({name,label:name,record_id:'s'+i,field_id:String(i),index:i,type:'string'}));
  let fields=sources.map((source,index)=>({name:source.name,label:source.label,type:'string',data_kind:'Дискретный',record_id:'t'+index,field_id:String(index),index,source})),selected=null,actions=0;
  if(grouped)fields=fields.map((f,i)=>({...f,excluded:i>=2,group_index:i%2}));
  const state=()=>({wizard:{root_ref:'wizard',root_tid:'W',stage:'output_mapping',output_columns:{page:{status:'complete_definition_page',schema_id:'schema',offset:0,limit:8,total_columns:fields.length,returned:fields.length,next_offset:null},fields:fields.map(f=>({...f,status:'observed',name_ref:f.record_id,selected:f.record_id===selected}))}},
-  node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,autosync:false,...(grouped?{mapping_wizard:'DerivedDataSourceOutputSocketWizard'}:{}),source_fields:sources,target_fields:fields,rendered_indices:fields.map(f=>f.index)},
+  node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,autosync:false,...(grouped?{mapping_wizard:'DerivedDataSourceOutputSocketWizard'}:{}),...(sourceSelection===undefined?{}:{source_selection:sourceSelection}),source_fields:sources,target_fields:fields,rendered_indices:fields.map(f=>f.index)},
   ui:{elements:[...fields.map(f=>({ref:f.record_id,allowed_actions:['click']})),{ref:'up',tid:'W;'+(grouped?'DerivedDataSourceOutputSocketWizard':'ColumnsMappingEngineOutputPortWizard')+';btnMoveMappingColumnUp',allowed_actions:['click']}]}});
  const channel={async observe(o){const s=structuredClone(state());if(!o.ready(s))throw Error('Not ready');return s;},async perform(o){const s=structuredClone(state());assert.ok(o.ready(s));const a=o.resolve(s);actions++;
-  if(a.ref!=='up')selected=a.ref;else{const index=fields.findIndex(f=>f.record_id===selected);assert.ok(index>0);if(grouped)assert.equal(fields[index-1].excluded,fields[index].excluded);[fields[index-1],fields[index]]=[fields[index],fields[index-1]];fields=fields.map((f,index)=>({...f,index,...(grouped?{group_index:index%2}:{})}));channel.afterMove?.(fields);}}};
+  if(a.ref!=='up')selected=a.ref;else{const index=fields.findIndex(f=>f.record_id===selected);assert.ok(index>0);if(grouped)assert.equal(fields[index-1].excluded,fields[index].excluded);[fields[index-1],fields[index]]=[fields[index],fields[index-1]];fields=fields.map((f,index)=>({...f,index,...(grouped?{group_index:index%2}:{})}));if(channel.sourceSelectionAfterMove)sourceSelection=channel.sourceSelectionAfterMove(sourceSelection);channel.afterMove?.(fields);}}};
  return {channel,actions:()=>actions};
 }
 test('output reorder moves only requested records and retains native source identities',async()=>{
@@ -113,6 +113,40 @@ test('output reorder refuses incomplete goals and stops after an unexpected nati
  const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');
  for(const ids of [['t0'],['t0','t0','t2'],['t0','t1','foreign']]){const f=reorderFixture();await assert.rejects(reorderOutputFields(f.channel,ids));assert.equal(f.actions(),0);}
  const f=reorderFixture();f.channel.afterMove=fields=>{fields[0].label='Wrong';};await assert.rejects(reorderOutputFields(f.channel,['t2','t1','t0']),/unrelated/);assert.equal(f.actions(),2);
+});
+
+test('output reorder permits only disappearance of a verified empty source selection',async()=>{
+ const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const f=reorderFixture(true,{verified:true,record_ids:[]});
+ f.channel.sourceSelectionAfterMove=()=>undefined;
+ const result=await reorderOutputFields(f.channel,['t1','t0','t3','t2']);
+ assert.equal(result.moves,2);assert.equal(f.actions(),4);
+ assert.equal(Object.hasOwn(result.definition,'source_selection'),false);
+ assert.deepEqual(result.definition.target_fields.map(f=>f.record_id),['t1','t0','t3','t2']);
+});
+for(const sourceSelection of [
+ {verified:true,record_ids:['s0']},
+ {verified:false,record_ids:[]},
+ {verified:true,record_ids:[],unexpected:true},
+])test('output reorder retains the source selection guard: '+JSON.stringify(sourceSelection),async()=>{
+ const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const f=reorderFixture(true,sourceSelection);f.channel.sourceSelectionAfterMove=()=>undefined;
+ await assert.rejects(reorderOutputFields(f.channel,['t1','t0','t3','t2']),/unrelated native mapping state/);
+ assert.equal(f.actions(),2,'stop after the first move, before another selection or move');
+});
+test('output reorder refuses another mapping change even when empty selection disappears',async()=>{
+ const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const f=reorderFixture(true,{verified:true,record_ids:[]});f.channel.sourceSelectionAfterMove=()=>undefined;
+ f.channel.afterMove=fields=>{fields[0].source.label='Changed';};
+ await assert.rejects(reorderOutputFields(f.channel,['t1','t0','t3','t2']),/unrelated native mapping state/);
+ assert.equal(f.actions(),2);
+});
+test('output reorder refuses a newly nonempty source selection',async()=>{
+ const {reorderOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const f=reorderFixture(true,{verified:true,record_ids:[]});
+ f.channel.sourceSelectionAfterMove=()=>({verified:true,record_ids:['s0']});
+ await assert.rejects(reorderOutputFields(f.channel,['t1','t0','t3','t2']),/unrelated native mapping state/);
+ assert.equal(f.actions(),2);
 });
 
  test('field edit planning breaks cycles without taking an existing or requested name',async()=>{
@@ -139,28 +173,45 @@ test('output reorder refuses incomplete goals and stops after an unexpected nati
  assert.equal(r.verified,true);assert.equal(r.edits.length,1);assert.equal(f.mutations(),4);
  });
 
-function exclusionFixture() {
+function exclusionFixture({links=false,rowDelete=false,deleteMode='valid'}={}) {
  const sources=['A','B','C'].map((name,index)=>({record_id:'s'+index,field_id:String(index),index,name,label:name,type:'string',required:false}));
  const native={verified:true,inventory_complete:true,source_identity_verified:true,mapping_wizard:'DerivedDataSourceOutputSocketWizard',autosync:true,source_fields:sources,
   target_fields:sources.map((source,index)=>({...source,record_id:'t'+index,source,group_index:index,excluded:false,inherited:false,exclusion_source:null,data_kind:'Дискретный'})),rendered_indices:[0,1,2]};
+ const hasView=links;
+ if(hasView){native.source_selection={verified:true,record_ids:[]};native.node_context={verified:true,node_id:'owned'};}
  let selected=null,count=0;
  const state=()=>({node_mapping:structuredClone(native),wizard:{status:'observed',stage:'output_mapping',root_tid:'W',root_ref:'root',output_columns:{
   page:{status:'complete_definition_page',schema_id:'schema',offset:0,limit:8,total_columns:native.target_fields.length,returned:native.target_fields.length,next_offset:null},
   fields:native.target_fields.map(f=>({...f,status:'observed',name_ref:f.record_id,selected:selected===f.record_id}))}},
- ui:{elements:[...native.target_fields.map(f=>({ref:f.record_id,allowed_actions:['click']})),{ref:'exclude',tid:'W;DerivedDataSourceOutputSocketWizard;btnAddMappingToExcluded',allowed_actions:['click']}]}});
+ ui:{elements:[...native.target_fields.map(f=>({ref:f.record_id,tid:'W;DerivedDataSourceOutputSocketWizard;colName_'+f.name,allowed_actions:['click']})),
+  ...(!rowDelete?[{ref:'exclude',tid:'W;DerivedDataSourceOutputSocketWizard;btnAddMappingToExcluded',allowed_actions:['click']}]:selected?[{ref:'inline-exclude',identity:{anchor_tid:(deleteMode==='foreign_wizard'?'OTHER':'W')+';DerivedDataSourceOutputSocketWizard;colTargetDelete_'+(deleteMode==='foreign_field'?'A':native.target_fields.find(f=>f.record_id===selected).name),path:deleteMode==='foreign_path'?[1,0]:[0,0]},
+   signature:{tag:deleteMode==='wrong_tag'?'a':'img'},role:'button',visible:deleteMode!=='hidden',enabled:deleteMode!=='disabled',interaction:{state:deleteMode==='no_point'?'point_not_observed':'point_observed'},allowed_actions:deleteMode==='disabled'?[]:['click']},...(deleteMode==='duplicate'?[{ref:'inline-duplicate',identity:{anchor_tid:'W;DerivedDataSourceOutputSocketWizard;colTargetDelete_B',path:[0,0]},signature:{tag:'img'},role:'button',visible:true,enabled:true,interaction:{state:'point_observed'},allowed_actions:['click']}]:[])]:[]),
+  ...(rowDelete&&deleteMode==='disabled_toolbar'?[{ref:'exclude',tid:'W;DerivedDataSourceOutputSocketWizard;btnAddMappingToExcluded',allowed_actions:[]}]:[]),
+  ...(hasView?['Table','Links'].map(name=>({ref:name,tid:'W;DerivedDataSourceOutputSocketWizard;rb'+name+';DisplayEl',allowed_actions:['click'],signature:{check_state:{kind:'radio',source:'loginom_ext',checked:name==='Links'?links:!links}}})):[])]}});
  const channel={observe:async o=>{const s=state();assert.ok(o.ready(s),o.condition);return s;},perform:async o=>{
   const s=state();assert.ok(o.ready(s));const a=o.resolve(s);count++;
-  if(a.ref==='exclude'){
+  if(a.ref==='Table'){links=false;delete native.source_selection;channel.afterTable?.(native);}
+  else if(['exclude','inline-exclude'].includes(a.ref)){
    const field=native.target_fields.find(f=>f.record_id===selected),source=field.source;
    const groups=new Map();native.target_fields=native.target_fields.filter(f=>f!==field).map((f,index)=>{
     const group_index=groups.get(f.excluded)??0;groups.set(f.excluded,group_index+1);return {...f,index,group_index};
    });
-   native.target_fields.push({...source,label:source.name,record_id:'excluded'+count,field_id:String(99+count),index:2,group_index:groups.get(true)??0,excluded:true,inherited:false,source:null,exclusion_source:source,data_kind:'Неопределенное'});
-   channel.afterExclude?.(native);
+   if(a.ref==='exclude')native.target_fields.push({...source,label:source.name,record_id:'excluded'+count,field_id:String(99+count),index:2,group_index:groups.get(true)??0,excluded:true,inherited:false,source:null,exclusion_source:source,data_kind:'Неопределенное'});
+   selected=null;channel.afterExclude?.(native);
   }else {selected=a.ref;channel.afterSelection?.(native);}
  }};
  return {channel,native,count:()=>count};
 }
+test('exclusion binds its unchanged-mapping baseline after the owned Links to Table switch',async()=>{
+ const {excludeOutputField}=await import('../lib/port-mapping-procedure.mjs');
+ const f=exclusionFixture({links:true}),r=await excludeOutputField(f.channel,'s1');
+ assert.equal(r.verified,true);assert.equal(r.source_identity_verified,true);assert.equal(f.count(),3);
+ assert.equal(r.definition.source_selection,undefined);assert.equal(r.excluded_source.record_id,'s1');
+ for(const change of [n=>{n.autosync=false;},n=>{n.source_fields[0].name='changed';},n=>{n.node_context.node_id='foreign';}]){
+  const bad=exclusionFixture({links:true});bad.channel.afterTable=change;
+  await assert.rejects(excludeOutputField(bad.channel,'s1'));assert.equal(bad.count(),1);
+ }
+});
 test('optional exclusion creates one source exclusion, preserves all other fields and is idempotent',async()=>{
  const {excludeOutputField}=await import('../lib/port-mapping-procedure.mjs');
  const f=exclusionFixture(),r=await excludeOutputField(f.channel,'s1');assert.equal(r.verified,true);assert.equal(f.count(),2);
@@ -169,6 +220,18 @@ test('optional exclusion creates one source exclusion, preserves all other field
  assert.equal((await excludeOutputField(f.channel,'s1')).effect_possible,false);assert.equal(f.count(),2);
 });
 
+test('optional exclusion never substitutes the distinct Table row delete action',async()=>{
+ const {excludeOutputField}=await import('../lib/port-mapping-procedure.mjs');
+ const f=exclusionFixture({rowDelete:true});
+ f.native.source_fields[1].label=f.native.target_fields[1].label='Расстояние до центра кластера';
+ await assert.rejects(excludeOutputField(f.channel,'s1'),/Optional output exclusion action unavailable/);
+ assert.equal(f.count(),1,'selection only; no destructive row delete');
+ for(const deleteMode of ['foreign_wizard','foreign_field','foreign_path','wrong_tag','disabled','hidden','no_point','duplicate','disabled_toolbar']){
+  const bad=exclusionFixture({rowDelete:true,deleteMode});
+  await assert.rejects(excludeOutputField(bad.channel,'s1'),/Optional output exclusion action unavailable/);
+  assert.equal(bad.count(),1,deleteMode+': only selection, no exclusion gesture');
+ }
+});
 test('batch exclusions preserve the active field and repeated full mapping needs no gestures',async()=>{
  const {configureOutputFields}=await import('../lib/port-mapping-procedure.mjs'),f=exclusionFixture();
  const configured=f.native.source_fields.map(s=>({...s,used:true}));

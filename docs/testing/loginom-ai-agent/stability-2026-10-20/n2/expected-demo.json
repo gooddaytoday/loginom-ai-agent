@@ -1,0 +1,54 @@
+{
+  "package_path": "/stability-2026-10-20/n2.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.union_data"
+    },
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Courier",
+          "label": "Courier",
+          "type": "string"
+        },
+        {
+          "name": "Payout",
+          "label": "Payout",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Courier": "CA",
+          "Payout": 10.0
+        },
+        {
+          "Courier": "CC",
+          "Payout": 8.0
+        },
+        {
+          "Courier": "CB",
+          "Payout": 7.5
+        },
+        {
+          "Courier": "CD",
+          "Payout": 6.0
+        }
+      ]
+    }
+  ]
+}

@@ -11,6 +11,8 @@ export const Manifest = Schema.Struct({
   schemaVersion: Schema.Literal(1),
   version: text,
   channel: Schema.Literals(["dev", "beta", "prod"]),
+  // Diagnostic record of the baked capability; packaged mode is still checked at runtime.
+  browserRecovery: Schema.optional(flag),
   builtAt: text,
   source: Schema.Struct({
     commit: text,

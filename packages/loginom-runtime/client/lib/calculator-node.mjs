@@ -1,4 +1,5 @@
 import {outputMappingOrigin,outputMappingState,outputRecoveryCalculatorState,verifyOutputMappingFinish,outputRecoveryBoundary,sameOutputRecovery} from './node-output-mapping-recovery.mjs';
+import {readCalculatorOutputMapping} from './calculator-output-source.mjs';
 import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {inputMappingOrigin,inputMappingState,inputMappingGraph,verifyInputMappingFinish,inputRecoveryBoundary,sameInputRecovery} from './node-input-mapping-recovery.mjs';
 import {verifyCalculatorInlineSync} from './calculator-inline-mapping.mjs';
@@ -121,6 +122,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     const s=await channel.observe({condition:'calculator graph before opening',ready:s=>s.prepared_node_context?.surface==='graph'});
     await selectPreparedGraphNode(channel,s,'select calculator graph node');
     await openPreparedWizard(channel);
+    if(implementation?.afterOpen)await implementation.afterOpen(channel,operation.nodeApply.request);
     const opened=await channel.observe(implementation?.configurationObservation??{condition:'calculator expression page',readCalculator:true,ready:s=>s.wizard?.stage==='calculator'&&s.node_calculator?.verified===true});
     return verified({effect_possible:true,node_context:opened.prepared_node_context,...(preconfiguration?{preconfiguration}: {})});
    },
@@ -257,14 +259,14 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     await channel.openOutputPort(0);
     const ready=s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true;
     if(implementation){
-     const result=await implementation.configureOutput(channel,configured,operation.nodeApply.request.parameters,mappings[0]??{});
+     const result=await implementation.configureOutput(channel,configured,operation.nodeApply.request.parameters,mappings[0]??{},operation.nodeApply.request);
      mapping=result.native_mapping;columns=mapping.target_fields.filter(f=>!f.excluded);
      const definition=await readOutputDefinitionPages(channel,{expectedCount:mapping.target_fields.length});
      requireValue(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===mapping.target_fields[i][k])),'Derived output definition differs');
      const finish=await finishWizard('done',true,definition);return verified({...result,effect_possible:true,definition,finish,source_identity_verified:true});
     }
     const sources=calculatorOutputSources(configured);
-    let s=await channel.observe({condition:'calculator native output mapping',readMappings:true,ready});
+    let s=await readCalculatorOutputMapping(channel);
     resolveConfiguredOutputMapping({direction:'output',port:0},sources,s.node_mapping);
     const changes=[];
     if(mappings.length) {
@@ -291,13 +293,25 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
    async finishGraph(mode,ctx){
     enter(ctx);
     finishStart??=operation.nodeStepSequence??0;
-    if(mode==='execute'&&implementation?.beforeGraphExecute)await implementation.beforeGraphExecute(options,ctx,configured);
+    if(mode==='execute'&&implementation?.keepExecutionConsoleOpen===true){
+     // REST progress repaints the toolbar while HTTP is running. Prepare the
+     // existing pinned console before launch, rather than opening it afterward.
+     executionDriver=createNodeExecutionProcedure(channel,ctx.node);
+     await executionDriver.prepare({keepConsoleOpen:true});
+     await channel.revealGraphNode();
+    }
+    let training;
+    if(mode==='execute'&&implementation?.beforeGraphExecute){
+     const result=await implementation.beforeGraphExecute(options,ctx,configured,channel);
+     if(result?.training){training=result.training;executionDriver=createNodeExecutionProcedure(channel,ctx.node,{allowDeactivate:true});await executionDriver.prepare();}
+    }
     const graph=await channel.observe({condition:'calculator graph ready after port commit',ready:s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'});
     // Loginom can leave a visible port without an SVG shape after port Done.
     // The normal node selection redraws it before the next graph checkpoint.
     await selectPreparedGraphNode(channel,graph,'select configured calculator after port commit',{
      refreshReplacedBody:implementation?.refreshGraphBodyAfterPortCommit===true});
     const finish=await finishConfiguredGraph(channel,executionDriver,mode,ctx.node);
+    if(training)finish.training=training;
     if(mode==='execute')finish.continuation_surface=finishedImportSurface(await channel.observe({
      condition:'calculator graph execution continuity checkpoint',readProcesses:true,readOutputs:true,
      ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true&&s.node_outputs?.verified===true}));
@@ -400,9 +414,8 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
      requireValue(sameOutputRecovery(calculator,outputCheckpoint.calculator),'Committed calculator configuration differs');
      try{
       await channel.openOutputPort(0);opened=true;
-      const s=await channel.observe({condition:'recovery reads committed output mapping without edits',readMappings:true,
-       ready:s=>s.wizard?.stage==='output_mapping'&&s.node_mapping?.verified===true});observed=s.node_mapping;
-     }finally{if(opened){cancelled=await closePreparedWizard(channel);outputCheckpoint.probe_pending=false;}}
+      const s=await readCalculatorOutputMapping(channel);observed=s.node_mapping;
+     }finally{if(opened&&observed){cancelled=await closePreparedWizard(channel);outputCheckpoint.probe_pending=false;}}
      await recordInput('node_output_mapping_recovery_checked',{observed,cancelled,calculator,expected:outputCheckpoint.mapping});
      requireValue(sameOutputRecovery(outputMappingState(observed,outputCheckpoint.node),outputCheckpoint.mapping),'Committed output mapping differs');
      requireValue(sameOutputRecovery(await graphForInput(),outputCheckpoint.graph),'Output graph changed during verification');

@@ -14,6 +14,8 @@ const file = Schema.Struct({
 const metadata = Schema.Struct({
   version: Schema.String,
   channel: Schema.String,
+  // Diagnostic record of the baked capability; the launcher reads the baked constant.
+  browserRecovery: Schema.optional(Schema.Boolean),
   platform: Schema.String,
   arch: Schema.String,
   sourceCommit: Schema.String,

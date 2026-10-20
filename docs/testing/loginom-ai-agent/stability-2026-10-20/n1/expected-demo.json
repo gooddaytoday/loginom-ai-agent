@@ -1,0 +1,75 @@
+{
+  "package_path": "/stability-2026-10-20/n1.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.group_data"
+    },
+    {
+      "type": "transform.join_data"
+    },
+    {
+      "type": "transform.filter_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "SKU",
+          "label": "SKU",
+          "type": "string"
+        },
+        {
+          "name": "Requested",
+          "label": "Requested",
+          "type": "integer"
+        },
+        {
+          "name": "Available",
+          "label": "Available",
+          "type": "integer"
+        },
+        {
+          "name": "Shortage",
+          "label": "Shortage",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "SKU": "SKU-C",
+          "Requested": 12,
+          "Available": 2,
+          "Shortage": 10
+        },
+        {
+          "SKU": "SKU-E",
+          "Requested": 9,
+          "Available": 0,
+          "Shortage": 9
+        },
+        {
+          "SKU": "SKU-A",
+          "Requested": 7,
+          "Available": 5,
+          "Shortage": 2
+        },
+        {
+          "SKU": "SKU-F",
+          "Requested": 1,
+          "Available": 0,
+          "Shortage": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Для каждой строки checks.csv сделай GET на https://httpbin.org/anything с параметрами Code и Route из строки и верни из ответа args.Code как Code, args.Route как Route, method как Method и HTTP-код как HttpStatusCode. Выгрузи только эти поля в checked-routes.csv и сохрани сценарий.

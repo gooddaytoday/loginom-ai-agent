@@ -1,0 +1,17 @@
+ShowID,Stage,Capacity,Reserved
+SH16,Main,80,80
+SH15,Small,100,98
+SH01,Small,100,100
+SH03,Main,100,80
+SH13,Main,120,120
+SH02,Main,120,119
+SH08,Small,120,90
+SH11,Small,80,68
+SH09,Main,100,99
+SH04,Small,120,120
+SH10,Small,100,100
+SH14,Small,80,65
+SH05,Small,80,75
+SH06,Small,80,70
+SH12,Small,80,72
+SH07,Main,80,80
