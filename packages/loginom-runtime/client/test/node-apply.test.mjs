@@ -455,6 +455,31 @@ test('unsupported retained export settings require acknowledged cleanup proof be
  }
 });
 
+test('export destination conflict advice requires acknowledged unchanged-settings cleanup and preserves overwrite authorization',async()=>{
+ for(const finish of ['done','execute'])for(const fail of [null,'cleanup_complete','settings_unchanged','verification','journal']){
+  const f=fixture({failJournal:fail==='journal'?'node_phase_refused':undefined}),p=request();
+  p.target={kind:'existing',type:'exports.text',ref:{document_id:'doc',workflow_id:'workflow',node_id:'node1'}};
+  p.finish=finish;p.read={ports:[],sample_rows:0,require_exact_numbers:false};
+  p.parameters={destination:'/test-2/debts.csv',overwrite:'reject'};
+  const before=structuredClone(p);
+  f.handlers.set('exports.text',{...f.handlers.get('imports.text'),configure:async()=>{
+   const e=Error('Export destination exists; reject policy preserved it');
+   e.nodePhaseRefusal={phase:'configure',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'text_export_conflict_rejected'};
+   if(fail&&fail!=='journal')delete e.nodePhaseRefusal[fail];throw e;
+  }});
+  const r=await f.run(p);
+  assert.equal(r.status,fail?'AMBIGUOUS':'FAILED');assert.equal(r.cleanup_complete,!fail);
+  if(!fail){
+   assert.equal(r.next_step.tool,'dock_node_apply');
+   for(const text of ['NEW operation_id','parameters.destination','parameters.overwrite:"replace"','ONLY if the user authorized','Otherwise retain reject','finish:"done"','Do not restore an older destination'])
+    assert.ok(r.next_step.instruction.includes(text),text);
+   assert.ok(r.next_step.instruction.includes(JSON.stringify(p.target)));
+  }else assert.equal(r.next_step,undefined);
+  assert.deepEqual(p,before);
+  assert.ok(!f.calls.includes('finish')&&!f.calls.includes('execute')&&!f.calls.includes('read'));
+ }
+});
+
 for(const finish of ['done','close'])test('incompatible '+finish+' read identifies the rejected field before effects',()=>{
  const p=request();p.finish=finish;
  assert.throws(()=>validateNodeApplyRequest(p,fixture().handlers),/Invalid parameters\.read\.ports:.*finish=execute/);
