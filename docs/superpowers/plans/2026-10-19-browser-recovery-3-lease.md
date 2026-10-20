@@ -50,7 +50,7 @@
   - `RECOVERY_BROWSER_TOOLS` — замороженный массив 16 имён из общего контракта.
   - `browserRecoveryTool` — определение `dock_browser_recovery` со схемой из общего контракта (`oneOf` по `action`, `additionalProperties: false`).
   - `recoveryBrowserCatalog(browserTools) → Tool[]` — определения allowlist из закреплённого каталога без свойства `filename`; отсутствие любого имени — `Error` с этим именем.
-  - `admitRecoveryBrowserCall(name, args) → args` — иначе `Error('BROWSER_RECOVERY_TOOL_FORBIDDEN')` или `Error('BROWSER_RECOVERY_ARGUMENT_FORBIDDEN')`; разрешены только ключи опубликованной схемы.
+  - `admitRecoveryBrowserCall(name, args, publishedTools) → args` — иначе `Error('BROWSER_RECOVERY_TOOL_FORBIDDEN')` или `Error('BROWSER_RECOVERY_ARGUMENT_FORBIDDEN')`; разрешены только ключи опубликованной схемы; `publishedTools` — уже построенный результат `recoveryBrowserCatalog`, без скрытого registry или копий схем.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -64,15 +64,16 @@ test('only the design allowlist is published and filename parameters are removed
   assert.deepEqual(Object.keys(published.find(t => t.name === 'browser_snapshot').inputSchema.properties).sort(), ['boxes', 'depth', 'target']);
   assert.equal('filename' in published.find(t => t.name === 'browser_take_screenshot').inputSchema.properties, false);
 });
-test('forbidden tools and arguments are refused before reaching the browser', () => {
+test('forbidden tools and arguments are refused before reaching the browser', async () => {
+  const published = recoveryBrowserCatalog(await pinnedBrowserTools());
   for (const name of ['browser_evaluate', 'browser_run_code_unsafe', 'browser_navigate', 'browser_navigate_back', 'browser_reload',
     'browser_tabs', 'browser_close', 'browser_cookie_list', 'browser_localstorage_get', 'browser_storage_state', 'browser_set_storage_state',
     'browser_network_requests', 'browser_route', 'browser_file_upload', 'browser_drop', 'browser_resize', 'browser_emulate_media',
     'browser_pdf_save', 'browser_start_tracing', 'browser_highlight', 'browser_resume', 'browser_mouse_down', 'browser_keydown',
     'browser_press_sequentially', 'browser_check', 'browser_uncheck'])
-    assert.throws(() => admitRecoveryBrowserCall(name, {}), /BROWSER_RECOVERY_TOOL_FORBIDDEN/);
-  assert.throws(() => admitRecoveryBrowserCall('browser_snapshot', { filename: 'page.yml' }), /BROWSER_RECOVERY_ARGUMENT_FORBIDDEN/);
-  assert.deepEqual(admitRecoveryBrowserCall('browser_snapshot', { target: 'e12', depth: 3 }), { target: 'e12', depth: 3 });
+    assert.throws(() => admitRecoveryBrowserCall(name, {}, published), /BROWSER_RECOVERY_TOOL_FORBIDDEN/);
+  assert.throws(() => admitRecoveryBrowserCall('browser_snapshot', { filename: 'page.yml' }, published), /BROWSER_RECOVERY_ARGUMENT_FORBIDDEN/);
+  assert.deepEqual(admitRecoveryBrowserCall('browser_snapshot', { target: 'e12', depth: 3 }, published), { target: 'e12', depth: 3 });
 });
 test('a pinned catalog without an allowlisted tool fails closed', async () => {
   assert.throws(() => recoveryBrowserCatalog((await pinnedBrowserTools()).filter(t => t.name !== 'browser_find')), /browser_find/);
@@ -201,7 +202,7 @@ git commit -m "feat(runtime): lease the browser for one recovery attempt"
 - Produces:
   - `makeRecoveryPageProbeCode({origin, documentId, sessionId, account, loginomBuild}) → string` — read-only код для `browser_run_code_unsafe` из проверок `readSavedPackageState` (`package-persistence.mjs:15-19`): `location.origin`, `app.Version`, `__loginomDockPreparationV1` с `document === document` и `id === documentId`, квитанция подготовки этой сессии, подключённый аккаунт; плюс `page.context().pages().length`. Значения — из `getStorageBinding()`. Проверки пакета и вкладки не используются: Save As меняет путь и может переоткрыть пакет, а открытые мастер или диалог того же документа — не смена страницы.
   - `parseRecoveryPageProbe(response) → {origin_ok: boolean, page_count: number, document_present: boolean}` — неполный ответ даёт `false`.
-  - Порядок вызова allowlist-инструмента: состояние `browser`, иначе `BROWSER_RECOVERY_INACTIVE` → `admitRecoveryBrowserCall` → расход вызова (нет вызова или времени → `stopped` (`budget_exhausted`) и `BROWSER_RECOVERY_BUDGET_EXHAUSTED`, браузер не вызывается) → `callBrowser(name, args)` без сигнала → `probePage()` → `browser_recovery_call` → ответ. После ответа: `signal.aborted` → `stopped` (`cancelled`); провал пробы → `stopped` (`page_changed`) и код `BROWSER_RECOVERY_PAGE_CHANGED`; исключение, тайм-аут или protocol reply `isError: true` без структурированного no-effect доказательства → `stopped` (`browser_call_unconfirmed`) и `BROWSER_CALL_UNCONFIRMED` без повтора.
+  - Порядок вызова allowlist-инструмента: состояние `browser`, иначе `BROWSER_RECOVERY_INACTIVE` → `admitRecoveryBrowserCall(name, args, definitions)` → расход вызова (нет вызова или времени → `stopped` (`budget_exhausted`) и `BROWSER_RECOVERY_BUDGET_EXHAUSTED`, браузер не вызывается) → `callBrowser(name, args)` без сигнала → `probePage()` → `browser_recovery_call` → ответ. После ответа: `signal.aborted` → `stopped` (`cancelled`); провал пробы → `stopped` (`page_changed`) и код `BROWSER_RECOVERY_PAGE_CHANGED`; исключение, тайм-аут или protocol reply `isError: true` без структурированного no-effect доказательства → `stopped` (`browser_call_unconfirmed`) и `BROWSER_CALL_UNCONFIRMED` без повтора.
   - Успешная проба страницы не подтверждает no-effect ошибочного MCP-ответа. Такой исход сохраняется в ограниченном ответе/журнале; нет повторного жеста или safe UI cleanup. Локальный отказ admission до dispatch остаётся отказом без browser-вызова.
   - `browser_recovery_call`: `{attempt_id, tool, arguments, duration_ms, is_error, text_bytes, images: [{mime, bytes, sha256}], page, calls_remaining, ms_remaining}`.
 
