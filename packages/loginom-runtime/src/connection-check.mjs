@@ -33,6 +33,9 @@ export async function loginPage(page, candidate) {
   if (!(await avatar.isVisible())) {
     await field("edtUsername").locator("input").fill(candidate.username)
     const password = field("edtPassword").locator("input")
+    // Loginom resolves password availability when username loses focus.
+    // fill() waits for editability before focusing, so focus explicitly first.
+    await password.click()
     // Passwordless accounts may make an already empty field readonly after username lookup.
     if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password)
     await field("btnLogin").click()
