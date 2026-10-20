@@ -97,7 +97,7 @@ const exists = (file: string) =>
   )
 
 export async function management(command: AgentCommand, args: string[], stdin?: string, timeoutMs = 120_000, signal?: AbortSignal) {
-  const cmd = [...command.cmd, ...(command.mode === "binary" ? ["--headless"] : []), ...args]
+  const cmd = [...command.cmd, ...args, ...(command.mode === "binary" && args[0] === "loginom" ? ["--headless"] : [])]
   const out = command.cleanupDir ? path.join(command.cleanupDir, `${Date.now()}-${crypto.randomUUID()}`) : undefined
   if (out) await mkdir(out, { recursive: true, mode: 0o700 })
   const workdir = command.mode === "binary" && args[0] === "loginom" && args[1] === "check"

@@ -30,6 +30,24 @@ process.exit(headless ? 0 : 2)
   } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
 })
 
+test("management: model commands preserve the standalone command selector", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-models-"))
+  let confirmed = false
+  try {
+    const driver = path.join(root, "models.ts")
+    await Bun.write(driver, `const models = process.argv[2] === "models"
+console.log(JSON.stringify({ models }))
+process.exit(models ? 0 : 2)
+`)
+    const result = await management({ mode: "binary", cmd: [process.execPath, driver], cwd: root,
+      env: { PATH: process.env.PATH ?? "" } }, ["models", "openai"])
+    confirmed = result.processCleanup.status === "confirmed"
+    expect(result.exitCode).toBe(0)
+    expect(JSON.parse(result.stdout)).toEqual({ models: true })
+    expect(confirmed).toBe(true)
+  } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
+})
+
 test("writerIdentity: observes an owner published during initial guard creation", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-writer-initialization-"))
   try {
