@@ -44,7 +44,7 @@ for (const writable of [true,false]) test("managed login retains sanitized navig
   const reply=()=>once(child,"message",{signal:AbortSignal.timeout(15000)}).then(([message])=>message)
   const failed=reply()
   child.send({id:"start",operation:"start",input:{protocol:1,generation:1,chat:"test",stateDir,resources,validation:true,headless:true,
-    connection:{url:`http://127.0.0.1:${server.address().port}/app/?opaque=secret-query#secret-fragment`,
+    connection:{url:`http://127.0.0.1:${server.address().port}/app/?opaque=public secret-query#secret-fragment`,
       username:"secret-user",password:"secret-password",apiKey:"secret-key"}}})
   assert.deepEqual(await failed,{id:"start",error:"LOGINOM_LOGIN_UNAVAILABLE"})
   const closed=reply(),exited=once(child,"exit",{signal:AbortSignal.timeout(5000)})

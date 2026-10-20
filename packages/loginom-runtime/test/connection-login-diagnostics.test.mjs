@@ -105,6 +105,52 @@ test("structured error messages cannot retain unknown cookie or token fields", a
   })
 })
 
+test("candidate URL query with raw spaces is canonicalized as one complete URL", async () => {
+  const f=fixture("goto:navigate",Error("Navigation unavailable"))
+  // Synthetic raw query whitespace accepted by the URL parser.
+  f.page.goto=async()=>{throw Error("Navigation unavailable")}
+  await assert.rejects(loginPage(f.page,{...candidate,url:"https://example.test/app/?opaque=public SYNTHETIC_PRIVATE_QUERY#SYNTHETIC_FRAGMENT"}),error=>{
+    assert.equal(error.cause.login.url,"https://example.test/app/")
+    assert.doesNotMatch(JSON.stringify(error.cause),/SYNTHETIC_PRIVATE_QUERY|SYNTHETIC_FRAGMENT/)
+    return true
+  })
+})
+
+test("partly encoded and whitespace-bearing message URLs cannot retain query tails", async () => {
+  for(const url of ["https:%2F%2Fexample.test%2Fapp%2F?opaque=public SYNTHETIC_PRIVATE_QUERY#SYNTHETIC_FRAGMENT",
+    "https%253A%252F%252Fexample.test%252Fapp?opaque=SYNTHETIC_PRIVATE_QUERY#SYNTHETIC_FRAGMENT",
+    "https://[invalid/?opaque=public SYNTHETIC_PRIVATE_QUERY#SYNTHETIC_FRAGMENT",
+    "https://example.test/app/?opaque=public SYNTHETIC_PRIVATE_QUERY#SYNTHETIC_FRAGMENT"]){
+    const f=fixture("goto:navigate",Error("Navigation failed "+url))
+    await assert.rejects(loginPage(f.page,candidate),error=>{
+      assert.doesNotMatch(JSON.stringify(error.cause),/SYNTHETIC_PRIVATE_QUERY|SYNTHETIC_FRAGMENT/)
+      return true
+    })
+  }
+})
+
+test("syntax-like short credentials cannot defeat structured redaction", async () => {
+  for(const password of ['"',"\\","{","k"]){
+    const f=fixture("goto:navigate",Error(JSON.stringify({error:"form failed",nested:[{cookie:"SYNTHETIC_PRIVATE_COOKIE",token:"SYNTHETIC_PRIVATE_TOKEN"}]})))
+    await assert.rejects(loginPage(f.page,{...candidate,password}),error=>{
+      const message=error.cause.login.original_message
+      assert.doesNotMatch(message,/SYNTHETIC_PRIVATE_COOKIE|SYNTHETIC_PRIVATE_TOKEN/)
+      assert.doesNotThrow(()=>JSON.parse(message))
+      return true
+    })
+  }
+})
+
+test("nested JSON strings retain structural redaction while their URL query is removed", async () => {
+  const nested=JSON.stringify({cookie:"SYNTHETIC_PRIVATE_COOKIE",url:"https://example.test/?opaque=public SYNTHETIC_PRIVATE_QUERY#SYNTHETIC_FRAGMENT",token:"SYNTHETIC_PRIVATE_TOKEN"})
+  const f=fixture("goto:navigate",Error(JSON.stringify({detail:nested})))
+  await assert.rejects(loginPage(f.page,{...candidate,password:'"'}),error=>{
+    assert.doesNotMatch(error.cause.login.original_message,/SYNTHETIC_PRIVATE_COOKIE|SYNTHETIC_PRIVATE_TOKEN|SYNTHETIC_PRIVATE_QUERY|SYNTHETIC_FRAGMENT/)
+    assert.doesNotThrow(()=>JSON.parse(error.cause.login.original_message))
+    return true
+  })
+})
+
 test("login redacts short credentials and bounds arbitrary error fields", async () => {
   for (const password of ["z!", "ab"]) {
     const f = fixture("submit:click", Object.assign(Error((password + " ").repeat(3000)), {code:password,name:password}))

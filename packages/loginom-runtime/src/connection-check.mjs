@@ -70,21 +70,51 @@ function loginFailure(error, candidate, phase, duration, elapsed) {
     const known = [candidate.username, candidate.password, candidate.apiKey, url.username, url.password, ...url.searchParams.values()]
       .filter(value => typeof value === "string" && value.length)
     const redactor = createRedactor(known)
-    const clean = value => {
-      let text = String(value).replace(/\b(?:https?|wss?)(?::\/\/|%3a%2f%2f)[^\s<>"'`]+/gi, raw => {
-        try { const parsed = new URL(raw.includes("://") ? raw : decodeURIComponent(raw)); parsed.username = ""; parsed.password = ""; parsed.search = ""; parsed.hash = ""; return parsed.href }
-        catch { return "[URL omitted]" }
-      }).replace(/\/[^\s<>"'`?#]*[?#][^\s<>"'`]+/g, raw => raw.split(/[?#]/)[0])
+    const endpoint = raw => {
+      try {
+        const parsed = new URL(raw)
+        if (!["http:","https:","ws:","wss:"].includes(parsed.protocol)) return "[URL omitted]"
+        parsed.username = ""; parsed.password = ""; parsed.search = ""; parsed.hash = ""
+        return parsed.href
+      } catch { return "[URL omitted]" }
+    }
+    const strings = (item, transform) => typeof item === "string" ? transform(item)
+      : Array.isArray(item) ? item.map(value=>strings(value,transform))
+        : item && typeof item === "object" ? Object.fromEntries(Object.entries(item).map(([key,value])=>[transform(key),strings(value,transform)])) : item
+    const urls = value => {
+      // Keep nested JSON strings valid until the shared structural policy runs.
+      if (/^[\s]*[\[{]/.test(value)) {
+        try { return JSON.stringify(strings(JSON.parse(value),urls)) }
+        catch { return "[structured login diagnostic omitted]" }
+      }
+      // A query/fragment may contain raw spaces. Consume its whole line;
+      // unsupported/mixed encoded URLs are omitted instead of keeping a tail.
+      return value.replace(/\b(?:https?|wss?)(?::|%)[^\r\n]*/gi, endpoint)
+        .replace(/\/[^\r\n?#]*[?#][^\r\n]*/g, "[URL omitted]")
+    }
+    const cleanText = value => {
+      let text = value
       // The shared redactor intentionally ignores very short known values;
-      // login credentials must be removed even when shorter than four chars.
+      // replace only data strings, never serialized JSON syntax or keys before
+      // the structured credential policy has run.
       for (const secret of known.sort((a,b) => b.length - a.length))
         for (const variant of new Set([secret, encodeURIComponent(secret), JSON.stringify(secret).slice(1,-1)]))
           text = text.replaceAll(variant, "[redacted]")
-      const redacted = redactor.redact(text)
-      return typeof redacted === "string" ? redacted.slice(0, 1024) : "[login diagnostic unavailable]"
+      return redactor.text(text)
+    }
+    const clean = value => {
+      let input = String(value)
+      if (/^[\s]*[\[{]/.test(input)) {
+        try { input = JSON.parse(input) }
+        catch { return "[structured login diagnostic omitted]" }
+      }
+      const redacted = redactor.redact(strings(input,urls))
+      if (redacted?.type === "redaction_failure") return "[login diagnostic unavailable]"
+      const cleaned = strings(redacted,cleanText)
+      return (typeof cleaned === "string" ? cleaned : JSON.stringify(cleaned)).slice(0, 1024)
     }
     return { phase, duration_ms: Math.max(0, Math.round(duration)), elapsed_ms: Math.max(0, Math.round(elapsed)),
-      url: clean(candidate.url), original_name: clean(error?.name ?? "Error"),
+      url: clean(endpoint(candidate.url)), original_name: clean(error?.name ?? "Error"),
       original_code: clean(error?.code ?? /net::ERR_[A-Z0-9_]+/.exec(error?.message ?? "")?.[0] ?? "") || null,
       original_message: clean(error?.message ?? error) }
   } catch {
