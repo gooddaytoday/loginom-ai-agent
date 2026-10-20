@@ -1,5 +1,15 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-20 — v0.3.1 опубликован
+
+Release source: `57f0a4557ed50cee66a662b45a8956d9893832b5`, ветка `loginom` (PR #267: demo-022 после v0.3.0).
+Главное: #264 — на macOS узел JavaScript не настраивался (`Control+A` вместо `ControlOrMeta+A`).
+CI39460728575 PASS на попытке2: попытка1 — chromium-direct flake и Windows DPAPI PowerShell на раннере.
+30 assets/digests/SHA256SUMS сверены; три manifests 0.3.1/prod/browserRecovery=true/dirty=false; matrix5/5.
+Published2026-10-20T17:45:13Z, pre-release, latest=false, ID418688690; 30 URLs HTTP200.
+Живая проверка JavaScript на macOS — владелец/тестировщики.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-20-v0.3.1-release.md).
+
 ## 2026-10-20 — v0.3.0 опубликован
 
 Release source: `992fd1c34ad41b541c045d67c552b36e86160141`, ветка `loginom` (PR #240: demo-022 + #185/#237).
