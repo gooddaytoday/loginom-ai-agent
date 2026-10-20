@@ -58,6 +58,10 @@ JS-узлы не удаляй автоматически; их наличие н
 `loginom_dock_action_describe`. Узлы и связи создаёт `loginom_dock_node_apply`;
 `loginom_dock_action_run` используется только для объявленных операций сохранения.
 
+В `action_describe` одиночный `action_key` нельзя сочетать с `action_keys` или
+`node_types`. Для общей справки используй пакет, даже для одной операции Save:
+`{"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}`.
+
 ## Браузер и владение операцией
 
 `target.label` необязателен: используй короткую подпись словами без `; | < >`, кавычек, обратной косой черты и управляющих символов; сравнения и формулы передавай только в `parameters`.
