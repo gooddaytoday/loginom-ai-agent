@@ -1,0 +1,1 @@
+Разбей клиентов из clients.csv на две естественные группы по Visits и Spend; по каждой нужны число клиентов Customers и средние MeanVisits и MeanSpend, без номеров групп. Выгрузи client-segments.csv и сохрани сценарий.

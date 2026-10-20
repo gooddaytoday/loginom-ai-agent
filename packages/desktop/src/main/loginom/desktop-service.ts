@@ -17,5 +17,7 @@ export function desktopLoginom() {
     environment: process.env,
     headless:
       process.env.LOGINOM_AI_AGENT_TEST_ONBOARDING === "1" && process.env.LOGINOM_AI_AGENT_TEST_HEADLESS === "1",
+    // Only the packaged app with its own resources may carry the baked capability.
+    browserRecovery: import.meta.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === true && app.isPackaged,
   })
 }

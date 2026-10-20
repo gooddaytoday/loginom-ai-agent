@@ -1,0 +1,118 @@
+{
+  "package_path": "/stability-2026-10-20/p5.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/shelter-readable.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "AnimalID",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Species",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Status",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "AnimalID": "AN01",
+          "Species": "Rabbit",
+          "Status": "Карантин"
+        },
+        {
+          "AnimalID": "AN11",
+          "Species": "Rabbit",
+          "Status": "Пристроен"
+        },
+        {
+          "AnimalID": "AN15",
+          "Species": "Dog",
+          "Status": "Пристроен"
+        },
+        {
+          "AnimalID": "AN07",
+          "Species": "Cat",
+          "Status": "Пристроен"
+        },
+        {
+          "AnimalID": "AN12",
+          "Species": "Dog",
+          "Status": "Hold"
+        },
+        {
+          "AnimalID": "AN13",
+          "Species": "Dog",
+          "Status": "Карантин"
+        },
+        {
+          "AnimalID": "AN05",
+          "Species": "Cat",
+          "Status": "Карантин"
+        },
+        {
+          "AnimalID": "AN16",
+          "Species": "Cat",
+          "Status": "Hold"
+        },
+        {
+          "AnimalID": "AN09",
+          "Species": "Dog",
+          "Status": "Карантин"
+        },
+        {
+          "AnimalID": "AN08",
+          "Species": "Rabbit",
+          "Status": "Hold"
+        },
+        {
+          "AnimalID": "AN04",
+          "Species": "Dog",
+          "Status": "Hold"
+        },
+        {
+          "AnimalID": "AN06",
+          "Species": "Dog",
+          "Status": "Готов к пристройству"
+        },
+        {
+          "AnimalID": "AN14",
+          "Species": "Rabbit",
+          "Status": "Готов к пристройству"
+        },
+        {
+          "AnimalID": "AN10",
+          "Species": "Cat",
+          "Status": "Готов к пристройству"
+        },
+        {
+          "AnimalID": "AN02",
+          "Species": "Cat",
+          "Status": "Готов к пристройству"
+        },
+        {
+          "AnimalID": "AN03",
+          "Species": "Rabbit",
+          "Status": "Пристроен"
+        }
+      ]
+    }
+  ]
+}

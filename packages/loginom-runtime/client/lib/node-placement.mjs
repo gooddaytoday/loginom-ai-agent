@@ -48,7 +48,7 @@ export function nodePlacementOverflow(view,occupied,min,max) {
  if(x<min||y<min||x>max||y>max)return null;
  return {x,y};
 }
-export async function revealNodePlacement({page,root,position,prefix,guard,remaining,readViewport,project,nodeId}) {
+export async function revealNodePlacement({page,root,position,prefix,guard,remaining,readViewport,project,nodeId,scrollNode=false}) {
  const within=(v,p)=>{
   const bounds=nodeId===undefined?{x:p.x,y:p.y,width:0,height:0}:v.node_bounds;
   if(!bounds||!Object.values(bounds).every(Number.isFinite))throw Error('Placement footprint unavailable');
@@ -56,10 +56,55 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
    &&bounds.x+bounds.width<Math.min(v.x+v.width,v.viewportWidth)-8&&bounds.y+bounds.height<Math.min(v.y+v.height,v.viewportHeight)-8;
  };
  let view=await root.evaluate(readViewport,nodeId),point=project(view,position),opened=false,steps=0,error,zoom;
+ // A rejected gesture reply does not prove that the native UI stayed unchanged.
+ // Preserve that uncertainty even if a later owned-menu cleanup succeeds.
+ const gesture=async dispatch=>{
+  try{return await dispatch();}
+  catch(e){e.placement_navigation_unverified=true;throw e;}
+ };
  const toggle=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;btnShowOutline')+']');
+ const setOutline=async opening=>{
+  if(await toggle.count()!==1)throw Error('Canvas outline control unavailable');
+  if(await toggle.isVisible()){
+   await guard();await gesture(()=>toggle.click({timeout:remaining()}));if(opening)opened=true;return;
+  }
+  // At 1280px the native toolbar moves this button into its own overflow
+  // menu. Bind that portal by the prepared form, never by a global label.
+  if(await toggle.getAttribute('data-qtip')!=='Показать карту сценария')throw Error('Canvas outline control unavailable');
+  const trigger=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;tlbModel;b')+']');
+  const menu=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;tlbModel;b;mn')+']');
+  if(await trigger.count()!==1||!await trigger.isVisible()||await menu.count()>1||await menu.isVisible())throw Error('Owned canvas outline menu unavailable');
+  // Ext suppresses menu reopening for 250ms after hide. A drop can need a
+  // second reveal immediately; settle before its single opening gesture.
+  await page.waitForTimeout(Math.min(300,remaining()));await guard();remaining();
+  if(await menu.isVisible())throw Error('Owned canvas outline menu changed');
+  await guard();await gesture(()=>trigger.click({timeout:remaining()}));
+  try {
+   await menu.waitFor({state:'visible',timeout:Math.min(2000,remaining())});
+   const item=menu.locator('[role="menuitem"][data-qtip="Показать карту сценария"]');
+   if(await menu.count()!==1||await item.count()!==1||!await item.isVisible()||await item.locator('.bg-icon-preview').count()!==1)throw Error('Owned canvas outline menu item unavailable');
+   await guard();await gesture(()=>item.click({timeout:remaining()}));if(opening)opened=true;
+  } finally {
+   // Native check items keep the menu open and can cover the outline.
+   if(await menu.isVisible()){
+    try {await guard();await trigger.click({timeout:remaining()});await menu.waitFor({state:'hidden',timeout:Math.min(2000,remaining())});}
+    catch(e){e.placement_navigation_unverified=true;throw e;}
+   }
+  }
+ };
  // Loginom allocates outline IDs per form (cnt, cnt-1, ...). A global
  // cnt lookup can select a hidden outline belonging to another workflow.
  try {
+  // Existing targets can already have native scrollable canvas space. Reveal
+  // that exact drawing before zooming, preserving model-grid drag coordinates.
+  if(scrollNode&&nodeId!==undefined&&!within(view,point)){
+   await guard();remaining();
+   const b=view.node_bounds;
+   await gesture(()=>root.evaluate((e,delta)=>{e.scrollLeft+=delta.x;e.scrollTop+=delta.y;},
+    {x:b.x+b.width/2-(Math.max(view.x,0)+Math.min(view.x+view.width,view.viewportWidth))/2,
+     y:b.y+b.height/2-(Math.max(view.y,0)+Math.min(view.y+view.height,view.viewportHeight))/2}));
+   await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
+  }
   if(!within(view,point)) {
    await guard();remaining();
    const owner=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;cntDiagram')+']');
@@ -67,14 +112,13 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
    zoom=owner.locator('.bg-workflow-outline-toolbar [data-tid$=";tlb;b"]');
    if(await zoom.count()>1)throw Error('Owned canvas zoom-out control is ambiguous');
    if(await zoom.count()===0||!await zoom.isVisible()){
-    if(await toggle.count()!==1||!await toggle.isVisible())throw Error('Canvas outline control unavailable');
-    await toggle.click({timeout:remaining()});opened=true;
+    await setOutline(true);
     await zoom.waitFor({state:'visible',timeout:Math.min(2000,remaining())});
    }
    if(await zoom.count()!==1||!await zoom.isVisible()||await zoom.getAttribute('data-qtip')!=='Уменьшить масштаб')throw Error('Exact canvas zoom-out control unavailable');
    while(!within(view,point)&&steps<12){
     await guard();remaining();const old=view.scale;
-    await zoom.click({timeout:remaining()});steps++;
+    await gesture(()=>zoom.click({timeout:remaining()}));steps++;
     const end=Math.min(Date.now()+1500,Date.now()+remaining());
     do {view=await root.evaluate(readViewport,nodeId);if(view.scale!==old)break;await page.waitForTimeout(Math.min(50,Math.max(0,end-Date.now())));}while(Date.now()<end);
     await guard();
@@ -85,11 +129,34 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
  }catch(e){error=e;}
  finally {
   if(opened) {
-   try {await guard();await toggle.click({timeout:remaining()});await zoom.waitFor({state:'hidden',timeout:Math.min(2000,remaining())});}
+   try {await guard();await setOutline(false);await zoom.waitFor({state:'hidden',timeout:Math.min(2000,remaining())});}
    catch(e){e.placement_navigation_unverified=true;error=e;}
   }
  }
  if(error)throw error;
  await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
  return {view,point,zoom_steps:steps,outline_closed:opened,fully_visible:within(view,point)};
+}
+
+// View navigation only: retain the prepared document and every graph setting.
+export async function revealPreparedGraphNode(page,args,read,reveal,readViewport,project,sameGraph) {
+ const need=(v,m)=>{if(!v)throw Error('Prepared node viewport: '+m);};
+ const task={request:{document_id:args.binding.document_id,workflow_ref:args.binding.workflow_ref},
+  types:args.types,origin:args.origin,build:args.build};
+ const remaining=()=>{const n=args.deadline-Date.now();need(n>0,'deadline');return n;};
+ remaining();const before=await read(page,task),ref=args.binding.node;
+ need(before.complete===true&&before.interaction_ready===true,'complete idle graph');
+ const nodes=before.nodes.filter(n=>n.ref.node_id===ref.node_id);
+ need(nodes.length===1&&nodes[0].locked===false&&['document_id','workflow_id','node_id'].every(k=>nodes[0].ref[k]===ref[k]),'node owner');
+ const position=nodes[0].position;
+ need(['x','y'].every(k=>Number.isFinite(position?.[k])&&position[k]>=0&&position[k]<=10000),'bounded position');
+ const root=page.locator('[data-tid='+JSON.stringify(args.binding.workflow_ref.prefix+';ModelForm;cmpDiagram')+']');
+ need(await root.count()===1&&await root.isVisible(),'owned canvas');
+ const guard=async()=>{remaining();need(sameGraph(before,await read(page,task)),'graph changed during navigation');};
+ const navigation=await reveal({page,root,position,nodeId:ref.node_id,prefix:args.binding.workflow_ref.prefix,
+  remaining,guard,readViewport,project});
+ await guard();need(navigation.fully_visible===true,'node not revealed');
+ return {status:'SUCCEEDED',verified:true,node:ref,graph_unchanged:true,settings_applied:false,
+  fully_visible:true,cleanup_complete:true,effect_possible:navigation.zoom_steps>0,
+  zoom_steps:navigation.zoom_steps,outline_closed:navigation.outline_closed};
 }

@@ -4,6 +4,34 @@ import {parseExpectedOutputs,matchExpectedOutputs} from '../expected-outputs.mjs
 const columns=[{name:'Region',label:'Region',type:'string'},{name:'Amount',label:'A|Amount|Сумма',type:'real'}];
 const report=value=>({output_node_type:'transform.cross_table',columns,rows:[{Region:'North',Amount:value}]});
 const actual=(id,value)=>({node:{node_id:id},type:'transform.cross_table',execution:{execution_id:id},data:{schema:columns,row_count:1,sample_complete:true,precision:{numbers_verified:true},sample:[[{type:'string',is_null:false,value:'North'},{type:'real',is_null:false,value}]]}});
+test('label_any skips only the opted-in column label with either column order policy',()=>{
+ for(const column_order of ['any','exact']){
+  const want=structuredClone({...report(10),column_order});want.columns[1].label_any=true;
+  for(const label of ['Amount','Произвольная метка','']){
+   const a=structuredClone(actual('a',10));a.data.schema[1].label=label;
+   assert.equal(matchExpectedOutputs([a],[want]).length,1);
+   for(const change of [b=>b.data.schema[1].name='Other',b=>b.data.schema[1].type='integer',
+    b=>b.data.schema[0].label='Other',b=>b.data.sample[0][1].value=11]){
+    const bad=structuredClone(a);change(bad);assert.throws(()=>matchExpectedOutputs([bad],[want]));
+   }
+   for(const label_any of [undefined,false]){
+    const strict=structuredClone(want);delete strict.columns[1].label_any;
+    if(label_any!==undefined)strict.columns[1].label_any=label_any;
+    assert.throws(()=>matchExpectedOutputs([a],[strict]));
+   }
+  }
+  const fallback=structuredClone(want);delete fallback.columns[0].label;
+  assert.equal(matchExpectedOutputs([actual('a',10)],[fallback]).length,1);
+ }
+});
+test('label_any validates boolean values in legacy and outputs forms',()=>{
+ for(const multiple of [false,true])for(const label_any of [true,false,'true',null,1,[],{}]){
+  const output=structuredClone(report(10));output.columns[1].label_any=label_any;
+  const expected={package_path:'/own/labels.lgp',nodes:[],...(multiple?{outputs:[output]}:output)};
+  if(typeof label_any==='boolean')assert.equal(parseExpectedOutputs(expected).outputs[0].columns[1].label_any,label_any);
+  else assert.throws(()=>parseExpectedOutputs(expected),/EXPECTED_COLUMNS_INVALID/);
+ }
+});
 test('StdDev and other scalar values require exact independently derived binary64 values',()=>{
  const c=[{name:'Units_StdDev',label:'Units|Стандартное откл.',type:'real'}];
  const expected={output_node_type:'transform.cross_table',columns:c,rows:[{Units_StdDev:Math.sqrt((35/3-9)*3/2)}]};
@@ -49,9 +77,31 @@ test('ambiguous, reused, extra and numerically substituted reports fail',()=>{
  }
 });
 
-test('ordered field composition refuses permutations even when every value and identity is preserved',()=>{
+test('column permutations match by name unless exact column order is requested',()=>{
  const a=structuredClone(actual('ordered',10));a.data.schema.reverse();a.data.sample[0].reverse();
- assert.throws(()=>matchExpectedOutputs([a],[report(10)]));
+ for(const options of [{},{column_order:'any'}])assert.equal(matchExpectedOutputs([a],[{...report(10),...options}]).length,1);
+ assert.throws(()=>matchExpectedOutputs([a],[{...report(10),column_order:'exact'}]));
+ assert.equal(matchExpectedOutputs([actual('ordered',10)],[{...report(10),column_order:'exact'}]).length,1);
+});
+test('name-based column matching still rejects extra, missing, duplicate, renamed or mistyped columns',()=>{
+ for(const change of [a=>a.data.schema.pop(),a=>a.data.schema.push({name:'Extra',label:'Extra',type:'string'}),
+  a=>a.data.schema[1]={...a.data.schema[0]},a=>a.data.schema[0].name='Other',
+  a=>a.data.schema[0].label='Other',a=>a.data.schema[1].type='integer',
+  a=>a.data.sample[0].reverse()]){
+  const a=structuredClone(actual('changed',10));change(a);
+  assert.throws(()=>matchExpectedOutputs([a],[report(10)]));
+ }
+});
+test('column_order accepts exact or any in both expected forms and rejects other values',()=>{
+ const base={package_path:'/own/order.lgp',nodes:[]};
+ for(const column_order of ['exact','any'])for(const multiple of [true,false]){
+  const output={...report(10),column_order};
+  assert.equal(parseExpectedOutputs({...base,...(multiple?{outputs:[output]}:output)}).outputs[0].column_order,column_order);
+ }
+ for(const column_order of ['EXACT','',null,true,1,[],{}])for(const multiple of [true,false]){
+  const output={...report(10),column_order};
+  assert.throws(()=>parseExpectedOutputs({...base,...(multiple?{outputs:[output]}:output)}));
+ }
 });
 test('stage-three labels disambiguate identical outputs only after exact schema and value verification',()=>{
  const first={...actual('a',10),label:'First'},second={...actual('b',10),label:'Second'};

@@ -50,9 +50,11 @@ export async function downloadExportWithFreshObservation({snapshot,file,download
  for(let attempt=0;attempt<3;attempt++){
   guard();const outcome=await download(snapshot,file,attempt);
   const checks=outcome.trace?.find(t=>t.event==='download_context_refused')?.checks;
+  const contextEpoch=outcome.error?.code==='DOWNLOAD_CONTEXT_CHANGED'&&checks?.epoch===false
+   &&['observation','authenticated','origin','build','workflow','tab','package','storage','dialogs','masks'].every(k=>checks[k]===true);
+  const revealEpoch=outcome.phase==='revealing'&&outcome.error?.code==='DOWNLOAD_REVEAL_EPOCH_CHANGED';
   if(attempt===2||outcome.status!=='NOT_APPLIED'||outcome.effect_possible!==false||outcome.cleanup_complete!==true
-   ||outcome.error?.code!=='DOWNLOAD_CONTEXT_CHANGED'||!checks||checks.epoch!==false
-   ||!['observation','authenticated','origin','build','workflow','tab','package','storage','dialogs','masks'].every(k=>checks[k]===true))return outcome;
+   ||!contextEpoch&&!revealEpoch)return outcome;
   const fresh=await refresh(file.ref),matches=fresh.ui.elements.filter(e=>e.ref===file.ref&&e.tid===file.tid&&e.label===file.label&&e.storage_entry?.bytes===file.storage_entry.bytes);
   need(fresh.authenticated&&fresh.origin===original.origin&&fresh.loginom_build===original.loginom_build
    &&fresh.dom_epoch.document===original.dom_epoch.document&&same(fresh.workflow_ref,original.workflow_ref)
@@ -61,6 +63,20 @@ export async function downloadExportWithFreshObservation({snapshot,file,download
    &&!fresh.ui.dialogs.length&&!fresh.ui.masks.length&&matches.length===1,'Export download target changed during pre-gesture refresh');
   snapshot=fresh;file=matches[0];
  }
+}
+// Storage navigation and download never mutate the exported data. Their failed
+// observation may be released only after a fresh return to the owned quiet graph.
+export async function releaseRefusedExportRead({operationId,binding,navigationOnly,restore,release,record,failure}){
+ if(navigationOnly!==true)return null;
+ const restored=await restore();
+ need(restored?.verified===true&&restored.cleanup_complete===true&&restored.quiet===true
+  &&restored.node_context?.verified===true&&restored.node_context.surface==='graph'&&restored.node_context.locked===false
+  &&['document_id','workflow_id','node_id'].every(k=>restored.node_context[k]===binding[k]),'Export refusal did not restore its quiet owned graph');
+ await release();
+ const proof={operation_id:operationId,binding,navigation_only:true,restored,lease_released:true,...(failure?{failure}:{})};
+ await record('export_file_read_refused_restored',{proof});
+ return {phase:'read',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,
+  verification:'text_export_read_refused_restored',proof};
 }
 // A virtual file row may not exist in the DOM until its page is rendered.
 // Search only the observed folder, through bounded native scroll gestures.
@@ -116,9 +132,9 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  need(owner.verified&&owner.surface==='graph','Export graph changed before file read');
  const fileBinding={session_id:artifactStore.outputSessionId,document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,node_id:ctx.node.node_id,execution_id:ctx.execution.execution_id,destination};
  const lease=await artifactStore.stageOutput(fileBinding),name=destination.split('/').at(-1),directory=destination.slice(0,-name.length-1);
- let sequence=0,uncertain=false,retained=false,observationDocument=null;
+ let sequence=0,uncertain=false,retained=false,released=false,navigationOnly=true,journalFailed=false,observationDocument=null,readStep='storage_navigation';
  const guard=()=>{ctx.signal?.throwIfAborted();need(Date.now()<ctx.deadline,'Export file read deadline elapsed');};
- const record=async(phase,data)=>{const r=await onRecord({phase,operation_id:operation.id,...data});need(r?.phase===phase&&r.operation_id===operation.id,'Export file receipt not acknowledged');};
+ const record=async(phase,data)=>{try{const r=await onRecord({phase,operation_id:operation.id,...data});need(r?.phase===phase&&r.operation_id===operation.id,'Export file receipt not acknowledged');}catch(error){journalFailed=true;throw error;}};
  const base={expected_origin:targetOrigin,expected_build:targetBuild};
  const read=async options=>{
   guard();const r=await execute(makeWorkspaceUiCode({mode:'observe',...base,...options}));
@@ -140,10 +156,20 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   const original={workflow:s.workflow_ref,directory:s.file_storage?.directory,package:s.package_identity,tid:e.tid,label:e.label,root:s.observation_root?.ref};
   for(let attempt=0;attempt<3;attempt++){
   guard();need(quiet(s)&&e.allowed_actions.includes(verb),'Export storage gesture unavailable');
+  const fileRow=e.tid?.startsWith(s.workflow_ref.prefix+';FileStorageForm;colName_');
+  const allowed=verb==='scroll'&&fileRow&&e.scroll
+   ||verb==='double_click'&&fileRow&&e.storage_entry?.kind==='folder'
+   ||verb==='click'&&(e.tid==='MF;cntMain;tlbMainToolbar;btnFilestorage'
+    ||e.tid===ctx.workflow_ref.tab_tid||e.tid===options.storageContinuation?.tid
+    ||e.tid===s.workflow_ref.prefix+';cnrNaviMode;b.s_Сервер>Файлы'
+    ||e.tid===s.workflow_ref.prefix+';FileStorageForm;btnRefresh'
+    ||fileRow&&e.storage_entry?.kind==='file');
+  if(!allowed){navigationOnly=false;throw Error('Export read contains an unknown or mutating storage gesture');}
   const id=operation.id+':export-file-'+(++sequence),action={verb,ref:e.ref,...extra},signature=createHash('sha256').update(JSON.stringify({action,snapshot:s})).digest('hex');
   await record('export_file_step_prepared',{id,action,signature});uncertain=true;
   const r=await execute(withBrowserReceipt('('+makeWorkspaceUiCode({mode:'act',snapshot:s,action,...base})+')(page)',{...receiptOptions(id,'ui.act',signature),operation_id:id}));
-  await record('export_file_step_completed',{id,outcome:r});uncertain=r.cleanup_complete!==true;
+  if(r.action_key&&r.action_key!=='ui.act'||r.operation_id&&r.operation_id!==id)navigationOnly=false;
+  await record('export_file_step_completed',{id,outcome:r});need(navigationOnly,'Export gesture receipt identity differs');uncertain=r.cleanup_complete!==true;
   if(r.status==='NOT_APPLIED'&&r.effect_possible===false&&r.cleanup_complete===true&&r.error?.code==='UI_EPOCH_CHANGED'&&attempt<2){
    // Keep the stable table root during scroll retries: virtual rows can
    // detach after the gesture, so they cannot own its post-observation.
@@ -159,6 +185,47 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   &&(expected===undefined||(Array.isArray(expected)?expected:[expected]).includes(s.file_storage.directory))
   &&(!previous||s.file_storage.directory!==previous.file_storage.directory||JSON.stringify(s.workflow_ref)!==JSON.stringify(previous.workflow_ref)));
  const row=name=>findNativeStorageRow({name,read,roots,ready,act,guard});
+ const returnToWorkflow=async(refreshTabs=false,beforeReturn=null)=>{
+  readStep='return_node_context';
+  const current=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
+  if(current.verified&&current.surface==='graph'&&current.locked===false)return {continuation:null,node_context:current};
+  // A fresh tab observation precedes the sole return gesture. Never open a
+  // second package or guess a tab after an uncertain navigation.
+  readStep='return_workspace_roots';
+  let r=await roots();const workspace=one(r.ui.elements.filter(e=>e.tid==='MF;cntMain;cntWorkspace;Workspace;t.br'));
+  readStep='return_tabs_observation';
+  try{r=await read({root_ref:workspace.ref});}
+  catch(error){
+   if(!refreshTabs||error.code!=='UI_ROOT_STALE')throw error;
+   // Only the pre-gesture tab read may be repeated, with a freshly issued root.
+   // Recovery and failures after the return gesture never enter this refresh.
+   // Root discovery omits active_tab_ref and package_identity. Preserve the
+   // last complete Files observation across the read-only root refresh.
+   const before=beforeReturn;
+   need(before&&quiet(before),'Export return observation baseline unavailable');
+   r=await roots();
+   need(quiet(r)&&JSON.stringify(r.workflow_ref)===JSON.stringify(before.workflow_ref),
+    'Export return workspace changed during observation refresh');
+   const fresh=one(r.ui.elements.filter(e=>e.tid==='MF;cntMain;cntWorkspace;Workspace;t.br'));
+   r=await read({root_ref:fresh.ref});
+   need(quiet(r)&&['workflow_ref','active_tab_ref','package_identity'].every(k=>JSON.stringify(r[k])===JSON.stringify(before[k])),
+    'Export return workspace changed during observation refresh');
+  }
+  const storageTab=one(r.ui.elements.filter(e=>e.tid===r.workflow_ref.tab_tid));
+  const continuation={document_id:ctx.document_id,document:r.dom_epoch.document,tid:storageTab.tid,ref:storageTab.ref};
+  readStep='return_tab_gesture';
+  try{await act(r,one(r.ui.elements.filter(e=>e.tid===ctx.workflow_ref.tab_tid)));}
+  catch(error){if(!navigationOnly||journalFailed)throw error;}
+  // The return click is navigation too: only the fresh owned graph below
+  // proves restoration, even when that click's post-observation failed.
+  for(let i=0;i<50;i++){
+   readStep='return_graph_context';
+   guard();const actual=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);
+   if(actual.verified&&actual.surface==='graph')return {continuation,node_context:actual};
+   await new Promise(r=>setTimeout(r,100));
+  }
+  throw Error('Export file read did not return to its workflow');
+ };
  try{
   await record('export_file_lease_prepared',{binding:fileBinding,artifact_id:lease.artifact_id});
   let r=await roots(),retainedTab=null;
@@ -179,6 +246,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   const e=one(s.ui.elements.filter(e=>e.tid===s.workflow_ref.prefix+';FileStorageForm;colName_'+storageTidSuffix(name)&&e.label===name)),bytes=e.storage_entry?.bytes;
   need(Number.isSafeInteger(bytes)&&bytes>=0&&bytes<=16*1024*1024,'Export output size is unavailable or exceeds limit');
   let id;
+  readStep='download';
   const downloaded=await downloadExportWithFreshObservation({snapshot:s,file:e,guard,refresh:ref=>read({root_ref:ref}),download:async(snapshot,file,attempt)=>{
    id=operation.id+':export-download'+(attempt?'-'+attempt:'');
    const task={...base,storage_directories:options.storageDirectories,operation_id:id,artifact:{artifact_id:lease.artifact_id,name},output_binding:{...fileBinding,directory},expected_bytes:bytes,
@@ -187,20 +255,43 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
    await record('export_file_download_prepared',{binding:fileBinding,artifact_id:lease.artifact_id,bytes,id,signature});
    guard();uncertain=true;
    const result=await execute(withBrowserReceipt('('+makeNativeOutputDownloadCode(task)+')(page)',{...receiptOptions(id,'artifact.download',signature),operation_id:id}));
-   await record('export_file_download_completed',{id,outcome:result});uncertain=result.cleanup_complete!==true;return result;
+   if(result.action_key!=='artifact.download'||result.operation_id!==id)navigationOnly=false;
+   await record('export_file_download_completed',{id,outcome:result});need(navigationOnly,'Export download receipt identity differs');uncertain=result.cleanup_complete!==true;return result;
   }});
   need(downloaded.status==='SUCCEEDED'&&!uncertain&&downloaded.output?.destination===destination&&downloaded.output.artifact_id===lease.artifact_id
    &&downloaded.output.download_completed&&downloaded.output.output_binding?.execution_id===ctx.execution.execution_id,'Native export download unconfirmed');
+  readStep='verify_file';
   const artifact=await lease.verify(downloaded.output.suggested_name,bytes);
   const result={artifact_id:artifact.artifact_id,destination,bytes:artifact.bytes,sha256:artifact.sha256,execution_id:ctx.execution.execution_id,verification_id:id,freshness_basis:check.existed?'explicit_replace_and_completed_native_execution':'native_absence_check_and_completed_execution'};
   await record('export_file_bytes_verified',{binding:fileBinding,result});
-  // Return through a newly observed tab; then verify the prepared node again.
-  r=await roots();const workspace=one(r.ui.elements.filter(e=>e.tid==='MF;cntMain;cntWorkspace;Workspace;t.br'));
-  r=await read({root_ref:workspace.ref});const storageTab=one(r.ui.elements.filter(e=>e.tid===r.workflow_ref.tab_tid));
-  const continuation={document_id:ctx.document_id,document:r.dom_epoch.document,tid:storageTab.tid,ref:storageTab.ref};
-  await act(r,one(r.ui.elements.filter(e=>e.tid===ctx.workflow_ref.tab_tid)));
-  let restored=false;for(let i=0;i<50;i++){guard();const actual=await execute(`async page=>(${readPreparedNodeContext.toString()})(page,${JSON.stringify(binding)})`);if(actual.verified&&actual.surface==='graph'){restored=true;break;}await new Promise(r=>setTimeout(r,100));}
-  need(restored,'Export file read did not return to its workflow');
-  await lease.retain();retained=true;await record('export_file_read_completed',{result,workflow_return_verified:true});options.rememberStorageContinuation?.(continuation);return result;
- }finally{if(!uncertain&&!retained)await lease.release();}
+  const restored=await returnToWorkflow(true,s);
+  readStep='retain_file';await lease.retain();retained=true;
+  readStep='record_completion';await record('export_file_read_completed',{result,workflow_return_verified:true});options.rememberStorageContinuation?.(restored.continuation);return result;
+ }catch(error){
+  // Preserve the original failure before restoration changes the step or
+  // replaces its error. Never copy arbitrary messages, URLs or local paths.
+  const failure={step:readStep,code:/^[A-Z][A-Z0-9_]{0,79}$/.test(error?.code??'')?error.code:null,
+   kind:['Error','TypeError','RangeError','SyntaxError','ReferenceError','TimeoutError','AbortError','TargetClosedError'].includes(error?.name)?error.name:'OtherError',
+   reason:['Unique export file control required','Export observation document changed','Export storage gesture requires inspection',
+    'Export file read did not return to its workflow','Output lease owner changed','Unverified output cannot be retained',
+    'Invalid artifact identity','Artifact must be a regular file','Artifact changed before reading',
+    'Artifact size or SHA does not match the admitted identity'].includes(error?.message)?error.message:null};
+  uncertain=true;
+  try{
+   const refusal=await releaseRefusedExportRead({operationId:operation.id,binding:fileBinding,navigationOnly:navigationOnly&&!journalFailed,record,failure,
+    restore:async()=>{await returnToWorkflow();
+     // Root discovery deliberately omits dialogs/masks and the UI workflow
+     // has only tab/prefix. Read the full surface with the native owner binding.
+     const regions=await read({discover_roots:true,prepared_node_context:binding});
+     const root=one(regions.ui.elements.filter(e=>e.tid===ctx.workflow_ref.prefix+';ModelForm;cmpDiagram'));
+     const graph=await read({root_ref:root.ref,prepared_node_context:binding});
+     need(quiet(graph)&&graph.observation_kind!=='roots'&&graph.ui.truncated?.dialogs===false&&graph.ui.truncated?.masks===false
+      &&graph.wizard?.status==='absent'&&['tab_tid','prefix'].every(k=>graph.workflow_ref?.[k]===ctx.workflow_ref[k]),
+      'Export refusal workflow is not quiet or changed');
+     return {verified:true,cleanup_complete:true,quiet:true,node_context:graph.prepared_node_context};},
+    release:async()=>{await lease.release();released=true;}});
+   if(refusal)throw Object.assign(Error('The native export completed, but downloading was not confirmed. The original quiet workflow is restored. Save the scenario and report downloading as unconfirmed; do not repeat the export.'),{nodePhaseRefusal:refusal});
+   throw error;
+  }catch(restorationError){uncertain=true;throw restorationError;}
+ }finally{if(!uncertain&&!retained&&!released)await lease.release();}
 }

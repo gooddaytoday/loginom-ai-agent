@@ -206,6 +206,32 @@ test('observation supplies real graph references, visible editor settings, dialo
   assert.equal(snapshot.ui.table_cells[0].text, '42');
 });
 
+test('storage table observation inventories headers once while preserving per-table redaction',async()=>{
+  const clock=fixtureClock(),page=new Page({clock:clock.Date});
+  const root=page.add('div','MF;TF-1;FileStorageForm;pnlFileStorage;tbl');
+  for(const [label,value] of [['Filename','result.csv'],['Password','private-value']]) {
+    const table=page.add('table',null,'',undefined,root);
+    page.add('th',null,label,undefined,table);
+    for(let i=0;i<80;i++)page.add('td',null,value,undefined,table).cellIndex=0;
+  }
+  let headerTests=0;
+  for(const cell of root.descendants().filter(e=>['TD','TH'].includes(e.tagName))) {
+    const matches=cell.matches.bind(cell);
+    cell.matches=selector=>{
+      if(selector==='th,[role="columnheader"]'){headerTests++;clock.advance(1);}
+      return matches(selector);
+    };
+  }
+  const result=await page.execute({mode:'observe'});
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.equal(result.output.scan.max_ms,500);
+  assert.equal(headerTests,162);
+  assert.equal(result.output.ui.table_cells.length,120);
+  assert.equal(result.output.ui.table_cells[1].text,'result.csv');
+  assert.equal(result.output.ui.table_cells[82].text,'[REDACTED]');
+  assert.deepEqual(page.events,[]);
+});
+
 function deleteConfirmation(page, { id = 'msgbox-1', y = 340, z = 19000 } = {}) {
   const dialog = page.add('div', null, 'Удалить выделенную связь?', { x: 460, y, width: 280, height: 140 });
   dialog.attrs.class = 'x-window x-message-box'; dialog.style.zIndex = String(z);
@@ -899,6 +925,42 @@ test('storage filename code tokens are data, not editor identity: native-input-p
   }
 });
 
+for(const stage of ['controls','data_views'])for(const fault of ['transient','persistent','before','work','elements','traversal','other_stage','directory','owner','position','expired'])test('file-list scroll retries only its timed '+stage+' read without replay: '+fault,async()=>{
+ const {page,table,cell}=scriptNamedStorageFixture('anchor.csv'),clock=fixtureClock();page.context.Date=clock.Date;
+ page.context.innerWidth=1000;page.context.innerHeight=800;page.waitForTimeout=async()=>{};
+ Object.assign(table,{scrollTop:0,scrollHeight:2400,clientHeight:400});table.style.overflowY='auto';
+ const bar=page.add('div','MF;TF-1;NavigationBar;NavigationPanel');let folder;
+ for(const [i,text] of ['Файлы','user'].entries()){
+  const button=page.add('div','MF;TF-1;cnrNaviMode;b.s_Сервер>Файлы'+(i?'>user':''),'',undefined,bar);
+  const label=page.add('span',null,text,undefined,button);label.attrs.class='x-btn-inner-default-toolbar-small';if(i)folder=label;
+ }
+ const roots=await page.execute({mode:'observe',discover_roots:true});
+ const root=roots.output.ui.elements.find(e=>e.tid===table.attrs['data-tid']);
+ const before=await page.execute({mode:'observe',root_ref:root.ref});
+ const target=before.output.ui.elements.find(e=>e.tid===cell.attrs['data-tid']);
+ assert.ok(target.allowed_actions.includes('scroll'),JSON.stringify(target));assert.equal(before.output.file_storage.directory,'/user',JSON.stringify(before.output.file_storage));
+ const evaluate=page.evaluate.bind(page);let failures=0;
+ page.evaluate=async(fn,arg)=>{
+  if(arg&&Object.hasOwn(arg,'discoverRoots')){
+   if((fault==='before'&&table.scrollTop===0)||(table.scrollTop===1000&&(failures===0||fault==='persistent'))){
+    failures++;if(fault==='expired')clock.advance(16000);
+    return {ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:['work','elements','traversal'].includes(fault)?fault:'time',scan_stage:fault==='other_stage'?'collect':stage}};
+   }
+   if(failures){if(fault==='directory')folder.ownText='foreign';if(fault==='owner')table.style.overflowY='hidden';if(fault==='position')table.scrollTop=999;}
+  }
+  return evaluate(fn,arg);
+ };
+ const result=await page.act({verb:'scroll',ref:target.ref,delta_y:1000},before.output);
+ const retry=['transient','persistent','directory','owner','position'].includes(fault);
+ assert.equal(result.status,fault==='transient'?'SUCCEEDED':fault==='before'?'NOT_APPLIED':'AMBIGUOUS',JSON.stringify(result.error));
+ assert.equal(result.trace.filter(e=>e.event==='ui_scroll_applied').length,fault==='before'?0:1);
+ assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,retry?1:0);
+ assert.equal(result.effect_possible,fault!=='before');assert.equal(result.cleanup_complete,true);
+ assert.equal(failures,fault==='persistent'?2:1);
+ if(['directory','owner','position'].includes(fault))assert.equal(result.error.code,'UI_SCROLL_NOT_CONFIRMED');
+ if(fault==='expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+});
+
 test('storage filename exception preserves code-editor, link, secret and active-row guards',async()=>{
   for(const mode of ['name','id','editor','href','secret','foreign','detached_row','wrong_label','wrong_tag','editable','duplicate']){
     const f=scriptNamedStorageFixture(),{page,cell,table,row}=f;
@@ -975,6 +1037,30 @@ test('navigation root reads the directory without traversing a large storage tab
   assert.equal(detail.output.file_storage.listing_complete,false);assert.equal(walkedTable,false);
 });
 
+test('virtual storage table shares ancestor checks only within each fresh read', async () => {
+  const page=new Page({clock:fixtureClock().Date}),tid='MF;TF-1;FileStorageForm;pnlFileStorage;tbl';
+  const table=page.add('div',tid),rows=[];
+  for(let i=0;i<40;i++) {
+    const row=page.add('table',null,'',undefined,table);rows.push(row);
+    for(let j=0;j<6;j++)page.add('td',j===0?'MF;TF-1;FileStorageForm;colName_file'+i:null,'file'+i,undefined,row);
+  }
+  const roots=await page.execute({mode:'observe',discover_roots:true});
+  const ref=roots.output.ui.elements.find(e=>e.tid===tid).ref;
+  const computed=page.context.getComputedStyle;let tableStyles=0;
+  page.context.getComputedStyle=element=>{if(element===table)tableStyles++;return computed(element);};
+  const read=()=>page.execute({mode:'observe',root_ref:ref});
+  let result=await read();
+  assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.ui.table_cells.length,120);
+  assert.ok(tableStyles<=3,'shared table ancestor was recomputed '+tableStyles+' times');
+  tableStyles=0;rows[0].style.visibility='hidden';rows[1].attrs['aria-label']='credential';
+  result=await read();assert.equal(result.status,'SUCCEEDED');
+  assert.equal(result.output.ui.elements.some(e=>e.tid?.endsWith('colName_file0')||e.tid?.endsWith('colName_file1')),false);
+  assert.ok(!result.output.ui.table_cells.some(c=>c.text==='file0'||c.text==='file1'));
+  assert.ok(tableStyles>0&&tableStyles<=3,'fresh read must recompute ancestor visibility');
+  table.style.visibility='hidden';
+  assert.equal((await read()).error.code,'UI_ROOT_STALE');
+});
+
 test('storage-name discovery uses escaped fixed lookup and no table traversal', async () => {
   const page=new Page({ clock: fixtureClock().Date }),name='data, " ]';
   const cell=page.add('td','MF;TF-1;FileStorageForm;colName_data_"_]','data, " ]');
@@ -1046,6 +1132,30 @@ test('wizard context exposes the current step and lifecycle states on a narrow r
   hidden.style.display='';
   const mixed=await page.execute({mode:'observe',root_ref:ref});
   assert.equal(mixed.output.wizard.stage,null);assert.equal(mixed.output.wizard.stage_status,'ambiguous');
+});
+
+test('cold export input card treats its grid and Add button as one stage without accepting conflicting markers',async()=>{
+  for(const fault of ['none','duplicate_grid','duplicate_add','foreign_card','other_stage','hidden_other_stage']) {
+    const page=new Page({clock:fixtureClock().Date}),base='MF;TF-1;WizrdMCF',form=page.add('div',base);
+    const grid=';TuneDataSourceInputPortWizard;grdTargetColumns',add=';TuneDataSourceInputPortWizard;btnAddMappingColumn';
+    page.add('div',base+';cardWizardPanel;p.h;p.t','Настройка входных столбцов',undefined,form);
+    page.add('div',base+grid,'',undefined,form);page.add('button',base+add,'',undefined,form);
+    if(fault==='duplicate_grid')page.add('div',base+grid,'',undefined,form);
+    if(fault==='duplicate_add')page.add('button',base+add,'',undefined,form);
+    if(fault==='foreign_card')page.add('button',base+';TuneDataSourceMappingWizard;btnAddMappingColumn','',undefined,form);
+    if(fault==='other_stage'||fault==='hidden_other_stage') {
+      const other=page.add('input',base+';ExportTextFileParamsWizard;edtFileName','',undefined,form);
+      if(fault==='hidden_other_stage')other.style.display='none';
+    }
+    const expected=['none','hidden_other_stage'].includes(fault)?'input_mapping':null;
+    const full=await page.observe();assert.equal(full.wizard.stage,expected,fault);
+    assert.equal(full.wizard.stage_status,expected?'observed':'ambiguous',fault);
+    const ref=full.wizard.root_ref;
+    const narrow=await page.execute({mode:'observe',root_ref:ref});
+    assert.equal(narrow.output.wizard.stage,expected,fault);
+    const roots=await page.execute({mode:'observe',discover_roots:true});
+    assert.equal(roots.output.wizard.stage,expected,fault);
+  }
 });
 
 test('wizard metadata excludes hidden and inactive forms and redacts sensitive title children',async()=>{
@@ -1242,7 +1352,27 @@ function calculatorKeyboard(page,c,{corrupt=false,loseFocus=false}={}) {
     if(loseFocus && key==='ControlOrMeta+A')page.document.activeElement=page.document.body;
   };
   page.keyboard.type=async text=>{page.events.push('keyboard_type');c.state.text+=corrupt?'wrong':text;};
+  page.keyboard.insertText=async text=>{page.events.push('keyboard_insert_text');c.state.text+=corrupt?'wrong':text;};
 }
+
+test('Calculator replacement inserts literal quotes brackets and parentheses without an auto-close suffix',async()=>{
+  for(const text of ['RegExMatchedSubExp(Concat("args[^}]*",Chr(34),"Code",Chr(34),"[[:space:]]*:[[:space:]]*",Chr(34),"([^",Chr(34),"]*)"),Response,1)',
+    'Round(Revenue / Products, 2)']) {
+    const page=new Page(),c=calculatorDocument(page);calculatorKeyboard(page,c);
+    // The observed CodeMirror auto-close keymap leaves this suffix when the
+    // regex formula is typed character by character. Literal input avoids it.
+    page.keyboard.type=async value=>{page.events.push('keyboard_type');c.state.text+=value+(value.includes('[')?'"))':'');};
+    const snapshot=await page.observe(),record=snapshot.ui.elements.find(e=>e.tid===c.base+'cmpExpression');
+    const result=await page.act({verb:'replace_expression',ref:record.ref,text},snapshot);
+    assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+    assert.equal(c.state.text,text);
+    assert.equal(result.output.ui.elements.find(e=>e.ref===record.ref).calculator_editor.document.text,text);
+    assert.equal(page.events.filter(e=>e==='keyboard_insert_text').length,1);
+    assert.equal(page.events.filter(e=>e==='keyboard_type').length,0);
+    assert.equal(page.events.filter(e=>e==='Backspace').length,1);
+    assert.ok(result.trace.some(e=>e.event==='expression_text_verified' && e.settings_applied===false));
+  }
+});
 
 test('typed Calculator replacement confirms exact multiline and empty document via keyboard',async()=>{
   for(const text of ['Quantity * UnitPrice','a\n\n b','']) {
@@ -1707,6 +1837,34 @@ test('completed generic click rediscovers regions when its observed root closes'
   }
 });
 
+test('prepared graph control ranking bounds repeated DOM reads and refreshes uniqueness per observation',async()=>{
+  const page=new Page({clock:fixtureClock().Date}),prefix='MF;TF-1;Graph;';
+  const bodies=[];
+  for(let i=0;i<8;i++){
+    const label=i===0?'Партии; batches.csv':'Узел_'+i,tid=prefix+label;
+    bodies.push(page.add('g',tid));
+    page.add('span',tid+';Label;Label',label);
+    page.add('g',tid+';Input_Data-0');page.add('g',tid+';Output_Data-0');
+  }
+  const reads=new Map();
+  for(const element of page.document.all()){
+    const get=element.getAttribute.bind(element);
+    element.getAttribute=name=>{if(name==='data-tid')reads.set(element,(reads.get(element)??0)+1);return get(name);};
+  }
+  // Isolate the synchronous DOM reader; native context admission has its own suite.
+  const observe=()=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {mode:'observe',expected_build:build,expected_origin:origin,
+      prepared_node_context:{node:{node_id:'node-0'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}},
+    async()=>({verified:true,surface:'graph'}));
+  const first=await observe();assert.equal(first.status,'SUCCEEDED');
+  assert.equal(first.output.ui.elements.filter(e=>e.graph_node?.part==='body').length,8);
+  assert.ok(Math.max(...reads.values())<200,'ranking must not rescan every graph element for every control');
+  const tid=bodies[0].attrs['data-tid'];
+  page.add('g',tid,'',undefined,bodies[0].parentElement);
+  const second=await observe();assert.equal(second.status,'SUCCEEDED');
+  assert.equal(second.output.ui.elements.some(e=>e.tid===tid&&e.graph_node),false);
+});
+
 test('graph paging retains identified node controls without anonymous SVG vertices',async()=>{
   const page=new Page();
   for(let i=0;i<70;i++)page.add('g','MF;TF-1;Graph;Vertex');
@@ -1889,7 +2047,7 @@ test('wizard owner context uses bounded active-tab breadcrumbs and survives narr
 });
 
 test('typed wizard opening verifies node and workflow path after one settings click',async()=>{
-  for(const mode of ['bound_begin_busy_import_preview','bound_begin_busy_import_preview_only','bound_begin_busy_import_preview_unbound','bound_begin_busy_import_preview_outside','bound_begin_busy_import_preview_duplicate','bound_begin_busy_import_preview_foreign','bound_begin_busy_import_preview_expired','bound_begin_busy_import_preview_wrong_owner','bound_begin_busy_import_preview_changed_stage','bound_begin_pending_long','bound_begin_busy_long','bound_begin_busy_expired','bound_begin_busy_foreign','bound_begin_busy_dialog','bound_begin_busy_wrong_owner','bound_begin_suffix','bound_begin_pending','bound_begin_lock','bound_begin_foreign','bound_begin_churn','success','clipped_settings','clipped_settings_covered','formatted_name','same_label_wrong_key','renamed_tab','replaced_tab','wrong_node','wrong_workflow','dialog','lost_reply',
+  for(const mode of ['bound_begin_overflow','bound_begin_overflow_unbound','bound_begin_overflow_foreign','bound_begin_overflow_hidden','bound_begin_overflow_opacity','bound_begin_overflow_wrong_caption','bound_begin_overflow_no_icon','bound_begin_overflow_input_port','bound_begin_busy_import_preview','bound_begin_busy_import_preview_only','bound_begin_busy_import_preview_unbound','bound_begin_busy_import_preview_outside','bound_begin_busy_import_preview_duplicate','bound_begin_busy_import_preview_foreign','bound_begin_busy_import_preview_expired','bound_begin_busy_import_preview_wrong_owner','bound_begin_busy_import_preview_changed_stage','bound_begin_pending_long','bound_begin_busy_long','bound_begin_busy_expired','bound_begin_busy_foreign','bound_begin_busy_dialog','bound_begin_busy_wrong_owner','bound_begin_suffix','bound_begin_pending','bound_begin_lock','bound_begin_foreign','bound_begin_churn','success','clipped_settings','clipped_settings_covered','formatted_name','same_label_wrong_key','renamed_tab','replaced_tab','wrong_node','wrong_workflow','dialog','lost_reply',
     'stale_region','stale_origin','stale_document','stale_tab','stale_wrong_owner','stale_exhausted']) {
     const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
     let path='';
@@ -1910,8 +2068,8 @@ test('typed wizard opening verifies node and workflow path after one settings cl
       const reader=async()=>{const clicked=page.events.includes('click');if(clicked)post++;
         if(clicked&&(mode==='bound_begin_pending'&&post<=90||mode==='bound_begin_pending_long'&&post<=1300))return {verified:false,surface_pending:true};
         const graph=!clicked||mode==='bound_begin_churn'||post<=2;
-        return {verified:true,document_id:'doc',workflow_id:'workflow',node_id:mode==='bound_begin_foreign'&&post>=2||['bound_begin_busy_wrong_owner','bound_begin_busy_import_preview_wrong_owner'].includes(mode)&&waits>=2?'foreign':'node',
-          surface:graph?'graph':'wizard',tid:base+(graph?'Graph;'+nodeKey:'WizrdMCF'),...(graph?{locked:clicked&&post%2===0}:{})};};
+        return {verified:true,document_id:'doc',workflow_id:'workflow',node_id:['bound_begin_foreign','bound_begin_overflow_foreign'].includes(mode)&&post>=2||['bound_begin_busy_wrong_owner','bound_begin_busy_import_preview_wrong_owner'].includes(mode)&&waits>=2?'foreign':'node',
+          surface:graph?'graph':'wizard',tid:base+(graph?'Graph;'+nodeKey:'WizrdMCF'),...(graph?{locked:clicked&&post%2===0}:mode==='bound_begin_overflow_input_port'?{input_port:{direction:'input',port:0,native_index:0,port_guid:'input',opening_operation_id:'input-open'}}:{})};};
       page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
         {expected_build:build,expected_origin:origin,kind:'workspace-ui',...(mode.startsWith('bound_begin_busy_')||mode==='bound_begin_pending_long'?{opening_timeout_ms:120000}:{}),...(mode.endsWith('_unbound')?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}}),...options},reader));
     }
@@ -1937,6 +2095,13 @@ test('typed wizard opening verifies node and workflow path after one settings cl
       page.add('span',null,'',undefined,node).attrs.class='bg-vendor-icon-calcdata';
       const last=page.add('a',base+'cnrNaviMode;b.s_'+path+'>'+name+'>Настройка','Настройка',undefined,panel);
       page.add('span',null,'',undefined,last).attrs.class='maptree-icon-wizard';
+      if(mode.startsWith('bound_begin_overflow')){
+        last.style.display='none';
+        if(mode.endsWith('_hidden'))last.attrs.hidden='';
+        if(mode.endsWith('_opacity'))last.style.opacity='0';
+        if(mode.endsWith('_wrong_caption'))last.ownText='Other';
+        if(mode.endsWith('_no_icon'))last.children[0].remove();
+      }
       if(mode==='dialog')page.add('div','msgbox','Подтвердить').attrs.class='x-window';
       if(mode==='lost_reply')throw new Error('reply lost');
     };
@@ -1978,7 +2143,7 @@ test('typed wizard opening verifies node and workflow path after one settings cl
     };
     if(mode==='clipped_settings_covered')page.document.querySelectorAll('[data-tid="GraphTopToolbar"]')[0].box.height=115;
     const result=await page.act({verb:mode.startsWith('bound_begin_')?'begin_wizard':'open_wizard',ref:button.ref},snapshot);
-    const success=['bound_begin_busy_import_preview','bound_begin_busy_import_preview_only','bound_begin_pending_long','bound_begin_busy_long','bound_begin_suffix','bound_begin_pending','bound_begin_lock','success','clipped_settings','formatted_name','renamed_tab','stale_region'].includes(mode);
+    const success=['bound_begin_overflow','bound_begin_busy_import_preview','bound_begin_busy_import_preview_only','bound_begin_pending_long','bound_begin_busy_long','bound_begin_suffix','bound_begin_pending','bound_begin_lock','success','clipped_settings','formatted_name','renamed_tab','stale_region'].includes(mode);
     assert.equal(result.status,success?'SUCCEEDED':mode==='clipped_settings_covered'?'NOT_APPLIED':'AMBIGUOUS',mode+JSON.stringify(result.error));
     assert.equal(page.events.filter(e=>e==='click').length,mode==='clipped_settings_covered'?0:1);
     assert.equal(result.trace.some(e=>e.event==='wizard_open_verified'),success);
@@ -2008,8 +2173,79 @@ test('typed wizard opening verifies node and workflow path after one settings cl
   }
 });
 
+test('prepared wizard opening retries one refused sample and preserves native owner guards',async()=>{
+ for(const fault of [null,'node','owner','path','absent','loading','loading_foreign','loading_dialog','loading_owner','loading_node','loading_expired']) {
+  const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
+  const loading=fault?.startsWith('loading');let mask,secondary,waits=0;
+  page.waitForTimeout=async ms=>{
+   clock.advance(ms);waits++;
+   if(loading&&fault!=='loading_expired'&&waits===3)mask.attrs.class='';
+   if(fault==='loading_foreign'&&waits===1)page.add('div','foreign-mask','Loading').attrs.class='x-mask-msg';
+   if(fault==='loading_dialog'&&waits===1)page.add('div','foreign-dialog','Other').attrs.class='x-window';
+   if(fault==='loading_owner'&&waits===1){
+    const crumb=page.document.querySelectorAll('[data-tid="'+base+'cnrNaviMode;b.s_'+path+'>REST"]')[0];
+    crumb.attrs['data-tid']=base+'cnrNaviMode;b.s_'+path+'>Other';
+   }
+  };
+  let path='';
+  for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий']) {
+   path+=(path?'>':'')+label;
+   const crumb=page.add('a',base+'cnrNaviMode;b.s_'+path,label,undefined,panel);
+   if(label==='Сценарий')page.add('span',null,'',undefined,crumb).attrs.class='maptree-icon-workflow';
+  }
+  const graph=page.add('div',base+'ModelForm;cmpDiagram'),body=page.add('g',base+'Graph;REST','',undefined,graph);
+  page.add('span',base+'Graph;REST;Label;Label','REST',undefined,body);
+  page.add('g',base+'Graph;REST;Setting','',{x:500,y:300,width:30,height:30},graph);
+  let reads=0;
+  const binding=async()=>({verified:true,document_id:'doc',workflow_id:'workflow',
+   node_id:fault==='node'&&reads>=26||fault==='loading_node'&&waits>=1?'foreign':'node',surface:page.events.includes('click')?'wizard':'graph',
+   tid:base+(page.events.includes('click')?'WizrdMCF':'Graph;REST'),...(!page.events.includes('click')?{locked:false}:{})});
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,kind:'workspace-ui',prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},binding));
+  const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_open),click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);graph.remove();
+   const wizard=page.add('div',base+'WizrdMCF');page.add('button',base+'WizrdMCF;RESTRequestWizard;btnHelp','',undefined,wizard);
+   if(loading){
+    mask=wizard;mask.attrs.class='bg-mask-message';
+    page.add('table',base+'WizrdMCF;JoinDataWizard;grdSourceColumns;tbl','',undefined,wizard);
+    secondary=page.add('div',null,'Загрузка...',undefined,wizard);secondary.attrs.class='x-mask-msg';
+   }
+   const ownerPath=fault==='path'?path.replace('Модуль1','Модуль2'):path,owner=fault==='owner'?'Other':'REST';
+   const node=page.add('a',base+'cnrNaviMode;b.s_'+ownerPath+'>'+owner,owner,undefined,panel);
+   page.add('span',null,'',undefined,node).attrs.class='bg-vendor-icon-restclient';
+   const last=page.add('a',base+'cnrNaviMode;b.s_'+ownerPath+'>'+owner+'>Настройка','Настройка',undefined,panel);
+   page.add('span',null,'',undefined,last).attrs.class='maptree-icon-wizard';
+  };
+  const evaluate=page.evaluate.bind(page);
+  page.evaluate=async(fn,arg)=>{const out=await evaluate(fn,arg);
+   if(arg?.discoverRoots===false&&page.events.includes('click')) {
+    reads++;
+    // The native controller has switched while the rendered wizard read is
+    // still absent. Exhaust the existing bounded observations before retry.
+    if(!loading&&(reads<=25||fault==='absent'))out.wizard={status:'absent'};
+    // mas2: the first sample includes an unbound grid loading message. The
+    // confirmation reread sees only the exact wizard mask, still loading.
+    if(loading&&reads===1)secondary.remove();
+   }
+   return out;
+  };
+  const result=await page.act({verb:'begin_wizard',ref:button.ref},snapshot);
+  assert.equal(result.status,!fault||fault==='loading'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify({error:result.error,trace:result.trace}));
+  const retry=result.trace.filter(e=>e.event==='wizard_open_confirmation_read_retried');
+  assert.equal(retry.length,1,fault+JSON.stringify(result.error));assert.equal(retry[0].initial_observation.wizard.status,loading?'observed':'absent');
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  if(loading){
+   assert.equal(retry[0].initial_observation.ui.masks.length,2);
+   assert.equal(retry[0].initial_observation.ui.masks[1].target_tid,null);
+  }
+  if(fault&&fault!=='loading')assert.equal(result.error.code,
+   fault==='node'?'PREPARED_NODE_CONTEXT_CHANGED':fault==='loading_expired'?'UI_DEADLINE_EXCEEDED':fault==='loading_dialog'?'WIZARD_CONTEXT_CHANGED':'WIZARD_OPEN_NOT_CONFIRMED',fault);
+ }
+});
+
 test('wizard cancellation confirms the original graph after one exact affirmative click',async()=>{
- for(const mode of ['success','wrong_question','wrong_node','still_open']) {
+ for(const mode of ['success','wrong_question','wrong_node','still_open','bound_unlock','bound_churn','bound_relock',
+  'bound_document_id','bound_workflow_id','bound_node_id','bound_tid','bound_navigation_node']) {
   const page=new Page(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
   let path='';const crumbs=[];
   for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий','Old','Настройка']) {
@@ -2026,6 +2262,21 @@ test('wizard cancellation confirms the original graph after one exact affirmativ
   page.add('span',null,mode==='wrong_question'?'Удалить пакет?':'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
   page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
   page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  if(mode.startsWith('bound_')) {
+   let graphReads=0;
+   const reader=async()=>{
+    const graph=page.events.includes('click');if(graph)graphReads++;
+    const binding={verified:true,document_id:'doc',workflow_id:'workflow',node_id:'node',
+     surface:graph?'graph':'wizard',tid:base+(graph?'Graph;Old':'WizrdMCF'),
+     ...(graph?{locked:mode==='bound_churn'?graphReads%2===1:mode==='bound_relock'?graphReads>1:graphReads===1}:{})};
+    if(graphReads>1&&!['bound_unlock','bound_churn','bound_relock'].includes(mode))
+     binding[mode.slice(6)]=mode==='bound_navigation_node'?{tid:'foreign',label:'Foreign'}:'foreign';
+    return binding;
+   };
+   page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {expected_build:build,expected_origin:origin,kind:'workspace-ui',
+     prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},reader));
+  }
   const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.allowed_actions.includes('confirm_wizard_close'));
   if(mode==='wrong_question'){assert.equal(button,undefined);continue;}
   assert.ok(button);
@@ -2036,9 +2287,14 @@ test('wizard cancellation confirms the original graph after one exact affirmativ
    const node=page.add('g',base+'Graph;'+name,'',undefined,graph);page.add('span',base+'Graph;'+name+';Label;Label',name,undefined,node);
   };
   const result=await page.act({verb:'confirm_wizard_close',ref:button.ref},snapshot);
-  assert.equal(result.status,mode==='success'?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+  const success=['success','bound_unlock'].includes(mode);
+  assert.equal(result.status,success?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
   assert.equal(page.events.filter(e=>e==='click').length,1);
-  assert.equal(result.trace.some(e=>e.event==='wizard_cancel_graph_verified'),mode==='success');
+  assert.equal(result.trace.some(e=>e.event==='wizard_cancel_graph_verified'),success);
+  if(mode==='bound_unlock')assert.equal(result.output.prepared_node_context.locked,false);
+  if(mode.startsWith('bound_')&&!success)assert.equal(result.error.code,'PREPARED_NODE_CONTEXT_CHANGED',mode);
+  if(mode.startsWith('bound_'))assert.equal(result.trace.filter(e=>e.event==='node_graph_lock_rediscovery').length,
+   mode==='bound_unlock'?1:mode==='bound_churn'?2:0,mode);
  }
 });
 
@@ -2599,6 +2855,7 @@ test('storage byte identity uses the same cached native file record regardless o
     const read=async()=> (await page.observe()).ui.elements.find(e=>e.tid===cell.getAttribute('data-tid')).storage_entry;
     const entry=await read();
     assert.equal(entry.bytes,mode==='valid'?1702:undefined,mode);
+    assert.equal(entry.kind,mode==='valid'?'file':'unknown',mode);
     if(mode==='valid') {
       assert.equal(entry.bytes_source,'native_file_store');
       for(const bytes of [0,900,1023,1024,1025,1536,1937,3072,1048576]) {
@@ -3581,8 +3838,8 @@ test('input port overflow caption requires native binding and the exact hidden c
  }
 });
 
-async function joinInputPortOverflowFixture(mode='valid',port=1) {
-  const caption=port===0?'Главная таблица':'Присоединяемая таблица';
+async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
+  const caption=['group','sorting','crosstable','calculator','reform','filter'].includes(vendor)?'Входной источник данных':port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
   const {page,panel,crumbs}=await inputPortContextFixture();
   // Loginom 7.4.2 native diagnostic: 1280x800, input1 and Настройка hidden
   // by breadcrumb overflow; node/input/wizard icons remain in the same DOM.
@@ -3597,9 +3854,10 @@ async function joinInputPortOverflowFixture(mode='valid',port=1) {
     if(i>=7)c.style.display='none';
     for(const icon of c.children)icon.box={x:c.box.x+1,y:c.box.y+1,width:16,height:16};
   }
-  crumbs[5].children[0].attrs.class='bg-vendor-icon-joindata';
+  const nodeIcon={calculator:'bg-vendor-icon-calcdata',crosstable:'bg-vendor-icon-crosstab',sorting:'bg-vendor-icon-sorting',union:'bg-vendor-icon-uniondata',group:'bg-vendor-icon-groupdata',join:'bg-vendor-icon-joindata',reform:'bg-vendor-icon-reformcolumns',filter:'bg-vendor-icon-filterdata'}[vendor];
+  crumbs[5].children[0].attrs.class=nodeIcon;
   page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[7]).attrs.class='bg-vendor-icon-tunedatasourcesocketdef';
-  if(mode==='wrong_icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
+  if(mode==='wrong_icon')crumbs[5].children[0].attrs.class=vendor==='calculator'?'bg-vendor-icon-groupdata':'bg-vendor-icon-calcdata';
   if(mode==='wrong_caption')for(const c of crumbs.slice(7)) {
     c.attrs['data-tid']=c.attrs['data-tid'].replace(caption.replaceAll(' ','_'),caption.replaceAll(' ','_')+'_2');
     if(c===crumbs[7])c.ownText=caption+' 2';
@@ -3608,7 +3866,9 @@ async function joinInputPortOverflowFixture(mode='valid',port=1) {
   if(mode==='hidden_ancestor')panel.style.display='none';
   if(mode==='missing_wizard_icon')crumbs[8].children[0].remove();
   const binding={verified:true,surface:'wizard',document_id:'doc',workflow_id:'flow',node_id:'node',
-    input_port:{direction:'input',port:mode==='wrong_port'?1-port:mode==='unknown_port'?2:port,native_index:port,port_guid:'input-'+port,opening_operation_id:'join-open-'+port}};
+    input_port:{direction:'input',port:mode==='wrong_port'?1-port:mode==='unknown_port'?2:port,native_index:mode==='wrong_native_index'?1-port:port,port_guid:'input-'+port,opening_operation_id:'join-open-'+port,node_icon_class:nodeIcon}};
+  if(mode==='missing_native_icon')delete binding.input_port.node_icon_class;
+  if(mode==='wrong_native_icon')binding.input_port.node_icon_class='bg-vendor-icon-unknown';
   let reads=0;
   if(mode!=='unbound')page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
     {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},async()=>{
@@ -3634,6 +3894,113 @@ test('owned Join input observes its actual hidden joined-table breadcrumb',async
   assert.equal(full.wizard.input_port_context.opening_verified,false);
   assert.deepEqual(page.events,[]);
 });
+
+test('owned Union input observes its numbered hidden appended-table breadcrumb',async()=>{
+  // Loginom 7.4.2 live: a long Union label pushes 'Присоединяемая таблица 2' and
+  // 'Настройка' into the breadcrumb overflow while input2 is bound natively.
+  const {page}=await joinInputPortOverflowFixture('valid',2,'union');
+  const full=await page.observe(),narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+  assert.equal(full.wizard.input_port_context.status,'observed');
+  assert.equal(full.wizard.input_port_context.port_display_label,'Присоединяемая таблица 2');
+  assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
+});
+
+test('owned Union and Grouping inputs keep their exact hidden input folder and captions',async()=>{
+ for(const vendor of ['union','group'])for(const port of (vendor==='union'?[0,1,2]:[0]))for(const mode of ['valid','unnumbered','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','wrong_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
+  const {page}=await joinInputPortOverflowFixture(mode,port,vendor);
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  const accepted=mode==='valid'||mode==='unnumbered'&&port===1;
+  if(mode==='unnumbered')for(const [i,c] of crumbs.entries())if(i>=7){
+   c.attrs['data-tid']=c.attrs['data-tid'].replace((port===0?'Главная таблица':'Присоединяемая таблица '+port).replaceAll(' ','_'),'Присоединяемая_таблица');
+   if(i===7)c.ownText='Присоединяемая таблица';
+  }
+  crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
+  if(mode==='wrong_folder_icon')crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  const observed=await page.execute({mode:'observe'});
+  if(observed.status!=='SUCCEEDED'){assert.equal(accepted,false);assert.deepEqual(page.events,[]);continue;}
+  const full=observed.output,narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+  assert.equal(full.wizard.input_port_context.status==='observed',accepted,port+':'+mode);
+  assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const close=await page.execute({mode:'observe'});
+  assert.equal(close.output.ui?.elements?.some(e=>e.allowed_actions.includes('confirm_wizard_close'))===true,accepted,port+':'+mode);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+test('tabular input0 keeps Done and close bound to the native node icon when its input folder overflows',async()=>{
+ for(const vendor of ['group','sorting','crosstable','calculator','reform','filter'])for(const mode of ['valid','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','unknown_port','wrong_native_index','wrong_icon','missing_native_icon','wrong_native_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
+  const {page}=await joinInputPortOverflowFixture(mode,0,vendor);
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
+  if(mode==='wrong_folder_icon')crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0];
+  const c=mappingCoverageFixture(page,4);page.context.innerWidth=1280;
+  for(const child of [...c.form.children]) {
+   if(child.attrs['data-tid']?.endsWith(';btnAddMappingColumn')){child.remove();continue;}
+   for(const e of [child,...child.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid']
+    .replace('MF;TF-1;','MF;TF-5;').replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard')
+    .replace('colDefaultUsageType_','colUsageType_');
+   wizard.append(child);
+  }
+  c.form.remove();page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1208,y:380,width:64,height:64},wizard);
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  assert.equal(r.output.ui?.elements?.some(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone'&&e.allowed_actions.includes('finish_wizard'))===true,mode==='valid',mode);
+  if(r.status!=='SUCCEEDED')continue;
+  assert.equal(r.output.wizard.input_port_context.status==='observed',mode==='valid',mode);
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const close=await page.execute({mode:'observe'});
+  assert.equal(close.output.ui?.elements?.some(e=>e.allowed_actions.includes('confirm_wizard_close'))===true,mode==='valid',mode);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+test('three-input Union offers Done and owned close only with its exact numbered overflow owner',async()=>{
+ for(const port of [1,2])for(const mode of ['valid','union_wrong_number','wrong_icon','missing_native_port','unverified_owner']) {
+  const {page}=await joinInputPortOverflowFixture(mode,port,'union');
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0];
+  const c=mappingCoverageFixture(page,4);page.context.innerWidth=1280;
+  for(const child of [...c.form.children]) {
+   if(child.attrs['data-tid']?.endsWith(';btnAddMappingColumn')){child.remove();continue;}
+   for(const e of [child,...child.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid']
+    .replace('MF;TF-1;','MF;TF-5;').replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard')
+    .replace('colDefaultUsageType_','colUsageType_');
+   wizard.append(child);
+  }
+  c.form.remove();page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1208,y:380,width:64,height:64},wizard);
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  const done=r.output.ui?.elements?.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone');
+  assert.equal(done?.allowed_actions.includes('finish_wizard')===true,mode==='valid',port+':'+mode+JSON.stringify({error:r.error,wizard:r.output.wizard}));
+  if(mode==='valid')assert.equal(r.output.wizard.output_columns.page.status,'complete_definition_page');
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const close=await page.execute({mode:'observe'});
+  assert.equal(close.output.ui?.elements?.some(e=>e.allowed_actions.includes('confirm_wizard_close'))===true,mode==='valid',port+':'+mode);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+// A Join numbered caption remains refused by the 'wrong_caption' Join case.
+for(const [name,mode] of [['a number other than the native port','union_wrong_number'],['a foreign node icon','wrong_icon']])
+  test('hidden numbered Union caption is refused for '+name,async()=>{
+    const {page}=await joinInputPortOverflowFixture(mode,2,'union');
+    assert.notEqual((await page.observe()).wizard.input_port_context.status,'observed');
+  });
 
 test('owned Join input observes its known main-table caption when overflow hides it',async()=>{
   // The same native Join exposed Главная таблица with verified input0/GUID/opening;
@@ -3705,6 +4072,22 @@ test('owned text export input observes its actual hidden data-source caption',as
   assert.deepEqual(page.events,[]);
 });
 
+test('text export input0 retains its hidden folder only with native input1 ownership',async()=>{
+  for(const mode of ['valid','wrong_folder','wrong_icon','wrong_type','wrong_index','wrong_port','unbound','hidden_panel']) {
+    const {page,binding,crumbs,panel,opening}=await exportInputPortOverflowFixture();
+    crumbs[5].children[0].attrs.class=mode==='wrong_type'?'bg-vendor-icon-calcdata':'bg-vendor-icon-exporttextfile';
+    crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
+    page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class=mode==='wrong_icon'?'maptree-icon-modeloutputports':'maptree-icon-modelinputports';
+    if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
+    if(mode==='wrong_index')opening.nativeIndex=0;
+    if(mode==='wrong_port')opening.portIndex=1;
+    if(mode==='hidden_panel')panel.style.display='none';
+    const result=await page.execute({mode:'observe',...(mode==='unbound'?{}:{prepared_node_context:binding})});
+    assert.equal(result.output?.wizard?.input_port_context?.status==='observed',mode==='valid',mode);
+    assert.deepEqual(page.events,[],mode);
+  }
+});
+
 test('hidden export input caption cannot replace native ownership or exact breadcrumb evidence',async()=>{
   for(const mode of ['unbound','missing_opening','duplicate_opening','foreign_node','foreign_port','foreign_workflow','foreign_engine',
     'wrong_port','wrong_caption','foreign_path','duplicate_crumb','duplicate_panel','hidden_panel','missing_icon','sensitive']) {
@@ -3729,6 +4112,55 @@ test('hidden export input caption cannot replace native ownership or exact bread
     const result=await page.execute({mode:'observe',...(mode==='unbound'?{}:{prepared_node_context:binding})});
     if(['missing_opening','duplicate_opening','foreign_node','foreign_port','foreign_workflow','foreign_engine'].includes(mode))
       assert.equal(result.error?.code,'PREPARED_NODE_CONTEXT_CHANGED',mode);
+    else assert.notEqual(result.output.wizard.input_port_context?.status,'observed',mode);
+    assert.deepEqual(page.events,[],mode);
+  }
+});
+
+async function restInputPortOverflowFixture() {
+  // Request-data caption: Loginom Help, REST request / Input ports.
+  // Overflow geometry comes from the existing export fixture, not a REST DOM capture.
+  const fixture=await exportInputPortOverflowFixture();
+  for(const [i,crumb] of fixture.crumbs.entries()) {
+    crumb.attrs['data-tid']=crumb.attrs['data-tid'].replaceAll('Источник_данных','Источник_данных_запроса');
+    if(i===7)crumb.ownText='Источник данных запроса';
+  }
+  fixture.crumbs[5].children[0].attrs.class='bg-vendor-icon-restclient';
+  // REST's table input is logical input0 but native input2, after the
+  // connection and variables. LAB-88/0352 confirmed that opening binding.
+  fixture.opening.nativeIndex=2;fixture.opening.portTree.FIndex=2;fixture.opening.port.FPortIndex=2;
+  return fixture;
+}
+
+test('owned REST input recognizes its request-data caption in breadcrumb overflow',async()=>{
+  const {page,binding}=await restInputPortOverflowFixture();
+  const full=await page.execute({mode:'observe',prepared_node_context:binding});
+  assert.equal(full.status,'SUCCEEDED',JSON.stringify(full.error));
+  assert.equal(full.output.prepared_node_context.input_port.native_index,2);
+  assert.equal(full.output.wizard.input_port_context.status,'observed');
+  assert.equal(full.output.wizard.input_port_context.port_display_label,'Источник данных запроса');
+  const narrow=await page.execute({mode:'observe',root_ref:full.output.wizard.root_ref,prepared_node_context:binding});
+  assert.deepEqual(narrow.output.wizard.input_port_context,full.output.wizard.input_port_context);
+  assert.deepEqual(page.events,[]);
+});
+
+test('REST overflow caption preserves exact input, icon, opening and navigation guards',async()=>{
+  for(const mode of ['unbound','missing_opening','foreign_port','wrong_port','wrong_native_index','wrong_icon','wrong_caption','foreign_path','hidden_panel','missing_icon']) {
+    const {page,binding,crumbs,panel,opening,preparation}=await restInputPortOverflowFixture();
+    if(mode==='missing_opening')preparation.inputPortOpenReceipts.clear();
+    if(mode==='foreign_port')opening.port.FGuid='foreign';
+    if(mode==='wrong_port')opening.portIndex=1;
+    if(mode==='wrong_native_index'){opening.nativeIndex=1;opening.portTree.FIndex=1;opening.port.FPortIndex=1;}
+    if(mode==='wrong_icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
+    if(mode==='wrong_caption')for(const crumb of crumbs.slice(7)) {
+      crumb.attrs['data-tid']=crumb.attrs['data-tid'].replace('Источник_данных_запроса','Источник_данных_запроса_2');
+      if(crumb===crumbs[7])crumb.ownText='Источник данных запроса 2';
+    }
+    if(mode==='foreign_path')crumbs[7].attrs['data-tid']=crumbs[7].attrs['data-tid'].replace('TF-5','TF-3');
+    if(mode==='hidden_panel')panel.style.display='none';
+    if(mode==='missing_icon')crumbs[8].children[0].remove();
+    const result=await page.execute({mode:'observe',...(mode==='unbound'?{}:{prepared_node_context:binding})});
+    if(['missing_opening','foreign_port'].includes(mode))assert.equal(result.error?.code,'PREPARED_NODE_CONTEXT_CHANGED',mode);
     else assert.notEqual(result.output.wizard.input_port_context?.status,'observed',mode);
     assert.deepEqual(page.events,[],mode);
   }
@@ -3785,6 +4217,17 @@ test('native process console joins bounded grids and keeps ownership and executi
   }
 });
 
+function lostLinksPrompt(page,mode='lost_links') {
+  const prompt=page.add('div',null,'',{x:410,y:331,width:459,height:138});prompt.attrs.class='x-window';
+  page.add('h1',null,mode==='lost_links_title'?'Другой вопрос':'Loginom '+build,undefined,prompt).attrs.role='heading';
+  page.add('span',null,mode==='lost_links_text'?'Удалить выбранные поля?':'Обнаружены связи с несуществующими объектами. Вы хотите удалить все потерянные связи и продолжить?',undefined,prompt);
+  for(const [name,label,x] of [['yes','Удалить и продолжить',480],['no','Не удалять и продолжить',620],['cancel','Отмена',780]]){
+    const button=page.add('button','msgbox;tlb;'+name,mode==='lost_links_button'&&name==='yes'?'Продолжить':label,{x,y:430,width:120,height:28},prompt);
+    if(mode==='lost_links_disabled'&&name==='yes')button.disabled=true;
+    if(mode==='lost_links_duplicate'&&name==='yes')page.add('button','msgbox;tlb;yes',label,button.box,prompt);
+  }
+  return prompt;
+}
 async function inputPortFinishFixture(mode='valid') {
   const clock=fixtureClock(),f=await inputMappingLiveFixture(false,clock.Date),{page,owner,base,nodes}=f;
   const {inputPortBreadcrumbs}=await import('./input-port-breadcrumbs.fixture.mjs');
@@ -3797,9 +4240,20 @@ async function inputPortFinishFixture(mode='valid') {
   if(mode==='missing_context')crumbs[7].remove();
   if(mode==='missing_mapping')nodes.get(base+'colSourceName_Region').remove();
   if(mode==='duplicate_done')page.add('button',done.attrs['data-tid'],'Готово',done.box,owner);
-  let graph,node,label,toast,loading,waits=0;
+  let graph,node,label,toast,loading,prompt,waits=0;
   const click=page.mouse.click;page.mouse.click=async(...args)=>{
     await click(...args);if(mode==='still_open')return;
+    if(mode.startsWith('lost_links')){
+      if(!prompt){
+        prompt=lostLinksPrompt(page,mode);
+        if(mode==='lost_links_workflow')crumbs[4].ownText='Другой сценарий';
+        if(mode==='lost_links_mask')page.add('div',null,'Загрузка').attrs.class='x-mask-msg';
+        return;
+      }
+      if(mode==='lost_links_lost_reply')throw Error('Lost confirmation reply');
+      if(mode==='lost_links_repeat')return;
+      prompt.remove();
+    }
     owner.remove();for(const c of crumbs.slice(5))c.remove();
     if(mode==='wrong_workflow')crumbs[4].ownText='Другой сценарий';
     graph=page.add('div','MF;TF-5;ModelForm;cmpDiagram','',{x:48,y:71,width:1392,height:929});
@@ -3819,9 +4273,9 @@ async function inputPortFinishFixture(mode='valid') {
     if(mode==='churn')page.mutationObserver.pending.push({type:'attributes',target:node,attributeName:'style'});
     if(mode==='late_tab'&&waits===2)page.tab.attrs['data-tid']='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';
   };
-  if((mode.startsWith('ellipsis')&&mode!=='ellipsis_unbound')||mode.startsWith('suffix')||mode.startsWith('late_loading'))page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  if((mode.startsWith('ellipsis')&&mode!=='ellipsis_unbound')||mode.startsWith('suffix')||mode.startsWith('late_loading')||mode.startsWith('lost_links_native'))page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
     {expected_build:build,expected_origin:origin,...(mode==='late_loading_long'?{settlement_timeout_ms:120000}:{}),prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},
-    async()=>({verified:true,node_id:mode==='suffix_wrong_id'||mode==='late_loading_foreign_node'&&waits>=3?'other':'node',surface:graph?'graph':'wizard',tid:graph?(mode==='ellipsis_wrong_body'?'foreign':node.attrs['data-tid']):'MF;TF-5;WizrdMCF',...(!graph?{input_port:{direction:'input',port:0}}:{})})));
+    async()=>({verified:true,node_id:mode==='suffix_wrong_id'||mode==='late_loading_foreign_node'&&waits>=3||mode==='lost_links_native_foreign'&&prompt?'other':'node',surface:graph?'graph':'wizard',tid:graph?(mode==='ellipsis_wrong_body'?'foreign':node.attrs['data-tid']):'MF;TF-5;WizrdMCF',...(!graph?{input_port:{direction:'input',port:0}}:{})})));
   return {...f,done,waits:()=>waits};
 }
 
@@ -3853,6 +4307,61 @@ test('typed input-port finish uses one gesture and quiet exact graph return with
     }
     if(mode==='late_body')assert.equal(waits(),5);if(mode==='churn')assert.equal(waits(),12);
   }
+});
+
+test('input-port Done confirms the exact lost-links question once and retains all refusal cases',async()=>{
+  for(const mode of ['lost_links','lost_links_native','lost_links_text','lost_links_title','lost_links_button','lost_links_disabled','lost_links_duplicate','lost_links_workflow','lost_links_mask','lost_links_native_foreign','lost_links_repeat','lost_links_lost_reply']){
+    const {page}=await inputPortFinishFixture(mode),snapshot=await page.observe();
+    const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');assert.ok(done,mode);
+    const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot),success=['lost_links','lost_links_native'].includes(mode);
+    assert.equal(result.status,success?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+    assert.equal(page.events.filter(e=>e==='click').length,success||['lost_links_repeat','lost_links_lost_reply'].includes(mode)?2:1,mode);
+    assert.equal(result.trace.filter(e=>e.event==='wizard_lost_links_deleted').length,success||mode==='lost_links_repeat'?1:0,mode);
+    if(success)assert.ok(result.trace.some(e=>e.event==='input_port_finish_verified'));
+  }
+});
+test('ordinary input Done click never confirms a lost-links question',async()=>{
+  const {page}=await inputPortFinishFixture('lost_links'),snapshot=await page.observe();
+  const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');
+  const result=await page.act({verb:'click',ref:done.ref},snapshot);
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  assert.ok(!result.trace.some(e=>e.event==='wizard_lost_links_deleted'));
+});
+test('lost-links confirmation refuses a mutation after its final checked target',async()=>{
+  const {page}=await inputPortFinishFixture('lost_links'),snapshot=await page.observe();
+  const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port'),evaluate=page.evaluate.bind(page);
+  page.evaluate=(fn,arg)=>{
+    const yes=page.document.querySelectorAll('[data-tid="msgbox;tlb;yes"]')[0];
+    if(yes&&fn.toString().includes('state.captureMutations(state.observer.takeRecords());')&&fn.toString().includes('return {document:state.epoch')){
+      yes.ownText='Другой ответ';page.mutationObserver.pending.push({type:'childList',target:yes});
+    }
+    return evaluate(fn,arg);
+  };
+  const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot);
+  assert.equal(result.status,'AMBIGUOUS');assert.equal(result.error.code,'UI_EPOCH_CHANGED');
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+test('input-port finish retries a timed graph read once without repeating Done',async()=>{
+ for(const persistent of [false,true]) {
+  const {page}=await inputPortFinishFixture('ellipsis'),snapshot=await page.observe();
+  const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='input_port');
+  let elapsed=0,armed=false,first=false,failures=0;
+  const Clock=page.context.Date;
+  page.context.Date=class extends Clock {static now(){return Clock.now()+elapsed;}};
+  const click=page.mouse.click,evaluate=page.evaluate.bind(page),query=page.document.querySelectorAll.bind(page.document);
+  page.mouse.click=async(...args)=>{await click(...args);armed=true;};
+  page.evaluate=(fn,arg)=>{if(arg&&Object.hasOwn(arg,'discoverRoots'))first=true;return evaluate(fn,arg);};
+  page.document.querySelectorAll=selector=>{
+   if(first){first=false;if(armed&&(persistent||failures===0)){elapsed+=600;failures++;}}
+   return query(selector);
+  };
+  const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot);
+  assert.equal(result.status,persistent?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(result.error));
+  assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,1);
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  assert.equal(failures,persistent?2:1);
+  if(persistent)assert.equal(result.error.code,'UI_SCAN_LIMIT');
+ }
 });
 
 test('input-port completion waits through late loading without repeating Done or accepting a changed owner',async()=>{
@@ -4110,7 +4619,7 @@ function outputPortFinishFixture(mode='valid') {
   if(mode==='duplicate_done')page.add('button',done.attrs['data-tid'],'Готово',done.box,c.form);
   if(mode==='missing_auto')c.auto.remove();
   const click=page.mouse.click;let node,waits=0;
-  page.mouse.click=async(...args)=>{await click(...args);if(mode==='still_open')return;c.form.remove();for(const crumb of crumbs.slice(2))crumb.remove();
+  page.mouse.click=async(...args)=>{await click(...args);if(mode==='still_open')return;if(mode==='lost_links'){lostLinksPrompt(page);return;}c.form.remove();for(const crumb of crumbs.slice(2))crumb.remove();
     if(mode==='wrong_workflow')crumbs[1].ownText='Other';
     const graph=page.add('div','MF;TF-1;ModelForm;cmpDiagram','',{x:20,y:70,width:850,height:650});
     const key=mode==='wrong_node'?'Other':'Calc';node=page.add('g','MF;TF-1;Graph;'+key,'',{x:100,y:200,width:150,height:80},graph);
@@ -4121,6 +4630,13 @@ function outputPortFinishFixture(mode='valid') {
   return {page,waits:()=>waits};
 }
 
+test('output-port Done never confirms the input lost-links question',async()=>{
+  const {page}=outputPortFinishFixture('lost_links'),snapshot=await page.observe();
+  const done=snapshot.ui.elements.find(e=>e.wizard_finish?.mode==='output_port');assert.ok(done);
+  const result=await page.act({verb:'finish_wizard',ref:done.ref},snapshot);
+  assert.equal(result.status,'AMBIGUOUS');assert.equal(page.events.filter(e=>e==='click').length,1);
+  assert.ok(!result.trace.some(e=>e.event==='wizard_lost_links_deleted'));
+});
 test('typed output-port finish requires complete output mapping and its own port owner',async()=>{
   for(const mode of ['valid','missing_context','filtered','duplicate_done','missing_auto']){
     const {page}=outputPortFinishFixture(mode),s=await page.observe();const controls=s.ui.elements.filter(e=>e.wizard_finish?.mode==='output_port');
@@ -4129,7 +4645,7 @@ test('typed output-port finish requires complete output mapping and its own port
 });
 
 test('overflow output socket requires a current native owner and visible actionable Done',async()=>{
-  for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
+  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns','filterdata'])for(const outputPort of vendor==='filterdata'?[0,1]:[0])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
     'duplicate_socket','wrong_socket_icon','missing_settings','hidden_ancestor','hidden_visibility','disabled_done','hidden_done']){
     const {page}=outputPortFinishFixture();
     const find=suffix=>page.document.all().find(e=>e.attrs['data-tid']?.endsWith(suffix));
@@ -4137,11 +4653,24 @@ test('overflow output socket requires a current native owner and visible actiona
     socket.children[0].attrs.class='bg-vendor-icon-'+socketIcon;
     settings.attrs['data-tid']=settings.attrs['data-tid'].replace('>Settings','>Настройка');settings.ownText='Настройка';
     socket.style.display='none';settings.style.display='none';
-    const port={direction:'output',port:0,native_index:0,port_guid:'out-guid',opening_operation_id:'open-output'};
+    if(mode.startsWith('bound_folder')){
+      const folder=find('>Outputs');
+      for(const e of page.document.all())if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('>Outputs','>Выходные_порты');
+      folder.ownText=mode==='bound_folder_wrong_caption'?'Other':'Выходные порты';folder.style.display='none';
+      find('>Calc').children[0].attrs.class=mode==='bound_folder_wrong_type'?'bg-vendor-icon-'+(vendor==='calcdata'?'groupdata':'calcdata'):'bg-vendor-icon-'+vendor;
+      if(mode==='bound_folder_wrong_icon')folder.children[0].attrs.class='maptree-icon-modelinputports';
+    }
+    const port={direction:'output',port:outputPort,native_index:outputPort,port_guid:'out-guid',opening_operation_id:'open-output',node_icon_class:'bg-vendor-icon-'+vendor};
+    if(mode==='bound_folder_missing_native_icon')delete port.node_icon_class;
+    if(mode==='bound_folder_wrong_native_icon')port.node_icon_class='bg-vendor-icon-unknown';
+    if(mode==='bound_folder_wrong_port')port.port=port.native_index=vendor==='filterdata'?2:1;
+    if(mode==='bound_folder_wrong_index')port.native_index=outputPort===0?1:0;
+    if(mode==='bound_folder_missing_guid')delete port.port_guid;
+    if(mode==='bound_folder_missing_opening')delete port.opening_operation_id;
     if(mode==='foreign_port')port.direction='input';
     if(mode==='missing_guid')delete port.port_guid;
     if(mode==='missing_opening')delete port.opening_operation_id;
-    if(mode==='wrong_index')port.native_index=1;
+    if(mode==='wrong_index')port.native_index=outputPort===0?1:0;
     if(mode==='duplicate_socket'){
       const duplicate=page.add('a',socket.attrs['data-tid'],'Result',undefined,socket.parentElement);duplicate.style.display='none';
       page.add('span',null,'',undefined,duplicate).attrs.class='bg-vendor-icon-'+socketIcon;
@@ -4153,14 +4682,14 @@ test('overflow output socket requires a current native owner and visible actiona
     if(mode==='disabled_done')done.disabled=true;
     if(mode==='hidden_done')done.style.display='none';
     page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
-      {expected_build:build,expected_origin:origin,...(mode==='unbound'?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}}),...options},
+      {expected_build:build,expected_origin:origin,...(['unbound','bound_folder_unbound'].includes(mode)?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}}),...options},
       async()=>mode==='stale_owner'?{verified:false,reason:'node'}:{verified:true,surface:'wizard',node_id:'node',output_port:port}));
     const raw=await page.execute({mode:'observe'});
     if(mode==='stale_owner'){assert.notEqual(raw.status,'SUCCEEDED');assert.equal(raw.error.code,'PREPARED_NODE_CONTEXT_CHANGED');continue;}
     assert.equal(raw.status,'SUCCEEDED',mode);
     const controls=raw.output.ui.elements.filter(e=>e.allowed_actions.includes('finish_wizard'));
-    assert.equal(controls.length,mode==='valid'?1:0,socketIcon+': '+mode);
-    if(mode==='valid'){assert.equal(raw.output.wizard.port_context.status,'observed');assert.equal(controls[0].wizard_finish.mode,'output_port');}
+    assert.equal(controls.length,['valid','bound_folder'].includes(mode)?1:0,vendor+': '+socketIcon+': '+mode);
+    if(['valid','bound_folder'].includes(mode)){assert.equal(raw.output.wizard.port_context.status,'observed');assert.equal(controls[0].wizard_finish.mode,'output_port');}
     assert.equal(page.events.filter(e=>e==='click').length,0,mode);
   }
 });
@@ -4249,6 +4778,33 @@ test('scan time budget accepts 500 ms but rejects 501 ms before issuing referenc
     }
     assert.deepEqual(page.events, []);
   }
+});
+
+test('owned wizard retries one timed scan, including after a gesture, without replaying it',async()=>{
+ for(const mode of ['transient','persistent','after_gesture','unbound']) {
+  const {page,binding}=await exportInputPortOverflowFixture(),clock=fixtureClock();
+  page.context.Date=clock.Date;
+  const wizardTid=binding.workflow_ref.prefix+';WizrdMCF';
+  const probe=page.add('button',wizardTid+';btnProbe','Probe',undefined,page.document.querySelectorAll('[data-tid="'+wizardTid+'"]')[0]);
+  const before=await page.execute({mode:'observe',prepared_node_context:binding});
+  const target=before.output.ui.elements.find(e=>e.tid===probe.attrs['data-tid']);
+  let reads=0,first=false;
+  const evaluate=page.evaluate.bind(page),query=page.document.querySelectorAll.bind(page.document);
+  page.evaluate=(fn,arg)=>{if(arg&&Object.hasOwn(arg,'discoverRoots')){reads++;first=true;}return evaluate(fn,arg);};
+  page.document.querySelectorAll=selector=>{
+   if(first){first=false;if(mode==='persistent'||reads===(mode==='after_gesture'?2:1))clock.advance(600);}
+   return query(selector);
+  };
+  const result=await page.execute(mode==='after_gesture'
+   ?{mode:'act',prepared_node_context:binding,snapshot:before.output,action:{verb:'click',ref:target.ref}}
+   :{mode:'observe',...(mode==='unbound'?{}:{prepared_node_context:binding})});
+  const success=['transient','after_gesture'].includes(mode);
+  assert.equal(result.status,success?'SUCCEEDED':'NOT_APPLIED',mode+JSON.stringify(result.error));
+  assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,mode==='unbound'?0:1,mode);
+  assert.equal(reads,mode==='after_gesture'?3:mode==='unbound'?1:2,mode);
+  assert.equal(page.events.filter(e=>e==='click').length,mode==='after_gesture'?1:0,mode);
+  if(!success){assert.equal(result.error.code,'UI_SCAN_LIMIT');assert.equal(result.output.ui,undefined);}
+ }
 });
 
 test('mask settlement cannot extend unbound or unrelated actions',()=>{
@@ -4865,7 +5421,7 @@ test('grouped mapping pages bind group-local indexes and permit only subpixel ta
   const {page,c,records}=bufferedMappingFixture();
   const rename=e=>{if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard',family);for(const child of e.children)rename(child);};rename(c.form);
   records.forEach((r,i)=>{r.data.GroupField=i<10?'':'Исключенные';r.data.Index=i<10?i:i-10;});
-  c.rows[11].box.width+=fault==='clipped'?0.5:1/128;
+  c.rows[11].box.width+=fault==='clipped'?2:1/128;
   if(fault==='group')records[19].data.GroupField='Unknown';
   if(fault==='index')records[19].data.Index=19;
   const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
@@ -4893,6 +5449,18 @@ test('graph launch only exposes typed execution for the exact native selected no
  const e=r.output.ui.elements.find(e=>e.tid===f.button.attrs['data-tid']);assert.deepEqual(clone(e.allowed_actions),['execute_graph_node'],JSON.stringify(e));
  assert.equal(e.graph_execution.node_id,'node-a');assert.throws(()=>validateUiAction({verb:'click',ref:e.ref},r.output));
  const done=await f.execute({mode:'act',action:{verb:'execute_graph_node',ref:e.ref},snapshot:r.output});assert.equal(done.status,'SUCCEEDED');assert.equal(f.page.events.filter(e=>e==='click').length,1);
+});
+test('graph launch refuses a repainted body of the same selected node before the execution gesture',async()=>{
+ const f=graphLaunchFixture(),view=f.model.FDiagram.FmxGraph.view,original=view.getState;let reads=0;
+ view.getState=()=>{
+  if(++reads<3)return original();
+  return {shape:{node:f.page.add('div','MF;TF-1;Graph;Calculator','',{x:100,y:100,width:100,height:50})}};
+ };
+ const observed=await f.execute({mode:'observe'}),button=observed.output.ui.elements.find(e=>e.tid===f.button.attrs['data-tid']);
+ const outcome=await f.execute({mode:'act',action:{verb:'execute_graph_node',ref:button.ref},snapshot:observed.output});
+ assert.equal(outcome.error.code,'GRAPH_EXECUTION_CONTEXT_CHANGED');assert.equal(outcome.status,'NOT_APPLIED');
+ assert.equal(outcome.effect_possible,false);assert.equal(outcome.cleanup_complete,true);
+ assert.equal(f.page.events.filter(e=>e==='click').length,0);
 });
 for(const [name,mutate] of Object.entries({unselected:f=>f.select([]),foreign:f=>f.select([{}]),multiple:f=>f.select([f.owner.FCell,{}]),locked:f=>f.owner.FLocked=true,disabled:f=>f.native.disabled=true,deactivate:f=>f.native.tooltip='Деактивировать узел',duplicate:f=>f.model.FDiagram.FNodes.FCollection.push({...f.owner}),foreign_button:f=>f.native.el.dom={}}))test('graph launch refuses native '+name+' drift without a gesture',async()=>{
  const f=graphLaunchFixture(),r=await f.execute({mode:'observe'}),e=r.output.ui.elements.find(e=>e.tid===f.button.attrs['data-tid']);
@@ -5219,16 +5787,16 @@ test('fractional geometry keeps ordinary and addressed output definitions comple
 });
 
 test('fractional geometry accepts only bounded edge error and retains refusal diagnostics',async()=>{
-  for(const extra of [0,0.000025,1/128,1/64,1/64+0.00001,0.25,0.5,1,NaN,Infinity]) {
+  for(const extra of [0,0.000025,1/128,1/64,1/32,0.25,0.5,1,1+0.00001,2,NaN,Infinity]) {
     const page=new Page(),c=mappingCoverageFixture(page);
     c.rows[0].box={...c.rows[0].box,width:500+extra};
     const observed=await page.observe();
     assert.equal(observed.wizard.output_columns.definition_coverage.status,
-      Number.isFinite(extra)&&extra<=1/64?'complete_configured_rows':'partial',String(extra));
-    if(Number.isFinite(extra)&&extra>1/64){
+      Number.isFinite(extra)&&extra<=1?'complete_configured_rows':'partial',String(extra));
+    if(Number.isFinite(extra)&&extra>1){
       assert.equal(observed.geometry.failure.condition,'right_containment');
-      assert.equal(observed.geometry.failure.tolerance,1/64);
-      assert.ok(observed.geometry.failure.delta>1/64);
+      assert.equal(observed.geometry.failure.tolerance,1);
+      assert.ok(observed.geometry.failure.delta>1);
     }
   }
 });
@@ -5389,3 +5957,19 @@ for(const prefix of ['ConsoleForm','MF;ConsoleForm'])test('bounded '+prefix+' co
  const ambiguous=await f.page.execute({mode:'observe',root_ref:root.ref});
  assert.equal(ambiguous.output.ui.elements.some(e=>e.process_row||e.process_grid),false);
 });
+
+for(const [card,family] of [['LAB-66','DerivedDataSourceOutputSocketWizard'],['LAB-69','DerivedDataSourceMappingEngineOutputPortWizard']])
+ test(card+' mapping rows admit 0.5/1 CSS px and reject 2 CSS px overflow within owned definition pages',async()=>{
+  for(const fault of ['observed','half_pixel','one_pixel','overflow','foreign_record','group','left','cell']) {
+   const {page,c,records}=bufferedMappingFixture();
+   for(const e of page.document.all())if(e.attrs['data-tid']?.startsWith(c.base))e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard',family);
+   records.forEach((r,i)=>{r.data.GroupField=i<10?'':'Исключенные';r.data.Index=i<10?i:i-10;});
+   c.rows[11].box.width+=fault==='overflow'?2:fault==='half_pixel'?0.5:fault==='one_pixel'?1:1/32;
+   if(fault==='foreign_record')c.rows[11].attrs['data-recordid']='foreign';
+   if(fault==='group')records[11].data.GroupField='Unknown';
+   if(fault==='left')c.rows[11].box.x-=1/32;
+   if(fault==='cell')c.rows[11].children[4].box.width+=1/16;
+   const result=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+   assert.equal(result.output.wizard.output_columns.page.status,['observed','half_pixel','one_pixel'].includes(fault)?'complete_definition_page':'unverified_definition_page',fault);
+  }
+ });

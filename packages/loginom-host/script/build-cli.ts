@@ -20,7 +20,11 @@ const repo = resolve(import.meta.dir, "../../..")
 const args = process.argv.slice(2)
 const destination = args[0]
 const noArchive = args.slice(1).includes("--no-archive")
-if (args.slice(1).some((arg) => arg !== "--no-archive")) throw new Error("Unknown build option")
+// Linux x64 hosts without AVX2 (for example Ivy Bridge Xeons) need Bun's
+// baseline runtime; the default native build stays unchanged.
+const baseline = args.slice(1).includes("--baseline")
+if (args.slice(1).some((arg) => arg !== "--no-archive" && arg !== "--baseline")) throw new Error("Unknown build option")
+if (baseline && (process.platform !== "linux" || process.arch !== "x64")) throw new Error("Baseline builds are linux-x64 only")
 if (!destination || !isAbsolute(destination)) throw new Error("Provide a new absolute artifact directory")
 if (await Bun.file(join(destination, "cli-manifest.json")).exists()) throw new Error("Artifact already exists")
 await lstat(destination).then(
@@ -48,7 +52,7 @@ const archiver = process.platform === "win32" ? join(systemRoot!, "System32/tar.
 const source = await cliSourceSnapshot(repo)
 const work = await mkdtemp(join(dirname(destination), ".cli-build-"))
 try {
-  await $`${process.execPath} script/build.ts --standalone --single --skip-install`
+  await $`${process.execPath} script/build.ts --standalone --single --skip-install ${baseline ? ["--baseline"] : []}`
     .cwd(join(repo, "packages/agent"))
     .env({
       ...process.env,
@@ -57,7 +61,7 @@ try {
     })
   const artifact = join(
     work,
-    `native/loginom-ai-agent-cli-${process.platform === "win32" ? "windows" : process.platform}-${process.arch}`,
+    `native/loginom-ai-agent-cli-${process.platform === "win32" ? "windows" : process.platform}-${process.arch}${baseline ? "-baseline" : ""}`,
   )
   const resources = join(artifact, "resources/loginom")
   if (process.platform === "darwin") {
@@ -137,6 +141,7 @@ try {
     writeCliManifest(artifact, {
       version: pkg.version,
       channel: process.env.LOGINOM_AI_AGENT_CHANNEL ?? "dev",
+      browserRecovery: process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1",
       platform: process.platform,
       arch: process.arch,
       ...source,

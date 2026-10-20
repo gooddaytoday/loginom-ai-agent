@@ -7,26 +7,26 @@ import {createHash} from 'node:crypto';
 import {createArtifactStore} from '../lib/artifacts.mjs';
 import {Page,runtime} from './support/executor-fixture.mjs';
 
-async function fixture({submissionFailure=false}={}) {
+async function fixture({submissionFailure=false,name='sales.csv',bytes=Buffer.from('abc')}={}) {
   const directory=await mkdtemp(join(tmpdir(),'dock-verify-'));
-  const sourcePath=join(directory,'source');await writeFile(sourcePath,'abc');
+  const sourcePath=join(directory,'source');await writeFile(sourcePath,bytes);
   const store=await createArtifactStore({directory:join(directory,'store')});
-  const artifact=await store.admit({sourcePath,name:'sales.csv',bytes:3,sha256:createHash('sha256').update('abc').digest('hex'),
+  const artifact=await store.admit({sourcePath,name,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),
     upload:{directory:'/test',overwrite:'replace'}});
   const page=new Page(),elements=page.elements.bind(page),snapshot=page.uiSnapshot.bind(page),locator=page.locator.bind(page);
-  const tid=page.prefix+';FileStorageForm;colName_sales.csv';
-  page.elements=()=>[...elements(),page.element(tid,{label:'sales.csv',kind:'file'})];
+  const tid=page.prefix+';FileStorageForm;colName_'+name;
+  page.elements=()=>[...elements(),page.element(tid,{label:name,kind:'file'})];
   page.uiSnapshot=()=>({...snapshot(),file_storage:{status:'observed',directory:'/test',listing_complete:false}});
   const counts={uploads:0,downloads:0,verifications:0};
   const input={count:async()=>1,isEnabled:async()=>true,elementHandle:async()=>input,dispose:async()=>{},
     evaluate:async fn=>fn({isConnected:true,tagName:'INPUT',type:'file'}),setInputFiles:async path=>{
-      assert.equal((await readFile(path)).toString(),'abc');counts.uploads++;
+      assert.deepEqual(await readFile(path),bytes);counts.uploads++;
       if(submissionFailure)throw new Error('input completion not confirmed');
     }};
   page.locator=selector=>selector.includes('FileStorageForm;tbrActions') ? {
     count:async()=>1,isVisible:async()=>true,isEnabled:async()=>true,locator:()=>input} : locator(selector);
-  let event;page.downloadBytes='abc';page.dropReply=false;
-  const download={url:()=> 'https://loginom.invalid/download',suggestedFilename:()=> 'sales.csv',failure:async()=>null,cancel:async()=>{},
+  let event;page.downloadBytes=bytes;page.dropReply=false;
+  const download={url:()=> 'https://loginom.invalid/download',suggestedFilename:()=>name,failure:async()=>null,cancel:async()=>{},
     saveAs:async path=>{counts.downloads++;await writeFile(path,page.downloadBytes);}};
   page.waitForEvent=async()=>new Promise(resolve=>{event=resolve;});
   const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);event(download);};
@@ -167,4 +167,25 @@ test('local validation or staging failure never marks verification as dispatched
   const result=await f.rt.verifyArtifact({...request,onDispatched:()=>dispatched++});
   assert.equal(result.status,'SUCCEEDED');assert.equal(dispatched,1);assert.equal(f.counts.uploads,1);assert.equal(f.counts.downloads,1);
  }finally{await f.cleanup();}
+});
+
+
+test('XLSX preflight and download retain exact byte/hash verification and format refusals',async()=>{
+ const bytes=Buffer.from([0x50,0x4b,0xff,0x00]);
+ const f=await fixture({name:'sales.XLSX',bytes});
+ try {
+  for(const name of ['sales.xlsx','sales.XLSX','sales.csv','sales.tsv','sales.txt'])assert.doesNotThrow(()=>f.rt.preflightDeliveredArtifact({name}));
+  for(const name of ['sales.xls','sales.xlsm','file.lgp','sales.xlsx.exe','file.json'])assert.throws(()=>f.rt.preflightDeliveredArtifact({name}),e=>e.code==='ARTIFACT_VERIFICATION_UNSUPPORTED');
+  const result=await f.rt.verifyArtifact(await f.request());
+  assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.bytes_verified,true);
+  assert.equal(result.output.sha256,createHash('sha256').update(bytes).digest('hex'));
+  assert.deepEqual(f.counts,{uploads:1,downloads:1,verifications:1});
+ }finally{await f.cleanup();}
+ const wrong=await fixture({name:'wrong.xlsx',bytes});
+ try {
+  wrong.page.downloadBytes=Buffer.from([0x50,0x4b,0xfe,0x00]);
+  const r=await wrong.rt.verifyArtifact(await wrong.request());
+  assert.equal(r.status,'FAILED');assert.equal(r.error.code,'DOWNLOADED_ARTIFACT_MISMATCH');
+  assert.equal(r.output.bytes_verified,false);
+ }finally{await wrong.cleanup();}
 });

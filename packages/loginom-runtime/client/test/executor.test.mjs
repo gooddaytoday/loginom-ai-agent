@@ -4,6 +4,132 @@ import { validateActionParameters } from '../lib/action-catalog.mjs';
 import { actions, selectors, build, Page, nodeParameters, linkPage, linkParameters, run, runtime } from './support/executor-fixture.mjs';
 import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from '../../tools/loginom-acceptance/javascript-persistence-save.mjs';
 
+async function arrangePage({ intent = 'new_draft', running = false, wizard = false } = {}) {
+  const page = linkPage(), packageNode = new page.app.PackageTreeNode();
+  page.storageBinding = { session_id: 'own-session', document_id: 'own-document' };
+  page.edges = ['Источник|Output_Data-0|Приёмник|Input_Data-0'];
+  packageNode.HasRunningNodes = () => running;
+  page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab = () => ({
+    Controller: { FController: page.model, Node: { data: { node: packageNode } } },
+  });
+  await page.execute('async () => null');
+  const tab = { classList: { contains: () => page.active } };
+  const document = { querySelectorAll: selector => selector.includes('cmpDiagram') ? [page.model.FDiagram.FmxGraph.container]
+    : selector.includes('Workspace;t.br;tb') ? [tab]
+    : selector.includes(';cnrNaviMode;b.s_') ? ['Пакет','Модуль','Сценарий'].map((text,index) => ({
+      textContent: text, getAttribute: () => page.prefix+';cnrNaviMode;b.s_'+Array.from({length:index+1},(_,i)=>i).join('>'),
+    }))
+    : wizard ? [{ getBoundingClientRect: () => ({ width: 10, height: 10 }), visible: true }] : [] };
+  Object.assign(page.context, { document, __loginomDockPreparationV1: { document, id: 'own-document', receipts: new Map([
+    ['prepare', { phase: 'verified', packageNode, tab, request: JSON.stringify({ intent, session: 'own-session' }) }],
+  ]) } });
+  const elements = page.elements.bind(page);
+  page.elements = () => [...elements(), page.element(page.prefix+';ModelForm;btnLayout', { symbol: 'workflow.arrange' })];
+  const click = page.click.bind(page);
+  page.arrangements = 0;
+  page.click = async item => {
+    if (item.symbol !== 'workflow.arrange') return click(item);
+    page.arrangements++;
+    page.events.push('arranged');
+    if (page.failArrange) throw Error('Native layout refused');
+    page.nodes.forEach((node,index) => { node.x = 120; node.y = 40 + index * 136; });
+    if (page.changeTopology) page.edges = [];
+  };
+  return page;
+}
+
+test('both saves arrange an owned draft once before writing and preserve topology', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) {
+    const page = await arrangePage(), links = [...page.edges], path = '/user/data/packages/arranged.lgp';
+    const outcome = await run(page, action, { path, conflict_policy: 'fail' });
+    assert.equal(outcome.status, 'SUCCEEDED', JSON.stringify(outcome));
+    assert.equal(page.arrangements, 1);
+    assert.deepEqual(page.storage.get(path).edges, links);
+    assert.equal(page.storage.get(path).nodes[0].x, 120);
+    assert.equal(outcome.trace.find(item => item.event === 'package_arrangement').reason, 'result_unconfirmed');
+    assert.ok(outcome.trace.findIndex(item => item.event === 'package_arrangement') < outcome.trace.findIndex(item => item.event === 'save_requested'));
+    validateActionParameters(actions.get(action).output_schema, outcome.output);
+  }
+});
+
+test('an opened package or missing creation receipt never authorizes layout', async () => {
+  for (const mode of ['open_package','existing_workflow','missing','foreign-package','foreign-document','foreign-session','missing-binding']) {
+    const page = await arrangePage({ intent: mode });
+    const state = page.context.__loginomDockPreparationV1;
+    if (mode === 'missing') state.receipts.clear();
+    if (mode === 'foreign-package') state.receipts.get('prepare').packageNode = new page.app.PackageTreeNode();
+    if (mode === 'foreign-document') state.document = {};
+    if (mode === 'foreign-session') state.receipts.get('prepare').request = JSON.stringify({ intent: 'new_draft', session: 'other-session' });
+    if (mode === 'missing-binding') page.storageBinding = null;
+    const result = await run(page, 'package.save_checkpoint', { path: '/user/data/packages/opened.lgp', conflict_policy: 'fail' });
+    assert.equal(result.status, 'SUCCEEDED', JSON.stringify(result));
+    assert.equal(page.arrangements, 0);
+    assert.equal(result.trace.find(item => item.event === 'package_arrangement').reason, 'ownership_unconfirmed');
+  }
+});
+
+test('native layout refusal, disabled control, wizard and running package do not fail saving', async () => {
+  for (const mode of ['refused','disabled','wizard','running','missing-button']) {
+    const page = await arrangePage({ wizard: mode === 'wizard', running: mode === 'running' });
+    page.failArrange = mode === 'refused';
+    const elements = page.elements.bind(page);
+    page.elements = () => elements().filter(item => mode !== 'missing-button' || item.symbol !== 'workflow.arrange')
+      .map(item => item.symbol === 'workflow.arrange' && mode === 'disabled' ? { ...item, enabled: false } : item);
+    let writes = 0;
+    const save = page.save.bind(page); page.save = () => { writes++; save(); };
+    const result = await run(page, 'package.save_checkpoint', { path: '/user/data/packages/optional.lgp', conflict_policy: 'fail' });
+    assert.equal(result.status, 'SUCCEEDED', JSON.stringify(result));
+    assert.equal(writes, 1);
+    assert.equal(result.trace.find(item => item.event === 'package_arrangement').warning, true);
+    assert.equal(page.arrangements, mode === 'refused' ? 1 : 0);
+  }
+});
+
+test('both saves refuse topology drift during layout before writing the package', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) {
+    const page = await arrangePage(); page.changeTopology = true;
+    const result = await run(page, action, { path: '/user/data/packages/drift-layout.lgp', conflict_policy: 'fail' });
+    assert.equal(result.status, 'AMBIGUOUS', JSON.stringify(result));
+    assert.match(result.error.message, /Package changed after save preflight/);
+    assert.equal(page.storage.size, 0);
+    assert.equal(result.trace.some(item => item.event === 'save_requested'), false);
+  }
+});
+
+test('both saves check the original topology after staging the dialog, beyond the layout repaint', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) {
+    const page = await arrangePage(), links = [...page.edges], click = page.click.bind(page);
+    page.click = async item => {
+      await click(item);
+      if (item.symbol === 'workflow.arrange') page.edges = [];
+      if (item.symbol === 'packages.menu') page.edges = [...links];
+    };
+    const path = '/user/data/packages/layout-repaint.lgp';
+    const result = await run(page, action, { path, conflict_policy: 'fail' });
+    assert.equal(result.status, 'SUCCEEDED', JSON.stringify(result));
+    assert.deepEqual(page.storage.get(path).edges, links);
+    assert.equal(page.arrangements, 1);
+  }
+});
+
+test('layout is skipped near the original deadline while ordinary saving still completes', async () => {
+  const page = await arrangePage(), deadline = page.clock + 2500;
+  const result = await run(page, 'package.save_checkpoint', { path: '/user/data/packages/deadline.lgp', conflict_policy: 'fail' }, { deadline_at: deadline });
+  assert.equal(result.status, 'SUCCEEDED', JSON.stringify(result));
+  assert.equal(result.trace.find(item => item.event === 'package_arrangement').reason, 'save_deadline_near');
+  assert.equal(page.arrangements, 0);
+  assert.ok(page.clock < deadline);
+});
+
+test('the runtime supplies its existing session binding to the private Save step', async () => {
+  const page = await arrangePage();
+  const engine = runtime(page, { getStorageBinding: () => page.storageBinding });
+  const result = await engine.run('package.save_checkpoint', { path: '/user/data/packages/runtime-arrange.lgp', conflict_policy: 'fail' }, { operationId: 'runtime-arrange' });
+  assert.equal(result.status, 'SUCCEEDED', JSON.stringify(result));
+  assert.equal(result.trace.find(item => item.event === 'package_arrangement').status, 'attempted');
+  assert.equal(page.arrangements, 1);
+});
+
 test('node capability creates, types the rename and verifies actual snapped geometry with a workflow-bound ref', async () => {
   const page = new Page();
   const outcome = await run(page, 'node.add', nodeParameters);

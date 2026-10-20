@@ -1809,6 +1809,34 @@ describe("ProviderTransform.schema - openai supported schema subset", () => {
     },
   } as any
 
+  test("Responses request preserves required root finish and its description for the actual Loginom node tool", async () => {
+    const { createOpenAI } = await import("@ai-sdk/openai")
+    const { nodeApiTools } = await import("../../../loginom-runtime/client/lib/node-api.mjs")
+    const { userNodeTool } = await import("../../../loginom-runtime/client/lib/user-workflow.mjs")
+    const definition = userNodeTool(nodeApiTools.find((item: any) => item.name === "dock_node_apply"))
+    const before = structuredClone(definition)
+    const model = { providerID: "openai", api: { id: "gpt-6-luna", npm: "@ai-sdk/openai" } } as any
+    const lowered = ProviderTransform.schema(model, definition.inputSchema) as any
+    let body: any
+    const provider = createOpenAI({
+      apiKey: "test-only",
+      fetch: Object.assign(async (_url: any, init: any) => {
+        body = JSON.parse(String(init.body))
+        return Response.json({ id: "resp_test", object: "response", created_at: 0, model: "gpt-6-luna", status: "completed", output: [], usage: { input_tokens: 1, output_tokens: 0, total_tokens: 1 } })
+      }, { preconnect: () => undefined }),
+    })
+    await generateText({ model: provider.responses("gpt-6-luna"), prompt: "test", maxRetries: 0,
+      tools: { loginom_dock_node_apply: { description: definition.description, inputSchema: jsonSchema(lowered) } } })
+    const sent = body.tools.find((item: any) => item.name === "loginom_dock_node_apply")
+    expect(sent.parameters.required).toEqual(definition.inputSchema.required)
+    expect(sent.parameters.required).toContain("finish")
+    expect(sent.parameters.properties.finish).toEqual(definition.inputSchema.properties.finish)
+    expect(sent.parameters.properties.finish.default).toBeUndefined()
+    expect(sent.description).toBe(definition.description)
+    expect(sent.parameters.properties.mappings.items.properties.fields.description).toContain("Mutually exclusive")
+    expect(definition).toEqual(before)
+  })
+
   test("keeps the actual Dock wizard stage array constant compatible with its inferred type", async () => {
     const source = (await import(
       new URL("../../../loginom-runtime/client/lib/workspace-ui.mjs", import.meta.url).href

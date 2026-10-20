@@ -14,6 +14,80 @@ const request=()=>({operation_id:'op',contract_revision:'1.0.0',document_id:'doc
   target:{kind:'existing',type:'transform.sorting',ref:{document_id:'doc',workflow_id:'wf',node_id:'sort'}},inputs:[],mappings:[],mode:'keys',parameters:{},finish:'execute',
   read:{ports:[0],sample_rows:3,require_exact_numbers:false}});
 
+test('user node apply publishes finish first without changing its contract or source schema',()=>{
+ const source=nodeApiTools.find(t=>t.name==='dock_node_apply'),before=structuredClone(source);
+ const tool=userNodeTool(source),keys=Object.keys(JSON.parse(JSON.stringify(tool.inputSchema)).properties);
+ assert.equal(keys[0],'finish');
+ assert.ok(keys.indexOf('finish')<keys.indexOf('parameters'));
+ assert.ok(keys.indexOf('finish')<keys.indexOf('mappings'));
+ assert.deepEqual(tool.inputSchema.properties.finish,source.inputSchema.properties.finish);
+ assert.ok(tool.inputSchema.required.includes('finish'));
+ assert.ok(tool.description.length<500);
+ assert.deepEqual(source,before);
+});
+
+test('mapping conflict explains full-request repair while preserving finish and strict rejection',async()=>{
+ const {validateNodeApplyRequest}=await import('../lib/node-apply.mjs');
+ const tool=userNodeTool(nodeApiTools.find(t=>t.name==='dock_node_apply'));
+ for(const key of ['fields','changes'])assert.match(tool.inputSchema.properties.mappings.items.properties[key].description,/Mutually exclusive/);
+ const b=createUserWorkflowBindings();b.remember({document_id:'doc',workflow_ref:{workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'scenario',label:'Scenario'}]}});
+ const args={...request(),target:{kind:'new',type:'transform.calculator'},mode:'expression',
+  mappings:[{direction:'output',port:0,fields:[{source:{kind:'configured_field',name:'Region'},excluded:true}],changes:[]}]};
+ const before=structuredClone(args),handlers=new Map([['transform.calculator',{revision:'1',modes:['expression'],validate(){},configure(){}}]]);
+ let rejection;
+ try{validateNodeApplyRequest(b.expandNode(args),handlers);}catch(error){rejection=error;}
+ assert.equal(rejection?.message,'Output changes and full fields are mutually exclusive');
+ const failure={effect_possible:false,action_key:'request.validate',error:{code:'REQUEST_REJECTED',message:rejection.message}};
+ const reply=compactNodeRequestFailure(failure,args);
+ assert.equal(reply.status,'NOT_APPLIED');assert.equal(reply.error.parameter_path,'mappings');
+ for(const text of [reply.error.message,reply.next_step.instruction]){
+  assert.match(text,/remove changes/);assert.match(text,/excluded:true/);assert.match(text,/including top-level finish/);
+  assert.match(text,/COMPLETE corrected request/);assert.match(text,/NEW operation_id/);
+ }
+ assert.deepEqual(args,before);
+ const repaired=structuredClone(args);delete repaired.mappings[0].changes;
+ assert.equal(repaired.finish,'execute');assert.doesNotThrow(()=>validateNodeApplyRequest(b.expandNode(repaired),handlers));
+ assert.throws(()=>validateNodeApplyRequest(b.expandNode(args),handlers),/mutually exclusive/);
+ const uncertain=compactNodeRequestFailure({...failure,effect_possible:true,operation_id:'pending'},args);
+ assert.equal(uncertain.next_step.tool,'dock_operation_inspect');assert.equal(uncertain.error.message,rejection.message);
+});
+
+test('published Calculator and common node schemas require root finish and explain a usable repair',async()=>{
+ const {calculatorParametersSchema}=await import('../lib/node-api.mjs');
+ const tool=userNodeTool(nodeApiTools.find(t=>t.name==='dock_node_apply'));
+ assert.ok(tool.inputSchema.required.includes('finish'));
+ assert.deepEqual(tool.inputSchema.properties.finish.enum,['done','execute','close']);
+ for(const description of [tool.description,tool.inputSchema.properties.finish.description,calculatorParametersSchema.description]){
+  assert.match(description,/top-level finish|top-level field/);
+  assert.match(description,/"finish":"execute"/);
+  assert.match(description,/beside parameters/);
+ }
+ for(const type of ['transform.calculator','transform.sorting']){
+  const args={...request(),target:{kind:'new',type},mode:type==='transform.calculator'?'expression':'keys'};
+  delete args.finish;
+  const before=structuredClone(args);let rejection;
+  try{validateActionParameters(tool.inputSchema,args);}catch(error){rejection=error;}
+  assert.equal(rejection?.message,'Invalid parameters: missing finish');
+  const failure={action_key:'request.validate',effect_possible:false,error:{code:'REQUEST_REJECTED',message:rejection.message}};
+  const reply=compactNodeRequestFailure(failure,args);
+  assert.equal(reply.error.parameter_path,'finish');
+  assert.match(reply.error.message,/"finish":"execute"/);
+  assert.match(reply.next_step.instruction,/not inside it/);
+  assert.match(reply.next_step.instruction,/NEW operation_id/);
+  assert.equal(reply.status,'NOT_APPLIED');assert.equal(reply.effect_possible,false);assert.equal(reply.cleanup_complete,true);
+  assert.equal(new AjvJsonSchemaValidator().getValidator(userResultSchema)(reply).valid,true);
+  assert.deepEqual(args,before);assert.equal(args.finish,undefined);
+  const nested=structuredClone(args);nested.parameters.finish='execute';
+  assert.throws(()=>validateActionParameters(tool.inputSchema,nested),/missing finish/);
+  const repaired={...args,operation_id:'repaired',finish:'execute'};
+  assert.doesNotThrow(()=>validateActionParameters(tool.inputSchema,repaired));
+  assert.throws(()=>validateActionParameters(tool.inputSchema,{...repaired,finish:'auto'}));
+  const unknown=compactNodeRequestFailure({...failure,effect_possible:true,operation_id:'pending'},args);
+  assert.equal(unknown.next_step.tool,'dock_operation_inspect');assert.equal(unknown.status,'AMBIGUOUS');
+  assert.equal(unknown.error.message,rejection.message);
+ }
+});
+
 test('new export technical defaults preserve explicit format and never authorize overwrite or patch existing nodes',()=>{
  const b=createUserWorkflowBindings();b.remember(workspace());
  const r={...request(),target:{kind:'new',type:'exports.text'},mode:'delimited',inputs:[{}],parameters:{destination:'/test-2/a.csv'}};delete r.read;
@@ -70,7 +144,7 @@ test('nonempty selected parameters pass the user envelope and retain internal va
 test('technical defaults expand deterministically and preserve explicit choices',()=>{
  const bindings=createUserWorkflowBindings();bindings.remember(workspace());
  const tool=userNodeTool(nodeApiTools.find(t=>t.name==='dock_node_apply'));
- for(const [type,finish,ports] of [['transform.sorting','execute',[0]],['transform.filter_data','execute',[0,1]],['exports.text','execute',[]],['transform.sorting','done',[]]]){
+ for(const [type,finish,ports] of [['transform.sorting','execute',[0]],['transform.filter_data','execute',[0,1]],['datamining.clustering','execute',[0,1]],['exports.text','execute',[]],['transform.sorting','done',[]]]){
   const args=request();args.target.type=type;args.finish=finish;delete args.read;delete args.budgets;delete args.mappings;
   validateActionParameters(tool.inputSchema,args);
   const full=bindings.expandNode(args);assert.deepEqual(full.read.ports,ports);assert.deepEqual(full.mappings,[]);

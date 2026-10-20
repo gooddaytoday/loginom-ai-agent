@@ -1,0 +1,59 @@
+{
+  "package_path": "/stability-2026-10-20/p15.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.clustering"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/summer-hives.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Hives",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "MeanFlight",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "TotalPollen",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Hives": 6,
+          "MeanFlight": 12.125,
+          "TotalPollen": 108.75
+        },
+        {
+          "Hives": 8,
+          "MeanFlight": 120.0,
+          "TotalPollen": 1440.0
+        }
+      ]
+    }
+  ]
+}

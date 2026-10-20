@@ -29,6 +29,40 @@ test('source replacement remains a different graph even with equal labels and co
  after.foreign_links=['unknown'];assert.throws(()=>inputMappingGraph(after,node));
 });
 function operation(){return {id:'op',nodeApply:{node,signature:'sig',request:{contract_revision:'1.0.0'},phases:[{phase:'source'},{phase:'workflow'},{phase:'target'}],pending:{phase:'input_mapping',receipt_id:'op:input_mapping',deadline:100},deadline:200,configure_deadline:100,execution:{status:'not_requested'},output:{status:'not_refreshed'},cleanup_complete:false},transportUncertain:true};}
+test('Calculator mapping admits its REST source connection while unrelated foreign links still refuse',()=>{
+ const graph={complete:true,document_id:'d',workflow_ref:{workflow_id:'w'},foreign_links:['service-edge'],
+  rest_connection_links:[{tid:'service-edge',source:'connection',target:'rest',output:'connection:0',input:'connection:0'}],
+  links:[{source:'rest',output:0,target:'n',input:0}],
+  nodes:[['n','transforms.calculator'],['rest','integration.rest_request'],['connection','bg-vendor-icon-restclientconnection']].map(([id,type])=>({ref:{...node,node_id:id},type,label:'Same',inputs:[0],outputs:[0],locked:false}))};
+ const before=inputMappingGraph(graph,node);assert.equal(before.rest_connection_links[0].source,'connection');
+ for(const change of [g=>g.foreign_links.push('unknown'),g=>g.rest_connection_links=[],g=>g.rest_connection_links[0].input='data:0',
+  g=>g.rest_connection_links[0].target='n',g=>g.nodes[1].type='imports.text',g=>g.nodes[2].type='bg-vendor-icon-textconnection',
+  g=>g.nodes[2].locked=true,g=>g.rest_connection_links.push({...g.rest_connection_links[0]})]){
+  const bad=structuredClone(graph);change(bad);assert.throws(()=>inputMappingGraph(bad,node),/complete prepared graph/);
+ }
+ const replacement=structuredClone(graph);replacement.nodes[2].ref.node_id='replacement';replacement.rest_connection_links[0].source='replacement';
+ assert.equal(sameInputRecovery(before,inputMappingGraph(replacement,node)),false);
+});
+test('Calculator mapping admits two native REST service edges to different unlocked REST nodes',()=>{
+ const graph={complete:true,document_id:'d',workflow_ref:{workflow_id:'w'},foreign_links:['service-1','service-2'],
+  rest_connection_links:[1,2].map(i=>({tid:'service-'+i,source:'connection-'+i,target:'rest-'+i,output:'connection:0',input:'connection:0'})),
+  links:[{source:'rest-1',output:1,target:'n',input:0}],
+  nodes:[['n','transform.calculator'],['rest-1','integration.rest_request'],['rest-2','bg-vendor-icon-restclient'],
+   ['connection-1','bg-vendor-icon-restclientconnection'],['connection-2','bg-vendor-icon-restclientconnection']]
+   .map(([id,type])=>({ref:{...node,node_id:id},type,label:'Same',inputs:[0],outputs:[0],locked:false}))};
+ const before=inputMappingGraph(graph,node);
+ assert.deepEqual(before.rest_connection_links,graph.rest_connection_links);
+ assert.deepEqual(before.links,graph.links);
+ assert.deepEqual(before.nodes.map(n=>n.ref.node_id),['n','rest-1']);
+ for(const change of [g=>g.rest_connection_links[1].target='n',g=>g.nodes[2].type='imports.text',
+  g=>g.nodes[2].locked=true,g=>g.nodes[4].locked=true,g=>g.nodes[4].type='bg-vendor-icon-textconnection',
+  g=>g.rest_connection_links[1].input='data:0',g=>g.rest_connection_links[1].output='data:0',
+  g=>g.foreign_links.push('unrelated'),g=>g.rest_connection_links[1].tid='unobserved-svg',
+  g=>g.rest_connection_links[1].target='missing']){
+  const bad=structuredClone(graph);change(bad);
+  assert.throws(()=>inputMappingGraph(bad,node),/complete prepared graph/);
+ }
+});
 test('reconciliation accepts the phase only after durable proof, retaining original ID and no execution',async()=>{
  const op=operation();op.nodeApplyDrivers={recoverInputMapping:async()=>({verified:true,cleanup_complete:true,finish:{settings_applied:true,execution_started:false},recovery:{verified:true}})};
  const events=[];await reconcileInputMappingPhase({operation:op,now:()=>1,record:async e=>{events.push(e);return structuredClone(e);}});

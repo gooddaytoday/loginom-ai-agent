@@ -9,7 +9,7 @@ import { promisify } from 'node:util';
 import { ACTION_CATALOG_ROOT, pinActionCatalog as pinRemoteActionCatalog, ACCEPTANCE_CHECKS, EXECUTOR_REVISION,
   validateReplayAcceptance, assertCatalogTarget, validateActionParameters } from '../lib/action-catalog.mjs';
 import { updateForE2E } from '../../../../services/loginom-ai/deploy/loginom-dock/build-action-catalog.mjs';
-import { createActionRuntime, parseCapabilityResult } from '../lib/executor.mjs';
+import { createActionRuntime, parseCapabilityResult, makeCapabilityCode } from '../lib/executor.mjs';
 
 const exec = promisify(execFile);
 const root = new URL('../../executor/catalog/', import.meta.url);
@@ -74,6 +74,17 @@ test('pins and verifies the complete production release once', async () => {
   assert.equal(pinned.pins.catalogLifecycleStatus, 'production');
   data.files.set(`${ACTION_CATALOG_ROOT}/current.json`, '{}');
   assert.equal(pinned.actions.get('node.add').revision, '4');
+});
+
+test('native Save selector comes from the bundled resource, independently of the remote catalog', async () => {
+  const pinned = await pinActionCatalog((await fixture({ mutate: values => {
+    values['selectors.json'].native_save_arrangement.value = 'OtherButton';
+  } })).remote);
+  assert.equal(pinned.selectors.has('workflow.arrange'), false);
+  const code = makeCapabilityCode(pinned.actions.get('package.save_checkpoint'), pinned.selectors,
+    { path: '/own/result.lgp', conflict_policy: 'fail' });
+  assert.ok(code.includes('ModelForm;btnLayout'));
+  assert.ok(!code.includes('OtherButton'));
 });
 
 test('pins an exact candidate only for operator-selected replay and rejects it in the production runtime', async () => {

@@ -117,6 +117,8 @@ test('MCP application refusals remain typed normal content and the same connecti
     assert.deepEqual(JSON.parse(available.content[0].text).available_actions, ['node.add', 'link.create', 'package.save_as', 'node.configure_text_import', 'package.save_checkpoint']);
     assert.equal(browserCalls, 0);
 
+    // Bootstrap starts from a known blank browser page, before mocked preparation.
+    page.url = () => 'about:blank';
     const bootstrap = await client.callTool({ name: 'dock_workspace_observe', arguments: { scope: 'bootstrap' } });
     const initial = JSON.parse(bootstrap.content[0].text);
     assert.equal(initial.status, 'SUCCEEDED');

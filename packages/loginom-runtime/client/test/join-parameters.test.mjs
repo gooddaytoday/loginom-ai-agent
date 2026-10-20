@@ -8,4 +8,11 @@ test('join rejects invalid settings before effects',()=>{for(const change of [p=
 test('join refuses incompatible types or missing keys',()=>{const f=structuredClone(fields);f[1][0].type='integer';assert.throws(()=>resolveJoinKeys(valid(),f),/types differ/);f[1][0].name='Other';assert.throws(()=>resolveJoinKeys(valid(),f),/absent/);});
 test('join existing preserve, configure-only and Close retain explicit semantics',()=>{assert.throws(()=>validateJoinParameters({},'inner',request));assert.doesNotThrow(()=>validateJoinParameters({},'inner',{...request,target:{kind:'existing'},inputs:[]}));assert.throws(()=>validateJoinParameters(valid(),'inner',{...request,inputs:[{input:0}]}));assert.throws(()=>validateJoinParameters(valid(),'inner',{...request,finish:'close',mappings:[{direction:'input',port:1}]}));assert.throws(()=>validateJoinParameters(valid(),'inner',{...request,read:{ports:[]}}));});
 test('join output keeps multiplicity semantics and excludes only right keys',()=>{const c={...valid(),input_fields:fields};assert.deepEqual(joinOutputFields(c).map(f=>f.name),['Key','Part','LValue','RValue']);c.include_joined_keys=true;assert.equal(joinOutputFields(c).length,6);});
+test('join preflight rejects changes to omitted right keys before target mutation',()=>{
+ const c={...valid(),input_fields:fields},changes=name=>({changes:[{source:{kind:'configured_field',name},excluded:true}]});
+ for(const name of ['Id','Section','unknown'])assert.throws(()=>joinOutputFields(c,changes(name)),/unknown source/);
+ assert.equal(joinOutputFields(c,changes('RValue')).length,4);
+ c.include_joined_keys=true;
+ assert.equal(joinOutputFields(c,changes('Id')).length,6);
+});
 test('join rejects duplicate aliases in a complete mapping',()=>assert.throws(()=>validateJoinParameters(valid(),'inner',{...request,mappings:[{direction:'input',port:1,fields:[{source:{kind:'configured_field',name:'Id'},name:'Alias'},{source:{kind:'configured_field',name:'Section'},name:'ALIAS'}]}]}),/conflict/));

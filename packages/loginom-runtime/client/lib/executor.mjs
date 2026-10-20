@@ -25,6 +25,9 @@ import {createJavascriptSourceReadSession,validateJavascriptSourceReadRequest} f
 import {createJavascriptContextReadSession,validateJavascriptContextReadRequest} from './javascript-context-read.mjs';
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
 import { configureTextImportDraft, validateTextImportRequest } from './text-import-procedure.mjs';
+import selectorCatalog from '../../executor/catalog/selectors.json' with { type: 'json' };
+
+const arrangementSelector = selectorCatalog.native_save_arrangement;
 
 const identifier = { type: 'string', minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9._:-]+$' };
 const operationInspectTool = { name: 'dock_operation_inspect',
@@ -276,13 +279,53 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       return result(gesture?'AMBIGUOUS':'NOT_APPLIED','DOWNLOAD_OUTPUT_SIZE_CHANGED');
     // Register BEFORE the checked gesture; native download may fire before
     // the click promise settles. Only this Page's event is eligible.
-    event=page.waitForEvent('download',{timeout:15000}).then(value=>value,error=>{
+    let eventPending=true;
+    event=page.waitForEvent('download',{timeout:15000}).then(value=>{eventPending=false;return value;},error=>{
+      eventPending=false;
       trace.push({event:'download_event_failure',...failureEvidence(error),step:'download.event'});return null;
     });
     phase='requesting';gesture=true;
     completed=false;
     browserStep='download.gesture';
-    const action=await act(page,before.output);
+    let action;const epochRefreshes=[];
+    for(let attempt=0;attempt<3;attempt++) {
+      action=await act(page,before.output);
+      // Reobserve only after the checked action proves its epoch refusal
+      // happened before applying, including when the file was already visible.
+      // Keep the single listener/deadline and never repeat reveal or a gesture.
+      if(!task.output_binding||attempt===2||!eventPending||action.phase!=='preconditions'
+        ||action.status!=='NOT_APPLIED'||action.effect_possible!==false||action.cleanup_complete!==true
+        ||action.error?.code!=='UI_EPOCH_CHANGED') {
+        if(action.error?.code==='UI_EPOCH_CHANGED')trace.push({event:'download_epoch_refresh_refused',stage:'eligibility',
+          checks:{output_bound:!!task.output_binding,attempt_available:attempt<2,event_pending:eventPending,
+            preconditions:action.phase==='preconditions',not_applied:action.status==='NOT_APPLIED',
+            no_effect:action.effect_possible===false,cleanup_complete:action.cleanup_complete===true}});
+        break;
+      }
+      const previous=target(before.output),fresh=await observe(page);
+      const file=fresh.status==='SUCCEEDED'&&contextMatches(fresh.output)&&target(fresh.output);
+      // A visible file need not have a scrollable ancestor. In that case
+      // require its original DOM row, issued by the same native file read.
+      const owner=!!previous?.scroll?.ref||(!previous?.scroll&&!file?.scroll
+        &&typeof previous?.storage_entry?.row_ref==='string'&&previous.storage_entry.row_ref.length>0
+        &&file?.storage_entry?.row_ref===previous.storage_entry.row_ref);
+      if(!eventPending||!file||!owner||!same(file.scroll,previous.scroll)
+        ||!same(file.identity,previous.identity)||!same(file.signature,previous.signature)
+        ||file.storage_entry?.kind!=='file'||file.storage_entry.bytes!==task.expected_bytes
+        ||file.interaction?.state!=='point_observed'||!file.allowed_actions?.includes('double_click')) {
+        trace.push({event:'download_epoch_refresh_refused',stage:'observation',checks:{event_pending:eventPending,
+          observation:fresh.status==='SUCCEEDED',context:fresh.status==='SUCCEEDED'&&contextMatches(fresh.output),
+          file:!!file,owner,scroll:!!file&&same(file.scroll,previous?.scroll),
+          identity:!!file&&same(file.identity,previous?.identity),signature:!!file&&same(file.signature,previous?.signature),
+          file_kind:file?.storage_entry?.kind==='file',bytes:file?.storage_entry?.bytes===task.expected_bytes,
+          point_observed:file?.interaction?.state==='point_observed',double_click:file?.allowed_actions?.includes('double_click')===true}});
+        break;
+      }
+      epochRefreshes.push({from:before.output.dom_epoch.revision,to:fresh.output.dom_epoch.revision,
+        mutation_delta:Object.fromEntries(['cursor_style','other_style','attributes','child_list','text','other','unclassified','ignored_cursor_blink']
+          .map(key=>[key,(fresh.output.scan?.mutation_counts?.[key]??0)-(before.output.scan?.mutation_counts?.[key]??0)]))});
+      before=fresh;
+    }
     gesture=revealed || action.effect_possible===true;
     const refusal=action.trace?.find(e=>e.event==='ui_reference_precondition_refused')?.checks;
     const referenceChecks=refusal?Object.fromEntries(['present','identity_matches','signature_matches','action_allowed']
@@ -294,6 +337,7 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
       'Observed control geometry changed':'geometry_changed'};
     trace.push({event:'download_gesture_result',status:action.status,effect_possible:action.effect_possible===true,
       cleanup_complete:action.cleanup_complete===true,
+      ...(epochRefreshes.length?{epoch_refreshes:epochRefreshes}:{}),
       error_code:/^[A-Z][A-Z0-9_]{0,79}$/.test(action.error?.code??'')?action.error.code:null,
       ...(action.error?.code==='UI_REFERENCE_STALE'?{reference_reason:referenceReasons[action.error.message]??'unclassified',
         ...(referenceChecks?{reference_checks:referenceChecks}:{})}:{})});
@@ -360,18 +404,18 @@ export function makeNativeOutputDownloadCode(options){
 
 // Trusted adapter only: every public reference must additionally be checked
 // against createObservationPages.assertIssued before this code is constructed.
-// This candidate covers CSV/TSV/TXT double-click downloads only; package files require
+// This candidate covers CSV/TSV/TXT/XLSX double-click downloads only; package files require
 // an explicit download command instead of opening their scenario.
 export function makeArtifactDownloadCode(options) {
   const artifact=options?.artifact,snapshot=options?.snapshot;
   const matches=snapshot?.ui?.elements?.filter(item=>item.ref===options.file_ref) ?? [];
   const suffix=artifact?.name?.replace(/\s/g,'_').replace(/,/g,'');
-  if(!artifact?.upload || !/\.(?:csv|tsv|txt)$/i.test(artifact.name) || matches.length!==1
+  if(!artifact?.upload || !/\.(?:csv|tsv|txt|xlsx)$/i.test(artifact.name) || matches.length!==1
     || matches[0].label!==artifact.name || matches[0].tid!==snapshot.workflow_ref?.prefix+';FileStorageForm;colName_'+suffix)
-    throw new Error('Download requires the exact observed authorized CSV/TSV/TXT file');
+    throw new Error('Download requires the exact observed authorized CSV/TSV/TXT/XLSX file');
   const shared={expected_build:options.expected_build,expected_origin:options.expected_origin};
   // Upload may have observed the folder tree. Verification owns the separately
-  // issued exact CSV/TSV/TXT ref, so its narrow reads must follow that file, not the
+  // issued exact CSV/TSV/TXT/XLSX ref, so its narrow reads must follow that file, not the
   // earlier upload region. Global context/blocker guards remain in native reads.
   const observe=makeWorkspaceUiCode({mode:'observe',root_ref:options.file_ref,...shared});
   const act=makeWorkspaceUiCode({mode:'act',snapshot,action:{verb:'double_click',ref:options.file_ref},...shared},{snapshotArgument:true});
@@ -403,7 +447,7 @@ export async function readNodeTargetLinkValidation(page, context, parameters) {
     const bind=(expected,direction,port)=>{
       const nodes=diagram.FNodes.FCollection.filter(n=>n.FGuid===expected.id);
       if(nodes.length!==1)throw Error('Link validation node changed');
-      const node=nodes[0],tid=request.workflow_ref.prefix+';Graph;'+expected.tid+';'+direction+'_'+(port.kind==='add'?'Add':'Data-'+port.index);
+      const node=nodes[0],tid=request.workflow_ref.prefix+';Graph;'+expected.tid+';'+direction+'_'+(port.kind==='add'?'Add':(port.kind==='connection'?'Connection-':'Data-')+port.index);
       const ports=node.FPorts.flatMap(p=>p.FCollection).filter(p=>p.parent===node&&p.FCell?.parent===node.FCell
         &&(graph.view.getState(p.FCell)?.shape?.node?.getAttribute('data-tid')===tid||receipt.nodeTargetPortIdentities?.get(p)?.tid===tid));
       const elements=[...roots[0].querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
@@ -1086,6 +1130,53 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
   const runPackageSaveAs = async ({ keepOpen = false } = {}) => {
     const before = await packageCheckpoint();
     if (task.checkpoint && !same(before, task.checkpoint)) throw new Error('Package changed after save preflight');
+    let arrangement = { status: 'skipped', reason: 'ownership_unconfirmed' };
+    try {
+      const admission = await page.evaluate(binding => {
+        const prep = globalThis.__loginomDockPreparationV1, app = globalThis.bg?.app;
+        if (!binding.session_id || !binding.document_id || prep?.document !== document || prep.id !== binding.document_id)
+          return { reason: 'ownership_unconfirmed' };
+        const card = app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab();
+        let node = card?.Controller?.Node?.data?.node;
+        const seen = new Set();
+        while (node && seen.size < 32 && !seen.has(node) && !(node instanceof app.PackageTreeNode)) {
+          seen.add(node); node = node.ParentNode;
+        }
+        const tabs = document.querySelectorAll('[data-tid='+JSON.stringify(binding.tab_tid)+']');
+        const creation = node instanceof app.PackageTreeNode && tabs.length === 1 && tabs[0].classList.contains('x-tab-active')
+          && [...prep.receipts.values()].some(receipt => {
+            if (receipt.phase !== 'verified' || receipt.packageNode !== node || receipt.tab !== tabs[0]) return false;
+            try {
+              const request = JSON.parse(receipt.request);
+              return request.intent === 'new_draft' && request.session === binding.session_id;
+            } catch { return false; }
+          });
+        if (!creation) return { reason: 'ownership_unconfirmed' };
+        if (node.HasRunningNodes() !== false) return { reason: 'package_running' };
+        const visible = element => !!element.getBoundingClientRect().width && !!element.getBoundingClientRect().height
+          && getComputedStyle(element).visibility !== 'hidden';
+        if ([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg,[data-tid$=";WizrdMCF"]')].some(visible))
+          return { reason: 'dialog_or_wizard_open' };
+        return null;
+      }, { ...before.workflow_ref, session_id: task.storage_binding?.session_id, document_id: task.storage_binding?.document_id });
+      if (admission?.reason) arrangement.reason = admission.reason;
+      else if (remaining() < 3000) arrangement.reason = 'save_deadline_near';
+      else {
+        // This optional native step uses the bundled, resource-pinned selector;
+        // an older remote Save catalog need not expose a new public action.
+        const definition = task.arrangement_selector;
+        if (!definition || definition.strategy !== 'data_tid' || definition.scope !== 'activeWorkflow')
+          throw Error('Bundled layout selector unavailable');
+        const buttons = await visible(tid('', before.workflow_ref.prefix+';'+definition.value));
+        const button = buttons.length === 1 && await buttons[0].isEnabled() ? buttons[0] : null;
+        if (!button) arrangement.reason = 'button_unavailable';
+        else {
+          arrangement = { status: 'attempted', reason: 'result_unconfirmed' };
+          await interact(timeout => button.click({ timeout: Math.min(timeout, 1000) }), true);
+        }
+      }
+    } catch { arrangement.reason = 'arrangement_unconfirmed'; }
+    record('package_arrangement', { ...arrangement, warning: true });
     const continuationsBefore = keepOpen ? await packageContinuations(before.workflow_ref) : [];
     const click = async (symbol, effect = false) => interact(timeout => resolve(symbol).then(item => item.click({ timeout })), effect);
     transientDialog = true;
@@ -1093,6 +1184,9 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     await click('packages.save_as');
     const input = await poll(() => resolve('file_dialog.file_name', {}, { cardinality: 'zeroOrOne', stable: false }));
     await writeFileName(input, before.path);
+    // Keep the original graph; inspect it after staging the dialog, beyond the
+    // layout repaint, and before the gesture that writes the package.
+    if (!same(await packageCheckpoint(), before)) throw Error('Package changed after save preflight');
     await click('file_dialog.confirm', true);
     record('save_requested', { path: before.path });
     const expectedConflict = '"' + before.path + '" уже существует. Вы хотите заменить его?';
@@ -1309,7 +1403,8 @@ export function makeCapabilityCode(action, selectors, parameters, options = {}) 
   if(readNodeTargetGraph!==undefined&&(typeof readNodeTargetGraph!=='function'||!options.node_target_context))throw Error('Internal node graph reader requires a bound context');
   const handler = requireCapability(action).handler;
   const allowedSelectors = Object.fromEntries(action.selector_symbols.map(symbol => [symbol, selectors.get(symbol)]));
-  const task = { action: structuredClone(action), selectors: structuredClone(allowedSelectors), parameters: structuredClone(parameters), ...structuredClone(serializableOptions), handler };
+  const task = { action: structuredClone(action), selectors: structuredClone(allowedSelectors), parameters: structuredClone(parameters), ...structuredClone(serializableOptions), handler,
+    ...(['packageSaveAs','packageSaveCheckpoint'].includes(handler) ? { arrangement_selector: structuredClone(arrangementSelector) } : {}) };
   const body = `(${browserCapability.toString()})(page, ${JSON.stringify(task)}, ${readNodeTargetGraph?readNodeTargetGraph.toString():'undefined'}, ${rebindNodeTargetLinkEpochs.toString()}, ${readNodeTargetLinkValidation.toString()})`;
   return ['apply', 'recover_link'].includes(task.mode) && task.receipt_namespace
     ? withBrowserReceipt(body, task) : `async (page) => ${body}`;
@@ -1364,13 +1459,18 @@ export function parseCapabilityResult(response) {
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   let pending = null;
   let running = false;
   const operations = new Map();
   const auxiliary = new Map();
   const observations = createObservationPages();
+  // Browser recovery lease: while set, only read-only facade calls run.
+  let leased = null;
+  let recoverySequence = 0;
+  const recoveryReceipts = new Map();
+  const recoveredSteps = new Map();
   const receiptNamespace = randomUUID();
   const checkId = id => { if (typeof id !== 'string' || !/^[A-Za-z0-9_.:-]{1,128}$/.test(id)) throw new Error('A stable operation identifier is required'); };
   const fingerprint = (actionKey, parameters) => {
@@ -1458,7 +1558,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     if (mutation) operation.lastReceipt.operation_id = operation.id;
     const outcome = await execute(makeCapabilityCode(operation.action, pinned.selectors, operation.parameters, {
       operation_id: operation.id, mode, checkpoint: operation.checkpoint, expected_build: targetBuild,
-      ...(operation.action.effect?.destination_policy==='session_storage'?{storage_binding:getStorageBinding()}:{}),
+      ...(operation.action.effect?.destination_policy==='session_storage'||['package.save_as','package.save_checkpoint'].includes(operation.action.action_key)
+        ?{storage_binding:getStorageBinding()}:{}),
       ...receipt, ...(mutation ? { deadline_at: mode === 'apply' ? operation.deadline : now() + operation.action.timeout_ms }
         : operation.parentDeadline !== undefined ? { deadline_at: operation.deadline } : {}),
     }), { timeout: operation.parentDeadline !== undefined && ['prepare', 'apply'].includes(mode)
@@ -1714,6 +1815,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   // rests unlocked on a quiet unchanged graph and reports unverified settings or
   // execution as unknown; no observation_id is taken from the caller.
   const nodeReleaseStep=operation=>!operation.transportUncertain&&!nodeJobs.busy&&operation.nodeApply?.pending
+    &&(!operation.nodeApplyDrivers?.releasePendingPhases||operation.nodeApplyDrivers.releasePendingPhases.includes(operation.nodeApply.pending.phase))
     &&operation.nodeApply.node&&typeof operation.nodeApplyDrivers?.releasePending==='function'?{tool:'dock_operation_recover',
       arguments:{operation_id:operation.id,strategy:'abandon_operation'},required_fields:['recovery_operation_id'],
       id_roles:{operation_id:'original_pending_operation',recovery_operation_id:'new_unique_request'},
@@ -1740,17 +1842,22 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       }catch(error){
         // The original operation keeps its gate. A blocker the user can clear is
         // named explicitly instead of leaving an empty recovery list.
+        operation.releaseRefused={message:String(error?.message??error).slice(0,1000),ui_blocker:error?.userAction??null};
+        const trigger=browserRecoveryTrigger(operation,null);
         returned={status:'AMBIGUOUS',action_key:'operation.recover',action_revision:'1',operation_id:operation.id,phase:'release_refused',
           effect_possible:true,trace:[],recovery_operation_id:recoveryOperationId,
           error:{code:'NODE_RELEASE_REFUSED',message:String(error?.message??error).slice(0,1000)},
-          output:{original_operation_pending:pending===operation,...(error?.userAction?{user_action:error.userAction}:{})}};
+          // With browser recovery the agent clears the blocker itself; the user is not asked to.
+          output:{original_operation_pending:pending===operation,...(error?.userAction
+            ?trigger?{ui_blocker:error.userAction}:{user_action:error.userAction}:{}),
+            ...(trigger?{next_step:browserRecoveryNext(operation,trigger)}:{})}};
       }
       await remember(record,'recovery_completed',returned);
       auxiliary.set(recoveryOperationId,{signature,outcome:structuredClone(returned)});
       return structuredClone(returned);
     }finally{running=false;}
   };
-  const recoveryAdvice = operation => {
+  const dockRecoveryAdvice = operation => {
     const base = [{ tool: 'dock_workspace_observe', arguments: {}, required_fields: [],
       requires: [], provides: ['observation_id', 'fresh_ui_refs'] }];
     if (!operation || pending !== operation) return { recovery_options: [], next_steps: base };
@@ -1824,6 +1931,204 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       provides: ['gesture_receipt', 'reconciliation'] });
     return { recovery_options: strategies, next_steps: base };
   };
+  // Browser recovery follows exhausted Dock recovery only (design 2026-10-19 §5):
+  // a refused release (T1), no remaining Dock option (T2) or the same phase of
+  // the same node failing again after a recovery (T3). Unconfirmed calls never qualify.
+  const recoveryAdvice = operation => {
+    const advice = dockRecoveryAdvice(operation);
+    const trigger = browserRecoveryTrigger(operation, advice);
+    return trigger ? { ...advice, browser_recovery: trigger.reason,
+      next_steps: [browserRecoveryNext(operation, trigger), ...advice.next_steps] } : advice;
+  };
+  const nodeRecoveryStep = operation => {
+    const state = operation?.nodeApply;
+    if (!state?.node || !state.pending) return null;
+    return { key: ['node', state.node.document_id, state.node.workflow_id, state.node.node_id, state.pending.phase].join('|'),
+      kind: 'node', document_id: state.node.document_id, workflow_id: state.node.workflow_id, node_id: state.node.node_id,
+      node_type: state.request.target.type, phase: state.pending.phase };
+  };
+  const failureCode = operation => operation?.outcome?.error?.cause?.code ?? operation?.outcome?.error?.code ?? null;
+  function exportRecoveryTrigger(operation) {
+    const state = operation?.nodeApply;
+    if (!browserRecovery || !operation || pending || operation.action.capability !== 'node.apply' || operation.transportUncertain
+      || !state?.export_download_refusal || !state.node || operation.exportRecovered
+      || typeof operation.nodeApplyDrivers?.recoveryReadExport !== 'function' || laterExportToSameFile(operation)) return null;
+    return { reason: 'EXPORT_DOWNLOAD_UNCONFIRMED', step: { key: ['export', state.node.document_id, state.node.workflow_id,
+      state.node.node_id, state.execution?.execution_id].join('|'), kind: 'export', document_id: state.node.document_id,
+      workflow_id: state.node.workflow_id, node_id: state.node.node_id, node_type: state.request.target.type, phase: 'read' } };
+  }
+  // A file read after another export to the same destination could attribute that
+  // export's bytes to this execution; such an export stays unconfirmed.
+  function laterExportToSameFile(operation) {
+    const destination = operation.nodeApply.request.parameters?.destination;
+    const ordered = [...operations.values()];
+    return ordered.slice(ordered.indexOf(operation) + 1).some(other => other.action.capability === 'node.apply'
+      && other.nodeApply?.request?.target?.type === 'exports.text' && other.outcome?.status !== 'NOT_APPLIED'
+      && (destination === undefined || other.nodeApply.request.parameters?.destination === undefined
+        || other.nodeApply.request.parameters.destination === destination));
+  }
+  function browserRecoveryTrigger(operation, advice) {
+    const exported = exportRecoveryTrigger(operation);
+    if (exported) return exported;
+    if (!browserRecovery || !operation || pending !== operation || operation.action.capability !== 'node.apply'
+      || operation.transportUncertain || typeof operation.nodeApplyDrivers?.releasePending !== 'function') return null;
+    const step = nodeRecoveryStep(operation);
+    if (!step) return null;
+    if (operation.releaseRefused) return { reason: 'NODE_RELEASE_REFUSED', step };
+    const prior = recoveredSteps.get(step.key);
+    if (prior && prior.operation_id !== operation.id && prior.code === failureCode(operation))
+      return { reason: 'REPEATED_PHASE_FAILURE', step };
+    if (advice && !advice.recovery_options.length && !advice.next_steps.some(next => next.tool === 'dock_node_resume'))
+      return { reason: 'NO_RECOVERY_OPTION', step };
+    return null;
+  }
+  function browserRecoveryNext(operation, trigger) {
+    return { tool: 'dock_browser_recovery', arguments: { action: 'start', operation_id: operation.id },
+      reason: trigger.reason, step: structuredClone(trigger.step),
+      instruction: 'Dock recovery for this step is exhausted. Start browser recovery for this operation and complete only this '
+        + 'step yourself in the same Loginom tab. Do not ask the user to close wizards or fix the interface.' };
+  }
+  const browserRecoveryApi = {
+    browserRecoveryBasis(operationId) {
+      if (!browserRecovery) throw new Error('Browser recovery is unavailable in this session');
+      const operation = operations.get(operationId);
+      if (!operation) throw new Error('Operation is not known in this session');
+      if (running || nodeJobs.busy) throw new Error('Another Dock action is still running; wait for it before browser recovery');
+      const trigger = browserRecoveryTrigger(operation, dockRecoveryAdvice(operation));
+      if (!trigger) throw new Error('No browser recovery trigger for this operation; follow its Dock next_step');
+      operation.browserRecoveryReason = trigger.reason;
+      const request = operation.nodeApply.request;
+      if (trigger.step.kind === 'export') return { ...trigger, goal: { node: structuredClone(operation.nodeApply.node),
+        node_type: request.target.type, destination: operation.nodeApply.request.parameters?.destination ?? null,
+        execution: structuredClone(operation.nodeApply.execution),
+        required_result: 'The export already completed; its download was not confirmed. Remove what blocks the file storage '
+          + 'view or download (dialogs, masks, notifications) and return to the scenario graph. Do not export again; the '
+          + 'runtime repeats only the file read and verifies its bytes.' } };
+      return { ...trigger, goal: { node: structuredClone(operation.nodeApply.node), node_type: request.target.type,
+        stopped_phase: trigger.step.phase, verified_phases: operation.nodeApply.phases.map(p => p.phase),
+        requested_finish: request.finish, error: structuredClone(operation.outcome?.error ?? null),
+        ...(operation.releaseRefused ? { ui_blocker: operation.releaseRefused.ui_blocker ?? operation.releaseRefused.message } : {}),
+        how: 'Leave node views and visualizers through the scenario breadcrumb (Сценарий); never close workspace tabs or the package.',
+        required_result: 'Leave this node unlocked on the quiet graph with no wizard, dialog or mask open'
+          + (trigger.reason === 'REPEATED_PHASE_FAILURE' ? ', its settings and ports completed as in the original request'
+            + (request.finish === 'execute' ? ' and the node executed' : '') : '') + '.' } };
+    },
+    async browserRecoveryHandoff(operationId) {
+      const operation = operations.get(operationId);
+      if (!operation || pending !== operation && !exportRecoveryTrigger(operation))
+        return { stopped: false, reason: 'The operation is no longer eligible for browser recovery' };
+      if (running || nodeJobs.busy || delivery.busy || sourceReads.busy) return { stopped: false, reason: 'A Dock action is still running' };
+      if (operation.transportUncertain) return { stopped: false, reason: 'The last browser call of this operation is unconfirmed' };
+      // A sent abort or an expired timeout is not proof: only the page ledger is.
+      const state = operation.lastReceipt ? await readReceipt(operation) : { state: 'none' };
+      // Same proof as the node release: a completed last gesture with confirmed cleanup.
+      if (state?.state !== 'none' && (state?.state !== 'completed' || state.receipt?.cleanup_complete !== true))
+        return { stopped: false, reason: 'The last browser receipt is ' + (state?.state ?? 'unavailable')
+          + (state?.state === 'completed' ? ' without confirmed cleanup' : '') };
+      leased = operation.id;
+      return { stopped: true, proof: { receipt_id: operation.lastReceipt?.id ?? null, receipt_state: state.state,
+        cleanup_complete: state.receipt?.cleanup_complete ?? null } };
+    },
+    async verifyBrowserRecovery({ operationId, step, attested, signal }) {
+      const operation = operations.get(operationId);
+      if (!operation || leased !== operationId) throw new Error('The browser lease does not belong to this operation');
+      if (step.kind === 'export') return verifyRecoveredExport(operation, step, attested, signal);
+      if (pending !== operation) throw new Error('The browser lease does not belong to this pending operation');
+      const code = failureCode(operation), reason = operation.browserRecoveryReason;
+      running = true;
+      let result;
+      const receiptBefore = operation.lastReceipt;
+      const journal = { started: false };
+      try {
+        observations.clear();
+        // Release-proof runs even when the stopped phase has no own verifier;
+        // the stopped procedure and its predicate are not called again (§8).
+        const drivers = operation.nodeApplyDrivers;
+        result = await releaseNodeApply({ operation, handlers: nodeApplyHandlers, signal,
+          record: event => { journal.started = true; return onRecord(event); },
+          drivers: { ...drivers, releasePending: drivers.recoveryReleasePending ?? drivers.releasePending } });
+      } catch (error) {
+        // Only a refusal before any gesture, or after gestures whose own receipts settled with cleanup,
+        // is a settled unresolved result; anything else leaves the release outcome unknown.
+        const gestured = operation.lastReceipt !== receiptBefore;
+        const receipt = gestured && !operation.transportUncertain ? await readReceipt(operation).catch(() => null) : null;
+        const uncertainRelease = operation.transportUncertain === true || journal.started
+          || gestured && (receipt?.state !== 'completed' || receipt.receipt?.cleanup_complete !== true);
+        return { status: 'unresolved', facts: [], reason: String(error?.message ?? error).slice(0, 1000), uncertain: uncertainRelease };
+      } finally { running = false; }
+      const request = operation.nodeApply.request;
+      const readable = reason === 'REPEATED_PHASE_FAILURE' && !['programming.javascript', 'exports.text'].includes(request.target.type);
+      const receipt = { id: operation.id + ':br' + (++recoverySequence), kind: 'browser_recovery', status: 'continuable',
+        source_operation_id: operation.id, step: structuredClone(step), reason,
+        facts: ['node_released_on_quiet_graph', 'no_wizard_dialog_or_mask'], attested_by_model: structuredClone(attested),
+        node: structuredClone(result.node), request: structuredClone(request),
+        configuration: structuredClone(result.configuration), execution: structuredClone(result.execution) };
+      receipt.next_step = readable ? { tool: 'dock_node_read', original_operation_id: operation.id,
+        instruction: 'The step was completed in the browser and the runtime proved the node rests on the quiet graph. Execute and read '
+          + 'it with dock_node_read using a NEW operation_id and source_operation_id:"' + receipt.id + '"; the read establishes the '
+          + 'fresh execution and observed output schema. Do not re-apply the failed procedure.' } : result.next_step;
+      const event = { operation_id: operation.id, action_key: 'node.apply', action_revision: request.contract_revision,
+        phase: 'browser_recovery_receipt', receipt };
+      const ack = await onRecord(event);
+      if (!ack || fingerprint('ack', Object.fromEntries(Object.keys(event).map(k => [k, ack[k]]))) !== fingerprint('ack', event))
+        throw new Error('Browser recovery receipt journal acknowledgement differs');
+      // The lock is released only after the receipt is durable.
+      operation.outcome = nodeApplyOutcome(operation, result); operation.cleanupConfirmed = true;
+      // Redelivery of the original request reports its own failure and the linked recovery.
+      operation.outcome.output.browser_recovery = { receipt_id: receipt.id, status: receipt.status, facts: receipt.facts };
+      await remember(operation, 'operation_abandoned', operation.outcome);
+      pending = null; nodeJobs.settle(operation.id, operation.outcome);
+      recoveryReceipts.set(receipt.id, receipt);
+      recoveredSteps.set(step.key, { operation_id: operation.id, code, receipt_id: receipt.id });
+      leased = null;
+      return { status: 'continuable', facts: receipt.facts, receipt_id: receipt.id, next_step: receipt.next_step,
+        original_operation: { operation_id: operation.id, status: operation.outcome.status, phase: operation.outcome.phase,
+          configuration: receipt.configuration, execution: receipt.execution } };
+    },
+    async stopBrowserRecovery({ operationId, uncertain }) {
+      if (uncertain) return { state: 'retained_uncertain', reason: 'A browser recovery action has an unknown outcome; Dock mutations stay blocked.' };
+      if (leased === operationId) leased = null;
+      // Unknown effects are never discarded to clear the journal (§9).
+      return { state: 'retained', reason: 'The original operation keeps its gate; inspect it for the next Dock step.' };
+    },
+  };
+  // The original export stays FAILED; the recovery receipt carries the byte-verified file.
+  async function verifyRecoveredExport(operation, step, attested, signal) {
+    running = true;
+    let file;
+    try {
+      observations.clear();
+      file = await operation.nodeApplyDrivers.recoveryReadExport(operation.nodeApply, { signal });
+    } catch (error) {
+      // Only a refusal that restored the quiet graph is settled; any other failure leaves storage gestures unknown.
+      return { status: 'unresolved', facts: [], reason: String(error?.message ?? error).slice(0, 1000),
+        uncertain: error?.nodePhaseRefusal?.cleanup_complete !== true };
+    } finally { running = false; }
+    const receipt = { id: operation.id + ':br' + (++recoverySequence), kind: 'browser_recovery', status: 'completed',
+      source_operation_id: operation.id, step: structuredClone(step), reason: operation.browserRecoveryReason,
+      facts: ['export_file_storage_row_observed', 'export_file_bytes_verified'], attested_by_model: structuredClone(attested),
+      node: structuredClone(operation.nodeApply.node), file_artifacts: [structuredClone(file)] };
+    receipt.next_step = { tool: 'dock_action_run', original_operation_id: operation.id,
+      instruction: 'The exported file is now downloaded and byte-verified (file_artifacts). Do not export again. Save the '
+        + 'package with package.save_checkpoint and a NEW operation_id if it is not saved yet, then report the file.' };
+    const event = { operation_id: operation.id, action_key: 'node.apply', action_revision: operation.nodeApply.request.contract_revision,
+      phase: 'browser_recovery_receipt', receipt };
+    const ack = await onRecord(event);
+    if (!ack || fingerprint('ack', Object.fromEntries(Object.keys(event).map(k => [k, ack[k]]))) !== fingerprint('ack', event))
+      throw new Error('Browser recovery receipt journal acknowledgement differs');
+    operation.exportRecovered = true;
+    if (operation.outcome?.output) {
+      operation.outcome.output.browser_recovery = { receipt_id: receipt.id, status: receipt.status, facts: receipt.facts,
+        file_artifacts: structuredClone(receipt.file_artifacts) };
+      // The recovered export no longer offers browser recovery as its next step.
+      operation.outcome.output.next_step = receipt.next_step;
+      nodeJobs.settle(operation.id, operation.outcome);
+    }
+    recoveryReceipts.set(receipt.id, receipt);
+    leased = null;
+    return { status: 'completed', facts: receipt.facts, receipt_id: receipt.id, file_artifacts: receipt.file_artifacts,
+      next_step: receipt.next_step, original_operation: { operation_id: operation.id, status: operation.outcome?.status } };
+  }
   const view = (operation, outcome) => ({ status: 'SUCCEEDED', action_key: 'operation.inspect', action_revision: '1',
     operation_id: operation?.id, phase: 'observed', effect_possible: false, error: null, trace: [], output: {
       operation_id: operation?.id ?? null, state: !operation ? 'idle' : pending === operation ? 'pending' : 'resolved',
@@ -1931,7 +2236,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(!['source','context'].includes(args.kind)){
         if(sourceReads.busy||sourceReads.unsettled)throw Error('JavaScript source read retains the Dock browser');
         if(sourceReads.has(args.operation_id))throw Error('Operation ID belongs to a JavaScript read');
-        return nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id)));
+        return nodeJobs.start(buildNodeReadRequest(args,operations.get(args.source_operation_id)??recoveryReceipts.get(args.source_operation_id)));
       }
       if(!sourceReads.has(args.operation_id)
         &&(operations.has(args.operation_id)||auxiliary.has(args.operation_id)||nodeJobs.has(args.operation_id)))
@@ -2311,7 +2616,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       } finally {running=false;}
     },
     preflightDeliveredArtifact(artifact,snapshot) {
-      if(!/\.(?:csv|tsv|txt)$/i.test(artifact?.name??''))throw Object.assign(Error('Server-copy verification supports only admitted CSV/TSV/TXT files; no upload was submitted'),{code:'ARTIFACT_VERIFICATION_UNSUPPORTED'});
+      if(!/\.(?:csv|tsv|txt|xlsx)$/i.test(artifact?.name??''))throw Object.assign(Error('Server-copy verification supports only admitted CSV/TSV/TXT/XLSX files; no upload was submitted'),{code:'ARTIFACT_VERIFICATION_UNSUPPORTED'});
       if(snapshot)makeArtifactDiscoveryDownloadCode({artifact,snapshot},{download:browserArtifactDownload,reveal:browserArtifactReveal});
     },
     uploadDeliveredArtifact:options=>runtime.upload({...options,decideConflicts:true}),
@@ -2473,7 +2778,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                   throw Error('Complete owned graph required before node preflight');
                 preflight=await operation.nodeApplyDrivers.beforeTarget(ctx);
               }
-              result=await prepareNodeTarget({request:graph,operation,adapter:operation.nodeTargetAdapter,
+              const targetRequest=preflight?.target_inputs?{...graph,inputs:preflight.target_inputs}:graph;
+              result=await prepareNodeTarget({request:targetRequest,operation,adapter:operation.nodeTargetAdapter,
                 record:onRecord,signal:ctx.signal,now});
             }finally{operation.deadline=overallDeadline;}
             if(result.status!=='SUCCEEDED'){
@@ -2526,6 +2832,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           return structuredClone(operation.outcome);
         }
         if(result.status!=='AMBIGUOUS'&&operation.cleanupConfirmed)pending=null;
+        // T4: an unconfirmed export download is offered to browser recovery first;
+        // the plain save-and-report continuation stays available as the alternative.
+        const exported=exportRecoveryTrigger(operation);
+        if(exported&&operation.outcome.output)operation.outcome.output.next_step={...browserRecoveryNext(operation,exported),
+          alternative_next_step:operation.outcome.output.next_step??null};
         return structuredClone(operation.outcome);
       }finally{running=false;}
     },
@@ -2626,19 +2937,21 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const nodeControls=new Set([...readOnly,'startNodeApply','startNodeRead','cancelNodeApply','stopNodeApply']);
   const exposed=Object.fromEntries(Object.entries(runtime).map(([name,value])=>[name,typeof value!=='function'||readOnly.has(name)?value:
     (...args)=>{
+      if(leased&&!readOnly.has(name)){const error=Error('Browser recovery holds the page; finish or stop it before further Dock actions');
+        if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
       if(delivery.busy){const error=Error('Artifact delivery is in progress');
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
       if((nodeJobs.busy||sourceReads.busy||sourceReads.unsettled)&&!nodeControls.has(name)){const error=Error('A background node operation is running');
         if(value.constructor.name==='AsyncFunction')return Promise.reject(error);throw error;}
       return value(...args);
     }]));
-  return Object.freeze({...exposed,
+  return Object.freeze({...exposed,...browserRecoveryApi,
     // Retained ambiguous jobs are active recovery work even while no worker is
     // running. Keep the same host lease so the next model turn can use the
     // explicitly bounded status/resume tools instead of dead-ending in global
     // recovery mode.
-    hasActiveWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
-    hasUnsettledWork:()=>!!(running||pending||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
+    hasActiveWork:()=>!!(running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
+    hasUnsettledWork:()=>!!(running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),
     resumeArtifactDelivery:(request,options)=>delivery.resume(request,options),
     artifactDeliveryStatus:id=>delivery.status(id)});

@@ -214,6 +214,65 @@ test('serialized managed body admits one detached same-native unselected redraw 
  assert.equal(result.output.selection.dom_replacements,1);assert.equal((await h.run('dispose')).disposed,true);
 });
 
+// LAB-112: after an owned source Close, the native cell remains selected while
+// its Setting controls are absent. The same body is redrawn during the ACK.
+function managedSelectedRedrawFixture(deadlineMs=5000){
+ const h=managedUnselectedRedrawFixture(deadlineMs);let controls=false;
+ const setting={...h.shape,getAttribute:key=>key==='data-tid'?h.f.node.tid+';Setting':null};
+ h.graph.getSelectionCells=()=>[h.f.native.FCell];
+ h.graph.container.querySelectorAll=()=>controls?[h.shape,setting]:[h.shape];
+ h.graph.container.contains=e=>e===h.shape||e===setting;
+ h.f.realm.document.elementFromPoint=()=>controls?setting:h.shape;
+ const click=h.f.page.mouse.click;
+ h.f.page.mouse.click=async(...args)=>{await click(...args);controls=true;};
+ return h;
+}
+
+test('LAB-112 managed source reopening materializes Setting after one selected-cell redraw',async()=>{
+ const h=managedSelectedRedrawFixture(),before=await h.run('capture'),records=[];
+ assert.equal(before.ready,false);assert.equal(before.node_selected,true);assert.equal(before.settings_count,0);
+ const result=await dispatchManagedJavascriptBody({task:h.task,before,execute:h.execute,
+   receiptOptions:(id,key,signature)=>({receipt_namespace:'managed-js-selected',receipt_id:id,receipt_signature:signature}),
+   record:async event=>{records.push(event);if(event.phase==='javascript_managed_body_prepared')h.redraw();return event;}});
+ assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.ready,true);
+ assert.equal(result.output.pre_click_dom_replacements,1);assert.equal(h.f.clicks,1);
+ assert.equal(result.output.selection.settings_count,1);assert.ok(result.output.selection.setting_point);
+ assert.equal(records.filter(e=>e.phase==='javascript_managed_body_prepared').length,1);
+ assert.equal(records.filter(e=>e.phase==='javascript_managed_body_returned').length,1);
+ assert.equal((await h.run('dispose')).disposed,true);
+});
+
+for(const fault of ['connected','owner','cell','selection','foreign_selection','duplicate','point','controls','blocker','second','ack','deadline'])
+test('selected managed redraw preserves refusal before a gesture: '+fault,async()=>{
+ const h=managedSelectedRedrawFixture(fault==='deadline'?1000:5000),before=await h.run('capture');
+ const run=()=>dispatchManagedJavascriptBody({task:h.task,before,execute:h.execute,
+   receiptOptions:(id,key,signature)=>({receipt_namespace:'managed-js-selected',receipt_id:id,receipt_signature:signature}),
+   record:async event=>{
+    if(event.phase!=='javascript_managed_body_prepared')return event;
+    h.redraw();
+    if(fault==='connected')h.initial.isConnected=true;
+    if(fault==='owner')h.f.native.data={};
+    if(fault==='cell')h.f.native.FCell={};
+    if(fault==='selection')h.graph.getSelectionCells=()=>[];
+    if(fault==='foreign_selection')h.graph.getSelectionCells=()=>[{}];
+    if(fault==='duplicate')h.graph.container.querySelectorAll=()=>[h.shape,{...h.shape}];
+    if(fault==='point')h.shape.getBoundingClientRect=()=>({x:120,y:100,width:80,height:100});
+    if(fault==='controls')h.shape.closest=selector=>selector.includes('button')?h.shape:null;
+    if(fault==='blocker')h.f.realm.document.querySelectorAll=()=>[{isConnected:true,
+      getBoundingClientRect:()=>({x:1,y:1,width:100,height:100}),matches:()=>true,getAttribute:()=>null}];
+    if(fault==='second'){
+      await h.execute(makeJavascriptManagedSelectionReadCode({...h.task,mode:'inspect',inspectPhase:'managed_pre_select_click'}));
+      h.redraw();
+    }
+    if(fault==='deadline')await new Promise(resolve=>setTimeout(resolve,1020));
+    return fault==='ack'?{}:event;
+   }});
+ let result;
+ try{result=await run();}catch(error){assert.equal(typeof error.message,'string');}
+ if(result)assert.equal(result.status,'NOT_APPLIED');
+ assert.equal(h.f.clicks,0);assert.equal((await h.run('dispose')).disposed,true);
+});
+
 for(const fault of ['connected','owner','cell','selection','foreign_selection','duplicate','point','controls','blocker','second','ack','deadline'])
 test('serialized managed pre-body redraw refuses without click: '+fault,async()=>{
  const h=managedUnselectedRedrawFixture(fault==='deadline'?1000:5000),before=await h.run('capture');

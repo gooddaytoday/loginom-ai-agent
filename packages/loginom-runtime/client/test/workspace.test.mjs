@@ -21,10 +21,10 @@ async function bootstrap({ url='https://loginom.test/app', actualBuild=build, ti
   }));
   const page={url:()=>url, async evaluate(fn,args) {
     evaluations++;
-    return runInNewContext(`(${fn.toString()})(args)`,{args,location:{origin:'https://loginom.test'},bg:{app:{Version:actualBuild}},
+    return runInNewContext(`(${fn.toString()})(args)`,{URL,args,location:{origin:'https://loginom.test'},bg:{app:{Version:actualBuild}},
       Date:{now:()=>0},getComputedStyle:()=>({}),document:{documentElement:{},createTreeWalker:()=>({nextNode:()=>elements[scanned++]??null})}});
   }};
-  const result=await runInNewContext(makeWorkspaceBootstrapCode({origin:'https://loginom.test',build}),{URL})(page);
+  const result=await runInNewContext(makeWorkspaceBootstrapCode({origin:'https://loginom.test',build}),{page,__end__:()=>{}})(page);
   return {result:JSON.parse(JSON.stringify(result)),evaluations,scanned};
 }
 
@@ -100,6 +100,7 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
       else {assert.equal(entryDelay,0,'menu must wait for homepage readiness');events.push('menu');}
     },
     async fill(value) { events.push({ fill: value });if(selector.includes('edtFileName'))openedPath=value; },
+    async press(key) { assert.equal(key,'Tab');assert.ok(selector.includes('edtUsername'));events.push('username_lookup'); },
     locator(child) { return locator(selector + ' ' + child); },
   });
   return { events, tabs, context, openFiles() {add(null);const tab=tabs.at(-1);tab.graph=null;tab.area=null;packages.delete(tab);}, page: {

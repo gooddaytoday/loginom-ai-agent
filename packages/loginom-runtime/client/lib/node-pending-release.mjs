@@ -31,7 +31,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  if(restoreRead)cleanup.read_view_restored=await restoreRead();
  // A heavy wizard can exceed the observation budget; only the user can then
  // cancel it. Its unsaved settings are lost, which the agent must say first.
- const current=await channel.observe({condition:'stopped node release surface',
+ const current=await channel.observe({condition:'stopped node release surface',releaseWizard:true,
   ready:s=>['absent','observed'].includes(s.wizard?.status)}).catch(error=>{
    throw new NodeReleaseBlocked('The Loginom workspace could not be observed for release: '+String(error.message).slice(0,300),
     'Warn the user that unsaved settings of the open wizard will be lost, ask them to close any open Loginom wizard or dialog with its Cancel button and return to this scenario graph.'+retry);});
@@ -41,7 +41,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
     'Ask the user to close the open Loginom wizard of another node with its Cancel button and return to this scenario graph.'+retry);
   // A wizard draft is committed only by Done/Execute. Closing this node's own
   // draft discards uncommitted settings; earlier committed settings remain.
-  await closePreparedWizard(channel);
+  await closePreparedWizard(channel,{initialObservation:current});
   cleanup.wizard_closed=true;
  }
  // A read stopped before its Table became active leaves this node's

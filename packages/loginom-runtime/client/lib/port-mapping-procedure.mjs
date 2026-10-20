@@ -1,5 +1,6 @@
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
 import {expandOutputChanges} from './output-mapping-changes.mjs';
+import {ensureMappingTableView} from './mapping-table-view.mjs';
 
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const mappingControl=(s,suffix)=>{
@@ -174,7 +175,14 @@ export async function reorderOutputFields(channel,recordIds) {
         return {...f,index:i,...(grouped?{group_index:groupIndex}:{})};
       });moves++;
       state=await channel.observe({condition:'native output order after one move',readMappings:true,ready});
-      if(!same(semantic(state.node_mapping),semantic(expected)))throw Error('Output reorder changed unrelated native mapping state');
+      const observed=semantic(state.node_mapping),wanted=semantic(expected),selection=wanted.source_selection;
+      // Moving an output row can remove the confirmed empty source selection.
+      // No selected source or other mapping property may change with the move.
+      if(!Object.hasOwn(observed,'source_selection')&&selection?.verified===true
+        &&Object.keys(selection).sort().join(',')==='record_ids,verified'
+        &&Array.isArray(selection.record_ids)&&selection.record_ids.length===0)
+        delete wanted.source_selection;
+      if(!same(observed,wanted))throw Error('Output reorder changed unrelated native mapping state');
     }
   }
   return {verified:true,cleanup_complete:true,effect_possible:moves>0,moves,definition:state.node_mapping??expected,
@@ -258,6 +266,8 @@ export async function excludeOutputField(channel,sourceRecordId) {
     &&s.node_mapping?.verified===true&&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true
     &&s.node_mapping.mapping_wizard==='DerivedDataSourceOutputSocketWizard';
   let state=await channel.observe({condition:'native output mapping before exclusion',readMappings:true,ready});
+  // Definition paging uses Table view; bind the baseline after that guarded UI-only transition.
+  state=await ensureMappingTableView(channel,state);
   const baseline=state.node_mapping,source=baseline.source_fields.filter(f=>f.record_id===sourceRecordId);
   if(source.length!==1||source[0].required!==false)throw Error('Only a verified optional source can be excluded');
   const existing=baseline.target_fields.filter(f=>f.excluded===true&&f.exclusion_source?.record_id===sourceRecordId);

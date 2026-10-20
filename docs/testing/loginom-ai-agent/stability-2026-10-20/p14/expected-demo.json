@@ -1,0 +1,117 @@
+{
+  "package_path": "/stability-2026-10-20/p14.lgp",
+  "nodes": [
+    {
+      "type": "imports.excel"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/exhibit-weights.csv",
+      "ordered": false,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Gallery",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Weight",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Id": 6,
+          "Gallery": "Atrium",
+          "Weight": 24.0
+        },
+        {
+          "Id": 14,
+          "Gallery": "Atrium",
+          "Weight": 18.5
+        },
+        {
+          "Id": 1,
+          "Gallery": "West",
+          "Weight": 30.0
+        },
+        {
+          "Id": 2,
+          "Gallery": "East",
+          "Weight": 28.5
+        },
+        {
+          "Id": 5,
+          "Gallery": "Atrium",
+          "Weight": 7.25
+        },
+        {
+          "Id": 8,
+          "Gallery": "Atrium",
+          "Weight": 37.0
+        },
+        {
+          "Id": 9,
+          "Gallery": "East",
+          "Weight": 37.25
+        },
+        {
+          "Id": 7,
+          "Gallery": "West",
+          "Weight": 11.75
+        },
+        {
+          "Id": 3,
+          "Gallery": "East",
+          "Weight": 9.75
+        },
+        {
+          "Id": 13,
+          "Gallery": "East",
+          "Weight": 19.75
+        },
+        {
+          "Id": 11,
+          "Gallery": "East",
+          "Weight": 36.25
+        },
+        {
+          "Id": 10,
+          "Gallery": "Atrium",
+          "Weight": 3.0
+        },
+        {
+          "Id": 4,
+          "Gallery": "East",
+          "Weight": 27.25
+        },
+        {
+          "Id": 15,
+          "Gallery": "West",
+          "Weight": 0.5
+        },
+        {
+          "Id": 12,
+          "Gallery": "West",
+          "Weight": 35.25
+        }
+      ]
+    }
+  ]
+}

@@ -10,7 +10,8 @@ export function makePackageCleanupCode(options) {
       || typeof diagnosticReadOnly !== 'boolean' || typeof diagnosticDiscard !== 'boolean' || !Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 15000) throw Error('Exact isolated cleanup identity required');
   const url = new URL(loginomUrl);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw Error('Invalid cleanup origin');
-  return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, diagnosticDiscard, diagnosticReadOnly})})`;
+  // Match the existing bridge cleanup call's 30000 ms budget, including dispatch.
+  return `async page=>(${closeOwnedPackage.toString()})(page,${JSON.stringify({sessionId, documentId, account, packagePath, origin:url.origin, loginomBuild, tabTid, timeoutMs, diagnosticDiscard, diagnosticReadOnly})},${Date.now()+30000})`;
 }
 
 export function parsePackageCleanupResult(response, expected) {
@@ -31,12 +32,17 @@ export function parsePackageCleanupResult(response, expected) {
   throw Error('Bound package cleanup receipt missing');
 }
 
-async function closeOwnedPackage(page, options) {
+async function closeOwnedPackage(page, options, deadline) {
   const {sessionId, documentId, account, packagePath, tabTid, timeoutMs} = options;
   const receipt = {version:1, session_id:sessionId, document_id:documentId, account, package_path:packagePath,
-    package_closed:false, logged_out:false, unsaved_changes_discarded:false, started_at:new Date().toISOString()};
+    package_closed:false, logged_out:false, unsaved_changes_discarded:false, stage:'close_request', started_at:new Date().toISOString()};
   const finish = (status, reason, extra = {}) => ({...receipt, ...extra, status, reason, completed_at:new Date().toISOString()});
   const at = tid => page.locator('[data-tid='+JSON.stringify(tid)+']');
+  const remaining = () => {
+    const ms = Math.min(timeoutMs, deadline-Date.now());
+    if (ms <= 0) throw Error('Cleanup deadline exceeded');
+    return ms;
+  };
   try {
     const before = await page.evaluate(async o => {
       const app = globalThis.bg?.app, f = app?.Application?.FInstance?.FMainForm, m = f?.FMapTree;
@@ -79,12 +85,14 @@ async function closeOwnedPackage(page, options) {
       return {started:true, packages_before:1, modified, display_name:node.DisplayName};
     }, options);
     if (!before.started) return finish('BLOCKED', before.reason);
+    receipt.stage = 'close_wait';
     await page.waitForFunction(() => {
       const state = globalThis.__loginomDockCleanupV1;
       const visible = e => !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height && getComputedStyle(e).visibility !== 'hidden';
       return state?.done || [...document.querySelectorAll('[role="dialog"],.x-message-box')].some(visible);
     }, undefined, {timeout:timeoutMs});
     if (options.diagnosticDiscard === true && before.modified === true) {
+      receipt.stage = 'discard_prompt';
       const message = page.locator('[data-tid^="msgbox"][data-tid$="cnt;cnt;cmp"]:visible');
       const no = page.locator('[data-tid^="msgbox"][data-tid$="tlb;no"]:visible');
       if (await message.count() !== 1 || await no.count() !== 1) return finish('BLOCKED','DIAGNOSTIC_SAVE_PROMPT_MISSING');
@@ -100,31 +108,68 @@ async function closeOwnedPackage(page, options) {
         return n && '/'+n.PackageFileName.replaceAll('\\','/').replace(/^\/+/, '') === o.packagePath
           && m.FServerConnection.UserName === o.account && n.HasRunningNodes() === false;
       }, options)) return finish('BLOCKED','DIAGNOSTIC_PACKAGE_CHANGED');
+      receipt.stage = 'discard_click';
       await no.click({timeout:timeoutMs});
       receipt.unsaved_changes_discarded = true;
+      receipt.stage = 'discard_close_wait';
       await page.waitForFunction(() => globalThis.__loginomDockCleanupV1?.done === true, undefined, {timeout:timeoutMs});
     }
+    receipt.stage = 'close_readback';
     const closed = await page.evaluate(() => {
       const state = globalThis.__loginomDockCleanupV1;
       return {done:state?.done === true, closed:state?.closed === true,
         remaining:globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.PackageNodes?.Count};
     });
     if (!closed.done || !closed.closed || closed.remaining !== 0) return finish('BLOCKED', 'NATIVE_CLOSE_UNCONFIRMED');
+    receipt.stage = 'tab_detach';
     await at(tabTid).waitFor({state:'detached', timeout:timeoutMs});
     receipt.package_closed = true;
-    await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:timeoutMs});
+    receipt.stage = 'logout_menu_open';
+    try {
+      await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:remaining()});
+    } catch (error) {
+      if (error?.name !== 'TimeoutError') throw error;
+      // A timed-out click may already have opened the menu. Observe before
+      // retrying once; never toggle it closed or extend the cleanup call.
+      const observed = await page.waitForFunction(o => {
+        const prep = globalThis.__loginomDockPreparationV1, app = globalThis.bg?.app;
+        const m = app?.Application?.FInstance?.FMainForm?.FMapTree;
+        if (location.origin !== o.origin || app?.Version !== o.loginomBuild || prep?.document !== document
+            || prep.id !== o.documentId || m?.FServerConnection?.UserName !== o.account
+            || m.FServerConnection.Connected !== true || m.PackageNodes?.Count !== 0) return {safe:false};
+        const visible = e => !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height && getComputedStyle(e).visibility !== 'hidden';
+        if ([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg,.x-mask')].some(visible)) return false;
+        const menu = [...document.querySelectorAll('[data-tid="MF;AppMenuForm;btnLogOut"]')].filter(visible);
+        if (menu.length > 1) return {safe:false};
+        if (menu.length === 1) return {safe:true, menu:true};
+        const avatar = [...document.querySelectorAll('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')].filter(visible);
+        return avatar.length === 1 ? {safe:true, menu:false} : false;
+      }, options, {timeout:remaining()});
+      const state = await observed.jsonValue();
+      await observed.dispose();
+      if (!state?.safe) return finish('BLOCKED', 'CLEANUP_UNCONFIRMED');
+      if (!state.menu) await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:remaining()});
+    }
+    receipt.stage = 'logout_account_readback';
     if ((await at('MF;AppMenuForm;p.h;p.t').innerText()).trim() !== account) return finish('BLOCKED', 'LOGOUT_ACCOUNT_CHANGED');
     // Native close already removed every package; logout cannot discard work.
+    receipt.stage = 'logout_inventory_readback';
     if (!await page.evaluate(expected => {
       const m = globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree;
       return m?.PackageNodes?.Count === 0 && m.FServerConnection.UserName === expected;
     }, account)) return finish('BLOCKED', 'LOGOUT_INVENTORY_CHANGED');
-    await at('MF;AppMenuForm;btnLogOut').click({timeout:timeoutMs});
-    await at('LoginForm;Login;edtUsername').locator('input').waitFor({state:'visible', timeout:timeoutMs});
+    receipt.stage = 'logout_click';
+    await at('MF;AppMenuForm;btnLogOut').click({timeout:remaining()});
+    receipt.stage = 'login_form_wait';
+    await at('LoginForm;Login;edtUsername').locator('input').waitFor({state:'visible', timeout:remaining()});
+    receipt.stage = 'logout_readback';
     if (await at('MF;cntMain;tlbMainToolbar;btnAvatar').isVisible()) return finish('BLOCKED', 'LOGOUT_UNCONFIRMED');
     receipt.logged_out = true;
+    receipt.stage = 'complete';
     return finish('SUCCEEDED', null, {packages_before:1, packages_after:0});
   } catch {
+    // Fixed private stage only: retain refusal and never persist raw errors,
+    // credentials, DOM contents or an inferred logout from browser closure.
     return finish('BLOCKED', 'CLEANUP_UNCONFIRMED');
   }
 }

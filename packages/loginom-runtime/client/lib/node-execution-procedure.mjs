@@ -77,7 +77,7 @@ export async function revealExecutionControl(channel,node,initial,process,tid,ve
 }
 
 export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false,verifyFailedChild=false,retainReadWait=false}={}) {
-  let baseline,execution,stopPromise,readWaitBinding,launchAttempted=false,deactivationAttempted=false,failedChildAttempted=false;
+  let baseline,execution,stopPromise,readWaitBinding,consoleControl,launchSucceeded=false,launchAttempted=false,deactivationAttempted=false,failedChildAttempted=false;
   const observe=(condition,ready=()=>true,extra={})=>channel.observe({condition,readProcesses:true,ready,...extra});
   const control=(s,tid,verb='click')=>{const current=typeof tid==='function'?tid(s):tid;
     return typeof current==='string'&&current.length?s.ui.elements.filter(e=>consoleTid(e.tid,current)&&e.allowed_actions.includes(verb)):[];};
@@ -87,7 +87,12 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
     resolve:s=>({verb,ref:one(control(s,tid,verb),'Unique execution control required').ref,...(key?{key}:{})}),identity});
   const consoleVisible=s=>s.ui.elements.filter(e=>consoleTid(e.tid,grid)).length===1;
   async function openConsole() {
-    let s=await observe('prepared node available for process console',s=>consoleVisible(s)||control(s,button).length===1,{readProcesses:false,readProcessControls:true});
+    let s=await observe('prepared node available for process console',s=>consoleVisible(s)||control(s,button).length===1,{readProcesses:false,readProcessControls:true,
+      ...(launchSucceeded&&consoleControl?{settleProcessConsole:consoleControl}:{})});
+    if(!launchSucceeded){
+      const buttons=control(s,button);
+      consoleControl=buttons.length===1&&buttons[0].signature?{ref:buttons[0].ref,signature:structuredClone(buttons[0].signature)}:undefined;
+    }
     if(!consoleVisible(s))await act(s,button);
     // The control-only read above has no native inventory, even when the
     // console was already open. Stop must refresh its root/process proof.
@@ -180,6 +185,12 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
         &&s.prepared_node_context.locked===false&&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k])
         &&s.wizard?.status==='absent'&&s.node_outputs?.verified===true;
       let s=await channel.observe({condition:'configured graph node ready for execution',readOutputs:true,ready:same});
+      const body=s.ui.elements.filter(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body');
+      if(body.length===1&&body[0].interaction?.state==='outside_viewport') {
+        await channel.revealGraphNode();
+        s=await channel.observe({condition:'configured graph node revealed before execution',readOutputs:true,
+          ready:s=>same(s)&&s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'&&e.interaction?.state==='point_observed')});
+      }
       if(!s.node_outputs.node_selected) {
         const tid=s.prepared_node_context.tid;
         await channel.perform({condition:'select the configured node for execution',initialObservation:s,
@@ -206,7 +217,13 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       const result=await channel.perform({condition:'execute the configured graph node',initialObservation:s,
         ready:s=>same(s)&&s.node_outputs.node_selected&&launch(s).length===1,
         resolve:s=>({verb:'execute_graph_node',ref:one(launch(s),'Unique native execution control required').ref}),
-        identity:s=>({node,launch:one(launch(s),'Unique native execution control required').graph_execution})});
+        identity:s=>{
+          // A native graph redraw replaces the opaque body ref without changing
+          // the launch owner or intent. The fresh gesture still checks that ref.
+          const {node_ref,...control}=one(launch(s),'Unique native execution control required').graph_execution;
+          return {node,launch:control};
+        }});
+      launchSucceeded=result.status==='SUCCEEDED';
       return {verified:true,launch_gesture_verified:true,execution_completed:false,receipt:result};
     },
     async identify() {
@@ -370,6 +387,26 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
 
 // Final lifecycle after a separate output-port wizard has saved its settings.
 // This does not reopen the node wizard or treat intermediate Done as final.
+// Training is a separate native launch. Its completed process must settle
+// before the ordinary Execute captures a new process-history baseline.
+export async function trainConfiguredNode(channel,node) {
+  const driver=createNodeExecutionProcedure(channel,node);
+  await driver.prepare();
+  const ready=s=>s.prepared_node_context?.surface==='graph'&&s.wizard?.status==='absent'
+    &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k]);
+  const graph=await channel.observe({condition:'owned node before training',ready});
+  await channel.perform({condition:'open training menu of owned node',initialObservation:graph,ready,
+    identity:()=>node,resolve:s=>({verb:'right_click',ref:one(s.ui.elements.filter(e=>e.tid===s.prepared_node_context.tid&&e.graph_node?.part==='body'&&e.allowed_actions.includes('right_click')),'Owned training node body required').ref})});
+  const menu=s=>s.ui.elements.filter(e=>e.label==='Обучить узел'&&e.tid?.startsWith('mn;')&&e.allowed_actions.includes('click'));
+  const observed=await channel.observe({condition:'native Train command',readTraining:true,ready:s=>ready(s)&&menu(s).length===1});
+  await channel.perform({condition:'train owned node once',initialObservation:observed,ready:s=>ready(s)&&menu(s).length===1,
+    identity:()=>node,resolve:s=>({verb:'click',ref:one(menu(s),'One native Train command required').ref})});
+  await driver.identify();
+  const completed=await driver.waitCompleted();
+  requireValue(completed.verified===true&&completed.owner_verified===true,'Native training completion is unconfirmed');
+  return {status:'trained',node:structuredClone(node),execution_id:completed.execution_id};
+}
+
 export async function finishConfiguredGraph(channel,driver,mode,node) {
   requireValue(['done','execute'].includes(mode),'A configured graph supports Done or Execute; Close belongs to the node draft');
   const graph=await channel.observe({condition:'configured node and ports returned to graph',readOutputs:true,

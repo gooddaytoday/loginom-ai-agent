@@ -28,7 +28,8 @@ for (const [initial, password, expected] of [
       (password ? "password" : initial ? "clear stale" : "empty readonly"),
     async () => {
       const fills = [],
-        clicks = []
+        clicks = [],
+        calls = []
       let visible = false
       const account = "User"
       const locator = (selector) => ({
@@ -42,9 +43,16 @@ for (const [initial, password, expected] of [
         async fill(value) {
           if (selector.includes("edtPassword") && initial === "" && password === "") throw Error("FIELD_READONLY")
           fills.push([selector, value])
+          calls.push(["fill", value])
+        },
+        async press(key) {
+          assert.ok(selector.includes("edtUsername"))
+          assert.equal(key, "Tab")
+          calls.push(["press", key])
         },
         async click() {
           clicks.push(selector)
+          calls.push(["click"])
           visible = true
         },
         async isVisible() {
@@ -78,6 +86,12 @@ for (const [initial, password, expected] of [
         [account, ...expected],
       )
       assert.equal(clicks.length, 1)
+      assert.deepEqual(calls, [
+        ["fill", account],
+        ["press", "Tab"],
+        ...expected.map((value) => ["fill", value]),
+        ["click"],
+      ])
       await assert.rejects(
         loginPage(page, { url: "http://example.test/app/", username: "Other", password: "secret" }),
         /LOGINOM_ACCOUNT_MISMATCH/,

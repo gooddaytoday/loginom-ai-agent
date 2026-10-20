@@ -219,7 +219,8 @@ export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessi
     getUploadGrant(artifactId,grantId) {
       const descriptor=entries.get(artifactId);
       if (!descriptor?.upload || typeof grantId!=='string' || descriptor.upload.grant_id!==grantId) {
-        const error=new Error('Artifact upload was not authorized for this session and grant. Copy the exact artifact_id and upload.grant_id pair from input_artifacts; dock_action_describe can reread them without preparing a new workspace.');
+        const pair=descriptor?.upload ? ' For '+JSON.stringify(descriptor.name)+', use this exact argument pair: '+JSON.stringify({artifact_id:descriptor.artifact_id,upload_grant_id:descriptor.upload.grant_id})+'. The upload_grant_id argument is this same input_artifacts entry\'s upload.grant_id; do not edit the identifier.' : '';
+        const error=new Error('Artifact upload was not authorized for this session and grant.'+pair+' Copy the exact artifact_id and upload.grant_id pair from input_artifacts; dock_action_describe can reread them without preparing a new workspace.');
         error.code='ARTIFACT_GRANT_NOT_FOUND';throw error;
       }
       return structuredClone(descriptor);

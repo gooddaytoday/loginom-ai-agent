@@ -1,0 +1,58 @@
+{
+  "package_path": "/stability-2026-10-20/n7.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.clustering"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": false,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Points",
+          "label": "Points",
+          "type": "integer"
+        },
+        {
+          "name": "MeanVisits",
+          "label": "MeanVisits",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        },
+        {
+          "name": "MeanItems",
+          "label": "MeanItems",
+          "type": "real",
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-10
+          }
+        }
+      ],
+      "rows": [
+        {
+          "Points": 6,
+          "MeanVisits": 2.2083333333333335,
+          "MeanItems": 4.25
+        },
+        {
+          "Points": 8,
+          "MeanVisits": 25.125,
+          "MeanItems": 30.03125
+        }
+      ]
+    }
+  ]
+}

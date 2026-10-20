@@ -1,0 +1,71 @@
+{
+  "package_path": "/demo-2026-10-22/s4-branches.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.union_data"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/demo-2026-10-22/branches-ru.csv",
+      "ordered": true,
+      "column_order": "exact",
+      "columns": [
+        {
+          "name": "Branch",
+          "label": "Филиал",
+          "type": "string"
+        },
+        {
+          "name": "Category",
+          "label": "Категория",
+          "type": "string"
+        },
+        {
+          "name": "Revenue",
+          "label": "Выручка",
+          "type": "real"
+        }
+      ],
+      "rows": [
+        {
+          "Branch": "Центр",
+          "Category": "Техника",
+          "Revenue": 80193.0
+        },
+        {
+          "Branch": "Север",
+          "Category": "Техника",
+          "Revenue": 51110.0
+        },
+        {
+          "Branch": "Юг",
+          "Category": "Техника",
+          "Revenue": 47270.0
+        },
+        {
+          "Branch": "Центр",
+          "Category": "Офис",
+          "Revenue": 11415.0
+        },
+        {
+          "Branch": "Юг",
+          "Category": "Офис",
+          "Revenue": 6839.0
+        },
+        {
+          "Branch": "Север",
+          "Category": "Офис",
+          "Revenue": 6182.0
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 interface ImportMetaEnv {
   readonly LOGINOM_AI_AGENT_CHANNEL: string
+  readonly LOGINOM_AI_AGENT_BROWSER_RECOVERY: boolean
 }
 
 interface ImportMeta {
