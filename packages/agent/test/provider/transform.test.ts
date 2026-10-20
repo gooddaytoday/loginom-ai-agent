@@ -1906,6 +1906,18 @@ describe("ProviderTransform.schema - openai supported schema subset", () => {
     if (type === "array") expect(result.items).toEqual({ type: "number", enum: [1, 2] })
   })
 
+  test("OpenAI retains the same-runtime preparation rule before the first call", async () => {
+    const { prepareTool } = await import("../../../loginom-runtime/client/lib/skill.mjs")
+    const inputSchema = prepareTool.inputSchema as unknown as import("@ai-sdk/provider").JSONSchema7
+    const schema = ProviderTransform.schema(openaiModel, inputSchema)
+    for (const key of ["intent", "workflow_ref", "package_path"] as const) {
+      const field = schema.properties![key] as import("@ai-sdk/provider").JSONSchema7
+      const original = inputSchema.properties![key] as import("@ai-sdk/provider").JSONSchema7
+      expect(field.description).toBe(original.description)
+      expect(field.description).toContain(key === "package_path" ? "Never guess" : "open_package")
+    }
+  })
+
   test("infers mixed enum types instead of forcing strings", () => {
     expect(ProviderTransform.schema(openaiModel, { enum: ["done", 42, null, true] }).type).toEqual([
       "string",
