@@ -243,6 +243,24 @@ trial-dosage-outcomes
 - [x] Та же полная10 запущена:20261020-093030-959fb6050f-dirty-g03U7Q,
   первые2dispatch09:31:38Z;исходныйdeadline15:28:25Z,наблюдение/приёмка прежние.
 
+## Остановка серии4 и полная серия5
+
+- [x] g03U7Q завершенаавтоматически:JUDGE_CONFIGURATION_MISMATCH,3attempts/7unassigned.
+  abc0/noartifact/cleanupconfirmed (Data recursion безcache→error dialog),
+  articles oraclePASS/judgeerror64×2/cleanupconfirmed,basketinterrupted/cleanupfailed.
+  Processproofsconfirmed/unknown[];postverifyexit2/nativeprofilepending. Старыйстенд сохранён.
+- [x] Watcher вовремяпрекратилadmissions.880probes/0missed/maxgap1.42s,resourceacceptancepassed;
+  RAMmin10.69GiB/CPUmax98.91%,новыхOOM/FS/licence/providerlimitнет.
+- [x] Причинаcfgотказа09:46:03неустановлена:globalmtime09:46:55,позднееsemanticdiffпуст.
+  Wrapper/codexversionне менялись. Точныеcwd/env version/login/exec--help иBuncheckpass.
+- [x] Диагностическийrejudge наprivateкопии:articles100/oraclePASS/1judge,unitcomplete;
+  source100fileshashunchanged,configcaptureстабилен. Это не приёмка/не склеиватьрезультаты.
+- [x] Независимоеreviewпланаdiagnostic→fullrun выполнено;launcher/security checks не меняются.
+- [ ] Новыйownstand,localOAuth,pins;RAMpolicy99.9% фиксироватьдоdispatch.
+  Тотже CLIb5ad7c602ea1,измеряемыйкодне менялся. Прежниеprepare/verify/cold/A-B gates.
+- [ ] Полнаятаже10всерии5,deadline15:28:25Z;privatecaptureconfigchanges толькодиагностика,
+  без2гоколлектора/новыхкритериев/решенияисходапопыток поописи.
+
 ## Приёмка и завершение
 
 - [ ] Ровно 10 итоговых attempts без пропусков/дублей/подмен; реальное перекрытие
@@ -268,13 +286,13 @@ trial-dosage-outcomes
 
 ## Checkpoint
 
-1. Harness959fb6050f;CLI b5ad7c602ea1 installed/verified/hashunchanged;measuredcode не менялся после watcherbecff.
-2. Старые acceptance/Sp38yS/root2standretained не менять;root1w6kidhm4/eval_parallel_blockers.md.
-3. Серия3gMHr5j root3k9rcj844 завершена09:17:42Z/exit1:4attempts/6unassigned,3cleanupconfirmed/basketrecoveryfailed.
-4. articles100/oraclePASS,abc0/noartifact;basket/budgetinterrupted одним SIGINTиз-заRAM7.65GiB<8(3пробы).
-5. Resources1121/0missed/max1.39s;CPU99.92разрешён,новыхOOM/licence/providerlimitнет;budgetfailed.
-6. Judgeunitterminated/home released;postverifyexit2/незавершённыйprofile:старыйстенд/receipts/recovery сохранены.
-7. Root4 /home/kiselev/storage/tmp/analytic10-branch-r4-20261020-bgrox9gn;новаяпара551c2efca21b/5fcac22c5ef4:52889.
-8. Preparee04729d6/verifye811dfc2 ready,coldbrowser/model a/b,judge login/version,4liveA/Bpass.
-9. g03U7Q активен:2dispatch09:31:38Z/8queued;RAMпередrun16.97GiB;наблюдение30–60sдо завершения.
-10. Modelwindowдо15:28:25Z;owneramendmentRAM99.9%(remaining≥39.397MiB),CPU100сохранён;rawbudgetне менять.
+1. HEADa77b427db8;CLI b5ad7c602ea1 installed/hashunchanged;watcherbecfflastmeasuredcode,77tests/typecheck/reviewpass.
+2. Старые acceptance/Sp38yS/root2/root4standsretained не менять;root1w6kidhm4/eval_parallel_blockers.md.
+3. Серия4g03U7Q закончиласьJUDGE_CONFIGURATION_MISMATCH09:46:03:3attempts/7unassigned;2cleanupconfirmed/basketfailed.
+4. abc0 Data recursion безcache,articlesoraclePASS/judgeerror64×2,basketinterrupted;resource880/0missed/passed.
+5. Root4bgrox9gn сохранён;postverifyexit2/nativeprofilepending. Причинаcfgfailureне установлена;позднеесравнениесовпадает.
+6. Diagnosticprivatecopyarticles100/oraclePASS/1judge/unitcomplete/source100filesunchanged;нечастьприёмки.
+7. Root5 /home/kiselev/storage/tmp/analytic10-branch-r5-20261020-w24bg0nh;новыйownstand;установленныйCLIостаётсяroot3k9rcj844.
+8. OwnerRAMusage99.9%(remaining≥39.397MiB),CPU100сохранён;длясерии5предварительныйbudget,rawseries4не менять.
+9. Следующийшагpaircreate/init/prepare/verify/cold/A-B,полная10+live30–60s;captureconfigchangesдиагностический.
+10. Общийmodelwindow07:28:25Z–15:28:25Z;seed/IDs/sourceauth/inputs/rubricпрежние;foreignсохранены.
