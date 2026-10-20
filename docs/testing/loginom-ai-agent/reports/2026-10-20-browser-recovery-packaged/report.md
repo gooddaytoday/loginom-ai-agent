@@ -1,4 +1,4 @@
-# Packaged browser recovery: CLI и Desktop availability
+# Packaged browser recovery: availability и естественные модельные прогоны
 
 Канонический installed flag1 CLI путь прошёл: current capability true,
 save_checkpoint, native Close/logout/noDiscard, ACK/exit0 и освобождение writer.
@@ -6,7 +6,10 @@ save_checkpoint, native Close/logout/noDiscard, ACK/exit0 и освобожде�
 Три отрицательные CLI строки также PASS; контрольная установка штатно удалена.
 Task 1 принята независимым spec+quality review без обязательных замечаний.
 Desktop Task2 принята независимым spec+quality review без обязательных замечаний.
-Модели и acceptance gate открыты.
+Новый image run выполнил бизнес-задание без recovery; text run заблокирован
+rate limit provider. Desktop model run не допущен без CLI transition.
+Собственные CLI/Desktop установки штатно удалены; profiles/evidence сохранены.
+Исходная Task3 и acceptance/release gate открыты.
 
 ## Проверенная поставка
 
@@ -187,3 +190,162 @@ Current `session.json` и `package-cleanup.json` находятся под со�
 `<row>/profile/desktop/loginom/runtime/generations/1/chats/<SHA256 backend session>/attempts/<attempt>`.
 Transport receipts лежат в runtime root; `evidence/verified-summary.json` связывает
 их с текущими native/Save/OS фактами. Исторический `installed` Bun-timeout отделён.
+
+Дополнение к stderr Task2: в unpackaged также наблюдались CSP warning и quit-time
+`Failed to finish bootstrap instance TypeError: Failed to fetch` (15:55:54.710).
+Причина не установлена; подтверждённые native cleanup и ACK остаются отдельными
+успешными фактами. Production repair и дополнительного native запуска не было.
+
+## Natural Task3: исходный комплект до live model run
+
+До первого модельного запуска 20.10 закреплён `WIZARD_OPEN_NOT_CONFIRMED`:
+LAB-91 `103006-r3`, исходный source `025b73afacf2a9e6e485c5fc1872274a31f95502`.
+Связь ID/ошибки дана в
+[аналитическом срезе](../../../../node-development/nodes/integration-restrequest/large-graph-interaction.md).
+Текущие stage1 `acceptance/README.md`, `task.md`, `data/requests.csv` и
+`fixtures/manifest.json` побайтно совпали с историческим source. `expected.json`
+отличается только ранее добавленным `label_any:true` у `HttpStatusCode`;
+значения, типы и две строки прежние.
+
+Модель получает только четырёхстрочное бизнес-задание GET
+`https://httpbin.org/anything` с параметрами RequestId/Key, входной CSV UTF-8
+(`r-a,"a b&я"` и `r-b,"x/y?"`), свежий собственный путь пакета вместо
+`{{PACKAGE_PATH}}`. Требуется взять вернувшиеся RequestId/Key и реальный HTTP-код,
+выгрузить три столбца в CSV рядом с сохранённым пакетом. Oracle, expected,
+история отказов и инструкции обработчиков модели не передаются.
+
+Четыре класса (DOM-owner, `UI_SCAN_LIMIT`, ожидание готовности, подтверждение
+журнала JS) не имеют установленных case/run ID: каждый BLOCKED отдельно.
+`100909-r1` известен для скачивания, но связь с медленным host не подтверждена:
+эта строка также BLOCKED. Отсутствующий investigations-каталог и HTTP401
+исторических архивов не блокируют известный WIZARD-комплект. Нового требования
+старого timestamp/snapshot нет. Повтор естественного отказа не гарантирован;
+успешная задача без перехода не станет recovery PASS.
+
+Private evidence Task3: `/tmp/loginom-browser-recovery-task3-4wmxpueb`;
+`evidence/preflight.json` фиксирует сравнение до запуска.
+
+До первого live run выбрана `openai/gpt-5.6-sol`, variant `medium`: фактически
+использована отдельным test model-smoke 19.10 и присутствует в текущем installed
+`models openai --verbose`; `capabilities.input.image:true`, medium доступен.
+Выделенный same-project OAuth имеется, исходник читается без изменения,
+копия0600 помещена в новый CLI profile. Токены в отчёт не включаются.
+По решению controller это выбор реально доступной модели для текущей Task3;
+прежнее требование `gpt-6.1-sol/medium` относится к корпусу package-docs 07.10.
+Сравнимость с тем корпусом не заявляется, модель внутри попытки не меняется.
+В текущем OAuth-каталоге все15 моделей имеют image:true; текстовая модель
+пока не выбрана. Public model-list preflight не является модельным запуском
+или доказательством реального screenshot content.
+
+### Image run: задача выполнена, recovery BLOCKED
+
+Новая фактическая CLI session `ses_ea685a818ffefdcuJvJtZoMRd9`, runtime
+`6704466b-5ade-4429-b644-55d1e3db31e1`, attempt
+`b7387485-29c1-4877-a241-f04d2364301a`. Current task `browserRecovery:true`,
+workspaceReady true; связь session/hash/attempt проверена. Модель и medium
+сохранены в projected messages.
+
+Естественный отказ не повторился: recovery calls0, screenshot calls0,
+`recovered_via_browser_count:0`. Recovery — **BLOCKED**, не PASS.
+Полный фактический provider tool catalog не захвачен; image capability и исходный
+фильтр tools не доказывают публикацию screenshot или настоящий image content.
+
+Текущий parse output прошёл существующий expected-output matcher; два actual
+CSV-файла artifact store совпали, UTF-8/57байт/SHA256
+`59090a0ade71b6a02213718ac850a6d120e6f1259fce149cc35acaa609ce1733`.
+CSV содержит точные две ожидаемые строки. Public JS parameters берут RequestId/Key
+из `JSON.parse(Response).args`, HttpStatusCode из ответа REST.
+Canonical Save `save-httpbin-package` SUCCEEDED, reopened:false,
+workflow_preserved:true, modified:false; persisted_content_verified:false
+и arrangement result_unconfirmed сохранены. Cold readback не выполнялся.
+
+Native `saved-package-cleanup.json`: SUCCEEDED, package_closed:true,
+logged_out:true, unsaved_changes_discarded:false, packages_after0.
+Task transport ACKtrue/exit0/no signal; CLIexit0/пустой stderr/writer освобождён.
+Все29 наблюдавшихся собственных процессов setup+run отсутствуют. Исходный
+dedicated OAuth hash не изменился. Raw evidence — `image/`; сводки
+`evidence/image-summary.json`, `output-matcher.json`, `csv-check.json`.
+
+### Text pre-run
+
+После полного image cleanup один public `models --verbose` показал
+`opencode/big-pickle`: input.image:false, toolcall:true, active, variants отсутствуют.
+Штатный provider autoload допускает бесплатную модель с public authorization
+без отдельного секрета; provider/config/capabilities не изменяются.
+Controller разрешил одну последовательную попытку этой моделью с default variant
+на том же бизнес-комплекте и новым private profile/UUID. Реальная доступность
+provider проверяется этой попыткой; при отказе перебора моделей не будет.
+
+### Text run: BLOCKED provider, Desktop не запущен
+
+Фактическая новая session `ses_ea67c88c1ffeWIbFC5AYXgRdJR` подтверждает
+`opencode/big-pickle`. Setup exit0, но первый provider turn получил
+`AI_APICallError: Rate limit exceeded. Please try again later.`
+Внутренний title request записал `AI_RetryError: Failed after 3 attempts`
+с той же причиной. Эти автоматические повторы сохранены как наблюдение;
+дополнительного запуска, смены модели или настройки retry не было.
+После обнаружения ошибки отправлен SIGINT только собственному CLI.
+
+CLI exit130/no signal, stderr пуст, writer освобождён, все18 наблюдавшихся
+процессов setup+run отсутствуют. Tool calls0, task session.json отсутствует:
+task capability **NOT_OBSERVED**, а не false. Task package/native Close/logout/
+task transport не наблюдались; отдельные management validation и knowledge
+receipts имеют ACKtrue/exit0. Их успех не заменяет task cleanup.
+Результат задачи отсутствует; recovery count0, screenshot publication не проверена.
+Оба профиля также записали auxiliary background npm install404 для
+`@loginom-ai-agent/plugin`; причина отдельно не исследовалась, image PASS
+этим предупреждением не отменяется. Сводка: `evidence/text-summary.json`.
+
+Desktop real-model строка **BLOCKED**: ни один CLI run не дал recovery transition,
+на котором brief разрешает её выполнять. Новых Desktop model session/receipt нет.
+
+### Итоговая матрица исходной Task3 и §11
+
+| Естественный класс 18.10 | Идентичность и новый результат |
+|---|---|
+| DOM-owner | BLOCKED: исходный case/run ID не установлен |
+| UI_SCAN_LIMIT | BLOCKED: исходный case/run ID не установлен |
+| WIZARD_OPEN_NOT_CONFIRMED | LAB-91 `103006-r3`; image `ses_ea685a818ffefdcuJvJtZoMRd9`: бизнес-результат PASS, recovery BLOCKED/no transition; text `ses_ea67c88c1ffeWIbFC5AYXgRdJR`: BLOCKED/provider rate limit |
+| Ожидание готовности | BLOCKED: исходный case/run ID не установлен |
+| Подтверждение журнала JS | BLOCKED: исходный case/run ID не установлен |
+| Скачивание на медленном host | BLOCKED: для `100909-r1` не подтверждена принадлежность к slow-host классу |
+
+Ниже PASS source означает только ранее зафиксированный scripted native/source
+результат из [smoke](../2026-10-20-browser-recovery-smoke/report.md) и
+[source](../2026-10-20-browser-recovery-source/report.md); новых fault-прогонов
+Task3 нет. Неповторённые unit/source проверки не названы installed/model PASS.
+
+| Критерий §11 | Имеющееся evidence и граница |
+|---|---|
+| Исчерпанное восстановление mapping/настройки | Source BR-S1/S3 PASS; natural installed recovery BLOCKED/no transition |
+| Release `user_action`, T1 | Source BR-S1 PASS; real-model T1 BLOCKED/not observed |
+| Сломанный DOM-предикат, completed | Source BR-S3 PASS; real-model completed recovery BLOCKED/not observed |
+| Потерян ответ выполнения/экспорта | Source BR-S4 PASS; BR-S5 FAIL/no_scroll_owner с прежней неопределённостью файла/Save/cleanup; новая model строка BLOCKED/not observed |
+| Частичное восстановление, тот же узел | Source BR-S1/S2 continuable PASS; natural model BLOCKED/not observed |
+| Неверные параметры до изменений | BLOCKED для этой model проверки: требуемый отказ не наблюдался |
+| Живой старый исполнитель, поздний ответ | BLOCKED для installed/model: не воспроизводилось; отдельные source/unit claims не расширяются |
+| Dock/browser вне своей фазы | Source BR-S6 отрицательные assertions PASS, cleanup BLOCKED; installed/model BLOCKED/not observed |
+| Запрещённый tool/navigation/reload | Source BR-S6 проверил observe/evaluate/navigate/filename отказы; reload и installed/model здесь BLOCKED/not observed |
+| Повторная ошибка/смена ID/continuable budget | Source BR-S3 повторная ошибка и BR-S6 budget evidence; полный installed/model критерий BLOCKED/not observed |
+| Лимит/отмена/падение runtime | Source BR-S6 budget assertions PASS, native cleanup BLOCKED/ACKfalse/exit1; Task3 provider cancellation не является recovery cancel/crash проверкой — BLOCKED |
+| Текстовая модель | BLOCKED/provider rate limit; image:false/toolcall:true — catalog facts, фактическая screenshot-tool absence не доказана |
+| Модель с изображениями | BLOCKED/image content: capability true, screenshot calls0, настоящий image reply отсутствует |
+| Prod CLI/Desktop Linux full recovery | CLI business output/Save/lifecycle PASS, recovery BLOCKED; Desktop model BLOCKED/no eligible CLI transition; Windows/macOS not checked |
+| Flagged/dev/env controls | PASS только availability: принятые Task1 CLI4/4 и Task2 installed true/unpackaged false, flag1/flag0 DEB/static; не recovery quality |
+
+### Возврат исходного install state
+
+Перед удалением проверено отсутствие процессов, исполняемых из обоих собственных
+payload. Из `/tmp` выполнен stock `artifact/uninstall.sh` с исходным CLI install
+HOME: exit0, `uninstalled:true`, `profilesPreserved:true`. Далее
+`sudo -n dpkg --remove loginom-ai-agent`: exit0, без purge. Dpkg оставил
+`deinstall ok config-files`; наблюдались update-alternatives warnings об удаляемой
+цели/dangling alternative, итоговые launcher и `/opt/loginom-ai-agent` отсутствуют.
+CLI launcher, versioned payload и current.json также отсутствуют.
+
+Metadata-снимки семи собственных старых/новых профилей до/после совпали;
+исходный failed writer guard и dedicated OAuth hash неизменны. Артефакты,
+все raw attempts и evidence сохранены. Два temporary Node drivers удалены.
+`evidence/teardown-before.json`/`teardown-after.json` и
+`cli-uninstall.*`/`desktop-remove.*` содержат проверки/вывод/exit.
+Production repair, S5, merge, release и публикация не выполнялись.

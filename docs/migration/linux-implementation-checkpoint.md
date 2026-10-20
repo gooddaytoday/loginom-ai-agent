@@ -1,17 +1,19 @@
 # Linux: завершение реализации — 2026-09-16
 
-## 2026-10-20 — browser recovery, Linux availability
+## 2026-10-20 — browser recovery, Linux packaged/model срез
 
 CLI availability4/4 принята независимым spec+quality review без обязательных замечаний.
 Root подтвердил Desktop installed true/unpackaged false и flag1/flag0 DEB/static PASS.
 Для каждой положенной строки — canonical Save/native Close/logout/noDiscard,
 task ACKexit0/app0 и OS отсутствие собственных процессов, отдельными фактами.
 Desktop typecheck/packaging14 PASS/2 SKIP; crash-logging6 PASS на каждой сборке.
-CLI control штатно удалён; flag1 CLI/Desktop сохранены для моделей. Пользовательские
-profiles не затрагивались. Первый CLI SaveAs cleanup FAIL/guard, Desktop pre-task
-Bun timeout и проверочные ошибки сохранены отдельно. Production не менялся.
 Desktop Task2 принята независимым spec+quality review без обязательных замечаний.
-Далее модели; полная приёмка/release gate открыты. Merge/release не было.
+Natural WIZARD image gpt-5.6-sol/medium: output/CSV/Save/lifecycle PASS,
+recovery BLOCKED/no transition. Text big-pickle: BLOCKED/rate limit, SIGINT/exit130,
+task runtime не возник, writer освобождён; Desktop model BLOCKED/no CLI transition.
+Обе собственные установки штатно удалены без purge, profiles/evidence сохранены.
+Исходные SaveAs cleanup FAIL/guard, Desktop pre-task timeout и source S5 FAIL
+не отменены. Production не менялся; Task3 и release gate открыты, merge/release нет.
 [Фактические identities, evidence и ограничения](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md).
 
 ## 2026-10-16 — v0.2.1 опубликован

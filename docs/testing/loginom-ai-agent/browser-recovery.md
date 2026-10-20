@@ -164,5 +164,25 @@ Save advice, flat capability именно текущего task, backend chat ha
 Desktop native receipt называется `package-cleanup.json`/`saved_package_cleanup`;
 CLI run использует `saved-package-cleanup.json`. Native Close/logout/noDiscard,
 task ACK/exit и OS absence подтверждать отдельно. Не заменять absent session на false.
-Установленный flag1 оставлен для Task3; после последнего необходимого запуска
-восстановить исходное отсутствие Desktop штатным remove без purge/user-profile cleanup.
+После Task3 обе собственные установки штатно удалены: CLI stock uninstall с
+исходным install HOME и Desktop dpkg remove без purge; profiles/evidence сохранены.
+
+## Natural packaged модельные проверки, 2026-10-20
+
+Исходный WIZARD LAB-91 `103006-r3` закреплён до запуска: stage1 REST GET task/CSV
+совпадают с историческим комплектом. Image `openai/gpt-5.6-sol/medium` выполнила
+задачу: текущий output matcher, CSV bytes/hash, Save и обычный lifecycle PASS,
+но recovery не возник. Text `opencode/big-pickle` заблокирована provider rate limit,
+остановлена штатным SIGINT/exit130 до task runtime, writer освобождён.
+Обе новые session IDs и §11 matrix находятся в [отчёте](reports/2026-10-20-browser-recovery-packaged/report.md).
+
+В дальнейшей приёмке сначала фиксировать исходный case, доступный model ID,
+capabilities и auth availability; запускать image, затем text последовательно.
+Public `models --verbose` может показать бесплатный штатный public-auth provider;
+его catalog entry не доказывает успешный provider call. Фактическую screenshot
+publication/image content подтверждать отдельно от capability и отсутствия вызовов.
+Desktop real-model case допустим только после CLI recovery transition.
+Отсутствие естественного перехода — BLOCKED с новым run ID; не добавлять fault
+или повтор для получения PASS. Для text возобновление требует доступного provider;
+для четырёх natural классов — исходных IDs, для slow-host — подтверждённой связи.
+Исходная Task3, S5 и release gate остаются открытыми; Windows/macOS not checked.
