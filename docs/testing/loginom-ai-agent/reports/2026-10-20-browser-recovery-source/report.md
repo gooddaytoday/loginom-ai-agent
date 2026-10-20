@@ -140,3 +140,27 @@ Ruling: минимальный существующий enum дал недост
 В NativeC сохранённые post-scroll snapshots615/617 содержат одинаковые65 строк/refs: после top1000→2000 все bounding boxes сдвинулись на−1000px, все65 строк стали outside_viewport, actionable anchors24→0. Это не потеря строк по лимиту240: table-root содержит66 элементов, scan complete, mutation counts/root прежние. Для snapshot617 hit-test также не причина отказа — outside_viewport определяется раньше. Почему native virtualizer не заменил видимое окно строк, эти данные не устанавливают; wrong owner, необходимость wheel или transient repaint не доказаны.
 
 Existing fixtures используют статические rectangles либо вручную заменяют строки; достоверного causal reproducer не получено. Новых live calls/production changes/wait/retry не было. S5 остаётся FAIL/deferred с исходными file/Save/native cleanup критериями; следующий независимый путь — [packaged Task3](../../../../superpowers/plans/2026-10-20-browser-recovery-packaged.md). NativeC cleanup и все исторические UNKNOWN остаются прежними.
+
+
+## 2026-10-20 — preparatory scroll probe: BLOCKED до scroll
+
+Один current-source запуск на свежем штатном desktop/linux-x64 stage; verifyResources,
+закреплённый remote catalog, compatibility и выбранный Save destination PASS.
+Own new_draft READY/ownership_verified/persisted=false; direct checkpoint Save
+SUCCEEDED/verified/save_completed, reopened=false/workflow_preserved=true/path exact.
+Passive identity/connection до/после Save подтверждены; Save остаётся успешным.
+Дополнительный probe assert ожидал непустой workflow_continuations, фактически [].
+Этот producer требует nodeTargetWorkflowNode, которого new_draft prepare не создаёт;
+причинность namespace отвергнута source inspection. STOP без повторной записи.
+Files navigation/Refresh/scroll и passive250/1000ms reads не достигнуты; causal
+временного результата нет, поэтому это BLOCKED, не NOT_REPRODUCED и не S5 PASS.
+Probe bookkeeping отметил persisted только после assertion и ошибочно пропустил
+native cleanup: Close/logout/modified=false/noDiscard не подтверждены; это дефект
+probe, не отмена Save. Own diagnostic package и private profile сохранены.
+Context.close resolved/close event/pages0 подтверждены отдельно. OS ownership
+UNKNOWN: before список PID/starttime пуст; after exact-profile absence не заменяет
+потерянное ownership evidence. Причина пустого collector filter не установлена;
+offline exact-source regex/NUL гипотеза опровергнута. Повторов/kill не было.
+Private evidence: `/home/george/.cache/loginom-ai-agent/browser-recovery-scroll-0goRLMSE/evidence`;
+raw commands/source/self-review — ignored scroll-probe task report. Production
+не менялся; прежние S5 FAIL/deferred и historical cleanup UNKNOWN сохраняются.

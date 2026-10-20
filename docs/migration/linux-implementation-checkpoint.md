@@ -1,5 +1,18 @@
 # Linux: завершение реализации — 2026-09-16
 
+
+## 2026-10-20 — preparatory browser scroll probe
+
+Один source run BLOCKED до scroll; fresh stock stage/catalog gates PASS.
+Own new_draft + checkpoint Save SUCCEEDED; direct passive identity PASS.
+Probe-only nonempty continuation assert получил []; causal scroll факт не получен.
+Собственный bookkeeping defect пропустил native cleanup после confirmed Save.
+Native Close/logout UNKNOWN; package/profile сохранены. Context closed/pages0.
+OS ownership UNKNOWN: before PID/starttime не захвачены; after absence недостаточно.
+Production неизменён; исходный S5 FAIL/deferred и historical UNKNOWN сохраняются.
+Следующий шаг — root plan revision/review; повтор live в этом назначении не выполнялся.
+[Фактический отчёт и ограничения](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md#2026-10-20--preparatory-scroll-probe-blocked-до-scroll).
+
 ## 2026-10-20 — browser recovery, Linux packaged/model срез
 
 CLI availability4/4 принята независимым spec+quality review без обязательных замечаний.
