@@ -612,11 +612,11 @@ git commit -m "feat(runtime): record browser recovery receipts and release only 
 **Interfaces:**
 - Produces:
   - `validateStartInput(input).acceptanceFault: Fault[] | null` — формат из общего контракта.
-  - `createActionRuntime({..., acceptanceFault})`. Счётчики `times` живут в runtime; каждое срабатывание пишет `acceptance_fault_injected {kind, node_type, phase, code, remaining}`.
+  - `createActionRuntime({..., acceptanceFault})`. Счётчики `times` живут в runtime; каждое срабатывание пишет `acceptance_fault_injected` с полями события из общего контракта (целевая фаза — `target_phase`).
   - `phase_stop`: тело фазы `phase` для `request.target.type === node_type` завершилось, его квитанции закрыты. Тогда помощник `phase` до записи завершения бросает ошибку с `receipt: {error: {code, message: "acceptance fault"}}`, и операция остаётся `AMBIGUOUS` с `pending_phase === phase` и `error.cause.code === code`.
   - `release_refusal`: в `releaseApply` до `releaseNodeApply` бросается `NodeReleaseBlocked('Acceptance fault: release refused', 'Ask the user to close the open Loginom wizard with its Cancel button.')`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```js
 test("acceptance fault input is validated and refused for validation and readiness", () => {
@@ -642,16 +642,16 @@ test('release_refusal turns the next release into NODE_RELEASE_REFUSED', async (
 
 В `browser-recovery-capability.test.ts` (план 1) фиктивный `managed-entry.mjs` дополнительно пишет `m.input.acceptanceFault ?? null`; новый тест `the product host never forwards acceptanceFault` ожидает `null` во всех стартах.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd packages/loginom-runtime && "$LOGINOM_AI_AGENT_TEST_NODE" --test test/start-input.test.mjs`; `cd client && "$LOGINOM_AI_AGENT_TEST_NODE" --test test/browser-recovery-executor.test.mjs`; `cd packages/loginom-host && LOGINOM_AI_AGENT_TEST_NODE=<pinned node> bun test test/browser-recovery-capability.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement** по Interfaces.
+- [x] **Step 3: Implement** по Interfaces.
 
-- [ ] **Step 4: Run tests to verify they pass** (команды Step 2 и `bun run test:upstream`; Expected: PASS)
+- [x] **Step 4: Run tests to verify they pass** (команды Step 2 и `bun run test:upstream`; Expected: PASS)
 
-- [ ] **Step 5: Commit and checkpoint**
+- [x] **Step 5: Commit and checkpoint**
 
 ```bash
 git add packages/loginom-runtime packages/loginom-host

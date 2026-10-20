@@ -140,6 +140,7 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 
 - События `execution-events.jsonl` (поле `phase`): `browser_recovery_basis`, `browser_recovery_handoff`, `browser_recovery_state`, `browser_recovery_call`, `browser_recovery_verified`, `browser_recovery_dock_resumed`, `acceptance_fault_injected`. Обычные запуски без опции новых событий не пишут. Изображение в журнале — только `{mime, bytes, sha256}`.
 - `acceptanceFault` (план 2, Task 7): массив до 4 записей `{kind: "phase_stop", node_type, phase, code, times}` или `{kind: "release_refusal", node_type, times}`; `code` соответствует `^[A-Z][A-Z0-9_]{0,63}$`, `times` — 1..3.
+- Событие `acceptance_fault_injected` сохраняет `phase` как имя события, а фазу отказа — в `target_phase` (`release` для отказа освобождения); остальные поля: `kind`, `node_type`, `code`, `remaining`.
 
 ## Команды проверки
 
@@ -152,19 +153,10 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 
 ## Checkpoint — 20.10.2026
 
-- База реализации: `0afb4c483a`; принятый код плана 2: `105559fca2`.
-- План 1, Tasks 1–4: выполнены, отмечены в подплане; независимое итоговое ревью и scoped-ревью фикса — без замечаний.
-- Runtime client после плана 2, Task 6: 4412 PASS / 13 SKIP; Host: 368 PASS / 7 SKIP. CLI policy: 6 PASS; Desktop packaging/manifest: 14 PASS / 2 SKIP.
-- Typecheck agent/core/host/desktop и `git diff --check` — PASS.
-- Воспроизведённый сбой Bun loader при сборке fixture в процессе тестов устранён существующим способом отдельного compiler-процесса; production-код для этого не менялся.
-- Ограничения: проверки исходников; положительный packaged-путь и реальное recovery ещё не приняты, release-флаг в CI не включён.
-- План 2, Task 0: выполнен; независимое review принято. Реальный Calculator: новое успешное выполнение и схема Preview независимо подтверждены.
-- Snapshot: 20 093 байта целиком, 1 073 байта с target/depth; итоговый собственный пакет, transport и браузер закрыты.
+- База реализации: `0afb4c483a`; принятый код плана 2: `f354138afa`.
+- План 1, Tasks 1–4, и план 2, Tasks 0–7: выполнены и отмечены в подпланах; task reviews приняты. Итоговое review плана 2 — следующий gate.
+- Текущие source-проверки: runtime client 4414 PASS / 13 SKIP; start-input 22/22; executor 68/68; Host capability 2/2, Host typecheck и `git diff --check` — PASS.
+- Task 0 на Loginom: реальный Calculator, новое успешное выполнение и схема Preview независимо подтверждены; итоговый собственный пакет, transport и браузер закрыты.
 - Ограничение пробы: закрытие несохранённого пакета первой неудачной попытки осталось неподтверждённым.
-- План 2, Task 1: чистые функции основания/решения выполнены; 7/7 focused tests PASS, независимое review без замечаний.
-- План 2, Task 2: выполнен; 53/53 focused PASS; два замечания актуальности основания исправлены и приняты scoped review.
-- План 2, Task 3: handoff выполнен; 26/26 focused PASS на Node 24; deadline/journal fixes приняты scoped review.
-- План 2, Task 4: выполнен; 213/213 focused PASS, независимое review без замечаний.
-- План 2, Task 5: выполнен; 154/154 focused PASS; три замечания ownership/unknown/deadline исправлены и приняты scoped review.
-- План 2, Task 6: выполнен; 156/156 focused PASS, независимое review без замечаний. Recovery-квитанция и safe release снимают только своё владение после соответствующего durable ACK.
-- Следующий шаг: план 2, Task 7 — приватный acceptance-only ввод отказов.
+- Проверки установленных артефактов и живого recovery ещё впереди; release-флаг в CI не включён.
+- Следующий шаг после итогового review: план 3, Task 1 — allowlist и фильтр аргументов; перед реализацией независимый review плана.
