@@ -20,6 +20,12 @@ export type Launch = {
   // Acceptance-only: exact saved package path the runtime closes and logs out of during
   // its own shutdown (bridge acceptanceCleanupPackage). Product code never sets it.
   acceptanceCleanupPackage?: string
+  // Acceptance-only fault input for source-level browser recovery scenarios.
+  // Product Host never sets or forwards it.
+  acceptanceFault?: Array<
+    | { kind: "phase_stop"; node_type: string; phase: string; code: string; times: number }
+    | { kind: "release_refusal"; node_type: string; times: number }
+  >
   // Private owner policy. The runtime derives the path from its confirmed Save.
   closeSavedPackageOnShutdown?: boolean
   browserRecovery?: boolean

@@ -26,7 +26,7 @@ import {createJavascriptContextReadSession,validateJavascriptContextReadRequest}
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
 import {readNativeExportFile} from './text-export-output.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState} from './package-persistence.mjs';
-import {proveNodeRestsQuiet} from './node-pending-release.mjs';
+import {proveNodeRestsQuiet,NodeReleaseBlocked} from './node-pending-release.mjs';
 import {createNodeExecutionProcedure} from './node-execution-procedure.mjs';
 import {openOwnedNativePreview,closeOwnedNativePreview} from './collapse-native-output.mjs';
 import {classifyBrowserRecovery,browserRecoveryNextStep,browserRecoveryStepKey,decideBrowserRecovery,BROWSER_RECOVERY_VERIFY_MS} from './browser-recovery-basis.mjs';
@@ -1465,8 +1465,9 @@ export function parseCapabilityResult(response) {
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery, acceptanceFault }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
+  const faults=acceptanceFault?.map(fault=>({...fault,remaining:fault.times}))??[];
   let pending = null;
   let running = false;
   const operations = new Map();
@@ -1908,6 +1909,16 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       observations.clear();
       let returned;
       try{
+        const fault=faults.find(item=>item.kind==='release_refusal'
+          &&item.node_type===operation.nodeApply.request.target.type&&item.remaining>0);
+        if(fault){
+          await onRecord({operation_id:operation.id,action_key:'node.apply',action_revision:operation.action.revision,
+            phase:'acceptance_fault_injected',kind:fault.kind,node_type:fault.node_type,target_phase:'release',
+            code:'NODE_RELEASE_REFUSED',remaining:fault.remaining-1});
+          fault.remaining--;
+          throw new NodeReleaseBlocked('Acceptance fault: release refused',
+            'Ask the user to close the open Loginom wizard with its Cancel button.');
+        }
         const result=await releaseNodeApply({operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,record:onRecord,signal});
         operation.releaseRefused=null;
         operation.outcome=nodeApplyOutcome(operation,result);operation.cleanupConfirmed=true;
@@ -2965,7 +2976,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         operations.set(operation.id,operation);pending=operation;observations.clear();
         let result;
         try{result=await applyNode({request,operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,
-          record:onRecord,signal,stopSignal,now,resume});}
+          record:onRecord,signal,stopSignal,now,resume,acceptanceFault:faults});}
         catch(error){
           // Keep the claimed ID even if the first phase could not be started.
           // A reused ID must never silently acquire a different request.

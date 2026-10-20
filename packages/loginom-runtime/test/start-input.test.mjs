@@ -5,13 +5,13 @@ import { validateStartInput } from "../src/start-input.mjs"
 const base = { protocol: 1, generation: 1, chat: "chat-1", stateDir: "/tmp/state" }
 
 test("managed start without cleanup input stays a product launch", () => {
-  assert.deepEqual(validateStartInput(base), { acceptanceCleanupPackage: null, closeSavedPackageOnShutdown: false, browserRecovery: false })
-  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: undefined }), { acceptanceCleanupPackage: null, closeSavedPackageOnShutdown: false, browserRecovery: false })
+  assert.deepEqual(validateStartInput(base), { acceptanceCleanupPackage: null, closeSavedPackageOnShutdown: false, browserRecovery: false, acceptanceFault: null })
+  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: undefined }), { acceptanceCleanupPackage: null, closeSavedPackageOnShutdown: false, browserRecovery: false, acceptanceFault: null })
 })
 
 test("managed start accepts an exact saved package path for acceptance cleanup", () => {
   const path = "/user/loginom-ai-agent-acceptance-run-A.lgp"
-  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: path }), { acceptanceCleanupPackage: path, closeSavedPackageOnShutdown: false, browserRecovery: false })
+  assert.deepEqual(validateStartInput({ ...base, acceptanceCleanupPackage: path }), { acceptanceCleanupPackage: path, closeSavedPackageOnShutdown: false, browserRecovery: false, acceptanceFault: null })
   assert.equal(validateStartInput({ ...base, acceptanceCleanupPackage: "/a b/пакет.lgp" }).acceptanceCleanupPackage, "/a b/пакет.lgp")
 })
 
@@ -32,6 +32,15 @@ test("private browser recovery capability accepts only an explicit boolean", () 
 test("browser recovery is never granted to validation or readiness runtimes", () => {
   for (const patch of [{ validation: true }, { chat: "readiness" }])
     assert.throws(() => validateStartInput({ ...base, ...patch, browserRecovery: true }), /^Error: LOGINOM_START_INVALID$/)
+})
+
+test("acceptance fault input is validated and refused for validation and readiness", () => {
+  const fault = [{ kind: "phase_stop", node_type: "transform.calculator", phase: "configure", code: "UI_SCAN_LIMIT", times: 2 }]
+  assert.deepEqual(validateStartInput({ ...base, acceptanceFault: fault }).acceptanceFault, fault)
+  for (const value of [[], [{ ...fault[0], times: 4 }], [{ ...fault[0], code: "ui scan" }], Array(5).fill(fault[0]), [{ kind: "drop_reply" }]])
+    assert.throws(() => validateStartInput({ ...base, acceptanceFault: value }), /^Error: LOGINOM_START_INVALID$/)
+  for (const patch of [{ validation: true }, { chat: "readiness" }])
+    assert.throws(() => validateStartInput({ ...base, ...patch, acceptanceFault: fault }), /^Error: LOGINOM_START_INVALID$/)
 })
 
 test("normal cleanup cannot borrow acceptance identity or run in validation/readiness", () => {

@@ -85,7 +85,7 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
-      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery } = validateStartInput(input)
+      const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery, acceptanceFault } = validateStartInput(input)
       const resources = await verifyResources(input.resources)
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
       const directory = join(
@@ -138,6 +138,7 @@ async function handle(message) {
         acceptanceCleanupPackage,
         closeSavedPackageOnShutdown,
         browserRecovery,
+        acceptanceFault,
         storageDirectories: {
           inputs: `/${input.connection.username}`,
           exports: `/${input.connection.username}`,

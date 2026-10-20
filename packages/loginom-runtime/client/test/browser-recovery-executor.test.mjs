@@ -13,6 +13,36 @@ import {compactNodeResult} from '../lib/user-results.mjs';
 
 const full={remaining:()=>({calls_remaining:30,ms_remaining:600000})};
 const refuse=()=>{throw new NodeReleaseBlocked('A Loginom wizard of another node is open','Ask the user to close it with Cancel.');};
+
+test('phase_stop stops after a verified finish and counts down',async()=>{
+  const f=fixture({release:proved(),acceptanceFault:[{kind:'phase_stop',node_type:'imports.text',phase:'finish',code:'UI_SCAN_LIMIT',times:1}]});
+  f.runtime.startNodeApply(request());
+  const first=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+  assert.equal(first.outcome.status,'AMBIGUOUS');
+  assert.equal(first.outcome.output.pending_phase,'finish');
+  assert.equal(first.outcome.error.cause.code,'UI_SCAN_LIMIT');
+  assert.equal(f.calls.filter(call=>call==='finish').length,1);
+  assert.deepEqual(f.events.filter(event=>event.phase==='acceptance_fault_injected').map(event=>({kind:event.kind,node_type:event.node_type,phase:event.target_phase,code:event.code,remaining:event.remaining})),
+    [{kind:'phase_stop',node_type:'imports.text',phase:'finish',code:'UI_SCAN_LIMIT',remaining:0}]);
+  await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-1'});
+  f.runtime.startNodeApply({...request(),operation_id:'again',target:{kind:'existing',type:'imports.text',ref:{document_id:'doc',workflow_id:'wf',node_id:'new'}}});
+  const second=await f.runtime.waitNodeApply('again',{timeoutMs:1000});
+  assert.equal(second.outcome.status,'SUCCEEDED');
+  assert.equal(f.events.filter(event=>event.phase==='acceptance_fault_injected').length,1);
+});
+
+test('release_refusal blocks one native release and counts down',async()=>{
+  const f=fixture({release:proved(),acceptanceFault:[{kind:'release_refusal',node_type:'imports.text',times:1}]});
+  await stop(f,'finish');
+  const first=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-1'});
+  assert.equal(first.error.code,'NODE_RELEASE_REFUSED');
+  assert.equal(f.calls.filter(call=>call==='release:finish').length,0);
+  assert.deepEqual(f.events.filter(event=>event.phase==='acceptance_fault_injected').map(event=>({kind:event.kind,node_type:event.node_type,remaining:event.remaining})),
+    [{kind:'release_refusal',node_type:'imports.text',remaining:0}]);
+  const second=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-2'});
+  assert.equal(second.status,'SUCCEEDED');
+  assert.equal(f.calls.filter(call=>call==='release:finish').length,1);
+});
 const saveWithReceipt=({receipt,now=Date.now,deadlineAt,onRecord,status='AMBIGUOUS',savedState,reconcile}={})=>{
   const key='package.save_checkpoint',revision=actions.get(key).revision;
   const outcome={status,action_key:key,action_revision:revision,operation_id:'save',

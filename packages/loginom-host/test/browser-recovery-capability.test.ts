@@ -24,7 +24,7 @@ afterAll(async () => {
   if (fixture.directory) await rm(fixture.directory, { recursive: true, force: true })
 })
 
-test.each([true, false])("browser recovery capability reaches only the task runtime: %p", async (capability) => {
+test.each([true, false])("browser recovery capability reaches only the task runtime; product host never forwards acceptanceFault: %p", async (capability) => {
   const directory = await mkdtemp(join(fixture.directory, "profile-"))
   const resources = join(directory, "resources")
   const root = join(directory, "profile")
@@ -42,6 +42,7 @@ test.each([true, false])("browser recovery capability reaches only the task runt
         appendFileSync(${JSON.stringify(join(directory, "starts.jsonl"))}, JSON.stringify({
           validation:m.input.validation===true,
           browserRecovery:m.input.browserRecovery,
+          acceptanceFault:m.input.acceptanceFault??null,
           environmentRecovery:process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY??null
         })+'\\n');
         process.send({id:m.id,result:m.input.validation
@@ -114,4 +115,5 @@ test.each([true, false])("browser recovery capability reaches only the task runt
   expect(starts.filter((value) => value.validation).every((value) => value.browserRecovery === false)).toBe(true)
   expect(starts.find((value) => !value.validation)?.browserRecovery).toBe(capability)
   expect(starts.every((value) => value.environmentRecovery === null)).toBe(true)
+  expect(starts.every((value) => value.acceptanceFault === null)).toBe(true)
 }, 15_000)
