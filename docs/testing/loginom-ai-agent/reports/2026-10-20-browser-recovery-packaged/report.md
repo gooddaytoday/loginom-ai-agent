@@ -1,8 +1,9 @@
 # Packaged browser recovery: первый installed CLI
 
-Первая попытка 2026-10-20 остановлена после флаговой Linux CLI строки с SaveAs.
-Capability и Save подтверждены; обычная очистка пакета отказала.
-Полная Task 1 и acceptance gate остаются открытыми.
+Канонический installed flag1 CLI путь прошёл: current capability true,
+save_checkpoint, native Close/logout/noDiscard, ACK/exit0 и освобождение writer.
+Первая SaveAs/reopen попытка завершилась cleanup FAIL и сохранена отдельно.
+Controls ещё не выполнены; Task 1 и acceptance gate остаются открытыми.
 
 ## Проверенная поставка
 
@@ -12,7 +13,7 @@ Capability и Save подтверждены; обычная очистка па�
 - Установка штатным installer в отдельный HOME; launcher указывает на собственный payload. Собственный sandbox root:root/4755, запуск non-root без обхода sandbox.
 - Отдельные profile/workspace, `PURE=1`, без `CLI_BUNDLE`; public headless setup завершился кодом0.
 
-## Результат одного public run
+## Первая попытка: SaveAs/reopen
 
 | Проверка | Наблюдение |
 |---|---|

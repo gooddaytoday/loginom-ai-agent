@@ -1,16 +1,15 @@
 # Linux: завершение реализации — 2026-09-16
 
-## 2026-10-20 — browser recovery, первый собственный installed CLI
+## 2026-10-20 — browser recovery, собственный installed CLI
 
 Полный flag1 CLI archive/roundtrip и штатная установка в отдельный HOME PASS;
-пользовательская установка/profiles не заменялись. Current task session capability
-true, public prepare и SaveAs собственного пустого пакета подтверждены, modified:false.
-Обычный native cleanup BLOCKED/TAB_IDENTITY_CHANGED, task ACKfalse/exit1,
-.writer сохранён; собственных процессов нет, logout не подтверждён. Повторов нет.
-Отрицательные CLI строки, Desktop и модели не запускались, матрица не принята.
-Следующий шаг — одна scoped-reviewed попытка с каноническим save_checkpoint;
-переоткрытие для availability не требуется, runtime guards не меняются.
-Merge/release не выполнялись, штатный release-флаг выключен.
+пользовательская установка/profiles не заменялись. Канонический public Save
+подтверждён: current task capability true, save_checkpoint без переоткрытия,
+modified:false, native Close/logout/noDiscard, task ACK+exit0 и CLIexit0,
+.writer освобождён,15 собственных PID отсутствуют. Production не менялся.
+Первый SaveAs/reopen cleanup FAIL/guard сохранён отдельно, новый PASS его не чинит.
+Следующий шаг — три отрицательные CLI строки, затем независимый task review.
+Desktop/models и полная матрица не приняты; merge/release не выполнялись.
 [Фактические build/run identities и ограничения](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md).
 
 ## 2026-10-16 — v0.2.1 опубликован
