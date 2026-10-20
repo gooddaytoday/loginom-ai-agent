@@ -9,6 +9,12 @@ import { evalsRoot, loadConfig } from "../src/config"
 const fixture = (name: string) => Bun.file(path.join(evalsRoot, "fixtures", name)).text()
 const fakeCommand = () => agentCommand(loadConfig(["--dry-run"], {}))
 
+test("parseEvents: завершённый browser recovery start отмечает попытку без finish", () => {
+  const event = { type: "tool_use", part: { type: "tool", tool: "loginom_dock_browser_recovery",
+    state: { status: "completed", input: { action: "start" } } } }
+  expect(parseEvents(JSON.stringify(event)).browserRecoveryStarted).toBe(true)
+})
+
 test("parseEvents: квитанция сохранения читается из последовательности JSON-документов", () => {
   const output = '{"output":{"package_ref":{"path":"/user/eval-run-task-1.lgp"}}}\n{"status":"ok"}\n{"trace":{"note":"literal } and \\\" quote"}}'
   const parsed = parseEvents(JSON.stringify({ type: "tool_use", part: {

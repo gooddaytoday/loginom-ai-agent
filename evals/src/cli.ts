@@ -54,6 +54,8 @@ export function parseEvents(text: string) {
     steps.reduce((acc, part) => acc + (pick(part) ?? 0), 0)
   return {
     sessionId: events.find((event) => typeof event.sessionID === "string")?.sessionID,
+    browserRecoveryStarted: tools.some((part) => part.tool === "loginom_dock_browser_recovery" &&
+      completed(part) && part.state?.input?.action === "start"),
     saveReceipts,
     nodeReceipts: receipts.kept,
     nodeReceiptsDropped: receipts.dropped,
