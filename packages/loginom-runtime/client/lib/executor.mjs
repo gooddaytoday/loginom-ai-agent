@@ -2037,17 +2037,24 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const code = failureCode(operation), reason = operation.browserRecoveryReason;
       running = true;
       let result;
+      const receiptBefore = operation.lastReceipt;
+      const journal = { started: false };
       try {
         observations.clear();
         // Release-proof runs even when the stopped phase has no own verifier;
         // the stopped procedure and its predicate are not called again (§8).
         const drivers = operation.nodeApplyDrivers;
-        result = await releaseNodeApply({ operation, handlers: nodeApplyHandlers, record: onRecord, signal,
+        result = await releaseNodeApply({ operation, handlers: nodeApplyHandlers, signal,
+          record: event => { journal.started = true; return onRecord(event); },
           drivers: { ...drivers, releasePending: drivers.recoveryReleasePending ?? drivers.releasePending } });
       } catch (error) {
-        // A release gesture whose browser call did not confirm completion leaves the outcome unknown.
-        return { status: 'unresolved', facts: [], reason: String(error?.message ?? error).slice(0, 1000),
-          uncertain: operation.transportUncertain === true };
+        // Only a refusal before any gesture, or after gestures whose own receipts settled with cleanup,
+        // is a settled unresolved result; anything else leaves the release outcome unknown.
+        const gestured = operation.lastReceipt !== receiptBefore;
+        const receipt = gestured && !operation.transportUncertain ? await readReceipt(operation).catch(() => null) : null;
+        const uncertainRelease = operation.transportUncertain === true || journal.started
+          || gestured && (receipt?.state !== 'completed' || receipt.receipt?.cleanup_complete !== true);
+        return { status: 'unresolved', facts: [], reason: String(error?.message ?? error).slice(0, 1000), uncertain: uncertainRelease };
       } finally { running = false; }
       const request = operation.nodeApply.request;
       const readable = reason === 'REPEATED_PHASE_FAILURE' && !['programming.javascript', 'exports.text'].includes(request.target.type);

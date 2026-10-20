@@ -305,3 +305,30 @@ test('a release gesture with an unconfirmed browser call reports an unknown veri
   assert.equal(verified.status, 'unresolved');
   assert.equal(verified.uncertain, true);
 });
+
+test('a release whose own gesture receipt lacks cleanup is unknown even without a transport error', async () => {
+  for (const cleanup of [false, true]) {
+    const f = fixture();
+    await stopAtFinish(f);
+    await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+    const basis = f.runtime.browserRecoveryBasis('apply');
+    await f.runtime.browserRecoveryHandoff('apply');
+    // The release closes a dialog through its own receipt, then refuses on the next check.
+    f.state.receipt = { cleanup };
+    f.state.release = () => { f.state.receiptOptions('apply:finish', 'node.finish', 'signature-2'); throw Error('Graph is not quiet'); };
+    const verified = await f.runtime.verifyBrowserRecovery({ operationId: 'apply', step: basis.step, attested: { actions_performed: ['Clicked'] } });
+    assert.equal(verified.status, 'unresolved');
+    assert.equal(verified.uncertain, !cleanup, 'cleanup ' + cleanup);
+  }
+});
+
+test('a refusal before any release gesture stays a settled unresolved result', async () => {
+  const f = fixture();
+  await stopAtFinish(f);
+  await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+  const basis = f.runtime.browserRecoveryBasis('apply');
+  await f.runtime.browserRecoveryHandoff('apply');
+  const verified = await f.runtime.verifyBrowserRecovery({ operationId: 'apply', step: basis.step, attested: { actions_performed: ['Looked'] } });
+  assert.equal(verified.status, 'unresolved');
+  assert.equal(verified.uncertain, false);
+});

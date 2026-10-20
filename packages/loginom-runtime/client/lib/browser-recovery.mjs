@@ -209,7 +209,8 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
       await journal({ phase: 'browser_recovery_attested', attempt_id: current.id, operation_id: current.operation_id,
         attested_by_model: attested });
       const verification = await Promise.resolve().then(() => executor.verifyBrowserRecovery({ operationId: current.operation_id,
-        step: current.step, attested, signal: extra?.signal })).catch(error => ({ status: 'unresolved', facts: [], reason: error.message }));
+        step: current.step, attested, signal: extra?.signal })).catch(error => ({ status: 'unresolved', facts: [],
+          reason: error.message, uncertain: true }));
       // The verifier's own release gestures may end with an unknown outcome too.
       if (verification.uncertain) uncertain ??= { operation_id: current.operation_id, tool: browserRecoveryToolName,
         reason: 'Verification outcome is unknown: ' + String(verification.reason ?? '').slice(0, 400) };
@@ -254,16 +255,18 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     // Still holding: a dispatched action or verification settles first and decides whether the page may return to Dock.
     current.phase = 'stopping';
     if (inflight) await inflight.catch(() => undefined);
-    current.phase = 'stopped';
     // Safe completion only: the runtime may cancel its own unapplied draft; unknown effects stay locked.
     const cleanup = await Promise.resolve().then(() => executor.stopBrowserRecovery({ operationId: current.operation_id,
       step: current.step, reason: code, uncertain: !!uncertain })).catch(error => ({ state: 'retained', reason: error.message }));
     // A lost page or document ends the step for good, whatever stopped the attempt; other stops keep
     // the shared budget for an explicit re-entry.
-    if (code === 'page_changed' || current.pageLost) current.budget.closed = true;
-    await journal({ phase: 'browser_recovery_stopped', attempt_id: current.id, operation_id: current.operation_id,
-      code, reason, cleanup, budget: remaining(current.budget) });
-    return reply({ ...view(), stopped: { code, reason, cleanup }, ...extra,
+    if (current.step && (code === 'page_changed' || current.pageLost)) current.budget.closed = true;
+    // The attempt keeps holding until its stop is journaled; a new start waits for that.
+    try {
+      await journal({ phase: 'browser_recovery_stopped', attempt_id: current.id, operation_id: current.operation_id,
+        code, reason, cleanup, budget: remaining(current.budget) });
+    } finally { current.phase = 'stopped'; }
+    return reply({ ...view(current), stopped: { code, reason, cleanup }, ...extra,
       instruction: 'Browser recovery stopped. Report what was done, what the runtime confirmed, what only you attested, '
         + 'whether the package was saved, and what remains unknown. Do not claim success for an unknown result.' });
   }
@@ -303,10 +306,9 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     return null;
   }
 
-  function view() {
-    if (!attempt) return { phase: 'dock' };
-    return { phase: attempt.phase, operation_id: attempt.operation_id, reason: attempt.reason, step: attempt.step,
-      budget: remaining(attempt.budget) };
+  function view(of = attempt) {
+    if (!of) return { phase: 'dock' };
+    return { phase: of.phase, operation_id: of.operation_id, reason: of.reason, step: of.step, budget: remaining(of.budget) };
   }
 
   function exhausted(budget) {

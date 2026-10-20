@@ -102,21 +102,34 @@ for (const [name, failure] of Object.entries(failures)) {
   });
 }
 
-test('a failed verifier keeps the browser phase; a failed executor stop still reaches stopped', async () => {
-  const h = harness({});
-  h.recovery = createBrowserRecovery({ enabled: true, gate: createSerialGate(), now: () => 1_000, record: async e => e, probe: async () => ({ ok: true }),
-    browser: { callTool: async () => ({ content: [{ type: 'text', text: 'ok' }] }) },
-    executor: { browserRecoveryBasis: () => ({ step, reason: 'NO_RECOVERY_OPTION' }), browserRecoveryHandoff: async () => ({ stopped: true }),
-      verifyBrowserRecovery: async () => { throw Error('release proof failed'); },
-      stopBrowserRecovery: async () => { throw Error('cleanup failed'); } } });
-  await start(h);
-  const verified = JSON.parse((await finish(h)).content[0].text);
-  assert.equal(verified.phase, 'browser');
-  assert.equal(verified.verification.status, 'unresolved');
-  const stopped = JSON.parse((await h.recovery.call('dock_browser_recovery', { action: 'stop', operation_id: 'op-1' })).content[0].text);
-  assert.equal(stopped.phase, 'stopped');
-  assert.equal(stopped.stopped.cleanup.state, 'retained');
-});
+for (const thrown of [false, true])
+  test('a verifier that ' + (thrown ? 'throws blocks' : 'returns unresolved keeps the browser phase') + '; a failed executor stop still reaches stopped', async () => {
+    let calls = 0;
+    const recovery = createBrowserRecovery({ enabled: true, gate: createSerialGate(), now: () => 1_000, record: async e => e, probe: async () => ({ ok: true }),
+      browser: { callTool: async () => { calls++; return { content: [{ type: 'text', text: 'ok' }] }; } },
+      executor: { browserRecoveryBasis: () => ({ step, reason: 'NO_RECOVERY_OPTION' }), browserRecoveryHandoff: async () => ({ stopped: true }),
+        verifyBrowserRecovery: async () => { if (thrown) throw Error('receipt journal acknowledgement differs');
+          return { status: 'unresolved', facts: [], reason: 'wizard still open' }; },
+        stopBrowserRecovery: async () => { throw Error('cleanup failed'); } } });
+    const h = { recovery };
+    await start(h);
+    const verified = JSON.parse((await finish(h)).content[0].text);
+    if (!thrown) {
+      assert.equal(verified.phase, 'browser');
+      assert.equal(verified.verification.status, 'unresolved');
+      await recovery.call('browser_click', { target: 'e1' });
+      assert.equal(calls, 1);
+      const stopped = JSON.parse((await recovery.call('dock_browser_recovery', { action: 'stop', operation_id: 'op-1' })).content[0].text);
+      assert.equal(stopped.phase, 'stopped');
+      assert.equal(stopped.stopped.cleanup.state, 'retained');
+      return;
+    }
+    assert.equal(verified.phase, 'stopped');
+    assert.equal(verified.stopped.code, 'browser_unavailable');
+    assert.equal(recovery.refusesDock('dock_node_apply'), true);
+    assert.equal((await recovery.call('browser_click', { target: 'e1' })).isError, true);
+    assert.equal(calls, 0);
+  });
 
 test('a journal failure during start or finish still lets the attempt reach stopped with Dock blocked', async () => {
   for (const failing of ['browser_recovery_handoff', 'browser_recovery_attested', 'browser_recovery_verified']) {
