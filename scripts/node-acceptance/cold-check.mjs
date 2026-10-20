@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
-import {coldNativeEligible,performColdNodeAction,runColdExecution} from './cold-reader-policy.mjs'
+import {coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -204,7 +204,29 @@ try {
       ||result.receipt?.action_key!==reference.action_key))throw Error('COLD_RECEIPT_IDENTITY_CHANGED');
     return result;
   };
-  const execution = await runColdExecution({driver,channel,node,operation,readReceipt,record})
+  let javascriptAdmission;
+  if(target.type==='programming.javascript'){
+   const {createJavascriptSourceAdmission}=await load('client/lib/javascript-source-admission.mjs');
+   const {createJavascriptManagedSourceAdapter}=await load('client/lib/javascript-managed-source-adapter.mjs');
+   const {createRedactor}=await load('client/lib/redact.mjs');
+   const redactor=createRedactor([config.api_key,loginPassword]);
+   const owner={...node,operation_id:operation.id,ui_epoch:Date.now()};
+   const receiptOptions=(id,action_key,signature)=>({receipt_namespace:session,receipt_id:id,
+    receipt_signature:signature,operation_id:id});
+   const admission=retained=>createJavascriptSourceAdmission({kind:'existing',owner,deadline:operation.deadline,redactor,record,
+    ...(retained?{expectedSource:Object.fromEntries(['source_sha256','source_utf8_bytes','source_lf_lines'].map(k=>[k,retained.effective_source[k]])),expectedSettings:retained.settings_sha256}:{}),
+    sourceAdapter:()=>createJavascriptManagedSourceAdapter({page:{},prepared:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node},
+     node,uiEpoch:owner.ui_epoch,deadline:operation.deadline,targetOrigin:origin,execute,record,receiptOptions,redactor,
+     channel:()=>procedure,openingBudgetMs:180000})});
+   const retained=await admission().admit({});
+   javascriptAdmission=admission(retained);
+   const receipt=await javascriptAdmission.admit({});
+   javascriptAdmission={admission:javascriptAdmission,receipt,owner};
+  }
+  const run=()=>runColdExecution({driver,channel,node,operation,readReceipt,record});
+  const execution = javascriptAdmission
+   ?await javascriptAdmission.admission.withEffect({receipt:javascriptAdmission.receipt,owner:javascriptAdmission.owner},run)
+   :await run();
   if (execution.status !== "completed" || !execution.verified || !execution.owner_verified)
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
   ownedExecutions.push(execution);
@@ -239,7 +261,13 @@ try {
     data=read.ports[0];
   }
   if(!data){
-  const opened = await openNewOutputTable(channel, outputPort)
+  const {openManagedJavascriptOutputViews}=target.type==='programming.javascript'?await load('client/lib/javascript-managed-views.mjs'):{};
+  const opened = await openNewOutputTable(channel, outputPort,{openViews:args=>target.type==='programming.javascript'
+   ?openManagedJavascriptOutputViews({prepared:{document_id:prepared.document_id,workflow_ref:prepared.workflow_ref},node,output:args.output,
+     deadline:operation.deadline,targetOrigin:origin,execute,record,receiptOptions:(id,action_key,signature)=>({receipt_namespace:session,
+      receipt_id:id,receipt_signature:signature,operation_id:id}),wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{
+      receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})})
+   :openColdOutputViews(channel,args,{node,operation,readReceipt,record})})
   const precision = await configureTablePrecision(channel, opened.table)
   const readSettings = await prepareTableRead(channel, opened.table)
   const raw = await readTableOutputPages(channel, opened.table, {
@@ -267,6 +295,15 @@ try {
   if([config.api_key,loginPassword].filter(Boolean).some(secret=>checkpoint.includes(secret)))throw Error('SECRET_IN_RESULT');
   await writeFile(join(args.output,'actual-readback.json'),checkpoint+'\n');
   }
+  }
+  // REST-dependent schemas are restored by cold execution. Inspect the saved
+  // export input only after its source has executed and its output was read.
+  if(exportInput){
+   const [savedExport]=await observeExportDestinations({load,channelFor,execute,includeInputFields:true,
+    graph:{...graph,nodes:graph.nodes.filter(n=>n.ref.node_id===exportInput.export_node_id)}});
+   if(savedExport.node_id!==exportInput.export_node_id)throw Error('COLD_EXPORT_INPUT_MAPPING_CHANGED');
+   exportInput.input_fields=savedExport.input_fields;
+   await record({phase:'cold_export_input_mapping',...savedExport,settings_applied:false});
   }
   const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));

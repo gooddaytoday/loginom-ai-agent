@@ -98,6 +98,7 @@ export async function readGraph(page, task) {
         if(renderedPort.getAttribute('data-tid')===ptid && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && [...exact(ptid)].filter(e=>containers[0].contains(e)).length===1)portIdentities.set(p,{graph,node:n,cell:p.FCell,guid:p.FGuid,data:p.data,nodeTid:tid,type:p.FType,subtype:p.FSubType,tid:ptid});
         const suffix = ptid.slice(tid.length + 1), m = /^(Input|Output)_Data-(\d+)$/.exec(suffix);
+        if(type==='programming.javascript' && m && (p.FType!==(m[1]==='Input'?0:1) || p.FSubType!==1))fail('JavaScript data port has a foreign native type');
         allPorts.push(suffix);
         if (/^(Input|Output)_Connection-0$/.test(suffix) && p.parent===n && p.FCell.parent===n.FCell
           && [...exact(ptid)].filter(e=>containers[0].contains(e)).length===1)
@@ -149,7 +150,7 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
     if(p?.document!==document||p.id!==request.document_id||!r||tab.length!==1||tab[0]!==r.tab||!tab[0].classList.contains('x-tab-active')||root.length!==1||p.nodeTargetDomEpochs?.objects.get(root[0])!==epoch)throw new Error('Node target document/workflow/DOM epoch changed');
   },{request:task.request,epoch:task.effect.before.dom_epoch});
   const find=value=>{const selector='[data-tid='+JSON.stringify(value)+']';return value.startsWith(task.request.workflow_ref.prefix+';Graph;')?page.locator('[data-tid='+JSON.stringify(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram')+']').locator(selector):page.locator(selector);};
-  const wait=async(name,probe,reserve=0)=>{const end=Math.min(task.deadline-reserve,Date.now()+15000);while(remaining() && Date.now()<end){await ensureContext();const v=await probe();if(v)return v;await page.waitForTimeout(Math.max(0,Math.min(80,end-Date.now())));}throw new Error('Readiness timeout: '+name);};
+  const wait=async(name,probe,reserve=0,ownedSettlement=false)=>{const end=ownedSettlement?task.deadline-reserve:Math.min(task.deadline-reserve,Date.now()+15000);while(remaining() && Date.now()<end){await ensureContext();const v=await probe();if(v)return v;await page.waitForTimeout(Math.max(0,Math.min(80,end-Date.now())));}throw new Error('Readiness timeout: '+name);};
   const targetTid=async ref=>page.evaluate(id=>{
     const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;
     const matches=d.FNodes.FCollection.filter(n=>n.FGuid===id);if(matches.length!==1)throw new Error('Node disappeared');
@@ -282,11 +283,32 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       await yes.click({timeout:remaining()});transient=false;
     }else throw new Error('Graph primitive is not implemented: '+kind);
     await page.mouse.move(10,10);
-    let after=await wait('graph_effect_visible_and_drag_idle',async()=>{try{const g=await read(page,task);return g.interaction_ready&&JSON.stringify(g)!==JSON.stringify(before)?g:null;}catch{return null;}});
+    const settleJavascript=kind==='create' && p.type==='programming.javascript';
+    const maskDeadline=Math.min(task.deadline,Date.now()+15000);
+    let pendingNode;
+    let after=await wait('graph_effect_visible_and_drag_idle',async()=>{
+      try{const g=await read(page,task);return g.interaction_ready&&JSON.stringify(g)!==JSON.stringify(before)?g:null;}
+      catch(error){
+        if(!settleJavascript)return null;
+        if(String(error.message).includes('Graph is blocked') && Date.now()<maskDeadline)return null;
+        if(!String(error.message).includes('Visible port identity is not rendered'))throw error;
+        // One create already happened. Wait only for that native JavaScript's
+        // port rendering, under the original deadline; never repeat the drag.
+        const id=await page.evaluate(({before,icon})=>{
+          const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;
+          const added=d.FNodes.FCollection.filter(n=>!before.some(id=>id===n.FGuid));
+          if(added.length!==1 || !added[0].FGuid || added[0].FIconCls!==icon)throw Error('Created JavaScript rendering owner changed');
+          return added[0].FGuid;
+        },{before:before.nodes.map(n=>n.ref.node_id),icon:task.types[p.type].icon_class});
+        if(pendingNode && pendingNode!==id)throw Error('Created JavaScript rendering owner changed');
+        pendingNode=id;return null;
+      }
+    },0,settleJavascript);
     if(kind==='create'){
       const created=after.nodes.filter(n=>!before.nodes.some(b=>b.ref.node_id===n.ref.node_id));
       if(created.length!==1)throw Error('Created node visibility owner is ambiguous');
       const baseline=after,node=created[0],canvas=find(task.request.workflow_ref.prefix+';ModelForm;cmpDiagram');
+      if(settleJavascript && (node.type!==p.type || pendingNode && node.ref.node_id!==pendingNode))throw Error('Created JavaScript rendering owner changed');
       const visibility=await revealPosition({page,root:canvas,nodeId:node.ref.node_id,position:node.position,prefix:task.request.workflow_ref.prefix,
         remaining,readViewport,project:projectPosition,guard:async()=>{remaining();await ensureContext();if(!sameGraph(baseline,await read(page,task)))throw Error('Graph changed while revealing created node');}});
       placementNavigation.node_visibility=visibility;
@@ -411,7 +433,8 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
     observe:observeGraph,
     async choosePosition(value,graph,deadline,signal){
       signal?.throwIfAborted();
-      if(JSON.stringify(await observeGraph(value,deadline))!==JSON.stringify(graph))throw Error('Graph changed before automatic placement');
+      if(JSON.stringify(await observeGraph(value,deadline))!==JSON.stringify(graph))
+        throw Object.assign(Error('Graph changed before automatic placement'),{code:'NODE_PLACEMENT_GRAPH_CHANGED'});
       const tid=value.workflow_ref.prefix+';ModelForm;cmpDiagram';
       return call(`async page=>page.locator('[data-tid='+${JSON.stringify(JSON.stringify(tid))}+']').evaluate(e=>{
         const b=e.getBoundingClientRect(),width=Math.min(b.right,innerWidth)-b.x,height=Math.min(b.bottom,innerHeight)-b.y;

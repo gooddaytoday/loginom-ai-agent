@@ -23,6 +23,45 @@ export function coldGraphExecutionIdentity(identity,node) {
  return identity;
 }
 
+// The ordinary Views gesture may return a completed timeout receipt after
+// dispatch. Reconcile only that owned opening by observation; never click again.
+export async function openColdOutputViews(channel,{state,output},{node,operation,readReceipt,record}) {
+ const owned=s=>s.prepared_node_context?.verified===true
+  &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k]);
+ const controls=s=>s.ui.elements.filter(e=>e.allowed_actions.includes('open_node_views'));
+ let s=state;
+ if(s.node_outputs.node_selected!==true||controls(s).length!==1){
+  const tid=s.prepared_node_context.tid;
+  await channel.perform({condition:'select cold output node',initialObservation:s,
+   ready:s=>owned(s)&&s.ui.elements.filter(e=>e.tid===tid&&e.graph_node?.part==='body'&&e.allowed_actions.includes('click')).length===1,
+   resolve:s=>({verb:'click',ref:s.ui.elements.find(e=>e.tid===tid&&e.graph_node?.part==='body').ref}),identity:()=>({node})});
+  s=await channel.observe({condition:'cold output visualizers control',readOutputs:true,
+   ready:s=>owned(s)&&s.node_outputs?.node_selected===true&&controls(s).length===1});
+ }
+ try {
+  await channel.perform({condition:'open cold output visualizers',initialObservation:s,
+   ready:s=>owned(s)&&s.node_outputs?.node_selected===true&&controls(s).length===1,
+   resolve:s=>({verb:'open_node_views',ref:controls(s)[0].ref}),identity:()=>({node,port_guid:output.port_guid})});
+ } catch(error) {
+  const r=error.receipt,step=channel.lastPreparedStep;
+  if(operation.transportUncertain||Date.now()>=operation.deadline||step?.action?.verb!=='open_node_views'||r?.operation_id!==step.internal_operation_id
+   ||r.action_key!=='ui.act'||r.status!=='AMBIGUOUS'||r.phase!=='observing'||r.effect_possible!==true
+   ||r.cleanup_complete!==true||r.error?.code!=='UI_DEADLINE_EXCEEDED'||!Array.isArray(r.trace)
+   ||r.trace.filter(e=>e.event==='ui_preconditions_verified'&&e.verb==='open_node_views').length!==1
+   ||JSON.stringify(r.trace.find(e=>e.event==='ui_preconditions_verified')?.refs)!==JSON.stringify([step.action.ref])
+   ||r.trace.filter(e=>e.event==='ui_gesture_applied'&&e.verb==='open_node_views').length!==1)throw error;
+  const inspected=await readReceipt({id:step.internal_operation_id,operation_id:step.internal_operation_id,
+   action_key:'ui.act',signature:step.signature});
+  if(inspected?.state!=='completed'||JSON.stringify(inspected.receipt)!==JSON.stringify(r))throw error;
+  await channel.observe({condition:'settle the dispatched cold output opening',readOutputs:true,
+   ready:s=>owned(s)&&s.prepared_node_context.surface==='views'&&s.node_outputs?.verified===true
+    &&s.node_outputs.port_panels?.filter(p=>p.port_guid===output.port_guid).length===1
+    &&s.ui.dialogs.length===0&&s.ui.masks.length===0});
+  await record({phase:'cold_output_views_settled',operation_id:operation.id,
+   opening_operation_id:r.operation_id,node,port_guid:output.port_guid,effect_possible:true,deadline:operation.deadline});
+ }
+}
+
 export async function performColdNodeAction(channel,options,{node,operation,record,now=Date.now}) {
  let binding,intent,verb,document,workflow,fresh;
  const identity=s=>{

@@ -925,6 +925,42 @@ test('storage filename code tokens are data, not editor identity: native-input-p
   }
 });
 
+for(const fault of ['transient','persistent','before','work','elements','traversal','other_stage','directory','owner','position','expired'])test('file-list scroll retries only its timed controls read without replay: '+fault,async()=>{
+ const {page,table,cell}=scriptNamedStorageFixture('anchor.csv'),clock=fixtureClock();page.context.Date=clock.Date;
+ page.context.innerWidth=1000;page.context.innerHeight=800;page.waitForTimeout=async()=>{};
+ Object.assign(table,{scrollTop:0,scrollHeight:2400,clientHeight:400});table.style.overflowY='auto';
+ const bar=page.add('div','MF;TF-1;NavigationBar;NavigationPanel');let folder;
+ for(const [i,text] of ['Файлы','user'].entries()){
+  const button=page.add('div','MF;TF-1;cnrNaviMode;b.s_Сервер>Файлы'+(i?'>user':''),'',undefined,bar);
+  const label=page.add('span',null,text,undefined,button);label.attrs.class='x-btn-inner-default-toolbar-small';if(i)folder=label;
+ }
+ const roots=await page.execute({mode:'observe',discover_roots:true});
+ const root=roots.output.ui.elements.find(e=>e.tid===table.attrs['data-tid']);
+ const before=await page.execute({mode:'observe',root_ref:root.ref});
+ const target=before.output.ui.elements.find(e=>e.tid===cell.attrs['data-tid']);
+ assert.ok(target.allowed_actions.includes('scroll'),JSON.stringify(target));assert.equal(before.output.file_storage.directory,'/user',JSON.stringify(before.output.file_storage));
+ const evaluate=page.evaluate.bind(page);let failures=0;
+ page.evaluate=async(fn,arg)=>{
+  if(arg&&Object.hasOwn(arg,'discoverRoots')){
+   if((fault==='before'&&table.scrollTop===0)||(table.scrollTop===1000&&(failures===0||fault==='persistent'))){
+    failures++;if(fault==='expired')clock.advance(16000);
+    return {ui_read_failure:{code:'UI_SCAN_LIMIT',limit_kind:['work','elements','traversal'].includes(fault)?fault:'time',scan_stage:fault==='other_stage'?'collect':'controls'}};
+   }
+   if(failures){if(fault==='directory')folder.ownText='foreign';if(fault==='owner')table.style.overflowY='hidden';if(fault==='position')table.scrollTop=999;}
+  }
+  return evaluate(fn,arg);
+ };
+ const result=await page.act({verb:'scroll',ref:target.ref,delta_y:1000},before.output);
+ const retry=['transient','persistent','directory','owner','position'].includes(fault);
+ assert.equal(result.status,fault==='transient'?'SUCCEEDED':fault==='before'?'NOT_APPLIED':'AMBIGUOUS',JSON.stringify(result.error));
+ assert.equal(result.trace.filter(e=>e.event==='ui_scroll_applied').length,fault==='before'?0:1);
+ assert.equal(result.trace.filter(e=>e.event==='ui_scan_read_retried').length,retry?1:0);
+ assert.equal(result.effect_possible,fault!=='before');assert.equal(result.cleanup_complete,true);
+ assert.equal(failures,fault==='persistent'?2:1);
+ if(['directory','owner','position'].includes(fault))assert.equal(result.error.code,'UI_SCROLL_NOT_CONFIRMED');
+ if(fault==='expired')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+});
+
 test('storage filename exception preserves code-editor, link, secret and active-row guards',async()=>{
   for(const mode of ['name','id','editor','href','secret','foreign','detached_row','wrong_label','wrong_tag','editable','duplicate']){
     const f=scriptNamedStorageFixture(),{page,cell,table,row}=f;
@@ -1316,7 +1352,27 @@ function calculatorKeyboard(page,c,{corrupt=false,loseFocus=false}={}) {
     if(loseFocus && key==='ControlOrMeta+A')page.document.activeElement=page.document.body;
   };
   page.keyboard.type=async text=>{page.events.push('keyboard_type');c.state.text+=corrupt?'wrong':text;};
+  page.keyboard.insertText=async text=>{page.events.push('keyboard_insert_text');c.state.text+=corrupt?'wrong':text;};
 }
+
+test('Calculator replacement inserts literal quotes brackets and parentheses without an auto-close suffix',async()=>{
+  for(const text of ['RegExMatchedSubExp(Concat("args[^}]*",Chr(34),"Code",Chr(34),"[[:space:]]*:[[:space:]]*",Chr(34),"([^",Chr(34),"]*)"),Response,1)',
+    'Round(Revenue / Products, 2)']) {
+    const page=new Page(),c=calculatorDocument(page);calculatorKeyboard(page,c);
+    // The observed CodeMirror auto-close keymap leaves this suffix when the
+    // regex formula is typed character by character. Literal input avoids it.
+    page.keyboard.type=async value=>{page.events.push('keyboard_type');c.state.text+=value+(value.includes('[')?'"))':'');};
+    const snapshot=await page.observe(),record=snapshot.ui.elements.find(e=>e.tid===c.base+'cmpExpression');
+    const result=await page.act({verb:'replace_expression',ref:record.ref,text},snapshot);
+    assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+    assert.equal(c.state.text,text);
+    assert.equal(result.output.ui.elements.find(e=>e.ref===record.ref).calculator_editor.document.text,text);
+    assert.equal(page.events.filter(e=>e==='keyboard_insert_text').length,1);
+    assert.equal(page.events.filter(e=>e==='keyboard_type').length,0);
+    assert.equal(page.events.filter(e=>e==='Backspace').length,1);
+    assert.ok(result.trace.some(e=>e.event==='expression_text_verified' && e.settings_applied===false));
+  }
+});
 
 test('typed Calculator replacement confirms exact multiline and empty document via keyboard',async()=>{
   for(const text of ['Quantity * UnitPrice','a\n\n b','']) {
@@ -3783,7 +3839,7 @@ test('input port overflow caption requires native binding and the exact hidden c
 });
 
 async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
-  const caption=['group','sorting','crosstable','calculator','reform'].includes(vendor)?'Входной источник данных':port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
+  const caption=['group','sorting','crosstable','calculator','reform','filter'].includes(vendor)?'Входной источник данных':port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
   const {page,panel,crumbs}=await inputPortContextFixture();
   // Loginom 7.4.2 native diagnostic: 1280x800, input1 and Настройка hidden
   // by breadcrumb overflow; node/input/wizard icons remain in the same DOM.
@@ -3798,7 +3854,7 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
     if(i>=7)c.style.display='none';
     for(const icon of c.children)icon.box={x:c.box.x+1,y:c.box.y+1,width:16,height:16};
   }
-  const nodeIcon={calculator:'bg-vendor-icon-calcdata',crosstable:'bg-vendor-icon-crosstab',sorting:'bg-vendor-icon-sorting',union:'bg-vendor-icon-uniondata',group:'bg-vendor-icon-groupdata',join:'bg-vendor-icon-joindata',reform:'bg-vendor-icon-reformcolumns'}[vendor];
+  const nodeIcon={calculator:'bg-vendor-icon-calcdata',crosstable:'bg-vendor-icon-crosstab',sorting:'bg-vendor-icon-sorting',union:'bg-vendor-icon-uniondata',group:'bg-vendor-icon-groupdata',join:'bg-vendor-icon-joindata',reform:'bg-vendor-icon-reformcolumns',filter:'bg-vendor-icon-filterdata'}[vendor];
   crumbs[5].children[0].attrs.class=nodeIcon;
   page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[7]).attrs.class='bg-vendor-icon-tunedatasourcesocketdef';
   if(mode==='wrong_icon')crumbs[5].children[0].attrs.class=vendor==='calculator'?'bg-vendor-icon-groupdata':'bg-vendor-icon-calcdata';
@@ -3879,7 +3935,7 @@ test('owned Union and Grouping inputs keep their exact hidden input folder and c
 });
 
 test('tabular input0 keeps Done and close bound to the native node icon when its input folder overflows',async()=>{
- for(const vendor of ['group','sorting','crosstable','calculator','reform'])for(const mode of ['valid','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','unknown_port','wrong_native_index','wrong_icon','missing_native_icon','wrong_native_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
+ for(const vendor of ['group','sorting','crosstable','calculator','reform','filter'])for(const mode of ['valid','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','unknown_port','wrong_native_index','wrong_icon','missing_native_icon','wrong_native_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
   const {page}=await joinInputPortOverflowFixture(mode,0,vendor);
   const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
   crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
@@ -4589,7 +4645,7 @@ test('typed output-port finish requires complete output mapping and its own port
 });
 
 test('overflow output socket requires a current native owner and visible actionable Done',async()=>{
-  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns'])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
+  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns','filterdata'])for(const outputPort of vendor==='filterdata'?[0,1]:[0])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
     'duplicate_socket','wrong_socket_icon','missing_settings','hidden_ancestor','hidden_visibility','disabled_done','hidden_done']){
     const {page}=outputPortFinishFixture();
     const find=suffix=>page.document.all().find(e=>e.attrs['data-tid']?.endsWith(suffix));
@@ -4604,17 +4660,17 @@ test('overflow output socket requires a current native owner and visible actiona
       find('>Calc').children[0].attrs.class=mode==='bound_folder_wrong_type'?'bg-vendor-icon-'+(vendor==='calcdata'?'groupdata':'calcdata'):'bg-vendor-icon-'+vendor;
       if(mode==='bound_folder_wrong_icon')folder.children[0].attrs.class='maptree-icon-modelinputports';
     }
-    const port={direction:'output',port:0,native_index:0,port_guid:'out-guid',opening_operation_id:'open-output',node_icon_class:'bg-vendor-icon-'+vendor};
+    const port={direction:'output',port:outputPort,native_index:outputPort,port_guid:'out-guid',opening_operation_id:'open-output',node_icon_class:'bg-vendor-icon-'+vendor};
     if(mode==='bound_folder_missing_native_icon')delete port.node_icon_class;
     if(mode==='bound_folder_wrong_native_icon')port.node_icon_class='bg-vendor-icon-unknown';
-    if(mode==='bound_folder_wrong_port')port.port=port.native_index=1;
-    if(mode==='bound_folder_wrong_index')port.native_index=1;
+    if(mode==='bound_folder_wrong_port')port.port=port.native_index=vendor==='filterdata'?2:1;
+    if(mode==='bound_folder_wrong_index')port.native_index=outputPort===0?1:0;
     if(mode==='bound_folder_missing_guid')delete port.port_guid;
     if(mode==='bound_folder_missing_opening')delete port.opening_operation_id;
     if(mode==='foreign_port')port.direction='input';
     if(mode==='missing_guid')delete port.port_guid;
     if(mode==='missing_opening')delete port.opening_operation_id;
-    if(mode==='wrong_index')port.native_index=1;
+    if(mode==='wrong_index')port.native_index=outputPort===0?1:0;
     if(mode==='duplicate_socket'){
       const duplicate=page.add('a',socket.attrs['data-tid'],'Result',undefined,socket.parentElement);duplicate.style.display='none';
       page.add('span',null,'',undefined,duplicate).attrs.class='bg-vendor-icon-'+socketIcon;

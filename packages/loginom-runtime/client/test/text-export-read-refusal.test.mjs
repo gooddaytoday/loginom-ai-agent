@@ -98,20 +98,24 @@ for(const fault of ['binding','execution','lease','restore','cleanup','transport
 for(const kind of ['success','download_refusal','ambiguous_download','download_transport','open_files','root_stale',
  'return_tab_observation','download_select','directory_navigation','storage_scroll','unknown_scroll','unclean_scroll','changed_scroll','scroll_unobserved','foreign_storage',
  'mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure',
+ 'return_tabs_stale','return_tabs_foreign','return_tabs_document','return_tabs_other','return_tabs_exhausted',
+ 'return_tabs_active','return_tabs_package','return_tabs_deadline','return_tabs_cancelled',
  'verified_return_observation','retain_failure','retain_private'])test('native export read and real save: '+kind,async()=>{
- const success=kind==='success',storage=kind.includes('scroll')||kind==='foreign_storage';
- const downloadSucceeded=success||['verified_return_observation','retain_failure','retain_private'].includes(kind);
- const blocked=['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure'].includes(kind);
- let files=false,downloads=0,releases=0,retained=0,failed=false;const gestures=[],records=[];
+ const success=['success','return_tabs_stale'].includes(kind),storage=kind.includes('scroll')||kind==='foreign_storage';
+ const downloadSucceeded=success||kind.startsWith('return_tabs_')||['verified_return_observation','retain_failure','retain_private'].includes(kind);
+ const blocked=['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure','return_tabs_document','return_tabs_exhausted','return_tabs_deadline','return_tabs_cancelled'].includes(kind);
+ let files=false,downloads=0,releases=0,retained=0,failed=false,tabReads=0,freshRoots=0;const gestures=[],records=[];
  let scrollTop=0,observationFailed=false,directory=kind==='directory_navigation'?'/':'/user';
  const filesWorkflow={workflow_id:'files',prefix:'MF;TF-2',tab_tid:'files-tab'},targetOrigin='https://loginom.invalid';
  const element=(tid,ref=tid,extra={})=>({tid,ref:'ui-'+ref.replace(/[^a-zA-Z0-9-]/g,'-'),allowed_actions:['click'],...extra});
- const snapshot=()=>({authenticated:true,origin:targetOrigin,loginom_build:'7.4',dom_epoch:{document:'browser',revision:1},
-  workflow_ref:files?{tab_tid:filesWorkflow.tab_tid,prefix:failed&&kind==='foreign_storage'?'foreign':filesWorkflow.prefix}:
+ const snapshot=()=>({authenticated:true,origin:targetOrigin,loginom_build:'7.4',dom_epoch:{document:failed&&kind==='return_tabs_document'?'foreign-browser':'browser',revision:1},
+  active_tab_ref:files?(failed&&kind==='return_tabs_active'?'ui-other-tab':'ui-files-tab'):'ui-workflow-tab',
+  package_identity:files?(failed&&kind==='return_tabs_package'?{name:'other'}:null):{name:'Package1'},
+  workflow_ref:files?{tab_tid:filesWorkflow.tab_tid,prefix:failed&&['foreign_storage','return_tabs_foreign'].includes(kind)?'foreign':filesWorkflow.prefix}:
    {tab_tid:workflow.tab_tid,prefix:failed&&kind==='changed_workflow'?'foreign':workflow.prefix},wizard:{status:!files&&failed&&kind==='graph_wizard'?'observed':'absent'},
   ui:{dialogs:!files&&failed&&kind==='graph_dialog'?[{kind:'unknown'}]:[],masks:!files&&failed&&kind==='graph_mask'?[{kind:'unknown'}]:[],elements:[
    element('MF;cntMain;tlbMainToolbar'),element('MF;cntMain;tlbMainToolbar;btnFilestorage'),
-   element('MF;cntMain;cntWorkspace;Workspace;t.br'),element(workflow.tab_tid),element('files-tab'),element('MF;TF-1;ModelForm;cmpDiagram','graph'),
+   element('MF;cntMain;cntWorkspace;Workspace;t.br',failed&&kind.startsWith('return_tabs_')?'fresh-tabs':undefined),element(workflow.tab_tid),element('files-tab'),element('MF;TF-1;ModelForm;cmpDiagram','graph'),
    element('MF;TF-2;NavigationBar;NavigationPanel'),element('MF;TF-2;FileStorageForm;btnRefresh'),
    element('MF;TF-2;FileStorageForm;pnlFileStorage;tbl','file-table'),
    ...(kind==='directory_navigation'?[element('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix('user'),'folder',{label:'user',storage_entry:{kind:'folder'},allowed_actions:['double_click']})]:[]),
@@ -163,9 +167,24 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
    if(files&&downloads&&!failed&&kind==='verified_return_observation'){
     failed=true;return {status:'FAILED',error:{code:'UI_SCAN_LIMIT',message:'private /token/path'}};
    }
+   if(files&&downloads&&kind.startsWith('return_tabs_')){
+    if(task.discover_roots&&failed)freshRoots++;
+    if(task.root_ref?.includes('Workspace-t-br')||task.root_ref==='ui-fresh-tabs'){
+     tabReads++;
+     if(tabReads===1||kind==='return_tabs_exhausted'){
+      if(kind==='return_tabs_deadline')ctx.deadline=Date.now()-1;
+      if(kind==='return_tabs_cancelled')cancellation.abort(Error('caller stopped'));
+      failed=true;return {status:'FAILED',error:{code:kind==='return_tabs_other'?'UI_SCAN_LIMIT':'UI_ROOT_STALE'}};
+     }
+     assert.equal(task.root_ref,'ui-fresh-tabs','rediscover the tab root instead of reusing its stale ref');
+    }
+   }
    if(files&&failed&&kind==='scroll_unobserved'&&!observationFailed){observationFailed=true;throw Error('Export scroll outcome is not freshly observed');}
    const output=snapshot();
    output.observation_kind=task.discover_roots?'roots':'region';output.ui.truncated={dialogs:!!task.discover_roots,masks:!!task.discover_roots};
+   // Real root discovery omits these detail-only context fields. A region
+   // observation must be compared with a preceding complete observation.
+   if(task.discover_roots){delete output.active_tab_ref;delete output.package_identity;}
    if(task.prepared_node_context){
     assert.deepEqual(task.prepared_node_context,{document_id:'doc',workflow_ref:workflow,node});
     if(!task.discover_roots)assert.equal(task.root_ref,'ui-graph','restoration must avoid an unscoped full-page data_views scan');
@@ -175,7 +194,8 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
    }
    return {status:'SUCCEEDED',output};
   }};
- const ctx={...node,node,workflow_ref:workflow,execution:{status:'completed',execution_id:'exec'},deadline:Date.now()+10000};
+ const cancellation=new AbortController();
+ const ctx={...node,node,workflow_ref:workflow,execution:{status:'completed',execution_id:'exec'},deadline:Date.now()+10000,signal:cancellation.signal};
  const result=await readNativeExportFile(options,ctx,{destination:'/user/result.csv',configured:{destination_check:{verified:true,destination:'/user/result.csv',existed:false}}},
   {verified:true,owner_verified:true,status:'completed',execution_id:'exec'}).catch(e=>e);
  if(success){assert.equal(result.artifact_id,'artifact',String(result.stack));assert.equal(retained,1);assert.equal(releases,0);}
@@ -193,16 +213,29 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
   const saved=await f.run('package.save_checkpoint',{path:'/user/data/packages/read-refusal.lgp',conflict_policy:'fail'},{operationId:'save-read-refusal'});
   assert.equal(saved.status,'SUCCEEDED',JSON.stringify(saved));assert.equal(page.packagePath,'/user/data/packages/read-refusal.lgp');
  }
- assert.equal(records.some(r=>r.phase==='export_file_read_refused_restored'),!success&&!['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','lease_failure'].includes(kind));
+ assert.equal(records.some(r=>r.phase==='export_file_read_refused_restored'),!success&&!['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','lease_failure','return_tabs_document','return_tabs_exhausted','return_tabs_deadline','return_tabs_cancelled'].includes(kind));
  assert.equal(records.some(r=>r.phase==='export_file_bytes_verified'),downloadSucceeded);
  assert.equal(records.some(r=>r.phase==='export_file_read_completed'),success);
- if(downloadSucceeded&&!success){
+ if(downloadSucceeded&&!success&&!blocked){
   const failure=result.nodePhaseRefusal.proof.failure;
-  assert.equal(failure.step,kind==='verified_return_observation'?'return_workspace_roots':'retain_file');
-  assert.equal(failure.code,kind==='verified_return_observation'?'UI_SCAN_LIMIT':null);
+  assert.equal(failure.step,kind==='verified_return_observation'?'return_workspace_roots':kind.startsWith('return_tabs_')?'return_tabs_observation':'retain_file');
+  assert.equal(failure.code,kind==='verified_return_observation'||kind==='return_tabs_other'?'UI_SCAN_LIMIT':kind==='return_tabs_exhausted'?'UI_ROOT_STALE':null);
   assert.equal(failure.kind,kind==='retain_private'?'TypeError':'Error');
   assert.equal(failure.reason,kind==='retain_failure'?'Artifact size or SHA does not match the admitted identity':null);
   assert.deepEqual(records.find(r=>r.phase==='export_file_read_refused_restored').proof.failure,failure);
   assert.ok(!JSON.stringify(result.nodePhaseRefusal).includes('/token/path'));
+ }
+ if(kind==='return_tabs_stale'){
+  assert.equal(tabReads,2);assert.equal(freshRoots,1);assert.equal(downloads,1);
+  assert.equal(gestures.filter(t=>t===workflow.tab_tid).length,1,'one return gesture');
+ }
+ if(['return_tabs_active','return_tabs_package','return_tabs_deadline','return_tabs_cancelled'].includes(kind)){
+  assert.equal(downloads,1);assert.equal(retained,0);
+  if(blocked)assert.equal(gestures.filter(t=>t===workflow.tab_tid).length,0,'no return gesture after expiry or cancellation');
+ }
+ if(kind==='return_tabs_exhausted'){
+  assert.equal(tabReads,3,'two original tab reads and one existing refusal-restoration read');
+  assert.equal(freshRoots,2,'one refresh and existing recovery roots; no retry inside recovery');
+  assert.equal(gestures.filter(t=>t===workflow.tab_tid).length,0);
  }
 });
