@@ -47,9 +47,11 @@ trial-dosage-outcomes
 ## Подготовка и CLI
 
 - [x] Сохранить план отдельным коммитом; private backup чужих изменений и baseline.
-- [ ] По TDD перенести минимальное поведение focus password из `694c1d3a4c`:
+- [x] По TDD перенести минимальное поведение focus password из `694c1d3a4c`:
   воспроизвести readonly password до username blur, исправить, проверить пустой
-  пароль/чужую identity. Отдельный fix commit, связанные tests/typecheck.
+  пароль/чужую identity. RED FIELD_READONLY → GREEN; 44 related tests pass, Host typecheck pass.
+  Дополнительные native cancellation tests: 1 pass/2 fail (2с ожидание), те же 2 failures
+  воспроизведены на исходном HEAD без fix; не новая регрессия, вне области этого изменения.
 - [x] Создать новый private root: `/home/kiselev/storage/tmp/analytic10-branch-20261020-w6kidhm4`.
 - [ ] Из `packages/loginom-host` собрать полный payload командой
   `bun script/build-cli.ts <root>/cli-payload --no-archive`, pinned Bun1.3.14
@@ -135,6 +137,7 @@ trial-dosage-outcomes
 
 1. Base dca5e33d22, план утверждён владельцем и независимо проверен.
 2. Private root выше, исходный index/worktree и пять чужих файлов сохранены.
-3. Следующий шаг — RED для username blur/password fill, минимальный fix и build.
-4. Модельные вызовы не начаты; общий8ч дедлайн ещё не установлен.
-5. Run проверяет обычный N2/reuse, не аварийное восстановление/SIGINT/shared refresh.
+3. Focus fix: RED→GREEN, 44 related pass, Host typecheck pass; следующий шаг build.
+4. Native cancellation baseline тоже имеет 2 failures при 2с ожидании; новых регрессий нет.
+5. Модельные вызовы не начаты; общий8ч дедлайн ещё не установлен.
+6. Run проверяет обычный N2/reuse, не аварийное восстановление/SIGINT/shared refresh.
