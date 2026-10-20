@@ -17,7 +17,40 @@ const task = {operation_id: 'managed-js-1', owner: node,
   targetOrigin: 'http://logi-test-plan.bg.local', targetBuild: '7.4.2', deadline,
   prepared: {...prepared, node}, allowDeactivation: true};
 
+for(const [fault,field] of [['generation','settings.generation_checked'],['grids','mappings.grids'],
+  ['grid_tid','mappings.grid_tid'],['grid_fields','mappings.grid_fields'],
+  ['field_type','mappings.DataType_supported'],['reciprocity','mappings.reciprocity_verified'],['store','mappings.store_available']])
+test('source boundary journals only the failed predicate: '+fault,async()=>{
+  const schema={verified:true,node_context:{...node,verified:true,surface:'wizard'},generation:{checked:true},
+    grids:[{tid:'PRIVATE_COLUMN;grdTargetColumns;tbl',fields:[]}]};
+  if(fault==='generation')schema.generation=null;
+  if(fault==='grids')schema.grids='PRIVATE_VALUE';
+  if(fault==='grid_tid')schema.grids[0].tid={secret:'PRIVATE_VALUE'};
+  if(fault==='grid_fields')schema.grids[0].fields='PRIVATE_VALUE';
+  if(fault==='field_type'){
+    schema.verified=false;schema.reason='native_field_contract_unconfirmed';
+    schema.grids[0].fields=[{Name:'PRIVATE_COLUMN',DataType:999,Index:0,Required:true,Broken:false}];
+  }
+  if(fault==='reciprocity'){schema.verified=false;schema.reason='mapping_reciprocity_unconfirmed';}
+  if(fault==='store'){schema.verified=false;schema.reason='JavaScript schema store is unavailable';}
+  const f=fixture({schemaOverride:schema});
+  const admission=createJavascriptSourceAdmission({kind:'existing',owner,deadline,sourceAdapter:f.sourceAdapter,
+    record:f.record,redactor:createRedactor()});
+  let refused;
+  await assert.rejects(admission.admit({}),error=>{
+    refused=error;return error.code==='boundary'&&error.message==='JavaScript source admission refused: boundary';
+  });
+  const detail=f.events.find(e=>e.phase==='javascript_source_boundary_refused')?.diagnostic;
+  assert.ok(detail?.checks.some(c=>c.field===field&&c.expected!==c.observed));
+  assert.equal(JSON.stringify(detail).includes('PRIVATE'),false);
+  assert.equal(JSON.stringify(refused).includes('diagnostic'),false);
+  assert.equal(refused.javascriptSourceBoundary,undefined);
+  assert.deepEqual(f.calls,['type','open','schema'],'no extra browser read or Next on refusal');
+  assert.equal(admission.state,'retired');
+});
+
 function fixture({closeFails = false, pageTransientOnce = false, wrongType = false,
+  schemaOverride,
   settingsAckChanged = false,
   nativeRefusal=false,doneRefusal=false,captureFails=false,recoveryAckChanged=false,closeRefusalFails=false,
   generationFalse = false, generationFails = false, declaredFails = false, doneFails = false,
@@ -62,7 +95,7 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     calls.push(code);
     if (code === 'type') return {verified: true, node_id: 'node',
       icon_class: wrongType ? 'bg-vendor-icon-calculator' : 'bg-vendor-icon-javascript'};
-    if (code === 'schema') return {verified: true, node_context: {...node, verified: true, surface: 'wizard'},
+    if (code === 'schema') return schemaOverride??{verified: true, node_context: {...node, verified: true, surface: 'wizard'},
       generation: {checked: !generationFalse}, grids: [{tid: 'grid', fields: [{record_id: 'volatile', Name: 'Value'}]}]};
     if(code==='stage'||code.includes('runManagedJavascriptStageRead'))return {owner:node,native_owner_verified:true,owner_verified:true,wizard_visible:true,
       pending:false,preview_visible:false,boundary_refusal:null,dialog_diagnostic:{visible_count:0,foreign_count:0,roots:[]},mask_diagnostic:{foreign_count:0},

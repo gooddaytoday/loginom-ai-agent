@@ -11,6 +11,30 @@ class SourceAdmissionError extends Error {
   }
 }
 const need = (condition, code) => { if (!condition) throw new SourceAdmissionError(code); };
+function boundaryDiagnostic(error) {
+  try {
+    const value=Object.getOwnPropertyDescriptor(error,'javascriptSourceBoundary')?.value;
+    const own=(o,k)=>Object.getOwnPropertyDescriptor(o??{},k)?.value;
+    const fields=new Set(['settings.verified','settings.generation_checked','settings.owner_verified','settings.wizard_surface',
+      'settings.document_id_matches','settings.workflow_id_matches','settings.node_id_matches',
+      'settings.schema_page_unique','settings.generation_binding','mappings.store_available','mappings.cache_complete',
+      'mappings.record_identity','mappings.target_grid_unique','mappings.control_unique','mappings.control_bound',
+      'mappings.grids','mappings.grid_tid','mappings.grid_fields','mappings.Name_type','mappings.Name_present','mappings.Name_unique',
+      'mappings.DataType_supported','mappings.Index_matches','mappings.Required_type','mappings.Broken_clear',
+      'mappings.reciprocity_verified','mappings.source_grid_unique','navigation.count_within_bound','navigation.tid_matches','navigation.label_matches']);
+    const types=new Set(['true','false','boolean','string','array','object','undefined','null','number','function','symbol','bigint']);
+    const scope=own(value,'scope'),raw=own(value,'checks');
+    if(!['settings','navigation'].includes(scope)||!Array.isArray(raw))return;
+    const checks=[];
+    for(let i=0;i<Math.min(raw.length,12);i++) {
+      const c=own(raw,String(i)),field=own(c,'field'),expected=own(c,'expected'),observed=own(c,'observed'),index=own(c,'index');
+      if(!fields.has(field)||!types.has(expected)||!types.has(observed)
+        ||index!==undefined&&(!Number.isSafeInteger(index)||index<0||index>32768))continue;
+      checks.push({field,expected,observed,...(index===undefined?{}:{index})});
+    }
+    if(checks.length)return {scope,checks,truncated:raw.length>12};
+  }catch{} // Unavailable diagnostics never replace the original refusal.
+}
 function immutable(value) {
   const copy = structuredClone(value), pending = [copy];
   while (pending.length) {
@@ -97,11 +121,12 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
       timely(); return result;
     } finally { clearTimeout(timer); }
   };
-  const journal = async event => {
+  const journal = async (event,diagnostic) => {
     // Keep a private immutable expected copy: a producer must not mutate the
     // event in-place and make its own changed ACK authoritative.
     const expected = immutable({...event, admission_id: admissionId, deadline});
-    const ack = await bounded(() => record(structuredClone(expected)));
+    // Diagnostic fields cannot become a new acknowledgement requirement.
+    const ack = await bounded(() => record({...structuredClone(expected),...(diagnostic?{diagnostic}:{})}));
     need(Object.keys(expected).every(key => equal(ack?.[key], expected[key])), 'ack');
   };
   const retire = async error => {
@@ -122,7 +147,7 @@ export function createJavascriptSourceAdmission({kind, owner, deadline, sourceAd
     // its public message. Recording it cannot authorize a retry or an effect.
     if (!(error instanceof SourceAdmissionError) && Date.now() < deadline) {
       await journal({phase:'javascript_source_boundary_refused',owner:targetOwner,read_id:readId,
-        reason:redactor.text(String(error?.message ?? 'Source boundary failed')).slice(0,1024)});
+        reason:redactor.text(String(error?.message ?? 'Source boundary failed')).slice(0,1024)},boundaryDiagnostic(error));
     }
     throw error instanceof SourceAdmissionError ? error : new SourceAdmissionError('boundary');
   };
