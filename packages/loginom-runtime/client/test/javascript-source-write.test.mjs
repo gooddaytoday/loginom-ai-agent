@@ -14,7 +14,7 @@ function writerFixture(initial='old source',options={}) {
   mouse:{click:async()=>{calls.push('click');browser.document.activeElement=browser.input;}},
   keyboard:{press:async key=>{
    calls.push(key);
-   if(key==='Control+A')browser.setSelection(browser.getSource());
+   if(key==='ControlOrMeta+A')browser.setSelection(browser.getSource());
    if(key==='Backspace')browser.setSource('');
   },insertText:async text=>{calls.push('insertText');browser.setSource(text);browser.setSelection('');}},
  };
@@ -35,7 +35,7 @@ test('owned editor writes exact Unicode source once and journals only digests',a
  assert.equal(f.writer.state,'draft_verified');
  assert.deepEqual(f.events.map(x=>x.phase),['javascript_source_write_prepared','javascript_source_write_mutation_dispatch','javascript_source_write_draft_verified']);
  assert.ok(f.events.every(x=>!JSON.stringify(x).includes('source_text')&&!JSON.stringify(x).includes('Сумма')));
- assert.deepEqual(f.calls.filter(x=>['click','Control+A','Backspace','insertText'].includes(x)),['click','Control+A','Backspace','insertText']);
+ assert.deepEqual(f.calls.filter(x=>['click','ControlOrMeta+A','Backspace','insertText'].includes(x)),['click','ControlOrMeta+A','Backspace','insertText']);
  await assert.rejects(()=>f.replace(source),/one-shot/);
 });
 
