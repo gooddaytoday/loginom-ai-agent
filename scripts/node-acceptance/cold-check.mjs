@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
-import {coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews} from './cold-reader-policy.mjs'
+import {coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews,coldProcessObservation} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -166,9 +166,10 @@ try {
     action: { action_key: "acceptance.cold_read", revision: "1" },
     deadline: Date.now() + 540_000,
   }
+  const processObservation=coldProcessObservation(execute,{node,operation,record});
   const procedure = createNodeProcedure({
     operation,
-    execute,
+    execute:processObservation.execute,
     record,
     targetOrigin: origin,
     targetBuild: "7.4.2",
@@ -182,7 +183,7 @@ try {
         operation_id: receipt.id,
       }),
   })
-  const channel={...procedure,get lastPreparedStep(){return procedure.lastPreparedStep;},
+  const channel={...procedure,observe:options=>processObservation.observe(procedure,options),get lastPreparedStep(){return procedure.lastPreparedStep;},
     get steps(){return procedure.steps;},perform:options=>performColdNodeAction(procedure,options,{node,operation,record})};
   const nativeSource=staticSources?.crossTables.find(c=>c.node_id===node.node_id);
   const nativeConfiguration=nativeSource?.configuration;

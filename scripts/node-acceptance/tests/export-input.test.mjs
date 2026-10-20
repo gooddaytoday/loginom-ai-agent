@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {parseExpectedOutputs,resolveExportInput,matchExpectedOutputs} from '../expected-outputs.mjs';
+import {coldProcessObservation} from '../cold-reader-policy.mjs';
 
 const output={output_node_type:'export_input',columns:[{name:'Code',type:'string'}],rows:[{Code:'A'}],ordered:true};
 const node=(id,type,outputs=[0])=>({ref:{node_id:id},type,label:id,outputs});
@@ -18,7 +19,7 @@ test('cold inspects saved export mapping after execution restores the complete d
  const run=new (Object.getPrototypeOf(async function(){}).constructor)('f',
   `const {${['expectedOutputs','expected','graph','load','channelFor','execute','record','saved','prepared','origin','multiple',
    'createNodeProcedure','withBrowserReceipt','session','createNodeExecutionProcedure','performColdNodeAction',
-   'runColdExecution','staticSources','openNewOutputTable','configureTablePrecision','prepareTableRead',
+   'runColdExecution','coldProcessObservation','staticSources','openNewOutputTable','configureTablePrecision','prepareTableRead',
    'readTableOutputPages','decodeTableOutput','returnFromOutputTable','writeFile','join','args','config',
    'loginPassword','matchExpectedOutputs','resolveExportInput','observeExportDestinations','openColdOutputViews'].join(',')}}=f;\n${body}\nreturn correspondence;`);
  const fields=[{name:'Code',source_name:'Code',type:'string'},{name:'Status',source_name:'Status',type:'integer'}];
@@ -36,7 +37,7 @@ test('cold inspects saved export mapping after execution restores the complete d
    openNewOutputTable:async()=>({table:{}}),configureTablePrecision:async()=>({fields:data.schema.map(f=>({...f,key:f.name}))}),
    prepareTableRead:async()=>({}),readTableOutputPages:async()=>structuredClone(data),decodeTableOutput:raw=>raw,
    returnFromOutputTable:async()=>{},writeFile:async()=>{},join:()=>'',args:{output:''},config:{},loginPassword:'',
-   matchExpectedOutputs,resolveExportInput,openColdOutputViews:async()=>{},
+   matchExpectedOutputs,resolveExportInput,coldProcessObservation,openColdOutputViews:async()=>{},
    observeExportDestinations:async()=>{calls.push('mapping');return [{node_id:'export',input_fields:restored?fields:fields.slice(1)}];}});
   if(completeAfterExecution)assert.equal((await result).length,1);
   else await assert.rejects(result,/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
