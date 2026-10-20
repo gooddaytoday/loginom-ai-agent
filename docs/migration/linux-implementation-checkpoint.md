@@ -8,7 +8,8 @@ true, public prepare и SaveAs собственного пустого паке�
 Обычный native cleanup BLOCKED/TAB_IDENTITY_CHANGED, task ACKfalse/exit1,
 .writer сохранён; собственных процессов нет, logout не подтверждён. Повторов нет.
 Отрицательные CLI строки, Desktop и модели не запускались, матрица не принята.
-Следующий шаг — source/saved-data binding diagnosis и отдельный reviewed repair.
+Следующий шаг — одна scoped-reviewed попытка с каноническим save_checkpoint;
+переоткрытие для availability не требуется, runtime guards не меняются.
 Merge/release не выполнялись, штатный release-флаг выключен.
 [Фактические build/run identities и ограничения](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md).
 

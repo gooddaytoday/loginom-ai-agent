@@ -48,3 +48,13 @@ SaveAs reply не содержит `next_step` на prepare/refresh; advice фи
 собственная установка, profile и raw evidence сохранены. Следующий шаг требует
 отдельного reviewed repair plan. Отрицательные CLI строки, Desktop, модельные
 кейсы и качество recovery этим прогоном не проверены.
+
+## Следующая проверяемая гипотеза
+
+Для availability исходная Task3 требует собственного Save, без обязательного
+переоткрытия. Bundled skill предписывает `package.save_checkpoint`: existing
+keepOpen flow сохраняет package/workflow/tab и тот же native cleanup guard.
+Scoped independent review GO для одной новой попытки в fresh profile/workspace
+с новым UUID и тем же verified artifact; production inputs не менялись.
+Первый SaveAs FAIL/guard/evidence сохраняются; новый путь не чинит SaveAs и
+не будет заявлен как reopen или проверка persisted content.
