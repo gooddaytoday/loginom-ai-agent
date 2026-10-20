@@ -112,3 +112,13 @@ find пока не проверены нативно. Ref-поиск собст�
 - Временный probe script удалён; повторов, вызовов Calculator/imports.text/delivery и изменения harness не было. Разрешение на замену setup не открыто; подготовка с неактивным source output0 не повторяется.
 
 Task 5 остаётся отложен до реально проверенного активного входа текущего runtime. Приёмочные критерии и release-гейт сохраняются; независимая работа над evals может продолжаться по указанию владельца об отложенных блокерах.
+
+## Подготовка по уточнённому назначению — остановлена на дефекте пробы
+
+После независимого GO выполнен свежий штатный staging из `5368a2fbfbc81d9861a586f1bcde102b776b3102`: 4753 inventory entries, manifest SHA-256 `4f48f2c8b8ed1495aa4058170c6d481531c24ec3891fbf2616800430b85d8452`. Private evidence: `/home/george/.cache/loginom-ai-agent/browser-recovery-20261020-fixture-proof`. Production и harness не менялись.
+
+Две команды остановились до browser/login из-за дефектов временной пробы: запуск hash-identical Node вне обязательного staged path (`LOGINOM_NODE_PATH_MISMATCH`), затем лишний filename-prefix gate исторического seed. В третьей попытке (`prep12-native`) открытие seed READY и собственный SaveAs SUCCEEDED/verified/cleanup_complete, `reopened:true`, path совпал с новой копией. Затем ошибочный assert поля `save_completed` от checkpoint получил undefined: actual SaveAs output содержит package_ref/reopened/arrangement/reporting_constraints. Fresh prepare, internal Import execute/read и Group NOT_RUN; гипотеза активного входа ещё не проверена.
+
+Guarded package cleanup третьей попытки BLOCKED, `TAB_IDENTITY_CHANGED`: package_closed:false, logged_out:false, без discard. Resource trace дошёл до client close fulfilled и bridge_ack rejected; browserServer/context close этим путём не достигнуты. Exit1 и отсутствие post-exit exact profile/script process matches не доказывают полный descendant cleanup; исходный PID/PGID не фиксировался. Собственные package/logout/resources остаются UNCONFIRMED. Это не изменяет cleanup предыдущих запусков.
+
+После третьего дефекта проба остановлена для пересмотра: общая ошибочная предпосылка — перенос проверок похожего checkpoint-ответа на SaveAs. Временный candidate упрощён до действительных SaveAs полей и немедленного fresh prepare; до следующего native запуска назначен independent read-only preflight. Первый свежий Import, Group/Save, cold public Group и BR-S1/BR-S3 по-прежнему не подтверждены. Временный код удерживается только до этого анализа, затем удаляется; private evidence/profile сохраняются.
