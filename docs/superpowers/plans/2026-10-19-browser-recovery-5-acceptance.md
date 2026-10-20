@@ -128,7 +128,12 @@ git commit -m "feat(evals): count recovered_via_browser apart from clean passes"
 
 **Подтверждённый прогресс:** ordinary Export, BR-S2 и BR-S4 native PASS; source-отчёт хранит квитанции и исторические FAIL. Две необходимые Export-правки A+B проверены RED→GREEN/full runtime и независимо одобрены по качеству кода. Последний BR-S5 подтверждает execution,11 UI ID и quiet graph restore, но возвращает continuable/STORAGE_ENTRY_UNAVAILABLE, без файла/Save и native cleanup. Task2 и [Export follow-up](2026-10-20-browser-recovery-export-refresh.md) открыты.
 
-**Следующий шаг — BR-S6, S5 отложен.** Сохранённые наблюдения устанавливают поиск текущего файла в правильном parent, но не содержат table observation, вызвавшего отказ. Гипотеза временного отсутствия scroll anchors не доказана; нового runtime retry/readiness не добавляем. По поручению владельца откладывать неразрешённый блокер сначала выполняется независимый S6. Это изменение порядка, а не критериев: S5 по-прежнему требует completed/current bytes/SHA/provenance/first Dock Save/native cleanup. Условие возврата к S5 — отдельная новая подготовительная проба существующими observe/navigation средствами, сохраняющая точный отказ; старую сессию/файл не читать и не повторять.
+**S6 выполнен, S5 отложен.** Сохранённые наблюдения устанавливают поиск текущего файла в правильном parent, но не содержат table observation, вызвавшего отказ. Гипотеза временного отсутствия scroll anchors не доказана; нового runtime retry/readiness не добавляем. По поручению владельца откладывать неразрешённый блокер выполнен независимый S6. Это изменение порядка, а не критериев: S5 по-прежнему требует completed/current bytes/SHA/provenance/first Dock Save/native cleanup. Условие возврата к S5 — отдельная новая подготовительная проба существующими observe/navigation средствами, сохраняющая точный отказ; старую сессию/файл не читать и не повторять.
+
+- [x] BR-S2: native PASS, текущий файл/Save/native cleanup.
+- [x] BR-S4: native PASS, execution/schema/fresh read/Save/native cleanup.
+- [ ] BR-S5: отложенный storage refusal; исходный строгий completed остаётся обязательным.
+- [x] BR-S6: negative assertions PASS;30 current-page snapshots,31-й stopped/budget_exhausted/no dispatch. Cleanup BLOCKED/ACKfalse/exit1 отражён отдельно. Root проверил raw/journal/resource/OS evidence; независимое review кода Task2 Approved без обязательных исправлений, полный Task2 не принят из-за S5.
 
 **Минимальный план S6:**
 1. Только harness/runbook: включить S6 в существующий Export configure fault/T2 путь; после start выполнить четыре безопасных ожидаемых отказа, не ослабляя invoke для S1–S5. Затем30 разрешённых snapshot depth1, первый remaining29, текущие metadata/attempt/state;31-й отказ budget_exhausted/stopped/remaining0. Не Cancel/finish/repeat Export/Save.
@@ -138,18 +143,18 @@ git commit -m "feat(evals): count recovered_via_browser apart from clean passes"
 
 S6 использует уже согласованную узкую expected-error ветвь, необходимую отрицательному контракту; новых production/API/deps/hooks/retries/фикстур нет. Ожидается ещё3–4файла, примерно+90/−10 строк. Текущий полный Task2 diff около600 строк; исходный ×2 порог770 сохраняется, при превышении — пересмотр до продолжения. Tests не дублируют логику harness: его asserts и единственный реальный прогон проверяют исходный отрицательный контракт. Independent scoped plan review S6: GO, обязательных замечаний нет. Installed/models/release этим шагом не выполняются.
 
-- [ ] **Step 1: Extend the script and runbook**
+- [x] **Step 1: Extend the script and runbook**
 
 - [ ] **Step 2: Run the scenarios**
 
 Run: `cd packages/desktop && LOGINOM_AI_AGENT_TEST_CONFIG=<private config> LOGINOM_AI_AGENT_TEST_RESOURCES=<staged resources> bun test/loginom/browser-recovery-acceptance.ts BR-S2 /path/to/private/saved-A.json` (остальные сценарии — по текущему порядку выше)
 Expected: все четыре выполняют требуемый результат; в журналах BR-S2, BR-S4 и BR-S5 есть `acceptance_fault_injected`, `browser_recovery_handoff`, `browser_recovery_verified`, `browser_recovery_dock_resumed`.
 
-- [ ] **Step 3: Write the report**
+- [x] **Step 3: Write the report**
 
 SHA исходников, SHA-256 ресурсов, по сценарию — PASS/FAIL, ключевые квитанции (выдержки), ограничения: оператор скриптован, это не качество модели.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add packages/desktop/test/loginom/browser-recovery-acceptance.ts docs/testing/loginom-ai-agent
