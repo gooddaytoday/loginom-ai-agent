@@ -23,6 +23,35 @@ export function coldGraphExecutionIdentity(identity,node) {
  return identity;
 }
 
+// Preserve the two existing reads when the process cache and final UI scan
+// disagree. The refused snapshot is never returned as usable evidence.
+export function coldProcessObservation(execute,{node,operation,record}) {
+ let reading=false,before,after;
+ return {
+  async execute(code,options) {
+   const result=await execute(code,options);
+   if(reading&&result?.node_context)before=structuredClone(result.node_context);
+   if(reading&&result?.status==='SUCCEEDED'&&result.action_key==='workspace.observe'
+    &&result.output?.prepared_node_context)after=structuredClone(result.output.prepared_node_context);
+   return result;
+  },
+  async observe(channel,options) {
+   reading=options.readProcesses===true&&options.condition==='new node execution completed';
+   before=after=undefined;
+   try{return await channel.observe(options);}
+   catch(error) {
+    if(reading&&error.message==='Native process/output context changed during observation'&&before&&after){
+     const context={condition:options.condition,before,after};
+     await record({phase:'cold_process_context_refused',operation_id:operation.id,node,
+      deadline:operation.deadline,...context});
+     error.coldProcessContext=context;
+    }
+    throw error;
+   }finally{reading=false;}
+  },
+ };
+}
+
 // The ordinary Views gesture may return a completed timeout receipt after
 // dispatch. Reconcile only that owned opening by observation; never click again.
 export async function openColdOutputViews(channel,{state,output},{node,operation,readReceipt,record}) {
@@ -109,6 +138,20 @@ export async function runColdExecution({driver,channel,node,operation,readReceip
     break;
    } catch(error) {
     if(attempt||now()>=operation.deadline||operation.transportUncertain)throw error;
+    const process=error.coldProcessContext;
+    const owned=b=>b?.verified===true&&['document_id','workflow_id','node_id'].every(k=>b[k]===node[k]);
+    // The native process cache is read before the final UI scan. Completion
+    // can unlock this same graph node between those reads. Discard both reads
+    // and resume only the driver's original completion wait, never its launch.
+    if(phase==='waitCompleted'&&error.message==='Native process/output context changed during observation'
+     &&process?.condition==='new node execution completed'
+     &&[process.before,process.after].every(b=>owned(b)&&b.surface==='graph'&&typeof b.tid==='string'&&b.tid.length>0&&typeof b.locked==='boolean')
+     &&process.before.locked!==process.after.locked
+     &&JSON.stringify({...process.before,locked:false})===JSON.stringify({...process.after,locked:false})) {
+     await record({phase:'cold_execution_observation_refresh',operation_id:operation.id,
+      execution_phase:phase,reason:'native_process_lock_changed',deadline:operation.deadline,effect_possible:false});
+     continue;
+    }
     if(!error.receipt&&error.message!=='Node procedure recovery target or intent changed')throw error;
     const step=channel.lastPreparedStep;
     const response=step&&await readReceipt({id:step.internal_operation_id,
@@ -117,7 +160,6 @@ export async function runColdExecution({driver,channel,node,operation,readReceip
     if(!refused||refused.operation_id!==step.internal_operation_id||refused.action_key!=='ui.act'
       ||refused.status!=='NOT_APPLIED'||refused.effect_possible!==false||refused.cleanup_complete!==true
       ||!Array.isArray(refused.trace)||refused.trace.some(e=>['ui_preconditions_verified','ui_gesture_applied'].includes(e.event)))throw error;
-    const owned=b=>b?.verified===true&&['document_id','workflow_id','node_id'].every(k=>b[k]===node[k]);
     const mismatch=refused.trace.filter(e=>e.event==='prepared_node_surface_mismatch');
     const lockOnly=refused.phase==='observing'&&refused.error?.code==='PREPARED_NODE_CONTEXT_CHANGED'
      &&mismatch.length===1&&[mismatch[0].before,mismatch[0].after].every(b=>owned(b)&&b.surface==='graph'&&typeof b.locked==='boolean')
