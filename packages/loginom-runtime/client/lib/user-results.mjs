@@ -41,7 +41,9 @@ export function compactNodeRequestFailure(outcome,request={}) {
   const finishHint='Add the REQUIRED top-level field finish beside parameters, not inside it. Use "execute" to commit, execute and read output; "done" commits only; "close" discards the wizard draft. Example patch to merge into your original request: {"finish":"execute"}. Keep the other required fields and submit with a NEW operation_id.';
   const mappingConflict=!pending&&message==='Output changes and full fields are mutually exclusive';
   const mappingHint='For each output mapping choose changes (a patch) OR fields (the complete ordered layout), never both. For ordering plus exclusions, keep fields, account for every configured source field and express exclusions as excluded:true in those entries; remove changes from that mapping. Keep ALL other original request fields, including top-level finish, parameters and inputs. Submit the COMPLETE corrected request with a NEW operation_id, not just a mappings patch.';
-  const repairHint=missingFinish?finishHint:mappingConflict?mappingHint:null;
+  const exportMappings=!pending&&message==='Invalid parameters.mappings: use an empty list; text export does not support requested port mappings';
+  const exportMappingHint='For exports.text omit top-level mappings or set mappings:[], and use read:{ports:[]}. To select, rename or reorder columns, configure the upstream node output mapping or a transform.reform_columns node, execute it and connect that output to the export. Keep the remaining export settings and submit the COMPLETE request with a NEW operation_id.';
+  const repairHint=missingFinish?finishHint:mappingConflict?mappingHint:exportMappings?exportMappingHint:null;
   if(missingFinish)path='finish';
   if(mappingConflict)path='mappings';
   return {result_version:'user-v1',operation_id:operationId,state:'settled',
@@ -54,7 +56,9 @@ export function compactNodeRequestFailure(outcome,request={}) {
         ?{tool:'dock_action_describe',arguments:{node_types:[request.target.type]},original_operation_id:requestedId,
           instruction:'Read the parameter_schema for this exact node type. Then correct the rejected parameters and submit dock_node_apply with a NEW operation_id. No browser recovery is required.'}
         :{tool:'dock_node_apply',original_operation_id:requestedId,
-          instruction:repairHint?repairHint+' No browser recovery is required.':'Correct the indicated request using its schema and submit it with a NEW operation_id. No browser recovery is required.'}};
+          instruction:repairHint?repairHint+' No browser recovery is required.':path==='target.label'
+            ?message+'. Keep all other request fields and submit with a NEW operation_id. No browser recovery is required.'
+            :'Correct the indicated request using its schema and submit it with a NEW operation_id. No browser recovery is required.'}};
 }
 
 export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
@@ -79,9 +83,14 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   if(outcome?.status==='SUCCEEDED')limitations.push(...calculatorPrecisionWarnings(node));
   // Delivery jobs carry their byte-verified destination in outcome directly.
   if (!node && outcome) Object.assign(output, outcome);
+  const inactiveSorting=result.state==='settled'&&outcome?.status==='NOT_APPLIED'&&outcome.effect_possible===false
+    &&outcome.cleanup_complete===true&&outcome.error?.code==='NODE_APPLY_STOPPED'
+    &&outcome.error.message==='sorting preflight requires an active source output';
   const next=outcome?.next_step??node?.next_step??(outcome&&['FAILED','AMBIGUOUS','NOT_APPLIED'].includes(outcome.status)&&!result.upload_operation_id
     ?outcome.effect_possible===false&&outcome.cleanup_complete===true
-      ?{tool:'dock_node_apply',original_operation_id:result.operation_id,instruction:'Correct the request and submit with a NEW operation_id. No node mutation or browser recovery is required.'}
+      ?{tool:'dock_node_apply',original_operation_id:result.operation_id,instruction:inactiveSorting
+        ?'No sorting node was created. First execute/read the SAME upstream node referenced by the rejected inputs[].source and output. Use dock_node_read with a successful local source_operation_id from this preparation; if none exists, use dock_node_apply with its exact existing ref, original type/mode, inputs:[], an empty settings patch from its parameter_schema and finish:"execute". Wait for confirmed success and the needed output, then submit the original sorting request with a NEW operation_id. Do not recreate the source, guess its identity or automatically run REST/JavaScript/export side effects outside the user request. No browser recovery is required.'
+        :'Correct the request and submit with a NEW operation_id. No node mutation or browser recovery is required.'}
       :{tool:'dock_operation_inspect',arguments:{operation_id:result.operation_id},instruction:'Inspect the original operation; do not repeat an unresolved effect.'}
     :null);
   const reply={

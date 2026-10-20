@@ -171,6 +171,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     }else requireValue(await (continuingConfigure?drivers.verifyPendingConfigure(state,{signal}):drivers.verifyContinuation(state,{signal}))===true, 'Live package or accepted phases differ from checkpoint');
     state.resumes++;
     delete state.verified_refusal;
+    delete state.export_destination_conflict;
   } else {
     signal?.throwIfAborted();
     state={signature,handler_revision:handler.revision,request:structuredClone(request),phases:[],pending:null,
@@ -268,6 +269,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
         &&refusal.effect_possible===true&&refusal.cleanup_complete===true&&refusal.settings_unchanged===true&&['text_export_conflict_rejected','text_export_unsupported_retained'].includes(refusal.verification)){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=true;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+        state.export_destination_conflict=refusal.verification==='text_export_conflict_rejected';
       }
       if(name==='input_mapping'&&request.target.type==='research.duplicates'&&refusal?.phase===name
         &&refusal.status==='FAILED'&&refusal.effect_possible===true&&refusal.cleanup_complete===true
@@ -453,7 +455,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
           :state.export_download_refusal?{tool:'dock_action_run',original_operation_id:operation.id,
           instruction:'The native export completed, but its download was not confirmed. The original scenario is restored, its temporary download lease released and no phase remains unresolved. Save the scenario with dock_action_run, action_key:"package.save_checkpoint", a NEW operation_id and the task package path in parameters.path. Report the download as unconfirmed. Do not resume this failed operation, repeat export, or recreate the node.'}
           :state.native_read_refusal?{tool:'dock_node_apply',original_operation_id:operation.id,
-          instruction:'Full native reading was refused by the unchanged 50x8 limit. The owned Preview is closed, workflow restored and execution retained. No operation remains unresolved; saving or another action is allowed. Do not recreate or reconfigure the node. For a scalar report use a NEW operation_id with the SAME existing target, parameters:{}, inputs:[], mappings:[], finish:"execute" and read:{ports:[0],sample_rows:100,require_exact_numbers:true} without full coverage. This does not authorize ordinary reading of Variant values.'}:correctNodeRequest(request,state.node)}:{}),
+          instruction:'Full native reading was refused by the unchanged 50x8 limit. The owned Preview is closed, workflow restored and execution retained. No operation remains unresolved; saving or another action is allowed. Do not recreate or reconfigure the node. For a scalar report use a NEW operation_id with the SAME existing target, parameters:{}, inputs:[], mappings:[], finish:"execute" and read:{ports:[0],sample_rows:100,require_exact_numbers:true} without full coverage. This does not authorize ordinary reading of Variant values.'}:correctNodeRequest(request,state.node,state.export_destination_conflict===true)}:{}),
       ...(state.correctable_import_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
         instruction:'The import wizard draft was discarded and the SAME node is back in the graph. '+(state.correctable_import_request==='initial_settings'
           ?'This node has no saved source. Supply complete settings.source with explicit source_path equal to the verified upload destination, encoding, rows_to_skip and first_line_as_title, complete settings.format and nonempty settings.columns with at least one used field. Submit a NEW operation_id with target:'
@@ -516,9 +518,10 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   return result;
 }
 
-function correctNodeRequest(request,node) {
+function correctNodeRequest(request,node,exportConflict=false) {
   return {tool:'dock_node_apply',original_operation_id:request.operation_id,
     instruction:'The failure is known and cleanup is verified. Correct the indicated settings or inputs and submit a NEW operation_id with target:'
       +JSON.stringify({kind:'existing',type:request.target.type,ref:node})
-      +'. Preserve the existing graph and source receipts. Do not recreate the node or inspect an unknown effect: no effect is unresolved.'};
+      +'. Preserve the existing graph and source receipts. Do not recreate the node or inspect an unknown effect: no effect is unresolved.'
+      +(exportConflict?' The existing destination file was preserved by overwrite:"reject". Choose parameters.destination allowed by the task, or use parameters.overwrite:"replace" with an explicit destination ONLY if the user authorized replacement of that file. Otherwise retain reject and report the path conflict; do not invent a different required path. finish:"done" still checks destination conflicts and does not verify file export. Do not restore an older destination unless the task requires it.':'')};
 }

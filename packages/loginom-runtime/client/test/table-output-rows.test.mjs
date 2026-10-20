@@ -1,17 +1,24 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readTableOutputPages} from '../lib/table-output-pages.mjs';
 const table={view_guid:'view',port_guid:'port',table_tid:'table'};
-function fixture({rowCount=72,count=14,longText=false}={}){
- let top=0,left=0,reads=0,scrolls=0;const maxTop=Math.max(0,rowCount*24-240),maxLeft=Math.max(0,count*90-800);
+function fixture({rowCount=72,count=14,longText=false,viewportRows=10}={}){
+ let top=0,left=0,reads=0,scrolls=0;const height=viewportRows*24,maxTop=Math.max(0,rowCount*24-height),maxLeft=Math.max(0,count*90-800),vertical=[];
  const ch={async observe({tablePage:{page},ready}){
   const {row_offset:ro,row_limit:rl,column_offset:co,column_limit:cl}=page,end=Math.min(count,co+cl),rn=Math.min(rl,rowCount-ro);
-  let t;const row=Array.from({length:rn},(_,i)=>ro+i).find(i=>i*24<top||i*24+24>top+240);
+  let t;const row=Array.from({length:rn},(_,i)=>ro+i).find(i=>i*24<top||i*24+24>top+height);
   const col=Array.from({length:end-co},(_,i)=>co+i).find(i=>i*90<left||i*90+90>left+800);
-  if(row!==undefined)t={verified:false,reason:'row_not_rendered',row_index:row,vertical_window:{table,tid:'grid',top,max_top:maxTop,first_visible:Math.ceil(top/24),last_visible:Math.min(rowCount-1,Math.floor((top+240)/24)-1),row_height:24}};
+  if(row!==undefined)t={verified:false,reason:'row_not_rendered',row_index:row,vertical_window:{table,tid:'grid',top,max_top:maxTop,first_visible:Math.ceil(top/24),last_visible:Math.min(rowCount-1,Math.floor((top+height)/24)-1),row_height:24}};
   else if(rn&&col!==undefined)t={verified:false,reason:'cell_not_visible',row_index:ro,column_index:col,horizontal_window:{table,tid:'grid',left,max_left:maxLeft,viewport_left:0,viewport_right:800,cell_left:col*90-left,cell_right:col*90+90-left,row_visible:true}};
   else t={verified:true,table,row_total:rowCount,column_total:count,segment:{index:0,size:1000000,start:0,count:rowCount},columns:Array.from({length:end-co},(_,j)=>({index:co+j,name:'F'+(co+j),type:'string'})),rows:Array.from({length:rn},(_,i)=>({index:ro+i,record_id:String(ro+i),cells:Array.from({length:end-co},(_,j)=>({column:co+j,is_null:false,text:longText?'x'.repeat(16000):String((ro+i)*1000+co+j)}))})),page:{...page,column_returned:end-co,row_returned:rn,next_column_offset:end===count?null:end},value_source:'rendered_cell_and_cached_value_text'};
   t.schema_id='schema';const s={node_table:t,ui:{elements:[{ref:'scroll',tid:'grid',table_scroller:table,scroll:{ref:'scroll',top,max_top:maxTop},horizontal_scroll:{ref:'scroll',left,max_left:maxLeft},allowed_actions:['scroll','scroll_horizontal']}]}};ch.change?.(s,++reads);assert.equal(ready(s),true);return s;
- },async perform(step){const s=step.initialObservation;assert.equal(step.ready(s),true);const a=step.resolve(s);assert.equal(a.ref,'scroll');scrolls++;if(ch.stuck)return;if(a.verb==='scroll')top=Math.max(0,Math.min(maxTop,top+a.delta_y));else left=Math.max(0,Math.min(maxLeft,left+a.delta_x));},get scrolls(){return scrolls;}};return ch;
+ },async perform(step){const s=step.initialObservation;assert.equal(step.ready(s),true);const a=step.resolve(s);assert.equal(a.ref,'scroll');scrolls++;if(ch.stuck)return;if(a.verb==='scroll'){vertical.push(a.delta_y);top=Math.max(0,Math.min(maxTop,top+a.delta_y));}else left=Math.max(0,Math.min(maxLeft,left+a.delta_x));},get scrolls(){return scrolls;},get vertical(){return vertical;}};return ch;
 }
+test('n18 reads each ten-row block without scrolling one row at a time',async()=>{
+ const ch=fixture({rowCount:72,count:4,viewportRows:28}),out=await readTableOutputPages(ch,table,{sampleRows:100});
+ assert.equal(out.rows.length,72);assert.equal(out.sample_complete,true);
+ for(const row of out.rows)assert.deepEqual(row.cells.map(c=>c.text),Array.from({length:4},(_,i)=>String(row.index*1000+i)));
+ assert.ok(ch.vertical.length<=6,`Expected bounded block scrolling, got ${ch.vertical.length} gestures`);
+ assert.ok(ch.vertical.every(delta=>delta>0&&delta<=1000));
+});
 test('72 rows by 14 columns are read across both axes with exact order',async()=>{const ch=fixture(),out=await readTableOutputPages(ch,table,{sampleRows:100});assert.equal(out.rows.length,72);assert.equal(out.sample_complete,true);assert.ok(ch.scrolls>0);for(const r of out.rows)assert.deepEqual(r.cells.map(c=>c.text),Array.from({length:14},(_,i)=>String(r.index*1000+i)));});
 for(const sampleRows of [0,3,10,32,72,100])test('requested row limit '+sampleRows,async()=>{const out=await readTableOutputPages(fixture(),table,{sampleRows});assert.equal(out.rows.length,Math.min(72,sampleRows));assert.equal(out.sample_complete,sampleRows>=72);});
 for(const [name,change] of Object.entries({schema:t=>t.schema_id='changed',count:t=>t.row_total++,segment:t=>t.segment.index++,column:t=>t.columns[0].name='other',record:t=>t.rows[0].record_id='0'}))test('drift between vertical blocks: '+name,async()=>{const ch=fixture({count:2});ch.change=s=>{if(s.node_table.verified&&s.node_table.page.row_offset>0)change(s.node_table);};await assert.rejects(readTableOutputPages(ch,table,{sampleRows:32}));});

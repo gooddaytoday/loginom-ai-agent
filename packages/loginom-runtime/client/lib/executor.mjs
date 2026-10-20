@@ -1937,8 +1937,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const recoveryAdvice = operation => {
     const advice = dockRecoveryAdvice(operation);
     const trigger = browserRecoveryTrigger(operation, advice);
-    return trigger ? { ...advice, browser_recovery: trigger.reason,
-      next_steps: [browserRecoveryNext(operation, trigger), ...advice.next_steps] } : advice;
+    if (trigger) return { ...advice, browser_recovery: trigger.reason,
+      next_steps: [browserRecoveryNext(operation, trigger), ...advice.next_steps] };
+    if (operation && pending === operation && !operation.transportUncertain && !nodeJobs.busy
+      && operation.nodeApply?.request.target.type === 'exports.text'
+      && operation.nodeApply.pending?.phase === 'input_mapping'
+      && advice.internal_resume_available === false && !advice.recovery_options.length
+      && !advice.next_steps.some(next => next.tool === 'dock_node_resume')) return { ...advice,
+      next_step: { instruction: 'Report that this exports.text operation is blocked in input_mapping, citing its operation_id and error. '
+        + 'No dock_node_resume or dock_operation_recover strategy is available for this checkpoint. '
+        + 'Do not retry either tool, reapply the export with a new operation_id, use generic UI gestures, or save through the pending operation. '
+        + 'Read-only observation can describe the UI but cannot release this operation. Settings, execution, file output and package persistence remain unverified; do not report success.' } };
+    return advice;
   };
   const nodeRecoveryStep = operation => {
     const state = operation?.nodeApply;
@@ -2286,6 +2296,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         output: { available_actions: pending ? [] : [...pinned.actions.keys()], ui_action_tool: 'dock_ui_action', operation: view(pending).output,
           ...(nodeJobs.active?{active_node_job:nodeJobs.active}:{}),
           ...(error?.code==='ARTIFACT_GRANT_NOT_FOUND' && allowCandidate && artifactStore ? {input_artifacts:artifactStore.list()} : {}) },
+        ...(!pending&&!nodeJobs.active&&error?.message==='Choose a single action or a batch description'
+          ?{next_step:{tool:'dock_action_describe',instruction:'Use action_key alone for one action, OR action_keys:[...] with optional node_types:[...] for a batch. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text","transform.join_data","exports.text"]}. Remove action_key from the batch request; do not combine it with action_keys or node_types. This is a description request; no browser mutation or recovery is needed.'}}:{}),
         error: { code: 'REQUEST_REJECTED', message: String(error?.message ?? error).slice(0, 1000) }, trace: [] };
     },
     inspect,

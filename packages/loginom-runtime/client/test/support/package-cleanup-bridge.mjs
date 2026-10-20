@@ -87,6 +87,62 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
 
+test('unknown prepared workflow advises only the last confirmed Save of its own bridge',async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'prepared-workflow-hint-'));
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  const f=current={scenario:'success',events:[],busy:false,saves:0,path,receipts:new Map(),catalog};
+  const makeSession=()=>({directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+    artifactStore:{list:()=>[],async releaseUploads(){}}});
+  const config={resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+    mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+    loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2'};
+  const bridge=await createBridge(config,makeSession());
+  const client=new AgentClient({name:'prepared-workflow-hint',version:'1'});
+  const stale={intent:'existing_workflow',workflow_ref:{document_id:'old-doc',workflow_id:'old-workflow',
+    tab_tid:'old-tab',prefix:'old',navigation_path:[{tid:'not-a-package-path',label:'guessed.lgp'}]}};
+  const save=(operation_id,action_key,savePath)=>client.callTool({name:'dock_action_run',arguments:{operation_id,action_key,parameters:{path:savePath}}});
+  const refusal=async(c=client)=>{
+    const before=[...f.events],saves=f.saves;
+    const reply=await c.callTool({name:'dock_prepare',arguments:stale});
+    assert.equal(reply.isError,true);
+    assert.deepEqual(f.events,before);assert.equal(f.saves,saves);
+    const value=JSON.parse(reply.content[0].text);
+    assert.equal(value.code,'UNKNOWN_PREPARED_WORKFLOW');
+    assert.match(value.message,/reference issued in this session/);
+    assert.equal(value.next_step.tool,'dock_prepare');assert.equal(value.next_step.arguments.intent,'open_package');
+    return value.next_step;
+  };
+  try{
+    const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+    const unknown=await refusal();
+    assert.deepEqual(unknown.arguments,{intent:'open_package'});assert.match(unknown.instruction,/does not know/);
+    await client.callTool({name:'dock_prepare',arguments:{}});
+    await save('first-save','package.save_checkpoint',path);
+    assert.deepEqual((await refusal()).arguments,{intent:'open_package',package_path:path});
+    await save('newer-save','package.save_as',secondPath);
+    assert.equal((await refusal()).arguments.package_path,secondPath);
+    await save('first-save','package.save_checkpoint',path);
+    assert.equal((await refusal()).arguments.package_path,secondPath);
+    f.refuseOnce='failed-save';await save('failed-save','package.save_checkpoint',path);
+    assert.equal((await refusal()).arguments.package_path,secondPath);
+    f.loseId='ambiguous-save';await save('ambiguous-save','package.save_checkpoint',path);
+    assert.equal((await refusal()).arguments.package_path,secondPath);
+    await client.callTool({name:'dock_operation_inspect',arguments:{operation_id:'ambiguous-save'}});
+    assert.equal((await refusal()).arguments.package_path,path);
+    f.unsettled=true;
+    const pending=await client.callTool({name:'dock_prepare',arguments:stale});
+    assert.equal(pending.isError,true);assert.match(pending.content[0].text,/^UNKNOWN_PREPARED_WORKFLOW:/);
+    assert.doesNotMatch(pending.content[0].text,/next_step|open_package/);
+    f.unsettled=false;
+    const fresh=await createBridge(config,makeSession()),other=new AgentClient({name:'new-runtime',version:'1'});
+    try{
+      const [x,y]=InMemoryTransport.createLinkedPair();await fresh.server.connect(y);await other.connect(x);
+      assert.deepEqual((await refusal(other)).arguments,{intent:'open_package'});
+    }finally{await other.close();await fresh.close();}
+  }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+});
+
 for(const action_key of ['package.save_checkpoint','package.save_as'])
  test('Save rejects explicit null but permits an omitted ID: '+action_key,async t=>{
   const directory=await mkdtemp(join(tmpdir(),'cleanup-null-save-'));
