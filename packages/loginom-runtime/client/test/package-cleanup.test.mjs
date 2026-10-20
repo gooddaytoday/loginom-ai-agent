@@ -40,9 +40,10 @@ function fixture(overrides = {}) {
   const dialog = {getBoundingClientRect:() => ({width:10,height:10})};
   const tab = {getAttribute:() => state.tabTid ?? options.tabTid};
   const doc = {querySelectorAll:query => {
-    if(query.includes('btnLogOut'))return state.menu ? [dialog] : [];
+    if(query.includes('MF;AppMenuForm'))return state.menu ? Array(state.menuCount??1).fill(dialog) : [];
     if(query.includes('btnAvatar'))return state.avatarAbsent ? [] : [dialog];
-    return state.dialog || state.mask ? [dialog] : [];
+    // Timeout adds a plain backdrop; initial masks also expose busy markers.
+    return state.dialog || state.mask && (query.split(',').includes('.x-mask') || !state.maskAfterTimeout) ? [dialog] : [];
   }, contains:value => value === tab && state.tab};
   const context = vm.createContext({document:doc, location:{origin:'http://loginom.invalid'},
     ownedPackage:state.foreignPreparedPackage ? {} : node, ownedTab:tab,
@@ -68,6 +69,7 @@ function fixture(overrides = {}) {
           state.clock += state.avatarElapsed??(state.timeoutMs??options.timeoutMs);
           if(state.menuAfterTimeout)state.menu=true;
           if(state.maskAfterTimeout)state.mask=true;
+          if(state.dialogAfterTimeout)state.dialog=true;
           if(state.accountAfterTimeout)state.account=state.accountAfterTimeout;
           throw Object.assign(Error('private click timeout'),{name:'TimeoutError'});
         }
@@ -224,8 +226,26 @@ test('second avatar timeout keeps the original unconfirmed cleanup refusal',asyn
 });
 
 test('a menu opened by a timed-out avatar click is not toggled again',async()=>{
-  const f=fixture({avatarTimeouts:1,menuAfterTimeout:true}),r=await f.run();
-  assert.equal(r.status,'SUCCEEDED');assert.equal(r.logged_out,true);assert.equal(f.state.avatarClicks,1);
+  for(const maskAfterTimeout of [false,true]){
+    const f=fixture({avatarTimeouts:1,menuAfterTimeout:true,maskAfterTimeout}),r=await f.run();
+    assert.equal(r.status,'SUCCEEDED');assert.equal(r.logged_out,true);assert.equal(f.state.avatarClicks,1);
+    assert.deepEqual(f.events,['modified-read','close','tab-detached','avatar','logout-observe','logout','login-visible']);
+  }
+});
+
+test('a dialog still blocks avatar-timeout recovery with an open or closed menu',async()=>{
+  for(const menuAfterTimeout of [false,true]){
+    const f=fixture({avatarTimeouts:1,menuAfterTimeout,maskAfterTimeout:true,dialogAfterTimeout:true}),r=await f.run();
+    assert.equal(r.status,'BLOCKED');assert.equal(r.stage,'logout_menu_open');
+    assert.equal(r.reason,'CLEANUP_UNCONFIRMED');assert.equal(r.package_closed,true);assert.equal(r.logged_out,false);
+    assert.equal(f.state.avatarClicks,1);assert.equal(f.events.includes('logout'),false);
+  }
+});
+
+test('ambiguous open menus refuse logout after an avatar timeout',async()=>{
+  const f=fixture({avatarTimeouts:1,menuAfterTimeout:true,menuCount:2,maskAfterTimeout:true}),r=await f.run();
+  assert.equal(r.status,'BLOCKED');assert.equal(r.reason,'CLEANUP_UNCONFIRMED');
+  assert.equal(r.logged_out,false);assert.equal(f.state.avatarClicks,1);assert.equal(f.events.includes('logout'),false);
 });
 
 test('avatar retry uses the original cleanup deadline and never passes timeout zero',async()=>{
@@ -237,7 +257,7 @@ test('avatar retry uses the original cleanup deadline and never passes timeout z
 });
 
 test('avatar retry refuses a changed account or masks that remain visible',async()=>{
-  for(const change of [{accountAfterTimeout:'foreign'},{maskAfterTimeout:true}]){
+  for(const change of [{accountAfterTimeout:'foreign'},{accountAfterTimeout:'foreign',menuAfterTimeout:true,maskAfterTimeout:true},{maskAfterTimeout:true}]){
     const f=fixture({avatarTimeouts:1,...change}),r=await f.run();
     assert.equal(r.reason,'CLEANUP_UNCONFIRMED');assert.equal(r.logged_out,false);assert.equal(f.state.avatarClicks,1);
     assert.equal(f.events.includes('logout'),false);
