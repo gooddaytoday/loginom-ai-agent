@@ -54,7 +54,7 @@
   - `renderReport` выводит строку рядом с `pass_rate`.
   - Признак переносится в существующий измеренный `base` после `runAgent`, чтобы последующая ошибка артефакта/учёта не стирала наблюдённый факт. `aggregate` использует текущий набор `counted` и строгое `browser_recovery === true`: считает попытку один раз, не количество start. `aggregateTask`, знаменатели и `compare` не меняются.
 
-- [ ] **Step 1: Write one failing behavior test**
+- [x] **Step 1: Write one failing behavior test**
 
 Последовательные вертикальные циклы: один падающий тест → минимальная реализация → GREEN → коммит, затем следующее поведение. Примеры ниже описывают контракт, а не пакет тестов перед реализацией. Проверить completed start без finish, finish без start, running/error start, несколько start как один признак; judge count требует pass=true, skipJudge — completed; историческое отсутствие поля не увеличивает count, старые rates сохраняются.
 
@@ -74,16 +74,16 @@ test("aggregate keeps recovered_via_browser apart from clean passes", () => {
 })
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd evals && bun test test/cli.test.ts test/report.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement minimally for that behavior**; повторить Steps 1–3 последовательно для оставшихся поведений, коммитить GREEN циклы. Правка соответствующего контракта в спеке evals предшествует реализации и идёт тем же коммитом (`evals/AGENTS.md`: при расхождении правится спека).
+- [x] **Step 3: Implement minimally for that behavior**; повторить Steps 1–3 последовательно для оставшихся поведений, коммитить GREEN циклы. Правка соответствующего контракта в спеке evals предшествует реализации и идёт тем же коммитом (`evals/AGENTS.md`: при расхождении правится спека).
 
-- [ ] **Step 4: Run tests to verify they pass** (команда Step 2, `bun test` и `bun typecheck` в `evals`; Expected: PASS)
+- [x] **Step 4: Run tests to verify they pass** (команда Step 2, `bun test` и `bun typecheck` в `evals`; Expected: PASS)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add evals docs/superpowers/specs/2026-09-18-evals-design.md
