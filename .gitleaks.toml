@@ -1,0 +1,4 @@
+title = "Loginom secret protection"
+
+[extend]
+useDefault = true
