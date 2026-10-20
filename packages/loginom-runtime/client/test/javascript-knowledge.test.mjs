@@ -18,7 +18,7 @@ import {previewWireSize} from '../lib/user-preview-budget.mjs';
 test('7.4.2 knowledge contains only exact headed probes and rejects another observed build',async()=>{
   const knowledge=describeJavascriptKnowledge('7.4.2');
   assert.equal(knowledge.knowledge_sha256,JAVASCRIPT_KNOWLEDGE_SHA256);
-  assert.equal(JAVASCRIPT_CARD_LIMITATIONS.length,9);
+  assert.equal(JAVASCRIPT_CARD_LIMITATIONS.length,10);
   assert.deepEqual(knowledge.limitations,JAVASCRIPT_CARD_LIMITATIONS);
   assert.equal(knowledge.validated_for.server_os,'Linux');
   assert.equal(knowledge.validated_for.source_prompt_sha256,
@@ -56,7 +56,7 @@ test('knowledge1.1 keeps historical1.0 identity and delivers only observed Name 
 });
 
 test('knowledge1.2 delivers the exact declared writer contract without rewriting1.1',()=>{
-  const current=describeJavascriptKnowledge('7.4.2'),previous=describeJavascriptKnowledge('7.4.2','1.1.0');
+  const current=describeJavascriptKnowledge('7.4.2','1.2.0'),previous=describeJavascriptKnowledge('7.4.2','1.1.0');
   assert.equal(current.version,'1.2.0');
   assert.equal(previous.knowledge_sha256,'9a4b79833948e2441a0594131708c530fb5da739cd2eea1ebb8787221dfb122d');
   assert.equal(previous.declared_columns,undefined);
@@ -102,7 +102,7 @@ test('JavaScript card delivers pinned compact rules and on-demand Data API only 
   assert.deepEqual(card.limitations,JAVASCRIPT_CARD_LIMITATIONS);
   assert.equal(card.javascript_knowledge.scalar_data_api.import,'import {InputTable,OutputTable,DataType} from "builtIn/Data";');
   assert.equal(card.javascript_knowledge.validated_for.loginom_build,'7.4.2');
-  assert.equal(card.javascript_knowledge.version,'1.2.0');
+  assert.equal(card.javascript_knowledge.version,'1.3.0');
   assert.equal(card.javascript_knowledge.column_names.method,'AssignColumns');
   const compact=compactKnowledgeBundle({session_manifest:{},actions:[],node_types:[card]}).node_types[0];
   assert.deepEqual(compact.limitations,JAVASCRIPT_CARD_LIMITATIONS);
@@ -112,6 +112,25 @@ test('JavaScript card delivers pinned compact rules and on-demand Data API only 
   assert.equal(compact.parameter_schema,undefined);
   assert.throws(()=>describeNodeTypes(['programming.javascript'],{},new Map(),handlers,'7.4.3'),/not validated/);
   assert.equal(card.cache_key,describeNodeTypes(['programming.javascript'],{client:'pin'},new Map(),handlers,'7.4.2')[0].cache_key);
+});
+
+test('code schema DataType guidance reaches compact preparation and full node description',()=>{
+  const handlers=new Map([['programming.javascript',{revision:'javascript-v1',modes:['script'],parameter_schema:javascriptParametersSchema}]]);
+  const [card]=describeNodeTypes(['programming.javascript'],{},new Map(),handlers,'7.4.2');
+  const compact=compactKnowledgeBundle({session_manifest:{},actions:[],node_types:[card]}).node_types[0];
+  for(const delivery of [compact,card]){
+    assert.match(delivery.limitations.at(-1),/parameters\.source_text.*AssignColumns.*DataType\.Float/);
+    assert.match(delivery.limitations.at(-1),/DataType\.Real.*не существует/);
+    assert.match(delivery.limitations.at(-1),/parameters\.columns.*type="real"/);
+  }
+  assert.deepEqual(card.javascript_knowledge.scalar_data_api.column_types,
+    {integer:'DataType.Integer',real:'DataType.Float',string:'DataType.String',boolean:'DataType.Boolean',datetime:'DataType.DateTime'});
+  const previous=describeJavascriptKnowledge('7.4.2','1.2.0');
+  assert.equal(previous.knowledge_sha256,'86506db742980407b41de7c042edcd622d4809b339141b2065e936f5803049c0');
+  assert.equal(previous.scalar_data_api.column_types,undefined);
+  assert.deepEqual(card.javascript_knowledge.examples,previous.examples);
+  assert.deepEqual(card.limitations.slice(0,-1),previous.limitations);
+  assert.notEqual(card.knowledge_sha256,previous.knowledge_sha256);
 });
 
 test('full node envelope admits JavaScript fields without changing import source shape',()=>{

@@ -81,7 +81,7 @@ const previous=Object.freeze({...knowledge,version:'1.1.0',
   }),
 });
 
-const current=Object.freeze({...previous,version:'1.2.0',
+const declared=Object.freeze({...previous,version:'1.2.0',
   limitations:Object.freeze([...previous.limitations,
     'schema_mode=declared: 1–64 columns с name,label,type,data_kind,usage. Для integer/real/datetime data_kind=Непрерывный, для string/boolean — Дискретный; иной вид не поддержан writer. usage=Не задано оставляет стандартную роль. Код заполняет объявленную схему без AssignColumns.']),
   declared_columns:Object.freeze({max_columns:JAVASCRIPT_DECLARED_COLUMN_LIMIT,
@@ -91,12 +91,20 @@ const current=Object.freeze({...previous,version:'1.2.0',
   }),
 });
 
+const current=Object.freeze({...declared,version:'1.3.0',
+  limitations:Object.freeze([...declared.limitations,
+    'В parameters.source_text для AssignColumns использовать DataType.Integer, DataType.Float (вещественный), DataType.String, DataType.Boolean, DataType.DateTime из builtIn/Data. DataType.Real не существует; parameters.columns использует строковый type="real", это другой контракт.']),
+  scalar_data_api:Object.freeze({...declared.scalar_data_api,
+    column_types:Object.freeze({integer:'DataType.Integer',real:'DataType.Float',string:'DataType.String',boolean:'DataType.Boolean',datetime:'DataType.DateTime'}),
+  }),
+});
+
 export const JAVASCRIPT_KNOWLEDGE_SHA256=createHash('sha256').update(JSON.stringify(current)).digest('hex');
 export const JAVASCRIPT_CARD_LIMITATIONS=current.limitations;
 
 export function describeJavascriptKnowledge(observedBuild,version=current.version) {
   if(observedBuild!==knowledge.validated_for.loginom_build)throw Error('JavaScript knowledge is not validated for observed Loginom build');
-  const selected=version===knowledge.version?knowledge:version===previous.version?previous:version===current.version?current:null;
+  const selected=version===knowledge.version?knowledge:version===previous.version?previous:version===declared.version?declared:version===current.version?current:null;
   if(!selected)throw Error('Unsupported JavaScript knowledge version');
   return structuredClone({...selected,knowledge_sha256:createHash('sha256').update(JSON.stringify(selected)).digest('hex')});
 }
