@@ -4,7 +4,21 @@
 Ветка `browser-recovery` от `demo-022` `d64cd92aa7`. Ниже различаются проверки из исходников,
 приёмочная сборка CLI с явно заданным флагом и упакованный release-артефакт.
 
-## Модульные и контрактные проверки (mas, 2026-10-19)
+## Проверки на смёрженной ветке (с `demo-022` `d8d8400290`, 2026-10-19 вечер PT)
+
+| Проверка | Где | Результат |
+| --- | --- | --- |
+| runtime client, все `test/*.test.mjs` на `33b2045682` | mas3 | 4371 pass, 0 fail |
+| loginom-host: capability (вкл. stop при release), host-port, node-host на `97584c129e` | mas3 | 45 pass, 0 fail; `bun typecheck` чистый |
+| agent: browser-recovery, profile-tools, prompt (вкл. одно сохранённое напоминание), CLI policy на `97584c129e` | mas3 | 108 pass, 0 fail; `bun typecheck` чистый |
+| live-харнес T2 + T3, сборка `e5971b2ce6` | mas, app.loginom.ai | PASS: T3 распознан как `REPEATED_PHASE_FAILURE`, `finish` → `dock_node_read` от квитанции с наблюдаемой схемой → SUCCEEDED |
+
+Сверка с реальными журналами отказов 18–19.10 (fail-logs сквадов):
+- T4-экспорт: в 4 журналах (q4, n19, q9; mas) есть `node_phase_refused` с `export_file_read_refused_restored`. Именно это состояние триггер превращает в `next_step` восстановления.
+- T1: `NODE_RELEASE_REFUSED` с `user_action` («A prepared wizard is required for cancellation», q4, Фильтр) на текущем HEAD закрыт #210/#213. Путь T1 покрыт модульным тестом; проверка после него общая с T2.
+- `saved_package_state: unavailable` в журналах не встречался.
+
+## Модульные и контрактные проверки до слияния (mas, 2026-10-19)
 
 | Пакет | Набор | Результат |
 | --- | --- | --- |
