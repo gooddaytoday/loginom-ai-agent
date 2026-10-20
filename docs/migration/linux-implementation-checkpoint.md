@@ -12,6 +12,7 @@ Natural WIZARD image gpt-5.6-sol/medium: output/CSV/Save/lifecycle PASS,
 recovery BLOCKED/no transition. Text big-pickle: BLOCKED/rate limit, SIGINT/exit130,
 task runtime не возник, writer освобождён; Desktop model BLOCKED/no CLI transition.
 Обе собственные установки штатно удалены без purge, profiles/evidence сохранены.
+Текущий отчёт и teardown приняты независимым spec+quality review; Task3 отложена.
 Исходные SaveAs cleanup FAIL/guard, Desktop pre-task timeout и source S5 FAIL
 не отменены. Production не менялся; Task3 и release gate открыты, merge/release нет.
 [Фактические identities, evidence и ограничения](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md).

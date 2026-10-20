@@ -190,18 +190,18 @@ git commit -m "test(desktop): accept browser recovery on Loginom with induced fa
 
 До первого прогона записать в отчёт набор кейсов, где 18.10 наблюдались остаточные классы (не наблюдён DOM-owner, `UI_SCAN_LIMIT`, `WIZARD_OPEN_NOT_CONFIRMED`, ожидание готовности, подтверждение журнала JS, скачивание на медленном хосте). Без этих ID строки естественных отказов получают `BLOCKED` с причиной. Прогнать набор на установленном CLI с флагом с моделью с изображениями и с текстовой моделью; затем одна сессия Desktop с реальной моделью на кейсе, где в CLI наблюдался переход. Записать `recovered_via_browser_count`, наличие `loginom_browser_take_screenshot` в каталоге каждой модели и итог задачи.
 
-- [ ] **Step 4: Write the report**
+- [x] **Step 4: Write the report**
 
 Матрица по строкам таблицы раздела 11 дизайна: PASS, FAIL или `BLOCKED` (нет естественного отказа) с ID прогонов. Отдельно: Windows и macOS не проверялись, флаг для них включается решением владельца.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/testing/loginom-ai-agent
 git commit -m "docs(testing): record packaged browser recovery acceptance"
 ```
 
-**Текущее выполнение Task3:** [подплан](2026-10-20-browser-recovery-packaged.md), build/availability приняты независимым review. WIZARD LAB-91/103006-r3: новый image run прошёл current business output/CSV/Save/native cleanup, но recovery0/no transition → BLOCKED; text provider rate limit → SIGINT/exit130,0tools/0task, native task NOT_OBSERVED. Desktop model BLOCKED/no eligible CLI transition; missing IDs/slow-host association ограничивают свои строки. [Отчёт и обе session IDs](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md). Обе собственные установки штатно удалены без purge; profiles/evidence/oldguard/auth сохранены. Current report/teardown ожидают independent review; модельная приёмка/Task3 открыты. После review вернуться к первому сквозному S5/Task2, не ослабляя его критериев; release gate закрыт.
+**Текущее выполнение Task3:** [подплан](2026-10-20-browser-recovery-packaged.md), build/availability приняты независимым review. WIZARD LAB-91/103006-r3: новый image run прошёл current business output/CSV/Save/native cleanup, но recovery0/no transition → BLOCKED; text provider rate limit → SIGINT/exit130,0tools/0task, native task NOT_OBSERVED. Desktop model BLOCKED/no eligible CLI transition; missing IDs/slow-host association ограничивают свои строки. [Отчёт и обе session IDs](../../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-packaged/report.md). Обе собственные установки штатно удалены без purge; profiles/evidence/oldguard/auth сохранены. Current report/teardown приняты independent spec compliant/quality Approved без обязательных замечаний; модельная приёмка/Task3 отложены и открыты. Следующий шаг — первый сквозной S5/Task2, не ослабляя его критериев; release gate закрыт.
 
 ### Task 4: Включение флага в release
 
