@@ -476,8 +476,34 @@ export async function applyNode({request, operation, handlers, drivers, record,
  * release proof clears the phase; verified phases keep their facts, while an
  * unverified commit or launch is reported as unknown rather than inferred.
  */
-export async function releaseNodeApply({operation,handlers,drivers,record,signal}) {
-  const state=operation.nodeApply,pending=state?.pending,request=state?.request;
+export async function releaseNodeApply({operation,handlers,drivers,record,signal,releaseBeforeTarget}) {
+  const state=operation.nodeApply,pending=state?.pending??(!state?.node&&state?.target_reconciled?{phase:'target'}:null),request=state?.request;
+  if(pending&&!state.node&&!state.result&&['source','workflow','target'].includes(pending.phase)&&releaseBeforeTarget){
+    validateNodeApplyRequest(request,handlers);
+    const proof=await releaseBeforeTarget();
+    requireValue(proof?.verified===true&&proof.cleanup_complete===true&&['found','not_created'].includes(proof.target_state)
+      &&(proof.target_state==='not_created'?proof.node===null:proof.node?.document_id===request.document_id
+        &&proof.node?.workflow_id===request.workflow_ref.workflow_id&&id(proof.node.node_id)), 'Pre-target release proof differs');
+    const result={operation_id:operation.id,status:'FAILED',effect_possible:state.effect_possible,
+      phases:state.phases.map(({value,...p})=>p),node:proof.node,execution:state.execution,output:state.output,
+      package_saved:false,cleanup_complete:true,configuration:{status:'not_requested'},warnings:[],
+      checkpoint_kind:'local_node_released',persisted_package_verified:false,pending_phase:null,released_phase:pending.phase,
+      error:{code:'NODE_OPERATION_RELEASED',message:'Early node phase released after confirmed browser completion and a quiet original graph; the stopped phase was not repeated.'},
+      next_step:request.mode===NODE_READ_MODE?{tool:'dock_node_read',original_operation_id:operation.id,
+        instruction:'The early read was released without reading output. Call dock_node_read with a NEW operation_id and source_operation_id:'
+          +JSON.stringify(request.parameters.source_operation_id)+'. Do not reconfigure or recreate its existing node.'}
+        :{tool:'dock_node_apply',original_operation_id:operation.id,
+        instruction:'The original operation remains unsuccessful. Correct the request and use a NEW operation_id with target:'
+          +JSON.stringify(proof.node?{kind:'existing',type:request.target.type,ref:proof.node}:request.target)
+          +'. '+(proof.node?'The partial target was found; do not recreate it. Supply complete intended settings and complete intended inputs, preserving all observed existing links.':'This operation did not create its target.')
+          +' Source/preflight effects are not undone; no settings, output or package persistence are verified by release.'}};
+    const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,
+      phase:'node_operation_released',signature:state.signature,receipt:{...pending,proof},result};
+    const saved=await record(event);
+    requireValue(saved&&hash(Object.fromEntries(Object.keys(event).map(k=>[k,saved[k]])))===hash(event),'Node phase journal acknowledgement differs');
+    state.pending=null;state.cleanup_complete=true;state.result=structuredClone(result);
+    return result;
+  }
   requireValue(pending&&state.node&&!state.result&&typeof drivers?.releasePending==='function',
     'Release proof unavailable: no stopped phase of a known node with a release verifier');
   const {handler}=validateNodeApplyRequest(request,handlers);
