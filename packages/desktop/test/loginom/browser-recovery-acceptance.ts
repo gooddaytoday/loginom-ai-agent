@@ -1,5 +1,4 @@
 import { supervise } from "@loginom-ai-agent/loginom-host/supervisor"
-import { inputStore } from "@loginom-ai-agent/loginom-host/inputs"
 import { createHash, randomUUID } from "node:crypto"
 import { mkdir, readdir, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
@@ -8,6 +7,12 @@ import assert from "node:assert/strict"
 process.umask(0o077)
 const scenario = process.argv[2]
 assert.ok(scenario === "BR-S1" || scenario === "BR-S3", "Expected BR-S1 or BR-S3")
+assert.equal(process.argv.length, 4, "Expected scenario and one private saved-A manifest path")
+const seed = await Bun.file(resolve(process.argv[3]!)).json()
+assert.equal(seed.label, "A")
+assert.equal(typeof seed.path, "string")
+assert.equal(typeof seed.node, "string")
+assert.deepEqual(seed.expected, { Alpha: 35, Beta: 20 })
 assert.ok(process.env.LOGINOM_AI_AGENT_TEST_CONFIG, "Private config required")
 assert.ok(process.env.LOGINOM_AI_AGENT_TEST_RESOURCES, "Fresh staged resources required")
 const config = await Bun.file(process.env.LOGINOM_AI_AGENT_TEST_CONFIG!).json()
@@ -115,41 +120,35 @@ const status: Record<string, unknown> = {
   resourceManifestSha256: createHash("sha256").update(manifestBytes).digest("hex"),
 }
 try {
-  const csv = await Bun.file(join(import.meta.dir, "fixtures/standalone-cli/A/sales.csv")).text()
-  const files = await inputStore(join(directory, "inputs")).admit(
-    run,
-    "input",
-    [{ name: "sales.csv", data: Buffer.from(csv).toString("base64") }],
-    `/${config.workflow_profile.loginom_user}`,
-  )
-  await child.request("admit", { userMessage: "input", files })
-  const prepared = await call("dock_prepare", { intent: "new_draft", operation_id: "prepare" })
-  assert.equal(prepared.workspace.authenticated, true)
-  assert.equal(prepared.input_artifacts.length, 1)
-  const artifact = prepared.input_artifacts[0]
-  let delivery = await call("dock_artifact_deliver", {
-    operation_id: "deliver",
-    artifact_id: artifact.artifact_id,
-    upload_grant_id: artifact.upload.grant_id,
-    budget_ms: 90000,
+  const opened = await call("dock_prepare", {
+    intent: "open_package",
+    package_path: seed.path,
+    operation_id: "open-seed",
   })
-  // Resume only the runtime's proven no-upload checkpoint, once, with its original identity.
-  if (
-    delivery.status === "NOT_APPLIED" &&
-    delivery.effect_possible === false &&
-    delivery.cleanup_complete === true &&
-    delivery.output?.upload_submitted_or_unknown === false &&
-    delivery.output?.inspection_required === false &&
-    delivery.next_step?.tool === "dock_artifact_delivery_resume" &&
-    delivery.next_step.original_operation_id === "deliver"
+  assert.equal(opened.workspace.status, "READY")
+  assert.equal(opened.workspace.package_ref.path, seed.path)
+  const copied = await call("dock_action_run", {
+    action_key: "package.save_as",
+    operation_id: "own-save-as",
+    parameters: { path: packagePath, conflict_policy: "fail" },
+  })
+  assert.equal(copied.status, "SUCCEEDED")
+  assert.equal(copied.cleanup_complete, true)
+  assert.equal(copied.output.package_ref.path, packagePath)
+  const prepared = await call("dock_prepare", {
+    intent: "open_package",
+    package_path: packagePath,
+    operation_id: "prepare-copy",
+  })
+  assert.equal(prepared.workspace.status, "READY")
+  assert.equal(prepared.workspace.authenticated, true)
+  assert.equal(prepared.workspace.package_ref.path, packagePath)
+  assert.ok(
+    !prepared.workspace.workflow_ref.navigation_path.some((item: { label: string }) =>
+      item.label.endsWith("(только чтение)"),
+    ),
+    "COLD_PACKAGE_READONLY",
   )
-    delivery = await call("dock_artifact_delivery_resume", {
-      operation_id: "deliver",
-      resume_id: "deliver-resume",
-      budget_ms: 120000,
-    })
-  assert.equal(delivery.status, "SUCCEEDED")
-  assert.equal(delivery.output.upload_completion_verified, true)
   const identity = {
     contract_revision: "1.0.0",
     document_id: prepared.workspace.document_id,
@@ -160,31 +159,44 @@ try {
     finish: "execute",
     read: { ports: [], sample_rows: 10, require_exact_numbers: true, coverage: "sample" },
   }
-  const imported = await apply({
+  const grouped = await apply({
     ...identity,
-    ...policy,
-    operation_id: "import",
-    target: { kind: "new", type: "imports.text", label: "Recovery CSV", position: { x: 240, y: 160 } },
-    inputs: [],
-    mode: "delimited",
-    parameters: {
-      source: { artifact_id: artifact.artifact_id, upload_operation_id: delivery.output.upload_operation_id },
-      settings: {
-        source: {
-          source_path: artifact.upload.destination,
-          encoding: "UTF-8",
-          rows_to_skip: 0,
-          first_line_as_title: true,
-        },
-        format: { delimiter: ";", decimal_separator: ".", null_marker: "", text_qualifier: '"' },
-        columns: [
-          { name: "Category", label: "Category", type: "string", data_kind: "Дискретный", used: true },
-          { name: "amount", label: "amount", type: "integer", data_kind: "Непрерывный", used: true },
-        ],
+    operation_id: "group",
+    target: {
+      kind: "existing",
+      type: "transform.group_data",
+      ref: {
+        document_id: identity.document_id,
+        workflow_id: identity.workflow_ref.workflow_id,
+        node_id: seed.node,
       },
     },
+    inputs: [],
+    mappings: [],
+    parameters: {},
+    mode: "aggregate",
+    finish: "execute",
+    read: { ports: [0], sample_rows: 10, require_exact_numbers: true },
   })
-  assert.equal(imported.status, "SUCCEEDED")
+  assert.equal(grouped.status, "SUCCEEDED")
+  assert.equal(grouped.cleanup_complete, true)
+  assert.equal(grouped.execution.status, "completed")
+  const port = grouped.output.ports.find((item: { port: number }) => item.port === 0)
+  assert.equal(port.fresh, true)
+  assert.equal(port.execution_id, grouped.execution.execution_id)
+  assert.equal(port.row_count, 2)
+  assert.equal(port.sample_complete, true)
+  assert.equal(port.precision.numbers_verified, true)
+  assert.deepEqual(
+    port.schema.map((field: { name: string; type: string }) => [field.name, field.type]).sort(),
+    [["Category", "string"], ["Total", "real"]],
+  )
+  const category = port.schema.findIndex((field: { name: string }) => field.name === "Category")
+  const total = port.schema.findIndex((field: { name: string }) => field.name === "Total")
+  assert.deepEqual(
+    port.sample.map((row: Array<{ value: string | number }>) => [row[category].value, row[total].value]).sort(),
+    Object.entries(seed.expected).sort(),
+  )
   const parameters = {
     expressions: [
       {
@@ -192,7 +204,7 @@ try {
         name: "DoubleAmount",
         label: "DoubleAmount",
         type: "integer",
-        formula: "amount * 2",
+        formula: "Total*2",
         replace: false,
       },
     ],
@@ -202,7 +214,7 @@ try {
     ...policy,
     operation_id: "calculator",
     target: { kind: "new", type: "transform.calculator", label: `Recovery ${scenario}`, position: { x: 520, y: 160 } },
-    inputs: [{ source: imported.node, output: 0, input: 0 }],
+    inputs: [{ source: grouped.node, output: 0, input: 0 }],
     mode: "expression",
     parameters,
   }
@@ -261,7 +273,7 @@ try {
     report: {
       actions: [`Clicked ${label} in the owned wizard`],
       result: "Wizard closed",
-      settings: ["DoubleAmount = amount * 2; integer; no output mapping"],
+      settings: ["DoubleAmount = Total*2; integer; no output mapping"],
     },
   })
   assert.equal(recovered.state, "dock")
@@ -291,7 +303,7 @@ try {
   let saved = await invoke("dock_action_run", {
     action_key: "package.save_checkpoint",
     operation_id: "save",
-    parameters: { path: packagePath, conflict_policy: "fail" },
+    parameters: { path: packagePath, conflict_policy: "replace" },
   })
   const body = saved.structuredContent ?? JSON.parse(saved.content[0].text)
   assert.equal(body.status, "SUCCEEDED")
