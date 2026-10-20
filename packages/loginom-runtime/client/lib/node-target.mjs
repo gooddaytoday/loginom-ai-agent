@@ -296,6 +296,7 @@ export async function releaseNodeTarget({operation,adapter,record,readReceipt,de
   check();
   const ctx={deadline,signal};
   const value={document_id:request.document_id,workflow_ref:request.workflow_ref};
+  if(phase==='workflow')await verifyPendingWorkflowReceipt({operation,adapter,deadline,signal,now});
   const active=await adapter.verifyWorkflow(value,ctx);
   check();
   if(active?.verified!==true||active.status!=='SUCCEEDED'||active.cleanup_complete!==true||active.effect_possible!==false
@@ -308,7 +309,7 @@ export async function releaseNodeTarget({operation,adapter,record,readReceipt,de
   if(target?.pending)throw Error('Original target effect remains unresolved');
   const first=await adapter.observe(value,deadline,signal);
   check();
-  const quiet=g=>g?.complete===true&&g.document_id===request.document_id&&same(g.workflow_ref,request.workflow_ref)
+  const quiet=g=>g?.complete===true&&g.interaction_ready===true&&g.document_id===request.document_id&&same(g.workflow_ref,request.workflow_ref)
     &&g.nodes.every(n=>n.locked===false&&n.ref.document_id===request.document_id&&n.ref.workflow_id===request.workflow_ref.workflow_id)
     &&new Set(g.nodes.map(n=>n.ref.node_id)).size===g.nodes.length;
   if(!quiet(first))throw Error('Complete quiet original graph required for pre-target release');
@@ -327,4 +328,21 @@ export async function releaseNodeTarget({operation,adapter,record,readReceipt,de
   if(!quiet(second)||!same(first,second))throw Error('Graph changed during pre-target release');
   return {verified:true,cleanup_complete:true,node:matches[0]?.ref??null,graph:second,
     target_state:id?'found':'not_created',cleanup:{wizard_closed:false,read_view_restored:false,views_returned:false}};
+}
+
+// Activation uses its own browser ledger, not operation.lastReceipt. A visible
+// active tab is not proof that its original native click finished.
+export async function verifyPendingWorkflowReceipt({operation,adapter,deadline,signal,now=Date.now}) {
+  const state=operation.nodeApply,pending=state?.pending;
+  const check=()=>{signal?.throwIfAborted();if(now()>=deadline)throw Error('Workflow receipt deadline elapsed');};
+  check();
+  if(pending?.phase!=='workflow'||pending.receipt_id!==operation.id+':workflow'||typeof adapter?.readWorkflowReceipt!=='function')
+    throw Error('Original workflow activation receipt is unavailable');
+  const value={document_id:state.request.document_id,workflow_ref:state.request.workflow_ref};
+  const response=await adapter.readWorkflowReceipt(value,{deadline,signal,receipt_id:pending.receipt_id});
+  check();
+  const receipt=response?.output?.receipt;
+  if(response?.output?.state!=='completed'||receipt?.status!=='SUCCEEDED'||receipt.verified!==true
+    ||receipt.cleanup_complete!==true||receipt.document_id!==value.document_id||!same(receipt.workflow_ref,value.workflow_ref))
+    throw Error('Original workflow activation has no confirmed completion and cleanup');
 }

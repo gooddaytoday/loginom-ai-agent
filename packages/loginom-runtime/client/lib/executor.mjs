@@ -4,7 +4,7 @@ import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference} from './artifact-discovery.mjs';
 import {createArtifactDelivery} from './artifact-delivery.mjs';
-import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget } from './node-target.mjs';
+import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt } from './node-target.mjs';
 import {NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 import { createNodeTargetBrowserAdapter } from './node-target-browser.mjs';
 import { validateNodeTargetRequest } from './node-contracts.mjs';
@@ -2049,6 +2049,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return { stopped: false, reason: 'The operation is no longer eligible for browser recovery' };
       if (running || nodeJobs.busy || delivery.busy || sourceReads.busy) return { stopped: false, reason: 'A Dock action is still running' };
       if (operation.transportUncertain) return { stopped: false, reason: 'The last browser call of this operation is unconfirmed' };
+      if(operation.nodeApply?.pending?.phase==='workflow'){
+        try{await verifyPendingWorkflowReceipt({operation,adapter:operation.nodeTargetAdapter,deadline:now()+10000,now});}
+        catch(error){return {stopped:false,reason:String(error.message).slice(0,1000)};}
+      }
       // A sent abort or an expired timeout is not proof: only the page ledger is.
       const state = operation.lastReceipt ? await readReceipt(operation) : { state: 'none' };
       // Same proof as the node release: a completed last gesture with confirmed cleanup.

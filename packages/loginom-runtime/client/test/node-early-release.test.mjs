@@ -6,12 +6,13 @@ import {releaseNodeTarget} from '../lib/node-target.mjs';
 const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]};
 const node={document_id:'doc',workflow_id:'wf',node_id:'created'};
 function fixture(phase='target',type='imports.text'){
-  const events=[],calls=[],graph={complete:true,document_id:'doc',workflow_ref:workflow,dom_epoch:1,nodes:[],links:[],foreign_links:[]};
+  const events=[],calls=[],graph={complete:true,interaction_ready:true,document_id:'doc',workflow_ref:workflow,dom_epoch:1,nodes:[],links:[],foreign_links:[]};
   const state={blocked:false,fail:true,graph};
   const ok=()=>({verified:true,cleanup_complete:true,effect_possible:false});
   const adapter={
     observe:async()=>{if(state.blocked)throw Error('Graph is blocked');return structuredClone(graph);},
     verifyWorkflow:async()=>({...ok(),status:'SUCCEEDED',document_id:'doc',workflow_ref:workflow}),
+    readWorkflowReceipt:async()=>({output:{state:'completed',receipt:{...ok(),status:'SUCCEEDED',document_id:'doc',workflow_ref:workflow}}}),
     activateWorkflow:async()=>{if(phase==='workflow')throw Error('Injected workflow failure');return ok();},
     preflight:async()=>{},positionMatches:(n,p)=>JSON.stringify(n.position)===JSON.stringify(p),
     mutate:async effect=>{calls.push(effect.kind);if(effect.kind==='create')graph.nodes.push({ref:node,type,label:'Target',position:effect.parameters.position,inputs:[],outputs:[0],locked:false});return {status:'SUCCEEDED',cleanup_complete:true};},
@@ -206,4 +207,34 @@ test('expired proof read cannot issue a second observation or release the gate',
   await assert.rejects(releaseNodeTarget({operation:f.state.operation,adapter:f.adapter,record:async e=>e,
     readReceipt:async()=>null,deadline:10,now:()=>clock}),/deadline/);
   assert.equal(reads,1);assert.throws(()=>f.runtime.assertPreparationAllowed(),/pending|unsettled|uncertain/);
+});
+
+for(const route of ['release','finish','handoff'])for(const fault of ['running','unknown','missing','cleanup','foreign','unverified','no_reader'])
+test('workflow receipt guard '+route+' / '+fault,async()=>{
+  const f=fixture('workflow');await stop(f);let reads=0;
+  f.state.blocked=true;await release(f);const basis=f.runtime.browserRecoveryBasis('apply');
+  if(route==='finish')assert.equal((await f.runtime.browserRecoveryHandoff('apply')).stopped,true);
+  f.state.blocked=false;
+  f.adapter.readWorkflowReceipt=async(value,ctx)=>{reads++;assert.deepEqual(value,{document_id:'doc',workflow_ref:workflow});
+    assert.equal(ctx.receipt_id,'apply:workflow');return {output:{state:['running','unknown','missing'].includes(fault)?fault:'completed',
+      receipt:{status:'SUCCEEDED',verified:fault!=='unverified',cleanup_complete:fault!=='cleanup',document_id:fault==='foreign'?'other':'doc',workflow_ref:workflow}}};};
+  if(fault==='no_reader')delete f.adapter.readWorkflowReceipt;
+  const result=route==='release'?await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release2'})
+    :route==='handoff'?await f.runtime.browserRecoveryHandoff('apply'):await f.runtime.verifyBrowserRecovery({operationId:'apply',step:basis.step,attested:{}});
+  if(route==='release')assert.equal(result.error.code,'NODE_RELEASE_REFUSED');
+  else if(route==='handoff')assert.equal(result.stopped,false);
+  else assert.equal(result.status,'unresolved');
+  assert.equal(reads,fault==='no_reader'?0:1);assert.equal(f.state.operation.nodeApply.pending.phase,'workflow');
+  assert.throws(()=>f.runtime.assertPreparationAllowed());assert.deepEqual(f.calls,[]);
+});
+
+for(const route of ['release','finish'])for(const ready of [false,undefined,null])for(const at of [1,2,'both'])
+test('graph interaction guard '+route+' / '+ready+' / read '+at,async()=>{
+  const f=fixture('source');await stop(f);let step;
+  if(route==='finish'){f.state.blocked=true;await release(f);step=f.runtime.browserRecoveryBasis('apply').step;
+    assert.equal((await f.runtime.browserRecoveryHandoff('apply')).stopped,true);f.state.blocked=false;}
+  let reads=0;f.adapter.observe=async()=>({...structuredClone(f.state.graph),interaction_ready:++reads===at||at==='both'?ready:true});
+  const result=route==='release'?await release(f):await f.runtime.verifyBrowserRecovery({operationId:'apply',step,attested:{}});
+  if(route==='release')assert.equal(result.error.code,'NODE_RELEASE_REFUSED');else assert.equal(result.status,'unresolved');
+  assert.throws(()=>f.runtime.assertPreparationAllowed());assert.equal(f.state.operation.nodeApply.result,undefined);assert.deepEqual(f.calls,[]);
 });
