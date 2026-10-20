@@ -1837,6 +1837,16 @@ describe("ProviderTransform.schema - openai supported schema subset", () => {
     expect(definition).toEqual(before)
   })
 
+  test("OpenAI retains the same-runtime preparation rule before the first call", async () => {
+    const { prepareTool } = await import("../../../loginom-runtime/client/lib/skill.mjs")
+    const schema = ProviderTransform.schema(openaiModel, prepareTool.inputSchema)
+    for (const key of ["intent", "workflow_ref", "package_path"] as const) {
+      const field = schema.properties![key] as import("@ai-sdk/provider").JSONSchema7
+      expect(field.description).toBe(prepareTool.inputSchema.properties[key].description)
+      expect(field.description).toContain(key === "package_path" ? "Never guess" : "open_package")
+    }
+  })
+
   test("keeps the actual Dock wizard stage array constant compatible with its inferred type", async () => {
     const source = (await import(
       new URL("../../../loginom-runtime/client/lib/workspace-ui.mjs", import.meta.url).href

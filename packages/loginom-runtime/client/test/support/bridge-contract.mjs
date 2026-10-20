@@ -132,6 +132,10 @@ test('MCP application refusals remain typed normal content and the same connecti
     assert.equal(JSON.parse(premature.content[0].text).status, 'FAILED');
     assert.equal(browserCalls, 1);
 
+    const prepareSchema=listed.tools.find(tool=>tool.name==='dock_prepare').inputSchema;
+    assert.match(prepareSchema.properties.intent.description,/first use open_package/);
+    assert.match(prepareSchema.properties.workflow_ref.description,/THIS runtime/);
+    assert.ok(Buffer.byteLength(JSON.stringify(prepareSchema))<46000);
     const invalidPreparation = await client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:'../bad.lgp'}});
     assert.equal(invalidPreparation.isError,true);
     assert.equal(session.metadata.workspacePreparation,undefined);
@@ -245,6 +249,8 @@ test('MCP application refusals remain typed normal content and the same connecti
     const missingContext=structuredClone(contextReceipt);delete missingContext.ports;
     assert.equal(compactReadValidator(missingContext).valid,false);
     await client.callTool({name:'dock_workspace_observe',arguments:{scope:'bootstrap'}});
+    const compactPreparation=compactTools.tools.find(tool=>tool.name==='dock_prepare').inputSchema;
+    assert.deepEqual(compactPreparation,prepareSchema);
     const compactPrepare=await client.callTool({name:'dock_prepare',arguments:{}});
     assert.equal(JSON.parse(compactPrepare.content[0].text).prepared,true);
     const compactRequest={...sourceRequest,operation_id:'bridge-compact-source',
