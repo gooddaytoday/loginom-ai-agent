@@ -189,3 +189,27 @@ Own diagnostic server package сохранён. Private evidence:
 `/home/george/.cache/loginom-ai-agent/browser-recovery-scroll2-a5FVbBUQ/evidence`.
 Syntax/static/diff проверки — в ignored task report. Production неизменён;
 первая native cleanup UNKNOWN и S5 FAIL/deferred остаются историческими фактами.
+
+
+## 2026-10-20 — third preparatory probe: busy после Files, scroll BLOCKED
+
+Одна fresh source attempt: штатный новый stage/catalog/Save route PASS,
+новый own draft/profile/UUID package. Roots служат только discovery и tab/prefix;
+quiet/directory/table state берутся через existing detail routes, без новых API/hooks.
+Save SUCCEEDED/verified/save_completed/path/active_identity, workflow сохранён;
+continuation[] raw допустим, native saved-state modified=false. Save не отменён.
+Toolbar detail перед click quiet; единственный observed Files click SUCCEEDED/
+completed/cleanup_complete. Его post-read detail показал busy mask MF и
+file_storage unobserved: STOP DETAIL_NOT_QUIET, до NavigationPanel/filegrid/Refresh.
+Scroll и passive250/1000ms reads не достигнуты; causal timing/window факта нет.
+Finally fresh tabs detail также busy; return-tab click/final Save не выполнялись.
+Direct guarded native cleanup ровно1: BLOCKED/DIALOG_OR_OPERATION_OPEN,
+package_closed=false/logged_out=false/noDiscard. Это отдельный UNKNOWN lifecycle,
+не отказ уже confirmed Save/navigation. Own server package/profile сохранены.
+Context CLOSED: close event/pages0. OS NOT_CONFIRMED: own driver/lineage сохранён,
+exact-profile candidates0; after absence не заменяет attribution. Kill/повторов нет.
+Private evidence: `/home/george/.cache/loginom-ai-agent/browser-recovery-scroll3-6y95uhHM/evidence`.
+Syntax/static/diff checks и source audit — ignored task report/отдельный source artifact.
+Busy duration/причина и virtualizer не исследованы; четвёртого live не было.
+Root пересматривает подход по stop-signal; product fix не выполнялся.
+S5 FAIL/deferred, первая native UNKNOWN и вторая native PASS сохраняются.

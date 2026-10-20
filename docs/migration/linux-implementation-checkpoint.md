@@ -2,16 +2,15 @@
 
 ## 2026-10-20 — preparatory browser scroll probe
 
-Последняя attempt2: fresh source stage/catalog/Save route PASS.
-Own checkpoint Save SUCCEEDED; initial/final native saved-state modified=false.
-Scroll BLOCKED до filegrid: probe требовал package_identity на compact roots,
-где поле отсутствует по контракту; tab_tid/prefix exact prepared сохранены.
-Native cleanup PASS: single guarded Close/logout/noDiscard; context closed/pages0.
-OS attribution NOT_CONFIRMED: currentPID/lineage есть, exact-profile candidates0.
-First attempt native cleanup UNKNOWN сохраняется; полная история — в отчёте.
-Own diagnostic packages сохранены; S5 FAIL/deferred и historical UNKNOWN неизменны.
-Production без правок; следующий шаг — root reassessment до нового назначения.
-[Отчёт и история попыток](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md).
+Latest attempt3: fresh source stage/catalog/Save PASS; initial saved-state modified=false.
+Единственный Files click SUCCEEDED, post-read busy MF → BLOCKED до filegrid/scroll.
+Direct native cleanup1 BLOCKED/DIALOG_OR_OPERATION_OPEN; Close/logout UNKNOWN.
+Context closed/pages0; OS attribution NOT_CONFIRMED (exact-profile candidates0).
+Own diagnostic packages/profiles сохранены; новых native попыток нет.
+First native cleanup UNKNOWN и attempt2 native cleanup PASS сохраняются явно.
+Causal scroll timing не получен; S5 FAIL/deferred и historical UNKNOWN неизменны.
+Production без правок; следующий шаг — root reassessment подхода по stop-signal.
+[Фактический отчёт и история попыток](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md).
 
 ## 2026-10-20 — browser recovery, Linux packaged/model срез
 
