@@ -13,12 +13,20 @@ function fixture(overrides = {}) {
   const events = [], state = {clock:Date.now(), avatarClicks:0, avatarBudgets:[], menu:false, account:'test-2', path:options.packagePath, modified:false, running:false,
     count:1, tab:true, dialog:false, loggedOut:false, readonly:false, closeResult:true, ...overrides};
   const fail = stage => {if(state.failStage===stage)throw Error('private upstream failure: do not persist');};
+  const timed = (stage, settings) => {
+    (state.apiBudgets??=[]).push({stage,timeout:settings.timeout,at:state.clock});
+    const elapsed=state.apiElapsed?.[stage]??0;
+    state.clock+=Math.min(elapsed,settings.timeout);
+    if(elapsed>0&&elapsed>=settings.timeout)throw Object.assign(Error('simulated bounded UI timeout'),{name:'TimeoutError'});
+  };
   const node = {DisplayName:'result',get PackageFileName(){return state.path;}, get ReadOnly(){return state.readonly;},
     Package:{}, HasRunningNodes:() => state.running};
   const m = {PackageNodes:{get Count(){return state.count;}, Items:() => node}, HasRunningNodes:() => state.running,
     FServerConnection:{get UserName(){return state.account;}, Connected:true, Session:{IsPackageModified:async () => {
       events.push('modified-read'); if (state.racePath) state.path = state.racePath; if(state.raceReadOnly!==undefined)state.readonly=state.raceReadOnly;
       if(state.raceTab)state.tab=false; if(state.raceTabTid)state.tabTid=state.raceTabTid;
+      if(state.maskOnModifiedRead){state.mask=true;state.maskOnModifiedRead=false;}
+      state.clock+=state.modifiedReadElapsed??0;
       return state.modified;
     }}}, async ClosePackage(target, suppressEvents, processAfterCall) {
       events.push('close'); assert.equal(target,node); assert.equal(suppressEvents,false); assert.equal(processAfterCall,true);
@@ -44,11 +52,13 @@ function fixture(overrides = {}) {
     locator:() => locator(query+' input'),
     async waitFor(settings) {
       assert.ok(settings.timeout > 0 && settings.timeout <= (state.timeoutMs??options.timeoutMs));
+      timed(query.includes('LoginForm')?'login_form_wait':'tab_detach',settings);
       fail(query.includes('LoginForm')?'login_form_wait':'tab_detach');
       events.push(query.includes('LoginForm') ? 'login-visible' : 'tab-detached');
       if (query.includes('LoginForm') ? !state.loggedOut : state.tab) throw Error('UI wait failed');
     }, async click(settings) {
       assert.ok(settings.timeout > 0 && settings.timeout <= (state.timeoutMs??options.timeoutMs));
+      timed(query.includes('tlb;no')?'discard_click':query.includes('btnLogOut')?'logout_click':'logout_menu_open',settings);
       fail(query.includes('tlb;no')?'discard_click':query.includes('btnLogOut')?'logout_click':'logout_menu_open');
       if (query.includes('tlb;no')) {events.push('discard');state.confirm();}
       else if (query.includes('btnLogOut')) { events.push('logout'); state.loggedOut=true; }
@@ -68,6 +78,12 @@ function fixture(overrides = {}) {
     async isVisible(){fail('logout_readback');return !state.loggedOut;},
   });
   const page = {locator,
+    async waitForTimeout(ms){
+      assert.ok(ms>0&&ms<=100);events.push('idle-wait');state.clock+=state.idleElapsed??ms;
+      if(state.clearBlocker){state.mask=false;state.dialog=false;}
+      Object.assign(state,state.idleChange??{});
+      if(state.changePreparation)context.__loginomDockPreparationV1.id='foreign-document';
+    },
     async evaluate(fn,arg){
       if(fn.toString().includes('m.ClosePackage(node, false, true)'))fail('close_request');
       if(fn.toString().includes('remaining:globalThis'))fail('close_readback');
@@ -76,6 +92,7 @@ function fixture(overrides = {}) {
     },
     async waitForFunction(fn,arg,settings){
       assert.ok(settings.timeout > 0 && settings.timeout <= (state.timeoutMs??options.timeoutMs));
+      timed(fn.toString().includes('const menu =')?'logout_observe':fn.toString().includes('globalThis.__loginomDockCleanupV1?.done === true')?'discard_close_wait':'close_wait',settings);
       if(fn.toString().includes('const menu =')){
         events.push('logout-observe'); state.observeTimeout=settings.timeout;
         for(let i=0;i<2;i++){
@@ -91,7 +108,9 @@ function fixture(overrides = {}) {
   const Clock = class extends Date {static now(){return state.clock;}};
   return {state,events,context, run:changed => {
     const code=makePackageCleanupCode({...options,timeoutMs:state.timeoutMs??options.timeoutMs,...changed});
-    state.clock=Date.now();
+    state.deadline=Number(code.match(/,(\d+)\)$/)[1]);
+    state.clock=state.deadline-30000;
+    context.Date=Clock;
     return vm.runInNewContext('('+code+')',{Date:Clock})(page);
   }};
 }
@@ -103,6 +122,92 @@ test('saved owned package closes with native guards, tabs disappear, then logout
   assert.equal(result.unsaved_changes_discarded,false);
   assert.deepEqual(f.events,['modified-read','close','tab-detached','avatar','logout','login-visible']);
   const again=await f.run();assert.equal(again.reason,'CLEANUP_ALREADY_ATTEMPTED');assert.equal(f.events.filter(e=>e==='close').length,1);
+});
+
+for(const blocker of ['mask','dialog'])test('cold cleanup waits read-only for a transient '+blocker+' before one native close/logout',async()=>{
+ const f=fixture({[blocker]:true,clearBlocker:true,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+ assert.equal(r.status,'SUCCEEDED');assert.equal(r.package_closed,true);assert.equal(r.logged_out,true);
+ assert.deepEqual(f.events,['idle-wait','modified-read','close','tab-detached','avatar','logout','login-visible']);
+ assert.equal(r.unsaved_changes_discarded,false);
+});
+
+test('cold idle wait also rechecks blockers after the asynchronous dirty-state read',async()=>{
+ const f=fixture({maskOnModifiedRead:true,clearBlocker:true,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+ assert.equal(r.status,'SUCCEEDED');assert.equal(r.logged_out,true);
+ assert.deepEqual(f.events.slice(0,4),['modified-read','idle-wait','modified-read','close']);
+ assert.equal(f.events.filter(e=>e==='close').length,1);
+});
+
+test('cold idle wait retains the exact owned temporary-view discard confirmation',async()=>{
+ const f=fixture({mask:true,clearBlocker:true,modified:true,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+ assert.equal(r.status,'SUCCEEDED');assert.equal(r.package_closed,true);assert.equal(r.logged_out,true);
+ assert.equal(r.unsaved_changes_discarded,true);
+ assert.deepEqual(f.events,['idle-wait','modified-read','close','discard','tab-detached','avatar','logout','login-visible']);
+});
+
+test('cold idle wait never retries an unconfirmed native close',async()=>{
+ const f=fixture({mask:true,clearBlocker:true,closeResult:false,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+ assert.equal(r.reason,'NATIVE_CLOSE_UNCONFIRMED');assert.equal(r.package_closed,false);assert.equal(r.logged_out,false);
+ assert.equal(f.events.filter(e=>e==='idle-wait').length,1);assert.equal(f.events.filter(e=>e==='close').length,1);
+ assert.equal(f.events.includes('logout'),false);
+});
+
+test('all cleanup waits and clicks share the remainder after idle and server delay',async()=>{
+ const f=fixture({mask:true,clearBlocker:true,modified:true,timeoutMs:8000,idleElapsed:7900,modifiedReadElapsed:22000,
+  apiElapsed:{close_wait:20,discard_click:20,discard_close_wait:20,tab_detach:20}});
+ const r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+ assert.equal(r.status,'SUCCEEDED');assert.equal(r.package_closed,true);assert.equal(r.logged_out,true);
+ assert.deepEqual(f.state.apiBudgets.slice(0,4).map(b=>[b.stage,b.timeout]),
+  [['close_wait',100],['discard_click',80],['discard_close_wait',60],['tab_detach',40]]);
+ assert.ok(f.state.apiBudgets.every(b=>b.timeout>0&&b.at+b.timeout<=f.state.deadline));
+ assert.ok(f.state.clock<=f.state.deadline);
+});
+
+for(const stage of ['close_wait','discard_click','discard_close_wait','tab_detach'])
+ test('cleanup stops within the absolute deadline when '+stage+' stalls after idle wait',async()=>{
+  const f=fixture({mask:true,clearBlocker:true,modified:true,timeoutMs:8000,idleElapsed:7900,modifiedReadElapsed:22000,
+   apiElapsed:{[stage]:20000}}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+  assert.equal(r.status,'BLOCKED');assert.equal(r.stage,stage);assert.equal(r.logged_out,false);
+  assert.ok(f.state.clock<=f.state.deadline);assert.ok(f.state.apiBudgets.every(b=>b.at+b.timeout<=f.state.deadline));
+  assert.equal(f.state.apiBudgets.at(-1).stage,stage);assert.equal(f.events.filter(e=>e==='close').length,1);
+  assert.equal(f.events.includes('logout'),false);
+ });
+
+for(const [change,reason] of [[{account:'foreign'},'ACCOUNT_CHANGED'],[{path:'/foreign/result.lgp'},'PACKAGE_IDENTITY_CHANGED'],
+ [{count:2},'PACKAGE_INVENTORY_CHANGED'],[{tab:false},'TAB_IDENTITY_CHANGED'],[{running:true},'RUNNING_NODES'],[{readonly:true},'PACKAGE_IDENTITY_CHANGED']])
+ test('cold idle wait preserves ownership and running-node refusal: '+JSON.stringify(change),async()=>{
+  const f=fixture({mask:true,clearBlocker:true,idleChange:change,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+  assert.equal(r.reason,reason);
+  assert.equal(r.status,'BLOCKED');assert.equal(r.package_closed,false);assert.equal(r.logged_out,false);
+  assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+ });
+
+test('cold idle wait refuses a changed preparation document',async()=>{
+ const f=fixture({mask:true,clearBlocker:true,changePreparation:true,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+ assert.equal(r.reason,'DOCUMENT_IDENTITY_CHANGED');assert.deepEqual(f.events,['idle-wait']);
+});
+
+for(const blocker of ['mask','dialog'])test('persistent '+blocker+' keeps cold cleanup blocked within its original wait allowance',async()=>{
+ const f=fixture({[blocker]:true}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+ assert.equal(r.reason,'DIALOG_OR_OPERATION_OPEN');assert.equal(r.stage,'idle_wait');
+ assert.equal(r.package_closed,false);assert.equal(r.logged_out,false);assert.deepEqual(f.events,['idle-wait']);
+});
+
+test('cold cleanup never closes after idle wait or server read exhausts the original deadline',async()=>{
+ for(const change of [{mask:true,clearBlocker:true,idleElapsed:30001},{modifiedReadElapsed:30001}]){
+  const f=fixture(change),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
+  assert.equal(r.status,'BLOCKED');assert.equal(r.package_closed,false);assert.equal(r.logged_out,false);
+  assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+ }
+});
+
+test('idle waiting is opt-in for isolated diagnostics, ordinary cleanup still refuses immediately',async()=>{
+ for(const changed of [{},{diagnosticDiscard:true}]){
+  const f=fixture({mask:true}),r=await f.run(changed);
+  assert.equal(r.reason,'DIALOG_OR_OPERATION_OPEN');assert.deepEqual(f.events,[]);
+ }
+ for(const changed of [{diagnosticWaitForIdle:true},{diagnosticDiscard:true,diagnosticWaitForIdle:'true'}])
+  assert.throws(()=>makePackageCleanupCode({...options,...changed}));
 });
 
 test('avatar timeout observes cleared masks and retries once before confirmed logout',async()=>{

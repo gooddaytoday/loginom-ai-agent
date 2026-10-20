@@ -811,7 +811,7 @@ const probeOwnedSource=async (baseline,executionSource=null)=>{
       before_sha256:digest(before.source),expected_sha256:digest(source)});await save();
     if(Date.now()>=deadline)throw Error('Original source probe deadline expired before input');
     const started=Date.now();
-    await page.keyboard.press('Control+A');
+    await page.keyboard.press('ControlOrMeta+A');
     if((await read(true)).source!==before.source)throw Error('Source changed before replacement');
     await page.keyboard.press('Backspace');
     if((await read(true)).source!=='')throw Error('Owned editor did not clear');

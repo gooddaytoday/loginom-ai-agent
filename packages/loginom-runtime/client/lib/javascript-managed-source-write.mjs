@@ -37,7 +37,8 @@ export async function runManagedJavascriptSourceReplace(page, task, target, insp
   timely(); await page.mouse.click(before.point.x, before.point.y);
   const focused = await read({requireInputFocus: true});
   if (focused.source !== before.source) throw Error('Managed source changed on focus');
-  timely(); await page.keyboard.press('Control+A');
+  // Control+A only moves the caret on macOS; the platform select-all is Meta+A.
+  timely(); await page.keyboard.press('ControlOrMeta+A');
   const selected = await read({requireInputFocus: true, selectionCheck: true});
   if (selected.source !== before.source || selected.selection_full !== true)
     throw Error('Managed source full selection unconfirmed');

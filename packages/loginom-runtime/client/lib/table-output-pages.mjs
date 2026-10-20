@@ -19,8 +19,12 @@ async function readTableRowPages(channel,table,{sampleRows=10,rowOffset=0}={}) {
       const controls=s.ui.elements.filter(e=>same(e.table_scroller,table)&&e.tid===w.tid&&e.scroll?.ref===e.ref
         &&e.scroll.top===w.top&&e.scroll.max_top===w.max_top&&e.allowed_actions.includes('scroll'));
       requireValue(controls.length===1,'Bound Table vertical control unavailable');
-      const distance=t.row_index<w.first_visible?t.row_index-w.first_visible:t.row_index>w.last_visible?t.row_index-w.last_visible:0;
-      const delta=Math.max(-1000,Math.min(1000,Math.round(distance*w.row_height)));
+      // Reveal the requested block when it fits, rather than its first missing
+      // row: otherwise a ten-row page can require ten native round trips.
+      const last=w.last_visible-w.first_visible+1>=sampleRows?rowOffset+sampleRows-1:t.row_index;
+      const distance=t.row_index<w.first_visible?t.row_index-w.first_visible:t.row_index>w.last_visible?last-w.last_visible:0;
+      const to=Math.max(0,Math.min(w.max_top,w.top+distance*w.row_height));
+      const delta=Math.max(-1000,Math.min(1000,Math.round(to-w.top)));
       requireValue(delta!==0&&previousVertical!==w.top&&++verticalScrolls<=100,'Table vertical scroll made no progress');
       previousVertical=w.top;
       await channel.perform({condition:'reveal Table output row '+t.row_index,initialObservation:s,

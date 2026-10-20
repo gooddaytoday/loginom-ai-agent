@@ -25,6 +25,21 @@ for(const permanent of [false,true])test('link hover waits boundedly for covered
  if(permanent){await assert.rejects(prepareLinkHover(page,task,async()=>graph,samePlacementGraph),/covered/);assert.equal(moves,0);assert.equal(probes,10);assert.equal(waits,10);}
  else{await prepareLinkHover(page,task,async()=>graph,samePlacementGraph);assert.equal(probes,3);assert.equal(waits,2);assert.equal(moves,1);}
 });
+for(const fault of ['rejected','thrown'])test('covered link keeps original refusal when diagnostic evaluation is '+fault,async()=>{
+ const graph={document_id:'doc',dom_epoch:1,nodes:[],links:[]};
+ const diagnosticError=Object.assign(Error('Execution context was destroyed'),{name:'TimeoutError',code:'DIAGNOSTIC_FAILURE'});
+ let probes=0,waits=0,moves=0,diagnostics=0;
+ const source={count:async()=>1,evaluate:async()=>{probes++;return null;}};
+ const page={locator:()=>({locator:()=>source}),mouse:{move:async()=>{moves++;}},
+  waitForTimeout:async ms=>{assert.equal(ms,50);waits++;},
+  evaluate:()=>{diagnostics++;if(fault==='thrown')throw diagnosticError;return Promise.reject(diagnosticError);}};
+ const task={deadline:Date.now()+10000,request:{workflow_ref:{prefix:'wf'}},effect:{before:graph},source_tid:'port'};
+ await assert.rejects(prepareLinkHover(page,task,async()=>graph,samePlacementGraph),error=>{
+  assert.notEqual(error,diagnosticError);assert.equal(error.name,'Error');assert.equal(error.code,undefined);
+  assert.equal(error.message,'Link hover source is covered');return true;
+ });
+ assert.equal(probes,10);assert.equal(waits,10);assert.equal(diagnostics,1);assert.equal(moves,0);
+});
 for(const mode of ['transient','persistent','foreign'])test('link hover graph wait: '+mode,async()=>{
  const graph={document_id:'doc',dom_epoch:1,nodes:[],links:[]};let reads=0,waits=0,moves=0;
  const source={count:async()=>1,evaluate:async()=>({x:10,y:10})};

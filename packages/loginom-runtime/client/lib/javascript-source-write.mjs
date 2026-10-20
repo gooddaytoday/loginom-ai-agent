@@ -59,7 +59,7 @@ export function createJavascriptSourceWriter({page,context,owner,epoch,deadline,
         await bounded(()=>page.mouse.click(location.point.x,location.point.y));
         const focused=await read({requireInputFocus:true});
         need(focused.source===before.source,'Source writer focus changed source');
-        phase='selecting';await bounded(()=>page.keyboard.press('Control+A'));
+        phase='selecting';await bounded(()=>page.keyboard.press('ControlOrMeta+A'));
         const selected=await read({requireInputFocus:true,selectionCheck:true});
         need(selected.source===before.source&&selected.selection_full===true,'Source writer full selection unconfirmed');
         phase='mutation_prepared';await journal('javascript_source_write_mutation_dispatch',previous,target);

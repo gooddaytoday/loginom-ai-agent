@@ -519,6 +519,22 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           // a usable snapshot or authorize a gesture.
           await entry('node_observation_context_refused', {step, sample, internal_operation_id:id,
             condition, reason:error.message, outcome:structuredClone(result)});
+          const dialogs=result.output.ui?.dialogs;
+          const blocker=dialogs?.length===1&&dialogs[0].text==='[outside selected root]'?dialogs[0]:null;
+          // Inspect this already observed portal for diagnostics only. It is
+          // never promoted to a usable node snapshot or dismissed as owned.
+          if(error.message==='Node procedure is blocked by a mask or dialog'&&typeof blocker?.ref==='string'
+              &&!signal?.aborted&&observationNow()+MIN_OBSERVATION_READ_MS<deadline) {
+            try {
+              const detail=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
+                root_ref:blocker.ref,expected_origin:targetOrigin,expected_build:targetBuild}),{timeout:readTimeout()});
+              await entry('node_blocking_dialog_observed',{step,sample,internal_operation_id:id,
+                condition,dialog_ref:blocker.ref,outcome:structuredClone(detail)});
+            } catch(inspectionError) {
+              await entry('node_blocking_dialog_observation_failed',{step,sample,internal_operation_id:id,
+                condition,dialog_ref:blocker.ref,reason:String(inspectionError?.message??inspectionError)}).catch(()=>{});
+            }
+          }
           throw error;
         }
         if(result.output.geometry)lastGeometry=structuredClone(result.output.geometry);

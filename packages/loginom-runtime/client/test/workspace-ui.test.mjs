@@ -4807,6 +4807,143 @@ test('owned wizard retries one timed scan, including after a gesture, without re
  }
 });
 
+async function consoleScanRetryFixture(prefix='MF;ConsoleForm') {
+ const f=scrolledProcessWindowFixture(prefix),{page}=f,clock=fixtureClock();page.context.Date=clock.Date;
+ page.add('div','MF;TF-1;Graph;Export','Export',{x:100,y:100,width:100,height:50});
+ const consolePanel=f.grids[0].parentElement;consolePanel.remove();page.document.body.append(consolePanel);
+ const binding={node:{node_id:'export'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+ const context={verified:true,document_id:'document',workflow_id:'workflow',node_id:'export',surface:'graph',tid:'MF;TF-1;Graph;Export',locked:false};
+ const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:binding,...options},async()=>clone(context));
+ const roots=await execute({mode:'observe',discover_roots:true});
+ const panel=roots.output.ui.elements.find(e=>e.tid===prefix);
+ const before=await execute({mode:'observe',root_ref:panel.ref});assert.equal(before.status,'SUCCEEDED');
+ const target=before.output.ui.elements.find(e=>e.tid===prefix+';ProgressForm;trpProgress;grd;tbl');
+ assert.ok(target?.process_grid);assert.ok(target.allowed_actions.includes('right_click'));
+ return {...f,clock,context,execute,before:clone(before.output),target:clone(target),panel:consolePanel};
+}
+
+for(const prefix of ['ConsoleForm','MF;ConsoleForm'])test('owned '+prefix+' menu retries a timed data_views read once without replaying right-click',async()=>{
+ const f=await consoleScanRetryFixture(prefix),{page}=f;
+ const click=page.mouse.click;
+ page.mouse.click=async(...args)=>{
+  await click(...args);
+  const portal=page.add('div','mnContextMenu','',{x:420,y:460,width:250,height:100});
+  page.add('div','mnContextMenu;mniShowNodeToProcess','Show node',{x:425,y:465,width:200,height:25},portal);
+  page.add('div','mnContextMenu;mniShowCompletedProcesses','Completed',{x:425,y:495,width:200,height:25},portal).attrs.class='x-menu-item-unchecked';
+  page.mutationObserver.pending.push({type:'childList',target:page.document.body});
+ };
+ const match=f.panel.matches.bind(f.panel);let failures=0;
+ f.panel.matches=selector=>{
+  if(page.clickedButton==='right'&&!failures&&selector==='.bg-mask-message,.x-mask-msg'){failures++;f.clock.advance(600);}
+  return match(selector);
+ };
+ const outcome=await f.execute({mode:'act',snapshot:f.before,action:{verb:'right_click',ref:f.target.ref}});
+ assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome.error));
+ assert.equal(failures,1);assert.equal(outcome.trace.filter(t=>t.event==='ui_scan_read_retried').length,1);
+ assert.ok(outcome.trace.some(t=>t.event==='ui_scan_limit'&&t.limit_kind==='time'&&t.scan_stage==='data_views'));
+ assert.equal(page.events.filter(e=>e==='click').length,1);assert.equal(page.clickedButton,'right');
+ assert.equal(outcome.output.verification_required,true);
+ assert.equal(outcome.output.scan.complete,true);assert.equal(outcome.output.scan.max_ms,500);
+ assert.equal(outcome.output.scan.max_elements,6000);assert.equal(outcome.output.scan.max_work,250000);
+ assert.equal(outcome.output.ui.table_cells.length,f.before.ui.table_cells.length);
+ assert.ok(outcome.output.dom_epoch.revision>f.before.dom_epoch.revision);
+ assert.deepEqual(clone(outcome.output.prepared_node_context),f.context);
+ const roots=await f.execute({mode:'observe',discover_roots:true}),menu=roots.output.ui.elements.find(e=>e.tid==='mnContextMenu');assert.ok(menu);
+ const observed=await f.execute({mode:'observe',root_ref:menu.ref});
+ const filter=observed.output.ui.elements.find(e=>e.process_menu?.action==='mniShowCompletedProcesses');
+ assert.ok(filter?.allowed_actions.includes('click'));assert.equal(filter.process_menu.checked,false);
+ assert.equal(page.events.filter(e=>e==='click').length,1);
+});
+
+for(const fault of ['persistent','diagnostic_scan','deadline','authentication','origin','build','document','workflow','tab','package','node','surface','grid_id','grid_ref','grid_signature','root','dialog','mask'])
+test('Console scan retry refuses '+fault+' without another gesture or confirmed result',async()=>{
+ const f=await consoleScanRetryFixture(),{page}=f,match=f.panel.matches.bind(f.panel),evaluate=page.evaluate.bind(page);
+ let failures=0,changed=false,postReads=0;
+ f.panel.matches=selector=>{
+  if(page.clickedButton==='right'&&selector==='.bg-mask-message,.x-mask-msg'&&(fault==='persistent'||!failures||fault==='diagnostic_scan'&&postReads===3)){failures++;f.clock.advance(600);}
+  return match(selector);
+ };
+ page.evaluate=async(fn,arg)=>{
+  if(arg&&Object.hasOwn(arg,'discoverRoots')&&page.clickedButton==='right')postReads++;
+  const retry=arg&&Object.hasOwn(arg,'discoverRoots')&&failures>0&&!changed;
+  if(retry){
+   changed=true;
+   if(fault==='authentication')page.avatar.remove();
+   if(['origin','diagnostic_scan'].includes(fault))page.location.origin='https://other.example';
+   if(fault==='build')page.app.Version='other';
+   if(fault==='document')vm.runInContext('globalThis[Symbol.for("loginom-dock.workspace-ui.identity.v1")].epoch="new-document"',page.context);
+   if(fault==='workflow')f.context.workflow_id='other';
+   if(fault==='tab')page.tab.attrs['data-tid']='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';
+   if(fault==='package'){
+    page.app.PackageTreeNode=class PackageTreeNode{};const node=new page.app.PackageTreeNode();node.PackageFileName='/other.lgp';node.PackageName='other';
+    const active=page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();active.Controller.Node={data:{node}};
+    page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>active;
+   }
+   if(fault==='node')f.context.node_id='other';
+   if(fault==='surface')f.context.surface='wizard';
+   if(fault==='grid_id'){f.grids[1].id='other';f.grids[1].attrs.id='other';}
+   if(fault==='grid_ref'){
+    const old=f.grids[1],replacement=new Element('div',old.attrs,'',old.box);old.remove();f.panel.append(replacement);
+   }
+   if(fault==='grid_signature')f.grids[1].ownText='changed history';
+   if(fault==='root')f.panel.remove();
+   if(fault==='dialog')page.add('div','foreign-dialog','Foreign',{x:10,y:100,width:100,height:50}).attrs.role='dialog';
+   if(fault==='mask')page.add('div','foreign-mask','Busy',{x:10,y:100,width:100,height:50}).attrs.class='x-mask-msg';
+  }
+  const value=await evaluate(fn,arg);
+  if(retry&&fault==='deadline')f.clock.advance(15000);
+  return value;
+ };
+ const outcome=await f.execute({mode:'act',snapshot:f.before,action:{verb:'right_click',ref:f.target.ref}});
+ assert.equal(outcome.status,'AMBIGUOUS',fault+JSON.stringify(outcome.error));assert.equal(outcome.effect_possible,true);
+ assert.equal(outcome.trace.filter(t=>t.event==='ui_scan_read_retried').length,1,fault);
+ assert.equal(page.events.filter(e=>e==='click').length,1,fault);assert.notEqual(outcome.output.gesture_applied,true,fault);
+ if(fault==='persistent')assert.equal(outcome.output.ui,undefined);
+ if(fault==='diagnostic_scan'){assert.equal(failures,2);assert.equal(postReads,3);assert.equal(outcome.output.ui,undefined);}
+ assert.equal(outcome.error.code,fault==='persistent'?'UI_SCAN_LIMIT':fault==='deadline'?'UI_DEADLINE_EXCEEDED'
+  :['workflow','node','surface'].includes(fault)?'PREPARED_NODE_CONTEXT_CHANGED':'UI_CONTEXT_CHANGED',fault);
+});
+
+for(const fault of ['unbound','unscoped','graph','tree_grid','pre_gesture','lost_ack','collect_time','elements','traversal','work'])
+test('Console time retry does not admit '+fault,async()=>{
+ const f=await consoleScanRetryFixture(),{page}=f,match=f.panel.matches.bind(f.panel),query=page.document.querySelectorAll.bind(page.document);
+ let failures=0;
+ f.panel.matches=selector=>{
+  if((fault==='pre_gesture'||page.clickedButton==='right')&&!failures&&selector==='.bg-mask-message,.x-mask-msg'){
+   failures++;if(fault!=='elements'&&fault!=='work')f.clock.advance(600);
+  }
+  return match(selector);
+ };
+ page.document.querySelectorAll=selector=>{
+  if(fault==='collect_time'&&page.clickedButton==='right'&&!failures){failures++;f.clock.advance(600);}
+  return query(selector);
+ };
+ const click=page.mouse.click;
+ page.mouse.click=async(...args)=>{
+  await click(...args);
+  if(fault==='lost_ack')throw Error('Lost right-click receipt');
+  if(fault==='elements')for(let i=0;i<6001;i++)page.add('div',null,'',undefined,f.panel);
+  if(fault==='traversal')page.document.createTreeWalker=()=>{let visited=0;return {nextNode:()=>++visited<=6001?f.grids[1]:null};};
+  if(fault==='work'){
+   let parent=f.panel;for(let i=0;i<220;i++)parent=page.add('div',null,'',undefined,parent);
+   for(let i=0;i<1200;i++)page.add('td',null,'',undefined,parent);
+  }
+ };
+ const target=fault==='tree_grid'
+  ?f.before.ui.elements.find(e=>e.process_grid?.grid_id===f.grids[0].id):f.target;
+ // The graph body is outside the narrow Console observation.
+ const snapshot=['graph','unscoped'].includes(fault)?(await f.execute({mode:'observe'})).output:f.before;
+ const ref=fault==='graph'?snapshot.ui.elements.find(e=>e.tid==='MF;TF-1;Graph;Export').ref:target.ref;
+ const outcome=await f.execute({mode:'act',snapshot,action:{verb:'right_click',ref},...(fault==='unbound'?{prepared_node_context:undefined}:{})});
+ assert.notEqual(outcome.status,'SUCCEEDED',fault);assert.equal(outcome.trace.filter(t=>t.event==='ui_scan_read_retried').length,0,fault);
+ assert.equal(page.events.filter(e=>e==='click').length,fault==='pre_gesture'?0:1,fault);
+ assert.notEqual(outcome.output.gesture_applied,true,fault);
+ if(fault!=='lost_ack')assert.equal(outcome.output.ui,undefined,fault);
+ if(!['lost_ack'].includes(fault))assert.equal(outcome.error.code,'UI_SCAN_LIMIT',fault+JSON.stringify(outcome.error));
+ if(['elements','traversal','work'].includes(fault))assert.ok(outcome.trace.some(t=>t.event==='ui_scan_limit'&&t.limit_kind===fault),JSON.stringify(outcome.trace));
+});
+
 test('mask settlement cannot extend unbound or unrelated actions',()=>{
   for(const options of [
     {mode:'observe'},

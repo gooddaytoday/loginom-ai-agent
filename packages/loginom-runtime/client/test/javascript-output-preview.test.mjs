@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {managedJavascriptPreviewAdmission} from '../lib/javascript-output-preview.mjs';
+import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
 import {runInNewContext} from 'node:vm';
 import {Element} from './support/workspace-ui-fixture.mjs';
 import {captureManagedJavascriptSelection} from '../lib/javascript-managed-selection.mjs';
@@ -28,6 +29,42 @@ test('completed actual managed JS receipt admits a fresh native preview under th
  assert.equal(proof.execution_id,f.history.outcome.output.execution.execution_id);
  assert.deepEqual(proof.schema.map(f=>f.name),['item_id','item_name','annual_revenue','profit','total_storage_cost','cumulative_revenue','total_revenue','cumulative_share','abc_class']);
  assert.deepEqual(f,before);
+});
+
+function rereadFixture(){
+ const f=fixture(),request=buildNodeReadRequest({operation_id:'compact-preview',source_operation_id:f.history.request.operation_id,
+  read:{ports:[0],sample_rows:5,require_exact_numbers:true}},{parameters:f.history.request,outcome:f.history.outcome});
+ const outcome=structuredClone(f.history.outcome),node=outcome.output,execution='fresh-reread';
+ outcome.operation_id=request.operation_id;node.operation_id=request.operation_id;
+ node.configuration={status:'not_requested'};
+ node.phases=['source','workflow','target','finish','execute','read'].map(phase=>({phase,receipt_id:request.operation_id+':'+phase,status:'verified'}));
+ node.execution.execution_id=execution;node.output.execution_id=execution;
+ node.output.ports.forEach(port=>{port.execution_id=execution;port.schema=structuredClone(request.parameters.schemas.find(s=>s.port===port.port).schema);});
+ node.output.javascript_source={...request.parameters.javascript_source,source_operation_id:request.parameters.source_operation_id,
+  settings_sha256:'b'.repeat(64),policy:'javascript-module-v1'};
+ f.reread={sequence:f.history.sequence+1,request,outcome,cleanup_confirmed:true};return f;
+}
+test('n18 admits the latest source-bound JS reread before creating a downstream node',()=>{
+ const f=rereadFixture(),before=structuredClone(f);
+ const proof=managedJavascriptPreviewAdmission([f.history,f.reread],f.binding,f.port);
+ assert.equal(proof.source_operation_id,'compact-preview');assert.equal(proof.execution_id,'fresh-reread');
+ assert.deepEqual(proof.schema,f.reread.request.parameters.schemas[0].schema);assert.deepEqual(f,before);
+});
+for(const [name,change] of Object.entries({
+ sourceHash:f=>f.reread.outcome.output.output.javascript_source.source_sha256='c'.repeat(64),
+ sourceBytes:f=>f.reread.outcome.output.output.javascript_source.source_utf8_bytes++,
+ sourceLines:f=>f.reread.outcome.output.output.javascript_source.source_lf_lines++,
+ sourceOperation:f=>f.reread.outcome.output.output.javascript_source.source_operation_id='foreign',
+ settings:f=>f.reread.outcome.output.output.javascript_source.settings_sha256='',
+ policy:f=>f.reread.outcome.output.output.javascript_source.policy='other',
+ requestOwner:f=>f.reread.request.target.ref.node_id='foreign',
+ noReadPhase:f=>f.reread.outcome.output.phases.pop(),
+ unverifiedFinish:f=>f.reread.outcome.output.phases.find(p=>p.phase==='finish').status='pending',
+ foreignReceipt:f=>f.reread.outcome.output.phases.find(p=>p.phase==='read').receipt_id='foreign:read',
+ staleExecution:f=>f.reread.outcome.output.output.ports[0].execution_id='old',
+ changedSchema:f=>f.reread.outcome.output.output.ports[0].schema[0].name='foreign',
+}))test('JS reread preview rejects '+name+' without falling back to an older creation',()=>{
+ const f=rereadFixture();change(f);assert.throws(()=>managedJavascriptPreviewAdmission([f.history,f.reread],f.binding,f.port));
 });
 
 for(const [name,change] of Object.entries({
