@@ -90,10 +90,37 @@ test('configuration projection uses accepted receipts once and survives replay',
  assert.deepEqual(result.configuration.readback.node,result.node);
  assert.deepEqual(await f.run(),result);assert.equal(projections,1);
 });
-test('failed configuration projection cannot create a successful checkpoint',async()=>{
- const f=fixture();f.handlers.get('imports.text').configurationReadback=()=>{throw Error('Incomplete observed settings')};
- const result=await f.run();assert.equal(result.status,'AMBIGUOUS');
- assert.ok(!f.records.some(e=>e.phase==='node_checkpoint'));
+test('failed configuration projection settles only the verified phases without claiming valid settings',async()=>{
+ const f=fixture();let projections=0;
+ f.handlers.get('imports.text').configurationReadback=()=>{projections++;throw Error('Sorting readback: input source')};
+ const result=await f.run();assert.equal(result.status,'FAILED');assert.equal(result.cleanup_complete,true);
+ assert.deepEqual(result.configuration,{status:'unknown'});assert.equal(result.checkpoint_kind,'local_node_failed');
+ assert.equal(result.execution.status,'completed');assert.equal(result.output.evidence_ref,'evidence1');
+ assert.equal(result.package_saved,false);assert.equal(result.persisted_package_verified,false);
+ assert.equal(result.error.code,'NODE_CONFIGURATION_READBACK_FAILED');assert.match(result.error.message,/Sorting readback: input source/);
+ assert.equal(result.next_step.tool,'dock_node_apply');assert.match(result.next_step.instruction,/Correct.*settings or inputs.*NEW operation_id/);
+ assert.equal(f.operation.nodeApply.pending,null);assert.ok(f.records.some(e=>e.phase==='node_checkpoint'&&e.result.status==='FAILED'));
+ const count=f.calls.length;assert.deepEqual(await f.run(),result);assert.equal(f.calls.length,count);assert.equal(projections,1);
+});
+test('failed projection cannot settle unknown transport, phase receipts or checkpoint writes',async()=>{
+ for(const options of [{failAfter:'read'},{failJournal:'node_phase_completed'},{failJournal:'node_checkpoint'}]){
+  const f=fixture(options);f.handlers.get('imports.text').configurationReadback=()=>{throw Error('Incomplete observed settings')};
+  const result=await f.run();assert.equal(result.status,options.failJournal==='node_phase_completed'?'NOT_APPLIED':'AMBIGUOUS');assert.equal(f.operation.nodeApply.result,undefined);
+  assert.ok(!f.records.some(e=>e.phase==='node_checkpoint')||options.failJournal==='node_checkpoint');
+ }
+});
+test('projection refusal preserves transport uncertainty, cancellation and the original deadline',async()=>{
+ for(const kind of ['transport','cancel','deadline']){
+  const controller=new AbortController(),f=fixture({signal:controller.signal});
+  f.handlers.get('imports.text').configurationReadback=()=>{
+   if(kind==='transport')f.operation.transportUncertain=true;
+   if(kind==='cancel')controller.abort();
+   if(kind==='deadline')f.setTime(20000);
+   throw Error('Incomplete observed settings');
+  };
+  const result=await f.run();assert.equal(result.status,'AMBIGUOUS');assert.equal(f.operation.nodeApply.result,undefined);
+  assert.ok(!f.records.some(e=>e.phase==='node_checkpoint'));assert.notEqual(result.error.code,'NODE_CONFIGURATION_READBACK_FAILED');
+ }
 });
 test('unsupported parameters reject before journal or graph',async()=>{
  const f=fixture(),p=request();p.parameters.unsupported=true;await assert.rejects(f.run(p),/unsupported/);assert.equal(f.calls.length,0);assert.equal(f.records.length,0);

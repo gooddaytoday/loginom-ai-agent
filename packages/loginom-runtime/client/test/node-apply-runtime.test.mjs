@@ -93,6 +93,19 @@ test('read-only target refusal is NOT_APPLIED with confirmed cleanup and no grap
  assert.ok(f.events.some(e=>e.phase==='node_phase_refused'&&e.receipt.phase==='target'&&e.receipt.effect_possible===false));
  const count=f.calls.length;await f.runtime.runNodeApply(request());assert.equal(f.calls.length,count);
 });
+test('a pure final readback refusal frees the settled runtime for correction on the same node',async()=>{
+ const f=fixture();f.handler.configurationReadback=()=>{throw Error('Sorting readback: input source')};
+ const failed=await f.runtime.runNodeApply(request());
+ assert.equal(failed.status,'FAILED');assert.equal(failed.cleanup_complete,true);
+ assert.deepEqual(failed.output.configuration,{status:'unknown'});assert.equal(failed.output.pending_phase,undefined);
+ assert.equal(failed.error.code,'NODE_CONFIGURATION_READBACK_FAILED');assert.doesNotThrow(()=>f.runtime.assertPreparationAllowed());
+ const inspected=await f.runtime.inspect({operationId:'apply'});assert.equal(inspected.output.cleanup_confirmed,true);
+ const calls=f.calls.length;assert.deepEqual(await f.runtime.runNodeApply(request()),failed);assert.equal(f.calls.length,calls);
+ delete f.handler.configurationReadback;
+ const corrected=request();corrected.operation_id='corrected';corrected.target={kind:'existing',type:'imports.text',ref:failed.output.node};
+ const succeeded=await f.runtime.runNodeApply(corrected);assert.equal(succeeded.status,'SUCCEEDED');
+ assert.equal(f.calls.filter(c=>c==='create').length,1);
+});
 test('lost target mutation response retains ambiguity and pending cleanup',async()=>{
  const f=fixture();f.adapter.mutate=async()=>{throw Error('lost gesture response');};
  const result=await f.runtime.runNodeApply(request());
