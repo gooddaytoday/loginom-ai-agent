@@ -146,3 +146,15 @@ Cleanup этой попытки BLOCKED/UNSAVED_CHANGES: package_closed:false, l
 Resume/retry/inspect/Save не выполнялись. Native cleanup BLOCKED/CLEANUP_OR_OPERATION_UNCONFIRMED, managed ACK:false/exit1 без signal. Parent/child PID отсутствуют, own PGID пуст, profile сохранён; logout не подтверждён. Причина readonly и её связь с прежней незавершённой сессией не установлены. Подготовки 1–2 и их подтверждённый cleanup сохраняют свой результат; это не снимает новый блокер.
 
 Независимо принят следующий ограниченный план: одна новая UUID-заготовка исходного Task0 seed через уже проверенные подготовки 1–2, полный Save/cleanup; затем один cold public запуск нового manifest/path с ранним отказом при readonly navigation. Все semantic/read/finalSave/cleanup критерии прежние. Старые операции не повторяются и не разблокируются, новые hooks/API/fixture infrastructure не добавляются. Если readonly повторится на новой очищенной копии — STOP с внешним ограничением; последующие варианты не разрешены этой гипотезой.
+
+## Подготовки 1–3 PASS — блокер подготовки снят
+
+После independent GO выполнена одна новая уникальная заготовка `browser-recovery-20261020-fixture-proof/prep12-fresh`: fresh Import/Group с прежними точными schema/data, checkpoint modified:false, native package close/logout без discard, resource closure и exit0 подтверждены. Новый private manifest `saved-A-fresh.json` создан только после cleanup, старый manifest сохранён.
+
+Один новый managed public запуск `prep3-fresh-cold` открыл эту сохранённую копию без readonly-метки. Existing Group parameters:{}/inputs:[]/mappings:[] завершился SUCCEEDED/cleanup_complete/completed; fresh execution-linked полная exact выборка Alpha35/Beta20, schema Category:string/Total:real по именам. Roles/functions/options/input mapping и все output field properties/bindings, кроме незаданного order/index, сохранены. Native column order наблюдается Total,Category; его причина не заявляется. Internal execution/foreign node_read/исторические operation IDs не использовались.
+
+Final checkpoint `save-cold-group` SUCCEEDED/save_completed/workflow_preserved, modified:false. Native cleanup SUCCEEDED/package_closed:true/logged_out:true/unsaved_changes_discarded:false, exact path/save operation совпадают с текущим запуском. Managed close ACK:true/request_error:null/exit0 без signal, parent exit0. Собственные PID/PGID отсутствуют. Оба временных one-off скрипта удалены; evidence/profiles/reviews сохранены.
+
+Ключевые private доказательства: `prep12-fresh/step2.json`; `prep3-fresh-cold/fresh-group-proof.json`, `05-dock_action_run.json`, `result.json` и связанная nested cleanup/close receipt. Ресурсы — тот же проверенный stage; runtime bytes не менялись. Успешный новый cleanup не закрывает исторические TAB_IDENTITY_CHANGED, UNSAVED_CHANGES, CONFIRMED_SAVE_REQUIRED и CLEANUP_OR_OPERATION_UNCONFIRMED. Причина readonly старой копии остаётся неизвестной.
+
+По действующему критерию шаг 3 PASS снимает setup blocker и разрешает заменить только setup harness. BR-S1/BR-S3 ещё не запускались на этой заготовке, Task5 не завершена; release-гейт закрыт.
