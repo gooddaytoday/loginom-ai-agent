@@ -1,7 +1,8 @@
 import {captureManagedJavascriptSelection,makeJavascriptManagedSelectionReadCode} from './javascript-managed-selection.mjs';
 import {captureJavascriptSelection} from './javascript-owned-selection.mjs';
 import {inspectJavascriptVisualizers} from './javascript-output-context.mjs';
-import {buildNodeReadRequest} from './node-read-contract.mjs';
+import {buildNodeReadRequest,NODE_READ_MODE,nodeReadHandler,alignReadSchema} from './node-read-contract.mjs';
+import {JAVASCRIPT_MODULE_POLICY} from './javascript-module-policy.mjs';
 const need=(value,message)=>{if(!value)throw Error(message);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 
@@ -19,17 +20,31 @@ export function managedJavascriptPreviewAdmission(history,binding,port){
  need(request?.target?.type==='programming.javascript'&&latest.cleanup_confirmed===true
   &&latest.outcome?.status==='SUCCEEDED'&&latest.outcome.action_key==='node.apply'
   &&latest.outcome.operation_id===request.operation_id&&node?.operation_id===request.operation_id
-  &&node.status==='SUCCEEDED'&&owner(node.node)&&request.document_id===binding.document_id
+  &&node.status==='SUCCEEDED'&&latest.outcome.cleanup_complete===true&&node.cleanup_complete===true
+  &&node.execution?.status==='completed'&&owner(node.node)&&request.document_id===binding.document_id
   &&request.workflow_ref?.workflow_id===binding.workflow_ref.workflow_id,
   'Latest managed JavaScript operation is not settled for this owner');
- const read=buildNodeReadRequest({operation_id:'preview-admission',source_operation_id:request.operation_id,read:{ports:[0]}},
+ const reread=request.mode===NODE_READ_MODE;
+ if(reread){
+  nodeReadHandler({revision:'preview'}).validate(request.parameters,NODE_READ_MODE,request);
+  const source=node.output?.javascript_source;
+  need(owner(request.target.ref)&&node.configuration?.status==='not_requested'
+   &&['source_sha256','source_utf8_bytes','source_lf_lines'].every(key=>source?.[key]===request.parameters.javascript_source[key])
+   &&source.source_operation_id===request.parameters.source_operation_id&&source.policy===JAVASCRIPT_MODULE_POLICY
+   &&typeof source.settings_sha256==='string'&&/^[a-f0-9]{64}$/.test(source.settings_sha256)
+   &&node.phases?.length===6&&['source','workflow','target','finish','execute','read'].every(phase=>
+    node.phases.filter(p=>p.phase===phase&&p.receipt_id===request.operation_id+':'+phase&&p.status==='verified').length===1),
+   'Managed JavaScript reread source or verified phases differ');
+ }
+ const read=reread?request:buildNodeReadRequest({operation_id:'preview-admission',source_operation_id:request.operation_id,read:{ports:[0]}},
   {parameters:request,outcome:latest.outcome});
  const outputs=node.output?.ports?.filter(p=>p.port===0),output=outputs?.[0],execution=node.execution?.execution_id;
  need(typeof execution==='string'&&execution.length>0&&node.output?.verified===true&&node.output.cleanup_complete===true
   &&node.output.execution_id===execution&&outputs?.length===1&&output.fresh===true&&output.execution_id===execution
   &&port.index===0&&port.native_index===0&&port.active===true&&output.port_guid===port.port_guid,
   'Managed JavaScript preview requires the same freshly executed native output zero');
- return {source_operation_id:request.operation_id,execution_id:execution,schema:read.parameters.schemas[0].schema};
+ return {source_operation_id:request.operation_id,execution_id:execution,
+  schema:reread?alignReadSchema(output.schema,read.parameters.schemas[0].schema):read.parameters.schemas[0].schema};
 }
 
 // Browser-only, fixed output-port observer. Visualizers contributes native
