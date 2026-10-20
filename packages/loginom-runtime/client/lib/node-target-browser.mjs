@@ -70,6 +70,14 @@ export async function readGraph(page, task) {
         // port whose live hit-test resolves to this exact native cell. Preserve
         // prior identity checks; never infer an index or repair the DOM.
         const previous=portIdentities.get(p);
+        // JavaScript's output AddPort is a service control, not a data port.
+        // Its SVG may lack data-tid and it has no GUID; never grant it a port
+        // identity or let it hide a previously bound data port or an edge.
+        if(type==='programming.javascript' && p.FSubType===10 && p.FCell?.visible===true
+          && p.FType===1 && p.FGuid==null && !previous && p.parent===n && p.FCell.parent===n.FCell
+          && element && containers[0].contains(element) && (!ptid || ptid===tid+';Output_Add')
+          && (p.FCell.edges==null || Array.isArray(p.FCell.edges) && p.FCell.edges.length===0)
+          && (n.FPorts??[]).flatMap(group=>group.FCollection??[]).filter(port=>port.FType===1&&port.FSubType===10).length===1)continue;
         if(!ptid && element && containers[0].contains(element) && visible(element)
           && p.FGuid && p.data && p.parent===n && p.FCell.parent===n.FCell
           && (!previous || (previous.graph===graph && previous.node===n && previous.cell===p.FCell

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {verifyNodeTargetEffect} from '../lib/node-target.mjs';
 import {createNodeTargetBrowserAdapter,readGraph} from '../lib/node-target-browser.mjs';
+import {NODE_TYPES} from '../lib/node-contracts.mjs';
 function fixture(){
  class PackageTreeNode{};class WorkFlowTreeNode{};class ModelForm{};
  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'tab',navigation_path:[{tid:'crumb',label:'Scenario'}]}};
@@ -39,7 +40,12 @@ function fixture(){
   const tid='MF;TF-1;Graph;connection|Output_Connection-0|rest|Input_Connection-0',dom=element(tid),edge={source:source.port.FCell,target:target.port.FCell};
   source.port.FCell.edges=[edge];inside.push(dom);extraStates.set(edge,{shape:{node:dom}});return {source,target,edge,tid};
  };
- return {restLink,binding:()=>readGraph(page,{request,types:{},origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
+ const addService=(tid=null)=>{
+  const port={parent:node,FType:1,FSubType:10,FCell:{parent:node.FCell,visible:true}},dom=element(tid);
+  node.FPorts[0].FCollection.push(port);inside.push(dom);extraStates.set(port.FCell,{shape:{node:dom}});
+  return {port,dom,hide:()=>{port.FCell.visible=false;extraStates.set(port.FCell,{});},unrender:()=>extraStates.set(port.FCell,{}),render:()=>extraStates.set(port.FCell,{shape:{node:dom}})};
+ };
+ return {restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
 }
 test('REST service edge is identified by native node/port types and the exact rendered edge, never labels',async()=>{
  const f=fixture(),link=f.restLink(),g=await f.read();
@@ -124,4 +130,41 @@ test('JavaScript tabular DOM identity cannot hide a foreign native port type',as
   const f=fixture();f.node.FIconCls='bg-vendor-icon-javascript';change(f);
   await assert.rejects(f.read(),/foreign native type/);
  }
+});
+
+test('JavaScript data0 remains fully bound beside its GUID-less service AddPort',async()=>{
+ const f=fixture();f.node.FIconCls='bg-vendor-icon-javascript';const service=f.addService();
+ const first=await f.binding();assert.equal(first.complete,true);
+ assert.deepEqual(Array.from(first.nodes[0].outputs),[0]);assert.deepEqual(Array.from(first.native_bindings[0].outputs),[0]);
+ assert.deepEqual(Array.from(first.nodes[0].other_ports),[]);
+ service.dom.getAttribute=()=> 'MF;TF-1;Graph;Calc;Output_Add';
+ assert.equal(JSON.stringify(await f.binding()),JSON.stringify(first));
+ f.losePortTid();await assert.rejects(f.binding(),/Visible port identity/);
+});
+
+test('hidden unrendered JavaScript service ports retain their existing graph behavior',async()=>{
+ const f=fixture();f.node.FIconCls='bg-vendor-icon-javascript';f.addService().hide();
+ const graph=await f.binding();assert.equal(graph.complete,true);assert.deepEqual(Array.from(graph.nodes[0].outputs),[0]);
+});
+
+test('pending JavaScript service SVG retains the existing read-only rendering wait',async()=>{
+ const f=fixture();f.node.FIconCls='bg-vendor-icon-javascript';const service=f.addService();service.unrender();
+ await assert.rejects(f.binding(),/Visible port identity is not rendered/);
+ f.paintWith(()=>service.render());assert.equal((await f.read()).complete,true);
+});
+
+test('only one owned unlinked output AddPort is outside the JavaScript data-port contract',async()=>{
+ for(const change of [
+  (f,s)=>{s.port.parent={};},(f,s)=>{s.port.FCell.parent={};},(f,s)=>{s.port.FType=0;},
+  (f,s)=>{s.port.FGuid='unexpected-guid';},(f,s)=>{s.port.FCell.edges=[{}];},
+  (f,s)=>{s.dom.getAttribute=()=> 'MF;TF-1;Graph;Calc;Output_Data-1';},
+  (f,s)=>{s.dom.getAttribute=()=> 'MF;TF-1;Graph;Other;Output_Add';},f=>{f.addService();}
+ ]){
+  const f=fixture();f.node.FIconCls='bg-vendor-icon-javascript';const service=f.addService();change(f,service);
+  await assert.rejects(f.binding(),/port.*(identity|native type)/i);
+ }
+ const nonJs=fixture();nonJs.addService();await assert.rejects(nonJs.binding(),/Visible port identity/);
+ const changed=fixture();changed.node.FIconCls='bg-vendor-icon-javascript';await changed.binding();
+ changed.port.FSubType=10;delete changed.port.FGuid;changed.losePortTid();
+ await assert.rejects(changed.binding(),/port.*(identity|native type)/i);
 });
