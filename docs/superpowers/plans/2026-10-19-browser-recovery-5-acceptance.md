@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - `acceptanceFault` никогда не передаётся продуктом (план 2, Task 7): `host.ts` его не читает, Node handshake и Desktop его не принимают; validation и readiness его отклоняют.
-- «Искусственно вызванный отказ допустим для воспроизводимости, но успешный unit-тест или вызов Playwright сам по себе не доказывает выполнение задачи.» Каждый сценарий доводит задачу до сохранённого пакета и прочитанного результата или проверенного файла.
+- «Искусственно вызванный отказ допустим для воспроизводимости, но успешный unit-тест или вызов Playwright сам по себе не доказывает выполнение задачи.» Каждый успешный восстановительный сценарий доводит задачу до сохранённого пакета и прочитанного результата или проверенного файла. BR-S6 — отрицательная проверка запретов и остановки, с отдельным учётом фактического cleanup/shutdown, как уточнено в Task 2.
 - Упакованные CLI и Desktop проверяются только на естественных отказах (решение владельца от 19.10). Строка матрицы, которой нужен отказ, без наблюдённого отказа получает `BLOCKED` с идентификаторами прогонов, а не PASS.
 - «Исход `recovered_via_browser` учитывается отдельно от чистого PASS»; `pass_rate`, `completion_rate` и `compare` не меняются.
 - Отчёты различают проверенные установленные артефакты и проверки из исходников. Приёмка — на Linux; Windows и macOS получают флаг без отдельной приёмки (решение владельца от 19.10), отчёт это называет.
@@ -110,11 +110,27 @@ git commit -m "feat(evals): count recovered_via_browser apart from clean passes"
 
 Сценарии BR-S2, BR-S4 и BR-S5 заканчиваются `package.save_checkpoint` через Dock и состоянием пакета `modified: false`.
 
+**Уточнение перед реализацией — independent plan review GO.** Исходные fault/trigger/result таблицы сохраняются. Дополнительного numeric-гейта Calculator 70/40 нет: требуются completed, execution/schema и успешное свежее чтение по квитанции. Принятые точные Alpha35/Beta20 на входном Group сохраняются.
+
+**BR-S6 — отрицательная native-проверка запретов и остановки по бюджету.** PASS относится только к выполнению её assertions и не означает completed/recovered export, сохранённый итоговый пакет либо успешную очистку. Recovery state, native package/logout cleanup и подтверждение shutdown отражаются отдельно по фактическим свидетельствам; BLOCKED/unknown не преобразуются в success. Финальный Save и успешное продолжение обязательны для BR-S2/S4/S5. Это согласованное прочтение специального критерия S6 и spec §8–11; новые release/cleanup-пути не добавляются.
+
+**Ближайший проверяемый путь и порядок:**
+
+1. До изменения harness выполнить временную отдельную public `supervise` пробу без fault: собственная SaveAs/fail-копия saved-A → fresh prepare → принятый existing Group → обычный Export → retained bytes/размер/SHA/правильные данные → Dock Save modified:false → собственный native cleanup и managed ACK/exit0. При первой неопределённости остановиться и диагностировать только этот основной путь. Временный код вне git удалить после пробы; в production и runtime ничего не добавлять.
+2. После PASS добавить и проверить только BR-S2: T2 → owned Cancel/подтверждение → continuable → исходная операция с `released_by` и receipt → новая полная операция над тем же existing Export node → текущий файл → Save/cleanup. Не resume и не recreate. Затем отдельно BR-S4, затем BR-S5 с исходными критериями; каждый следующий запуск только после проверки предыдущего.
+3. BR-S6 последним: четыре конкретных отказа без расхода бюджета, затем ровно30 разрешённых snapshots с подтверждённым документом и отказ31/stopped/budget_exhausted. Узкая ветвь expected refusal не ослабляет общий invoke или финализатор успешных S1–S5. Не требовать successful verified/dock_resumed/Save после предусмотренной остановки. Existing close вызвать один раз; сохранить фактический native cleanup, ACK/exit и наблюдённое закрытие собственных OS-процессов отдельно. Не повторять неизвестный жест, не добавлять logout/второй runtime для маскировки BLOCKED.
+
+**Существующие механизмы Export:** destination — новый UUID `.csv` в `dock_prepare.storage_directories.exports` каждого запуска; для контрольной пробы `overwrite:reject`, для BR-S2/S5/S6 — требуемый `replace`. В S2 продолжение сохраняет тот же destination этого запуска. Других CLI-входов, исторической Export-квитанции и общего изменяемого target нет. Используются public `exports.text`, mode `delimited`, input Group/output0 → input0, mappings `[]`, finish `execute`, read ports `[]`/sample_rows0/require_exact_numbersfalse. Параметры: UTF-8, delimiter `;`, header `names`, bom false, LF, decimal_separator `.`, null_marker пустой, text_qualifier `"`. Native destination_check/execution ownership связывают текущие operation/receipt/artifact с файлом; читается уже retained файл `<attempt>/artifacts/input/output-<artifact_id>/<basename>`, без второго download. Проверяются текущий lineage, raw bytes/размер/SHA и заданные данные по именам полей; предварительные успехи других сессий не доказывают текущий результат. Реальное неожиданное существование/чужой target — причина остановить конкретный прогон.
+
+**Публичные отказы S6:** Dock, browser_evaluate и browser_navigate в browser возвращают `BROWSER_RECOVERY_ACTIVE`; snapshot с filename — `BROWSER_RECOVERY_ARGUMENT_FORBIDDEN`. Они не расходуют бюджет: первый разрешённый snapshot показывает remaining29. У30 actual browser calls в журнале page origin_ok:true/page_count1/document_present:true; вызов31 не dispatch-ится и даёт budget_exhausted. Не требовать внутреннего TOOL_FORBIDDEN на другой публичной границе. Аргументы отклоняемых вызовов безопасны и относятся только к своей странице/evidence.
+
+**Объём/проверки/границы:** ~4–5 файлов, до +340/−45 строк с harness/runbook/report/plan/checkpoint; после удаления исторического input ожидается меньше. При ×2 пересмотреть подход. Единственная новая harness-ветвь — ожидаемые отказы и отдельный результат S6, необходимые его отрицательному критерию; runtime/API/deps/fixture stores/retries/monitoring не нужны. Native receipts каждого шага, syntax transpile, Desktop package-local bun typecheck и git diff --check; S1/S3 не повторять без изменения их поведения. Source/resource provenance указывается фактический, прежним bytes не присваивается новый source SHA. Installed acceptance, модели, workflow/merge/release и исправления Dock-процедур исключены. Исторические unknown сохраняются.
+
 - [ ] **Step 1: Extend the script and runbook**
 
 - [ ] **Step 2: Run the scenarios**
 
-Run: `cd packages/desktop && LOGINOM_AI_AGENT_TEST_CONFIG=<private config> LOGINOM_AI_AGENT_TEST_RESOURCES=<staged resources> bun test/loginom/browser-recovery-acceptance.ts BR-S2` (затем BR-S4, BR-S5, BR-S6)
+Run: `cd packages/desktop && LOGINOM_AI_AGENT_TEST_CONFIG=<private config> LOGINOM_AI_AGENT_TEST_RESOURCES=<staged resources> bun test/loginom/browser-recovery-acceptance.ts BR-S2 /path/to/private/saved-A.json` (затем BR-S4, BR-S5, BR-S6)
 Expected: все четыре выполняют требуемый результат; в журналах BR-S2, BR-S4 и BR-S5 есть `acceptance_fault_injected`, `browser_recovery_handoff`, `browser_recovery_verified`, `browser_recovery_dock_resumed`.
 
 - [ ] **Step 3: Write the report**
