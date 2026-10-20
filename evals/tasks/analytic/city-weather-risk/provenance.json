@@ -1,0 +1,128 @@
+{
+  "task_id": "city-weather-risk",
+  "dataset_sha256": {
+    "dataset.csv": "ec32fa60c4b1545eba7aec63b61b42b87ca9dc7243c77444c3ed3f683eb23102"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "6383c48f15aad5f8eb02781d950f9d2ffa766dcf40e3b3a1dc8847c1591e70bd"
+  },
+  "reference_sha256": "d2f3a1d5abecdc3d927072303e145a3b45e7438cb90ecd024a5d1b6e86879c29",
+  "cli": {
+    "binary": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/runtime/bin/loginom-ai-agent-cli",
+    "version": "0.2.2",
+    "profile": "profile"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-city-weather-risk-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/b29d301051dbf650009da62393b74d68b7a4fe805f13048065e6d4d61978c303-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_ea9d233b3ffePvygBU2wBboMpc",
+    "skill_revision": "8afb17d6a2c247fa0fb8fc6e2285e6ed05e6bf475a1a9d88ae7b760a29260dfc",
+    "exit_code": 0,
+    "started_at": "2026-10-20T01:00:01+03:00",
+    "duration_s": 1213,
+    "tokens": {
+      "input": 147475,
+      "output": 5819,
+      "reasoning": 3338
+    },
+    "tool_calls": 50,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-city-weather-risk-1/Unit1/workflow",
+  "source_task": "analitic-tasks/task58-openweather",
+  "runtime_pin": {
+    "version": "0.2.2",
+    "ci_run": 39210148809,
+    "ci_artifact": {
+      "id": 12168030843,
+      "name": "loginom-linux",
+      "sha256": "bf0e29fd686cb5ec50477a8e36775359486f6aafb93897dce363082fa879c86c"
+    },
+    "archive": {
+      "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/downloads/loginom-ai-agent-cli-0.2.2-linux-x64.tar.gz",
+      "sha256": "c612eab428e5dc16b9a6105cb4fd401a00c04a25dee6390644b50e86044283b9"
+    },
+    "source_commit": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "source_tree_sha256": "92f2bf27f7771109634d33bb8ce6ab1be4f84a74209a45936e0a18d430b57bff",
+    "cli_manifest_sha256": "26c94fe7d3d6f975cc2d60d99eb5f7b2b6fcb377c753c6de3079c155f41ac28c",
+    "resource_manifest_sha256": "0642015ac67c8f569e7b4d1ac158973d514ae39d72b77cacae10d48810fddd34",
+    "harness_sha": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "harness_clean": true
+  },
+  "independent_oracle_check": {
+    "pass": true,
+    "method": "blind Python stdlib csv + in-memory SQLite independent SQL; author oracle not provided",
+    "independent_csv_sha256": "a37a6965782f22052b10e667b5850762bdba28621386653835c8475df07ff4dc",
+    "query_sha256": "e98681ec0e1081c3aac00e35fb2582c2d56f78137b8dfb892c40527512984307",
+    "solver_sha256": "eae9569a56fb4abc8fe3cfe0078f438dd1cfd3759f7e31a3ce83d9ba82fb7da3",
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/independent/root/city-weather-risk/report.json",
+    "comparison": {
+      "passed": true,
+      "error": null
+    }
+  },
+  "browser_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/city-weather-risk/attempt-1/browser-rerun.json",
+    "screenshot": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/city-weather-risk/attempt-1/browser-rerun.png",
+    "all_nodes_active": true,
+    "closed_without_save": true,
+    "rounding_verified_in_exported_path": true
+  },
+  "graph_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/city-weather-risk/attempt-1/graph-inspection.json",
+    "node_count": 8,
+    "connected": true,
+    "exact_weather_flag_semantics_report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/reports/review-t58-weather-flag.md",
+    "exact_weather_flag_semantics_sha256": "1643aaa6e0b0c35b2b24cd38ca789a8e4e1233e18a74c8b7d200ac849d994371",
+    "raw_sort_before_explicit_Round_six": true
+  },
+  "fallback_used": false,
+  "attempt_history": [
+    {
+      "number": 1,
+      "classification": "accepted",
+      "analytic_revision": "primary",
+      "assisted": false,
+      "exit_code": 0,
+      "cli_check": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/city-weather-risk/attempt-1/check.json",
+      "rerun_check": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/city-weather-risk/attempt-1/check-rerun.json",
+      "in_attempt_technical_recovery": {
+        "operation_id": "weather-final-01",
+        "phase": "output_mapping",
+        "reason": "complete output definition page readiness timeout; no mutation authorized for stopped phase",
+        "resolution": "inspect then abandon_operation released_after_proof; weather-final-readback-02 succeeded",
+        "events": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/city-weather-risk/attempt-1/events.jsonl",
+        "content_failure_counted": false
+      }
+    }
+  ]
+}

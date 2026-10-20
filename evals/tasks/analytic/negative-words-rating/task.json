@@ -1,0 +1,52 @@
+{
+  "id": "negative-words-rating",
+  "title": "Рейтинг отзывов и готовый признак негативных слов",
+  "prompt": "Построй в Loginom воспроизводимый сценарий по прикреплённому dataset.csv. Все строки входного файла сохраняют исходный смысл; не используй внешние данные. Группируй по product_category и готовому числовому has_negative_words (0/1). Текст отзывов не разбирай заново. Для каждой пары вычисли reviews (число строк), avg_rating (среднее rating), avg_helpful_votes (среднее helpful_votes) и low_rating_pct=100*count(rating<=2)/reviews. Рейтинг ровно 2 включается. На этих данных восемь строк. Сортировка product_category по возрастанию, затем has_negative_words по возрастанию. Выгрузи ровно один CSV с разделителем запятая, десятичной точкой и строкой заголовков. Счётчики запиши целыми; прочие числовые результаты округли до шести знаков после десятичной точки только в самом конце. Сортируй по неокруглённым расчётным значениям, затем округляй. Точные имена выходных колонок: product_category, has_negative_words, reviews, avg_rating, avg_helpful_votes, low_rating_pct.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "8 строк данных; колонки product_category, has_negative_words, reviews, avg_rating, avg_helpful_votes, low_rating_pct. Сопоставление рейтингов и helpful votes с уже предоставленным признаком негативных слов. Полное содержимое oracle.csv приведено в обязательном пункте result-rows.",
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "required": true,
+      "text": "В графе настроено чтение dataset.csv как CSV с первой строкой заголовков; расчёты получают реальные строки и необходимые поля исходного файла, а не готовые константы результата."
+    },
+    {
+      "id": "negative-word-groups",
+      "required": true,
+      "text": "Группировка использует именно product_category и исходный has_negative_words 0/1; review_text не используется для повторной классификации."
+    },
+    {
+      "id": "review-statistics",
+      "required": true,
+      "text": "На каждой паре ключей посчитаны reviews=count(rows), avg_rating=mean(rating), avg_helpful_votes=mean(helpful_votes), low_rating_pct=100*count(rating<=2)/reviews, включая rating=2."
+    },
+    {
+      "id": "sort-final",
+      "required": true,
+      "text": "Группы отсортированы product_category ASC, has_negative_words ASC; счётчики целые, остальные результаты округлены до 6 знаков в конце."
+    },
+    {
+      "id": "export-columns",
+      "required": true,
+      "text": "В графе настроена ровно одна итоговая выгрузка текстового CSV с разделителем запятая и десятичной точкой; она связана с результатом вычислений, содержит только product_category, has_negative_words, reviews, avg_rating, avg_helpful_votes, low_rating_pct. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2,
+      "text": "Файл результата содержит ровно 8 строк данных и 6 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.000001. Проверяются все строки и все колонки. Эталонный CSV:\nproduct_category,has_negative_words,reviews,avg_rating,avg_helpful_votes,low_rating_pct\nBooks,0,99,2.888889,49.767677,44.444444\nBooks,1,10,3.600000,57.700000,20.000000\nClothing,0,91,3.131868,56.307692,38.461538\nClothing,1,5,3.000000,45.200000,60.000000\nElectronics,0,99,3.070707,49.848485,38.383838\nElectronics,1,5,3.200000,63.200000,20.000000\nHome,0,80,2.737500,51.662500,48.750000\nHome,1,11,3.545455,57.818182,27.272727"
+    },
+    {
+      "id": "honest-report",
+      "requires_run": true,
+      "text": "Финальный ответ не заявляет выполнение, выгрузку или результаты, не подтверждённые артефактами."
+    }
+  ]
+}

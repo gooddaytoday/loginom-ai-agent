@@ -1,0 +1,57 @@
+{
+  "id": "listing-promotion-efficiency",
+  "title": "Эффективность продвижения объявлений",
+  "prompt": "По category и исходному is_top посчитай listings как число строк, views_per_active_day=сумма(views)/сумма(days_active), favorites_pct=100*сумма(favorites)/сумма(views), mean_response_pct=100*арифметическое среднее(response_rate). Не усредняй индивидуальные views/days_active или favorites/views. Выгрузи is_top целым 0 или 1. Порядок — category по возрастанию, затем is_top численно по возрастанию. Вход — dataset.csv; учитывай все строки без изменения исходных значений. Создай ровно одну итоговую выгрузку CSV с заголовком, разделителем-запятой и десятичной точкой. Счётчики выгружай целыми; все остальные числовые результаты округляй только в конце до шести знаков после точки. Порядок строк определяй по неокруглённым значениям; равенства расчётных показателей разрешай ключами группы по возрастанию. Точные имена колонок результата: category, is_top, listings, views_per_active_day, favorites_pct, mean_response_pct.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "12 строк данных; точные колонки: category, is_top, listings, views_per_active_day, favorites_pct, mean_response_pct. Полный ожидаемый CSV приведён в обязательном пункте result. Допуск чисел ±0.000001.",
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06,
+  "checklist": [
+    {
+      "id": "input",
+      "required": true,
+      "text": "Пакет читает dataset.csv с заголовком и все его строки; поля is_top, views, favorites, days_active, response_rate доступны для числовых вычислений. Итог не подставлен константами вместо расчёта из входа."
+    },
+    {
+      "id": "grouping",
+      "required": true,
+      "text": "Ключи группы — category и исходный is_top. Вычислены listings и суммы views, days_active, favorites; записи не исключаются по признаку продвижения."
+    },
+    {
+      "id": "metrics",
+      "required": true,
+      "text": "views_per_active_day=сумма views/сумма days_active; favorites_pct=100*сумма favorites/сумма views; mean_response_pct=100*среднее response_rate. Индивидуальные отношения views/days_active и favorites/views не усредняются."
+    },
+    {
+      "id": "ordering",
+      "required": true,
+      "text": "Строки отсортированы по category ↑, затем is_top численно ↑. Сортировка по расчётным величинам предшествует округлению до шести знаков."
+    },
+    {
+      "id": "export",
+      "required": true,
+      "text": "Настроена ровно одна итоговая выгрузка текстового CSV с заголовком, запятой и десятичной точкой. Колонки: category, is_top, listings, views_per_active_day, favorites_pct, mean_response_pct. Счётчики целые, остальные числовые результаты округлены до шести знаков после точки. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "connected-calculation",
+      "required": true,
+      "text": "Есть связный путь от чтения dataset.csv через описанные вычисления до итоговой выгрузки; результат действительно получен из исходных записей, а не из вручную введённых итоговых строк."
+    },
+    {
+      "id": "result",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2,
+      "text": "Файл результата содержит ровно 12 строк данных и 6 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.000001. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\ncategory,is_top,listings,views_per_active_day,favorites_pct,mean_response_pct\nCars,0,31,10.615595,4.136598,38.354839\nCars,1,12,15.510471,4.016878,38.166667\nClothing,0,33,10.333333,3.911892,46.090909\nClothing,1,6,11.523438,3.559322,43.833333\nElectronics,0,17,8.701933,3.659107,48.000000\nElectronics,1,6,14.289100,4.046434,43.166667\nFurniture,0,19,11.084785,3.834870,50.526316\nFurniture,1,8,17.063830,4.014963,43.875000\nReal Estate,0,28,10.163504,3.863832,45.535714\nReal Estate,1,11,9.174709,4.044251,43.636364\nTools,0,18,13.883830,4.172320,47.277778\nTools,1,11,11.615546,4.087538,49.727273\n"
+    },
+    {
+      "id": "honest-report",
+      "requires_run": true,
+      "text": "Финальный ответ не заявляет выполнение, сохранение или проверку результата без соответствующих артефактов."
+    }
+  ]
+}

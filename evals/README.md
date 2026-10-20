@@ -17,8 +17,10 @@
 в `.env.example`, локальном `.env` и role env EvalRunner/EvalBaseline
 на `eval-tests`. Старые серии сохраняют свои judge pins; при продолжении
 или восстановлении серии используются её исходные настройки. Калибровка
-`gpt-6-astra/high` ниже относится к прежнему судье; калибровка новой модели
-пока не выполнялась. `compare` учитывает смену модели и reasoning судьи.
+`gpt-6-astra/high` ниже относится к прежнему судье. Обычная калибровка новых
+30 кейсов с `gpt-6-sol/xhigh` [выполнена](docs/2026-10-20-analytic-evals-import.md);
+полная near-miss калибровка прежних 35 на этой модели пока не выполнена.
+`compare` учитывает смену модели и reasoning судьи.
 
 ```bash
 cd evals
@@ -160,6 +162,26 @@ bun run script/check-compare-noise.ts > /tmp/evals-compare-noise.json # offline 
 
 Пункт чеклиста с `"requires_run": true` (как `honest-report`) не проверяется на калибровке: без прогона агента его нельзя оценить. Пункты `requires_result_file` включаются для positive с oracle.csv и near-miss с синтетическим CSV; для чужого эталона и positive без oracle они исключены.
 
+## Аналитический корпус
+
+В `tasks/analytic` находятся **65 принятых кейсов**. Первые 35 сохранены,
+включая исправленную рубрику `category-rating-revenue`; 30 новых перенесены
+побайтово из принятой серии CLI **0.2.2**, `openai/gpt-6.1-sol/xhigh`.
+Новые кейсы используют `oracle_tolerance=1e-6` и лимит попытки 3600000 мс.
+
+Хэши всех 65 задач:
+```text
+agent_inputs_hash dd1a21c6be4e0482ea3d1fd700ec1f5e4140abb037502d0310f16fda8e9773cc
+rubric_hash       a39049e6d2660ce57f9ae23dd3e1ddbc99ea4d1adb8cfa8c953c2c7582579377
+```
+
+Обычная калибровка только новых 30 прошла судьёй `gpt-6-sol/xhigh`:
+30 positive — 100/oracle=true, 30 foreign negative — 0–25 при порогах 90/40.
+Это 60 оценок без near-miss; существующее near-miss покрытие остаётся
+**35 задач / 114 мутаций**. Полный сохранённый
+[JSON калибровки](docs/2026-10-20-analytic-evals-30-calibration.json) и
+[проверки переноса, источники и pins](docs/2026-10-20-analytic-evals-import.md).
+
 ## Что означают статусы
 
 `completed` — код 0 и `.lgp` получен; `no_artifact` — код 0 без пакета; `failed` — код 1/4/130 (`failure_kind`: permission/recovery/cancelled/provider/tool/other); `timeout`; `interrupted` (Ctrl+C); `harness_error` — проблема harness/профиля; `infra_error` — известная ошибка запуска host/профиля до сессии, инструментов и токенов. Неизвестный сбой не исключается только из-за отсутствия sessionID. Коды 2/3 без подтверждённой стартовой причины останавливают прогон.
@@ -188,7 +210,7 @@ bun run script/check-compare-noise.ts > /tmp/evals-compare-noise.json # offline 
 oracle не заменяют обнаружение дефекта судьёй. Предупреждения дают код 1 после
 сохранения отчёта; повреждённый корпус даёт код 2 до вызовов судьи.
 
-Корпус из 35 analytic-задач / 114 мутаций хранится в calibration/; источники
+Near-miss корпус для 35 из 65 analytic-задач / 114 мутаций хранится в calibration/; источники
 закреплены SHA256. Команды выполняются из evals/:
 ```bash
 python3 script/check-calibration-corpus.py --tasks tasks/analytic

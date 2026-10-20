@@ -1,0 +1,101 @@
+application_id,service,applicant_age,region,submission_method,processing_days,status,satisfaction,documents_provided,is_digital
+1,Birth certificate,38,SPb,Gosuslugi,12,Submitted,2,7,1
+2,Property registration,45,Moscow,Gosuslugi,5,Submitted,5,4,0
+3,Tax filing,65,Moscow,Gosuslugi,22,Approved,8,7,1
+4,Tax filing,53,Regional,Gosuslugi,20,Submitted,7,1,1
+5,Birth certificate,57,SPb,MFC,22,Rejected,7,1,1
+6,Passport,19,Regional,Gosuslugi,28,Submitted,6,7,1
+7,Passport,59,Regional,Gosuslugi,24,Approved,3,1,1
+8,Business registration,26,Moscow,Gosuslugi,3,Approved,5,7,0
+9,Passport,40,Rural,MFC,5,Approved,1,4,1
+10,Tax filing,32,Regional,Gosuslugi,2,In progress,7,2,1
+11,Property registration,30,Rural,Gosuslugi,14,Approved,9,5,0
+12,Birth certificate,40,SPb,Gosuslugi,2,Approved,1,4,1
+13,Car registration,34,Moscow,Gosuslugi,13,In progress,2,2,1
+14,Property registration,79,SPb,Gosuslugi,7,In progress,3,2,1
+15,Car registration,65,SPb,MFC,10,Approved,3,6,1
+16,Property registration,77,Moscow,Gosuslugi,13,Approved,8,4,1
+17,Passport,19,SPb,Gosuslugi,16,In progress,7,4,0
+18,Tax filing,37,Moscow,Gosuslugi,26,Rejected,6,7,0
+19,Car registration,37,Rural,MFC,14,Submitted,10,2,1
+20,Property registration,76,SPb,Gosuslugi,11,In progress,10,2,1
+21,Tax filing,63,Moscow,Gosuslugi,10,Approved,4,2,1
+22,Car registration,20,Regional,Gosuslugi,6,Approved,9,7,1
+23,Birth certificate,72,SPb,Gosuslugi,4,Approved,1,6,1
+24,Property registration,29,Rural,Gosuslugi,21,Rejected,2,4,1
+25,Birth certificate,57,Moscow,Gosuslugi,1,In progress,4,2,0
+26,Passport,19,SPb,Gosuslugi,7,Submitted,3,1,1
+27,Birth certificate,53,SPb,Gosuslugi,24,Submitted,1,4,1
+28,Birth certificate,31,SPb,Gosuslugi,9,Approved,5,7,1
+29,Business registration,33,Rural,Gosuslugi,8,Approved,7,6,0
+30,Property registration,36,Moscow,Gosuslugi,5,Submitted,2,1,1
+31,Passport,51,Regional,MFC,19,Submitted,5,7,1
+32,Birth certificate,61,Regional,Direct,10,Submitted,6,3,1
+33,Tax filing,78,Regional,Direct,11,Approved,7,4,0
+34,Car registration,63,Moscow,Direct,25,In progress,1,3,1
+35,Birth certificate,23,Regional,MFC,15,In progress,7,7,1
+36,Passport,30,Rural,MFC,6,Approved,4,7,1
+37,Birth certificate,53,Moscow,Gosuslugi,15,Approved,8,7,0
+38,Car registration,39,SPb,MFC,5,Approved,4,2,1
+39,Passport,35,Rural,Gosuslugi,29,Approved,6,6,0
+40,Property registration,29,SPb,Gosuslugi,19,Submitted,9,2,1
+41,Passport,69,Regional,MFC,22,Approved,5,6,1
+42,Property registration,76,Rural,Gosuslugi,19,Approved,4,5,1
+43,Passport,71,Moscow,Gosuslugi,10,Rejected,8,2,1
+44,Car registration,47,Rural,Direct,12,Submitted,9,3,0
+45,Car registration,70,SPb,Gosuslugi,22,Submitted,4,6,1
+46,Passport,68,Moscow,Gosuslugi,4,Submitted,3,2,1
+47,Birth certificate,57,Rural,Direct,18,In progress,8,4,1
+48,Car registration,24,Rural,MFC,16,Approved,5,7,1
+49,Property registration,49,Rural,Gosuslugi,8,Submitted,2,6,1
+50,Property registration,65,Rural,Gosuslugi,4,In progress,10,6,1
+51,Tax filing,36,Moscow,Gosuslugi,25,In progress,9,2,0
+52,Business registration,23,SPb,Direct,23,Submitted,3,5,1
+53,Business registration,37,Rural,Gosuslugi,12,In progress,2,2,1
+54,Business registration,44,Moscow,Gosuslugi,2,Submitted,1,3,1
+55,Property registration,70,SPb,Gosuslugi,4,In progress,8,3,1
+56,Tax filing,60,Rural,Gosuslugi,5,Approved,3,6,1
+57,Business registration,54,SPb,Direct,3,Approved,7,6,1
+58,Business registration,65,SPb,Gosuslugi,9,Submitted,1,2,0
+59,Passport,24,Moscow,MFC,29,Rejected,1,3,1
+60,Passport,76,SPb,Gosuslugi,21,Approved,9,3,1
+61,Passport,22,Moscow,MFC,18,Approved,8,5,1
+62,Birth certificate,28,Rural,Direct,11,Submitted,3,4,1
+63,Business registration,32,SPb,Gosuslugi,3,Submitted,6,5,1
+64,Birth certificate,20,SPb,Gosuslugi,25,Submitted,3,1,1
+65,Tax filing,75,Regional,Gosuslugi,23,Submitted,4,7,1
+66,Property registration,22,Rural,MFC,2,In progress,1,5,0
+67,Business registration,40,Rural,Gosuslugi,9,Rejected,5,2,1
+68,Property registration,70,Regional,Direct,14,In progress,1,4,1
+69,Passport,54,Regional,MFC,4,Submitted,1,2,1
+70,Business registration,26,Moscow,Direct,29,Approved,10,7,1
+71,Car registration,32,Moscow,MFC,9,Submitted,7,1,1
+72,Birth certificate,20,SPb,Gosuslugi,13,Approved,6,4,1
+73,Birth certificate,46,SPb,Gosuslugi,18,Approved,2,6,1
+74,Business registration,23,SPb,Gosuslugi,15,Approved,2,3,0
+75,Passport,34,SPb,Direct,28,Rejected,7,5,1
+76,Birth certificate,43,Moscow,MFC,10,Submitted,1,2,1
+77,Passport,38,Rural,MFC,16,Approved,2,1,1
+78,Tax filing,25,SPb,Gosuslugi,12,Rejected,8,3,1
+79,Property registration,38,Rural,Gosuslugi,20,Approved,6,5,1
+80,Car registration,74,SPb,MFC,5,In progress,2,3,1
+81,Property registration,28,Regional,Gosuslugi,2,Rejected,7,5,1
+82,Property registration,55,SPb,Gosuslugi,10,Submitted,4,6,0
+83,Tax filing,25,SPb,MFC,1,Rejected,2,4,1
+84,Birth certificate,59,SPb,Gosuslugi,7,Submitted,6,3,1
+85,Car registration,41,Moscow,Gosuslugi,26,Approved,9,3,1
+86,Birth certificate,78,Regional,Gosuslugi,17,Approved,9,3,1
+87,Business registration,52,SPb,Gosuslugi,16,Submitted,8,4,1
+88,Property registration,72,SPb,Direct,27,In progress,3,1,1
+89,Business registration,31,Rural,Gosuslugi,27,In progress,3,5,1
+90,Passport,72,Regional,Gosuslugi,24,Rejected,2,6,1
+91,Property registration,31,SPb,Gosuslugi,3,Approved,5,3,0
+92,Birth certificate,27,Rural,MFC,14,Approved,4,7,1
+93,Property registration,29,Rural,Gosuslugi,10,Approved,7,4,1
+94,Passport,55,Moscow,Gosuslugi,22,Approved,4,1,1
+95,Tax filing,61,Rural,Gosuslugi,7,In progress,9,5,1
+96,Business registration,72,SPb,Gosuslugi,26,In progress,2,4,1
+97,Business registration,63,Moscow,Gosuslugi,17,Approved,6,6,1
+98,Birth certificate,51,Moscow,MFC,6,In progress,7,6,0
+99,Property registration,58,SPb,Direct,23,Submitted,4,5,1
+100,Birth certificate,27,Regional,Gosuslugi,22,Submitted,6,3,1
