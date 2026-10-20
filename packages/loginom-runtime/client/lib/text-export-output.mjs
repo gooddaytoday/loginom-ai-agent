@@ -269,7 +269,8 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   // replaces its error. Never copy arbitrary messages, URLs or local paths.
   const failure={step:readStep,code:/^[A-Z][A-Z0-9_]{0,79}$/.test(error?.code??'')?error.code:null,
    kind:['Error','TypeError','RangeError','SyntaxError','ReferenceError','TimeoutError','AbortError','TargetClosedError'].includes(error?.name)?error.name:'OtherError',
-   reason:['Unique export file control required','Export observation document changed','Export storage gesture requires inspection',
+   reason:error?.code==='STORAGE_ENTRY_UNAVAILABLE'&&['no_scroll_owner','folder_end'].includes(error.storage_entry?.reason)?error.storage_entry.reason
+    :['Unique export file control required','Export observation document changed','Export storage gesture requires inspection',
     'Export file read did not return to its workflow','Output lease owner changed','Unverified output cannot be retained',
     'Invalid artifact identity','Artifact must be a regular file','Artifact changed before reading',
     'Artifact size or SHA does not match the admitted identity'].includes(error?.message)?error.message:null};

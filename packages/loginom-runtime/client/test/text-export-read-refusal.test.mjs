@@ -95,13 +95,13 @@ for(const fault of ['binding','execution','lease','restore','cleanup','transport
  assert.equal(saved.operation_id,'export-op');assert.equal(saved.status,'AMBIGUOUS');assert.equal(page.storage.size,0);
 });
 
-for(const kind of ['success','download_refusal','ambiguous_download','download_transport','open_files','root_stale',
+for(const kind of ['folder_end','no_scroll_owner','success','download_refusal','ambiguous_download','download_transport','open_files','root_stale',
  'return_tab_observation','download_select','directory_navigation','storage_scroll','unknown_scroll','unclean_scroll','changed_scroll','scroll_unobserved','foreign_storage',
  'mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure',
  'return_tabs_stale','return_tabs_foreign','return_tabs_document','return_tabs_other','return_tabs_exhausted',
- 'verified_return_observation','retain_failure','retain_private'])test('native export read and real save: '+kind,async()=>{
- const success=['success','return_tabs_stale'].includes(kind),storage=kind.includes('scroll')||kind==='foreign_storage';
- const downloadSucceeded=success||kind.startsWith('return_tabs_')||['verified_return_observation','retain_failure','retain_private'].includes(kind);
+ 'verified_return_observation','retain_failure','retain_private','retain_storage_private','retain_storage_wrong_code'])test('native export read and real save: '+kind,async()=>{
+ const success=['success','return_tabs_stale'].includes(kind),storage=kind.includes('scroll')||['folder_end','foreign_storage'].includes(kind);
+ const downloadSucceeded=success||kind.startsWith('return_tabs_')||['verified_return_observation','retain_failure','retain_private','retain_storage_private','retain_storage_wrong_code'].includes(kind);
  const blocked=['mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure','return_tabs_document','return_tabs_exhausted'].includes(kind);
  let files=false,downloads=0,releases=0,retained=0,failed=false,tabReads=0,freshRoots=0;const gestures=[],records=[];
  let scrollTop=0,observationFailed=false,directory=kind==='directory_navigation'?'/':'/user';
@@ -116,8 +116,8 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
    element('MF;TF-2;NavigationBar;NavigationPanel'),element('MF;TF-2;FileStorageForm;btnRefresh'),
    element('MF;TF-2;FileStorageForm;pnlFileStorage;tbl','file-table'),
    ...(kind==='directory_navigation'?[element('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix('user'),'folder',{label:'user',storage_entry:{kind:'folder'},allowed_actions:['double_click']})]:[]),
-   ...(storage?[element('MF;TF-2;FileStorageForm;colName_other','other',{label:'other',interaction:{state:'point_observed'},
-    scroll:{ref:'ui-scroll-owner',top:kind==='changed_scroll'?999:scrollTop,max_top:3000},allowed_actions:['scroll']})]
+   ...(kind==='no_scroll_owner'?[]:storage?[element('MF;TF-2;FileStorageForm;colName_other','other',{label:'other',interaction:{state:'point_observed'},
+    scroll:{ref:'ui-scroll-owner',top:kind==='changed_scroll'?999:scrollTop,max_top:kind==='folder_end'?0:3000},allowed_actions:['scroll']})]
     :[element('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix('result.csv'),'csv',{label:'result.csv',storage_entry:{bytes:57},allowed_actions:['click','double_click']})])]},
   file_storage:files?{status:'observed',directory}:undefined});
  const options={operation:{id:'export-op'},targetOrigin,targetBuild:'7.4',storageDirectories:{packages:'/user',inputs:'/user',exports:'/user'},
@@ -125,6 +125,8 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
   artifactStore:{outputSessionId:'session',stageOutput:async b=>{assert.deepEqual(b,binding);return {artifact_id:'artifact',path:'/private/download.csv',
    release:async()=>{if(kind==='lease_failure')throw Error('lease unavailable');releases++;},retain:async()=>{
     if(kind==='retain_failure')throw Error('Artifact size or SHA does not match the admitted identity');
+    if(kind==='retain_storage_wrong_code')throw Object.assign(Error('private /token/path'),{code:'OTHER_ERROR',storage_entry:{reason:'no_scroll_owner'}});
+    if(kind==='retain_storage_private')throw Object.assign(Error('private /token/path'),{code:'STORAGE_ENTRY_UNAVAILABLE',storage_entry:{reason:'/token/path',name:'/token/path',directory:'/token/path'}});
     if(kind==='retain_private')throw Object.assign(new TypeError('private /token/path'),{code:'private-unsafe'});
     assert.ok(success);retained++;},
    verify:async()=>{assert.ok(downloadSucceeded);return {artifact_id:'artifact',bytes:57,sha256:'abc'};}};}},
@@ -210,11 +212,17 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
  if(downloadSucceeded&&!success&&!blocked){
   const failure=result.nodePhaseRefusal.proof.failure;
   assert.equal(failure.step,kind==='verified_return_observation'?'return_workspace_roots':kind.startsWith('return_tabs_')?'return_tabs_observation':'retain_file');
-  assert.equal(failure.code,kind==='verified_return_observation'||kind==='return_tabs_other'?'UI_SCAN_LIMIT':kind==='return_tabs_exhausted'?'UI_ROOT_STALE':null);
+  assert.equal(failure.code,kind==='retain_storage_wrong_code'?'OTHER_ERROR':kind==='retain_storage_private'?'STORAGE_ENTRY_UNAVAILABLE':kind==='verified_return_observation'||kind==='return_tabs_other'?'UI_SCAN_LIMIT':kind==='return_tabs_exhausted'?'UI_ROOT_STALE':null);
   assert.equal(failure.kind,kind==='retain_private'?'TypeError':'Error');
   assert.equal(failure.reason,kind==='retain_failure'?'Artifact size or SHA does not match the admitted identity':null);
   assert.deepEqual(records.find(r=>r.phase==='export_file_read_refused_restored').proof.failure,failure);
   assert.ok(!JSON.stringify(result.nodePhaseRefusal).includes('/token/path'));
+ }
+ if(['no_scroll_owner','folder_end'].includes(kind)){
+  const failure=result.nodePhaseRefusal.proof.failure;
+  assert.deepEqual(failure,{step:'storage_navigation',code:'STORAGE_ENTRY_UNAVAILABLE',kind:'Error',reason:kind});
+  assert.deepEqual(records.find(r=>r.phase==='export_file_read_refused_restored').proof.failure,failure);
+  assert.equal(downloads,0);
  }
  if(kind==='return_tabs_stale'){
   assert.equal(tabReads,2);assert.equal(freshRoots,1);assert.equal(downloads,1);
