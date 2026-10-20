@@ -48,7 +48,15 @@ const appCache: Partial<Record<string, CachedApp>> = {}
 export async function disposeApps() {
   const apps = Object.values(appCache)
   for (const key of Object.keys(appCache)) delete appCache[key]
-  await Promise.all(apps.flatMap((app) => (app === undefined ? [] : [app.dispose()])))
+  await Promise.all(
+    apps.map(async (app, index) => {
+      if (app === undefined) return
+      // Cache keys contain credentials; identify cleanup by numeric index only.
+      console.error(`[httpapi-cleanup] BEGIN app ${index}`)
+      await app.dispose()
+      console.error(`[httpapi-cleanup] END app ${index}`)
+    }),
+  )
 }
 
 function app(modules: Runtime, options: CallOptions) {
