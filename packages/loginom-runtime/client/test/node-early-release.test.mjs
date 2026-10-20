@@ -28,6 +28,8 @@ function fixture(phase='target',type='imports.text'){
       operation_id:'apply',phase:'observed',effect_possible:false,output:state.receiptResult,error:null,trace:[]};throw Error('Unexpected browser transport');},nodeTargetAdapterFactory:()=>adapter,
     nodeApplyHandlers:new Map([[type,{revision:'1',modes:['test'],validate:()=>{},configure:async()=>ok()}]]),
     nodeApplyDriverFactory:({operation})=>{state.operation=operation;return {
+      ...(type==='programming.javascript'?{releasePendingPhases:['input_mapping','open','configure'],
+        releasePending:async()=>{throw Error('Early target must use its graph release verifier');}}:{}),
       verifySource:async()=>{if(phase==='source')throw Error('Injected source failure');return ok();},
       ...(phase==='target_before_create'?{beforeTarget:async()=>{throw Error('Injected preflight failure before creation');}}:{}),
       openWizard:async()=>{throw Error('No wizard should open');},mapPorts:async()=>ok(),verifyContinuation:async()=>true,
@@ -131,7 +133,7 @@ test('unknown transport never admits early release or browser recovery',async()=
   assert.throws(()=>f.runtime.browserRecoveryBasis('apply'),/No browser recovery trigger/);
 });
 
-for(const type of ['imports.text','exports.text'])test('refused early release offers only graph-restoring browser recovery, then re-verifies: '+type,async()=>{
+for(const type of ['imports.text','exports.text','programming.javascript'])test('refused early release offers only graph-restoring browser recovery, then re-verifies: '+type,async()=>{
   const f=fixture('target',type);await stop(f);f.state.blocked=true;
   const refused=await release(f);
   assert.equal(refused.output.next_step.tool,'dock_browser_recovery');

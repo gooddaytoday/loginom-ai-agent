@@ -159,8 +159,8 @@ test('export input guidance preserves an admitted release and browser recovery',
   f.handlers.set('exports.text',{...f.handler,fileOutput:true});
   f.drivers.mapPorts=async()=>{throw Error('Initial bound observation is no longer current or ready');};
   f.drivers.releasePending=async()=>{throw Error('not invoked by inspection');};
-  // With no admitted release phase, enabled browser recovery is the next path.
-  if(browserRecovery)f.drivers.releasePendingPhases=['finish'];
+  // A separate browser verifier admits this phase outside native release.
+  if(browserRecovery){f.drivers.releasePendingPhases=['finish'];f.drivers.recoveryReleasePending=f.drivers.releasePending;}
   const r=request();r.target.type='exports.text';
   await f.runtime.startNodeApply(r);await f.runtime.waitNodeApply(r.operation_id,{timeoutMs:1000});
   const inspected=await f.runtime.inspect({operationId:r.operation_id});
