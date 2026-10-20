@@ -9,6 +9,20 @@ import { gitInfo } from "../src/preflight"
 import { afterAttempt, main, redact, runAttempt, stamp } from "../src/run"
 import type { RunSummary } from "../src/report"
 import { loadTasks } from "../src/task"
+import { readStartupCleanup } from "../src/startup-reconciliation"
+
+test("runAttempt: startup accepts the emitted cleanup receipt", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-attempt-startup-receipt-"))
+  try {
+    const config = loadConfig(["--dry-run"], { EVAL_WORKSPACE_ROOT: path.join(root, "workspace"), EVAL_PROFILE_DIR: path.join(root, "profile") })
+    const [task] = await loadTasks(config.tasksDir, ["calc-data-double"])
+    const runDir = path.join(root, "results")
+    await runAttempt({ config, command: agentCommand(config), source: parseArtifactSource(config.artifactSource, config.loginom),
+      task: task!, attempt: 1, runId: "startup", runDir, signal: new AbortController().signal, profileRecovered: false, skipJudge: true })
+    expect(await readStartupCleanup(path.join(runDir, task!.id, "1/cleanup.json"), process.pid))
+      .toMatchObject({ status: "confirmed", capture_complete: true, unknownProcesses: [] })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("main: unfinished v2 admission cannot fall through to legacy dispatch", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-v2-admission-"))

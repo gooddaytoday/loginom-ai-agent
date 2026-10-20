@@ -6,6 +6,20 @@ import { readStartupCleanup, readStartupManagement } from "../src/startup-reconc
 import { writeLeaseReceipt } from "../src/lease"
 import { reconcileEnvironment } from "../src/startup-reconciliation"
 import { parallelFixture } from "./helpers/parallel-fixture"
+import { management } from "../src/profile"
+
+test("startup accepts the cleanup receipt produced by management", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-startup-management-receipt-"))
+  let confirmed = false
+  try {
+    const result = await management({ mode: "fake", cmd: [process.execPath, "-e", "console.log('ready')"],
+      cwd: root, env: { PATH: process.env.PATH ?? "" }, cleanupDir: path.join(root, "management-command-a") }, ["loginom", "status"])
+    confirmed = result.processCleanup.status === "confirmed"
+    expect(confirmed).toBe(true)
+    expect(await readStartupManagement({ stateDir: root, commandId: "command", slotId: "a", producerPid: process.pid }))
+      .toEqual(result.processCleanup)
+  } finally { if (confirmed) await rm(root, { recursive: true }) }
+})
 
 test("startup uses supervisor cleanup and refuses unknown prior processes before deletion", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-startup-"))
