@@ -1940,6 +1940,59 @@ test('typed Calculator parameter editing binds dialog, selected row and exact dr
   }
 });
 
+test('Calculator Apply confirms Token metadata without exposing sensitive controls or table values',async()=>{
+  const {page,base,records}=calculatorManifestFixture(),r=records[0];
+  page.waitForTimeout=async()=>{};
+  const dialog=page.add('div',base+'ExprDataEditForm');dialog.attrs.class='x-window';
+  for(const [key,value] of [['edtName','Token'],['edtDisplayName','Token'],['cbxDataType','Строковый']]) {
+    const owner=page.add('div',base+'ExprDataEditForm;'+key,'',undefined,dialog);
+    page.add('input',null,'',undefined,owner).value=value;
+  }
+  const button=page.add('button',base+'ExprDataEditForm;btnApply','Изменить',{x:600,y:400,width:90,height:25},dialog);
+  const roots=await page.execute({mode:'observe',discover_roots:true});
+  const root=roots.output.ui.elements.find(e=>e.tid===base+'ExprDataEditForm');
+  const read=await page.execute({mode:'observe',root_ref:root.ref});
+  const target=read.output.ui.elements.find(e=>e.tid===button.getAttribute('data-tid'));
+  const click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);dialog.remove();
+    r.cell.attrs['data-tid']=base+'CalcDataWizard;colExpressionName_Token';r.cell.ownText='Token';
+    r.label.attrs['data-tid']=base+'CalcDataWizard;colExpressionDisplayName_Token';r.label.ownText='Token';
+    r.icon.attrs.class='bg-TBGDataType-dtString';
+  };
+  const outcome=await page.act({verb:'apply_expression_parameters',ref:target.ref},read.output);
+  assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome.error));
+  assert.deepEqual(Object.fromEntries(['name','label','type_label'].map(k=>[k,outcome.output.wizard.expression_selection[k]])),
+    {name:'Token',label:'Token',type_label:'Строковый'});
+  assert.equal(outcome.output.wizard.calculator_expressions.fields[0].name,'Token');
+  assert.equal(outcome.output.wizard.calculator_expressions.settings_applied,false);
+  assert.equal(page.clickedPoints.length,1);
+  assert.ok(outcome.trace.some(e=>e.event==='expression_parameters_row_verified'&&e.node_settings_applied===false));
+});
+
+test('Calculator metadata exception retains secret attributes, editor, grid and active-tab guards',async()=>{
+  for(const mode of ['valid','name','id','aria','autocomplete','ancestor','child','editable','input','link','foreign_grid','foreign_view','foreign_tab','duplicate','wrong_key','wrong_tag']) {
+    const {page,base,records,grid}=calculatorManifestFixture(),r=records[0];
+    r.cell.attrs['data-tid']=base+'CalcDataWizard;colExpressionName_Token';r.cell.ownText='Token';
+    r.label.attrs['data-tid']=base+'CalcDataWizard;colExpressionDisplayName_Token';r.label.ownText='Token';
+    if(['name','id','aria','autocomplete'].includes(mode))r.cell.attrs[mode==='aria'?'aria-label':mode]='secret';
+    if(mode==='ancestor')r.row.attrs.name='password';
+    if(mode==='child')page.add('span','secret','never-expose',undefined,r.cell);
+    if(mode==='editable')r.cell.attrs.contenteditable='true';
+    if(mode==='input')page.add('input',null,'',undefined,r.cell).attrs.type='password';
+    if(mode==='link')page.add('a',null,'',undefined,r.cell).attrs.href='https://outside.test';
+    if(mode==='foreign_grid')grid.attrs['data-tid']=base+'Foreign;tbl';
+    if(mode==='foreign_view')r.row.attrs['data-boundview']='other';
+    if(mode==='foreign_tab')page.tab.attrs.class='';
+    if(mode==='duplicate')page.add('td',r.cell.attrs['data-tid'],'Token',undefined,r.tr);
+    if(mode==='wrong_key')r.cell.ownText='Other';
+    if(mode==='wrong_tag')r.cell.tagName='INPUT';
+    const observed=await page.observe();
+    assert.equal(observed.wizard.expression_selection?.status??'unobserved',mode==='valid'?'observed':'unobserved',mode);
+    assert.equal(observed.wizard.calculator_expressions?.status??'unobserved',mode==='valid'?'rendered_expression_definitions':'unobserved',mode);
+    assert.ok(!JSON.stringify(observed).includes('never-expose'),mode);
+  }
+});
+
 test('expression apply checks the resulting selected row after its separate dialog closes',async()=>{
   for(const variation of ['success','delayed_mask','wrong_name','wrong_label','wrong_type','still_open','lost_reply','cancel_success','cancel_changed','cancel_replaced_row']) {
     const page=new Page(),wizard=page.add('div','MF;TF-1;WizrdMCF'),base='MF;TF-1;WizrdMCF;';
