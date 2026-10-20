@@ -210,7 +210,7 @@ git commit -m "feat(runtime): lease the browser for one recovery attempt"
   - Успешная проба страницы не подтверждает no-effect ошибочного MCP-ответа. Такой исход сохраняется в ограниченном ответе/журнале; нет повторного жеста или safe UI cleanup. Локальный отказ admission до dispatch остаётся отказом без browser-вызова.
   - `browser_recovery_call`: `{attempt_id, tool, arguments, duration_ms, is_error, text_bytes, images: [{mime, bytes, sha256}], page, calls_remaining, ms_remaining}`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `started(options)` — `recovery(options)` после успешного `start`; `browserCalls` хранит аргументы каждого `callBrowser`.
 
@@ -260,13 +260,13 @@ test('page probe accepts the prepared page with an open dialog and refuses a sec
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail** (`--test test/browser-recovery.test.mjs`; интеграционный тест — `LOGINOM_DOCK_TEST_BROWSER=<pinned Chromium> <pinned Node> --test test/browser-recovery-probe.integration.test.mjs` из client с `headless: true`, `chromiumSandbox: true`, как в geometry-тесте; общий `support/run-direct-browser-tests.mjs` выполняет его в CI. Expected: FAIL). Если общий runner не стартует из-за отсутствия `xvfb-run`, это отдельное ограничение среды, а не результат нового теста.
+- [x] **Step 2: Run tests to verify they fail** (`--test test/browser-recovery.test.mjs`; интеграционный тест — `LOGINOM_DOCK_TEST_BROWSER=<pinned Chromium> <pinned Node> --test test/browser-recovery-probe.integration.test.mjs` из client с `headless: true`, `chromiumSandbox: true`, как в geometry-тесте; общий `support/run-direct-browser-tests.mjs` выполняет его в CI. Expected: FAIL). Если общий runner не стартует из-за отсутствия `xvfb-run`, это отдельное ограничение среды, а не результат нового теста.
 
-- [ ] **Step 3: Implement** по порядку из Interfaces.
+- [x] **Step 3: Implement** по порядку из Interfaces.
 
-- [ ] **Step 4: Run tests to verify they pass** (Expected: PASS)
+- [x] **Step 4: Run tests to verify they pass** (Expected: PASS)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/loginom-runtime/client
