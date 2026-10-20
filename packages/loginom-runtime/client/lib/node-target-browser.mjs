@@ -244,15 +244,20 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       await wait('node_selection_controls_closed',()=>page.evaluate(()=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FmxGraph.getSelectionCells().length===0));
       const deselected=await read(page,task);
       if(JSON.stringify(deselected)!==JSON.stringify(gestureBefore)){
-        // Deselecting an existing JavaScript can replace its SVG. Rebind only
-        // that drawing epoch: ports, links, every other node and the root stay
-        // exact. Two identical fresh reads must precede the single drag.
+        // Clearing selection can redraw the visible batch, not only this JS.
+        // Rebind only fresh drawing epochs; the complete structural graph and
+        // root remain exact. Two stable fresh reads precede the single drag.
         const node=gestureBefore.nodes.find(n=>n.ref.node_id===p.ref.node_id);
         const current=deselected.nodes.find(n=>n.ref.node_id===p.ref.node_id);
-        const rebound={...deselected,nodes:deselected.nodes.map(n=>n===current?{...n,dom_epoch:node?.dom_epoch}:n)};
+        const previousEpoch=Math.max(...gestureBefore.nodes.map(n=>n.dom_epoch));
+        const rebound={...deselected,nodes:deselected.nodes.map(n=>{
+          const previous=gestureBefore.nodes.find(b=>b.ref.node_id===n.ref.node_id);
+          return previous && Number.isSafeInteger(n.dom_epoch)
+            && (n.dom_epoch===previous.dom_epoch || n.dom_epoch>previousEpoch)?{...n,dom_epoch:previous.dom_epoch}:n;
+        })};
         if(node?.type!=='programming.javascript' || !Number.isSafeInteger(node.dom_epoch)
-          || !Number.isSafeInteger(current?.dom_epoch) || current.dom_epoch<=node.dom_epoch
-          || JSON.stringify(rebound)!==JSON.stringify(gestureBefore)){
+          || !Number.isSafeInteger(previousEpoch) || !Number.isSafeInteger(current?.dom_epoch)
+          || current.dom_epoch<=previousEpoch || JSON.stringify(rebound)!==JSON.stringify(gestureBefore)){
           const differences=[],pending=[{path:'$',expected:gestureBefore,observed:deselected}];
           let inspected=0;
           while(pending.length&&differences.length<32&&inspected++<512){

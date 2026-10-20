@@ -46,6 +46,17 @@ function fixture(kind,fault,{javascript=false}={}) {
    if(fault==='other_node')graph.nodes[1].dom_epoch++;
    if(fault==='epoch_decreased')graph.nodes[0].dom_epoch=1;
    if(fault==='epoch_missing')delete graph.nodes[0].dom_epoch;
+   if(fault?.startsWith('batch')){
+    const latest=Math.max(...graph.nodes.map(n=>n.dom_epoch));
+    graph.nodes.forEach((n,i)=>{n.dom_epoch=latest+i+1;});
+    if(fault==='batch_position')graph.nodes[1].position.x++;
+    if(fault==='batch_port')graph.nodes[1].outputs.push(1);
+    if(fault==='batch_type')graph.nodes[1].type='foreign';
+    if(fault==='batch_root')graph.dom_epoch++;
+    if(fault==='batch_link')graph.links.push({source:'node',output:0,target:'other',input:0});
+    if(fault==='batch_stale_epoch')graph.nodes[1].dom_epoch=9;
+    if(fault==='batch_busy')graph.interaction_ready=false;
+   }
   },move:async()=>{},down:async()=>{assert.ok(revealed);order.push('move');held=true;},up:async()=>{ups++;if(held){graph.nodes[0].position={x:648,y:400};graph.nodes[0].dom_epoch++;held=false;if(fault==='lost_drag')throw Error('Lost drag reply');}}
  }};
  const reveal=async args=>{
@@ -56,12 +67,15 @@ function fixture(kind,fault,{javascript=false}={}) {
   await args.guard();return {fully_visible:fault!=='not_visible',zoom_steps:2,outline_closed:true};
  };
  const effect={id:'effect',kind,before,parameters:{ref,...(kind==='rename'?{label:'Debt descending'}:{position:{x:648,y:400}})}};
- if(fault==='other_node'){
+ if(fault==='other_node'||fault?.startsWith('batch')){
   graph.nodes.push({...structuredClone(graph.nodes[0]),ref:{...ref,node_id:'other'},dom_epoch:10});
   before.nodes=structuredClone(graph.nodes);
  }
  return {order,effect,counts:()=>({clicks,ups}),run:()=>mutateGraph(page,{effect,request:{document_id:'doc',workflow_ref},deadline:Date.now()+15000},async()=>{
-  if(deselected&&++readsAfterDeselect===2&&fault==='unstable')graph.nodes[0].dom_epoch++;
+  if(deselected&&++readsAfterDeselect===2){
+   if(fault==='unstable')graph.nodes[0].dom_epoch++;
+   if(fault==='batch_unstable')graph.nodes[1].dom_epoch++;
+  }
   if(deselected&&readsAfterDeselect===3&&fault==='before_drag')graph.nodes[0].label='Changed before drag';
   return structuredClone(graph);
  },null,null,null,reveal,samePlacementGraph)};
@@ -95,4 +109,26 @@ test('existing JavaScript move never repeats a drag with a lost reply',async()=>
  const f=fixture('move','lost_drag',{javascript:true}),r=await f.run();
  assert.equal(r.status,'AMBIGUOUS');assert.deepEqual(f.order,['reveal','move']);
  assert.deepEqual(f.counts(),{clicks:1,ups:2});assert.equal(r.effect_possible,true);assert.match(r.error,/Lost drag reply/);
+});
+
+// Live mas3 receipt: deselection replaced six visible SVGs while the entire
+// logical graph and root stayed identical. All new epochs follow the old max.
+test('existing JavaScript move survives a stable visible-batch SVG redraw with one drag',async()=>{
+ const f=fixture('move','batch',{javascript:true}),r=await f.run();
+ assert.equal(r.status,'SUCCEEDED',r.error);assert.deepEqual(f.order,['reveal','move']);
+ assert.deepEqual(f.counts(),{clicks:1,ups:1});assert.equal(r.cleanup_complete,true);
+ assert.ok(verifyNodeTargetEffect(f.effect,r.after,(n,p)=>n.position.x===p.x&&n.position.y===p.y));
+});
+for(const fault of ['batch_position','batch_port','batch_type','batch_root','batch_link','batch_stale_epoch','batch_busy','batch_unstable'])test('existing JavaScript batch redraw still refuses '+fault+' before drag',async()=>{
+ const f=fixture('move',fault,{javascript:true}),r=await f.run();
+ assert.equal(r.status,'AMBIGUOUS');assert.deepEqual(f.order,['reveal']);
+ assert.deepEqual(f.counts(),{clicks:1,ups:0});assert.equal(r.effect_possible,true);
+});
+test('existing JavaScript deselection failure includes a bounded field diagnostic',async()=>{
+ const f=fixture('move','root',{javascript:true}),r=await f.run();
+ assert.match(r.error,/Graph changed while deselecting:/);
+ const d=JSON.parse(r.error.slice(r.error.indexOf(': ')+2));
+ assert.ok(d.differences.some(x=>x.path==='$.dom_epoch'&&x.expected===1&&x.observed===2));
+ assert.ok(d.differences.length<=32);assert.equal(d.truncated,false);
+ assert.deepEqual(f.counts(),{clicks:1,ups:0});
 });
