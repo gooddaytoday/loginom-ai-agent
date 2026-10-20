@@ -104,6 +104,10 @@ test('MCP application refusals remain typed normal content and the same connecti
     for(const name of ['dock_node_apply','dock_node_resume','dock_node_status','dock_node_wait','dock_node_cancel','dock_node_stop',
       'dock_artifact_deliver','dock_artifact_delivery_status','dock_artifact_delivery_resume'])
       assert.ok(listed.tools.some(tool=>tool.name===name),name);
+    const caption=listed.tools.find(tool=>tool.name==='dock_node_apply').inputSchema.properties.target.properties.label;
+    assert.match(caption.description,/No ; \| < >/);
+    assert.equal(new AjvJsonSchemaValidator().getValidator(caption)('Debt > 0').valid,false);
+    assert.ok(Buffer.byteLength(JSON.stringify(caption))<2000);
     const rejectedVerify=await client.callTool({name:'dock_artifact_verify',arguments:{operation_id:'u',verification_id:'v',
       observation_id:'o',file_ref:'r',download_path:'/private/replaced'}});
     assert.equal(JSON.parse(rejectedVerify.content[0].text).error.code,'REQUEST_REJECTED');
@@ -244,6 +248,9 @@ test('MCP application refusals remain typed normal content and the same connecti
     assert.equal(compactReadValidator(sourceReceipt).valid,true);
     const missingContext=structuredClone(contextReceipt);delete missingContext.ports;
     assert.equal(compactReadValidator(missingContext).valid,false);
+    const compactCaption=compactTools.tools.find(tool=>tool.name==='dock_node_apply').inputSchema.properties.target.properties.label;
+    assert.deepEqual(compactCaption,caption);
+    assert.equal(new AjvJsonSchemaValidator().getValidator(compactCaption)('Debt > 0').valid,false);
     await client.callTool({name:'dock_workspace_observe',arguments:{scope:'bootstrap'}});
     const compactPrepare=await client.callTool({name:'dock_prepare',arguments:{}});
     assert.equal(JSON.parse(compactPrepare.content[0].text).prepared,true);
