@@ -16,6 +16,7 @@ export const recoveryBrowserTools = Object.freeze([
 ]);
 
 const recoveryBrowserToolSet = new Set(recoveryBrowserTools);
+const readOnlyBrowserTools = new Set(['browser_snapshot', 'browser_find', 'browser_take_screenshot', 'browser_wait_for']);
 
 export function isBrowserRecoveryTool(name) {
   return name === browserRecoveryToolName || recoveryBrowserToolSet.has(name);
@@ -56,6 +57,8 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
   let attempt = null;
   // A browser action with an unknown outcome blocks Dock until the session is recovered.
   let uncertain = null;
+  // The action currently dispatched; a stop waits for it before releasing the page.
+  let inflight = null;
 
   return {
     enabled,
@@ -128,15 +131,26 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     if (!recoveryBrowserToolSet.has(name)) return refusal(`${name} is outside the browser recovery allowlist.`);
     if (exhausted(attempt.budget)) return stopAttempt('budget_exhausted', 'The browser recovery budget for this step is exhausted.');
     if (Object.hasOwn(args, 'filename')) return refusal('Browser recovery does not write files; omit filename.');
+    if (attempt.observationRequired && !readOnlyBrowserTools.has(name))
+      return refusal('The last browser gesture failed after it may have taken effect. Observe the page with browser_snapshot '
+        + 'or browser_find before another gesture.');
     const current = attempt;
     current.budget.calls++;
-    const outcome = await gate(async () => {
+    const call = gate(async () => {
       const response = await browser.callTool({ name, arguments: args }, undefined, { signal: extra?.signal, timeout: 60_000 })
         .then(value => ({ value }), error => ({ error }));
+      // Latch an unknown outcome before the page check, the journal or any early return can intervene.
+      if (response.error) uncertain ??= { operation_id: current.operation_id, tool: name,
+        reason: String(response.error.message).slice(0, 500) };
       // The page check runs even after a failed action: its effect may still have landed.
       const page = await Promise.resolve().then(probe).catch(error => ({ ok: false, reason: error.message }));
       return { ...response, page };
     });
+    inflight = call;
+    const outcome = await call.finally(() => { if (inflight === call) inflight = null; });
+    // A failed gesture may still have landed: the next gesture waits for an observation.
+    if (outcome.value) current.observationRequired = readOnlyBrowserTools.has(name)
+      ? current.observationRequired && outcome.value.isError === true : outcome.value.isError === true;
     await record({ phase: 'browser_recovery_action', attempt_id: current.id, operation_id: current.operation_id, tool: name,
       arguments_sha256: sha256(JSON.stringify(args)), is_error: outcome.error ? null : outcome.value?.isError === true,
       transport_error: outcome.error ? String(outcome.error.message) : null, page: outcome.page,
@@ -144,13 +158,9 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
     // A late reply belongs to an attempt that already ended: it never regains the page.
     if (attempt !== current || current.phase !== 'browser')
       return refusal('This browser action finished after the recovery attempt ended; its result is not evidence.', view());
+    if (outcome.error) return stopAttempt('browser_unavailable', 'The browser action outcome is unknown: ' + outcome.error.message);
     if (outcome.page.ok !== true)
       return stopAttempt('page_changed', `The Loginom page changed outside recovery bounds: ${outcome.page.reason}.`);
-    if (outcome.error) {
-      // The action may still run in the browser: never hand the page back to Dock.
-      uncertain = { operation_id: current.operation_id, tool: name, reason: String(outcome.error.message).slice(0, 500) };
-      return stopAttempt('browser_unavailable', 'The browser action outcome is unknown: ' + outcome.error.message);
-    }
     const result = boundText(outcome.value, limits.textBytes);
     result.content.push({ type: 'text', text: JSON.stringify({ browser_recovery: remaining(current.budget) }) });
     return result;
@@ -193,6 +203,8 @@ export function createBrowserRecovery({ enabled, browser, executor, gate, record
   async function stopAttempt(code, reason, extra = {}) {
     const current = attempt;
     current.phase = 'stopped';
+    // A dispatched action settles first: its outcome decides whether the page may return to Dock.
+    if (inflight) await inflight.catch(() => undefined);
     // Safe completion only: the runtime may cancel its own unapplied draft; unknown effects stay locked.
     const cleanup = await Promise.resolve().then(() => executor.stopBrowserRecovery({ operationId: current.operation_id,
       step: current.step, reason: code, uncertain: !!uncertain })).catch(error => ({ state: 'retained', reason: error.message }));

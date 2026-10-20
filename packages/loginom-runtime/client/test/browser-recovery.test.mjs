@@ -10,12 +10,12 @@ const catalog = [...recoveryBrowserTools, 'browser_navigate', 'browser_run_code_
 
 function harness({ basis = () => ({ step, reason: 'NODE_RELEASE_REFUSED', goal: 'Close the wizard' }),
   handoff = () => ({ stopped: true, proof: { receipt: 'completed' } }), verify = () => ({ status: 'completed', facts: ['released'] }),
-  probe = () => ({ ok: true }), callTool, now } = {}) {
+  probe = () => ({ ok: true }), callTool, now, record } = {}) {
   const events = [], calls = [], stops = [];
   const clock = { value: 1_000 };
   const recovery = createBrowserRecovery({
     enabled: true, gate: createSerialGate(), now: now ?? (() => clock.value),
-    record: async event => { events.push(event); return event; },
+    record: record ?? (async event => { events.push(event); return event; }),
     probe: async () => probe(),
     browser: { callTool: callTool ?? (async request => { calls.push(request);
       return { content: [{ type: 'text', text: 'ok ' + request.name }] }; }) },
@@ -162,10 +162,11 @@ test('a late action reply after stop is not evidence and does not regain the pag
   await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
   const action = h.recovery.call('browser_click', { target: 'e1' });
   await new Promise(resolve => setImmediate(resolve));
-  const stopped = body(await h.recovery.call('dock_browser_recovery', { action: 'stop', operation_id: 'op-1', reason: 'cancelled' }));
-  assert.equal(stopped.phase, 'stopped');
+  // The stop waits for the dispatched action before it releases the page.
+  const stopping = h.recovery.call('dock_browser_recovery', { action: 'stop', operation_id: 'op-1', reason: 'cancelled' });
   release();
-  const late = await action;
+  const [late, stopped] = await Promise.all([action, stopping.then(body)]);
+  assert.equal(stopped.phase, 'stopped');
   assert.equal(late.isError, true);
   assert.match(late.content[0].text, /not evidence/);
   assert.deepEqual(names(h.recovery.listTools(catalog)), ['dock_browser_recovery']);
@@ -225,4 +226,57 @@ test('a tool-level browser error keeps the lease and the browser phase', async (
   assert.equal(h.recovery.active(), true);
   assert.equal(h.recovery.refusesDock('dock_node_apply'), true);
   assert.deepEqual(h.stops, []);
+});
+
+test('an unknown outcome is latched before a failed page check can release the page', async () => {
+  const h = harness({ callTool: async () => { throw Error('transport closed'); }, probe: () => { throw Error('page gone'); } });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  const stopped = body(await h.recovery.call('browser_click', { target: 'e1' }));
+  assert.equal(stopped.stopped.code, 'browser_unavailable');
+  assert.equal(h.stops.at(-1).uncertain, true);
+  assert.equal(h.recovery.refusesDock('dock_action_run'), true);
+});
+
+test('a journal failure after an unknown outcome still keeps Dock blocked', async () => {
+  const h = harness({ callTool: async () => { throw Error('transport closed'); },
+    record: async event => { if (event.phase === 'browser_recovery_action') throw Error('disk full'); return event; } });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  await assert.rejects(h.recovery.call('browser_click', { target: 'e1' }), /disk full/);
+  assert.equal(h.recovery.unsettled(), true);
+  assert.equal(h.recovery.refusesDock('dock_node_apply'), true);
+});
+
+for (const late of ['error', 'success'])
+  test('stop during a dispatched action waits for it; a late ' + late + ' decides the lease', async () => {
+    let settle;
+    const pending = new Promise((resolve, reject) => { settle = late === 'error' ? () => reject(Error('timed out')) : () => resolve({ content: [{ type: 'text', text: 'done' }] }); });
+    const h = harness({ callTool: () => pending });
+    await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+    const action = h.recovery.call('browser_click', { target: 'e1' });
+    await new Promise(resolve => setImmediate(resolve));
+    const stopping = h.recovery.call('dock_browser_recovery', { action: 'stop', operation_id: 'op-1', reason: 'cancelled' });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(h.stops, [], 'the executor lease stays while the action is in flight');
+    settle();
+    const [late_reply, stopped] = await Promise.all([action, stopping]);
+    assert.equal(late_reply.isError, true);
+    assert.equal(body(stopped).phase, 'stopped');
+    assert.equal(h.stops.at(-1).uncertain, late === 'error');
+    assert.equal(h.recovery.refusesDock('dock_node_apply'), late === 'error');
+  });
+
+test('a failed gesture requires an observation before the next gesture', async () => {
+  let calls = 0;
+  const h = harness({ callTool: async request => { calls++;
+    return request.name === 'browser_click' && calls === 1 ? { isError: true, content: [{ type: 'text', text: 'Timeout after click' }] }
+      : { content: [{ type: 'text', text: 'ok' }] }; } });
+  await h.recovery.call('dock_browser_recovery', { action: 'start', operation_id: 'op-1' });
+  assert.equal((await h.recovery.call('browser_click', { target: 'e1' })).isError, true);
+  const refused = await h.recovery.call('browser_click', { target: 'e1' });
+  assert.equal(refused.isError, true);
+  assert.match(refused.content[0].text, /Observe the page/);
+  assert.equal(calls, 1);
+  assert.equal((await h.recovery.call('browser_snapshot', { depth: 2 })).isError, undefined);
+  assert.equal((await h.recovery.call('browser_click', { target: 'e1' })).isError, undefined);
+  assert.equal(calls, 3);
 });
