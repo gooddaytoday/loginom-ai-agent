@@ -1,9 +1,10 @@
-# Packaged browser recovery: первый installed CLI
+# Packaged browser recovery: CLI availability
 
 Канонический installed flag1 CLI путь прошёл: current capability true,
 save_checkpoint, native Close/logout/noDiscard, ACK/exit0 и освобождение writer.
 Первая SaveAs/reopen попытка завершилась cleanup FAIL и сохранена отдельно.
-Controls ещё не выполнены; Task 1 и acceptance gate остаются открытыми.
+Три отрицательные CLI строки также PASS; контрольная установка штатно удалена.
+Task 1 ожидает независимого review; Desktop, модели и acceptance gate открыты.
 
 ## Проверенная поставка
 
