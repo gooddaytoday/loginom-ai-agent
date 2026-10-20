@@ -40,10 +40,16 @@ bun run secrets range BASE_SHA HEAD_SHA
 
 Workflow `.github/workflows/secrets.yml` запускает единственный статус **Secret scan**:
 
-- push в рабочую ветку: `before..head`; новая ветка — от merge-base с `origin/loginom`;
-- PR в `loginom`: от merge-base base/head до head PR;
+- push в рабочую ветку или тег: `before..head`; новый ref — от merge-base с `origin/loginom`. Аннотированные теги разрешаются до коммитов;
+- PR в `loginom`: `pull_request_target` использует workflow и checkout базовой ветки, получает точный head SHA только как Git objects и сканирует диапазон от merge-base base/head до head PR;
 - checkout полного графа нужен для выбора диапазона; содержимое всего проекта и полный аудит здесь не сканируются;
 - перед проверкой CI устанавливает закреплённый сканер с checksum и запускает его тесты и typecheck только пакета инструментов.
+
+В PR-проверке код, lockfile, Bun-конфигурация, правила и исключения сканера берутся из base SHA. Файлы PR не checkout-ятся и не исполняются; команда сканера вызывается непосредственно с `bun --no-install`, без package scripts из PR. Отсутствие сканера в base не разрешает fallback на head. Fetch объектов выполняется без credentials из публичного origin.
+
+Первое внедрение требует отдельного слияния PR #185: до него `pull_request_target` workflow отсутствует в `loginom` и независимая PR-проверка из base не запускается. Push CI проверяет конкретный SHA #185, но не заменяет эту гарантию. После слияния следующие PR используют доверенную базовую версию. Изменения самого workflow/сканера требуют содержательного ревью владельца: статус **Secret scan** от GitHub Actions с нулём обязательных одобрений не является криптографическим подтверждением конкретной реализации workflow.
+
+Push тега запускает workflow, только если его файл присутствует в целевом коммите. Тег на старый коммит без workflow не получает такой проверки; полная обязательная серверная защита любых тегов этим workflow не обеспечивается. Защита ветки `loginom` не изменяется.
 
 19 октября 2026 года после успешных проверочных [push CI](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/39263559725) и [PR CI](https://github.com/gooddaytoday/loginom-ai-agent/actions/runs/39263566257) серверное правило для `loginom` включено и повторно прочитано через GitHub API: обязательный `Secret scan` именно от GitHub Actions (`app_id=15368`), слияние через PR, применение к администраторам, **0** обязательных одобрений. Force push и удаление защищённой ветки запрещены. GitHub secret scanning и push protection уже были включены и сохранены.
 
@@ -107,3 +113,9 @@ TMPDIR=/home/kiselev/storage/tmp bun run secrets audit > /home/kiselev/storage/t
 - [x] Установка с checksum, CI workflow, `.gitignore`, проверка старых исключений.
 - [x] Полный аудит и безопасная классификация; замеры и независимое ревью.
 - [x] Проверочный GitHub CI и включение защиты `loginom` с повторной проверкой API.
+
+### Исправления ревью PR #185, 20 октября 2026
+
+Два замечания: исполнение недоверенного PR scanner/config и отсутствие tag trigger. План независимо проверен; изменения ограничены workflow, его поведенческими тестами и этим описанием. RED → GREEN подтверждает отказ PR с секретом при одновременной подмене scanner/package scripts/policy и отказ нового annotated tag с секретом. Дополнительно проверяются изменение тега с промежуточным секретом, чистые push/PR и отсутствие базы. Тесты исполняют фактический shell scan step из YAML с настоящим Gitleaks во временном Git-репозитории.
+
+Checkpoint: исходный SHA `af1490095b`; локально **29/29 тестов**, package-local `bun typecheck` и `git diff --check` — PASS. Независимое ревью изменений не нашло блокирующих дефектов. Новый GitHub CI ожидается после push. Слияние #185 и включение его в #237 — отдельный следующий шаг владельца.
