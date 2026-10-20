@@ -40,6 +40,21 @@ test('successful readonly import reexecution retains the original byte proof wit
  const f=readonlyFixture(),p=completedStaticImports(f.history,f.uploads,ctx,f.uploadHistory)[0];
  assert.equal(p.execution_id,'doc:1:3');assert.equal(p.import_operation_id,'import');assert.equal(p.readonly_reexecution_operation_id,'reread');assert.equal(p.source.sha256,'a'.repeat(64));assert.equal(p.source.lineage.execution_sequence,3);
 });
+test('successful reread after a cancelled released read still refuses full provenance with safe coverage guidance',()=>{
+ const f=readonlyFixture(),cancelled=structuredClone(f.read);
+ cancelled.sequence=2;cancelled.request.operation_id='cancelled-read';
+ cancelled.outcome.status='FAILED';cancelled.outcome.phase='node_released';cancelled.outcome.output.status='FAILED';
+ cancelled.outcome.output.execution.execution_id='doc:1:2';
+ f.history.splice(1,0,cancelled);
+ assert.throws(()=>completedStaticImports(f.history,f.uploads,ctx,f.uploadHistory),error=>{
+  assert.match(error.message,/Exact full read requires a same-session byte-verified completed local import/);
+  assert.match(error.message,/dock_node_apply/);assert.match(error.message,/omit read\.coverage or set it to "sample"/);
+  assert.match(error.message,/sample is not full-output proof/);
+  assert.match(error.message,/next_step to resolve the stopped operation before a new request/);
+  assert.match(error.message,/full exact output is required, keep "full"/);
+  return true;
+ });
+});
 for(const [name,change] of [
  ['failed reexecution',f=>f.read.outcome.status='FAILED'],
  ['unfinished cleanup',f=>f.read.cleanup_confirmed=false],
