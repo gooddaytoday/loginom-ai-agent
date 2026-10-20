@@ -153,12 +153,12 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 
 ## Checkpoint — 20.10.2026
 
-- База реализации: `0afb4c483a`; принятый код плана 3, Task 3: `87509b5448`.
+- База реализации: `0afb4c483a`; принятый код плана 3, Task 4: `3f258aff35`.
 - План 1, Tasks 1–4, и план 2, Tasks 0–7: выполнены и отмечены в подпланах; task reviews и итоговое whole-branch review приняты; четыре итоговых замечания исправлены и подтверждены scoped re-review.
-- Последние полные source-проверки плана 2: runtime client 4420 PASS / 13 SKIP; focused 144/144; start-input 22/22; Host capability 2/2, Host typecheck и `git diff --check` — PASS.
+- Последние source-проверки: полный runtime client 4468 PASS / 14 SKIP / 0 FAIL; focused 133/133, timeout 4/4; Host managed IPC 1/1 (16 assertions), Host typecheck и `git diff --check` — PASS.
 - Task 0 на Loginom: реальный Calculator, новое успешное выполнение и схема Preview независимо подтверждены; итоговый собственный пакет, transport и браузер закрыты.
 - Ограничение пробы: закрытие несохранённого пакета первой неудачной попытки осталось неподтверждённым.
 - Проверки установленных артефактов и живого recovery ещё впереди; release-флаг в CI не включён.
-- План 3 прошёл preflight и scoped review уточнений; Tasks 1–3 выполнены, 45/45 focused и 1/1 реальная Chromium-проба PASS; замечание о final-await abort исправлено и подтверждено scoped re-review. CI опубликованного checkpoint плана 2 — PASS.
+- План 3 прошёл preflight и scoped review уточнений; Tasks 1–4 выполнены и приняты независимыми reviews; 1/1 реальная Chromium-проба PASS; замечание о final-await abort исправлено и подтверждено scoped re-review. CI опубликованного checkpoint плана 2 — PASS.
 - Ограничение локального общего browser runner: отсутствует xvfb-run; новая headless Chromium-проба с sandbox выполнена напрямую.
-- Следующий шаг: план 3, Task 4 — интеграция bridge, границы допуска, ответы и конец run.
+- Следующий шаг: план 3, Task 5 — свежий staging принятого HEAD и BR-S1/BR-S3 на живом Loginom.

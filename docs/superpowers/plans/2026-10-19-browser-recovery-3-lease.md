@@ -299,7 +299,7 @@ git commit -m "feat(runtime): check the page after every recovery browser call"
   - `session.mjs` пишет `snapshot: {mode: "none"}` в `playwright.json` только в executor-режиме при `config.browserRecovery === true`.
   - `runtimeCallTimeout('dock_browser_recovery', args) = 255000` (`BROWSER_RECOVERY_VERIFY_MS` плюс 15000). Из него выводятся срок IPC host (+15 с, `host-port.ts:427`) и срок адаптера агента (`max(180 с, +30 с)`, `adapter.ts:88`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Фикстура bridge: поддельные MCP-клиенты, как в `package-cleanup-bridge.mjs`. Браузерный клиент отдаёт настоящий каталог 0.0.82 и `browser_run_code_unsafe`; на коде Save отвечает `AMBIGUOUS` с `cleanup_complete: true`, на чтение квитанции — `completed`; проба страницы и состояние сохранённого пакета (`modified: false`) задаются тестом. После inspect этого Save получается настоящее основание T4 `save`. Помощник `recoveryBridge({browserRecovery})` возвращает `{call, callRaw, tools, events, browserCodes}`: `call` разбирает первый текстовый блок, `callRaw` отдаёт ответ MCP, `tools()` — имена `listTools`.
 
@@ -361,19 +361,19 @@ test('browser recovery calls get the verification deadline', () => {   // test/c
 
 В `managed-work-entry.test.ts` фиктивный bridge получает `releaseRun`, который пишет файл; тест шлёт `run-released` и проверяет ответ `{released: true}` и файл.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd packages/loginom-runtime/client && "$LOGINOM_AI_AGENT_TEST_NODE" --test test/browser-recovery-bridge.test.mjs test/user-response-budget.test.mjs test/session-browser-config.test.mjs`; `cd packages/loginom-runtime && "$LOGINOM_AI_AGENT_TEST_NODE" --test test/call-timeout.test.mjs`; `cd packages/loginom-host && LOGINOM_AI_AGENT_TEST_NODE=<pinned node> bun test test/managed-work-entry.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement** по Interfaces.
+- [x] **Step 3: Implement** по Interfaces.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: команды Step 2 и `cd packages/loginom-runtime && PATH="$(dirname "$LOGINOM_AI_AGENT_TEST_NODE"):$PATH" bun run test:upstream`
 Expected: PASS; прежние наборы bridge без capability не изменились.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/loginom-runtime packages/loginom-host/test/managed-work-entry.test.ts
