@@ -3355,6 +3355,74 @@ function mappingCoverageFixture(page,count=2) {
   return {form,base,body,container,filter,input,tableMode,linksMode,auto,rows};
 }
 
+function calculatorOutputMetadataFixture(name='Token') {
+  const page=new Page(),c=mappingCoverageFixture(page,1),row=c.rows[0];
+  for(const cell of row.children) {
+    cell.attrs['data-tid']=cell.attrs['data-tid'].replace(/Field0$/,name);
+    if(cell.ownText==='Field0')cell.ownText=name;
+  }
+  // Only name/label are under review. A source value must remain redacted.
+  row.children[2].ownText='PRIVATE_DATA_VALUE';
+  const port={direction:'output',port:0,native_index:0,port_guid:'output-guid',
+    opening_operation_id:'calculator:output',node_icon_class:'bg-vendor-icon-calcdata'};
+  const binding={node:{node_id:'calculator-guid'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+  const read=(options={})=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {expected_build:build,expected_origin:origin,prepared_node_context:binding,mode:'observe',...options},
+    async()=>({verified:true,surface:'wizard',output_port:port}));
+  return {page,...c,row,port,binding,read};
+}
+
+test('Calculator output definition exposes the owned Token name/label pair without exposing other row values',async()=>{
+  for(const name of ['OrdinaryName','Token']) {
+    const f=calculatorOutputMetadataFixture(name),result=await f.read();
+    assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+    const columns=result.output.wizard.output_columns;
+    assert.equal(columns.fields[0]?.name,name);
+    assert.equal(columns.fields[0]?.label,name);
+    assert.equal(columns.settings_applied,false);assert.equal(columns.complete,false);
+    if(name==='Token') {
+      assert.equal(columns.fields[0].source.status,'unobserved');
+      assert.ok(!JSON.stringify(result).includes('PRIVATE_DATA_VALUE'));
+    }
+    assert.deepEqual(f.page.events,[]);
+  }
+});
+
+test('Calculator output metadata exception requires the native Calculator output and retains all secret guards',async()=>{
+  for(const mode of ['name','id','aria','autocomplete','ancestor','child','editable','input','link',
+    'foreign_grid','foreign_view','foreign_tab','duplicate','wrong_key','wrong_tag',
+    'unbound','foreign_node','input_port','wrong_port','wrong_native_index','missing_guid','missing_opening','foreign_workflow','foreign_page']) {
+    const f=calculatorOutputMetadataFixture(),name=f.row.children[0],label=f.row.children[1];
+    if(['name','id','aria','autocomplete'].includes(mode))name.attrs[mode==='aria'?'aria-label':mode]='secret';
+    if(mode==='ancestor')f.row.attrs.name='password';
+    if(mode==='child')f.page.add('span','secret','PRIVATE_CHILD',undefined,name);
+    if(mode==='editable')name.attrs.contenteditable='true';
+    if(mode==='input')f.page.add('input',null,'',undefined,name).attrs.type='password';
+    if(mode==='link')f.page.add('a',null,'',undefined,name).attrs.href='https://outside.test';
+    if(mode==='foreign_grid')f.body.attrs['data-tid']=f.base+'Foreign;tbl';
+    if(mode==='foreign_view')f.row.attrs['data-boundview']='other';
+    if(mode==='foreign_tab')f.page.tab.attrs.class='';
+    if(mode==='duplicate')f.page.add('td',name.attrs['data-tid'],'Token',undefined,f.row);
+    if(mode==='wrong_key')name.ownText='Other';
+    if(mode==='wrong_tag')name.tagName='INPUT';
+    if(mode==='foreign_node')f.port.node_icon_class='bg-vendor-icon-groupdata';
+    if(mode==='input_port')f.port.direction='input';
+    if(mode==='wrong_port')f.port.port=1;
+    if(mode==='wrong_native_index')f.port.native_index=1;
+    if(mode==='missing_guid')delete f.port.port_guid;
+    if(mode==='missing_opening')delete f.port.opening_operation_id;
+    if(mode==='foreign_workflow')f.binding.workflow_ref.prefix='MF;TF-2';
+    if(mode==='foreign_page')for(const e of [f.form,...f.form.descendants()])if(e.attrs['data-tid'])
+      e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard');
+    const result=await f.read(mode==='unbound'?{prepared_node_context:undefined}:{});
+    assert.equal(result.status,'SUCCEEDED',mode+JSON.stringify(result.error));
+    assert.ok(!result.output.wizard.output_columns?.fields?.some(f=>f.name==='Token'),mode);
+    assert.ok(!JSON.stringify(result).includes('PRIVATE_DATA_VALUE'),mode);
+    assert.ok(!JSON.stringify(result).includes('PRIVATE_CHILD'),mode);
+    assert.deepEqual(f.page.events,[],mode);
+  }
+});
+
 test('configured mapping coverage rejects clipped filtered virtualized or unmatched rows',async()=>{
   for(const mode of ['valid','hidden_extra','gap','overflow','spacer','filter','mode','duplicate','offset','unmatched','wrong_boundview','clipped_cell','editor','mask','container_gap','body_extra','missing_dimensions','column_editor','horizontal_offset']) {
     const page=new Page(),c=mappingCoverageFixture(page);

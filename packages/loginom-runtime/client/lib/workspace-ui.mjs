@@ -426,12 +426,21 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const sensitivePattern = /password|passwd|\bpwd\b|secret|token|credential|authorization|api[_ -]?key|private[_ -]?key|one[_ -]?time|\botp\b|парол|секрет|токен/i;
     const calculatorMetadataTid=memoRead(element=>{
       const tid=getTid(element)??'';
-      const match=/^(MF;TF(?:-\d+)?);WizrdMCF;CalcDataWizard;(colExpressionName_|colExpressionDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
+      const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
       if(!match || element.tagName!=='TD' || !sensitivePattern.test(tid))return tid;
+      const output=match[2]==='ColumnsMappingEngineOutputPortWizard';
+      if(output ? !['colName_','colDisplayName_'].includes(match[3])
+        || definitionPrefix!==match[1] || preparedOutputPort?.direction!=='output'
+        || preparedOutputPort.node_icon_class!=='bg-vendor-icon-calcdata'
+        || preparedOutputPort.port!==0 || preparedOutputPort.native_index!==0
+        || typeof preparedOutputPort.port_guid!=='string' || !preparedOutputPort.port_guid
+        || typeof preparedOutputPort.opening_operation_id!=='string' || !preparedOutputPort.opening_operation_id
+        : !['colExpressionName_','colExpressionDisplayName_'].includes(match[3]))return tid;
       const base=match[1]+';WizrdMCF;',tab='MF;cntMain;cntWorkspace;Workspace;t.br;tb'+match[1].slice('MF;TF'.length);
-      const tabs=tids.get(tab)??[],wizards=tids.get(base.slice(0,-1))??[],grids=tids.get(base+'CalcDataWizard;grdExpressions;tbl')??[];
-      const names=tids.get(base+'CalcDataWizard;colExpressionName_'+match[3])??[];
-      const labels=tids.get(base+'CalcDataWizard;colExpressionDisplayName_'+match[3])??[];
+      const prefix=base+match[2]+';';
+      const tabs=tids.get(tab)??[],wizards=tids.get(base.slice(0,-1))??[],grids=tids.get(prefix+(output?'grdTargetColumns;tbl':'grdExpressions;tbl'))??[];
+      const names=tids.get(prefix+(output?'colName_':'colExpressionName_')+match[4])??[];
+      const labels=tids.get(prefix+(output?'colDisplayName_':'colExpressionDisplayName_')+match[4])??[];
       const row=element.closest('table.x-grid-item');
       if(tabs.length!==1 || !tabs[0].classList.contains('x-tab-active') || wizards.length!==1 || grids.length!==1
         || !wizards[0].contains(grids[0]) || !row || !grids[0].contains(row)
@@ -448,8 +457,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             || sensitivePattern.test(['name','id','autocomplete','aria-label',...(child===cell?[]:['data-tid'])].map(k=>child.getAttribute(k)??'').join(' '));
         }))return tid;
       }
-      if(names[0].textContent!==match[3])return tid;
-      return base+'CalcDataWizard;'+match[2];
+      if(names[0].textContent!==match[4])return tid;
+      return prefix+match[3];
     });
     const safeAncestors=ancestorCheck(parent=>!parent.matches('input[type="password"],input[type="hidden"],input[type="file"]')
       &&!sensitivePattern.test(['name','id','data-tid','autocomplete','aria-label'].map(name=>name==='data-tid'?calculatorMetadataTid(parent):parent.getAttribute(name)??'').join(' '))
