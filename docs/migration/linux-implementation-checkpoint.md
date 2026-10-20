@@ -10,7 +10,8 @@ Native cleanup PASS/Close/logout/noDiscard; saved-state modified=false, context 
 OS attribution NOT_CONFIRMED; own diagnostic packages сохранены.
 First native UNKNOWN/second PASS/third BLOCKED — история в source report, без переоценки.
 S5 FAIL/deferred; exact native update cause/time не установлены; production неизменён.
-Следующий шаг — независимый task review causal slice и concerns; новых live нет.
+Causal report принят independent review/DONE_WITH_CONCERNS, полный protocol PASS не дан.
+Следующий шаг — отдельный reviewed TDD-план минимальной правки чтения; новых live нет.
 [Фактический отчёт и история](../testing/loginom-ai-agent/reports/2026-10-20-browser-recovery-source/report.md).
 
 ## 2026-10-20 — browser recovery, Linux packaged/model срез
