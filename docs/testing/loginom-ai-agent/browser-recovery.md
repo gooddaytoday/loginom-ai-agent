@@ -47,6 +47,10 @@ LOGINOM_AI_AGENT_TEST_RESOURCES=<fresh-resources> \
 DISPLAY=:1 LOGINOM_AI_AGENT_TEST_CONFIG=<private-config> \
 LOGINOM_AI_AGENT_TEST_RESOURCES=<fresh-resources> \
 <absolute-pinned-bun> test/loginom/browser-recovery-acceptance.ts BR-S5 <private-saved-A.json>
+# Текущий порядок: S5 FAIL отложен; один независимый отрицательный S6:
+DISPLAY=:1 LOGINOM_AI_AGENT_TEST_CONFIG=<private-config> \
+LOGINOM_AI_AGENT_TEST_RESOURCES=<fresh-resources> \
+<absolute-pinned-bun> test/loginom/browser-recovery-acceptance.ts BR-S6 <private-saved-A.json>
 ```
 
 Manifest существующей формы `{label,path,node,expected}` содержит `label:"A"`,
@@ -75,6 +79,7 @@ Category:string/Total:real, полная точная выборка Alpha/35, B
 | BR-S3 | configure ×3                     | Dock освобождает первый сбой; повторный existing configure даёт T3; найти текущий ref собственной btnExecute, click, ждать закрытия мастера, finish | completed, runtime проверяет console execution и Preview schema; node read использует recovery receipt; configure fault remaining=1 |
 | BR-S4 | Calculator execute ×1 | Dock release → T4 execution; start → finish actions[] без browser tools | completed, verified execution/schema, fresh node read по recovery receipt, Save/cleanup |
 | BR-S5 | Export execute ×1 | T2 без Dock release; start → finish actions[] без browser tools | completed, текущий файл/данные/bytes/SHA/lineage; далее сразу Save/cleanup |
+| BR-S6 | Export configure ×1 | T2; четыре безопасных отказа, затем 31 snapshot depth1 | 30 dispatch с подтверждённой страницей; отказ31, stopped/budget_exhausted; только отрицательный PASS |
 
 Calculator: `DoubleAmount = Total*2`, integer, без output mapping,
 `finish: execute`, `read.ports: []`. Browser оператор использует только публичные
@@ -118,7 +123,20 @@ recovery receipt, native configure, execution/download/bytes и retained фай�
 Сразу после finish и локальной проверки файла первым Dock вызовом идёт final Save;
 повторный Export не выполняется. После completed числовой budget gate не задаётся.
 
-Все пять сценариев завершаются Dock `package.save_checkpoint` с `conflict_policy:replace`
+BR-S6 использует новую own SaveAs-копию, fresh Group и новый Export UUID, как S2.
+Dock observe, безопасный evaluate `() => 1` и navigate на текущий Loginom URL
+должны отказать с BROWSER_RECOVERY_ACTIVE, snapshot с filename своего evidence —
+с BROWSER_RECOVERY_ARGUMENT_FORBIDDEN. Filename metadata30 и первый разрешённый
+snapshot29 подтверждают отсутствие расхода; три ACTIVE-ответа не содержат budget metadata.
+Ровно30 snapshots depth1 сохраняют текущие attempt/state и remaining29…0;
+журнал подтверждает30 dispatch с origin_ok:true/page_count1/document_present:true.
+31-й snapshot отказывает BROWSER_RECOVERY_BUDGET_EXHAUSTED, stopped/budget_exhausted,
+remaining0 без dispatch; всё в пределах600000ms. Cancel/finish/repeat Export/Save/read не вызываются.
+Existing child.close вызывается один раз. `assertions:PASS` относится только к
+отрицательному контракту: фактические recovery, package/logout cleanup и ACK/exit/OS
+фиксируются отдельно; BLOCKED/unknown не превращаются в success или сохранённый результат.
+
+Пять положительных сценариев S1–S5 завершаются Dock `package.save_checkpoint` с `conflict_policy:replace`
 только по точному собственному пути, созданному SaveAs, и native `modified:false`.
 При modified:true сохраняются проверки runtime next_step и новый checkpoint ID.
 Журнал должен содержать `acceptance_fault_injected`, `browser_recovery_handoff`,

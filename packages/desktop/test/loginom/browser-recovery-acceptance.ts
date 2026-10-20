@@ -7,11 +7,11 @@ import assert from "node:assert/strict"
 process.umask(0o077)
 const scenario = process.argv[2]
 assert.ok(
-  scenario === "BR-S1" || scenario === "BR-S2" || scenario === "BR-S3" || scenario === "BR-S4" || scenario === "BR-S5",
-  "Expected BR-S1, BR-S2, BR-S3, BR-S4 or BR-S5",
+  scenario === "BR-S1" || scenario === "BR-S2" || scenario === "BR-S3" || scenario === "BR-S4" || scenario === "BR-S5" || scenario === "BR-S6",
+  "Expected BR-S1, BR-S2, BR-S3, BR-S4, BR-S5 or BR-S6",
 )
 assert.equal(process.argv.length, 4, "Expected scenario and one private saved-A manifest path")
-const exportsFile = scenario === "BR-S2" || scenario === "BR-S5"
+const exportsFile = scenario === "BR-S2" || scenario === "BR-S5" || scenario === "BR-S6"
 const noBrowserCalls = scenario === "BR-S4" || scenario === "BR-S5"
 const seed = await Bun.file(resolve(process.argv[3]!)).json()
 assert.equal(seed.label, "A")
@@ -76,6 +76,24 @@ async function invoke(name: string, args: Record<string, unknown>) {
   assert.ok(!result.isError, `Tool failed: ${name}`)
   return result
 }
+// S6 alone expects public refusals; ordinary invoke remains strict.
+async function refuse(name: string, args: Record<string, unknown>, code: string) {
+  assert.equal(scenario, "BR-S6")
+  const reply = await child.request("call", { name, arguments: args })
+  assert.ok(reply && typeof reply === "object" && "result" in reply, "Invalid tool envelope")
+  const serialized = JSON.stringify(reply.result)
+  await writeFile(join(directory, `${String(++sequence.value).padStart(2, "0")}-${name}.json`), serialized, {
+    mode: 0o600,
+  })
+  assert.ok(!serialized.includes(config.api_key), "Secret in tool result")
+  assert.ok(!serialized.includes("user_action"), "Unexpected user_action")
+  const result = JSON.parse(serialized)
+  assert.equal(result.isError, true)
+  const body =
+    result.structuredContent ?? JSON.parse(result.content.find((item: { type: string }) => item.type === "text").text)
+  assert.equal(body.error?.code, code)
+  return { result, body }
+}
 async function call(name: string, args: Record<string, unknown>) {
   const result = await invoke(name, args)
   return (
@@ -124,7 +142,7 @@ const status: Record<string, unknown> = {
   status: "FAIL",
   resourceManifestSha256: createHash("sha256").update(manifestBytes).digest("hex"),
 }
-try {
+async function runScenario() {
   const opened = await call("dock_prepare", {
     intent: "open_package",
     package_path: seed.path,
@@ -283,8 +301,39 @@ try {
   const operation = scenario === "BR-S3" ? "calculator-again" : request.operation_id
   const started = await call("dock_browser_recovery", { action: "start", operation_id: operation })
   assert.equal(started.state, "browser")
-  if (scenario === "BR-S2" || scenario === "BR-S4") assert.equal(started.budget.calls_remaining, 30)
+  if (scenario === "BR-S2" || scenario === "BR-S4" || scenario === "BR-S6") assert.equal(started.budget.calls_remaining, 30)
   assert.equal(started.recovery_input.node.node_id, stopped.node.node_id)
+  if (scenario === "BR-S6") {
+    const began = Date.now()
+    status.recoveryAttempt = started.attempt_id
+    await refuse("dock_workspace_observe", {}, "BROWSER_RECOVERY_ACTIVE")
+    await refuse("browser_evaluate", { function: "() => 1" }, "BROWSER_RECOVERY_ACTIVE")
+    const forbidden = await refuse(
+      "browser_snapshot",
+      { filename: join(directory, "forbidden.txt") },
+      "BROWSER_RECOVERY_ARGUMENT_FORBIDDEN",
+    )
+    assert.equal(forbidden.result._meta["loginom/browser_recovery"].calls_remaining, 30)
+    await refuse("browser_navigate", { url: config.loginom_url }, "BROWSER_RECOVERY_ACTIVE")
+    for (let count = 1; count <= 30; count++) {
+      const snapshot = await invoke("browser_snapshot", { depth: 1 })
+      const metadata = snapshot._meta["loginom/browser_recovery"]
+      assert.equal(metadata.attempt_id, started.attempt_id)
+      assert.equal(metadata.state, "browser")
+      assert.equal(metadata.calls_remaining, 30 - count)
+    }
+    const exhausted = await refuse("browser_snapshot", { depth: 1 }, "BROWSER_RECOVERY_BUDGET_EXHAUSTED")
+    status.recovery = exhausted.body
+    assert.equal(exhausted.body.state, "stopped")
+    assert.equal(exhausted.body.stop_reason, "budget_exhausted")
+    assert.equal(exhausted.result._meta["loginom/browser_recovery"].attempt_id, started.attempt_id)
+    assert.equal(exhausted.result._meta["loginom/browser_recovery"].state, "stopped")
+    assert.equal(exhausted.result._meta["loginom/browser_recovery"].calls_remaining, 0)
+    status.browserElapsedMs = Date.now() - began
+    assert.ok((status.browserElapsedMs as number) < 600000)
+    status.status = "PASS"
+    return
+  }
   const label = scenario === "BR-S3" ? "Выполнить" : "Отмена"
   if (!noBrowserCalls) {
     const wizard = `[data-tid="${started.recovery_input.workflow_ref.prefix};WizrdMCF"]`
@@ -532,6 +581,9 @@ try {
   assert.equal(dirty?.modified, false)
   status.saved = { operation_id: saveOperation, modified: false }
   status.status = "PASS"
+}
+try {
+  await runScenario()
 } catch (error) {
   status.error = error instanceof Error ? error.message : "Unknown failure"
 } finally {
@@ -577,7 +629,32 @@ try {
     "browser_recovery_verified",
     "browser_recovery_dock_resumed",
   ].filter((phase) => journal.includes(`"phase":"${phase}"`))
-  if (
+  if (scenario === "BR-S6") {
+    try {
+      const events = journal.split("\n").filter(Boolean).map((line) => JSON.parse(line))
+      const calls = events.filter((event) => event.phase === "browser_recovery_call")
+      assert.equal(calls.length, 30)
+      calls.forEach((event, index) => {
+        assert.equal(event.attempt_id, status.recoveryAttempt)
+        assert.equal(event.tool, "browser_snapshot")
+        assert.deepEqual(event.arguments, { depth: 1 })
+        assert.equal(event.is_error, false)
+        assert.deepEqual(event.page, { origin_ok: true, page_count: 1, document_present: true })
+        assert.equal(event.calls_remaining, 29 - index)
+      })
+      assert.ok((status.journalPhases as string[]).includes("browser_recovery_handoff"))
+      assert.equal(
+        events.some((event) => ["browser_recovery_verified", "browser_recovery_dock_resumed"].includes(event.phase)),
+        false,
+      )
+      status.browserCalls = calls.length
+    } catch (error) {
+      status.status = "FAIL"
+      status.journalError = error instanceof Error ? error.message : "Unknown failure"
+    }
+    status.assertions = status.status
+    status.scope = "negative_assertions"
+  } else if (
     status.runtimeClose !== "confirmed" ||
     status.packageCleanupConfirmed !== true ||
     (status.journalPhases as string[]).length !== 4
