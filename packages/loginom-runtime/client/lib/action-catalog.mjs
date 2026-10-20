@@ -15,12 +15,16 @@ export const ACCEPTANCE_CHECKS = ['node_add', 'link_create_standard', 'link_crea
 
 export const actionDescribeTool = {
   name: 'dock_action_describe',
-  description: 'List the pinned available actions with {} or describe one exact action. Batch action_keys and node_types return selected pinned actions and graph-phase cards; planned configuration handlers are explicitly marked and are not callable node.apply. Supported local handlers include node.add, link.create, package.save_as, package.save_checkpoint and node.configure_text_import. Only actions present in this session catalog are callable. Does not change Loginom.',
+  description: 'List pinned actions/types with {}. Single: action_key alone. Batch: action_keys and/or node_types; never combine action_key with either. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}. Only catalog actions are callable; planned configuration handlers are marked and are not callable node.apply. Read-only; does not change Loginom.',
   inputSchema: {
     type: 'object',
-    properties: { action_key: { type: 'string', enum: [...ACTION_KEYS] },
-      action_keys: { type: 'array', items: { type: 'string', enum: [...ACTION_KEYS] } },
-      node_types: { type: 'array', items: { type: 'string', enum: Object.keys(NODE_TYPES) } } },
+    properties: { action_key: { type: 'string', enum: [...ACTION_KEYS], description: 'Single action only. Omit action_keys and node_types; for a combined request use action_keys instead.' },
+      action_keys: { type: 'array', items: { type: 'string', enum: [...ACTION_KEYS] }, description: 'Batch actions, optionally with node_types. Omit action_key, even for one action: ["package.save_checkpoint"].' },
+      node_types: { type: 'array', items: { type: 'string', enum: Object.keys(NODE_TYPES) }, description: 'Selected node schemas, optionally with action_keys. Never combine with action_key.' } },
+    allOf: [{ oneOf: [
+      { type:'object', properties:{action_key:{type:'string'}}, required:['action_key'], additionalProperties:false },
+      { type:'object', properties:{action_keys:{type:'array',items:{type:'string'}},node_types:{type:'array',items:{type:'string'}}}, additionalProperties:false },
+    ] }],
     additionalProperties: false,
   },
   annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },

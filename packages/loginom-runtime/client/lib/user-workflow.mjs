@@ -9,7 +9,7 @@ export function userActionTool(tool) {
   if(p.action_keys)p.action_keys.items.enum=[...userActionKeys];
   copy.description=tool.name==='dock_action_run'
     ? 'Save the completed scenario with package.save_checkpoint. Use package.save_as only when the user explicitly requests reopening the saved package; it closes and reopens the workflow. First request missing action parameters with dock_action_describe. Create and configure supported nodes through dock_node_apply.'
-    : 'List supported nodes with {}. Request node_types:[type] for that node parameter schema, or action_keys for package saving. Read-only; does not change Loginom.';
+    : 'List supported nodes with {}. Single: action_key alone. Batch: action_keys and/or node_types; never combine action_key with either. For example: {"action_keys":["package.save_checkpoint"],"node_types":["imports.text"]}. Read-only; does not change Loginom.';
   return copy;
 }
 export function userActionInventory(value) {

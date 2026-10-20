@@ -98,6 +98,10 @@ test('MCP application refusals remain typed normal content and the same connecti
     assert.match(client.getInstructions(), /activate.*loginom-automation/i);
     assert.match(client.getInstructions(), /Help, diagnostics, and package reports do not require/i);
     const listed = await client.listTools();
+    const describeTool=listed.tools.find(tool=>tool.name==='dock_action_describe');
+    assert.match(describeTool.description,/never combine action_key/);
+    assert.equal(new AjvJsonSchemaValidator().getValidator(describeTool.inputSchema)({action_key:'package.save_checkpoint',node_types:['imports.text']}).valid,false);
+    assert.ok(Buffer.byteLength(JSON.stringify(describeTool))<46000);
     assert.ok(listed.tools.some(tool => tool.name === 'dock_operation_recover'));
     assert.ok(listed.tools.some(tool => tool.name === 'dock_artifact_upload'));
     assert.ok(listed.tools.some(tool => tool.name === 'dock_artifact_verify'));
@@ -241,6 +245,10 @@ test('MCP application refusals remain typed normal content and the same connecti
     const [compactAgentTransport,compactBridgeTransport]=InMemoryTransport.createLinkedPair();
     await Promise.all([bridge.server.connect(compactBridgeTransport),client.connect(compactAgentTransport)]);
     const compactTools=await client.listTools(),contextTool=compactTools.tools.find(t=>t.name==='dock_node_read');
+    const compactDescribe=compactTools.tools.find(tool=>tool.name==='dock_action_describe');
+    assert.match(compactDescribe.description,/never combine action_key/);
+    assert.equal(new AjvJsonSchemaValidator().getValidator(compactDescribe.inputSchema)({action_key:'package.save_checkpoint',node_types:['imports.text']}).valid,false);
+    assert.ok(Buffer.byteLength(JSON.stringify(compactDescribe))<46000);
     assert.deepEqual(contextTool.outputSchema.oneOf[2],javascriptContextReceiptSchema);
     const sourceField={index:0,name:'Value',label:'Value',type:'integer',required:true,field_id:'0'};
     const contextReceipt=javascriptContextReply({owner:sourceReceipt.owner,source:sourceReceipt.source_text,
