@@ -151,17 +151,17 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 - Agent, desktop, product, evals: `bun test <file>` и `bun typecheck` из каталога пакета.
 - `LOGINOM_AI_AGENT_TEST_NODE` — абсолютный путь к Node 24.19.0 из `packages/product/loginom-release.json`.
 
-## Checkpoint — 20.10.2026
+## Checkpoint — 20.10.2026, пауза владельца
 
-- База реализации: `0afb4c483a`; текущий принятый код: `32fb93f96b` (план 4, Task 4).
-- План 1, Tasks 1–4, и план 2, Tasks 0–7: выполнены и отмечены в подпланах; task reviews и итоговое whole-branch review приняты; четыре итоговых замечания исправлены и подтверждены scoped re-review.
-- Последние source-проверки: полный runtime client 4468 PASS / 14 SKIP / 0 FAIL; focused 133/133, timeout 4/4; Host managed IPC 1/1 (16 assertions), Host typecheck и `git diff --check` — PASS.
-- Task 0 на Loginom: реальный Calculator, новое успешное выполнение и схема Preview независимо подтверждены; итоговый собственный пакет, transport и браузер закрыты.
-- Ограничение пробы: закрытие несохранённого пакета первой неудачной попытки осталось неподтверждённым.
-- BR-S1 подтвердил T1 handoff, но ещё не завершён: первый поиск не нашёл имя icon-кнопки; последующие прогоны остановились на доставке входа, последний — `DISCOVERY_FILE_NOT_FOUND` без byte proof. Очистка несохранённых пакетов этих попыток не подтверждена.
-- Установленные артефакты и завершённый живой recovery ещё не приняты; release-флаг в CI не включён.
-- План 3 прошёл preflight и scoped review уточнений; Tasks 1–4 выполнены и приняты независимыми reviews; 1/1 реальная Chromium-проба PASS; замечание о final-await abort исправлено и подтверждено scoped re-review. CI опубликованного checkpoint `f616c2d632` — PASS; новые локальные коммиты этим CI не проверены.
-- Ограничение локального общего browser runner: отсутствует xvfb-run; новая headless Chromium-проба с sandbox выполнена напрямую.
-- План 3, Task 5 отложен: одна проба сохранённого Import → Group дала NOT_APPLIED без эффекта — нет активного source output0; собственная очистка подтверждена. Harness не менялся. Возобновление — реально проверенный активный вход текущего runtime; delivery product и критерии BR-S1/BR-S3 не меняются.
-- План 4: preflight/scoped re-review GO; Tasks 1–4 приняты независимыми reviews; уточнение обязательного report для первого T4 finish подтверждено scoped re-review. Product 5/5, bundled skills 7/7 и Product typecheck PASS. Agent focused: 107 PASS / 1 SKIP; полный suite: 3842 PASS / 25 SKIP / 1 TODO / 0 FAIL в subshell umask 0022, typecheck PASS; исходный mode failure воспроизведён и изолирован. Host: focused 59/59, typecheck, полный охват 370 PASS / 7 SKIP двумя процессами; единый Bun suite ограничен loader `EISDIR`.
-- Итоговое source integration review планов 3–4 — Approved, обязательных замечаний нет; следующий шаг — preflight плана 5 и независимая Task 1 (evals); завершение живой приёмки и release-гейт остаются обязательными.
+- Статус: PAUSED по просьбе владельца; безопасная граница перед реализацией плана 5, Task 1. Код evals ещё не менялся.
+- Рабочая ветка `recovery-build-flag`, worktree `/home/george/.codex/worktrees/browser-recovery/loginom-ai-agent`; исходная база `0afb4c483a`, HEAD до checkpoint-коммита `d0127e8f95`.
+- Планы 1–2 и план 4 выполнены; план 3, Tasks 1–4 приняты. Task reviews и итоговое source integration review планов 3–4 — Approved, обязательных замечаний нет.
+- Runtime: 4468 PASS / 14 SKIP / 0 FAIL, focused 133/133, timeout 4/4; настоящая Chromium-проба 1/1 и Host managed IPC 1/1 (16 assertions) PASS.
+- Agent: focused 107 PASS / 1 SKIP, полный suite 3842 PASS / 25 SKIP / 1 TODO / 0 FAIL в subshell umask 0022, typecheck PASS. Исходный mode failure при umask 0002 изолирован; ожидаемый/прежний диагностический шум не скрыт.
+- Host: typecheck PASS; полный охват 370 PASS / 7 SKIP двумя процессами, единая команда Bun ограничена loader EISDIR. Product 5/5, bundled skills 7/7 и Product typecheck PASS.
+- План 3, Task 5 отложен: BR-S1 BLOCKED, BR-S3 NOT_RUN. Однократный saved Import → Group pilot дал NOT_APPLIED без эффекта: source output0 неактивен. Собственная cleanup этого пилота подтверждена; прежние неизвестные cleanup не объявлены успешными.
+- Harness после пилота не менялся; повтор неактивного setup и неизвестной доставки запрещён результатами пробы. Возобновление native — после реально проверенного активного входа текущего runtime; подробности в smoke-отчёте.
+- План 5 preflight и scoped re-review — GO для независимой Task 1, M1–M3 закрыты. Дальше последовательный TDD через fake/dir: events → persisted boolean → count/report; интеграционный цикл — test/run.test.ts. Старые summary читаются без миграции, rates и compare не меняются.
+- План 5, Task 2 отложена до успешного native main path; установленные артефакты/модели/evals ещё не приняты. Release-флаг выключен; merge и release требуют отдельной команды владельца.
+- Draft PR224 содержит опубликованный `0da6732785`; последующие коммиты пока локальны. Последний CI snapshot: typecheck/Windows/PR standards PASS, macOS candidate FAIL без triage, push/PR test ещё выполнялись. Это не общий CI PASS.
+- Все subagents завершены; локальных выполняемых native-проб/тестов не осталось, временный probe удалён. Приватные evidence и ignored SDD ledgers/reviews сохранены; основной пользовательский checkout и его три untracked документа не изменены.
