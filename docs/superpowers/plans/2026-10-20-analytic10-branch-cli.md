@@ -79,19 +79,21 @@ trial-dosage-outcomes
 - [x] Binary management должен явно передавать --headless: после rebase CLI default=false
   сохраняется и для readiness. Независимое ревью минимальной правки выполнено;
   RED exit2 → GREEN exit0/confirmed cleanup через публичный management. Связанные проверки:
-  103 pass/2 proc-denial skip/0 fail; typecheck и независимое final review pass.
+  Итог после уточнения routing:104 pass/2 proc-denial skip/0 fail; typecheck и
+  независимое final review pass. Headless только для Loginom, в конце args; models/providers
+  сохраняют selector. Routing regression также прошёл RED exit2→GREEN exit0.
 - [ ] Новая сборка CLI после headless fix перед модельными gates. Supervisor не менять
   без отдельного воспроизведения: возможная потеря ancestry не объявляется устранённой.
 
 ## Gates перед dispatch
 
-- [ ] Проверить pair/container IDs/startedAt/network/markers/reservations,
+- [x] Проверить pair/container IDs/startedAt/network/markers/reservations,
   отсутствие внешних клиентов, ACL, Pool=0, пустой SessionBackup.
-- [ ] Подготовить private slots config и local OAuth, подтвердить validity >=8ч,
+- [x] Подготовить private slots config и local OAuth, подтвердить validity >=8ч,
   модель/variant и версию нового binary.
 - [x] Проверить lockdown и login judge через прежний launcher без model calls;
   invalid login — stop и вход владельца. Home прежний: parallel/judge-codex.
-- [ ] Штатный verify --parallel2, отдельно cold loginom check обоих слотов под
+- [x] Штатный verify --parallel2, отдельно cold loginom check обоих слотов под
   guards/supervisor: ok=true/code=LOGINOM_CONNECTION_VALID/help.ready/**browser.verified**,
   правильные username/URL, подтверждённый process/server cleanup. Verify сам по себе
   может пропустить browser.failed.
@@ -152,12 +154,12 @@ trial-dosage-outcomes
 
 ## Checkpoint
 
-1. CLI9b6a73475cf1 verified; focus fix6548e04d2c. Private root выше.
-2. Старый verify1065633c failed unknown Chromium;3reservations retained, original receipts unchanged.
-3. Владелец разрешил новый выделенный стенд; новый server3463cae565ca/studiod84925713c74.
-4. Новые profiles/local auth готовы; публичный catalogue pinned59bcb39e…; hashes tasks unchanged.
-5. Judge login/version exit0, units terminated, home released.
-6. Headless management: RED→GREEN,103pass/2skip/0fail,typecheck и независимое review pass.
-7. Native prepare нового стенда идёт; после fix commit пересобрать CLI, затем verify/cold/4A-B.
-8. Model dispatch ещё не начат,8ч окно не началось; old incidents untouched.
+1. Новый стенд3463cae565ca/d84925713c74 создан по разрешению владельца; старый incident1065633c retained.
+2. Private root выше; CLI3a7491b579b0 built/installed/verified, sourceTree6197499f….
+3. Prepare29dc2d41 и verify нового стенда ready/code0, оба cold browser verified/cleanup confirmed.
+4. Публичный CLI подтвердил gpt-6.1-sol/medium для обоих слотов; catalogue59bcb39e….
+5. Headless routing уточнён: только binary loginom, после args; models/providers selector сохранён.
+6. RED→GREEN;104pass/2proc-denialskip/0fail,typecheck и независимое review pass.
+7. Следующий шаг — final CLI rebuild после routing commit,4A/B и memory gate, затем run.
+8. Source auth сохранён; inputs/rubric hashes прежние. Model window ещё не началось.
 9. Native cancellation2s tests:2 pre-existing failures reproduced on original code.
