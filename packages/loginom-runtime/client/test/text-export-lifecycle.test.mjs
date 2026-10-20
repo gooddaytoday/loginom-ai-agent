@@ -54,3 +54,27 @@ test('unsupported retained params close the draft before any Next/Execute',async
  await assert.rejects(configureTextExport({}, {}, {...binding,finish:'execute',signal:ac.signal,deadline:Date.now()+10000},{operation:{id:'op'},execute:async()=>{calls++;return {...before,values:values({...params,decimal_separator:''})};},onRecord:async r=>r,close:async()=>{closed++;return {cleanup_complete:true,draft_discarded:true,settings_applied:false};}}),e=>e.nodePhaseRefusal?.verification==='text_export_unsupported_retained'&&e.nodePhaseRefusal.cleanup_complete===true);
  assert.equal(calls,1);assert.equal(closed,1);
 });
+
+test('export option callbacks bind the exact choice in each current observation',async()=>{
+ const tid='ExportTextFileParamsWizard;decimal_separator',stage='text_export_params';
+ const option={tid:tid+';boundlist;point',label:'Точка (.)',allowed_actions:['select_wizard_option'],ref:'old-option'};
+ const snapshot=elements=>({wizard:{stage},ui:{elements}}),old=snapshot([option]),fresh=snapshot([{...option,ref:'fresh-option'}]);
+ const stop=Error('choice callbacks checked');let checked=false;
+ const channel={
+  observe:async request=>request.condition==='bound '+stage?snapshot([{tid:tid+';trg_picker',allowed_actions:['click'],ref:'picker'}]):old,
+  perform:async request=>{
+   if(request.condition==='export options decimal_separator')return;
+   assert.equal(request.ready(old),true);assert.equal(request.resolve(old).ref,'old-option');
+   assert.equal(request.ready(fresh),true);
+   assert.deepEqual(request.resolve(fresh),{verb:'select_wizard_option',ref:'fresh-option'});
+   assert.deepEqual(request.identity(fresh),{node:binding.node,key:'decimal_separator',value:'.'});
+   for(const elements of [[],[{...option,label:'Запятая (,)'}],[{...option,tid:'foreign;boundlist;point'}],[{...option,allowed_actions:['click']}],[option,{...option,ref:'duplicate'}]]){
+    const unavailable=snapshot(elements);assert.equal(request.ready(unavailable),false);assert.throws(()=>request.resolve(unavailable),/Unique export control required/);
+   }
+   assert.equal(request.ready({...fresh,wizard:{stage:'text_export_format'}}),false);
+   checked=true;throw stop;
+  },
+ };
+ await assert.rejects(configureTextExport(channel,{decimal_separator:'.'},{...binding,finish:'execute',deadline:Date.now()+10000},{operation:{id:'op'},execute:async()=>({verified:true,stage,values:{decimal_separator:{value:',',tid}}}),onRecord:async r=>r}),error=>error===stop);
+ assert.equal(checked,true);
+});
