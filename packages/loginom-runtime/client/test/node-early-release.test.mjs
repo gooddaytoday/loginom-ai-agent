@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createActionRuntime} from '../lib/executor.mjs';
 import {releaseNodeTarget} from '../lib/node-target.mjs';
+import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
+import {createHash} from 'node:crypto';
+import {runInNewContext} from 'node:vm';
 
 const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]};
 const node={document_id:'doc',workflow_id:'wf',node_id:'created'};
@@ -32,6 +35,7 @@ function fixture(phase='target',type='imports.text'){
     onRecord:async event=>{
       events.push(structuredClone(event));
       if(state.fail&&phase==='target'&&event.phase==='node_phase_completed'&&event.receipt?.phase==='target')throw Error('Injected target acknowledgement failure');
+      if(phase==='target_pending'&&event.phase==='node_target_checkpoint'&&event.target_state.pending)throw Error('Injected graph checkpoint failure');
       if(state.failReleaseAck&&event.phase==='node_operation_released')throw Error('Injected release acknowledgement failure');
       return event;
     }});
@@ -45,6 +49,39 @@ async function stop(f){
   return job;
 }
 const release=f=>f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release'});
+
+for(const fault of ['running','unknown','cleanup','missing','identity','completed'])
+test('handoff reads the original target ledger without a parent receipt: '+fault,async()=>{
+  const f=fixture('target_pending');await stop(f);
+  assert.equal(f.state.operation.lastReceipt,undefined);assert.equal(f.state.operation.nodeApply.node,null);
+  const effect=f.state.operation.targetPhase.pending,key='node-target:doc/'+effect.id;
+  const ledger=new Map(),page={[Symbol.for('loginom-dock.operation-receipts.v1')]:ledger},timeouts=[];let reads=0;
+  if(fault!=='missing')ledger.set(key,{state:['running','unknown'].includes(fault)?fault:'completed',
+    signature:fault==='identity'?'foreign':createHash('sha256').update(JSON.stringify({...effect,receipt:undefined})).digest('hex'),
+    outcome:{status:'SUCCEEDED',cleanup_complete:fault!=='cleanup'}});
+  const adapter=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',execute:async(code,options)=>{
+    if(code.includes('"receipt_read":true')){reads++;timeouts.push(options.timeout);assert.ok(options.timeout>0);
+      return runInNewContext('('+code+')(page)',{page});}
+    assert.match(code,/async function readGraph/);return structuredClone(f.state.graph);
+  }});
+  await adapter.observe(f.request,Date.now()+10000);f.adapter.reconcile=adapter.reconcile;
+  if(fault==='completed')f.state.blocked=true;
+  assert.equal((await release(f)).error.code,'NODE_RELEASE_REFUSED');
+  const basis=f.runtime.browserRecoveryBasis('apply');assert.equal(basis.reason,'NODE_RELEASE_REFUSED');
+  const before=reads,handoff=await f.runtime.browserRecoveryHandoff('apply');
+  assert.equal(handoff.stopped,fault==='completed');assert.equal(reads,before+1);assert.ok(timeouts.at(-1)<=10000);
+  if(fault==='completed'){
+    f.state.blocked=false;
+    const result=await f.runtime.verifyBrowserRecovery({operationId:'apply',step:basis.step,attested:{}});
+    assert.equal(result.status,'continuable',JSON.stringify(result));assert.equal(result.original_operation.status,'FAILED');
+    f.runtime.assertPreparationAllowed();
+  }else{
+    assert.throws(()=>f.runtime.assertPreparationAllowed());
+    assert.ok(f.state.operation.targetPhase.pending);assert.equal(f.state.operation.nodeApply.pending.phase,'target');
+    await assert.rejects(f.runtime.verifyBrowserRecovery({operationId:'apply',step:basis.step,attested:{}}),/lease/);
+  }
+  assert.deepEqual(f.calls,['create']);
+});
 
 for(const phase of ['source','workflow','target'])test('release before accepted node: '+phase,async()=>{
   const f=fixture(phase);await stop(f);
@@ -94,8 +131,8 @@ test('unknown transport never admits early release or browser recovery',async()=
   assert.throws(()=>f.runtime.browserRecoveryBasis('apply'),/No browser recovery trigger/);
 });
 
-test('refused early release offers only graph-restoring browser recovery, then re-verifies',async()=>{
-  const f=fixture();await stop(f);f.state.blocked=true;
+for(const type of ['imports.text','exports.text'])test('refused early release offers only graph-restoring browser recovery, then re-verifies: '+type,async()=>{
+  const f=fixture('target',type);await stop(f);f.state.blocked=true;
   const refused=await release(f);
   assert.equal(refused.output.next_step.tool,'dock_browser_recovery');
   const basis=f.runtime.browserRecoveryBasis('apply');

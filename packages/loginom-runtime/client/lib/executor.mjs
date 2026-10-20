@@ -2053,6 +2053,16 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         try{await verifyPendingWorkflowReceipt({operation,adapter:operation.nodeTargetAdapter,deadline:now()+10000,now});}
         catch(error){return {stopped:false,reason:String(error.message).slice(0,1000)};}
       }
+      if(operation.targetPhase?.pending){
+        // Target gestures use their own page ledger, not parent lastReceipt.
+        // Read only that original effect; graph repair cannot settle its call.
+        try{
+          const deadline=now()+10000;
+          const receipt=await operation.nodeTargetAdapter.reconcile(operation.targetPhase.pending,null,deadline);
+          if(now()>=deadline||receipt?.completed!==true||receipt.cleanup_complete!==true)
+            return {stopped:false,reason:'The original target receipt has no confirmed completion and cleanup'};
+        }catch(error){return {stopped:false,reason:String(error.message).slice(0,1000)};}
+      }
       // A sent abort or an expired timeout is not proof: only the page ledger is.
       const state = operation.lastReceipt ? await readReceipt(operation) : { state: 'none' };
       // Same proof as the node release: a completed last gesture with confirmed cleanup.
