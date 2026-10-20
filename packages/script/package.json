@@ -2,10 +2,18 @@
   "$schema": "https://json.schemastore.org/package",
   "name": "@loginom-ai-agent/script",
   "license": "MIT",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsgo --noEmit"
+  },
   "dependencies": {
+    "@zip.js/zip.js": "2.7.62",
+    "tar": "7.5.22",
     "semver": "^7.6.3"
   },
   "devDependencies": {
+    "@tsconfig/bun": "catalog:",
+    "@typescript/native-preview": "catalog:",
     "@types/bun": "catalog:",
     "@types/semver": "^7.5.8"
   },
