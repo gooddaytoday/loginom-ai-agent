@@ -45,6 +45,7 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
       process.on('message', m => {
         if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
         if (m.operation === 'close') { owner.port1.close(); owner.port2.close(); process.send({id:m.id,result:{closed:true}},()=>process.disconnect()); }
+        if (m.operation === 'run-released') process.send({id:m.id,result:{released:true}});
         if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
         if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
         if (m.operation !== 'call') return;
@@ -124,6 +125,10 @@ test.each(["finish", "release", "close", "uncertain", "disconnect", "kill"])(
       }
       if (ending === "disconnect" || ending === "kill")
         await expect(call(ending)).rejects.toThrow("LOGINOM_CALL_UNCERTAIN")
+      if (ending === "kill")
+        await expect(client.request("acquire", { run: "other", session: "another-chat" })).rejects.toThrow(
+          "LOGINOM_RECOVERY_REQUIRED",
+        )
       expect(host.journal.pending().length).toBeGreaterThanOrEqual(2)
       expect((await recoveryStore(join(root, "recovery"), { strict: true })).pending().sort()).toEqual(
         host.journal.pending().sort(),
@@ -205,6 +210,7 @@ test("an uncertain call leaves the same run free to continue", async () => {
     process.on('message', m => {
       if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true}});
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'run-released') process.send({id:m.id,result:{released:true}});
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
       if (m.operation !== 'call') return;
@@ -281,6 +287,7 @@ test.each(["local", "leased"])(
     process.on('message', m => {
       if (m.operation === 'start') process.send({id:m.id,result:{protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true,checked:true}});
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'run-released') process.send({id:m.id,result:{released:true}});
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
       if (m.operation !== 'call') return;
@@ -484,6 +491,7 @@ test("a killed runtime requires an explicit prepare before the next scenario cal
         return;
       }
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'run-released') process.send({id:m.id,result:{released:true}});
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
       if (m.operation !== 'call') return;
@@ -578,6 +586,7 @@ test.each(["after-call", "during-admission", "disconnect-before-exit", "strict-b
         return;
       }
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'run-released') process.send({id:m.id,result:{released:true}});
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
       if (m.operation !== 'call') return;
@@ -724,6 +733,7 @@ test("the next turn replaces a runtime that cannot continue", async () => {
         return;
       }
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'run-released') process.send({id:m.id,result:{released:true}});
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
       if (m.operation !== 'call') return;
@@ -808,6 +818,7 @@ test("the next turn keeps a runtime that still has active work", async () => {
         return;
       }
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'run-released') process.send({id:m.id,result:{released:true}});
       if (m.operation === 'list') process.send({id:m.id,result:{prepared:true,tools:['dock_node_wait','dock_action_describe'].map(name=>({name,inputSchema:{type:'object'}}))}});
       if (m.operation === 'call' && m.input.name === 'dock_prepare') { process.send({id:m.id,result:{result:{},recoveryPending:false,activeWork:false}}); return; }
       if (m.operation !== 'call') return;
@@ -895,6 +906,7 @@ test("Help and diagnostics never use a browser runtime, including after chat pre
         return;
       }
       if (m.operation === 'close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+      if (m.operation === 'run-released') process.send({id:m.id,result:{released:true}});
       if (m.operation === 'interrupt') {
         appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ chat, name: 'interrupt' }) + '\\n');
         process.send({id:m.id,result:true});

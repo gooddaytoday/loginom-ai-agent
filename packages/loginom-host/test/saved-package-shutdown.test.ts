@@ -143,6 +143,7 @@ test.each([undefined, false, true].flatMap((policy) => [false, true].map((headle
       }
       if(m.operation==='call') process.send({id:m.id,result:{result:{ok:true},recoveryPending:false,activeWork:false}});
       if(m.operation==='interrupt') process.send({id:m.id,result:{interrupted:true}});
+      if(m.operation==='run-released') process.send({id:m.id,result:{released:true}});
       if(m.operation==='close') process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
     });
   `,

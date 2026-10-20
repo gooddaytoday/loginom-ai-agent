@@ -57,6 +57,7 @@ async function fixture(configured = false) {
       }
       if (message.operation === 'fixture.state') { Object.assign(work, message.input); send(true); }
       if (message.operation === 'fixture.exit') process.send({ id: message.id, result: true }, () => process.disconnect());
+      if (message.operation === 'run-released') send({ released: true });
       if (message.operation === 'admit') {
         appendFileSync(${JSON.stringify(marker)}, JSON.stringify({ operation: 'admit', userMessage: message.input.userMessage }) + '\\n');
         send([]);
