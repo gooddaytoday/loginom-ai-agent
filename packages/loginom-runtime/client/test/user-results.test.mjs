@@ -159,3 +159,14 @@ test('user-v1 replies put the browser recovery next_step first',()=>{
     output:{next_step:{tool:'dock_operation_inspect'},browser_recovery:{next_step:next}}}}).next_step.tool,'dock_browser_recovery');
   assert.equal(compactActionResult({status:'AMBIGUOUS',action_key:'operation.recover',output:{browser_recovery:{next_step:next}}}).next_step.tool,'dock_browser_recovery');
 });
+
+test('compact released results retain recovery links inside the closed output schema',()=>{
+ const raw={operation_id:'apply',state:'settled',outcome:{status:'FAILED',cleanup_complete:true,
+  error:{code:'ORIGINAL_FAILURE'},output:{released_by:'browser_recovery',recovery_receipt_id:'br-1:receipt',
+   output:{ports:[]},next_step:{tool:'dock_node_read',arguments:{source_operation_id:'br-1:receipt'}}}}};
+ const result=compactNodeResult(raw);
+ assert.equal(result.output.released_by,'browser_recovery');
+ assert.equal(result.output.recovery_receipt_id,'br-1:receipt');
+ assert.equal(result.released_by,undefined);assert.equal(result.recovery_receipt_id,undefined);
+ assert.equal(result.error.code,'ORIGINAL_FAILURE');assert.equal(validate(result).valid,true);
+});

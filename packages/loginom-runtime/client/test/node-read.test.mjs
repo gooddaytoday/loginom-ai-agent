@@ -176,3 +176,35 @@ test('JavaScript declared readback and original verified phase identities remain
  s.outcome.output.phases.find(phase=>phase.phase==='node_finish').status='pending';
  assert.throws(()=>buildNodeReadRequest(args,s));
 });
+
+const recoveryReceipt=()=>{
+ const value=source();
+ Object.assign(value.outcome.output,{checkpoint_kind:'browser_recovery_verified',result:'completed',
+  configuration:{status:'attested_by_model',attested_by_model:['Configured']},
+  verified:{execution:{verified:true,status:'completed'},output_schema:{verified:true,ports:[{port:0,schema}]}}});
+ value.outcome.output.output.ports=[{port:0,schema:[{name:'unverified'}]}];
+ return value;
+};
+test('dock_node_read accepts only completed recovery receipts with runtime execution and schema',()=>{
+ const receipt=recoveryReceipt(),before=structuredClone(receipt);
+ const read=buildNodeReadRequest(args,receipt);
+ assert.deepEqual(read.parameters.schemas,receipt.outcome.output.verified.output_schema.ports);
+ validateNodeApplyRequest(read,handlers);assert.deepEqual(receipt,before);
+ for(const mutate of [r=>r.result='continuable',r=>r.result='unresolved',r=>r.cleanup_complete=false,
+  r=>delete r.verified,r=>r.verified.execution.verified=false,r=>r.verified.output_schema.verified=false]){
+  const invalid=recoveryReceipt();mutate(invalid.outcome.output);
+  assert.throws(()=>buildNodeReadRequest(args,invalid),/source_operation_id/);
+ }
+ for(const type of ['programming.javascript','exports.text']){
+  const invalid=recoveryReceipt();invalid.parameters.target.type=type;
+  assert.throws(()=>buildNodeReadRequest(args,invalid),/source_operation_id/);
+ }
+});
+
+
+test('CrossTable recovery uses verified schemas without claiming an applied settings readback',()=>{
+ const receipt=recoveryReceipt();receipt.parameters.target.type='transform.cross_table';
+ const result=buildNodeReadRequest(args,receipt);
+ assert.deepEqual(result.parameters.schemas,receipt.outcome.output.verified.output_schema.ports);
+ assert.equal(result.parameters.cross_table_policy,undefined);
+});

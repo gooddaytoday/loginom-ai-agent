@@ -60,6 +60,7 @@ export function compactNodeRequestFailure(outcome,request={}) {
 export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   const outcome = result.outcome, node = outcome?.output, data = node?.output;
   const output = data ? pick(data, ['status', 'evidence_ref', 'execution_id', 'no_output_requested', 'javascript_source']) : {};
+  Object.assign(output,pick(node,['released_by','recovery_receipt_id']));
   if (data?.ports) output.ports = data.ports.map(port => {
     const value = pick(port, ['port', 'port_guid', 'fresh', 'execution_id', 'category_fields', 'schema', 'row_count', 'sample', 'sample_rows', 'sample_complete', 'precision', 'table', 'exact_table', 'read_coverage', 'read_consistency', 'cell_precision', 'binding', 'limitations']);
     value.schema = value.schema.map(column => pick(column, ['index', 'name', 'label', 'type', 'data_kind']));

@@ -7,6 +7,8 @@ import {browserRecoveryStepKey} from '../lib/browser-recovery-basis.mjs';
 import {actions,Page,runtime} from './support/executor-fixture.mjs';
 import {storageTidSuffix} from '../lib/storage-policy.mjs';
 import {createActionRuntime,parseCapabilityResult} from '../lib/executor.mjs';
+import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
+import {validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {compactNodeResult} from '../lib/user-results.mjs';
 
 const full={remaining:()=>({calls_remaining:30,ms_remaining:600000})};
@@ -373,7 +375,7 @@ async function typedBoundaryResult(code,value) {
 
 // Transport-boundary fixture: the real channel, console and Preview procedures
 // consume the same observations as their focused procedure tests.
-async function verificationFixture({shortVerificationClock=false,receiptExpired=false,lostDownload=false,lostPreview=false,previewRefused=false,busy=false,changedAfterPreview=false,released=false,exportFile=false,exportCheck={verified:true,destination:'/user/result.csv',existed:false}}={}) {
+async function verificationFixture({onRecord,nodeType,shortVerificationClock=false,receiptExpired=false,lostDownload=false,lostPreview=false,previewRefused=false,busy=false,changedAfterPreview=false,released=false,exportFile=false,exportCheck={verified:true,destination:'/user/result.csv',existed:false}}={}) {
  const node={document_id:'doc',workflow_id:'wf',node_id:'new'},workflow=request().workflow_ref;
  const context={...node,verified:true,surface:'graph',locked:false,tid:'graph-node'};
  const calls=[],events=[],gestures=[],receipts=new Map();
@@ -434,7 +436,7 @@ async function verificationFixture({shortVerificationClock=false,receiptExpired=
     {process_id:'1.1',record_id:'child',parent_id:'1',state:'completed',error:false,rendered:true,selected,process_tid:'child-row'}]};
   else if(code.includes('function readOutputContext('))value={verified:true,node_selected:shown,ports:[port]};
   else if(code.includes('function readNodePreviewSchema('))value={verified:preview,inventory_complete:true,port:0,
-   port_guid:port.port_guid,node_id:node.node_id,root_tid:'MF;TF-1;ModelForm;PreviewWindow',fields:[{name:'value',type:'integer'}]};
+   port_guid:port.port_guid,node_id:node.node_id,root_tid:'MF;TF-1;ModelForm;PreviewWindow',fields:[{index:0,record_id:'field',name:'value',label:'Value',type:'integer'}]};
   else if(code.includes('output:{value:await (async page=>(async function readPreparedNodeContext'))value=files?{verified:false}:context;
   else value=outcome(state());
   return typedBoundaryResult(code,value);
@@ -448,15 +450,21 @@ async function verificationFixture({shortVerificationClock=false,receiptExpired=
    retain:async()=>retained.push(binding),release:async()=>{}};}},
   execute,targetOrigin:'http://example.test',targetBuild:'7.4.2',onRecord:async e=>{
    if(shortVerificationClock&&e.phase==='node_step_prepared')clockOffset=239900;
-   events.push(e);return e;},
+   events.push(e);return onRecord?onRecord(e):e;},
   nodeTargetAdapterFactory:()=>({observe:async()=>{if(changedAfterPreview&&closedPreview)throw Error('Final graph changed');return structuredClone(graph);},preflight:async()=>{}}),
-  nodeApplyHandlers:new Map([[exportFile?'exports.text':'imports.text',{revision:'1',modes:['delimited'],validate:()=>{},
+  nodeApplyHandlers:new Map([[nodeType??(exportFile?'exports.text':'imports.text'),{revision:'1',modes:['delimited'],validate:()=>{},
    configure:exportFile?async()=>({verified:true,cleanup_complete:true,configuration:{configured:{destination_check:exportCheck}}}):ok('configure')}]]),
-  nodeApplyDriverFactory:options=>{operation=options.operation;return {verifySource:ok('source'),mapPorts:ok('mapping'),openWizard:ok('open'),waitExecution:ok('execute'),readOutput:ok('read'),verifyContinuation:async()=>true,...(released?{releasePending:async()=>proved()()}:{}),
+  nodeApplyDriverFactory:options=>{operation=options.operation;return {verifySource:ok('source'),mapPorts:ok('mapping'),openWizard:ok('open'),
+   finishGraph:async()=>{calls.push('read-execute');return {verified:true,cleanup_complete:true,mode:'execute',execution_id:'fresh-read',settings_applied:false};},
+   waitExecution:async()=>({verified:true,cleanup_complete:true,status:'completed',execution_id:'fresh-read'}),
+   readOutput:async read=>({verified:true,cleanup_complete:true,status:'complete',execution_id:'fresh-read',evidence_ref:'fresh-read:output',
+    ports:read.ports.map(port=>({port,fresh:true,schema:[{index:0,name:'value',label:'Value',type:'integer'}],sample:[],sample_complete:true}))}),
+   verifyContinuation:async()=>true,...(released?{releasePending:async()=>proved()()}:{}),
    finish:async()=>{calls.push('finish');operation.nodeApply.execution_baseline={root_id:'root',node,roots:[]};throw Error('Local node cancellation requested');}};}});
- if(exportFile)graph.nodes[0].type='exports.text';
- await engine.runNodeApply({...request(),target:{kind:'existing',type:exportFile?'exports.text':'imports.text',ref:node},
+ graph.nodes[0].type=nodeType??(exportFile?'exports.text':'imports.text');
+ engine.startNodeApply({...request(),target:{kind:'existing',type:nodeType??(exportFile?'exports.text':'imports.text'),ref:node},
   ...(exportFile?{parameters:{destination:'/user/result.csv',overwrite:exportCheck?.overwrite??'reject'}}:{})});
+ await engine.waitNodeApply('apply',{timeoutMs:1000});
  if(released)await engine.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'released'});
  return {runtime:engine,calls,events,gestures,operation,retained,receipts,downloads,timeouts};
 }
@@ -666,4 +674,284 @@ test('short verification budget refuses a prepared gesture without inventing an 
  assert.deepEqual(f.gestures,[],'the prepared gesture must not reach the browser');
  assert.deepEqual([result.facts.execution.verified,result.decision.result,result.unconfirmed],[false,'unresolved',false]);
  assert.equal(f.runtime.hasUnsettledWork(),true);
+});
+
+
+test('the recovery receipt is journaled before the original operation is released',async()=>{
+ let f,observed=false;
+ f=await verificationFixture({onRecord:async event=>{
+  if(event.phase==='browser_recovery_verified'){
+   observed=true;
+   assert.equal(f.runtime.hasUnsettledWork(),true);
+   assert.equal(f.operation.nodeApply.pending.phase,'finish');
+  }
+  return structuredClone(event);
+ }});
+ delete f.operation.nodeApply.execution_baseline;
+ const checked=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-1',sequence:1});
+ assert.equal(checked.decision.result,'continuable');
+ const originalError=structuredClone(f.operation.outcome.error),stoppedError=structuredClone(f.operation.stoppedError),phases=structuredClone(f.operation.nodeApply.phases);
+ const settled=await f.runtime.settleBrowserRecovery('apply',{attemptId:'br-1',...checked,attested:{settings:['Configured in browser']}});
+ assert.equal(observed,true);
+ assert.equal(settled.receipt_id,'br-1:receipt');
+ assert.equal(settled.result,'continuable');
+ assert.equal(f.runtime.hasUnsettledWork(),false);
+ const original=f.operation.outcome;
+ assert.equal(original.status,'FAILED');
+ assert.equal(original.output.checkpoint_kind,'local_node_released');
+ assert.equal(original.output.released_phase,'finish');
+ assert.equal(original.output.released_by,'browser_recovery');
+ assert.equal(original.output.recovery_receipt_id,'br-1:receipt');
+ assert.equal(original.output.error.code,'NODE_OPERATION_RELEASED');
+ assert.deepEqual(f.operation.stoppedError,stoppedError);
+ assert.deepEqual(original.error,originalError);
+ assert.deepEqual(f.operation.nodeApply.phases,phases);
+ assert.match(settled.next_step.instruction,/existing/);
+});
+
+test('an unresolved decision writes no receipt and keeps the lock',async()=>{
+ const f=await verificationFixture({previewRefused:true});
+ const checked=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-unresolved',sequence:1});
+ const before=structuredClone(f.operation.outcome);
+ const settled=await f.runtime.settleBrowserRecovery('apply',{attemptId:'br-unresolved',...checked,attested:{settings:['Claimed correct']}});
+ assert.equal(settled.result,'unresolved');assert.equal(settled.receipt_id,undefined);
+ assert.equal(f.runtime.hasUnsettledWork(),true);assert.deepEqual(f.operation.outcome,before);
+ assert.equal(f.events.some(e=>e.operation_id==='br-unresolved:receipt'),false);
+ await assert.rejects(f.runtime.startNodeRead({operation_id:'read',source_operation_id:'br-unresolved:receipt'}),/source_operation_id/);
+});
+
+test('a failed receipt write keeps even a released T4 locked until a matching ACK',async()=>{
+ let reject=true,f;
+ f=await verificationFixture({released:true,onRecord:async event=>{
+  if(event.phase==='browser_recovery_verified'){
+   assert.equal(f.runtime.hasUnsettledWork(),true);
+   if(reject)throw Error('Journal unavailable');
+  }
+  return structuredClone(event);
+ }});
+ const original=structuredClone(f.operation.outcome);
+ const checked=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-ack',sequence:1});
+ const settle=()=>f.runtime.settleBrowserRecovery('apply',{attemptId:'br-ack',...checked,attested:{settings:[]}});
+ const refused=await settle();
+ assert.deepEqual([refused.result,refused.error.code],['unresolved','RECOVERY_RECEIPT_UNCONFIRMED']);
+ assert.deepEqual(f.operation.outcome,original);assert.equal(f.runtime.hasUnsettledWork(),true);
+ const before=f.gestures.length;
+ const blocked=await f.runtime.run('package.save_checkpoint',{path:'/user/a.lgp',conflict_policy:'replace'},{operationId:'blocked'});
+ assert.equal(blocked.status,'AMBIGUOUS');assert.equal(f.gestures.length,before);
+ reject=false;
+ assert.equal((await settle()).receipt_id,'br-ack:receipt');
+ assert.equal(f.runtime.hasUnsettledWork(),false);
+ assert.deepEqual(f.operation.outcome,{...original,output:{...original.output,recovery_receipt_id:'br-ack:receipt'}});
+ await f.runtime.runNodeApply({...request(),operation_id:'next',target:{kind:'existing',type:'imports.text',ref:f.operation.nodeApply.node}});
+ assert.equal(f.calls.filter(c=>c==='finish').length,2);
+});
+
+
+test('a completed Calculator receipt supplies the actual next read identity and verified schema',async()=>{
+ const f=await verificationFixture({nodeType:'transform.calculator'});
+ const checked=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-calc',sequence:1});
+ const settled=await f.runtime.settleBrowserRecovery('apply',{attemptId:'br-calc',...checked,attested:{settings:['Expression']}});
+ assert.equal(settled.next_step.tool,'dock_node_read');
+ assert.equal(settled.next_step.arguments.source_operation_id,'br-calc:receipt');
+ const event=f.events.find(e=>e.phase==='browser_recovery_verified');
+ const read=buildNodeReadRequest({operation_id:'calc-read',...settled.next_step.arguments},
+  {parameters:event.parameters,outcome:{status:'SUCCEEDED',cleanup_complete:true,output:event.result}});
+ assert.deepEqual(read.parameters.schemas,[{port:0,schema:[{index:0,name:'value',label:'Value',type:'integer'}]}]);
+ validateNodeApplyRequest(read,new Map([['transform.calculator',{revision:'1'}]]));
+ const admitted=await f.runtime.startNodeRead({operation_id:'calc-read',...settled.next_step.arguments});
+ assert.equal(admitted.operation_id,'calc-read');
+ const completed=await f.runtime.waitNodeApply('calc-read',{timeoutMs:1000});
+ assert.equal(completed.outcome.status,'SUCCEEDED',JSON.stringify(completed));
+ assert.equal(completed.outcome.output.execution.execution_id,'fresh-read');
+ assert.equal(f.calls.filter(c=>c==='read-execute').length,1);
+});
+
+test('a completed export points to its verified file rather than a node read',async()=>{
+ const f=await verificationFixture({exportFile:true});
+ const checked=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-file',sequence:1});
+ const result=await f.runtime.settleBrowserRecovery('apply',{attemptId:'br-file',...checked,attested:{settings:[]}});
+ assert.equal(result.result,'completed');assert.equal(result.next_step.tool,undefined);
+ assert.match(result.next_step.instruction,/result.csv/);
+ await assert.rejects(f.runtime.startNodeRead({operation_id:'file-read',source_operation_id:result.receipt_id}),/source_operation_id/);
+});
+
+test('verified Save settlement links its receipt without rewriting the original Save outcome',async()=>{
+ const savedState={version:1,session_id:'session',document_id:'doc',account:'user',package_path:'/user/a.lgp',
+  modified:false,observation:'after_confirmed_save',read_only:true,persisted_content_verified:false};
+ const events=[];
+ const engine=await saveWithReceipt({savedState,receipt:outcome=>({state:'completed',receipt:outcome}),onRecord:async e=>{events.push(e);return e;}});
+ await engine.inspect({operationId:'save'});
+ const checked=await engine.verifyBrowserRecovery('save',{attemptId:'br-save',sequence:1});
+ const result=await engine.settleBrowserRecovery('save',{attemptId:'br-save',...checked,attested:{actions:['Save']}});
+ assert.equal(result.result,'completed');assert.equal(engine.hasUnsettledWork(),false);
+ assert.match(result.next_step.instruction,/Save.*Dock/);
+ const retry=await engine.run('package.save_checkpoint',{path:'/user/a.lgp',conflict_policy:'replace'},{operationId:'save'});
+ assert.equal(retry.status,'AMBIGUOUS');
+ assert.deepEqual(retry.output.browser_recovery,{receipt_id:'br-save:receipt',result:'completed'});
+ assert.equal(events.filter(e=>e.phase==='browser_recovery_verified').length,1);
+});
+
+test('a stopped attempt is never offered again and its release refusal names no user action',async()=>{
+ const f=fixture({release:refuse,browserRecovery:full});await stop(f,'finish');
+ f.runtime.markBrowserRecoveryStopped('apply','br-stopped');
+ assert.equal(f.runtime.browserRecoveryBasis('apply'),null);
+ const next=f.runtime.browserRecoverySafeCompletion('apply');
+ assert.equal(next.tool,'dock_operation_recover');
+ const refused=await f.runtime.recover(next.arguments.operation_id,{strategy:next.arguments.strategy,recoveryOperationId:'release-stopped'});
+ assert.equal(refused.output.user_action,undefined);assert.equal(refused.output.browser_recovery,undefined);
+ assert.match(refused.output.instruction,/apply.*phase.*finish/);
+ assert.match(refused.output.instruction,/another node/);
+ assert.equal(f.runtime.hasUnsettledWork(),true);
+});
+
+test('stopping and safe completion stay callable while the original node job is busy',async()=>{
+ const f=fixture({release:proved(),browserRecovery:full});
+ let entered,release;
+ const started=new Promise(resolve=>{entered=resolve;});
+ f.drivers.finish=async()=>{entered();await new Promise(resolve=>{release=resolve;});throw Error('Local node cancellation requested');};
+ f.runtime.startNodeApply(request());await started;
+ try{
+  const calls=[...f.calls];
+  f.runtime.markBrowserRecoveryStopped('apply','br-busy');
+  const next=f.runtime.browserRecoverySafeCompletion('apply');
+  assert.equal(next.tool,undefined);assert.match(next.instruction,/apply/);
+  assert.deepEqual(f.calls,calls);assert.equal(f.runtime.browserRecoveryBasis('apply'),null);
+ }finally{release();await f.runtime.waitNodeApply('apply',{timeoutMs:1000});}
+});
+
+
+test('exact retry returns the released original and its receipt without rerunning the stopped phase',async()=>{
+ const f=await verificationFixture();
+ const originalRequest=structuredClone(f.operation.nodeApply.request),originalError=structuredClone(f.operation.outcome.error);
+ const checked=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-retry',sequence:1});
+ await f.runtime.settleBrowserRecovery('apply',{attemptId:'br-retry',...checked,attested:{settings:[]}});
+ const job=f.runtime.startNodeApply(originalRequest);
+ const waited=await f.runtime.waitNodeApply('apply',{timeoutMs:0});
+ assert.deepEqual(job,waited);assert.equal(job.outcome.status,'FAILED');
+ assert.deepEqual(job.outcome.error,originalError);
+ assert.equal(job.outcome.output.recovery_receipt_id,'br-retry:receipt');
+ assert.equal(compactNodeResult(job).output.recovery_receipt_id,'br-retry:receipt');
+ assert.equal(f.calls.filter(c=>c==='finish').length,1);
+ const inspected=await f.runtime.inspect({operationId:'apply'});
+ assert.equal(f.runtime.hasUnsettledWork(),false);
+ assert.equal(f.operation.outcome.status,'FAILED');assert.deepEqual(f.operation.outcome.error,originalError);
+ assert.ok(inspected);
+});
+
+test('stopped confirmed verification releases only after the existing native proof and release ACK',async()=>{
+ let reject=true,f;
+ f=await verificationFixture({previewRefused:true,onRecord:async event=>{
+  if(event.phase==='node_operation_released'){
+   assert.equal(f.runtime.hasUnsettledWork(),true);
+   if(reject)throw Error('Release journal unavailable');
+  }
+  return event;
+ }});
+ const originalError=structuredClone(f.operation.outcome.error);
+ const checked=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-stop',sequence:1});
+ f.operation.nodeApplyDrivers.releasePending=async()=>proved()();
+ const settlement=await f.runtime.settleBrowserRecovery('apply',{attemptId:'br-stop',...checked,attested:{}});
+ assert.equal(settlement.result,'unresolved');
+ await assert.rejects(f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'unstopped'}));
+ f.runtime.markBrowserRecoveryStopped('apply','other-attempt');
+ assert.equal(f.runtime.browserRecoverySafeCompletion('apply').tool,undefined);
+ await assert.rejects(f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'wrong-attempt'}));
+ f.runtime.markBrowserRecoveryStopped('apply','br-stop');
+ const step=f.runtime.browserRecoverySafeCompletion('apply');
+ assert.equal(step.tool,'dock_operation_recover');
+ const refused=await f.runtime.recover('apply',{strategy:step.arguments.strategy,recoveryOperationId:'refused-ack'});
+ assert.equal(refused.error.code,'NODE_RELEASE_REFUSED');assert.equal(f.runtime.hasUnsettledWork(),true);
+ assert.equal(refused.output.user_action,undefined);
+ reject=false;
+ const released=await f.runtime.recover('apply',{strategy:step.arguments.strategy,recoveryOperationId:'safe-release'});
+ assert.equal(released.output.goal_verified,false);assert.equal(f.runtime.hasUnsettledWork(),false);
+ assert.equal(f.operation.outcome.status,'FAILED');assert.deepEqual(f.operation.outcome.error,originalError);
+ assert.equal(f.operation.outcome.output.recovery_receipt_id,undefined);
+ assert.equal(f.events.some(e=>e.phase==='browser_recovery_verified'),false);
+});
+
+test('the same stopped phase after browser recovery release offers T3 without touching other work',async()=>{
+ const f=await verificationFixture();
+ delete f.operation.nodeApply.execution_baseline;
+ const checked=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-repeat-phase',sequence:1});
+ await f.runtime.settleBrowserRecovery('apply',{attemptId:'br-repeat-phase',...checked,attested:{}});
+ const original=structuredClone(f.operation.outcome);
+ f.runtime.startNodeApply({...f.operation.nodeApply.request,operation_id:'again'});
+ const again=await f.runtime.waitNodeApply('again',{timeoutMs:1000});
+ assert.equal(again.outcome.output.browser_recovery.next_step.trigger,'T3');
+ await assert.rejects(f.runtime.settleBrowserRecovery('apply',{attemptId:'br-repeat-phase',...checked,attested:{}}),/owned/);
+ assert.deepEqual(f.runtime.nodeApplyStatus('again'),again);
+ assert.deepEqual((await f.runtime.inspect({operationId:'apply'})).output.outcome,original);
+ assert.equal(f.runtime.hasUnsettledWork(),true);
+});
+
+test('unknown verification and stopped released T4 offer no stale release',async()=>{
+ for(const lostPreview of [false,true]){
+  const f=await verificationFixture({released:true,lostPreview});
+  const checked=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-stop-t4',sequence:1});
+  if(lostPreview)await assert.rejects(f.runtime.settleBrowserRecovery('apply',{attemptId:'br-stop-t4',...checked,attested:{}}),/confirmed|Confirmed/);
+  const before=f.gestures.length;
+  f.runtime.markBrowserRecoveryStopped('apply','br-stop-t4');
+  const step=f.runtime.browserRecoverySafeCompletion('apply');
+  assert.equal(step.tool,undefined);assert.match(step.instruction,/factual state/);
+  await assert.rejects(f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'unsafe-release'}));
+  assert.equal(f.runtime.hasUnsettledWork(),true);assert.equal(f.gestures.length,before);
+ }
+});
+
+test('a completed JavaScript recovery requires a new existing operation instead of receipt reading',async()=>{
+ const f=await verificationFixture({nodeType:'programming.javascript'});
+ const checked=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-js',sequence:1});
+ const settled=await f.runtime.settleBrowserRecovery('apply',{attemptId:'br-js',...checked,attested:{settings:['Script']}});
+ assert.equal(settled.result,'completed');assert.equal(settled.next_step.tool,'dock_node_apply');
+ assert.match(settled.next_step.instruction,/NEW operation_id.*existing.*complete intended settings/);
+ await assert.rejects(f.runtime.startNodeRead({operation_id:'js-read',source_operation_id:settled.receipt_id}),/source_operation_id/);
+});
+
+test('a mismatched receipt ACK or attempt cannot release the original and concurrent mutation is refused',async()=>{
+ let f;
+ f=await verificationFixture({onRecord:async event=>{
+  if(event.phase!=='browser_recovery_verified')return event;
+  assert.equal(f.runtime.hasUnsettledWork(),true);
+  const mutation=await f.runtime.run('package.save_checkpoint',{path:'/user/a.lgp',conflict_policy:'replace'},{operationId:'during-ack'});
+  assert.notEqual(mutation.status,'SUCCEEDED');
+  return {...event,result:{...event.result,result:'unresolved'}};
+ }});
+ const checked=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-mismatch',sequence:1});
+ const original=structuredClone(f.operation.outcome),gestures=f.gestures.length;
+ await assert.rejects(f.runtime.settleBrowserRecovery('apply',{attemptId:'other',...checked,attested:{}}),/owned/);
+ const settled=await f.runtime.settleBrowserRecovery('apply',{attemptId:'br-mismatch',...checked,attested:{}});
+ assert.equal(settled.error.code,'RECOVERY_RECEIPT_UNCONFIRMED');assert.equal(settled.receipt_id,undefined);
+ assert.equal(f.runtime.hasUnsettledWork(),true);assert.deepEqual(f.operation.outcome,original);
+ assert.equal(f.gestures.length,gestures);
+ await assert.rejects(f.runtime.startNodeRead({operation_id:'no-receipt',source_operation_id:'br-mismatch:receipt'}),/source_operation_id/);
+});
+
+test('a recovery receipt cannot reuse another node job identity',async()=>{
+ const f=await verificationFixture();
+ f.runtime.startNodeApply({...f.operation.nodeApply.request,operation_id:'br-collision:receipt'});
+ const other=await f.runtime.waitNodeApply('br-collision:receipt',{timeoutMs:1000});
+ const checked=await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-collision',sequence:1});
+ await assert.rejects(f.runtime.settleBrowserRecovery('apply',{attemptId:'br-collision',...checked,attested:{}}),/identity.*used/);
+ assert.deepEqual(f.runtime.nodeApplyStatus('br-collision:receipt'),other);
+ assert.equal(f.runtime.hasUnsettledWork(),true);
+ assert.equal(f.events.some(e=>e.phase==='browser_recovery_verified'),false);
+});
+
+for(const phase of ['operation_abandoned','recovery_completed'])test('safe release survives auxiliary journal failure after its native ACK: '+phase,async()=>{
+ const f=await verificationFixture({onRecord:async event=>{
+  if(event.phase===phase)throw Error('Auxiliary journal unavailable: '+phase);
+  return event;
+ }});
+ await f.runtime.verifyBrowserRecovery('apply',{attemptId:'br-aux',sequence:1});
+ f.operation.nodeApplyDrivers.releasePending=async()=>proved()();
+ f.runtime.markBrowserRecoveryStopped('apply','br-aux');
+ const result=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'aux-release'});
+ assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.goal_verified,false);
+ assert.match(result.output.journal_error,/Auxiliary journal unavailable/);
+ assert.equal(f.runtime.hasUnsettledWork(),false);
+ assert.equal(f.runtime.nodeApplyStatus('apply').outcome.status,'FAILED');
+ const retry=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'aux-release'});
+ assert.deepEqual(retry,result);
+ assert.equal(f.events.filter(e=>e.phase==='node_operation_released').length,1);
 });

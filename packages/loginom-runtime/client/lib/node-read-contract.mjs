@@ -40,6 +40,10 @@ export function buildNodeReadRequest(args,source){
  const outcome=source?.outcome,node=outcome?.output,request=source?.parameters;
  // A release after a stopped read keeps the verified configuration and the
  // completed execution; only its output was not refreshed.
+ const recovery=node?.checkpoint_kind==='browser_recovery_verified';
+ if(recovery)need(node.result==='completed'&&node.verified?.execution?.verified===true
+  &&node.verified?.output_schema?.verified===true&&!['programming.javascript','exports.text'].includes(request?.target?.type),
+  'Invalid parameters.source_operation_id: a completed runtime-verified recovery table receipt is required');
  const releasedRead=outcome?.status==='FAILED'&&node?.checkpoint_kind==='local_node_released'&&node.released_phase==='read';
  need((outcome?.status==='SUCCEEDED'||releasedRead)&&outcome.cleanup_complete===true&&node?.cleanup_complete===true
   &&node.execution?.status==='completed'&&node.node&&request?.target?.type!=='exports.text',
@@ -47,12 +51,12 @@ export function buildNodeReadRequest(args,source){
  const javascript=request.target.type==='programming.javascript';
  const readback=node.configuration?.readback;
  if(javascript)need(readback?.kind==='javascript', 'JavaScript output reread requires source-bound admission');
- const previews=node.output?.ports?.map(p=>({port:p.port,schema:p.schema}))??[];
+ const previews=recovery?node.verified.output_schema.ports:node.output?.ports?.map(p=>({port:p.port,schema:p.schema}))??[];
  // A verified local configuration retains the full mapping even when the
  // original operation requested no preview. Fresh execution and table-schema
  // comparison remain mandatory in the read driver; callers cannot supply this.
- const crossPolicy=retainCrossTableReadPolicy(source,args.source_operation_id);
- const retained=request.target.type==='transform.cross_table'?[]:retainedMappingSchemas(node,args.source_operation_id);
+ const crossPolicy=recovery?null:retainCrossTableReadPolicy(source,args.source_operation_id);
+ const retained=recovery||request.target.type==='transform.cross_table'?[]:retainedMappingSchemas(node,args.source_operation_id);
  // JS binds to the owned full mapping even when an earlier preview exists.
  const schemas=javascript?retained:[...previews,...retained.filter(p=>!previews.some(s=>s.port===p.port))];
  need(schemas?.length>0,'Invalid parameters.source_operation_id: the source operation has no verified table output');
