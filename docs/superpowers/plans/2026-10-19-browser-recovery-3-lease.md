@@ -125,7 +125,7 @@ git commit -m "feat(runtime): define the browser recovery allowlist"
 
 Подтверждённый safe release — отдельный явный путь возврата обычного допуска Dock; он не повторяет stopped-попытку и не заявляет recovered goal. Каждый переход в `stopped` вызывает `markBrowserRecoveryStopped` и пишет `browser_recovery_state`. Любой ответ со `state: "stopped"` содержит `stop_reason`, `summary` (вызванные инструменты, состояние исходной операции, последний результат проверки, `attested_by_model`) и `next_step`: при живой странице — `runtime.browserRecoverySafeCompletion(operationId)`, после `page_changed` и `browser_call_unconfirmed` — `{instruction}` сообщить фактическое состояние.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `runtime(...)` в тестах — обычный объект с функциями плана 2, без библиотек моков: `markBrowserRecoveryStopped` записывает id в `rt.stopped` и обнуляет основание, `settleBrowserRecovery` — в `rt.settled`. `now` — управляемые часы. `recovery(options)` создаёт автомат и считает вызовы `callBrowser` в массиве `r.browserCalls`, события журнала — в `r.events`. `start(r, id)` и `finish(r)` — вызовы `dock_browser_recovery` с `action: "start"` и `action: "finish"` (фиксированный отчёт); `meta(reply)` — `reply._meta["loginom/browser_recovery"]`.
 
@@ -181,13 +181,13 @@ test('each finish consumes one call and unresolved returns to browser only with 
 
 Дополнительные регрессии Task 2: `finish` при времени 600000 мс не вызывает verify даже с 30 оставшимися вызовами; release/abort во время deferred handoff и verify (confirmed/unknown) не возрождают аренду поздним ответом и сохраняют факты; начатый durable ACK сохраняет результат при stop; matching safe release разрешает Dock только после подтверждённого outcome.
 
-- [ ] **Step 2: Run tests to verify they fail** (`--test test/browser-recovery.test.mjs`; Expected: FAIL)
+- [x] **Step 2: Run tests to verify they fail** (`--test test/browser-recovery.test.mjs`; Expected: FAIL)
 
-- [ ] **Step 3: Implement** по таблице переходов.
+- [x] **Step 3: Implement** по таблице переходов.
 
-- [ ] **Step 4: Run tests to verify they pass** (Expected: PASS)
+- [x] **Step 4: Run tests to verify they pass** (Expected: PASS)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/loginom-runtime/client
