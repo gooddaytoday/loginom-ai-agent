@@ -260,7 +260,7 @@ test('page probe accepts the prepared page with an open dialog and refuses a sec
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail** (`--test test/browser-recovery.test.mjs`, интеграционный тест — командой `support/run-direct-browser-tests.mjs`; Expected: FAIL)
+- [ ] **Step 2: Run tests to verify they fail** (`--test test/browser-recovery.test.mjs`; интеграционный тест — `LOGINOM_DOCK_TEST_BROWSER=<pinned Chromium> <pinned Node> --test test/browser-recovery-probe.integration.test.mjs` из client с `headless: true`, `chromiumSandbox: true`, как в geometry-тесте; общий `support/run-direct-browser-tests.mjs` выполняет его в CI. Expected: FAIL). Если общий runner не стартует из-за отсутствия `xvfb-run`, это отдельное ограничение среды, а не результат нового теста.
 
 - [ ] **Step 3: Implement** по порядку из Interfaces.
 
