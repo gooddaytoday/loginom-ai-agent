@@ -23,6 +23,7 @@ test("runAttempt: live binary без выделенного Loginom остана
       runId: "storage", runDir: path.join(directory, "results"), signal: new AbortController().signal,
       profileRecovered: false, skipJudge: false })
     expect(result.status).toBe("harness_error")
+    expect(result.browser_recovery).toBe(false)
     expect(result.harness_error).toContain("выделенный Docker-контейнер")
     expect(result.judge_attempts).toBe(0)
     expect(result.session_id).toBeNull()
@@ -196,6 +197,25 @@ test("main --dry-run --only: подмножество задач", async () => {
   } finally {
     if (result.runDir) await rm(result.runDir, { recursive: true, force: true })
   }
+}, 30_000)
+
+test("main: browser recovery event проходит в result, count и report", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-browser-recovered-"))
+  try {
+    const tasksDir = path.join(directory, "tasks")
+    await cp(path.join(evalsRoot, "tasks/group-sum-qty"), path.join(tasksDir, "browser-recovered"), { recursive: true })
+    const taskFile = path.join(tasksDir, "browser-recovered/task.json")
+    await Bun.write(taskFile, JSON.stringify({ ...await Bun.file(taskFile).json(), id: "browser-recovered" }))
+    const run = await main(["--dry-run", "--tasks", tasksDir], {
+      EVAL_RESULTS_DIR: path.join(directory, "results"), EVAL_WORKSPACE_ROOT: path.join(directory, "workspace"),
+    })
+    expect(run.code).toBe(0)
+    const summary = await Bun.file(path.join(run.runDir, "summary.json")).json() as RunSummary
+    expect(summary.tasks[0]!.attempts[0]!.browser_recovery).toBe(true)
+    expect((await Bun.file(path.join(run.runDir, "browser-recovered/1/result.json")).json()).browser_recovery).toBe(true)
+    expect(summary.metrics.recovered_via_browser_count).toBe(1)
+    expect(await Bun.file(path.join(run.runDir, "report.md")).text()).toContain("recovered_via_browser_count: 1")
+  } finally { await rm(directory, { recursive: true, force: true }) }
 }, 30_000)
 
 test("redact: password, dock.apiKey и provider.apiKey не попадают в JSON", () => {
@@ -481,6 +501,27 @@ test("runAttempt: исключение записи cleanup не стирает 
   expect(run.stop).toBe(true)
   expect(await Bun.file(path.join(out, "run.json")).exists()).toBe(true)
   expect(await Bun.file(path.join(out, "result.json")).json()).toEqual(run.result)
+})
+
+test("runAttempt: поздний сбой записи не стирает browser recovery из измеренного результата", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-browser-write-"))
+  try {
+    const tasksDir = path.join(directory, "tasks")
+    await cp(path.join(evalsRoot, "tasks/group-sum-qty"), path.join(tasksDir, "browser-recovered"), { recursive: true })
+    const taskFile = path.join(tasksDir, "browser-recovered/task.json")
+    await Bun.write(taskFile, JSON.stringify({ ...await Bun.file(taskFile).json(), id: "browser-recovered" }))
+    const config = loadConfig(["--dry-run", "--tasks", tasksDir], { EVAL_WORKSPACE_ROOT: path.join(directory, "workspace") })
+    const [task] = await loadTasks(tasksDir)
+    await mkdir(path.join(directory, "results/browser-recovered/1/cleanup.json"), { recursive: true })
+    const { result, stop } = await runAttempt({ config, command: agentCommand(config),
+      source: parseArtifactSource(config.artifactSource, config.loginom), task: task!, attempt: 1,
+      runId: "browser-write", runDir: path.join(directory, "results"),
+      signal: new AbortController().signal, profileRecovered: false, skipJudge: true })
+    expect(result.browser_recovery).toBe(true)
+    expect(result.environment_cleanup?.status).toBe("failed")
+    expect(stop).toBe(true)
+    expect((await Bun.file(path.join(directory, "results/browser-recovered/1/result.json")).json()).browser_recovery).toBe(true)
+  } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
 test("main: summary фиксирует переданный variant и эффективный лимит задачи", async () => {

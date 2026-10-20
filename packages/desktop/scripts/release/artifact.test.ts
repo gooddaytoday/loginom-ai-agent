@@ -206,6 +206,12 @@ test("decodes Linux and Windows manifests without mixing installation or artifac
   ).toThrow("RELEASE_MANIFEST_INVALID")
 })
 
+test("release manifest keeps the browser recovery build flag and decodes older manifests", () => {
+  const released = releaseManifest("linux")
+  expect(decodeManifest({ ...released, browserRecovery: true }).browserRecovery).toBe(true)
+  expect(decodeManifest(released).browserRecovery).toBeUndefined()
+})
+
 function pe() {
   const executable = Buffer.alloc(256)
   executable.write("MZ")

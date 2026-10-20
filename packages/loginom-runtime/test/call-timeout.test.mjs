@@ -25,3 +25,8 @@ test("invalid budgets cannot turn private timeouts into an unbounded wait", () =
   }
   assert.equal(runtimeCallTimeout("dock_node_wait", { kind: "source", budget_ms: 1_800_000 }), 105_000)
 })
+
+test('browser recovery receives the native verification deadline plus delivery margin', () => {
+  assert.equal(runtimeCallTimeout('dock_browser_recovery', {action:'finish'}), 255000);
+  assert.equal(runtimeCallTimeout('dock_node_apply', {}), 105000);
+});

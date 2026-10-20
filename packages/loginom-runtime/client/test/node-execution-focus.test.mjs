@@ -4,20 +4,23 @@ import {createNodeExecutionProcedure,trainConfiguredNode} from '../lib/node-exec
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
 const button='MF;cntMain;tlbMainToolbar;btnProgress',grid='ConsoleForm;ProgressForm;trpProgress;grd;tbl';
 async function fixture({hide=true,replace=false,lost=false,failure=false,closeFault=false,failedChild=false,
- training=false,trainUnknown=false,verifyFailedChild=false,ownerNode='node',childState='failed',showMismatch=false,changedError=false,replaceAtMenu=false,deadlineFault=false}={}){
- let opened=true,launched=false,selected=false,menu=false,shown=false,trainMenu=false;
+ training=false,trainUnknown=false,verifyFailedChild=false,ownerNode='node',childState='failed',showMismatch=false,changedError=false,replaceAtMenu=false,deadlineFault=false,adopted=false,noNew=false,multipleNew=false}={}){
+ let opened=true,launched=adopted,selected=false,menu=false,shown=false,trainMenu=false;
+ const baselines=[];
  const actions=[],el=(tid,allowed_actions=['click'])=>({tid,ref:tid,allowed_actions});
  const state=()=>({prepared_node_context:{...node,...(showMismatch&&shown?{node_id:'foreign'}:{}),verified:true,surface:'graph',tid:'graph-node'},wizard:{status:'absent'},navigation_context:{status:'observed'},
   node_outputs:{verified:true,node_selected:shown},
+  ...(failure&&adopted?{node_preview_schema:{verified:true,port:0,port_guid:'old-preview',node_id:'node'}}:{}),
   node_processes:{verified:opened,inventory_complete:true,show_completed:true,root_id:'root',node_context:{...node,verified:true,surface:'graph'},processes:launched?[
    {process_id:'1',record_id:'group',parent_id:null,state:failure?'pending_or_failed':'completed',error:failure,children_loaded:true,expanded:true,rendered:true,...(failure?{error_details:'Missing own CSV',progress_state:{verified:true,state:'failed',terminal:true,can_cancel:false,source:'native_progress_record'}}:{})},
    {process_id:'1.1',record_id:replace&&shown||replaceAtMenu&&menu&&selected?'replaced':'child',parent_id:'1',state:'completed',error:false,rendered:true,selected,process_tid:'child-row',
     ...(failedChild?{state:'pending_or_failed',error:true,error_details:changedError&&shown?'Changed child error':'Own JS sentinel error',
       progress_state:{verified:true,state:childState,terminal:true,can_cancel:false,source:'native_progress_record'},
-      owner:{verified:true,node_id:ownerNode,source:'native_process_model_identity'}}:{})}]:[]},
+      owner:{verified:true,node_id:ownerNode,source:'native_process_model_identity'}}:{})},
+   ...(multipleNew?[{process_id:'2',record_id:'other',parent_id:null,state:'completed',error:false}]:[])]:[]},
   ui:{elements:[el(button),{...el('graph-node',['right_click']),graph_node:{part:'body'}},{...el('graph-node;Label;Label',['right_click']),graph_node:{part:'label'}},...(trainMenu?[{...el('mn;mniTrain'),label:'Обучить узел'}]:[]),...(opened?[el(grid,['right_click']),el('ConsoleForm;btnClose'),el('child-row',['right_click'])]:[]),
    ...(menu?[el('mnContextMenu;mniShowCompletedProcesses',['click','press']),el('mnContextMenu;mniShowNodeToProcess',['show_process_node'])]:[])]}});
- const channel={observe:async o=>{if(deadlineFault&&o.condition==='new process selects the prepared graph node')throw Error('Original deadline expired');
+ const channel={rememberExecutionBaseline:baseline=>baselines.push(structuredClone(baseline)),observe:async o=>{if(deadlineFault&&o.condition==='new process selects the prepared graph node')throw Error('Original deadline expired');
   const s=state();assert.ok(o.ready(s),o.condition);return structuredClone(s);},perform:async o=>{
   const s=state();assert.ok(o.ready(s));o.identity(s);const a=o.resolve(s);actions.push(a);
   if(a.ref==='graph-node')trainMenu=true;
@@ -30,9 +33,32 @@ async function fixture({hide=true,replace=false,lost=false,failure=false,closeFa
   return {status:'SUCCEEDED'};
  }};
  if(training)return {actions,run:()=>trainConfiguredNode(channel,node)};
- const driver=createNodeExecutionProcedure(channel,node,{verifyFailedChild});await driver.prepare();launched=true;await driver.identify();actions.length=0;
- return {driver,actions};
+ const driver=createNodeExecutionProcedure(channel,node,{verifyFailedChild,...(adopted?{baseline:{root_id:'root',node,roots:[],launch_verified:false}}:{})});
+ if(!adopted){await driver.prepare();launched=true;await driver.identify();actions.length=0;}
+ if(noNew)launched=false;
+ return {driver,actions,baselines,get consoleOpen(){return opened;}};
 }
+test('preparation remembers its process baseline without recovery events',async()=>{
+ const f=await fixture();assert.equal(f.baselines.length,1);assert.equal(f.baselines[0].root_id,'root');
+});
+test('adopted completion proves one new owned group and closes an empty console',async()=>{
+ const completed=await fixture({adopted:true});
+ await assert.rejects(completed.driver.prepare(),/already been captured/);
+ const result=await completed.driver.verifyCompletion();
+ assert.equal(result.verified,true);assert.equal(result.status,'completed');assert.equal(result.owner_verified,true);
+ const empty=await fixture({adopted:true,noNew:true});
+ assert.deepEqual(await empty.driver.verifyCompletion(),{verified:false,reason:'NO_NEW_EXECUTION'});
+ assert.equal(empty.consoleOpen,false);
+ const multiple=await fixture({adopted:true,multipleNew:true});
+ assert.deepEqual(await multiple.driver.verifyCompletion(),{verified:false,reason:'AMBIGUOUS_EXECUTION'});
+ assert.equal(multiple.consoleOpen,false);
+});
+test('adopted failed receipt cannot prove completion',async()=>{
+ const f=await fixture({adopted:true,failure:true});
+ const result=await f.driver.verifyCompletion();
+ assert.equal(result.verified,false);assert.equal(result.reason,'EXECUTION_FAILED');
+ assert.equal(result.status,'failed');assert.equal(result.error.message,'Missing own CSV');
+});
 for(const hide of [false,true])test('completion verifies the same process after Show Node, hidden console: '+hide,async()=>{
  const f=await fixture({hide}),r=await f.driver.waitCompleted();assert.equal(r.execution_id,'doc:root:1');assert.equal(r.owner_verified,true);
  assert.equal(f.actions.filter(a=>a.ref===button).length,hide?1:0);

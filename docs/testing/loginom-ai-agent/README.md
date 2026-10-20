@@ -1,5 +1,7 @@
 # Приёмка Loginom AI Agent на отдельных машинах
 
+[Browser recovery BR-S1/BR-S3](browser-recovery.md) — отдельный source smoke на реальном Loginom.
+
 Самостоятельный CLI из ветки `loginom-cli` проверяется по отдельному
 [runbook IND-01…14](standalone-cli.md). Его текущая спецификация —
 [standalone CLI](../../superpowers/specs/2026-09-17-loginom-cli-standalone-design.md);

@@ -20,6 +20,7 @@ import { Plugin } from "@/plugin"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { isRecord } from "@/util/record"
 import { Cause, Effect, Exit, Layer, Schema } from "effect"
+import type { Tool as AITool } from "ai"
 import { testEffect } from "../lib/effect"
 
 const callID = "call-test"
@@ -400,3 +401,159 @@ for (const failure of [undefined, "catalog", "call"]) {
     }),
   )
 }
+
+const metadataWrites: SessionV1.ToolPart[] = []
+
+function resolveWith(input: { catalog: string[]; image: boolean; result?: unknown }) {
+  const task = MessageID.ascending()
+  const history: SessionV1.WithParts[] = [
+    {
+      info: {
+        id: task,
+        sessionID,
+        role: "user",
+        agent: "build",
+        model: { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("test-model") },
+        time: { created: 1 },
+      },
+      parts: [
+        { id: PartID.ascending(), sessionID, messageID: task, type: "text", text: "Recover browser" },
+        {
+          id: PartID.ascending(),
+          sessionID,
+          messageID: task,
+          type: "text",
+          text: "",
+          metadata: { skill_activation: { name: "loginom-automation", profile: "loginom-automation", digest: "a".repeat(64) } },
+        },
+      ],
+    },
+  ]
+  const assistant: SessionV1.Assistant = {
+    id: messageID,
+    sessionID,
+    role: "assistant",
+    parentID: task,
+    agent: "build",
+    mode: "build",
+    path: { cwd: "/tmp", root: "/tmp" },
+    cost: 0,
+    tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    modelID: ModelV2.ID.make("test-model"),
+    providerID: ProviderV2.ID.make("test"),
+    time: { created: 2 },
+  }
+  return SessionTools.resolve({
+    agent,
+    model: { ...model, capabilities: { input: { image: input.image } } } as Provider.Model,
+    session: { id: sessionID, permission: [] } as unknown as Session.Info,
+    processor: {
+      message: assistant,
+      updateToolCall: (_toolCallID, update) =>
+        Effect.sync(() => {
+          const previous: SessionV1.ToolPart = {
+            id: partID,
+            sessionID,
+            messageID,
+            type: "tool",
+            tool: "loginom_browser_click",
+            callID,
+            state: { status: "running", input: {}, time: { start: 1 } },
+          }
+          const next = update(previous)
+          metadataWrites.push(next)
+          return next
+        }),
+      completeToolCall: () => Effect.void,
+    },
+    bypassAgentCheck: false,
+    promptOps: {} as never,
+    history,
+    messages: history,
+    loginom: {
+      generation: 1,
+      async scope(_mode: unknown, scope: unknown) { return scope },
+      async tools() {
+        return { tools: input.catalog.map((name) => ({ name, inputSchema: { type: "object", properties: {} } })) }
+      },
+      async call() { return input.result ?? { content: [] } },
+      async release() {},
+    } as unknown as NonNullable<Parameters<typeof SessionTools.resolve>[0]["loginom"]>,
+  })
+}
+
+function run(tools: Record<string, AITool>, name: string) {
+  const execute = tools[name].execute
+  if (!execute) throw new Error(`${name} has no execute`)
+  return Effect.promise(() =>
+    execute({}, { toolCallId: callID, messages: [], abortSignal: new AbortController().signal }),
+  ) as Effect.Effect<{ metadata: Record<string, unknown>; attachments: { url: string }[] }>
+}
+
+it.effect("hides the recovery screenshot from a model without image input", () =>
+  Effect.gen(function* () {
+    for (const image of [false, true]) {
+      const tools = yield* resolveWith({ catalog: ["browser_click", "browser_take_screenshot"], image })
+      expect(Object.keys(tools).filter((key) => key.startsWith("loginom_browser_")).sort()).toEqual(
+        image ? ["loginom_browser_click", "loginom_browser_take_screenshot"] : ["loginom_browser_click"],
+      )
+    }
+  }),
+)
+
+it.effect("delivers a recovery screenshot to an image model as an image attachment", () =>
+  Effect.gen(function* () {
+    const tools = yield* resolveWith({
+      catalog: ["browser_take_screenshot"],
+      image: true,
+      result: { content: [{ type: "image", mimeType: "image/png", data: "iVBORw0KGgo=" }] },
+    })
+    expect((yield* run(tools, "loginom_browser_take_screenshot")).attachments[0].url).toBe(
+      "data:image/png;base64,iVBORw0KGgo=",
+    )
+  }),
+)
+
+it.effect("copies browser recovery state only from a valid _meta record", () =>
+  Effect.gen(function* () {
+    const meta = (value: unknown) => ({ content: [], _meta: { "loginom/browser_recovery": value } })
+    const valid = { attempt_id: "br-1", state: "browser", calls_remaining: 29, ms_remaining: 1000 }
+    const output = yield* run(
+      yield* resolveWith({ catalog: ["browser_click"], image: false, result: meta(valid) }),
+      "loginom_browser_click",
+    )
+    expect(output.metadata.loginomBrowserRecovery).toEqual({ attempt_id: "br-1", state: "browser" })
+    for (const invalid of [
+      { ...valid, state: "paused" },
+      { ...valid, attempt_id: "" },
+      { ...valid, attempt_id: "x".repeat(161) },
+    ]) {
+      const rejected = yield* run(
+        yield* resolveWith({ catalog: ["browser_click"], image: false, result: meta(invalid) }),
+        "loginom_browser_click",
+      )
+      expect("loginomBrowserRecovery" in rejected.metadata).toBe(false)
+    }
+  }),
+)
+
+it.effect("keeps browser recovery state of a failed recovery reply", () =>
+  Effect.gen(function* () {
+    metadataWrites.length = 0
+    const failed = {
+      content: [{ type: "text", text: '{"error":{"code":"BROWSER_RECOVERY_PAGE_CHANGED"}}' }],
+      isError: true,
+      _meta: {
+        "loginom/browser_recovery": { attempt_id: "br-1", state: "stopped", calls_remaining: 20, ms_remaining: 1000 },
+      },
+    }
+    const result = yield* Effect.exit(
+      run(yield* resolveWith({ catalog: ["browser_click"], image: false, result: failed }), "loginom_browser_click"),
+    )
+    expect(Exit.isFailure(result)).toBe(true)
+    const last = metadataWrites.at(-1)
+    expect(last?.state.status).toBe("running")
+    if (last?.state.status === "running")
+      expect(last.state.metadata?.loginomBrowserRecovery).toEqual({ attempt_id: "br-1", state: "stopped" })
+  }),
+)

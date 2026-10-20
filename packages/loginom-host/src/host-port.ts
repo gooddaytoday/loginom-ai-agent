@@ -85,6 +85,11 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
     service.recoveries.set(run.chat, run.lease)
   }
   async function release(id: string, run: NonNullable<ReturnType<typeof runs.get>>) {
+    if (run.lease && service.hasRuntime(run.lease.generation, run.chat))
+      await service
+        .runtime(run.lease.generation, run.chat)
+        .then((runtime) => runtime.request("run-released", undefined, 5000))
+        .catch(() => undefined)
     await abandon(run)
     run.lease?.release()
     runs.delete(id)

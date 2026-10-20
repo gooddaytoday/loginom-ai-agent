@@ -19,6 +19,7 @@ export async function createLoginomHost(options: {
   preflightHeadless?: boolean
   strictRecovery?: boolean
   closeSavedPackageOnShutdown?: boolean
+  browserRecovery?: boolean
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
@@ -85,6 +86,7 @@ export async function createLoginomHost(options: {
         // retains quiet validation while Help readiness stays browser-free.
         headless: validation ? (options.preflightHeadless ?? true) : options.headless === true,
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
+        browserRecovery: !validation && options.browserRecovery === true,
         environment,
         endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
         actionManifestUri: manifest.actionManifestUri,

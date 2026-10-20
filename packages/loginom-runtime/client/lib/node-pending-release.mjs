@@ -48,6 +48,11 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  // visualizers open; return through the observed scenario control only.
  if(current.wizard.status==='absent'&&current.prepared_node_context?.surface==='views'&&sameNode(current.prepared_node_context,node))
   cleanup.views_returned=(await returnFromNodeViews(channel,node)).returned;
+ const proof=await proveNodeRestsQuiet({operation,channel,node});
+ return {...proof,cleanup_complete:true,effect_possible:cleanup.wizard_closed||cleanup.read_view_restored||cleanup.views_returned,cleanup};
+}
+
+export async function proveNodeRestsQuiet({operation,channel,node}) {
  const quiet=s=>s.wizard?.status==='absent'&&s.prepared_node_context?.surface==='graph'
   &&sameNode(s.prepared_node_context,node)&&s.prepared_node_context.locked===false
   &&s.ui?.dialogs?.length===0&&s.ui?.masks?.length===0;
@@ -62,8 +67,7 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  requireValue(same(graph,await readReleaseGraph(operation,node))&&same(first.prepared_node_context,second.prepared_node_context),
   'The graph changed during release; inspect the operation again');
  requireValue(graph.nodes.filter(n=>same(n.ref,node)).length===1,'The released node is absent from its graph');
- return {verified:true,cleanup_complete:true,effect_possible:cleanup.wizard_closed||cleanup.read_view_restored||cleanup.views_returned,
-  node_context:second.prepared_node_context,graph,cleanup};
+ return {verified:true,node_context:second.prepared_node_context,graph};
 }
 
 // Every launch-class gesture prepared in a stopped finish must have a settled

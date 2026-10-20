@@ -28,6 +28,14 @@ function fixture({ recordFailure, executeFailure, changedDocument, foreignReceip
     } });
   return { channel, operation, events, records, state };
 }
+test('execution baseline is copied onto a node operation without a journal event',()=>{
+ const f=fixture({sharedOperation:{id:'owned',action:{action_key:'node.apply',revision:'1'},deadline:10000,
+  checkpoint:{workflow_ref:{prefix:'MF;TF-1',tab_tid:'tab'},document_id:'doc'},nodeApply:{}}});
+ const baseline={root_id:'root',roots:[]};
+ f.channel.rememberExecutionBaseline(baseline);baseline.root_id='changed';
+ assert.equal(f.operation.nodeApply.execution_baseline.root_id,'root');
+ assert.deepEqual(f.records,[]);
+});
 test('a disappearing read root permits at most two rediscoveries without gestures',async()=>{
   for(const staleReads of [1,2,3]) {
     const f=fixture({staleReads});

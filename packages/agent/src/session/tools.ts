@@ -1,4 +1,5 @@
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
+import { BrowserRecovery } from "./browser-recovery"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js"
@@ -599,6 +600,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     if (task && catalog)
       for (const definition of catalog.tools) {
         if (profile !== "loginom-automation" && !LOGINOM_LOCAL_TOOLS.has(definition.name)) continue
+        if (definition.name === "browser_take_screenshot" && !input.model.capabilities.input.image) continue
         const key = `loginom_${definition.name}`
         tools[key] = tool({
           description: definition.description,
@@ -644,6 +646,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 const text = result.content.flatMap((block) => (block.type === "text" ? [block.text] : []))
                 const truncated = yield* truncate.output(text.join("\n\n"), {}, input.agent)
                 const state = loginomResultState(result)
+                const loginomBrowserRecovery = BrowserRecovery.state(result._meta?.["loginom/browser_recovery"])
                 const summary = truncated.truncated ? loginomResultSummary(result) : undefined
                 const content =
                   truncated.truncated && summary
@@ -652,7 +655,11 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 if (state === "failed") {
                   yield* ctx.metadata({
                     title: definition.name,
-                    metadata: { generation: loginom.generation, isError: true },
+                    metadata: {
+                      generation: loginom.generation,
+                      isError: true,
+                      ...(loginomBrowserRecovery ? { loginomBrowserRecovery } : {}),
+                    },
                   })
                   throw new Error(content || "LOGINOM_TOOL_FAILED")
                 }
@@ -662,6 +669,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                   metadata: {
                     generation: loginom.generation,
                     truncated: truncated.truncated,
+                    ...(loginomBrowserRecovery ? { loginomBrowserRecovery } : {}),
                     ...(state === "pending" ? { loginomPending: true } : {}),
                     ...(truncated.truncated ? { outputPath: truncated.outputPath } : {}),
                   },

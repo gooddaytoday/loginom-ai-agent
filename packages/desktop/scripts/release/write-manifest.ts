@@ -92,6 +92,7 @@ if (
 const source = await fileHash(join(root, "docs/migration/source-map.json"))
 const manifest = decodeManifest({
   schemaVersion: 1,
+  browserRecovery: process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1",
   version: args.version,
   channel,
   builtAt: new Date().toISOString(),

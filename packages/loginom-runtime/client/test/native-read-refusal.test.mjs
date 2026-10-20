@@ -14,6 +14,6 @@ for(const fault of [null,'port','node','root','close','return'])test('owned nati
   if(closed&&fault==='return')s.prepared_node_context.workflow_id='foreign';
   if(!o.ready(s))throw Error('Owned observation unavailable');return s;
  },perform:async o=>{if(fault==='close')throw Error('Close response lost');assert.equal(o.resolve(o.initialObservation).ref,'close');closed=true;}};
- if(fault)await assert.rejects(closeOwnedNativePreview(channel,{node},{port_guid:'port'},'preview'));
- else{const result=await closeOwnedNativePreview(channel,{node},{port_guid:'port'},'preview');assert.equal(result.preview_closed,true);assert.deepEqual(result.node_context,{...node,verified:true,surface:'graph'});}
+ if(fault)await assert.rejects(closeOwnedNativePreview(channel,{node},{port_guid:'port',index:0},'preview'));
+ else{const result=await closeOwnedNativePreview(channel,{node},{port_guid:'port',index:0},'preview');assert.equal(result.preview_closed,true);assert.deepEqual(result.node_context,{...node,verified:true,surface:'graph'});}
 });

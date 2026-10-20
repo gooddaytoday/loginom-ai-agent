@@ -124,7 +124,7 @@ export async function reconcileNodeWorkflow({operation,adapter,record,now=Date.n
 }
 
 export async function applyNode({request, operation, handlers, drivers, record,
-  signal, stopSignal, now=Date.now, resume=false}) {
+  signal, stopSignal, now=Date.now, resume=false, acceptanceFault=[]}) {
   request=structuredClone(request);
   const {graph,handler}=validateNodeApplyRequest(request,handlers);
   requireValue(operation.id===request.operation_id, 'node.apply operation identity differs');
@@ -315,6 +315,17 @@ export async function applyNode({request, operation, handlers, drivers, record,
     }
     requireValue(value?.verified===true && value.cleanup_complete===true, 'Node phase did not verify '+name);
     verify(value);
+    const fault=acceptanceFault.find(item=>item.kind==='phase_stop'&&item.node_type===request.target.type
+      &&item.phase===name&&item.remaining>0);
+    if(fault){
+      await record({operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,
+        phase:'acceptance_fault_injected',kind:fault.kind,node_type:fault.node_type,target_phase:name,
+        code:fault.code,remaining:fault.remaining-1});
+      fault.remaining--;
+      const error=Error('acceptance fault');
+      error.receipt={error:{code:fault.code,message:'acceptance fault'}};
+      throw error;
+    }
     const receipt={phase:name,receipt_id:pending.receipt_id,status:'verified',effect_possible:value.effect_possible===true,value:structuredClone(value)};
     await acknowledge({phase:'node_phase_completed',signature,receipt});
     // Anticipated mutation is uncertainty until the verified receipt arrives.

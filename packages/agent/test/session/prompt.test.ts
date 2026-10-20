@@ -1085,6 +1085,74 @@ const stageBundledResources = Effect.gen(function* () {
   )
 })
 
+bundled.instance("a text-only turn during an active attempt gets exactly one reminder", () =>
+  Effect.gen(function* () {
+    yield* stageBundledResources
+    const requests: { method: string; input: unknown }[] = []
+    let receive: ((event: { data: unknown }) => void) | undefined
+    LoginomHost.connect({
+      start() {},
+      on(_event, listener) {
+        receive = listener
+      },
+      postMessage(value) {
+        if (!isRecord(value) || typeof value.method !== "string") throw Error("Invalid Host request")
+        requests.push({ method: value.method, input: value.input })
+        const result =
+          value.method === "acquire"
+            ? { generation: 9 }
+            : value.method === "scope" && isRecord(value.input)
+              ? value.input.scope
+              : value.method === "tools"
+                ? {
+                    tools: [
+                      {
+                        name: "dock_browser_recovery",
+                        inputSchema: {
+                          type: "object",
+                          properties: { action: { type: "string" }, operation_id: { type: "string" } },
+                          required: ["action"],
+                        },
+                      },
+                    ],
+                  }
+                : value.method === "call"
+                  ? {
+                      content: [{ type: "text", text: "Continue in the browser" }],
+                      _meta: { "loginom/browser_recovery": { attempt_id: "br-1", state: "browser" } },
+                    }
+                  : {}
+        receive?.({ data: { id: value.id, generation: 9, result } })
+      },
+    })
+    yield* Effect.addFinalizer(() => Effect.sync(() => LoginomHost.disconnect()))
+    const { llm } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const session = yield* sessions.create({
+      title: "Browser recovery",
+      permission: [{ permission: "*", pattern: "*", action: "allow" }],
+    })
+    yield* llm.tool("loginom_dock_browser_recovery", { action: "start", operation_id: "apply" })
+    yield* llm.text("The attempt is still active")
+    yield* llm.text("No justified action remains")
+    yield* prompt.command({
+      sessionID: session.id,
+      command: "loginom-automation",
+      arguments: "Continue the failed step",
+    })
+    const history = yield* sessions.messages({ sessionID: session.id })
+    const reminders = history
+      .flatMap((message) => message.parts)
+      .filter((part) => part.type === "text" && part.synthetic && part.metadata?.browser_recovery_reminder === "br-1")
+    expect(reminders).toHaveLength(1)
+    expect(yield* llm.inputs).toHaveLength(3)
+    expect(TaskScope.derive({ sessionID: session.id, messages: history })?.profile).toBe("loginom-automation")
+    expect(requests.at(-1)?.method).toBe("release")
+    expect(requests.filter((request) => request.method === "call")).toHaveLength(1)
+  }),
+)
+
 for (const failure of [undefined, "request", "apply", "revert"]) {
   const denied = !!failure
   const reverted = failure === "revert"

@@ -35,6 +35,9 @@ export default defineConfig({
   main: {
     define: {
       "import.meta.env.LOGINOM_AI_AGENT_CHANNEL": JSON.stringify(channel),
+      "import.meta.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY": JSON.stringify(
+        process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1" ? "1" : "0",
+      ),
     },
     build: {
       rollupOptions: {

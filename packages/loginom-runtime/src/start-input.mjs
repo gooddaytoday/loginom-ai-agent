@@ -20,6 +20,21 @@ export function validateStartInput(input) {
   // Acceptance-only: the exact saved package the bridge closes during shutdown.
   const cleanup = input.acceptanceCleanupPackage ?? null
   const closeSavedPackageOnShutdown = input.closeSavedPackageOnShutdown === undefined ? false : input.closeSavedPackageOnShutdown
+  const browserRecovery = input.browserRecovery === undefined ? false : input.browserRecovery
+  const acceptanceFault = input.acceptanceFault ?? null
+  if (acceptanceFault !== null && (input.validation === true || input.chat === "readiness" ||
+      !Array.isArray(acceptanceFault) || acceptanceFault.length < 1 || acceptanceFault.length > 4 ||
+      acceptanceFault.some((fault) => !fault || typeof fault !== "object" ||
+        !/^[a-z][a-z0-9_.]{0,127}$/.test(fault.node_type) ||
+        !Number.isInteger(fault.times) || fault.times < 1 || fault.times > 3 ||
+        (fault.kind === "phase_stop"
+          ? Object.keys(fault).sort().join(",") !== "code,kind,node_type,phase,times" ||
+            !/^[a-z][a-z0-9_]{0,63}$/.test(fault.phase) || !/^[A-Z][A-Z0-9_]{0,63}$/.test(fault.code)
+          : fault.kind !== "release_refusal" || Object.keys(fault).sort().join(",") !== "kind,node_type,times"))))
+    throw Error("LOGINOM_START_INVALID")
+  if (typeof browserRecovery !== "boolean" ||
+      (browserRecovery && (input.validation === true || input.chat === "readiness")))
+    throw Error("LOGINOM_START_INVALID")
   if (typeof closeSavedPackageOnShutdown !== "boolean" ||
       (closeSavedPackageOnShutdown && (cleanup !== null || input.validation === true || input.chat === "readiness")))
     throw Error("LOGINOM_START_INVALID")
@@ -31,5 +46,5 @@ export function validateStartInput(input) {
       cleanup.split("/").some((segment) => segment === "." || segment === ".."))
   )
     throw Error("LOGINOM_START_INVALID")
-  return { acceptanceCleanupPackage: cleanup, closeSavedPackageOnShutdown }
+  return { acceptanceCleanupPackage: cleanup, closeSavedPackageOnShutdown, browserRecovery, acceptanceFault }
 }

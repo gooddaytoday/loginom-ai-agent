@@ -1,5 +1,5 @@
 import {nodeResultReply} from './node-result-reply.mjs';
-import {boundedUserToolReply} from './user-response-budget.mjs';
+import {boundedUserToolReply, boundedRecoveryReply} from './user-response-budget.mjs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport, getDefaultEnvironment } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -31,6 +31,7 @@ import { recordLocalDiagnostics } from './local-diagnostics.mjs';
 import { createUserWorkflowBindings, userNodeTool, userActionTool, userActionInventory } from './user-workflow.mjs';
 import { makePackageCleanupCode, parsePackageCleanupResult } from './package-cleanup.mjs';
 import {makeSavedPackageStateCode,parseSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
+import {createBrowserRecovery, recoveryBrowserCatalog, makeRecoveryPageProbeCode, parseRecoveryPageProbe} from './browser-recovery.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity } from './storage-policy.mjs';
 
 // Keep the runtime receipt byte-for-byte meaningful to reconciliation/journal
@@ -95,6 +96,8 @@ export async function createBridge(config, session, { browserTransport: managedB
     throw Error('Invalid private saved-package cleanup policy');
   const admitHostArtifacts = createHostArtifactAdmission(config, session);
   const userProfile = config.resultProfile === 'user-v1';
+  const recoveryEnabled = config.browserRecovery === true && userProfile && config.mode === 'executor-replay';
+  let recovery;
   const userWorkflows = createUserWorkflowBindings();
   let userBundleDelivered = false;
   const logResult = async (tool, result) => {
@@ -164,10 +167,12 @@ export async function createBridge(config, session, { browserTransport: managedB
       recoveryContext = createRecoveryContext({ remote, pinned, knownSecrets: [config.apiKey] });
       Object.assign(session.metadata, pinned.pins);
       actionRuntime = createActionRuntime({ pinned,
+        ...(recoveryEnabled ? {browserRecovery: {remaining: key => recovery.remaining(key)}} : {}),
         ...(replay?createCandidateNodeSupport({targetOrigin:config.loginomUrl?new URL(config.loginomUrl).origin:undefined,targetBuild:pinned.compatibility?.loginom_build,storageDirectories:config.storageDirectories,redactor}):{}),
         getStorageBinding: () => session.metadata.storageBinding ?? null,
         getNodeContractPins: () => ({...pinned.pins, skillRevision:session.metadata.skillRevision, loginomProfile:session.metadata.targetIdentity ?? pinned.compatibility}),
         artifactStore:session.artifactStore, allowCandidate: replay, onRecord: recordExecution, redactor,
+        acceptanceFault:config.acceptanceFault,
         targetOrigin: config.loginomUrl ? new URL(config.loginomUrl).origin : undefined, execute: async (code, options) => {
         const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
           code: config.storageDirectories ? withStorageIdentity(code, session.metadata.storageBinding) : code,
@@ -175,6 +180,16 @@ export async function createBridge(config, session, { browserTransport: managedB
         return parseCapabilityResult(response);
       } });
     }
+    if (recoveryEnabled) recovery = createBrowserRecovery({
+      runtime: actionRuntime, definitions: recoveryBrowserCatalog(browserTools), record: recordExecution,
+      callBrowser: (name, args) => browser.callTool({name, arguments: args}, undefined, {timeout: 360000}),
+      probePage: async () => parseRecoveryPageProbe(await browser.callTool({name: 'browser_run_code_unsafe', arguments: {
+        code: makeRecoveryPageProbeCode({origin: new URL(config.loginomUrl).origin,
+          documentId: session.metadata.workspacePreparation?.state?.document_id, sessionId: session.metadata.sessionId,
+          account: session.metadata.workspacePreparation?.state?.loginom_account,
+          loginomBuild: session.metadata.targetIdentity?.loginom_build}),
+      }}, undefined, {timeout: 15000})),
+    });
     const groups = selectToolGroups(config.mode ?? 'classic', {
       remoteTools, browserTools,
       commonLocalTools: [diagnosticTool, clipboardTool, prepareTool],
@@ -204,9 +219,18 @@ export async function createBridge(config, session, { browserTransport: managedB
         ? `This process is pinned to ${config.mode}. Call dock_prepare. Plan and complete the user's goal using verified actions plus dock_workspace_observe and bounded dock_ui_action gestures. An action failure is feedback: inspect, diagnose, repair in this same session, verify and continue. For AMBIGUOUS call dock_operation_inspect; bind UI repairs to the pending operation or use dock_operation_recover. Never bypass uncertain in-flight work with a new ID. Raw JavaScript/browser tools are unavailable; the mode cannot change during this session.`
         : 'Call dock_prepare for scenario work after skill activation. It returns dynamic readiness, input artifacts and local skill pins. Dock provides shared knowledge and a local browser. Source files and live DOM take precedence over recalled context. All clipboard copy/paste must use dock_clipboard_transfer so other Dock sessions cannot overwrite it during the operation. The installed native adapter activates shared session archiving after successful preparation. Check dock_diagnostics for actual archive activation and delivery state.'),
     });
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: structuredClone(catalog.tools) }));
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: structuredClone(recovery ? recovery.tools(catalog.tools) : catalog.tools) }));
     const callTool = async (request, extra) => {
       if (shutdownStarted) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
+      if (recovery?.owns(request.params.name)) return boundedRecoveryReply(
+        await browserGate(() => recovery.call(request.params.name, request.params.arguments ?? {}, extra)), {tool: request.params.name});
+      const dockAdmission = recovery?.captureDockAdmission();
+      const dockAllowed = () => !recovery || recovery.dockAllowed(request.params.name, request.params.arguments ?? {}, dockAdmission);
+      const recoveryRefusal = () => ({isError: true, content: [{type: 'text', text: JSON.stringify({
+        error: {code: 'BROWSER_RECOVERY_ACTIVE'}, next_step: {tool: 'dock_browser_recovery',
+          instruction: 'Finish or stop the current browser recovery before another Dock operation.'},
+      })}]});
+      if (!dockAllowed()) return recoveryRefusal();
       const owner = catalog.routes.get(request.params.name);
       if (!owner) throw new McpError(ErrorCode.InvalidParams, 'Unknown Dock tool');
       if (request.params.name === 'dock_diagnostics') {
@@ -251,6 +275,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           let workspace = null;
           if (actionRuntime) {
             workspace = await browserGate(async () => {
+              if (!dockAllowed()) return recoveryRefusal();
               const state = await prepareWorkspaceSession({ metadata: session.metadata,
               request: preparationRequest, signal: extra.signal,
               assertAllowed() { extra.signal.throwIfAborted(); actionRuntime.assertPreparationAllowed(); },
@@ -283,6 +308,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               return state;
             });
           }
+          if (workspace?.isError) return workspace;
           if (!actionRuntime) await session.save(catalog);
           if (userProfile && actionRuntime) {
             const first = !userBundleDelivered;
@@ -312,6 +338,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         if (owner === 'action') {
           if(isNodeApiTool(request.params.name)) {
             const invoke=async()=>{
+              if (!dockAllowed()) return recoveryRefusal();
               requirePreparedWorkspace(session.metadata);
               let args=request.params.arguments??{};
               if(userProfile && ['dock_node_apply','dock_node_resume','dock_node_read'].includes(request.params.name)) {
@@ -320,6 +347,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                 if(request.params.name==='dock_node_read')args=userWorkflows.expandNodeRead(args);
               }
               const result=await dispatchNodeApi(actionRuntime,request.params.name,args,{signal:extra.signal});
+              await recovery?.noteDockCall(request.params.name, args, result.outcome ?? result, dockAdmission);
               if(userProfile)userWorkflows.rememberDelivery(result,args);
               await logResult(request.params.name,result);
               return nodeResultReply(result,{userProfile});
@@ -338,6 +366,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             return { content: [{ type: 'text', text: JSON.stringify(userProfile?userActionInventory(description):description) }] };
           }
           return await browserGate(async () => {
+            if (!dockAllowed()) return recoveryRefusal();
             extra.signal.throwIfAborted();
             const args = request.params.arguments ?? {};
             if(userProfile&&request.params.name==='dock_action_run'&&!['package.save_as','package.save_checkpoint'].includes(args.action_key))
@@ -366,6 +395,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                   : request.params.name === 'dock_ui_action' ? await actionRuntime.uiAct(args.action,
                     { observationId: args.observation_id, operationId: args.operation_id, recoveryOperationId: args.recovery_operation_id, signal: extra.signal })
                     : await actionRuntime.run(args.action_key, args.parameters, { signal: extra.signal, operationId });
+            await recovery?.noteDockCall(request.params.name, args, outcome, dockAdmission);
             // Validation throws, earlier reconciliation and proven no-effect
             // refusals do not admit this Save. Bind only its returned receipt;
             // an ambiguous admitted result can still be confirmed by inspection.
@@ -479,10 +509,11 @@ export async function createBridge(config, session, { browserTransport: managedB
       return userProfile && ['local','action'].includes(catalog.routes.get(request.params.name))
         ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
     });
-    return { server, catalog, hasActiveWork: () => !clipboardUncertain && !!actionRuntime?.hasActiveWork(),
-      hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0, close() {
+    return { server, catalog, releaseRun: () => recovery?.release('run_released'), hasActiveWork: () => !!recovery?.active() || !clipboardUncertain && !!actionRuntime?.hasActiveWork(),
+      hasUnsettledWork: () => !!recovery?.hasUnsettledWork() || !!actionRuntime?.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
       closing ??= (async () => {
+        await recovery?.release('runtime_closed');
         const normalCleanup = config.closeSavedPackageOnShutdown === true;
         const packagePath = config.acceptanceCleanupPackage ?? (normalCleanup ? lastSavedPackage?.path : userProfile && savedPackages.size === 1 ? savedPackages.keys().next().value : null);
         const saveOperationId = normalCleanup ? lastSavedPackage?.operation_id : savedPackages.get(packagePath);
@@ -495,13 +526,13 @@ export async function createBridge(config, session, { browserTransport: managedB
               // Refuse unsettled background node jobs before waiting on the
               // browser gate. Shutdown never cancels them to force a close.
               actionRuntime.assertPreparationAllowed();
-              if (actionRuntime.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
+              if (recovery?.hasUnsettledWork() || actionRuntime.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
               if (session.metadata.workspaceReady !== true || !packagePath || !saveOperationId
                   || normalCleanup && lastSavedPackage.document_id !== prepared.state?.document_id) {
                 cleanup = {status:'BLOCKED', reason:'CONFIRMED_SAVE_REQUIRED'};
               } else cleanup = await browserGate(async () => {
                 actionRuntime.assertPreparationAllowed();
-                if (actionRuntime.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
+                if (recovery?.hasUnsettledWork() || actionRuntime.hasUnsettledWork() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
                 const cleanupOptions = {
                   sessionId:session.metadata.sessionId, documentId:prepared.state.document_id,
                   // Managed runtimes have no replay login account; the cleanup

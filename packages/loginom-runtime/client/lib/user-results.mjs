@@ -60,6 +60,7 @@ export function compactNodeRequestFailure(outcome,request={}) {
 export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   const outcome = result.outcome, node = outcome?.output, data = node?.output;
   const output = data ? pick(data, ['status', 'evidence_ref', 'execution_id', 'no_output_requested', 'javascript_source']) : {};
+  Object.assign(output,pick(node,['released_by','recovery_receipt_id']));
   if (data?.ports) output.ports = data.ports.map(port => {
     const value = pick(port, ['port', 'port_guid', 'fresh', 'execution_id', 'category_fields', 'schema', 'row_count', 'sample', 'sample_rows', 'sample_complete', 'precision', 'table', 'exact_table', 'read_coverage', 'read_consistency', 'cell_precision', 'binding', 'limitations']);
     value.schema = value.schema.map(column => pick(column, ['index', 'name', 'label', 'type', 'data_kind']));
@@ -79,7 +80,7 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   if(outcome?.status==='SUCCEEDED')limitations.push(...calculatorPrecisionWarnings(node));
   // Delivery jobs carry their byte-verified destination in outcome directly.
   if (!node && outcome) Object.assign(output, outcome);
-  const next=outcome?.next_step??node?.next_step??(outcome&&['FAILED','AMBIGUOUS','NOT_APPLIED'].includes(outcome.status)&&!result.upload_operation_id
+  const next=node?.browser_recovery?.next_step??outcome?.output?.browser_recovery?.next_step??outcome?.next_step??node?.next_step??(outcome&&['FAILED','AMBIGUOUS','NOT_APPLIED'].includes(outcome.status)&&!result.upload_operation_id
     ?outcome.effect_possible===false&&outcome.cleanup_complete===true
       ?{tool:'dock_node_apply',original_operation_id:result.operation_id,instruction:'Correct the request and submit with a NEW operation_id. No node mutation or browser recovery is required.'}
       :{tool:'dock_operation_inspect',arguments:{operation_id:result.operation_id},instruction:'Inspect the original operation; do not repeat an unresolved effect.'}
@@ -130,7 +131,8 @@ export function compactActionResult(result) {
     copy.output.reporting_constraints = ['Сохранение подтверждает пакет, но не правильность итогового текста. Для каждого численного вывода используй прочитанное поле результата узла. Разности, изменения в п.п. и темпы роста тоже должны быть вычислены в узлах; не вычитай округлённые проценты. Если нужного показателя нет, вычисли его или не добавляй необязательное число.', 'Ноль и отсутствие наблюдения различаются. Не объявляй нули пропусками или будущими периодами без явного признака в исходных данных либо условия задания. Интерпретацию, не подтверждённую данными, обозначай как гипотезу.'];
     if (copy.output.workflow_continuations) copy.output.workflow_continuations = copy.output.workflow_continuations.map(item => pick(item, ['document_id', 'workflow_ref']));
   }
-  return { ...copy, result_version: 'user-v1' };
+  return { ...copy, result_version: 'user-v1',
+    ...(copy.output?.browser_recovery?.next_step?{next_step:copy.output.browser_recovery.next_step}:{}) };
 }
 
 export function compactKnowledgeBundle(description) {

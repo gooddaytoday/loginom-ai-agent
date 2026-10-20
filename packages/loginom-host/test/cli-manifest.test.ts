@@ -7,6 +7,28 @@ import { writeCliManifest, verifyCliManifest } from "../src/cli-manifest"
 import { resourceInventory } from "../../loginom-runtime/src/resource-inventory.mjs"
 import { copyProductSkillsFixture } from "./fixtures/product-skills"
 
+test("CLI manifest records the browser recovery build flag and verifies manifests without it", async () => {
+  const root = await mkdtemp(join(tmpdir(), "cli-browser-recovery-"))
+  const info = {
+    version: "test", channel: "dev", platform: "linux", arch: "x64",
+    sourceCommit: "a".repeat(40), sourceTreeSha256: "b".repeat(64), sourceDirty: true, dependencies: {},
+  }
+  try {
+    for (const path of ["bin/loginom-ai-agent-cli", "resources/loginom/bin/node", "resources/loginom/host/node-host.mjs"])
+      await Bun.write(join(root, path), "fixture")
+    await copyProductSkillsFixture(join(root, "resources/loginom"))
+    await Bun.write(join(root, "resources/loginom/resource-manifest.json"), JSON.stringify({
+      protocol: 1, files: await resourceInventory(join(root, "resources/loginom")),
+    }))
+    await writeCliManifest(root, { ...info, browserRecovery: true })
+    expect((await verifyCliManifest(root, info)).browserRecovery).toBe(true)
+    await writeCliManifest(root, info)
+    expect((await verifyCliManifest(root, info)).browserRecovery).toBeUndefined()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test("CLI artifact verification rejects an accurately inventoried payload without Product skills", async () => {
   const root = await mkdtemp(join(tmpdir(), "cli-product-skills-"))
   try {

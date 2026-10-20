@@ -35,6 +35,7 @@ test.each(["complete", "uncertain", "cancel", "interrupt", "release", "disconnec
       process.on('message', m => {
         if (m.operation === 'start') return reply(m.id, {protocol:1,generation:m.input.generation,chat:m.input.chat,ready:true});
         if (m.operation === 'close') return process.send({id:m.id,result:{closed:true}},()=>process.disconnect());
+        if (m.operation === 'run-released') return reply(m.id, {released:true});
         if (m.operation === 'started') {
           if (active) return reply(m.id, true);
           started = m.id;

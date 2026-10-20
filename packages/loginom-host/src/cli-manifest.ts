@@ -14,6 +14,7 @@ const file = Schema.Struct({
 const metadata = Schema.Struct({
   version: Schema.String,
   channel: Schema.String,
+  browserRecovery: Schema.optional(Schema.Boolean),
   platform: Schema.String,
   arch: Schema.String,
   sourceCommit: Schema.String,

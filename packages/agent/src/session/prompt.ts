@@ -10,6 +10,7 @@ import { SessionID, MessageID, PartID } from "./schema"
 import { MessageV2 } from "./message-v2"
 import { SessionRevert } from "./revert"
 import { TaskScope } from "./task-scope"
+import { BrowserRecovery } from "./browser-recovery"
 import { Session } from "./session"
 import { Agent } from "../agent/agent"
 import { Provider } from "@/provider/provider"
@@ -1342,6 +1343,28 @@ const layer = Layer.effect(
                 tool: orphan.tool,
                 callID: orphan.callID,
               })
+            }
+            const reminder = BrowserRecovery.reminder({ sessionID, messages: history, revert: session.revert })
+            if (reminder) {
+              const message: SessionV1.User = {
+                id: MessageID.ascending(),
+                sessionID,
+                role: "user",
+                time: { created: Date.now() },
+                agent: lastUser.agent,
+                model: lastUser.model,
+              }
+              yield* sessions.updateMessage(message)
+              yield* sessions.updatePart({
+                id: PartID.ascending(),
+                messageID: message.id,
+                sessionID,
+                type: "text",
+                text: reminder.text,
+                synthetic: true,
+                metadata: { browser_recovery_reminder: reminder.attemptID },
+              } satisfies SessionV1.TextPart)
+              continue
             }
             yield* Effect.logInfo("exiting loop", { "session.id": sessionID })
             break
