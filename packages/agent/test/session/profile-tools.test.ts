@@ -235,9 +235,41 @@ for (const profile of ["default", "package-docs", "loginom-automation"] as const
   )
 }
 
+for (const image of [false, true])
+  it.instance(`browser recovery publishes the screenshot tool only to an image model: ${image}`, () =>
+    Effect.gen(function* () {
+      const loginom: Awaited<ReturnType<typeof LoginomHost.acquire>> = {
+        generation: 9,
+        async scope(mode, scope) {
+          return scope
+        },
+        async tools() {
+          return {
+            tools: ["dock_prepare", "dock_browser_recovery", "browser_snapshot", "browser_take_screenshot"].map((name) => ({
+              name,
+              inputSchema: { type: "object", properties: {} },
+            })),
+          }
+        },
+        async admit() {
+          throw Error("Unexpected eager admission")
+        },
+        async call() {
+          return { content: [] }
+        },
+        async release() {},
+      }
+      const { tools } = yield* resolveProfile("loginom-automation", loginom, image)
+      expect(tools.loginom_dock_browser_recovery).toBeDefined()
+      expect(tools.loginom_browser_snapshot).toBeDefined()
+      expect(!!tools.loginom_browser_take_screenshot).toBe(image)
+    }),
+  )
+
 const resolveProfile = Effect.fn("test.resolveProfile")(function* (
   profile: TaskScope.Profile,
   loginom?: Awaited<ReturnType<typeof LoginomHost.acquire>>,
+  image?: boolean,
 ) {
   const sessions = yield* Session.Service
   const agents = yield* Agent.Service
@@ -299,7 +331,11 @@ const resolveProfile = Effect.fn("test.resolveProfile")(function* (
     session,
     history,
     messages: history,
-    model: { providerID: ProviderV2.ID.make("test"), api: { id: "test-model" } } as Provider.Model,
+    model: {
+      providerID: ProviderV2.ID.make("test"),
+      api: { id: "test-model" },
+      ...(image === undefined ? {} : { capabilities: { input: { image } } }),
+    } as Provider.Model,
     processor: {
       message: assistant,
       updateToolCall: () => Effect.die("unexpected execution"),

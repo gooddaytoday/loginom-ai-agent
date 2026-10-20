@@ -35,6 +35,10 @@ export default defineConfig({
   main: {
     define: {
       "import.meta.env.LOGINOM_AI_AGENT_CHANNEL": JSON.stringify(channel),
+      // Release builds bake browser recovery; packaged mode is still required at runtime.
+      "import.meta.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY": JSON.stringify(
+        process.env.LOGINOM_AI_AGENT_BROWSER_RECOVERY === "1",
+      ),
     },
     build: {
       rollupOptions: {

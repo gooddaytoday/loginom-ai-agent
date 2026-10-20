@@ -19,6 +19,8 @@ export async function createLoginomHost(options: {
   preflightHeadless?: boolean
   strictRecovery?: boolean
   closeSavedPackageOnShutdown?: boolean
+  // Private launcher capability baked into packaged release builds; never from env or the model.
+  browserRecovery?: boolean
 }) {
   if (![options.root, options.resources].every(isAbsolute)) throw new Error("LOGINOM_ABSOLUTE_PATH_REQUIRED")
   const root = options.root
@@ -85,6 +87,7 @@ export async function createLoginomHost(options: {
         // retains quiet validation while Help readiness stays browser-free.
         headless: validation ? (options.preflightHeadless ?? true) : options.headless === true,
         closeSavedPackageOnShutdown: !validation && options.closeSavedPackageOnShutdown === true,
+        browserRecovery: !validation && options.browserRecovery === true,
         environment,
         endpoint: environment.LOGINOM_AI_AGENT_KNOWLEDGE_ENDPOINT ?? manifest.endpoint,
         actionManifestUri: manifest.actionManifestUri,
@@ -198,6 +201,7 @@ export async function createLoginomHost(options: {
   const recoveries = new Map<string, NonNullable<ReturnType<typeof service.acquire>>>()
   return {
     ...service,
+    browserRecovery: options.browserRecovery === true,
     async close() {
       await service.close()
       // Startup failures and retired or unexpectedly exited children retain
