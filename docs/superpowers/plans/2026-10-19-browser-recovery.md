@@ -151,10 +151,10 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 - Agent, desktop, product, evals: `bun test <file>` и `bun typecheck` из каталога пакета.
 - `LOGINOM_AI_AGENT_TEST_NODE` — абсолютный путь к Node 24.19.0 из `packages/product/loginom-release.json`.
 
-## Checkpoint — 20.10.2026, пауза владельца
+## Checkpoint — 20.10.2026, работа возобновлена
 
-- Статус: PAUSED по просьбе владельца; безопасная граница перед реализацией плана 5, Task 1. Код evals ещё не менялся.
-- Рабочая ветка `recovery-build-flag`, worktree `/home/george/.codex/worktrees/browser-recovery/loginom-ai-agent`; исходная база `0afb4c483a`, HEAD до checkpoint-коммита `d0127e8f95`.
+- Статус: ACTIVE по просьбе владельца; следующий шаг — реализация плана 5, Task 1 по принятому preflight. Код evals на момент возобновления не менялся.
+- Рабочая ветка `recovery-build-flag`, worktree `/home/george/.codex/worktrees/browser-recovery/loginom-ai-agent`; исходная база `0afb4c483a`, коммит безопасной паузы `ba5ac875fc`.
 - Планы 1–2 и план 4 выполнены; план 3, Tasks 1–4 приняты. Task reviews и итоговое source integration review планов 3–4 — Approved, обязательных замечаний нет.
 - Runtime: 4468 PASS / 14 SKIP / 0 FAIL, focused 133/133, timeout 4/4; настоящая Chromium-проба 1/1 и Host managed IPC 1/1 (16 assertions) PASS.
 - Agent: focused 107 PASS / 1 SKIP, полный suite 3842 PASS / 25 SKIP / 1 TODO / 0 FAIL в subshell umask 0022, typecheck PASS. Исходный mode failure при umask 0002 изолирован; ожидаемый/прежний диагностический шум не скрыт.
@@ -164,4 +164,4 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 - План 5 preflight и scoped re-review — GO для независимой Task 1, M1–M3 закрыты. Дальше последовательный TDD через fake/dir: events → persisted boolean → count/report; интеграционный цикл — test/run.test.ts. Старые summary читаются без миграции, rates и compare не меняются.
 - План 5, Task 2 отложена до успешного native main path; установленные артефакты/модели/evals ещё не приняты. Release-флаг выключен; merge и release требуют отдельной команды владельца.
 - Draft PR224 содержит опубликованный `0da6732785`; последующие коммиты пока локальны. Последний CI snapshot: typecheck/Windows/PR standards PASS, macOS candidate FAIL без triage, push/PR test ещё выполнялись. Это не общий CI PASS.
-- Все subagents завершены; локальных выполняемых native-проб/тестов не осталось, временный probe удалён. Приватные evidence и ignored SDD ledgers/reviews сохранены; основной пользовательский checkout и его три untracked документа не изменены.
+- На границе возобновления все прежние subagents завершены, временный probe удалён. Приватные evidence и ignored SDD ledgers/reviews сохранены; основной пользовательский checkout и его три untracked документа не изменены.
