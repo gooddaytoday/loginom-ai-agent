@@ -49,7 +49,7 @@
 - Между `hasRuntime` и получением уже существующего runtime нет промежуточного `await`. Фикстуры затронутых release/close путей отвечают `{released: true}` на новый IPC; другие фикстуры меняются только при подтверждённом аналогичном пути или сбое suite. Глобальный test timeout не повышается, общий framework фикстур не вводится.
 - BR-S7, строгий режим восстановления (`strictRecovery: true`, в CLI — `LOGINOM_AI_AGENT_STRICT_RECOVERY=1`): падение runtime во время вызова, в том числе `dock_browser_recovery`, оставляет записи журнала pending, и `acquire` любого чата профиля отклоняется `LOGINOM_RECOVERY_REQUIRED` (`host-port.ts:133-134` проверяет `journal.pending()` для всего профиля). В режиме по умолчанию журнал мягкий (`packages/loginom-host/AGENTS.md`): runtime закрывается вместе с браузером, попытка не возобновляется, новые чаты не блокируются. Автоматического возобновления нет ни в одном режиме.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Структура — как в `saved-package-shutdown.test.ts:115-219`: настоящий Node host и фиктивный `managed-entry.mjs`, который пишет каждую `m.operation` в файл и отвечает `{released: true}` на `run-released`.
 
@@ -74,16 +74,16 @@ test("a refused run-released never fails the release", async () => {
 await expect(client.request("acquire", { run: "other", session: "another-chat" })).rejects.toThrow("LOGINOM_RECOVERY_REQUIRED")
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cd packages/loginom-host && LOGINOM_AI_AGENT_TEST_NODE=<pinned node> bun test test/browser-recovery-release.test.ts test/host-port.test.ts test/task-scope.test.ts test/saved-package-shutdown.test.ts`
 Expected: FAIL — `run-released` не отправляется. Проверка BR-S7 проходит уже сейчас: она фиксирует существующее поведение, на которое опирается дизайн (§6).
 
-- [ ] **Step 3: Implement** по Interfaces.
+- [x] **Step 3: Implement** по Interfaces.
 
-- [ ] **Step 4: Run tests to verify they pass** (команда Step 2 и `bun typecheck`; Expected: PASS)
+- [x] **Step 4: Run tests to verify they pass** (команда Step 2 и `bun typecheck`; Expected: PASS)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/loginom-host

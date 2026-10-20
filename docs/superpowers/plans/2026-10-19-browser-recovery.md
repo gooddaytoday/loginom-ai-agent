@@ -153,7 +153,7 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 
 ## Checkpoint — 20.10.2026
 
-- База реализации: `0afb4c483a`; принятый код плана 3, Task 4: `3f258aff35`.
+- База реализации: `0afb4c483a`; текущий принятый код: `1c00606071` (план 4, Task 1).
 - План 1, Tasks 1–4, и план 2, Tasks 0–7: выполнены и отмечены в подпланах; task reviews и итоговое whole-branch review приняты; четыре итоговых замечания исправлены и подтверждены scoped re-review.
 - Последние source-проверки: полный runtime client 4468 PASS / 14 SKIP / 0 FAIL; focused 133/133, timeout 4/4; Host managed IPC 1/1 (16 assertions), Host typecheck и `git diff --check` — PASS.
 - Task 0 на Loginom: реальный Calculator, новое успешное выполнение и схема Preview независимо подтверждены; итоговый собственный пакет, transport и браузер закрыты.
@@ -163,4 +163,5 @@ Allowlist Playwright MCP (у агента `loginom_<имя>`), ровно 16 и�
 - План 3 прошёл preflight и scoped review уточнений; Tasks 1–4 выполнены и приняты независимыми reviews; 1/1 реальная Chromium-проба PASS; замечание о final-await abort исправлено и подтверждено scoped re-review. CI опубликованного checkpoint плана 2 — PASS.
 - Ограничение локального общего browser runner: отсутствует xvfb-run; новая headless Chromium-проба с sandbox выполнена напрямую.
 - План 3, Task 5 отложен по указанию владельца о блокерах; условие возобновления — штатная проверенная доставка входа, затем BR-S1 по текущему ref собственной кнопки и BR-S3. Product-код доставки не меняется.
-- Следующий шаг — независимые задачи плана 4 после preflight review; завершение живой приёмки и release-гейт остаются обязательными.
+- План 4: preflight/scoped re-review GO; Task 1 принят независимым review. Host: focused 59/59, typecheck, полный охват 370 PASS / 7 SKIP двумя процессами; единый Bun suite ограничен loader `EISDIR`.
+- Следующий шаг — план 4, Task 2 (каталог по image capability и metadata); завершение живой приёмки и release-гейт остаются обязательными.
