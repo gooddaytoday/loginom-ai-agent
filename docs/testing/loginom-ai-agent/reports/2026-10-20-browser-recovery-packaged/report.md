@@ -88,3 +88,38 @@ Production и cleanup policy не менялись. Одноразовый drive
 попытки и установленный payload сохранены. Выполнение остановлено перед
 отрицательными controls; Desktop, модельные кейсы и recovery quality остаются
 открытыми.
+
+
+## Три отрицательные CLI строки: PASS
+
+Контрольный полный flag0 artifact собран из чистого source
+`ad1e302a74562c54a6dffdaddc9ecdf42b99a426`, установлен штатно в отдельный HOME;
+manifest содержит `browserRecovery:false`. Build/archive roundtrip и installed
+verification прошли. Флаговая установка сохранила исходную identity выше;
+production inputs не менялись.
+
+Каждая строка выполнена один раз последовательно со свежими HOME/XDG/profile,
+workspace и UUID-пакетом через ту же публичную canonical Save цепочку.
+
+| Строка | Manifest / runtime env | Текущая task capability | Lifecycle |
+|---|---|---|---|
+| Установленный compiled flag0, без CLI_BUNDLE | false / flag1, prod | `false` | PASS |
+| Установленный compiled flag1, внешний CLI_BUNDLE на собственные неизменённые resources | true / flag1, prod | `false` | PASS |
+| Source standalone через pinned Bun и development CLI_BUNDLE | source / flag1, prod | `false` | PASS |
+
+Source использует существующий `packages/agent/src/standalone.ts`; legacy
+`src/index.ts` был исправлен в назначении до live-запуска. Source строка не
+представлена как installed artifact evidence.
+
+Для каждой строки отдельно подтверждены current `session.json` и привязка к CLI
+run, prepare READY, текущий Save SUCCEEDED/без reopen/с сохранённым workflow,
+`modified:false`, native Close/logout/noDiscard и `packages_after:0`, task
+ACKtrue/exit0/no signal, CLIexit0/пустой stderr/освобождение `.writer`. Все15
+наблюдавшихся собственных PID каждой строки отсутствуют; выживших процессов
+соответствующего профиля нет. `persisted_content_verified:false` и arrangement
+warning сохранены как ограничения. Повторов Save не потребовалось.
+
+Одноразовый driver удалён. Обе установки, исходный failed guard и private evidence
+сохранены до независимого review; uninstall в этом срезе не выполнялся.
+Отрицательные значения не доказали качество recovery или моделей; Desktop и
+модельные строки остаются открытыми. На этом controls slice остановлен.
