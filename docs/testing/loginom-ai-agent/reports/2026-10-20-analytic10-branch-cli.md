@@ -145,3 +145,17 @@ Watcher исправлен в becff0a541 по RED→GREEN;77тестов/374asse
 независимое review прошли. Private judge config синхронизирован только по service_tier
 под бронью; version/login без модели прошли,units завершены,home освобождён.
 Полная следующая серия сохранит ту же десятку и исходное модельное окно.
+
+
+## Серия3: готовность
+
+Private root `/home/kiselev/storage/tmp/analytic10-branch-r3-20261020-k9rcj844`.
+CLI `0.0.0-evals-parallel-20261020-b5ad7c602ea1`,source b5ad7c602ea19d2645a018d48fb2b1a7d03ceeac,
+tree5bb3938896a11926391cabfe64fce62b06a9face2da314c5d4c6e803a95e9722,
+sourceDirty=true. Установлен отдельно,candidate verified;исходники между build/verify не менялись.
+Manifest закрепляет binary/resource/CLI/task/config hashes и зависимости.
+Пара второй серии переиспользуется после штатного post verify;новые результаты отдельно.
+На новом CLI прошли verify5d07638b,cold browser обоих слотов,modelmedium,
+judge version/login без модели и4живых A/B. Final gate:2profilesclean/4leasesreleased.
+Local OAuth запас101ч,исходныйauth-store неизменён. Лишние свои неустановленные payload удалены;
+установленные кандидаты,логи,старые результаты и инциденты сохранены.

@@ -187,8 +187,15 @@ trial-dosage-outcomes
 - [x] Штатный verify1eca1c6b ready/code0 восстановил подтверждённые остатки серии2;
   оба профиля clean,4reservations released. Manual repair не выполнялся;
   новая серия переиспользует эту же пару, с новым CLI и отдельными results.
-- [ ] CLI rebuild/install/verify после fix; новая полная та же десятка в отдельном
-  private root/results,тот же deadline15:28:25Z; gates и live наблюдение прежние.
+- [x] CLIb5ad7c602ea1 rebuilt/installed/candidate verified;tree5bb3938896a1…,sourceDirty=true.
+  Source/docs во время build/verify не менялись; два своих лишних payload удалены.
+  Root3k9rcj844 хранит manifest/hashes; local OAuth101ч,source auth unchanged.
+- [x] Новый CLI verify5d07638b ready/code0; cold browser a/b ready/verified,
+  правильные URL/users,model medium и cleanup confirmed.
+- [x] Четыре liveA/B нового runtime:4pass/0fail;judge version/login exit0,units completed.
+  Final gate:2profiles clean/4reservations released; память повторить непосредственно перед dispatch.
+- [ ] Новая полная та же десятка в отдельном private root3/results,
+  тот же deadline15:28:25Z; gates и live наблюдение прежние.
   Повтор нужен для технической проверки,задача budget с нулём не исключается.
 
 ## Приёмка и завершение
@@ -216,13 +223,13 @@ trial-dosage-outcomes
 
 ## Checkpoint
 
-1. HEADbecff0a541:watcher exact judge mismatch→abort;77pass/0fail/374assertions,typecheck/review pass.
-2. Старые acceptance1065633c и Sp38yS не меняются; root1 w6kidhm4/eval_parallel_blockers.md.
-3. Root2 /home/kiselev/storage/tmp/analytic10-branch-r2-20261020-3zm1mmp9; параae288d3753ad/ebe9872b15e0.
+1. HEADb5ad7c602e;watcher fixbecff0a541 RED→GREEN,77pass/0fail/374assertions,typecheck/review pass.
+2. CLIb5ad7c602ea1 installed/candidate verified,tree5bb3938896a1…,sourceDirty=true;foreign changes сохранены.
+3. Старые acceptance1065633c/Sp38yS не меняются;root1w6kidhm4/eval_parallel_blockers.md.
 4. Серияu6JJ0p:5attempts/5cleanup confirmed;2по100/oraclePASS,basket judge64/oraclePASS,budget0,categoryinterrupted.
-5. Resources incomplete:2missed/maxgap2.13s,числовые bounds/OOM pass; не заменять наблюдения PASS.
-6. Judge private tier синхронизирован под lease;version/login exit0,units completed,home released;global unchanged.
-7. Post verify1eca1c6b ready/code0 без manual repair;2profiles clean/4reservations released,пара пригодна к reuse.
-8. Root3 /home/kiselev/storage/tmp/analytic10-branch-r3-20261020-k9rcj844; результаты отдельно,slots/config/стенд второй серии сохраняются.
-9. Следующий шаг:rebuild/install/candidate verify без изменения исходников,повтор gates,полная10 и live monitoring.
-10. Model window07:28:25Z–15:28:25Z; source auth/выборка/seed/inputs/rubric прежние; scores серий не склеивать.
+5. Серия2resources incomplete:2missed/maxgap2.13s;измеренные bounds/OOM pass. Данные серий не склеиваются.
+6. Штатный post verify1eca1c6b подтвердил reuse парыae288d3753ad/ebe9872b15e0 без manual repair.
+7. Root3 /home/kiselev/storage/tmp/analytic10-branch-r3-20261020-k9rcj844;new results,existingroot2stand/config.
+8. Новый CLI verify5d07638b,coldbrowser/modelsa/b,judge version/login,4liveA/B pass;2profilesclean/4leasesreleased.
+9. Следующий шаг:RAM≥8GiB непосредственно перед dispatch,обновить pins;полная10,live monitoring30–60s.
+10. Model window07:28:25Z–15:28:25Z;source auth unchanged/local101h,выборка/seed/inputs/rubric прежние.
