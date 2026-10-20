@@ -148,6 +148,25 @@ trial-dosage-outcomes
   выполняется на ещё одном свежем своём стенде в том же окне07:28:25Z–15:28:25Z.
   Независимое ревью подтвердило соответствие авторизации. Техническая приёмка пока не пройдена.
 
+## Полная повторная серия2
+
+- [x] CLI4593a1396b built/installed/candidate verified,treeb448862b…; исходники во время build/verify не менялись.
+- [x] Новый private root `/home/kiselev/storage/tmp/analytic10-branch-r2-20261020-3zm1mmp9`,
+  новая параae288d3753ad/ebe9872b15e0; прежние стенды/receipts не менялись.
+  Отказ PAIR_PORT_BUSY произошёл до создания ресурсов; исходный пустой journal сохранён,
+  новый config использует свободный порт52067 и отдельный controller-ready.
+- [x] Две новые local OAuth copies, прежние task/input/rubric/catalogue hashes,
+  тот же numeric budget с новыми path/container scopes; общее model window не сбрасывается.
+- [x] Preparec29d7423 ready/code0 для a/b; новые management receipts0600/confirmed.
+- [x] Judge login/version без модели через VPN:exit0/units completed/home released.
+- [x] Verify750de3b8 ready/code0 и cold browser/model variant a/b:ready/verified/cleanup confirmed.
+- [x] Четыре liveA/B final CLI второй пары:4pass/0fail.
+- [x] Final private pins, release/clean gates:2profiles clean/4reservations released;
+  RAM16.62GiB,FS2661GiB/241M inode,OAuth102ч, исходный auth hash сохранён.
+- [ ] Новый полный run второй серии, прежние10IDs/2слота/модельное окно.
+- [ ] Активное наблюдение/полная приёмка/отчёт второй серии по прежним критериям;
+  не объединять с interrupted Sp38yS.
+
 ## Приёмка и завершение
 
 - [ ] Ровно 10 итоговых attempts без пропусков/дублей/подмен; реальное перекрытие
@@ -180,6 +199,6 @@ trial-dosage-outcomes
 5. Model window07:28:25Z–15:28:25Z; B network socket retry вызвал abort обоих агентов.
 6. Process cleanup2confirmed/unknown=[]; native cleanup BLOCKED/unconfirmed, recovery и карантин2слотов.
 7. Post verify exit2/LEASE_FILE_PRIVATE:cleanup receipts0664, private reader требует0600.
-8. Writer fix:2RED→GREEN;138pass/2skip/0fail, typecheck/review pass; следующий шаг rebuild и свежий стенд.
-9. Серия2:private root /home/kiselev/storage/tmp/analytic10-branch-r2-20261020-3zm1mmp9; build4593a1396b verified.
-10. Source auth/inputs/rubric сохранены; native cancellation2s:2 baseline failures вне этой задачи.
+8. Writer fix4593a1396b:2RED→GREEN;138pass/2skip/0fail,typecheck/review pass; installed candidate verified.
+9. Серия2:private root /home/kiselev/storage/tmp/analytic10-branch-r2-20261020-3zm1mmp9; все gates pass,RAM16.62GiB.
+10. Следующий шаг — серия2/активное наблюдение; source auth/inputs/rubric сохранены.
