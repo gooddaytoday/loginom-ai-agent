@@ -82,7 +82,8 @@ trial-dosage-outcomes
   Итог после уточнения routing:104 pass/2 proc-denial skip/0 fail; typecheck и
   независимое final review pass. Headless только для Loginom, в конце args; models/providers
   сохраняют selector. Routing regression также прошёл RED exit2→GREEN exit0.
-- [ ] Новая сборка CLI после headless fix перед модельными gates. Supervisor не менять
+- [x] Новая сборка CLI8f1808e9804e после headless/routing fix: install и candidate verify pass,
+  sourceTree15b69fc3…; Bun1.3.14/Node24.19.0/Chromium1246, prod, sourceDirty=true. Supervisor не менять
   без отдельного воспроизведения: возможная потеря ancestry не объявляется устранённой.
 
 ## Gates перед dispatch
@@ -97,10 +98,11 @@ trial-dosage-outcomes
   guards/supervisor: ok=true/code=LOGINOM_CONNECTION_VALID/help.ready/**browser.verified**,
   правильные username/URL, подтверждённый process/server cleanup. Verify сам по себе
   может пропустить browser.failed.
-- [ ] Все четыре существующих немодельных A/B с runtime нового binary: mutual file
+- [x] Все четыре существующих немодельных A/B с runtime final binary:4 pass/0 fail, mutual file
   denial, peer survival, deletion after session close/readback, unknown refuses delete.
-- [ ] Сохранить budget copy до dispatch и после build непосредственно перед run
-  подтвердить MemAvailable >=8GiB. Недостаток — stop/сообщение владельцу.
+- [x] Сохранить budget copy до dispatch и после build непосредственно перед run
+  подтвердить MemAvailable >=8GiB:20.51GiB в07:27UTC, FS2663GiB/241M inode;
+  OAuth запас102ч, две отдельные copies, исходный auth hash сохранён. Недостаток — stop/сообщение владельцу.
 
 ## Серия и наблюдение
 
@@ -155,11 +157,11 @@ trial-dosage-outcomes
 ## Checkpoint
 
 1. Новый стенд3463cae565ca/d84925713c74 создан по разрешению владельца; старый incident1065633c retained.
-2. Private root выше; CLI3a7491b579b0 built/installed/verified, sourceTree6197499f….
-3. Prepare29dc2d41 и verify нового стенда ready/code0, оба cold browser verified/cleanup confirmed.
+2. Private root выше; final CLI8f1808e9804e built/installed/verified, sourceTree15b69fc3….
+3. Prepare29dc2d41, final verify2b8641b9 ready/code0; cold browser verified/cleanup confirmed обоих слотов.
 4. Публичный CLI подтвердил gpt-6.1-sol/medium для обоих слотов; catalogue59bcb39e….
 5. Headless routing уточнён: только binary loginom, после args; models/providers selector сохранён.
 6. RED→GREEN;104pass/2proc-denialskip/0fail,typecheck и независимое review pass.
-7. Следующий шаг — final CLI rebuild после routing commit,4A/B и memory gate, затем run.
+7. Четыре live A/B:4pass/0fail;20.51GiB RAM,4reservations released,2profiles clean. Следующий шаг — run.
 8. Source auth сохранён; inputs/rubric hashes прежние. Model window ещё не началось.
 9. Native cancellation2s tests:2 pre-existing failures reproduced on original code.
