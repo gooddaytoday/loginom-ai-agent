@@ -202,3 +202,13 @@ judge version/login без модели и4живых A/B прошли.2profiles
 CLI установленный b5ad7c602ea1 из private root3,тот жеbinaryhash;с тех пор в ветке
 менялись только два документа,поэтому measuredcode и evidence тестов сохраняются.
 Новый budget имеет прежние25границ с новыми scopes;RAMиdeadline проверяются перед dispatch.
+
+
+В ходе серии4 владелец разрешил RAM/CPUusageдо99.9%. Утверждённая поправка
+хранится в root4/evidence/resource-budget-amendment.json с фактическим recorded_at,
+run_id и SHA исходного frozenbudget. ДляRAM используется MemAvailable≥ceil(MemTotal×0.001):
+39.397MiB при MemTotal38.473GiB. Прежний CPUmax100% сохраняет разрешение99.9%.
+Rawbudget/probes/штатныйacceptance не переписываются;owner-amended budget оценка
+показывается отдельно как поправка посреди серии. Остальные контейнерные/FS/OOM/
+coverage/cadence/identity/cleanup требования не меняются. Review:No findings.
+Исторический stopсерии3 не отменяется,её6unassigned не становятся попытками.
