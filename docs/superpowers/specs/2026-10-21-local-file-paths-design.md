@@ -132,4 +132,5 @@ Oracle рассчитывается до модели; reference строитс�
 - Native source IPC: A → B в одном document, отдельные operation/workflow, граф A сохранён; 6,9/6,3 с после ограничения всех private read/navigation/upload общим deadline. ACK/exit0 и удаление собственного стенда подтверждены.
 - Независимое ревью задачи 3 Approved; изменённые attribution entries проверены, общий verifier имеет прежний README hash mismatch. Source-проверки не подтверждают installed acceptance.
 - Задача 4 завершена: skill/save instructions и Host guidance обновлены, независимое ревью Approved. Agent regression 179 pass / 1 existing skip / 0 fail, Host task-scope 17 pass; agent typecheck прошёл.
-- Следующие задачи 5–8: paths-mode, routing corpus, два scenario eval и installed/model acceptance. Состояние и следующий шаг — в checkpoint плана; поведение дизайна не сужено.
+- Задача 5 завершена: paths-mode внутри attempt workspace, mode hash и before/after integrity, rejudge сохраняет отказ; независимое ревью Approved, eval tests/typecheck прошли.
+- Следующие задачи 6–8: routing corpus, два scenario eval и installed/model acceptance. Состояние и следующий шаг — в checkpoint плана; поведение дизайна не сужено.

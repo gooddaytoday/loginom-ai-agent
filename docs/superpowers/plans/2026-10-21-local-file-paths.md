@@ -140,14 +140,14 @@ prepareLocalPackage(args, { artifactID, uploadGrantID }, { signal })
 
 ## Задача 5. Paths-mode внутри attempt workspace
 
-**Files:** `evals/src/{task,run}.ts`, `evals/test/{task,run}.test.ts`, `evals/{README,AGENTS}.md`, amendment inputs в `docs/superpowers/specs/2026-09-18-evals-design.md` со ссылкой на канонический дизайн #74. `cli.ts`, `profile.ts`, `sandbox.ts` для этой функции не менять.
+**Files:** `evals/src/{task,run}.ts`, `evals/test/{task,run}.test.ts`; existing `evals/src/rejudge.ts` и `evals/test/rejudge.test.ts` сохраняют детерминированный отказ при judge-only. `evals/{README,AGENTS}.md`, amendment inputs в `docs/superpowers/specs/2026-09-18-evals-design.md` со ссылкой на канонический дизайн #74. `cli.ts`, `profile.ts`, `sandbox.ts` для этой функции не менять.
 **Interface:** `task.json: input_mode?: "attachment" | "paths"`; runtime Task хранит paths marker только для нового режима. Полный контракт — [раздел evals](../specs/2026-10-21-local-file-paths-design.md#только-два-сценарных-eval-в-evals).
 
-- [ ] **RED:** copy existing task fixture с `left/sales.csv`/`right/sales.csv`: paths-mode принимает оба, прежний attachment case отклоняет collision. Одинаковый полный путь и выход за case/attempt directory отклоняются. Затем реализовать loader branch, не меняя старый default/hash.
-- [ ] Следующий цикл: staging помещает inputs по relative paths внутри workdir попытки, `{{INPUT_ROOT}}` указывает туда; `runAgent` получает `files: []`. Assert prompt содержит оба разных пути, argv/user parts не содержат attachments. Existing CLI уже не добавляет `--file` для пустого массива — новая API option не нужна.
-- [ ] Следующий цикл: hash режима/relative names/bytes стабилен между случайными attempt roots, изменение любого input между началом и концом попытки даёт явный failed check. Реализовать before/after hashes и сохранить evidence. Не обещать read-only inputs и не монтировать corpus/parent attempts.
-- [ ] Уточнить правило basename в `evals/AGENTS.md` и контракте: запрет остаётся у attachment mode. Не добавлять per-attempt scoped permissions или новый bubblewrap test: внешний путь здесь не проверяется.
-- [ ] Из `evals` выполнить `bun test test/task.test.ts test/run.test.ts test/cli.test.ts` и `bun typecheck`. Existing sandbox guards остаются прежними. Не экспортировать `prepareProfile` и не создавать reference API.
+- [x] **RED:** copy existing task fixture с `left/sales.csv`/`right/sales.csv`: paths-mode принимает оба, прежний attachment case отклоняет collision. Одинаковый полный путь и выход за case/attempt directory отклоняются. Затем реализовать loader branch, не меняя старый default/hash.
+- [x] Следующий цикл: staging помещает inputs по relative paths внутри workdir попытки, `{{INPUT_ROOT}}` указывает туда; `runAgent` получает `files: []`. Assert prompt содержит оба разных пути, argv/user parts не содержат attachments. Existing CLI уже не добавляет `--file` для пустого массива — новая API option не нужна.
+- [x] Следующий цикл: hash режима/relative names/bytes стабилен между случайными attempt roots, изменение любого input между началом и концом попытки даёт явный failed check. Реализовать before/after hashes и сохранить evidence; existing rejudge сохраняет failed inputs-unchanged вместо повторного судейства (риск подтверждён независимым ревью). Не обещать read-only inputs и не монтировать corpus/parent attempts.
+- [x] Уточнить правило basename в `evals/AGENTS.md` и контракте: запрет остаётся у attachment mode. Не добавлять per-attempt scoped permissions или новый bubblewrap test: внешний путь здесь не проверяется.
+- [x] Из `evals` выполнить `bun test test/task.test.ts test/run.test.ts test/cli.test.ts test/rejudge.test.ts` и `bun typecheck`. Existing sandbox guards остаются прежними. Не экспортировать `prepareProfile` и не создавать reference API.
 
 ## Задача 6. Existing routing corpus и Desktop/CLI пути
 
@@ -218,7 +218,7 @@ EVAL_REPEAT=1 bun run src/run.ts --tasks tasks/local-path-scenarios --only csv-t
 
 ## Planning checkpoint
 
-- 2026-10-21: задачи 1–4 завершены; код задачи 3 — `1df187237d`, инструкции/fixture задачи 4 — `4922c79691`. Следующая задача — 5, затем 6–8 по порядку.
+- 2026-10-21: задачи 1–5 завершены; код задачи 3 — `1df187237d`, итог задачи 4 — `40eecc0469`. Далее задачи 6–8 по порядку.
 - Каноническое поведение — в дизайне; исходные оценки и пороги объёма сохранены. Задача 3: 25 файлов, +1219/−150, ниже порога 2220 строк / 44 файла.
 - Задача 3: независимое ревью Approved; agent 592/1530 assertions, Host 38/361, runtime 219 named +503 UI/artifact (пересечение) +8 entry/timeout; typecheck agent/Host прошёл.
 - Native source IPC v2 A→B: 6867/6338 мс, тот же document, новые operation/workflow, граф A сохранён, source/server SHA совпали. ACK/exit0 и удаление двух собственных стендов подтверждены. Installed acceptance ещё не выполнен.
@@ -227,5 +227,6 @@ EVAL_REPEAT=1 bun run src/run.ts --tasks tasks/local-path-scenarios --only csv-t
 - Повторная регистрация после prepare и запрет автоматического скачивания для docs сохранены. Независимое ревью инструкций и тестовой изоляции Approved.
 - Итог задачи 4: agent 179 pass / 1 existing skip / 0 fail, 969 assertions; Host task-scope 17 pass / 110 assertions; agent typecheck и diff check прошли.
 - Stable test-only отказ из-за сканирования home-предков TMPDIR устранён существующим `{git:true}` только в realpath fixture; исходные assertions сохранены, узкий RED→GREEN и полный набор прошли.
-- Evidence/logs: `/home/kiselev/storage/tmp/local-paths-74-ptufs123/`; итоговый лог задачи 4 — `task4-agent-tests-final.log`. Отчёт задач 1–4 — `docs/testing/loginom-ai-agent/local-file-paths.md`.
-- Следующий шаг: отдельное ревью подхода задачи 5, затем loader/staging/input-hash по одному RED→GREEN циклу. Не менять cli/profile/sandbox и не запускать модель/installed acceptance раньше задач 7–8.
+- Evidence/logs: `/home/kiselev/storage/tmp/local-paths-74-ptufs123/`; итоговый лог задачи 4 — `task4-agent-tests-final.log`. Отчёт задач 1–5 — `docs/testing/loginom-ai-agent/local-file-paths.md`.
+- Задача 5: paths loader/staging/hash по RED→GREEN, 93 tests/503 assertions; после persistence fix run regression 27/234, typecheck/diff check прошли. Независимое ревью Approved; cli/profile/sandbox не менялись.
+- Следующий шаг: задача 6 — существующий routing corpus/adapters с fixture selector, CSV/TXT paths и переходами; эталонные bytes и модель/installed acceptance — задачи 7–8.

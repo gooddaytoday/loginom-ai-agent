@@ -319,6 +319,8 @@ Dock-skill/образа Loginom — предупреждение об окруж
 имеет приоритет. Каталоги без `task.json` пропускаются с предупреждением;
 невалидный существующий task.json и явно выбранная отсутствующая задача дают отказ.
 
+Новые path-сценарии задают в `task.json` `input_mode: "paths"` и, например, `inputs: ["data/Первый #1/sales.csv", "data/Второй %2/sales.csv"]`. В prompt используйте `{{INPUT_ROOT}}/data/...`: runner подставит каталог текущей попытки и не добавит `--file`. По умолчанию остаются плоские attachments с уникальными basename. В paths-mode `inputs.json` сохраняет before/after hash и `passed`; изменение или удаление входа даёт failed check `inputs-unchanged`, `pass:false` и ошибку `INPUTS_CHANGED`, которую judge-only сохраняет. Это проверка неизменности, а не read-only mount; подробный контракт — [дизайн #74](../docs/superpowers/specs/2026-10-21-local-file-paths-design.md#только-два-сценарных-eval-в-evals).
+
 ## Вердикт compare
 
 Сравнение читает только сохранённые `summary.json`; профиль, Loginom и judge
