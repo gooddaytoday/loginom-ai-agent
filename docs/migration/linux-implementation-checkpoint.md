@@ -11,12 +11,14 @@ Published2026-10-26T07:16:28Z, pre-release, latest=false, ID423944660; 30 URLs H
 
 ## 2026-10-21 — приватный candidate #74, без выпуска
 
-Clean source `bbd2e1af7d`, ветка `local-file-paths`; CLI `0.0.0-dev-202610211509`, Desktop `0.3.2-localpaths74.bbd2e1af7`.
-CLI private install/manifest/archive roundtrip PASS; Desktop DEB/AppImage static PASS (5042 resources), GUI acceptance ещё нет.
-Pinned Bun 1.3.14 / Node 24.19.0 / Chromium1246; общие установки и профили не заменялись.
-CSV reference: actual candidate CLI/model DB/cold browser MCP/oracle PASS; это authoring, не isolated benchmark.
-Автономная edit-фикстура и её guard — B1–B2; release/installed routing acceptance не заявлены.
-[Отчёт](../testing/loginom-ai-agent/local-file-paths.md#task-7-candidate-and-authoring-preparation-2026-10-21) · [блокеры](../testing/loginom-ai-agent/local-file-paths-blockers.md).
+Clean CLI source `9cb57e9cd9`, prod `0.3.2-localpaths74.9cb57e9cd9`; Desktop source `bbd2e1af7d`, `0.3.2-localpaths74.bbd2e1af7`, ветка `local-file-paths`.
+CLI private native install/manifest/archive roundtrip PASS; Desktop DEB/AppImage static PASS (5042 resources).
+Selected routing4/4 на prod CLI и4/4 на native Desktop: PDF/GUI permissions/CSV35/20/TXT; manual PDF/facts и process cleanup подтверждены. Итоговое независимое review Approved; это частичная приёмка #74, не release gate.
+Pinned Bun1.3.14 / Node24.19.0 / Chromium1246; общие установки/профили/сервисы не менялись.
+CSV reference CLI/model DB/cold browser MCP/oracle PASS; local edit/transition fixture и pair calibration ждут B1, isolated benchmark — B3.
+Default-save отдельно FAILED/UNKNOWN доopen: upload deadline, no ACK, retained guard (B4); повторов/обхода/увеличения таймаутов нет.
+Собственные stand-контейнеры остановлены с сохранением state/storage; guards B2/B4 сохранены. Windows native NOT_RUN.
+[Отчёт](../testing/loginom-ai-agent/local-file-paths.md#task-8-independent-routing-acceptance-in-progress) · [решения владельца](../testing/loginom-ai-agent/local-file-paths-blockers.md).
 
 ## 2026-10-20 — v0.3.2 опубликован
 
