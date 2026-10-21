@@ -216,18 +216,21 @@ test('a hidden preflight child with possible effects cannot be cleared by a quie
   assert.deepEqual(f.calls,[]);
 });
 
-function stoppedCrossTablePreflight(){
- const f=fixture('target_source_child','transform.cross_table');
+function stoppedCrossTablePreflight(type='transform.cross_table'){
+ const f=fixture('target_source_child',type);
  for(let i=0;i<5;i++)f.state.graph.nodes.push({ref:{...node,node_id:'retained-'+i},type:i===0?'imports.text':i<3?'transform.group_data':'transform.sorting',
   label:'Retained '+i,position:{x:100+i*100,y:100},inputs:i?[0]:[],outputs:[0],locked:false});
+ for(const [source,target] of [[0,1],[0,2],[1,3],[2,4]])f.state.graph.links.push({source:'retained-'+source,output:0,target:'retained-'+target,input:0});
  f.state.receiptResult={state:'completed',receipt:{status:'AMBIGUOUS',action_key:'ui.act',action_revision:'1',operation_id:'apply:n1',
   phase:'observing',effect_possible:true,output:{},error:{code:'WIZARD_CONTEXT_CHANGED',message:'Original wizard context changed'},trace:[],cleanup_complete:true}};
  return f;
 }
-for(const browser of [false,true])test('CrossTable source child failure releases the checkpointed original graph, browser='+browser,async()=>{
- const f=stoppedCrossTablePreflight();await stop(f);
+for(const type of ['transform.cross_table','transform.calculator','preprocessing.data_recovery'])
+for(const browser of [false,true])test(type+' source child failure releases the checkpointed original graph, browser='+browser,async()=>{
+ const f=stoppedCrossTablePreflight(type);await stop(f);
  assert.equal(f.state.operation.nodeApply.pending.phase,'target');assert.equal(f.state.operation.targetPhase.baseline,null);
  assert.equal(f.state.operation.targetPhase.last_graph.nodes.length,5);assert.equal(f.state.preflightCalls,1);
+ assert.deepEqual(f.state.operation.targetPhase.last_graph.links,f.state.graph.links);assert.equal(f.state.graph.links.length,4);
  await f.runtime.inspect({operationId:'apply'});
  assert.equal(f.state.operation.nodeApply.pending.phase,'target');
  if(browser){
@@ -247,9 +250,10 @@ for(const browser of [false,true])test('CrossTable source child failure releases
  f.runtime.assertPreparationAllowed();assert.equal(f.runtime.hasUnsettledWork(),false);
  assert.equal(f.state.preflightCalls,1);assert.deepEqual(f.calls,[]);
 });
+for(const type of ['transform.cross_table','transform.calculator','preprocessing.data_recovery'])
 for(const fault of ['changed_graph','extra_node','receipt_pending','receipt_cleanup','transport','release_ack'])
- test('checkpointed CrossTable source child still refuses '+fault,async()=>{
- const f=stoppedCrossTablePreflight();await stop(f);
+ test('checkpointed '+type+' source child still refuses '+fault,async()=>{
+ const f=stoppedCrossTablePreflight(type);await stop(f);
  if(fault==='changed_graph')f.state.graph.nodes[0].label='Changed';
  if(fault==='extra_node')f.state.graph.nodes.push({...structuredClone(f.state.graph.nodes[0]),ref:{...node,node_id:'unexpected'}});
  if(fault==='receipt_pending')f.state.receiptResult.state='pending';
@@ -262,21 +266,24 @@ for(const fault of ['changed_graph','extra_node','receipt_pending','receipt_clea
  assert.deepEqual(f.calls,[]);assert.equal(f.state.preflightCalls,1);
 });
 
-test('unfinished checkpointed CrossTable preflight cannot resume its source gestures',async()=>{
- const f=stoppedCrossTablePreflight();await stop(f);
+for(const type of ['transform.cross_table','transform.calculator','preprocessing.data_recovery'])
+test(type+' unfinished checkpointed preflight cannot resume its source gestures',async()=>{
+ const f=stoppedCrossTablePreflight(type);await stop(f);
  await f.runtime.startNodeApply(f.request,{resume:true});
  const job=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
  assert.equal(job.outcome.status,'AMBIGUOUS');assert.equal(f.state.operation.nodeApply.pending.phase,'target');
  assert.equal(f.state.preflightCalls,1);assert.deepEqual(f.calls,[]);
 });
 
-test('CrossTable source preflight checkpoint ACK failure prevents all child and target gestures',async()=>{
- const f=stoppedCrossTablePreflight();f.state.failPreflightAck=true;await stop(f);
+for(const type of ['transform.cross_table','transform.calculator','preprocessing.data_recovery'])
+test(type+' source preflight checkpoint ACK failure prevents all child and target gestures',async()=>{
+ const f=stoppedCrossTablePreflight(type);f.state.failPreflightAck=true;await stop(f);
  assert.equal(f.state.preflightCalls,undefined);assert.deepEqual(f.calls,[]);assert.equal(f.state.graph.nodes.length,5);
 });
 
-test('successful checkpointed CrossTable preflight still prepares its one new target',async()=>{
- const f=stoppedCrossTablePreflight();f.state.preflightSuccess=true;await stop(f);
+for(const type of ['transform.cross_table','transform.calculator','preprocessing.data_recovery'])
+test(type+' successful checkpointed preflight still prepares its one new target',async()=>{
+ const f=stoppedCrossTablePreflight(type);f.state.preflightSuccess=true;await stop(f);
  assert.equal(f.state.preflightCalls,1);assert.deepEqual(f.calls,['create']);
  assert.equal(f.state.graph.nodes.length,6);assert.equal(f.state.operation.targetPhase.completed,true);
  assert.equal(f.state.operation.nodeApply.node.node_id,'created');
