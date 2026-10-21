@@ -145,6 +145,10 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
    const match=code.match(/\)\(page, (\{"mode":[\s\S]*?\}), (?:async )?function readPreparedNodeContext/);
    assert.ok(match,'known native observation or gesture');const task=JSON.parse(match[1]);
    if(task.mode==='act'){
+    const receipt=code.match(/\)\(page, (\{"operation_id":[^\n]*?\}), \(\) =>/);
+    assert.ok(receipt,'export navigation uses a browser receipt');
+    assert.equal(task.operation_id,JSON.parse(receipt[1]).operation_id,
+     'the native UI outcome must identify the same export step as its browser receipt, including the return to graph');
     const tid=task.snapshot.ui.elements.find(e=>e.ref===task.action.ref).tid;gestures.push(tid);
     if(tid.endsWith('btnFilestorage')){
      files=true;
