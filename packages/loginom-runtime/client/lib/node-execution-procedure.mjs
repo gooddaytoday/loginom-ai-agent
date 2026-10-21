@@ -105,8 +105,10 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
   const processes=s=>s.node_processes?.verified===true&&s.node_processes.show_completed===true;
   async function revealChildren(s,group) {
     // A cached process can be complete while its virtualized row is offscreen.
+    // Buffered split grids can retain matching DOM cells (rendered=true)
+    // below the viewport, before the snapshot annotates their expander tid.
     // Reveal the exact record before requiring its painted expander identity.
-    if(group.rendered!==true){
+    if(group.rendered!==true||group.expanded!==true&&!group.expander_tid){
       const current=state=>state.node_processes?.processes.find(p=>p.process_id===group.process_id&&p.record_id===group.record_id);
       s=await revealExecutionControl(channel,node,s,group,state=>current(state)?.process_tid);
       group=current(s);requireValue(group?.rendered===true,'Execution group did not become visible');

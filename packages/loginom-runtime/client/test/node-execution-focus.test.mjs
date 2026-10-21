@@ -4,22 +4,24 @@ import {createNodeExecutionProcedure,trainConfiguredNode} from '../lib/node-exec
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
 const button='MF;cntMain;tlbMainToolbar;btnProgress',grid='ConsoleForm;ProgressForm;trpProgress;grd;tbl';
 async function fixture({hide=true,replace=false,lost=false,failure=false,closeFault=false,failedChild=false,
- training=false,trainUnknown=false,verifyFailedChild=false,ownerNode='node',childState='failed',showMismatch=false,changedError=false,replaceAtMenu=false,deadlineFault=false}={}){
- let opened=true,launched=false,selected=false,menu=false,shown=false,trainMenu=false;
+ training=false,trainUnknown=false,verifyFailedChild=false,ownerNode='node',childState='failed',showMismatch=false,changedError=false,replaceAtMenu=false,deadlineFault=false,cachedGroup=false,groupFault}={}){
+ let opened=true,launched=false,selected=false,menu=false,shown=false,trainMenu=false,groupVisible=!cachedGroup,groupExpanded=!cachedGroup;
  const actions=[],el=(tid,allowed_actions=['click'])=>({tid,ref:tid,allowed_actions});
  const state=()=>({prepared_node_context:{...node,...(showMismatch&&shown?{node_id:'foreign'}:{}),verified:true,surface:'graph',tid:'graph-node'},wizard:{status:'absent'},navigation_context:{status:'observed'},
   node_outputs:{verified:true,node_selected:shown},
-  node_processes:{verified:opened,inventory_complete:true,show_completed:true,root_id:'root',node_context:{...node,verified:true,surface:'graph'},processes:launched?[
-   {process_id:'1',record_id:'group',parent_id:null,state:failure?'pending_or_failed':'completed',error:failure,children_loaded:true,expanded:true,rendered:true,...(failure?{error_details:'Missing own CSV',progress_state:{verified:true,state:'failed',terminal:true,can_cancel:false,source:'native_progress_record'}}:{})},
+  node_processes:{verified:opened,inventory_complete:true,show_completed:true,root_id:groupVisible&&groupFault==='root'?'foreign':'root',node_context:{...node,verified:true,surface:'graph'},processes:launched?[
+   {process_id:'1',record_id:groupVisible&&groupFault==='record'?'foreign':'group',parent_id:null,state:failure?'pending_or_failed':'completed',error:failure,children_loaded:true,expanded:groupVisible?groupExpanded:null,rendered:true,process_tid:'group-row',expander_tid:groupVisible?'group-expander':null,...(failure?{error_details:'Missing own CSV',progress_state:{verified:true,state:'failed',terminal:true,can_cancel:false,source:'native_progress_record'}}:{})},
    {process_id:'1.1',record_id:replace&&shown||replaceAtMenu&&menu&&selected?'replaced':'child',parent_id:'1',state:'completed',error:false,rendered:true,selected,process_tid:'child-row',
     ...(failedChild?{state:'pending_or_failed',error:true,error_details:changedError&&shown?'Changed child error':'Own JS sentinel error',
       progress_state:{verified:true,state:childState,terminal:true,can_cancel:false,source:'native_progress_record'},
       owner:{verified:true,node_id:ownerNode,source:'native_process_model_identity'}}:{})}]:[]},
-  ui:{elements:[el(button),{...el('graph-node',['right_click']),graph_node:{part:'body'}},{...el('graph-node;Label;Label',['right_click']),graph_node:{part:'label'}},...(trainMenu?[{...el('mn;mniTrain'),label:'Обучить узел'}]:[]),...(opened?[el(grid,['right_click']),el('ConsoleForm;btnClose'),el('child-row',['right_click'])]:[]),
+  ui:{elements:[el(button),{...el('graph-node',['right_click']),graph_node:{part:'body'}},{...el('graph-node;Label;Label',['right_click']),graph_node:{part:'label'}},...(trainMenu?[{...el('mn;mniTrain'),label:'Обучить узел'}]:[]),...(opened?[el(grid,['right_click']),el('ConsoleForm;btnClose'),...(!cachedGroup||groupVisible?[el('child-row',['right_click'])]:[]),...(cachedGroup?[{...el('ConsoleForm;ProgressForm;trpProgress;treepanel;tree',['scroll']),process_grid:{grid_id:'tree'},scroll:{ref:'ConsoleForm;ProgressForm;trpProgress;treepanel;tree',top:groupVisible?96:0,max_top:96}},...(groupVisible?[el('group-row'),el('group-expander')]:[])]:[])]:[]),
    ...(menu?[el('mnContextMenu;mniShowCompletedProcesses',['click','press']),el('mnContextMenu;mniShowNodeToProcess',['show_process_node'])]:[])]}});
  const channel={observe:async o=>{if(deadlineFault&&o.condition==='new process selects the prepared graph node')throw Error('Original deadline expired');
   const s=state();assert.ok(o.ready(s),o.condition);return structuredClone(s);},perform:async o=>{
   const s=state();assert.ok(o.ready(s));o.identity(s);const a=o.resolve(s);actions.push(a);
+  if(a.verb==='scroll'){if(groupFault==='unknown')throw Error('Unknown scroll reply');groupVisible=true;}
+  if(a.ref==='group-expander')groupExpanded=true;
   if(a.ref==='graph-node')trainMenu=true;
   if(a.ref==='mn;mniTrain'){trainMenu=false;launched=true;if(trainUnknown)throw Error('Unknown training reply');}
   if(a.verb==='right_click'){menu=true;if(a.ref==='child-row')selected=true;}
@@ -95,4 +97,20 @@ for(const trainUnknown of [false,true])test('native training settles its owned p
  assert.equal(f.actions.filter(a=>a.ref==='mn;mniTrain').length,1);
  assert.equal(f.actions.filter(a=>a.ref==='graph-node;Label;Label').length,0,'label context menu cannot train a node');
  assert.equal(f.actions.some(a=>a.verb==='execute_graph_node'),false);
+});
+
+// LAB-109 s3: process 15 / record 3400 has matching cached split-grid cells,
+// rendered=true, loaded=true, but no visible row or annotated expander.
+test('cached rendered execution group is scrolled into view before its expander is required',async()=>{
+ const f=await fixture({cachedGroup:true}),r=await f.driver.waitCompleted();
+ assert.equal(r.owner_verified,true);assert.equal(r.cleanup_complete,true);
+ assert.equal(f.actions.filter(a=>a.verb==='scroll').length,1);
+ assert.equal(f.actions.filter(a=>a.ref==='group-expander').length,1);
+ assert.equal(f.actions.findIndex(a=>a.verb==='scroll')<f.actions.findIndex(a=>a.ref==='group-expander'),true);
+ assert.equal(f.actions.some(a=>a.verb==='execute_graph_node'),false);
+});
+for(const groupFault of ['root','record','unknown'])test('cached group reveal refuses '+groupFault+' without expansion or launch replay',async()=>{
+ const f=await fixture({cachedGroup:true,groupFault});await assert.rejects(f.driver.waitCompleted());
+ assert.equal(f.actions.filter(a=>a.verb==='scroll').length,1);
+ assert.equal(f.actions.some(a=>a.ref==='group-expander'||a.verb==='execute_graph_node'||a.verb==='show_process_node'),false);
 });
