@@ -5981,8 +5981,8 @@ test('graph observation retains automatic-label links and excludes their child d
  const s=await page.observe();assert.deepEqual(s.links.map(e=>e.tid??e),[link]);
 });
 test('output-port Close returns through the port breadcrumb path after exactly one confirmation',async()=>{
- for(const mode of ['valid','duplicate','foreign_guid','foreign_document','foreign_workflow','wrong_workflow','wrong_node','still_open','missing_context']) {
-  const {page}=outputPortFinishFixture(mode);
+ for(const mode of ['valid','duplicate','foreign_guid','foreign_document','foreign_workflow','wrong_workflow','wrong_node','still_open','missing_context','toast','foreign_toast','permanent_toast','toast_foreign_document','toast_foreign_workflow','toast_foreign_guid','toast_foreign_tab','toast_foreign_dialog','toast_deadline']) {
+  const {page}=outputPortFinishFixture(mode),clock=fixtureClock();page.context.Date=clock.Date;let toast,waits=0;
   const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
   page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
   page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
@@ -5991,18 +5991,28 @@ test('output-port Close returns through the port breadcrumb path after exactly o
   const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
   const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
    {expected_build:build,expected_origin:origin,prepared_node_context:binding,...options},async()=>{const graph=page.document.all().some(e=>e.attrs['data-tid']==='MF;TF-1;ModelForm;cmpDiagram');return {verified:true,
-     document_id:graph&&mode==='foreign_document'?'foreign':'doc',workflow_id:graph&&mode==='foreign_workflow'?'foreign':'flow',
-     node_id:graph&&['foreign_guid','wrong_node'].includes(mode)?'foreign':'node',surface:graph?'graph':'wizard',tid:graph?'MF;TF-1;Graph;'+(mode==='duplicate'?'Calc@1':'Calc'):'MF;TF-1;WizrdMCF',
+     document_id:graph&&['foreign_document','toast_foreign_document'].includes(mode)?'foreign':'doc',workflow_id:graph&&['foreign_workflow','toast_foreign_workflow'].includes(mode)?'foreign':'flow',
+     node_id:graph&&['foreign_guid','wrong_node','toast_foreign_guid'].includes(mode)?'foreign':'node',surface:graph?'graph':'wizard',tid:graph?'MF;TF-1;Graph;'+(mode==='duplicate'?'Calc@1':'Calc'):'MF;TF-1;WizrdMCF',
      output_port:{direction:'output',port:0,native_index:0,port_guid:'out',opening_operation_id:'open'}};});
   const snapshot=(await execute({mode:'observe'})).output;
   const button=snapshot.ui.elements.find(e=>e.allowed_actions.includes('confirm_wizard_close'));
   if(mode==='missing_context'){assert.equal(button,undefined);continue;}
   assert.ok(button,mode);
   const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);dialog.remove();if(mode==='duplicate')for(const e of page.document.all()){
-   if(e.attrs['data-tid']?.startsWith('MF;TF-1;Graph;Calc'))e.attrs['data-tid']=e.attrs['data-tid'].replace('Graph;Calc','Graph;Calc@1');}};
+   if(e.attrs['data-tid']?.startsWith('MF;TF-1;Graph;Calc'))e.attrs['data-tid']=e.attrs['data-tid'].replace('Graph;Calc','Graph;Calc@1');}
+   if(mode.includes('toast')){toast=page.add('div',mode==='foreign_toast'?'foreign':'toast','Closed',{x:1000,y:800,width:300,height:75});toast.attrs.role='dialog';}};
+  page.waitForTimeout=async ms=>{clock.advance(mode==='toast_deadline'?120001:ms);waits++;
+   if(mode==='toast'&&waits===3)toast.remove();
+   if(mode==='toast_foreign_tab'&&waits===2)page.tab.attrs['data-tid']='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';
+   if(mode==='toast_foreign_dialog'&&waits===2)toast.attrs['data-tid']='foreign';};
   const result=await execute({mode:'act',operation_id:'output-close',action:{verb:'confirm_wizard_close',ref:button.ref},snapshot});
-  assert.equal(result.status,['valid','duplicate'].includes(mode)?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+  assert.equal(result.status,['valid','duplicate','toast'].includes(mode)?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
   assert.equal(page.events.filter(e=>e==='click').length,1);
+  if(mode==='toast'){assert.equal(waits,3);assert.equal(result.trace.filter(e=>e.event==='wizard_toast_wait').length,3);
+   assert.equal(result.trace.some(e=>e.event==='wizard_cancel_graph_verified'),true);}
+  if(mode==='toast_deadline')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+  if(mode==='foreign_toast')assert.equal(result.trace.some(e=>e.event==='wizard_toast_wait'),false);
+  if(mode==='permanent_toast')assert.equal(result.trace.filter(e=>e.event==='wizard_toast_wait').length,50);
  }
 });
 
