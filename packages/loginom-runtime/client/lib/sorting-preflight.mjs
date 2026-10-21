@@ -1,4 +1,5 @@
 import {managedJavascriptPreviewAdmission} from './javascript-output-preview.mjs';
+import {makeJavascriptManagedSelectionReadCode,dispatchManagedJavascriptBody} from './javascript-managed-selection.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
 import {createNodeProcedure} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
@@ -27,7 +28,30 @@ export async function preflightTabularSource(options,ctx,config,{required,resolv
  if(port.active!==true){const error=Error(label+' preflight requires an active source output');error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  const script=s.ui.elements.filter(e=>e.tid===port.tid&&e.signature?.native_graph?.status==='script');
  const admission=['sorting','calculator','filter','join_input_0','join_input_1'].includes(label)&&script.length===1?managedJavascriptPreviewAdmission(options.nodeHistory?.(),binding,port):null;
- if(admission)await channel.openJavascriptPreview(port);
+ if(admission){
+  // Join input 0's preview can leave its source selected. Select the owned JS
+  // producer with the existing journaled body gesture before strict port capture.
+  const task={operation_id:operation.id+':source-select-'+(inputPort??0),owner:binding.node,
+   workflow_ref:{prefix:binding.workflow_ref.prefix,tab_tid:binding.workflow_ref.tab_tid},
+   targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,deadline:operation.deadline};
+  const before=await execute(makeJavascriptManagedSelectionReadCode({...task,mode:'capture'}));
+  try{
+   let selected=before;
+   if(before.ready!==true){
+    operation.cleanupConfirmed=false;
+    let result;
+    try{result=await dispatchManagedJavascriptBody({task,before,execute,record:onRecord,receiptOptions});}
+    catch(error){operation.transportUncertain=true;operation.nodeEffectPossible=true;throw error;}
+    operation.nodeEffectPossible ||= result.effect_possible===true;
+    operation.cleanupConfirmed=result.cleanup_complete===true;
+    need(result.status==='SUCCEEDED','Managed JavaScript source selection refused');
+    selected=result.output?.selection;
+   }
+   need(selected?.ready===true&&selected.node_tid===s.prepared_node_context.tid,
+    'Managed JavaScript source selection unconfirmed');
+  }finally{if(!operation.transportUncertain)await execute(makeJavascriptManagedSelectionReadCode({...task,mode:'dispose'}));}
+  await channel.openJavascriptPreview(port);
+ }
  if(!admission){
   const portControl=s=>s.ui.elements.filter(e=>e.tid===port.tid&&e.allowed_actions.includes('click'));
   if(portControl(s).length!==1){

@@ -2391,7 +2391,7 @@
   },
   "packages/loginom-runtime/client/lib/sorting-preflight.mjs": {
     "baseHash": "dc38f59b11a1361de080061b95598bd801ceafdecad25bbe857f9b47191788e5",
-    "hash": "cfbce753c8d2f806de3a515cfb53f64ed3358034dbeacc20f955563110e1062d",
-    "reason": "Route Filter preflight after a freshly executed managed JavaScript source through the existing owned preview used by Sort. Preserve denied generic JS actions, history admission, native owner/port identity, full schema comparison and original deadlines."
+    "hash": "25e01ca57b39f65f1b508056768d9a82f7a9a4dec51e3f6f8543ba44a3b17fe2",
+    "reason": "Route Filter preflight after a freshly executed managed JavaScript source through the existing owned preview used by Sort. Preserve denied generic JS actions, history admission, native owner/port identity, full schema comparison and original deadlines. Before strict managed JavaScript output preview capture, use the existing journaled owned-body selection to clear a previous Join input source selection. Preserve native script action denial, original deadline, uncertain gesture refusal and preview ownership guards."
   }
 }
