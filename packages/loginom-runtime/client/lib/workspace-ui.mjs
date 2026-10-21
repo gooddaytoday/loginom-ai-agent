@@ -689,6 +689,18 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     let workflowNavigation={status:'unobserved'};
     let pendingWizardOwner={status:'unobserved'};
     let nodeContext={status:'unobserved',opening_verified:false};
+    // Long export/package captions can overflow the node breadcrumb itself.
+    // This is context text only: gestures still require visible controls and
+    // the current native node wizard or exact input0/native input1 opening.
+    const hiddenExportNode=e=>(preparedNodeWizard&&['text_export_params','text_export_format'].includes(wizard.stage)
+        ||preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===1
+          &&preparedInputPort.node_icon_class==='bg-vendor-icon-exporttextfile')
+      &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'
+      &&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')&&!sensitive(e)
+      &&(tids.get(getTid(e))??[]).length===1
+      &&e.querySelectorAll('[class*="bg-vendor-icon-"]').length===1
+      &&e.querySelectorAll('.bg-vendor-icon-exporttextfile').length===1
+      &&e.textContent.trim().length>0&&(getTid(e)??'').endsWith('>'+e.textContent.trim().replace(/\s/g,'_').replace(/,/g,''));
     if(workflow) {
       // E2E navigation.GetCurrentTabPath: inspect the current tab's visible
       // breadcrumb buttons, not document.title. This is observed context only;
@@ -723,13 +735,13 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&e.textContent.trim()==='Настройка'&&(getTid(e)??'').endsWith('>Настройка')
           &&e.querySelectorAll('.maptree-icon-wizard').length===1
           &&(tids.get((getTid(e)??'').slice(0,-'>Настройка'.length))??[]).filter(parent=>panels[0].contains(parent)
-            &&visible(parent)&&parent.querySelectorAll('[class*="bg-vendor-icon-"]').length===1).length===1;
+            &&(visible(parent)||hiddenExportNode(parent))&&parent.querySelectorAll('[class*="bg-vendor-icon-"]').length===1).length===1;
         const crumbs=all.filter(e=>{charge();return (getTid(e)??'').startsWith(prefix) && panels[0].contains(e) && !sensitive(e)
-          && (visible(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
+          && (visible(e)||hiddenExportNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
             &&e.querySelectorAll('.maptree-icon-wizard').length===1);});
         if(crumbs.length>32)ownerContext.status='bounded';
         else if(crumbs.length) {
-          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
+          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
             overflow_context:overflowSocket(e),
             wizard_icon:e.querySelectorAll('.maptree-icon-wizard').length===1,
             workflow_icon:e.querySelectorAll('.maptree-icon-workflow').length===1,
@@ -830,13 +842,13 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata'].includes(preparedInputPort.node_icon_class)
           &&crumbs.length===9&&crumbs[5].querySelectorAll('.'+preparedInputPort.node_icon_class).length===1;
         if(crumbs.length>32)context.status='bounded';
-        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
+        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&hiddenExportNode(e)||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
               ||singleInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1))&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
           // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
           // Join input roles have fixed captions; retain the native port and node icon binding.
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
-            &&(i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
+            &&(i===5&&hiddenExportNode(e)||i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
               &&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
               ||singleInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1)
@@ -865,7 +877,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             &&folder.tid===node.tid+'>Входные_порты'&&port.tid===folder.tid+'>'+format(port.label)
             &&last.tid===port.tid+'>Настройка';
           const iconCount=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1
-            &&(inside(found[0],e)||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
+            &&(inside(found[0],e)||e===crumbs[5]&&hiddenExportNode(e)||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
           const icons=iconCount(crumbs[4],'.maptree-icon-workflow')===1
             &&iconCount(crumbs[5],'[class*="bg-vendor-icon-"]')===1
             &&iconCount(crumbs[8],'.maptree-icon-wizard')===1;

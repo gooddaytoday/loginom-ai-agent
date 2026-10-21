@@ -4246,6 +4246,40 @@ async function exportInputPortOverflowFixture() {
   return {page,crumbs,panel,opening,preparation,binding,expectedPort:exportInputPortOverflow.inputPort};
 }
 
+test('native-owned export keeps its hidden node breadcrumb in input and settings wizards',async()=>{
+  for(const settings of [false,true])for(const mode of ['valid','unbound','hidden_workflow','wrong_icon','sensitive','duplicate','wrong_path']) {
+    const {page,binding,crumbs,panel,opening}=await exportInputPortOverflowFixture();
+    opening.node.FIconCls='bg-vendor-icon-exporttextfile';
+    crumbs[5].children[0].attrs.class=mode==='wrong_icon'?'bg-vendor-icon-calcdata':'bg-vendor-icon-exporttextfile';
+    for(const c of crumbs.slice(5)) {
+      c.attrs['data-tid']=c.attrs['data-tid'].replace('Exportsort','Выгрузка_с_русскими_заголовками');
+      c.style.display='none';c.box={x:0,y:0,width:0,height:0};
+      for(const icon of c.children)icon.box={x:0,y:0,width:0,height:0};
+    }
+    crumbs[5].ownText='Выгрузка с русскими заголовками';
+    page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+    if(settings) {
+      const wizard=opening.wizard.FView.el.dom;
+      page.document.querySelectorAll('[data-tid$=";TuneDataSourceMappingWizard;btnAddMappingColumn"]')[0].remove();
+      page.add('input','MF;TF-5;WizrdMCF;ExportTextFileParamsWizard;edtFileName','',undefined,wizard);
+      opening.wizard.FModelNode=opening.nodeTree.FModelNode;
+      page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node.ParentNode=opening.nodeTree;
+      // The fixture returns a new card wrapper, retaining the same tree object.
+      crumbs[8].attrs['data-tid']=crumbs[5].attrs['data-tid']+'>Настройка';
+      crumbs[6].remove();crumbs[7].remove();
+    }
+    if(mode==='hidden_workflow')crumbs[4].style.display='none';
+    if(mode==='sensitive')crumbs[5].attrs['aria-label']='password';
+    if(mode==='wrong_path')crumbs[5].attrs['data-tid']=crumbs[5].attrs['data-tid'].replace('>Сценарий>','>Other>');
+    if(mode==='duplicate')page.add('a',crumbs[5].attrs['data-tid'],crumbs[5].ownText,crumbs[5].box,panel).style.display='none';
+    const result=await page.execute({mode:'observe',...(mode==='unbound'?{}:{prepared_node_context:binding})});
+    const context=settings?result.output?.wizard?.owner_context:result.output?.wizard?.input_port_context;
+    assert.equal(context?.status==='observed',mode==='valid',`${settings?'settings':'input'}:${mode}`);
+    if(mode==='valid')assert.equal(context.node.label,'Выгрузка с русскими заголовками');
+    assert.deepEqual(page.events,[]);
+  }
+});
+
 test('owned text export input observes its actual hidden data-source caption',async()=>{
   const {page,binding,expectedPort}=await exportInputPortOverflowFixture();
   const full=await page.execute({mode:'observe',prepared_node_context:binding});
