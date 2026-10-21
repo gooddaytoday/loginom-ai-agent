@@ -15,6 +15,7 @@ import {preflightGroupingSource} from '../lib/grouping-preflight.mjs';
 import {preflightCalculatorSource} from '../lib/calculator-preflight.mjs';
 import {preflightSortingSource,preflightTabularSource} from '../lib/sorting-preflight.mjs';
 import {preflightJoin} from '../lib/join-node.mjs';
+import {resolveFilterConditions} from '../lib/filter-parameters.mjs';
 const source=()=>JSON.parse(readFileSync(new URL('./fixtures/javascript-preflight-source.json',import.meta.url),'utf8'));
 function fixture(){
  const history=source(),node=history.outcome.output.node;
@@ -178,7 +179,9 @@ function preflightFixture(type){
     ?{group_by:[{kind:'input_field',name:'abc_class'}],measures:[{field:{kind:'input_field',name:'annual_revenue'},function:'sum',name:'revenue',label:'Revenue'}]}
     :type==='transform.calculator'
      ?{expressions:[{target:{kind:'new'},name:'revenue_tax',label:'Revenue tax',type:'real',formula:'annual_revenue*0.2'}]}
-     :{keys:[{field:{kind:'input_field',name:'annual_revenue'},direction:'DESC'}]}}};
+     :type==='transform.filter_data'
+      ?{groups:[[{field:{kind:'input_field',name:'annual_revenue'},type:'real',operator:'>=',value:100}]]}
+      :{keys:[{field:{kind:'input_field',name:'annual_revenue'},direction:'DESC'}]}}};
  const options={operation,nodeHistory:()=>[f.history],onRecord:async r=>structuredClone(r),
   receiptOptions:()=>assert.fail('no mutation before private capture'),execute:async code=>{
    calls.push(code);
@@ -190,7 +193,9 @@ function preflightFixture(type){
  if(type.startsWith('join_input_')){options.operation.parameters.target.type='transform.join_data';options.operation.parameters.inputs[0].input=Number(type.at(-1));}
  return {history:f.history,binding:f.binding,context,state,port,calls,options,run:()=>type.startsWith('join_input_')
   ?preflightTabularSource(options,{},config,{required:true,inputPort:Number(type.at(-1)),label:type,resolve:()=>{}})
-  :(type==='transform.group_data'?preflightGroupingSource:type==='transform.calculator'?preflightCalculatorSource:preflightSortingSource)(options,{},config)};
+  :type==='transform.filter_data'
+   ?preflightTabularSource(options,{},config,{required:true,label:'filter',resolve:resolveFilterConditions})
+   :(type==='transform.group_data'?preflightGroupingSource:type==='transform.calculator'?preflightCalculatorSource:preflightSortingSource)(options,{},config)};
 }
 test('actual denied JS port routes Group preflight to owned fresh preview before any target creation',async()=>{
  const f=preflightFixture('transform.group_data');await assert.rejects(f.run(),/reached owned preview capture/);
@@ -208,6 +213,19 @@ test('Calculator after managed JS uses owned preview while generic port actions 
 test('Calculator cannot preview an unsettled or foreign managed JavaScript source',async()=>{
  for(const change of [f=>f.history.cleanup_confirmed=false,f=>f.history.outcome.output.node={...f.history.outcome.output.node,node_id:'foreign'}]){
   const f=preflightFixture('transform.calculator');change(f);await assert.rejects(f.run(),/not settled|ambiguous/);
+  assert.equal(f.calls.filter(code=>code.includes('runJavascriptOutputPreview')).length,0);
+ }
+});
+test('Filter after managed JS uses owned preview while its generic port remains denied',async()=>{
+ const f=preflightFixture('transform.filter_data');await assert.rejects(f.run(),/reached owned preview capture/);
+ assert.equal(f.calls.filter(code=>code.includes('runJavascriptOutputPreview')).length,1);
+ assert.deepEqual(f.state.ui.elements[0].allowed_actions,[]);
+});
+test('Filter refuses unconfirmed, stale or foreign managed JS before preview',async()=>{
+ for(const change of [f=>f.history.cleanup_confirmed=false,
+  f=>f.history.outcome.output.output.ports[0].fresh=false,
+  f=>f.history.outcome.output.node={...f.history.outcome.output.node,node_id:'foreign'}]){
+  const f=preflightFixture('transform.filter_data');change(f);await assert.rejects(f.run(),/not settled|ambiguous|freshly executed/);
   assert.equal(f.calls.filter(code=>code.includes('runJavascriptOutputPreview')).length,0);
  }
 });
@@ -256,7 +274,7 @@ for(const type of ['transform.filter_rows','transform.union_data'])test('private
  await assert.rejects(f.channel.openJavascriptPreview(f.task.output),/restricted/);assert.deepEqual(f.events,[]);
 });
 
-for(const type of ['transform.group_data','transform.sorting','transform.calculator','join_input_0','join_input_1'])test(type+' reads the fresh full preview and closes it even if schema changed',async()=>{
+for(const type of ['transform.group_data','transform.sorting','transform.calculator','transform.filter_data','join_input_0','join_input_1'])test(type+' reads the fresh full preview and closes it even if schema changed',async()=>{
  for(const changed of [false,true]){
   const f=preflightFixture(type),browser=channelFixture(),records=[];
   const original=f.options.execute,root=f.binding.workflow_ref.prefix+';ModelForm;PreviewWindow';
