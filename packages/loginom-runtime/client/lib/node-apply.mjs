@@ -430,12 +430,22 @@ export async function applyNode({request, operation, handlers, drivers, record,
       state.output=output;
     }
     check();
-    const result={operation_id:operation.id,status:'SUCCEEDED',effect_possible:state.effect_possible,phases:state.phases.map(({value,...p})=>p),node:state.node,
+    let readback,readbackError;
+    if(!readingOnly&&request.finish!=='close'&&handler.configurationReadback){
+      try{readback=handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id});}
+      catch(error){
+        // Only the pure projection failed: every requested browser phase has
+        // already settled. Keep its strict refusal without inventing settings
+        // or retaining an operation that has no phase left to release/resume.
+        requireValue(!state.pending&&state.cleanup_complete===true&&!operation.transportUncertain,'Configuration readback has unresolved work');
+        check();readbackError={code:'NODE_CONFIGURATION_READBACK_FAILED',message:String(error.message).slice(0,1000)};
+      }
+    }
+    const result={operation_id:operation.id,status:readbackError?'FAILED':'SUCCEEDED',effect_possible:state.effect_possible,phases:state.phases.map(({value,...p})=>p),node:state.node,
       execution:state.execution,output:state.output,package_saved:false,cleanup_complete:true,warnings:[],
-      configuration:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied',
-        ...(!readingOnly&&request.finish!=='close'&&handler.configurationReadback?{readback:handler.configurationReadback({
-          node:state.node,phases:state.phases,operation_id:operation.id})}:{})},
-      checkpoint_kind:request.finish==='close'?'local_node_cancellation':'local_node_checkpoint',persisted_package_verified:false};
+      configuration:readbackError?{status:'unknown'}:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied',...(readback?{readback}:{})},
+      checkpoint_kind:readbackError?'local_node_failed':request.finish==='close'?'local_node_cancellation':'local_node_checkpoint',persisted_package_verified:false,
+      ...(readbackError?{error:readbackError,next_step:correctNodeRequest(request,state.node)}:{})};
     await acknowledge({phase:'node_checkpoint',signature,result});state.result=structuredClone(result);
     return result;
   } catch(error) {
