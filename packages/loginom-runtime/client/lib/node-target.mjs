@@ -116,11 +116,11 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
     return same(retained(before), retained(after));
   };
   if(beforeTarget){
-    if(request.target.kind!=='new'||request.target.type!=='transform.cross_table'
+    if(request.target.kind!=='new'||!['transform.cross_table','transform.calculator','preprocessing.data_recovery'].includes(request.target.type)
       ||state.baseline||state.last_graph||state.pending||state.targetId||state.receipts.length)
-      throw Error('CrossTable source preflight already started; release without replay');
-    // The source definition wizard can fail before creation begins. Retain
-    // the existing graph checkpoint before that first child gesture, so a
+      throw Error('Source preflight already started; release without replay');
+    // The source preview or definition wizard can fail before creation begins.
+    // Retain the existing graph checkpoint before that first child gesture, so a
     // later read-only release can compare the original graph. No target
     // effect is prepared here; an unfinished preflight is never resumable.
     state.last_graph=structuredClone(await observe());
@@ -287,7 +287,7 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
   const ack=await record(event);if(!same(ack?.target_state,event.target_state))throw new Error('Node target journal acknowledgement differs');
   operation.targetPhase=state;
   return state.completed?{...structuredClone(state.result),cleanup_complete:true}:{status:'AMBIGUOUS',phase:'target_partial',cleanup_complete:true,pending:null,node_id:state.targetId,
-    resume_available:!(request?.target.kind==='new'&&request.target.type==='transform.cross_table'&&!state.baseline&&state.last_graph)};
+    resume_available:!(request?.target.kind==='new'&&['transform.cross_table','transform.calculator','preprocessing.data_recovery'].includes(request.target.type)&&!state.baseline&&state.last_graph)};
 }
 
 // A pre-target release observes only. In particular, it cannot finish creation,
