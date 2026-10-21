@@ -6,6 +6,10 @@ import {releaseNodeApply} from '../lib/node-apply.mjs';
 import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {createActionRuntime} from '../lib/executor.mjs';
 import {actions} from './support/executor-fixture.mjs';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createExecutionJournal} from '../lib/execution-journal.mjs';
 
 const node={document_id:'doc',workflow_id:'flow',node_id:'export'};
 const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',
@@ -120,7 +124,7 @@ test('text export release checks cancellation before observing or closing',async
  await assert.rejects(f.run(c.signal),/release cancelled/);assert.deepEqual(f.gestures,[]);assert.equal(f.operation.deadline,1);
 });
 
-async function stoppedRuntime(phase,{browserRecovery=false,blocked=false}={}) {
+async function stoppedRuntime(phase,{browserRecovery=false,blocked=false,record=async e=>e}={}) {
  const calls=[],events=[];
  const state={blocked};
  const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[{
@@ -132,14 +136,14 @@ async function stoppedRuntime(phase,{browserRecovery=false,blocked=false}={}) {
  const ok=async()=>({verified:true,cleanup_complete:true,effect_possible:false});
  const stop=name=>{calls.push(name);if(name===phase)throw Error('Stopped export '+phase);};
  const runtime=createActionRuntime({pinned:{actions,selectors:new Map(),pins:{}},allowCandidate:true,browserRecovery,
-  targetOrigin:'http://test',targetBuild:'7.4.2',onRecord:async e=>{events.push(e);return e;},
+  targetOrigin:'http://test',targetBuild:'7.4.2',onRecord:async e=>{events.push(e);return record(e);},
   execute:async()=>{
    if(state.blocked)throw Error('Blocking dialog');
    return {status:'SUCCEEDED',output:{value:{status:'SUCCEEDED',output:structuredClone(snapshot)}}};
   },
   nodeTargetAdapterFactory:()=>({observe:async()=>structuredClone(graph),preflight:ok,positionMatches:()=>true}),
   nodeApplyHandlers:support.nodeApplyHandlers,nodeApplyDriverFactory:options=>({
-   ...support.nodeApplyDriverFactory(options),verifySource:ok,mapPorts:ok,openWizard:ok,
+   ...support.nodeApplyDriverFactory(options),verifySource:ok,mapPorts:async()=>{stop('input_mapping');return ok();},openWizard:ok,
    configureExport:async()=>{stop('configure');return ok();},
    finish:async mode=>({verified:true,cleanup_complete:true,mode,execution_id:'exec',execution_started:true}),
    waitExecution:async()=>{stop('execute');return {verified:true,cleanup_complete:true,status:'completed',execution_id:'exec'};},
@@ -184,4 +188,34 @@ test('browser recovery verifies an export release without inferring settings, ex
  assert.equal(f.runtime.hasUnsettledWork(),false);assert.equal(f.calls.filter(c=>c==='configure').length,1);
  const receipt=f.events.find(e=>e.phase==='browser_recovery_receipt').receipt;
  assert.equal(receipt.file_artifacts,undefined);assert.equal(receipt.configuration.status,'unknown');
+});
+
+for(const phase of ['input_mapping','configure'])for(const browserRecovery of [false,true])
+ test('text export '+phase+' release survives the real redacted fsync journal, browser='+browserRecovery,async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'export-release-journal-'));
+ try{
+  const record=createExecutionJournal({directory,metadata:{sessionId:'test',clientRevision:'test'}});
+  const f=await stoppedRuntime(phase,{browserRecovery,blocked:browserRecovery,record});
+  if(browserRecovery){
+   const refused=await f.runtime.recover('apply-export',{strategy:'abandon_operation',recoveryOperationId:'release-export'});
+   assert.equal(refused.error.code,'NODE_RELEASE_REFUSED');
+   const basis=f.runtime.browserRecoveryBasis('apply-export');
+   assert.equal((await f.runtime.browserRecoveryHandoff('apply-export')).stopped,true);
+   f.state.blocked=false;
+   const result=await f.runtime.verifyBrowserRecovery({operationId:'apply-export',step:basis.step,attested:{actions_performed:['inspected quiet graph']}});
+   assert.equal(result.status,'continuable',JSON.stringify(result));
+  }else{
+   const result=await f.runtime.recover('apply-export',{strategy:'abandon_operation',recoveryOperationId:'release-export'});
+   assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+  }
+  const saved=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(line=>JSON.parse(line));
+  const release=saved.find(e=>e.phase==='node_operation_released');
+  assert.deepEqual(release.result,f.events.find(e=>e.phase==='node_operation_released').result);
+  assert.equal(release.result.next_step.tool,'dock_action_run');
+  assert.match(release.result.next_step.instruction,/package.save_checkpoint/);
+  assert.equal(release.result.configuration.status,'unknown');assert.equal(release.result.execution.status,'unknown');
+  assert.equal(release.result.package_saved,false);assert.equal(f.runtime.hasUnsettledWork(),false);
+  assert.equal(f.calls.filter(c=>c===phase).length,1);
+  f.runtime.assertPreparationAllowed();
+ }finally{await rm(directory,{recursive:true,force:true});}
 });
