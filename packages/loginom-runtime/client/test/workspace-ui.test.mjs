@@ -2346,8 +2346,9 @@ test('wizard region context refusal records exact failed checks without private 
 
 test('wizard cancellation confirms the original graph after one exact affirmative click',async()=>{
  for(const mode of ['success','wrong_question','wrong_node','still_open','bound_unlock','bound_churn','bound_relock',
-  'bound_document_id','bound_workflow_id','bound_node_id','bound_tid','bound_navigation_node']) {
-  const page=new Page(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
+  'bound_document_id','bound_workflow_id','bound_node_id','bound_tid','bound_navigation_node','toast','foreign_toast','permanent_toast','mixed_toast']) {
+  const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
+  let toast,waits=0;
   let path='';const crumbs=[];
   for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий','Old','Настройка']) {
    path+=(path?'>':'')+label;const crumb=page.add('a',base+'cnrNaviMode;b.s_'+path,label,undefined,panel);crumbs.push(crumb);
@@ -2386,9 +2387,14 @@ test('wizard cancellation confirms the original graph after one exact affirmativ
    wizard.remove();crumbs.at(-1).remove();crumbs.at(-2).remove();
    const graph=page.add('div',base+'ModelForm;cmpDiagram'),name=mode==='wrong_node'?'Other':'Old';
    const node=page.add('g',base+'Graph;'+name,'',undefined,graph);page.add('span',base+'Graph;'+name+';Label;Label',name,undefined,node);
+   if(mode.includes('toast')){
+    toast=page.add('div',mode==='foreign_toast'?'foreign':'toast','Notification',{x:1000,y:800,width:300,height:75});toast.attrs.role='dialog';
+    if(mode==='mixed_toast')page.add('div','foreign','Other',{x:500,y:400,width:200,height:100}).attrs.role='dialog';
+   }
   };
+  page.waitForTimeout=async ms=>{clock.advance(ms);waits++;if(mode==='toast'&&waits===3)toast.remove();};
   const result=await page.act({verb:'confirm_wizard_close',ref:button.ref},snapshot);
-  const success=['success','bound_unlock'].includes(mode);
+  const success=['success','bound_unlock','toast'].includes(mode);
   assert.equal(result.status,success?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
   assert.equal(page.events.filter(e=>e==='click').length,1);
   assert.equal(result.trace.some(e=>e.event==='wizard_cancel_graph_verified'),success);
@@ -2396,6 +2402,11 @@ test('wizard cancellation confirms the original graph after one exact affirmativ
   if(mode.startsWith('bound_')&&!success)assert.equal(result.error.code,'PREPARED_NODE_CONTEXT_CHANGED',mode);
   if(mode.startsWith('bound_'))assert.equal(result.trace.filter(e=>e.event==='node_graph_lock_rediscovery').length,
    mode==='bound_unlock'?1:mode==='bound_churn'?2:0,mode);
+  if(mode.includes('toast')){
+   assert.equal(result.trace.filter(e=>e.event==='wizard_toast_wait').length,mode==='toast'?3:mode==='permanent_toast'?50:0,mode);
+   assert.equal(waits,mode==='toast'?3:mode==='permanent_toast'?50:0,mode);
+   if(!success)assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  }
  }
 });
 
