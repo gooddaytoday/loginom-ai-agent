@@ -424,8 +424,50 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return visibleAncestors(element);
     });
     const sensitivePattern = /password|passwd|\bpwd\b|secret|token|credential|authorization|api[_ -]?key|private[_ -]?key|one[_ -]?time|\botp\b|парол|секрет|токен/i;
+    const calculatorMetadataTid=memoRead(element=>{
+      const tid=getTid(element)??'';
+      const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard|DerivedDataSourceOutputSocketWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_|colDataKind_|colDefaultUsageType_|colSourceDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
+      if(!match || element.tagName!=='TD' || !sensitivePattern.test(tid))return tid;
+      const output=match[2]!=='CalcDataWizard';
+      if(output ? !['colName_','colDisplayName_','colDataKind_','colDefaultUsageType_','colSourceDisplayName_'].includes(match[3])
+        || definitionPrefix!==match[1] || preparedOutputPort?.direction!=='output'
+        || preparedOutputPort.node_icon_class!=='bg-vendor-icon-calcdata'
+        || preparedOutputPort.port!==0 || preparedOutputPort.native_index!==0
+        || typeof preparedOutputPort.port_guid!=='string' || !preparedOutputPort.port_guid
+        || typeof preparedOutputPort.opening_operation_id!=='string' || !preparedOutputPort.opening_operation_id
+        : !['colExpressionName_','colExpressionDisplayName_'].includes(match[3]))return tid;
+      const base=match[1]+';WizrdMCF;',tab='MF;cntMain;cntWorkspace;Workspace;t.br;tb'+match[1].slice('MF;TF'.length);
+      const prefix=base+match[2]+';';
+      const tabs=tids.get(tab)??[],wizards=tids.get(base.slice(0,-1))??[],grids=tids.get(prefix+(output?'grdTargetColumns;tbl':'grdExpressions;tbl'))??[];
+      const names=tids.get(prefix+(output?'colName_':'colExpressionName_')+match[4])??[];
+      const labels=tids.get(prefix+(output?'colDisplayName_':'colExpressionDisplayName_')+match[4])??[];
+      const row=element.closest('table.x-grid-item');
+      if(tabs.length!==1 || !tabs[0].classList.contains('x-tab-active') || wizards.length!==1 || grids.length!==1
+        || !wizards[0].contains(grids[0]) || !row || !grids[0].contains(row)
+        || !grids[0].getAttribute('id') || row.getAttribute('data-boundview')!==grids[0].getAttribute('id')
+        || names.length!==1 || labels.length!==1 || names[0].closest('table')!==row || labels[0].closest('table')!==row
+        || names[0].tagName!=='TD' || labels[0].tagName!=='TD')return tid;
+      const metadata=[names[0],labels[0]];
+      if(output)for(const key of ['colDataKind_','colDefaultUsageType_','colSourceDisplayName_']) {
+        const cells=tids.get(prefix+key+match[4])??[];
+        if(cells.length!==1 || cells[0].tagName!=='TD' || cells[0].closest('table')!==row)return tid;
+        metadata.push(cells[0]);
+      }
+      // Only technical-name suffixes of the owned definition cells are data.
+      // Never exempt secret attributes, ancestors, editors or dataset values.
+      for(const cell of metadata) {
+        const children=[...cell.querySelectorAll('*')];charge();
+        if(children.length>16 || [cell,...children].some(child=>{
+          charge();return child.isContentEditable || child.closest('[contenteditable="true"],a[href],.monaco-editor,.CodeMirror,.ace_editor')
+            || child.matches('input,textarea,select,iframe,object,embed')
+            || sensitivePattern.test(['name','id','autocomplete','aria-label',...(child===cell?[]:['data-tid'])].map(k=>child.getAttribute(k)??'').join(' '));
+        }))return tid;
+      }
+      if(names[0].textContent!==match[4])return tid;
+      return prefix+match[3];
+    });
     const safeAncestors=ancestorCheck(parent=>!parent.matches('input[type="password"],input[type="hidden"],input[type="file"]')
-      &&!sensitivePattern.test(['name','id','data-tid','autocomplete','aria-label'].map(name=>parent.getAttribute(name)??'').join(' '))
+      &&!sensitivePattern.test(['name','id','data-tid','autocomplete','aria-label'].map(name=>name==='data-tid'?calculatorMetadataTid(parent):parent.getAttribute(name)??'').join(' '))
       &&!(getTid(parent)??'').startsWith('LoginForm;'),document.body);
     const sensitive = memoRead(element => !safeAncestors(element));
     const short = (value, limit = 240) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, limit);
