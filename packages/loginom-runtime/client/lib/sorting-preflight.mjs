@@ -26,7 +26,7 @@ export async function preflightTabularSource(options,ctx,config,{required,resolv
  const ports=s.node_outputs.ports.filter(p=>p.index===input.output);need(ports.length===1,'Exact upstream '+label+' port required');const port=ports[0];
  if(port.active!==true){const error=Error(label+' preflight requires an active source output');error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
  const script=s.ui.elements.filter(e=>e.tid===port.tid&&e.signature?.native_graph?.status==='script');
- const admission=['sorting','calculator','join_input_0','join_input_1'].includes(label)&&script.length===1?managedJavascriptPreviewAdmission(options.nodeHistory?.(),binding,port):null;
+ const admission=['sorting','calculator','filter','join_input_0','join_input_1'].includes(label)&&script.length===1?managedJavascriptPreviewAdmission(options.nodeHistory?.(),binding,port):null;
  if(admission)await channel.openJavascriptPreview(port);
  if(!admission){
   const portControl=s=>s.ui.elements.filter(e=>e.tid===port.tid&&e.allowed_actions.includes('click'));
