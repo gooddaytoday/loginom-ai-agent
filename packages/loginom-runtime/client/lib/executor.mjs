@@ -2813,7 +2813,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               {document_id:request.document_id,workflow_ref:request.workflow_ref},ctx)}:{}),prepareTarget:async(graph,ctx)=>{
             const overallDeadline=operation.deadline;operation.deadline=ctx.deadline;
             let result,preflight;
-            try{
+            const sourcePreflight=async()=>{
               if(operation.nodeApplyDrivers.beforeTarget){
                 const current=await operation.nodeTargetAdapter.verifyWorkflow({document_id:graph.document_id,workflow_ref:graph.workflow_ref},ctx);
                 if(current?.status!=='SUCCEEDED'||current.verified!==true||current.cleanup_complete!==true
@@ -2828,9 +2828,17 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                   throw Error('Complete owned graph required before node preflight');
                 preflight=await operation.nodeApplyDrivers.beforeTarget(ctx);
               }
+            };
+            try{
+              const checkpointPreflight=graph.target.kind==='new'&&graph.target.type==='transform.cross_table'
+                &&!operation.targetPhase?.baseline&&typeof operation.nodeApplyDrivers.beforeTarget==='function';
+              if(!checkpointPreflight)await sourcePreflight();
               const targetRequest=preflight?.target_inputs?{...graph,inputs:preflight.target_inputs}:graph;
               result=await prepareNodeTarget({request:targetRequest,operation,adapter:operation.nodeTargetAdapter,
-                record:onRecord,signal:ctx.signal,now});
+                record:onRecord,signal:ctx.signal,now,...(checkpointPreflight?{beforeTarget:async()=>{
+                  await sourcePreflight();
+                  if(preflight?.target_inputs)throw Error('CrossTable source preflight cannot replace target inputs');
+                }}:{})});
             }finally{operation.deadline=overallDeadline;}
             if(result.status!=='SUCCEEDED'){
               const error=new Error(result.error??'Node target is not verified');
