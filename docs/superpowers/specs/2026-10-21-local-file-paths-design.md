@@ -132,6 +132,8 @@ Backend продолжает ограничивать catalog и выполне�
 
 Reference cases готовятся по skill: independent oracle до модели, максимум три попытки построения, проверка графа, холодный rerun, обычная positive/foreign-negative calibration для новых scenario IDs. Не запускать live `--repeat`. Не коммитить сгенерированные кейсы в рамках skill. Черновики находятся вне принятого корпуса; attempts, profiles и временные конфиги — в `/home/kiselev/storage/tmp/`.
 
+Старые скрипты skill flatten inputs и добавляют `--file`, поэтому для этих path references не подходят. Одноразовый adapter подготовки в task temp вызывает существующие `runAttempt`/`afterAttempt` eval harness с paths-mode и выключенным judge; не создаёт фиктивный reference, не ослабляет accepted task loader и не меняет установленный skill. Его точная последовательность, evidence mapping и сохранение ограничений skill описаны в плане. Это адаптация построения эталонов, а не новый постоянный benchmark runner.
+
 Модель построения reference берётся из конфигурации skill (наблюдалась `openai/gpt-6.1-sol`, `xhigh`), модель judge — из текущего repository pin (`gpt-6-sol`, `xhigh`); это разные роли. Для acceptance фиксируются фактически использованные candidate SHA, модель и variant. Нужен установленный candidate CLI/desktop с изменением #74, не произвольный текущий бинарник. Сохраняются isolated endpoint, чистый профиль, фильтрация child env и подтверждённый cleanup; инфраструктурный отказ не считается аналитической ошибкой и не снимается удалением writer guard.
 
 ## Основные файлы и порядок
@@ -150,4 +152,5 @@ Reference cases готовятся по skill: independent oracle до моде�
 - Новые real-model cases запланированы в `evals/` по указанному skill; корпус и эталоны пока не созданы.
 - Код, unit/e2e tests, model runs и calibration в этой planning-задаче не запускались.
 - Независимое spec review: Approved; технические предположения не считаются живой проверкой.
-- Следующий шаг: [подробный план реализации](../plans/2026-10-21-local-file-paths.md).
+- [Подробный план реализации](../plans/2026-10-21-local-file-paths.md) сохранён, независимое plan review: Approved.
+- Следующий шаг реализации: ранняя проверка native upload completion без контрольного скачивания.
