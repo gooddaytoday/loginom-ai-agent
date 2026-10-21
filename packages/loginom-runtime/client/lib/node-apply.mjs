@@ -540,7 +540,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
     next_step:exportRelease?{tool:'dock_action_run',original_operation_id:operation.id,
       instruction:'The stopped text export was released, but its settings, execution and file output remain unverified. '
         +'Do not resume this operation, repeat the export or recreate the node: a file may already have been written. '
-        +'Save the retained scenario with dock_action_run, action_key:"package.save_checkpoint", a NEW operation_id '
+        +'Save the retained scenario with dock_action_run using action_key package.save_checkpoint, a NEW operation_id '
         +'and the task package path in parameters.path, or continue work on other nodes. Report export and download as unconfirmed.'}
       :readSource?{tool:'dock_node_read',original_operation_id:operation.id,
       instruction:(readingOnly?'This output read was released. ':'The node is configured and executed; only reading its output stopped. ')
