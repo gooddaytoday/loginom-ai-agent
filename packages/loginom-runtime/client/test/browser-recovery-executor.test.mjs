@@ -57,6 +57,8 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
       if (!state.receipt || !code.includes('receipt_read')) throw Error('Unexpected public transport');
       const receipt = { status: 'SUCCEEDED', action_key: 'node.finish', action_revision: '1', operation_id: 'apply:finish', phase: 'verified',
         effect_possible: true, output: {}, error: null, trace: [], cleanup_complete: state.receipt.cleanup };
+      if ('operation_id' in state.receipt) receipt.operation_id = state.receipt.operation_id;
+      if ('action_key' in state.receipt) receipt.action_key = state.receipt.action_key;
       return { status: 'SUCCEEDED', action_key: 'operation.receipt', action_revision: '1', operation_id: 'apply', phase: 'observed',
         effect_possible: false, error: null, trace: [], output: { state: 'completed', receipt } };
     },
@@ -317,6 +319,18 @@ test('handoff requires the same completed and cleaned-up last receipt as the nod
     if (cleanup) assert.equal(handoff.proof.cleanup_complete, true);
   }
 });
+
+for (const identity of [{ operation_id: null }, { operation_id: 'foreign:step' }, { action_key: 'foreign.action' }]) {
+  test('handoff refuses a cleaned-up receipt with a missing or foreign identity: ' + JSON.stringify(identity), async () => {
+    const f = fixture();
+    f.state.receipt = { cleanup: true, ...identity };
+    await stopAtFinish(f);
+    await f.runtime.recover('apply', { strategy: 'abandon_operation', recoveryOperationId: 'release-1' });
+    await assert.rejects(f.runtime.browserRecoveryHandoff('apply'), /different identity/);
+    assert.equal(f.runtime.hasUnsettledWork(), true);
+    assert.throws(() => f.runtime.assertPreparationAllowed(), /pending|uncertain/);
+  });
+}
 
 test('an unknown recovery action outcome keeps Dock mutations blocked after stop', async () => {
   const f = fixture();
