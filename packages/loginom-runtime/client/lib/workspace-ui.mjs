@@ -3951,6 +3951,14 @@ function readRenderedInputMapping(observation) {
                   transientToastReads++;record('wizard_toast_wait',{attempt:transientToastReads});
                   await page.waitForTimeout(Math.min(100,timeout()));continue;
                 }
+                record('wizard_context_mismatch',{
+                  verb:task.action.verb,authenticated:!!fresh.authenticated,
+                  origin_matches:fresh.origin===current.origin,build_matches:fresh.loginom_build===current.loginom_build,
+                  workflow_matches:same(fresh.workflow_ref,current.workflow_ref),package_matches:same(fresh.package_identity,current.package_identity),
+                  active_tab_matches:fresh.active_tab_ref===current.active_tab_ref,original_tab_present:!!current.active_tab_ref,
+                  document_matches:fresh.dom_epoch?.document===current.dom_epoch?.document,original_document_present:!!current.dom_epoch?.document,
+                  dialogs_clear:fresh.ui.dialogs.length===0 || task.action.verb==='begin_wizard'&&exactDeactivation(fresh),
+                  dialog_count:fresh.ui.dialogs.length,dialogs_truncated:fresh.ui.truncated?.dialogs===true});
                 fail('WIZARD_CONTEXT_CHANGED','The original document and workspace changed while reading the wizard region');
               }
               return fresh;

@@ -2296,6 +2296,54 @@ test('prepared wizard opening retries one refused sample and preserves native ow
  }
 });
 
+test('wizard region context refusal records exact failed checks without private values or another gesture',async()=>{
+ for(const fault of ['authenticated','origin','build','workflow','package','active_tab','document','dialog']){
+  const page=new Page({clock:fixtureClock().Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
+  let path='';
+  for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий']){
+   path+=(path?'>':'')+label;
+   const crumb=page.add('a',base+'cnrNaviMode;b.s_'+path,label,undefined,panel);
+   if(label==='Сценарий')page.add('span',null,'',undefined,crumb).attrs.class='maptree-icon-workflow';
+  }
+  const graph=page.add('div',base+'ModelForm;cmpDiagram'),body=page.add('g',base+'Graph;REST','',undefined,graph);
+  page.add('span',base+'Graph;REST;Label;Label','REST',undefined,body);
+  page.add('g',base+'Graph;REST;Setting','',{x:500,y:300,width:30,height:30},graph);
+  const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_open),click=page.mouse.click;
+  page.mouse.click=async(...args)=>{
+   await click(...args);graph.remove();
+   const wizard=page.add('div',base+'WizrdMCF');page.add('button',base+'WizrdMCF;RESTRequestWizard;btnHelp','',undefined,wizard);
+   const owner=page.add('a',base+'cnrNaviMode;b.s_'+path+'>REST','REST',undefined,panel);
+   page.add('span',null,'',undefined,owner).attrs.class='bg-vendor-icon-restclient';
+   const last=page.add('a',base+'cnrNaviMode;b.s_'+path+'>REST>Настройка','Настройка',undefined,panel);
+   page.add('span',null,'',undefined,last).attrs.class='maptree-icon-wizard';
+  };
+  const evaluate=page.evaluate.bind(page);
+  page.evaluate=async(fn,arg)=>{
+   const out=await evaluate(fn,arg);
+   if(arg?.discoverRoots===false&&page.events.includes('click')){
+    if(fault==='authenticated')out.authenticated=false;
+    if(fault==='origin')out.origin='https://private.invalid';
+    if(fault==='build')out.loginom_build='private-build';
+    if(fault==='workflow')out.workflow_ref={private:'workflow'};
+    if(fault==='package')out.package_identity={name:'private-package'};
+    if(fault==='active_tab')out.active_tab_ref='private-tab';
+    if(fault==='document')out.dom_epoch.document='private-document';
+    if(fault==='dialog')out.ui.dialogs=[{text:'private-dialog'}];
+   }
+   return out;
+  };
+  const result=await page.act({verb:'open_wizard',ref:button.ref},snapshot);
+  assert.equal(result.status,'AMBIGUOUS',fault+JSON.stringify(result.error));assert.equal(result.error.code,'WIZARD_CONTEXT_CHANGED');
+  const trace=result.trace.filter(e=>e.event==='wizard_context_mismatch');assert.equal(trace.length,1,fault);
+  const key={authenticated:'authenticated',origin:'origin_matches',build:'build_matches',workflow:'workflow_matches',
+   package:'package_matches',active_tab:'active_tab_matches',document:'document_matches',dialog:'dialogs_clear'}[fault];
+  for(const check of ['authenticated','origin_matches','build_matches','workflow_matches','package_matches','active_tab_matches',
+   'original_tab_present','document_matches','original_document_present','dialogs_clear'])assert.equal(trace[0][check],check!==key,fault+'/'+check);
+  assert.equal(trace[0].dialog_count,fault==='dialog'?1:0);assert.equal(trace[0].dialogs_truncated,false);
+  assert.equal(JSON.stringify(trace).includes('private'),false);assert.equal(page.events.filter(e=>e==='click').length,1);
+ }
+});
+
 test('wizard cancellation confirms the original graph after one exact affirmative click',async()=>{
  for(const mode of ['success','wrong_question','wrong_node','still_open','bound_unlock','bound_churn','bound_relock',
   'bound_document_id','bound_workflow_id','bound_node_id','bound_tid','bound_navigation_node']) {
