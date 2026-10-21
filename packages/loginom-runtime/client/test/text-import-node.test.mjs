@@ -4,6 +4,53 @@ import {createTextImportNodeSupport,validateTextImportNodeParameters,verifyTextI
 const params=()=>({settings:{source:{source_path:'/test/data.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},format:{delimiter:';',decimal_separator:'.',null_marker:'NULL',text_qualifier:'"'},columns:[{name:'A',label:'A',type:'integer',data_kind:'Дискретный',used:true}]},source:{artifact_id:'artifact',upload_operation_id:'upload',bytes:15,sha256:'a'.repeat(64)}});
 const request=()=>({finish:'done',read:{ports:[]},mappings:[],inputs:[]});
 const uploaded=()=>({operation_id:'upload',artifact:{artifact_id:'artifact',bytes:15,sha256:'a'.repeat(64)},outcome:{operation_id:'upload',action_key:'artifact.upload',status:'SUCCEEDED',cleanup_complete:true,output:{artifact_id:'artifact',destination:'/test/data.csv',bytes:15,sha256:'a'.repeat(64),server_copy_verification:{verification_id:'verification',status:'SUCCEEDED',bytes_verified:true,upload_completion_verified:true,destination:'/test/data.csv',bytes:15,sha256:'a'.repeat(64)}}}});
+
+// Exercise the actual import driver and node procedure through the first wizard
+// gesture. Only the browser transport is replaced; no opening is dispatched.
+function importOpening({kind='new',covered=true,foreignLabel=false}={}) {
+ const node={document_id:'doc',workflow_id:'flow',node_id:'import-node'};
+ const workflow_ref={prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',workflow_id:'flow',navigation_path:[{tid:'flow',label:'Flow'}]};
+ const context={...node,verified:true,surface:'graph',locked:false,tid:'MF;TF-1;Graph;Import'};
+ const operation={id:'import',action:{action_key:'node.apply',revision:'1.0.0'},nodeApply:{request:{...request(),target:{kind},parameters:params()}}};
+ const actions=[];let pending,hidden=covered;
+ const state=()=>({origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,
+  dom_epoch:{document:'dom',revision:1},scan:{complete:true},prepared_node_context:context,wizard:{status:'absent'},
+  graph_identity:{status:'observed',container_ref:'ui-graph'},
+  ui:{masks:[],dialogs:[],truncated:{elements:false,masks:false,dialogs:false},elements:[
+   {ref:'ui-body',tid:context.tid,graph_node:{part:'body'},allowed_actions:['click'],interaction:{state:hidden?'point_not_observed':'point_observed'}},
+   {ref:'ui-label',tid:(foreignLabel?'Other':context.tid)+';Label;Label',graph_node:{part:'label'},allowed_actions:['click'],interaction:{state:'point_observed'}},
+   {ref:'ui-settings',tid:context.tid+';Setting',wizard_open:{node:{node_label:'Import'},workflow_path:[{tid:'flow',label:'Flow'}]},allowed_actions:['open_wizard','begin_wizard']}
+  ]}});
+ const driver=createTextImportNodeSupport({targetOrigin:'http://example.test',targetBuild:'7.4.2'}).nodeApplyDriverFactory({operation,now:()=>1,
+  receiptOptions:()=>({}),onRecord:async entry=>{
+   if(entry.phase==='node_step_prepared'){
+    actions.push(entry.action);
+    if(['open_wizard','begin_wizard'].includes(entry.action.verb))throw Error('wizard opening reached');
+    pending=entry;
+   }
+   return structuredClone(entry);
+  },execute:async()=>{
+   if(!pending)return {status:'SUCCEEDED',output:state()};
+   const entry=pending;pending=null;
+   if(entry.action.ref==='ui-body'&&hidden)return {status:'NOT_APPLIED',action_key:'ui.act',operation_id:entry.internal_operation_id,
+    phase:'preconditions',effect_possible:false,cleanup_complete:true,error:{code:'UI_REFERENCE_OBSCURED'},trace:[]};
+   assert.ok(['ui-label','ui-body'].includes(entry.action.ref),'selection must not click Launch or Setting');
+   if(entry.action.ref==='ui-label')hidden=false;
+   return {status:'SUCCEEDED',action_key:'ui.act',operation_id:entry.internal_operation_id,effect_possible:true,cleanup_complete:true,output:state()};
+  }});
+ return {actions,run:()=>driver.openWizard({document_id:'doc',workflow_ref,node,deadline:600001})};
+}
+for(const kind of ['new','existing'])test('import selects its visible label before opening a hover-covered '+kind+' node',async()=>{
+ const f=importOpening({kind});
+ await assert.rejects(f.run(),/wizard opening reached/);
+ assert.deepEqual(f.actions.map(a=>[a.verb,a.ref]),[['click','ui-label'],['click','ui-body'],[kind==='new'?'open_wizard':'begin_wizard','ui-settings']]);
+});
+test('import keeps ordinary body selection and refuses a foreign label',async()=>{
+ const ordinary=importOpening({covered:false});await assert.rejects(ordinary.run(),/wizard opening reached/);
+ assert.deepEqual(ordinary.actions.map(a=>a.ref),['ui-body','ui-settings']);
+ const foreign=importOpening({foreignLabel:true});await assert.rejects(foreign.run(),/no observed selection point|did not confirm completion/);
+ assert.ok(!foreign.actions.some(a=>['open_wizard','begin_wizard'].includes(a.verb)));
+});
 test('new import missing columns identifies the corrective parameter; existing patches remain allowed',()=>{
  const p=params();delete p.settings.columns;
  assert.throws(()=>validateTextImportNodeParameters(p,'delimited',request()),/Invalid parameters.parameters.settings.columns:/);
