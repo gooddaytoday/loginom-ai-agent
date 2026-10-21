@@ -1,313 +1,224 @@
-# Локальные файлы по путям — Implementation Plan
+# Локальные файлы по путям — Implementation Plan #74
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** выполнять задачи по очереди с TDD и независимым ревью; шаги отмечать `- [ ]`. Задача 1 может идти параллельно задаче 2, но задача 3 зависит от её результата.
 
-**Goal:** Выполнить #74: Desktop и standalone CLI используют несколько локальных файлов из prompt без обязательных вложений; локальный `.lgp` обрабатывается по намерению пользователя.
+**Goal:** Реализовать согласованное поведение #74.
+**Spec:** [Канонический дизайн](../specs/2026-10-21-local-file-paths-design.md). Правила доступа, ошибок, identity, сохранения и размещения кейсов определены там; план их не переопределяет.
+**Architecture:** существующие backend tools → private Host admission → runtime upload/open; существующие eval harness и skills-acceptance.
+**Tech Stack:** TypeScript/Effect/Bun, pinned Node/Playwright, Python stdlib для oracle; новые runtime dependencies не предполагаются.
 
-**Architecture:** Backend проверяет пути и снимает ограниченный бинарный snapshot; host/runtime переиспользуют существующие admission, artifact store и upload. Для локального пакета backend расширяет prepare, а private runtime route загружает и открывает пакет без контрольного скачивания. Проверки переиспользуют eval harness и real-model skills-acceptance.
+## Порядок и оценка
 
-**Tech Stack:** TypeScript, Effect, Bun; существующий Node/Playwright runtime; Python stdlib для независимых oracle. Новые runtime dependencies не нужны.
+База проверки кода — `72bfb4e45`. Эта ревизия изменяет только дизайн и план; все команды ниже относятся к будущей реализации. Применять owning AGENTS и [TDD](/home/kiselev/.agents/skills/tdd/SKILL.md), не запрашивая заново согласованные решения. Область поведения и ограничения — в [дизайне](../specs/2026-10-21-local-file-paths-design.md#результат-и-границы).
 
-**Spec:** [Согласованный дизайн](../specs/2026-10-21-local-file-paths-design.md). Это каноническое описание поведения; данный файл задаёт последовательность выполнения.
+Порядок: **1 ∥ 2 → ранний CLI smoke в конце 2 → 3 → 4 → 5/6 → 7 → 8**. Задача 3 ждёт результат пробы 1; данные не должны ждать всей инфраструктуры evals. Установленный candidate собирается после изменений runtime/guidance/harness, до подготовки эталонов; ранний source smoke использует dev bundle по standalone runbook.
 
-## Global Constraints
+Оценка — ориентир будущего implementation diff от этой редакции, не измерение выполненной работы. Включены код, тесты, corpus, текстовые fixtures и документация; бинарные `.lgp` считаются файлами, без выдуманного числа строк. «Впервые» позволяет не суммировать один файл повторно. Строки — добавления/удаления за этап, как в `git diff --stat`.
 
-- Лимит новой загрузки — **16 MiB на файл**; прежний default attachment snapshot — **10 MiB**.
-- Один вызов регистрации принимает один файл. Несколько путей в одном prompt обрабатываются отдельными вызовами. Одинаковые basename в разных каталогах допустимы.
-- Относительный путь разрешается от каталога текущей сессии; абсолютный — нативными средствами текущей ОС. Не применять URL decode и shell expansion.
-- Локальный `.lgp` для изменения — `loginom-automation`; документация — `package-docs`, без новой browser/upload операции.
-- Новый маршрут локального `.lgp` не делает контрольного скачивания и не заявляет независимый SHA серверной копии.
-- Automatic `.lgp` attachment exclusion, explicit deny, cancellation/recovery, обычная data-delivery verification и старые attachments сохраняются.
-- Настоящие model cases и fixtures — в `evals/`; нет нового launcher, универсального judge, classifier/router или постоянного файлового registry.
-- Временные файлы, attempts и profiles — `/home/kiselev/storage/tmp/`; не менять `HOME`/`CODEX_HOME` и не выводить секреты.
-- Реализация — TDD по `/home/kiselev/.agents/skills/tdd/SKILL.md`: один RED → минимум GREEN → REFACTOR, затем следующий риск. Документация не требует TDD.
-- Тесты и `bun typecheck` запускать из owning package; runtime — pinned Node из candidate resources. Не запускать тесты из repo root и `tsc` напрямую.
-- База `loginom@72bfb4e45`; текущая planning-ветка `local-file-paths`. Не менять чужой checkout. Public Protocol/HTTP API не расширяется; generated SDK не редактируется.
+| Задача | Затронуто файлов / впервые | Добавлено строк | Удалено строк |
+| --- | ---: | ---: | ---: |
+| 1. Проба `.lgp`, измерения и report | 1 / 1 | 40 | 0 |
+| 2. Авторизация, snapshot, registration, имена, ранний smoke | 13 / 13 | 330 | 95 |
+| 3. Private package prepare и его проверки | 20 / 18 | 430 | 100 |
+| 4. Инструкции и профильные границы | 7 / 4 | 75 | 60 |
+| 5. Paths-mode scenario harness | 7 / 7 | 85 | 30 |
+| 6. Existing routing corpus и adapters | 10 / 10 | 200 | 35 |
+| 7. Два reference cases и fixtures | 21 / 20, включая 4 бинарных | 360 | 5 |
+| 8. Итоговая проверка, reports/checkpoints | 5 / 2 | 60 | 10 |
+| **Итого, без двойного счёта файлов** | **около 75, включая 4 бинарных** | **1580** | **335** |
 
-## Карта изменений
+Это около **1915 изменённых текстовых строк**. В задаче 3 учтён резерв на согласованное изменение timeout и его test, только если измерения его потребуют. Копии пяти scripts skill и соседних settings в task temp не входят в git diff; отдельно оценить их адаптацию примерно в **+65/−30 строк**, без изменения установленного skill. Число/размер бинарных fixtures уточнить по фактическим пакетам; повторно использовать исходный пакет там, где возможно.
 
-| Область | Файлы и ответственность |
-| --- | --- |
-| Snapshot/policy | `packages/agent/src/util/file-snapshot.ts`; новый `src/tool/loginom-local-file.ts` — разрешённый локальный источник для двух backend-входов |
-| Model-facing tools | `packages/agent/src/session/tools.ts` — `loginom_file_admit`, schema и interception `loginom_dock_prepare`; `src/tool/package-docs.ts` — точный отказ без обязательного attachment |
-| Private transport | `packages/loginom-host/src/adapter.ts`, `host-port.ts`, `inputs.ts` — байты, отдельная admission identity, descriptor; host не читает произвольный OS path |
-| Runtime | `packages/loginom-runtime/src/managed-entry.mjs`; `client/lib/bridge.mjs`, `workspace.mjs`, `storage-policy.mjs`, `artifact-delivery.mjs`, `executor.mjs` — private package prepare, binding, upload finish и open |
-| Guidance | `packages/product/skills/loginom-automation/{SKILL.md,references/workflow.md}`, `skills/package-docs/SKILL.md`, `packages/agent/src/session/prompt.ts`, owning AGENTS |
-| Scenario evals | `evals/src/{task,run,cli,sandbox}.ts`; tests; два каталога `evals/tasks/local-path-scenarios/` |
-| Routing/e2e | `packages/loginom-host/script/skills-acceptance.ts`, `skills-acceptance/{run,desktop,turns,scenario-import}.mjs`; `evals/cases/local-file-routing/` |
-| Evidence/docs | `evals/README.md`, `docs/testing/loginom-ai-agent/local-file-paths.md`; поправка контракта inputs в `docs/superpowers/specs/2026-09-18-evals-design.md` со ссылкой на новый дизайн |
+После каждой задачи сравнивать фактический diff с оценкой, включая тесты/docs. Если число файлов либо сумма добавленных/удалённых строк превысили оценку задачи или общего diff **вдвое**, остановить наращивание соответствующего механизма, проверить более простой путь и представить владельцу фактический объём, причину и варианты с ценой. Для общего текста сигнал — более **3830 строк**, для файлов — более **150**; это сигнал пересмотра, не допустимый плановый расход. Не расширять оценку задним числом, чтобы скрыть превышение.
 
-## Задача 1. Проверить native upload до проектирования вокруг него
+## Задача 1. Доказать native completion и измерить маршрут `.lgp`
 
-**Files:** существующие `packages/loginom-runtime/client/lib/{executor,workspace,text-export-output}.mjs` для чтения; новый `docs/testing/loginom-ai-agent/local-file-paths.md` для компактного evidence. Product code на этом шаге не менять.
+**Files:** читать runtime `client/lib/{executor,workspace,workspace-ui,bridge,storage-policy}.mjs` и `src/call-timeout.mjs`; evidence — `docs/testing/loginom-ai-agent/local-file-paths.md`. На этапе пробы product code не менять.
+**Результат:** наблюдаемые predicates, длительности и решение о реализуемости [private маршрута](../specs/2026-10-21-local-file-paths-design.md#подготовка-локального-пакета).
 
-**Consumes:** существующая authenticated session, regular `.lgp` fixture, выделенный Loginom, разрешённый каталог `/<username>`.
-**Produces:** наблюдаемый способ подтвердить завершение upload и точную file row без download; имя/размер/owner и opened package identity, либо конкретно записанная неподтверждённая предпосылка.
+- [ ] На выделенном стенде с pinned runtime выбрать проверенный `.lgp`, зафиксировать локальные size/SHA. В одной authenticated session пройти home → upload → native completion/точная file row → open. Модель для технической пробы не нужна.
+- [ ] Переиспользовать уже возвращаемые `storageEntry.bytes`/`bytes_source: native_file_store` из `workspace-ui.mjs:2959–2981`. Не создавать parser UI-размера. Зафиксировать owner/path/name/type/size, отсутствие download и повторного upload.
+- [ ] Измерить отдельно binding/«Файлы», upload, ожидание строки, open/geometry и суммарное время. Сопоставить с текущими 105 с runtime, около 120 с Host и минимумом 180 с adapter. Upload имеет внутренний timeout 35 с, open — до 125 с; успех отдельных стадий не означает, что общий вызов дождётся их.
+- [ ] Повторить при уже подготовленном workspace A: следующим запросом открыть локальный B. Проверить новый `operation_id`, правильную квитанцию B, переход `workspaceReady` и отсутствие изменения чужих workflow. Отдельно проверить conflict `reject` и неудачный/задержанный upload.
+- [ ] **Точка решения:** если read-only observation не подтверждает completion, остановиться. Представить владельцу две альтернативы: контрольное скачивание через существующую verification либо draft + существующая delivery. Для каждой оценить файлы/строки, дополнительное время/трафик, сохранение проверок и workspace effects. Не продолжать строить новую verification систему и не подменять uncertain на success.
+- [ ] Если completion доказан, записать достаточные predicates и измерения; при риске deadline сформулировать согласованное изменение бюджета для задачи 3. Проба не подтверждает новый API или installed acceptance.
 
-- [ ] Установить точный candidate/runtime pin и отдельное окружение по runtime AGENTS и installed runbook. Выбрать существующий проверенный `.lgp`, снять локальные size/SHA. Достаточно fixture; модель для этого технического опыта не нужна.
-- [ ] Через разрешённые native UI действия в одной authenticated session загрузить пакет из home без создания draft. Наблюдать sender, каталог, свежую строку файла и size; открыть именно этот файл. Не вызывать hidden RPC и не создавать второй browser/CDP context.
-- [ ] Зафиксировать отсутствие download и второй отправки. Проверить конфликт с `overwrite: reject` и upload failure/задержку: неизвестный исход не должен открывать старый одноимённый пакет. Если размер в UI округлён, использовать доступное точное native observation, а не сравнивать строку вроде «16 KB» с числом байтов.
-- [ ] Записать наблюдаемые predicates и ограничения в report. При отсутствии достаточного сигнала уточнить read-only observation; не превращать `UPLOAD_SERVER_VERIFICATION_REQUIRED` в успех. Сначала закрыть этот риск, затем выполнять runtime часть задачи 3.
+## Задача 2. Общая авторизация, snapshot и `loginom_file_admit`
 
-## Задача 2. Разрешённый snapshot и регистрация одного файла
-
-**Files:** modify `packages/agent/src/util/file-snapshot.ts`, `src/session/tools.ts`; create `src/tool/loginom-local-file.ts`, `test/tool/loginom-local-file.test.ts`; modify `test/util/file-snapshot.test.ts`, `test/session/{tools,profile-tools}.test.ts`. Host: `src/{adapter,host-port,inputs}.ts`, `test/{inputs,task-scope,host-port}.test.ts`.
+**Files:** agent `src/util/file-snapshot.ts`, новый `src/tool/loginom-local-file.ts`, `src/tool/package-docs.ts`, `src/session/tools.ts`; tests `test/util/file-snapshot.test.ts`, новый `test/tool/loginom-local-file.test.ts`, `test/tool/package-docs.test.ts`, `test/session/{tools,profile-tools}.test.ts`. Host `src/inputs.ts`, `test/inputs.test.ts`. Минимальные инструкции данных — product `skills/loginom-automation/{SKILL.md,references/workflow.md}`. `adapter.admit` и ранний `[]` Host не менять.
 
 **Interfaces:**
 
 ```ts
-// Новый параметр сохраняет существующие callers без изменений.
 fileSnapshot(path: string, maxBytes = 10 * 1024 * 1024): Promise<Buffer>
-
-// Новый helper — Effect в стиле существующих tools, без отдельного service/layer.
+// В существующем Effect стиле, без отдельного service/layer:
+authorizeLoginomFile(path: string, ctx: Tool.Context)
+// -> { sourcePath: string, canonicalPath: string }
 snapshotLoginomFile(path: string, ctx: Tool.Context)
-// Результат: { sourcePath: string, file: InputFile }
-// InputFile — существующий { name: string, data: string /* base64 */ }.
-
-// Публичный backend tool, только automation + уже подготовленный runtime.
+// -> { sourcePath: string, file: InputFile }; использует authorizeLoginomFile.
+// InputFile — прежний { name: string, data: string /* base64 */ }.
 loginom_file_admit({ path: string })
-// Результат: { source_path: string, artifact: существующий runtime descriptor }.
-
-// Существующий private adapter; admissionID — отдельная строка identity,
-// а не новая пользовательская реплика и не исходная attachment-группа.
-run.admit(admissionID, [source.file])
+// -> { source_path: string, artifact: существующий runtime descriptor }
 ```
 
-- [ ] **RED:** добавить один тест явного 16 MiB, оставив default 10 MiB. Полный тест использует настоящий файл и существующий `fileSnapshot`:
+- [ ] **RED:** добавить только тест явного предела snapshot. `mkdtemp`, `open`, `rm`, `join` и `tmpdir` уже импортированы в существующем тестовом файле; никаких machine-specific путей. Default 10 MiB, binary fidelity, special file и directory уже покрыты, их тест не дублировать:
 
 ```ts
-test("explicit 16 MiB snapshot preserves bytes without changing attachment default", async () => {
-  const root = await mkdtemp("/home/kiselev/storage/tmp/loginom-snapshot-")
+test("snapshot accepts the explicit 16 MiB boundary and rejects a larger file", async () => {
+  const root = await mkdtemp(join(tmpdir(), "loginom-file-snapshot-"))
   try {
-    const input = join(root, "данные #1%.bin")
-    const bytes = Buffer.alloc(16 * 1024 * 1024, 0xa5)
-    await writeFile(input, bytes)
-    expect(await fileSnapshot(input, 16 * 1024 * 1024)).toEqual(bytes)
-    await expect(fileSnapshot(input)).rejects.toThrow("10 MiB")
-    await writeFile(input, Buffer.alloc(bytes.length + 1))
-    await expect(fileSnapshot(input, bytes.length)).rejects.toThrow("16 MiB")
+    const input = join(root, "large.bin")
+    const limit = 16 * 1024 * 1024
+    const handle = await open(input, "w")
+    try {
+      await handle.truncate(limit)
+      expect((await fileSnapshot(input, limit)).length).toBe(limit)
+      await handle.truncate(limit + 1)
+      await expect(fileSnapshot(input, limit)).rejects.toThrow("16 MiB")
+    } finally {
+      await handle.close()
+    }
   } finally {
     await rm(root, { recursive: true, force: true })
   }
 })
 ```
 
-- [ ] Запустить из `packages/agent`: `bun test test/util/file-snapshot.test.ts`. Убедиться, что новый тест падает из-за прежнего предела/сигнатуры, а не окружения. **GREEN:** параметризовать предел и сообщение, сохранить handle/fstat/O_NONBLOCK/final-stat/finally. Не заменять на неограниченный `readFile`.
-- [ ] Следующим RED циклом проверить helper на реальном session/permission service из `test/tool/package-docs.test.ts`: внутренний относительный путь; внешний `данные #1%.csv`; symlink в запрещённый каталог; deny при прежнем allow-always; missing/directory/special/oversized. В каждом отказе snapshot/admission не состоялись. Реальные filesystem fixtures создаются под task temp, не через `globalThis` mock.
-- [ ] **GREEN:** реализовать helper после hooks: session directory → requested/canonical → policy → bounded snapshot. До `ctx.ask` проверять `Permission.evaluate(..., mergedRules).action === "deny"` для обоих путей и permissions. Typed `DeniedError` должен попадать в тот же permissionDenied marker, что нынешний `ctx.ask`; не возвращать обычную «успешную» строку ошибки. Не менять весь permission engine.
-- [ ] Следующий RED цикл в session tools/Host tests: два одинаковых basename с разными bytes в одной сессии должны возвращать два descriptor и source mappings; отказ второго не стирает первый. Registration в docs/default и до prepare отказывает до inputs/runtime. Добавить replay exact identity и конфликт изменённых bytes. Backend-схема:
+- [ ] Из `packages/agent` запустить `bun test test/util/file-snapshot.test.ts`, увидеть отказ нового поведения. **GREEN:** параметризовать предел/сообщение, сохранив bounded handle/fstat/O_NONBLOCK/final-stat/finally. При локальном запуске TMPDIR можно направить в task temp; переносимый тест использует системный tmpdir.
+- [ ] Следующий RED цикл: перенести, а не скопировать, авторизацию original user attachments из `package-docs.ts` в общий helper. Тесты проверяют attached внешний `.lgp` без ask в неинтерактивном CLI и отказ при explicit deny; дополнительно invisible/reverted/replay part, query/fragment и несовпадающий realpath не дают разрешения. Сохранить исходные tests с `--file` hint без изменения ожиданий.
+- [ ] **GREEN:** реализовать [каноническую авторизацию](../specs/2026-10-21-local-file-paths-design.md#общая-авторизация-локального-пути), подключить `package_docs_run` к ней; snapshot читать по `canonicalPath`. Precheck deny должен предшествовать attachment/allow-always и сохранять typed marker. Общее `Permission.ask` и обычный Read не переписывать.
+- [ ] Следующий RED цикл проверяет текст tool error для missing path, directory, OS EACCES и access refusal по [каноническому правилу ошибок](../specs/2026-10-21-local-file-paths-design.md#ошибки). Отдельный случай: requested path запрещён настройками и недоступен ОС — сохраняется policy deny. Проверить также отсутствие admission. Дополнить существующие сообщения причиной/путём, не удалять `--file` и не ослаблять exit/permissionDenied assertions.
+- [ ] Следующий RED цикл: один binary source, два разных файла с одним basename, ошибка второго, новый вызов после изменения файла. Отдельно одинаковый `callID` в **двух сообщениях ассистента** не конфликтует. **GREEN:** backend source identity и вызов существующего adapter:
 
 ```ts
-const localFileParameters = Schema.Struct({ path: Schema.String })
-// admission identity создаёт backend, не модель:
-const admissionID = JSON.stringify(["local-file", task.taskMessageID, options.toolCallId])
-// При возврате использовать source.sourcePath, никогда private snapshot sourcePath.
+const admissionID = JSON.stringify(["local-file", ctx.messageID, ctx.callID])
+const source = yield* snapshotLoginomFile(args.path, ctx)
+// В async boundary существующего resolver:
+const descriptors = await loginom.admit(admissionID, [source.file])
 ```
 
-- [ ] **GREEN:** добавить tool в automation resolver, использовать существующие hook/permission/truncation/error правила. Host standalone `admit` должен возвращать cached runtime descriptor и при точном повторе: убрать ранний пустой `[]` в этой ветке и доверить caching существующему managed admission. Inline attachment admission в `call` остаётся прежним. Новая карта descriptors не нужна.
-- [ ] Проверить настоящие private snapshot bytes и immutable group; сделать безопасным только имя server copy с сохранением расширения, используя существующий identity prefix. Добавить негативный `.lgp` тест для обычной регистрации. Формат generic source не проверять CSV whitelist; delivery возвращает свой конкретный unsupported-format отказ.
-- [ ] **REFACTOR/verify:** переиспользовать существующие helpers, удалить лишние wrappers. Из `packages/agent` выполнить `bun test test/util/file-snapshot.test.ts test/tool/loginom-local-file.test.ts test/session/tools.test.ts test/session/profile-tools.test.ts` и `bun typecheck`. Из `packages/loginom-host` — `bun test test/inputs.test.ts test/host-port.test.ts test/task-scope.test.ts` с `LOGINOM_AI_AGENT_TEST_NODE`, затем `bun typecheck`. Коммит только owning files: `feat(agent): admit permitted local files`.
+Tool внедряется только в automation с уже подготовленным runtime, применяет обычные hooks/permissions/error serialization. Не тестировать двойное исполнение одного tool call и не менять Host caching. Обычный `.lgp` admission остаётся запрещён.
 
-## Задача 3. Private подготовка локального `.lgp` без скачивания
+- [ ] Следующий RED в `inputs.test.ts`: имена `Скидка 10%.csv`, `План #2.lgp`, `a:b?.xlsx` сохраняют расширение/bytes и дают допустимые copy names; покрыть controls/конечную точку или пробел. **GREEN:** нормализовать в единственной точке `inputs.ts` по [дизайну](../specs/2026-10-21-local-file-paths-design.md#регистрация-identity-и-имя-копии); согласовать ранний controls check в этом же файле. Не добавлять sanitizers в runtime/import/open.
+- [ ] Внести только необходимые инструкции для файлов данных: prepare → регистрация каждого пути → доставка descriptors → импорт подтверждённых destinations; повторная подготовка требует новой регистрации. Завершить TDD циклы, выполнить связанные agent/host tests и package typecheck. Host tests используют pinned `LOGINOM_AI_AGENT_TEST_NODE`; не трогать ранний `[]` ради ответа descriptor.
+- [ ] **Сразу ранний главный путь:** по [standalone runbook](../../testing/loginom-ai-agent/standalone-cli.md) выполнить один CLI сценарий с двумя внешними CSV в каталогах с пробелами/кириллицей. Проверить обе регистрации, upload/import и независимый результат; отдельно missing path и текст ошибки. Dev bundle допустим. Сохранить source SHA, bytes/results/ошибку/cleanup в report, явно обозначить **source smoke**, а не installed acceptance. Не откладывать до задач 5–8.
 
-**Files:** agent `src/session/tools.ts`, `test/session/tools.test.ts`; host `src/{adapter,host-port}.ts`, `test/{host-port,task-scope}.test.ts`; runtime `src/managed-entry.mjs`, `client/lib/{bridge,workspace,storage-policy,artifact-delivery,executor}.mjs`. Tests: `client/test/{user-profile-bridge,workspace,storage-policy,artifact-upload,artifact-delivery}.test.mjs`, `test/support/user-profile-bridge.mjs`.
+## Задача 3. Private local package prepare
 
-**Consumes:** `snapshotLoginomFile`, подтверждение native completion из задачи 1, существующие artifact/grant/operation IDs.
-**Produces:** `loginom_dock_prepare({intent:"open_package",local_package_path})` с подтверждённым upload/open, без public runtime OS-path API.
+**Files:** agent `src/session/tools.ts`, `test/session/tools.test.ts`; host `src/{adapter,host-port}.ts`, `test/{host-port,task-scope}.test.ts`; runtime `src/managed-entry.mjs`, `client/lib/{bridge,workspace,storage-policy,artifact-delivery,executor}.mjs`; tests `client/test/{user-profile-bridge,workspace,storage-policy,artifact-upload,artifact-delivery}.test.mjs`, support fixture. При необходимости бюджета — `src/call-timeout.mjs`, `test/call-timeout.test.mjs`.
+**Depends:** successful probe 1 и helper 2. **Produces:** backend local path → private package bytes → artifact/grant → confirmed upload/open.
 
 ```ts
-// Последний необязательный аргумент private adapter.call:
+// Последний optional аргумент private adapter.call:
 packageInput?: { admissionID: string; file: InputFile }
-
-// Только private host -> managed-entry message.input:
+// Private host -> managed-entry, вне публичных MCP arguments:
 packageArtifact?: { artifactID: string; uploadGrantID: string }
-
-// Новый private метод результата createBridge:
+// Private метод результата createBridge, общая prepare-ветка с публичным вызовом:
 prepareLocalPackage(args, { artifactID, uploadGrantID }, { signal })
-// Возвращает существующий CallToolResult; MCP handler остаётся прежним.
 ```
 
-- [ ] **RED:** расширить существующую Loginom fixture в `test/session/tools.test.ts`, захватывающую `loginom.call`: local path виден только в backend prepare schema; mutually exclusive с `package_path/workflow_ref`; не подходит другим intent; private `packageInput.file` равен исходным bytes. В `args`, дошедших до Host/runtime, нет local OS path/base64. Исходный attachment `.lgp` по-прежнему не попадает в admissions.
-- [ ] **GREEN:** расширить только модельную schema в backend (`session/tools.ts`, где уже скрывается `host_context_token`), применить helper после hook и убрать `local_package_path` из forwarded args. Сохранить существующий server `package_path` без изменения. Runtime `prepareTool` в `skill.mjs` не получает local-path поле.
-- [ ] Следующий RED в Host: docs/default, неправильный method/intent, два файла, не `.lgp`, совмещённые источники отказывают до startup/inputs. Повтор package admission возвращает тот же descriptor. **GREEN:** допустимый private package source записывается через `service.inputs`, затем существующий runtime `admit`; ровно один descriptor превращается в artifact/grant pair. Не менять ordinary `.lgp` admission deny и правило «runtime стартует только из prepare».
-- [ ] Следующий RED в bridge fixture: sequence bind → verified upload → package finish → open exact receipt destination; workspaceReady остаётся false до успешного open. Отсутствуют create-draft и download. Поддельное `packageArtifact` в обычных MCP arguments не даёт полномочий.
-- [ ] **GREEN:** выделить текущую prepare-ветку в общую локальную функцию для двух реальных входов — public prepare и private `prepareLocalPackage`. Managed entry dispatch вызывает private метод с прежним AbortController и возвращает прежний `{result,recoveryPending,activeWork}`. Scope/startup/cleanup не обходятся.
-- [ ] Следующий RED в upload/delivery tests: прежний `AMBIGUOUS` receipt не является завершением; missing row, неверные size/name/owner, conflict, unknown gesture, journal write failure и cancellation не разрешают open или очистку pending как успешного. **GREEN:** private package finish проверяет predicates задачи 1, записывает package-specific completion и освобождает lease. `source_sha256` обозначает исходные bytes; не создавать `server_copy_verification`.
-- [ ] Добавить следующий тест: upload подтверждён, open failed → разрешённое продолжение использует тот же destination и не выполняет второй `setInputFiles`. После unknown исхода действует существующий recovery, не автоматический replay. Отдельно прежний data-delivery тест должен по-прежнему требовать download/readback.
-- [ ] **REFACTOR/verify:** из `packages/loginom-runtime/client` запускать pinned Node: `"$LOGINOM_AI_AGENT_TEST_NODE" --test test/user-profile-bridge.test.mjs test/workspace.test.mjs test/storage-policy.test.mjs test/artifact-upload.test.mjs test/artifact-delivery.test.mjs`. Повторить связанные agent/host tests и package typecheck. `source-map.json` неизменяем; требуемую фиксацию локальных runtime transforms выполнить по runtime AGENTS. Коммит: `feat(runtime): open uploaded local packages`.
+- [ ] **RED → GREEN:** backend prepare schema/validation согласно дизайну. После hook вызвать общий snapshot helper, убрать local OS path из forwarded args, передать `packageInput`. Тесты attached external package/no ask/explicit deny идут через этот реальный вход, а не только helper. Runtime MCP schema local path не получает.
+- [ ] Следующий цикл: Host отказывает wrong scope/method/intent/format/двум источникам до startup/inputs; допустимый package source проходит существующие `service.inputs` и runtime admission, private call получает ровно один artifact/grant pair. Ordinary `.lgp` attachment deny не ослабляется. Повтор по той же identity не добавлять как требование.
+- [ ] Следующий цикл: bridge reuse prepare-function и реальный binding до workspace; upload finish использует predicates пробы 1 и existing FileStore size. Тесты missing/wrong row, owner/conflict/unknown/cancel и обязательного journal/cleanup не разрешают success/open. Не смешивать вспомогательный report failure с утратой уже проверенного результата.
+- [ ] Отдельный тест: workspace A уже готов, следующий запрос открывает B с новым `operation_id`; старое READY/receipt не подходит, foreign-workflow checks сохраняются. Новый READY появляется только после фактического B. Private source нельзя подделать публичным MCP input.
+- [ ] Отдельный тест: upload succeeded, open failed → error + `next_step` на существующий `dock_prepare` с `package_path` из receipt. Следующий **server-path** вызов открывает без upload; новый **local-path** вызов заново читает/загружает. Не заводить retry state. Unknown upload не возвращает подсказку открыть неподтверждённый путь.
+- [ ] По измерениям задачи 1 проверить весь маршрут в едином deadline. Если текущего бюджета недостаточно, согласованно расширить runtime/MCP call timeout, Host IPC и adapter/outer ожидания; покрыть границы и cancel/cleanup тестом. Только увеличение adapter недопустимо. Проверить absence `LOGINOM_CALL_UNCERTAIN` из-за рассогласования тайм-аутов.
+- [ ] Выполнить названные runtime tests pinned Node из `packages/loginom-runtime/client`, связанные agent/host tests и package typechecks. Обычная data delivery должна по-прежнему требовать server-copy verification. Проверить необходимые runtime attribution transforms по owning AGENTS, не менять immutable source-map.
 
-## Задача 4. Инструкции и границы выбора skill
+## Задача 4. Skill instructions и профильные границы
 
-**Files:** product skills из карты; agent `src/session/{prompt,tools}.ts`, `src/tool/package-docs.ts`; tests `test/session/{tools,profile-tools}.test.ts`, `test/tool/package-docs.test.ts`, `test/cli/{package-docs-pipeline,package-docs-permissions}.test.ts`; `packages/{agent,loginom-host}/AGENTS.md`.
+**Files:** product `skills/loginom-automation/{SKILL.md,references/workflow.md}`, `skills/package-docs/SKILL.md`; agent `src/session/prompt.ts`, `test/session/profile-tools.test.ts`; owning `packages/{agent,loginom-host}/AGENTS.md`.
+**Результат:** инструкции отражают [выбор и сохранение](../specs/2026-10-21-local-file-paths-design.md#skill-выбор-задачи-и-сохранение), без нового алгоритма маршрутизации.
 
-**Consumes:** два новых backend-входа. **Produces:** natural prompt выбирает нужный skill; backend разрешает только профильные возможности.
+- [ ] Дополнить automation-инструкции выбором local package, сохранением собственной загруженной copy по умолчанию, ограниченным `replace` и сообщением server path/local unchanged; явный output path следует прежним правилам. Сохранить действующее отсутствие автоматического скачивания для docs. Код сохранения не добавлять.
+- [ ] Объяснить, что прежние artifact IDs после повторной подготовки runtime не действуют и файлы надо регистрировать заново. Для docs использовать общий authorization helper из задачи 2; не возвращать attachment-only ограничение для разрешённых путей.
+- [ ] В instructions/errors **дополнить** отказ причиной/путём, сохранив alternative hint и его исключение при configured deny. Existing unit/CLI assertions с `--file` и corpus expectation не менять. Исправить только устаревшие attachment-only формулировки owning AGENTS.
+- [ ] TDD для меняемого bootstrap/profile поведения: actual invocation registration/prepare запрещена в docs/default, custom origin не подменяет builtin, новый настоящий user turn начинает default. Наличие tool в catalog само по себе не доказательство исполнения. Выполнить связанный profile/package-docs regression, включая текущий CLI permission test.
 
-- [ ] **RED:** проверить actual invocation registration/prepare в docs/default, custom origin с тем же ID и новый user turn после docs. В session history остаётся text-only prompt; переход profile применяется только обычным trusted skill механизмом. Не ограничиваться проверкой списка tool names.
-- [ ] **GREEN:** подключить tool только к automation и сохранить HostTaskScope guards. Не создавать intent classifier. Инструкции должны прямо содержать последовательности:
+## Задача 5. Paths-mode внутри attempt workspace
 
-```text
-Изменить локальный .lgp: loginom-automation → loginom_dock_prepare
-  intent=open_package, local_package_path=<путь> → изменить → сохранить.
-Документация: package-docs → package_docs_run по локальному пути → документ.
-Файлы данных: подготовить workspace → loginom_file_admit для каждого пути
-  → доставить returned artifacts → использовать подтверждённые destinations.
-Обычное чтение текста: Read; запуск Loginom не требуется.
-```
+**Files:** `evals/src/{task,run}.ts`, `evals/test/{task,run}.test.ts`, `evals/{README,AGENTS}.md`, amendment inputs в `docs/superpowers/specs/2026-09-18-evals-design.md` со ссылкой на канонический дизайн #74. `cli.ts`, `profile.ts`, `sandbox.ts` для этой функции не менять.
+**Interface:** `task.json: input_mode?: "attachment" | "paths"`; runtime Task хранит paths marker только для нового режима. Полный контракт — [раздел evals](../specs/2026-10-21-local-file-paths-design.md#только-два-сценарных-eval-в-evals).
 
-- [ ] Проверить targeted regression `package_docs_run`: native path без attachment разрешается обычной политикой, explicit deny (включая прошлое allow-always) сохраняет отказ. Если существующая ветка `ctx.ask` теряет deny, применить такой же локальный precheck typed error здесь, не менять общее разрешение чтения/предел размера документации. Заменить ошибку «прикрепите/передайте --file» на причину отказа и путь; обновить только связанные assertions.
-- [ ] Обновить attachment-only AGENTS формулировки: model path сам по себе не разрешение, но разрешённый backend snapshot — законный второй источник bytes. Указать relative base, 16 MiB, mapping нескольких источников, operation-specific формат и честный partial failure. Сохранить `.lgp` automatic exclusion.
-- [ ] Запустить названные agent tests с pinned Node для package-docs и `bun typecheck`; host `bun test test/task-scope.test.ts test/bundled-skills.test.ts`. Коммит: `feat(skills): route local packages by user intent`.
+- [ ] **RED:** copy existing task fixture с `left/sales.csv`/`right/sales.csv`: paths-mode принимает оба, прежний attachment case отклоняет collision. Одинаковый полный путь и выход за case/attempt directory отклоняются. Затем реализовать loader branch, не меняя старый default/hash.
+- [ ] Следующий цикл: staging помещает inputs по relative paths внутри workdir попытки, `{{INPUT_ROOT}}` указывает туда; `runAgent` получает `files: []`. Assert prompt содержит оба разных пути, argv/user parts не содержат attachments. Existing CLI уже не добавляет `--file` для пустого массива — новая API option не нужна.
+- [ ] Следующий цикл: hash режима/relative names/bytes стабилен между случайными attempt roots, изменение любого input между началом и концом попытки даёт явный failed check. Реализовать before/after hashes и сохранить evidence. Не обещать read-only inputs и не монтировать corpus/parent attempts.
+- [ ] Уточнить правило basename в `evals/AGENTS.md` и контракте: запрет остаётся у attachment mode. Не добавлять per-attempt scoped permissions или новый bubblewrap test: внешний путь здесь не проверяется.
+- [ ] Из `evals` выполнить `bun test test/task.test.ts test/run.test.ts test/cli.test.ts` и `bun typecheck`. Existing sandbox guards остаются прежними. Не экспортировать `prepareProfile` и не создавать reference API.
 
-## Задача 5. Native paths в существующем сценарном eval harness
+## Задача 6. Existing routing corpus и Desktop/CLI пути
 
-**Files:** `evals/src/{task,run,cli,sandbox}.ts`; `evals/test/{task,cli,run,sandbox}.test.ts`; `evals/fixtures/fake-cli.ts`; `evals/README.md`, прежний eval design (только amendment inputs).
+**Files:** `packages/agent/test/cli/package-docs-routing/{cases.json,fixtures/}`; `packages/loginom-host/script/skills-acceptance.ts`, `skills-acceptance/{run,desktop,turns,scenario-import,receipts}.mjs`; существующие `test/{skills-acceptance,skills-acceptance-turns}.test.ts`. Если несколько проверок помещаются в уже используемый общий модуль, новый файл не создавать.
 
-**Interfaces:**
-
-```ts
-// task.json; omission и явный attachment сохраняют старую семантику.
-input_mode?: "attachment" | "paths"
-
-// Task: inputMode?: "paths"; отсутствие поля не меняет старые hashes.
-// runAgent: files=[] в paths-mode; дополнительный private inputRoot?: string.
-// sandboxCommand: inputRoot?: string, только узкий read-only mount.
-// Prompt содержит {{INPUT_ROOT}}; абсолютный native путь подставляет harness.
-```
-
-- [ ] **RED:** адаптировать существующий collision-test, оставив прежний запрет без input_mode. Новый paths case с `left/sales.csv`, `right/sales.csv` должен успешно загрузиться; одинаковый полный путь, absolute/traversal и symlink наружу — отказ до staging. Тест строит task-копию существующего `group-sum-qty`, не выдумывает reference:
-
-```ts
-await Bun.write(file, JSON.stringify({
-  ...raw, input_mode: "paths", inputs: ["left/sales.csv", "right/sales.csv"],
-}))
-const [loaded] = await loadTasks(root)
-expect(loaded.inputMode).toBe("paths")
-expect(loaded.inputs).toEqual(["left/sales.csv", "right/sales.csv"])
-```
-
-- [ ] **GREEN:** валидировать режим; только paths-mode разрешает совпадение basename. Проверять обычные файлы внутри case directory до копирования. В `agentInputsHash` добавлять новую метку только при paths-mode; hash включает относительные имена и bytes, но не случайный абсолютный attempt root.
-- [ ] Следующий RED на fake CLI: prompt содержит два настоящих разных пути и их содержимое, argv не содержит `--file`, persisted user parts только text. **GREEN:** в paths-mode staging сохраняет вложенные пути в sibling input root текущей попытки, session directory пустой; binding один `{{INPUT_ROOT}}`. В attachment-mode staging и `files` прежние.
-- [ ] Следующий RED на настоящий bubblewrap: агент читает только текущие inputs и session workspace, не может читать case SPEC/oracle/reference, родительский attempt root, repo и чужую попытку, не может менять inputs. **GREEN:** добавить optional `inputRoot` через runAgent в sandboxCommand и один `--ro-bind`; проверить realpath/overlap, не монтировать весь corpus/attempt parent. Existing installation/profile/workspace guards сохраняются.
-- [ ] Добавить scoped read/external_directory allow только для созданного input root в отдельный eval profile до run; не включать глобальный `--auto`. Test refusal при explicit deny. Снять input hashes до/после; сохранить snapshot inputs и prompt в evidence после confirmed cleanup, без доступа агента к expected/oracle. Existing process/archive lifecycle не переписывать.
-- [ ] Экспортировать существующий `prepareProfile` из `run.ts` без изменения поведения: это позволит task-local reference adapter задачи 7 переиспользовать ту же подготовку вместе с уже экспортированными `runAttempt`/`afterAttempt`. Не добавлять новый CLI mode, отдельный launcher или ослабление `loadTasks` ради отсутствующего draft reference.
-- [ ] Выполнить из `evals`: `bun test test/task.test.ts test/cli.test.ts test/run.test.ts test/sandbox.test.ts` и `bun typecheck`. Sandbox test требует штатного окружения; отсутствие bubblewrap — ограничение среды, не повод пропускать изоляцию. Коммит кода/docs, без generated cases: `feat(evals): support native path inputs`.
-
-## Задача 6. Использовать real-model acceptance для корпуса в evals/
-
-**Files:** `packages/loginom-host/script/skills-acceptance.ts`, `skills-acceptance/{run,desktop,turns,scenario-import}.mjs`; `test/{skills-acceptance,skills-acceptance-turns}.test.ts`; новый `test/skills-local-path-results.test.ts`. Corpus создаётся задачей 7.
-
-**Interfaces:** `--corpus <absolute cases.json>` необязателен; default старый. Явный corpus — fixtures относительно его каталога, одна попытка без `--repeat`. Старый default остаётся 3. В `loginom-skills-routing.v1` используются input kinds `local-lgp-path`, `local-text-path`, `created-lgp-path`; они не создают attachments. Добавляется необязательное top-level `expectations: "expected.json"`: это evaluator-only ресурс рядом с corpus, отдельно от `fixtures`. Его bytes/hash входят в evidence, но файл и oracle facts не монтируются в агентский input/workspace и не входят в prompt.
-
-- [ ] **RED:** существующий parser/fixture snapshot тест должен принять новый corpus, сохранить его bytes/hash и использовать только его fixtures. Старый запуск без `--corpus` должен сохранить прежние paths/default. **GREEN:** параметризовать только источник corpus и fixture root; default repeat вычислять `args.repeat ?? (args.corpus ? "1" : "3")`, а не менять исторический default всех запусков.
-- [ ] Следующий RED на `acceptanceTurns`: сохранить явный `created-lgp-path` для второго хода, старый fallback `lgp-attachment` не меняется. Для `scenario-after-docs` разрешить expected format Markdown из setup вместо принудительного PDF. Для обоих переходов новый local package editing вариант использует проверку изменения исходного пакета, а не старый verifier, требующий CSV в prepare.
-
-```ts
-const turns = acceptanceTurns({
-  id: "docs-after-build", input: "created-lgp-path", prompt: "Документируй изменённый пакет",
-  setup: { input: "local-lgp-path", prompt: "Исправь расчёт в пакете" },
-  expected: { profile: "package-docs", result: "md" },
-})
-expect(turns[1].input).toBe("created-lgp-path")
-expect(turns[0].scenario).toBe(true)
-```
-
-- [ ] **GREEN:** расширить существующие CLI/Desktop adapters конкретными path kinds, bindings `{{external_text}}`/`{{created_lgp}}` и существующим `{{unicode_lgp}}`; выбрать correct originalPath для SHA. Внешний input root разрешается только целевой policy/явным Desktop allow. Отдельно assert text-only submission. Сохранить существующие parent/container bridge, session identity, cleanup и profile isolation. Не добавлять `resume` в общий eval runner.
-- [ ] Следующий RED на проверяющие функции: ошибочная activation, неверный input SHA, отсутствующий emit/report, неверная формула в документе и произвольный ответ Read должны проваливаться. Использовать маленькие positive/negative evidence fixtures; они проверяют checker, не заменяют true-model run.
-- [ ] **GREEN:** в общем для двух adapters модуле `scenario-import.mjs` добавить `verifyLocalPackageEdit`: проверить package source SHA/prepare receipt, preserved fixture nodes, изменённую формулу и результат. Prepare открывает upload destination; итоговый Save As обязан подтвердить отдельный `input.packagePath`, заданный binding `{{server_package}}`, который затем использует существующий bridge. Не ослаблять существующие `verifySalesScenario`/`verifyCalculatorModification` для исторических cases. Новые ожидания берутся из corpus oracle, недоступного модели.
-- [ ] Добавить общий небольшой `skills-acceptance/local-path-results.mjs` для docs/Read: actual emitted Markdown, таблицы узлов/связей/формул по `expected.json`; completed Read и точное значение из TXT. Это два настоящих callers (CLI/Desktop), не новый runner. Проверить, что report — regular file в workspace до копирования evidence. Не принимать самоотчёт «создал документ» и не добавлять model judge текста; фактический документ дополнительно просмотреть при acceptance.
-- [ ] Из `packages/loginom-host`: `bun test test/skills-acceptance.test.ts test/skills-acceptance-turns.test.ts test/skills-local-path-results.test.ts`, затем `bun typecheck`. Изменения launcher и checker коммитятся отдельно от генерируемых cases: `test(evals): reuse acceptance for local path cases`.
-
-## Задача 7. Подготовить реальные eval cases по loginom-eval-case
-
-**Skill:** `/home/kiselev/git/agent-validation/.agents/skills/loginom-eval-case/SKILL.md` и его `references/{case-contract,environment,verification}.md`. Следовать процедурам oracle → CLI reference → граф → cold rerun → calibration; ниже только согласованные адаптации.
-
-**Files:** будущие `evals/tasks/local-path-scenarios/{csv-two-paths,local-lgp-edit}/{task.json,SPEC.md,reference.lgp,acceptance.json,oracle.py,oracle.csv,provenance.json,data/}`; `evals/tasks/local-path-scenarios/README.md`; `evals/cases/local-file-routing/{cases.json,expected.json,README.md,data/}`. Незавершённые материалы — в отдельном task draft под storage/tmp, не в принятом корпусе.
-
-**Фиксированный небольшой набор:**
-
-| ID | Prompt/вход | Независимый результат |
+| Case ID | Подготовленный prompt и вход | Проверяемый результат |
 | --- | --- | --- |
-| `csv-two-paths` | «Объедини продажи из `{{INPUT_ROOT}}/data/Первый #1/sales.csv` и `{{INPUT_ROOT}}/data/Второй %2/sales.csv`. Посчитай сумму amount по Category. Выгрузи CSV с разделителем запятая и колонками Category, amount, по возрастанию Category». | Первый CSV: Alpha=10, Beta=20; второй: Alpha=7, Gamma=5. Итог Alpha=17, Beta=20, Gamma=5; нужны оба источника |
-| `local-lgp-edit` | «В пакете `{{INPUT_ROOT}}/data/Пакет #1/sales.lgp` исправь расчёт amount_double: умножать amount на 3 вместо 2. Сохрани остальные узлы и связи, выполни сценарий. Выгрузи CSV с разделителем запятая и колонками Category, amount, amount_double, в исходном порядке строк». | Исходный пакет с автономным источником Alpha10/Beta20/Alpha25 и calculator amount*2; итог amount_double=30/60/75, сохранены исходные IDs и связи |
-| `lgp-docs` | «Создай Markdown-документацию к пакету `{{unicode_lgp}}`: назначение, таблица узлов, связи и формулы вычисляемых полей». | actual `.lgp_report.md`; точные факты source package, формула amount*2; нет upload/browser, SHA input прежний |
-| `text-read` | «Прочитай `{{external_text}}` и укажи значение поля контрольная_строка». | TXT содержит `контрольная_строка=PATH-74-АБВ-37`; точный ответ, completed Read, default profile |
-| `scenario-after-docs` | Ход 1: Markdown-документация `{{unicode_lgp}}`. Ход 2: «В `{{unicode_lgp}}` исправь amount_double на amount*3, сохрани остальные узлы и связи, выполни сценарий и сохрани изменённый пакет как `{{server_package}}`». | docs → automation; корректное изменение существующего пакета, та же Session |
-| `docs-after-build` | Ход 1: «В `{{unicode_lgp}}` исправь amount_double на amount*3, сохрани остальные узлы и связи, выполни сценарий и сохрани изменённый пакет как `{{server_package}}`». Ход 2: Markdown-документация `{{created_lgp}}` | automation → docs; actual saved modified copy, формула amount*3 в документе, та же Session |
+| `docs-local-path` (existing) | Прежний workspace `.lgp` prompt | Прежний PDF/docs результат |
+| `docs-external-unicode-path` (existing) | Прежний `external-text-path` `.lgp` | Desktop разрешает доступ; CLI сохраняет refusal-with-file-hint |
+| `scenario-create-path` (new) | «Построй сценарий: используй CSV `{{external_csv}}`, сгруппируй по Category и просуммируй amount. Сохрани пакет в `{{server_package}}`» | На Desktop и CLI: registration → delivery → import; Alpha=35/Beta=20 из существующего CSV |
+| `text-read` (new) | «Прочитай `{{external_text}}` и ответь только значением поля контрольная_строка» | completed Read, default profile, ответ ровно `PATH-74-АБВ-37` |
+| `edit-after-docs` (new) | Ход 1: Markdown-документация `{{unicode_lgp}}`. Ход 2: исправить amount_double на amount*3 в том же local package; сохранить остальные узлы/связи, выполнить, сохранить как `{{server_package}}` | docs → automation, та же Session, изменение исходного пакета |
+| `docs-after-edit` (new) | Ход 1: такое же исправление local package и Save As `{{server_package}}`. Ход 2: документация `{{created_lgp}}` | automation → docs, actual изменённая local copy, факт `amount*3` |
 
-Первые два — обычные scenario evals с reference. Следующие два — одноходовые routing evals existing acceptance. Последние два — E2E переходы через existing acceptance. Не смешивать `task.json` и `cases.json` и не выдавать docs за diagnostic/package case. Имена skills, tool names и команды их принудительного выбора в prompts не добавлять.
+- [ ] **RED → GREEN:** добавить новые ID/ветки `acceptanceTurns`; старые `scenario-after-docs`, `docs-after-build`/`scenario-then-docs` и их input defaults оставить буквально прежними. Новый CSV case пометить scenario, переиспользовать существующие sales expectations. `lgp-docs` не добавлять: существующие cases уже покрывают маршрут.
+- [ ] Для внешнего `.lgp` использовать `external-text-path`. Добавить только необходимые `csv-path` и `created-lgp-path`; TXT требует текстового fixture и собственного binding/выбора originalPath (не переименовывать старый `.lgp` case). Если нужен `text-path`, его причина — старые handlers копируют именно `.lgp`; не делать общий новый input framework.
+- [ ] В adapters/allowlist поддержать text-only submission, правильный source hash для CSV/TXT/`.lgp`. Для положительных новых внешних cases разрешать только их пути: CLI в собственном acceptance profile, Desktop через существующее одобрение запроса. Старый `docs-external-unicode-path` CLI отказ не менять. Не давать global auto-allow ради docs-first хода.
+- [ ] Проверить новую CSV ветку на фактических `loginom_file_admit` и `dock_artifact_deliver`, link delivered destination → import и результате. Existing verifier, ожидающий CSV только в prepare attachment artifacts, адаптировать отдельной веткой для path case; старую attachment проверку не ослаблять.
+- [ ] Для local edit проверять исходный package SHA/prepare, сохранённые source node IDs/links и изменённый результат. Не хешировать CSV для всех scenario cases. Итоговый Save в переходах проверяется по заданному `server_package`, поэтому прежний bridge получения modified package подходит; не менять его на произвольный guessed path.
+- [ ] Для docs-after-edit проверить actual emitted Markdown и 1–3 заранее известных факта из fixture, например нормализованное `amount*3`; не строить parser таблиц/`expected.json`/model judge. Для Read сверить точный ответ. Маленькие positive/negative evidence fixtures должны ловить wrong profile, source, формулу и отсутствие output. Оставить проверки в существующем общем модуле, используемом обоими adapters.
+- [ ] Corpus/fixtures для новых случаев довести до готовности вместе с эталонами задачи 7. Existing corpus root и default repeat не менять; флаг `--corpus` не добавлять. Выполнить host acceptance/turns unit tests и `bun typecheck`.
 
-- [ ] После code commits задач 2–6, до генерации cases собрать отдельный установленный CLI/Desktop candidate с pinned resources по `docs/testing/loginom-ai-agent/standalone-cli.md` и Desktop runbook. Зафиксировать clean source SHA, manifest и skills digests; далее эталоны и acceptance используют этот candidate. Generated cases по skill остаются без автоматического коммита и не требуют переобозначать уже собранный binary.
-- [ ] Прочитать актуальную skill config, подтвердить существующую модель/variant и installed candidate SHA; source/set/IDs заданы этим планом. Переопределить WORK_ROOT только в task config на `/home/kiselev/storage/tmp/loginom-local-paths-reference`. Не изменять общий env и не использовать его прежний `/tmp` default.
-- [ ] Для paths-mode **не запускать** прежние `prepare_attempt.ts`/`run_attempt.sh`: они flatten basename и безусловно используют `--file`. В task temp подготовить одноразовый `run-reference.ts`, который импортирует существующие функции evals из текущего checkout. Это adapter подготовки references по skill, не новый сохраняемый runner. Его smoke/dry-run проверяет два одинаковых basename, реальную подстановку путей, пустой files argv и одну попытку; отсутствие reference до запуска не должно требовать фиктивного пакета.
+## Задача 7. Два scenario references по loginom-eval-case
 
-Порядок task-local adapter фиксирован:
+**Skill:** [loginom-eval-case](/home/kiselev/git/agent-validation/.agents/skills/loginom-eval-case/SKILL.md), его case-contract/environment/verification. **Files:** `evals/tasks/local-path-scenarios/{csv-two-paths,local-lgp-edit}/`, README набора; fixtures/README существующего routing corpus. Незавершённые cases держать в task draft вне принятой коллекции.
 
-1. `loadConfig(["--skip-judge"], env)` с installed candidate и моделью/variant из skill config; для smoke — `--dry-run`. Только для live сначала получить штатный harness lease и применить его profileDir. Затем выполнить `preflight`, создать `reserveRunDirectory` и `agentCommand`; только для live выполнить `prepareProfile`. Сигнал отмены — через существующий `installSigint`. Dry-run не получает live lease и не готовит реальный профиль.
-2. Построить один **авторский объект Task в памяти**, указав `dir` draft, исходные `prompt/inputs`, `inputMode: "paths"`, `reference: ""`, ожидаемые поля/таймаут/oracle из конкретного draft. Это не вызов `loadTasks` и не финальный task.json; accepted loader остаётся строгим. Поле reference не используется при `skipJudge: true`; фиктивный файл не создаётся.
-3. Вызвать уже существующий `runAttempt` ровно один раз с `skipJudge: true`, `judge: undefined`, `profileRecovered: false`, фактическими runId/runDir/source/task/attempt и AbortSignal. Он выполняет path staging, scoped permission, sandbox, `runAgent`, получение настоящего `.lgp`/CSV и сохранение evidence. Не копировать эту логику и не вызывать старый shell launcher skill.
-4. Только для live вызвать существующий `afterAttempt`, проверить `environment_cleanup.status === "confirmed"`, архив DB/WAL и input hashes. Освобождать harness lease только после подтверждённого lifecycle; не удалять guards при отказе. Dry-run пропускает `afterAttempt`, как существующий main. Зависимые проверки останавливаются при infra failure, аналитические неуспехи учитываются в лимите skill.
-5. Сопоставить paths evidence с входами `check_reference.py`/проверки результата/finalize skill: actual artifact `.lgp`, output CSV, events, сохранённые input snapshots и архив БД. Подтвердить model/variant по БД, а не argv. После graph/cold rerun принятия положить actual artifact в `reference.lgp` и записать финальный task.json с этим существующим файлом. Если конкретный helper skill жёстко требует прежний layout, адаптировать его task-local пути/evidence mapping, сохраняя все проверки; установленный skill и его defaults не менять.
+| ID | Prompt | Независимый oracle |
+| --- | --- | --- |
+| `csv-two-paths` | «Объедини продажи из `{{INPUT_ROOT}}/data/Первый #1/sales.csv` и `{{INPUT_ROOT}}/data/Второй %2/sales.csv`. Посчитай сумму amount по Category. Выгрузи CSV с запятой, колонками Category, amount, по возрастанию Category» | Первый CSV: Alpha10/Beta20; второй: Alpha7/Gamma5. Результат Alpha17/Beta20/Gamma5 |
+| `local-lgp-edit` | «В `{{INPUT_ROOT}}/data/Пакет #1/sales.lgp` исправь amount_double: amount*3 вместо amount*2. Сохрани остальные узлы/связи, выполни сценарий. Выгрузи CSV с запятой, колонками Category, amount, amount_double, в исходном порядке строк» | Автономный source package: Alpha10/Beta20/Alpha25 и calculator amount*2. После изменения: 30/60/75, исходные node IDs/links сохранены |
 
-- [ ] До модели создать данные, SPEC и independent oracle. Для двух CSV использовать Python stdlib; эталонные числа посчитать из входов, не копировать из результата Loginom:
+Existing scenario prompt tail задаёт output paths; prompts не принуждают выбор skill/tool. References настоящие, docs reference-пакетом не подменяется.
 
-```python
-import csv
-from collections import defaultdict
-from pathlib import Path
-
-root = Path(__file__).parent
-totals = defaultdict(int)
-for name in ("data/Первый #1/sales.csv", "data/Второй %2/sales.csv"):
-    with (root / name).open(encoding="utf-8", newline="") as stream:
-        for row in csv.DictReader(stream):
-            totals[row["Category"]] += int(row["amount"])
-with (root / "oracle.csv").open("w", encoding="utf-8", newline="") as stream:
-    writer = csv.writer(stream)
-    writer.writerow(["Category", "amount"])
-    writer.writerows(sorted(totals.items()))
-assert dict(totals) == {"Alpha": 17, "Beta": 20, "Gamma": 5}
-```
-
-- [ ] Подготовить через настоящий CLI исходный автономный `.lgp` с тремя строками, calculator amount*2 и наблюдаемым output. Не писать Unit.xml вручную. Проверить граф/результат и cold rerun, затем использовать одни проверенные source bytes в edit/docs cases. Oracle edit заранее `[30,60,75]`; source expected facts выписать независимо из проверенного графа/Unit.xml. В prompts только входные пути/задача, не reference/oracle.
-- [ ] Для каждого scenario case получить `reference.lgp` через installed CLI с configured model/variant посредством описанного task-local adapter. Максимум три попытки согласно skill; фиксировать реальные analytical/infra исходы и hint третьей попытки. Reference edit обязан сохранить исходные IDs/связи и изменить формулу/результат; совпадения только выходного CSV недостаточно.
-- [ ] Выполнить graph/code checks и холодное открытие/повторное выполнение reference на чистом браузере. Сравнить output с oracle, включая schema/rows. Инфраструктурную проблему устранить в окружении, не ослаблять oracle и не удалять `.writer` guard.
-- [ ] Для routing cases заполнить existing corpus v1 и expected facts. Данные лежат относительно corpus; после подстановки внешние пути содержат пробелы/кириллицу/#/%. Для изменённого документа использовать actual полученную copy из bridge, не исходный fixture. `created_lgp` скачивается для дальнейшей документации, а не при проверке первого upload.
-- [ ] Провести case validation по skill, обновить hashes/provenance/README и только после complete evidence перенести из draft в final collections. Для нового path-контракта старый basename-only validator не является основанием переименовать одинаковые `sales.csv`: применить изменённый task loader и эквивалентные graph/oracle checks, явно записать эту адаптацию.
-- [ ] Предупредить о стоимости и выполнить обычную calibration только двух новых scenario IDs. Из `evals`:
+- [ ] После code changes собрать clean installed CLI/Desktop candidate с pinned resources по runbooks, зафиксировать source/manifest/skills digests. Candidate должен существовать до CLI-построения references. Не подменять его текущим произвольным бинарником; generated cases не требуют автоматического коммита skill.
+- [ ] Прочитать актуальную skill config. В private task-local env указать текущий AGENT_REPO, проверенный CLI, WORK_ROOT/PROFILE под `/home/kiselev/storage/tmp/`, модель/variant из config и выделенный стенд; использовать `LOGINOM_EVAL_CASE_ENV`. Общий env/установленный skill не менять, секреты не выводить.
+- [ ] Скопировать в task temp `run_attempt.sh`, `prepare_attempt.ts` и нужные соседние `settings.py/settings.ts`; сохранить их relative dependencies и layout evidence. В копии prepare сохранять relative paths внутри attempt workdir, подставлять root, писать пустой `files.txt`. Shell уже использует пустой files array без `--file` (`:62–65`), поэтому новый launcher не нужен.
+- [ ] Task-local `collect_artifacts.py`: заменить basename-only matching уникальным relative source → admitted descriptor/destination → SHA соответствием; copies evidence различать по relative path/identity, не `storage-input-sales.csv` для обоих. Для `.lgp` как входного пакета проверять prepare/admission source SHA и snapshot, а не искать его как импортируемый `FileName` в результирующем Unit.xml. Это сохраняет смысл проверки исходных bytes, не вводит product control download.
+- [ ] Task-local `validate_collection.ts`: duplicate basename допускается только в paths-mode; остальные checks остаются. Дополнительно поправить task-local `finalize_case.py:43`: нынешний `data.glob("*")` с basename keys не работает с вложенными каталогами. Hash manifest строить по файлам `task.inputs` с relative keys, не пропуская второе `sales.csv`. Раскладка events/exit/artifacts/DB остаётся прежней для остальных scripts. Не добавлять adapter вокруг `runAttempt`, экспорт `prepareProfile` или фиктивный Task/reference.
+- [ ] Сначала подготовить входы, ожидаемый результат и Python-stdlib oracle; например CSV case независимо суммирует оба `DictReader` в `defaultdict(int)` и пишет sorted pairs. Проверить точные 17/20/5 до вызова модели. Сохранить явные CSV columns/order/separator в task.json/checklist.
+- [ ] Через настоящий candidate CLI подготовить автономный source `.lgp`, проверить его граф/выход/cold rerun; использовать эти же подтверждённые bytes в local edit и новых routing cases, не менять старый global `fixtures.lgp`. Для нового edit fixture дать отдельный ключ в существующем repo-relative fixtures map. Unit.xml вручную не создавать.
+- [ ] По skill выполнить smoke/model confirmation, построение reference каждого case (максимум три попытки, правила hint/infra failure прежние), graph/result checks и cold rerun. Подтвердить model/variant по БД, не только argv. Провести описанные task-local adaptations с минимальными проверками прежде, чем доверять собранному provenance; basename collision не обходить переименованием данных.
+- [ ] Только после complete evidence/validation перенести accepted cases в `evals/tasks/local-path-scenarios`, записать actual reference/provenance/hashes/README. Подготовить новые routing fixtures/prompts без второго corpus. Предупредить о стоимости обычной calibration только новых scenario IDs:
 
 ```bash
 JUDGE_MODEL=gpt-6-sol JUDGE_REASONING=xhigh bun run src/run.ts --calibrate --tasks tasks/local-path-scenarios --only csv-two-paths,local-lgp-edit
 ```
 
-Оба case дают reference для foreign negative друг другу. Positive/negative должны проходить действующие thresholds; calibration не доказывает cold rerun/выгрузку. Near-miss corpus не добавлять. Нет живого `--repeat` и коммита cases в рамках этого skill. В отчёте перечислить готовые, непринятые и не созданные cases отдельно, не объявлять всё принятым по одному запуску.
+Запуск из `evals`; references дают foreign negative друг другу. Не добавлять near-miss corpus, живой benchmark repeat или автоматический commit cases в workflow skill. Reference authoring scripts не являются доказательством sandbox benchmark; эту проверку выполняет задача 8.
 
-## Задача 8. Проверить весь путь на candidate и завершить
+## Задача 8. Проверка candidate и завершение
 
-**Files:** существующие build/installed acceptance runbooks; report `docs/testing/loginom-ai-agent/local-file-paths.md`, collection README, checkpoint дизайна.
+**Files:** existing runbooks и reports; `docs/testing/loginom-ai-agent/local-file-paths.md`, README коллекции/corpus, checkpoints этих дизайна и плана.
+**Критерии:** результаты раздела [проверок дизайна](../specs/2026-10-21-local-file-paths-design.md#проверки-и-размещение-кейсов), без новых acceptance требований.
 
-- [ ] Проверить manifest SHA/skills digests candidate из задачи 7; использовать его повторно, если product code не изменился. После исправления кода нужен новый candidate и повтор только затронутых проверок. Не называть старый установленный бинарник новым candidate и не ставить dirty artifact в runner, который требует clean snapshot.
-- [ ] Выполнить необходимые package tests/typechecks по предыдущим задачам. Повторять уже прошедшие проверки лишь после относящихся к ним изменений. Runtime attribution/resource verification выполнить по owning instructions, не подменять ими behavioral tests.
-- [ ] Выполнить один live scenario проход новых IDs через isolated harness, без `--repeat`; effective EVAL_REPEAT должен быть 1. Сначала проверить private config `EVAL_CLI_MODE=binary`, EVAL_CLI_BIN candidate, выделенный endpoint, paths/profile/results под storage/tmp, модель/variant. Команда из `evals`:
+- [ ] Переиспользовать candidate задачи 7, если relevant code не менялся; иначе собрать новый и повторить только затронутые проверки. Выполнить mandatory package tests/typechecks, resource/attribution checks. В отчёте отделить source smoke задачи 2, reference authoring и installed acceptance.
+- [ ] Один live scenario проход двух IDs через штатный isolated harness. Проверить installed EVAL_CLI_BIN, dedicated endpoint, модель/variant, private profiles/results; из `evals`:
 
 ```bash
 EVAL_REPEAT=1 bun run src/run.ts --tasks tasks/local-path-scenarios --only csv-two-paths,local-lgp-edit
 ```
 
-- [ ] Запустить existing skills-acceptance для нового corpus, один раз на CLI и один на Desktop, с фактическими absolute artifact/output/model/variant/installed image из проверенного candidate. Нужные аргументы — `--corpus` на `evals/cases/local-file-routing/cases.json`, `--cases lgp-docs,text-read,scenario-after-docs,docs-after-build`, `--interface run` либо `desktop`; не передавать `--repeat`. Default нового corpus — одна попытка. Использовать существующий secret/profile setup, не создавать второй runner.
-- [ ] Проверить actual documents и все четыре intent/profile outcomes, оба transition Session IDs, source hashes, отсутствие attachments и исходного `.lgp` control download. При edit → docs показать факт amount*3 в выгруженной изменённой copy и документе. Две CSV используются обе; продукт не объявляет partial completion успехом.
-- [ ] Выполнить нативную Windows проверку абсолютного пути с пробелом/кириллицей и нескольких разных файлов; POSIX relative/absolute уже покрываются Linux. Linux unit tests с `C:\\...` не считать Windows filesystem acceptance. Если Windows runner недоступен, сохранить честное ограничение и условие продолжения, не объявлять полное платформенное покрытие.
-- [ ] Убедиться в confirmed runtime/process/storage cleanup и архивировании attempts без секретов. Обновить report: что проверено, candidate SHA, модель/variant, paths корпуса, результаты каждого case, оставшиеся ограничения. Не добавлять историческую полную матрицу, массовый benchmark или новый CI gate без требования.
-- [ ] Финальная проверка простоты: удалить ненужные helpers/fixtures, fake server SHA и повторные файловые registries; `git diff --check`. Независимый reviewer проверяет итог против дизайна, особенно permissions, package finish/retry и отсутствие обхода isolation. Исправить относящиеся к задаче замечания. Сгенерированные cases не коммитить автоматически по skill; PR/merge/release не входят в эту planning-задачу.
-
-## Критерии завершения реализации
-
-Исходный prompt с несколькими путями работает без attachments в CLI/Desktop; bytes и mapping верны, 16 MiB и deny соблюдаются. Local `.lgp` edit открывает исходный пакет без контрольного скачивания; docs создаёт правильный документ и не запускает upload. Новые сценарные и routing evals находятся в `evals/`, имеют реальные ожидаемые результаты и сохранённое evidence; переходы проверены в одной сессии. Старые attachment/data verification пути проходят регрессию. Непроверенная платформа или live gate явно остаётся ограничением, не PASS.
+- [ ] Existing `skills-acceptance` запустить на **CLI и Desktop** с явными `--repeat 1` и `--cases docs-local-path,docs-external-unicode-path,scenario-create-path,text-read,edit-after-docs,docs-after-edit`. Остальные аргументы artifact/output/model/variant/installed CLI image брать из проверенного candidate/runbook. Никакого `--corpus` или специального default. CSV-path case обязан пройти в обоих интерфейсах, а не только в scenario benchmark.
+- [ ] Проверить actual outputs, activations, source hashes, absence attachments, две transition Session IDs, факт изменения и документ после изменения. Сохранить различающиеся outcomes существующего external docs case. Harness выдаёт modified copy во второй user prompt; продукт не начинает автоматически скачивать серверные пакеты ради docs.
+- [ ] Отдельным целевым CLI prompt на candidate проверить сохранение local `.lgp` **без output path**: Save в собственную upload copy с допустимым replace, полный server path в ответе, явное «локальный файл не изменён» и прежний local SHA. Это проверка skill-поведения, не новый runner/механизм Save; explicit output path уже покрыт переходами. Использовать сохранённое валидное evidence этой проверки, если оно уже получено.
+- [ ] На доступной Windows среде проверить нативный абсолютный путь с пробелом/кириллицей и несколько источников. Linux string test не считать Windows filesystem acceptance. Недоступную платформу записать как ограничение с условием продолжения, не как PASS.
+- [ ] Подтвердить runtime/process/storage cleanup; сохранить evidence без секретов. Неполадку вспомогательного отчёта указывать отдельно от проверенного результата; обязательные ownership/journal/cleanup отказы не игнорировать. Обновить checkpoint каждого документа в пределах 20 строк.
+- [ ] Удалить лишние добавления; сравнить diff с оценкой, выполнить `git diff --check` и итоговое независимое ревью только против требований/реальных рисков. Не расширять задачу до новой исторической матрицы/CI framework. Слияние и release требуют отдельного поручения.
 
 ## Planning checkpoint
 
-- План подготовлен 2026-10-21 по одобренному дизайну #74.
-- Это документ будущих действий: код, корпус, references, model runs и calibration пока не выполнялись.
-- Ранний технический риск: доказательство native upload completion без download.
-- Перед исполнением прочитать spec, owning AGENTS и TDD skill; отдельное повторное одобрение уже согласованных требований не требуется.
-- Независимое plan review: Approved после исправления native-path reference запуска и Save As в переходах.
-- Ссылки, code fences и отсутствие незаполненных мест проверены; runtime/tests/model evidence не заявляется.
+- 2026-10-21: план пересмотрен по внешнему ревью и решениям владельца; поведение канонично в дизайне.
+- Последовательность: probe 1 параллельно 2, обязательный ранний source smoke сразу после 2, затем package route и acceptance.
+- Оценка реализации: около 75 файлов (4 бинарных), +1580/−335 текстовых строк; временные scripts отдельно.
+- Единственное опровергнутое абсолютное утверждение: adapter.admit имеет caller в parallel-calls-live.ts:78; Host ранний [] всё равно не меняется.
+- Дополнительно учтены nested-path hashes finalize_case.py и .lgp source verification в task-local collector.
+- В этой ревизии код/fixtures не менялись, tests/model/browser не запускались.
+- Независимое ревью новым агентом без истории: Approved во втором раунде; замечание о подсказках файловых ошибок исправлено, обязательных замечаний нет.

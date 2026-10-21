@@ -1,156 +1,131 @@
 # Локальные файлы по путям из prompt — дизайн #74
 
-Дата: 2026-10-21. Задача: [#74](https://github.com/gooddaytoday/loginom-ai-agent/issues/74).
-База исследования: ветка `loginom`, `72bfb4e45e3ede244121a3f3de589b3afb51b533`.
-Статус: требования согласованы; реализация и живые проверки ещё не выполнены.
+Дата ревизии: 2026-10-21. Задача: [#74](https://github.com/gooddaytoday/loginom-ai-agent/issues/74). Проверенная база: `loginom@72bfb4e45e3ede244121a3f3de589b3afb51b533`; текущие изменения ограничены документацией.
+
+Этот документ — каноническое описание поведения с решениями владельца после внешнего ревью. [План](../plans/2026-10-21-local-file-paths.md) определяет порядок работ и проверки. Реализация и живые проверки ещё не выполнены.
 
 ## Результат и границы
 
-Пользователь Desktop или standalone CLI указывает в обычном prompt один или несколько локальных путей. Агент читает или передаёт выбранные файлы по назначению задачи без обязательного вложения в чат и без `--file`. Доступ определяется правами ОС и действующей политикой приложения, включая пути вне рабочего каталога.
+Пользователь Desktop или standalone CLI указывает в обычном prompt один или несколько локальных путей. Агент читает либо передаёт файлы по назначению задачи без обязательного вложения в чат и без `--file`. Доступ ограничивают ОС и политика приложения, включая пути вне каталога сессии.
 
-Согласованные ограничения:
+- Новая загрузка ограничена **16 MiB на файл** — существующий предел host/runtime. Default старого attachment snapshot остаётся **10 MiB**; это не новый предел обычного Read или документации.
+- Один вызов регистрации принимает один файл. Несколько путей обрабатываются отдельными вызовами; одинаковый basename в разных каталогах допустим. Ошибка одного файла не стирает успешные регистрации остальных и не позволяет объявить всю задачу выполненной.
+- Относительные пути разрешаются от каталога сессии; абсолютные — нативно для текущей ОС. Пробелы, кириллица, `#`, `%` и допустимые символы пути читаются буквально, без URL decode и shell expansion.
+- Источник читается как байты. Допустимость формата определяет операция Loginom, а не общий CSV-only фильтр регистрации.
+- Изменение `.lgp` относится к `loginom-automation`; документация по тому же пути — к `package-docs`. Обычное чтение TXT не запускает Loginom.
+- Автоматическое включение `.lgp` в текст модели и ordinary attachment admission по-прежнему запрещено. Это не запрещает явную обработку приложенного пакета через разрешённый путь.
+- Сохраняются существующие attachments, серверный `open_package(package_path)`, профильные ограничения и cancellation/recovery. Обычный data delivery сохраняет свою проверку серверной копии.
+- Новый маршрут локального `.lgp` проектируется без контрольного скачивания. Независимый SHA серверной копии не обещается.
 
-- Лимит новой загрузки — **16 MiB на файл**. Это существующий предел host/runtime, а не лимит чтения моделью. Старый предел attachment snapshot 10 MiB этим изменением не повышается.
-- Один вызов регистрации принимает один файл. Несколько путей в одном prompt обрабатываются отдельными вызовами. Одинаковые basename в разных каталогах допустимы.
-- Относительный путь разрешается от каталога текущей сессии; абсолютный — нативными средствами текущей ОС. Пробелы, кириллица, `#`, `%` и допустимые на этой ОС символы остаются буквальной частью пути. Не применять URL decode и shell expansion.
-- Чтение и регистрация работают с байтами, не ограничиваются CSV. Допустимость формата проверяет конкретная операция Loginom; неподдерживаемый формат даёт явную ошибку.
-- `.lgp` для редактирования, исправления или доработки загружается и открывается через `loginom-automation`. Для документации тот же локальный файл обрабатывает `package-docs` без browser/runtime upload.
-- `.lgp` по-прежнему не включается автоматически в текст модели и не проходит обычный автоматический attachment admission.
-- Новый маршрут локального `.lgp` не делает контрольного скачивания. Проверка исходных байтов, подтверждение загрузки и открытия обязательны; независимый SHA серверной копии не обещается.
-- Существующие вложения, серверный `open_package(package_path)`, профильные запреты, cancellation/recovery и проверка серверной копии при обычной доставке данных сохраняются.
-- Новые evals с настоящей моделью, подготовленными prompts и fixtures размещаются в `evals/`. Реализация проходит TDD. В этой задаче создаются только дизайн и план.
+## Общая авторизация локального пути
 
-## Почему не новый файловый сервис
+Один helper авторизации используется в `package_docs_run`, `loginom_file_admit` и `local_package_path`. Он переносит существующую проверку вложения из `packages/agent/src/tool/package-docs.ts:51–77`, а не создаёт её вторую копию:
 
-`Read` и `package_docs_run` уже читают локальные пути; `file-snapshot.ts` умеет ограниченное чтение regular file через открытый handle; host уже сохраняет байты и проверяет identity; runtime уже имеет artifact store, private transfer lease, upload и recovery. Недостающая часть — разрешённый backend-вход от выбранного моделью пути к существующей передаче байтов и подготовка локального пакета до открытия workspace.
+1. Разрешить requested path от session directory и проверить для него явный `read`/`external_directory` deny объединённой agent/session policy до realpath и формирования файловой ошибки. Известный запрет не должен превращаться в OS error с подсказкой о вложении.
+2. Получить canonical path через realpath и проверить явный deny также для него. Обе проверки предшествуют учёту attachment и прежнего allow-always.
+3. Рассматривать только видимые исходные сообщения пользователя своей сессии с учётом revert; исключить compaction replay. Вложение — принадлежащий такому сообщению file part с `file:` URL без query и fragment; его realpath должен совпасть с canonical path источника.
+4. Подходящее вложение разрешает чтение без повторного запроса. В частности, приложенный внешний `.lgp` можно править в неинтерактивном CLI через `local_package_path`. При явном deny вложение не даёт обхода.
+5. Для неприложенного файла применить обычные разрешения и запросы доступа. Сохранить typed rejection, `metadata.permissionDenied` и соответствующий код выхода CLI.
 
-Не добавляются файловый сервер, сканирование каталогов, глобальный registry, парсер путей всего prompt, классификатор намерения или универсальный механизм выбора верификатора. Модель выбирает файл и skill; backend разрешает конкретную операцию.
+Backend вызывает helper после `tool.execute.before`, чтобы проверять фактические аргументы. Для двух путей загрузки общий snapshot helper затем читает **canonical/realpath**, используя существующий bounded regular-file reader. `package_docs_run` использует авторизацию без навязывания нового snapshot/лимита. Host получает разрешённые байты и имя, а не право читать произвольный OS path.
 
-## Входы и ответственность
+### Ошибки
 
-### Регистрация файла данных
+Все три входа сообщают **причину и путь**: файл отсутствует, путь указывает на каталог/special file, нет доступа, превышен размер или обнаружено изменение во время чтения. Отсутствие admission само по себе не считается достаточной проверкой ошибки.
 
-Новый backend-owned tool `loginom_file_admit({ path: string })` доступен только в профиле automation после успешного `dock_prepare`. Он возвращает `source_path` — абсолютный путь выбранного источника — и существующий runtime artifact descriptor: `artifact_id`, `name`, `bytes`, `sha256`, `upload`.
+При ошибке получения локального файла — в том числе missing path, directory, OS EACCES и отказе через обычный запрос разрешения — сообщение также предлагает альтернативу: «приложите файл — `--file` в CLI, вложение в Desktop/TUI». При **явном запрете в настройках** остаются только причина и путь, без подсказки обхода. Существующий `--file` hint, его tests и `permission-refusal-with-file-hint` в routing corpus сохраняются; текст дополняется, а не заменяется.
 
-Вызов разрешает регистрацию снимка, но сам не запускает browser и не загружает файл. Модель использует существующий `dock_artifact_deliver` и descriptor. Повторное перечисление доступных artifacts уже есть в `dock_action_describe({})`; новый list tool не нужен. `.lgp` через этот tool отклоняется с указанием `dock_prepare.local_package_path`.
+### Известное ограничение permissions
 
-Backend применяет один общий helper для этого tool и подготовки локального пакета:
+В `Permission.ask` прежний allow-always с шаблоном `*` может перекрыть policy deny: `permission/index.ts:28–37` выбирает последнее совпадение, а строка 73 передаёт `approved` после `ruleset`. Новый precheck закрывает это только для новых входов и `package_docs_run`. Обычный `Read` сохраняет прежнее поведение; исправление общего permission engine не входит в #74. Это ограничение подтверждено чтением кода, не новым тестовым прогоном.
 
-1. Проверяет непустой нативный путь и разрешает его от session directory.
-2. Применяет `read` и, где необходимо, `external_directory` к запрошенному и каноническому пути. Явный deny в объединённой agent/session policy проверяется до ранее выданного allow-always. Отказ сохраняет `metadata.permissionDenied` и корректный код выхода CLI.
-3. Читает regular file через существующий bounded snapshot с явным пределом 16 MiB. Каталог, special file, отсутствующий/недоступный файл, превышение размера и обнаруженное изменение во время чтения завершают этот вызов до upload.
-4. Передаёт host только разрешённые байты и имя; произвольный OS path не становится полномочием host/runtime. Helper вызывается после `tool.execute.before` hooks, чтобы проверять фактические аргументы.
+## Регистрация, identity и имя копии
 
-`--auto` может отвечать на запрос разрешения, но не обходить deny. В неинтерактивном CLI сохраняется существующая политика отказа от неразрешённых asks; требование no-attachments не означает скрытое разрешение всего диска.
+Backend-owned `loginom_file_admit({ path: string })` доступен только в automation после успешного `dock_prepare`. Ответ содержит абсолютный `source_path` выбранного источника и existing descriptor (`artifact_id`, `name`, `bytes`, `sha256`, `upload`). Tool регистрирует снимок; доставку выполняет существующий `dock_artifact_deliver`. Список artifacts уже возвращает `dock_action_describe({})`. `.lgp` направляется в `dock_prepare.local_package_path`, а не в generic data admission.
 
-### Identity, имена и несколько файлов
-
-Для явной регистрации используется отдельная identity на основе session/tool-call, а не исходная immutable группа вложений сообщения. Host повторно использует `inputStore`, runtime — `artifactStore`; один вызов создаёт одну запись. Несколько вызовов не перезаписывают immutable attachment manifest. У разных источников с одинаковым basename разные artifact IDs и серверные destination.
-
-Только имя передаваемой копии приводится к ограничениям серверного хранилища с сохранением расширения; исходный путь остаётся неизменным и возвращается рядом с descriptor. Для destination сохраняется `overwrite: reject`. Нет перезаписи пользовательского файла или другого server artifact.
-
-Повтор той же операции использует прежний снимок и operation ID, не перечитывает изменившийся исходник. После утраты runtime требуется явная новая регистрация. Ошибка одного источника не удаляет успешные регистрации других и не позволяет объявить всю задачу выполненной.
-
-### Локальный пакет для редактирования
-
-Расширяется существующий `dock_prepare`:
+Identity регистрации создаёт backend:
 
 ```ts
-{ intent: "open_package", package_path: string }       // прежний серверный путь
-{ intent: "open_package", local_package_path: string } // новый локальный путь
+JSON.stringify(["local-file", ctx.messageID, ctx.callID])
 ```
 
-Для `open_package` требуется ровно один из этих источников. `local_package_path` недопустим при других intent. Это аргумент backend tool, не путь для произвольного чтения browser/runtime.
+`messageID` принадлежит сообщению **ассистента**, не `taskMessageID`: одинаковые provider call IDs в разных ходах не должны конфликтовать. Используются существующие `inputStore` и `artifactStore`; группы local calls не смешиваются с immutable attachment-группой. Не добавляются таблица повторов или постоянный registry. Новый вызов модели — новая регистрация и новое чтение файла. После повторной подготовки runtime прежние `artifact_id` недействительны: skill требует зарегистрировать локальные файлы заново.
 
-Backend вызывает общий permission/snapshot helper и передаёт private package source в уже существующий prepare. Только этот явный маршрут допускает `.lgp`; запрет automatic attachment admission не снимается. `prepare` остаётся единственной точкой запуска runtime — общий registration tool не получает нового права запуска.
+Нормализация имени server copy находится **только в `packages/loginom-host/src/inputs.ts`**, при формировании имени с существующим identity/index prefix. На `_` заменяется объединённый набор `\ / : < > " | ? * % #`, управляющие `U+0000–U+001F/U+007F`, конечные точки и пробелы. Расширение сохраняется, в том числе при ограничении длины; original path и bytes не меняются. В этом же файле нужно согласовать раннюю проверку controls со стадией нормализации, иначе до неё такие имена не доходят. Downstream validators не ослабляются. Правка действует и на вложения.
 
-После существующего loginBrowser, до открытия пакета, runtime устанавливает реальный storage binding к authenticated origin/document/account/build и разрешённому каталогу. Выделяется только необходимая часть существующей подготовки. Не создаётся пустой draft, фиктивный workspace identity или публичное состояние «подготовлен для файлов».
+Основания: `artifacts.mjs:11–13`, `text-import-procedure.mjs:61–63`, `imports-excel-parameters.mjs:23–24`, `storage-policy.mjs:6–12`. Сейчас `%` может пройти upload, но сорвать import; `#` — сорвать open/save. Identity/index различает разные источники даже после совпавшей нормализации имён. Первоначальный upload сохраняет `overwrite: reject`.
 
-Далее переиспользуется цепочка artifact snapshot → `stageTransfer` → проверка lease → `setInputFiles` → native upload. Существующий upload receipt имеет `AMBIGUOUS / UPLOAD_SERVER_VERIFICATION_REQUIRED`; одного пустого input и отсутствия loader недостаточно, чтобы заменить его на success.
+Существующий ранний `[]` в Host standalone admit (`host-port.ts:352–355`) не меняется, новые тесты «точного повтора» не добавляются. У `adapter.admit` нет найденного production caller, однако есть вызов в `script/parallel-calls-live.ts:78`; утверждение «никем не вызывается» неверно.
 
-Private завершение для пакета должно подтвердить в пределах исходного deadline:
+## Подготовка локального пакета
 
-- тот же sender, document/account и каталог назначения;
-- завершение native upload, отсутствие конфликта и ожидающей операции;
-- свежую точную строку созданного файла: destination/name, тип file и ожидаемый размер;
-- запись завершения и очистку transfer lease/pending по правилам существующего journal.
+Backend-обёртка `loginom_dock_prepare` принимает для `intent: open_package` ровно один источник: существующий серверный `package_path` либо новый `local_package_path`. Последний несовместим с `workflow_ref` и другими intent. Runtime MCP schema не получает OS path: backend авторизует источник, снимает snapshot и передаёт private package input; host превращает его в artifact/grant pair. Только этот явный маршрут допускает `.lgp`; общий attachment deny сохраняется. Runtime по-прежнему запускается только через prepare.
 
-После этого открывается **destination из подтверждённой операции**, а не повторно придуманный путь. Успешный `open_package` подтверждает фактический открытый пакет и только тогда устанавливает workspaceReady.
+После существующего loginBrowser, до открытия пакета, private маршрут получает настоящий storage binding authenticated origin/document/account/build и разрешённого каталога. Затем переиспользует snapshot → `stageTransfer` → lease verification → `setInputFiles` → native upload. В основном варианте не нужны пустой draft, фиктивный workspace identity, второй browser или публичный флаг отключения проверки.
 
-В receipt SHA относится к источнику (`source_sha256`), а не к независимому чтению серверной копии. Гарантия: «передан проверенный снимок выбранного файла, загрузка подтверждена, пакет открыт по подтверждённому пути». Публичный флаг `verify_remote: false` не нужен. Для обычного `dock_artifact_deliver` существующий download/readback остаётся прежним.
+Текущий upload receipt `AMBIGUOUS / UPLOAD_SERVER_VERIFICATION_REQUIRED` нельзя переименовать в success. Private package finish подтверждает завершение upload, тот же sender/owner/catalog и свежую точную строку файла с ожидаемыми name/path/type/size; затем сохраняет завершение и освобождает lease/pending. Точный размер **уже** возвращается из native `FileStore` в `workspace-ui.mjs:2959–2981`; разбор форматированного UI размера не нужен. Ошибку вспомогательного отчёта следует отделять от результата операции; durable journal/ownership/cleanup остаются обязательными для безопасного продолжения.
 
-После успешной загрузки и неудачного открытия retry может только продолжить разрешённое открытие того же destination. Неизвестный результат загрузки, смена owner или конфликт не разрешают повторную отправку. Новый явный запрос после recovery — отдельная операция.
+Открывается destination подтверждённого upload. `source_sha256` относится к переданному снимку, не к скачанной серверной копии. `workspaceReady` подтверждается для фактически открытого пакета. Второй запрос открыть B при уже подготовленном workspace A требует нового `operation_id`, корректных квитанций и сохранения проверок чужих workflow; прежнее READY не доказывает готовность B.
 
-**Ранняя проверка предположения:** на настоящем Loginom пройти authenticated home → upload fixture `.lgp` → подтверждение native completion/строки → open exact destination без draft, download и повторной отправки. Проверить также конфликт `reject` и задержанный/неудачный upload. Это первый runtime этап реализации. Если текущие observations не различают завершение и неопределённость, сначала найти более точное read-only native подтверждение; не возвращать фиктивный success и не добавлять контрольное скачивание молча.
+Если upload завершён, а open упал, результат содержит `next_step` на **существующий** `dock_prepare` с `intent: open_package` и `package_path`, равным подтверждённому destination. Пакет нельзя объявить открытым. Повтор `dock_prepare(local_package_path)` — новый вызов и новая загрузка; отдельного состояния автоматического повтора нет. При неизвестном исходе upload действуют прежние recovery правила, без подсказки открыть неподтверждённый путь.
 
-## Выбор skill
+### Время и точка решения
 
-Обновляются существующие описания `loginom-automation`, `package-docs` и bootstrap guidance. Intent определяется задачей, а не расширением файла:
+Текущие границы: runtime call — 105 с (`call-timeout.mjs`, `managed-entry.mjs:228–232`), Host IPC — 105 + 15 = около 120 с (`host-port.ts:457`), adapter — не меньше 180 с (`adapter.ts:88`). Внутри нужны binding/переход в «Файлы», upload (до 35 с), проверка строки, open (внутренний timeout до 125 с; есть и проверка geometry). Максимумы стадий нельзя просто сложить и считать, что внешний вызов их дождётся: возможен `LOGINOM_CALL_UNCERTAIN`.
 
-| Prompt | Поведение |
-| --- | --- |
-| «Исправь расчёт в `/.../sales.lgp`» | automation → prepare local package → изменение и сохранение |
-| «Создай документацию к `/.../sales.lgp`» | docs → локальный package_docs_run → реальный документ |
-| «Используй `/a/sales.csv` и `/b/sales.csv`» | automation → две регистрации → работа с обоими artifacts |
-| «Прочитай значение из `/.../note.txt`» | обычный Read, без запуска Loginom |
+Ранняя проба измеряет стадии и полный маршрут из home, а также при готовом workspace A. Реализация должна уложиться в общий бюджет; если этого недостаточно, бюджет расширяется согласованно во всех участвующих слоях, с проверкой cancellation/cleanup, а не только в adapter.
 
-Инструкции не предлагают обязательное вложение/`--file` для доступного по политике локального файла. Ошибка доступа сообщает причину и путь. Ошибка формата относится к выбранной операции.
+Если доступное read-only наблюдение не доказывает завершение upload, **остановить развитие этого механизма** и представить владельцу варианты с оценкой изменений, времени и рисков: контрольное скачивание через существующую проверку либо маршрут через черновик и существующую доставку. Не добавлять новые слои верификации и не менять основной вариант молча. Задача этой ревизии — зафиксировать точку решения, не принять альтернативу заранее.
 
-Backend продолжает ограничивать catalog и выполнение по текущему task profile. Docs не получает registration, prepare/upload и обход через custom tool с совпадающим ID. Следующий настоящий запрос пользователя начинает новый task в default; переключения docs → edit и edit → docs проверяются в одной сессии. Глобально запрещать обычное явное чтение `.lgp` не требуется: сохраняется именно запрет автоматического включения его содержимого.
+## Skill: выбор задачи и сохранение
 
-## Проверки
+Модель выбирает intent; существующий trusted skill/profile механизм и Host границы остаются авторитетными. Новый настоящий запрос пользователя начинает task в default. Docs не получает регистрацию/prepare/upload и не обходит запрет через custom tool с совпадающим ID. Нового классификатора намерения нет.
 
-### Поведение без модели
+Правило сохранения добавляется в `loginom-automation` и не требует нового runtime кода сохранения:
 
-- Snapshot: точные бинарные байты, граница 16 MiB, отказ выше границы, прежний default 10 MiB, regular-file ошибки.
-- Policy: внутренний/внешний/относительный путь, explicit deny до allow-always, symlink alias, CLI permission marker, отсутствие admission при отказе.
-- Host/runtime: identity повторов, одинаковый basename, safe destination name, mutation исходника после snapshot, private package-only допуск `.lgp`, отсутствие general runtime startup.
-- Package prepare: проверенный upload/open, отсутствие download, конфликт/неизвестный исход/cancel/owner change, cleanup; существующая data verification не ослаблена.
-- Routing boundary: catalog и фактический запрет вызова в docs/default, автоматический `.lgp` attachment exclusion, следующий user task и сохранение старых вложений.
+- Если пользователь **не указал путь**, сохранить изменения в ту собственную загруженную копию, которая открыта: `/<user>/<identity>-0-<имя>.lgp`. Для замены именно этой копии разрешён `conflict_policy: replace`. Это не разрешение перезаписывать чужие файлы или повторно загружать поверх них.
+- Если путь указан, сохранять туда по существующим правилам перезаписи.
+- В итоговом ответе назвать **полный подтверждённый серверный путь** и прямо сообщить: **локальный файл не изменён**.
 
-Проверяются наблюдаемые результаты, не количество вызовов внутренних helper. Новое поведение добавляется отдельными RED → GREEN → REFACTOR циклами.
+Это совместимо с существующим Save/conflict handling и совпадающими product каталогами inputs/packages (`managed-entry.mjs:141`). Правило skill «для документации нужен локальный `.lgp`, автоматического скачивания сохранённого серверного пакета нет» (`SKILL.md:121–124`) сохраняется. Получение изменённой copy тестовым harness для следующего хода не добавляет такое поведение продукту.
 
-### Настоящая модель и подготовленные prompts в evals/
+## Проверки и размещение кейсов
 
-Применяется [точный loginom-eval-case skill](/home/kiselev/git/agent-validation/.agents/skills/loginom-eval-case/SKILL.md). Пользователь переопределил каталог `agent-validation/sources` на `evals/`; требование native paths также намеренно заменяет basename-only входы и допускает одинаковый basename разных файлов. Исторические attachment cases сохраняют свой контракт.
+### Проверки без модели и ранний главный путь
 
-**Два сценарных evals:** `evals/tasks/local-path-scenarios/csv-two-paths/` и `local-lgp-edit/`. У каждого настоящие `task.json`, `SPEC.md`, `reference.lgp`, независимый oracle, graph acceptance и provenance. Первый использует два разных `sales.csv` из вложенных каталогов; результат должен отличать обработку обоих файлов от любого одного. Второй изменяет существующий локальный `.lgp`; числовой результат и граф должны доказывать изменение исходного пакета, а не создание несвязанного нового.
+Проверяются реальные bytes, новый явный предел snapshot, canonical read, тексты missing/directory/access ошибок, typed deny, attachment authorization без повторного ask и deny поверх attachment/allow-always. Existing default-limit/special-file tests переиспользуются. Проверяются раздельные local identities между сообщениями ассистента, несколько файлов, `%/#/:/?` в basename и неизменность источников.
 
-Существующий eval harness получает узкое `input_mode: "paths"`; отсутствие поля сохраняет attachment-mode. В paths-mode вложенные пути сохраняются, `{{INPUT_ROOT}}` подставляется в подготовленный prompt, `--file`/file parts отсутствуют. Входы текущей попытки размещаются отдельно от session directory и получают только собственный read-only sandbox mount и scoped app permission. Corpus, oracle, SPEC, reference, Git и чужие attempts остаются недоступны агенту. Семантика paths-mode входит в hash входов; старые hashes не меняются из-за default-поля.
+Runtime проверки покрывают private `.lgp` route, native completion, общий deadline, ready workspace → B, actual `next_step` после open failure, unknown/conflict/owner change/cancel и прежнюю data verification. После задачи регистрации и минимальных инструкций для данных выполняется ранний standalone CLI прогон: два внешних CSV с пробелами/кириллицей в путях → upload/import/правильный результат, отдельно missing path с понятной ошибкой. Dev bundle допустим; это source evidence, не installed acceptance. Проба `.lgp` может идти параллельно.
 
-**Два одноходовых routing evals:** `lgp-docs` и `text-read`; канонические prompts, inputs и ожидаемые факты находятся в `evals/cases/local-file-routing/`. Их результат — настоящий Markdown-документ с верными фактами пакета и точный ответ из TXT соответственно. Применяются существующие возможности real-model skills-acceptance запуска/сбора evidence; пакетный judge и `output_mode: diagnostic` для документов не используются. Не создаётся фиктивный `reference.lgp`, новый модельный судья текста или общий framework непакетных результатов.
+### Существующий routing corpus
 
-В `script/skills-acceptance.ts` добавляется необязательный `--corpus`; его default и исторические repo-relative fixtures сохраняются. Явный corpus использует fixtures относительно собственного каталога. Остаётся схема `loginom-skills-routing.v1`; в `run.mjs`/`desktop.mjs` добавляются только native-path inputs, TXT binding, scoped permission и проверки содержимого. Входы передаются text-only, actual document извлекается из существующего evidence workspace. Небольшой oracle сверяет факты в Markdown; Read требует завершённого `read` и ожидаемого значения ответа. Нового launcher, profile lifecycle или output mode не требуется.
+Все проверки выбора skill и переходов остаются в `packages/agent/test/cli/package-docs-routing/cases.json`, fixtures — с существующим repo-relative root. Runner `skills-acceptance` не получает `--corpus`, второго root, `expected.json` или специального default repeat. Целевые запуски CLI/Desktop используют явный **`--repeat 1`**.
 
-Для явно выбранного нового корпуса default — одна попытка на case, исторический default без `--corpus` остаётся прежним. Это исключает скрытый тройной платный прогон при подготовке новых evals; отдельный повтор не является шагом создания эталона.
+- Переиспользовать `docs-local-path` и `docs-external-unicode-path`; новый `lgp-docs` дублировал бы их. Сохранить разные ожидания external case: Desktop разрешает доступ, CLI ожидает отказ с `--file` hint.
+- Добавить новые IDs `scenario-create-path`, `text-read`, `edit-after-docs`, `docs-after-edit`; существующие `scenario-after-docs`, `docs-after-build` и их ветки `turns.mjs:8–17` не менять.
+- `scenario-create-path` — вариант существующего создания сценария с внешним CSV в prompt без attachment. На **Desktop и CLI** обязателен полный путь `loginom_file_admit` → `dock_artifact_deliver` → import → проверенный результат.
+- Для внешнего `.lgp` переиспользовать `external-text-path` — несмотря на имя, сейчас это именно пакет. `csv-path` и `created-lgp-path` нужны там, где старые kinds создают вложение. Для TXT нужен явный текстовый fixture/путь; не менять смысл старого `.lgp` case ради названия kind.
+- Оба перехода — настоящие user turns в одной Session. В edit → docs harness получает реально сохранённую изменённую copy; prompt указывает её локальный путь. Для совместимости существующего bridge transition prompts явно задают итоговый `{{server_package}}`; правило сохранения без заданного пути проверяется отдельным целевым CLI запросом, без нового runner.
+- Для положительных новых внешних cases разрешается только их input path/catalog; это не меняет старый refusal case. Applied activation и реальные tool results важнее заявления модели. Для документа после правки достаточно 1–3 точных фактов, например формулы `amount*3`; без разбора таблиц и нового judge/module при достаточности существующего общего модуля. `text-read` проверяет точное значение ответа и completed Read.
 
-**Два перехода E2E:** docs → edit и edit → docs в одной сессии на существующем Desktop/CLI skills-acceptance. Prompts и fixtures также лежат в этом корпусе `evals/`. В edit → docs источник второго хода — реально сохранённая и выгруженная изменённая локальная копия. Эта выгрузка нужна пользователю для документации и не является контрольным скачиванием при исходном upload.
+### Только два сценарных eval в evals/
 
-Используются существующие transition IDs внутри нового corpus: `scenario-after-docs` и `docs-after-build`. `turns.mjs` сохраняет attachment default и допускает явный `created-lgp-path`; существующий bridge получения сохранённого пакета и проверка Session ID переиспользуются. Acceptance runner остаётся Linux x64: installed CLI image/Docker и изолированный Electron с настоящим backend; это отдельное свидетельство от bubblewrap scenario evals и не проверка всех installer-форматов.
+По [loginom-eval-case](/home/kiselev/git/agent-validation/.agents/skills/loginom-eval-case/SKILL.md) готовятся `evals/tasks/local-path-scenarios/csv-two-paths/` и `local-lgp-edit/`: настоящие reference, SPEC, независимый oracle, graph checks и provenance. Отдельного routing corpus в `evals/` нет.
 
-Для всех checks сохраняются applied skill activations и tool results, а не заявления модели; отсутствие attachments; соответствие source → artifact → destination; исходные/итоговые hashes; фактические outputs. Docs-turn не начинает новую browser/upload операцию; отдельный docs-case не запускает runtime. CLI и Desktop проверяются отдельно, Windows paths — на Windows, а не строковой симуляцией под Linux.
+`input_mode: "paths"` сохраняет вложенные пути внутри **каталога текущей попытки**, например `data/Первый #1/sales.csv`, допускает одинаковые basename разных относительных путей, подставляет `{{INPUT_ROOT}}` и передаёт пустой `files`. Метка режима входит в hash; старый attachment default/hash сохраняется. Входные hashes сравниваются до и после попытки. Read-only гарантия входам не приписывается: существующий workspace mount доступен для записи. Дополнительный input root, `--ro-bind`, per-attempt scoped policy и изменение `sandbox.ts` не нужны. Внешние пути покрываются другими перечисленными проверками. Правило basename в `evals/AGENTS.md` уточняется при реализации.
 
-Reference cases готовятся по skill: independent oracle до модели, максимум три попытки построения, проверка графа, холодный rerun, обычная positive/foreign-negative calibration для новых scenario IDs. Не запускать live `--repeat`. Не коммитить сгенерированные кейсы в рамках skill. Черновики находятся вне принятого корпуса; attempts, profiles и временные конфиги — в `/home/kiselev/storage/tmp/`.
+References строятся task-local копиями `run_attempt.sh` и `prepare_attempt.ts` skill. Копия подготовителя сохраняет вложенные paths, подставляет root и пишет пустой `files.txt`: существующий shell уже не добавляет `--file` при пустом списке (`run_attempt.sh:62–65`). Candidate CLI/WORK_ROOT задаются task-local env через `LOGINOM_EVAL_CASE_ENV`. Сохраняются layout evidence и соседние зависимости scripts. Для двух `sales.csv` адаптируются task-local `collect_artifacts.py` (однозначное сопоставление по relative source → descriptor/destination и SHA, а не basename) и `validate_collection.ts` (duplicate basename допускается только в paths-mode). Установленный skill не меняется. Adapter вокруг `runAttempt`, экспорт `prepareProfile` и искусственный Task не нужны.
 
-Старые скрипты skill flatten inputs и добавляют `--file`, поэтому для этих path references не подходят. Одноразовый adapter подготовки в task temp вызывает существующие `runAttempt`/`afterAttempt` eval harness с paths-mode и выключенным judge; не создаёт фиктивный reference, не ослабляет accepted task loader и не меняет установленный skill. Его точная последовательность, evidence mapping и сохранение ограничений skill описаны в плане. Это адаптация построения эталонов, а не новый постоянный benchmark runner.
+Oracle рассчитывается до модели; reference строится максимум за три попытки, проходит graph/result checks, cold rerun и ordinary positive/foreign-negative calibration двух новых IDs. Модель/variant reference берутся из актуальной skill config, judge — из repository pin; роли не смешиваются. Сгенерированные cases не коммитятся автоматически skill. Запрет живого benchmark `--repeat` при создании эталонов не относится к отдельному согласованному skills-acceptance `--repeat 1`.
 
-Модель построения reference берётся из конфигурации skill (наблюдалась `openai/gpt-6.1-sol`, `xhigh`), модель judge — из текущего repository pin (`gpt-6-sol`, `xhigh`); это разные роли. Для acceptance фиксируются фактически использованные candidate SHA, модель и variant. Нужен установленный candidate CLI/desktop с изменением #74, не произвольный текущий бинарник. Сохраняются isolated endpoint, чистый профиль, фильтрация child env и подтверждённый cleanup; инфраструктурный отказ не считается аналитической ошибкой и не снимается удалением writer guard.
-
-## Основные файлы и порядок
-
-1. Agent `util/file-snapshot.ts`, новый общий local-file helper и `session/tools.ts`: policy, snapshot и model-facing входы.
-2. Host `src/host-port.ts`, `src/inputs.ts`, private adapter/IPC; runtime `managed-entry.mjs`, `bridge.mjs`, workspace preparation, `artifacts.mjs`, `artifact-delivery.mjs`, `executor.mjs`: reuse admission и package upload/open.
-3. Product skills, bootstrap guidance и owning AGENTS: снять attachment-only ограничение только для разрешённого backend local-path route.
-4. Evals `src/task.ts`, `run.ts`, `cli.ts`, `sandbox.ts` и существующий skills-acceptance: native paths, реальные outputs, corpus, evidence.
-5. Детерминированные проверки, live gate, новые references/evals и Desktop/CLI E2E. Изменения public Protocol/HTTP API не планируются; generated SDK не редактируется.
+Временные scripts/configs, profiles и evidence создаются под `/home/kiselev/storage/tmp/`; тестовые fixtures в переносимом коде используют `os.tmpdir()`. Candidate SHA/model/variant и cleanup фиксируются, секреты в отчёты не попадают. Не путать reference authoring по skill, ранний source smoke и installed/sandbox acceptance; у них разные свидетельства. Неизолированный fallback benchmark и удаление writer guard не разрешаются.
 
 ## Checkpoint
 
-- 2026-10-21: дизайн по #74 согласован с правками пользователя; product база `72bfb4e45`.
-- Лимит 16 MiB, несколько путей, local `.lgp` edit и docs routing включены.
-- Контрольное скачивание нового local `.lgp` исключено; native completion ещё не проверено живьём.
-- Новые real-model cases запланированы в `evals/` по указанному skill; корпус и эталоны пока не созданы.
-- Код, unit/e2e tests, model runs и calibration в этой planning-задаче не запускались.
-- Независимое spec review: Approved; технические предположения не считаются живой проверкой.
-- [Подробный план реализации](../plans/2026-10-21-local-file-paths.md) сохранён, независимое plan review: Approved.
-- Следующий шаг реализации: ранняя проверка native upload completion без контрольного скачивания.
+- 2026-10-21: ревизия по внешнему ревью и согласованным решениям владельца; база `72bfb4e45` проверена чтением кода.
+- Канонические правила: общий attachment-aware helper, имена копий, ошибки с сохранением hint, сохранение собственной server copy.
+- Удалены точные повторы, второй routing corpus, новые mounts и reference adapter; runtime IDs после prepare обновляются регистрацией.
+- Сценарные evals — два в evals; routing/переходы — существующий corpus с новыми ID и repeat 1.
+- Риски перед реализацией: upload completion/deadline и workspace A → B; есть точка решения, без наращивания механизма.
+- Код, тесты, модель и browser в этой ревизии не запускались; изменяются только дизайн и план.
+- Независимое ревью новым агентом без истории: Approved во втором раунде; замечание о подсказках файловых ошибок исправлено, обязательных замечаний нет.
