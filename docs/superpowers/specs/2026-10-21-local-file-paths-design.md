@@ -133,4 +133,5 @@ Oracle рассчитывается до модели; reference строитс�
 - Независимое ревью задачи 3 Approved; изменённые attribution entries проверены, общий verifier имеет прежний README hash mismatch. Source-проверки не подтверждают installed acceptance.
 - Задача 4 завершена: skill/save instructions и Host guidance обновлены, независимое ревью Approved. Agent regression 179 pass / 1 existing skip / 0 fail, Host task-scope 17 pass; agent typecheck прошёл.
 - Задача 5 завершена: paths-mode внутри attempt workspace, mode hash и before/after integrity, rejudge сохраняет отказ; независимое ревью Approved, eval tests/typecheck прошли.
-- Следующие задачи 6–8: routing corpus, два scenario eval и installed/model acceptance. Состояние и следующий шаг — в checkpoint плана; поведение дизайна не сужено.
+- Код задачи 6 готов, ревью Approved: existing corpus/fixture selection, CSV/TXT paths и local-edit transitions, source/graph/Markdown checks; host regression 51/207 и typecheck прошли. Actual edit_lgp и live gate ещё впереди.
+- Следующие задачи 7–8 и завершение fixture-пункта 6: routing corpus, два scenario eval и installed/model acceptance. Состояние и следующий шаг — в checkpoint плана; поведение дизайна не сужено.

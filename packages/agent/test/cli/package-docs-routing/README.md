@@ -1,7 +1,7 @@
 # Живая проверка выбора product skills
 
-`cases.json` содержит 20 естественных русских запросов: 10 docs, 5 scenario,
-5 default. Это собственный продуктовый corpus. Near-miss corpus, общий judge
+`cases.json` содержит 24 естественных русских запроса: 11 docs, 7 scenario,
+6 default. Это собственный продуктовый corpus. Near-miss corpus, общий judge
 prompt и harness соседней сессии остаются в её владении.
 
 Ожидания в JSON — критерии будущего прогона, а не выполненная приёмка. Scripted
@@ -55,3 +55,9 @@ Slash-команды `/package-docs` и `/loginom-automation`, same-task denial 
 TUI discovery проверяются отдельными механическими smoke: явная команда не
 входит в эти 20 естественных запросов. Пара baseline/candidate через закреплённый
 evals harness также выполняется отдельно по этапу 7 канонического плана.
+
+## Локальные пути #74
+
+Новые IDs: `scenario-create-path`, `text-read`, `edit-after-docs`, `docs-after-edit`. Внешние CSV/TXT и исходный `.lgp` передаются текстовыми путями; после правки bridge копирует actual saved package внутрь workspace для документации. Оба перехода задают `fixture: "edit_lgp"`; этот ключ добавляется в fixture map только вместе с подтверждённым автономным source из задачи 7. До этого новые edit cases не готовы к живому запуску. Старый default `lgp` и прежние cases сохранены.
+Для #74 выбрать также existing `docs-local-path,docs-external-unicode-path` и запускать Desktop/CLI с явным `--repeat 1`; default runner остаётся 3. Scenario CLI turns уже используют `--auto`; scoped external-directory allow применяется только к `text-read` и docs-ходу `edit-after-docs`. Existing external docs CLI case сохраняет отказ с `--file` hint. Desktop одобряет запросы по источнику текущего хода; evidence хранит все решения.
+Verifiers проверяют admit → delivery → импорт CSV, SHA исходного `.lgp`, сохранение GUID/портов связей и результат amount*3. Для документа после правки проверяются источник extract/emit и точные факты Markdown; для Read — точное значение ответа. Unit checks не являются installed/model acceptance; [канонический план](../../../../../docs/superpowers/plans/2026-10-21-local-file-paths.md) разделяет подготовку fixture и живые прогоны. Desktop temp roots учитывают TMPDIR; при локальном запуске задавать `/home/kiselev/storage/tmp`.
