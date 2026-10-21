@@ -68,13 +68,19 @@ export function inspectJavascriptPreviewPort({held,task,ticket=null,capture=fals
  const shape=graph.view.getState(native.FCell)?.shape?.node,portElement=graph.view.getState(port.FCell)?.shape?.node;
  const selected=graph.getSelectionCells();
  const portRedrawn=ticket&&ticket.portElement!==portElement;
+ const nodeRedrawn=ticket&&ticket.shape!==shape;
+ const selectionRedraw=ticket&&allowPortRedraw&&ticket.portElementReplacements===0
+  &&Array.isArray(selected)&&selected.length===1&&selected[0]===port.FCell
+  &&ticket.portElement?.isConnected===false&&portElement?.isConnected===true;
  if(port.FType!==1||port.FSubType!==1||task.output.native_index!==0
   ||port.FPortIndex!==undefined&&port.FPortIndex!==0
   ||!Array.isArray(selected)||selected.length>1||selected.length===1&&![native.FCell,port.FCell].includes(selected[0])
-  ||ticket&&(ticket.shape!==shape||ticket.port!==port||ticket.portData!==port.data
+  ||ticket&&(ticket.port!==port||ticket.portData!==port.data
    ||ticket.portCell!==port.FCell)
-  ||portRedrawn&&!(allowPortRedraw&&ticket.portElementReplacements===0&&selected.length===1&&selected[0]===port.FCell
-   &&ticket.portElement?.isConnected===false&&portElement?.isConnected===true))throw Error('Managed preview native port changed');
+  ||portRedrawn&&!selectionRedraw
+  ||nodeRedrawn&&!(portRedrawn&&selectionRedraw&&ticket.shape?.isConnected===false&&shape?.isConnected===true
+   &&ticket.shape.getAttribute('data-tid')===held.node.tid&&shape.getAttribute('data-tid')===held.node.tid
+   &&graph.container.contains(shape)))throw Error('Managed preview native port changed');
  const box=portElement.getBoundingClientRect(),point={x:box.x+box.width/2,y:box.y+box.height/2};
  const hit=document.elementFromPoint(point.x,point.y),interactive=hit?.closest('button,a,input,select,textarea,[role="button"],[role="menuitem"]');
  if(!Object.values(box).every(Number.isFinite)||box.width<=0||box.height<=0
@@ -87,6 +93,9 @@ export function inspectJavascriptPreviewPort({held,task,ticket=null,capture=fals
  // Selection redraws the port in Loginom 7.4.2. Rebind only our private ticket,
  // after the unchanged native owner and the current DOM/hit point are verified.
  if(portRedrawn){ticket.portElement=portElement;ticket.portElementReplacements++;}
+ // The same confirmed port selection can remount its producer body as well.
+ // Rebind only that detached same-tid body during the single port redraw.
+ if(nodeRedrawn)ticket.shape=shape;
  return {verified:true,node_id:task.owner.node_id,port_guid:port.FGuid,native_index:0,
   selected:selected.length===1&&selected[0]===port.FCell,point,execution_started:false,
   port_element_replacements:ticket?.portElementReplacements??0};
