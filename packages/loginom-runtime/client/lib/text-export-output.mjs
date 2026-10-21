@@ -80,6 +80,7 @@ export async function releaseRefusedExportRead({operationId,binding,navigationOn
 }
 // A virtual file row may not exist in the DOM until its page is rendered.
 // Search only the observed folder, through bounded native scroll gestures.
+const EXPORT_SEARCH_SCROLLS=40;
 export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
  const suffix=';FileStorageForm;colName_'+storageTidSuffix(name);
  let binding=null,owner=null,lastTop=null,direction=null;
@@ -96,7 +97,9 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
  const issued=initial.ui.elements.filter(e=>e.tid===initial.workflow_ref?.prefix+suffix);need(issued.length<=1,'Export file row is ambiguous');
  if(issued.length){const found=await read({root_ref:issued[0].ref});bind(found);need(found.ui.elements.filter(e=>e.tid===found.workflow_ref.prefix+suffix&&e.label===name).length===1,'Export file name changed');return found;}
  let s=await table();bind(s);
- for(let step=0;step<=12;step++){
+ // Shared storage folders grow with every export; t11 needed ~19600 px.
+ // The operation deadline still bounds the whole search through guard().
+ for(let step=0;step<=EXPORT_SEARCH_SCROLLS;step++){
   guard();
   const r=await read({discover_roots:true,storage_name:name});
   const matches=r.ui.elements.filter(e=>e.tid===r.workflow_ref?.prefix+suffix);
@@ -112,7 +115,7 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
   if(lastTop!==null)need(direction==='up'?scroll.top<lastTop:scroll.top>lastTop,'Export search scroll did not advance');
   if(direction==='up'&&scroll.top===0){direction='down';lastTop=null;}
   if(direction==='down'&&scroll.top>=scroll.max_top)throw unavailable(s,'folder_end');
-  need(step<12,'Export file search scroll budget exhausted');
+  need(step<EXPORT_SEARCH_SCROLLS,'Export file search scroll budget exhausted');
   const delta=direction==='up'?-Math.min(1000,scroll.top):Math.min(1000,scroll.max_top-scroll.top);
   lastTop=scroll.top;await act(s,e,'scroll',{delta_y:delta});
  }
