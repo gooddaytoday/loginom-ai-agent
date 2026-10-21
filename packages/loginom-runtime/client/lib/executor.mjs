@@ -2830,14 +2830,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               }
             };
             try{
-              const checkpointPreflight=graph.target.kind==='new'&&graph.target.type==='transform.cross_table'
+              const checkpointPreflight=graph.target.kind==='new'&&['transform.cross_table','transform.calculator','preprocessing.data_recovery'].includes(graph.target.type)
                 &&!operation.targetPhase?.baseline&&typeof operation.nodeApplyDrivers.beforeTarget==='function';
               if(!checkpointPreflight)await sourcePreflight();
               const targetRequest=preflight?.target_inputs?{...graph,inputs:preflight.target_inputs}:graph;
               result=await prepareNodeTarget({request:targetRequest,operation,adapter:operation.nodeTargetAdapter,
                 record:onRecord,signal:ctx.signal,now,...(checkpointPreflight?{beforeTarget:async()=>{
                   await sourcePreflight();
-                  if(preflight?.target_inputs)throw Error('CrossTable source preflight cannot replace target inputs');
+                  if(preflight?.target_inputs)throw Error('Checkpointed source preflight cannot replace target inputs');
                 }}:{})});
             }finally{operation.deadline=overallDeadline;}
             if(result.status!=='SUCCEEDED'){
