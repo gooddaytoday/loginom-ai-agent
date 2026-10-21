@@ -37,3 +37,13 @@ Also cover the observed conflict-dialog suffix in the shared upload/conflict bou
 Measured route fits 105 s runtime / ~120 s Host / >=180 s adapter; these small local fixtures do not prove worst-case latency. Task 3 must retain a coherent overall deadline.
 Downloads: **0**. Local source hashes unchanged. Owned temporary packages closed with diagnostic discard, logout SUCCEEDED; browser disconnected and upload leases released (`cleanup.json`).
 `stand-cleanup.json` records zero browser processes and removal of only the created no-mount containers/network; existing stands were retained.
+
+## Task 2: local data admission and early source CLI, 2026-10-21
+
+Evidence: `local-paths-74-ptufs123/early-smoke/` under the same task temp. Source `1f52de3d58` plus recorded dirty patch/untracked hashes; dev bundle manifest `89719f65bc057dec341a13b716e5f21920c627cad3ff5d7c357957245088e5ee`. This is source smoke, not installed acceptance.
+TDD covers 16 MiB/default 10 MiB, canonical snapshots, attachments/deny, filesystem and all permission refusal kinds, identities/hooks, multiple sources and copy names. Latest agent checks: 22 tests/152 assertions plus 24 docs tests/92 assertions; Host: 40 tests/319 assertions. Agent/Host typechecks passed; independent code review Approved.
+Real CLI: `run --auto`, `openai/gpt-6.1-sol/xhigh`, 634.6 s; DB confirms model/variant and zero user file parts. Standard `models --refresh` supplied the catalog; initial missing-catalog/model launch failures remain in evidence.
+Two external paths with spaces/Cyrillic and equal `sales.csv` basenames produced distinct admissions and verified deliveries. Actual owned-server bytes match both sources; saved `Unit.xml` imports exactly their destinations. Exported CSV equals the independent oracle: Alpha=17, Beta=20, Gamma=5 (`verification.json`, `result.csv`, `result.lgp`).
+Separate registration of the missing path returned `NotFound: FileSystem.realPath` with its full path and no attachment hint; no file was created. Both original CSV hashes are unchanged. CLI exit 0, runtime closed ACK/exit 0, successful profile guard absent.
+Isolation failure retained: Studio entrypoint overwrote an early `wsproxy:true` with `auto`; the first model attempt reached shared port 8080 and was cancelled. Only its two exact SHA-confirmed own CSV copies were removed. Native cleanup was unconfirmed; its guard/evidence remain, not a cleanup PASS.
+After entrypoint completion, served `server.json` was verified; successful retry sockets used only owned Studio port 32774, never 8080, and physical inputs/results were verified in the owned server. After capture, no owned Bun/Node/Chromium remained; only the created no-mount containers/network were removed (`stand-cleanup.json`).
