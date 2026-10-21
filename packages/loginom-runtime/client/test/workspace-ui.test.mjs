@@ -4306,7 +4306,7 @@ test('hidden export node breadcrumb requires its exact native opening node and i
 });
 
 test('hidden export node remains owned in its main wizard after the input port closes',async()=>{
-  for(const mode of ['valid','missing_opening','foreign_key','foreign_node','foreign_workflow','foreign_data','wrong_native_icon','wrong_icon','wrong_port','hidden_panel','hidden_visibility','opacity','duplicate_node']) {
+  for(const mode of ['valid','missing_opening','foreign_key','foreign_node','foreign_workflow','foreign_data','wrong_native_icon','wrong_icon','wrong_port','hidden_panel','hidden_visibility','opacity','duplicate_node','duplicate_settings','duplicate_settings_outside']) {
     const {page,binding,crumbs,panel,opening,preparation}=await exportInputPortOverflowFixture();
     const label='Выгрузка выручки с русскими заголовками',key=label.replaceAll(' ','_'),base='MF;TF-5;';
     for(const crumb of crumbs.slice(5))crumb.attrs['data-tid']=crumb.attrs['data-tid'].replace('Exportsort',key);
@@ -4330,6 +4330,7 @@ test('hidden export node remains owned in its main wizard after the input port c
     if(mode==='hidden_visibility')crumbs[5].style.visibility='hidden';
     if(mode==='opacity')crumbs[5].style.opacity='0';
     if(mode==='duplicate_node')page.add('a',crumbs[5].attrs['data-tid'],label,crumbs[5].box,panel).style.display='none';
+    if(mode.startsWith('duplicate_settings'))page.add('a',crumbs[8].attrs['data-tid'],'Настройка',crumbs[8].box,mode.endsWith('_outside')?page.document.body:panel).style.display='none';
     const full=await page.execute({mode:'observe',prepared_node_context:binding});
     assert.equal(full.output?.wizard?.owner_context?.status==='observed',mode==='valid',mode);
     if(mode==='valid'){

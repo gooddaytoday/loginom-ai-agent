@@ -725,6 +725,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'
           &&!e.hasAttribute('hidden')&&!sensitive(e)&&e.querySelectorAll('.bg-vendor-icon-exporttextfile').length===1;
         const overflowNodeSettings=e=>preparedNodeWizard===true&&getComputedStyle(e).display==='none'
+          &&(tids.get(getTid(e))??[]).length===1
           &&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
           &&e.textContent.trim()==='Настройка'&&(getTid(e)??'').endsWith('>Настройка')
           &&e.querySelectorAll('.maptree-icon-wizard').length===1
