@@ -4305,6 +4305,42 @@ test('hidden export node breadcrumb requires its exact native opening node and i
   }
 });
 
+test('hidden export node remains owned in its main wizard after the input port closes',async()=>{
+  for(const mode of ['valid','missing_opening','foreign_key','foreign_node','foreign_workflow','foreign_data','wrong_native_icon','wrong_icon','wrong_port','hidden_panel','hidden_visibility','opacity','duplicate_node']) {
+    const {page,binding,crumbs,panel,opening,preparation}=await exportInputPortOverflowFixture();
+    const label='Выгрузка выручки с русскими заголовками',key=label.replaceAll(' ','_'),base='MF;TF-5;';
+    for(const crumb of crumbs.slice(5))crumb.attrs['data-tid']=crumb.attrs['data-tid'].replace('Exportsort',key);
+    crumbs[5].ownText=label;crumbs[5].style.display='none';crumbs[5].box={x:0,y:0,width:0,height:0};
+    crumbs[5].children[0].attrs.class=mode==='wrong_icon'?'bg-vendor-icon-calcdata':'bg-vendor-icon-exporttextfile';
+    crumbs[6].remove();crumbs[7].remove();crumbs[8].attrs['data-tid']=crumbs[5].attrs['data-tid']+'>Настройка';
+    const wizard=page.document.querySelectorAll('[data-tid="'+base+'WizrdMCF"]')[0];
+    page.document.querySelectorAll('[data-tid="'+base+'WizrdMCF;TuneDataSourceMappingWizard;btnAddMappingColumn"]')[0].remove();
+    page.add('input',base+'WizrdMCF;ExportTextFileParamsWizard;edtFileName','',undefined,wizard);
+    const card=page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab();
+    card.Controller.Node.data.node.ParentNode=opening.nodeTree;
+    opening.wizard.FModelNode=opening.nodeData;
+    opening.node.FIconCls=mode==='wrong_native_icon'?'bg-vendor-icon-calcdata':'bg-vendor-icon-exporttextfile';
+    opening.portTid=base+'Graph;'+(mode==='foreign_key'?'Other':key)+';Input_Data-1';
+    if(mode==='missing_opening')preparation.inputPortOpenReceipts.clear();
+    if(mode==='foreign_node')opening.node_id='other';
+    if(mode==='foreign_workflow')opening.workflow={};
+    if(mode==='foreign_data')opening.nodeData={};
+    if(mode==='wrong_port')opening.portIndex=1;
+    if(mode==='hidden_panel')panel.style.display='none';
+    if(mode==='hidden_visibility')crumbs[5].style.visibility='hidden';
+    if(mode==='opacity')crumbs[5].style.opacity='0';
+    if(mode==='duplicate_node')page.add('a',crumbs[5].attrs['data-tid'],label,crumbs[5].box,panel).style.display='none';
+    const full=await page.execute({mode:'observe',prepared_node_context:binding});
+    assert.equal(full.output?.wizard?.owner_context?.status==='observed',mode==='valid',mode);
+    if(mode==='valid'){
+      assert.equal(full.output.prepared_node_context.export_node.node_tid,base+'Graph;'+key);
+      const narrow=await page.execute({mode:'observe',root_ref:full.output.wizard.root_ref,prepared_node_context:binding});
+      assert.deepEqual(narrow.output.wizard.owner_context,full.output.wizard.owner_context);
+    }
+    assert.deepEqual(page.events,[],mode);
+  }
+});
+
 test('hidden export input caption cannot replace native ownership or exact breadcrumb evidence',async()=>{
   for(const mode of ['unbound','missing_opening','duplicate_opening','foreign_node','foreign_port','foreign_workflow','foreign_engine',
     'wrong_port','wrong_caption','foreign_path','duplicate_crumb','duplicate_panel','hidden_panel','missing_icon','sensitive']) {

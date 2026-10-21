@@ -117,7 +117,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   // The state is document-bound; navigation invalidates every previous reference.
   const readUi = async (rediscover = false, scanRetried = false) => {
     const nodeContext=await boundNode();
-    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard}) => {
+    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard,preparedExportNode}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -718,18 +718,24 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&e.querySelectorAll('.maptree-icon-modeloutputports').length===1
           &&(tids.get((getTid(e)??'').slice(0,-'>Выходные_порты'.length))??[]).filter(parent=>panels[0].contains(parent)
             &&visible(parent)&&parent.querySelectorAll('.'+preparedOutputPort.node_icon_class).length===1).length===1;
+        const overflowExportNode=e=>preparedNodeWizard===true&&preparedExportNode?.node_icon_class==='bg-vendor-icon-exporttextfile'
+          &&typeof preparedExportNode.node_tid==='string'&&preparedExportNode.node_tid.startsWith(workflow.prefix+';Graph;')
+          &&getTid(e)===preparedWorkflowPath?.at(-1)?.tid+'>'+preparedExportNode.node_tid.slice((workflow.prefix+';Graph;').length)
+          &&(tids.get(getTid(e))??[]).length===1
+          &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'
+          &&!e.hasAttribute('hidden')&&!sensitive(e)&&e.querySelectorAll('.bg-vendor-icon-exporttextfile').length===1;
         const overflowNodeSettings=e=>preparedNodeWizard===true&&getComputedStyle(e).display==='none'
           &&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
           &&e.textContent.trim()==='Настройка'&&(getTid(e)??'').endsWith('>Настройка')
           &&e.querySelectorAll('.maptree-icon-wizard').length===1
           &&(tids.get((getTid(e)??'').slice(0,-'>Настройка'.length))??[]).filter(parent=>panels[0].contains(parent)
-            &&visible(parent)&&parent.querySelectorAll('[class*="bg-vendor-icon-"]').length===1).length===1;
+            &&(visible(parent)||overflowExportNode(parent))&&parent.querySelectorAll('[class*="bg-vendor-icon-"]').length===1).length===1;
         const crumbs=all.filter(e=>{charge();return (getTid(e)??'').startsWith(prefix) && panels[0].contains(e) && !sensitive(e)
-          && (visible(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
+          && (visible(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||overflowExportNode(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
             &&e.querySelectorAll('.maptree-icon-wizard').length===1);});
         if(crumbs.length>32)ownerContext.status='bounded';
         else if(crumbs.length) {
-          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
+          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||overflowExportNode(e)?short(e.textContent):textOf(e,true),
             overflow_context:overflowSocket(e),
             wizard_icon:e.querySelectorAll('.maptree-icon-wizard').length===1,
             workflow_icon:e.querySelectorAll('.maptree-icon-workflow').length===1,
@@ -835,6 +841,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&preparedInputPort.node_icon_class==='bg-vendor-icon-exporttextfile'&&typeof preparedInputPort.node_tid==='string'
           &&preparedInputPort.node_tid.startsWith(workflow.prefix+';Graph;')
           &&getTid(e)===preparedWorkflowPath?.at(-1)?.tid+'>'+preparedInputPort.node_tid.slice((workflow.prefix+';Graph;').length)
+          &&(tids.get(getTid(e))??[]).length===1
           &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'
           &&!e.hasAttribute('hidden')&&!sensitive(e)&&e.querySelectorAll('.bg-vendor-icon-exporttextfile').length===1;
         if(crumbs.length>32)context.status='bounded';
@@ -3465,7 +3472,7 @@ function readRenderedInputMapping(observation) {
     preparedGraphTid:nodeContext?.surface==='graph'?nodeContext.tid:null,
     preparedNavigationNode:nodeContext?.surface==='graph'?nodeContext.navigation_node??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
-    preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,
+    preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,preparedExportNode:nodeContext?.export_node??null,
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
     if (observed?.ui_read_failure) {
       const code=observed.ui_read_failure.code;

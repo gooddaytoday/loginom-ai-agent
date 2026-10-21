@@ -43,7 +43,10 @@ export async function readPreparedNodeContext(page, binding) {
     }
     if(b.workflow_ref.navigation_path.some((c,i)=>c.tid!==crumbs[i].tid || c.label!==crumbs[i].label))return reject('navigation');
     const model=card?.Controller?.FController;
-    let surface, tid, locked, outputPort, graphRoot, pendingWizardNode;
+    let surface, tid, locked, outputPort, graphRoot, pendingWizardNode, exportNode;
+    const exportNodeFrom=o=>o?.direction==='input'&&o.node?.FIconCls==='bg-vendor-icon-exporttextfile'&&o.portIndex===0&&o.nativeIndex===1
+      &&typeof o.portTid==='string'&&o.portTid.startsWith(b.workflow_ref.prefix+';Graph;')&&o.portTid.endsWith(';Input_Data-1')
+      ?{node_tid:o.portTid.slice(0,-';Input_Data-1'.length),node_icon_class:o.node.FIconCls}:null;
     if(app.ModelForm && model instanceof app.ModelForm) {
       const d=model.FDiagram, nodes=d?.FNodes?.FCollection, roots=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
       if(roots.length===0)return pending();
@@ -85,11 +88,21 @@ export async function readPreparedNodeContext(page, binding) {
           ||o.port.data!==portTree.FModelNodePort||o.port.parent!==o.node||o.port.FPortIndex!==undefined&&o.port.FPortIndex!==o.nativeIndex
           ||portTree.FIndex!==o.nativeIndex||!o.enginePort||(input?model.FModelSocket:model.FModelEnginePort)!==o.enginePort||model.FModelNode
           ||roots.length!==1||model.FView?.el?.dom!==roots[0])return reject('wizard_model');
-        const exportNodeTid=input&&o.node.FIconCls==='bg-vendor-icon-exporttextfile'&&o.portIndex===0&&o.nativeIndex===1
-          &&typeof o.portTid==='string'&&o.portTid.startsWith(b.workflow_ref.prefix+';Graph;')&&o.portTid.endsWith(';Input_Data-1')
-          ?o.portTid.slice(0,-';Input_Data-1'.length):null;
+        const exportNodeTid=exportNodeFrom(o)?.node_tid;
         outputPort={direction:input?'input':'output',port:o.portIndex,native_index:o.nativeIndex,port_guid:o.port.FGuid,opening_operation_id:o.operation_id,node_icon_class:o.node.FIconCls,
           ...(exportNodeTid?{node_tid:exportNodeTid}:{})};
+      } else {
+        // The main export wizard owns the same native node as its input
+        // opening. Reuse only that node's exact key, not the old wizard owner.
+        for(const o of p.inputPortOpenReceipts?.values()??[]) {
+          const key=exportNodeFrom(o);
+          if(key&&o.phase==='verified'&&o.document_id===b.document_id&&o.workflow_id===b.workflow_ref.workflow_id&&o.node_id===b.node.node_id
+            &&o.nodeTree===nodeTree&&o.workflow===workflowNode&&o.packageNode===packageNode&&o.node.FGuid===b.node.node_id
+            &&o.node.data===model.FModelNode&&o.nodeData===o.node.data
+            &&crumbs[b.workflow_ref.navigation_path.length]?.tid===b.workflow_ref.navigation_path.at(-1).tid+'>'+key.node_tid.slice((b.workflow_ref.prefix+';Graph;').length)){
+            exportNode=key;break;
+          }
+        }
       }
       tid=b.workflow_ref.prefix+';WizrdMCF'; surface='wizard';
     } else if(model?.constructor?.name==='ViewsForm') {
@@ -105,7 +118,7 @@ export async function readPreparedNodeContext(page, binding) {
     if(elements[0].getBoundingClientRect().width<=0 || elements[0].getBoundingClientRect().height<=0
       || getComputedStyle(elements[0]).visibility==='hidden')return pending();
     return {verified:true,document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,surface,tid,
-      ...(outputPort?{[outputPort.direction==='input'?'input_port':'output_port']:outputPort}:{}),
+      ...(outputPort?{[outputPort.direction==='input'?'input_port':'output_port']:outputPort}:{}),...(exportNode?{export_node:exportNode}:{}),
       ...(surface==='graph'?{locked,...(nodeTree&&crumbs.length===b.workflow_ref.navigation_path.length+1?{navigation_node:crumbs.at(-1)}:{}),
         ...(pendingWizardNode?{pending_wizard_node:pendingWizardNode}:{})}:{} )};
   },binding);
