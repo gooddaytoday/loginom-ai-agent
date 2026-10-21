@@ -167,7 +167,7 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
   if(!allowed){navigationOnly=false;throw Error('Export read contains an unknown or mutating storage gesture');}
   const id=operation.id+':export-file-'+(++sequence),action={verb,ref:e.ref,...extra},signature=createHash('sha256').update(JSON.stringify({action,snapshot:s})).digest('hex');
   await record('export_file_step_prepared',{id,action,signature});uncertain=true;
-  const r=await execute(withBrowserReceipt('('+makeWorkspaceUiCode({mode:'act',snapshot:s,action,...base})+')(page)',{...receiptOptions(id,'ui.act',signature),operation_id:id}));
+  const r=await execute(withBrowserReceipt('('+makeWorkspaceUiCode({mode:'act',operation_id:id,snapshot:s,action,...base})+')(page)',{...receiptOptions(id,'ui.act',signature),operation_id:id}));
   if(r.action_key&&r.action_key!=='ui.act'||r.operation_id&&r.operation_id!==id)navigationOnly=false;
   await record('export_file_step_completed',{id,outcome:r});need(navigationOnly,'Export gesture receipt identity differs');uncertain=r.cleanup_complete!==true;
   if(r.status==='NOT_APPLIED'&&r.effect_possible===false&&r.cleanup_complete===true&&r.error?.code==='UI_EPOCH_CHANGED'&&attempt<2){
