@@ -100,6 +100,29 @@ test('delivery navigates exact authorized folders and reuses upload and byte ver
  result.outcome.sha256='forged';assert.equal(f.service.status('delivery').outcome.sha256,'a'.repeat(64));
  assert.throws(()=>f.service.deliver({...request,budget_ms:1000}),/different parameters/);
 });
+test('private package delivery reuses folder navigation and native completion while ordinary delivery keeps byte verification',async()=>{
+ const f=fixture();f.artifact.name='source.lgp';f.artifact.upload.destination='/user/dock-p3/source.lgp';f.artifact.upload.overwrite='reject';
+ const signal=new AbortController().signal,observe=f.runtime.observe,act=f.runtime.uiAct;
+ f.runtime.observe=async options=>{assert.equal(options.signal,signal);assert.ok(options.deadlineAt>Date.now()&&options.deadlineAt<=Date.now()+120000);return observe(options);};
+ f.runtime.uiAct=async(a,options)=>{assert.equal(options.signal,signal);assert.ok(options.deadlineAt>Date.now()&&options.deadlineAt<=Date.now()+120000);return act(a,options);};
+ f.runtime.preflightDeliveredArtifact=()=>{throw Error('LGP is not a data verification format');};
+ f.runtime.uploadPackageArtifact=async options=>{
+  assert.ok(options.deadline>Date.now());f.calls.push('package-upload');
+  return {status:'AMBIGUOUS',cleanup_complete:true,output:{upload_submitted:true},error:{code:'UPLOAD_SERVER_VERIFICATION_REQUIRED'}};
+ };
+ f.runtime.completePackageArtifact=async()=>{
+  f.calls.push('package-complete');return {status:'SUCCEEDED',destination:f.artifact.upload.destination,bytes:f.artifact.bytes,
+   source_sha256:f.artifact.sha256,upload_completion_verified:true,cleanup_complete:true};
+ };
+ const result=await f.service.deliver(request,{packageUpload:true,signal});
+ assert.equal(result.outcome.status,'SUCCEEDED');assert.equal(result.outcome.source_sha256,f.artifact.sha256);
+ assert.equal(Object.hasOwn(result.outcome,'sha256'),false);
+ assert.deepEqual(f.calls,['double_click','double_click','package-upload','package-complete']);
+ assert.equal(f.service.unsettled,false);
+ assert.equal(f.events.find(e=>e.phase==='artifact_delivery_upload_receipt').upload.status,'AMBIGUOUS');
+ const ordinary=await f.service.deliver({...request,operation_id:'ordinary'});
+ assert.equal(ordinary.outcome.status,'NOT_APPLIED');assert.deepEqual(f.calls,['double_click','double_click','package-upload','package-complete']);
+});
 test('pre-upload read failure resumes the same attachment with fresh navigation IDs',async()=>{
  const f=fixture(),observe=f.runtime.observe,act=f.runtime.uiAct;let clicks=0,failed=false;const ids=[];
  f.runtime.uiAct=async(a,options)=>{ids.push(options.operationId);clicks++;return act(a,options);};

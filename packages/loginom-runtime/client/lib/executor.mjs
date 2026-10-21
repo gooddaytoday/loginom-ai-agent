@@ -2,7 +2,7 @@ import {browserFailureCategory} from './browser-failure.mjs';
 import {requireStorageDestination,requireExportDestination,storageTidSuffix} from './storage-policy.mjs';
 import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
-import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference} from './artifact-discovery.mjs';
+import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference,completePackageUpload,waitArtifactDiscoveryReady} from './artifact-discovery.mjs';
 import {createArtifactDelivery} from './artifact-delivery.mjs';
 import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt } from './node-target.mjs';
 import {NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
@@ -64,7 +64,12 @@ async function browserArtifactUpload(page,task,observe,resolveConflict) {
   const outcome=(status,code,output={})=>({status,action_key:'artifact.upload',action_revision:'1',operation_id:task.operation_id,
     phase,effect_possible:effect,cleanup_complete:true,output,error:code?{code,message:code}:null,trace});
   const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  const remaining=limit=>{
+    const ms=task.deadline_at===undefined?limit:Math.min(limit,task.deadline_at-Date.now());
+    if(ms<=0)throw Error('UPLOAD_DEADLINE');return ms;
+  };
   try {
+    remaining(15000);
     if(task.artifact.upload.overwrite!=='replace'&&!(task.decide_conflicts&&task.artifact.upload.overwrite==='reject'))return outcome('NOT_APPLIED','UPLOAD_POLICY_UNAVAILABLE');
     let current,prefix,expectedEpoch=task.snapshot.dom_epoch,refreshes=0;
     const refresh=next=>{
@@ -112,20 +117,22 @@ async function browserArtifactUpload(page,task,observe,resolveConflict) {
       if(!admissible)return outcome('NOT_APPLIED','UPLOAD_SENDER_NOT_IDLE');
     }
     trace.push({event:'upload_preconditions_verified',destination:task.artifact.upload.destination});
+    const inputTimeout=remaining(15000);
     phase='submitting';effect=true;
-    await input.setInputFiles(task.upload_path,{timeout:15000});
+    await input.setInputFiles(task.upload_path,{timeout:inputTimeout});
     phase='submitted';trace.push({event:'upload_input_submitted'});
     if(task.decide_conflicts) {
       const decisionTask={operation_id:task.operation_id,overwrite:task.artifact.upload.overwrite,
         expected_origin:task.expected_origin,expected_build:task.expected_build,document:current.dom_epoch.document,prefix,
-        directory:task.artifact.upload.directory,destination:task.artifact.upload.destination,name:task.artifact.name,bytes:task.artifact.bytes};
-      const deadline=Date.now()+15000;let settled=false;
+        directory:task.artifact.upload.directory,destination:task.artifact.upload.destination,name:task.artifact.name,bytes:task.artifact.bytes,
+        ...(task.deadline_at===undefined?{}:{deadline_at:task.deadline_at})};
+      const deadline=Math.min(Date.now()+15000,task.deadline_at??Infinity);let settled=false;
       while(Date.now()<deadline) {
         const state=await input.evaluate((element,task)=>{
           const f=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController,s=f?.FFileSenderManager;
           if(f?.constructor?.name!=='FileStorageForm'||f.FFileInput!==element||!element.isConnected
             ||s?.CurrentDirectory!==task.artifact.upload.directory.replace(/\/?$/,'/'))return 'foreign';
-          const titles=[...document.querySelectorAll('[data-tid="msgbox;p.h;p.t"]')].filter(e=>{const r=e.getBoundingClientRect();return r.x>=0&&r.y>=0&&r.width>0&&r.height>0;});
+          const titles=[...document.querySelectorAll('[data-tid$=";p.h;p.t"]')].filter(e=>{const r=e.getBoundingClientRect();return /^msgbox(?:-\d+)?;p\.h;p\.t$/.test(e.getAttribute('data-tid')??'')&&r.x>=0&&r.y>=0&&r.width>0&&r.height>0;});
           if(titles.length)return 'dialog';
           return element.files?.length===0&&s.FLastConflictResult===undefined&&s.FActiveLoadersCount===0?'settled':'waiting';
         },task);
@@ -138,7 +145,7 @@ async function browserArtifactUpload(page,task,observe,resolveConflict) {
           settled=true;break;
         }
         if(state==='settled'){settled=true;break;}
-        await page.waitForTimeout(100);
+        await page.waitForTimeout(Math.min(100,Math.max(0,deadline-Date.now())));
       }
       if(!settled)return outcome('AMBIGUOUS','UPLOAD_DECISION_UNKNOWN');
       trace.push({event:'upload_native_input_settled',policy:task.artifact.upload.overwrite});
@@ -2448,8 +2455,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return returned;
       } finally { running = false; }
     },
-    async observe({ signal, scope, cursor, rootRef, observationId, storageName } = {}) {
+    async observe({ signal, scope, cursor, rootRef, observationId, storageName, deadlineAt } = {}) {
       signal?.throwIfAborted();
+      const browserOptions=(limit=35000)=>{
+        signal?.throwIfAborted();const timeout=Math.min(limit,deadlineAt===undefined?limit:deadlineAt-now());
+        if(timeout<1)throw Error('Observation deadline elapsed');return {signal,timeout};
+      };
       if (scope !== undefined && !['bootstrap', 'all', 'palette', 'graph', 'dialogs', 'roots', 'wizard'].includes(scope)) throw new Error('Unknown observation scope');
       if (cursor !== undefined && (typeof cursor !== 'string' || !cursor || scope !== undefined)) throw new Error('Use cursor alone to continue the original observation scope');
       if (cursor !== undefined && (rootRef !== undefined || observationId !== undefined)) throw new Error('Use cursor alone to continue the original root');
@@ -2462,12 +2473,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           || !storageName || storageName.length>200 || /[\\/\x00-\x1f\x7f]/.test(storageName))) throw new Error('storage_name requires roots scope and one filename');
       const selectedStorageName=cursor===undefined ? storageName : observations.filterForCursor(cursor)?.storage_name;
       let selectedRoot = cursor===undefined ? rootRef : observations.rootForCursor(cursor);
-      if (scope === 'bootstrap') return execute(makeWorkspaceBootstrapCode({ origin: targetOrigin, build: targetBuild }), { signal, timeout: 5000 });
+      if (scope === 'bootstrap') return execute(makeWorkspaceBootstrapCode({ origin: targetOrigin, build: targetBuild }), browserOptions(5000));
       const observationOperationId=randomUUID();
       let outcome,deliveredScope=scope,selection;
       if(scope==='wizard') {
         const discovery=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:observationOperationId,
-          discover_roots:true,expected_build:targetBuild,expected_origin:targetOrigin}),{signal,timeout:35000});
+          discover_roots:true,expected_build:targetBuild,expected_origin:targetOrigin}),browserOptions());
         const state=discovery.output,wizard=state?.wizard;
         const candidates=(state?.ui?.elements??[]).filter(e=>e.kind==='region'
           && e.ref===wizard?.root_ref && e.tid===state?.workflow_ref?.prefix+';WizrdMCF');
@@ -2481,13 +2492,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         }
       }
       signal?.throwIfAborted();
-      if(!outcome)outcome = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id:observationOperationId, root_ref:selectedRoot, storage_name:selectedStorageName, discover_roots:scope==='roots' || (cursor!==undefined && observations.kindForCursor(cursor)==='roots'), expected_build: targetBuild, expected_origin: targetOrigin }), { signal, timeout: 35000 });
+      if(!outcome)outcome = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id:observationOperationId, root_ref:selectedRoot, storage_name:selectedStorageName, discover_roots:scope==='roots' || (cursor!==undefined && observations.kindForCursor(cursor)==='roots'), expected_build: targetBuild, expected_origin: targetOrigin }), browserOptions());
       if(selection)outcome.trace.push(selection);
       if(cursor===undefined && selectedRoot===undefined && !['roots','wizard'].includes(scope)
           && outcome.status==='NOT_APPLIED' && outcome.error?.code==='UI_SCAN_LIMIT') {
         signal?.throwIfAborted();
         outcome=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:observationOperationId,
-          discover_roots:true,expected_build:targetBuild,expected_origin:targetOrigin}),{signal,timeout:35000});
+          discover_roots:true,expected_build:targetBuild,expected_origin:targetOrigin}),browserOptions());
         deliveredScope='roots';
         outcome.trace.push({event:'observation_scope_fallback',requested_scope:scope??'all',
           delivered_scope:'roots',reason:'UI_SCAN_LIMIT'});
@@ -2496,7 +2507,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       outcome.output.operation = view(pending).output;
       return cursor === undefined ? observations.retain(outcome, { scope:deliveredScope }) : observations.next(cursor, outcome);
     },
-    async uiAct(action, { observationId, operationId, recoveryOperationId, signal } = {}) {
+    async uiAct(action, { observationId, operationId, recoveryOperationId, signal, deadlineAt } = {}) {
       signal?.throwIfAborted(); checkId(operationId);
       const signature = fingerprint('ui.act', [observationId, action, recoveryOperationId ?? null]);
       if (auxiliary.has(operationId)) {
@@ -2570,7 +2581,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       const uiOperation = { id: operationId, signature, action: { action_key: 'ui.act', revision: '1', capability: 'ui.act' },
         parameters: { action, observation_id: observationId, recovery_operation_id: recoveryOperationId ?? null },
         checkpoint: { workflow_ref: snapshot.workflow_ref, target_tids: [action.ref, action.source_ref, action.target_ref].filter(Boolean)
-          .map(ref => snapshot.ui.elements.find(item => item.ref === ref)).map(item => item.tid ?? item.identity?.anchor_tid) }, deadline: now() + 30000 };
+          .map(ref => snapshot.ui.elements.find(item => item.ref === ref)).map(item => item.tid ?? item.identity?.anchor_tid) }, deadline: Math.min(now() + 30000,deadlineAt??Infinity) };
       const owner = original ?? uiOperation;
       try {
         await remember(uiOperation, 'prepared');
@@ -2581,8 +2592,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         let outcome;
         try {
           const code = makeWorkspaceUiCode({ mode: 'act', expected_build: targetBuild, expected_origin: targetOrigin,
-            operation_id: operationId, action, snapshot });
-          outcome = await execute(withBrowserReceipt(`(${code})(page)`, receipt), { timeout: 35000 });
+            operation_id: operationId, action, snapshot,...(deadlineAt===undefined?{}:{deadline_at:deadlineAt}) });
+          outcome = await execute(withBrowserReceipt(`(${code})(page)`, receipt), { timeout: deadlineAt===undefined?35000:Math.max(1,Math.min(35000,deadlineAt-now())) });
         } catch (error) { owner.transportUncertain = true; outcome = failed(uiOperation, 'BROWSER_CALL_UNCERTAIN', String(error?.message ?? error).slice(0, 1000)); }
         if (!owner.transportUncertain) owner.cleanupConfirmed = outcome.cleanup_complete === true;
         uiOperation.outcome = outcome;
@@ -2596,10 +2607,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return outcome;
       } finally { running = false; }
     },
-    async upload({artifactId,grantId,observationId,operationId,signal,decideConflicts=false,deliveryOperationId}={}) {
+    async upload({artifactId,grantId,observationId,operationId,signal,decideConflicts=false,deliveryOperationId,packageCompletion=false,deadline}={}) {
       signal?.throwIfAborted();checkId(operationId);
       if(!allowCandidate || !artifactStore)throw new Error('Artifact upload is available only in an authorized candidate session');
       const artifact=artifactStore.getUploadGrant(artifactId,grantId);
+      const packageBinding=packageCompletion?getStorageBinding():null;
+      if(packageCompletion&&(!/\.lgp$/i.test(artifact.name)||artifact.upload.overwrite!=='reject'||!packageBinding
+        ||!Number.isSafeInteger(deadline)||deadline<=now()))throw Error('Private package upload requires its binding and original deadline');
       const signature=fingerprint(decideConflicts?'artifact.upload.delivery':'artifact.upload',[artifactId,grantId,observationId]);
       if(auxiliary.has(operationId))throw new Error('Upload operation ID conflicts with another request');
       if(operations.has(operationId)) {
@@ -2617,7 +2631,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const lease=await artifactStore.stageUpload(artifactId);
         const operation={id:operationId,signature,uploadLease:lease,action:{action_key:'artifact.upload',revision:'1',capability:'artifact.upload'},
           deliveryOperationId,parameters:{artifact_id:artifactId,upload_grant_id:grantId,observation_id:observationId,destination:artifact.upload.destination,overwrite:artifact.upload.overwrite},
-          checkpoint:{workflow_ref:snapshot.workflow_ref,file_storage:snapshot.file_storage,storage_root_ref:snapshot.observation_root?.ref ?? null,artifact},deadline:now()+30000};
+          checkpoint:{workflow_ref:snapshot.workflow_ref,file_storage:snapshot.file_storage,storage_root_ref:snapshot.observation_root?.ref ?? null,artifact},deadline:packageCompletion?deadline:now()+30000};
         try {await lease.verify();signal?.throwIfAborted();await remember(operation,'prepared');signal?.throwIfAborted();}
         catch(error){await lease.release();throw error;}
         operations.set(operationId,operation);pending=operation;observations.clear();
@@ -2625,8 +2639,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         try {
           const receipt=receiptOptions(operation,operationId,'artifact.upload',signature);
           const code=makeArtifactUploadCode({operation_id:operationId,artifact,upload_path:lease.path,snapshot,decide_conflicts:decideConflicts,
-            expected_build:targetBuild,expected_origin:targetOrigin});
-          outcome=assertActionOutcome(await execute(withBrowserReceipt(`(${code})(page)`,receipt),{timeout:35000}));
+            expected_build:targetBuild,expected_origin:targetOrigin,...(packageCompletion?{deadline_at:deadline}:{})});
+          const submission=withBrowserReceipt(`(${code})(page)`,receipt);
+          const dispatched=packageCompletion
+            ? `async page=>(${completePackageUpload.toString()})(page,${JSON.stringify({operation_id:operationId,artifact,snapshot,binding:packageBinding,
+                expected_build:targetBuild,expected_origin:targetOrigin,deadline_at:deadline})},${submission},${waitArtifactDiscoveryReady.toString()})`
+            : submission;
+          const raw=assertActionOutcome(await execute(dispatched,{timeout:packageCompletion?Math.max(1,deadline-now()):35000}));
+          if(packageCompletion){
+            if(raw.action_key!=='artifact.package_completion'||raw.operation_id!==operationId||raw.action_revision!=='1')throw Error('Package completion receipt identity mismatch');
+            operation.packageCompletion=structuredClone(raw);
+            outcome=assertActionOutcome(raw.output.upload??{...raw,action_key:'artifact.upload',phase:'preconditions',output:{}});
+          }else outcome=raw;
           if(outcome.operation_id!==operationId || outcome.action_key!=='artifact.upload' || outcome.action_revision!=='1')
             throw new Error('Upload receipt identity mismatch');
         } catch {operation.transportUncertain=true;outcome=failed(operation,'BROWSER_CALL_UNCERTAIN','Inspect the upload receipt before any further mutation');}
@@ -2638,6 +2662,23 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         }
         return structuredClone(outcome);
       } finally {running=false;}
+    },
+    uploadPackageArtifact:options=>runtime.upload({...options,decideConflicts:true,packageCompletion:true}),
+    async completePackageArtifact({operationId}={}) {
+      const operation=operations.get(operationId),native=operation?.packageCompletion,artifact=operation?.checkpoint.artifact,proof=native?.output.completion;
+      if(running||pending!==operation||!operation||operation.transportUncertain||!operation.cleanupConfirmed
+        ||native?.status!=='SUCCEEDED'||native.cleanup_complete!==true||native.action_key!=='artifact.package_completion'
+        ||operation.outcome?.status!=='AMBIGUOUS'||operation.outcome.error?.code!=='UPLOAD_SERVER_VERIFICATION_REQUIRED'
+        ||fingerprint('package-upload',native.output.upload)!==fingerprint('package-upload',operation.outcome)
+        ||proof?.artifact_id!==artifact.artifact_id||proof.destination!==artifact.upload.destination||proof.bytes!==artifact.bytes
+        ||proof.bytes_source!=='native_file_store'||proof.upload_completion_verified!==true
+        ||proof.files_entry?.document_id!==getStorageBinding()?.document_id||proof.files_entry?.tab_tid!==operation.checkpoint.workflow_ref.tab_tid
+        ||proof.files_entry?.directory!==artifact.upload.directory)throw Error('Native package upload completion remains unconfirmed');
+      await operation.uploadLease.release().catch(error=>{operation.cleanupConfirmed=false;throw error;});
+      const result={status:'SUCCEEDED',...structuredClone(proof),source_sha256:artifact.sha256,cleanup_complete:true};
+      const recorded=await onRecord({phase:'package_upload_completed',operation_id:operationId,result});
+      if(recorded?.phase!=='package_upload_completed'||recorded.operation_id!==operationId)throw Error('Package completion was not durably acknowledged');
+      pending=null;observations.clear();return result;
     },
     async verifyArtifact({operationId,verificationId,observationId,fileRef,signal,discover=false,compareExisting=false,onDispatched}={}) {
       signal?.throwIfAborted();checkId(operationId);checkId(verificationId);
@@ -3047,6 +3088,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     hasActiveWork:()=>!!(running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
     hasUnsettledWork:()=>!!(running||pending||leased||nodeJobs.unsettled||delivery.unsettled||sourceReads.unsettled),
     deliverArtifact:(request,options)=>delivery.deliver(request,options),
+    deliverPackageArtifact:(request,options)=>delivery.deliver(request,{...options,packageUpload:true}),
     resumeArtifactDelivery:(request,options)=>delivery.resume(request,options),
     artifactDeliveryStatus:id=>delivery.status(id)});
 }

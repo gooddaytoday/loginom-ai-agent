@@ -91,7 +91,7 @@ export function validateUiAction(action, snapshot) {
 
 export function workspaceUiCapability(page, task, readNodeContext, captureProcessFocus, restoreProcessFocus) {
   // Dispatch time consumes the bound node budget; it cannot restart in the browser.
-  const started = Date.now(), deadline = Math.min(task.deadline??Infinity,
+  const started = Date.now(), deadline = Math.min(task.deadline??Infinity,task.deadline_at??Infinity,
     started + (task.output_settlement_read?.timeout_ms??task.settlement_timeout_ms??task.opening_timeout_ms??15000));
   const trace = [], handles = [];
   let postActionRoot;

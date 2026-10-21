@@ -33,6 +33,7 @@ import { makePackageCleanupCode, parsePackageCleanupResult } from './package-cle
 import {makeSavedPackageStateCode,parseSavedPackageState,savedPackageStateAdvice} from './package-persistence.mjs';
 import { createStorageBinding, requireStorageDestination, withStorageIdentity } from './storage-policy.mjs';
 import { createBrowserRecovery, makeRecoveryPageProbeCode, parseRecoveryPageProbe } from './browser-recovery.mjs';
+import {runtimeCallTimeout} from '../../src/call-timeout.mjs';
 
 // Keep the runtime receipt byte-for-byte meaningful to reconciliation/journal
 // consumers; recovery advice is a separate MCP content block, never an effect.
@@ -277,7 +278,7 @@ export async function createBridge(config, session, { browserTransport: managedB
         : 'Call dock_prepare for scenario work after skill activation. It returns dynamic readiness, input artifacts and local skill pins. Dock provides shared knowledge and a local browser. Source files and live DOM take precedence over recalled context. All clipboard copy/paste must use dock_clipboard_transfer so other Dock sessions cannot overwrite it during the operation. The installed native adapter activates shared session archiving after successful preparation. Check dock_diagnostics for actual archive activation and delivery state.'),
     });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [...structuredClone(catalog.tools), ...recovery.listTools(browserTools)] }));
-    const callTool = async (request, extra) => {
+    const callTool = async (request, extra, privatePackage=null) => {
       if (shutdownStarted) throw new McpError(ErrorCode.InvalidRequest, 'Dock shutdown has started');
       if (recovery.owns(request.params.name)) {
         requirePreparedWorkspace(session.metadata);
@@ -307,14 +308,21 @@ export async function createBridge(config, session, { browserTransport: managedB
         clipboardTransferAvailable: !actionRuntime, clipboardUncertain, archive, connection,
       }) }] };
       }
+      let localPackageUpload=null;
       try {
         if (request.params.name === 'dock_prepare') {
           let args = request.params.arguments ?? {};
           validateActionParameters(prepareTool.inputSchema, args);
+          const packageDeadline=privatePackage?Date.now()+Math.min(args.timeout_ms??120000,runtimeCallTimeout('dock_prepare',args)-5000):null;
+          const remaining=()=>{
+            const ms=packageDeadline-Date.now();
+            if(ms<1)throw Error('Local package preparation deadline elapsed');
+            return ms;
+          };
           if (userProfile) args = userWorkflows.normalizePreparation(args);
           await admitHostArtifacts(args.host_context_token, codexInputIdentity(request.params));
           const preparationRequest = { operation_id: args.operation_id ?? 'prepare', intent: args.intent ?? 'new_draft',
-            package_path: args.package_path ?? null, workflow_ref: args.workflow_ref ?? null };
+            package_path: privatePackage?.upload.destination??args.package_path??null, workflow_ref: args.workflow_ref ?? null };
           if (config.storageDirectories && preparationRequest.package_path)
             requireStorageDestination(preparationRequest.package_path, config.storageDirectories, 'packages');
           const workspaceOptions = actionRuntime ? { loginomUrl: config.loginomUrl,
@@ -334,8 +342,33 @@ export async function createBridge(config, session, { browserTransport: managedB
               assertAllowed() { extra.signal.throwIfAborted(); actionRuntime.assertPreparationAllowed(); },
               async prepare({ recoverOnly }) {
                 if (!config.loginomUrl) throw new Error('Workspace preparation requires the configured Loginom URL');
-                const code = makeWorkspacePrepareCode({ ...workspaceOptions, recoverOnly });
-                const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: { code } }, undefined, { timeout: 125000 });
+                if(privatePackage){
+                  if(recoverOnly)throw Error('Reconcile the original package preparation using its server package_path; do not upload again');
+                  extra.signal.throwIfAborted();
+                  const identityCode=makeWorkspacePrepareCode({...workspaceOptions,intent:'new_draft',packagePath:null,identityOnly:true,timeoutMs:remaining()});
+                  const identity=parseWorkspacePreparation(await browser.callTool({name:'browser_run_code_unsafe',arguments:{code:identityCode}},undefined,{timeout:remaining()+1000}));
+                  if(identity.status!=='BOUND')throw Error('Local package storage identity is not ready: '+identity.reason);
+                  session.metadata.storageBinding=createStorageBinding({sessionId:session.metadata.sessionId,origin:new URL(config.loginomUrl).origin,
+                    build:identity.target.loginom_build,documentId:identity.document_id,account:identity.loginom_account,directories:config.storageDirectories});
+                  extra.signal.throwIfAborted();
+                  const budget=remaining();if(budget<1000)throw Error('Local package upload deadline elapsed');
+                  const delivered=await actionRuntime.deliverPackageArtifact({operation_id:'package-'+randomUUID(),artifact_id:privatePackage.artifact_id,
+                    upload_grant_id:privatePackage.upload.grant_id,budget_ms:budget},{signal:extra.signal});
+                  const proof=delivered.outcome;
+                  if(proof?.status!=='SUCCEEDED'||proof.cleanup_complete!==true||proof.upload_completion_verified!==true
+                    ||proof.destination!==privatePackage.upload.destination||proof.bytes!==privatePackage.bytes||proof.source_sha256!==privatePackage.sha256)
+                    throw Error('Local package upload remains unconfirmed; inspect the original transfer before further changes');
+                  localPackageUpload=proof;
+                  if(extra.signal.aborted||Date.now()>=packageDeadline)return {status:'NOT_READY',
+                    reason:extra.signal.aborted?'CANCELLED':'DEADLINE',effect_possible:false,created_draft:false,authenticated:true,
+                    operation_id:preparationRequest.operation_id,target:identity.target};
+                }
+                const code = makeWorkspacePrepareCode({ ...workspaceOptions, recoverOnly,
+                  storageBinding:session.metadata.storageBinding??null,
+                  ...(privatePackage?{timeoutMs:remaining()}:{}) });
+                const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
+                  code:privatePackage?withStorageIdentity(code,session.metadata.storageBinding):code,
+                } }, undefined, { timeout: privatePackage?remaining()+1000:125000 });
                 const state = parseWorkspacePreparation(response);
                 if (state.status === 'READY') {
                   if (config.storageDirectories) session.metadata.storageBinding = createStorageBinding({
@@ -349,7 +382,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                       runtime_revision: session.metadata.clientRevision,
                       manifest_sha256: session.metadata.actionManifestDigest,
                       workflow_ref: state.workflow_ref }),
-                  } }, undefined, { timeout: 15000 });
+                  } }, undefined, { timeout: privatePackage?Math.min(15000,remaining()+1000):15000 });
                   state.browser_geometry = parseBrowserGeometry(geometry);
                 }
                 return state;
@@ -360,6 +393,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               if (userProfile && session.metadata.workspaceReady === true) userWorkflows.remember(state);
               return state;
             });
+            if(localPackageUpload&&workspace.status!=='READY')throw Error('Local package opening was not verified: '+workspace.reason);
           }
           if (!actionRuntime) await session.save(catalog);
           if (userProfile && actionRuntime) {
@@ -372,6 +406,7 @@ export async function createBridge(config, session, { browserTransport: managedB
             const result = { prepared: ready, sessionId: session.metadata.sessionId, skillRevision: prepared.detail.revision,
               source: prepared.detail.source,
               loginomUrl: config.loginomUrl, workspace, result_version: 'user-v1', input_artifacts: session.artifactStore.list(),
+              ...(localPackageUpload?{local_package_upload:localPackageUpload}:{}),
               ...(config.storageDirectories ? { storage_directories: config.storageDirectories } : {}),
               knowledge: bundle ?? { reused: true, skillRevision: prepared.detail.revision } };
             await logResult('dock_prepare', result);
@@ -539,6 +574,13 @@ export async function createBridge(config, session, { browserTransport: managedB
         });
       } catch (error) {
         const message = String(error.message).replaceAll(config.apiKey, '[redacted]');
+        if(localPackageUpload)return boundedUserToolReply({isError:true,content:[{type:'text',text:JSON.stringify({
+          code:'LOCAL_PACKAGE_OPEN_UNCONFIRMED',message,prepared:false,local_package_upload:localPackageUpload,
+          workspace:session.metadata.workspacePreparation?.state??null,
+          next_step:{tool:'dock_prepare',arguments:{intent:'open_package',operation_id:request.params.arguments?.operation_id??'prepare',
+            package_path:localPackageUpload.destination},
+            instruction:'Continue with this confirmed server copy and the original operation ID. Reconcile the original opening receipt; never repeat an uncertain open or upload the local file again.'},
+        })}]},{tool:'dock_prepare'});
         if(userProfile&&request.params.name==='dock_prepare'&&message.startsWith('UNKNOWN_PREPARED_WORKFLOW:')
           &&!clipboardUncertain&&heldLeases.size===0&&!actionRuntime?.hasUnsettledWork()) {
           const next_step={tool:'dock_prepare',arguments:{intent:'open_package',
@@ -570,7 +612,18 @@ export async function createBridge(config, session, { browserTransport: managedB
       return userProfile && ['local','action'].includes(catalog.routes.get(request.params.name))
         ?boundedUserToolReply(reply,{tool:request.params.name,operationId:request.params.arguments?.operation_id}):reply;
     });
-    return { server, catalog, hasActiveWork: () => !clipboardUncertain && (!!actionRuntime?.hasActiveWork() || recovery.unsettled()),
+    return { server, catalog,
+      async prepareLocalPackage(args,pair,extra) {
+        if(!userProfile||!actionRuntime||!config.storageDirectories||args?.intent!=='open_package'
+          ||Object.hasOwn(args,'package_path')||Object.hasOwn(args,'workflow_ref'))
+          throw Error('Private package preparation requires open_package with one admitted source');
+        const artifact=session.artifactStore.getUploadGrant(pair?.artifactID,pair?.uploadGrantID);
+        if(!/\.lgp$/i.test(artifact.name)||artifact.upload.overwrite!=='reject')
+          throw Error('Private package preparation requires an admitted .lgp with reject upload policy');
+        requireStorageDestination(artifact.upload.destination,config.storageDirectories,'packages');
+        return callTool({params:{name:'dock_prepare',arguments:args}},extra,artifact);
+      },
+      hasActiveWork: () => !clipboardUncertain && (!!actionRuntime?.hasActiveWork() || recovery.unsettled()),
       hasUnsettledWork: () => !!actionRuntime?.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0, close() {
       shutdownStarted = true;
       closing ??= (async () => {

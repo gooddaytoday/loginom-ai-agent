@@ -667,11 +667,23 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           inputSchema: jsonSchema(
             ProviderTransform.schema(input.model, {
               ...definition.inputSchema,
-              properties: Object.fromEntries(
-                Object.entries(definition.inputSchema.properties ?? {}).filter(
-                  ([name]) => name !== "host_context_token",
+              properties: {
+                ...Object.fromEntries(
+                  Object.entries(definition.inputSchema.properties ?? {}).filter(
+                    ([name]) => name !== "host_context_token",
+                  ),
                 ),
-              ),
+                ...(definition.name === "dock_prepare"
+                  ? {
+                      local_package_path: {
+                        type: "string",
+                        minLength: 1,
+                        description:
+                          "Local .lgp path for intent open_package, instead of server package_path; incompatible with workflow_ref. The backend authorizes and snapshots the file.",
+                      },
+                    }
+                  : {}),
+              },
               required: definition.inputSchema.required?.filter((name) => name !== "host_context_token"),
             } as JSONSchema7),
           ),
@@ -686,15 +698,64 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                   { tool: key, sessionID: ctx.sessionID, callID: options.toolCallId },
                   { args },
                 )
-                yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
+                if (definition.name === "dock_prepare" && Object.hasOwn(args, "local_package_path")) {
+                  if (typeof args.local_package_path !== "string" || !args.local_package_path.length)
+                    return yield* Effect.die(Error("local_package_path must be a non-empty local path"))
+                  if (
+                    args.intent !== "open_package" ||
+                    args.package_path !== undefined ||
+                    args.workflow_ref !== undefined
+                  )
+                    return yield* Effect.die(
+                      Error(
+                        "local_package_path requires open_package without package_path or workflow_ref. Путь: " +
+                          path.resolve(input.session.directory, args.local_package_path),
+                      ),
+                    )
+                }
+                yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] }).pipe(
+                  Effect.catchCause((cause) => {
+                    if (definition.name !== "dock_prepare" || typeof args.local_package_path !== "string")
+                      return Effect.failCause(cause)
+                    return Effect.gen(function* () {
+                      const { localFilePermissionFailure } = yield* Effect.promise(
+                        () => import("@/tool/loginom-local-file"),
+                      )
+                      return yield* localFilePermissionFailure(
+                        path.resolve(input.session.directory, args.local_package_path),
+                        cause,
+                        ctx,
+                      )
+                    })
+                  }),
+                )
+                const forwarded = { ...args }
+                const packageInput =
+                  definition.name === "dock_prepare" && typeof args.local_package_path === "string"
+                    ? yield* Effect.gen(function* () {
+                        const { snapshotLoginomFile } = yield* Effect.promise(() => import("@/tool/loginom-local-file"))
+                        const source = yield* snapshotLoginomFile(args.local_package_path, ctx)
+                        if (path.extname(source.file.name).toLowerCase() !== ".lgp")
+                          return yield* Effect.die(
+                            Error("local_package_path requires a .lgp file. Путь: " + source.sourcePath),
+                          )
+                        delete forwarded.local_package_path
+                        if (forwarded.operation_id === undefined) forwarded.operation_id = crypto.randomUUID()
+                        return {
+                          admissionID: JSON.stringify(["local-file", ctx.messageID, ctx.callID]),
+                          file: source.file,
+                        }
+                      })
+                    : undefined
                 const result = yield* Effect.promise(async () =>
                   CallToolResultSchema.parse(
                     await loginom.call(
                       definition.name,
-                      args,
+                      forwarded,
                       task.taskMessageID,
                       options.abortSignal,
                       LOGINOM_LOCAL_TOOLS.has(definition.name) ? undefined : admissions,
+                      packageInput,
                     ),
                   ),
                 )

@@ -1,4 +1,6 @@
 import { expect } from "bun:test"
+import { asSchema } from "ai"
+import { pathToFileURL } from "node:url"
 import { Cause, Effect, Exit, Fiber, Layer } from "effect"
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import { AppProcess } from "@loginom-ai-agent/core/process"
@@ -105,38 +107,148 @@ it.instance("automation registers exact local bytes after preparation without se
   }),
 )
 
-it.instance("local registration permission failures retain path, typed marker and the appropriate hint", () =>
+it.instance("local package prepare snapshots bytes into its private input and strips the OS path", () =>
+  Effect.gen(function* () {
+    const fs = yield* FSUtil.Service
+    const instance = yield* TestInstance
+    const bytes = Uint8Array.from([0, 255, 128, 10])
+    yield* fs.writeFile(instance.directory + "/Пакет #1.lgp", bytes)
+    const calls: unknown[][] = []
+    const resolved = yield* resolveProfile("loginom-automation", {
+      ...preparedLoginom(async () => {
+        throw Error("Packages must not use ordinary attachment admission")
+      }),
+      async tools() {
+        return { tools: [{ name: "dock_prepare", inputSchema: { type: "object", properties: {} } }] }
+      },
+      async call(...args) {
+        calls.push(args)
+        return { content: [{ type: "text", text: "prepared" }] }
+      },
+    })
+    const execute = resolved.tools.loginom_dock_prepare?.execute
+    if (!execute) throw Error("Preparation tool missing")
+    const schema = yield* Effect.promise(
+      async () => asSchema(resolved.tools.loginom_dock_prepare.inputSchema).jsonSchema,
+    )
+    expect(schema.properties?.local_package_path).toMatchObject({ type: "string" })
+    yield* Effect.promise(() =>
+      execute(
+        { intent: "open_package", local_package_path: "Пакет #1.lgp", operation_id: "open-local-1" },
+        { toolCallId: "local-package-1", abortSignal: new AbortController().signal, messages: [] },
+      ),
+    )
+    expect(calls).toEqual([
+      [
+        "dock_prepare",
+        { intent: "open_package", operation_id: "open-local-1" },
+        resolved.user,
+        expect.any(AbortSignal),
+        [],
+        {
+          admissionID: JSON.stringify(["local-file", resolved.assistant.id, "local-package-1"]),
+          file: { name: "Пакет #1.lgp", data: Buffer.from(bytes).toString("base64") },
+        },
+      ],
+    ])
+    for (const toolCallId of ["local-package-2", "local-package-3"])
+      yield* Effect.promise(() =>
+        execute(
+          { intent: "open_package", local_package_path: "Пакет #1.lgp" },
+          { toolCallId, abortSignal: new AbortController().signal, messages: [] },
+        ),
+      )
+    const operations = calls.slice(1).map((call) => (call[1] as { operation_id?: string }).operation_id)
+    expect(operations).toEqual([expect.any(String), expect.any(String)])
+    expect(new Set(operations).size).toBe(2)
+  }),
+)
+
+it.instance("local package prepare rejects invalid source combinations before Host dispatch", () =>
+  Effect.gen(function* () {
+    const fs = yield* FSUtil.Service
+    const instance = yield* TestInstance
+    yield* fs.writeFileString(instance.directory + "/source.lgp", "package")
+    yield* fs.writeFileString(instance.directory + "/source.csv", "data")
+    const calls: unknown[] = []
+    const resolved = yield* resolveProfile("loginom-automation", {
+      ...preparedLoginom(async () => {
+        throw Error("Unexpected ordinary admission")
+      }),
+      async tools() {
+        return { tools: [{ name: "dock_prepare", inputSchema: { type: "object", properties: {} } }] }
+      },
+      async call(...args) {
+        calls.push(args)
+        return { content: [] }
+      },
+    })
+    const execute = resolved.tools.loginom_dock_prepare?.execute
+    if (!execute) throw Error("Preparation tool missing")
+    for (const args of [
+      { local_package_path: "source.lgp", intent: "new_draft" },
+      { local_package_path: "source.lgp", intent: "open_package", package_path: "/user/other.lgp" },
+      { local_package_path: "source.lgp", intent: "open_package", workflow_ref: {} },
+      { local_package_path: null, intent: "open_package" },
+      { local_package_path: 7, intent: "open_package" },
+      { local_package_path: "source.csv", intent: "open_package" },
+    ]) {
+      const result = yield* Effect.promise(() =>
+        execute(args, { toolCallId: "invalid-local-package", abortSignal: new AbortController().signal, messages: [] }),
+      ).pipe(Effect.exit)
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) expect(String(Cause.squash(result.cause))).toContain("local_package_path")
+    }
+    expect(calls).toEqual([])
+  }),
+)
+
+it.instance("local file tool permission failures retain path, typed marker and the appropriate hint", () =>
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
     const sessions = yield* Session.Service
     const permissions = yield* Permission.Service
     const instance = yield* TestInstance
-    const path = instance.directory + "/source.csv"
-    yield* fs.writeFileString(path, "amount\n10\n")
-    const loginom = preparedLoginom(async () => {
-      throw Error("Denied input must not be admitted")
-    })
-    for (const action of ["ask", "feedback", "deny"] as const) {
+    yield* fs.writeFileString(instance.directory + "/source.csv", "amount\n10\n")
+    yield* fs.writeFileString(instance.directory + "/source.lgp", "package")
+    const loginom = {
+      ...preparedLoginom(async () => {
+        throw Error("Denied input must not be admitted")
+      }),
+      async tools() {
+        return {
+          tools: ["dock_action_describe", "dock_prepare"].map((name) => ({
+            name,
+            inputSchema: { type: "object", properties: {} },
+          })),
+        }
+      },
+    }
+    for (const { tool, action } of ["loginom_file_admit", "loginom_dock_prepare"].flatMap((tool) =>
+      (["ask", "feedback", "deny"] as const).map((action) => ({ tool, action })),
+    )) {
+      const path = instance.directory + (tool === "loginom_file_admit" ? "/source.csv" : "/source.lgp")
+      const args =
+        tool === "loginom_file_admit"
+          ? { path: "source.csv" }
+          : { intent: "open_package", local_package_path: "source.lgp" }
       const resolved = yield* resolveProfile("loginom-automation", loginom, undefined, [
         { permission: "*", pattern: "*", action: "allow" },
-        { permission: "loginom_file_admit", pattern: "*", action: action === "feedback" ? "ask" : action },
+        { permission: tool, pattern: "*", action: action === "feedback" ? "ask" : action },
       ])
       const part = yield* sessions.updatePart({
         id: PartID.ascending(),
         sessionID: resolved.session.id,
         messageID: resolved.assistant.id,
         type: "tool",
-        tool: "loginom_file_admit",
+        tool,
         callID: "permission-test",
-        state: { status: "running", input: { path: "source.csv" }, time: { start: 3 } },
+        state: { status: "running", input: args, time: { start: 3 } },
       })
-      const execute = resolved.tools.loginom_file_admit?.execute
-      if (!execute) throw Error("Local registration missing")
+      const execute = resolved.tools[tool]?.execute
+      if (!execute) throw Error("Local file tool missing: " + tool)
       const fiber = yield* Effect.promise(() =>
-        execute(
-          { path: "source.csv" },
-          { toolCallId: "permission-test", abortSignal: new AbortController().signal, messages: [] },
-        ),
+        execute(args, { toolCallId: "permission-test", abortSignal: new AbortController().signal, messages: [] }),
       ).pipe(Effect.exit, Effect.forkScoped)
       if (action !== "deny") {
         const request = yield* pollWithTimeout(
@@ -170,6 +282,87 @@ it.instance("local registration permission failures retain path, typed marker an
       ).toBe(true)
     }
   }),
+)
+
+it.instance(
+  "attached external package preparation needs no file permission ask, while a configured deny still wins",
+  () =>
+    Effect.gen(function* () {
+      const fs = yield* FSUtil.Service
+      const sessions = yield* Session.Service
+      const permissions = yield* Permission.Service
+      const path = (yield* fs.makeTempDirectoryScoped()) + "/Внешний пакет.lgp"
+      yield* fs.writeFileString(path, "package bytes")
+      const calls: unknown[][] = []
+      const resolved = yield* resolveProfile(
+        "loginom-automation",
+        {
+          ...preparedLoginom(async () => {
+            throw Error("Packages must not use ordinary admission")
+          }),
+          async tools() {
+            return { tools: [{ name: "dock_prepare", inputSchema: { type: "object", properties: {} } }] }
+          },
+          async call(...args) {
+            calls.push(args)
+            return { content: [] }
+          },
+        },
+        undefined,
+        [
+          { permission: "*", pattern: "*", action: "allow" },
+          { permission: "read", pattern: "*", action: "ask" },
+          { permission: "external_directory", pattern: "*", action: "ask" },
+        ],
+      )
+      yield* sessions.updatePart({
+        id: PartID.ascending(),
+        messageID: resolved.user,
+        sessionID: resolved.session.id,
+        type: "file",
+        mime: "application/x-loginom-package",
+        url: pathToFileURL(path).href,
+      })
+      const execute = resolved.tools.loginom_dock_prepare?.execute
+      if (!execute) throw Error("Preparation tool missing")
+      const args = { intent: "open_package", local_package_path: path, operation_id: "attached-local" }
+      const options = { toolCallId: "attached-local", abortSignal: new AbortController().signal, messages: [] }
+      yield* Effect.promise(() => execute(args, options)).pipe(Effect.timeout("5 seconds"))
+      expect(calls).toHaveLength(1)
+      expect(calls[0][5]).toMatchObject({
+        file: { name: "Внешний пакет.lgp", data: Buffer.from("package bytes").toString("base64") },
+      })
+      expect(yield* permissions.list()).toEqual([])
+      yield* sessions.setPermission({
+        sessionID: resolved.session.id,
+        permission: [{ permission: "read", pattern: "*", action: "deny" }],
+      })
+      const deniedOptions = { ...options, toolCallId: "denied-attached-local" }
+      const part = yield* sessions.updatePart({
+        id: PartID.ascending(),
+        messageID: resolved.assistant.id,
+        sessionID: resolved.session.id,
+        type: "tool",
+        tool: "loginom_dock_prepare",
+        callID: deniedOptions.toolCallId,
+        state: { status: "running", input: args, time: { start: 3 } },
+      })
+      const denied = yield* Effect.promise(() => execute(args, deniedOptions)).pipe(Effect.exit)
+      expect(Exit.isFailure(denied)).toBe(true)
+      if (Exit.isFailure(denied)) {
+        expect(Cause.squash(denied.cause)).toBeInstanceOf(PermissionV1.DeniedError)
+        expect(String(Cause.squash(denied.cause))).toContain(path)
+        expect(String(Cause.squash(denied.cause))).not.toContain("--file")
+      }
+      const stored = yield* sessions.getPart({ sessionID: part.sessionID, messageID: part.messageID, partID: part.id })
+      expect(
+        stored?.type === "tool" && stored.state.status === "running" && stored.state.metadata?.permissionDenied,
+      ).toBe(true)
+      expect(calls).toHaveLength(1)
+      expect(yield* permissions.list()).toEqual([])
+      expect(yield* fs.readFileString(path)).toBe("package bytes")
+    }),
+  { git: true },
 )
 
 it.instance(

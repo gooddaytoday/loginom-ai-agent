@@ -1,8 +1,8 @@
 # Локальные файлы по путям из prompt — дизайн #74
 
-Дата ревизии: 2026-10-21. Задача: [#74](https://github.com/gooddaytoday/loginom-ai-agent/issues/74). Проверенная база: `loginom@72bfb4e45e3ede244121a3f3de589b3afb51b533`; текущие изменения ограничены документацией.
+Дата ревизии: 2026-10-21. Задача: [#74](https://github.com/gooddaytoday/loginom-ai-agent/issues/74). Проверенная база дизайна: `loginom@72bfb4e45e3ede244121a3f3de589b3afb51b533`.
 
-Этот документ — каноническое описание поведения с решениями владельца после внешнего ревью. [План](../plans/2026-10-21-local-file-paths.md) определяет порядок работ и проверки. Реализация и живые проверки ещё не выполнены.
+Этот документ — каноническое описание поведения с решениями владельца после внешнего ревью. [План](../plans/2026-10-21-local-file-paths.md) определяет порядок работ и проверки; фактический статус указан в checkpoint ниже.
 
 ## Результат и границы
 
@@ -128,7 +128,7 @@ Oracle рассчитывается до модели; reference строитс�
 - Уточнение владельца: hint только при permission request rejection/CLI автоотказе; файловые ошибки и configured deny — без hint.
 - Удалены точные повторы, второй routing corpus, новые mounts и reference adapter; runtime IDs после prepare обновляются регистрацией.
 - Переходы выбирают fixture edit_lgp, default lgp сохранён; ранний CLI и scenario turns используют --auto, scoped allow только для двух несценарных входов.
-- Риски перед реализацией: upload completion/deadline и workspace A → B; есть точка решения, без наращивания механизма.
-- Код, тесты, модель и browser в этой ревизии не запускались; изменяются только дизайн и план.
-- Повторная сверка пяти пунктов: hint привязан к отказу запроса, fixtures — к исходным bytes задачи 7; решения владельца не расширены.
-- Независимое ревью этой правки новым агентом без истории: Approved, обязательных замечаний по пяти пунктам нет; код, тесты и модель в этой правке не запускались.
+- Задачи 1–3 выполнены по TDD: common path authorization/data registration и private local-package upload/open без download; [evidence](../../testing/loginom-ai-agent/local-file-paths.md).
+- Native source IPC: A → B в одном document, отдельные operation/workflow, граф A сохранён; 6,9/6,3 с после ограничения всех private read/navigation/upload общим deadline. ACK/exit0 и удаление собственного стенда подтверждены.
+- Независимое ревью задачи 3 Approved; изменённые attribution entries проверены, общий verifier имеет прежний README hash mismatch. Source-проверки не подтверждают installed acceptance.
+- Задачи 4–8 остаются: skill/save instructions, paths-mode, routing corpus, два scenario eval и installed/model acceptance. Поведение этого дизайна ими не сужено.

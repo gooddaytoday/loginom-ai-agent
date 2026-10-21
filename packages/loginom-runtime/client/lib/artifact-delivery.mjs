@@ -28,13 +28,14 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   let submitted=job.uploadStarted===true,effectPossible=submitted;
   const preUploadResume=!!resumeId&&job.preUploadResume===true;
   const check=()=>{signal?.throwIfAborted();requireValue(now()<job.deadline,'Artifact delivery deadline elapsed');};
+  const privateDeadline=job.packageUpload?{signal,deadlineAt:job.deadline}:{};
   const readPages=async options=>{
-   check();const r=await runtime.observe(options);
+   check();const r=await runtime.observe({...options,...privateDeadline});
    if(r.status!=='SUCCEEDED')throw Object.assign(Error('Delivery observation failed: '+(r.error?.code??r.status)),{code:r.error?.code});
    const output=structuredClone(r.output);let cursor=output.page?.next_cursor,pages=0;
    while(cursor) {
     check();requireValue(++pages<=32,'Delivery observation page limit exceeded');
-    const next=await runtime.observe({cursor});
+    const next=await runtime.observe({cursor,...privateDeadline});
     requireValue(next.status==='SUCCEEDED'&&next.output.observation_id===output.observation_id
       &&JSON.stringify(next.output.dom_epoch)===JSON.stringify(output.dom_epoch),'Delivery observation changed during pagination');
     for(const key of ['elements','dialogs','masks'])output.ui[key]=[...(output.ui[key]??[]),...(next.output.ui[key]??[])];cursor=next.output.page?.next_cursor;
@@ -56,7 +57,7 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    check();const id=job.id+':nav'+(job.navigationStep=(job.navigationStep??0)+1);
    const previousEffect=effectPossible,previousUncertain=job.navigationUncertain===true;
    job.navigationUncertain=true;
-   effectPossible=true;const r=await runtime.uiAct({verb,ref:element.ref,...extra},{operationId:id,observationId:s.observation_id,signal});
+   effectPossible=true;const r=await runtime.uiAct({verb,ref:element.ref,...extra},{operationId:id,observationId:s.observation_id,signal,...privateDeadline});
    // Only a matched, cleaned-up precondition refusal permits a fresh folder lookup.
    // Never reuse its ref/observation or repeat an uncertain child operation.
    // The proven no-effect gesture leaves navigation certain, so the pre-upload
@@ -122,7 +123,8 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   try {
    let upload,inspected;
    check();job.phase='preflight';
-   runtime.preflightDeliveredArtifact(artifact);
+   if(job.packageUpload)requireValue(/\.lgp$/i.test(artifact.name)&&artifact.upload.overwrite==='reject','Private package upload requires an admitted .lgp with reject policy');
+   else runtime.preflightDeliveredArtifact(artifact);
    if(resumeId&&!preUploadResume) {
     await acknowledge(job,'artifact_delivery_resume_started',{resume_id:resumeId,upload_operation_id:job.uploadId,
       verification_started:job.verificationStarted===true,deadline_at:job.deadline});
@@ -194,10 +196,11 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     }
    }
    requireValue(s.file_storage?.directory===artifact.upload.directory,'Authorized destination mismatch');
-   check();runtime.preflightDeliveredArtifact(artifact,s);job.phase='upload';submitted=true;effectPossible=true;job.uploadStarted=true;
+   check();if(!job.packageUpload)runtime.preflightDeliveredArtifact(artifact,s);job.phase='upload';submitted=true;effectPossible=true;job.uploadStarted=true;
    job.binding={document:s.dom_epoch?.document,workflow_ref:s.workflow_ref,active_tab_ref:s.active_tab_ref};
-   upload=await runtime.uploadDeliveredArtifact({artifactId:artifact.artifact_id,grantId:artifact.upload.grant_id,
-    observationId:s.observation_id,operationId:job.uploadId,deliveryOperationId:job.id,signal});
+   const uploadOptions={artifactId:artifact.artifact_id,grantId:artifact.upload.grant_id,
+    observationId:s.observation_id,operationId:job.uploadId,deliveryOperationId:job.id,signal};
+   upload=job.packageUpload?await runtime.uploadPackageArtifact({...uploadOptions,deadline:job.deadline}):await runtime.uploadDeliveredArtifact(uploadOptions);
    await acknowledge(job,'artifact_delivery_upload_receipt',{upload});
    if(upload.error?.code==='BROWSER_CALL_UNCERTAIN') {
     check();inspected=await runtime.inspect({operationId:job.uploadId});
@@ -222,7 +225,20 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
     return snapshot(job);
    }
    requireValue(upload.status!=='NOT_APPLIED','Upload refusal requires inspection');
-   check();
+   if(!job.packageUpload)check();
+   if(job.packageUpload&&upload.status==='FAILED'&&upload.output?.conflict_rejected===true&&upload.cleanup_complete===true) {
+    const refused={status:'FAILED',code:'UPLOAD_PATH_CONFLICT',destination:artifact.upload.destination,
+      upload_operation_id:job.uploadId,upload_completion_verified:false,cleanup_complete:true};
+    await acknowledge(job,'artifact_delivery_rejected',{result:refused});job.outcome=refused;job.phase='rejected';job.state='settled';return snapshot(job);
+   }
+   if(job.packageUpload){
+    const completed=await runtime.completePackageArtifact({operationId:job.uploadId});
+    requireValue(completed.status==='SUCCEEDED'&&completed.cleanup_complete===true&&completed.upload_completion_verified===true
+      &&completed.destination===artifact.upload.destination&&completed.bytes===artifact.bytes&&completed.source_sha256===artifact.sha256,
+      'Native package completion proof mismatch');
+    await acknowledge(job,'artifact_delivery_completed',{result:completed});
+    job.outcome=completed;job.phase='completed';job.error=null;return snapshot(job);
+   }
    job.conflictRejected=artifact.upload.overwrite==='reject'&&upload.status==='FAILED'
      &&upload.output?.conflict_rejected===true&&upload.output.upload_submitted===false&&upload.cleanup_complete===true;
    if(!job.conflictRejected){
@@ -287,18 +303,18 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
   // checkpoint can resume without putting the managed host into recovery.
   get unsettled(){return active!==null || [...jobs.values()].some(job=>job.phase!=='completed' && job.outcome?.effect_possible===true
     && !(job.preUploadResume===true && job.outcome.inspection_required===false && job.outcome.cleanup_complete===true));},
-  deliver(request,{signal}={}) {
+  deliver(request,{signal,packageUpload=false}={}) {
    requireValue(request&&Object.keys(request).sort().join(',')==='artifact_id,budget_ms,operation_id,upload_grant_id','Exact delivery request required');
    requireValue(typeof request.operation_id==='string'&&/^[A-Za-z0-9_.:-]{1,80}$/.test(request.operation_id),'Bounded delivery ID required');
    requireValue(Number.isInteger(request.budget_ms)&&request.budget_ms>=1000&&request.budget_ms<=1800000,'Delivery budget must be 1000..1800000 ms');
-   const signature=hash([request.artifact_id,request.upload_grant_id,request.budget_ms]),previous=jobs.get(request.operation_id);
+   const signature=hash([request.artifact_id,request.upload_grant_id,request.budget_ms,...(packageUpload?['local-package']:[])]),previous=jobs.get(request.operation_id);
    if(previous){requireValue(previous.signature===signature,'Delivery ID has different parameters');return previous.promise;}
    requireValue(!active,'Another artifact delivery is in progress');signal?.throwIfAborted();
    requireValue(artifactStore,'Artifact delivery requires an admitted artifact store');
    const artifact=artifactStore.getUploadGrant(request.artifact_id,request.upload_grant_id);
    requireValue(['replace','reject'].includes(artifact.upload.overwrite),'Unsupported upload conflict policy');
    admit(request.operation_id,signature);
-   const job={artifact:structuredClone(artifact),resumeRequests:new Map(),id:request.operation_id,uploadId:request.operation_id+':upload',signature,state:'running',phase:'prepared',deadline:now()+request.budget_ms};
+   const job={artifact:structuredClone(artifact),resumeRequests:new Map(),id:request.operation_id,uploadId:request.operation_id+':upload',signature,state:'running',phase:'prepared',deadline:now()+request.budget_ms,packageUpload};
    jobs.set(job.id,job);active=job;job.promise=run(job,artifact,signal);return job.promise;
   },
   resume(request,{signal}={}) {

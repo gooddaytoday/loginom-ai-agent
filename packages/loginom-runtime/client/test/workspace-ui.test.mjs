@@ -5995,6 +5995,20 @@ test('owned import preview preserves scroll identity geometry schema and wizard 
  assert.equal(f.page.events.filter(e=>e==='click').length,1);
 });
 
+test('private parent deadline prevents a navigation gesture after its remaining budget',async()=>{
+  const clock=fixtureClock(),page=new Page({clock:clock.Date});
+  page.add('button','Safe;btnAction','Action');
+  const snapshot=await page.observe(),target=snapshot.ui.elements.find(element=>element.tid==='Safe;btnAction');
+  const locator=page.locator.bind(page);
+  page.locator=selector=>{
+    const control=locator(selector),count=control.count;
+    control.count=async()=>{clock.advance(250);return count();};return control;
+  };
+  const result=await page.execute({mode:'act',operation_id:'navigation',action:{verb:'click',ref:target.ref},snapshot,deadline_at:250});
+  assert.equal(result.status,'NOT_APPLIED');assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+  assert.equal(result.effect_possible,false);assert.deepEqual(page.events,[]);
+});
+
 test('wide import definitions have addressed pages with one schema identity and explicit completeness',async()=>{
  const page=new Page(),c=importCoverageFixture(page,12);c.body.scrollWidth=c.header.scrollWidth=1620;
  const read=async offset=>(await page.execute({mode:'observe',import_column_page:{offset,limit:8}})).output.wizard.import_columns;
