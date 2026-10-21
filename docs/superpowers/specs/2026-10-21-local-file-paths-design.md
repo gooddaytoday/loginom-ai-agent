@@ -131,4 +131,5 @@ Oracle рассчитывается до модели; reference строитс�
 - Задачи 1–3 выполнены по TDD: common path authorization/data registration и private local-package upload/open без download; [evidence](../../testing/loginom-ai-agent/local-file-paths.md).
 - Native source IPC: A → B в одном document, отдельные operation/workflow, граф A сохранён; 6,9/6,3 с после ограничения всех private read/navigation/upload общим deadline. ACK/exit0 и удаление собственного стенда подтверждены.
 - Независимое ревью задачи 3 Approved; изменённые attribution entries проверены, общий verifier имеет прежний README hash mismatch. Source-проверки не подтверждают installed acceptance.
-- Задачи 4–8 остаются: skill/save instructions, paths-mode, routing corpus, два scenario eval и installed/model acceptance. Поведение этого дизайна ими не сужено.
+- По просьбе владельца работа приостановлена: задача 4 (skill/save instructions) внесена частично и сохранена в checkpoint; полный regression после изоляции тестовой фикстуры ещё не повторён.
+- Задачи 5–8 не начаты: paths-mode, routing corpus, два scenario eval и installed/model acceptance. Точная команда продолжения и состояние задачи 4 — в checkpoint плана; поведение дизайна не сужено.

@@ -133,9 +133,9 @@ prepareLocalPackage(args, { artifactID, uploadGrantID }, { signal })
 **Files:** product `skills/loginom-automation/{SKILL.md,references/workflow.md}`, `skills/package-docs/SKILL.md`; agent `src/session/prompt.ts`, `test/session/profile-tools.test.ts`; owning `packages/{agent,loginom-host}/AGENTS.md`.
 **Результат:** инструкции отражают [выбор и сохранение](../specs/2026-10-21-local-file-paths-design.md#skill-выбор-задачи-и-сохранение), без нового алгоритма маршрутизации.
 
-- [ ] Дополнить automation-инструкции выбором local package, сохранением собственной загруженной copy по умолчанию, ограниченным `replace` и сообщением server path/local unchanged; явный output path следует прежним правилам. Сохранить действующее отсутствие автоматического скачивания для docs. Код сохранения не добавлять.
-- [ ] Объяснить, что прежние artifact IDs после повторной подготовки runtime не действуют и файлы надо регистрировать заново. Для docs использовать общий authorization helper из задачи 2; не возвращать attachment-only ограничение для разрешённых путей.
-- [ ] В instructions/errors **дополнить** отказ причиной/путём по [правилу ошибок дизайна](../specs/2026-10-21-local-file-paths-design.md#ошибки). Existing unit/CLI assertions с `--file` для permission rejection и corpus expectation не менять. Исправить только устаревшие attachment-only формулировки owning AGENTS.
+- [x] Дополнить automation-инструкции выбором local package, сохранением собственной загруженной copy по умолчанию, ограниченным `replace` и сообщением server path/local unchanged; явный output path следует прежним правилам. Сохранить действующее отсутствие автоматического скачивания для docs. Код сохранения не добавлять.
+- [x] Объяснить, что прежние artifact IDs после повторной подготовки runtime не действуют и файлы надо регистрировать заново. Для docs использовать общий authorization helper из задачи 2; не возвращать attachment-only ограничение для разрешённых путей.
+- [x] В instructions/errors **дополнить** отказ причиной/путём по [правилу ошибок дизайна](../specs/2026-10-21-local-file-paths-design.md#ошибки). Existing unit/CLI assertions с `--file` для permission rejection и corpus expectation не менять. Исправить только устаревшие attachment-only формулировки owning AGENTS.
 - [ ] TDD для меняемого bootstrap/profile поведения: actual invocation registration/prepare запрещена в docs/default, custom origin не подменяет builtin, новый настоящий user turn начинает default. Наличие tool в catalog само по себе не доказательство исполнения. Выполнить связанный profile/package-docs regression, включая текущий CLI permission test.
 
 ## Задача 5. Paths-mode внутри attempt workspace
@@ -218,19 +218,17 @@ EVAL_REPEAT=1 bun run src/run.ts --tasks tasks/local-path-scenarios --only csv-t
 
 ## Planning checkpoint
 
-- 2026-10-21: план пересмотрен по внешнему ревью и решениям владельца; поведение канонично в дизайне.
-- Последовательность: probe 1 параллельно 2, обязательный ранний source smoke сразу после 2, затем package route и acceptance.
-- Оценка реализации после повторной сверки: около 77 файлов (4 бинарных), +2100/−395 строк; задача 3 — 22 файла, +950/−160 с tests/attribution/timeout резервом и наблюдением пробы 1.
-- Единственное опровергнутое абсолютное утверждение: adapter.admit имеет caller в parallel-calls-live.ts:78; Host ранний [] всё равно не меняется.
-- Уточнения владельца: hint только permission rejection; fixture edit_lgp для переходов; ранний CLI/scenario turns с --auto, scoped allow только несценарным входам.
-- Реализация: задачи 1–3 выполнены; задачи 4–8 ещё не начаты. Source evidence и ограничения — в [отчёте](../../testing/loginom-ai-agent/local-file-paths.md).
-- В задаче 2 сработал сигнал объёма 860 строк: после упрощения тестовой подготовки (−20) итог — 14 файлов, +768/−86 (854 строки с отчётом). Исходная оценка не увеличивалась; новых механизмов ради проверок не добавлено.
-- План задачи 3 до реализации: независимое ревью без истории Approved. Использовать настоящий preparation document/account, существующее FileStore ожидание и единый deadline; server-path reconciliation сохраняет исходный operation_id.
-- Backend задачи 3: 592 tests/1530 assertions; attached external `.lgp` проходит без ask, deny сильнее, outer permission сохраняет path/hint; local call без operation_id получает новый ID.
-- Host private input: structural/scope/source checks → прежний inputStore до startup → ровно один artifact/grant вне MCP arguments. Ревью выявило потерю cancel во время staging; RED→GREEN подтверждает отказ до startup/journal и успех следующего call. Общий interrupt не перерабатывался.
-- Runtime задачи 3: BOUND без draft/READY, native completion с исходным AMBIGUOUS, durable finish/lease cleanup, open из Files, server-path next_step без повторной загрузки; неизвестный эффект сохраняет исходный ID.
-- Ревью исправило новый open после no-effect refusal и поздние read/navigation: единый private deadline 100 с ограничивает transport и native gesture; обычная data verification и внешние 105/120/180 с сохранены. Итоговое независимое ревью Approved.
-- Проверки: 219 named runtime, 503 UI/artifact (есть пересечение), 8 entry/timeout, Host 38/361 assertions; agent/Host typecheck проходят. Все 13 изменённых attribution entries проверены; полный verifier упирается в прежний README hash mismatch на HEAD.
-- Native source IPC v2: A 6867 мс, затем B 6338 мс; тот же document, новые operation/workflow, граф A сохранён. Source/server SHA совпали, ACK/exit0; собственный стенд удалён. Это не installed acceptance.
-- Фактический diff задачи 3: 25 файлов, +1219/−150 строк (код/tests/docs/attribution); исходная оценка 22, +950/−160 и порог 2220 строк / 44 файла сохранены.
-- Следующий шаг: задача 4 — инструкции выбора local package/сохранения и профильные ограничения; затем paths-mode/corpus/evals/installed acceptance по порядку.
+- Приостановлено владельцем в безопасном месте; последняя завершённая задача — 3, commit `1df187237d`. Задачи 1–3 отмечены выше; задача 4 частично выполнена, 5–8 не начаты.
+- Каноническое поведение — в дизайне; исходные оценки и пороги объёма сохранены. Задача 3: 25 файлов, +1219/−150; исходная оценка 22, +950/−160, порог 2220 строк / 44 файла не превышен.
+- Задача 3: независимое ревью Approved; backend 592/1530 assertions, Host 38/361, runtime 219 named +503 UI/artifact (пересечение) +8 entry/timeout; typecheck agent/Host прошёл.
+- Native source IPC v2 A→B: 6867/6338 мс, тот же document, новые operation/workflow, граф A сохранён, source/server SHA совпали. ACK/exit0 и удаление двух собственных стендов подтверждены; процессов task-root нет. Installed acceptance ещё не выполнен.
+- Attribution: 13 изменённых entries проверены; общий verifier упирается в прежний README hash mismatch, подтверждённый на HEAD. Immutable source-map сохранён.
+- Задача 4: обновлены automation SKILL/workflow (local prepare, default own-copy Save/replace, полный путь/local unchanged), package-docs (path/attachment permissions и точный hint), Host AGENTS. Bootstrap и продуктовый код не менялись.
+- Исходная повторная регистрация после prepare и запрет автоматического скачивания для docs сохранены. Независимое ревью этих инструкций Approved.
+- Первый agent run: 120 pass/19 fail/1 skip; 18 отказов вызваны неуказанным pinned Node. Повтор с Node: 178 pass/1 fail/1 skip, 968 assertions; Host task-scope 17 pass/110 assertions.
+- Оставшийся stable отказ: configured-path realpath test без Git сканировал предков TMPDIR под home и находил 59 пользовательских skills (dirs 62 вместо 3). Дефекта дедупликации нет; assertions сохранены.
+- RED→GREEN: только этому case добавлен существующий `{git:true}` fixture root; узкий тест прошёл (1 pass/6 assertions), agent typecheck и diff check прошли. Подготовка отдельно одобрена независимым ревью; полный набор после этой правки ещё не повторялся.
+- Текущий diff задачи 4: 7 файлов, +66/−37 строк против оценки 7, +75/−60. Все изменения сохранены вместе с этим checkpoint; задача 4 остаётся незавершённой до итогового regression/отчёта. Новые проверки после просьбы о паузе не запускались.
+- Evidence/logs: `/home/kiselev/storage/tmp/local-paths-74-ptufs123/`, task3-native-v2, task4-agent-tests[-v2].log и task4-host-tests.log. Отчёт задач 1–3 — `docs/testing/loginom-ai-agent/local-file-paths.md`.
+- Продолжить из `packages/agent`: `TMPDIR=/home/kiselev/storage/tmp LOGINOM_AI_AGENT_TEST_NODE=/opt/loginom-ai-agent-cli/0.3.2/resources/loginom/bin/node bun test test/session/profile-tools.test.ts test/session/task-scope.test.ts test/session/prompt.test.ts test/tool/package-docs.test.ts test/cli/package-docs-permissions.test.ts test/skill/bundled-skills.test.ts`.
+- После green: дописать evidence задачи 4, отметить её последний шаг и сохранить отдельный итоговый commit; затем задача 5 по порядку. Не запускать модель/installed acceptance до соответствующих задач 7–8.
