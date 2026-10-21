@@ -21,7 +21,7 @@
 
 Один helper авторизации используется в `package_docs_run`, `loginom_file_admit` и `local_package_path`. Он переносит существующую проверку вложения из `packages/agent/src/tool/package-docs.ts:51–77`, а не создаёт её вторую копию:
 
-1. Разрешить requested path от session directory и проверить для него явный `read`/`external_directory` deny объединённой agent/session policy до realpath и формирования файловой ошибки. Известный запрет не должен превращаться в OS error с подсказкой о вложении.
+1. Разрешить requested path от session directory и проверить для него явный `read`/`external_directory` deny объединённой agent/session policy до realpath и формирования файловой ошибки. Так известный запрет сохраняет свою причину, даже если путь недоступен ОС.
 2. Получить canonical path через realpath и проверить явный deny также для него. Обе проверки предшествуют учёту attachment и прежнего allow-always.
 3. Рассматривать только видимые исходные сообщения пользователя своей сессии с учётом revert; исключить compaction replay. Вложение — принадлежащий такому сообщению file part с `file:` URL без query и fragment; его realpath должен совпасть с canonical path источника.
 4. Подходящее вложение разрешает чтение без повторного запроса. В частности, приложенный внешний `.lgp` можно править в неинтерактивном CLI через `local_package_path`. При явном deny вложение не даёт обхода.
@@ -33,7 +33,7 @@ Backend вызывает helper после `tool.execute.before`, чтобы п�
 
 Все три входа сообщают **причину и путь**: файл отсутствует, путь указывает на каталог/special file, нет доступа, превышен размер или обнаружено изменение во время чтения. Отсутствие admission само по себе не считается достаточной проверкой ошибки.
 
-При ошибке получения локального файла — в том числе missing path, directory, OS EACCES и отказе через обычный запрос разрешения — сообщение также предлагает альтернативу: «приложите файл — `--file` в CLI, вложение в Desktop/TUI». При **явном запрете в настройках** остаются только причина и путь, без подсказки обхода. Существующий `--file` hint, его tests и `permission-refusal-with-file-hint` в routing corpus сохраняются; текст дополняется, а не заменяется.
+Подсказка «приложите файл — `--file` в CLI, вложение в Desktop/TUI» даётся **только при отклонении запроса разрешения**: обычного ask или автоотказа неинтерактивного CLI. Для отсутствующего файла, каталога, special file, ошибки прав ОС (включая EACCES) и других файловых ошибок подсказки нет: вложение не устраняет причину, а `--file` читает файл с теми же правами ОС. При **явном запрете в настройках** подсказки также нет. Причина и путь сохраняются во всех ветках. Существующий `--file` hint для permission rejection, его tests и `permission-refusal-with-file-hint` в routing corpus сохраняются; текст дополняется, а не заменяется.
 
 ### Известное ограничение permissions
 
@@ -95,7 +95,7 @@ Backend-обёртка `loginom_dock_prepare` принимает для `intent:
 
 Проверяются реальные bytes, новый явный предел snapshot, canonical read, тексты missing/directory/access ошибок, typed deny, attachment authorization без повторного ask и deny поверх attachment/allow-always. Existing default-limit/special-file tests переиспользуются. Проверяются раздельные local identities между сообщениями ассистента, несколько файлов, `%/#/:/?` в basename и неизменность источников.
 
-Runtime проверки покрывают private `.lgp` route, native completion, общий deadline, ready workspace → B, actual `next_step` после open failure, unknown/conflict/owner change/cancel и прежнюю data verification. После задачи регистрации и минимальных инструкций для данных выполняется ранний standalone CLI прогон: два внешних CSV с пробелами/кириллицей в путях → upload/import/правильный результат, отдельно missing path с понятной ошибкой. Dev bundle допустим; это source evidence, не installed acceptance. Проба `.lgp` может идти параллельно.
+Runtime проверки покрывают private `.lgp` route, native completion, общий deadline, ready workspace → B, actual `next_step` после open failure, unknown/conflict/owner change/cancel и прежнюю data verification. После задачи регистрации и минимальных инструкций для данных выполняется ранний standalone CLI прогон с `run --auto`: два внешних CSV с пробелами/кириллицей в путях → upload/import/правильный результат, отдельно missing path с понятной ошибкой. Без `--auto` или явного разрешения каталога неинтерактивный CLI отклоняет запрос доступа; автоодобрение не отменяет configured deny. Dev bundle допустим; это source evidence, не installed acceptance. Проба `.lgp` может идти параллельно.
 
 ### Существующий routing corpus
 
@@ -104,9 +104,9 @@ Runtime проверки покрывают private `.lgp` route, native complet
 - Переиспользовать `docs-local-path` и `docs-external-unicode-path`; новый `lgp-docs` дублировал бы их. Сохранить разные ожидания external case: Desktop разрешает доступ, CLI ожидает отказ с `--file` hint.
 - Добавить новые IDs `scenario-create-path`, `text-read`, `edit-after-docs`, `docs-after-edit`; существующие `scenario-after-docs`, `docs-after-build` и их ветки `turns.mjs:8–17` не менять.
 - `scenario-create-path` — вариант существующего создания сценария с внешним CSV в prompt без attachment. На **Desktop и CLI** обязателен полный путь `loginom_file_admit` → `dock_artifact_deliver` → import → проверенный результат.
-- Для внешнего `.lgp` переиспользовать `external-text-path` — несмотря на имя, сейчас это именно пакет. `csv-path` и `created-lgp-path` нужны там, где старые kinds создают вложение. Для TXT нужен явный текстовый fixture/путь; не менять смысл старого `.lgp` case ради названия kind.
-- Оба перехода — настоящие user turns в одной Session. В edit → docs harness получает реально сохранённую изменённую copy; prompt указывает её локальный путь. Для совместимости существующего bridge transition prompts явно задают итоговый `{{server_package}}`; правило сохранения без заданного пути проверяется отдельным целевым CLI запросом, без нового runner.
-- Для положительных новых внешних cases разрешается только их input path/catalog; это не меняет старый refusal case. Applied activation и реальные tool results важнее заявления модели. Для документа после правки достаточно 1–3 точных фактов, например формулы `amount*3`; без разбора таблиц и нового judge/module при достаточности существующего общего модуля. `text-read` проверяет точное значение ответа и completed Read.
+- Для внешнего `.lgp` переиспользовать `external-text-path` с optional case key `fixture`, default — `lgp`. Оба перехода задают `fixture: "edit_lgp"` и используют исходную edit-фикстуру задачи 7 с `amount`/`amount_double`; прежний `fixtures.lgp` (`nested.lgp`) не подходит для правки и не меняется. CLI и Desktop выбирают один и тот же ключ, сохраняя его для setup/turns. `csv-path` и `created-lgp-path` нужны там, где старые kinds создают вложение. Для TXT нужен явный текстовый fixture/путь; не менять смысл старого `.lgp` case ради названия kind.
+- Оба перехода — настоящие user turns в одной Session. В edit → docs harness получает реально сохранённую изменённую copy в каталог сессии; prompt указывает её путь через `{{created_lgp}}`. Поэтому этому docs-ходу не нужно разрешение внешнего каталога. Для совместимости существующего bridge transition prompts явно задают итоговый `{{server_package}}`; правило сохранения без заданного пути проверяется отдельным целевым CLI запросом, без нового runner.
+- Сценарные ходы CLI уже используют `--auto` (`run.mjs:147`); дополнительных правил доступа им не нужно. Scoped-разрешение только на собственные input path/catalog требуется несценарным `text-read` и ходу документации в `edit-after-docs`. Desktop использует существующее одобрение запроса. Старый external docs refusal case не меняется. Applied activation и реальные tool results важнее заявления модели. Для документа после правки достаточно 1–3 точных фактов, например формулы `amount*3`; без разбора таблиц и нового judge/module при достаточности существующего общего модуля. `text-read` проверяет точное значение ответа и completed Read.
 
 ### Только два сценарных eval в evals/
 
@@ -123,9 +123,9 @@ Oracle рассчитывается до модели; reference строитс�
 ## Checkpoint
 
 - 2026-10-21: ревизия по внешнему ревью и согласованным решениям владельца; база `72bfb4e45` проверена чтением кода.
-- Канонические правила: общий attachment-aware helper, имена копий, ошибки с сохранением hint, сохранение собственной server copy.
+- Уточнение владельца: hint только при permission request rejection/CLI автоотказе; файловые ошибки и configured deny — без hint.
 - Удалены точные повторы, второй routing corpus, новые mounts и reference adapter; runtime IDs после prepare обновляются регистрацией.
-- Сценарные evals — два в evals; routing/переходы — существующий corpus с новыми ID и repeat 1.
+- Переходы выбирают fixture edit_lgp, default lgp сохранён; ранний CLI и scenario turns используют --auto, scoped allow только для двух несценарных входов.
 - Риски перед реализацией: upload completion/deadline и workspace A → B; есть точка решения, без наращивания механизма.
 - Код, тесты, модель и browser в этой ревизии не запускались; изменяются только дизайн и план.
-- Независимое ревью новым агентом без истории: Approved во втором раунде; замечание о подсказках файловых ошибок исправлено, обязательных замечаний нет.
+- Предыдущее расширение hint по ревью отменено решением владельца; независимое ревью пяти уточнений новым агентом без истории: Approved, обязательных замечаний нет.
