@@ -3947,7 +3947,8 @@ function readRenderedInputMapping(observation) {
               const fresh=await readUi();
               if(!lifecycleContextMatches(fresh)){
                 if(await deleteLostLinks(fresh))continue;
-                if(['finish_wizard','execute_wizard'].includes(task.action.verb) && lifecycleContextMatches(fresh,true) && transientToastReads<50){
+                // Cancelling an owned output-port draft can also emit a toast.
+                if(['finish_wizard','execute_wizard','confirm_wizard_close'].includes(task.action.verb) && lifecycleContextMatches(fresh,true) && transientToastReads<50){
                   transientToastReads++;record('wizard_toast_wait',{attempt:transientToastReads});
                   await page.waitForTimeout(Math.min(100,timeout()));continue;
                 }
