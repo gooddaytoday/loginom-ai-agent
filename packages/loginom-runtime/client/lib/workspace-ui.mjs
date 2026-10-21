@@ -424,8 +424,50 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return visibleAncestors(element);
     });
     const sensitivePattern = /password|passwd|\bpwd\b|secret|token|credential|authorization|api[_ -]?key|private[_ -]?key|one[_ -]?time|\botp\b|парол|секрет|токен/i;
+    const calculatorMetadataTid=memoRead(element=>{
+      const tid=getTid(element)??'';
+      const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard|DerivedDataSourceOutputSocketWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_|colDataKind_|colDefaultUsageType_|colSourceDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
+      if(!match || element.tagName!=='TD' || !sensitivePattern.test(tid))return tid;
+      const output=match[2]!=='CalcDataWizard';
+      if(output ? !['colName_','colDisplayName_','colDataKind_','colDefaultUsageType_','colSourceDisplayName_'].includes(match[3])
+        || definitionPrefix!==match[1] || preparedOutputPort?.direction!=='output'
+        || preparedOutputPort.node_icon_class!=='bg-vendor-icon-calcdata'
+        || preparedOutputPort.port!==0 || preparedOutputPort.native_index!==0
+        || typeof preparedOutputPort.port_guid!=='string' || !preparedOutputPort.port_guid
+        || typeof preparedOutputPort.opening_operation_id!=='string' || !preparedOutputPort.opening_operation_id
+        : !['colExpressionName_','colExpressionDisplayName_'].includes(match[3]))return tid;
+      const base=match[1]+';WizrdMCF;',tab='MF;cntMain;cntWorkspace;Workspace;t.br;tb'+match[1].slice('MF;TF'.length);
+      const prefix=base+match[2]+';';
+      const tabs=tids.get(tab)??[],wizards=tids.get(base.slice(0,-1))??[],grids=tids.get(prefix+(output?'grdTargetColumns;tbl':'grdExpressions;tbl'))??[];
+      const names=tids.get(prefix+(output?'colName_':'colExpressionName_')+match[4])??[];
+      const labels=tids.get(prefix+(output?'colDisplayName_':'colExpressionDisplayName_')+match[4])??[];
+      const row=element.closest('table.x-grid-item');
+      if(tabs.length!==1 || !tabs[0].classList.contains('x-tab-active') || wizards.length!==1 || grids.length!==1
+        || !wizards[0].contains(grids[0]) || !row || !grids[0].contains(row)
+        || !grids[0].getAttribute('id') || row.getAttribute('data-boundview')!==grids[0].getAttribute('id')
+        || names.length!==1 || labels.length!==1 || names[0].closest('table')!==row || labels[0].closest('table')!==row
+        || names[0].tagName!=='TD' || labels[0].tagName!=='TD')return tid;
+      const metadata=[names[0],labels[0]];
+      if(output)for(const key of ['colDataKind_','colDefaultUsageType_','colSourceDisplayName_']) {
+        const cells=tids.get(prefix+key+match[4])??[];
+        if(cells.length!==1 || cells[0].tagName!=='TD' || cells[0].closest('table')!==row)return tid;
+        metadata.push(cells[0]);
+      }
+      // Only technical-name suffixes of the owned definition cells are data.
+      // Never exempt secret attributes, ancestors, editors or dataset values.
+      for(const cell of metadata) {
+        const children=[...cell.querySelectorAll('*')];charge();
+        if(children.length>16 || [cell,...children].some(child=>{
+          charge();return child.isContentEditable || child.closest('[contenteditable="true"],a[href],.monaco-editor,.CodeMirror,.ace_editor')
+            || child.matches('input,textarea,select,iframe,object,embed')
+            || sensitivePattern.test(['name','id','autocomplete','aria-label',...(child===cell?[]:['data-tid'])].map(k=>child.getAttribute(k)??'').join(' '));
+        }))return tid;
+      }
+      if(names[0].textContent!==match[4])return tid;
+      return prefix+match[3];
+    });
     const safeAncestors=ancestorCheck(parent=>!parent.matches('input[type="password"],input[type="hidden"],input[type="file"]')
-      &&!sensitivePattern.test(['name','id','data-tid','autocomplete','aria-label'].map(name=>parent.getAttribute(name)??'').join(' '))
+      &&!sensitivePattern.test(['name','id','data-tid','autocomplete','aria-label'].map(name=>name==='data-tid'?calculatorMetadataTid(parent):parent.getAttribute(name)??'').join(' '))
       &&!(getTid(parent)??'').startsWith('LoginForm;'),document.body);
     const sensitive = memoRead(element => !safeAncestors(element));
     const short = (value, limit = 240) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, limit);
@@ -540,9 +582,10 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       for(const e of nativeGraphElements){charge();const tid=getTid(e);if(!scoped.has(tid))scoped.set(tid,[]);scoped.get(tid).push(e);}
       const unique=e=>e&&graphContainer.contains(e)&&scoped.get(getTid(e))?.length===1&&scoped.get(getTid(e))[0]===e;
       const bindings=new Map();
-      const retain=(element,objects,icon)=>{
+      const retain=(element,objects,icon,nodeId)=>{
         if(!unique(element))return;
-        const receipt={status:icon==='bg-vendor-icon-javascript'?'script':'non_script',identity:objects.map(o=>refOf(o,false)),icon};
+        const receipt={status:icon==='bg-vendor-icon-javascript'?'script':'non_script',identity:objects.map(o=>refOf(o,false)),icon,
+          ...(typeof nodeId==='string'&&/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(nodeId)?{node_id:nodeId}:{})};
         if(bindings.has(element))nativeGraphControls.set(element,{status:'unconfirmed'});
         else {bindings.set(element,true);nativeGraphControls.set(element,receipt);}
       };
@@ -557,7 +600,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           if(!unique(shape)||!tid?.startsWith(graphPrefix))continue;
           const identity=[model,diagram,graph,view,node,cell];
           const data=value(node,'data');if(data&&typeof data==='object')identity.push(data);
-          retain(shape,identity,icon);
+          retain(shape,identity,icon,guid);
           const label=value(node,'FLabel'),labelCell=value(label,'FCell');
           if(value(label,'parent')===node&&labelCell&&value(labelCell,'parent')===cell){
             const text=value(value(getState.call(view,labelCell),'text'),'node');
@@ -2971,7 +3014,11 @@ function readRenderedInputMapping(observation) {
     scanStage='data_views';
     const nodes = labels.slice(0, 200).map(label => {
       const nodeTid = graphPrefix + label, matches=graphElements.filter(e=>getTid(e)===nodeTid),node=matches.length===1?matches[0]:null;
+      // A saved node's GUID comes only from the existing native/DOM binding,
+      // never from its editable label or an arbitrary DOM attribute.
+      const native=node&&nativeGraphControl(node);
       return { node_ref: { kind: 'node', node_label: label, workflow_ref: workflow }, bounding_box: node ? boxOf(node) : null,
+        ...(native?.node_id?{node_id:native.node_id}:{}),
         ports: graphElements.filter(element => (getTid(element) ?? '').startsWith(nodeTid + ';') && /;(?:Input|Output)_[^;]+$/.test(getTid(element)))
           .slice(0, 100).map(element => ({ tid: getTid(element), bounding_box: boxOf(element), ui_ref: refOf(element) })) };
     });

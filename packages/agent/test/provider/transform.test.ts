@@ -1809,6 +1809,32 @@ describe("ProviderTransform.schema - openai supported schema subset", () => {
     },
   } as any
 
+  test("Responses request retains Loginom description XOR and guidance in full and compact profiles", async () => {
+    const { createOpenAI } = await import("@ai-sdk/openai")
+    const { actionDescribeTool } = await import("../../../loginom-runtime/client/lib/action-catalog.mjs")
+    const { userActionTool } = await import("../../../loginom-runtime/client/lib/user-workflow.mjs")
+    const { AjvJsonSchemaValidator } = await import("@modelcontextprotocol/sdk/validation/ajv")
+    for (const tool of [actionDescribeTool, userActionTool(actionDescribeTool)]) {
+      const lowered = ProviderTransform.schema(openaiModel, tool.inputSchema)
+      let sent = false
+      const provider = createOpenAI({ apiKey: "test-only", fetch: Object.assign(async (_url: string | URL | Request, init?: RequestInit) => {
+        const definition = JSON.parse(String(init?.body)).tools[0]
+        const validate = new AjvJsonSchemaValidator().getValidator(definition.parameters)
+        expect(validate({ action_key: "package.save_checkpoint", node_types: ["imports.text"] }).valid).toBe(false)
+        expect(validate({ action_keys: ["package.save_checkpoint"], node_types: ["imports.text"] }).valid).toBe(true)
+        expect(validate({ action_key: "package.save_checkpoint" }).valid).toBe(true)
+        expect(validate({}).valid).toBe(true)
+        expect(definition.description).toContain("never combine action_key")
+        expect(definition.parameters.properties.node_types.description).toContain("Never combine with action_key")
+        sent = true
+        return Response.json({ id: "resp_test", object: "response", created_at: 0, model: "gpt-4.1", status: "completed", output: [], usage: { input_tokens: 1, output_tokens: 0, total_tokens: 1 } })
+      }, { preconnect: () => undefined }) })
+      await generateText({ model: provider.responses("gpt-4.1"), prompt: "test", maxRetries: 0,
+        tools: { loginom_dock_action_describe: { description: tool.description, inputSchema: jsonSchema(lowered) } } })
+      expect(sent).toBe(true)
+    }
+  })
+
   test("Responses request preserves required root finish and its description for the actual Loginom node tool", async () => {
     const { createOpenAI } = await import("@ai-sdk/openai")
     const { nodeApiTools } = await import("../../../loginom-runtime/client/lib/node-api.mjs")
@@ -1835,6 +1861,21 @@ describe("ProviderTransform.schema - openai supported schema subset", () => {
     expect(sent.description).toBe(definition.description)
     expect(sent.parameters.properties.mappings.items.properties.fields.description).toContain("Mutually exclusive")
     expect(definition).toEqual(before)
+  })
+
+  test("OpenAI retains Loginom caption restrictions in full and compact field descriptions", async () => {
+    const { nodeApiTools } = await import("../../../loginom-runtime/client/lib/node-api.mjs")
+    const { userNodeTool } = await import("../../../loginom-runtime/client/lib/user-workflow.mjs")
+    const source = nodeApiTools.find((tool) => tool.name === "dock_node_apply")!
+    for (const tool of [source, userNodeTool(source)]) {
+      const schema = ProviderTransform.schema(openaiModel, tool.inputSchema)
+      const target = schema.properties!.target as import("@ai-sdk/provider").JSONSchema7
+      const label = target.properties!.label as import("@ai-sdk/provider").JSONSchema7
+      expect(label.description).toBe(tool.inputSchema.properties.target.properties.label.description)
+      expect(label.description).toContain("No ; | < >")
+      expect(label.description).toContain("conditions and formulas in parameters")
+      expect(target.required).not.toContain("label")
+    }
   })
 
   test("keeps the actual Dock wizard stage array constant compatible with its inferred type", async () => {
@@ -1889,6 +1930,18 @@ describe("ProviderTransform.schema - openai supported schema subset", () => {
     if (type !== "array") expect(result.enum).toEqual([literal])
     if (type === "array") expect(result.enum).toBeUndefined()
     if (type === "array") expect(result.items).toEqual({ type: "number", enum: [1, 2] })
+  })
+
+  test("OpenAI retains the same-runtime preparation rule before the first call", async () => {
+    const { prepareTool } = await import("../../../loginom-runtime/client/lib/skill.mjs")
+    const inputSchema = prepareTool.inputSchema as unknown as import("@ai-sdk/provider").JSONSchema7
+    const schema = ProviderTransform.schema(openaiModel, inputSchema)
+    for (const key of ["intent", "workflow_ref", "package_path"] as const) {
+      const field = schema.properties![key] as import("@ai-sdk/provider").JSONSchema7
+      const original = inputSchema.properties![key] as import("@ai-sdk/provider").JSONSchema7
+      expect(field.description).toBe(original.description)
+      expect(field.description).toContain(key === "package_path" ? "Never guess" : "open_package")
+    }
   })
 
   test("infers mixed enum types instead of forcing strings", () => {

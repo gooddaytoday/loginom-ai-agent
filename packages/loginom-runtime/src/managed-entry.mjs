@@ -2,7 +2,7 @@ import { createRequire } from "node:module"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { mkdir, mkdtemp, readFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { appendFileSync } from "node:fs"
 import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
@@ -243,6 +243,13 @@ async function handle(message) {
       state.controller = undefined
     }
   } catch (error) {
+    if (message.operation === "start" && error?.cause?.login) {
+      // Validation deletes its generations/chat profile. Retain only the
+      // sanitized login failure at the private state root, outside that tree.
+      await writeFile(join(message.input.stateDir, `login-failure-${randomUUID()}.json`), JSON.stringify({
+        version: 1, recorded_at: new Date().toISOString(), code: error.message, ...error.cause.login,
+      }) + "\n", { mode: 0o600, flag: "wx" }).catch(() => undefined)
+    }
     if (message.operation === "start" && error?.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
       state.startupCleanupFailed = true
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"

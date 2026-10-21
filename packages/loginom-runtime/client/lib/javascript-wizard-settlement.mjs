@@ -25,8 +25,17 @@ export const inspectJavascriptWizardSettlement=withJavascriptWizardMasks(functio
     ||wizard&&(wizard.ParentNode!==tree||current!==wizard))throw Error('Wizard settlement current native owner changed');
   const path=prepared.workflow_ref.navigation_path;
   const crumbs=[...document.querySelectorAll('[data-tid^='+JSON.stringify(prepared.workflow_ref.prefix+';cnrNaviMode;b.s_')+']')];
-  if(crumbs.length>path.length+2||crumbs.slice(0,path.length).some((e,i)=>e.getAttribute('data-tid')!==path[i].tid||e.textContent.trim()!==path[i].label))
-    throw Error('Wizard settlement navigation changed');
+  let navigationFailure;
+  if(crumbs.length>path.length+2||crumbs.slice(0,path.length).some((e,i)=>{
+    if(e.getAttribute('data-tid')!==path[i].tid){navigationFailure={field:'navigation.tid_matches',index:i};return true;}
+    if(e.textContent.trim()!==path[i].label){navigationFailure={field:'navigation.label_matches',index:i};return true;}
+    return false;
+  })) {
+    const error=Error('Wizard settlement navigation changed');
+    Object.defineProperty(error,'javascriptSourceBoundary',{value:{scope:'navigation',checks:[{
+      ...(navigationFailure??{field:'navigation.count_within_bound'}),expected:'true',observed:'false'}]}});
+    throw error;
+  }
   const dialogs=[...document.querySelectorAll('[role="dialog"],.x-message-box')].filter(visible);
   const masks=[...document.querySelectorAll('.x-mask,.bg-mask-message,.x-mask-msg')].filter(visible);
   const roots=exact(prepared.workflow_ref.prefix+';WizrdMCF');

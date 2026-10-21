@@ -4,7 +4,8 @@ import {buildNodeReadRequest} from './node-read-contract.mjs';
 import {resolveArtifactUploadConflict} from './artifact-upload-conflict.mjs';
 import {makeArtifactDiscoveryDownloadCode,verifiedDiscoveryReference} from './artifact-discovery.mjs';
 import {createArtifactDelivery} from './artifact-delivery.mjs';
-import { prepareNodeTarget, inspectNodeTarget } from './node-target.mjs';
+import { prepareNodeTarget, inspectNodeTarget, releaseNodeTarget, verifyPendingWorkflowReceipt } from './node-target.mjs';
+import {NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 import { createNodeTargetBrowserAdapter } from './node-target-browser.mjs';
 import { validateNodeTargetRequest } from './node-contracts.mjs';
 import { describeNodeTypes } from './node-contracts.mjs';
@@ -1814,13 +1815,19 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   // Release never continues the stopped phase. Its driver proves that the node
   // rests unlocked on a quiet unchanged graph and reports unverified settings or
   // execution as unknown; no observation_id is taken from the caller.
-  const nodeReleaseStep=operation=>!operation.transportUncertain&&!nodeJobs.busy&&operation.nodeApply?.pending
-    &&(!operation.nodeApplyDrivers?.releasePendingPhases||operation.nodeApplyDrivers.releasePendingPhases.includes(operation.nodeApply.pending.phase))
-    &&operation.nodeApply.node&&typeof operation.nodeApplyDrivers?.releasePending==='function'?{tool:'dock_operation_recover',
+  const earlyNodePhase=operation=>!operation?.nodeApply?.node&&!operation?.nodeApply?.result
+    &&(['source','workflow','target'].includes(operation?.nodeApply?.pending?.phase)
+      ||operation?.nodeApply?.target_reconciled===true);
+  const earlyRelease=(operation,signal)=>earlyNodePhase(operation)?()=>releaseNodeTarget({operation,adapter:operation.nodeTargetAdapter,
+    record:nodeTargetRecord,readReceipt:ref=>readReceipt(operation,ref),deadline:now()+NODE_RELEASE_BUDGET_MS,signal,now}):undefined;
+  const nodeReleaseStep=operation=>!operation.transportUncertain&&!nodeJobs.busy&&(earlyNodePhase(operation)
+    ||operation.nodeApply?.pending&&(!operation.nodeApplyDrivers?.releasePendingPhases||operation.nodeApplyDrivers.releasePendingPhases.includes(operation.nodeApply.pending.phase))
+    &&operation.nodeApply.node&&typeof operation.nodeApplyDrivers?.releasePending==='function')?{tool:'dock_operation_recover',
       arguments:{operation_id:operation.id,strategy:'abandon_operation'},required_fields:['recovery_operation_id'],
       id_roles:{operation_id:'original_pending_operation',recovery_operation_id:'new_unique_request'},
       requires:['runtime_release_proof'],provides:['released_node_operation','unblocked_workspace'],
-      instruction:'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'}:null;
+      instruction:earlyNodePhase(operation)?'Release this early source/workflow/target failure with a NEW recovery_operation_id. Dock only reads the original receipts and quiet graph, proving that the target was not created or finding its exact partial node. Unknown effects remain blocked. Follow the released next_step; do not replay creation.'
+        :'Release this stopped node operation with a NEW recovery_operation_id; observation_id is not used. Dock itself proves that the node rests unlocked on an unchanged quiet graph. It may cancel only this node\'s own wizard draft or output Table view and never repeats the stopped gesture. Then follow next_step of the released outcome.'}:null;
   const releaseApply=async(operation,{strategy,recoveryOperationId,signature,signal})=>{
     if(strategy!=='abandon_operation')throw new Error('Use the enclosing node procedure to resume this internal phase; only abandon_operation can release a stopped node operation');
     if(running||nodeJobs.busy)throw new Error('Another Dock action is still running');
@@ -1832,7 +1839,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       observations.clear();
       let returned;
       try{
-        const result=await releaseNodeApply({operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,record:onRecord,signal});
+        const result=await releaseNodeApply({operation,handlers:nodeApplyHandlers,drivers:operation.nodeApplyDrivers,record:onRecord,signal,
+          releaseBeforeTarget:earlyRelease(operation,signal)});
         operation.outcome=nodeApplyOutcome(operation,result);operation.cleanupConfirmed=true;
         await remember(operation,'operation_abandoned',operation.outcome);
         pending=null;nodeJobs.settle(operation.id,operation.outcome);
@@ -1952,6 +1960,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   };
   const nodeRecoveryStep = operation => {
     const state = operation?.nodeApply;
+    if(earlyNodePhase(operation))return {key:['pretarget',state.request.document_id,state.request.workflow_ref.workflow_id,operation.id,
+      state.pending?.phase??'target'].join('|'),kind:'node_target',document_id:state.request.document_id,
+      workflow_id:state.request.workflow_ref.workflow_id,node_id:null,node_type:state.request.target.type,phase:state.pending?.phase??'target'};
     if (!state?.node || !state.pending) return null;
     return { key: ['node', state.node.document_id, state.node.workflow_id, state.node.node_id, state.pending.phase].join('|'),
       kind: 'node', document_id: state.node.document_id, workflow_id: state.node.workflow_id, node_id: state.node.node_id,
@@ -1981,9 +1992,16 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     const exported = exportRecoveryTrigger(operation);
     if (exported) return exported;
     if (!browserRecovery || !operation || pending !== operation || operation.action.capability !== 'node.apply'
-      || operation.transportUncertain || typeof operation.nodeApplyDrivers?.releasePending !== 'function') return null;
+      || operation.transportUncertain || !earlyNodePhase(operation)&&typeof operation.nodeApplyDrivers?.releasePending !== 'function') return null;
+    // Export draft release must not hand an unsettled file-read lease to the
+    // generic node route. Its settled download refusal has the separate T4 path.
+    if (operation.nodeApply?.request.target.type === 'exports.text'
+      && operation.nodeApply.pending?.phase === 'read') return null;
     const step = nodeRecoveryStep(operation);
     if (!step) return null;
+    if (step.kind === 'node' && operation.nodeApplyDrivers.releasePendingPhases
+      && !operation.nodeApplyDrivers.releasePendingPhases.includes(step.phase)
+      && typeof operation.nodeApplyDrivers.recoveryReleasePending !== 'function') return null;
     if (operation.releaseRefused) return { reason: 'NODE_RELEASE_REFUSED', step };
     const prior = recoveredSteps.get(step.key);
     if (prior && prior.operation_id !== operation.id && prior.code === failureCode(operation))
@@ -2014,6 +2032,11 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         required_result: 'The export already completed; its download was not confirmed. Remove what blocks the file storage '
           + 'view or download (dialogs, masks, notifications) and return to the scenario graph. Do not export again; the '
           + 'runtime repeats only the file read and verifies its bytes.' } };
+      if(trigger.step.kind==='node_target')return {...trigger,goal:{document_id:request.document_id,workflow_ref:structuredClone(request.workflow_ref),
+        target:structuredClone(request.target),partial_node_id:operation.targetPhase?.targetId??null,
+        stopped_phase:trigger.step.phase,required_result:'Return to the original prepared scenario graph, with no wizard, dialog or mask and all nodes unlocked. '
+          +'Do not create, delete, rename, move, connect, configure or execute nodes. Preserve all partial target effects; the runtime must reconcile their original receipts and find the exact target before release. '
+          +'Do not cancel a foreign draft or close workspace tabs or the package; stop if ownership is unknown. Unknown effects remain blocked; restoring the graph does not verify the failed request.'}};
       return { ...trigger, goal: { node: structuredClone(operation.nodeApply.node), node_type: request.target.type,
         stopped_phase: trigger.step.phase, verified_phases: operation.nodeApply.phases.map(p => p.phase),
         requested_finish: request.finish, error: structuredClone(operation.outcome?.error ?? null),
@@ -2029,6 +2052,20 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return { stopped: false, reason: 'The operation is no longer eligible for browser recovery' };
       if (running || nodeJobs.busy || delivery.busy || sourceReads.busy) return { stopped: false, reason: 'A Dock action is still running' };
       if (operation.transportUncertain) return { stopped: false, reason: 'The last browser call of this operation is unconfirmed' };
+      if(operation.nodeApply?.pending?.phase==='workflow'){
+        try{await verifyPendingWorkflowReceipt({operation,adapter:operation.nodeTargetAdapter,deadline:now()+10000,now});}
+        catch(error){return {stopped:false,reason:String(error.message).slice(0,1000)};}
+      }
+      if(operation.targetPhase?.pending){
+        // Target gestures use their own page ledger, not parent lastReceipt.
+        // Read only that original effect; graph repair cannot settle its call.
+        try{
+          const deadline=now()+10000;
+          const receipt=await operation.nodeTargetAdapter.reconcile(operation.targetPhase.pending,null,deadline);
+          if(now()>=deadline||receipt?.completed!==true||receipt.cleanup_complete!==true)
+            return {stopped:false,reason:'The original target receipt has no confirmed completion and cleanup'};
+        }catch(error){return {stopped:false,reason:String(error.message).slice(0,1000)};}
+      }
       // A sent abort or an expired timeout is not proof: only the page ledger is.
       const state = operation.lastReceipt ? await readReceipt(operation) : { state: 'none' };
       // Same proof as the node release: a completed last gesture with confirmed cleanup.
@@ -2056,6 +2093,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const drivers = operation.nodeApplyDrivers;
         result = await releaseNodeApply({ operation, handlers: nodeApplyHandlers, signal,
           record: event => { journal.started = true; return onRecord(event); },
+          releaseBeforeTarget:earlyRelease(operation,signal),
           drivers: { ...drivers, releasePending: drivers.recoveryReleasePending ?? drivers.releasePending } });
       } catch (error) {
         // Only a refusal before any gesture, or after gestures whose own receipts settled with cleanup,
@@ -2067,10 +2105,10 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return { status: 'unresolved', facts: [], reason: String(error?.message ?? error).slice(0, 1000), uncertain: uncertainRelease };
       } finally { running = false; }
       const request = operation.nodeApply.request;
-      const readable = reason === 'REPEATED_PHASE_FAILURE' && !['programming.javascript', 'exports.text'].includes(request.target.type);
+      const readable = step.kind!=='node_target'&&reason === 'REPEATED_PHASE_FAILURE' && !['programming.javascript', 'exports.text'].includes(request.target.type);
       const receipt = { id: operation.id + ':br' + (++recoverySequence), kind: 'browser_recovery', status: 'continuable',
         source_operation_id: operation.id, step: structuredClone(step), reason,
-        facts: ['node_released_on_quiet_graph', 'no_wizard_dialog_or_mask'], attested_by_model: structuredClone(attested),
+        facts: [step.kind==='node_target'?'pretarget_released_on_quiet_graph':'node_released_on_quiet_graph', 'no_wizard_dialog_or_mask'], attested_by_model: structuredClone(attested),
         node: structuredClone(result.node), request: structuredClone(request),
         configuration: structuredClone(result.configuration), execution: structuredClone(result.execution) };
       receipt.next_step = readable ? { tool: 'dock_node_read', original_operation_id: operation.id,

@@ -14,7 +14,11 @@
 `target.kind=new` создаёт новый узел. Для изменения уже завершённого узла
 используй `target.kind=existing`, выданный `target.ref` и новый operation ID.
 `inputs:[]` сохраняет существующие связи. Ссылки узлов сохранённого пакета
-содержат постоянный GUID, а не отображаемое имя. Document/workflow identity
+содержат постоянный GUID, а не отображаемое имя. После открытия пакета бери GUID
+из `output.nodes[].node_id` свежего `loginom_dock_workspace_observe` графа и составляй
+`target.ref={document_id,workflow_id,node_id}` с текущей подготовкой. Если ID не выдан,
+прочитай целиком наблюдённый `cmpDiagram` через свежие root_ref/observation_id; имя
+узла не заменяет отсутствующий ID. Document/workflow identity
 бери из актуальной подготовки. Не восстанавливай tab_tid и navigation_path.
 
 Для продолжения передавай `loginom_dock_node_resume` только исходный operation

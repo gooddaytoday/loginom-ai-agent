@@ -276,3 +276,73 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
   operation.targetPhase=state;
   return state.completed?{...structuredClone(state.result),cleanup_complete:true}:{status:'AMBIGUOUS',phase:'target_partial',cleanup_complete:true,pending:null,node_id:state.targetId,resume_available:true};
 }
+
+// A pre-target release observes only. In particular, it cannot finish creation,
+// repair links, cancel a foreign draft or infer a target from its label.
+export async function releaseNodeTarget({operation,adapter,record,readReceipt,deadline,signal,now=Date.now}) {
+  const state=operation.nodeApply,request=state.request;
+  const phase=state.pending?.phase??(state.target_reconciled?'target':null);
+  if(state.node||state.result||!['source','workflow','target'].includes(phase)||operation.transportUncertain)
+    throw Error('Pre-target release boundary is unavailable');
+  if(!operation.targetPhase&&operation.nodeEffectPossible===true&&operation.cleanupConfirmed!==true)
+    throw Error('Pre-target child effects have no settled checkpoint');
+  const check=()=>{signal?.throwIfAborted();if(now()>=deadline)throw Error('Pre-target release deadline elapsed');};
+  check();
+  if(operation.lastReceipt){
+    const response=await readReceipt(operation.lastReceipt);
+    if(response?.state!=='completed'||response.receipt?.cleanup_complete!==true)
+      throw Error('Pre-target release requires confirmed browser completion and cleanup');
+  }
+  check();
+  const ctx={deadline,signal};
+  const value={document_id:request.document_id,workflow_ref:request.workflow_ref};
+  if(phase==='workflow')await verifyPendingWorkflowReceipt({operation,adapter,deadline,signal,now});
+  const active=await adapter.verifyWorkflow(value,ctx);
+  check();
+  if(active?.verified!==true||active.status!=='SUCCEEDED'||active.cleanup_complete!==true||active.effect_possible!==false
+    ||active.document_id!==request.document_id||!same(active.workflow_ref,request.workflow_ref))
+    throw Error('Original prepared workflow is not quiet and active');
+  if(operation.targetPhase?.pending)
+    await inspectNodeTarget({request,operation,adapter,record,deadline});
+  check();
+  const target=operation.targetPhase;
+  if(target?.pending)throw Error('Original target effect remains unresolved');
+  const first=await adapter.observe(value,deadline,signal);
+  check();
+  const quiet=g=>g?.complete===true&&g.interaction_ready===true&&g.document_id===request.document_id&&same(g.workflow_ref,request.workflow_ref)
+    &&g.nodes.every(n=>n.locked===false&&n.ref.document_id===request.document_id&&n.ref.workflow_id===request.workflow_ref.workflow_id)
+    &&new Set(g.nodes.map(n=>n.ref.node_id)).size===g.nodes.length;
+  if(!quiet(first))throw Error('Complete quiet original graph required for pre-target release');
+  const baseline=target?.final_graph??target?.last_graph??target?.baseline;
+  if(baseline&&!sameDomainGraph(baseline,first))throw Error('Pre-target graph differs from its settled checkpoint');
+  if(!baseline&&(target?.effect_possible||target?.receipts?.length||target?.targetId))
+    throw Error('Target effects have no settled graph checkpoint');
+  const id=target?.targetId??(request.target.kind==='existing'?request.target.ref.node_id:null);
+  const matches=id?first.nodes.filter(n=>n.ref.node_id===id):[];
+  if(id&&(matches.length!==1||matches[0].type!==request.target.type))throw Error('Original target node is absent or changed');
+  // No target phase/effect means this procedure never created its new target.
+  // Any known partial target is retained, never removed or recreated.
+  if(!id&&(target?.effect_possible||target?.receipts?.length))throw Error('Created target identity is not proved');
+  const second=await adapter.observe(value,deadline,signal);
+  check();
+  if(!quiet(second)||!same(first,second))throw Error('Graph changed during pre-target release');
+  return {verified:true,cleanup_complete:true,node:matches[0]?.ref??null,graph:second,
+    target_state:id?'found':'not_created',cleanup:{wizard_closed:false,read_view_restored:false,views_returned:false}};
+}
+
+// Activation uses its own browser ledger, not operation.lastReceipt. A visible
+// active tab is not proof that its original native click finished.
+export async function verifyPendingWorkflowReceipt({operation,adapter,deadline,signal,now=Date.now}) {
+  const state=operation.nodeApply,pending=state?.pending;
+  const check=()=>{signal?.throwIfAborted();if(now()>=deadline)throw Error('Workflow receipt deadline elapsed');};
+  check();
+  if(pending?.phase!=='workflow'||pending.receipt_id!==operation.id+':workflow'||typeof adapter?.readWorkflowReceipt!=='function')
+    throw Error('Original workflow activation receipt is unavailable');
+  const value={document_id:state.request.document_id,workflow_ref:state.request.workflow_ref};
+  const response=await adapter.readWorkflowReceipt(value,{deadline,signal,receipt_id:pending.receipt_id});
+  check();
+  const receipt=response?.output?.receipt;
+  if(response?.output?.state!=='completed'||receipt?.status!=='SUCCEEDED'||receipt.verified!==true
+    ||receipt.cleanup_complete!==true||receipt.document_id!==value.document_id||!same(receipt.workflow_ref,value.workflow_ref))
+    throw Error('Original workflow activation has no confirmed completion and cleanup');
+}

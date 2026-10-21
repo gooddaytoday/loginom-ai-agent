@@ -41,7 +41,13 @@ export function makeJavascriptManagedWizardSettlementCode(task) {
       ||typeof item.tid!=='string'||item.tid.length<1||item.tid.length>1024
       ||typeof item.label!=='string'||item.label.length>256))
     throw Error('Invalid managed JavaScript wizard settlement');
-  const inspector=`function inspect(args){const native=${inspectJavascriptWizardSettlement.toString()};return (${inspectManagedJavascriptWizardSettlement.toString()})(args,native);}`;
+  // Only this read transports diagnostics through both browser/MCP JSON hops.
+  // Shared deactivation inspectors keep throwing their original error.
+  const inspector=`function inspect(args){const native=${inspectJavascriptWizardSettlement.toString()};
+    try{return (${inspectManagedJavascriptWizardSettlement.toString()})(args,native);}
+    catch(error){const detail=Object.getOwnPropertyDescriptor(error,'javascriptSourceBoundary')?.value;
+      if(error?.message==='Wizard settlement navigation changed'&&detail?.scope==='navigation')
+        return {javascript_source_boundary_refusal:detail};throw error;}}`;
   return `async page=>(${runManagedJavascriptWizardSettlement.toString()})(page,${JSON.stringify(task)},${inspector})`;
 }
 
@@ -50,6 +56,10 @@ export async function waitManagedJavascriptWizardSettlement({task,execute,record
   let first=true,last;
   while(Date.now()<task.deadline){
     last=await execute(code);
+    if(last?.javascript_source_boundary_refusal){
+      const error=Error('Wizard settlement navigation changed');
+      Object.defineProperty(error,'javascriptSourceBoundary',{value:last.javascript_source_boundary_refusal});throw error;
+    }
     if(first){
       const event={phase:'javascript_managed_wizard_settlement_before',operation_id:task.operation_id,
         owner:task.owner,deadline:task.deadline,observation:last};

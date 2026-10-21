@@ -5,6 +5,8 @@ import { NodeReleaseBlocked } from '../lib/node-pending-release.mjs';
 import { buildNodeReadRequest, nodeReadHandler, alignReadSchema } from '../lib/node-read-contract.mjs';
 import { actions } from './support/executor-fixture.mjs';
 import { compactNodeResult } from '../lib/user-results.mjs';
+import { createJavascriptCodeNodeSupport } from '../lib/javascript-code-node.mjs';
+import { createRedactor } from '../lib/redact.mjs';
 
 const node = { document_id: 'doc', workflow_id: 'wf', node_id: 'new' };
 const workflow = { workflow_id: 'wf', tab_tid: 'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1', prefix: 'MF;TF-1', navigation_path: [{ tid: 'path', label: 'Scenario' }] };
@@ -19,7 +21,8 @@ const proved = () => ({ verified: true, cleanup_complete: true, effect_possible:
   cleanup: { wizard_closed: false, read_view_restored: false, views_returned: false } });
 const blocked = () => { throw new NodeReleaseBlocked('A Loginom wizard of this node is open', 'Ask the user to close it with Cancel.'); };
 
-function fixture({ browserRecovery = true, release = blocked, releasePendingPhases } = {}) {
+function fixture({ browserRecovery = true, release = blocked, releasePendingPhases, recoveryReleasePending,
+  nodeType = 'imports.text', stopPhase = 'finish' } = {}) {
   const calls = [], events = [];
   const graph = { complete: true, document_id: 'doc', workflow_ref: workflow, nodes: [], links: [], foreign_links: [] };
   const adapter = { observe: async () => structuredClone(graph), preflight: async () => {},
@@ -28,7 +31,7 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
     mutate: async e => { calls.push(e.kind); if (e.kind === 'create') graph.nodes.push({ ref: node, type: e.parameters.type, label: 'Source',
       position: e.parameters.position, inputs: [], outputs: [0] }); return { status: 'SUCCEEDED', cleanup_complete: true }; } };
   const ok = name => async () => { calls.push(name); return { verified: true, cleanup_complete: true, effect_possible: false }; };
-  const state = { release, failFinish: true };
+  const state = { release, failFinish: stopPhase === 'finish' };
   const drivers = { verifySource: ok('source'), mapPorts: ok('mapping'), openWizard: ok('open'),
     finish: async mode => {
       calls.push('finish');
@@ -40,8 +43,14 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
     readOutput: async () => ({ verified: true, cleanup_complete: true, effect_possible: false, status: 'complete', execution_id: 'exec', evidence_ref: 'e', ports: [] }),
     verifyContinuation: async () => true,
     releasePending: async s => { calls.push('release:' + s.pending.phase); return state.release(s); },
-    ...(releasePendingPhases ? { releasePendingPhases } : {}) };
-  const handler = { revision: '1', modes: ['delimited'], validate: () => {}, configure: ok('configure') };
+    ...(releasePendingPhases ? { releasePendingPhases } : {}),
+    ...(recoveryReleasePending ? { recoveryReleasePending } : {}) };
+  const mode = nodeType === 'programming.javascript' ? 'script' : 'delimited';
+  const handler = { revision: '1', modes: [mode], validate: () => {}, configure: async () => {
+    const result = await ok('configure')();
+    if (stopPhase === 'configure') throw Error('Managed source configuration stopped');
+    return result;
+  } };
   const runtime = createActionRuntime({ pinned: { actions, selectors: new Map(), pins: {} }, allowCandidate: true, browserRecovery,
     // Only the page receipt ledger is read through this transport.
     execute: async code => {
@@ -51,14 +60,23 @@ function fixture({ browserRecovery = true, release = blocked, releasePendingPhas
       return { status: 'SUCCEEDED', action_key: 'operation.receipt', action_revision: '1', operation_id: 'apply', phase: 'observed',
         effect_possible: false, error: null, trace: [], output: { state: 'completed', receipt } };
     },
-    nodeTargetAdapterFactory: () => adapter, nodeApplyHandlers: new Map([['imports.text', handler]]),
-    nodeApplyDriverFactory: ({ operation, receiptOptions }) => { state.receiptOptions = receiptOptions; state.operation = operation; return drivers; },
+    nodeTargetAdapterFactory: () => adapter, nodeApplyHandlers: new Map([[nodeType, handler]]),
+    nodeApplyDriverFactory: options => {
+      state.receiptOptions = options.receiptOptions; state.operation = options.operation;
+      if (nodeType === 'programming.javascript') {
+        const js = createJavascriptCodeNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2',redactor:createRedactor()})
+          .nodeApplyDriverFactory(options);
+        drivers.releasePending = js.releasePending; drivers.releasePendingPhases = js.releasePendingPhases;
+      }
+      return drivers;
+    },
     onRecord: async e => { events.push(e); return e; } });
-  return { runtime, calls, events, state };
+  return { runtime, calls, events, state, request: (id, target) => ({...request(id, target), mode,
+    target: {...request(id, target).target, type: nodeType}}) };
 }
 
 async function stopAtFinish(f, id = 'apply', target) {
-  f.runtime.startNodeApply(request(id, target));
+  f.runtime.startNodeApply(f.request(id, target));
   const job = await f.runtime.waitNodeApply(id, { timeoutMs: 1000 });
   assert.equal(job.outcome.status, 'AMBIGUOUS');
   assert.equal(job.outcome.output.pending_phase, 'finish');
@@ -101,14 +119,45 @@ test('Dock recovery comes first: an available release is not a trigger', async (
   assert.throws(() => f.runtime.browserRecoveryBasis('apply'), /No browser recovery trigger/);
 });
 
-test('T2: no remaining Dock option makes browser recovery the next step', async () => {
-  const f = fixture({ release: proved, releasePendingPhases: ['read'] });
+test('T2: a dedicated browser release verifier permits phases outside native release', async () => {
+  const f = fixture({ release: blocked, releasePendingPhases: ['read'], recoveryReleasePending: proved });
   await stopAtFinish(f);
   const advice = (await f.runtime.inspect({ operationId: 'apply' })).output;
   assert.deepEqual(advice.recovery_options, []);
   assert.equal(advice.browser_recovery, 'NO_RECOVERY_OPTION');
   assert.equal(advice.next_steps[0].tool, 'dock_browser_recovery');
   assert.equal(f.runtime.browserRecoveryBasis('apply').reason, 'NO_RECOVERY_OPTION');
+  const basis = f.runtime.browserRecoveryBasis('apply');
+  assert.equal((await f.runtime.browserRecoveryHandoff('apply')).stopped, true);
+  assert.equal((await f.runtime.verifyBrowserRecovery({operationId:'apply',step:basis.step,
+    attested:{actions_performed:['Returned to graph']}})).status, 'continuable');
+  assert.equal(f.calls.some(call => call.startsWith('release:')), false);
+});
+
+test('JavaScript finish cannot offer or hand off browser recovery outside its real release phases', async () => {
+  const f = fixture({nodeType:'programming.javascript'});
+  await stopAtFinish(f);
+  const advice = (await f.runtime.inspect({operationId:'apply'})).output;
+  assert.deepEqual(advice.recovery_options, []);
+  assert.equal(advice.browser_recovery, undefined);
+  assert.equal(advice.next_steps.some(step => step.tool === 'dock_browser_recovery'), false);
+  assert.throws(() => f.runtime.browserRecoveryBasis('apply'), /No browser recovery trigger/);
+  assert.equal(f.calls.some(call => call.startsWith('release:')), false);
+  assert.equal(f.runtime.hasUnsettledWork(), true);
+  assert.equal(f.runtime.nodeApplyStatus('apply').outcome.output.pending_phase, 'finish');
+});
+
+test('JavaScript configure still offers browser recovery after its native release is refused', async () => {
+  const f = fixture({nodeType:'programming.javascript',stopPhase:'configure'});
+  f.runtime.startNodeApply(f.request('apply'));
+  const stopped = await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+  assert.equal(stopped.outcome.output.pending_phase,'configure');
+  assert.deepEqual((await f.runtime.inspect({operationId:'apply'})).output.recovery_options,['abandon_operation']);
+  const refused = await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-1'});
+  assert.equal(refused.error.code,'NODE_RELEASE_REFUSED');
+  assert.equal(refused.output.next_step.tool,'dock_browser_recovery');
+  assert.equal(refused.output.next_step.reason,'NODE_RELEASE_REFUSED');
+  assert.equal(f.runtime.browserRecoveryBasis('apply').step.phase,'configure');
 });
 
 test('the lease blocks Dock mutations; verification releases on proof and writes a receipt first', async () => {

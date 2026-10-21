@@ -78,8 +78,10 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   assert.notEqual(prepared.isError,true);assert.equal(full.prepared,true);assert.equal(full.knowledge.version,'user-v1');
   assert.ok(full.knowledge.node_types.some(node=>node.type==='programming.javascript'));assert.equal(full.knowledge.reused,undefined);
   const preparedJs=full.knowledge.node_types.find(node=>node.type==='programming.javascript');
-  assert.match(preparedJs.limitations.at(-2),/ASCII Name.*DisplayName.*schema\/readback/);
-  assert.match(preparedJs.limitations.at(-1),/integer\/real\/datetime data_kind=Непрерывный/);
+  // Knowledge revisions append limitations; check presence, not position.
+  assert.ok(preparedJs.limitations.some(text=>/ASCII Name.*DisplayName.*schema\/readback/.test(text)));
+  assert.ok(preparedJs.limitations.some(text=>/integer\/real\/datetime data_kind=Непрерывный/.test(text)));
+  assert.ok(preparedJs.limitations.some(text=>/DataType\.Float/.test(text)));
   assert.ok(size(prepared)<=46000);assert.equal(Object.hasOwn(full,'instructions'),false);
   assert.equal(full.source,'bundled');assert.match(full.skillRevision,/^[a-f0-9]{64}$/);
   assert.match(client.getInstructions(),/activate.*loginom-automation/i);
@@ -92,7 +94,7 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   assert.notEqual(single.isError,true);assert.ok(size(single)<=20000);
   const js=parse(single).node_types[0];assert.deepEqual(js.parameter_schema,javascriptParametersSchema);
   assert.equal(js.javascript_knowledge.validated_for.loginom_build,'7.4.2');assert.equal(js.javascript_knowledge.examples.length,2);
-  assert.equal(js.javascript_knowledge.version,'1.2.0');
+  assert.equal(js.javascript_knowledge.version,'1.3.0');
   assert.equal(js.knowledge_sha256,preparedJs.knowledge_sha256);
   assert.deepEqual(js.javascript_knowledge.column_names.observed_pairs.map(pair=>[pair.requested_name,pair.actual_name,pair.display_name]),
     [['Value','Value','Value'],['Сумма','Summa','Value'],['Value Total','Value_Total','Value'],['1Value','_1Value','Value'],['Value','Value','Сумма ё']]);
