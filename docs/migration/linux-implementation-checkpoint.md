@@ -9,6 +9,15 @@ CI40281597215 PASS на попытке1; matrix5/5; 30 assets/digests/SHA256SUMS
 Published2026-10-26T07:16:28Z, pre-release, latest=false, ID423944660; 30 URLs HTTP200.
 [Отчёт](../testing/loginom-ai-agent/reports/2026-10-26-v0.3.3-release.md).
 
+## 2026-10-21 — приватный candidate #74, без выпуска
+
+Clean source `bbd2e1af7d`, ветка `local-file-paths`; CLI `0.0.0-dev-202610211509`, Desktop `0.3.2-localpaths74.bbd2e1af7`.
+CLI private install/manifest/archive roundtrip PASS; Desktop DEB/AppImage static PASS (5042 resources), GUI acceptance ещё нет.
+Pinned Bun 1.3.14 / Node 24.19.0 / Chromium1246; общие установки и профили не заменялись.
+CSV reference: actual candidate CLI/model DB/cold browser MCP/oracle PASS; это authoring, не isolated benchmark.
+Автономная edit-фикстура и её guard — B1–B2; release/installed routing acceptance не заявлены.
+[Отчёт](../testing/loginom-ai-agent/local-file-paths.md#task-7-candidate-and-authoring-preparation-2026-10-21) · [блокеры](../testing/loginom-ai-agent/local-file-paths-blockers.md).
+
 ## 2026-10-20 — v0.3.2 опубликован
 
 Release source: `c130548bbe19515ea226796054786574ed2fc4a2`, ветка `loginom` (PR #286: demo-022 f9c302b3).
