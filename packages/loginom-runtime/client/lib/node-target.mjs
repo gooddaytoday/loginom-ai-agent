@@ -49,7 +49,7 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
 // Internal graph phase of node.apply. The enclosing runtime owns the gate and
 // operation ID; adapters invoke fixed local primitives, never dock_action_run.
 // Effects are committed one at a time. A possible effect never retries a gesture.
-export async function prepareNodeTarget({ request, operation, adapter, record, signal, now = Date.now }) {
+export async function prepareNodeTarget({ request, operation, adapter, record, signal, now = Date.now, beforeTarget }) {
   validateNodeTargetRequest(request);
   const signature = digest(request);
   const state = operation.targetPhase ??= { signature, receipts: [], baseline: null, targetId: null, effect_possible: false };
@@ -115,6 +115,18 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
     const retained = g => ({ nodes: g.nodes.filter(n => !ids.includes(n.ref.node_id)).map(domainNode), links: g.links.filter(e => !edges.includes(edgeKey(e))), foreign_links: g.foreign_links });
     return same(retained(before), retained(after));
   };
+  if(beforeTarget){
+    if(request.target.kind!=='new'||request.target.type!=='transform.cross_table'
+      ||state.baseline||state.last_graph||state.pending||state.targetId||state.receipts.length)
+      throw Error('CrossTable source preflight already started; release without replay');
+    // The source definition wizard can fail before creation begins. Retain
+    // the existing graph checkpoint before that first child gesture, so a
+    // later read-only release can compare the original graph. No target
+    // effect is prepared here; an unfinished preflight is never resumable.
+    state.last_graph=structuredClone(await observe());
+    await commit();budget();
+    await beforeTarget();
+  }
   try {
     let graph = await observe();
     if (state.pending) {
@@ -274,7 +286,8 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
   const event={operation_id:operation.id,phase:'node_target_checkpoint',internal_provenance:'node_target_v1',target_state:structuredClone(state)};
   const ack=await record(event);if(!same(ack?.target_state,event.target_state))throw new Error('Node target journal acknowledgement differs');
   operation.targetPhase=state;
-  return state.completed?{...structuredClone(state.result),cleanup_complete:true}:{status:'AMBIGUOUS',phase:'target_partial',cleanup_complete:true,pending:null,node_id:state.targetId,resume_available:true};
+  return state.completed?{...structuredClone(state.result),cleanup_complete:true}:{status:'AMBIGUOUS',phase:'target_partial',cleanup_complete:true,pending:null,node_id:state.targetId,
+    resume_available:!(request?.target.kind==='new'&&request.target.type==='transform.cross_table'&&!state.baseline&&state.last_graph)};
 }
 
 // A pre-target release observes only. In particular, it cannot finish creation,
