@@ -4,22 +4,27 @@ import {createNodeExecutionProcedure,trainConfiguredNode} from '../lib/node-exec
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
 const button='MF;cntMain;tlbMainToolbar;btnProgress',grid='ConsoleForm;ProgressForm;trpProgress;grd;tbl';
 async function fixture({hide=true,replace=false,lost=false,failure=false,closeFault=false,failedChild=false,
- training=false,trainUnknown=false,verifyFailedChild=false,ownerNode='node',childState='failed',showMismatch=false,changedError=false,replaceAtMenu=false,deadlineFault=false}={}){
+ bufferedGroup=false,groupFault,training=false,trainUnknown=false,verifyFailedChild=false,ownerNode='node',childState='failed',showMismatch=false,changedError=false,replaceAtMenu=false,deadlineFault=false}={}){
  let opened=true,launched=false,selected=false,menu=false,shown=false,trainMenu=false;
+ let groupRevealed=!bufferedGroup,groupExpanded=!bufferedGroup;
+ const oldGroup={process_id:'1',record_id:'old',parent_id:null,state:'completed',error:false,rendered:true,process_tid:'old-row',expanded:true,children_loaded:true};
  const actions=[],el=(tid,allowed_actions=['click'])=>({tid,ref:tid,allowed_actions});
- const state=()=>({prepared_node_context:{...node,...(showMismatch&&shown?{node_id:'foreign'}:{}),verified:true,surface:'graph',tid:'graph-node'},wizard:{status:'absent'},navigation_context:{status:'observed'},
+ const state=()=>({prepared_node_context:{...node,...(showMismatch&&shown||bufferedGroup&&groupRevealed&&groupFault==='node'?{node_id:'foreign'}:{}),verified:true,surface:'graph',tid:'graph-node'},wizard:{status:'absent'},navigation_context:{status:'observed'},
   node_outputs:{verified:true,node_selected:shown},
-  node_processes:{verified:opened,inventory_complete:true,show_completed:true,root_id:'root',node_context:{...node,verified:true,surface:'graph'},processes:launched?[
-   {process_id:'1',record_id:'group',parent_id:null,state:failure?'pending_or_failed':'completed',error:failure,children_loaded:true,expanded:true,rendered:true,...(failure?{error_details:'Missing own CSV',progress_state:{verified:true,state:'failed',terminal:true,can_cancel:false,source:'native_progress_record'}}:{})},
-   {process_id:'1.1',record_id:replace&&shown||replaceAtMenu&&menu&&selected?'replaced':'child',parent_id:'1',state:'completed',error:false,rendered:true,selected,process_tid:'child-row',
+  node_processes:{verified:opened,inventory_complete:true,show_completed:true,root_id:bufferedGroup&&groupRevealed&&groupFault==='root'?'foreign':'root',node_context:{...node,verified:true,surface:'graph'},processes:launched?[...(bufferedGroup?[oldGroup]:[]),
+   {process_id:bufferedGroup?'2':'1',record_id:bufferedGroup&&groupRevealed&&groupFault==='record'?'foreign':'group',parent_id:null,state:failure?'pending_or_failed':'completed',error:failure,children_loaded:true,expanded:true,rendered:true,...(bufferedGroup?{process_tid:'group-row',expanded:groupExpanded,expander_tid:groupRevealed?'group-expander':null}:{}),...(failure?{error_details:'Missing own CSV',progress_state:{verified:true,state:'failed',terminal:true,can_cancel:false,source:'native_progress_record'}}:{})},
+   {process_id:bufferedGroup?'2.1':'1.1',record_id:replace&&shown||replaceAtMenu&&menu&&selected?'replaced':'child',parent_id:bufferedGroup?'2':'1',state:'completed',error:false,rendered:true,selected,process_tid:'child-row',
     ...(failedChild?{state:'pending_or_failed',error:true,error_details:changedError&&shown?'Changed child error':'Own JS sentinel error',
       progress_state:{verified:true,state:childState,terminal:true,can_cancel:false,source:'native_progress_record'},
-      owner:{verified:true,node_id:ownerNode,source:'native_process_model_identity'}}:{})}]:[]},
-  ui:{elements:[el(button),{...el('graph-node',['right_click']),graph_node:{part:'body'}},{...el('graph-node;Label;Label',['right_click']),graph_node:{part:'label'}},...(trainMenu?[{...el('mn;mniTrain'),label:'Обучить узел'}]:[]),...(opened?[el(grid,['right_click']),el('ConsoleForm;btnClose'),el('child-row',['right_click'])]:[]),
+      owner:{verified:true,node_id:ownerNode,source:'native_process_model_identity'}}:{})}]:(bufferedGroup?[oldGroup]:[])},
+  ui:{elements:[el(button),{...el('graph-node',['right_click']),graph_node:{part:'body'}},{...el('graph-node;Label;Label',['right_click']),graph_node:{part:'label'}},...(trainMenu?[{...el('mn;mniTrain'),label:'Обучить узел'}]:[]),...(opened?[el(grid,['right_click']),el('ConsoleForm;btnClose'),...(!bufferedGroup||groupExpanded?[el('child-row',['right_click'])]:[])]:[]),
+   ...(bufferedGroup&&opened?[el('old-row'),{...el('ConsoleForm;ProgressForm;trpProgress;treepanel;tree',['scroll']),ref:'scroll',process_grid:{grid_id:'tree'},scroll:{ref:'scroll',top:groupRevealed?583:487,max_top:583}},...(groupRevealed?[el('group-row'),el('group-expander')]:[])]:[]),
    ...(menu?[el('mnContextMenu;mniShowCompletedProcesses',['click','press']),el('mnContextMenu;mniShowNodeToProcess',['show_process_node'])]:[])]}});
  const channel={observe:async o=>{if(deadlineFault&&o.condition==='new process selects the prepared graph node')throw Error('Original deadline expired');
   const s=state();assert.ok(o.ready(s),o.condition);return structuredClone(s);},perform:async o=>{
   const s=state();assert.ok(o.ready(s));o.identity(s);const a=o.resolve(s);actions.push(a);
+  if(a.verb==='scroll'){groupRevealed=true;if(groupFault==='unknown_scroll')throw Error('Unknown scroll reply');}
+  if(a.ref==='group-expander')groupExpanded=true;
   if(a.ref==='graph-node')trainMenu=true;
   if(a.ref==='mn;mniTrain'){trainMenu=false;launched=true;if(trainUnknown)throw Error('Unknown training reply');}
   if(a.verb==='right_click'){menu=true;if(a.ref==='child-row')selected=true;}
@@ -94,5 +99,18 @@ for(const trainUnknown of [false,true])test('native training settles its owned p
  else {const result=await f.run();assert.equal(result.status,'trained');assert.deepEqual(result.node,node);assert.equal(result.execution_id,'doc:root:1');}
  assert.equal(f.actions.filter(a=>a.ref==='mn;mniTrain').length,1);
  assert.equal(f.actions.filter(a=>a.ref==='graph-node;Label;Label').length,0,'label context menu cannot train a node');
+ assert.equal(f.actions.some(a=>a.verb==='execute_graph_node'),false);
+});
+
+for(const groupFault of [undefined,'root','node','record','unknown_scroll'])test('buffered rendered group reveals before requiring its expander: '+(groupFault??'success'),async()=>{
+ const f=await fixture({bufferedGroup:true,groupFault,hide:false});
+ if(groupFault)await assert.rejects(f.driver.waitCompleted());
+ else {
+  const result=await f.driver.waitCompleted();assert.equal(result.owner_verified,true);
+  assert.equal(f.actions.filter(a=>a.ref==='group-expander').length,1);
+  assert.equal(f.actions.filter(a=>a.verb==='show_process_node').length,1);
+ }
+ assert.deepEqual(f.actions.filter(a=>a.verb==='scroll'),[{verb:'scroll',ref:'scroll',delta_y:96}]);
+ if(groupFault)assert.equal(f.actions.filter(a=>a.ref==='group-expander').length,0);
  assert.equal(f.actions.some(a=>a.verb==='execute_graph_node'),false);
 });
