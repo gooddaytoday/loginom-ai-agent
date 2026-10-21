@@ -1940,6 +1940,59 @@ test('typed Calculator parameter editing binds dialog, selected row and exact dr
   }
 });
 
+test('Calculator Apply confirms Token metadata without exposing sensitive controls or table values',async()=>{
+  const {page,base,records}=calculatorManifestFixture(),r=records[0];
+  page.waitForTimeout=async()=>{};
+  const dialog=page.add('div',base+'ExprDataEditForm');dialog.attrs.class='x-window';
+  for(const [key,value] of [['edtName','Token'],['edtDisplayName','Token'],['cbxDataType','Строковый']]) {
+    const owner=page.add('div',base+'ExprDataEditForm;'+key,'',undefined,dialog);
+    page.add('input',null,'',undefined,owner).value=value;
+  }
+  const button=page.add('button',base+'ExprDataEditForm;btnApply','Изменить',{x:600,y:400,width:90,height:25},dialog);
+  const roots=await page.execute({mode:'observe',discover_roots:true});
+  const root=roots.output.ui.elements.find(e=>e.tid===base+'ExprDataEditForm');
+  const read=await page.execute({mode:'observe',root_ref:root.ref});
+  const target=read.output.ui.elements.find(e=>e.tid===button.getAttribute('data-tid'));
+  const click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);dialog.remove();
+    r.cell.attrs['data-tid']=base+'CalcDataWizard;colExpressionName_Token';r.cell.ownText='Token';
+    r.label.attrs['data-tid']=base+'CalcDataWizard;colExpressionDisplayName_Token';r.label.ownText='Token';
+    r.icon.attrs.class='bg-TBGDataType-dtString';
+  };
+  const outcome=await page.act({verb:'apply_expression_parameters',ref:target.ref},read.output);
+  assert.equal(outcome.status,'SUCCEEDED',JSON.stringify(outcome.error));
+  assert.deepEqual(Object.fromEntries(['name','label','type_label'].map(k=>[k,outcome.output.wizard.expression_selection[k]])),
+    {name:'Token',label:'Token',type_label:'Строковый'});
+  assert.equal(outcome.output.wizard.calculator_expressions.fields[0].name,'Token');
+  assert.equal(outcome.output.wizard.calculator_expressions.settings_applied,false);
+  assert.equal(page.clickedPoints.length,1);
+  assert.ok(outcome.trace.some(e=>e.event==='expression_parameters_row_verified'&&e.node_settings_applied===false));
+});
+
+test('Calculator metadata exception retains secret attributes, editor, grid and active-tab guards',async()=>{
+  for(const mode of ['valid','name','id','aria','autocomplete','ancestor','child','editable','input','link','foreign_grid','foreign_view','foreign_tab','duplicate','wrong_key','wrong_tag']) {
+    const {page,base,records,grid}=calculatorManifestFixture(),r=records[0];
+    r.cell.attrs['data-tid']=base+'CalcDataWizard;colExpressionName_Token';r.cell.ownText='Token';
+    r.label.attrs['data-tid']=base+'CalcDataWizard;colExpressionDisplayName_Token';r.label.ownText='Token';
+    if(['name','id','aria','autocomplete'].includes(mode))r.cell.attrs[mode==='aria'?'aria-label':mode]='secret';
+    if(mode==='ancestor')r.row.attrs.name='password';
+    if(mode==='child')page.add('span','secret','never-expose',undefined,r.cell);
+    if(mode==='editable')r.cell.attrs.contenteditable='true';
+    if(mode==='input')page.add('input',null,'',undefined,r.cell).attrs.type='password';
+    if(mode==='link')page.add('a',null,'',undefined,r.cell).attrs.href='https://outside.test';
+    if(mode==='foreign_grid')grid.attrs['data-tid']=base+'Foreign;tbl';
+    if(mode==='foreign_view')r.row.attrs['data-boundview']='other';
+    if(mode==='foreign_tab')page.tab.attrs.class='';
+    if(mode==='duplicate')page.add('td',r.cell.attrs['data-tid'],'Token',undefined,r.tr);
+    if(mode==='wrong_key')r.cell.ownText='Other';
+    if(mode==='wrong_tag')r.cell.tagName='INPUT';
+    const observed=await page.observe();
+    assert.equal(observed.wizard.expression_selection?.status??'unobserved',mode==='valid'?'observed':'unobserved',mode);
+    assert.equal(observed.wizard.calculator_expressions?.status??'unobserved',mode==='valid'?'rendered_expression_definitions':'unobserved',mode);
+    assert.ok(!JSON.stringify(observed).includes('never-expose'),mode);
+  }
+});
+
 test('expression apply checks the resulting selected row after its separate dialog closes',async()=>{
   for(const variation of ['success','delayed_mask','wrong_name','wrong_label','wrong_type','still_open','lost_reply','cancel_success','cancel_changed','cancel_replaced_row']) {
     const page=new Page(),wizard=page.add('div','MF;TF-1;WizrdMCF'),base='MF;TF-1;WizrdMCF;';
@@ -3301,6 +3354,140 @@ function mappingCoverageFixture(page,count=2) {
   }
   return {form,base,body,container,filter,input,tableMode,linksMode,auto,rows};
 }
+
+function calculatorOutputMetadataFixture(name='Token',family='ColumnsMappingEngineOutputPortWizard') {
+  // An ordinary neighbour keeps a partially redacted page observable, as in
+  // the live Calculator output, rather than removing output_columns entirely.
+  const page=new Page(),c=mappingCoverageFixture(page,2),row=c.rows[0];
+  if(family!=='ColumnsMappingEngineOutputPortWizard') {
+    for(const e of [c.form,...c.form.descendants()])if(e.attrs['data-tid'])
+      e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard',family);
+    c.base=c.base.replace('ColumnsMappingEngineOutputPortWizard',family);
+  }
+  for(const cell of row.children) {
+    cell.attrs['data-tid']=cell.attrs['data-tid'].replace(/Field0$/,name);
+    if(cell.ownText==='Field0')cell.ownText=name;
+  }
+  // Source is definition metadata; actual dataset cells remain outside it.
+  row.children[2].ownText='Items';
+  page.add('td','MF;TF-1;ViewsForm;BrowseView;grdData;grd-1;tbl;col_Token','PRIVATE_DATA_VALUE');
+  const port={direction:'output',port:0,native_index:0,port_guid:'output-guid',
+    opening_operation_id:'calculator:output',node_icon_class:'bg-vendor-icon-calcdata'};
+  const binding={node:{node_id:'calculator-guid'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+  const read=(options={})=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {expected_build:build,expected_origin:origin,prepared_node_context:binding,mode:'observe',...options},
+    async()=>({verified:true,surface:'wizard',output_port:port}));
+  return {page,...c,row,port,binding,read};
+}
+
+test('Calculator output definition completes Token metadata without exposing dataset values',async()=>{
+  for(const family of ['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard'])for(const name of ['OrdinaryName','Token']) {
+    const f=calculatorOutputMetadataFixture(name,family),result=await f.read({output_column_page:{offset:0,limit:8}});
+    assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+    const columns=result.output.wizard.output_columns;
+    assert.equal(columns?.page?.status,'complete_definition_page',family+':'+name);
+    assert.equal(columns.fields[0]?.name,name);
+    assert.equal(columns.fields[0]?.label,name);
+    assert.equal(columns.settings_applied,false);assert.equal(columns.complete,false);
+    assert.equal(columns.fields[0].data_kind,'Непрерывный');
+    assert.equal(columns.fields[0].usage,'Не задано');
+    assert.equal(columns.fields[0].source.status,'rendered_source');
+    assert.equal(columns.fields[0].source.label,'Items');
+    assert.ok(!JSON.stringify(result).includes('PRIVATE_DATA_VALUE'));
+    assert.deepEqual(f.page.events,[]);
+  }
+});
+
+test('Calculator output metadata exception requires the native Calculator output and retains all secret guards',async()=>{
+  for(const family of ['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard'])for(const mode of ['name','id','aria','autocomplete','ancestor','child','editable','input','link',
+    'foreign_grid','foreign_view','foreign_tab','duplicate','wrong_key','wrong_tag',
+    'unbound','foreign_node','input_port','wrong_port','wrong_native_index','missing_guid','missing_opening','foreign_workflow','foreign_page']) {
+    const f=calculatorOutputMetadataFixture('Token',family),name=f.row.children[0],label=f.row.children[1];
+    if(['name','id','aria','autocomplete'].includes(mode))name.attrs[mode==='aria'?'aria-label':mode]='secret';
+    if(mode==='ancestor')f.row.attrs.name='password';
+    if(mode==='child')f.page.add('span','secret','PRIVATE_CHILD',undefined,name);
+    if(mode==='editable')name.attrs.contenteditable='true';
+    if(mode==='input')f.page.add('input',null,'',undefined,name).attrs.type='password';
+    if(mode==='link')f.page.add('a',null,'',undefined,name).attrs.href='https://outside.test';
+    if(mode==='foreign_grid')f.body.attrs['data-tid']=f.base+'Foreign;tbl';
+    if(mode==='foreign_view')f.row.attrs['data-boundview']='other';
+    if(mode==='foreign_tab')f.page.tab.attrs.class='';
+    if(mode==='duplicate')f.page.add('td',name.attrs['data-tid'],'Token',undefined,f.row);
+    if(mode==='wrong_key')name.ownText='Other';
+    if(mode==='wrong_tag')name.tagName='INPUT';
+    if(mode==='foreign_node')f.port.node_icon_class='bg-vendor-icon-groupdata';
+    if(mode==='input_port')f.port.direction='input';
+    if(mode==='wrong_port')f.port.port=1;
+    if(mode==='wrong_native_index')f.port.native_index=1;
+    if(mode==='missing_guid')delete f.port.port_guid;
+    if(mode==='missing_opening')delete f.port.opening_operation_id;
+    if(mode==='foreign_workflow')f.binding.workflow_ref.prefix='MF;TF-2';
+    if(mode==='foreign_page')for(const e of [f.form,...f.form.descendants()])if(e.attrs['data-tid'])
+      e.attrs['data-tid']=e.attrs['data-tid'].replace(family,'TuneDataSourceMappingWizard');
+    const result=await f.read(mode==='unbound'?{prepared_node_context:undefined}:{});
+    assert.equal(result.status,'SUCCEEDED',mode+JSON.stringify(result.error));
+    assert.ok(!result.output.wizard.output_columns?.fields?.some(f=>f.name==='Token'),mode);
+    assert.ok(!JSON.stringify(result).includes('PRIVATE_DATA_VALUE'),mode);
+    assert.ok(!JSON.stringify(result).includes('PRIVATE_CHILD'),mode);
+    const paged=await f.read({...(mode==='unbound'?{prepared_node_context:undefined}:{}),output_column_page:{offset:0,limit:8}});
+    assert.notEqual(paged.output.wizard.output_columns?.page?.status,'complete_definition_page',mode);
+    assert.deepEqual(f.page.events,[],mode);
+  }
+});
+
+test('Calculator output metadata retains secret and row identity guards for all three added definition cells',async()=>{
+  for(const family of ['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard'])for(const index of [2,3,4])for(const mode of ['name','id','aria','autocomplete','child','editable','input','link','duplicate','foreign_row','wrong_tag','missing']) {
+    const f=calculatorOutputMetadataFixture('Token',family),cell=f.row.children[index];
+    cell.ownText='PRIVATE_EXCLUDED';
+    if(['name','id','aria','autocomplete'].includes(mode))cell.attrs[mode==='aria'?'aria-label':mode]='secret';
+    if(mode==='child')f.page.add('span','secret','PRIVATE_CHILD',undefined,cell);
+    if(mode==='editable')cell.attrs.contenteditable='true';
+    if(mode==='input')f.page.add('input',null,'',undefined,cell).attrs.type='password';
+    if(mode==='link')f.page.add('a',null,'',undefined,cell).attrs.href='https://outside.test';
+    if(mode==='duplicate')f.page.add('td',cell.attrs['data-tid'],'PRIVATE_EXCLUDED',cell.box,f.row);
+    if(mode==='foreign_row'){cell.remove();f.page.add('table',null,'',f.row.box,f.container).append(cell);}
+    if(mode==='wrong_tag')cell.tagName='INPUT';
+    if(mode==='missing')cell.remove();
+    const result=await f.read({output_column_page:{offset:0,limit:8}}),message=index+':'+mode;
+    assert.equal(result.status,'SUCCEEDED',message+JSON.stringify(result.error));
+    assert.notEqual(result.output.wizard.output_columns?.page?.status,'complete_definition_page',message);
+    assert.ok(!JSON.stringify(result).includes('PRIVATE_EXCLUDED'),message);
+    assert.ok(!JSON.stringify(result).includes('PRIVATE_CHILD'),message);
+    assert.ok(!JSON.stringify(result).includes('PRIVATE_DATA_VALUE'),message);
+    assert.deepEqual(f.page.events,[],message);
+  }
+});
+
+test('observed Calculator derived output TD layout keeps null source and the delete control protected',async()=>{
+  // LAB-113 token-output-snapshot.json: same record205, five metadata TDs,
+  // nested x-grid-cell-inner DIVs and a separate non-metadata delete column.
+  const f=calculatorOutputMetadataFixture('Token','DerivedDataSourceOutputSocketWizard');
+  f.body.attrs.id='tableview-1644';
+  for(const row of f.rows)row.attrs['data-boundview']='tableview-1644';
+  f.row.attrs['data-recordid']='205';
+  const cells=[...f.row.children],tbody=f.page.add('tbody',null,'',f.row.box,f.row);
+  const tr=f.page.add('tr',null,'',f.row.box,tbody);tr.attrs.class='bg-gridrow-bold x-grid-row';
+  for(const cell of cells){cell.remove();tr.append(cell);cell.attrs.tabindex='-1';cell.ownText='';
+    for(const child of [...cell.children])child.remove();
+  }
+  for(const [cell,text,icon] of [[cells[0],'Token'],[cells[1],'Token','bg-TBGDataType-dtString bg-grid-icon'],
+    [cells[2],''],[cells[3],'Дискретный','bg-TBGDataKind-dkDiscrete bg-grid-icon'],
+    [cells[4],'Не задано','bg-TBGUsageType-utUnspecified bg-grid-icon']]) {
+    f.page.add('div',null,text,cell.box,cell).attrs.class='x-grid-cell-inner'+(cell===cells[2]?' bg-cell-null-value':'');
+    if(icon)f.page.add('div',null,'',cell.box,cell).attrs.class=icon;
+  }
+  const deleted=f.page.add('td',f.base+'colTargetDelete_Token','PRIVATE_DELETE_CONTROL',f.row.box,tr);
+  f.page.add('img',null,'',deleted.box,deleted).attrs.role='button';
+  const result=await f.read({output_column_page:{offset:0,limit:8}}),columns=result.output.wizard.output_columns;
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
+  assert.equal(columns.page.status,'complete_definition_page');
+  assert.equal(columns.fields[0].name,'Token');assert.equal(columns.fields[0].type,'string');
+  assert.equal(columns.fields[0].source.status,'unmapped');
+  assert.equal(columns.fields[0].data_kind,'Дискретный');
+  assert.ok(!JSON.stringify(result).includes('PRIVATE_DELETE_CONTROL'));
+  assert.ok(!JSON.stringify(result).includes('PRIVATE_DATA_VALUE'));
+  assert.deepEqual(f.page.events,[]);
+});
 
 test('configured mapping coverage rejects clipped filtered virtualized or unmatched rows',async()=>{
   for(const mode of ['valid','hidden_extra','gap','overflow','spacer','filter','mode','duplicate','offset','unmatched','wrong_boundview','clipped_cell','editor','mask','container_gap','body_extra','missing_dimensions','column_editor','horizontal_offset']) {

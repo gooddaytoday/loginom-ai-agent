@@ -8,11 +8,21 @@ import {compactNodeResult} from '../lib/user-results.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 import {applyNode} from '../lib/node-apply.mjs';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 const node={document_id:'doc',workflow_id:'flow',node_id:'node'};
 const source={node_id:'source',document_id:'doc',workflow_id:'flow'};
 const request={target:{kind:'new',type:'programming.javascript',position:{x:256,y:256}},mode:'script',
   inputs:[{source,output:0,input:0}],parameters:{source_text:'import {OutputTable} from "builtIn/Data";\n',schema_mode:'code'},
   mappings:[],finish:'execute',read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'}};
+
+for(const point of ['read','replace'])test('configure cancellation during managed '+point+' retains pending without later effects',()=>{
+ const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
+  fileURLToPath(new URL('./support/javascript-configure-cancel.mjs',import.meta.url)),point],{encoding:'utf8',timeout:10000});
+ assert.equal(result.error,undefined,String(result.error));
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ const outcome=JSON.parse(result.stdout.trim());assert.equal(outcome.pending_phase,'configure');
+});
 
 for(const kind of ['new','existing'])test('redaction preflight refuses before the actual target/browser boundary '+kind,async()=>{
  const p={...structuredClone(request),operation_id:'redaction-'+kind,contract_revision:'1.0.0',document_id:'doc',

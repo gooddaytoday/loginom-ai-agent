@@ -18,14 +18,65 @@ import {captureManagedJavascriptWizardError,journalManagedJavascriptError} from 
 import {createRedactor} from './redact.mjs';
 
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
-const need = (condition, message) => { if (!condition) throw Error(message); };
+const need = (condition, message, diagnostic) => { if (!condition) {
+  const error=Error(message);
+  if(diagnostic)try{Object.defineProperty(error,'javascriptSourceBoundary',{value:diagnostic()});}catch{}
+  throw error;
+} };
+
+// Failure-only summaries of the already returned cache. Never retain names,
+// IDs, source text, cell values or arbitrary refusal messages in these details.
+function sourceSettingsDiagnostic(schema,owner) {
+  const checks=[],type=value=>value===null?'null':Array.isArray(value)?'array':typeof value;
+  const check=(field,value,expected,index)=>{
+    const observed=expected==='true'?String(value===true):type(value);
+    if(observed!==expected)checks.push({field,expected,observed,...(index===undefined?{}:{index})});
+  };
+  check('settings.verified',schema?.verified,'true');
+  check('settings.generation_checked',schema?.generation?.checked,'boolean');
+  check('mappings.grids',schema?.grids,'array');
+  if(Array.isArray(schema?.grids))for(const [index,grid] of schema.grids.slice(0,128).entries()) {
+    check('mappings.grid_tid',grid?.tid,'string',index);
+    check('mappings.grid_fields',grid?.fields,'array',index);
+  }
+  if(owner){
+    check('settings.owner_verified',schema?.node_context?.verified,'true');
+    check('settings.wizard_surface',schema?.node_context?.surface==='wizard','true');
+    for(const key of ['document_id','workflow_id','node_id'])check('settings.'+key+'_matches',schema?.node_context?.[key]===owner[key],'true');
+  }
+  if(schema?.reason==='native_field_contract_unconfirmed') {
+    const fields=schema.grids?.find(grid=>grid.tid?.endsWith(';grdTargetColumns;tbl'))?.fields,names=new Set();
+    if(Array.isArray(fields))for(const [index,field] of fields.slice(0,128).entries()) {
+      check('mappings.Name_type',field.Name,'string',index);check('mappings.Name_present',!!field.Name,'true',index);
+      check('mappings.Name_unique',!names.has(field.Name),'true',index);names.add(field.Name);
+      check('mappings.DataType_supported',[1,2,3,4,5,6].includes(field.DataType),'true',index);
+      check('mappings.Index_matches',field.Index===index,'true',index);check('mappings.Required_type',field.Required,'boolean',index);
+      check('mappings.Broken_clear',field.Broken!==true,'true',index);
+      if(checks.some(c=>c.index===index&&c.field.startsWith('mappings.')&&c.field!=='mappings.grid_tid'&&c.field!=='mappings.grid_fields'))break;
+    }
+  }
+  if(schema?.reason==='mapping_reciprocity_unconfirmed')check('mappings.reciprocity_verified',false,'true');
+  if(schema?.reason==='source_grid_ambiguous')check('mappings.source_grid_unique',false,'true');
+  const refused={
+    'JavaScript schema store is unavailable':'mappings.store_available',
+    'JavaScript schema cache is filtered or incomplete':'mappings.cache_complete',
+    'JavaScript schema record identity invalid':'mappings.record_identity',
+    'JavaScript target schema unavailable':'mappings.target_grid_unique',
+    'JavaScript schema control is ambiguous':'mappings.control_unique',
+    'JavaScript schema control binding missing':'mappings.control_bound',
+    'Unique JavaScript schema page required':'settings.schema_page_unique',
+    'JavaScript generation checkbox binding unavailable':'settings.generation_binding',
+  };
+  if(Object.hasOwn(refused,schema?.reason??''))check(refused[schema.reason],false,'true');
+  return {scope:'settings',checks};
+}
 
 // Native record IDs are transient across wizard openings. Preserve the complete
 // semantic grid values, including order, so source admission can detect drift.
 export function javascriptManagedSourceSettings(schema) {
   need(schema?.verified === true && typeof schema.generation?.checked === 'boolean'
     && Array.isArray(schema.grids) && schema.grids.every(grid => typeof grid.tid === 'string'
-      && Array.isArray(grid.fields)), 'Managed JavaScript source settings unavailable');
+      && Array.isArray(grid.fields)), 'Managed JavaScript source settings unavailable',()=>sourceSettingsDiagnostic(schema));
   return {generation: schema.generation.checked, grids: schema.grids.map(grid => ({
     tid: grid.tid, fields: grid.fields.map(({record_id, connected_record_id, connected_back_id, ...field}) => {
       // Loginom 7.4.2 adds this empty native cache reference after declared
@@ -137,7 +188,7 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
       need(schema?.verified === true && schema.node_context?.verified === true
         && schema.node_context.surface === 'wizard'
         && ['document_id', 'workflow_id', 'node_id'].every(key => schema.node_context[key] === task.owner[key]),
-      'Managed JavaScript source schema owner changed');
+      'Managed JavaScript source schema owner changed',()=>sourceSettingsDiagnostic(schema,task.owner));
       const generation = schemaMode === 'code'
         ? await driver.dispatchManagedJavascriptGeneration({task, execute, record, receiptOptions}) : null;
       if (generation) need(generation.status === 'SUCCEEDED'

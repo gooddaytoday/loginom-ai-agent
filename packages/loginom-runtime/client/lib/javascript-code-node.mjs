@@ -21,6 +21,7 @@ import {javascriptExecutionWaitContext} from './javascript-execution-continuatio
 import {NODE_READ_MODE} from './node-read-contract.mjs';
 import {createNodeReadDrivers} from './node-read-driver.mjs';
 import {withJavascriptSourcePolicyBoundary} from './javascript-source-policy-refusal.mjs';
+import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const same=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
@@ -95,7 +96,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
     parameter_schema:javascriptParametersSchema,output_wizard:'separate',materialize_output:true,fullUiOutput:true,
     validate:validateJavascriptCodeRequest,configure:(ctx,parameters,drivers)=>drivers.configureJavascript(ctx,parameters),
     configurationReadback:javascriptCodeReadback}]]);
-  const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions})=>{
+  const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,readReceipt})=>{
     if(operation.parameters.mode===NODE_READ_MODE)return createNodeReadDrivers({operation,execute,onRecord,now,receiptOptions},
       {targetOrigin,targetBuild,redactor});
     const request=operation.parameters;
@@ -251,11 +252,13 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       async configureJavascript(ctx,parameters){
         enter(ctx);need(handle&&adapter,'JavaScript owned Code editor unavailable');
         const baseline=await adapter.read(handle,{owner,deadline:ctx.deadline});
+        signal?.throwIfAborted();
         if(existingBaseline)need(javascriptSourceIdentity(baseline.source).source_sha256===admitted.previous_source.source_sha256,
           'JavaScript existing source changed before mutation');
         const written=await adapter.replace(handle,{owner,deadline:ctx.deadline,
           expected_source_sha256:javascriptSourceIdentity(baseline.source).source_sha256,
           source_text:parameters.source_text??baseline.source});
+        signal?.throwIfAborted();
         need(written.draft_exact===true&&written.source_sha256===expected.source_sha256,'JavaScript draft digest differs');
         return verified({effect_possible:true,draft_source_sha256:written.source_sha256,wizard_commit_verified:false});
       },
@@ -402,6 +405,14 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
         return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,
           evidence_ref:ctx.receipt_id,ports:[{port:0,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data}],
           table_creation:table,format_restoration:restoration,workflow_return:returned});
+      },
+      releasePendingPhases:['input_mapping','open','configure'],
+      async releasePending(state,{signal:releaseSignal}={}) {
+        need(['input_mapping','open','configure'].includes(state.pending?.phase),
+          'Only a stopped JavaScript draft can be released here');
+        enter({signal:releaseSignal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
+          workflow_ref:state.request.workflow_ref,node:state.node});
+        return releasePendingNode({operation,channel,readReceipt});
       },
       async verifyContinuation(state,{signal:nextSignal}) {
         const ctx=javascriptExecutionWaitContext(state,{operation,owner,expected,configured,committed,inputMapping,outputMapping,now:now()});

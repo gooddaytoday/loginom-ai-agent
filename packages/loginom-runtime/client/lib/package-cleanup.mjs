@@ -157,10 +157,12 @@ async function closeOwnedPackage(page, options, deadline) {
             || prep.id !== o.documentId || m?.FServerConnection?.UserName !== o.account
             || m.FServerConnection.Connected !== true || m.PackageNodes?.Count !== 0) return {safe:false};
         const visible = e => !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height && getComputedStyle(e).visibility !== 'hidden';
-        if ([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg,.x-mask')].some(visible)) return false;
-        const menu = [...document.querySelectorAll('[data-tid="MF;AppMenuForm;btnLogOut"]')].filter(visible);
+        if ([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)) return false;
+        const menu = [...document.querySelectorAll('[data-tid="MF;AppMenuForm"]')].filter(visible);
         if (menu.length > 1) return {safe:false};
         if (menu.length === 1) return {safe:true, menu:true};
+        // The opened menu has its own backdrop; only wait for masks if closed.
+        if ([...document.querySelectorAll('.x-mask')].some(visible)) return false;
         const avatar = [...document.querySelectorAll('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')].filter(visible);
         return avatar.length === 1 ? {safe:true, menu:false} : false;
       }, options, {timeout:remaining()});

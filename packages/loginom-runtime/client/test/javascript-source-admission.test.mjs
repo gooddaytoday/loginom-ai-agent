@@ -20,6 +20,38 @@ function fixture({kind='existing',source=original,deadline=Date.now()+60000,chun
   mutate:async args=>{calls.push('mutate');browser.setSource(args.source_text);return {owner};},effect:async args=>{calls.push('effect');assert.equal(args.deadline,deadline);return {host_result:'returned'};}};
 }
 const input=(f,receipt,boundOwner=f.owner)=>({receipt,owner:boundOwner});
+for(const fault of ['drop-detail-ack','accessor-detail','untrusted-fields'])
+test('optional boundary diagnostics cannot alter the refusal or disclose data: '+fault,async()=>{
+ let getterCalls=0;
+ const f=fixture({record:event=>{if(fault==='drop-detail-ack')delete event.diagnostic;return event;}});
+ const receipt=await f.admission.admit({});
+ await assert.rejects(f.admission.withEffect(input(f,receipt),async()=>{
+  const error=Error('original refusal');
+  if(fault==='accessor-detail')Object.defineProperty(error,'javascriptSourceBoundary',{get(){getterCalls++;throw Error('PRIVATE');}});
+  else Object.defineProperty(error,'javascriptSourceBoundary',{value:{scope:'settings',checks:[
+   {field:'settings.generation_checked',expected:'boolean',observed:'undefined'},
+   ...(fault==='untrusted-fields'?[{field:'PRIVATE_COLUMN',expected:'true',observed:'false'},
+    {field:'settings.verified',expected:'true',observed:'PRIVATE_VALUE'}]:[])]}});
+  throw error;
+ }),{code:'boundary',message:'JavaScript source admission refused: boundary'});
+ assert.equal(getterCalls,0);
+ assert.equal(f.admission.state,'retired');
+ assert.equal(JSON.stringify(f.events).includes('PRIVATE'),false);
+ const event=f.events.find(e=>e.phase==='javascript_source_boundary_refused');
+ assert.equal(event.reason,'original refusal');
+ if(fault==='untrusted-fields')assert.equal(event.diagnostic.checks.length,1);
+});
+test('boundary diagnostic journal payload has a fixed check bound',async()=>{
+ const f=fixture(),receipt=await f.admission.admit({});
+ await assert.rejects(f.admission.withEffect(input(f,receipt),async()=>{
+  const error=Error('original refusal');Object.defineProperty(error,'javascriptSourceBoundary',{value:{scope:'settings',
+   checks:Array.from({length:100},(_,index)=>({field:'mappings.Required_type',expected:'boolean',observed:'undefined',index}))}});
+  throw error;
+ }),{code:'boundary',message:'JavaScript source admission refused: boundary'});
+ const detail=f.events.find(e=>e.phase==='javascript_source_boundary_refused').diagnostic;
+ assert.equal(detail.checks.length,12);assert.equal(detail.truncated,true);
+ assert.ok(Buffer.byteLength(JSON.stringify(detail))<2048);
+});
 test('admission records a redacted host boundary refusal and remains retired without replay',async()=>{
  const f=fixture({secret:'PRIVATE_CREDENTIAL'}),receipt=await f.admission.admit({});
  let effects=0;
