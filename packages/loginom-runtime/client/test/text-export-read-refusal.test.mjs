@@ -95,7 +95,7 @@ for(const fault of ['binding','execution','lease','restore','cleanup','transport
  assert.equal(saved.operation_id,'export-op');assert.equal(saved.status,'AMBIGUOUS');assert.equal(page.storage.size,0);
 });
 
-for(const kind of ['success','download_refusal','ambiguous_download','download_transport','open_files','root_stale',
+for(const kind of ['scan_diagnostics','scan_diagnostics_journal','scan_diagnostics_invalid','success','download_refusal','ambiguous_download','download_transport','open_files','root_stale',
  'return_tab_observation','download_select','directory_navigation','storage_scroll','unknown_scroll','unclean_scroll','changed_scroll','scroll_unobserved','foreign_storage',
  'mutating','unknown_gesture','foreign_graph','locked_graph','graph_dialog','changed_workflow','graph_wizard','graph_mask','root_only','truncated_masks','journal_failure','lease_failure',
  'return_tabs_stale','return_tabs_foreign','return_tabs_document','return_tabs_other','return_tabs_exhausted',
@@ -124,7 +124,7 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
     :[element('MF;TF-2;FileStorageForm;colName_'+storageTidSuffix('result.csv'),'csv',{label:'result.csv',storage_entry:{bytes:57},allowed_actions:['click','double_click']})])]},
   file_storage:files?{status:'observed',directory}:undefined});
  const options={operation:{id:'export-op'},targetOrigin,targetBuild:'7.4',storageDirectories:{packages:'/user',inputs:'/user',exports:'/user'},
-  onRecord:async e=>{records.push(e);if(kind==='journal_failure'&&e.phase==='export_file_read_refused_restored')throw Error('journal unavailable');return e;},receiptOptions:()=>({}),
+  onRecord:async e=>{records.push(e);if(kind==='scan_diagnostics_journal'&&e.phase==='export_file_observation_failed')throw Error('diagnostic write unavailable');if(kind==='journal_failure'&&e.phase==='export_file_read_refused_restored')throw Error('journal unavailable');return e;},receiptOptions:()=>({}),
   artifactStore:{outputSessionId:'session',stageOutput:async b=>{assert.deepEqual(b,binding);return {artifact_id:'artifact',path:'/private/download.csv',
    release:async()=>{if(kind==='lease_failure')throw Error('lease unavailable');releases++;},retain:async()=>{
     if(kind==='retain_failure')throw Error('Artifact size or SHA does not match the admitted identity');
@@ -166,6 +166,15 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
     }
     if(tid===workflow.tab_tid){files=false;if(kind==='return_tab_observation')return {status:'AMBIGUOUS',action_key:'ui.act',cleanup_complete:false,error:{code:'UI_SCAN_LIMIT'}};}
     return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};
+   }
+   if(files&&!failed&&kind.startsWith('scan_diagnostics')&&task.discover_roots&&task.storage_name){
+    failed=true;return {status:'NOT_APPLIED',error:{code:'UI_SCAN_LIMIT',message:'private /token/path'},trace:[
+     {event:'unrelated',private:'secret-file-contents'},
+     {event:'ui_scan_limit',limit_kind:kind.endsWith('invalid')?'private':'time',scan_stage:kind.endsWith('invalid')?'private':'controls',
+      work:kind.endsWith('invalid')?-1:1500,elapsed_ms:kind.endsWith('invalid')?'secret':501,
+      visited_elements:kind.endsWith('invalid')?Infinity:1079,traversed_elements:kind.endsWith('invalid')?NaN:1047,
+      read_scope:{kind:kind.endsWith('invalid')?'private':'roots',storage_name_requested:kind.endsWith('invalid')?'private':true,
+       root_ref:'private /token/path',storage_name:'secret-file-contents'},private:'secret-file-contents'}]};
    }
    if(files&&!failed&&kind==='root_stale'){failed=true;return {status:'FAILED',error:{code:'UI_ROOT_STALE'}};}
    if(files&&downloads&&!failed&&kind==='verified_return_observation'){
@@ -228,6 +237,16 @@ for(const kind of ['success','download_refusal','ambiguous_download','download_t
   assert.equal(failure.reason,kind==='retain_failure'?'Artifact size or SHA does not match the admitted identity':null);
   assert.deepEqual(records.find(r=>r.phase==='export_file_read_refused_restored').proof.failure,failure);
   assert.ok(!JSON.stringify(result.nodePhaseRefusal).includes('/token/path'));
+ }
+ if(kind.startsWith('scan_diagnostics')){
+  assert.equal(downloads,0);const failure=result.nodePhaseRefusal.proof.failure;
+  assert.equal(failure.step,'storage_navigation');assert.equal(failure.code,'UI_SCAN_LIMIT');
+  if(kind.endsWith('invalid'))assert.equal(failure.scan_limit,undefined);
+  else assert.deepEqual(failure.scan_limit,{limit_kind:'time',scan_stage:'controls',work:1500,elapsed_ms:501,
+   visited_elements:1079,traversed_elements:1047,read_scope:{kind:'roots',storage_name_requested:true}});
+  assert.deepEqual(records.find(r=>r.phase==='export_file_read_refused_restored').proof.failure,failure);
+  assert.deepEqual(records.find(r=>r.phase==='export_file_observation_failed')?.scan_limit,failure.scan_limit);
+  assert.ok(!JSON.stringify(failure).includes('private'));assert.ok(!JSON.stringify(failure).includes('secret-file-contents'));
  }
  if(kind==='return_tabs_stale'){
   assert.equal(tabReads,2);assert.equal(freshRoots,1);assert.equal(downloads,1);

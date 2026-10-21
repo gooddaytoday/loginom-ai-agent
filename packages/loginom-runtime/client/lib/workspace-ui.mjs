@@ -118,10 +118,11 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   const readUi = async (rediscover = false, scanRetried = false) => {
     const nodeContext=await boundNode();
     const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard}) => {
-    try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
-    let work = 0,scanStage='collect';
+    let work = 0,scanStage='collect',traversed=0;
+    const dom = [];
+    try {
     const charge = () => {
       if (++work > maxWork || Date.now() - scanStarted > maxMs) {
         const error = new Error('Workspace scan budget exceeded; no complete observation or action references were issued');
@@ -190,7 +191,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     if (rootRef && !requestedRoot?.isConnected) {
       const error=new Error('Observed root is detached or its reference expired');error.code='UI_ROOT_STALE';throw error;
     }
-    const dom = [], seenElements = new Set();
+    const seenElements = new Set();
     const include = element => {
       charge(); if (seenElements.has(element)) return;
       if (dom.length >= maxElements) { const error=new Error('Selected region or global guards exceed the scan budget');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error; }
@@ -259,7 +260,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     }}:undefined;
     const walker=discoverRoots ? null : document.createTreeWalker(requestedRoot ?? document.documentElement,1,definitionFilter);
     if (requestedRoot) include(requestedRoot);
-    let next, traversed=0;while (walker && (next=walker.nextNode())) {
+    let next;while (walker && (next=walker.nextNode())) {
       if (++traversed>maxElements) { const error=new Error('DOM traversal exceeds the scan budget');error.code='UI_SCAN_LIMIT';error.limit_kind='traversal';throw error; }
       include(next);
     }
@@ -3445,7 +3446,10 @@ function readRenderedInputMapping(observation) {
       // never export exception messages that may contain page/private values.
       const code=['UI_SCAN_LIMIT','UI_ROOT_STALE','UI_EPOCH_UNAVAILABLE'].includes(error?.code)
         ? error.code : 'UI_OBSERVATION_FAILED';
-      return {ui_read_failure:{code,...(code==='UI_SCAN_LIMIT' && ['work','time','elements','traversal'].includes(error?.limit_kind)?{limit_kind:error.limit_kind}:{})
+      return {ui_read_failure:{code,...(code==='UI_SCAN_LIMIT'?{work,elapsed_ms:Math.max(0,Date.now()-scanStarted),visited_elements:dom.length,traversed_elements:traversed,
+        read_scope:{kind:discoverRoots?'roots':rootRef?'root':'workspace',storage_name_requested:storageName!==null,
+          root_ref:!discoverRoots&&typeof rootRef==='string'&&/^ui-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}-[0-9]{1,10}$/i.test(rootRef)?rootRef:null}}:{})
+        ,...(code==='UI_SCAN_LIMIT' && ['work','time','elements','traversal'].includes(error?.limit_kind)?{limit_kind:error.limit_kind}:{})
         ,...(['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(error?.scan_stage)?{scan_stage:error.scan_stage}:{})}};
     }
   },{rootRef:rediscover ? null : postActionRoot ?? task.root_ref ?? task.snapshot?.observation_root?.ref ?? null,discoverRoots:rediscover || task.discover_roots===true,storageName:task.storage_name ?? null,
@@ -3461,7 +3465,8 @@ function readRenderedInputMapping(observation) {
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
     if (observed?.ui_read_failure) {
       const code=observed.ui_read_failure.code;
-      if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown'});
+      if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown',
+        ...Object.fromEntries(['work','elapsed_ms','visited_elements','traversed_elements','read_scope'].filter(k=>Object.hasOwn(observed.ui_read_failure,k)).map(k=>[k,observed.ui_read_failure[k]]))});
       const before=task.snapshot,scroll=task.mode==='act'&&task.action?.verb==='scroll'
         ?before?.ui.elements.find(e=>e.ref===task.action.ref):null;
       const moved=effectPossible&&scroll?.scroll&&trace.find(t=>t.event==='ui_scroll_applied'

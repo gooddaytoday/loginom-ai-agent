@@ -758,6 +758,9 @@ test('oversized DOM stops observation and rejects a gesture before input without
   page.document.createTreeWalker=(root,kind)=>kind===1 ? {nextNode:()=>{visits++;return page.document.body;}} : original(root,kind);
   const observed=await page.execute({mode:'observe'});
   assert.equal(observed.error.code,'UI_SCAN_LIMIT');assert.equal(visits,6001);
+  const diagnostic=observed.trace.find(t=>t.event==='ui_scan_limit');
+  assert.equal(diagnostic.limit_kind,'traversal');assert.equal(diagnostic.visited_elements,1);assert.equal(diagnostic.traversed_elements,6001);
+  assert.ok(diagnostic.work>=6000);assert.equal(diagnostic.read_scope.kind,'workspace');
   assert.equal(observed.output.scan.complete,false);assert.equal(observed.output.nodes,undefined);
   assert.equal(observed.output.ui,undefined);
   const acted=await page.act({verb:'click',ref},snapshot);
@@ -765,6 +768,20 @@ test('oversized DOM stops observation and rejects a gesture before input without
   assert.equal(acted.error.code,'UI_SCAN_LIMIT');assert.deepEqual(page.events,[]);
 });
 
+test('scan-limit trace retains actual counters and content-free read scope',async()=>{
+ const clock=fixtureClock(),page=new Page({clock:clock.Date});
+ const query=page.document.querySelectorAll.bind(page.document);let slow=true;
+ page.document.querySelectorAll=selector=>{if(slow){slow=false;clock.advance(501);}return query(selector);};
+ const result=await page.execute({mode:'observe',discover_roots:true,storage_name:'private-file-content.csv'});
+ assert.equal(result.status,'NOT_APPLIED');assert.equal(result.error.code,'UI_SCAN_LIMIT');
+ const scan=result.trace.find(t=>t.event==='ui_scan_limit');
+ assert.equal(scan.limit_kind,'time');assert.equal(scan.scan_stage,'collect');
+ assert.equal(scan.elapsed_ms,501);assert.ok(Number.isSafeInteger(scan.work)&&scan.work>0);
+ assert.ok(Number.isSafeInteger(scan.visited_elements)&&scan.visited_elements>=0);
+ assert.equal(scan.traversed_elements,0);assert.deepEqual(scan.read_scope,{kind:'roots',storage_name_requested:true,root_ref:null});
+ assert.ok(!JSON.stringify(result).includes('private-file-content'));
+ assert.deepEqual(page.events,[]);assert.equal(result.output.ui,undefined);
+});
 test('scroll clamps to its observed owner, rejects old state and does not scroll its parent', async () => {
   const page=new Page();page.waitForTimeout=async()=>{};
   page.context.innerWidth=1000;page.context.innerHeight=800;

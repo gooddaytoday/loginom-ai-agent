@@ -133,12 +133,33 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  const fileBinding={session_id:artifactStore.outputSessionId,document_id:ctx.document_id,workflow_id:ctx.workflow_ref.workflow_id,node_id:ctx.node.node_id,execution_id:ctx.execution.execution_id,destination};
  const lease=await artifactStore.stageOutput(fileBinding),name=destination.split('/').at(-1),directory=destination.slice(0,-name.length-1);
  let sequence=0,uncertain=false,retained=false,released=false,navigationOnly=true,journalFailed=false,observationDocument=null,readStep='storage_navigation';
+ let failedObservationScan=null;
  const guard=()=>{ctx.signal?.throwIfAborted();need(Date.now()<ctx.deadline,'Export file read deadline elapsed');};
  const record=async(phase,data)=>{try{const r=await onRecord({phase,operation_id:operation.id,...data});need(r?.phase===phase&&r.operation_id===operation.id,'Export file receipt not acknowledged');}catch(error){journalFailed=true;throw error;}};
  const base={expected_origin:targetOrigin,expected_build:targetBuild};
  const read=async options=>{
   guard();const r=await execute(makeWorkspaceUiCode({mode:'observe',...base,...options}));
-  if(r.status!=='SUCCEEDED')throw Object.assign(Error('Export storage observation failed: '+(r.error?.code??'UNKNOWN')+' '+(r.error?.message??'')),{code:r.error?.code});
+  if(r.status!=='SUCCEEDED'){
+   const diagnostic=r.error?.code==='UI_SCAN_LIMIT'&&Array.isArray(r.trace)?r.trace.findLast(t=>t?.event==='ui_scan_limit'):null;
+   const scan={};
+   if(diagnostic){
+    if(['work','time','elements','traversal'].includes(diagnostic.limit_kind))scan.limit_kind=diagnostic.limit_kind;
+    if(['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(diagnostic.scan_stage))scan.scan_stage=diagnostic.scan_stage;
+    for(const key of ['work','elapsed_ms','visited_elements','traversed_elements'])
+     if(Number.isSafeInteger(diagnostic[key])&&diagnostic[key]>=0)scan[key]=diagnostic[key];
+    const scope=diagnostic.read_scope;
+    if(['roots','root','workspace'].includes(scope?.kind)){
+     scan.read_scope={kind:scope.kind};
+     if(typeof scope.storage_name_requested==='boolean')scan.read_scope.storage_name_requested=scope.storage_name_requested;
+     if(scope.kind==='root'&&typeof scope.root_ref==='string'&&/^ui-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}-[0-9]{1,10}$/i.test(scope.root_ref))scan.read_scope.root_ref=scope.root_ref;
+    }
+   }
+   failedObservationScan=Object.keys(scan).length?scan:null;
+   // Diagnostics must survive a later restoration failure without changing its guards.
+   if(failedObservationScan)try{await onRecord({phase:'export_file_observation_failed',operation_id:operation.id,scan_limit:failedObservationScan});}catch{}
+   throw Object.assign(Error('Export storage observation failed: '+(r.error?.code??'UNKNOWN')+' '+(r.error?.message??'')),
+    {code:r.error?.code,...(failedObservationScan?{scan_limit:failedObservationScan}:{})});
+  }
   const document=r.output?.dom_epoch?.document;
   need(typeof document==='string'&&document.length>0&&(!observationDocument||document===observationDocument),'Export observation document changed');
   observationDocument??=document;return r.output;
@@ -275,7 +296,8 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
    reason:['Unique export file control required','Export observation document changed','Export storage gesture requires inspection',
     'Export file read did not return to its workflow','Output lease owner changed','Unverified output cannot be retained',
     'Invalid artifact identity','Artifact must be a regular file','Artifact changed before reading',
-    'Artifact size or SHA does not match the admitted identity'].includes(error?.message)?error.message:null};
+    'Artifact size or SHA does not match the admitted identity'].includes(error?.message)?error.message:null,
+   ...(failedObservationScan?{scan_limit:failedObservationScan}:{})};
   uncertain=true;
   try{
    const refusal=await releaseRefusedExportRead({operationId:operation.id,binding:fileBinding,navigationOnly:navigationOnly&&!journalFailed,record,failure,
