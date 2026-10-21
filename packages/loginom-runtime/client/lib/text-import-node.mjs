@@ -12,6 +12,7 @@ import {decodeTableOutput} from './table-output-values.mjs';
 import {createNodeExecutionProcedure} from './node-execution-procedure.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {openPreparedWizard} from './node-wizard-open.mjs';
+import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {textImportConfigurationReadback} from './text-import-readback.mjs';
 import {textImportStepBudget} from './text-import-limits.mjs';
 import {textImportParametersSchema} from './node-api.mjs';
@@ -137,10 +138,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRea
           await executionDriver.prepare();
         }
         let s=await channel.observe({condition:'prepared import graph ready',ready:s=>s.prepared_node_context?.surface==='graph' && s.wizard?.status==='absent'});
-        await channel.perform({condition:'bound import graph body available',initialObservation:s,
-          ready:s=>s.prepared_node_context?.surface==='graph' && s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid && e.graph_node?.part==='body' && e.allowed_actions.includes('click')),
-          resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===s.prepared_node_context.tid && e.graph_node?.part==='body'),'Prepared graph body unavailable').ref}),
-          identity:s=>s.prepared_node_context});
+        await selectPreparedGraphNode(channel,s,'bound import graph selection available');
         if(operation.nodeApply.request.target.kind==='existing')await openPreparedWizard(channel);
         else {
           s=await channel.observe({condition:'prepared import settings available',ready:s=>s.prepared_node_context?.surface==='graph'
