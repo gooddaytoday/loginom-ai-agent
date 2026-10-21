@@ -1,9 +1,64 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createTextImportNodeSupport,validateTextImportNodeParameters,verifyTextImportSource} from '../lib/text-import-node.mjs';
+import {createCandidateNodeSupport} from '../lib/node-support.mjs';
+import {applyNode,validateNodeApplyRequest} from '../lib/node-apply.mjs';
+import {dispatchNodeApi,nodeApiTools,textImportParametersSchema} from '../lib/node-api.mjs';
 const params=()=>({settings:{source:{source_path:'/test/data.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},format:{delimiter:';',decimal_separator:'.',null_marker:'NULL',text_qualifier:'"'},columns:[{name:'A',label:'A',type:'integer',data_kind:'Дискретный',used:true}]},source:{artifact_id:'artifact',upload_operation_id:'upload',bytes:15,sha256:'a'.repeat(64)}});
 const request=()=>({finish:'done',read:{ports:[]},mappings:[],inputs:[]});
 const uploaded=()=>({operation_id:'upload',artifact:{artifact_id:'artifact',bytes:15,sha256:'a'.repeat(64)},outcome:{operation_id:'upload',action_key:'artifact.upload',status:'SUCCEEDED',cleanup_complete:true,output:{artifact_id:'artifact',destination:'/test/data.csv',bytes:15,sha256:'a'.repeat(64),server_copy_verification:{verification_id:'verification',status:'SUCCEEDED',bytes_verified:true,upload_completion_verified:true,destination:'/test/data.csv',bytes:15,sha256:'a'.repeat(64)}}}});
+const persistedImport=()=>({operation_id:'activate-import',contract_revision:'1.0.0',document_id:'doc',
+ workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+ target:{kind:'existing',type:'imports.text',ref:{document_id:'doc',workflow_id:'wf',node_id:'import'}},
+ inputs:[],mappings:[],mode:'delimited',parameters:{settings:{}},finish:'execute',
+ read:{ports:[0],sample_rows:100,require_exact_numbers:true},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
+test('unchanged persisted Import executes without a new upload or configuration phases',async()=>{
+ const support=createCandidateNodeSupport({targetOrigin:'https://loginom.invalid',targetBuild:'7.4.2'}),r=persistedImport();
+ const operation={id:r.operation_id,parameters:r},calls=[];
+ const drivers=support.nodeApplyDriverFactory({operation,
+  execute:async()=>assert.fail('No wizard or configuration transport expected'),
+  verifiedUploads:()=>assert.fail('Saved configuration does not require a new upload'),
+  onRecord:async e=>structuredClone(e),now:Date.now});
+ const ok=value=>({verified:true,cleanup_complete:true,effect_possible:false,...value});
+ const result=await applyNode({request:r,operation,handlers:support.nodeApplyHandlers,record:async e=>structuredClone(e),drivers:{...drivers,
+  prepareTarget:async()=>{calls.push('target');return ok({node:r.target.ref});},
+  finishGraph:async()=>{calls.push('execute');return ok({mode:'execute',execution_id:'fresh',settings_applied:false});},
+  waitExecution:async()=>ok({execution_id:'fresh',status:'completed'}),
+  readOutput:async()=>ok({execution_id:'fresh',status:'complete',ports:[{port:0,fresh:true}],evidence_ref:'fresh-output'})}});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.deepEqual(result.configuration,{status:'not_requested'});assert.deepEqual(calls,['target','execute']);
+ assert.deepEqual(result.phases.map(p=>p.phase),['source','target','finish','execute','read']);
+ assert.equal(result.execution.status,'completed');
+});
+for(const [name,change] of Object.entries({
+ newImport:r=>{r.target={kind:'new',type:'imports.text',label:'Source',position:{x:320,y:280}};},
+ sourcePath:r=>{r.parameters.settings={source:{source_path:'/other/source.csv'}};},
+ columns:r=>{r.parameters.settings={columns:[{name:'Ticket',label:'Changed'}]};},
+ format:r=>{r.parameters.settings={format:{delimiter:';'}};},
+ mapping:r=>{r.mappings=[{direction:'output',port:0,changes:[{source:{kind:'configured_field',name:'Ticket'},label:'Changed'}]}];},
+ done:r=>{r.finish='done';r.read.ports=[];},
+ close:r=>{r.finish='close';r.read.ports=[];},
+ otherPort:r=>{r.read.ports=[1];},
+ arraySettings:r=>{r.parameters.settings=[];},
+}))test('source omission cannot admit Import configuration: '+name,()=>{
+ const r=persistedImport();change(r);
+ const handlers=createTextImportNodeSupport({}).nodeApplyHandlers;
+ assert.throws(()=>validateNodeApplyRequest(r,handlers),/Exact import source and settings required/);
+});
+test('an explicit old upload ID still requires current-session verified upload evidence',async()=>{
+ const r=persistedImport();r.parameters.source={artifact_id:'old-artifact',upload_operation_id:'previous:upload'};
+ const support=createCandidateNodeSupport({targetOrigin:'https://loginom.invalid',targetBuild:'7.4.2'});
+ validateNodeApplyRequest(r,support.nodeApplyHandlers);
+ const drivers=support.nodeApplyDriverFactory({operation:{id:r.operation_id,parameters:r},verifiedUploads:()=>[],
+  execute:async()=>assert.fail('No browser call before source verification')});
+ await assert.rejects(drivers.verifySource(r.parameters),/Verified upload operation is missing/);
+});
+test('public Import discovery and dispatch admit the unchanged existing execution request',async()=>{
+ const handlers=createTextImportNodeSupport({}).nodeApplyHandlers,r=persistedImport();let received;
+ assert.deepEqual(textImportParametersSchema.required,['settings']);
+ await dispatchNodeApi({tools:nodeApiTools,startNodeApply:args=>{validateNodeApplyRequest(args,handlers);received=args;}},'dock_node_apply',r);
+ assert.deepEqual(received,r);
+});
 test('new import missing columns identifies the corrective parameter; existing patches remain allowed',()=>{
  const p=params();delete p.settings.columns;
  assert.throws(()=>validateTextImportNodeParameters(p,'delimited',request()),/Invalid parameters.parameters.settings.columns:/);

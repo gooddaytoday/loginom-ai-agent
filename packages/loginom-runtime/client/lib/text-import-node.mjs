@@ -16,12 +16,14 @@ import {textImportConfigurationReadback} from './text-import-readback.mjs';
 import {textImportStepBudget} from './text-import-limits.mjs';
 import {textImportParametersSchema} from './node-api.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
+import {isUnchangedTextImportExecution} from './node-read-contract.mjs';
 
 const requireValue=(v,m)=>{if(!v)throw new Error(m);};
 const one=(xs,m)=>{requireValue(xs.length===1,m);return xs[0];};
 const verified=(details={})=>({verified:true,cleanup_complete:true,effect_possible:false,...details});
 
 export function validateTextImportNodeParameters(p,mode,request) {
+  if(isUnchangedTextImportExecution({...request,parameters:p,mode}))return;
   requireValue(p && Object.keys(p).sort().join(',')==='settings,source','Exact import source and settings required');
   const existing=request.target?.kind==='existing';
   if(!existing)requireValue(Array.isArray(p.settings?.columns)&&p.settings.columns.length>0,

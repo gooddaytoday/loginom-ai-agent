@@ -5,7 +5,7 @@ import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-sch
 import {verifiedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
 import {verifiedJavascriptSourcePolicyRefusal} from './javascript-source-policy-refusal.mjs';
 import {NODE_CONTRACT_REVISION, validateNodeTargetRequest} from './node-contracts.mjs';
-import {NODE_READ_MODE,nodeReadHandler} from './node-read-contract.mjs';
+import {NODE_READ_MODE,nodeReadHandler,isUnchangedTextImportExecution} from './node-read-contract.mjs';
 
 const stable = v => Array.isArray(v) ? v.map(stable) : v && typeof v === 'object'
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, stable(v[k])])) : v;
@@ -328,7 +328,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     requireValue(now()<pending.deadline,'node.apply phase deadline elapsed: '+name);
     return value;
   };
-  const readingOnly=request.mode===NODE_READ_MODE;
+  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request);
   const waitForExecution=async name=>{
       const execution=await phase(name,ctx=>drivers.waitExecution(ctx),{budget:request.budgets.execute_ms,mutation:false,
         verify:value=>requireValue(value.execution_id===state.execution.execution_id
@@ -513,7 +513,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   const verified=name=>state.phases.some(p=>p.phase===name);
   const committed=request.finish!=='close'&&(verified('finish')||handler.output_wizard==='separate'&&verified('node_finish')&&verified('output_mapping'));
   const launch=['materialization_start','materialization_execute','execute'].includes(pending.phase)||pending.phase==='finish'&&request.finish==='execute';
-  const readingOnly=request.mode===NODE_READ_MODE;
+  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request);
   // Export release proves only workspace cleanup. An unconfirmed launch may
   // already have written a file; never infer its settings or offer a replay.
   const exportRelease=request.target.type==='exports.text';

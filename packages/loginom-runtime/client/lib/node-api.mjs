@@ -111,10 +111,10 @@ export const nodeApplyInputSchema=object({
 // target.kind remain in the installed handler, before any browser mutation.
 export const textImportParametersSchema=object({
  source:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.source),
-  description:'Use artifact_id and upload_operation_id from the completed, verified artifact delivery. Optional bytes and sha256 must match that receipt.'},
+  description:'Required for new imports and configuration changes: use artifact_id and upload_operation_id from the completed, verified artifact delivery. Optional bytes and sha256 must match that receipt. Omit source only to execute an unchanged existing Import: settings:{}, inputs:[], mappings:[], finish:execute and read.ports:[0]. This uses the saved native configuration without uploading again; an old upload ID is not a current receipt.'},
  settings:{...structuredClone(nodeApplyInputSchema.properties.parameters.properties.settings),
   description:'Optional settings.format.multiple_delimiters is boolean; date_format is an explicit dd/mm/yyyy, mm/dd/yyyy, yyyy/mm/dd, dd/mm/yy, mm/dd/yy or yy/mm/dd order and date_separator is ., /, backslash or -. Omission preserves native settings, including on partial existing-node patches; no automatic encoding or date substitution. For target.kind=new supply all three objects: source, format, columns. source requires source_path (the verified delivery destination), encoding, rows_to_skip, first_line_as_title. format requires delimiter, decimal_separator, null_marker, text_qualifier. columns must describe every CSV field with name, label, type, data_kind, used; source_name optionally identifies an original field when renaming. At least one field must be used. For target.kind=existing settings is a patch: omitted settings are preserved, and settings:{} reuses the saved configuration. A column patch identifies its field by source_name or name.'},
-});
+},['settings']);
 // Cross-field restrictions survive the compact user envelope. Runtime guards
 // remain authoritative after optional defaults are expanded.
 nodeApplyInputSchema.allOf=[
