@@ -7,7 +7,7 @@ import {nodeJobResultSchema} from '../lib/node-result-schema.mjs';
 import {inspectPendingWizardOpen} from '../lib/node-wizard-open.mjs';
 import {preflightCalculatorSource} from '../lib/calculator-preflight.mjs';
 import {actions} from './support/executor-fixture.mjs';
-import {compactActionResult} from '../lib/user-results.mjs';
+import {compactActionResult,compactNodeResult} from '../lib/user-results.mjs';
 const validateJob=new AjvJsonSchemaValidator().getValidator(nodeJobResultSchema);
 const assertJob=job=>{const result=validateJob(job);assert.equal(result.valid,true,result.errorMessage);};
 const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]};
@@ -92,6 +92,37 @@ test('read-only target refusal is NOT_APPLIED with confirmed cleanup and no grap
  assert.equal(result.output.node,null);assert.deepEqual(f.calls,['source']);
  assert.ok(f.events.some(e=>e.phase==='node_phase_refused'&&e.receipt.phase==='target'&&e.receipt.effect_possible===false));
  const count=f.calls.length;await f.runtime.runNodeApply(request());assert.equal(f.calls.length,count);
+});
+test('occupied existing export explains the safe new-target path without replacing its input',async()=>{
+ for(const variant of ['different source','different output','same connection','preserve input']){
+  const f=fixture(),ref=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
+  f.handlers.set('exports.text',f.handler);
+  f.graph.nodes.push({ref:ref('source'),type:'imports.text',label:'Source',position:{x:96,y:96},inputs:[],outputs:[0,1]},
+   {ref:ref('other'),type:'imports.text',label:'Other',position:{x:96,y:256},inputs:[],outputs:[0]},
+   {ref:ref('export'),type:'exports.text',label:'Saved export',position:{x:320,y:96},inputs:[0],outputs:[]});
+  f.graph.links.push({source:'source',output:0,target:'export',input:0});
+  const before=structuredClone(f.graph),r=request();
+  r.target={kind:'existing',type:'exports.text',ref:ref('export')};
+  r.inputs=variant==='preserve input'?[]:[{source:ref(variant==='different source'?'other':'source'),output:variant==='different output'?1:0,input:0}];
+  const outcome=await f.runtime.runNodeApply(r),conflict=variant.startsWith('different');
+  const reply=compactNodeResult({operation_id:r.operation_id,state:'settled',outcome});
+  assert.deepEqual(f.graph,before);assert.ok(!f.events.some(e=>e.phase==='node_target_effect_prepared'));
+  if(conflict){
+   assert.equal(reply.status,'NOT_APPLIED');assert.equal(reply.effect_possible,false);assert.equal(reply.cleanup_complete,true);
+   assert.equal(reply.error.code,'NODE_APPLY_STOPPED');
+   assert.match(reply.error.message,/Requested input is occupied by an unowned link/);
+   assert.match(reply.error.message,/does not replace existing connections/);
+   assert.match(reply.error.message,/target.kind:"new".*NEW operation_id/);
+   assert.match(reply.error.message,/same source.*inputs:\[\]/);
+   assert.match(reply.next_step.instruction,/No node mutation or browser recovery is required/);
+   assert.deepEqual(f.calls,['source']);
+   assert.equal((await f.runtime.runNodeApply(r)).error.message,outcome.error.message);
+   assert.deepEqual(f.calls,['source']);
+  }else{
+   assert.equal(reply.status,'SUCCEEDED',JSON.stringify(reply));assert.equal(reply.error,null);
+   assert.ok(f.calls.includes('configure'));assert.ok(!JSON.stringify(reply).includes('target.kind:"new"'));
+  }
+ }
 });
 test('lost target mutation response retains ambiguity and pending cleanup',async()=>{
  const f=fixture();f.adapter.mutate=async()=>{throw Error('lost gesture response');};

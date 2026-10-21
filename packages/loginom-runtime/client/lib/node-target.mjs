@@ -156,7 +156,8 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
         if (existing.type !== request.target.type) throw new Error('Existing node has a different component type');
         for(const input of request.inputs){
           const occupied=graph.links.find(e=>e.target===existing.ref.node_id&&e.input===input.input);
-          if(occupied&&(occupied.source!==input.source.node_id||occupied.output!==input.output))throw new Error('Requested input is occupied by an unowned link');
+          if(occupied&&(occupied.source!==input.source.node_id||occupied.output!==input.output))throw new Error('Requested input is occupied by an unowned link'
+            +(existing.type==='exports.text'?'. dock_node_apply does not replace existing connections. For a different source or output, use a NEW exports.text target with target.kind:"new", complete export settings and a NEW operation_id; preserve the existing export and its link. To keep the same source and only reconfigure the existing export, use inputs:[].':''));
         }
         state.targetId = existing.ref.node_id;
       }
