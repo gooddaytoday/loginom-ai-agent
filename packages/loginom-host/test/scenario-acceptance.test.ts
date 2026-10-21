@@ -19,6 +19,9 @@ test("CSV path acceptance binds admission, delivery and import to the same sourc
   const actual = tools(values)
   actual.splice(2, 0, admit, delivered)
   expect((await verify(values, "", { tools: actual, csvPath })).code).toBe(0)
+  delivered.state.output = JSON.stringify({ operation_id: "delivery", status: "SUCCEEDED", cleanup_complete: true,
+    output: { status: "SUCCEEDED", sha256: csvSha256, destination, cleanup_complete: true, upload_completion_verified: true } })
+  expect((await verify(values, "", { tools: actual, csvPath })).code).toBe(0)
   for (const missing of ["loginom_file_admit", "loginom_dock_artifact_deliver"])
     expect((await verify(values, "", { tools: actual.filter(tool => tool.tool !== missing), csvPath })).code).toBe(1)
   admit.state.input.path = "/input/foreign.csv"

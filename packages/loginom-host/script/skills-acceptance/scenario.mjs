@@ -26,7 +26,8 @@ export function verifySalesScenario(tools, input) {
       r.tool.state.input.artifact_id === source.artifact.artifact_id && r.tool.state.input.upload_grant_id === source.artifact.upload.grant_id)
     assert.ok(delivery, "SCENARIO_PATH_DELIVERY_NOT_VERIFIED")
     assert.equal(delivery.body.operation_id, delivery.tool.state.input.operation_id)
-    const proof = receipts.find(r => r.body.operation_id === delivery.body.operation_id && r.body.outcome?.status === "SUCCEEDED")?.body.outcome
+    const proof = delivery.body.status === "SUCCEEDED" ? delivery.body.output
+      : receipts.find(r => r.body.operation_id === delivery.body.operation_id && r.body.outcome?.status === "SUCCEEDED")?.body.outcome
     assert.ok(proof?.cleanup_complete && proof.upload_completion_verified, "SCENARIO_PATH_UPLOAD_NOT_VERIFIED")
     assert.equal(proof.sha256, input.csvSha256)
     assert.equal(proof.destination, source.artifact.upload.destination)

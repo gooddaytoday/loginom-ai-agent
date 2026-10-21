@@ -161,7 +161,7 @@ for (const [turnIndex, turn] of turns.entries()) {
       LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "1",
       ...(input.modelsPath ? { LOGINOM_AI_AGENT_MODELS_PATH: input.modelsPath } : {}),
       LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG: "1",
-      LOGINOM_AI_AGENT_CONFIG_CONTENT: JSON.stringify({ model: input.model, enabled_providers: [providerID], ...permission }),
+      LOGINOM_AI_AGENT_PERMISSION: JSON.stringify(permission.permission ?? {}),
     },
   })
   const events = []
