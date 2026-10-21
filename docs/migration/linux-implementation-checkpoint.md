@@ -1,5 +1,14 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-20 — v0.3.2 опубликован
+
+Release source: `c130548bbe19515ea226796054786574ed2fc4a2`, ветка `loginom` (PR #286: demo-022 f9c302b3).
+Финальный стабильный выпуск: release-драйверы JS/Export/target, подсказки модели, Калькулятор Token, выход после Save.
+CI39529632751 PASS на попытке1; matrix5/5; 30 assets/digests/SHA256SUMS и три manifests 0.3.2/prod/browserRecovery=true сверены.
+Финальная регрессия на кандидате: 12/12 агентов PASS по бизнес-критерию, 25+ доп. этапов PASS.
+Published2026-10-21T02:19:48Z, pre-release, latest=false, ID419071056; 30 URLs HTTP200.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-20-v0.3.2-release.md).
+
 ## 2026-10-20 — v0.3.1 опубликован
 
 Release source: `57f0a4557ed50cee66a662b45a8956d9893832b5`, ветка `loginom` (PR #267: demo-022 после v0.3.0).
