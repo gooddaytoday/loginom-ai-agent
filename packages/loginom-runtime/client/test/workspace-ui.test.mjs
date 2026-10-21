@@ -4275,6 +4275,36 @@ test('text export input0 retains its hidden folder only with native input1 owner
   }
 });
 
+test('hidden export node breadcrumb requires its exact native opening node and icon',async()=>{
+  for(const mode of ['valid','foreign_key','wrong_icon','wrong_native_icon','missing_node_tid','wrong_native_index','wrong_port','foreign_workflow','hidden_panel','hidden_visibility','opacity','duplicate_node','sensitive']) {
+    const {page,binding,crumbs,panel,opening}=await exportInputPortOverflowFixture();
+    const label='Выгрузка выручки с русскими заголовками',key=label.replaceAll(' ','_');
+    for(const crumb of crumbs.slice(5))crumb.attrs['data-tid']=crumb.attrs['data-tid'].replace('Exportsort',key);
+    crumbs[5].ownText=label;crumbs[5].children[0].attrs.class=mode==='wrong_icon'?'bg-vendor-icon-calcdata':'bg-vendor-icon-exporttextfile';
+    opening.node.FIconCls=mode==='wrong_native_icon'?'bg-vendor-icon-calcdata':'bg-vendor-icon-exporttextfile';
+    if(mode!=='missing_node_tid')opening.portTid='MF;TF-5;Graph;'+(mode==='foreign_key'?'Other':key)+';Input_Data-1';
+    for(const crumb of crumbs.slice(5)){crumb.style.display='none';crumb.box={x:0,y:0,width:0,height:0};}
+    page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+    if(mode==='wrong_native_index')opening.nativeIndex=0;
+    if(mode==='wrong_port')opening.portIndex=1;
+    if(mode==='foreign_workflow')opening.workflow={};
+    if(mode==='hidden_panel')panel.style.display='none';
+    if(mode==='hidden_visibility')crumbs[5].style.visibility='hidden';
+    if(mode==='opacity')crumbs[5].style.opacity='0';
+    if(mode==='duplicate_node')page.add('a',crumbs[5].attrs['data-tid'],label,crumbs[5].box,panel).style.display='none';
+    if(mode==='sensitive')crumbs[5].attrs['aria-label']='password';
+    const full=await page.execute({mode:'observe',prepared_node_context:binding});
+    assert.equal(full.output?.wizard?.input_port_context?.status==='observed',mode==='valid',mode);
+    if(mode==='valid'){
+      assert.equal(full.output.prepared_node_context.input_port.node_tid,'MF;TF-5;Graph;'+key);
+      const narrow=await page.execute({mode:'observe',root_ref:full.output.wizard.root_ref,prepared_node_context:binding});
+      assert.deepEqual(narrow.output.wizard.input_port_context,full.output.wizard.input_port_context);
+      assert.equal(narrow.output.wizard.input_port_context.node.tid,crumbs[5].attrs['data-tid']);
+    }
+    assert.deepEqual(page.events,[],mode);
+  }
+});
+
 test('hidden export input caption cannot replace native ownership or exact breadcrumb evidence',async()=>{
   for(const mode of ['unbound','missing_opening','duplicate_opening','foreign_node','foreign_port','foreign_workflow','foreign_engine',
     'wrong_port','wrong_caption','foreign_path','duplicate_crumb','duplicate_panel','hidden_panel','missing_icon','sensitive']) {

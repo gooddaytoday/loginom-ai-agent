@@ -829,14 +829,22 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const singleInputOverflow=preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===0
           &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata'].includes(preparedInputPort.node_icon_class)
           &&crumbs.length===9&&crumbs[5].querySelectorAll('.'+preparedInputPort.node_icon_class).length===1;
+        // Export's long caption may hide the node itself, not just its ports.
+        // Its key comes from the original native opening's exact graph port tid.
+        const exportNodeOverflow=e=>preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===1
+          &&preparedInputPort.node_icon_class==='bg-vendor-icon-exporttextfile'&&typeof preparedInputPort.node_tid==='string'
+          &&preparedInputPort.node_tid.startsWith(workflow.prefix+';Graph;')
+          &&getTid(e)===preparedWorkflowPath?.at(-1)?.tid+'>'+preparedInputPort.node_tid.slice((workflow.prefix+';Graph;').length)
+          &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'
+          &&!e.hasAttribute('hidden')&&!sensitive(e)&&e.querySelectorAll('.bg-vendor-icon-exporttextfile').length===1;
         if(crumbs.length>32)context.status='bounded';
-        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
+        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&exportNodeOverflow(e)||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
               ||singleInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1))&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
           // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
           // Join input roles have fixed captions; retain the native port and node icon binding.
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
-            &&(i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
+            &&(i===5&&exportNodeOverflow(e)||i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
               &&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
               ||singleInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1)
@@ -865,7 +873,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             &&folder.tid===node.tid+'>Входные_порты'&&port.tid===folder.tid+'>'+format(port.label)
             &&last.tid===port.tid+'>Настройка';
           const iconCount=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1
-            &&(inside(found[0],e)||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
+            &&(inside(found[0],e)||e===crumbs[8]&&preparedInputPort?.direction==='input'||e===crumbs[5]&&exportNodeOverflow(e))?1:0;};
           const icons=iconCount(crumbs[4],'.maptree-icon-workflow')===1
             &&iconCount(crumbs[5],'[class*="bg-vendor-icon-"]')===1
             &&iconCount(crumbs[8],'.maptree-icon-wizard')===1;
