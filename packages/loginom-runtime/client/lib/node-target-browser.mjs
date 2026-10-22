@@ -229,7 +229,6 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       await editor.click({timeout:remaining()});await editor.press('ControlOrMeta+A',{timeout:remaining()});
       await page.keyboard.type(p.label,{delay:20});await editor.press('Enter',{timeout:remaining()});transient=false;
     }else if(kind==='move'){
-      const tid=await targetTid(p.ref);
       // Positions are logical grid coordinates; preserve the initial pointer's
       // offset within the node while moving its top-left origin.
       const old=task.effect.before.nodes.find(n=>n.ref.node_id===p.ref.node_id).position;
@@ -243,8 +242,42 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       });
       effectPossible=true;await page.mouse.click(blank.x,blank.y);
       await wait('node_selection_controls_closed',()=>page.evaluate(()=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FmxGraph.getSelectionCells().length===0));
-      if(JSON.stringify(await read(page,task))!==JSON.stringify(gestureBefore))throw new Error('Graph changed while deselecting');
-      const source=find(tid),from=await point(source);
+      const deselected=await read(page,task);
+      if(JSON.stringify(deselected)!==JSON.stringify(gestureBefore)){
+        // Clearing selection can redraw the visible batch, not only this JS.
+        // Rebind only fresh drawing epochs; the complete structural graph and
+        // root remain exact. Two stable fresh reads precede the single drag.
+        const node=gestureBefore.nodes.find(n=>n.ref.node_id===p.ref.node_id);
+        const current=deselected.nodes.find(n=>n.ref.node_id===p.ref.node_id);
+        const previousEpoch=Math.max(...gestureBefore.nodes.map(n=>n.dom_epoch));
+        const rebound={...deselected,nodes:deselected.nodes.map(n=>{
+          const previous=gestureBefore.nodes.find(b=>b.ref.node_id===n.ref.node_id);
+          return previous && Number.isSafeInteger(n.dom_epoch)
+            && (n.dom_epoch===previous.dom_epoch || n.dom_epoch>previousEpoch)?{...n,dom_epoch:previous.dom_epoch}:n;
+        })};
+        if(node?.type!=='programming.javascript' || !Number.isSafeInteger(node.dom_epoch)
+          || !Number.isSafeInteger(previousEpoch) || !Number.isSafeInteger(current?.dom_epoch)
+          || current.dom_epoch<=previousEpoch || JSON.stringify(rebound)!==JSON.stringify(gestureBefore)){
+          const differences=[],pending=[{path:'$',expected:gestureBefore,observed:deselected}];
+          let inspected=0;
+          while(pending.length&&differences.length<32&&inspected++<512){
+            const item=pending.pop();
+            if(JSON.stringify(item.expected)===JSON.stringify(item.observed))continue;
+            if(item.expected&&item.observed&&typeof item.expected==='object'&&typeof item.observed==='object'){
+              const keys=[...new Set([...Object.keys(item.expected),...Object.keys(item.observed)])].slice(0,128);
+              for(const key of keys.reverse())pending.push({path:(item.path+'.'+key).slice(0,240),expected:item.expected[key],observed:item.observed[key]});
+            }else{
+              const bounded=value=>value===undefined?'[undefined]':typeof value==='string'?value.slice(0,128):value===null||typeof value==='boolean'||typeof value==='number'?value:'[object]';
+              differences.push({path:item.path,expected:bounded(item.expected),observed:bounded(item.observed)});
+            }
+          }
+          throw new Error('Graph changed while deselecting: '+JSON.stringify({differences,truncated:pending.length>0}));
+        }
+        remaining();await ensureContext();
+        if(JSON.stringify(await read(page,task))!==JSON.stringify(deselected))throw new Error('Graph changed after deselection redraw');
+        gestureBefore=deselected;
+      }
+      const source=find(await targetTid(p.ref)),from=await point(source);
       const scale=await page.evaluate(()=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;return d.FmxGraph.view.scale/d.FInitialScale;});
       await drag(source,{x:from.x+(p.position.x-old.x)*scale,y:from.y+(p.position.y-old.y)*scale});
     }else if(kind==='add_input'){
