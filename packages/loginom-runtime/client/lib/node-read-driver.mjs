@@ -5,7 +5,7 @@ import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-executi
 import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
 import {readTableOutputPages} from './table-output-pages.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
-import {alignReadSchema} from './node-read-contract.mjs';
+import {alignReadSchema,isUnchangedTextImportExecution} from './node-read-contract.mjs';
 import {createJavascriptSourceAdmission} from './javascript-source-admission.mjs';
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
 import {openManagedJavascriptOutputViews} from './javascript-managed-views.mjs';
@@ -17,6 +17,7 @@ const verified=value=>({verified:true,cleanup_complete:true,effect_possible:fals
 export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor}){
  const {operation,execute,onRecord,now,receiptOptions}=options;
  const request=operation.parameters,javascript=request.target.type==='programming.javascript';
+ const unchangedImport=isUnchangedTextImportExecution(request);
  const owner=javascript?{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,
   node_id:request.target.ref.node_id,operation_id:operation.id,ui_epoch:Date.now()}:null;
  let channel,signal,driver,execution,sourceReceipt;
@@ -37,7 +38,9 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    channel:remaining=>{operation.deadline=remaining;return channel;},openingBudgetMs:180000})});
  const forbidden=()=>{throw Error('A read operation cannot open or configure node/port wizards');};
  return {
-  verifySource:async()=>verified({source_kind:'completed_local_node',source_operation_id:operation.parameters.parameters.source_operation_id}),
+  verifySource:async()=>verified(unchangedImport
+   ?{source_kind:'unchanged_existing_text_import',node:structuredClone(request.target.ref),settings_changed:false}
+   :{source_kind:'completed_local_node',source_operation_id:request.parameters.source_operation_id}),
   ...(javascript?{async beforeTarget(ctx){
    enter({...ctx,node:request.target.ref});
    sourceReceipt=await withJavascriptSourcePolicyBoundary({phase:'target',owner,deadline:ctx.deadline,record:onRecord},
@@ -77,8 +80,8 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
     'Fresh owned execution required for reread');
    const ports=[];let restoration,returned;
    for(const port of read.ports){
-    const schema=operation.parameters.parameters.schemas.find(s=>s.port===port)?.schema;
-    need(schema||schema===null&&operation.parameters.parameters.observed_schema===true,'Retained output schema missing');
+    const schema=unchangedImport?null:request.parameters.schemas.find(s=>s.port===port)?.schema;
+    need(schema||schema===null&&(unchangedImport||request.parameters.observed_schema===true),'Retained output schema missing');
     const table=await openNewOutputTable(channel,port,javascript?{openViews:({output})=>openManagedJavascriptOutputViews({
      prepared:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},node:ctx.node,output,
      deadline:ctx.deadline,targetOrigin,execute,record:onRecord,receiptOptions,
