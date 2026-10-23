@@ -1653,16 +1653,23 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(pending===operation)pending=null;
       return completedVerification;
     }
+    if(attempt.checkpoint.existing_file_check&&raw.cleanup_complete===true){
+      try{await attempt.lease.release();}
+      catch{
+        operation.cleanupConfirmed=false;
+        attempt.outcome={...structuredClone(outcome),status:'AMBIGUOUS',phase:'cleanup',cleanup_complete:false,
+          error:{code:'TRANSFER_CLEANUP_FAILED',message:'Existing file was not accepted; temporary file cleanup is unconfirmed'}};
+        return attempt.outcome;
+      }
+      if(pending===operation)pending=null;
+    }
     attempt.outcome=outcome;attempt.settled=true;
     auxiliary.set(attempt.id,{signature:attempt.signature,outcome:structuredClone(outcome)});
     operation.transportUncertain=false;operation.cleanupConfirmed=raw.cleanup_complete===true;
     operation.outcome.output.server_copy_verification={verification_id:attempt.id,status:outcome.status,
       bytes_verified:outcome.output.bytes_verified===true,upload_completion_verified:false,
       ...(outcome.output.bytes_verified ? {destination:artifact.upload.destination,bytes:artifact.bytes,sha256:artifact.sha256} : {})};
-    if(attempt.checkpoint.existing_file_check&&raw.cleanup_complete===true){
-      await attempt.lease.release();
-      if(pending===operation)pending=null;
-    }else if(raw.status==='NOT_APPLIED' && raw.cleanup_complete===true)await attempt.lease.release();
+    if(!attempt.checkpoint.existing_file_check&&raw.status==='NOT_APPLIED' && raw.cleanup_complete===true)await attempt.lease.release();
     return outcome;
   };
   const nodeTargetOutcome=(operation,result)=>({status:result.status,action_key:operation.action.action_key,action_revision:'1',operation_id:operation.id,

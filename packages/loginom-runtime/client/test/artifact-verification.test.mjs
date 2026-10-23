@@ -94,6 +94,20 @@ test('lost response during an existing-file comparison reconciles without anothe
  }finally{await f.cleanup();}
 });
 
+test('failed comparison with unconfirmed local cleanup keeps the runtime blocked',async()=>{
+ const f=await fixture({conflict:true});
+ try{
+  const request={...await f.request(),compareExisting:true};f.page.downloadBytes='bad';f.page.failDownloadRelease=true;
+  const result=await f.rt.verifyArtifact(request);
+  assert.equal(result.status,'AMBIGUOUS');assert.equal(result.cleanup_complete,false);
+  assert.equal(result.error.code,'TRANSFER_CLEANUP_FAILED');
+  assert.throws(()=>f.rt.assertPreparationAllowed(),/action/);
+  f.page.failDownloadRelease=false;
+  assert.equal((await f.rt.inspect({operationId:'upload'})).output.state,'resolved');
+  assert.deepEqual(f.counts,{uploads:0,downloads:1,verifications:1});
+ }finally{f.page.failDownloadRelease=false;await f.cleanup();}
+});
+
 test('verification hashes downloaded bytes once and completes the confirmed transfer',async()=>{
   const f=await fixture();
   try {
