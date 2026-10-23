@@ -300,15 +300,15 @@ test("judge gate: unknown cleanup blocks waiting and future invocations without 
   } finally { await fixture.close() }
 })
 
-test("judge gate: failed process-output persistence blocks later invocations", async () => {
+test("judge gate: a secondary log failure preserves proven quality and later invocations", async () => {
   const fixture = await gateFixture()
   const gate = createJudgeGate()
   try {
     await mkdir(path.join(fixture.root, "a/judge-events-1.jsonl"), { recursive: true, mode: 0o700 })
     const a = await gate(fixture.input("a"))
-    expect(a).toMatchObject({ ok: false, cleanupUnconfirmed: true })
-    expect(await gate(fixture.input("b"))).toMatchObject({ ok: false, cleanupUnconfirmed: true, attempts: 0 })
-    expect((await fixture.records()).filter(row => row.kind === "start")).toHaveLength(1)
+    expect(a).toMatchObject({ ok: true, attempts: 1 })
+    expect(await gate(fixture.input("b"))).toMatchObject({ ok: true, attempts: 1 })
+    expect((await fixture.records()).filter(row => row.kind === "start")).toHaveLength(2)
   } finally { await fixture.close() }
 })
 

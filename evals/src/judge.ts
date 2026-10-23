@@ -9,6 +9,7 @@ import { EvalFailure } from "./fail"
 import { checkOracle } from "./oracle"
 import { superviseProcess } from "./process-supervisor"
 import { runJudgeUnit } from "./judge-unit"
+import type { AttemptResult } from "./report"
 
 export const judgePromptFile = path.join(evalsRoot, "src", "judge-prompt.md")
 export const verdictSchemaFile = path.join(evalsRoot, "src", "verdict.schema.json")
@@ -203,6 +204,8 @@ export async function judgeTask(input: {
   judge: JudgeSettings
   signal?: AbortSignal
   checklist?: ChecklistItem[]
+  saveJudgeFields?: (fields: Partial<Pick<AttemptResult, "judge_attempts" | "judge_status" | "score" | "pass" | "structural_score" |
+    "judge_confidence" | "judge_summary" | "checklist" | "oracle_pass" | "oracle_error">>) => Promise<void>
 }) {
   return judgeInvocation(input)
 }
@@ -213,10 +216,10 @@ async function judgeInvocation(input: Parameters<typeof judgeTask>[0], admit?: (
   const oracle = { oracle_pass: checked.passed, oracle_error: checked.error }
   await prepareJudgeDir({ ...input, dir: input.outDir, checklist })
   admit?.()
-  const first = await invoke(input, checklist, 1)
+  const first = await invoke(input, checklist, 1, oracle)
   if (first.ok) return { ...first, pass: first.pass && checked.passed !== false, ...oracle, attempts: 1 as const }
   if (input.signal?.aborted || "cleanupUnconfirmed" in first) return { ...first, ok: false as const, error: first.error, ...oracle, attempts: 1 as const }
-  const second = await invoke(input, checklist, 2)
+  const second = await invoke(input, checklist, 2, oracle)
   return second.ok
     ? { ...second, pass: second.pass && checked.passed !== false, ...oracle, attempts: 2 as const }
     : { ...second, ok: false as const, error: `${first.error}; повтор: ${second.error}`, ...oracle, attempts: 2 as const }
@@ -285,9 +288,10 @@ export function judgedFields(judged: Judged) {
 }
 
 async function invoke(
-  input: { outDir: string; judge: JudgeSettings; signal?: AbortSignal },
+  input: Parameters<typeof judgeTask>[0],
   checklist: ChecklistItem[],
-  attempt: number,
+  attempt: 1 | 2,
+  oracle: { oracle_pass: boolean | null; oracle_error: string | null },
 ) {
   const verdictPath = path.join(input.outDir, "verdict.json")
   await rm(verdictPath, { force: true })
@@ -301,19 +305,26 @@ async function invoke(
     timeoutMs: input.judge.timeoutMs, signal: input.signal,
     owner: { kind: "judge", id: input.outDir },
   }, input.judge)
-  await Bun.write(path.join(path.dirname(input.outDir), `judge-events-${attempt}.jsonl`), supervised.stdout)
-  await Bun.write(path.join(path.dirname(input.outDir), `judge-stderr-${attempt}.txt`), supervised.stderr)
-  if (!supervised.cleanupConfirmed) return { ok: false as const,
-    error: `Judge process cleanup unconfirmed: ${supervised.cleanupError ?? "unknown"}`, cleanupUnconfirmed: true }
-  const exitCode = supervised.exitCode
-  if (exitCode !== 0) return { ok: false as const, error: `судья завершился кодом ${exitCode}` }
-  const file = Bun.file(verdictPath)
-  if (!(await file.exists())) return { ok: false as const, error: "verdict.json не создан" }
-  const verdict = parseVerdict(await file.text())
-  if (!verdict) return { ok: false as const, error: "verdict.json не соответствует схеме" }
-  const scored = scoreVerdict(checklist, verdict, input.judge.passThreshold)
-  if (!scored.ok) return { ok: false as const, error: scored.error }
-  return { ...scored, verdict }
+  try {
+    if (!supervised.cleanupConfirmed) return { ok: false as const,
+      error: `Judge process cleanup unconfirmed: ${supervised.cleanupError ?? "unknown"}`, cleanupUnconfirmed: true }
+    const exitCode = supervised.exitCode
+    if (exitCode !== 0) return { ok: false as const, error: `судья завершился кодом ${exitCode}` }
+    const file = Bun.file(verdictPath)
+    if (!(await file.exists())) return { ok: false as const, error: "verdict.json не создан" }
+    const verdict = parseVerdict(await file.text())
+    if (!verdict) return { ok: false as const, error: "verdict.json не соответствует схеме" }
+    const scored = scoreVerdict(checklist, verdict, input.judge.passThreshold)
+    if (!scored.ok) return { ok: false as const, error: scored.error }
+    await input.saveJudgeFields?.(judgedFields({ ...scored, verdict, ...oracle, pass: scored.pass && oracle.oracle_pass !== false, attempts: attempt }))
+    return { ...scored, verdict }
+  } finally {
+    await Promise.all([[`judge-events-${attempt}.jsonl`, supervised.stdout], [`judge-stderr-${attempt}.txt`, supervised.stderr]].map(async ([file, content]) => {
+      await Bun.write(path.join(path.dirname(input.outDir), file!), content!).catch((error: unknown) => {
+        console.error(`Judge diagnostic copy failed (${file}): ${error instanceof Error ? error.message : String(error)}`)
+      })
+    }))
+  }
 }
 
 async function runJudge(input: Parameters<typeof superviseProcess>[0] & { timeoutMs: number; stdin?: string },

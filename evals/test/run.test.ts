@@ -11,7 +11,7 @@ import type { RunSummary } from "../src/report"
 import { loadTasks, rubricHash } from "../src/task"
 import { readStartupCleanup } from "../src/startup-reconciliation"
 import { evaluationContractHash } from "../src/evaluation"
-import { judgeInfo } from "../src/judge"
+import { createJudgeGate, judgeInfo } from "../src/judge"
 
 test("runAttempt persists generation before delayed judge", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-generation-checkpoint-"))
@@ -45,6 +45,28 @@ test("runAttempt persists generation before delayed judge", async () => {
     await running
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test("runAttempt keeps scored FAIL when a secondary judge log cannot be written", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-log-failure-"))
+  try {
+    const config = { ...loadConfig(["--dry-run"], { EVAL_WORKSPACE_ROOT: path.join(root, "workspace") }), skipJudge: false }
+    const [task] = await loadTasks(config.tasksDir, ["group-sum-qty"])
+    const runDir = path.join(root, "results")
+    const outDir = path.join(runDir, task!.id, "1")
+    const trace = path.join(root, "judge.jsonl")
+    await mkdir(path.join(outDir, "judge-events-1.jsonl"), { recursive: true })
+    const finished = await runAttempt({ config, command: agentCommand(config), source: parseArtifactSource(config.artifactSource, config.loginom),
+      task: task!, attempt: 1, runId: "log-failure", runDir, signal: new AbortController().signal, profileRecovered: false,
+      skipJudge: false, judgeGate: createJudgeGate(), judge: {
+        command: [process.execPath, path.join(evalsRoot, "fixtures/fake-codex.ts"), "--gate-log", trace],
+        model: "fake", reasoning: "high", timeoutMs: 30_000, passThreshold: 70, env: { FAKE_CODEX_VERDICT: "fail" } } })
+    expect(finished.result).toMatchObject({ status: "completed", judge_status: "scored", score: 0, pass: false, judge_attempts: 1 })
+    expect(finished.result).not.toHaveProperty("judge_cleanup_unconfirmed")
+    expect(finished.stop).toBe(false)
+    expect(await Bun.file(path.join(outDir, "result.json")).json()).toEqual(finished.result)
+    expect((await Bun.file(trace).text()).trim().split("\n").map(line => JSON.parse(line)).filter(row => row.kind === "start")).toHaveLength(1)
+  } finally { await rm(root, { recursive: true, force: true }) }
 })
 
 test("runAttempt: startup accepts the emitted cleanup receipt", async () => {

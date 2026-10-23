@@ -380,6 +380,11 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
           outDir: path.join(outDir, "judge"),
           judge: input.judge,
           signal: input.signal,
+          saveJudgeFields: async fields => {
+            Object.assign(result, fields)
+            Object.assign(base, result)
+            await writeLeaseReceipt(path.join(outDir, "result.json"), result)
+          },
         }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
       : undefined
   const judgeCleanupFailed = judged && "cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed
