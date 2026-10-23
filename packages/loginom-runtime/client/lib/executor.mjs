@@ -2276,6 +2276,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     };
     const graphRequest={document_id:request.document_id,workflow_ref:request.workflow_ref,
       target:{kind:'existing',type:'programming.javascript',ref:request.node},inputs:[]};
+    // Source-only requests need the same initial native graph binding as context
+    // reads. Observing never activates, executes or changes the requested node.
+    if(request.kind==='source')await targetAdapter(operation).observe(graphRequest,deadline);
     const session=request.kind==='context'?createJavascriptContextReadSession({request,uiEpoch,deadline,adapter,redactor,record:onRecord,
       channel:contextChannel,observeGraph:()=>targetAdapter(operation).observe(graphRequest,deadline)}):
       createJavascriptSourceReadSession({request,uiEpoch,deadline,adapter,redactor,record:onRecord});
