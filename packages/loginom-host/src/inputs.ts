@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto"
+import { createHash } from "node:crypto"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { basename, join } from "node:path"
 
@@ -57,9 +57,7 @@ export function inputStore(root: string) {
           )
           return {
             sourcePath,
-            // Source identity stays stable; each runtime admission gets its own server
-            // filename, so reopening a package never requires overwriting an old upload.
-            name: `${randomUUID()}-${index}-${file.name.slice(-120)}`,
+            name: `${identity}-${index}-${file.name.slice(-120)}`,
             bytes: file.bytes.length,
             sha256: file.sha256,
             upload: { directory: folder, overwrite: "reject" },

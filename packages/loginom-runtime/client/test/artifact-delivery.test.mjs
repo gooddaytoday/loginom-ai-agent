@@ -253,14 +253,26 @@ test('delivery returns from a different storage branch before entering the grant
 });
 
 
-test('delivery returns a terminal path conflict without byte verification or another submission',async()=>{
+for(const comparison of ['equal','different','unreadable','uncertain'])test('reject delivery compares the existing file without overwriting: '+comparison,async()=>{
  const f=fixture();f.artifact.upload.overwrite='reject';
  f.runtime.uploadDeliveredArtifact=async()=>{f.calls.push('upload');return {status:'FAILED',cleanup_complete:true,output:{upload_submitted:false,conflict_rejected:true}};};
+ const verify=f.runtime.verifyDeliveredArtifact;
+ f.runtime.verifyDeliveredArtifact=async options=>{
+  if(comparison==='equal')return verify(options);
+  if(comparison==='unreadable')throw Error('No readable row');
+  options.onDispatched();f.calls.push('verify');
+  return {status:'FAILED',cleanup_complete:comparison!=='uncertain',output:{bytes_verified:false}};
+ };
  const first=f.service.deliver(request),result=await first;
- assert.equal(result.state,'settled');assert.equal(result.phase,'rejected');assert.equal(result.outcome.code,'UPLOAD_PATH_CONFLICT');
- assert.equal(result.outcome.upload_completion_verified,false);assert.equal(f.service.busy,false);
- assert.deepEqual(f.calls,['double_click','double_click','upload']);assert.equal(f.service.deliver(request),first);
- assert.equal(f.events.at(-1).phase,'artifact_delivery_rejected');
+ assert.equal(result.state,'settled');assert.equal(f.service.busy,false);assert.equal(f.service.deliver(request),first);
+ assert.equal(f.calls.filter(c=>c==='upload').length,1);
+ if(comparison==='equal')assert.equal(result.outcome.status,'SUCCEEDED');
+ else if(comparison==='uncertain'){assert.equal(result.outcome.status,'AMBIGUOUS');assert.equal(f.service.unsettled,true);}
+ else {
+  assert.equal(result.phase,'rejected');assert.equal(result.outcome.code,'UPLOAD_PATH_CONFLICT');
+  assert.equal(result.outcome.upload_completion_verified,false);assert.equal(f.service.unsettled,false);
+  assert.equal(f.events.at(-1).phase,'artifact_delivery_rejected');
+ }
 });
 
 
