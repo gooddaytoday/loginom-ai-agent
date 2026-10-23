@@ -8,7 +8,7 @@ import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 type CampaignKey = { corpus: string; taskId: string; round: number }
 export type CampaignManifest = {
   id: string; server: string; executor: string; parallel: number; batchSize: number
-  keys: CampaignKey[]; pins: Record<string, string | number>; issueId?: string
+  keys: CampaignKey[]; pins: Record<string, string | number>; issueId?: string; wakeupIds?: string[]
 }
 type Batch = { id: string; keys: CampaignKey[]; resultsDir: string; invocationBefore: string; started: boolean; accounted?: boolean }
 type AccountedAttempt = {
@@ -17,19 +17,23 @@ type AccountedAttempt = {
 export type CampaignJournal = {
   manifestHash: string; server: string; campaignId: string; executor: string; repairing: boolean; repairer: string | null
   batches: Batch[]; attempts: AccountedAttempt[]; lastProgressAt: number; consecutiveErrors: number
-  blocker?: string; final?: "full" | "partial"; published?: boolean; reportCommentId?: string; wakeupIds?: string[]
+  blocker?: string; final?: "full" | "partial"; published?: boolean; reportCommentId?: string; attachmentId?: string
 }
 type UnitState = { active: boolean; invocation: string; exitCode: number }
 const keyId = (key: CampaignKey) => `${key.corpus}/${key.taskId}/${key.round}`
 
 type PublisherConfig = { stateDir: string; multica: { url: string; workspace: string; issueId: string; tokenFile: string } }
-async function campaignRequest(config: PublisherConfig, endpoint: string, method = "GET", body?: object): Promise<unknown> {
+async function campaignFetch(config: PublisherConfig, endpoint: string, method = "GET", body?: object | FormData) {
   const token = (await Bun.file(config.multica.tokenFile).text()).trim()
   const url = new URL(endpoint, config.multica.url)
   url.searchParams.set("workspace_slug", config.multica.workspace)
-  const response = await fetch(url, { method, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(30_000) })
+  const response = await fetch(url, { method, headers: { Authorization: `Bearer ${token}`, ...(body instanceof FormData ? {} : { "Content-Type": "application/json" }) },
+    body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(30_000) })
   if (!response.ok) throw Error(`MULTICA_${response.status}`)
+  return response
+}
+async function campaignRequest(config: PublisherConfig, endpoint: string, method = "GET", body?: object | FormData): Promise<unknown> {
+  const response = await campaignFetch(config, endpoint, method, body)
   return response.status === 204 ? null : response.json()
 }
 
@@ -45,9 +49,35 @@ export async function publishCampaign(manifest: CampaignManifest, journal: Campa
     }), "", `Учтено ${journal.attempts.filter(item => item.counted).length}/${manifest.keys.length}.`, ""].join("\n")
   await Bun.write(path.join(config.stateDir, "report.md"), report)
   const endpoint = `/api/issues/${config.multica.issueId}`
+  const archive = path.join(config.stateDir, `${manifest.id}.tar.gz`)
+  if (!(await Bun.file(archive).exists())) {
+    await writeLeaseReceipt(path.join(config.stateDir, "manifest.json"), manifest)
+    await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+    const files = ["manifest.json", "journal.json", "report.md", ...(await readdir(config.stateDir)).includes("batches") ? ["batches"] : []]
+    await command(["tar", "--exclude=*.secret.json", "-czf", archive, ...files], config.stateDir)
+  }
+  const digest = (bytes: ArrayBuffer) => new Bun.CryptoHasher("sha256").update(bytes).digest("hex")
+  const archiveHash = digest(await Bun.file(archive).arrayBuffer())
+  const attachments = await campaignRequest(config, `${endpoint}/attachments`) as { id: string; filename: string }[]
+  const matching = attachments.filter(item => item.filename === path.basename(archive))
+  for (const attachment of matching) {
+    if (digest(await (await campaignFetch(config, `/api/attachments/${attachment.id}/download`)).arrayBuffer()) === archiveHash)
+      journal.attachmentId = attachment.id
+  }
+  if (!journal.attachmentId) {
+    const form = new FormData()
+    form.set("issue_id", config.multica.issueId)
+    form.set("file", Bun.file(archive), path.basename(archive))
+    const uploaded = await campaignRequest(config, "/api/upload-file", "POST", form) as { id: string }
+    if (!uploaded.id) throw Error("CAMPAIGN_ATTACHMENT_NOT_PERSISTED")
+    journal.attachmentId = uploaded.id
+    await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+  }
+  if (digest(await (await campaignFetch(config, `/api/attachments/${journal.attachmentId}/download`)).arrayBuffer()) !== archiveHash)
+    throw Error("CAMPAIGN_ATTACHMENT_READBACK")
   const comments = await campaignRequest(config, `${endpoint}/comments`) as { id: string; content: string }[]
   const existing = comments.find(comment => comment.content.includes(marker))
-  const comment = existing ?? await campaignRequest(config, `${endpoint}/comments`, "POST", { content: report }) as { id: string }
+  const comment = existing ?? await campaignRequest(config, `${endpoint}/comments`, "POST", { content: report, attachment_ids: [journal.attachmentId] }) as { id: string }
   if (!comment.id) throw Error("CAMPAIGN_REPORT_NOT_PERSISTED")
   journal.reportCommentId = comment.id
   await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
@@ -56,11 +86,11 @@ export async function publishCampaign(manifest: CampaignManifest, journal: Campa
   const issue = await campaignRequest(config, endpoint) as { revision: number; status: string }
   if (issue.status !== "in_review") await campaignRequest(config, endpoint, "PUT", { status: "in_review", expected_revision: issue.revision, suppress_run: true })
   const rules = await campaignRequest(config, `${endpoint}/wakeups`) as { id: string; enabled: boolean }[]
-  for (const rule of rules.filter(rule => rule.enabled && journal.wakeupIds?.includes(rule.id)))
+  for (const rule of rules.filter(rule => rule.enabled && manifest.wakeupIds?.includes(rule.id)))
     await campaignRequest(config, `${endpoint}/wakeups/${rule.id}/disable`, "POST", {})
   const finalIssue = await campaignRequest(config, endpoint) as { status: string }
   const finalRules = await campaignRequest(config, `${endpoint}/wakeups`) as { id: string; enabled: boolean }[]
-  if (finalIssue.status !== "in_review" || journal.wakeupIds?.some(id => !finalRules.some(rule => rule.id === id && !rule.enabled)))
+  if (finalIssue.status !== "in_review" || manifest.wakeupIds?.some(id => !finalRules.some(rule => rule.id === id && !rule.enabled)))
     throw Error("CAMPAIGN_FINAL_READBACK")
   journal.published = true
   await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
@@ -185,7 +215,8 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
     Object.entries(manifest.pins).some(([key, value]) => !/^[A-Z][A-Z0-9_]*$/.test(key) || /PASSWORD|TOKEN|SECRET|API_KEY/.test(key) || !["string", "number"].includes(typeof value)))
     throw Error("CAMPAIGN_MANIFEST_INVALID")
   if (![config.stateRoot, config.harnessRoot, config.controllerLock, config.batchEnvFile, config.resourceBudgetFile].every(value => typeof value === "string" && path.isAbsolute(value)) ||
-    !config.batchUnit || !manifest.issueId || !config.preflightCommand?.length || !config.verifyCommand?.length)
+    !config.batchUnit || !manifest.issueId || !Array.isArray(manifest.wakeupIds) || manifest.wakeupIds.some(id => typeof id !== "string" || !id) ||
+    !config.preflightCommand?.length || !config.verifyCommand?.length)
     throw Error("CAMPAIGN_SERVER_INVALID")
   const stateDir = path.join(config.stateRoot, manifest.id)
   await mkdir(stateDir, { recursive: true, mode: 0o700 })

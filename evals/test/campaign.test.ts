@@ -63,10 +63,23 @@ test("campaign durably records a batch before exposing its parameters and reuses
 test("campaign publishes its saved FAIL once and reads back the final issue and disabled wakeup", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-publish-"))
   const comments: { id: string; content: string }[] = []
+  const attachments: { id: string; filename: string }[] = []
+  let uploaded = new Uint8Array()
+  let downloads = 0
   const issue = { revision: 1, status: "in_progress" }
   const wakeup = { id: "timer", enabled: true }
   const server = Bun.serve({ port: 0, async fetch(request) {
     const route = new URL(request.url).pathname
+    if (route === "/api/upload-file") {
+      const data = await request.formData()
+      const file = data.get("file") as File
+      uploaded = new Uint8Array(await file.arrayBuffer())
+      const attachment = { id: "archive", filename: file.name }
+      attachments.push(attachment)
+      return Response.json(attachment)
+    }
+    if (route.endsWith("/download")) { downloads++; return new Response(uploaded) }
+    if (route.endsWith("/attachments")) return Response.json(attachments)
     if (route.endsWith("/comments")) {
       if (request.method === "POST") comments.push({ ...await request.json(), id: "report" })
       return Response.json(request.method === "POST" ? comments.at(-1) : comments)
@@ -78,9 +91,9 @@ test("campaign publishes its saved FAIL once and reads back the final issue and 
   } })
   try {
     const manifest: CampaignManifest = { id: "publish", server: "runner2", executor: "EvalBaseline", parallel: 1, batchSize: 1,
-      keys: [{ corpus: "ordinary", taskId: "first", round: 1 }], pins: {} }
+      keys: [{ corpus: "ordinary", taskId: "first", round: 1 }], pins: {}, wakeupIds: ["timer"] }
     const journal: CampaignJournal = { manifestHash: "test", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
-      repairing: false, repairer: null, batches: [], wakeupIds: ["timer"], attempts: [{ key: manifest.keys[0]!, resultFile: "/saved/result.json", status: "no_artifact",
+      repairing: false, repairer: null, batches: [], attempts: [{ key: manifest.keys[0]!, resultFile: "/saved/result.json", status: "no_artifact",
         counted: true, pass: false, score: 0, cleanupConfirmed: true }], lastProgressAt: 1000, consecutiveErrors: 0, final: "full" }
     await Bun.write(path.join(root, "token"), "fixture-token", { mode: 0o600 })
     const config = { stateDir: root, multica: { url: `http://127.0.0.1:${server.port}`, workspace: "lab", issueId: "issue", tokenFile: path.join(root, "token") } }
@@ -92,5 +105,8 @@ test("campaign publishes its saved FAIL once and reads back the final issue and 
     expect(issue.status).toBe("in_review")
     expect(wakeup.enabled).toBe(false)
     expect(journal.published).toBe(true)
+    expect(attachments).toHaveLength(1)
+    expect(downloads).toBeGreaterThan(0)
+    expect(uploaded.length).toBeGreaterThan(0)
   } finally { server.stop(true); await rm(root, { recursive: true, force: true }) }
 })
