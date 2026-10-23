@@ -68,9 +68,13 @@ export async function finishPendingJudge(config: EvalConfig, resultFile: string,
         Object.assign(result, fields)
         await writeLeaseReceipt(resultFile, result)
       } })
-    Object.assign(result, judgedFields(judged), { judge_attempts: Math.max(result.judge_attempts, judged.attempts) })
+    const cleanupUnconfirmed = "cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed
+    Object.assign(result, judgedFields(judged), { judge_attempts: Math.max(result.judge_attempts, judged.attempts) }, cleanupUnconfirmed ? {
+      environment_cleanup: { status: "failed", evidence: judged.attempts ? `judge-processes-${judged.attempts}/process-cleanup.json` : null,
+        error: !judged.ok ? judged.error : null },
+    } : {})
     await writeLeaseReceipt(resultFile, result)
-    return { code: judged.ok ? 0 : 1, runDir: pending.runDir, judgeCleanupConfirmed: !("cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed) }
+    return { code: judged.ok ? 0 : 1, runDir: pending.runDir, judgeCleanupConfirmed: !cleanupUnconfirmed }
   } finally { removeSigint() }
 }
 

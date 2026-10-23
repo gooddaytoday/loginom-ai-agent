@@ -1,10 +1,12 @@
 import { expect, test } from "bun:test"
 import os from "node:os"
 import path from "node:path"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, stat } from "node:fs/promises"
 import { emptyResult } from "../src/run"
 import { writeLeaseReceipt } from "../src/lease"
 import { campaignEnvironment, campaignTick, prepareCampaignBatch, publishCampaign, type CampaignManifest, type CampaignJournal } from "../script/run-campaign"
+import { pendingJudgeFixture } from "./helpers/pending-judge"
+import { runOfflineJudge } from "../src/judge-environment"
 
 async function admitRun(runDir: string, taskIds: string[]) {
   const commandJournal = path.join(runDir, "native-command.json")
@@ -12,6 +14,45 @@ async function admitRun(runDir: string, taskIds: string[]) {
     attempts: taskIds.map(taskId => ({ taskId, attempt: 1, purpose: "measurement" })) })
   await writeLeaseReceipt(path.join(runDir, "config.json"), { commandJournal })
 }
+
+test("campaign finishes only the pending judge then selects the next missing key once", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-pending-offline-"))
+  try {
+    const fixture = await pendingJudgeFixture(root)
+    const key = { corpus: "ordinary", taskId: fixture.original.result.task_id, round: 1 }
+    const next = { ...key, taskId: "calc-data-double" }
+    const manifest: CampaignManifest = { id: "pending-offline", server: "runner2", executor: "EvalBaseline", parallel: 1, batchSize: 1, keys: [key, next], pins: {} }
+    await writeLeaseReceipt(fixture.resultFile, { ...fixture.original.result, environment_cleanup: { status: "confirmed", evidence: "cleanup.json", error: null } })
+    await writeLeaseReceipt(path.join(path.dirname(fixture.resultFile), "cleanup.json"), { processes: { status: "confirmed" }, nextAdmissionAllowed: true })
+    const commandJournal = path.join(fixture.runDir, "native-command.json")
+    await writeLeaseReceipt(commandJournal, { version: 2, kind: "unactivated-preparation", runDir: fixture.runDir,
+      attempts: [{ taskId: key.taskId, attempt: 1, purpose: "measurement" }] })
+    await writeLeaseReceipt(path.join(fixture.runDir, "config.json"), { ...await Bun.file(path.join(fixture.runDir, "config.json")).json(), commandJournal })
+    const state: CampaignJournal = { manifestHash: "fixture", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
+      repairing: false, repairer: null, batches: [{ id: "one", keys: [key], resultsDir: path.dirname(fixture.runDir), invocationBefore: "before", started: true }],
+      attempts: [], lastProgressAt: Date.now() - 1000, consecutiveErrors: 0 }
+    const pending = await campaignTick(manifest, state, { active: false, invocation: "done", exitCode: 1 })
+    expect(pending.action).toBe("judge")
+    if (pending.action !== "judge") throw Error("pending judge was not selected")
+    expect(pending.pendingJudge.resultFile).toBe(fixture.resultFile)
+    const judged = await runOfflineJudge({ ...fixture.config, judge: { ...fixture.config.judge, env: { FAKE_CODEX_VERDICT: "fail" } } },
+      fixture.fixture.lockRoot, pending.pendingJudge.resultFile)
+    expect(judged).toMatchObject({ code: 0, judgeCleanupConfirmed: true })
+    const completedAt = (await stat(fixture.resultFile)).mtimeMs
+    const observedAt = Math.ceil(completedAt)
+    const after = await campaignTick(manifest, pending.journal, { active: false, invocation: "done", exitCode: 1 }, observedAt)
+    expect(after.next).toEqual([next])
+    expect(after.journal.attempts).toMatchObject([{ key, counted: true, pass: false, score: 0 }])
+    expect(after.journal.startedAttempts).toBe(1)
+    expect(after.journal.consecutiveErrors).toBe(0)
+    expect(after.journal.lastProgressAt).toBe(completedAt)
+    const repeated = await campaignTick(manifest, after.journal, { active: false, invocation: "done", exitCode: 1 }, observedAt + 1)
+    expect(repeated.next).toEqual([next])
+    expect(repeated.journal.attempts).toHaveLength(1)
+    expect(repeated.journal.lastProgressAt).toBe(completedAt)
+    expect((await Bun.file(fixture.trace).text()).trim().split("\n").map(line => JSON.parse(line)).filter(row => row.kind === "start")).toHaveLength(1)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("campaign retains a saved generation for pending judge even when the measurement budget is exhausted", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-pending-judge-"))
@@ -39,6 +80,7 @@ test("campaign retains a saved generation for pending judge even when the measur
     expect(tick.journal.lastProgressAt).toBe(1000)
     expect(tick.journal.attempts).toMatchObject([{ counted: false }])
     expect(tick.journal.attempts[0]?.completedAt).toBeUndefined()
+    expect(tick.journal.attempts[0]?.cleanupConfirmed).toBe(false)
     expect((await campaignTick(manifest, tick.journal, { active: true, invocation: "running", exitCode: 0 }, 3000)).action).toBe("wait")
     expect((await campaignTick(manifest, { ...tick.journal, repairing: true }, { active: false, invocation: "done", exitCode: 1 }, 3000)).action).toBe("blocked")
     expect((await campaignTick(manifest, { ...tick.journal, blocker: "TECHNICAL_REPAIR" }, { active: false, invocation: "done", exitCode: 1 }, 3000)).action).toBe("blocked")

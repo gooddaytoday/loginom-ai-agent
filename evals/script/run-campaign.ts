@@ -390,7 +390,8 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
             ? completion.completedAt! : (await stat(resultFile)).mtimeMs)
           const entry = { key, resultFile, status: result.status, counted, pass: node && node.code !== 2 ? node.verdict === "PASS" : result.pass, score: result.score, resources,
             completedAt,
-            cleanupConfirmed: result.environment_cleanup?.status === "confirmed" && cleanup?.processes?.status === "confirmed" && cleanup?.nextAdmissionAllowed === true }
+            cleanupConfirmed: !awaitingJudge && !result.judge_cleanup_unconfirmed && result.environment_cleanup?.status === "confirmed" &&
+              cleanup?.processes?.status === "confirmed" && cleanup?.nextAdmissionAllowed === true }
           const index = journal.attempts.findIndex(attempt => attempt.resultFile === resultFile)
           if (index >= 0) {
             journal.attempts[index] = { ...entry, cleanupVerification: journal.attempts[index]!.cleanupVerification }
