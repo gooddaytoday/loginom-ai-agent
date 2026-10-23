@@ -69,6 +69,7 @@ test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("campaign service performs l
     await mkdir(stateDir, { recursive: true, mode: 0o700 })
     await writeLeaseReceipt(manifestFile, fixture.manifest)
     await writeLeaseReceipt(path.join(stateDir, "journal.json"), { ...fixture.journal, manifestHash })
+    await writeLeaseReceipt(path.join(stateRoot, "owner.json"), { campaignId: fixture.manifest.id })
     await writeLeaseReceipt(serverFile, { ...fixture.config, server: "runner2", stateRoot,
       controllerLock: path.join(fixture.root, "controller.lock"), batchUnit: "basic.target",
       acceptedHarness: "a".repeat(40), batchEnvFile: path.join(fixture.root, "batch.env"),
@@ -83,6 +84,35 @@ test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("campaign service performs l
     expect(await Bun.file(path.join(stateDir, "verify-observation.json")).json()).toEqual({ count: 1, durable: true, parallel: "2" })
     expect(await Bun.file(path.join(stateDir, "journal.json")).json()).toMatchObject({ verificationAttempted: true, cleanupVerified: true })
     expect(fixture.api.postAttempts).toBe(0)
+    expect(await Bun.file(path.join(stateRoot, "owner.json")).exists()).toBe(false)
+  } finally { await fixture.close() }
+})
+
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("service entry adopts an external partial before waiting for an active batch with fresh local progress", async () => {
+  const fixture = await finalizationFixture()
+  try {
+    fixture.manifest.issueId = "issue"
+    const stateRoot = path.join(fixture.root, "campaigns"), stateDir = path.join(stateRoot, fixture.manifest.id)
+    const manifestFile = path.join(fixture.root, "manifest.json"), serverFile = path.join(fixture.root, "server.json")
+    const manifestHash = new Bun.CryptoHasher("sha256").update(JSON.stringify(fixture.manifest)).digest("hex")
+    await mkdir(stateDir, { recursive: true, mode: 0o700 })
+    await writeLeaseReceipt(manifestFile, fixture.manifest)
+    const state = { ...fixture.journal, manifestHash, final: undefined, lastProgressAt: Date.now(),
+      batches: [{ id: "owned", keys: fixture.manifest.keys, resultsDir: path.join(stateDir, "batches/1"), invocationBefore: "prior", started: true }] }
+    await writeLeaseReceipt(path.join(stateDir, "journal.json"), state)
+    await writeLeaseReceipt(serverFile, { ...fixture.config, server: "runner2", stateRoot,
+      controllerLock: path.join(fixture.root, "controller.lock"), batchUnit: "basic.target", acceptedHarness: "a".repeat(40),
+      batchEnvFile: path.join(fixture.root, "batch.env"), slotsFile: path.join(fixture.root, "slots.json"),
+      resourceBudgetFile: path.join(fixture.root, "budget.json"), experimentPinsFile: path.join(fixture.root, "pins.json"),
+      corpusPinsFile: path.join(fixture.root, "corpus-pins.json"), preflightCommand: [process.execPath, "unreachable.ts"], corpora: {} })
+    fixture.comments.push({ id: "ops-final", content: `<!-- eval-campaign:${fixture.manifest.id} -->\n<!-- eval-final:partial -->\n# частичный: host unavailable` })
+    const finished = await runCampaign(manifestFile, serverFile, true)
+    expect(finished).toMatchObject({ final: "partial", published: true, reportCommentId: "ops-final", lastProgressAt: state.lastProgressAt })
+    expect(finished.attempts).toEqual(state.attempts)
+    expect(fixture.issue.status).toBe("in_review")
+    expect(fixture.wakeup.enabled).toBe(false)
+    expect(await Bun.file(path.join(stateDir, "verify-observation.json")).exists()).toBe(false)
+    expect(fixture.attachments).toHaveLength(0)
   } finally { await fixture.close() }
 })
 
@@ -155,7 +185,7 @@ test.each([true, false])("Multica outage permits local cleanup and recovery retr
     fixture.api.available = false
     const waiting = await finalizeCampaign(fixture.manifest, fixture.journal, fixture.config, 1500)
     expect(waiting).toMatchObject({ final, verificationAttempted: true, reportingError: "MULTICA_UNAVAILABLE" })
-    expect(waiting.cleanupVerified).toBe(cleanupSucceeded ? true : undefined)
+    expect(waiting.cleanupVerified === true).toBe(cleanupSucceeded)
     expect(waiting.published).not.toBe(true)
     expect(waiting.attempts).toEqual(attempts)
     expect(await Bun.file(path.join(fixture.root, "journal.json")).json()).toMatchObject({ reportingError: "MULTICA_UNAVAILABLE", verificationAttempted: true })
@@ -165,7 +195,7 @@ test.each([true, false])("Multica outage permits local cleanup and recovery retr
     fixture.api.available = true
     const finished = await finalizeCampaign(fixture.manifest, waiting, fixture.config, 1600)
     expect(finished).toMatchObject({ final, published: true })
-    expect(finished.cleanupVerified).toBe(cleanupSucceeded ? true : undefined)
+    expect(finished.cleanupVerified === true).toBe(cleanupSucceeded)
     expect(finished.reportingError).toBeUndefined()
     expect(finished.attempts).toEqual(attempts)
     expect(await Bun.file(path.join(fixture.root, "verify-observation.json")).json()).toEqual({ count: 1, durable: true, parallel: "2" })

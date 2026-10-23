@@ -96,13 +96,17 @@ test("campaign durably records a batch before exposing its parameters and reuses
       keys: [{ corpus: "ordinary", taskId: "first", round: 1 }], pins: { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/pinned/cli",
         EVAL_AGENT_MODEL: "pinned/model", EVAL_AGENT_VARIANT: "medium", JUDGE_MODEL: "judge", JUDGE_REASONING: "xhigh" } }
     const state: CampaignJournal = { manifestHash: "test", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
-      repairing: false, repairer: null, batches: [], attempts: [], lastProgressAt: 1000, consecutiveErrors: 0 }
-    const config = { stateDir: root, harnessRoot: path.join(root, "harness"), slotsFile: path.join(root, "slots.json"),
+      repairing: false, repairer: null, batches: [], attempts: [], lastProgressAt: 1000, consecutiveErrors: 0,
+      cleanupVerified: true, verificationAttempted: true, verificationDir: path.join(root, "previous-verification") }
+    const config = { stateDir: root, controllerLock: path.join(root, "controller.lock"), harnessRoot: path.join(root, "harness"), slotsFile: path.join(root, "slots.json"),
       batchEnvFile: path.join(root, "batch.env"), resourceBudgetFile: path.join(root, "budget.json"),
       corpora: { ordinary: { entrypoint: "src/run.ts", tasks: "tasks" } } }
     const batch = await prepareCampaignBatch(manifest, state, manifest.keys, "old-unit", config)
     const saved = await Bun.file(path.join(root, "journal.json")).json()
     expect(saved.batches).toEqual([batch])
+    expect(saved.cleanupVerified).not.toBe(true)
+    expect(saved.verificationAttempted).not.toBe(true)
+    expect(saved.verificationDir).toBeUndefined()
     const env = await Bun.file(config.batchEnvFile).text()
     expect(env).toContain('EVAL_AGENT_MODEL="pinned/model"')
     expect(env).toContain(`EVAL_ENTRYPOINT=${JSON.stringify(path.join(config.harnessRoot, "src/run.ts"))}`)
@@ -113,6 +117,9 @@ test("campaign durably records a batch before exposing its parameters and reuses
     expect(env).toContain('EVAL_CAMPAIGN_ERROR_LIMIT="3"')
     expect(env).toContain('EVAL_CAMPAIGN_LAST_PROGRESS_AT="1000"')
     expect(env).toContain('EVAL_CAMPAIGN_NO_PROGRESS_MS="86400000"')
+    expect(env).toContain(`EVAL_CAMPAIGN_JOURNAL=${JSON.stringify(path.join(root, "journal.json"))}`)
+    expect(env).toContain(`EVAL_CAMPAIGN_LOCK=${JSON.stringify(config.controllerLock)}`)
+    expect(env).toContain(`EVAL_CAMPAIGN_MANIFEST_HASH=${JSON.stringify(state.manifestHash)}`)
     expect((await prepareCampaignBatch(manifest, state, manifest.keys, "old-unit", config)).id).toBe(batch.id)
     expect(state.batches).toHaveLength(1)
     config.corpora.ordinary.entrypoint = "/old/harness/src/run.ts"

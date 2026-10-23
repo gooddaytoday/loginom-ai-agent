@@ -1,9 +1,9 @@
 import path from "node:path"
-import { constants } from "node:fs"
-import { mkdir, open, readdir, rename, stat } from "node:fs/promises"
+import { mkdir, readdir, rename, stat, unlink } from "node:fs/promises"
 import { parseArgs } from "node:util"
 import { isQualityResult, type AttemptResult } from "../src/report"
 import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
+import { tryCampaignLock } from "../src/campaign-lock"
 
 type CampaignKey = { corpus: string; taskId: string; round: number }
 export type CampaignManifest = {
@@ -16,6 +16,7 @@ type AccountedAttempt = {
   key: CampaignKey; resultFile: string; status: string; counted: boolean; pass: boolean | null; score: number | null; cleanupConfirmed: boolean
   resources?: { status: string; codes: string[] }
   completedAt?: number
+  cleanupVerification?: string
 }
 export type CampaignJournal = {
   manifestHash: string; server: string; campaignId: string; executor: string; repairing: boolean; repairer: string | null
@@ -23,7 +24,9 @@ export type CampaignJournal = {
   blocker?: string; final?: "full" | "partial"; published?: boolean; reportCommentId?: string; attachmentId?: string; cleanupVerified?: boolean
   blockerKind?: "technical" | "external" | "delivery"; blockerCommentId?: string; startedAttempts?: number
   verificationAttempted?: boolean
+  verificationDir?: string
   reportingError?: string
+  snapshotObservedAt?: number
 }
 type UnitState = { active: boolean; invocation: string; exitCode: number }
 const keyId = (key: CampaignKey) => `${key.corpus}/${key.taskId}/${key.round}`
@@ -124,6 +127,7 @@ export async function publishCampaign(manifest: CampaignManifest, journal: Campa
   const report = [marker, `<!-- eval-final:${journal.final} -->`, `# ${journal.final === "full" ? "полный" : `частичный: ${journal.blocker ?? "предел кампании"}`}`, "",
     `Кампания ${manifest.id}; сервер ${journal.server}.`, "",
     `Очистка кампании: ${journal.cleanupVerified ? "подтверждена" : "не подтверждена"} (globalcleanupConfirmed=${journal.cleanupVerified === true}).`,
+    ...(journal.snapshotObservedAt === undefined ? [] : [`Последнее наблюдение: ${new Date(journal.snapshotObservedAt).toISOString()}. Текущее состояние ресурсов хоста не подтверждено.`]),
     ...(journal.final === "partial" ? ["Частичный итог по последним известным данным. Непроверенные ресурсы остаются неподтверждёнными."] : []), "",
     ...manifest.keys.map(key => {
       const attempt = journal.attempts.find(item => item.counted && keyId(item.key) === keyId(key))
@@ -174,6 +178,24 @@ export async function publishCampaign(manifest: CampaignManifest, journal: Campa
   await finishCampaignIssue(manifest, journal, config)
 }
 
+async function verifyCampaignCleanup(manifest: CampaignManifest, journal: CampaignJournal,
+  config: PublisherConfig & { harnessRoot: string; verifyCommand: string[] }) {
+  const verificationDir = path.join(config.stateDir, "verification", crypto.randomUUID())
+  if (config.verifyCommand.some(value => value.includes("{verificationDir}"))) {
+    await mkdir(path.dirname(verificationDir), { recursive: true, mode: 0o700 })
+    journal.verificationDir = verificationDir
+  }
+  journal.verificationAttempted = true
+  await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+  const verified = await command(config.verifyCommand.map(value => value.replaceAll("{stateDir}", config.stateDir)
+    .replaceAll("{parallel}", String(manifest.parallel)).replaceAll("{verificationDir}", verificationDir)), config.harnessRoot).then(() => true, () => false)
+  journal.cleanupVerified = verified
+  if (verified && journal.verificationDir) journal.attempts = journal.attempts.map(attempt => attempt.cleanupConfirmed
+    ? attempt : { ...attempt, cleanupVerification: journal.verificationDir })
+  await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+  return verified
+}
+
 export async function finalizeCampaign(manifest: CampaignManifest, journal: CampaignJournal,
   config: PublisherConfig & { harnessRoot: string; verifyCommand: string[] }, now = Date.now()) {
   const synced = await syncCampaignIssue(manifest, journal, config).catch(() => undefined)
@@ -186,11 +208,7 @@ export async function finalizeCampaign(manifest: CampaignManifest, journal: Camp
   }
   if (!journal.final) return journal
   if (!journal.cleanupVerified && !journal.verificationAttempted) {
-    journal.verificationAttempted = true
-    await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
-    const verified = await command(config.verifyCommand.map(value => value.replaceAll("{stateDir}", config.stateDir)
-      .replaceAll("{parallel}", String(manifest.parallel))), config.harnessRoot).then(() => true, () => false)
-    if (verified) journal.cleanupVerified = true
+    const verified = await verifyCampaignCleanup(manifest, journal, config)
     if (!verified) {
       journal.blocker = journal.final === "partial" ? journal.blocker ?? "CLEANUP_UNCONFIRMED" : "CLEANUP_UNCONFIRMED"
       journal.blockerKind = "technical"
@@ -213,14 +231,19 @@ export async function finalizeCampaign(manifest: CampaignManifest, journal: Camp
 }
 
 export async function prepareCampaignBatch(manifest: CampaignManifest, journal: CampaignJournal, keys: CampaignKey[], invocation: string,
-  config: Pick<CampaignServerConfig, "harnessRoot" | "slotsFile" | "batchEnvFile" | "resourceBudgetFile" | "corpora"> & { stateDir: string }) {
+  config: Pick<CampaignServerConfig, "harnessRoot" | "slotsFile" | "batchEnvFile" | "resourceBudgetFile" | "corpora" | "controllerLock"> & { stateDir: string }) {
   if (journal.repairing || journal.final || journal.blocker || journal.executor !== manifest.executor) throw Error("CAMPAIGN_DISPATCH_BLOCKED")
   const previous = journal.batches.at(-1)
   const batch = previous && !previous.accounted ? previous : {
     id: `${manifest.id}-${crypto.randomUUID()}`, keys, invocationBefore: invocation, started: false,
     resultsDir: path.join(config.stateDir, "batches", String(journal.batches.length + 1)),
   }
-  if (batch !== previous) journal.batches.push(batch)
+  if (batch !== previous) {
+    journal.batches.push(batch)
+    delete journal.cleanupVerified
+    delete journal.verificationAttempted
+    delete journal.verificationDir
+  }
   await mkdir(batch.resultsDir, { recursive: true, mode: 0o700 })
   await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
   const corpus = config.corpora[batch.keys[0]!.corpus]
@@ -230,7 +253,9 @@ export async function prepareCampaignBatch(manifest: CampaignManifest, journal: 
   const environment = { ...campaignEnvironment(manifest, config), EVAL_ENTRYPOINT: entrypoint, EVAL_TASKS: tasks,
     EVAL_ONLY: batch.keys.map(key => key.taskId).join(","), EVAL_LABEL: batch.id, EVAL_RESULTS_DIR: batch.resultsDir,
     EVAL_CAMPAIGN_CONSECUTIVE_ERRORS: journal.consecutiveErrors, EVAL_CAMPAIGN_ERROR_LIMIT: campaignLimits(manifest).consecutiveErrors,
-    EVAL_CAMPAIGN_LAST_PROGRESS_AT: journal.lastProgressAt, EVAL_CAMPAIGN_NO_PROGRESS_MS: campaignLimits(manifest).noProgressMs }
+    EVAL_CAMPAIGN_LAST_PROGRESS_AT: journal.lastProgressAt, EVAL_CAMPAIGN_NO_PROGRESS_MS: campaignLimits(manifest).noProgressMs,
+    EVAL_CAMPAIGN_JOURNAL: path.join(config.stateDir, "journal.json"), EVAL_CAMPAIGN_LOCK: config.controllerLock,
+    EVAL_CAMPAIGN_MANIFEST_HASH: journal.manifestHash }
   const temporary = `${config.batchEnvFile}.${crypto.randomUUID()}.tmp`
   await Bun.write(temporary, Object.entries(environment).map(([key, value]) => `${key}=${JSON.stringify(String(value))}`).join("\n") + "\n", { mode: 0o600 })
   await rename(temporary, config.batchEnvFile)
@@ -332,7 +357,7 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
             completedAt,
             cleanupConfirmed: result.environment_cleanup?.status === "confirmed" && cleanup?.processes?.status === "confirmed" && cleanup?.nextAdmissionAllowed === true }
           const index = journal.attempts.findIndex(attempt => attempt.resultFile === resultFile)
-          if (index >= 0) journal.attempts[index] = entry
+          if (index >= 0) journal.attempts[index] = { ...entry, cleanupVerification: journal.attempts[index]!.cleanupVerification }
           if (index < 0) {
             journal.attempts.push(entry)
             completed.push({ entry, order: completion?.completionOrder })
@@ -374,7 +399,7 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
     journal.blocker = "ATTEMPT_BUDGET_EXHAUSTED"
     return { journal, action: "finalize" as const, next: [] }
   }
-  if (journal.attempts.some(attempt => !attempt.cleanupConfirmed) && !journal.cleanupVerified) journal.blocker ??= "CLEANUP_UNCONFIRMED"
+  if (journal.attempts.some(attempt => !attempt.cleanupConfirmed && !attempt.cleanupVerification) && !journal.cleanupVerified) journal.blocker ??= "CLEANUP_UNCONFIRMED"
   if (journal.repairing || journal.blocker) return { journal, action: "blocked" as const, next: [] }
   if (pending) return { journal, action: "launch" as const, next: pending }
   if (!missing.length) {
@@ -413,18 +438,16 @@ async function observeUnit(unit: string, cwd: string): Promise<UnitState> {
     invocation: fields.InvocationID ?? "", exitCode: Number(fields.ExecMainStatus) }
 }
 
-async function controllerLock(file: string) {
-  const { dlopen } = await import("bun:ffi")
-  const library = dlopen("libc.so.6", { flock: { args: ["i32", "i32"], returns: "i32" } })
-  const handle = await open(file, constants.O_CREAT | constants.O_RDWR | constants.O_NOFOLLOW, 0o600)
-  if (library.symbols.flock(handle.fd, 2 | 4) !== 0) { await handle.close(); library.close(); throw Error("CAMPAIGN_BUSY") }
-  return async () => { await handle.close(); library.close() }
+export async function controlCampaign(manifestFile: string, serverFile: string, operation: "reserve" | "repair" | "resume", repairer?: string) {
+  return runCampaign(manifestFile, serverFile, true, operation, repairer)
 }
 
-export async function runCampaign(manifestFile: string, serverFile: string, once = false) {
+export async function runCampaign(manifestFile: string, serverFile: string, once = false, operation?: string, repairer?: string) {
+  if (operation !== undefined && !["reserve", "repair", "resume"].includes(operation)) throw Error("CAMPAIGN_OPERATION_INVALID")
   const manifest = await readLeaseReceipt(manifestFile) as CampaignManifest
   const config = await readLeaseReceipt(serverFile) as CampaignServerConfig
   const safeId = (value: unknown) => typeof value === "string" && /^[a-zA-Z0-9_-]+$/.test(value)
+  if (operation && operation !== "reserve" && !safeId(repairer)) throw Error("CAMPAIGN_REPAIRER_REQUIRED")
   if (!safeId(manifest.id) || manifest.server !== config.server || !manifest.executor || !manifest.keys?.length ||
     !Number.isSafeInteger(manifest.parallel) || manifest.parallel < 1 || !Number.isSafeInteger(manifest.batchSize) || manifest.batchSize < 1 ||
     manifest.keys.some(key => !safeId(key.corpus) || !safeId(key.taskId) || !Number.isSafeInteger(key.round) || key.round < 1) ||
@@ -444,31 +467,137 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
   const manifestHash = new Bun.CryptoHasher("sha256").update(JSON.stringify(manifest)).digest("hex")
   const unitName = config.batchUnit.replace("{parallel}", String(manifest.parallel))
   const publication = { stateDir, multica: { ...config.multica, issueId: manifest.issueId } }
+  const ownerFile = path.join(config.stateRoot, "owner.json")
+  const claim = async () => {
+    await writeLeaseReceipt(path.join(stateDir, "manifest.json"), manifest)
+    await writeLeaseReceipt(ownerFile, { campaignId: manifest.id })
+  }
+  const release = async (journal: CampaignJournal) => {
+    if (!journal.final || !journal.cleanupVerified || !await Bun.file(ownerFile).exists()) return
+    if ((await readLeaseReceipt(ownerFile) as { campaignId: string }).campaignId === manifest.id) await unlink(ownerFile)
+  }
+  const settle = async (journal: CampaignJournal, unit: UnitState | undefined) => {
+    if (!journal.cleanupVerified) {
+      if (!unit || unit.active) return false
+      if (!config.verifyCommand.some(value => value.includes("{verificationDir}"))) throw Error("CAMPAIGN_FRESH_VERIFICATION_UNCONFIGURED")
+      await verifyCampaignCleanup(manifest, journal, { ...publication, harnessRoot: config.harnessRoot, verifyCommand: config.verifyCommand })
+    }
+    await release(journal)
+    return true
+  }
+  let entering = true
   do {
-    const unlock = await controllerLock(config.controllerLock)
+    const unlock = await tryCampaignLock(config.controllerLock)
+    if (!unlock) throw Error("CAMPAIGN_BUSY")
     try {
       const exists = await Bun.file(journalFile).exists()
-      const previous: CampaignJournal = exists ? await readLeaseReceipt(journalFile) as CampaignJournal : {
+      let previous: CampaignJournal = exists ? await readLeaseReceipt(journalFile) as CampaignJournal : {
         manifestHash, server: config.server, campaignId: manifest.id, executor: manifest.executor, repairing: false, repairer: null,
         batches: [], attempts: [], lastProgressAt: Date.now(), consecutiveErrors: 0,
       }
       if (previous.manifestHash !== manifestHash) throw Error("CAMPAIGN_MANIFEST_CHANGED")
-      if (previous.published) return previous
+      const owner = await Bun.file(ownerFile).exists() ? await readLeaseReceipt(ownerFile) as { campaignId: string } : undefined
+      if (owner && !safeId(owner.campaignId)) throw Error("CAMPAIGN_OWNER_INVALID")
+      if (owner && owner.campaignId !== manifest.id && !previous.final) throw Error("CAMPAIGN_SERVER_BUSY")
+      if (operation === "reserve") {
+        if (previous.final || previous.published) throw Error("CAMPAIGN_FINAL")
+        if (owner?.campaignId === manifest.id) {
+          if (!exists) throw Error("CAMPAIGN_OWNER_STATE_MISSING")
+          return previous
+        }
+        const unit = await observeUnit(unitName, config.harnessRoot)
+        if (unit.active) throw Error("CAMPAIGN_SERVER_BUSY")
+        const first = manifest.keys[0]!
+        await command([...config.preflightCommand, "--server", serverFile, "--manifest", manifestFile,
+          first.corpus, manifest.keys.filter(key => key.corpus === first.corpus && key.round === first.round).map(key => key.taskId).join(","),
+          String(first.round), String(manifest.parallel)], config.harnessRoot)
+        if (!exists) await writeLeaseReceipt(journalFile, previous)
+        await claim()
+        return previous
+      }
+      if ((operation === "repair" || operation === "resume") && exists) {
+        await syncCampaignIssue(manifest, previous, publication).catch(() => { previous.reportingError = "MULTICA_UNAVAILABLE" })
+        if (previous.published) {
+          const unit = previous.cleanupVerified || owner && owner.campaignId !== manifest.id ? undefined : await observeUnit(unitName, config.harnessRoot).catch(() => undefined)
+          await settle(previous, unit)
+          return previous
+        }
+      }
+      if (operation === "repair") {
+        if (!exists || owner?.campaignId !== manifest.id) throw Error("CAMPAIGN_OWNER_MISMATCH")
+        if (previous.repairing && previous.repairer !== repairer) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
+        previous = (await campaignTick(manifest, previous, await observeUnit(unitName, config.harnessRoot))).journal
+        if (previous.final) {
+          previous.repairing = false
+          previous.repairer = null
+          await writeLeaseReceipt(journalFile, previous)
+          return previous
+        }
+        previous.repairing = true
+        previous.repairer = repairer!
+        await writeLeaseReceipt(journalFile, previous)
+        return previous
+      }
+      if (operation === "resume") {
+        if (!exists) throw Error("CAMPAIGN_OWNER_STATE_MISSING")
+        if (!previous.repairing && !previous.blocker) { await release(previous); return previous }
+        if (owner?.campaignId !== manifest.id) throw Error("CAMPAIGN_OWNER_MISMATCH")
+        if (!previous.repairing || previous.repairer !== repairer) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
+        const unit = await observeUnit(unitName, config.harnessRoot)
+        if (unit.active) throw Error("CAMPAIGN_BATCH_ACTIVE")
+        const checked = await campaignTick(manifest, { ...previous, repairing: false, blocker: undefined, blockerKind: undefined }, unit)
+        previous = { ...checked.journal, repairing: true, repairer: repairer! }
+        if (["CAMPAIGN_RECONCILIATION_FAILED", "ADMISSION_STATE_UNCONFIRMED"].includes(previous.blocker ?? "")) {
+          await writeLeaseReceipt(journalFile, previous)
+          throw Error(previous.blocker)
+        }
+        if (!config.verifyCommand.some(value => value.includes("{verificationDir}"))) throw Error("CAMPAIGN_FRESH_VERIFICATION_UNCONFIGURED")
+        if (!await verifyCampaignCleanup(manifest, previous, { ...publication, harnessRoot: config.harnessRoot, verifyCommand: config.verifyCommand })) {
+          previous.blocker = "CLEANUP_UNCONFIRMED"
+          await writeLeaseReceipt(journalFile, previous)
+          throw Error("CAMPAIGN_CLEANUP_UNCONFIRMED")
+        }
+        const next = manifest.keys.filter(key => !previous.attempts.some(attempt => attempt.counted && keyId(attempt.key) === keyId(key)))
+        if (!previous.final && next.length) {
+          const first = next[0]!
+          await command([...config.preflightCommand, "--server", serverFile, "--manifest", manifestFile, first.corpus,
+            next.filter(key => key.corpus === first.corpus && key.round === first.round).slice(0, manifest.batchSize).map(key => key.taskId).join(","),
+            String(first.round), String(manifest.parallel)], config.harnessRoot)
+        }
+        if (!previous.final && Date.now() - previous.lastProgressAt >= campaignLimits(manifest).noProgressMs) {
+          previous.final = "partial"
+          previous.blocker = "NO_PROGRESS_LIMIT"
+        }
+        if (!previous.final) {
+          previous.consecutiveErrors = 0
+          previous.emptyPreflights = 0
+          delete previous.blocker
+          delete previous.blockerKind
+        }
+        previous.repairing = false
+        previous.repairer = null
+        await writeLeaseReceipt(journalFile, previous)
+        await release(previous)
+        return previous
+      }
       if (!exists) await writeLeaseReceipt(journalFile, previous)
-      const unit = await observeUnit(unitName, config.harnessRoot).catch(() => undefined)
+      const unit = owner && owner.campaignId !== manifest.id ? undefined : await observeUnit(unitName, config.harnessRoot).catch(() => undefined)
+      if (!owner && unit?.active && previous.batches.at(-1) && !previous.batches.at(-1)!.accounted) await claim()
       const tick = await campaignTick(manifest, previous, unit)
       await writeLeaseReceipt(journalFile, tick.journal)
-      if (tick.action !== "wait") {
+      if (entering || tick.action !== "wait") {
+        entering = false
         const synced = await syncCampaignIssue(manifest, tick.journal, publication).then(final => ({ final }), () => null)
-        if (synced?.final) return tick.journal
+        if (synced?.final && await settle(tick.journal, unit)) return tick.journal
         if (!synced) tick.journal.reportingError = "MULTICA_UNAVAILABLE"
-        if (synced) {
+        if (synced && !synced.final) {
           delete tick.journal.reportingError
           if (tick.action === "start" || tick.action === "launch") {
             try {
               const first = tick.next[0]!
               await command([...config.preflightCommand, "--server", serverFile, "--manifest", manifestFile,
                 first.corpus, tick.next.map(key => key.taskId).join(","), String(first.round), String(manifest.parallel)], config.harnessRoot)
+              if (!owner) await claim()
               const batch = await prepareCampaignBatch(manifest, tick.journal, tick.next, unit!.invocation, { ...config, stateDir })
               await command(["sudo", "-n", "systemctl", "start", unitName], config.harnessRoot)
               batch.started = true
@@ -479,14 +608,15 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
             }
           }
         }
-        if (tick.action === "finalize") {
+        if (tick.action === "finalize" && !synced?.final) {
           await (unit ? finalizeCampaign(manifest, tick.journal, { ...publication, harnessRoot: config.harnessRoot, verifyCommand: config.verifyCommand })
             : publishCampaign(manifest, tick.journal, publication)).catch(() => { tick.journal.reportingError = "FINAL_DELIVERY_FAILED" })
           if (!tick.journal.published) await syncCampaignIssue(manifest, tick.journal, publication)
             .catch(() => { tick.journal.reportingError = "MULTICA_UNAVAILABLE" })
         }
         await writeLeaseReceipt(journalFile, tick.journal)
-        if (tick.journal.published) return tick.journal
+        await release(tick.journal)
+        if (tick.journal.published && !synced?.final) return tick.journal
       }
       if (once) return tick.journal
     } finally { await unlock() }
@@ -495,7 +625,10 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
 }
 
 if (import.meta.main) {
-  const args = parseArgs({ args: Bun.argv.slice(2), options: { manifest: { type: "string" }, server: { type: "string" }, once: { type: "boolean" } } }).values
-  if (!args.manifest || !args.server) throw Error("usage: bun script/run-campaign.ts --manifest /private/manifest.json --server /private/server.json [--once]")
-  await runCampaign(args.manifest, args.server, args.once).catch(error => { console.error(error instanceof Error ? error.message : "CAMPAIGN_FAILED"); process.exitCode = 2 })
+  const args = parseArgs({ args: Bun.argv.slice(2), options: { manifest: { type: "string" }, server: { type: "string" }, once: { type: "boolean" },
+    operation: { type: "string" }, repairer: { type: "string" } } }).values
+  if (!args.manifest || !args.server) throw Error("usage: bun script/run-campaign.ts --manifest /private/manifest.json --server /private/server.json [--once | --operation reserve|repair|resume [--repairer agent]]")
+  await runCampaign(args.manifest, args.server, args.once, args.operation, args.repairer)
+    .then(journal => { if (args.operation) console.log(JSON.stringify(journal)) })
+    .catch(error => { console.error(error instanceof Error ? error.message : "CAMPAIGN_FAILED"); process.exitCode = 2 })
 }
