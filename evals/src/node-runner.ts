@@ -2,11 +2,9 @@ import path from "node:path"
 import { main } from "./run"
 import { evalsRoot, loadConfig } from "./config"
 import { loadTasks } from "./task"
-import { requireNodeEvidenceSlot, validateNodeRun } from "./node-evals"
-import { coverageCaseIds, nodeCaseIds } from "./node-cases"
-import { collectNodeNativeEvidence } from "./node-native"
-import { textImportIds, textImportChecks, collectTextImportEvidence, assertTextImportModel } from "./text-import"
-import type { RunSummary } from "./report"
+import { validateNodeRun } from "./node-evals"
+import { nodeCaseIds } from "./node-cases"
+import { textImportIds, textImportChecks, assertTextImportModel } from "./text-import"
 
 export async function runNodeEvals(argv: string[], env: Record<string, string | undefined>) {
   const state = { runDir: null as string | null }
@@ -28,15 +26,6 @@ async function executeNodeEvals(argv: string[], env: Record<string, string | und
   }
   const run = await main(args, env)
   state.runDir = run.runDir
-  const summary=await Bun.file(path.join(run.runDir,"summary.json")).json() as RunSummary
-  for (const task of summary.tasks) for (const attempt of task.attempts) {
-    if (attempt.status !== "completed" || attempt.environment_cleanup?.status !== "confirmed") continue
-    const slot = requireNodeEvidenceSlot(summary, attempt.slot_id)
-    if (task.id === "crosstable-min-max" || coverageCaseIds.includes(task.id))
-      await collectNodeNativeEvidence(path.join(run.runDir, task.id, String(attempt.attempt)), slot?.profileDir ?? config.profileDir, slot?.historyDir)
-    if (textImportIds.includes(task.id))
-      await collectTextImportEvidence(path.join(run.runDir, task.id, String(attempt.attempt)), slot?.profileDir ?? config.profileDir, slot?.historyDir)
-  }
   const verdict = await validateNodeRun(run.runDir, tasks.map((task) => task.id), config.tasksDir)
   await Bun.write(path.join(run.runDir, "code-verdict.json"), JSON.stringify(verdict, null, 2) + "\n")
   await Bun.write(path.join(run.runDir, "code-report.md"), [

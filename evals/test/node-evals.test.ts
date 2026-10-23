@@ -65,6 +65,9 @@ async function writeSummary(file: string, source: string) {
     id: task.id, checklist: [{ id: "crosstable", required: true }],
   }))
   for (const task of summary.tasks ?? []) for (const attempt of task.attempts ?? []) {
+    await Bun.write(path.join(path.dirname(file), task.id, String(attempt.attempt), "result.json"), JSON.stringify({
+      ...emptyResult(task.id, attempt.attempt, false), ...attempt,
+    }))
     if (attempt.environment_cleanup?.status !== "confirmed") continue
     await Bun.write(path.join(path.dirname(file), task.id, String(attempt.attempt), "cleanup.json"), JSON.stringify({
       processes: { status: "confirmed" }, stages: ["processes", "diagnostics", "writer", "ready", "pruning"].map(stage => ({ stage, status: "confirmed" })),
@@ -91,6 +94,7 @@ async function slotRun() {
   await Bun.write(path.join(directory, "cases", id, "task.json"), JSON.stringify({ id, checklist: [{ id: "crosstable", required: true }] }))
   const evidence = path.join(directory, id, "1/cleanup.json")
   await Bun.write(evidence, JSON.stringify(cleanup))
+  await Bun.write(path.join(directory, id, "1/result.json"), JSON.stringify({ ...emptyResult(id, 1, false), ...summary.tasks[0]!.attempts[0] }))
   return { directory, id, summary, cleanup, evidence }
 }
 
@@ -100,6 +104,19 @@ test("v2 cleanup with its own confirmed history archive preserves a failed node 
     const result = await validateNodeRun(context.directory, [context.id], path.join(context.directory, "cases"))
     expect(result).toMatchObject({ verdict: "FAIL", code: 1, errors: [] })
   } finally { await rm(context.directory, { recursive: true }) }
+})
+
+test("the completed node run treats a provider failure as ERROR rather than a quality FAIL", async () => {
+  const context = await slotRun()
+  try {
+    const attempt = { ...emptyResult(context.id, 1, false), status: "failed", failure_kind: "provider", slot_id: "a",
+      environment_cleanup: { status: "confirmed", evidence: "cleanup.json", error: null } }
+    await Bun.write(path.join(context.directory, context.id, "1/result.json"), JSON.stringify(attempt))
+    context.summary.tasks[0]!.attempts[0] = attempt
+    await Bun.write(path.join(context.directory, "summary.json"), JSON.stringify(context.summary))
+    expect(await validateNodeRun(context.directory, [context.id], path.join(context.directory, "cases")))
+      .toMatchObject({ verdict: "ERROR", code: 2 })
+  } finally { await rm(context.directory, { recursive: true, force: true }) }
 })
 
 test.each(["slot-id", "epoch", "foreign-profile", "foreign-archive", "missing-archive", "process-error", "capture-incomplete",
@@ -134,6 +151,9 @@ test("v2 confirmed cleanup still requires the completed node artifact", async ()
   try {
     context.summary.tasks[0]!.attempts[0]!.status = "completed"
     await Bun.write(path.join(context.directory, "summary.json"), JSON.stringify(context.summary))
+    await Bun.write(path.join(context.directory, context.id, "1/result.json"), JSON.stringify({
+      ...emptyResult(context.id, 1, false), ...context.summary.tasks[0]!.attempts[0],
+    }))
     const result = await validateNodeRun(context.directory, [context.id], path.join(context.directory, "cases"))
     expect(result).toMatchObject({ verdict: "FAIL", code: 1, errors: [] })
     expect(result.failures.join(" ")).toContain("missing artifact/package.lgp")
