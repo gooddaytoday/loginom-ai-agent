@@ -144,7 +144,8 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
    guard();
    if(attempt&&options.root_ref){
     const roots=await read({discover_roots:true,...(options.storage_name?{storage_name:options.storage_name}:{})});
-    need(roots.ui.elements.filter(e=>e.ref===options.root_ref).length===1,'Export observation root changed during scan refresh');
+    const matches=roots.ui.elements.filter(e=>e.ref===options.root_ref);
+    need(matches.length===1&&roots.ui.elements.filter(e=>e.tid===matches[0].tid).length===1,'Export observation root changed during scan refresh');
    }
    guard();const r=await execute(makeWorkspaceUiCode({mode:'observe',...base,...options}));
    if(r.status!=='SUCCEEDED'){
