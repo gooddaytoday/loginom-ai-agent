@@ -1,7 +1,7 @@
 import { EvalFailure } from "./fail"
 import path from "node:path"
 import { lstat, readdir, unlink } from "node:fs/promises"
-import { globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "./lease"
+import { globalLockRoot, readLeaseReceipt, readResourceReservation, writeLeaseReceipt } from "./lease"
 import { closeUserSessions, openLoginomAdmin } from "./loginom-admin"
 import { inspectAbsentUserStorage, verifyParallelPair } from "./parallel-pair"
 import { assertProfileClean, waitProfileIdle } from "./profile"
@@ -12,6 +12,36 @@ import { reopenEnvironmentLeases, type ServerIdentity, type SlotFile, type SlotL
 type StartupRecovery = {
   unitBinding: UnitBinding; owner: UnitBinding["producer"] & { bootId: string }; lease: SlotLease
   server: NonNullable<Awaited<ReturnType<typeof reopenEnvironmentLeases>>>["server"]
+}
+
+export async function releaseClosedEnvironment(file: SlotFile, identity: ServerIdentity, lockRoot = globalLockRoot) {
+  const environment = await reopenEnvironmentLeases(file, identity, lockRoot)
+  try {
+    if (environment?.slots.length) throw new EvalFailure("STARTUP_FINAL_PROOFS_UNCONFIRMED", 2)
+    const keys = [...file.slots.map(slot => `profile:${slot.profileDir}`), ...(environment ? [] : [`server:${identity.containerId}`])]
+    for (const key of keys) {
+      const reservation = await readResourceReservation({ key, lockRoot })
+      if (reservation?.state !== "released" || JSON.stringify(reservation.identity) !== JSON.stringify(identity))
+        throw new EvalFailure("STARTUP_FINAL_PROOFS_UNCONFIRMED", 2)
+      const proof = await readLeaseReceipt(reservation.releaseEvidence!.path)
+      if (new Bun.CryptoHasher("sha256").update(JSON.stringify(proof)).digest("hex") !== reservation.releaseEvidence!.sha256)
+        throw new EvalFailure("STARTUP_FINAL_PROOFS_UNCONFIRMED", 2)
+    }
+    if (!environment) return
+    const reservation = environment.server.reservation
+    const proofs = [
+      { file: path.join(file.controller.stateDir, `cleanup-${reservation.commandId}-server.json`), reasons: ["run-slots-clean", "prepared-environment-clean"] },
+      { file: path.join(file.controller.stateDir, `startup-${reservation.token}-server.json`), reasons: ["startup-slots-clean"] },
+    ]
+    for (const proof of proofs) {
+      if (!await Bun.file(proof.file).exists()) continue
+      const evidence = await readLeaseReceipt(proof.file) as { reason?: string }
+      if (!evidence || !proof.reasons.includes(evidence.reason ?? "")) throw new EvalFailure("STARTUP_FINAL_PROOFS_UNCONFIRMED", 2)
+      await environment.server.release(proof.file)
+      return
+    }
+    throw new EvalFailure("STARTUP_FINAL_PROOFS_UNCONFIRMED", 2)
+  } finally { if (environment) await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())]) }
 }
 
 export async function reconcileEnvironment(file: SlotFile, identity: ServerIdentity, binary: string, lockRoot = globalLockRoot) {
