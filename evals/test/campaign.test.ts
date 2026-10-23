@@ -3,7 +3,15 @@ import os from "node:os"
 import path from "node:path"
 import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { emptyResult } from "../src/run"
+import { writeLeaseReceipt } from "../src/lease"
 import { campaignEnvironment, campaignTick, prepareCampaignBatch, publishCampaign, type CampaignManifest, type CampaignJournal } from "../script/run-campaign"
+
+async function admitRun(runDir: string, taskIds: string[]) {
+  const commandJournal = path.join(runDir, "native-command.json")
+  await writeLeaseReceipt(commandJournal, { version: 2, kind: "unactivated-preparation", runDir,
+    attempts: taskIds.map(taskId => ({ taskId, attempt: 1, purpose: "measurement" })) })
+  await writeLeaseReceipt(path.join(runDir, "config.json"), { commandJournal })
+}
 
 test("campaign uses explicit experiment pins and canonical server paths for both preflight and dispatch", () => {
   const manifest: CampaignManifest = { id: "pins", server: "runner2", executor: "EvalBaseline", parallel: 1, batchSize: 1,
@@ -32,6 +40,7 @@ test("campaign accounts a saved quality FAIL without summary and selects only th
       score: 0, pass: false, judge_status: "no_artifact", harness_error: null, interrupted: false,
       environment_cleanup: { status: "confirmed", evidence: "cleanup.json", error: null } }))
     await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ processes: { status: "confirmed" }, nextAdmissionAllowed: true }))
+    await admitRun(path.dirname(path.dirname(out)), ["first"])
     const state: CampaignJournal = { manifestHash: "test", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
       repairing: false, repairer: null, batches: [batch], attempts: [], lastProgressAt: 1000, consecutiveErrors: 0 }
     const tick = await campaignTick(manifest, state, { active: false, invocation: "finished", exitCode: 0 }, 2000)
@@ -67,6 +76,7 @@ test("campaign retains quality with telemetry gaps but rejects an observed resou
       judge_status: "no_artifact", harness_error: null, environment_cleanup: { status: "confirmed", evidence: "cleanup.json", error: null } }
     await Bun.write(path.join(out, "result.json"), JSON.stringify(result))
     await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ processes: { status: "confirmed" }, nextAdmissionAllowed: true }))
+    await admitRun(path.dirname(path.dirname(out)), ["first"])
     const state: CampaignJournal = { manifestHash: "test", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
       repairing: false, repairer: null, batches: [batch], attempts: [], lastProgressAt: 1000, consecutiveErrors: 0 }
     for (const [status, code, counted] of [["incomplete", "RESOURCE_OBSERVATIONS_INCOMPLETE", true], ["failed", "RESOURCE_BUDGET_EXCEEDED", false]] as const) {
@@ -99,6 +109,10 @@ test("campaign durably records a batch before exposing its parameters and reuses
     expect(env).toContain(`EVAL_TASKS=${JSON.stringify(path.join(config.harnessRoot, "tasks"))}`)
     expect(env).toContain(`EVAL_SLOTS_FILE=${JSON.stringify(config.slotsFile)}`)
     expect(env).toContain(`EVAL_RESULTS_DIR=${JSON.stringify(batch.resultsDir)}`)
+    expect(env).toContain('EVAL_CAMPAIGN_CONSECUTIVE_ERRORS="0"')
+    expect(env).toContain('EVAL_CAMPAIGN_ERROR_LIMIT="3"')
+    expect(env).toContain('EVAL_CAMPAIGN_LAST_PROGRESS_AT="1000"')
+    expect(env).toContain('EVAL_CAMPAIGN_NO_PROGRESS_MS="86400000"')
     expect((await prepareCampaignBatch(manifest, state, manifest.keys, "old-unit", config)).id).toBe(batch.id)
     expect(state.batches).toHaveLength(1)
     config.corpora.ordinary.entrypoint = "/old/harness/src/run.ts"
@@ -120,6 +134,7 @@ test("three consecutive empty request preflights block a campaign without spendi
       const resultsDir = path.join(root, String(failure))
       await mkdir(path.join(resultsDir, "run"), { recursive: true })
       await Bun.write(path.join(resultsDir, "run/request-preflight.json"), JSON.stringify({ code: failures[failure - 1], evidence: "run.json" }))
+      await admitRun(path.join(resultsDir, "run"), [])
       state.batches.push({ id: `probe-${failure}`, keys: manifest.keys, resultsDir, invocationBefore: "prior", started: true })
       const tick = await campaignTick(manifest, state, { active: false, invocation: `probe-${failure}`, exitCode: 2 }, 2000 + failure)
       expect(tick.action).toBe(failure < failures.length ? "start" : "blocked")
@@ -176,7 +191,7 @@ test("campaign publishes its saved FAIL once and reads back the final issue and 
       keys: [{ corpus: "ordinary", taskId: "first", round: 1 }], pins: {}, wakeupIds: ["timer"] }
     const journal: CampaignJournal = { manifestHash: "test", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
       repairing: false, repairer: null, batches: [], attempts: [{ key: manifest.keys[0]!, resultFile: "/saved/result.json", status: "no_artifact",
-        counted: true, pass: false, score: 0, cleanupConfirmed: true, resources: { status: "incomplete", codes: ["RESOURCE_OBSERVATIONS_INCOMPLETE"] } }], lastProgressAt: 1000, consecutiveErrors: 0, final: "full" }
+        counted: true, pass: false, score: 0, cleanupConfirmed: true, resources: { status: "incomplete", codes: ["RESOURCE_OBSERVATIONS_INCOMPLETE"] } }], lastProgressAt: 1000, consecutiveErrors: 0, final: "full", cleanupVerified: true }
     await Bun.write(path.join(root, "token"), "fixture-token", { mode: 0o600 })
     const config = { stateDir: root, multica: { url: `http://127.0.0.1:${server.port}`, workspace: "lab", issueId: "issue", tokenFile: path.join(root, "token") } }
     await publishCampaign(manifest, journal, config)

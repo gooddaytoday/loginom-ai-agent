@@ -74,6 +74,11 @@ export type AttemptResult = {
   stderr_head: string | null
 }
 
+export function isQualityResult(result: Pick<AttemptResult, "status" | "failure_kind" | "harness_error" | "pass" | "judge_status">) {
+  return !["infra_error", "harness_error", "interrupted"].includes(result.status) && result.failure_kind !== "provider" &&
+    !result.harness_error && typeof result.pass === "boolean" && ["scored", "no_artifact"].includes(result.judge_status)
+}
+
 const round = (value: number, digits: number) => Math.round(value * 10 ** digits) / 10 ** digits
 const mean = (values: number[]) =>
   values.length ? round(values.reduce((sum, value) => sum + value, 0) / values.length, 1) : null

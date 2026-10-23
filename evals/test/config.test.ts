@@ -11,6 +11,17 @@ const full = {
   JUDGE_MODEL: "gpt-6-astra",
 }
 
+test("loadConfig: campaign admission state is explicit and complete", () => {
+  const env = { EVAL_CAMPAIGN_CONSECUTIVE_ERRORS: "2", EVAL_CAMPAIGN_ERROR_LIMIT: "3", EVAL_CAMPAIGN_LAST_PROGRESS_AT: "1000", EVAL_CAMPAIGN_NO_PROGRESS_MS: "86400000" }
+  expect(loadConfig([], full).campaign).toBeUndefined()
+  expect(loadConfig([], { ...full, ...env }).campaign).toEqual({ consecutiveErrors: 2, errorLimit: 3, lastProgressAt: 1000, noProgressMs: 86400000 })
+  expect(loadConfig([], { ...full, ...env, EVAL_CAMPAIGN_CONSECUTIVE_ERRORS: "0" }).campaign?.consecutiveErrors).toBe(0)
+  for (const name of Object.keys(env)) expect(() => loadConfig([], { ...full, ...env, [name]: undefined })).toThrow("EVAL_CAMPAIGN_STATE")
+  for (const [name, value] of Object.entries({ ...env, EVAL_CAMPAIGN_CONSECUTIVE_ERRORS: "-1", EVAL_CAMPAIGN_ERROR_LIMIT: "0", EVAL_CAMPAIGN_LAST_PROGRESS_AT: "NaN", EVAL_CAMPAIGN_NO_PROGRESS_MS: "9007199254740992" })) {
+    expect(() => loadConfig([], { ...full, ...env, [name]: value })).toThrow(name)
+  }
+})
+
 test("loadConfig: parallel selects slots v2 and defaults to legacy singleton", () => {
   expect(loadConfig([], full)).toMatchObject({ parallel: 1, slotsFile: undefined })
   expect(loadConfig(["--parallel", "2"], { ...full, EVAL_SLOTS_FILE: "/private/slots.json" })).toMatchObject({ parallel: 2, slotsFile: "/private/slots.json" })

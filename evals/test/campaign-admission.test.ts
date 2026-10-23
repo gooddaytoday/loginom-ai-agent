@@ -1,0 +1,100 @@
+import { expect, test } from "bun:test"
+import { isQualityResult } from "../src/report"
+import { emptyResult } from "../src/run"
+import { createCampaignAdmission } from "../src/prepared-run"
+import { buildJobs, runSlotQueue } from "../src/scheduler"
+
+test("campaign admission stops at the seeded third infrastructure completion and drains a healthy slot", async () => {
+  const started = Promise.withResolvers<void>(), third = Promise.withResolvers<void>(), healthy = Promise.withResolvers<void>()
+  const execution = new AbortController()
+  const admissions: { index: number; completedAt?: number; completionOrder?: number; quality?: boolean }[] = []
+  let saved: unknown
+  const admission = createCampaignAdmission({ consecutiveErrors: 2, errorLimit: 3, lastProgressAt: Date.now(), noProgressMs: 60_000 }, async state => { saved = structuredClone({ ...state, attempts: admissions }) })
+  const pending = runSlotQueue({ jobs: buildJobs(["task"], 5), slots: ["broken", "healthy"], signal: AbortSignal.any([execution.signal, admission.signal]),
+    async execute(slot, job) {
+      const entry: (typeof admissions)[number] = { index: job.index }
+      admissions.push(entry)
+      if (slot === "broken") { await started.promise; await admission.complete(entry, false); third.resolve() }
+      else { started.resolve(); await healthy.promise; expect(execution.signal.aborted).toBe(false); await admission.complete(entry, true) }
+      return { result: job.index, quarantine: false }
+    } })
+  try {
+    await third.promise
+    expect(admission.signal.aborted).toBe(true)
+    expect(saved).toMatchObject({ admissionBlocker: "CONSECUTIVE_INFRASTRUCTURE_ERRORS", consecutiveErrors: 3, attempts: [{ index: 0, quality: false, completionOrder: 1 }, { index: 1 }] })
+    healthy.resolve()
+    const finished = await pending
+    expect(finished.results.map(row => row.result)).toEqual([0, 1])
+    expect(finished.unassigned.map(job => job.index)).toEqual([2, 3, 4])
+    expect(saved).toMatchObject({ admissionBlocker: "CONSECUTIVE_INFRASTRUCTURE_ERRORS", consecutiveErrors: 0, attempts: [{ index: 0, quality: false, completionOrder: 1 }, { index: 1, quality: true, completionOrder: 2 }] })
+    expect(admission.signal.aborted).toBe(true)
+  } finally { started.resolve(); healthy.resolve(); await pending; await admission.close() }
+})
+
+test("campaign no-progress deadline closes only new admissions and a late result remains saved", async () => {
+  const finish = Promise.withResolvers<void>(), started = Promise.withResolvers<void>()
+  const execution = new AbortController()
+  let saved: unknown
+  const admission = createCampaignAdmission({ consecutiveErrors: 0, errorLimit: 3, lastProgressAt: Date.now(), noProgressMs: 20 }, async state => { saved = state })
+  const pending = runSlotQueue({ jobs: buildJobs(["task"], 2), slots: ["healthy"], signal: AbortSignal.any([execution.signal, admission.signal]),
+    async execute(_slot, job) {
+      started.resolve()
+      await finish.promise
+      expect(execution.signal.aborted).toBe(false)
+      await admission.complete({}, true)
+      return { result: job.index, quarantine: false }
+    } })
+  try {
+    await started.promise
+    await Promise.race([new Promise(resolve => admission.signal.addEventListener("abort", resolve, { once: true })), Bun.sleep(100)])
+    expect(admission.signal.aborted).toBe(true)
+    await Bun.sleep(0)
+    expect(saved).toMatchObject({ admissionBlocker: "NO_PROGRESS_LIMIT" })
+    finish.resolve()
+    const run = await pending
+    expect(run.results.map(row => row.result)).toEqual([0])
+    expect(run.unassigned.map(row => row.index)).toEqual([1])
+    expect(saved).toMatchObject({ admissionBlocker: "NO_PROGRESS_LIMIT", consecutiveErrors: 0 })
+  } finally { finish.resolve(); await pending; await admission.close() }
+})
+
+test("only a quality result advances the campaign deadline", async () => {
+  const admission = createCampaignAdmission({ consecutiveErrors: 1, errorLimit: 10, lastProgressAt: Date.now() - 250, noProgressMs: 300 }, async () => {})
+  try {
+    await admission.complete({}, isQualityResult({ ...emptyResult("task", 1, false), status: "completed", judge_status: "scored", pass: false }))
+    await Bun.sleep(80)
+    expect(admission.signal.aborted).toBe(false)
+    await admission.complete({}, false)
+    await Promise.race([new Promise(resolve => admission.signal.addEventListener("abort", resolve, { once: true })), Bun.sleep(400)])
+    expect(admission.signal.reason).toBe("NO_PROGRESS_LIMIT")
+  } finally { await admission.close() }
+})
+
+test("a completed attempt is persisted before its slot can admit the next job", async () => {
+  const save = Promise.withResolvers<void>(), writing = Promise.withResolvers<void>()
+  const starts: number[] = []
+  const admission = createCampaignAdmission(undefined, async () => { writing.resolve(); await save.promise })
+  const pending = runSlotQueue({ jobs: buildJobs(["task"], 2), slots: ["slot"], signal: admission.signal,
+    async execute(_slot, job) {
+      starts.push(job.index)
+      await admission.complete({}, true)
+      return { result: job.index, quarantine: false }
+    } })
+  try {
+    await writing.promise
+    expect(starts).toEqual([0])
+    save.resolve()
+    expect((await pending).results.map(row => row.result)).toEqual([0, 1])
+  } finally { save.resolve(); await pending; await admission.close() }
+})
+
+test("campaign quality includes scored FAIL and excludes technical failure", () => {
+  const qualityFail = { ...emptyResult("task", 1, false), status: "completed" as const, judge_status: "scored" as const, pass: false, score: 0 }
+  expect(isQualityResult(qualityFail)).toBe(true)
+  expect(isQualityResult({ ...qualityFail, judge_status: "no_artifact" })).toBe(true)
+  expect(isQualityResult({ ...qualityFail, pass: null })).toBe(false)
+  expect(isQualityResult({ ...qualityFail, failure_kind: "provider" })).toBe(false)
+  expect(isQualityResult({ ...qualityFail, harness_error: "broken harness" })).toBe(false)
+  for (const status of ["infra_error", "harness_error", "interrupted"] as const) expect(isQualityResult({ ...qualityFail, status })).toBe(false)
+  expect(isQualityResult({ ...qualityFail, judge_status: "error" })).toBe(false)
+})
