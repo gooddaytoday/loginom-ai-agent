@@ -17,7 +17,7 @@ type AccountedAttempt = {
 export type CampaignJournal = {
   manifestHash: string; server: string; campaignId: string; executor: string; repairing: boolean; repairer: string | null
   batches: Batch[]; attempts: AccountedAttempt[]; lastProgressAt: number; consecutiveErrors: number
-  blocker?: string; final?: "full" | "partial"; published?: boolean; reportCommentId?: string; attachmentId?: string
+  blocker?: string; final?: "full" | "partial"; published?: boolean; reportCommentId?: string; attachmentId?: string; cleanupVerified?: boolean
 }
 type UnitState = { active: boolean; invocation: string; exitCode: number }
 const keyId = (key: CampaignKey) => `${key.corpus}/${key.taskId}/${key.round}`
@@ -53,7 +53,8 @@ export async function publishCampaign(manifest: CampaignManifest, journal: Campa
   if (!(await Bun.file(archive).exists())) {
     await writeLeaseReceipt(path.join(config.stateDir, "manifest.json"), manifest)
     await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
-    const files = ["manifest.json", "journal.json", "report.md", ...(await readdir(config.stateDir)).includes("batches") ? ["batches"] : []]
+    const directories = await readdir(config.stateDir)
+    const files = ["manifest.json", "journal.json", "report.md", ...["batches", "verification"].filter(name => directories.includes(name))]
     await command(["tar", "--exclude=*.secret.json", "-czf", archive, ...files], config.stateDir)
   }
   const digest = (bytes: ArrayBuffer) => new Bun.CryptoHasher("sha256").update(bytes).digest("hex")
@@ -245,7 +246,11 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
         await writeLeaseReceipt(journalFile, tick.journal)
       }
       if (tick.action === "finalize") {
-        await command(config.verifyCommand, config.harnessRoot)
+        if (!tick.journal.cleanupVerified) {
+          await command(config.verifyCommand.map(arg => arg.replaceAll("{stateDir}", stateDir)), config.harnessRoot)
+          tick.journal.cleanupVerified = true
+          await writeLeaseReceipt(journalFile, tick.journal)
+        }
         await publishCampaign(manifest, tick.journal, publication)
         return tick.journal
       }
