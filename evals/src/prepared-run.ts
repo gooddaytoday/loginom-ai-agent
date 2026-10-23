@@ -16,7 +16,7 @@ import { sampleHostResources } from "./parallel-resources"
 import { readServerIdentity } from "./parallel-pair"
 import { preflight, requestPreflight, gitInfo, type Environment } from "./preflight"
 import { assertAuth, verifyProfile } from "./profile"
-import type { ProcessCleanup } from "./process-supervisor"
+import { captureUnitBinding, type ProcessCleanup } from "./process-supervisor"
 import { aggregate, aggregateLimits, aggregateTask, renderReport, writeSummary, type AttemptResult, type RunSummary } from "./report"
 import { describe, emptyResult, installSigint, redact, runAttempt, stamp } from "./run"
 import { reserveRunDirectory } from "./run-directory"
@@ -52,8 +52,9 @@ export async function runPreparedSlots(config: EvalConfig) {
   const runDir = await reserveRunDirectory(config.resultsDir, `${stamp(started)}-${git?.sha ?? "nogit"}${git?.dirty ? "-dirty" : ""}`)
   const runId = path.basename(runDir), commandId = crypto.randomUUID()
   const journal = path.join(file.controller.stateDir, `run-command-${commandId}.json`)
-  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId, identity, phase: "cli_admitted", runDir,
-    slotIds: file.slots.slice(0, config.parallel).map(slot => slot.id) })
+  const commandJournal = { version: 2, kind: "unactivated-preparation", commandId, identity, phase: "cli_admitted", runDir,
+    unitBinding: await captureUnitBinding(), slotIds: file.slots.slice(0, config.parallel).map(slot => slot.id) }
+  await writeLeaseReceipt(journal, commandJournal)
   const budgetFile = path.join(runDir, "resource-budget.json")
   const budget = await freezeResourceBudget({ out: budgetFile, runId, bounds })
   await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2))
@@ -66,8 +67,13 @@ export async function runPreparedSlots(config: EvalConfig) {
   let metadata: Environment = { git, agent: null, codex: null, dock: null, loginom: null }
   let judge: Awaited<ReturnType<typeof judgeInfo>> | null = null, stopped: string | null = null
   let judgeConfirmed = true, dispatchStarted = "", executionFinished = ""
-  const admissions: { slotId: string; taskId: string; attempt: number }[] = []
+  const admissions: { slotId: string; taskId: string; attempt: number; purpose: "preflight" | "measurement" }[] = []
   let admissionWrite = Promise.resolve()
+  const admit = (slotId: string, taskId: string, attempt: number, purpose: "preflight" | "measurement") => {
+    admissions.push({ slotId, taskId, attempt, purpose })
+    admissionWrite = admissionWrite.then(() => writeLeaseReceipt(journal, { ...commandJournal, attempts: [...admissions] }))
+    return admissionWrite
+  }
   try {
     admin = await openLoginomAdmin(file, identity, { serverLease: environment.server, binary: config.agent.cliBin })
     judgeLease = await acquireJudgeLease({ codexHome: file.judge.codexHome, journal, commandId })
@@ -101,9 +107,11 @@ export async function runPreparedSlots(config: EvalConfig) {
       await mkdir(out, { recursive: true, mode: 0o700 })
       await mkdir(workdir, { recursive: true, mode: 0o700 })
       context.confirmed = false
+      await admit(context.lease.slot.id, taskId, 1, "preflight")
       const probe = await requestPreflight({ command: context.command, taskId, model: context.config.agent.model, variant: context.config.agent.variant,
         workdir, outDir: out, profileDir: context.config.profileDir, slotId: context.lease.slot.id,
         timeoutMs: Math.min(...tasks.map(task => taskTimeoutMs(config, task))), signal: controller.signal })
+      await writeLeaseReceipt(path.join(out, "cleanup.json"), { processes: probe.run.processCleanup, nextAdmissionAllowed: false })
       const cleanup = await cleanupSlotStorage(file, environment.server, context.lease, admin, probe.run.processCleanup, [`eval-${runId}-${taskId}-1`], [out])
       await writeSlotCleanup(context, cleanup)
       await writeLeaseReceipt(path.join(out, "cleanup.json"), { processes: probe.run.processCleanup, ...cleanup, nextAdmissionAllowed: true })
@@ -123,10 +131,7 @@ export async function runPreparedSlots(config: EvalConfig) {
         const out = path.join(runDir, job.taskId, String(job.attempt))
         context.confirmed = false
         try {
-        admissions.push({ slotId, taskId: job.taskId, attempt: job.attempt })
-        admissionWrite = admissionWrite.then(() => writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId,
-          identity, phase: "cli_admitted", runDir, slotIds: environment.slots.map(lease => lease.slot.id), attempts: [...admissions] }))
-        await admissionWrite
+        await admit(slotId, job.taskId, job.attempt, "measurement")
         await mkdir(out, { recursive: true, mode: 0o700 })
         const watcher = watchAttemptIncidents(out, code => {
           if (code === "PROVIDER_ERROR_OBSERVED") return

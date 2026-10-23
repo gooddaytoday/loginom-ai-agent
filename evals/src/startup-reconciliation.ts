@@ -1,20 +1,25 @@
 import { EvalFailure } from "./fail"
 import path from "node:path"
-import { lstat, readdir } from "node:fs/promises"
+import { lstat, readdir, unlink } from "node:fs/promises"
 import { globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { closeUserSessions, openLoginomAdmin } from "./loginom-admin"
 import { inspectAbsentUserStorage, verifyParallelPair } from "./parallel-pair"
 import { assertProfileClean, waitProfileIdle } from "./profile"
-import type { ProcessCleanup } from "./process-supervisor"
+import { observeUnitExit, registrationIdentity, type ProcessCleanup, type UnitBinding } from "./process-supervisor"
 import { assertSessionBackupEmpty, cleanupSlotStorage } from "./slot-storage"
-import { reopenEnvironmentLeases, type ServerIdentity, type SlotFile } from "./slots"
+import { reopenEnvironmentLeases, type ServerIdentity, type SlotFile, type SlotLease } from "./slots"
+
+type StartupRecovery = {
+  unitBinding: UnitBinding; owner: UnitBinding["producer"] & { bootId: string }; lease: SlotLease
+  server: NonNullable<Awaited<ReturnType<typeof reopenEnvironmentLeases>>>["server"]
+}
 
 export async function reconcileEnvironment(file: SlotFile, identity: ServerIdentity, binary: string, lockRoot = globalLockRoot) {
   const environment = await reopenEnvironmentLeases(file, identity, lockRoot)
   if (!environment) return
   try {
     const reservation = environment.server.reservation
-    const command = await readLeaseReceipt(reservation.journal) as { runDir?: string; attempts?: { slotId: string; taskId: string; attempt: number }[] }
+    const command = await readLeaseReceipt(reservation.journal) as { runDir?: string; unitBinding?: UnitBinding; attempts?: { slotId: string; taskId: string; attempt: number }[] }
     const admins = (await readdir(file.controller.stateDir)).filter(name => /^admin-[a-zA-Z0-9_-]+$/.test(name))
     let observed = false
     for (const name of admins) {
@@ -26,29 +31,35 @@ export async function reconcileEnvironment(file: SlotFile, identity: ServerIdent
       observed ||= receipt.processes.lifetime!.producer_pid === reservation.owner.pid
     }
     if (!observed) throw new EvalFailure("STARTUP_ADMIN_CLEANUP_UNCONFIRMED", 2)
+    const reconciled = []
+    for (const lease of environment.slots) {
+      const recovery = command.unitBinding ? { unitBinding: command.unitBinding, owner: reservation.owner, server: environment.server, lease } : undefined
+      let processes = await readStartupManagement({ stateDir: file.controller.stateDir, commandId: reservation.commandId,
+        slotId: lease.slot.id, producerPid: reservation.owner.pid, runDir: command.runDir, recovery })
+      const prefixes: string[] = [], attemptDirs: string[] = []
+      for (const attempt of command.attempts?.filter(attempt => attempt.slotId === lease.slot.id) ?? []) {
+        if (!command.runDir || !path.isAbsolute(command.runDir) || !/^[a-z0-9_-]+$/i.test(attempt.taskId) || !Number.isSafeInteger(attempt.attempt) || attempt.attempt < 1)
+          throw new EvalFailure("STARTUP_OWNERSHIP_UNCONFIRMED", 2)
+        const directory = path.join(command.runDir, attempt.taskId, String(attempt.attempt))
+        processes = await reconcileStartupCleanup(path.join(directory, "cleanup.json"), reservation.owner.pid, recovery)
+        prefixes.push(`eval-${path.basename(command.runDir)}-${attempt.taskId}-${attempt.attempt}`)
+        attemptDirs.push(directory)
+      }
+      if (!await waitProfileIdle(lease.slot.profileDir, 1000)) throw new EvalFailure("STARTUP_PROCESS_CLEANUP_UNCONFIRMED", 2)
+      reconciled.push({ lease, processes, prefixes, attemptDirs })
+    }
     await verifyParallelPair(file, identity)
     const admin = await openLoginomAdmin(file, identity, { serverLease: environment.server, binary })
     const cleanups: { lease: typeof environment.slots[number]; proof: string }[] = []
     try {
       await assertSessionBackupEmpty(file, identity)
       await admin.inspectPoolPolicy()
-      for (const lease of environment.slots) {
-        let processes = await readStartupManagement({ stateDir: file.controller.stateDir, commandId: reservation.commandId,
-          slotId: lease.slot.id, producerPid: reservation.owner.pid, runDir: command.runDir })
-        const prefixes: string[] = []
-        const attemptDirs: string[] = []
-        for (const attempt of command.attempts?.filter(attempt => attempt.slotId === lease.slot.id) ?? []) {
-          if (!command.runDir || !path.isAbsolute(command.runDir) || !/^[a-z0-9_-]+$/i.test(attempt.taskId) || !Number.isSafeInteger(attempt.attempt) || attempt.attempt < 1)
-            throw new EvalFailure("STARTUP_OWNERSHIP_UNCONFIRMED", 2)
-          processes = await readStartupCleanup(path.join(command.runDir, attempt.taskId, String(attempt.attempt), "cleanup.json"), reservation.owner.pid)
-          prefixes.push(`eval-${path.basename(command.runDir)}-${attempt.taskId}-${attempt.attempt}`)
-          attemptDirs.push(path.join(command.runDir, attempt.taskId, String(attempt.attempt)))
-        }
-        if (!await waitProfileIdle(lease.slot.profileDir, 1000)) throw new EvalFailure("STARTUP_PROCESS_CLEANUP_UNCONFIRMED", 2)
+      for (const entry of reconciled) {
+        const lease = entry.lease
         const prepared = await lstat(path.join(file.controller.stateDir, `user-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
           if (error.code === "ENOENT") return undefined; throw error
         })
-        const cleanup = prepared ? processes && await cleanupSlotStorage(file, environment.server, lease, admin, processes, prefixes, attemptDirs) : undefined
+        const cleanup = prepared ? entry.processes && await cleanupSlotStorage(file, environment.server, lease, admin, entry.processes, entry.prefixes, entry.attemptDirs) : undefined
         if (prepared && !cleanup) throw new EvalFailure("STARTUP_PROCESS_CLEANUP_UNCONFIRMED", 2)
         if (!prepared) {
           await assertProfileClean(lease.slot.profileDir)
@@ -58,7 +69,7 @@ export async function reconcileEnvironment(file: SlotFile, identity: ServerIdent
         const proof = path.join(file.controller.stateDir, `startup-${lease.token}.json`)
         await writeLeaseReceipt(proof, { version: 2, status: "confirmed", slotId: lease.slot.id, leaseToken: lease.token, serverEpoch: identity.serverEpoch,
           processes: "confirmed", serverSessions: "confirmed", archive: "committed", profileArchive: cleanup?.archive ?? null,
-          closed: cleanup?.closed ?? [], removed: cleanup?.removed ?? [], unused: !prepared, storageDeletionAllowed: true, nextAdmissionAllowed: true })
+          closed: cleanup?.closed ?? [], removed: cleanup?.removed ?? [], attemptDirs: entry.attemptDirs, unused: !prepared, storageDeletionAllowed: true, nextAdmissionAllowed: true })
         cleanups.push({ lease, proof })
       }
     } finally { await admin.dispose() }
@@ -70,13 +81,33 @@ export async function reconcileEnvironment(file: SlotFile, identity: ServerIdent
   } finally { await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())]) }
 }
 
-export async function readStartupManagement(input: { stateDir: string; commandId: string; slotId: string; producerPid: number; runDir?: string }) {
+export async function readStartupManagement(input: { stateDir: string; commandId: string; slotId: string; producerPid: number; runDir?: string; recovery?: StartupRecovery }) {
   const root = input.runDir ? path.join(input.runDir, "preparation", input.slotId)
     : path.join(input.stateDir, `management-${input.commandId}-${input.slotId}`)
   const names = await readdir(root).catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return []; throw error })
   let processes: ProcessCleanup | undefined
-  for (const name of names) processes = await readStartupCleanup(path.join(root, name, "cleanup.json"), input.producerPid)
+  for (const name of names) processes = await reconcileStartupCleanup(path.join(root, name, "cleanup.json"), input.producerPid, input.recovery)
   return processes
+}
+
+export async function reconcileStartupCleanup(file: string, producerPid: number, recovery?: StartupRecovery) {
+  try { return await readStartupCleanup(file, producerPid) }
+  catch (error) {
+    if (!recovery || recovery.owner.pid !== producerPid) throw error
+    await recovery.server.assertHeld()
+    await recovery.lease.assertHeld()
+    const proof = await observeUnitExit({ sourceFile: file, profile: recovery.lease.slot.profileDir, binding: recovery.unitBinding, owner: recovery.owner })
+    await writeLeaseReceipt(`${file}.unit-exit.json`, proof)
+    await recovery.server.assertHeld()
+    await recovery.lease.assertHeld()
+    const marker = await registrationIdentity(recovery.lease.slot.profileDir).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined
+      throw error
+    })
+    if (marker && JSON.stringify(marker) !== JSON.stringify(proof.registration)) throw new EvalFailure("STARTUP_REGISTRATION_CHANGED", 2)
+    if (marker) await unlink(`${recovery.lease.slot.profileDir}.process-group`)
+    return proof.processes
+  }
 }
 
 export async function readStartupCleanup(file: string, producerPid: number) {
