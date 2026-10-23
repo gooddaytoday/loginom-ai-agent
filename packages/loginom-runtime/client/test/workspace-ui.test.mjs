@@ -4246,9 +4246,10 @@ async function exportInputPortOverflowFixture() {
   return {page,crumbs,panel,opening,preparation,binding,expectedPort:exportInputPortOverflow.inputPort};
 }
 
-test('native-owned export keeps its hidden node breadcrumb in input and settings wizards',async()=>{
-  for(const settings of [false,true])for(const mode of ['valid','unbound','hidden_workflow','wrong_icon','sensitive','duplicate','wrong_path']) {
-    const {page,binding,crumbs,panel,opening}=await exportInputPortOverflowFixture();
+test('native-owned export keeps its hidden node breadcrumb through input, settings and done',async()=>{
+  for(const stage of ['input_mapping','text_export_params','text_export_format','done'])for(const mode of ['valid','unbound','hidden_workflow','wrong_icon','sensitive','duplicate','wrong_path','hidden_attribute','invisible','transparent','wrong_caption','missing_opening','foreign_node']) {
+    const settings=stage!=='input_mapping';
+    const {page,binding,crumbs,panel,opening,preparation}=await exportInputPortOverflowFixture();
     opening.node.FIconCls='bg-vendor-icon-exporttextfile';
     crumbs[5].children[0].attrs.class=mode==='wrong_icon'?'bg-vendor-icon-calcdata':'bg-vendor-icon-exporttextfile';
     for(const c of crumbs.slice(5)) {
@@ -4261,7 +4262,13 @@ test('native-owned export keeps its hidden node breadcrumb in input and settings
     if(settings) {
       const wizard=opening.wizard.FView.el.dom;
       page.document.querySelectorAll('[data-tid$=";TuneDataSourceMappingWizard;btnAddMappingColumn"]')[0].remove();
-      page.add('input','MF;TF-5;WizrdMCF;ExportTextFileParamsWizard;edtFileName','',undefined,wizard);
+      const marker={text_export_params:'ExportTextFileParamsWizard;edtFileName',text_export_format:'ExportTextFilePreviewWizard;edtCodePage',done:'DoneWizard;edtDisplayName'}[stage];
+      const field=page.add('input','MF;TF-5;WizrdMCF;'+marker,'',undefined,wizard);
+      if(stage==='done') {
+        field.value=crumbs[5].ownText;
+        page.add('input','MF;TF-5;WizrdMCF;DoneWizard;cbxNodeTitleMode','',undefined,wizard).value='Пользовательская метка';
+        page.add('button','MF;TF-5;WizrdMCF;btnExecute','Выполнить',undefined,wizard);
+      }
       opening.wizard.FModelNode=opening.nodeTree.FModelNode;
       page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.Node.data.node.ParentNode=opening.nodeTree;
       // The fixture returns a new card wrapper, retaining the same tree object.
@@ -4269,13 +4276,30 @@ test('native-owned export keeps its hidden node breadcrumb in input and settings
       crumbs[6].remove();crumbs[7].remove();
     }
     if(mode==='hidden_workflow')crumbs[4].style.display='none';
+    if(mode==='hidden_attribute')crumbs[5].attrs.hidden='';
+    if(mode==='invisible')crumbs[5].style.visibility='hidden';
+    if(mode==='transparent')crumbs[5].style.opacity='0';
+    if(mode==='wrong_caption')crumbs[5].ownText='Другой экспорт';
+    if(mode==='missing_opening') {
+      if(settings)opening.wizard.FModelNode={};
+      else preparation.inputPortOpenReceipts.clear();
+    }
+    if(mode==='foreign_node') {
+      if(settings)opening.nodeTree.FGuid='foreign';
+      else opening.node.FGuid='foreign';
+    }
     if(mode==='sensitive')crumbs[5].attrs['aria-label']='password';
     if(mode==='wrong_path')crumbs[5].attrs['data-tid']=crumbs[5].attrs['data-tid'].replace('>Сценарий>','>Other>');
     if(mode==='duplicate')page.add('a',crumbs[5].attrs['data-tid'],crumbs[5].ownText,crumbs[5].box,panel).style.display='none';
     const result=await page.execute({mode:'observe',...(mode==='unbound'?{}:{prepared_node_context:binding})});
+    if(['missing_opening','foreign_node'].includes(mode)) {
+      assert.equal(result.error?.code,'PREPARED_NODE_CONTEXT_CHANGED',stage+':'+mode);continue;
+    }
     const context=settings?result.output?.wizard?.owner_context:result.output?.wizard?.input_port_context;
-    assert.equal(context?.status==='observed',mode==='valid',`${settings?'settings':'input'}:${mode}`);
+    assert.equal(result.output.wizard.stage,stage,stage+':'+mode);
+    assert.equal(context?.status==='observed',mode==='valid',stage+':'+mode);
     if(mode==='valid')assert.equal(context.node.label,'Выгрузка с русскими заголовками');
+    if(stage==='done')assert.equal(result.output.ui.elements.some(e=>e.allowed_actions.includes('execute_wizard')),mode==='valid',stage+':'+mode);
     assert.deepEqual(page.events,[]);
   }
 });
