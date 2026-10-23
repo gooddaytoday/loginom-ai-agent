@@ -28,14 +28,15 @@ function fixture({lostClick = false, drift = false} = {}) {
   return {page, lease, get clicks() { return clicks; }};
 }
 
-test('generation browser inspector binds native wizard, page, schema and uncovered checkbox', () => {
+for(const offset of [0,1])
+test('generation browser inspector binds native wizard, page, schema and uncovered checkbox / offset '+offset, () => {
   const display = {isConnected: true, getBoundingClientRect: () => ({x: 10, y: 20, width: 40, height: 40}),
     closest: () => null, contains: () => false};
   const root = {isConnected: true, querySelectorAll: () => [display]};
   const wizard = {}, tab = {Controller: {Node: {data: {node: wizard}}, FController: {FView: {el: {dom: root}}}}};
   const args = {held: {wizard, wizardRoot: root, binding: {tab}, wizardBinding: {}}, task, expected: schema};
   const context = {args, readPage: () => ({ready: true, node_guid: 'node',
-    page: {tid, index: 0, indicator_count: 4}}), readSchema: () => schema,
+    page: {tid, index: offset, indicator_count: 4+offset}}), readSchema: () => schema,
     bg: {app: {Application: {FInstance: {FMainForm: {Items: {Workspace: {getActiveTab: () => tab}}}}}}},
     document: {elementFromPoint: () => display}, innerWidth: 100, innerHeight: 100,
     getComputedStyle: () => ({visibility: 'visible'})};

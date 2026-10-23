@@ -11,7 +11,8 @@ export function inspectManagedJavascriptDonePoint({held, task}, inspect) {
   const prefix = task.workflow_ref.prefix;
   if (state.ready !== true || state.node_guid !== task.owner.node_id
     || state.page?.tid !== prefix + ';WizrdMCF;DoneWizard'
-    || state.page.index !== 3 || state.page.indicator_count !== 4
+    || !(state.page.index === 3 && state.page.indicator_count === 4
+      || state.page.index === 4 && state.page.indicator_count === 5)
     || state.page.visible_editors !== 0 || !held.wizard || !held.wizardRoot)
     throw Error('Managed JavaScript Done page changed');
   const tab = globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
@@ -88,7 +89,7 @@ export function makeJavascriptManagedDoneGestureCode(task) {
   if (task.gesture_id !== task.operation_id + ':done'
     || task.point?.tid !== task.workflow_ref.prefix + ';WizrdMCF;btnDone'
     || task.point.page_tid !== task.workflow_ref.prefix + ';WizrdMCF;DoneWizard'
-    || task.point.page_index !== 3 || task.point.node_id !== task.owner.node_id
+    || ![3,4].includes(task.point.page_index) || task.point.node_id !== task.owner.node_id
     || !Number.isFinite(task.point.x) || !Number.isFinite(task.point.y))
     throw Error('Invalid managed JavaScript Done gesture');
   const inspect = `function inspect(args){const native=${wizardReadiness.toString()};`+

@@ -50,13 +50,13 @@ test('source boundary journals only the failed predicate: '+fault,async()=>{
 });
 
 function fixture({closeFails = false, pageTransientOnce = false, wrongType = false,
-  schemaOverride,
+  schemaOverride,inputPage=false,inputNextFails=false,
   settingsAckChanged = false,
   nativeRefusal=false,doneRefusal=false,captureFails=false,recoveryAckChanged=false,closeRefusalFails=false,
   generationFalse = false, generationFails = false, declaredFails = false, doneFails = false,
   graphTransientOnce = false, graphTransientDetail = false, graphEffectPossible = false, graphOwnerChanged = false} = {}) {
   const calls = [], events = [];
-  let pageReads = 0, graphReads = 0, codeNextSent = false,doneSent=false,handleDraft;
+  let pageReads = 0, graphReads = 0, codeNextSent = false,doneSent=false,handleDraft,inputNextSent=false;
   const driver = {
     openManagedJavascriptExistingWizard: async args => {calls.push('open'); assert.equal(args.node, node); return {task};},
     dispatchManagedJavascriptGeneration: async () => {calls.push('generation');
@@ -68,7 +68,7 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
       return {verified:true,generation:false,columns:structuredClone(columns),schema:{verified:true,
         generation:{checked:false},grids:[{tid:'grid',fields:[{record_id:'volatile',Name:columns[0].name}]}]}};
     },
-    dispatchManagedJavascriptNext: async () => {calls.push('next'); return {status: 'SUCCEEDED', output: {next_gesture_returned: true}};},
+    dispatchManagedJavascriptNext: async () => {calls.push('next');if(inputPage&&!inputNextSent){inputNextSent=true;if(inputNextFails)throw Error('lost input Next reply');return {status:'SUCCEEDED',output:{next_gesture_returned:true}};} return {status: 'SUCCEEDED', output: {next_gesture_returned: true}};},
     dispatchManagedJavascriptCodeNext: async () => {calls.push('code-next');codeNextSent = true;
       return {status: 'SUCCEEDED', output: {next_gesture_returned: true, transition_verified: false}};},
     dispatchManagedJavascriptDone: async () => {calls.push('done');doneSent=true;if(doneFails)throw Error('lost Done reply');
@@ -95,16 +95,18 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
     calls.push(code);
     if (code === 'type') return {verified: true, node_id: 'node',
       icon_class: wrongType ? 'bg-vendor-icon-calculator' : 'bg-vendor-icon-javascript'};
+    if(code==='schema'&&inputPage&&!inputNextSent)return {verified:true,node_context:{...node,verified:true,surface:'wizard'},form:'TuneDataSourceInputPortWizard',generation:null,grids:[]};
     if (code === 'schema') return schemaOverride??{verified: true, node_context: {...node, verified: true, surface: 'wizard'},
       generation: {checked: !generationFalse}, grids: [{tid: 'grid', fields: [{record_id: 'volatile', Name: 'Value'}]}]};
     if(code==='stage'||code.includes('runManagedJavascriptStageRead'))return {owner:node,native_owner_verified:true,owner_verified:true,wizard_visible:true,
       pending:false,preview_visible:false,boundary_refusal:null,dialog_diagnostic:{visible_count:0,foreign_count:0,roots:[]},mask_diagnostic:{foreign_count:0},
       wizard_error:{visible:codeNextSent&&nativeRefusal||doneSent&&doneRefusal,exact_count:1,tooltip:'SyntaxError: Syntax error at code (:4:33)',
         tid:'MF;TF-1;WizrdMCF;btnError',tooltip_truncated:false},page_tid:codeNextSent&&!nativeRefusal?'MF;TF-1;WizrdMCF;DoneWizard':'MF;TF-1;WizrdMCF;JavaScriptCodeWizard'};
+    if(code==='page'&&inputPage&&!calls.includes('schema-columns')){calls.push('schema-columns');return {ready:true,node_guid:'node',page:{tid:task.workflow_ref.prefix+';WizrdMCF;JavaScriptColumnsWizard',index:1,indicator_count:5,visible_editors:0}};}
     if (code === 'page') return {ready: true, node_guid: 'node',
-      page:codeNextSent?{tid:'MF;TF-1;WizrdMCF;DoneWizard',index:3,indicator_count:4,visible_editors:0}
+      page:codeNextSent?{tid:'MF;TF-1;WizrdMCF;DoneWizard',index:inputPage?4:3,indicator_count:inputPage?5:4,visible_editors:0}
         : pageTransientOnce && pageReads++ === 0
-          ? {tid: 'MF;TF-1;WizrdMCF;JavaScriptColumnsWizard', index: 0, visible_editors: 0}
+          ? {tid: 'MF;TF-1;WizrdMCF;JavaScriptColumnsWizard', index: 0, indicator_count:4, visible_editors: 0}
           : {tid: 'MF;TF-1;WizrdMCF;JavaScriptCodeWizard', visible_editors: 1}};
     if (code === 'source') return {verified: true, source, node_context: {...node, verified: true, surface: 'wizard'}};
     if (code === 'dispose') return {disposed: true};
@@ -397,4 +399,28 @@ for(const failure of [null,'capture','close','ACK'])test('known Done refusal clo
  assert.equal(error.javascriptWizardRefusal.closed.settings_applied,null);
  assert.equal(error.javascriptWizardRefusal.closed.execution_started,null);
  assert.equal(f.calls.filter(x=>x==='close').length,1);assert.equal(f.calls.includes('graph'),false);
+});
+
+test('source admission advances the owned input page before reading generation and full source',async()=>{
+ const f=fixture({inputPage:true}),adapter=await f.sourceAdapter();
+ const handle=await adapter.open({owner,deadline});
+ assert.equal(f.calls.filter(c=>c==='next').length,2);
+ assert.ok(f.calls.indexOf('schema-columns')<f.calls.lastIndexOf('schema'));
+ assert.equal((await adapter.read(handle,{owner,deadline})).source,source);
+ assert.equal((await adapter.discard(handle,{owner,deadline})).draft_discarded,true);
+});
+test('unknown input Next never replays and retires the opening',async()=>{
+ const f=fixture({inputPage:true,inputNextFails:true}),adapter=await f.sourceAdapter();
+ await assert.rejects(adapter.open({owner,deadline}),/lost input Next/);
+ await assert.rejects(adapter.open({owner,deadline}),/owner changed/);
+ assert.equal(f.calls.filter(c=>c==='next').length,1);
+ assert.equal(f.calls.includes('source'),false);
+});
+
+test('replacement through the five-page route still commits Code Next and Done once',async()=>{
+ const f=fixture({inputPage:true}),adapter=await f.sourceAdapter(),handle=await adapter.open({owner,deadline});
+ await adapter.replace(handle,{owner,deadline,expected_source_sha256:createHash('sha256').update(source).digest('hex'),source_text:source});
+ await adapter.commit(handle,{owner,deadline});
+ assert.equal(f.calls.filter(c=>c==='code-next').length,1);
+ assert.equal(f.calls.filter(c=>c==='done').length,1);
 });
