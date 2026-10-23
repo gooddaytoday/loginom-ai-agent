@@ -2296,6 +2296,48 @@ test('prepared wizard opening retries one refused sample and preserves native ow
  }
 });
 
+test('saved Export opening keeps its exact overflow breadcrumb while input mapping is loading',async()=>{
+ for(const fault of [null,'foreign_icon','foreign_guid','foreign_path','missing_icon','wrong_caption','hidden_attribute','opacity','foreign_mask']) {
+  const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
+  let path='',waits=0,mask,owner;
+  for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий']) {
+   path+=(path?'>':'')+label;
+   const crumb=page.add('a',base+'cnrNaviMode;b.s_'+path,label,undefined,panel);
+   if(label==='Сценарий')page.add('span',null,'',undefined,crumb).attrs.class='maptree-icon-workflow';
+  }
+  const graph=page.add('div',base+'ModelForm;cmpDiagram'),body=page.add('g',base+'Graph;CSV_матрица_продаж','',undefined,graph);
+  page.add('span',base+'Graph;CSV_матрица_продаж;Label;Label','CSV матрица продаж',undefined,body);
+  page.add('g',base+'Graph;CSV_матрица_продаж;Setting','',{x:500,y:300,width:30,height:30},graph);
+  const binding=async()=>({verified:true,document_id:'doc',workflow_id:'workflow',node_id:fault==='foreign_guid'&&waits?'foreign':'node',
+   surface:page.events.includes('click')?'wizard':'graph',tid:base+(page.events.includes('click')?'WizrdMCF':'Graph;CSV_матрица_продаж')});
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,kind:'workspace-ui',prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},opening_timeout_ms:120000,...options},binding));
+  const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_open),click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);graph.remove();
+   mask=page.add('div',base+'WizrdMCF');mask.attrs.class='bg-mask-message';
+   page.add('button',base+'WizrdMCF;TuneDataSourceInputPortWizard;rbTable;InputEl','',undefined,mask);
+   page.add('div',base+'WizrdMCF;TuneDataSourceInputPortWizard;grdTargetColumns','',undefined,mask);
+   const ownerPath=fault==='foreign_path'?path.replace('Модуль1','Модуль2'):path;
+   owner=page.add('a',base+'cnrNaviMode;b.s_'+ownerPath+'>CSV_матрица_продаж',fault==='wrong_caption'?'Other':'CSV матрица продаж',undefined,panel);
+   if(fault!=='missing_icon')page.add('span',null,'',undefined,owner).attrs.class=fault==='foreign_icon'?'bg-vendor-icon-calcdata':'bg-vendor-icon-exporttextfile';
+   const last=page.add('a',base+'cnrNaviMode;b.s_'+ownerPath+'>CSV_матрица_продаж>Настройка','Настройка',undefined,panel);
+   page.add('span',null,'',undefined,last).attrs.class='maptree-icon-wizard';
+  };
+  page.waitForTimeout=async ms=>{
+   clock.advance(ms);waits++;
+   owner.style.display='none';
+   if(fault==='hidden_attribute')owner.attrs.hidden='';
+   if(fault==='opacity')owner.style.opacity='0';
+   if(fault==='foreign_mask'&&waits===1)page.add('div','foreign-mask','Loading').attrs.class='x-mask-msg';
+   if(waits===3)mask.attrs.class='';
+  };
+  const result=await page.act({verb:'begin_wizard',ref:button.ref},snapshot);
+  assert.equal(result.status,fault?'AMBIGUOUS':'SUCCEEDED',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  if(!fault){assert.equal(waits,3);assert.equal(result.output.wizard.stage,'input_mapping');assert.equal(result.output.wizard.owner_context.node.label,'CSV матрица продаж');}
+ }
+});
+
 test('wizard cancellation confirms the original graph after one exact affirmative click',async()=>{
  for(const mode of ['success','wrong_question','wrong_node','still_open','bound_unlock','bound_churn','bound_relock',
   'bound_document_id','bound_workflow_id','bound_node_id','bound_tid','bound_navigation_node']) {
