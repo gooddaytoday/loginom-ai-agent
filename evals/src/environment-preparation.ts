@@ -3,11 +3,11 @@ import { lstat } from "node:fs/promises"
 import { loadConfig, type EvalConfig } from "./config"
 import { agentCommand } from "./cli"
 import { EvalFailure } from "./fail"
-import { globalLockRoot, writeLeaseReceipt } from "./lease"
+import { globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { openLoginomAdmin } from "./loginom-admin"
 import { prepareUserStorage, readServerIdentity, verifyParallelPair } from "./parallel-pair"
 import { checkIsolatedLoginom } from "./preflight"
-import { assertAuth, ensureProfile, verifyProfile } from "./profile"
+import { assertAuth, ensureProfile, management, parseView, setupProfile, verifyProfile } from "./profile"
 import { assertSessionBackupEmpty, cleanupSlotStorage } from "./slot-storage"
 import { acquireEnvironmentLeases, loadSlots, type SlotFile, type SlotLease } from "./slots"
 import { reconcileEnvironment } from "./startup-reconciliation"
@@ -17,7 +17,7 @@ export class EnvironmentFailure extends EvalFailure {
   constructor(message: string, readonly receipt: string) { super(message, 2) }
 }
 
-export async function prepareEnvironment(input: { slotsFile: string; parallel: number; config?: EvalConfig }, lockRoot = globalLockRoot) {
+export async function prepareEnvironment(input: { slotsFile: string; parallel: number; config?: EvalConfig; previousSlotsFile?: string }, lockRoot = globalLockRoot) {
   return checkEnvironment(input, lockRoot, "prepare")
 }
 
@@ -34,12 +34,29 @@ export async function scopedSlotConfig(config: EvalConfig, file: SlotFile, lease
       container: lease.identity.containerId, storageDir: `${file.server.storageRoot}/${lease.slot.username}` } }
 }
 
-async function checkEnvironment(input: { slotsFile: string; parallel: number; config?: EvalConfig }, lockRoot: string, operation: "prepare" | "verify") {
+async function checkEnvironment(input: { slotsFile: string; parallel: number; config?: EvalConfig; previousSlotsFile?: string }, lockRoot: string, operation: "prepare" | "verify") {
   const file = await loadSlots(input.slotsFile, input.parallel)
+  const previous = operation === "prepare" && input.previousSlotsFile ? await loadSlots(input.previousSlotsFile, input.parallel) : undefined
+  if (previous && (file.controller.stateDir === previous.controller.stateDir ||
+    JSON.stringify({ ...file, controller: { ...file.controller, stateDir: previous.controller.stateDir },
+      slots: file.slots.map((slot, index) => ({ ...slot, username: previous.slots[index]?.username })) }) !== JSON.stringify(previous) ||
+    file.slots.some(slot => previous.slots.some(old => old.username === slot.username))))
+    throw new EvalFailure("PREPARATION_GENERATION_MISMATCH", 2)
   const config = input.config ?? loadConfig(["--skip-judge"], { ...process.env, EVAL_SLOTS_FILE: input.slotsFile })
   if (config.agent.cliMode !== "binary" || !path.isAbsolute(config.agent.cliBin ?? "")) throw new EvalFailure("PREPARATION_BINARY_REQUIRED", 2)
   const identity = await readServerIdentity(file)
   await verifyParallelPair(file, identity)
+  if (previous) {
+    await verifyParallelPair(previous, identity)
+    for (const slot of previous.slots.slice(0, input.parallel)) {
+      const prepared = await readLeaseReceipt(path.join(previous.controller.stateDir, `prepare-${slot.id}.json`)) as Awaited<ReturnType<typeof readUserPreparation>>
+      if (prepared?.version !== 2 || prepared.kind !== "user-preparation" || prepared.state !== "staged" ||
+        prepared.slotId !== slot.id || prepared.username !== slot.username || prepared.endpoint !== previous.server.url ||
+        prepared.identity?.containerId !== identity.containerId || prepared.identity.studioContainerId !== identity.studioContainerId ||
+        typeof prepared.identity.serverEpoch !== "string" || !/^[a-f0-9]{64}$/.test(prepared.identity.serverEpoch) ||
+        prepared.identity.serverEpoch === identity.serverEpoch) throw new EvalFailure("PREPARATION_GENERATION_MISMATCH", 2)
+    }
+  }
   await reconcileEnvironment(file, identity, config.agent.cliBin!, lockRoot)
   const commandId = crypto.randomUUID(), journal = path.join(file.controller.stateDir, `${operation}-command-${commandId}.json`)
   const receipt = path.join(file.controller.stateDir, `${operation === "prepare" ? "preparation" : "verification"}-${commandId}.json`)
@@ -76,6 +93,14 @@ async function checkEnvironment(input: { slotsFile: string; parallel: number; co
         const command = { ...agentCommand(scoped), cleanupDir: path.join(file.controller.stateDir, `management-${commandId}-${lease.slot.id}`),
           cleanupSecrets: [scoped.loginom.password, scoped.dock.apiKey, scoped.agent.provider?.apiKey ?? ""] }
         await checkIsolatedLoginom({ kind: "docker", container: identity.containerId, storageDir: scoped.loginom.storageDir }, { file, lease, secretFile: prepared.secretFile })
+        if (previous) {
+          const observed = await management(command, ["loginom", "status", "--format", "json"])
+          const view = parseView(observed.stdout)
+          const old = previous.slots.find(slot => slot.id === lease.slot.id)!
+          if (observed.exitCode !== 0 || !view || view.url !== scoped.loginom.url ||
+            ![old.username, lease.slot.username].includes(view.username ?? "")) throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
+          if (view.username === old.username) await setupProfile(scoped, command)
+        }
         if (operation === "prepare") await ensureProfile(scoped, command)
         await assertAuth(scoped, command)
         const checked = await verifyProfile(scoped, command)

@@ -1,14 +1,155 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
-import { createPair, destroyPair, verifyParallelPair } from "../src/parallel-pair"
-import { parseSlots } from "../src/slots"
+import { acquireResourceLease, globalLockRoot, readLeaseReceipt, readResourceReservation, writeLeaseReceipt } from "../src/lease"
+import { createPair, destroyPair, readServerIdentity, verifyParallelPair } from "../src/parallel-pair"
+import { loadSlots, parseSlots, type ServerIdentity } from "../src/slots"
+import { loadConfig } from "../src/config"
+import { prepareEnvironment, verifyEnvironment } from "../src/environment-preparation"
+import { tryCampaignLock } from "../src/campaign-lock"
+import { isQualityResult, type AttemptResult } from "../src/report"
+import { verifyAdminRuntime } from "../src/preflight"
+import type { CampaignServerConfig } from "../script/run-campaign"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { storageCodecFixture } from "./helpers/storage-codec-fixture"
 
 const integration = process.env.EVAL_PAIR_INTEGRATION === "1" ? test : test.skip
+
+test.skipIf(process.env.EVAL_PAIR_INTEGRATION !== "1" || !process.env.EVAL_CAMPAIGN_LIVE_SERVER)(
+  "fresh generation reuses profile after owned pair restart", async () => {
+    const server = await readLeaseReceipt(process.env.EVAL_CAMPAIGN_LIVE_SERVER!) as CampaignServerConfig
+    const unlock = await tryCampaignLock(server.controllerLock)
+    expect(Boolean(unlock)).toBe(true)
+    if (!unlock) return
+    try {
+      expect(await Bun.file(path.join(server.stateRoot, "owner.json")).exists()).toBe(false)
+      const source = await loadSlots(server.slotsFile, 1)
+      const parallel = source.slots.length
+      for (const count of Array.from({ length: parallel }, (_, index) => index + 1)) {
+        const unit = server.batchUnit.replace("{parallel}", String(count))
+        const state = await Bun.$`systemctl show --property=ActiveState --value ${unit}`.quiet()
+        expect(["inactive", "failed"].includes(state.text().trim())).toBe(true)
+      }
+      const config = loadConfig(["--skip-judge"], { ...process.env, EVAL_SLOTS_FILE: server.slotsFile })
+      expect(config.agent.cliMode).toBe("binary")
+      const fingerprint = async (file: string) => {
+        const hash = new Bun.CryptoHasher("sha256")
+        for await (const chunk of Bun.file(file).stream()) hash.update(chunk)
+        return hash.digest("hex")
+      }
+      const pins = await readLeaseReceipt(server.experimentPinsFile) as { cli: string; cliBinarySha256: string }
+      expect(config.agent.cliBin === pins.cli).toBe(true)
+      expect(await fingerprint(config.agent.cliBin!) === pins.cliBinarySha256).toBe(true)
+      await verifyAdminRuntime(config.agent.cliBin!)
+      const previous = await readLeaseReceipt(path.join(source.controller.stateDir, `prepare-${source.slots[0]!.id}.json`)) as { identity: ServerIdentity }
+      let identity = await readServerIdentity(source)
+      await verifyParallelPair(source, identity)
+      const recovering = await Bun.file(path.join(server.stateRoot, "environment-generations", identity.serverEpoch, "slots.json")).exists()
+      for (const key of [`judge:${source.judge.codexHome}`, ...(!recovering ?
+        [`server:${identity.containerId}`, ...source.slots.map(slot => `profile:${slot.profileDir}`)] : [])]) {
+        const reservation = await readResourceReservation({ key })
+        expect(reservation?.state === "released" && Boolean(reservation.releaseEvidence)).toBe(true)
+        const proof = await readLeaseReceipt(reservation!.releaseEvidence!.path)
+        expect(new Bun.CryptoHasher("sha256").update(JSON.stringify(proof)).digest("hex") === reservation!.releaseEvidence!.sha256).toBe(true)
+      }
+      const saved: string[] = [server.slotsFile, server.experimentPinsFile, server.corpusPinsFile, server.resourceBudgetFile]
+      for await (const name of new Bun.Glob("**/*.json").scan({ cwd: source.controller.stateDir, onlyFiles: true }))
+        saved.push(path.join(source.controller.stateDir, name))
+      for (const directory of [...source.slots.map(slot => slot.historyDir), ...(source.auth ? [source.auth.sharedDir] : [])])
+        for await (const name of new Bun.Glob("**/*").scan({ cwd: directory, onlyFiles: true, dot: true })) saved.push(path.join(directory, name))
+      for (const slot of source.slots) {
+        const auth = path.join(slot.profileDir, "data/auth.json")
+        if (await Bun.file(auth).exists()) saved.push(auth)
+      }
+      const quality: string[] = []
+      for (const name of (await readdir(source.controller.stateDir)).filter(name => /^run-command-.*\.json$/.test(name))) {
+        const command = await readLeaseReceipt(path.join(source.controller.stateDir, name)) as { runDir?: string }
+        if (!command.runDir) continue
+        for await (const result of new Bun.Glob("*/*/result.json").scan({ cwd: command.runDir, onlyFiles: true })) {
+          const file = path.join(command.runDir, result)
+          if (isQualityResult(await Bun.file(file).json() as AttemptResult)) quality.push(file)
+        }
+        for await (const name of new Bun.Glob("**/*").scan({ cwd: command.runDir, onlyFiles: true, dot: true })) saved.push(path.join(command.runDir, name))
+      }
+      expect(quality.length > 0).toBe(true)
+      const before: string[] = []
+      for (const file of saved) before.push(await fingerprint(file))
+      try {
+        const pair = await readLeaseReceipt(path.join(source.controller.stateDir, "pair.json")) as { purpose: "research" | "acceptance" }
+        const options = { purpose: pair.purpose, out: path.join(server.stateRoot, "pair-recovery"), lockRoot: globalLockRoot }
+        if (identity.serverEpoch === previous.identity.serverEpoch) {
+          await createPair(source, options)
+          await Bun.$`docker stop ${identity.containerId} ${identity.studioContainerId}`.quiet()
+          identity = (await createPair(source, options)).identity
+        }
+        expect(identity.containerId).toBe(previous.identity.containerId)
+        expect(identity.studioContainerId).toBe(previous.identity.studioContainerId)
+        expect(identity.serverEpoch).not.toBe(previous.identity.serverEpoch)
+        const root = path.join(server.stateRoot, "environment-generations", identity.serverEpoch)
+        const file = parseSlots({ ...source, controller: { ...source.controller, stateDir: path.join(root, "state") },
+          slots: source.slots.map(slot => ({ ...slot, username: "eval-" + new Bun.CryptoHasher("sha256").update(identity.serverEpoch + ":" + slot.id).digest("hex").slice(0, 48) })) }, parallel)
+        await mkdir(file.controller.stateDir, { recursive: true, mode: 0o700 })
+        const slotsFile = path.join(root, "slots.json")
+        for (const [target, value] of [[slotsFile, file], [path.join(file.controller.stateDir, "pair.json"), pair]] as const) {
+          if (await Bun.file(target).exists()) expect(JSON.stringify(await readLeaseReceipt(target)) === JSON.stringify(value)).toBe(true)
+          else await writeLeaseReceipt(target, value)
+        }
+        console.error(`native generation evidence: ${root}`)
+        const input = { slotsFile, parallel, previousSlotsFile: server.slotsFile, config: { ...config, slotsFile } }
+        expect((await prepareEnvironment(input)).ready).toBe(true)
+        expect((await verifyEnvironment({ slotsFile, parallel, config: input.config })).ready).toBe(true)
+        const inventory = (await Bun.$`docker exec ${identity.containerId} cat /workdir/.loginom-evals-isolated.json`.quiet()).text()
+        const secrets = await Promise.all(source.slots.map(slot => Bun.file(path.join(file.controller.stateDir, `prepare-${slot.id}.secret.json`)).text()))
+        expect((await prepareEnvironment(input)).changedUsers).toEqual([])
+        expect((await verifyEnvironment({ slotsFile, parallel, config: input.config })).ready).toBe(true)
+        expect((await Bun.$`docker exec ${identity.containerId} cat /workdir/.loginom-evals-isolated.json`.quiet()).text() === inventory).toBe(true)
+        expect((await Promise.all(source.slots.map(slot => Bun.file(path.join(file.controller.stateDir, `prepare-${slot.id}.secret.json`)).text()))).every((value, index) => value === secrets[index])).toBe(true)
+      } finally {
+        const after: (string | null)[] = []
+        for (const file of saved) after.push(await fingerprint(file).catch(() => null))
+        expect(after.every((value, index) => value === before[index])).toBe(true)
+      }
+    } finally { await unlock() }
+  }, 1_200_000,
+)
+
+test.skipIf(process.env.EVAL_PAIR_INTEGRATION !== "1" || !process.env.EVAL_CAMPAIGN_LIVE_SERVER)(
+  "fresh generation rejects unchanged epoch before resource admission", async () => {
+    const server = await readLeaseReceipt(process.env.EVAL_CAMPAIGN_LIVE_SERVER!) as CampaignServerConfig
+    const unlock = await tryCampaignLock(server.controllerLock)
+    expect(Boolean(unlock)).toBe(true)
+    if (!unlock) return
+    try {
+      expect(await Bun.file(path.join(server.stateRoot, "owner.json")).exists()).toBe(false)
+      const identity = await readServerIdentity(await loadSlots(server.slotsFile, 1))
+      const previousSlotsFile = path.join(server.stateRoot, "environment-generations", identity.serverEpoch, "slots.json")
+      const previous = await loadSlots(previousSlotsFile, 1)
+      const root = await mkdtemp(path.join(server.stateRoot, "epoch-probe-"))
+      const file = parseSlots({ ...previous, controller: { ...previous.controller, stateDir: path.join(root, "state") },
+        slots: previous.slots.map(slot => ({ ...slot, username: "probe-" + slot.username })) }, 1)
+      await mkdir(file.controller.stateDir, { mode: 0o700 })
+      const slotsFile = path.join(root, "slots.json")
+      await writeLeaseReceipt(slotsFile, file)
+      await writeLeaseReceipt(path.join(file.controller.stateDir, "pair.json"), await readLeaseReceipt(path.join(previous.controller.stateDir, "pair.json")) as object)
+      const commandId = crypto.randomUUID(), journal = path.join(previous.controller.stateDir, `epoch-probe-${commandId}.json`)
+      await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId, identity, phase: "unactivated", slotIds: [] })
+      const lease = await acquireResourceLease({ key: `server:${identity.containerId}`, lockRoot: globalLockRoot, journal, commandId, identity })
+      try {
+        const config = loadConfig(["--skip-judge"], { ...process.env, EVAL_SLOTS_FILE: slotsFile })
+        await expect(prepareEnvironment({ slotsFile, parallel: 1, config, previousSlotsFile })).rejects.toThrow("PREPARATION_GENERATION_MISMATCH")
+      } finally {
+        try {
+          const proof = path.join(previous.controller.stateDir, `epoch-probe-release-${commandId}.json`)
+          await writeLeaseReceipt(proof, { version: 2, status: "confirmed", key: lease.reservation.key, token: lease.reservation.token,
+            revision: lease.reservation.revision, serverEpoch: identity.serverEpoch, reason: "not-used" })
+          await lease.release(proof)
+        } finally { await lease.close() }
+        await rm(root, { recursive: true, force: true })
+      }
+    } finally { await unlock() }
+  }, 90_000,
+)
 
 integration("fresh generation: ready pair restarts the same owned containers", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "evals-ready-pair-"))
