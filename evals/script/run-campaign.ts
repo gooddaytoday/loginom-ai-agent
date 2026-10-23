@@ -24,6 +24,15 @@ export type CampaignJournal = {
 type UnitState = { active: boolean; invocation: string; exitCode: number }
 const keyId = (key: CampaignKey) => `${key.corpus}/${key.taskId}/${key.round}`
 
+export function campaignEnvironment(manifest: CampaignManifest, config: { slotsFile: string; resourceBudgetFile: string }): Record<string, string> {
+  if (manifest.pins.EVAL_CLI_MODE !== "binary" ||
+    ["EVAL_CLI_BIN", "EVAL_AGENT_MODEL", "EVAL_AGENT_VARIANT", "JUDGE_MODEL", "JUDGE_REASONING"]
+      .some(key => typeof manifest.pins[key] !== "string" || !String(manifest.pins[key]).trim()))
+    throw Error("CAMPAIGN_EXPERIMENT_PINS_REQUIRED")
+  return { ...Object.fromEntries(Object.entries(manifest.pins).map(([key, value]) => [key, String(value)])),
+    EVAL_SLOTS_FILE: config.slotsFile, EVAL_RESOURCE_BUDGET_FILE: config.resourceBudgetFile }
+}
+
 type PublisherConfig = { stateDir: string; multica: { url: string; workspace: string; issueId: string; tokenFile: string } }
 async function campaignFetch(config: PublisherConfig, endpoint: string, method = "GET", body?: object | FormData) {
   const token = (await Bun.file(config.multica.tokenFile).text()).trim()
@@ -102,7 +111,7 @@ export async function publishCampaign(manifest: CampaignManifest, journal: Campa
 }
 
 export async function prepareCampaignBatch(manifest: CampaignManifest, journal: CampaignJournal, keys: CampaignKey[], invocation: string,
-  config: { stateDir: string; batchEnvFile: string; resourceBudgetFile: string; corpora: Record<string, { entrypoint: string; tasks: string }> }) {
+  config: Pick<CampaignServerConfig, "harnessRoot" | "slotsFile" | "batchEnvFile" | "resourceBudgetFile" | "corpora"> & { stateDir: string }) {
   if (journal.repairing || journal.final || journal.blocker || journal.executor !== manifest.executor) throw Error("CAMPAIGN_DISPATCH_BLOCKED")
   const previous = journal.batches.at(-1)
   const batch = previous && !previous.accounted ? previous : {
@@ -114,9 +123,10 @@ export async function prepareCampaignBatch(manifest: CampaignManifest, journal: 
   await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
   const corpus = config.corpora[batch.keys[0]!.corpus]
   if (!corpus) throw Error("CAMPAIGN_CORPUS_UNKNOWN")
-  const environment = { ...manifest.pins, EVAL_ENTRYPOINT: corpus.entrypoint, EVAL_TASKS: corpus.tasks,
-    EVAL_ONLY: batch.keys.map(key => key.taskId).join(","), EVAL_LABEL: batch.id, EVAL_RESULTS_DIR: batch.resultsDir,
-    EVAL_RESOURCE_BUDGET_FILE: config.resourceBudgetFile }
+  const entrypoint = path.resolve(config.harnessRoot, corpus.entrypoint), tasks = path.resolve(config.harnessRoot, corpus.tasks)
+  if ([entrypoint, tasks].some(file => !file.startsWith(config.harnessRoot + path.sep))) throw Error("CAMPAIGN_CORPUS_PATH")
+  const environment = { ...campaignEnvironment(manifest, config), EVAL_ENTRYPOINT: entrypoint, EVAL_TASKS: tasks,
+    EVAL_ONLY: batch.keys.map(key => key.taskId).join(","), EVAL_LABEL: batch.id, EVAL_RESULTS_DIR: batch.resultsDir }
   const temporary = `${config.batchEnvFile}.${crypto.randomUUID()}.tmp`
   await Bun.write(temporary, Object.entries(environment).map(([key, value]) => `${key}=${JSON.stringify(String(value))}`).join("\n") + "\n", { mode: 0o600 })
   await rename(temporary, config.batchEnvFile)
@@ -201,8 +211,9 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
   return { journal, action: "start" as const, next }
 }
 
-type CampaignServerConfig = {
+export type CampaignServerConfig = {
   server: string; stateRoot: string; harnessRoot: string; controllerLock: string; batchUnit: string; batchEnvFile: string
+  acceptedHarness: string; slotsFile: string; experimentPinsFile: string; corpusPinsFile: string
   resourceBudgetFile: string; preflightCommand: string[]; verifyCommand: string[]
   corpora: Record<string, { entrypoint: string; tasks: string }>
   multica: { url: string; workspace: string; tokenFile: string }
@@ -242,7 +253,9 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
     manifest.limits?.consecutiveErrors !== undefined && (!Number.isSafeInteger(manifest.limits.consecutiveErrors) || manifest.limits.consecutiveErrors < 1) ||
     Object.entries(manifest.pins).some(([key, value]) => !/^[A-Z][A-Z0-9_]*$/.test(key) || /PASSWORD|TOKEN|SECRET|API_KEY/.test(key) || !["string", "number"].includes(typeof value)))
     throw Error("CAMPAIGN_MANIFEST_INVALID")
-  if (![config.stateRoot, config.harnessRoot, config.controllerLock, config.batchEnvFile, config.resourceBudgetFile].every(value => typeof value === "string" && path.isAbsolute(value)) ||
+  if (![config.stateRoot, config.harnessRoot, config.controllerLock, config.batchEnvFile, config.resourceBudgetFile,
+    config.slotsFile, config.experimentPinsFile, config.corpusPinsFile].every(value => typeof value === "string" && path.isAbsolute(value)) ||
+    !/^[a-f0-9]{40}$/.test(config.acceptedHarness) ||
     !config.batchUnit || !manifest.issueId || !Array.isArray(manifest.wakeupIds) || manifest.wakeupIds.some(id => typeof id !== "string" || !id) ||
     !config.preflightCommand?.length || !config.verifyCommand?.length)
     throw Error("CAMPAIGN_SERVER_INVALID")
@@ -266,7 +279,8 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
       await writeLeaseReceipt(journalFile, tick.journal)
       if (tick.action === "start" || tick.action === "launch") {
         const first = tick.next[0]!
-        await command([...config.preflightCommand, first.corpus, tick.next.map(key => key.taskId).join(","), String(first.round), String(manifest.parallel)], config.harnessRoot)
+        await command([...config.preflightCommand, "--server", serverFile, "--manifest", manifestFile,
+          first.corpus, tick.next.map(key => key.taskId).join(","), String(first.round), String(manifest.parallel)], config.harnessRoot)
         const batch = await prepareCampaignBatch(manifest, tick.journal, tick.next, unit.invocation, { ...config, stateDir })
         await command(["sudo", "-n", "systemctl", "start", unitName], config.harnessRoot)
         batch.started = true
@@ -274,7 +288,7 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
       }
       if (tick.action === "finalize") {
         if (!tick.journal.cleanupVerified) {
-          await command(config.verifyCommand.map(arg => arg.replaceAll("{stateDir}", stateDir)), config.harnessRoot)
+          await command(config.verifyCommand.map(arg => arg.replaceAll("{stateDir}", stateDir).replaceAll("{parallel}", String(manifest.parallel))), config.harnessRoot)
           tick.journal.cleanupVerified = true
           await writeLeaseReceipt(journalFile, tick.journal)
         }

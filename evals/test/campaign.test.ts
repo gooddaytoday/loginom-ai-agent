@@ -3,7 +3,22 @@ import os from "node:os"
 import path from "node:path"
 import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { emptyResult } from "../src/run"
-import { campaignTick, prepareCampaignBatch, publishCampaign, type CampaignManifest, type CampaignJournal } from "../script/run-campaign"
+import { campaignEnvironment, campaignTick, prepareCampaignBatch, publishCampaign, type CampaignManifest, type CampaignJournal } from "../script/run-campaign"
+
+test("campaign uses explicit experiment pins and canonical server paths for both preflight and dispatch", () => {
+  const manifest: CampaignManifest = { id: "pins", server: "runner2", executor: "EvalBaseline", parallel: 1, batchSize: 1,
+    keys: [{ corpus: "ordinary", taskId: "first", round: 1 }], pins: { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/pinned/cli",
+      EVAL_AGENT_MODEL: "pinned/model", EVAL_AGENT_VARIANT: "medium", JUDGE_MODEL: "pinned-judge", JUDGE_REASONING: "xhigh",
+      EVAL_SLOTS_FILE: "/old/slots.json", EVAL_RESOURCE_BUDGET_FILE: "/old/budget.json" } }
+  const server = { slotsFile: "/current/slots.json", resourceBudgetFile: "/current/budget.json" }
+  expect(campaignEnvironment(manifest, server)).toEqual({ ...manifest.pins, EVAL_SLOTS_FILE: server.slotsFile,
+    EVAL_RESOURCE_BUDGET_FILE: server.resourceBudgetFile })
+  for (const key of ["EVAL_CLI_MODE", "EVAL_CLI_BIN", "EVAL_AGENT_MODEL", "EVAL_AGENT_VARIANT", "JUDGE_MODEL", "JUDGE_REASONING"]) {
+    const unpinned = structuredClone(manifest)
+    delete unpinned.pins[key]
+    expect(() => campaignEnvironment(unpinned, server)).toThrow("CAMPAIGN_EXPERIMENT_PINS_REQUIRED")
+  }
+})
 
 test("campaign accounts a saved quality FAIL without summary and selects only the missing key", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-"))
@@ -68,19 +83,27 @@ test("campaign durably records a batch before exposing its parameters and reuses
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-admission-"))
   try {
     const manifest: CampaignManifest = { id: "admission", server: "runner2", executor: "EvalBaseline", parallel: 1, batchSize: 1,
-      keys: [{ corpus: "ordinary", taskId: "first", round: 1 }], pins: { EVAL_AGENT_MODEL: "pinned/model" } }
+      keys: [{ corpus: "ordinary", taskId: "first", round: 1 }], pins: { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/pinned/cli",
+        EVAL_AGENT_MODEL: "pinned/model", EVAL_AGENT_VARIANT: "medium", JUDGE_MODEL: "judge", JUDGE_REASONING: "xhigh" } }
     const state: CampaignJournal = { manifestHash: "test", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
       repairing: false, repairer: null, batches: [], attempts: [], lastProgressAt: 1000, consecutiveErrors: 0 }
-    const config = { stateDir: root, batchEnvFile: path.join(root, "batch.env"), resourceBudgetFile: path.join(root, "budget.json"),
+    const config = { stateDir: root, harnessRoot: path.join(root, "harness"), slotsFile: path.join(root, "slots.json"),
+      batchEnvFile: path.join(root, "batch.env"), resourceBudgetFile: path.join(root, "budget.json"),
       corpora: { ordinary: { entrypoint: "src/run.ts", tasks: "tasks" } } }
     const batch = await prepareCampaignBatch(manifest, state, manifest.keys, "old-unit", config)
     const saved = await Bun.file(path.join(root, "journal.json")).json()
     expect(saved.batches).toEqual([batch])
     const env = await Bun.file(config.batchEnvFile).text()
     expect(env).toContain('EVAL_AGENT_MODEL="pinned/model"')
+    expect(env).toContain(`EVAL_ENTRYPOINT=${JSON.stringify(path.join(config.harnessRoot, "src/run.ts"))}`)
+    expect(env).toContain(`EVAL_TASKS=${JSON.stringify(path.join(config.harnessRoot, "tasks"))}`)
+    expect(env).toContain(`EVAL_SLOTS_FILE=${JSON.stringify(config.slotsFile)}`)
     expect(env).toContain(`EVAL_RESULTS_DIR=${JSON.stringify(batch.resultsDir)}`)
     expect((await prepareCampaignBatch(manifest, state, manifest.keys, "old-unit", config)).id).toBe(batch.id)
     expect(state.batches).toHaveLength(1)
+    config.corpora.ordinary.entrypoint = "/old/harness/src/run.ts"
+    await expect(prepareCampaignBatch(manifest, state, manifest.keys, "old-unit", config)).rejects.toThrow("CAMPAIGN_CORPUS_PATH")
+    expect(await Bun.file(config.batchEnvFile).text()).toBe(env)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
