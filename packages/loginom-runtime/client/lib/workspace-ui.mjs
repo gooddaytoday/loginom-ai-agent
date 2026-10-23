@@ -692,7 +692,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // Long export/package captions can overflow the node breadcrumb itself.
     // This is context text only: gestures still require visible controls and
     // the current native node wizard or exact input0/native input1 opening.
-    const hiddenExportNode=e=>(preparedNodeWizard&&['text_export_params','text_export_format'].includes(wizard.stage)
+    const hiddenExportNode=e=>(preparedNodeWizard&&['text_export_params','text_export_format','done'].includes(wizard.stage)
         ||preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===1
           &&preparedInputPort.node_icon_class==='bg-vendor-icon-exporttextfile')
       &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'
