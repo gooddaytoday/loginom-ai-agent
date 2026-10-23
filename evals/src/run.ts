@@ -319,39 +319,23 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
         )
       : null)
   const noJudge = status === "harness_error" || status === "interrupted" || status === "infra_error"
-  const judged =
-    artifact && !noJudge && !input.signal.aborted && input.judge && !input.skipJudge
-      ? await (input.judgeGate ?? judgeTask)({
-          task,
-          run,
-          artifactDir: path.dirname(artifact.unpackedDir),
-          prompt,
-          outDir: path.join(outDir, "judge"),
-          judge: input.judge,
-          signal: input.signal,
-        }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
-      : undefined
   const skippedJudge = input.skipJudge || artifact !== undefined || noJudge
-  const judgeCleanupFailed = judged && "cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed
-  const judgeFields = judged
-    ? judgedFields(judged)
-    : {
-        structural_score: skippedJudge || task.checklist.some((item) => item.axis === undefined) || !task.checklist.some((item) => item.axis === "structure") ? null : 0,
-        score: skippedJudge ? null : 0,
-        pass: skippedJudge ? null : false,
-        judge_status: (skippedJudge ? "skipped" : "no_artifact") as AttemptResult["judge_status"],
-        judge_attempts: 0,
-        judge_confidence: null,
-        judge_summary: null,
-        checklist: null,
-        oracle_pass: !skippedJudge && task.oracle ? false : null,
-        oracle_error: !skippedJudge && task.oracle ? "Артефакт и файл результата для oracle отсутствуют" : null,
-      }
+  const judgeFields = {
+    structural_score: skippedJudge || task.checklist.some((item) => item.axis === undefined) || !task.checklist.some((item) => item.axis === "structure") ? null : 0,
+    score: skippedJudge ? null : 0,
+    pass: skippedJudge ? null : false,
+    judge_status: (skippedJudge ? "skipped" : "no_artifact") as AttemptResult["judge_status"],
+    judge_attempts: 0,
+    judge_confidence: null,
+    judge_summary: null,
+    checklist: null,
+    oracle_pass: !skippedJudge && task.oracle ? false : null,
+    oracle_error: !skippedJudge && task.oracle ? "Артефакт и файл результата для oracle отсутствуют" : null,
+  }
   const result: AttemptResult = {
     ...base,
     ...judgeFields,
-    ...(judgeCleanupFailed ? { judge_cleanup_unconfirmed: true } : {}),
-    ...((judged || !skippedJudge) && input.evaluationHash ? { evaluation_contract_hash: input.evaluationHash } : {}),
+    ...(!input.skipJudge && (artifact || !skippedJudge) && input.evaluationHash ? { evaluation_contract_hash: input.evaluationHash } : {}),
     status,
     exit_code: run.exitCode,
     timed_out: run.timedOut,
@@ -366,9 +350,9 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     artifact_ambiguous: artifact?.ambiguous ?? [],
     cleanup_error: cleanupError,
     environment_cleanup: {
-      status: judgeCleanupFailed || run.processCleanup.status === "failed" ? "failed" : "not_run",
-      evidence: judgeCleanupFailed ? judged.attempts ? `judge-processes-${judged.attempts}/process-cleanup.json` : null : "cleanup.json",
-      error: judgeCleanupFailed && !judged.ok ? judged.error : run.processCleanup.error,
+      status: run.processCleanup.status === "failed" ? "failed" : "not_run",
+      evidence: "cleanup.json",
+      error: run.processCleanup.error,
     },
     action_manifest_sha256: run.actionManifestSha256 ?? null,
     skill_revision: run.skillRevision ?? null,
@@ -385,7 +369,27 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   await writeLeaseReceipt(path.join(outDir, "cleanup.json"), { processes: run.processCleanup,
     ...(input.slot ? { slotId: input.slot.lease.slot.id, serverEpoch: input.slot.lease.identity.serverEpoch,
       serverSessions: "unknown", storageDeletionAllowed: false, nextAdmissionAllowed: false } : {}) })
-  await Bun.write(path.join(outDir, "result.json"), JSON.stringify(result, null, 2))
+  await writeLeaseReceipt(path.join(outDir, "result.json"), result)
+  const judged =
+    artifact && !noJudge && !input.signal.aborted && input.judge && !input.skipJudge
+      ? await (input.judgeGate ?? judgeTask)({
+          task,
+          run,
+          artifactDir: path.dirname(artifact.unpackedDir),
+          prompt,
+          outDir: path.join(outDir, "judge"),
+          judge: input.judge,
+          signal: input.signal,
+        }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
+      : undefined
+  const judgeCleanupFailed = judged && "cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed
+  if (judged) {
+    Object.assign(result, judgedFields(judged), judgeCleanupFailed ? { judge_cleanup_unconfirmed: true,
+      environment_cleanup: { status: "failed", evidence: judged.attempts ? `judge-processes-${judged.attempts}/process-cleanup.json` : null,
+        error: !judged.ok ? judged.error : null } } : {})
+    Object.assign(base, result)
+    await writeLeaseReceipt(path.join(outDir, "result.json"), result)
+  }
   return { result, stop: stop || run.processCleanup.status === "failed" || Boolean(judgeCleanupFailed) }
 }
 
