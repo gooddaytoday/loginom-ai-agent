@@ -66,6 +66,7 @@ test("campaign publishes its saved FAIL once and reads back the final issue and 
   const attachments: { id: string; filename: string }[] = []
   let uploaded = new Uint8Array()
   let downloads = 0
+  let unwantedAgentRuns = 0
   const issue = { revision: 1, status: "in_progress" }
   const wakeup = { id: "timer", enabled: true }
   const server = Bun.serve({ port: 0, async fetch(request) {
@@ -80,8 +81,13 @@ test("campaign publishes its saved FAIL once and reads back the final issue and 
     }
     if (route.endsWith("/download")) { downloads++; return new Response(uploaded) }
     if (route.endsWith("/attachments")) return Response.json(attachments)
+    if (route.endsWith("/comments/trigger-preview")) return Response.json({ agents: [{ id: "baseline" }] })
     if (route.endsWith("/comments")) {
-      if (request.method === "POST") comments.push({ ...await request.json(), id: "report" })
+      if (request.method === "POST") {
+        const data = await request.json()
+        if (!data.suppress_agent_ids?.includes("baseline")) unwantedAgentRuns++
+        comments.push({ ...data, id: "report" })
+      }
       return Response.json(request.method === "POST" ? comments.at(-1) : comments)
     }
     if (route.endsWith("/disable")) { wakeup.enabled = false; return Response.json(wakeup) }
@@ -108,5 +114,6 @@ test("campaign publishes its saved FAIL once and reads back the final issue and 
     expect(attachments).toHaveLength(1)
     expect(downloads).toBeGreaterThan(0)
     expect(uploaded.length).toBeGreaterThan(0)
+    expect(unwantedAgentRuns).toBe(0)
   } finally { server.stop(true); await rm(root, { recursive: true, force: true }) }
 })

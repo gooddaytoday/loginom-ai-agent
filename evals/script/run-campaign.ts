@@ -78,7 +78,9 @@ export async function publishCampaign(manifest: CampaignManifest, journal: Campa
     throw Error("CAMPAIGN_ATTACHMENT_READBACK")
   const comments = await campaignRequest(config, `${endpoint}/comments`) as { id: string; content: string }[]
   const existing = comments.find(comment => comment.content.includes(marker))
-  const comment = existing ?? await campaignRequest(config, `${endpoint}/comments`, "POST", { content: report, attachment_ids: [journal.attachmentId] }) as { id: string }
+  const preview = existing ? { agents: [] } : await campaignRequest(config, `${endpoint}/comments/trigger-preview`, "POST", { content: report }) as { agents: { id: string }[] }
+  const comment = existing ?? await campaignRequest(config, `${endpoint}/comments`, "POST", { content: report,
+    attachment_ids: [journal.attachmentId], suppress_agent_ids: preview.agents.map(agent => agent.id) }) as { id: string }
   if (!comment.id) throw Error("CAMPAIGN_REPORT_NOT_PERSISTED")
   journal.reportCommentId = comment.id
   await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
