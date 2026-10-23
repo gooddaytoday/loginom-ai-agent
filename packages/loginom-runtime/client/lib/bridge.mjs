@@ -576,11 +576,19 @@ export async function createBridge(config, session, { browserTransport: managedB
       closing ??= (async () => {
         await recovery.close();
         const normalCleanup = config.closeSavedPackageOnShutdown === true;
-        const packagePath = config.acceptanceCleanupPackage ?? (normalCleanup ? lastSavedPackage?.path : userProfile && savedPackages.size === 1 ? savedPackages.keys().next().value : null);
+        const prepared = session.metadata.workspacePreparation;
+        const preparationRequest = prepared?.identity ? JSON.parse(prepared.identity) : null;
+        // A refusal in a fresh continuation has no Save receipt. Its confirmed
+        // Open can still identify the package; native cleanup must prove it clean
+        // and retain every account/node/tab guard before closing without Save.
+        const openedPackage = normalCleanup && !lastSavedPackage && session.metadata.workspaceReady === true
+          && preparationRequest?.intent === 'open_package' && prepared.state?.status === 'READY'
+          && prepared.state.created_draft === false && prepared.state.package_ref?.persisted === true
+          && prepared.state.package_ref.path === preparationRequest.package_path ? prepared.state.package_ref.path : null;
+        const packagePath = config.acceptanceCleanupPackage ?? (normalCleanup ? lastSavedPackage?.path ?? openedPackage : userProfile && savedPackages.size === 1 ? savedPackages.keys().next().value : null);
         const saveOperationId = normalCleanup ? lastSavedPackage?.operation_id : savedPackages.get(packagePath);
         let cleanup;
         if (packagePath || normalCleanup) {
-          const prepared = session.metadata.workspacePreparation;
           if (!prepared?.attempted) cleanup = {status:'SKIPPED_UNPREPARED', session_id:session.metadata.sessionId};
           else {
             try {
@@ -588,8 +596,8 @@ export async function createBridge(config, session, { browserTransport: managedB
               // browser gate. Shutdown never cancels them to force a close.
               actionRuntime.assertPreparationAllowed();
               if (actionRuntime.hasUnsettledWork() || recovery.unsettled() || clipboardUncertain || heldLeases.size > 0) throw Error('Unsettled work prevents package cleanup');
-              if (session.metadata.workspaceReady !== true || !packagePath || !saveOperationId
-                  || normalCleanup && lastSavedPackage.document_id !== prepared.state?.document_id) {
+              if (session.metadata.workspaceReady !== true || !packagePath || !saveOperationId && !openedPackage
+                  || normalCleanup && lastSavedPackage && lastSavedPackage.document_id !== prepared.state?.document_id) {
                 cleanup = {status:'BLOCKED', reason:'CONFIRMED_SAVE_REQUIRED'};
               } else cleanup = await browserGate(async () => {
                 actionRuntime.assertPreparationAllowed();
@@ -609,7 +617,7 @@ export async function createBridge(config, session, { browserTransport: managedB
           }
           cleanup = {...cleanup, session_id:session.metadata.sessionId,
             save_operation_id:saveOperationId ?? null,
-            ...(normalCleanup ? {package_path:packagePath ?? null, policy:'last_confirmed_own_save'} : {})};
+            ...(normalCleanup ? {package_path:packagePath ?? null, policy:openedPackage?'opened_saved_package':'last_confirmed_own_save'} : {})};
           try {
             await writeFile(join(session.directory,normalCleanup?'saved-package-cleanup.json':'package-cleanup.json'), JSON.stringify(cleanup,null,2)+'\n', {mode:0o600});
             await recordExecution({event:normalCleanup?'managed_saved_package_cleanup':config.acceptanceCleanupPackage?'isolated_package_cleanup':'saved_package_cleanup', cleanup});
