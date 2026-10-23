@@ -16,20 +16,24 @@
 - Legacy preparations не дополняются текущими данными. Если доказательства отсутствуют у всех, остаётся прежнее точное сравнение configurationHash; смешанный/повреждённый набор запрещён. LAB-134 этим изменением задним числом не восстанавливается.
 - Campaign continuity guard остаётся в prepare-generation; generic prepareEnvironment не запрещает разные конфигурации разных экспериментов. Ownership, topology, закрытие старого использования, CLI/pins, deadline и финальная точная runtime-проверка сохраняются.
 
-Ревью проверяет пять рисков: реальное network churn; настоящее изменение HostConfig/сети/файла; legacy и смешанные receipts; прерывание planned→staged; смешанное наблюдение при restart. Тесты ниже закрепляют соответствующие границы. Не обещать устранение именно LAB-134 без исторических входов.
+Ревью проверяет пять рисков: реальный restart с новым endpoint; настоящее изменение HostConfig/сети/файла; legacy и смешанные receipts; прерывание planned→staged; смешанное наблюдение при restart. Тесты ниже закрепляют соответствующие границы. Не обещать устранение именно LAB-134 без исторических входов.
 
 ## Шаг 1 — первое native доказательство
 
 Файлы: `evals/src/parallel-pair.ts`, существующие `parallel-pair.test.ts` и `parallel-pair-integration.test.ts`.
 Интерфейсы: `stablePairConfiguration(input) → {version: 1, hash: string}` для указанных выше входов; `readServerObservation(file) → {identity: ServerIdentity, stableConfiguration}`. `readServerIdentity(file)` возвращает прежний identity из того же fenced чтения.
 
-- [ ] Один RED: runtime network-поля меняются, stable digest остаётся одинаковым. Добавить минимальную projection и получить GREEN. Следующий RED→GREEN отдельно проверяет изменение реальной настройки/файла, сохранение неизвестного поля и нечувствительность к порядку ключей/aliases.
-- [ ] Перенести native чтение в readServerObservation без изменения прежнего hash/полей identity; использовать те же повторные inspect и server epoch fence. Проверить существующие identity-тесты.
-- [ ] На локальном Docker создать отдельную временную owned research pair штатными createPair/destroyPair. Если точных образов нет, прочитать их через `docker image save` с runner2 по SSH и загрузить локально; удалённая среда не меняется. Сверить image IDs, не останавливать чужие контейнеры.
-- [ ] Опциональный integration-тест: observation → настоящий disconnect/reconnect server endpoint на той же сети с прежними aliases → observation. Legacy hash меняется, stable digest сохраняется; fresh verify проходит, verify со старой identity отказывает. Finally удаляет только ресурсы этой pair штатной командой. Команда из `evals/`: `EVAL_PAIR_INTEGRATION=1 bun run test test/parallel-pair-integration.test.ts -t 'stable configuration survives'`.
-- [ ] После первого native GREEN — целевые unit-тесты, typecheck, независимое ревью и коммит. Если native предположение неверно, сначала установить фактический diff; не добавлять исключения без доказательства runtime-семантики.
+- [x] Один RED: runtime network-поля меняются, stable digest остаётся одинаковым. Добавить минимальную projection и получить GREEN. Следующий RED→GREEN отдельно проверяет изменение реальной настройки/файла, сохранение неизвестного поля и нечувствительность к порядку ключей/aliases.
+- [x] Перенести native чтение в readServerObservation без изменения прежнего hash/полей identity; использовать те же повторные inspect и server epoch fence. Проверить существующие identity-тесты.
+- [x] На локальном Docker создать отдельную временную owned research pair штатными createPair/destroyPair. Если точных образов нет, прочитать их через `docker image save` с runner2 по SSH и загрузить локально; удалённая среда не меняется. Сверить image IDs, не останавливать чужие контейнеры.
+- [x] Опциональный integration-тест: observation → настоящий restart обоих контейнеров на той же сети → observation. Epoch и legacy hash меняются, stable digest сохраняется; fresh verify проходит, verify со старой identity отказывает. Finally удаляет только ресурсы этой pair штатной командой. Команда из `evals/`: `EVAL_PAIR_INTEGRATION=1 bun run test test/parallel-pair-integration.test.ts -t 'stable configuration survives'`.
+- [x] После первого native GREEN — целевые unit-тесты, typecheck, независимое ревью и коммит. Если native предположение неверно, сначала установить фактический diff; не добавлять исключения без доказательства runtime-семантики.
 
-**Проверяемый результат:** реальная смена endpoint не меняет stable proof и не ослабляет проверку текущей identity. Это не доказательство host reboot.
+**Проверяемый результат:** реальный restart со сменой endpoint не меняет stable proof и не ослабляет проверку текущей identity. Это не доказательство host reboot.
+
+Реальный probe показал: CLI disconnect/connect меняет IPAMConfig и DriverOpts, поэтому не годится для положительного сравнения неизменных настроек. Используется restart прежних контейнеров: он меняет endpoint и epoch, сохраняя эти настройки; исключать IPAMConfig/DriverOpts из digest не требуется.
+
+Шаг 1 проверен: 61 unit-тест / 226 assertions и typecheck прошли; native integration — 1 тест / 7 assertions. Реальный restart меняет epoch/legacy hash, stable proof сохраняется, старая identity отвергается. Свои контейнеры и сеть штатно удалены; независимое ревью — PASS.
 
 ## Шаг 2 — долговечное доказательство штатной preparation
 
@@ -49,7 +53,7 @@
 - [ ] Сравнивать старые proofs только с новым fenced observation; bootstrap identity должна точно совпасть с наблюдением. Сохранить все имеющиеся final/deadline/ownership/config-publish guards. Пройти целевые suite/typecheck и независимое ревью, коммит.
 - [ ] После завершения LAB-134 поставить принятый frozen SHA штатно. В следующей согласованной полной кампании получить новые preparations до reboot и выполнить saved-node/controller-gap/host-reboot путь исходных планов. Сохранённое качество учитывается один раз, missing продолжается, очистка и публикация подтверждены. Не добавлять отдельную модельную кампанию только ради нового механизма.
 
-**Проверяемый результат:** полный reboot-путь кампании работает при неизменных закреплённых условиях; local churn test не заменяет эту проверку.
+**Проверяемый результат:** полный reboot-путь кампании работает при неизменных закреплённых условиях; local restart test не заменяет эту проверку.
 
 ## Размер, стоимость и исключения
 
