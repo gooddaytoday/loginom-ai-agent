@@ -4,6 +4,9 @@ import { parseArgs } from "node:util"
 import { isQualityResult, type AttemptResult } from "../src/report"
 import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { tryCampaignLock } from "../src/campaign-lock"
+import { assessNodeAttempt } from "../src/node-evals"
+import { loadSlots } from "../src/slots"
+import { agentInputsHash, loadTasks, rubricHash } from "../src/task"
 
 type CampaignKey = { corpus: string; taskId: string; round: number }
 export type CampaignManifest = {
@@ -262,7 +265,8 @@ export async function prepareCampaignBatch(manifest: CampaignManifest, journal: 
   return batch
 }
 
-export async function campaignTick(manifest: CampaignManifest, previous: CampaignJournal, unit: UnitState | undefined, now = Date.now()) {
+export async function campaignTick(manifest: CampaignManifest, previous: CampaignJournal, unit: UnitState | undefined, now = Date.now(),
+  context?: Pick<CampaignServerConfig, "harnessRoot" | "corpora" | "slotsFile" | "corpusPinsFile">) {
   const journal: CampaignJournal = structuredClone(previous)
   if (journal.campaignId !== manifest.id || journal.server !== manifest.server) throw Error("CAMPAIGN_OWNERSHIP_MISMATCH")
   if (!unit) {
@@ -349,11 +353,31 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
             status: acceptance.checks.some(check => check.status === "failed") ? "failed" : acceptance.checks.some(check => check.status === "incomplete") || !acceptance.checks.length ? "incomplete" : "passed",
             codes: acceptance.checks.flatMap(check => check.codes),
           } : { status: "incomplete", codes: ["RESOURCE_EVIDENCE_MISSING"] }
-          const counted = resources.status !== "failed" && isQualityResult(result)
+          let node: Awaited<ReturnType<typeof assessNodeAttempt>> | undefined
+          if (key.corpus === "node") {
+            const corpus = context?.corpora[key.corpus]
+            if (!context || !corpus) throw Error("CAMPAIGN_NODE_CONTEXT_REQUIRED")
+            const tasksDir = path.resolve(context.harnessRoot, corpus.tasks)
+            if (!tasksDir.startsWith(path.resolve(context.harnessRoot) + path.sep)) throw Error("CAMPAIGN_CORPUS_PATH")
+            const pins = await readLeaseReceipt(context.corpusPinsFile) as { groups: { group: string; tasks: { id: string; agentInputsHash: string; rubricHash: string }[] }[] }
+            const pinned = pins.groups.find(group => group.group === key.corpus)?.tasks.find(task => task.id === key.taskId)
+            const tasks = await loadTasks(tasksDir, [key.taskId])
+            if (!pinned || pinned.agentInputsHash !== await agentInputsHash(tasks) || pinned.rubricHash !== await rubricHash(tasks))
+              throw Error("CAMPAIGN_NODE_PINS_CHANGED")
+            const saved = await Bun.file(path.join(batch.resultsDir, run, "config.json")).json()
+            for (const [name, value] of [["EVAL_CLI_MODE", saved.agent?.cliMode], ["EVAL_CLI_BIN", saved.agent?.cliBin],
+              ["EVAL_AGENT_MODEL", saved.agent?.model], ["EVAL_AGENT_VARIANT", saved.agent?.variant],
+              ["JUDGE_MODEL", saved.judge?.model], ["JUDGE_REASONING", saved.judge?.reasoning]] as const)
+              if (manifest.pins[name] !== undefined && manifest.pins[name] !== value) throw Error("CAMPAIGN_EXPERIMENT_PINS_CHANGED")
+            const slot = (await loadSlots(context.slotsFile, manifest.parallel)).slots.find(slot => slot.id === result.slot_id)
+            if (!slot) throw Error("CAMPAIGN_NODE_SLOT_UNKNOWN")
+            node = await assessNodeAttempt({ runDir: path.join(batch.resultsDir, run), taskId: key.taskId, tasksDir, slot })
+          }
+          const counted = resources.status !== "failed" && (key.corpus === "node" ? node?.code !== undefined && node.code !== 2 : isQualityResult(result))
           const completion = completions.get(resultFile)
-          const completedAt = Math.min(now, completion?.quality === counted && Number.isSafeInteger(completion.completedAt)
+          const completedAt = Math.min(now, completion && (key.corpus === "node" || completion.quality === counted) && Number.isSafeInteger(completion.completedAt)
             ? completion.completedAt! : (await stat(resultFile)).mtimeMs)
-          const entry = { key, resultFile, status: result.status, counted, pass: result.pass, score: result.score, resources,
+          const entry = { key, resultFile, status: result.status, counted, pass: node && node.code !== 2 ? node.verdict === "PASS" : result.pass, score: result.score, resources,
             completedAt,
             cleanupConfirmed: result.environment_cleanup?.status === "confirmed" && cleanup?.processes?.status === "confirmed" && cleanup?.nextAdmissionAllowed === true }
           const index = journal.attempts.findIndex(attempt => attempt.resultFile === resultFile)
@@ -526,7 +550,7 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
       if (operation === "repair") {
         if (!exists || owner?.campaignId !== manifest.id) throw Error("CAMPAIGN_OWNER_MISMATCH")
         if (previous.repairing && previous.repairer !== repairer) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
-        previous = (await campaignTick(manifest, previous, await observeUnit(unitName, config.harnessRoot))).journal
+        previous = (await campaignTick(manifest, previous, await observeUnit(unitName, config.harnessRoot), Date.now(), config)).journal
         if (previous.final) {
           previous.repairing = false
           previous.repairer = null
@@ -545,7 +569,7 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
         if (!previous.repairing || previous.repairer !== repairer) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
         const unit = await observeUnit(unitName, config.harnessRoot)
         if (unit.active) throw Error("CAMPAIGN_BATCH_ACTIVE")
-        const checked = await campaignTick(manifest, { ...previous, repairing: false, blocker: undefined, blockerKind: undefined }, unit)
+        const checked = await campaignTick(manifest, { ...previous, repairing: false, blocker: undefined, blockerKind: undefined }, unit, Date.now(), config)
         previous = { ...checked.journal, repairing: true, repairer: repairer! }
         if (["CAMPAIGN_RECONCILIATION_FAILED", "ADMISSION_STATE_UNCONFIRMED"].includes(previous.blocker ?? "")) {
           await writeLeaseReceipt(journalFile, previous)
@@ -583,7 +607,7 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
       if (!exists) await writeLeaseReceipt(journalFile, previous)
       const unit = owner && owner.campaignId !== manifest.id ? undefined : await observeUnit(unitName, config.harnessRoot).catch(() => undefined)
       if (!owner && unit?.active && previous.batches.at(-1) && !previous.batches.at(-1)!.accounted) await claim()
-      const tick = await campaignTick(manifest, previous, unit)
+      const tick = await campaignTick(manifest, previous, unit, Date.now(), config)
       await writeLeaseReceipt(journalFile, tick.journal)
       if (entering || tick.action !== "wait") {
         entering = false
