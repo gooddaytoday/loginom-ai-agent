@@ -66,6 +66,7 @@
 
 ## Шаг 2 — немедленный native E2E, до controller wiring и hardening
 
+- [x] Первым отдельным RED→GREEN проверить `fresh generation: ready pair restarts the same owned containers` в том же integration-файле: собственная временная pair, штатные guards, остановка и возврат прежних ID; marker и pair journal сохраняются. Это проверка Docker bootstrap без admin/модели; она не подменяет последующий native prepare.
 - [ ] В `test/user-environment-integration.test.ts` добавить один opt-in `fresh generation reuses profile after owned pair restart` с настоящей выделенной owned pair, установленным CLI/admin и сохранённым quality. Для первого пути взять уже released old server/profile/judge leases с полными native proofs: proof-only release ещё не требуется.
 - [ ] Команда из `evals/`: `EVAL_PAIR_INTEGRATION=1 bun run test test/user-environment-integration.test.ts -t 'fresh generation reuses profile after owned pair restart'`. Тест сверяет `docker inspect --type container <ID>`/network inspect с pair.json и labels до controlled stop/start; public createPair на ready pair сначала даёт воспроизводимый RED на остановленных контейнерах. Не создавать fake Docker, admin override или обход guards.
 - [ ] Минимально переиспользовать ready start-блок createPair; после start сверить прежние IDs и новую actual epoch/StartedAt. Создать детерминированные private state/SlotFile и byte-copy pair.json; через public prepareEnvironment(previousSlotsFile) → verifyEnvironment пройти новую native ownership, адресный setup и обычный cleanup/release на тех же profile/workspace/history/judgeHome.
@@ -106,4 +107,5 @@
 Checkpoint:
 
 - Шаг 1 выполнен: RED→GREEN публичного setup; profile suite 81 pass / 2 skip / 0 fail, 247 assertions; typecheck и независимое ревью — PASS.
-- Шаги 2–4 не выполнены; установленный CLI, native preparation и reboot этим не подтверждены. Следующий шаг — первый native E2E до controller wiring.
+- Bootstrap шага 2 проверен на отдельной временной pair runner2: два RED→GREEN, 1 live test / 13 assertions; локально 11 pair tests / 45 assertions и typecheck; независимое ревью — PASS. Рабочая pair не перезапускалась.
+- Шаги 2–4 не завершены: следующий шаг — native prepare с прежним профилем и новым username; CLI/native preparation и host reboot не подтверждены. Controller wiring не начинается до native GREEN.

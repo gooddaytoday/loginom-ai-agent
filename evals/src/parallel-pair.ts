@@ -315,7 +315,9 @@ async function usePair(file: SlotFile, options: PairOptions, action: "create" | 
   }) as PairJournal | undefined
   if (saved && (saved.version !== 2 || saved.kind !== "pair-provision" || !ownerNonce.test(saved.nonce) || saved.purpose !== options.purpose ||
     saved.daemonId !== daemonId || JSON.stringify(saved.server) !== JSON.stringify(file.server) || JSON.stringify(saved.images) !== JSON.stringify(pairImages) ||
-    !saved.resources || !["provisioning", "configured", "ready", "destroying", "destroyed"].includes(saved.phase))) throw new EvalFailure("PAIR_OWNERSHIP", 2)
+    !saved.resources || !["provisioning", "configured", "ready", "destroying", "destroyed"].includes(saved.phase) ||
+    saved.phase === "ready" && (Object.keys(saved.resources).length !== 3 ||
+      (["network", "server", "studio"] as const).some(role => !/^[a-f0-9]{64}$/.test(saved.resources[role] ?? ""))))) throw new EvalFailure("PAIR_OWNERSHIP", 2)
   if (action === "destroy" && !saved) throw new EvalFailure("PAIR_OWNERSHIP", 2)
   if (action === "create" && saved?.phase === "destroyed") throw new EvalFailure("PAIR_DESTROYED", 2)
   const journal: PairJournal = saved ? structuredClone(saved) : { version: 2, kind: "pair-provision", nonce: crypto.randomUUID(), purpose: options.purpose,
@@ -468,14 +470,12 @@ async function usePair(file: SlotFile, options: PairOptions, action: "create" | 
       delete journal.intent
       await writeLeaseReceipt(pairFile, journal)
     }
-    if (journal.phase !== "ready") {
-      for (const id of [serverId, studioId]) {
-        if ((await inspectContainer(id)).State.Running) continue
-        if (saved?.intent?.operation === "start" && saved.intent.target === id) throw new EvalFailure("PAIR_START_UNKNOWN", 2)
-        await intent("start", id)
-        await docker(["start", id])
-        if (!(await inspectContainer(id)).State.Running) throw new EvalFailure("PAIR_START_UNKNOWN", 2)
-      }
+    for (const id of [serverId, studioId]) {
+      if ((await inspectContainer(id)).State.Running) continue
+      if (saved?.intent?.operation === "start" && saved.intent.target === id) throw new EvalFailure("PAIR_START_UNKNOWN", 2)
+      await intent("start", id)
+      await docker(["start", id])
+      if (!(await inspectContainer(id)).State.Running) throw new EvalFailure("PAIR_START_UNKNOWN", 2)
     }
     const identity = await verifyPair(file, journal)
     journal.phase = "ready"
