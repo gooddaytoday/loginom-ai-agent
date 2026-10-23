@@ -391,8 +391,8 @@ test("cgroup coverage requires applicable controller data without inventing coun
   for (const change of [{ controllers: null }, { cpu_usage: null },
     { controllers: ["cpu", "memory"], cpu_max: null },
     { controllers: ["cpu", "memory"], cpu_throttling: null },
-    { controllers: ["memory"], memory_events: null }, { controllers: ["memory"], memory_limit_bytes: null },
-    { controllers: ["memory"], swap_current_bytes: null },
+    { controllers: ["cpu", "memory"], memory_events: null }, { controllers: ["cpu", "memory"], memory_limit_bytes: null },
+    { controllers: ["cpu", "memory"], swap_current_bytes: null },
   ]) expect(assessCgroupCoverage({ groups: [{ ...group, ...change }], view }))
     .toEqual({ status: "incomplete", codes: ["CGROUP_COUNTERS_INCOMPLETE"] })
   const disabled = { ...group, controllers: [], cpu_max: null, cpu_throttling: null, memory_current_bytes: null,

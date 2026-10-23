@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdtemp, rm, symlink } from "node:fs/promises"
+import { mkdtemp, realpath, rm, symlink } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { collectNodeNativeEvidence } from "../src/node-native"
 import { archiveProfileHistory } from "../src/profile"
 import { collectTextImportEvidence } from "../src/text-import"
@@ -73,7 +74,7 @@ test.each(["foreign archive", "noncanonical path", "symlink escape"] as const)(
 )
 
 async function fixture(event: unknown) {
-  const root = await mkdtemp("/home/kiselev/storage/tmp/prepared-native-")
+  const root = await mkdtemp(path.join(await realpath(tmpdir()), "prepared-native-"))
   const profile = path.join(root, "profile"), history = path.join(root, "history"), attempt = path.join(root, "attempt")
   const raw = JSON.stringify(event) + "\n"
   await Bun.write(path.join(profile, "runtime/execution-events.jsonl"), raw)
