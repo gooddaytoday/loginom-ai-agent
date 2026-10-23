@@ -10,8 +10,8 @@ import { createJudgeGate, judgeInfo, type JudgeSettings } from "./judge"
 import { acquireJudgeLease, readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { openLoginomAdmin, type AdminConnection } from "./loginom-admin"
 import { requireResourceBudgetScopes, validResourceBound } from "./parallel-resource-budget"
-import { freezeResourceBudget, readFrozenResourceBudget, readResourceEvidence } from "./parallel-resource-evidence"
-import { assessResourceBudget, assessResourceIncidents, assessResourceTimeline } from "./parallel-acceptance"
+import { freezeResourceBudget } from "./parallel-resource-evidence"
+import { checkRunResourceEvidence } from "./parallel-acceptance"
 import { sampleHostResources } from "./parallel-resources"
 import { readServerIdentity } from "./parallel-pair"
 import { preflight, requestPreflight, gitInfo, type Environment } from "./preflight"
@@ -194,18 +194,8 @@ export async function runPreparedSlots(config: EvalConfig) {
   }
   if (!dispatchStarted) throw new EvalFailure(stopped ?? "SLOT_ADMISSION_FAILED", 2)
   const samplesFile = path.join(runDir, "resources.jsonl"), summaryFile = `${samplesFile}.summary.json`
-  const resourceChecks: { status: string; codes: string[] }[] = []
-  try {
-    const evidence = await readResourceEvidence({ file: summaryFile, samplesFile, runId, phase: "run" })
-    resourceChecks.push(assessResourceBudget({ runId, startedAt: dispatchStarted,
-      budget: await readFrozenResourceBudget({ ...budget.source, runId, startedAt: dispatchStarted }), summary: evidence.receipt.summary }),
-      assessResourceIncidents({ samples: evidence.samples, summary: evidence.receipt.summary }),
-      assessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, startedAt: dispatchStarted, finishedAt: executionFinished }))
-    if (evidence.samples.some(sample => containers.some(target => {
-      const rows = sample.containers?.filter(row => row.container_id === target.id) ?? []
-      return rows.length !== 1 || rows[0]!.epoch_stable !== true || rows[0]!.inspect?.started_at !== target.startedAt
-    }))) resourceChecks.push({ status: "failed", codes: ["CONTAINER_RESOURCE_IDENTITY_UNCONFIRMED"] })
-  } catch (error) { resourceChecks.push({ status: "incomplete", codes: [describe(error)] }) }
+  const resourceChecks = await checkRunResourceEvidence({ runId, startedAt: dispatchStarted, finishedAt: executionFinished,
+    samplesFile, summaryFile, budget: budget.source, containers })
   if (resourceChecks.some(check => check.status === "failed")) stopped ??= resourceChecks.flatMap(check => check.codes).join(", ")
   const measured = attempts.filter((attempt): attempt is AttemptResult => attempt !== undefined)
   const limits = aggregateLimits(measured, ["provider", "judge"])
