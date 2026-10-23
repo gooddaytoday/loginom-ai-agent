@@ -261,7 +261,16 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRea
           readSettings=await prepareTableRead(channel,opened.table);
           raw=await readTableOutputPages(channel,opened.table,{sampleRows:read.sample_rows});
           data=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:outputColumns,requireExactNumbers:read.require_exact_numbers});
-        } finally { if(formatProof){formatRestoration=await restoreTablePrecision(channel,formatProof);readView.restored=true;} }
+        } catch(error) {
+          // A settled ambiguous Filter click can leave our own draft open.
+          // Cancel it before restoring Format; never clean up a lost transport
+          // call or replace its primary error with a secondary cleanup failure.
+          if(!operation.transportUncertain&&operation.cleanupConfirmed===true) {
+            await restoreStoppedTableRead(channel,readView,error);readView=null;
+          }
+          throw error;
+        }
+        if(formatProof){formatRestoration=await restoreTablePrecision(channel,formatProof);readView.restored=true;}
         const workflowReturn=await returnFromOutputTable(channel,opened.table);readView=null;
         // Private acceptance may retain raw civil evidence; no public response/schema changes.
         await onTableRead?.({raw,table_creation:opened,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:workflowReturn});
