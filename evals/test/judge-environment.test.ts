@@ -1,14 +1,160 @@
 import { expect, test } from "bun:test"
-import { chmod, link, lstat, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { chmod, cp, link, lstat, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { loadJudgeEnvironment } from "../src/slots"
 import { acquireJudgeLease, readResourceReservation, writeLeaseReceipt } from "../src/lease"
 import { evalsRoot, loadConfig, type EvalConfig } from "../src/config"
 import { runOfflineJudge } from "../src/judge-environment"
-import { main } from "../src/run"
+import { main, redact, runAttempt } from "../src/run"
 import { superviseProcess } from "../src/process-supervisor"
 import { parallelFixture } from "./helpers/parallel-fixture"
+import { agentCommand } from "../src/cli"
+import { parseArtifactSource } from "../src/artifact"
+import { agentInputsHash, loadTasks, rubricHash } from "../src/task"
+import { judgeInfo } from "../src/judge"
+import { evaluationContractHash } from "../src/evaluation"
+
+async function pendingJudgeFixture(root: string) {
+  const fixture = await parallelFixture(root)
+  const slots = path.join(root, "slots.json"), trace = path.join(root, "judge.jsonl"), probe = path.join(root, "version.json")
+  await writeLeaseReceipt(slots, fixture.slots)
+  const env = { EVAL_RESULTS_DIR: path.join(root, "results"), EVAL_WORKSPACE_ROOT: path.join(root, "workspace"),
+    JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: `${process.execPath} ${path.join(evalsRoot, "fixtures/fake-codex.ts")} --gate-log ${trace} --version-home-file ${probe}` }
+  const tasksDir = path.join(root, "tasks")
+  await cp(path.join(evalsRoot, "tasks/group-sum-qty"), path.join(tasksDir, "group-sum-qty"), { recursive: true })
+  const generation = { ...loadConfig(["--dry-run", "--tasks", tasksDir, "--only", "group-sum-qty"], env), skipJudge: false }
+  const tasks = await loadTasks(generation.tasksDir, generation.only)
+  const judge = await judgeInfo({ judge: { ...generation.judge, env: { CODEX_HOME: fixture.slots.judge.codexHome } } })
+  const rubric = await rubricHash(tasks)
+  const hash = evaluationContractHash({ rubric_hash: rubric, judge, pass_threshold: generation.passThreshold })
+  const runDir = path.join(env.EVAL_RESULTS_DIR, "saved")
+  const original = await runAttempt({ config: generation, command: agentCommand(generation), source: parseArtifactSource(generation.artifactSource, generation.loginom),
+    task: tasks[0]!, attempt: 1, runId: "saved", runDir, signal: new AbortController().signal, profileRecovered: false, skipJudge: false, evaluationHash: hash })
+  await writeLeaseReceipt(path.join(runDir, "config.json"), { ...redact(generation), agent_inputs_hash: await agentInputsHash(tasks), rubric_hash: rubric, judge })
+  return { fixture, runDir, resultFile: path.join(runDir, tasks[0]!.id, "1/result.json"), original, trace, probe, hash,
+    config: loadConfig(["--judge-only", "saved"], { ...env, EVAL_SLOTS_FILE: slots }) }
+}
+
+test("offline pending judge finishes one saved generation without summary and repeats as a no-op", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-offline-pending-"))
+  try {
+    const test = await pendingJudgeFixture(root)
+    const config = { ...test.config, judge: { ...test.config.judge, env: { FAKE_CODEX_VERDICT: "fail" } } }
+    const sibling = path.join(test.runDir, "already-scored/1/result.json")
+    await mkdir(path.dirname(sibling), { recursive: true })
+    await writeLeaseReceipt(sibling, { ...test.original.result, task_id: "already-scored", judge_status: "scored", judge_attempts: 1, score: 0, pass: false })
+    const siblingBefore = await Bun.file(sibling).text()
+    expect(await runOfflineJudge(config, test.fixture.lockRoot, test.resultFile)).toMatchObject({ code: 0, runDir: test.runDir, judgeCleanupConfirmed: true })
+    const saved = await Bun.file(test.resultFile).json()
+    expect(saved).toMatchObject({ judge_status: "scored", judge_attempts: 1, score: 0, pass: false, evaluation_contract_hash: test.hash,
+      session_id: test.original.result.session_id, package_path: test.original.result.package_path, tokens: test.original.result.tokens })
+    expect(await Bun.file(path.join(test.runDir, "summary.json")).exists()).toBe(false)
+    const rows = (await Bun.file(test.trace).text()).trim().split("\n").map(line => JSON.parse(line))
+    expect(rows.filter(row => row.kind === "start")).toHaveLength(1)
+    expect(rows.every(row => row.codexHome === test.fixture.slots.judge.codexHome)).toBe(true)
+    const reservation = await readResourceReservation({ key: `judge:${test.fixture.slots.judge.codexHome}`, lockRoot: test.fixture.lockRoot })
+    expect(reservation?.state).toBe("released")
+    const before = await Bun.file(test.resultFile).text()
+    await rm(test.probe)
+    expect(await runOfflineJudge(config, test.fixture.lockRoot, test.resultFile)).toMatchObject({ code: 0, judgeCleanupConfirmed: true })
+    expect(await Bun.file(test.resultFile).text()).toBe(before)
+    expect(await Bun.file(test.probe).exists()).toBe(false)
+    expect(await readResourceReservation({ key: `judge:${test.fixture.slots.judge.codexHome}`, lockRoot: test.fixture.lockRoot })).toEqual(reservation)
+    expect(await Bun.file(sibling).text()).toBe(siblingBefore)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("offline pending judge preserves an unconfirmed previous invocation without calling another judge", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-pending-unknown-outcome-"))
+  try {
+    const test = await pendingJudgeFixture(root)
+    await writeLeaseReceipt(test.resultFile, { ...await Bun.file(test.resultFile).json(), judge_attempts: 1 })
+    const verdict = path.join(path.dirname(test.resultFile), "judge/verdict.json")
+    await Bun.write(verdict, '{"unconfirmed":"old judge output"}')
+    const before = await Bun.file(test.resultFile).text()
+    await expect(runOfflineJudge(test.config, test.fixture.lockRoot, test.resultFile)).rejects.toThrow("PENDING_JUDGE_OUTCOME_UNCONFIRMED")
+    expect(await Bun.file(test.resultFile).text()).toBe(before)
+    expect(await Bun.file(verdict).text()).toBe('{"unconfirmed":"old judge output"}')
+    expect(await Bun.file(test.trace).exists()).toBe(false)
+    expect(await readResourceReservation({ key: `judge:${test.fixture.slots.judge.codexHome}`, lockRoot: test.fixture.lockRoot })).toBeUndefined()
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("offline pending judge rejects changed threshold, timeout and model pins before acquiring its home", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-pending-changed-threshold-"))
+  try {
+    const test = await pendingJudgeFixture(root)
+    const before = await Bun.file(test.resultFile).text()
+    await rm(test.probe)
+    for (const config of [{ ...test.config, passThreshold: test.config.passThreshold + 1 },
+      { ...test.config, judgeTimeoutMs: test.config.judgeTimeoutMs + 1 },
+      { ...test.config, judge: { ...test.config.judge, model: "another-model" } },
+      { ...test.config, judge: { ...test.config.judge, reasoning: "another-reasoning" } }])
+      await expect(runOfflineJudge(config, test.fixture.lockRoot, test.resultFile)).rejects.toThrow("PENDING_JUDGE_PINS_CHANGED")
+    expect(await Bun.file(test.resultFile).text()).toBe(before)
+    expect(await Bun.file(test.trace).exists()).toBe(false)
+    expect(await Bun.file(test.probe).exists()).toBe(false)
+    expect(await readResourceReservation({ key: `judge:${test.fixture.slots.judge.codexHome}`, lockRoot: test.fixture.lockRoot })).toBeUndefined()
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("offline pending judge rejects a changed saved corpus without touching the generation", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-pending-changed-corpus-"))
+  try {
+    const test = await pendingJudgeFixture(root)
+    const before = await Bun.file(test.resultFile).text()
+    const file = path.join(root, "tasks/group-sum-qty/task.json")
+    const task = await Bun.file(file).json()
+    task.checklist[0].weight = 2
+    await Bun.write(file, JSON.stringify(task))
+    await expect(runOfflineJudge(test.config, test.fixture.lockRoot, test.resultFile)).rejects.toThrow("PENDING_JUDGE_PINS_CHANGED")
+    expect(await Bun.file(test.resultFile).text()).toBe(before)
+    expect(await Bun.file(test.trace).exists()).toBe(false)
+    expect(await readResourceReservation({ key: `judge:${test.fixture.slots.judge.codexHome}`, lockRoot: test.fixture.lockRoot })).toBeUndefined()
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("offline pending judge respects busy and quarantined homes without invoking the judge", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-pending-held-home-"))
+  const test = await pendingJudgeFixture(root)
+  const journal = path.join(root, "holder.json")
+  await writeLeaseReceipt(journal, { commandId: "holder" })
+  const holder = await acquireJudgeLease({ codexHome: test.fixture.slots.judge.codexHome, journal, commandId: "holder", lockRoot: test.fixture.lockRoot })
+  try {
+    const before = await Bun.file(test.resultFile).text()
+    await rm(test.probe)
+    await expect(runOfflineJudge(test.config, test.fixture.lockRoot, test.resultFile)).rejects.toThrow("BUSY")
+    await holder.close()
+    await expect(runOfflineJudge(test.config, test.fixture.lockRoot, test.resultFile)).rejects.toThrow("RECOVERY_REQUIRED")
+    expect(await Bun.file(test.resultFile).text()).toBe(before)
+    expect(await Bun.file(test.trace).exists()).toBe(false)
+    expect(await Bun.file(test.probe).exists()).toBe(false)
+  } finally { await holder.close(); await rm(root, { recursive: true, force: true }) }
+})
+
+test("offline pending judge uses the saved invoke budget and refuses an exhausted attempt", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-pending-budget-"))
+  try {
+    for (const used of [1, 2]) {
+      const directory = path.join(root, String(used))
+      await mkdir(directory)
+      const test = await pendingJudgeFixture(directory)
+      await writeLeaseReceipt(test.resultFile, { ...await Bun.file(test.resultFile).json(), judge_status: "error", judge_attempts: used, judge_summary: "previous confirmed failure" })
+      const before = await Bun.file(test.resultFile).text()
+      if (used === 1) {
+        expect(await runOfflineJudge(test.config, test.fixture.lockRoot, test.resultFile)).toMatchObject({ code: 0, judgeCleanupConfirmed: true })
+        expect(await Bun.file(test.resultFile).json()).toMatchObject({ judge_status: "scored", judge_attempts: 2, score: 100, session_id: test.original.result.session_id })
+        expect((await Bun.file(test.trace).text()).trim().split("\n").map(line => JSON.parse(line)).filter(row => row.kind === "start")).toHaveLength(1)
+        continue
+      }
+      await expect(runOfflineJudge(test.config, test.fixture.lockRoot, test.resultFile)).rejects.toThrow("budget exhausted")
+      expect(await Bun.file(test.resultFile).text()).toBe(before)
+      expect(await Bun.file(test.trace).exists()).toBe(false)
+      expect(await readResourceReservation({ key: `judge:${test.fixture.slots.judge.codexHome}`, lockRoot: test.fixture.lockRoot })).toBeUndefined()
+    }
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("offline missing run leaves its judge home available to the next command", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-offline-missing-run-"))
