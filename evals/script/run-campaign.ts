@@ -1,5 +1,5 @@
 import path from "node:path"
-import { mkdir, readdir, rename, stat, unlink } from "node:fs/promises"
+import { mkdir, readdir, realpath, rename, stat, unlink } from "node:fs/promises"
 import { parseArgs } from "node:util"
 import { isQualityResult, type AttemptResult } from "../src/report"
 import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
@@ -7,6 +7,9 @@ import { tryCampaignLock } from "../src/campaign-lock"
 import { assessNodeAttempt } from "../src/node-evals"
 import { loadSlots } from "../src/slots"
 import { agentInputsHash, loadTasks, rubricHash } from "../src/task"
+import { evalsRoot, loadConfig } from "../src/config"
+import { readPendingJudge } from "../src/rejudge"
+import { runOfflineJudge } from "../src/judge-environment"
 
 type CampaignKey = { corpus: string; taskId: string; round: number }
 export type CampaignManifest = {
@@ -265,6 +268,24 @@ export async function prepareCampaignBatch(manifest: CampaignManifest, journal: 
   return batch
 }
 
+async function requireCampaignTaskPins(manifest: CampaignManifest, key: CampaignKey, runDir: string,
+  context: Pick<CampaignServerConfig, "harnessRoot" | "corpora" | "corpusPinsFile">) {
+  const corpus = context.corpora[key.corpus]
+  if (!corpus) throw Error("CAMPAIGN_CORPUS_UNKNOWN")
+  const tasksDir = path.resolve(context.harnessRoot, corpus.tasks)
+  if (!tasksDir.startsWith(path.resolve(context.harnessRoot) + path.sep)) throw Error("CAMPAIGN_CORPUS_PATH")
+  const pins = await readLeaseReceipt(context.corpusPinsFile) as { groups: { group: string; tasks: { id: string; agentInputsHash: string; rubricHash: string }[] }[] }
+  const pinned = pins.groups.find(group => group.group === key.corpus)?.tasks.find(task => task.id === key.taskId)
+  const tasks = await loadTasks(tasksDir, [key.taskId])
+  if (!pinned || pinned.agentInputsHash !== await agentInputsHash(tasks) || pinned.rubricHash !== await rubricHash(tasks))
+    throw Error("CAMPAIGN_CORPUS_PINS_CHANGED")
+  const saved = await Bun.file(path.join(runDir, "config.json")).json()
+  for (const [name, value] of [["EVAL_CLI_MODE", saved.agent?.cliMode], ["EVAL_CLI_BIN", saved.agent?.cliBin],
+    ["EVAL_AGENT_MODEL", saved.agent?.model], ["EVAL_AGENT_VARIANT", saved.agent?.variant]] as const)
+    if (manifest.pins[name] !== undefined && manifest.pins[name] !== value) throw Error("CAMPAIGN_EXPERIMENT_PINS_CHANGED")
+  return { tasksDir, saved }
+}
+
 export async function campaignTick(manifest: CampaignManifest, previous: CampaignJournal, unit: UnitState | undefined, now = Date.now(),
   context?: Pick<CampaignServerConfig, "harnessRoot" | "corpora" | "slotsFile" | "corpusPinsFile">) {
   const journal: CampaignJournal = structuredClone(previous)
@@ -356,19 +377,8 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
           } : { status: "incomplete", codes: ["RESOURCE_EVIDENCE_MISSING"] }
           let node: Awaited<ReturnType<typeof assessNodeAttempt>> | undefined
           if (key.corpus === "node") {
-            const corpus = context?.corpora[key.corpus]
-            if (!context || !corpus) throw Error("CAMPAIGN_NODE_CONTEXT_REQUIRED")
-            const tasksDir = path.resolve(context.harnessRoot, corpus.tasks)
-            if (!tasksDir.startsWith(path.resolve(context.harnessRoot) + path.sep)) throw Error("CAMPAIGN_CORPUS_PATH")
-            const pins = await readLeaseReceipt(context.corpusPinsFile) as { groups: { group: string; tasks: { id: string; agentInputsHash: string; rubricHash: string }[] }[] }
-            const pinned = pins.groups.find(group => group.group === key.corpus)?.tasks.find(task => task.id === key.taskId)
-            const tasks = await loadTasks(tasksDir, [key.taskId])
-            if (!pinned || pinned.agentInputsHash !== await agentInputsHash(tasks) || pinned.rubricHash !== await rubricHash(tasks))
-              throw Error("CAMPAIGN_NODE_PINS_CHANGED")
-            const saved = await Bun.file(path.join(batch.resultsDir, run, "config.json")).json()
-            for (const [name, value] of [["EVAL_CLI_MODE", saved.agent?.cliMode], ["EVAL_CLI_BIN", saved.agent?.cliBin],
-              ["EVAL_AGENT_MODEL", saved.agent?.model], ["EVAL_AGENT_VARIANT", saved.agent?.variant]] as const)
-              if (manifest.pins[name] !== undefined && manifest.pins[name] !== value) throw Error("CAMPAIGN_EXPERIMENT_PINS_CHANGED")
+            if (!context) throw Error("CAMPAIGN_NODE_CONTEXT_REQUIRED")
+            const { tasksDir } = await requireCampaignTaskPins(manifest, key, path.join(batch.resultsDir, run), context)
             const slot = (await loadSlots(context.slotsFile, manifest.parallel)).slots.find(slot => slot.id === result.slot_id)
             if (!slot) throw Error("CAMPAIGN_NODE_SLOT_UNKNOWN")
             node = await assessNodeAttempt({ runDir: path.join(batch.resultsDir, run), taskId: key.taskId, tasksDir, slot })
@@ -639,6 +649,64 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
         if (!synced) tick.journal.reportingError = "MULTICA_UNAVAILABLE"
         if (synced && !synced.final) {
           delete tick.journal.reportingError
+          if (tick.action === "judge") {
+            try {
+              if (owner?.campaignId !== manifest.id || unit?.active !== false) throw Error("CAMPAIGN_OWNER_MISMATCH")
+              if (await realpath(config.harnessRoot) !== await realpath(evalsRoot) ||
+                (await command(["git", "rev-parse", "HEAD"], config.harnessRoot)).trim() !== config.acceptedHarness ||
+                (await command(["git", "status", "--porcelain", "--untracked-files=normal"], config.harnessRoot)).trim())
+                throw Error("CAMPAIGN_HARNESS_CHANGED")
+              const batch = tick.journal.batches.at(-1)!
+              const resultFile = tick.pendingJudge.resultFile, runDir = path.dirname(path.dirname(path.dirname(resultFile)))
+              if (path.dirname(runDir) !== batch.resultsDir) throw Error("CAMPAIGN_PENDING_RUN_MISMATCH")
+              const { tasksDir, saved } = await requireCampaignTaskPins(manifest, tick.pendingJudge.key, runDir, config)
+              if (saved.tasksDir !== tasksDir || !Array.isArray(saved.only) || saved.only.length !== batch.keys.length ||
+                new Set(saved.only).size !== saved.only.length || saved.only.some((id: unknown) => !batch.keys.some(key => key.taskId === id)) ||
+                ["EVAL_PASS_THRESHOLD", "EVAL_JUDGE_TIMEOUT_MS"].some((name, index) => manifest.pins[name] !== undefined &&
+                  String(manifest.pins[name]) !== String(index === 0 ? saved.passThreshold : saved.judgeTimeoutMs)))
+                throw Error("CAMPAIGN_EXPERIMENT_PINS_CHANGED")
+              for (const key of batch.keys) await requireCampaignTaskPins(manifest, key, runDir, config)
+              if (!process.env.EVAL_JUDGE_COMMAND?.trim()) throw Error("CAMPAIGN_JUDGE_COMMAND_REQUIRED")
+              const judgeConfig = loadConfig(["--judge-only", path.basename(runDir), "--tasks", tasksDir, "--only", saved.only.join(",")], {
+                ...process.env, ...campaignEnvironment(manifest, config), EVAL_RESULTS_DIR: batch.resultsDir,
+                EVAL_PASS_THRESHOLD: String(saved.passThreshold), EVAL_JUDGE_TIMEOUT_MS: String(saved.judgeTimeoutMs),
+                EVAL_JUDGE_COMMAND: process.env.EVAL_JUDGE_COMMAND,
+              })
+              await readPendingJudge(judgeConfig, resultFile)
+              if (!config.verifyCommand.some(value => value.includes("{verificationDir}"))) throw Error("CAMPAIGN_FRESH_VERIFICATION_UNCONFIGURED")
+              if (!await verifyCampaignCleanup(manifest, tick.journal, { ...publication, harnessRoot: config.harnessRoot, verifyCommand: config.verifyCommand }))
+                throw Error("CAMPAIGN_CLEANUP_UNCONFIRMED")
+              const ready = await syncCampaignIssue(manifest, tick.journal, publication).then(final => ({ final }), () => null)
+              if (!ready) tick.journal.reportingError = "MULTICA_UNAVAILABLE"
+              if (ready?.final) await release(tick.journal)
+              if (ready && !ready.final) {
+                if ((await readLeaseReceipt(ownerFile) as { campaignId: string }).campaignId !== manifest.id) throw Error("CAMPAIGN_OWNER_MISMATCH")
+                const checked = await campaignTick(manifest, tick.journal, await observeUnit(unitName, config.harnessRoot), Date.now(), config)
+                Object.assign(tick.journal, checked.journal)
+                if (checked.action === "judge" && checked.pendingJudge.resultFile === resultFile) {
+                  await readPendingJudge(judgeConfig, resultFile)
+                  delete tick.journal.cleanupVerified
+                  delete tick.journal.verificationAttempted
+                  delete tick.journal.verificationDir
+                  const attempt = tick.journal.attempts.find(attempt => attempt.resultFile === resultFile)!
+                  attempt.cleanupConfirmed = false
+                  delete attempt.cleanupVerification
+                  await writeLeaseReceipt(journalFile, tick.journal)
+                  const judged = await runOfflineJudge({ ...judgeConfig, judge: { ...judgeConfig.judge, systemd: true } }, undefined, resultFile)
+                  if (!judged.judgeCleanupConfirmed ||
+                    !await verifyCampaignCleanup(manifest, tick.journal, { ...publication, harnessRoot: config.harnessRoot, verifyCommand: config.verifyCommand }))
+                    throw Error("CAMPAIGN_CLEANUP_UNCONFIRMED")
+                  Object.assign(tick.journal, (await campaignTick(manifest, tick.journal, await observeUnit(unitName, config.harnessRoot), Date.now(), config)).journal)
+                  if (judged.code !== 0) throw Error("CAMPAIGN_JUDGE_FAILED")
+                }
+              }
+            } catch (error) {
+              console.error(error instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(error.message) ? error.message : "CAMPAIGN_JUDGE_RECOVERY_FAILED")
+              tick.journal.blocker = "CAMPAIGN_JUDGE_RECOVERY_FAILED"
+              tick.journal.blockerKind = "technical"
+              await syncCampaignIssue(manifest, tick.journal, publication).catch(() => { tick.journal.reportingError = "MULTICA_UNAVAILABLE" })
+            }
+          }
           if (tick.action === "start" || tick.action === "launch") {
             try {
               const first = tick.next[0]!

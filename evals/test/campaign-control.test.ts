@@ -57,6 +57,35 @@ test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("reservation preflights only
   } finally { await fixture.close() }
 })
 
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("service refuses pending judge from another harness before changing resources", async () => {
+  const fixture = await controlFixture()
+  const api = Bun.serve({ port: 0, fetch(request) {
+    if (request.method === "GET" && new URL(request.url).pathname.endsWith("/comments")) return Response.json([])
+    return new Response(null, { status: 503 })
+  } })
+  try {
+    const reserved = await controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")
+    const resultsDir = path.join(fixture.root, "control/batches/1"), runDir = path.join(resultsDir, "saved")
+    const resultFile = path.join(runDir, "first/1/result.json"), commandJournal = path.join(runDir, "native-command.json")
+    await mkdir(path.dirname(resultFile), { recursive: true, mode: 0o700 })
+    await writeLeaseReceipt(resultFile, { ...emptyResult("first", 1, false), status: "completed", package_path: "/saved.lgp" })
+    const original = await Bun.file(resultFile).text()
+    await writeLeaseReceipt(commandJournal, { version: 2, kind: "unactivated-preparation", runDir,
+      attempts: [{ taskId: "first", attempt: 1, purpose: "measurement" }] })
+    await writeLeaseReceipt(path.join(runDir, "config.json"), { commandJournal })
+    await writeLeaseReceipt(path.join(fixture.root, "control/journal.json"), { ...reserved,
+      batches: [{ id: "one", keys: fixture.manifest.keys, resultsDir, invocationBefore: "before", started: true }] })
+    await Bun.write(path.join(fixture.root, "token"), "fixture-token", { mode: 0o600 })
+    await writeLeaseReceipt(fixture.serverFile, { ...fixture.config,
+      multica: { ...fixture.config.multica, url: `http://127.0.0.1:${api.port}` } })
+    const finished = await runCampaign(fixture.manifestFile, fixture.serverFile, true)
+    expect(finished).toMatchObject({ blocker: "CAMPAIGN_JUDGE_RECOVERY_FAILED", blockerKind: "technical", startedAttempts: 1 })
+    expect(await Bun.file(path.join(fixture.root, "control/verification")).exists()).toBe(false)
+    expect(await Bun.file(fixture.config.batchEnvFile).exists()).toBe(false)
+    expect(await Bun.file(resultFile).text()).toBe(original)
+  } finally { api.stop(true); await fixture.close() }
+})
+
 test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("repair assigns one repairer without changing progress, attempts or the fixed manifest", async () => {
   const fixture = await controlFixture()
   try {
