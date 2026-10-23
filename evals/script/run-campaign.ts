@@ -13,6 +13,7 @@ export type CampaignManifest = {
 type Batch = { id: string; keys: CampaignKey[]; resultsDir: string; invocationBefore: string; started: boolean; accounted?: boolean }
 type AccountedAttempt = {
   key: CampaignKey; resultFile: string; status: string; counted: boolean; pass: boolean | null; score: number | null; cleanupConfirmed: boolean
+  resources?: { status: string; codes: string[] }
 }
 export type CampaignJournal = {
   manifestHash: string; server: string; campaignId: string; executor: string; repairing: boolean; repairer: string | null
@@ -45,7 +46,7 @@ export async function publishCampaign(manifest: CampaignManifest, journal: Campa
     `Кампания ${manifest.id}; сервер ${journal.server}.`, "",
     ...manifest.keys.map(key => {
       const attempt = journal.attempts.find(item => item.counted && keyId(item.key) === keyId(key))
-      return `- ${keyId(key)}: ${attempt ? `${attempt.pass ? "PASS" : "FAIL"}; cleanup=${attempt.cleanupConfirmed ? "подтверждён" : "не подтверждён"}` : "не измерено"}`
+      return `- ${keyId(key)}: ${attempt ? `${attempt.pass ? "PASS" : "FAIL"}; cleanup=${attempt.cleanupConfirmed ? "подтверждён" : "не подтверждён"}; ресурсы=${attempt.resources?.status ?? "incomplete"}; ${attempt.resources?.codes.join(", ") ?? "RESOURCE_EVIDENCE_MISSING"}` : "не измерено"}`
     }), "", `Учтено ${journal.attempts.filter(item => item.counted).length}/${manifest.keys.length}.`, ""].join("\n")
   await Bun.write(path.join(config.stateDir, "report.md"), report)
   const endpoint = `/api/issues/${config.multica.issueId}`
@@ -145,10 +146,20 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
         const result = await Bun.file(resultFile).json() as AttemptResult
         if (result.task_id !== key.taskId || result.attempt !== 1) throw Error("CAMPAIGN_RESULT_IDENTITY")
         const cleanup = await Bun.file(path.join(path.dirname(resultFile), "cleanup.json")).json().catch(() => null)
-        const counted = !["infra_error", "harness_error", "interrupted"].includes(result.status) &&
+        const acceptance = await Bun.file(path.join(batch.resultsDir, run, "resource-acceptance.json")).json().catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return null
+          throw error
+        }) as { checks: { status: string; codes: string[] }[] } | null
+        if (acceptance && (!Array.isArray(acceptance.checks) || acceptance.checks.some(check => !["passed", "failed", "incomplete"].includes(check.status) ||
+          !Array.isArray(check.codes) || check.codes.some(code => typeof code !== "string")))) throw Error("CAMPAIGN_RESOURCE_EVIDENCE_INVALID")
+        const resources = acceptance ? {
+          status: acceptance.checks.some(check => check.status === "failed") ? "failed" : acceptance.checks.some(check => check.status === "incomplete") || !acceptance.checks.length ? "incomplete" : "passed",
+          codes: acceptance.checks.flatMap(check => check.codes),
+        } : { status: "incomplete", codes: ["RESOURCE_EVIDENCE_MISSING"] }
+        const counted = resources.status !== "failed" && !["infra_error", "harness_error", "interrupted"].includes(result.status) &&
           result.failure_kind !== "provider" && !result.harness_error && typeof result.pass === "boolean" &&
           ["scored", "no_artifact"].includes(result.judge_status)
-        const entry = { key, resultFile, status: result.status, counted, pass: result.pass, score: result.score,
+        const entry = { key, resultFile, status: result.status, counted, pass: result.pass, score: result.score, resources,
           cleanupConfirmed: result.environment_cleanup?.status === "confirmed" && cleanup?.processes?.status === "confirmed" && cleanup?.nextAdmissionAllowed === true }
         const index = journal.attempts.findIndex(attempt => attempt.resultFile === resultFile)
         if (index >= 0) journal.attempts[index] = entry

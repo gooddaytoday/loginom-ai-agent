@@ -191,10 +191,10 @@ export async function runPreparedSlots(config: EvalConfig) {
       return rows.length !== 1 || rows[0]!.epoch_stable !== true || rows[0]!.inspect?.started_at !== target.startedAt
     }))) resourceChecks.push({ status: "failed", codes: ["CONTAINER_RESOURCE_IDENTITY_UNCONFIRMED"] })
   } catch (error) { resourceChecks.push({ status: "incomplete", codes: [describe(error)] }) }
-  if (resourceChecks.some(check => check.status !== "passed")) stopped ??= resourceChecks.flatMap(check => check.codes).join(", ")
+  if (resourceChecks.some(check => check.status === "failed")) stopped ??= resourceChecks.flatMap(check => check.codes).join(", ")
   const measured = attempts.filter((attempt): attempt is AttemptResult => attempt !== undefined)
   const limits = aggregateLimits(measured, ["provider", "judge"])
-  if (limits.status !== "passed") stopped ??= limits.codes.join(", ")
+  if (limits.codes.some(code => code.startsWith("LOGINOM_") || code.startsWith("HOST_"))) stopped ??= limits.codes.join(", ")
   const summary: RunSummary = {
     run_id: runId, label: config.label, started_at: started.toISOString(), finished_at: new Date().toISOString(), interrupted: controller.signal.aborted,
     interrupted_cleanup: measured.some(attempt => attempt.interrupted) ? { recovered: false } : null, stopped_reason: stopped,
