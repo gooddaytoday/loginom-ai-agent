@@ -60,10 +60,10 @@ test("fake node FAIL survives summary loss and is accounted once without repeati
     await writeLeaseReceipt(commandJournal, { version: 2, kind: "unactivated-preparation", runDir: result.runDir,
       attempts: [{ taskId: "crosstable-fixed-sum", attempt: 1, purpose: "measurement", completedAt: 1000, completionOrder: 1, quality: false }] })
     const saved = await Bun.file(path.join(result.runDir!, "config.json")).json()
-    await writeLeaseReceipt(path.join(result.runDir!, "config.json"), { ...saved, commandJournal })
+    await writeLeaseReceipt(path.join(result.runDir!, "config.json"), { ...saved, judge: null, commandJournal })
     await rm(path.join(result.runDir!, "summary.json"))
     const manifest = { id: "node-recovery", server: "runner2", executor: "EvalBaseline", parallel: 1, batchSize: 1,
-      keys: [{ corpus: "node", taskId: "crosstable-fixed-sum", round: 1 }], pins: {} }
+      keys: [{ corpus: "node", taskId: "crosstable-fixed-sum", round: 1 }], pins: { JUDGE_MODEL: "pinned-unused-judge", JUDGE_REASONING: "xhigh" } }
     const journal: CampaignJournal = { manifestHash: "fixture", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
       repairing: false, repairer: null, batches: [{ id: "one", keys: manifest.keys, resultsDir: env.EVAL_RESULTS_DIR,
         invocationBefore: "before", started: true }], attempts: [], lastProgressAt: 500, consecutiveErrors: 0 }
@@ -75,6 +75,21 @@ test("fake node FAIL survives summary loss and is accounted once without repeati
     expect(repeated.journal.attempts).toHaveLength(1)
     expect(repeated.journal.startedAttempts).toBe(1)
     expect(repeated.next).toEqual([])
+    expect(await Bun.file(resultFile).text()).toBe(original)
+    const confirmed = await Bun.file(path.join(attempt, "cleanup.json")).json()
+    await writeLeaseReceipt(path.join(attempt, "cleanup.json"), { ...confirmed, archive: directory })
+    const blocked = await campaignTick(manifest, journal, { active: false, invocation: "done", exitCode: 1 }, 2000, context)
+    expect(blocked.action).toBe("blocked")
+    expect(blocked.journal.batches[0]?.accounted).not.toBe(true)
+    expect(blocked.next).toEqual([])
+    await writeLeaseReceipt(path.join(attempt, "cleanup.json"), confirmed)
+    const recovered = await campaignTick(manifest, { ...blocked.journal, blocker: undefined }, { active: false, invocation: "done", exitCode: 1 }, 2500, context)
+    expect(recovered.journal.attempts).toHaveLength(1)
+    expect(recovered.journal.attempts[0]?.counted).toBe(true)
+    expect(recovered.journal.lastProgressAt).toBe(1000)
+    expect(recovered.journal.consecutiveErrors).toBe(0)
+    expect(recovered.journal.startedAttempts).toBe(1)
+    expect(recovered.next).toEqual([])
     expect(await Bun.file(resultFile).text()).toBe(original)
   } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
 }, 60_000)

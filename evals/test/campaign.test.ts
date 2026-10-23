@@ -13,6 +13,42 @@ async function admitRun(runDir: string, taskIds: string[]) {
   await writeLeaseReceipt(path.join(runDir, "config.json"), { commandJournal })
 }
 
+test("a recovered earlier quality result preserves later infrastructure errors in their original order", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-recovered-order-"))
+  try {
+    const ids = ["a", "b", "c"]
+    const manifest: CampaignManifest = { id: "recovered-order", server: "runner2", executor: "EvalBaseline", parallel: 3, batchSize: 3,
+      keys: ids.map(taskId => ({ corpus: "ordinary", taskId, round: 1 })), pins: {} }
+    const runDir = path.join(root, "run")
+    const attempts = []
+    for (const [index, id] of ids.entries()) {
+      const resultFile = path.join(runDir, id, "1/result.json")
+      await Bun.write(resultFile, JSON.stringify({ ...emptyResult(id, 1, false), status: index === 0 ? "no_artifact" : "infra_error",
+        pass: index === 0 ? false : null, score: index === 0 ? 0 : null, judge_status: index === 0 ? "no_artifact" : "skipped",
+        environment_cleanup: { status: "confirmed", evidence: "cleanup.json", error: null } }))
+      await Bun.write(path.join(runDir, id, "1/cleanup.json"), JSON.stringify({ processes: { status: "confirmed" }, nextAdmissionAllowed: true }))
+      attempts.push({ key: manifest.keys[index]!, resultFile, status: index === 0 ? "no_artifact" : "infra_error",
+        counted: false, pass: null, score: null, cleanupConfirmed: true, completedAt: (index + 1) * 1000 })
+    }
+    await admitRun(runDir, ids)
+    await writeLeaseReceipt(path.join(runDir, "native-command.json"), { version: 2, kind: "unactivated-preparation", runDir,
+      attempts: ids.map((taskId, index) => ({ taskId, attempt: 1, purpose: "measurement", completedAt: (index + 1) * 1000,
+        completionOrder: index + 1, quality: index === 0 })) })
+    const journal: CampaignJournal = { manifestHash: "fixture", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
+      repairing: false, repairer: null, batches: [{ id: "one", keys: manifest.keys, resultsDir: root, invocationBefore: "before", started: true }],
+      attempts, lastProgressAt: 500, consecutiveErrors: 3, blocker: "CONSECUTIVE_INFRASTRUCTURE_ERRORS" }
+    const tick = await campaignTick(manifest, journal, { active: false, invocation: "done", exitCode: 1 }, 4000)
+    expect(tick.journal.consecutiveErrors).toBe(2)
+    expect(tick.journal.lastProgressAt).toBe(1000)
+    expect(tick.journal.attempts).toHaveLength(3)
+    expect(tick.journal.attempts[0]?.counted).toBe(true)
+    expect(tick.journal.blocker).toBe("CONSECUTIVE_INFRASTRUCTURE_ERRORS")
+    const repeated = await campaignTick(manifest, tick.journal, { active: false, invocation: "done", exitCode: 1 }, 5000)
+    expect(repeated.journal.consecutiveErrors).toBe(2)
+    expect(repeated.journal.attempts).toHaveLength(3)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("campaign uses explicit experiment pins and canonical server paths for both preflight and dispatch", () => {
   const manifest: CampaignManifest = { id: "pins", server: "runner2", executor: "EvalBaseline", parallel: 1, batchSize: 1,
     keys: [{ corpus: "ordinary", taskId: "first", round: 1 }], pins: { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/pinned/cli",

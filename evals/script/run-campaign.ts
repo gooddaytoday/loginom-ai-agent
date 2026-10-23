@@ -300,7 +300,7 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
     }
     return { journal, action: "wait" as const, next: [] }
   }
-  const completed: { entry: AccountedAttempt; order?: number }[] = []
+  const completions = new Map<string, { completedAt?: number; completionOrder?: number; quality?: boolean }>()
   try {
     if (batch && !batch.accounted) {
       const runs = await readdir(batch.resultsDir).catch((error: NodeJS.ErrnoException) => {
@@ -308,7 +308,6 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
         throw error
       })
       let startedAttempts = 0, admissionConfirmed = true
-      const completions = new Map<string, { completedAt?: number; completionOrder?: number; quality?: boolean }>()
       for (const run of runs) {
         const runDir = path.join(batch.resultsDir, run)
         try {
@@ -336,6 +335,7 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
         const file = Bun.file(path.join(batch.resultsDir, run, "request-preflight.json"))
         return await file.exists() ? file.json() as Promise<{ code: string | null }> : null
       }))
+      let nodePending = false
       for (const key of batch.keys) {
         for (const run of runs) {
           const resultFile = path.join(batch.resultsDir, run, key.taskId, "1/result.json")
@@ -366,12 +366,16 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
               throw Error("CAMPAIGN_NODE_PINS_CHANGED")
             const saved = await Bun.file(path.join(batch.resultsDir, run, "config.json")).json()
             for (const [name, value] of [["EVAL_CLI_MODE", saved.agent?.cliMode], ["EVAL_CLI_BIN", saved.agent?.cliBin],
-              ["EVAL_AGENT_MODEL", saved.agent?.model], ["EVAL_AGENT_VARIANT", saved.agent?.variant],
-              ["JUDGE_MODEL", saved.judge?.model], ["JUDGE_REASONING", saved.judge?.reasoning]] as const)
+              ["EVAL_AGENT_MODEL", saved.agent?.model], ["EVAL_AGENT_VARIANT", saved.agent?.variant]] as const)
               if (manifest.pins[name] !== undefined && manifest.pins[name] !== value) throw Error("CAMPAIGN_EXPERIMENT_PINS_CHANGED")
             const slot = (await loadSlots(context.slotsFile, manifest.parallel)).slots.find(slot => slot.id === result.slot_id)
             if (!slot) throw Error("CAMPAIGN_NODE_SLOT_UNKNOWN")
             node = await assessNodeAttempt({ runDir: path.join(batch.resultsDir, run), taskId: key.taskId, tasksDir, slot })
+            if (node.code === 2 && ["completed", "failed", "timeout", "no_artifact"].includes(result.status) &&
+              !result.harness_error && result.failure_kind !== "provider") {
+              nodePending = true
+              journal.blocker ??= "NODE_ASSESSMENT_UNCONFIRMED"
+            }
           }
           const counted = resources.status !== "failed" && (key.corpus === "node" ? node?.code !== undefined && node.code !== 2 : isQualityResult(result))
           const completion = completions.get(resultFile)
@@ -381,17 +385,16 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
             completedAt,
             cleanupConfirmed: result.environment_cleanup?.status === "confirmed" && cleanup?.processes?.status === "confirmed" && cleanup?.nextAdmissionAllowed === true }
           const index = journal.attempts.findIndex(attempt => attempt.resultFile === resultFile)
-          if (index >= 0) journal.attempts[index] = { ...entry, cleanupVerification: journal.attempts[index]!.cleanupVerification }
-          if (index < 0) {
-            journal.attempts.push(entry)
-            completed.push({ entry, order: completion?.completionOrder })
+          if (index >= 0) {
+            journal.attempts[index] = { ...entry, cleanupVerification: journal.attempts[index]!.cleanupVerification }
           }
+          if (index < 0) journal.attempts.push(entry)
         }
       }
       if (!batch.started && unit.invocation === batch.invocationBefore && !probes.some(probe => probe) &&
         !journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep)))
         pending = batch.keys
-      if (!pending) batch.accounted = true
+      if (!pending) batch.accounted = !nodePending
       if (probes.some(probe => probe?.code === null)) journal.emptyPreflights = 0
       if (!pending && !batch.keys.every(key => journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep) && keyId(attempt.key) === keyId(key)))) {
         const failure = probes.find(probe => probe && ["REQUEST_PREFLIGHT_EMPTY", "REQUEST_PREFLIGHT_FAILED"].includes(probe.code ?? ""))
@@ -406,8 +409,17 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
     journal.blocker = "CAMPAIGN_RECONCILIATION_FAILED"
     journal.blockerKind = "technical"
   }
-  completed.sort((a, b) => a.entry.completedAt! - b.entry.completedAt! || (a.order ?? 0) - (b.order ?? 0))
-  for (const { entry } of completed) {
+  const completed = journal.attempts.filter(entry => batch && entry.resultFile.startsWith(batch.resultsDir + path.sep)).map(entry => ({
+    entry, order: completions.get(entry.resultFile)?.completionOrder,
+    priorCounted: previous.attempts.find(attempt => attempt.resultFile === entry.resultFile)?.counted,
+  })).sort((a, b) => a.entry.completedAt! - b.entry.completedAt! || (a.order ?? 0) - (b.order ?? 0))
+  const recovered = completed.some(item => item.priorCounted === false && item.entry.counted)
+  if (recovered) {
+    const lastQuality = completed.findLastIndex(item => item.priorCounted === true)
+    const priorErrors = completed.slice(lastQuality + 1).filter(item => item.priorCounted === false).length
+    journal.consecutiveErrors = Math.max(0, journal.consecutiveErrors - priorErrors)
+  }
+  for (const { entry } of recovered ? completed : completed.filter(item => item.priorCounted === undefined)) {
     journal.consecutiveErrors = entry.counted ? 0 : journal.consecutiveErrors + 1
     if (entry.counted) journal.lastProgressAt = Math.max(journal.lastProgressAt, entry.completedAt!)
     if (journal.consecutiveErrors >= campaignLimits(manifest).consecutiveErrors) journal.blocker ??= "CONSECUTIVE_INFRASTRUCTURE_ERRORS"
