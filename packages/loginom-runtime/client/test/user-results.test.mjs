@@ -135,7 +135,9 @@ test('installed import discovery supplies its complete parameter vocabulary on t
   for (const card of knowledge.node_types) { assert.equal(card.candidate_node_apply_available, true, card.type); assert.equal(card.parameter_schema, undefined, card.type); }
   for (const card of cards) assert.ok(card.parameter_schema, card.type);
   const schema = cards.find(card => card.type === 'imports.text').parameter_schema;
-  assert.deepEqual(schema.required, ['source', 'settings']);
+  assert.deepEqual(schema.required, ['settings']);
+  assert.match(schema.properties.source.description, /Required for new imports and configuration changes/);
+  assert.match(schema.properties.source.description, /Omit source only to execute an unchanged existing Import/);
   for (const key of ['source', 'settings']) {
     const { description, ...shape } = schema.properties[key];
     assert.deepEqual(shape, nodeApplyInputSchema.properties.parameters.properties[key]);

@@ -31,7 +31,7 @@ class ExternalClient {
     const code=request.arguments.code;
     let value;
     if(code.includes('async function prepareWorkspace'))value={status:'READY',authenticated:true,target_verified:true,
-      target,loginom_account:'test-2',document_id:'own-doc',created_draft:true,effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:{path:null}};
+      target,loginom_account:'test-2',document_id:'own-doc',created_draft:!this.f.scenario.startsWith('opened-'),effect_possible:true,workflow_ref:{tab_tid:'own-tab',prefix:'own',workflow_id:'own-workflow',navigation_path:[]},package_ref:this.f.scenario.startsWith('opened-')?{path,persisted:true}:{path:null}};
     else if(code.includes('async function observeGeometry'))value={version:1,source:'prepare_same_browser_page',observed:{document_id:'own-doc'}};
     else if(code.includes('function readSavedPackageState')){
       this.f.events.push('saved-state');
@@ -51,7 +51,7 @@ class ExternalClient {
       if(this.f.scenario==='foreign-path')value.package_path=secondPath;
       if(this.f.scenario==='foreign-account')value.account='foreign';
       if(this.f.scenario==='discard-receipt')value.unsaved_changes_discarded=true;
-      if(this.f.scenario==='mutated-after-save')value={...value,status:'BLOCKED',package_closed:false,logged_out:false,reason:'UNSAVED_CHANGES'};
+      if(['mutated-after-save','opened-dirty'].includes(this.f.scenario))value={...value,status:'BLOCKED',package_closed:false,logged_out:false,reason:'UNSAVED_CHANGES'};
     } else throw Error('Unexpected browser code');
     return {content:[{type:'text',text:JSON.stringify(value)}]};
   }
@@ -86,6 +86,40 @@ mock.module(new URL('../../lib/executor.mjs',import.meta.url).href,{namedExports
   };
 }}});
 const {createBridge}=await import('../../lib/bridge.mjs');
+
+for(const scenario of ['opened-clean','opened-dirty','opened-path-mismatch','opened-busy','opened-unsettled','opened-not-persisted'])
+ test('normal shutdown of an opened package without Save: '+scenario,async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'cleanup-opened-'));
+  const resources=await createBundledSkillFixture(t),catalog=await createActionCatalogFixture(target);
+  const f=current={scenario,events:[],busy:false,saves:0,path,receipts:new Map(),catalog};
+  const session={directory,browserCli:'/test/browser',browserRoot:'/test',browserConfig:'/test/config',
+    metadata:{client:'test',sessionId:'own-session',clientRevision:'a'.repeat(64)},async save(){},
+    artifactStore:{list:()=>[],async releaseUploads(){}}};
+  const bridge=await createBridge({resources:resources.resources,actionManifestUri:catalog.manifestUri,actionManifestSha256:catalog.manifestSha256,
+    mode:'executor-replay',resultProfile:'user-v1',apiKey:'test-only',endpoint:'https://dock.invalid/mcp',stateDir:directory,
+    loginomUrl:'http://loginom.invalid/app',replayBootstrap:true,replayLoginUser:'test-2',closeSavedPackageOnShutdown:true},session);
+  const client=new AgentClient({name:'opened-cleanup',version:'1'});
+  try{
+    const [a,b]=InMemoryTransport.createLinkedPair();await bridge.server.connect(b);await client.connect(a);
+    const prepared=await client.callTool({name:'dock_prepare',arguments:{intent:'open_package',package_path:scenario==='opened-path-mismatch'?secondPath:path}});
+    assert.notEqual(prepared.isError,true,JSON.stringify(prepared));
+    if(scenario==='opened-not-persisted')session.metadata.workspacePreparation.state.package_ref.persisted=false;
+    f.busy=scenario==='opened-busy';f.unsettled=scenario==='opened-unsettled';
+    const result=await bridge.close();
+    const cleanup=JSON.parse(await readFile(join(directory,'saved-package-cleanup.json'),'utf8'));
+    assert.equal(result.browser_transport_closed,true);assert.equal(f.saves,0);
+    assert.equal(cleanup.save_operation_id,null);
+    assert.equal(cleanup.status,scenario==='opened-clean'?'SUCCEEDED':'BLOCKED');
+    assert.equal(f.events.includes('package-cleanup'),['opened-clean','opened-dirty'].includes(scenario));
+    if(scenario==='opened-dirty')assert.equal(cleanup.reason,'UNSAVED_CHANGES');
+    if(scenario==='opened-clean'){
+      assert.equal(cleanup.package_closed,true);assert.equal(cleanup.logged_out,true);
+      assert.equal(cleanup.policy,'opened_saved_package');assert.equal(cleanup.package_path,path);
+      assert.equal(f.cleanupOptions.diagnosticDiscard,false);assert.equal(f.cleanupOptions.diagnosticReadOnly,false);
+      assert.equal(f.cleanupOptions.documentId,'own-doc');assert.equal(f.cleanupOptions.tabTid,'own-tab');
+    }
+  }finally{await client.close();await bridge.close();await rm(directory,{recursive:true,force:true});}
+ });
 
 test('unknown prepared workflow advises only the last confirmed Save of its own bridge',async t=>{
   const directory=await mkdtemp(join(tmpdir(),'prepared-workflow-hint-'));
