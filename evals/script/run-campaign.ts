@@ -289,6 +289,7 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
   }
   const batch = journal.batches.at(-1)
   let pending: CampaignKey[] | undefined
+  let pendingJudge: { key: CampaignKey; resultFile: string } | undefined
   if (unit.active) {
     if (!batch || batch.accounted) {
       journal.blocker = "UNOWNED_BATCH_ACTIVE"
@@ -335,7 +336,7 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
         const file = Bun.file(path.join(batch.resultsDir, run, "request-preflight.json"))
         return await file.exists() ? file.json() as Promise<{ code: string | null }> : null
       }))
-      let nodePending = false
+      let assessmentPending = false
       for (const key of batch.keys) {
         for (const run of runs) {
           const resultFile = path.join(batch.resultsDir, run, key.taskId, "1/result.json")
@@ -373,13 +374,19 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
             node = await assessNodeAttempt({ runDir: path.join(batch.resultsDir, run), taskId: key.taskId, tasksDir, slot })
             if (node.code === 2 && ["completed", "failed", "timeout", "no_artifact"].includes(result.status) &&
               !result.harness_error && result.failure_kind !== "provider") {
-              nodePending = true
+              assessmentPending = true
               journal.blocker ??= "NODE_ASSESSMENT_UNCONFIRMED"
             }
           }
+          const awaitingJudge = key.corpus !== "node" && ["completed", "failed", "timeout"].includes(result.status) &&
+            !result.harness_error && result.failure_kind !== "provider" && Boolean(result.package_path) && ["skipped", "error"].includes(result.judge_status)
+          if (awaitingJudge) {
+            assessmentPending = true
+            pendingJudge ??= { key, resultFile }
+          }
           const counted = resources.status !== "failed" && (key.corpus === "node" ? node?.code !== undefined && node.code !== 2 : isQualityResult(result))
           const completion = completions.get(resultFile)
-          const completedAt = Math.min(now, completion && (key.corpus === "node" || completion.quality === counted) && Number.isSafeInteger(completion.completedAt)
+          const completedAt = awaitingJudge && result.judge_status === "skipped" ? undefined : Math.min(now, completion && (key.corpus === "node" || completion.quality === counted) && Number.isSafeInteger(completion.completedAt)
             ? completion.completedAt! : (await stat(resultFile)).mtimeMs)
           const entry = { key, resultFile, status: result.status, counted, pass: node && node.code !== 2 ? node.verdict === "PASS" : result.pass, score: result.score, resources,
             completedAt,
@@ -394,7 +401,7 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
       if (!batch.started && unit.invocation === batch.invocationBefore && !probes.some(probe => probe) &&
         !journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep)))
         pending = batch.keys
-      if (!pending) batch.accounted = !nodePending
+      if (!pending) batch.accounted = !assessmentPending
       if (probes.some(probe => probe?.code === null)) journal.emptyPreflights = 0
       if (!pending && !batch.keys.every(key => journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep) && keyId(attempt.key) === keyId(key)))) {
         const failure = probes.find(probe => probe && ["REQUEST_PREFLIGHT_EMPTY", "REQUEST_PREFLIGHT_FAILED"].includes(probe.code ?? ""))
@@ -409,10 +416,10 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
     journal.blocker = "CAMPAIGN_RECONCILIATION_FAILED"
     journal.blockerKind = "technical"
   }
-  const completed = journal.attempts.filter(entry => batch && entry.resultFile.startsWith(batch.resultsDir + path.sep)).map(entry => ({
-    entry, order: completions.get(entry.resultFile)?.completionOrder,
-    priorCounted: previous.attempts.find(attempt => attempt.resultFile === entry.resultFile)?.counted,
-  })).sort((a, b) => a.entry.completedAt! - b.entry.completedAt! || (a.order ?? 0) - (b.order ?? 0))
+  const completed = journal.attempts.filter(entry => batch && entry.resultFile.startsWith(batch.resultsDir + path.sep) && entry.completedAt !== undefined).map(entry => {
+    const prior = previous.attempts.find(attempt => attempt.resultFile === entry.resultFile)
+    return { entry, order: completions.get(entry.resultFile)?.completionOrder, priorCounted: prior?.completedAt === undefined ? undefined : prior.counted }
+  }).sort((a, b) => a.entry.completedAt! - b.entry.completedAt! || (a.order ?? 0) - (b.order ?? 0))
   const recovered = completed.some(item => item.priorCounted === false && item.entry.counted)
   if (recovered) {
     const lastQuality = completed.findLastIndex(item => item.priorCounted === true)
@@ -430,6 +437,9 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
     return { journal, action: "finalize" as const, next: [] }
   }
   const missing = manifest.keys.filter(key => !journal.attempts.some(attempt => attempt.counted && keyId(attempt.key) === keyId(key)))
+  if (pendingJudge) return journal.repairing || journal.blocker
+    ? { journal, action: "blocked" as const, next: [] }
+    : { journal, action: "judge" as const, next: [], pendingJudge }
   if (missing.length && (journal.startedAttempts ?? 0) >= campaignLimits(manifest).maxStartedAttempts) {
     journal.final = "partial"
     journal.blocker = "ATTEMPT_BUDGET_EXHAUSTED"

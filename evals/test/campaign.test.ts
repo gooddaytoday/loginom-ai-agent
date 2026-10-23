@@ -13,6 +13,41 @@ async function admitRun(runDir: string, taskIds: string[]) {
   await writeLeaseReceipt(path.join(runDir, "config.json"), { commandJournal })
 }
 
+test("campaign retains a saved generation for pending judge even when the measurement budget is exhausted", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-pending-judge-"))
+  try {
+    const key = { corpus: "ordinary", taskId: "first", round: 1 }
+    const manifest: CampaignManifest = { id: "pending-judge", server: "runner2", executor: "EvalBaseline", parallel: 1, batchSize: 1,
+      keys: [key], pins: {}, limits: { maxStartedAttempts: 1 } }
+    const runDir = path.join(root, "run")
+    const out = path.join(runDir, key.taskId, "1")
+    await mkdir(out, { recursive: true })
+    await writeLeaseReceipt(path.join(out, "result.json"), { ...emptyResult(key.taskId, 1, false), status: "completed", exit_code: 0,
+      package_path: "/user/saved.lgp", judge_status: "skipped", score: null, pass: null,
+      environment_cleanup: { status: "confirmed", evidence: "cleanup.json", error: null } })
+    await writeLeaseReceipt(path.join(out, "cleanup.json"), { processes: { status: "confirmed" }, nextAdmissionAllowed: true })
+    await admitRun(runDir, [key.taskId])
+    const state: CampaignJournal = { manifestHash: "fixture", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
+      repairing: false, repairer: null, batches: [{ id: "one", keys: [key], resultsDir: root, invocationBefore: "before", started: true }],
+      attempts: [], lastProgressAt: 1000, consecutiveErrors: 0 }
+    const tick = await campaignTick(manifest, state, { active: false, invocation: "done", exitCode: 1 }, 2000)
+    expect(tick.action).toBe("judge")
+    expect(tick.next).toEqual([])
+    expect(tick.journal.batches[0]?.accounted).toBe(false)
+    expect(tick.journal.startedAttempts).toBe(1)
+    expect(tick.journal.consecutiveErrors).toBe(0)
+    expect(tick.journal.lastProgressAt).toBe(1000)
+    expect(tick.journal.attempts).toMatchObject([{ counted: false }])
+    expect(tick.journal.attempts[0]?.completedAt).toBeUndefined()
+    expect((await campaignTick(manifest, tick.journal, { active: true, invocation: "running", exitCode: 0 }, 3000)).action).toBe("wait")
+    expect((await campaignTick(manifest, { ...tick.journal, repairing: true }, { active: false, invocation: "done", exitCode: 1 }, 3000)).action).toBe("blocked")
+    expect((await campaignTick(manifest, { ...tick.journal, blocker: "TECHNICAL_REPAIR" }, { active: false, invocation: "done", exitCode: 1 }, 3000)).action).toBe("blocked")
+    const expired = await campaignTick(manifest, tick.journal, { active: false, invocation: "done", exitCode: 1 }, 1000 + 24 * 3600000)
+    expect(expired.action).toBe("finalize")
+    expect(expired.journal.final).toBe("partial")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("a recovered earlier quality result preserves later infrastructure errors in their original order", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-recovered-order-"))
   try {
