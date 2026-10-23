@@ -113,7 +113,10 @@ export async function runPreparedSlots(config: EvalConfig) {
           identity, phase: "cli_admitted", runDir, slotIds: environment.slots.map(lease => lease.slot.id), attempts: [...admissions] }))
         await admissionWrite
         await mkdir(out, { recursive: true, mode: 0o700 })
-        const watcher = watchAttemptIncidents(out, code => { stopped ??= code; controller.abort() })
+        const watcher = watchAttemptIncidents(out, code => {
+          if (code === "PROVIDER_ERROR_OBSERVED") return
+          stopped ??= code; controller.abort()
+        })
         const completed = await admin!.verifySlotUser(context.lease.slot.username).then(() => runAttempt({ config: context.config, command: context.command, source: parseArtifactSource("docker", context.config.loginom),
           task: tasks.find(task => task.id === job.taskId)!, attempt: job.attempt, runId, runDir, signal: controller.signal, profileRecovered: false,
           slotId, slot: { file, lease: context.lease, secretFile: path.join(file.controller.stateDir, `prepare-${slotId}.secret.json`) },
@@ -134,9 +137,6 @@ export async function runPreparedSlots(config: EvalConfig) {
           context.confirmed = false
           result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error: describe(error) }
           if (/SESSION_BACKUP|SERVER_EPOCH|SERVER_FENCE/.test(describe(error))) controller.abort()
-        }
-        if (result.limit_evidence?.events.length || result.failure_kind === "provider") {
-          stopped = "PROVIDER_LIMIT_OBSERVED"; controller.abort()
         }
         await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2))
         console.error(`[${slotId}/${job.taskId}#${job.attempt}] ${result.status} score=${result.score ?? "—"}`)
