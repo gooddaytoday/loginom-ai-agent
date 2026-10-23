@@ -14,7 +14,7 @@ import { freezeResourceBudget, readFrozenResourceBudget, readResourceEvidence } 
 import { assessResourceBudget, assessResourceIncidents, assessResourceTimeline } from "./parallel-acceptance"
 import { sampleHostResources } from "./parallel-resources"
 import { readServerIdentity } from "./parallel-pair"
-import { preflight, gitInfo, type Environment } from "./preflight"
+import { preflight, requestPreflight, gitInfo, type Environment } from "./preflight"
 import { assertAuth, verifyProfile } from "./profile"
 import type { ProcessCleanup } from "./process-supervisor"
 import { aggregate, aggregateLimits, aggregateTask, renderReport, writeSummary, type AttemptResult, type RunSummary } from "./report"
@@ -94,6 +94,21 @@ export async function runPreparedSlots(config: EvalConfig) {
       judgeConfirmed = false
       judge = await judgeInfo({ judge: scopedJudge }, controller.signal)
       judgeConfirmed = true
+    }
+    for (const context of contexts) {
+      const taskId = `request-preflight-${context.lease.slot.id}`
+      const out = path.join(runDir, taskId, "1"), workdir = path.join(context.lease.slot.workspaceRoot, runId, taskId, "1")
+      await mkdir(out, { recursive: true, mode: 0o700 })
+      await mkdir(workdir, { recursive: true, mode: 0o700 })
+      context.confirmed = false
+      const probe = await requestPreflight({ command: context.command, taskId, model: context.config.agent.model, variant: context.config.agent.variant,
+        workdir, outDir: out, profileDir: context.config.profileDir, slotId: context.lease.slot.id,
+        timeoutMs: Math.min(...tasks.map(task => taskTimeoutMs(config, task))), signal: controller.signal })
+      const cleanup = await cleanupSlotStorage(file, environment.server, context.lease, admin, probe.run.processCleanup, [`eval-${runId}-${taskId}-1`], [out])
+      await writeSlotCleanup(context, cleanup)
+      await writeLeaseReceipt(path.join(out, "cleanup.json"), { processes: probe.run.processCleanup, ...cleanup, nextAdmissionAllowed: true })
+      await writeLeaseReceipt(path.join(runDir, "request-preflight.json"), { slotId: context.lease.slot.id, code: probe.code, evidence: path.join(out, "run.json") })
+      if (probe.code) throw new EvalFailure(probe.code, 2)
     }
     const settings: JudgeSettings | undefined = judge ? { ...scopedJudge, timeoutMs: config.judgeTimeoutMs, passThreshold: config.passThreshold } : undefined
     const gate = createJudgeGate()

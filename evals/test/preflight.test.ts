@@ -5,10 +5,36 @@ import os from "node:os"
 import { evalsRoot, loadConfig, type EvalConfig } from "../src/config"
 import { parseArtifactSource } from "../src/artifact"
 import { EvalFailure } from "../src/fail"
-import { agentInfo, checkFreeSpace, checkStorage, checkSandbox, dockSkillRevision, preflight, verifyAdminRuntime } from "../src/preflight"
+import { agentInfo, checkFreeSpace, checkStorage, checkSandbox, dockSkillRevision, preflight, requestPreflight, verifyAdminRuntime } from "../src/preflight"
+import { agentCommand } from "../src/cli"
 import { probeJudgeEnvironment } from "./helpers/judge-probe"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
+
+test.each([
+  ["request-preflight-empty", "REQUEST_PREFLIGHT_EMPTY"],
+  ["request-preflight-provider-error", "REQUEST_PREFLIGHT_FAILED"],
+  ["request-preflight-ready", null],
+] as const)("request preflight uses the configured CLI without creating a measurement: %s", async (taskId, code) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-request-preflight-"))
+  try {
+    const config = loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "fake", EVAL_PROFILE_DIR: path.join(root, "profile"),
+      EVAL_AGENT_MODEL: "provider/pinned", LOGINOM_DOCK_API_KEY: "fixture-key" })
+    const argsFile = path.join(root, "args.json")
+    await mkdir(config.profileDir, { mode: 0o700 })
+    const command = agentCommand(config)
+    command.env.EVAL_FAKE_ARGS_FILE = argsFile
+    const probe = await requestPreflight({ command, taskId, model: config.agent.model, variant: "pinned-variant",
+      workdir: root, outDir: root, profileDir: config.profileDir, slotId: "a", timeoutMs: 2000 })
+    expect(probe.code).toBe(code)
+    expect(probe.run).toMatchObject({ exitCode: 0, timedOut: false, processCleanup: { status: "confirmed" } })
+    const args = await Bun.file(argsFile).json() as string[]
+    expect(args.slice(args.indexOf("--model"), args.indexOf("--model") + 4)).toEqual(["--model", "provider/pinned", "--variant", "pinned-variant"])
+    expect(args).not.toContain("--file")
+    expect(await Bun.file(path.join(root, "run.json")).exists()).toBe(true)
+    expect(await Bun.file(path.join(root, "result.json")).exists()).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("preflight preserves the judge systemd boundary for its version probe", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-preflight-unit-"))

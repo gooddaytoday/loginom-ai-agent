@@ -84,6 +84,35 @@ test("campaign durably records a batch before exposing its parameters and reuses
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test("three consecutive empty request preflights block a campaign without spending measurement attempts", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-preflight-"))
+  try {
+    const manifest: CampaignManifest = { id: "preflight", server: "runner2", executor: "EvalBaseline", parallel: 1, batchSize: 1,
+      keys: [{ corpus: "ordinary", taskId: "first", round: 1 }], pins: {}, limits: { consecutiveErrors: 6 } }
+    let state: CampaignJournal = { manifestHash: "test", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
+      repairing: false, repairer: null, batches: [], attempts: [{ key: manifest.keys[0]!, resultFile: path.join(root, "earlier/result.json"),
+        status: "infra_error", counted: false, pass: null, score: null, cleanupConfirmed: true }], lastProgressAt: 1000, consecutiveErrors: 0 }
+    const failures = ["REQUEST_PREFLIGHT_EMPTY", "REQUEST_PREFLIGHT_FAILED", "REQUEST_PREFLIGHT_EMPTY", "REQUEST_PREFLIGHT_EMPTY", "REQUEST_PREFLIGHT_EMPTY"]
+    for (let failure = 1; failure <= failures.length; failure++) {
+      const resultsDir = path.join(root, String(failure))
+      await mkdir(path.join(resultsDir, "run"), { recursive: true })
+      await Bun.write(path.join(resultsDir, "run/request-preflight.json"), JSON.stringify({ code: failures[failure - 1], evidence: "run.json" }))
+      state.batches.push({ id: `probe-${failure}`, keys: manifest.keys, resultsDir, invocationBefore: "prior", started: true })
+      const tick = await campaignTick(manifest, state, { active: false, invocation: `probe-${failure}`, exitCode: 2 }, 2000 + failure)
+      expect(tick.action).toBe(failure < failures.length ? "start" : "blocked")
+      expect(tick.journal.consecutiveErrors).toBe(failure)
+      expect(tick.journal.attempts).toEqual(state.attempts)
+      expect(tick.journal.lastProgressAt).toBe(1000)
+      state = tick.journal
+    }
+    expect(state.blocker).toBe("REQUEST_PREFLIGHT_EMPTY")
+    const again = await campaignTick(manifest, state, { active: false, invocation: "probe-5", exitCode: 2 }, 3000)
+    expect(again.action).toBe("blocked")
+    expect(again.next).toEqual([])
+    expect(again.journal.consecutiveErrors).toBe(5)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("campaign publishes its saved FAIL once and reads back the final issue and disabled wakeup", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-publish-"))
   const comments: { id: string; content: string }[] = []

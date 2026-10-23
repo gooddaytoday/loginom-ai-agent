@@ -5,7 +5,7 @@ import type { EvalConfig } from "./config"
 import { evalsRoot, repoRoot } from "./config"
 import { EvalFailure } from "./fail"
 import { assertIsolatedStorageEmpty, listStorage, type ArtifactSource } from "./artifact"
-import { agentCommand } from "./cli"
+import { agentCommand, runAgent } from "./cli"
 import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
 import { superviseProcess } from "./process-supervisor"
 import { judgeEnvironment, judgeVersion, type JudgeSettings } from "./judge"
@@ -20,6 +20,14 @@ export type Environment = {
   codex: { version: string } | null
   dock: { skillRevision: string | null } | null
   loginom: { imageDigest: string | null } | null
+}
+
+export async function requestPreflight(input: Omit<Parameters<typeof runAgent>[0], "prompt" | "files">) {
+  const run = await runAgent({ ...input, files: [], prompt: "Ответь одним словом READY. Не вызывай инструменты и не изменяй файлы или Loginom." })
+  const code = run.exitCode !== 0 || run.timedOut || run.interrupted || run.sandboxError || run.processCleanup.status !== "confirmed"
+    || !run.finalText?.trim() && run.failureKind === "provider"
+    ? "REQUEST_PREFLIGHT_FAILED" : run.finalText?.trim() ? null : "REQUEST_PREFLIGHT_EMPTY"
+  return { run, code }
 }
 
 export async function preflight(config: EvalConfig, source: ArtifactSource, signal?: AbortSignal, slot?: SlotStorageContext): Promise<Environment> {

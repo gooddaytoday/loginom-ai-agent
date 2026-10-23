@@ -9,6 +9,7 @@ type CampaignKey = { corpus: string; taskId: string; round: number }
 export type CampaignManifest = {
   id: string; server: string; executor: string; parallel: number; batchSize: number
   keys: CampaignKey[]; pins: Record<string, string | number>; issueId?: string; wakeupIds?: string[]
+  limits?: { consecutiveErrors?: number }
 }
 type Batch = { id: string; keys: CampaignKey[]; resultsDir: string; invocationBefore: string; started: boolean; accounted?: boolean }
 type AccountedAttempt = {
@@ -17,7 +18,7 @@ type AccountedAttempt = {
 }
 export type CampaignJournal = {
   manifestHash: string; server: string; campaignId: string; executor: string; repairing: boolean; repairer: string | null
-  batches: Batch[]; attempts: AccountedAttempt[]; lastProgressAt: number; consecutiveErrors: number
+  batches: Batch[]; attempts: AccountedAttempt[]; lastProgressAt: number; consecutiveErrors: number; emptyPreflights?: number
   blocker?: string; final?: "full" | "partial"; published?: boolean; reportCommentId?: string; attachmentId?: string; cleanupVerified?: boolean
 }
 type UnitState = { active: boolean; invocation: string; exitCode: number }
@@ -135,11 +136,15 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
     return { journal, action: "wait" as const, next: [] }
   }
   if (batch && !batch.accounted) {
+    const runs = await readdir(batch.resultsDir).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return []
+      throw error
+    })
+    const probes = await Promise.all(runs.map(async run => {
+      const file = Bun.file(path.join(batch.resultsDir, run, "request-preflight.json"))
+      return await file.exists() ? file.json() as Promise<{ code: string | null }> : null
+    }))
     for (const key of batch.keys) {
-      const runs = await readdir(batch.resultsDir).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === "ENOENT") return []
-        throw error
-      })
       for (const run of runs) {
         const resultFile = path.join(batch.resultsDir, run, key.taskId, "1/result.json")
         if (!(await Bun.file(resultFile).exists())) continue
@@ -170,11 +175,19 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
         }
       }
     }
-    if (!batch.started && unit.invocation === batch.invocationBefore && !journal.attempts.some(attempt => batch.keys.some(key => keyId(key) === keyId(attempt.key))))
+    if (!batch.started && unit.invocation === batch.invocationBefore && !probes.some(probe => probe) &&
+      !journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep)))
       return { journal, action: "launch" as const, next: batch.keys }
     batch.accounted = true
-    if (!batch.keys.every(key => journal.attempts.some(attempt => keyId(attempt.key) === keyId(key))))
-      journal.blocker = "BATCH_RESULT_MISSING"
+    if (probes.some(probe => probe?.code === null)) journal.emptyPreflights = 0
+    if (!batch.keys.every(key => journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep) && keyId(attempt.key) === keyId(key)))) {
+      const failure = probes.find(probe => probe && ["REQUEST_PREFLIGHT_EMPTY", "REQUEST_PREFLIGHT_FAILED"].includes(probe.code ?? ""))
+      if (failure && !journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep))) {
+        journal.consecutiveErrors++
+        journal.emptyPreflights = failure.code === "REQUEST_PREFLIGHT_EMPTY" ? (journal.emptyPreflights ?? 0) + 1 : 0
+        if (journal.emptyPreflights >= 3 || journal.consecutiveErrors >= (manifest.limits?.consecutiveErrors ?? 3)) journal.blocker = failure.code!
+      } else journal.blocker = "BATCH_RESULT_MISSING"
+    }
   }
   if (journal.attempts.some(attempt => !attempt.cleanupConfirmed)) journal.blocker = "CLEANUP_UNCONFIRMED"
   if (journal.repairing || journal.blocker) return { journal, action: "blocked" as const, next: [] }
@@ -226,6 +239,7 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
     !Number.isSafeInteger(manifest.parallel) || manifest.parallel < 1 || !Number.isSafeInteger(manifest.batchSize) || manifest.batchSize < 1 ||
     manifest.keys.some(key => !safeId(key.corpus) || !safeId(key.taskId) || !Number.isSafeInteger(key.round) || key.round < 1) ||
     new Set(manifest.keys.map(keyId)).size !== manifest.keys.length ||
+    manifest.limits?.consecutiveErrors !== undefined && (!Number.isSafeInteger(manifest.limits.consecutiveErrors) || manifest.limits.consecutiveErrors < 1) ||
     Object.entries(manifest.pins).some(([key, value]) => !/^[A-Z][A-Z0-9_]*$/.test(key) || /PASSWORD|TOKEN|SECRET|API_KEY/.test(key) || !["string", "number"].includes(typeof value)))
     throw Error("CAMPAIGN_MANIFEST_INVALID")
   if (![config.stateRoot, config.harnessRoot, config.controllerLock, config.batchEnvFile, config.resourceBudgetFile].every(value => typeof value === "string" && path.isAbsolute(value)) ||
