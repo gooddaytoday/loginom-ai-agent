@@ -2,6 +2,7 @@ import path from "node:path"
 import { mkdir } from "node:fs/promises"
 import type { EvalConfig } from "./config"
 import { agentCommand, type AgentCommand } from "./cli"
+import { tryCampaignLock } from "./campaign-lock"
 import { parseArtifactSource } from "./artifact"
 import { scopedSlotConfig } from "./environment-preparation"
 import { evaluationContractHash, rubricSnapshot } from "./evaluation"
@@ -57,6 +58,42 @@ export function createCampaignAdmission(config: EvalConfig["campaign"], persist:
   arm()
   return {
     signal: controller.signal,
+    async admit(write: () => Promise<void>, signal = controller.signal) {
+      const control = config?.control
+      let release: (() => Promise<void>) | undefined
+      while (control && !release) {
+        if (signal.aborted || controller.signal.aborted) return false
+        release = await tryCampaignLock(control.lockFile)
+        if (!release) await Bun.sleep(25)
+      }
+      try {
+        if (signal.aborted || controller.signal.aborted) return false
+        if (control) {
+          const journal = await readLeaseReceipt(control.journalFile)
+          if (!journal || typeof journal !== "object" || Array.isArray(journal) || !("manifestHash" in journal) || journal.manifestHash !== control.manifestHash)
+            throw new EvalFailure("CAMPAIGN_CONTROL_UNCONFIRMED", 2)
+          if ("final" in journal && journal.final || "published" in journal && journal.published) {
+            stop("CAMPAIGN_FINAL")
+            await save()
+            return false
+          }
+          if ("repairing" in journal && journal.repairing) {
+            stop("CAMPAIGN_REPAIRING")
+            await save()
+            return false
+          }
+          if ("blocker" in journal && journal.blocker) {
+            stop("CAMPAIGN_BLOCKED")
+            await save()
+            return false
+          }
+        }
+        if (signal.aborted || controller.signal.aborted) return false
+        await write()
+        return true
+      } catch (error) { controller.abort(error); throw error }
+      finally { await release?.() }
+    },
     async complete(admission: { completedAt?: number; completionOrder?: number; quality?: boolean }, quality: boolean) {
       admission.completedAt = Date.now()
       admission.completionOrder = ++completionOrder
@@ -177,13 +214,16 @@ export async function runPreparedSlots(config: EvalConfig) {
     sampler = await startRunResourceSampler({ slotsFile: config.slotsFile, out: path.join(runDir, "resources.jsonl"), runId })
     dispatchStarted = new Date().toISOString()
     const queued = await runSlotQueue({ jobs: buildJobs(tasks.map(task => task.id), config.repeat), slots: contexts.map(context => context.lease.slot.id),
-      signal: AbortSignal.any([controller.signal, campaignAdmission.signal]), async execute(slotId, job) {
+      signal: AbortSignal.any([controller.signal, campaignAdmission.signal]),
+      async admit(slotId, job) {
+        return campaignAdmission.admit(async () => { await admit(slotId, job.taskId, job.attempt, "measurement") }, controller.signal)
+      },
+      async execute(slotId, job) {
         const context = contexts.find(context => context.lease.slot.id === slotId)!
         const out = path.join(runDir, job.taskId, String(job.attempt))
-        let admission: CommandAdmission | undefined
+        const admission = admissions.find(item => item.purpose === "measurement" && item.slotId === slotId && item.taskId === job.taskId && item.attempt === job.attempt)!
         context.confirmed = false
         try {
-        admission = await admit(slotId, job.taskId, job.attempt, "measurement")
         await mkdir(out, { recursive: true, mode: 0o700 })
         const watcher = watchAttemptIncidents(out, code => {
           if (code === "PROVIDER_ERROR_OBSERVED") return
@@ -224,7 +264,7 @@ export async function runPreparedSlots(config: EvalConfig) {
           return { result, quarantine: true }
         } finally {
           const result = attempts[job.index]
-          if (admission && result) await campaignAdmission.complete(admission, isQualityResult(result))
+          if (result) await campaignAdmission.complete(admission, isQualityResult(result))
         }
       } })
     executionFinished = new Date().toISOString()

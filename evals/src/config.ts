@@ -58,11 +58,16 @@ export function loadConfig(argv: string[], env: Env = process.env) {
   if (campaignValues[0] !== undefined) campaignValues.forEach((raw, index) => {
     if (!raw?.trim() || !Number.isSafeInteger(Number(raw)) || Number(raw) < (index === 0 ? 0 : 1)) throw new EvalFailure(`${campaignKeys[index]}: ожидается ${index === 0 ? "неотрицательное" : "положительное"} целое`, 2)
   })
+  const campaignControl = [env.EVAL_CAMPAIGN_JOURNAL, env.EVAL_CAMPAIGN_LOCK, env.EVAL_CAMPAIGN_MANIFEST_HASH]
+  if (campaignControl.some(value => value !== undefined) && (campaignValues[0] === undefined ||
+    !campaignControl.slice(0, 2).every(value => typeof value === "string" && path.isAbsolute(value)) || !/^[a-f0-9]{64}$/.test(campaignControl[2] ?? "")))
+    throw new EvalFailure("EVAL_CAMPAIGN_CONTROL: требуются journal/lock с абсолютными путями, manifest SHA-256 и состояние admissions", 2)
   const providerId = env.EVAL_AGENT_PROVIDER_ID
   return {
     parallel,
     campaign: campaignValues[0] === undefined ? undefined : { consecutiveErrors: Number(campaignValues[0]), errorLimit: Number(campaignValues[1]),
-      lastProgressAt: Number(campaignValues[2]), noProgressMs: Number(campaignValues[3]) },
+      lastProgressAt: Number(campaignValues[2]), noProgressMs: Number(campaignValues[3]),
+      ...(campaignControl[0] === undefined ? {} : { control: { journalFile: campaignControl[0], lockFile: campaignControl[1]!, manifestHash: campaignControl[2]! } }) },
     slotsFile,
     resourceBudgetFile: env.EVAL_RESOURCE_BUDGET_FILE ? path.resolve(evalsRoot, env.EVAL_RESOURCE_BUDGET_FILE) : undefined,
     dryRun,
