@@ -333,6 +333,61 @@ test('native process, port and mapping reads share the prepared node and durable
  await assert.rejects(fixture().channel.observe({condition:'unbound controls',readProcessControls:true,ready:()=>true}),/prepared node/);
 });
 
+function processLockFixture(onProcessRead,{deadline=10000}={}) {
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'crumb',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const node={verified:true,...binding.node,surface:'graph',tid:'MF;TF-1;Graph;JS',locked:true};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,dom_epoch:{document:'dom',revision:1},
+  prepared_node_context:node,scan:{complete:true},wizard:{status:'absent'},ui:{elements:[{tid:'MF;ConsoleForm',ref:'ui-console'}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+ const records=[],timeouts=[];let clock=1,reads=0,gestures=0;
+ const channel=createNodeProcedure({operation:{id:'replace',deadline,action:{action_key:'node.apply',revision:'1'}},preparedNodeContext:binding,
+  targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>clock,wait:async ms=>{clock+=ms},
+  record:async r=>{records.push(structuredClone(r));return structuredClone(r)},wrapMutation:()=>{gestures++;throw Error('unexpected gesture')},
+  execute:async(code,options)=>{
+   timeouts.push(options?.timeout);
+   if(code.includes('function workspaceUiCapability'))return {status:'SUCCEEDED',output:structuredClone(state)};
+   if(code.includes('async function readNodeProcesses')){
+    const context=structuredClone(node);onProcessRead(reads++,node,context);
+    return {verified:true,node_context:context,processes:[]};
+   }
+   throw Error('unexpected native read');
+  }});
+ return {channel,records,timeouts,state,get reads(){return reads},get gestures(){return gestures},get clock(){return clock}};
+}
+
+for(const locked of [false,true])test('process observation discards a lock-only transition to '+locked+' and rereads',async()=>{
+ const f=processLockFixture((n,node)=>{if(!n){node.locked=locked;node.tid='MF;TF-1;Graph;JS'};});
+ f.state.prepared_node_context.locked=!locked;
+ const ready=[];
+ const result=await f.channel.observe({condition:'execution after JS Done',readProcesses:true,ready:s=>{ready.push(s);return s.node_processes.verified}});
+ assert.equal(f.reads,2);assert.equal(ready.length,1,'mixed read is never passed to readiness');assert.equal(f.gestures,0);
+ assert.equal(result.prepared_node_context.locked,locked);assert.deepEqual(result.node_processes.node_context,result.prepared_node_context);
+ const retried=f.records.filter(e=>e.phase==='node_observation_lock_retried');assert.equal(retried.length,1);
+ assert.equal(retried[0].native_node_context.locked,!locked);assert.equal(retried[0].ui_node_context.locked,locked);
+});
+
+test('lock-only retry resets consecutive execution identity confirmation',async()=>{
+ const f=processLockFixture((n,node)=>{if(n===1)node.locked=false});
+ await f.channel.observe({condition:'stable execution',readProcesses:true,ready:()=>true,confirmIdentity:()=>({execution:'same'})});
+ assert.equal(f.reads,4);assert.deepEqual(f.records.filter(e=>e.phase==='node_observation_sample').map(e=>e.sample),[0,2,3]);
+ assert.equal(f.records.filter(e=>e.phase==='node_observation_completed').length,1);
+});
+
+for(const change of [{node_id:'foreign'},{document_id:'foreign'},{workflow_id:'foreign'},{surface:'wizard'},
+ {tid:'MF;TF-1;Graph;Other'},{verified:false},{locked:undefined},{navigation_node:{tid:'other',label:'Other'}}])
+test('process lock change cannot hide another context change '+JSON.stringify(change),async()=>{
+ const f=processLockFixture((n,node,native)=>{node.locked=false;Object.assign(native,change)});
+ await assert.rejects(f.channel.observe({condition:'execution',readProcesses:true,ready:()=>true}),/context changed/);
+ assert.equal(f.reads,1);assert.equal(f.records.filter(e=>e.phase==='node_observation_lock_retried').length,0);assert.equal(f.gestures,0);
+});
+
+test('continuous process lock changes exhaust the original observation deadline without a usable snapshot',async()=>{
+ const f=processLockFixture((n,node)=>{node.locked=!node.locked},{deadline:451});
+ await assert.rejects(f.channel.observe({condition:'execution',readProcesses:true,timeoutMs:1000,ready:()=>true}),/readiness timeout/);
+ assert.equal(f.clock,451);assert.equal(f.reads,3);assert.equal(f.gestures,0);
+ assert.equal(f.records.filter(e=>e.phase==='node_observation_completed').length,0);
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-console'}),/budget exhausted|observation/i);
+});
+
 for(const fault of ['other field','source connection','port owner','incomplete mapping'])
 test('actual generated input mapping gate blocks post-ACK '+fault+' before UI dispatch',async()=>{
  const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',
