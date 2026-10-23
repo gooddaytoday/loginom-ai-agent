@@ -398,7 +398,7 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
           const counted = resources.status !== "failed" && (key.corpus === "node" ? node?.code !== undefined && node.code !== 2 : isQualityResult(result))
           const completion = completions.get(resultFile)
           const completedAt = awaitingJudge && result.judge_status === "skipped" ? undefined : Math.min(now, completion && (key.corpus === "node" || completion.quality === counted) && Number.isSafeInteger(completion.completedAt)
-            ? completion.completedAt! : (await stat(resultFile)).mtimeMs)
+            ? completion.completedAt! : Math.floor((await stat(resultFile)).mtimeMs))
           const entry = { key, resultFile, status: result.status, counted, pass: node && node.code !== 2 ? node.verdict === "PASS" : result.pass, score: result.score, resources,
             completedAt,
             cleanupConfirmed: !awaitingJudge && !result.judge_cleanup_unconfirmed && result.environment_cleanup?.status === "confirmed" &&
