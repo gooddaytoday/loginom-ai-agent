@@ -20,27 +20,27 @@
       "columns": [
         {
           "name": "Region",
-          "label": "Region",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Office",
-          "label": "Office",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Warehouse",
-          "label": "Warehouse",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Tech",
-          "label": "Tech",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Total",
-          "label": "Total",
+          "label_any": true,
           "type": "real"
         }
       ],

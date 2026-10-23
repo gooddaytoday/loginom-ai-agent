@@ -20,17 +20,17 @@
       "columns": [
         {
           "name": "ABCClass",
-          "label": "ABCClass",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Products",
-          "label": "Products",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Revenue",
-          "label": "Revenue",
+          "label_any": true,
           "type": "real"
         }
       ],

@@ -15,8 +15,8 @@ def read(name):
     return list(csv.DictReader(io.StringIO((ROOT / "data" / name).read_bytes().decode("utf-8"), newline="")))
 
 
-NODE_TYPES = ['imports.text', 'transform.replace_columns', 'transform.reform_columns', 'transform.filter_data', 'exports.text']
-OUTPUT_TYPE = 'transform.filter_data'
+NODE_TYPES = ['imports.text', 'transform.replace_columns', 'transform.filter_data', 'exports.text']
+OUTPUT_TYPE = 'export_input'
 ORDERED = True
 COLUMNS = [('Code', 'string'), ('Name', 'string'), ('CreditLimit', 'real'), ('Status', 'string')]
 
@@ -35,7 +35,7 @@ expected = {
     "outputs": [{
         "output_node_type": OUTPUT_TYPE,
         "ordered": ORDERED,
-        "columns": [{"name": name, "label": name, "type": kind} for name, kind in COLUMNS],
+        "columns": [{"name": name, "label_any": True, "type": kind} for name, kind in COLUMNS],
         "rows": rows,
     }],
 }

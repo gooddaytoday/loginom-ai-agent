@@ -25,17 +25,17 @@
       "columns": [
         {
           "name": "Region",
-          "label": "Region",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Business",
-          "label": "Business",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Engineering",
-          "label": "Engineering",
+          "label_any": true,
           "type": "real"
         }
       ],

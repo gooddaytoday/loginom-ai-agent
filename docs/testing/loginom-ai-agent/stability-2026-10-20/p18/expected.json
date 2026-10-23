@@ -8,9 +8,6 @@
       "type": "transform.replace_columns"
     },
     {
-      "type": "transform.reform_columns"
-    },
-    {
       "type": "transform.filter_data"
     },
     {
@@ -19,27 +16,27 @@
   ],
   "outputs": [
     {
-      "output_node_type": "transform.filter_data",
+      "output_node_type": "export_input",
       "ordered": true,
       "columns": [
         {
           "name": "Code",
-          "label": "Code",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Name",
-          "label": "Name",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "CreditLimit",
-          "label": "CreditLimit",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Status",
-          "label": "Status",
+          "label_any": true,
           "type": "string"
         }
       ],

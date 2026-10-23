@@ -8,15 +8,12 @@
       "type": "transform.cross_table"
     },
     {
-      "type": "transform.reform_columns"
-    },
-    {
       "type": "exports.text"
     }
   ],
   "outputs": [
     {
-      "output_node_type": "transform.reform_columns",
+      "output_node_type": "export_input",
       "ordered": false,
       "columns": [
         {

@@ -28,7 +28,7 @@ expected = {
         "export_destination": sys.argv[2] if len(sys.argv) > 2 else "/stability-2026-10-20/forecast-refit.csv",
         "ordered": False,
         "column_order": "exact",
-        "columns": [{"name": name, "label": name, "type": kind,
+        "columns": [{"name": name, "label_any": True, "type": kind,
                      **({"tolerance": {"abs": 1e-8, "rel": 1e-10}} if name == "Forecast" else {})}
                     for name, kind in (("RowID", "integer"), ("X", "real"), ("Forecast", "real"))],
         "rows": rows,

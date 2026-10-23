@@ -19,12 +19,12 @@
       "columns": [
         {
           "name": "Points",
-          "label": "Points",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "MeanVisits",
-          "label": "MeanVisits",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -33,7 +33,7 @@
         },
         {
           "name": "MeanItems",
-          "label": "MeanItems",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,

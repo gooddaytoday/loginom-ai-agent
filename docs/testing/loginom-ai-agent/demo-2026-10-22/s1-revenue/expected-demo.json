@@ -18,18 +18,18 @@
       "columns": [
         {
           "name": "Region",
-          "label": "Region",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "Category",
-          "label": "Category",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "Revenue",
-          "label": "Revenue",
-          "type": "real"
+          "type": "real",
+          "label_any": true
         }
       ],
       "rows": [

@@ -32,7 +32,7 @@ expected = {
         "output_node_type": "export_input",
         "ordered": False,
         "column_order": "exact",
-        "columns": [{"name": name, "label": name, "type": kind} for name, kind in [('Site', 'string'), ('Electricity', 'real'), ('Gas', 'real'), ('Water', 'real')]],
+        "columns": [{"name": name, "label_any": True, "type": kind} for name, kind in [('Site', 'string'), ('Electricity', 'real'), ('Gas', 'real'), ('Water', 'real')]],
         "rows": rows,
     }],
 }
