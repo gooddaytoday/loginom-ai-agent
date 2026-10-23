@@ -7,7 +7,7 @@ import os from "node:os"
 import { spawn } from "node:child_process"
 import { loadConfig, repoRoot } from "../src/config"
 import { agentCommand } from "../src/cli"
-import { agentConfigJson, archiveProfileHistory, assertProfileClean, assertAuth, ensureProfile, management, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, verifyProfile, waitProfileIdle } from "../src/profile"
+import { agentConfigJson, archiveProfileHistory, assertProfileClean, assertAuth, ensureProfile, management, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, setupProfile, verifyProfile, waitProfileIdle } from "../src/profile"
 import { EvalFailure } from "../src/fail"
 import { writerIdentity } from "../src/process-supervisor"
 import { Database } from "bun:sqlite"
@@ -545,6 +545,33 @@ test("ensureProfile v2: matching ready profile is reused without setup or genera
     expect(await Bun.file(path.join(context.profileDir, "cli-profile.json")).text()).toBe("preserve-profile")
     expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
     expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "status"])
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test("setupProfile rebinds username before ensureProfile", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),
+    loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-next", password: "new-password-canary" } }
+  const state = path.join(context.profileDir, "view.json")
+  const calls = path.join(context.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  try {
+    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, url: config.loginom.url, username: "eval-previous" }))
+    await Bun.write(path.join(context.profileDir, "data/loginom-ai-agent.db"), "preserve-history")
+    await Bun.write(path.join(context.profileDir, "data/auth.json"), '{"preserve":"auth"}')
+    await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_CONNECTION_MISMATCH")
+    await setupProfile(config, command)
+    const observed = await management(command, ["loginom", "status", "--format", "json"])
+    expect(observed.exitCode).toBe(0)
+    expect(observed.processCleanup.status).toBe("confirmed")
+    expect(JSON.parse(observed.stdout)).toMatchObject({ url: config.loginom.url, username: config.loginom.username, hasApiKey: true })
+    expect(await ensureProfile(config, command)).toEqual({ fresh: false })
+    expect(await Bun.file(path.join(context.profileDir, "data/loginom-ai-agent.db")).text()).toBe("preserve-history")
+    expect(await Bun.file(path.join(context.profileDir, "data/auth.json")).text()).toBe('{"preserve":"auth"}')
+    const commands = await Bun.file(calls).text()
+    expect(commands.trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "setup", "status", "status", "status"])
+    expect(commands).not.toContain(config.loginom.password)
+    expect(commands).not.toContain(config.dock.apiKey)
   } finally { await rm(context.profileDir, { recursive: true, force: true }) }
 })
 

@@ -58,9 +58,9 @@
 
 **Файлы:** только `evals/src/profile.ts`, `evals/test/profile.test.ts`.
 
-- [ ] В существующем fakeProfile добавить один тест `setupProfile rebinds username before ensureProfile`: профиль настроен на прежнее имя; прямой ensureProfile с новым именем по-прежнему отказывает; public setupProfile → public `management(..., ["loginom", "status", "--format", "json"])` → ensureProfile подтверждают новую пару URL/username без reset/history deletion. Использовать существующий fake CLI, не переписывать его контракт в тесте.
-- [ ] Из `evals/` выполнить `bun run test test/profile.test.ts -t 'setupProfile rebinds username before ensureProfile'`; получить RED на отсутствующем setupProfile, затем выделить существующий setup-блок без изменения проверок и получить GREEN.
-- [ ] Выполнить `bun run test test/profile.test.ts` и `bun typecheck`; сохранить прежние secrecy/cleanup и mismatch-проверки, сделать небольшой коммит `refactor(evals): expose supervised profile setup`.
+- [x] В существующем fakeProfile добавить один тест `setupProfile rebinds username before ensureProfile`: профиль настроен на прежнее имя; прямой ensureProfile с новым именем по-прежнему отказывает; public setupProfile → public `management(..., ["loginom", "status", "--format", "json"])` → ensureProfile подтверждают новую пару URL/username без reset/history deletion. Использовать существующий fake CLI, не переписывать его контракт в тесте.
+- [x] Из `evals/` выполнить `bun run test test/profile.test.ts -t 'setupProfile rebinds username before ensureProfile'`; получить RED на отсутствующем setupProfile, затем выделить существующий setup-блок без изменения проверок и получить GREEN.
+- [x] Выполнить `bun run test test/profile.test.ts` и `bun typecheck`; сохранить прежние secrecy/cleanup и mismatch-проверки, сделать небольшой коммит `refactor(evals): expose supervised profile setup`.
 
 **Результат:** проверена только управляемая смена credentials через публичный CLI process boundary; Docker/admin/native preparation этим не доказаны. `parallelFixture` содержит только локальные файлы/leases и не используется как fake Docker/admin/CLI.
 
@@ -102,3 +102,8 @@
 
 Уточнённый ориентир: **10 файлов, 500–850 изменённых строк** вместе с тестами и окончательным планом: один дополнительный source-файл нужен для переиспользования guarded start stopped ready pair. Отдельный runbook/модуль не нужен. Сверить через `git diff --stat`; если главный путь требует иных механизмов или более чем удвоенного объёма, пересмотреть дизайн до продолжения. Ревью плана проверило исходники; live-готовность и прохождение тестов устанавливаются при реализации шагов.
 Завершение реализации: первый saved-result E2E на тех же контейнерах, затем host reboot/service, подтверждают однократный учёт готового качества и продолжение missing при неизменных экспериментальных условиях; обязательные замечания независимого ревью устранены. Живая готовность до этих проверок не заявляется.
+
+Checkpoint:
+
+- Шаг 1 выполнен: RED→GREEN публичного setup; profile suite 81 pass / 2 skip / 0 fail, 247 assertions; typecheck и независимое ревью — PASS.
+- Шаги 2–4 не выполнены; установленный CLI, native preparation и reboot этим не подтверждены. Следующий шаг — первый native E2E до controller wiring.
