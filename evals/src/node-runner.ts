@@ -24,7 +24,7 @@ async function executeNodeEvals(argv: string[], env: Record<string, string | und
     for (const item of task.checklist) if (item.required && !(textImportIds.includes(task.id) ? textImportChecks : ["input", "crosstable", "graph", "export", "result", "sequence"]).includes(item.id))
       throw Error(`unknown required ID: ${item.id}`)
   }
-  const run = await main(args, env)
+  const run = await main(args, env, { nodeEvaluation: true })
   state.runDir = run.runDir
   const verdict = await validateNodeRun(run.runDir, tasks.map((task) => task.id), config.tasksDir)
   await Bun.write(path.join(run.runDir, "code-verdict.json"), JSON.stringify(verdict, null, 2) + "\n")

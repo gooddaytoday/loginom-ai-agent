@@ -18,7 +18,7 @@ import { reserveRunDirectory } from "./run-directory"
 import { writeLeaseReceipt } from "./lease"
 import { aggregate, aggregateLimits, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
-export async function main(argv: string[], env: Record<string, string | undefined> = process.env) {
+export async function main(argv: string[], env: Record<string, string | undefined> = process.env, options: { nodeEvaluation?: boolean } = {}) {
   const config = loadConfig(argv, env)
   if (config.slotsFile && (config.judgeOnly !== undefined || config.calibrate)) {
     const { runOfflineJudge } = await import("./judge-environment")
@@ -35,7 +35,7 @@ export async function main(argv: string[], env: Record<string, string | undefine
   if (config.slotsFile && !config.dryRun && !config.resourceBudgetFile) throw new EvalFailure("RESOURCE_BUDGET_REQUIRED", 2)
   if (config.slotsFile && !config.dryRun) {
     const { runPreparedSlots } = await import("./prepared-run")
-    return runPreparedSlots(config)
+    return runPreparedSlots(config, options.nodeEvaluation === true)
   }
   if (config.slotsFile) throw new EvalFailure("SLOTS_ADMISSION_UNAVAILABLE", 2)
   const lease = config.dryRun ? undefined : await acquireRunHarnessLease(config.profileDir, env)

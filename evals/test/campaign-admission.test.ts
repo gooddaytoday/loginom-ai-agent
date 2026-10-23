@@ -8,6 +8,40 @@ import path from "node:path"
 import { mkdtemp, rm } from "node:fs/promises"
 import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { tryCampaignLock } from "../src/campaign-lock"
+import { assessNodeAttempt } from "../src/node-evals"
+import { nodeCaseIds } from "../src/node-cases"
+
+test("node quality FAIL keeps the fourth job available while technical ERROR closes admissions", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-node-admission-"))
+  const ids = nodeCaseIds.slice(0, 4)
+  try {
+    for (const id of ids) await Bun.write(path.join(root, "tasks", id, "task.json"), JSON.stringify({ id, checklist: [{ id: "crosstable", required: true }] }))
+    for (const technical of [false, true]) {
+      for (const id of ids) {
+        await Bun.write(path.join(root, id, "1/result.json"), JSON.stringify({ ...emptyResult(id, 1, false),
+          status: technical ? "infra_error" : "no_artifact", environment_cleanup: { status: "confirmed", evidence: "cleanup.json", error: null } }))
+        await Bun.write(path.join(root, id, "1/cleanup.json"), JSON.stringify({ processes: { status: "confirmed" },
+          result: { status: "confirmed", error: null }, stages: ["processes", "diagnostics", "writer", "ready", "profile_history"].map(stage => ({ stage, status: "confirmed" })) }))
+      }
+      const admissions: { taskId: string; quality?: boolean }[] = []
+      const admission = createCampaignAdmission({ consecutiveErrors: 0, errorLimit: 3, lastProgressAt: Date.now(), noProgressMs: 60_000 }, async () => {})
+      try {
+        const queued = await runSlotQueue({ jobs: buildJobs(ids, 1), slots: ["one"], signal: admission.signal,
+          async execute(_slot, job) {
+            const entry: (typeof admissions)[number] = { taskId: job.taskId }
+            admissions.push(entry)
+            const assessed = await assessNodeAttempt({ runDir: root, taskId: job.taskId, tasksDir: path.join(root, "tasks") })
+            await admission.complete(entry, assessed.code !== 2)
+            return { result: assessed.verdict, quarantine: false }
+          } })
+        expect(queued.results.map(row => row.result)).toEqual(Array(technical ? 3 : 4).fill(technical ? "ERROR" : "FAIL"))
+        expect(admissions.every(entry => entry.quality === !technical)).toBe(true)
+        expect(queued.unassigned).toHaveLength(technical ? 1 : 0)
+        expect(admission.signal.aborted).toBe(technical)
+      } finally { await admission.close() }
+    }
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("a third infrastructure error during the journal read refuses a new durable admission", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-read-race-"))

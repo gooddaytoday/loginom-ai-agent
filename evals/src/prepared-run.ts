@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises"
 import type { EvalConfig } from "./config"
 import { agentCommand, type AgentCommand } from "./cli"
 import { tryCampaignLock } from "./campaign-lock"
+import { assessNodeAttempt } from "./node-evals"
 import { parseArtifactSource } from "./artifact"
 import { scopedSlotConfig } from "./environment-preparation"
 import { evaluationContractHash, rubricSnapshot } from "./evaluation"
@@ -109,7 +110,7 @@ export function createCampaignAdmission(config: EvalConfig["campaign"], persist:
   }
 }
 
-export async function runPreparedSlots(config: EvalConfig) {
+export async function runPreparedSlots(config: EvalConfig, nodeEvaluation = false) {
   if (!config.slotsFile || config.dryRun || config.agent.cliMode !== "binary" || !path.isAbsolute(config.agent.cliBin ?? ""))
     throw new EvalFailure("PREPARED_SLOTS_BINARY_REQUIRED", 2)
   if (!config.resourceBudgetFile) throw new EvalFailure("RESOURCE_BUDGET_REQUIRED", 2)
@@ -264,7 +265,10 @@ export async function runPreparedSlots(config: EvalConfig) {
           return { result, quarantine: true }
         } finally {
           const result = attempts[job.index]
-          if (result) await campaignAdmission.complete(admission, isQualityResult(result))
+          if (result) {
+            const node = nodeEvaluation ? await assessNodeAttempt({ runDir, taskId: job.taskId, tasksDir: config.tasksDir, slot: context.lease.slot }) : undefined
+            await campaignAdmission.complete(admission, node ? node.code !== 2 : isQualityResult(result))
+          }
         }
       } })
     executionFinished = new Date().toISOString()
