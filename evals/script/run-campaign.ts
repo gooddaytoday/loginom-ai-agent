@@ -509,7 +509,7 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
         if (unit.active) throw Error("CAMPAIGN_SERVER_BUSY")
         const first = manifest.keys[0]!
         await command([...config.preflightCommand, "--server", serverFile, "--manifest", manifestFile,
-          first.corpus, manifest.keys.filter(key => key.corpus === first.corpus && key.round === first.round).map(key => key.taskId).join(","),
+          first.corpus, manifest.keys.filter(key => key.corpus === first.corpus && key.round === first.round).slice(0, manifest.batchSize).map(key => key.taskId).join(","),
           String(first.round), String(manifest.parallel)], config.harnessRoot)
         if (!exists) await writeLeaseReceipt(journalFile, previous)
         await claim()

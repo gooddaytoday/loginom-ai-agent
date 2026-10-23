@@ -45,6 +45,18 @@ test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("reservation is idempotent a
   } finally { await fixture.close() }
 })
 
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("reservation preflights only the first bounded batch of a larger campaign", async () => {
+  const fixture = await controlFixture()
+  try {
+    fixture.manifest.keys.push({ corpus: "ordinary", taskId: "second", round: 1 })
+    await writeLeaseReceipt(fixture.manifestFile, fixture.manifest)
+    const script = path.join(fixture.root, "preflight.ts"), selection = path.join(fixture.root, "selection.json")
+    await Bun.write(script, await Bun.file(script).text() + `\nawait Bun.write(${JSON.stringify(selection)}, JSON.stringify(process.argv.slice(-4)))`)
+    await controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")
+    expect(await Bun.file(selection).json()).toEqual(["ordinary", "first", "1", "1"])
+  } finally { await fixture.close() }
+})
+
 test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("repair assigns one repairer without changing progress, attempts or the fixed manifest", async () => {
   const fixture = await controlFixture()
   try {
