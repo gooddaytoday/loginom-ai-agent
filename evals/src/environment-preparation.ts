@@ -5,7 +5,7 @@ import { agentCommand } from "./cli"
 import { EvalFailure } from "./fail"
 import { globalLockRoot, readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { openLoginomAdmin } from "./loginom-admin"
-import { prepareUserStorage, readServerIdentity, verifyParallelPair } from "./parallel-pair"
+import { prepareUserStorage, readServerObservation, verifyParallelPair } from "./parallel-pair"
 import { checkIsolatedLoginom } from "./preflight"
 import { assertAuth, ensureProfile, management, parseView, setupProfile, verifyProfile } from "./profile"
 import { assertSessionBackupEmpty, cleanupSlotStorage } from "./slot-storage"
@@ -44,7 +44,8 @@ async function checkEnvironment(input: { slotsFile: string; parallel: number; co
     throw new EvalFailure("PREPARATION_GENERATION_MISMATCH", 2)
   const config = input.config ?? loadConfig(["--skip-judge"], { ...process.env, EVAL_SLOTS_FILE: input.slotsFile })
   if (config.agent.cliMode !== "binary" || !path.isAbsolute(config.agent.cliBin ?? "")) throw new EvalFailure("PREPARATION_BINARY_REQUIRED", 2)
-  const identity = await readServerIdentity(file)
+  const observation = await readServerObservation(file)
+  const identity = observation.identity
   await verifyParallelPair(file, identity)
   if (previous) {
     await verifyParallelPair(previous, identity)
@@ -74,7 +75,8 @@ async function checkEnvironment(input: { slotsFile: string; parallel: number; co
       for (const lease of environment.slots) {
         const prepared = operation === "verify" ? await readUserPreparation(file, lease, path.join(file.controller.stateDir, `prepare-${lease.slot.id}.secret.json`)) :
           await stageUserPreparation(file, lease, new Bun.CryptoHasher("sha256").update(JSON.stringify({ identity, slot: lease.slot,
-            authMode: 1, isAdmin: false, isDesigner: true, isViewer: false, useGlobalFileStorage: false, schedulerFullAccess: false, allowPublish: false })).digest("hex"))
+            authMode: 1, isAdmin: false, isDesigner: true, isViewer: false, useGlobalFileStorage: false, schedulerFullAccess: false, allowPublish: false })).digest("hex"),
+            observation.stableConfiguration)
         const exists = await lstat(path.join(file.controller.stateDir, `user-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
           if (error.code === "ENOENT") return undefined
           throw error

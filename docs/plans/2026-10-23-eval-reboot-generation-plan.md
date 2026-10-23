@@ -85,6 +85,8 @@
 
 **Результат:** controller использует уже доказанные primitives, сохранённый quality не повторяется, released и fully-closed retained варианты имеют общий допустимый путь.
 
+Для новых preparations отдельный [stable-configuration подплан](2026-10-24-eval-stable-configuration-plan.md) сохраняет доказательство неизменных настроек отдельно от runtime identity. Это необходимо для endpoint churn после reboot; существующие legacy preparations не дополняются текущим snapshot и сохраняют прежний exact guard.
+
 ## Шаг 4 — host reboot и поставка, пока outline
 
 Для обеих кампаний ниже repair выполняется после подтверждения записи `attempts[]` с `purpose=measurement` в native command journal текущего batch. Путь берётся из `config.json.commandJournal` его runDir; связь с batch/commandId сверяется до действия. Запись сохраняется под admission lock до execute. Одного active unit недостаточно: preflight уже исполняется в активном unit, а ранний repair оставляет batch без измерений. При уже завершившемся batch принять сохранённый результат; не повторять измерение ради окна парковки или отказа controller.

@@ -40,10 +40,12 @@
 Файлы: `evals/src/environment-preparation.ts`, `evals/src/user-environment.ts`, существующий `user-environment.test.ts`.
 Интерфейс: optional аргумент stableConfiguration у stageUserPreparation; readUserPreparation валидирует и возвращает поле при наличии.
 
-- [ ] Через публичные stage/read с настоящими temp native leases получить RED→GREEN сохранения digest planned→staged и повторного входа. Отдельно проверить прерывание, повреждённое доказательство и неизменность legacy receipt; не переписывать старые preparations.
-- [ ] Prepare передаёт observation и identity из одного fenced чтения. Verify сохраняет прежние проверки. Запустить эти тесты и typecheck, независимо проверить diff, закоммитить.
+- [x] Через публичные stage/read с настоящими temp native leases получить RED→GREEN сохранения digest planned→staged и повторного входа. Отдельно проверить прерывание, повреждённое доказательство и неизменность legacy receipt; не переписывать старые preparations.
+- [x] Prepare передаёт observation и identity из одного fenced чтения. Verify сохраняет прежние проверки. Запустить эти тесты и typecheck, независимо проверить diff, закоммитить.
 
 **Проверяемый результат:** новый producer сохраняет ровно проверенный digest без секретов; legacy продолжает читаться без нового поля.
+
+Шаг 2 проверен: три последовательных RED→GREEN для producer/read/reentry и отрицательных границ; 57 связанных тестов / 310 assertions и typecheck прошли. Независимое ревью — PASS. Полная native preparation и controller/reboot остаются шагом 3.
 
 ## Шаг 3 — безопасное продолжение кампании и host reboot
 

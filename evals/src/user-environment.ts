@@ -63,8 +63,9 @@ export async function readUnactivatedUserObservation(file: SlotFile, lease: Slot
   return { identity: lease.identity, username: lease.slot.username, account, serverSessions: "absent" as const, source }
 }
 
-export async function stageUserPreparation(file: SlotFile, lease: SlotLease, desiredHash: string) {
+export async function stageUserPreparation(file: SlotFile, lease: SlotLease, desiredHash: string, stableConfiguration?: { version: 1; hash: string }) {
   await lease.assertHeld()
+  const configuration = parseStableConfiguration(stableConfiguration)
   const configured = parseSlots(file, 1).slots.find(slot => slot.id === lease.slot.id)
   if (!configured || Object.entries(configured).some(([key, value]) => lease.slot[key as keyof typeof configured] !== value) ||
     path.dirname(lease.receipt) !== file.controller.stateDir || !/^[0-9a-f]{64}$/.test(desiredHash))
@@ -91,13 +92,16 @@ export async function stageUserPreparation(file: SlotFile, lease: SlotLease, des
     try {
       await handle.writeFile(JSON.stringify({ version: 2, kind: "user-preparation", nonce: crypto.randomUUID(),
         slotId: lease.slot.id, username: lease.slot.username, endpoint: file.server.url, identity: lease.identity,
-        desiredHash, secretFile, state: "planned", secretHash: null }))
+        desiredHash, secretFile, state: "planned", secretHash: null, ...(configuration === undefined ? {} : { stableConfiguration: configuration }) }))
       await handle.sync()
     } finally { await handle.close() }
     const parent = await open(file.controller.stateDir, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW)
     try { await parent.sync() } finally { await parent.close() }
   }
   const intent = record(await readLeaseReceipt(journal).catch(() => { throw new EvalFailure("USER_PREPARATION_UNCONFIRMED", 2) }))
+  const savedConfiguration = parseStableConfiguration(intent.stableConfiguration)
+  if (configuration && savedConfiguration && configuration.hash !== savedConfiguration.hash)
+    throw new EvalFailure("USER_PREPARATION_CONFLICT", 2)
   if (intent.version !== 2 || intent.kind !== "user-preparation" || typeof intent.nonce !== "string" || !/^[0-9a-f-]{36}$/.test(intent.nonce) ||
     intent.slotId !== lease.slot.id || intent.username !== lease.slot.username || intent.endpoint !== file.server.url ||
     JSON.stringify(intent.identity) !== JSON.stringify(lease.identity) || intent.desiredHash !== desiredHash || intent.secretFile !== secretFile ||
@@ -116,7 +120,8 @@ export async function stageUserPreparation(file: SlotFile, lease: SlotLease, des
   const secretHash = new Bun.CryptoHasher("sha256").update(JSON.stringify(credential)).digest("hex")
   if (intent.state === "staged" && intent.secretHash !== secretHash) throw new EvalFailure("USER_PREPARATION_CONFLICT", 2)
   const staged = { version: 2, kind: "user-preparation", nonce: intent.nonce, slotId: lease.slot.id, username: lease.slot.username,
-    endpoint: file.server.url, identity: lease.identity, desiredHash, secretFile, secretHash, state: "staged" }
+    endpoint: file.server.url, identity: lease.identity, desiredHash, secretFile, secretHash, state: "staged",
+    ...(savedConfiguration === undefined ? {} : { stableConfiguration: savedConfiguration }) }
   await lease.assertHeld()
   if (intent.state === "planned") await writeLeaseReceipt(journal, staged)
   return staged
@@ -130,6 +135,7 @@ export async function readUserPreparation(file: SlotFile, lease: SlotLease, secr
     throw new EvalFailure("USER_PREPARATION_CONFLICT", 2)
   const intent = record(await readLeaseReceipt(path.join(file.controller.stateDir, `prepare-${lease.slot.id}.json`))
     .catch(() => { throw new EvalFailure("USER_PREPARATION_UNCONFIRMED", 2) }))
+  const configuration = parseStableConfiguration(intent.stableConfiguration)
   if (intent.version !== 2 || intent.kind !== "user-preparation" || typeof intent.nonce !== "string" || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(intent.nonce) ||
     intent.slotId !== lease.slot.id || intent.username !== lease.slot.username || intent.endpoint !== file.server.url ||
     JSON.stringify(intent.identity) !== JSON.stringify(lease.identity) || intent.state !== "staged" || intent.secretFile !== secretFile ||
@@ -141,7 +147,17 @@ export async function readUserPreparation(file: SlotFile, lease: SlotLease, secr
     throw new EvalFailure("USER_PREPARATION_CONFLICT", 2)
   await lease.assertHeld()
   return { version: 2, kind: "user-preparation", nonce: intent.nonce, slotId: lease.slot.id, username: lease.slot.username,
-    endpoint: file.server.url, identity: lease.identity, desiredHash: intent.desiredHash, secretFile, secretHash: intent.secretHash, state: "staged" }
+    endpoint: file.server.url, identity: lease.identity, desiredHash: intent.desiredHash, secretFile, secretHash: intent.secretHash, state: "staged",
+    ...(configuration === undefined ? {} : { stableConfiguration: configuration }) }
+}
+
+export function parseStableConfiguration(value: unknown) {
+  if (value === undefined) return undefined
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new EvalFailure("USER_PREPARATION_CONFLICT", 2)
+  const proof = value as Record<string, unknown>
+  if (Object.keys(proof).length !== 2 || proof.version !== 1 || typeof proof.hash !== "string" || !/^[a-f0-9]{64}$/.test(proof.hash))
+    throw new EvalFailure("USER_PREPARATION_CONFLICT", 2)
+  return { version: 1 as const, hash: proof.hash }
 }
 
 export async function claimUserOwnership(file: SlotFile, lease: SlotLease, secretFile: string, commandFile: string, reply: AdminReply) {
