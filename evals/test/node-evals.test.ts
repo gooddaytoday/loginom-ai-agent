@@ -2,7 +2,52 @@ import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
 import { mkdir, mkdtemp, rm } from "node:fs/promises"
-import { validateNodeAttempt, validateNodeRun } from "../src/node-evals"
+import { assessNodeAttempt, validateNodeAttempt, validateNodeRun } from "../src/node-evals"
+import { emptyResult } from "../src/run"
+import { evalsRoot } from "../src/config"
+
+test("saved node attempt without summary collects its own native evidence before assessing quality", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "node-attempt-recovery-"))
+  const taskId = "crosstable-min-max", attempt = path.join(root, taskId, "1")
+  const slot = { id: "a", profileDir: path.join(root, "profile"), historyDir: path.join(root, "history") }
+  const archive = path.join(slot.historyDir, "attempt-1")
+  try {
+    await mkdir(slot.profileDir, { mode: 0o700 })
+    const native = await Bun.file(new URL("fixtures/node-evals/min-max-native.json", import.meta.url)).json() as {
+      observations: { operation_id: string; recorded_at: string; node_crosstable: unknown }[]
+    }
+    await Bun.write(path.join(archive, "runtime/execution-events.jsonl"), native.observations.map(observation => JSON.stringify({
+      operation_id: observation.operation_id, recorded_at: observation.recorded_at, phase: "node_observation_completed",
+      outcome: { status: "SUCCEEDED", output: { node_crosstable: observation.node_crosstable } },
+    })).join("\n"))
+    await Bun.write(path.join(attempt, "cleanup.json"), JSON.stringify({ slotId: slot.id, profileDir: slot.profileDir, archive,
+      serverEpoch: "a".repeat(64), processes: { status: "confirmed", error: null, capture_complete: true, unknownProcesses: [], observation_mode: "continuous" },
+      serverSessions: "confirmed", storageDeletionAllowed: true, nextAdmissionAllowed: true }))
+    const result = { ...emptyResult(taskId, 1, false), slot_id: slot.id, status: "completed", judge_status: "skipped",
+      environment_cleanup: { status: "confirmed", evidence: "cleanup.json", error: null } }
+    await Bun.write(path.join(attempt, "result.json"), JSON.stringify(result))
+    const xml = await Bun.file(new URL("fixtures/node-evals/min-max.xml", import.meta.url)).text()
+    await Bun.write(path.join(attempt, "artifact/unpacked/Unit_0/Unit.xml"), xml.replace('Mapping Source="A_Amount_Min"', 'Mapping Source="A_Amount_Max"'))
+    const zip = Bun.spawn(["python3", "-c", "import zipfile,sys;z=zipfile.ZipFile(sys.argv[1],'w');z.write(sys.argv[2],'Unit_0/Unit.xml');z.close()",
+      path.join(attempt, "artifact/package.lgp"), path.join(attempt, "artifact/unpacked/Unit_0/Unit.xml")])
+    expect(await zip.exited).toBe(0)
+    const events = await Bun.file(new URL("fixtures/node-evals/min-max-protocol.json", import.meta.url)).json() as unknown[]
+    await Bun.write(path.join(attempt, "events.jsonl"), events.map(event => JSON.stringify(event)).join("\n"))
+    await Bun.write(path.join(attempt, "artifact/results/eval-lab26-builder-crosstable-min-max-1-crosstable-min-max-1.result.csv"),
+      await Bun.file(path.join(evalsRoot, "tasks/node-evals", taskId, "oracle.csv")).text())
+    const assessed = await assessNodeAttempt({ runDir: root, taskId, tasksDir: path.join(evalsRoot, "tasks/node-evals"), slot })
+    expect(assessed).toMatchObject({ verdict: "FAIL", code: 1, errors: [] })
+    expect(assessed.failures.join(" ")).toContain("mapping")
+    expect(assessed.failures.join(" ")).not.toContain("mask 12 proof required")
+    expect((await Bun.file(path.join(attempt, "native-crosstable.json")).json()).observations).toHaveLength(2)
+    expect(await Bun.file(path.join(root, "summary.json")).exists()).toBe(false)
+    expect(await Bun.file(path.join(attempt, "result.json")).json()).toEqual(result)
+    const cleanup = await Bun.file(path.join(attempt, "cleanup.json")).json()
+    await Bun.write(path.join(attempt, "cleanup.json"), JSON.stringify({ ...cleanup, archive: root }))
+    expect(await assessNodeAttempt({ runDir: root, taskId, tasksDir: path.join(evalsRoot, "tasks/node-evals"), slot }))
+      .toMatchObject({ verdict: "ERROR", code: 2 })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("неизвестный case ID получает ERROR до проверки артефакта", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-unknown-case-"))

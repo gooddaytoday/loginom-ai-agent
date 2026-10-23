@@ -1,13 +1,63 @@
 import path from "node:path"
-import type { RunSummary } from "./report"
+import type { AttemptResult, RunSummary } from "./report"
+import type { SlotDefinition } from "./slots"
 import { evalsRoot } from "./config"
 import { checkOracle } from "./oracle"
 import { readdir } from "node:fs/promises"
 import { checkNodeXml, readNodeXml } from "./node-xml"
 import { checkNodeEvidence } from "./node-evidence"
-import { nodeCaseIds } from "./node-cases"
-import { textImportIds, textImportChecks, validateTextImportAttempt } from "./text-import"
+import { coverageCaseIds, nodeCaseIds } from "./node-cases"
+import { collectNodeNativeEvidence } from "./node-native"
+import { collectTextImportEvidence, textImportIds, textImportChecks, validateTextImportAttempt } from "./text-import"
 import { confirmedProfileArchive } from "./profile-archive"
+
+export async function assessNodeAttempt(input: { runDir: string; taskId: string; tasksDir: string;
+  slot?: Pick<SlotDefinition, "id" | "profileDir" | "historyDir"> }) {
+  const errors: string[] = [], failures: string[] = []
+  const prefix = `${input.taskId}#1:`
+  const directory = path.join(input.runDir, input.taskId, "1")
+  let result: AttemptResult | undefined
+  try {
+    const task = await Bun.file(path.join(input.tasksDir, input.taskId, "task.json")).json() as { id: string; checklist: { id: string; required?: boolean }[] }
+    if (task.id !== input.taskId || !(nodeCaseIds as readonly string[]).includes(task.id) && !textImportIds.includes(task.id))
+      throw Error("unsupported node case or task identity differs")
+    for (const item of task.checklist)
+      if (item.required && !(textImportIds.includes(task.id) ? textImportChecks : ["input", "crosstable", "graph", "export", "result", "sequence"]).includes(item.id))
+        throw Error(`unknown required ID: ${item.id}`)
+    result = await Bun.file(path.join(directory, "result.json")).json() as AttemptResult
+    if (result.task_id !== input.taskId || result.attempt !== 1) throw Error("attempt identity differs")
+    if (!["completed", "failed", "timeout", "no_artifact"].includes(result.status) || result.harness_error || result.failure_kind === "provider" ||
+      result.judge_status !== "skipped" || result.pass !== null || result.score !== null) throw Error(`technical node result: ${result.status}`)
+    if (result.cleanup_error || result.environment_cleanup?.status !== "confirmed") throw Error("cleanup unconfirmed")
+    const cleanup = await Bun.file(path.join(directory, "cleanup.json")).json()
+    if (cleanup.processes?.observation_mode === "unit_after_exit") throw Error("unit_after_exit cleanup evidence cannot confirm node attempt")
+    if (input.slot) {
+      if (result.slot_id !== input.slot.id || cleanup.slotId !== input.slot.id || typeof cleanup.archive !== "string" ||
+        !/^[a-f0-9]{64}$/.test(cleanup.serverEpoch ?? "") || cleanup.processes?.error !== null || cleanup.processes?.observation_mode !== "continuous")
+        throw Error("cleanup evidence unconfirmed")
+      await confirmedProfileArchive(directory, input.slot.profileDir, input.slot.historyDir)
+    } else if (cleanup.result?.status !== "confirmed" || cleanup.result?.error || cleanup.processes?.status !== "confirmed" ||
+      !["processes", "diagnostics", "writer", "ready"].every(stage => cleanup.stages?.some((item: { stage: string; status: string }) => item.stage === stage && item.status === "confirmed")) ||
+      !cleanup.stages?.some((item: { stage: string; status: string }) => ["pruning", "profile_history"].includes(item.stage) && item.status === "confirmed"))
+      throw Error("cleanup evidence unconfirmed")
+    if (result.status !== "completed") failures.push(`${prefix} ${result.status}`)
+    if (result.status === "completed") {
+      const native = task.id === "crosstable-min-max" || coverageCaseIds.includes(task.id)
+      if (native || textImportIds.includes(task.id)) {
+        const profile = input.slot?.profileDir ?? (await Bun.file(path.join(input.runDir, "config.json")).json()).profileDir as string
+        if (native) await collectNodeNativeEvidence(directory, profile, input.slot?.historyDir)
+        if (textImportIds.includes(task.id)) await collectTextImportEvidence(directory, profile, input.slot?.historyDir)
+      }
+      const content = await validateNodeAttempt(path.join(input.tasksDir, task.id), directory, result.package_path ?? undefined)
+      errors.push(...content.errors.map(error => `${prefix} ${error}`))
+      failures.push(...content.failures.map(failure => `${prefix} ${failure}`))
+    }
+  } catch (error) { errors.push(`${prefix} ${error instanceof Error ? error.message : String(error)}`) }
+  const verdict = errors.length ? "ERROR" : failures.length ? "FAIL" : "PASS"
+  return { verdict, code: errors.length ? 2 : failures.length ? 1 : 0, errors, failures,
+    attempts: result ? [{ task_id: input.taskId, attempt: 1, status: result.status, session_id: result.session_id,
+      cleanup: result.environment_cleanup?.status, infra_retry_initial: result.infra_retry?.initial ?? null, verdict }] : [] }
+}
 
 export async function validateNodeAttempt(taskDir: string, attemptDir: string, packagePath?: string) {
   const task = await Bun.file(path.join(taskDir, "task.json")).json() as { id: string; checklist: { id: string; required?: boolean }[] }
