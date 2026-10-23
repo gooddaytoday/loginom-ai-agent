@@ -34,7 +34,7 @@ test("runAttempt persists generation before delayed judge", async () => {
     const saved = await Bun.file(file).json()
     expect(saved).toMatchObject({ task_id: task!.id, attempt: 1, status: "completed", exit_code: 0,
       session_id: "ses_fixture01", package_path: expect.any(String), artifact_origin: "receipt",
-      evaluation_contract_hash: hash, judge_status: "skipped", score: null, pass: null })
+      evaluation_contract_hash: hash, judge_status: "skipped", judge_attempts: 1, score: null, pass: null })
     expect(saved.cost).toBeGreaterThan(0)
     expect(saved.environment_cleanup.status).not.toBe("confirmed")
     expect(await Bun.file(path.join(runDir, "summary.json")).exists()).toBe(false)

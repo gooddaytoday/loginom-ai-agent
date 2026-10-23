@@ -204,6 +204,7 @@ export async function judgeTask(input: {
   judge: JudgeSettings
   signal?: AbortSignal
   checklist?: ChecklistItem[]
+  judgeAttemptsUsed?: 0 | 1 | 2
   saveJudgeFields?: (fields: Partial<Pick<AttemptResult, "judge_attempts" | "judge_status" | "score" | "pass" | "structural_score" |
     "judge_confidence" | "judge_summary" | "checklist" | "oracle_pass" | "oracle_error">>) => Promise<void>
 }) {
@@ -211,14 +212,18 @@ export async function judgeTask(input: {
 }
 
 async function judgeInvocation(input: Parameters<typeof judgeTask>[0], admit?: () => void) {
+  if (input.judgeAttemptsUsed === 2) return { ok: false as const, error: "Judge invocation budget exhausted", attempts: 2 as const }
   const checklist = input.checklist ?? input.task.checklist
   const checked = input.run ? await checkOracle(input.task, input.artifactDir) : { passed: null, error: null }
   const oracle = { oracle_pass: checked.passed, oracle_error: checked.error }
   await prepareJudgeDir({ ...input, dir: input.outDir, checklist })
   admit?.()
-  const first = await invoke(input, checklist, 1, oracle)
-  if (first.ok) return { ...first, pass: first.pass && checked.passed !== false, ...oracle, attempts: 1 as const }
-  if (input.signal?.aborted || "cleanupUnconfirmed" in first) return { ...first, ok: false as const, error: first.error, ...oracle, attempts: 1 as const }
+  const firstAttempt = input.judgeAttemptsUsed === 1 ? 2 : 1
+  await input.saveJudgeFields?.({ judge_attempts: firstAttempt })
+  const first = await invoke(input, checklist, firstAttempt, oracle)
+  if (first.ok) return { ...first, pass: first.pass && checked.passed !== false, ...oracle, attempts: firstAttempt }
+  if (firstAttempt === 2 || input.signal?.aborted || "cleanupUnconfirmed" in first) return { ...first, ok: false as const, error: first.error, ...oracle, attempts: firstAttempt }
+  await input.saveJudgeFields?.({ judge_attempts: 2 })
   const second = await invoke(input, checklist, 2, oracle)
   return second.ok
     ? { ...second, pass: second.pass && checked.passed !== false, ...oracle, attempts: 2 as const }

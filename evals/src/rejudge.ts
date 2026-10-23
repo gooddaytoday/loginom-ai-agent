@@ -10,6 +10,7 @@ import { preflight } from "./preflight"
 import { createJudgeGate, judgeInfo, judgedFields, type JudgeSettings } from "./judge"
 import { aggregate, aggregateTask, renderReport, writeSummary, type AttemptResult, type RunSummary } from "./report"
 import { describe, installSigint } from "./run"
+import { writeLeaseReceipt } from "./lease"
 
 export async function rejudge(config: EvalConfig, runId: string, onRunDirectory?: (directory: string) => Promise<void>) {
   const controller = new AbortController()
@@ -69,7 +70,7 @@ export async function rejudge(config: EvalConfig, runId: string, onRunDirectory?
             oracle_pass: task?.oracle ? false : null,
             oracle_error: task?.oracle ? "Артефакт и файл результата для oracle отсутствуют" : null,
           }
-          await Bun.write(path.join(dir, "result.json"), JSON.stringify(updated, null, 2))
+          await writeLeaseReceipt(path.join(dir, "result.json"), updated)
           attempts.push(updated)
           continue
         }
@@ -87,7 +88,7 @@ export async function rejudge(config: EvalConfig, runId: string, onRunDirectory?
           signal: controller.signal,
         }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
         const updated: AttemptResult = { ...attempt, ...judgedFields(judged), evaluation_contract_hash: evaluationHash }
-        await Bun.write(path.join(dir, "result.json"), JSON.stringify(updated, null, 2))
+        await writeLeaseReceipt(path.join(dir, "result.json"), updated)
         attempts.push(updated)
       }
     }

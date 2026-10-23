@@ -115,7 +115,7 @@ async function executeRunBody(config: EvalConfig, controller: AbortController) {
               result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error: describe(error) }
               return { stop: describe(error) }
             })
-          await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2)).catch(async () => {
+          await writeLeaseReceipt(path.join(out, "result.json"), result).catch(async () => {
             const error = "Attempt result persistence failed; measured outcome retained in summary"
             result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error }
             state.stopped = error
@@ -134,7 +134,7 @@ async function executeRunBody(config: EvalConfig, controller: AbortController) {
         await archiveInfraAttempt(out).catch(async (error: unknown) => {
           state.stopped = describe(error)
           result.environment_cleanup = { status: "failed", evidence: "infra-error", error: state.stopped }
-          await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2)).catch(() => {})
+          await writeLeaseReceipt(path.join(out, "result.json"), result).catch(() => {})
         })
         if (state.stopped) break outer
         history.initial = result
@@ -234,7 +234,7 @@ export async function runAttempt(input: {
     const result: AttemptResult = measured
       ? { ...base, environment_cleanup: { status: "failed", evidence: "cleanup.json", error: describe(error) } }
       : { ...base, status: "harness_error", judge_status: "skipped", harness_error: describe(error) }
-    await Bun.write(path.join(input.runDir, input.task.id, String(input.attempt), "result.json"), JSON.stringify(result, null, 2))
+    await writeLeaseReceipt(path.join(input.runDir, input.task.id, String(input.attempt), "result.json"), result)
       .catch(() => { console.error("Не удалось сохранить attempt result; исход сохранится в summary") })
     return { result, stop: measured || error instanceof SandboxFailure }
   })
@@ -389,7 +389,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
       : undefined
   const judgeCleanupFailed = judged && "cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed
   if (judged) {
-    Object.assign(result, judgedFields(judged), judgeCleanupFailed ? { judge_cleanup_unconfirmed: true,
+    Object.assign(result, judgedFields(judged), { judge_attempts: Math.max(result.judge_attempts, judged.attempts) }, judgeCleanupFailed ? { judge_cleanup_unconfirmed: true,
       environment_cleanup: { status: "failed", evidence: judged.attempts ? `judge-processes-${judged.attempts}/process-cleanup.json` : null,
         error: !judged.ok ? judged.error : null } } : {})
     Object.assign(base, result)
@@ -455,7 +455,7 @@ export async function afterAttempt(config: EvalConfig, command: AgentCommand, re
   } finally {
     if (outDir) {
       await Bun.write(path.join(outDir, "cleanup.json"), JSON.stringify({ ...evidence, result: result.environment_cleanup }, null, 2))
-      await Bun.write(path.join(outDir, "result.json"), JSON.stringify(result, null, 2))
+      await writeLeaseReceipt(path.join(outDir, "result.json"), result)
     }
   }
 }

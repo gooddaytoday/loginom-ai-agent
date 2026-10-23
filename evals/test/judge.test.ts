@@ -11,6 +11,8 @@ import { loadTasks } from "../src/task"
 import { analyzeComparison, parseComparisonSummary } from "../src/compare-analysis"
 import { comparisonSummary } from "./helpers/compare-summary"
 import { probeJudgeEnvironment } from "./helpers/judge-probe"
+import { writeLeaseReceipt } from "../src/lease"
+import type { AttemptResult } from "../src/report"
 
 const checklist = [
   { id: "a", text: "A", weight: 1, requiresResultFile: false, requiresRun: false, required: false },
@@ -235,6 +237,27 @@ async function gateFixture() {
     async close() { await rm(root, { recursive: true, force: true }); await rm(path.dirname(artifact.unpackedDir), { recursive: true, force: true }) },
   }
 }
+
+test("judgeTask resumes only the remaining invoke and persists its absolute budget before starting", async () => {
+  const fixture = await gateFixture()
+  const file = path.join(fixture.root, "result.json")
+  try {
+    await writeLeaseReceipt(file, { judge_attempts: 1 })
+    const input = fixture.input("resumed", { FAKE_CODEX_EXIT: "9" })
+    const result = await judgeTask({ ...input, judgeAttemptsUsed: 1, saveJudgeFields: async (fields: Partial<AttemptResult>) => {
+      expect((await fixture.records()).filter(row => row.kind === "start")).toHaveLength(0)
+      await writeLeaseReceipt(file, { ...await Bun.file(file).json(), ...fields })
+    } })
+    expect(result).toMatchObject({ ok: false, attempts: 2 })
+    expect((await fixture.records()).filter(row => row.kind === "start")).toHaveLength(1)
+    expect(await Bun.file(file).json()).toMatchObject({ judge_attempts: 2 })
+    expect(await Bun.file(path.join(fixture.root, "resumed/judge-processes-2/process-cleanup.json")).exists()).toBe(true)
+    const exhausted = await judgeTask({ ...input, judgeAttemptsUsed: 2 })
+    expect(exhausted).toMatchObject({ ok: false, attempts: 2 })
+    expect(exhausted.ok ? "" : exhausted.error).toContain("budget exhausted")
+    expect((await fixture.records()).filter(row => row.kind === "start")).toHaveLength(1)
+  } finally { await fixture.close() }
+})
 
 test("judgeTask: supervisor drains the judge's child before returning a verdict", async () => {
   const fixture = await gateFixture()

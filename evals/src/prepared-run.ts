@@ -251,7 +251,7 @@ export async function runPreparedSlots(config: EvalConfig, nodeEvaluation = fals
           result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error: describe(error) }
           if (/SESSION_BACKUP|SERVER_EPOCH|SERVER_FENCE/.test(describe(error))) controller.abort()
         }
-        await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2))
+        await writeLeaseReceipt(path.join(out, "result.json"), result)
         console.error(`[${slotId}/${job.taskId}#${job.attempt}] ${result.status} score=${result.score ?? "—"}`)
         if (["infra_error", "harness_error", "timeout", "interrupted"].includes(result.status) || result.judge_cleanup_unconfirmed) context.confirmed = false
         return { result, quarantine: !context.confirmed || Boolean(result.judge_cleanup_unconfirmed) }
