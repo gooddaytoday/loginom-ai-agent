@@ -4,6 +4,7 @@ import os from "node:os"
 import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { campaignTick, controlCampaign, prepareCampaignBatch, runCampaign, type CampaignManifest } from "../script/run-campaign"
 import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
+import { tryCampaignLock } from "../src/campaign-lock"
 import { emptyResult } from "../src/run"
 
 async function controlFixture() {
@@ -26,6 +27,144 @@ await Bun.write(file, JSON.stringify(count + 1))
 `)
   return { root, manifest, manifestFile, serverFile, config, async close() { await rm(root, { recursive: true, force: true }) } }
 }
+
+test("prepare generation requires the campaign owner before touching infrastructure", async () => {
+  const fixture = await controlFixture()
+  try {
+    const original = await Bun.file(fixture.serverFile).text()
+    const unlock = await tryCampaignLock(fixture.config.controllerLock)
+    try {
+      await expect(controlCampaign(fixture.manifestFile, fixture.serverFile, "prepare-generation", "EvalRunner"))
+        .rejects.toThrow("CAMPAIGN_BUSY")
+    } finally { await unlock!() }
+    await expect(controlCampaign(fixture.manifestFile, fixture.serverFile, "prepare-generation", "EvalRunner"))
+      .rejects.toThrow("CAMPAIGN_OWNER_MISMATCH")
+    expect(await Bun.file(fixture.serverFile).text()).toBe(original)
+    expect(await Bun.file(path.join(fixture.root, "environment-generations")).exists()).toBe(false)
+    expect(await Bun.file(fixture.config.batchEnvFile).exists()).toBe(false)
+  } finally { await fixture.close() }
+})
+
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("prepare generation requires the parked repairer and preserves admission state", async () => {
+  const fixture = await controlFixture()
+  try {
+    const reserved = await controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")
+    const journalFile = path.join(fixture.root, "control/journal.json")
+    for (const repair of [{ repairing: false, repairer: null }, { repairing: true, repairer: "EvalBaseline" }]) {
+      await writeLeaseReceipt(journalFile, { ...reserved, ...repair })
+      const original = await Bun.file(journalFile).text()
+      await expect(controlCampaign(fixture.manifestFile, fixture.serverFile, "prepare-generation", "EvalRunner"))
+        .rejects.toThrow("CAMPAIGN_REPAIRER_MISMATCH")
+      expect(await Bun.file(journalFile).text()).toBe(original)
+      expect(await Bun.file(path.join(fixture.root, "environment-generations")).exists()).toBe(false)
+    }
+  } finally { await fixture.close() }
+})
+
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("prepare generation accounts saved FAIL before rejecting an unaccepted harness", async () => {
+  const fixture = await controlFixture()
+  const api = Bun.serve({ port: 0, fetch() { return Response.json([]) } })
+  try {
+    fixture.manifest.keys.push({ corpus: "ordinary", taskId: "second", round: 1 })
+    fixture.manifest.pins = { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/pinned/cli", EVAL_AGENT_MODEL: "pinned/model",
+      EVAL_AGENT_VARIANT: "medium", JUDGE_MODEL: "judge", JUDGE_REASONING: "xhigh" }
+    await writeLeaseReceipt(fixture.manifestFile, fixture.manifest)
+    await writeLeaseReceipt(fixture.serverFile, { ...fixture.config, multica: { ...fixture.config.multica, url: `http://127.0.0.1:${api.port}` } })
+    await Bun.write(fixture.config.multica.tokenFile, "fixture-token", { mode: 0o600 })
+    const reserved = await controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")
+    const resultsDir = path.join(fixture.root, "control/batches/1"), runDir = path.join(resultsDir, "saved")
+    const out = path.join(runDir, "first/1"), commandJournal = path.join(runDir, "native.json")
+    const completedAt = Date.now() - 3600000
+    await mkdir(out, { recursive: true, mode: 0o700 })
+    await writeLeaseReceipt(path.join(runDir, "config.json"), { commandJournal })
+    await writeLeaseReceipt(commandJournal, { version: 2, kind: "unactivated-preparation", runDir,
+      attempts: [{ taskId: "first", attempt: 1, purpose: "measurement", completedAt, quality: true }] })
+    await writeLeaseReceipt(path.join(runDir, "resource-acceptance.json"), { checks: [{ status: "passed", codes: [] }] })
+    await writeLeaseReceipt(path.join(out, "result.json"), { ...emptyResult("first", 1, false), status: "no_artifact", pass: false,
+      score: 0, judge_status: "no_artifact", environment_cleanup: { status: "confirmed", evidence: "cleanup.json", error: null } })
+    await writeLeaseReceipt(path.join(out, "cleanup.json"), { processes: { status: "confirmed" }, nextAdmissionAllowed: true })
+    const original = await Bun.file(path.join(out, "result.json")).text(), server = await Bun.file(fixture.serverFile).text()
+    const journalFile = path.join(fixture.root, "control/journal.json")
+    await writeLeaseReceipt(journalFile, { ...reserved, repairing: true, repairer: "EvalRunner", lastProgressAt: completedAt - 1000,
+      batches: [{ id: "one", keys: [fixture.manifest.keys[0]!], resultsDir, invocationBefore: "before", started: true }] })
+    await expect(controlCampaign(fixture.manifestFile, fixture.serverFile, "prepare-generation", "EvalRunner"))
+      .rejects.toThrow("CAMPAIGN_HARNESS_CHANGED")
+    const checked = await readLeaseReceipt(journalFile)
+    expect(checked).toMatchObject({ repairing: true, repairer: "EvalRunner", lastProgressAt: completedAt, startedAttempts: 1,
+      batches: [{ accounted: true }], attempts: [{ counted: true, pass: false, score: 0 }] })
+    expect(await Bun.file(path.join(out, "result.json")).text()).toBe(original)
+    expect(await Bun.file(fixture.serverFile).text()).toBe(server)
+    expect(await readLeaseReceipt(fixture.manifestFile)).toEqual(fixture.manifest)
+    expect(await Bun.file(path.join(fixture.root, "environment-generations")).exists()).toBe(false)
+  } finally { api.stop(true); await fixture.close() }
+})
+
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("prepare generation refuses a pinned username before infrastructure changes", async () => {
+  const fixture = await controlFixture()
+  const api = Bun.serve({ port: 0, fetch() { return Response.json([]) } })
+  try {
+    fixture.manifest.pins.LOGINOM_USERNAME = "fixed-user"
+    await writeLeaseReceipt(fixture.manifestFile, fixture.manifest)
+    await writeLeaseReceipt(fixture.serverFile, { ...fixture.config, multica: { ...fixture.config.multica, url: `http://127.0.0.1:${api.port}` } })
+    await Bun.write(fixture.config.multica.tokenFile, "fixture-token", { mode: 0o600 })
+    const reserved = await controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")
+    await writeLeaseReceipt(path.join(fixture.root, "control/journal.json"), { ...reserved, repairing: true, repairer: "EvalRunner" })
+    await expect(controlCampaign(fixture.manifestFile, fixture.serverFile, "prepare-generation", "EvalRunner"))
+      .rejects.toThrow("CAMPAIGN_USERNAME_PINNED")
+    expect(await Bun.file(path.join(fixture.root, "environment-generations")).exists()).toBe(false)
+    expect(await Bun.file(fixture.config.batchEnvFile).exists()).toBe(false)
+  } finally { api.stop(true); await fixture.close() }
+})
+
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1").each(["deadline", "published", "unavailable"] as const)("prepare generation respects %s on repeated entry", async state => {
+  const fixture = await controlFixture()
+  const api = Bun.serve({ port: 0, fetch(request) {
+    if (state === "unavailable") return new Response(null, { status: 503 })
+    const route = new URL(request.url).pathname
+    if (route.endsWith("/comments")) return Response.json(state === "published"
+      ? [{ id: "ops-final", content: "<!-- eval-campaign:control -->\n<!-- eval-final:partial -->\n# частичный: остановлено" }] : [])
+    if (route.endsWith("/wakeups")) return Response.json([])
+    return Response.json({ revision: 1, status: "in_review" })
+  } })
+  try {
+    await writeLeaseReceipt(fixture.serverFile, { ...fixture.config, multica: { ...fixture.config.multica, url: `http://127.0.0.1:${api.port}` } })
+    await Bun.write(fixture.config.multica.tokenFile, "fixture-token", { mode: 0o600 })
+    const reserved = await controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")
+    const journalFile = path.join(fixture.root, "control/journal.json")
+    const lastProgressAt = state === "deadline" ? Date.now() - 25 * 3600000 : reserved.lastProgressAt
+    await writeLeaseReceipt(journalFile, { ...reserved, repairing: true, repairer: "EvalRunner", lastProgressAt, startedAttempts: 0 })
+    const server = await Bun.file(fixture.serverFile).text()
+    for (let entry = 0; entry < 2; entry++) {
+      const prepared = controlCampaign(fixture.manifestFile, fixture.serverFile, "prepare-generation", "EvalRunner")
+      if (state === "unavailable") await expect(prepared).rejects.toThrow("CAMPAIGN_STATE_UNAVAILABLE")
+      if (state !== "unavailable") expect(await prepared).toMatchObject({ final: "partial", ...(state === "published" ? { published: true } : {}) })
+      expect(await readLeaseReceipt(journalFile)).toMatchObject({ repairing: true, repairer: "EvalRunner", lastProgressAt,
+        startedAttempts: 0, attempts: [] })
+      expect(await Bun.file(fixture.serverFile).text()).toBe(server)
+      expect(await Bun.file(path.join(fixture.root, "environment-generations")).exists()).toBe(false)
+      expect(await Bun.file(fixture.config.batchEnvFile).exists()).toBe(false)
+    }
+  } finally { api.stop(true); await fixture.close() }
+})
+
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("prepare generation rechecks config after observing the external final", async () => {
+  const fixture = await controlFixture()
+  const next = { ...fixture.config, resourceBudgetFile: path.join(fixture.root, "changed-budget.json") }
+  const api = Bun.serve({ port: 0, async fetch() {
+    await writeLeaseReceipt(fixture.serverFile, next)
+    return Response.json([])
+  } })
+  try {
+    await writeLeaseReceipt(fixture.serverFile, { ...fixture.config, multica: { ...fixture.config.multica, url: `http://127.0.0.1:${api.port}` } })
+    await Bun.write(fixture.config.multica.tokenFile, "fixture-token", { mode: 0o600 })
+    const reserved = await controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")
+    await writeLeaseReceipt(path.join(fixture.root, "control/journal.json"), { ...reserved, repairing: true, repairer: "EvalRunner" })
+    await expect(controlCampaign(fixture.manifestFile, fixture.serverFile, "prepare-generation", "EvalRunner"))
+      .rejects.toThrow("CAMPAIGN_SERVER_CONFIG_CHANGED")
+    expect(await readLeaseReceipt(fixture.serverFile)).toEqual(next)
+    expect(await Bun.file(path.join(fixture.root, "environment-generations")).exists()).toBe(false)
+  } finally { api.stop(true); await fixture.close() }
+})
 
 test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("reservation is idempotent and a different campaign cannot claim the same server", async () => {
   const fixture = await controlFixture()
@@ -167,6 +306,9 @@ test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("controller CLI reserves wit
     const rejected = Bun.spawn([...args, "invalid"], { stdout: "pipe", stderr: "pipe" })
     expect(await rejected.exited).toBe(2)
     expect(await new Response(rejected.stderr).text()).toContain("CAMPAIGN_OPERATION_INVALID")
+    const generation = Bun.spawn([...args, "prepare-generation", "--repairer", "EvalRunner"], { stdout: "pipe", stderr: "pipe" })
+    expect(await generation.exited).toBe(2)
+    expect(await new Response(generation.stderr).text()).toContain("CAMPAIGN_REPAIRER_MISMATCH")
     expect(await Bun.file(path.join(fixture.root, "control/journal.json")).text()).toBe(journal)
     expect(await Bun.file(fixture.config.batchEnvFile).exists()).toBe(false)
   } finally { await fixture.close() }

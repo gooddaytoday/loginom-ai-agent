@@ -1,15 +1,16 @@
 import path from "node:path"
-import { mkdir, readdir, realpath, rename, stat, unlink } from "node:fs/promises"
+import { mkdir, open, readdir, realpath, rename, stat, unlink } from "node:fs/promises"
 import { parseArgs } from "node:util"
 import { isQualityResult, type AttemptResult } from "../src/report"
-import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
+import { globalLockRoot, readLeaseReceipt, readResourceReservation, writeLeaseReceipt, type Reservation } from "../src/lease"
 import { tryCampaignLock } from "../src/campaign-lock"
 import { assessNodeAttempt } from "../src/node-evals"
-import { loadSlots } from "../src/slots"
+import { loadSlots, type ServerIdentity } from "../src/slots"
 import { agentInputsHash, loadTasks, rubricHash } from "../src/task"
 import { evalsRoot, loadConfig } from "../src/config"
 import { readPendingJudge } from "../src/rejudge"
 import { runOfflineJudge } from "../src/judge-environment"
+import { requireResourceBudgetScopes, validResourceBound } from "../src/parallel-resource-budget"
 
 type CampaignKey = { corpus: string; taskId: string; round: number }
 export type CampaignManifest = {
@@ -477,6 +478,128 @@ export type CampaignServerConfig = {
   multica: { url: string; workspace: string; tokenFile: string }
 }
 
+async function prepareGeneration(manifest: CampaignManifest, config: CampaignServerConfig) {
+  const { prepareEnvironment, verifyEnvironment } = await import("../src/environment-preparation")
+  const { createPair, readServerIdentity, verifyParallelPair } = await import("../src/parallel-pair")
+  const { releaseClosedEnvironment } = await import("../src/startup-reconciliation")
+  const preparedConfig = loadConfig(["--skip-judge", "--parallel", String(manifest.parallel)],
+    { ...process.env, ...campaignEnvironment(manifest, config) })
+  const pins = await readLeaseReceipt(config.experimentPinsFile) as { cli: string; cliBinarySha256: string }
+  if (preparedConfig.agent.cliMode !== "binary" || typeof pins?.cli !== "string" || !path.isAbsolute(pins.cli) || preparedConfig.agent.cliBin !== pins.cli)
+    throw Error("CAMPAIGN_CLI_PIN_CHANGED")
+  if (!/^[a-f0-9]{64}$/.test(pins.cliBinarySha256) ||
+    new Bun.CryptoHasher("sha256").update(await Bun.file(pins.cli).bytes()).digest("hex") !== pins.cliBinarySha256)
+    throw Error("CAMPAIGN_CLI_PIN_CHANGED")
+  if (config.verifyCommand.filter(value => value === config.slotsFile).length !== 1) throw Error("CAMPAIGN_VERIFY_ARGUMENT_AMBIGUOUS")
+  const file = await loadSlots(config.slotsFile, manifest.parallel)
+  const preparations = await Promise.all(file.slots.map(async slot => {
+    const prepared = await readLeaseReceipt(path.join(file.controller.stateDir, `prepare-${slot.id}.json`)) as {
+      version: number; kind: string; state: string; slotId: string; username: string; endpoint: string; identity: ServerIdentity
+    }
+    if (prepared?.version !== 2 || prepared.kind !== "user-preparation" || prepared.state !== "staged" ||
+      prepared.slotId !== slot.id || prepared.username !== slot.username || prepared.endpoint !== file.server.url ||
+      !prepared.identity || ["containerId", "studioContainerId", "serverEpoch", "configurationHash"].some(key =>
+        !/^[a-f0-9]{64}$/.test(prepared.identity[key as keyof ServerIdentity])) ||
+      !Number.isFinite(Date.parse(prepared.identity.startedAt)) || !Number.isFinite(Date.parse(prepared.identity.studioStartedAt)))
+      throw Error("CAMPAIGN_PREPARATION_UNCONFIRMED")
+    return prepared.identity
+  }))
+  const old = preparations[0]!
+  if (preparations.some(identity => JSON.stringify(identity) !== JSON.stringify(old))) throw Error("CAMPAIGN_PREPARATION_UNCONFIRMED")
+  const pairFile = path.join(file.controller.stateDir, "pair.json")
+  const pair = await readLeaseReceipt(pairFile) as { version: number; kind: string; phase: string; purpose: "acceptance" | "research";
+    nonce: string; resources: { server: string; studio: string; network: string } }
+  if (pair?.version !== 2 || pair.kind !== "pair-provision" || pair.phase !== "ready" ||
+    !["acceptance", "research"].includes(pair.purpose) || pair.resources?.server !== old.containerId ||
+    pair.resources.studio !== old.studioContainerId || !/^[a-f0-9]{64}$/.test(pair.resources.network)) throw Error("CAMPAIGN_PAIR_UNCONFIRMED")
+  await requireReleasedReservation(await readResourceReservation({ key: `judge:${file.judge.codexHome}` }))
+  const reservation = await readResourceReservation({ key: `server:${old.containerId}` })
+  if (!reservation || !["retained", "released"].includes(reservation.state)) throw Error("CAMPAIGN_GENERATION_OWNERSHIP_UNCONFIRMED")
+  const containers = JSON.parse(await command(["docker", "inspect", "--type", "container", old.containerId, old.studioContainerId], config.harnessRoot)) as
+    { Id: string; State: { Running: boolean } }[]
+  if (!Array.isArray(containers) || containers.length !== 2 || containers.some((container, index) =>
+    container?.Id !== [old.containerId, old.studioContainerId][index] || typeof container.State?.Running !== "boolean"))
+    throw Error("CAMPAIGN_PAIR_UNCONFIRMED")
+  const observed = containers.every(container => container.State.Running) ? await readServerIdentity(file) : undefined
+  if (observed) await verifyParallelPair(file, observed)
+  const retainedPreparation = reservation.state === "retained" && observed && JSON.stringify(reservation.identity) === JSON.stringify(observed) &&
+    path.dirname(reservation.journal) === path.join(config.stateRoot, "environment-generations", observed.serverEpoch, "state")
+  if (!retainedPreparation) {
+    if (reservation.state === "retained") {
+      if (JSON.stringify(reservation.identity) !== JSON.stringify(old)) throw Error("CAMPAIGN_GENERATION_OWNERSHIP_UNCONFIRMED")
+      await releaseClosedEnvironment(file, old)
+    }
+    await requireReleasedReservation(await readResourceReservation({ key: `server:${old.containerId}` }))
+    for (const slot of file.slots)
+      await requireReleasedReservation(await readResourceReservation({ key: `profile:${slot.profileDir}` }))
+    if (!reservation.identity) {
+      const owner = await readLeaseReceipt(reservation.journal) as { kind: string; pairFile: string; nonce: string; action: string }
+      if (owner?.kind !== "pair-command" || owner.pairFile !== pairFile || owner.nonce !== pair.nonce || owner.action !== "create")
+        throw Error("CAMPAIGN_GENERATION_OWNERSHIP_UNCONFIRMED")
+    }
+  }
+  const identity = observed ?? (await createPair(file, { purpose: pair.purpose,
+    out: path.join(file.controller.stateDir, "pair-bootstrap"), lockRoot: globalLockRoot })).identity
+  if (identity.containerId !== old.containerId || identity.studioContainerId !== old.studioContainerId ||
+    identity.configurationHash !== old.configurationHash) throw Error("CAMPAIGN_GENERATION_IDENTITY_CHANGED")
+  const root = path.join(config.stateRoot, "environment-generations", identity.serverEpoch)
+  const slotsFile = path.join(root, "slots.json"), resourceBudgetFile = path.join(root, "budget.json")
+  const selected = config.slotsFile === slotsFile
+  if (selected && config.resourceBudgetFile !== resourceBudgetFile) throw Error("CAMPAIGN_GENERATION_CONFIG_CONFLICT")
+  if (!selected && identity.serverEpoch === old.serverEpoch) throw Error("CAMPAIGN_GENERATION_UNCHANGED")
+  const nextFile = selected ? file : { ...file, controller: { ...file.controller, stateDir: path.join(root, "state") },
+    slots: file.slots.map(slot => ({ ...slot, username: "eval-" + new Bun.CryptoHasher("sha256")
+      .update(identity.serverEpoch + ":" + slot.id).digest("hex").slice(0, 48) })) }
+  const bounds = await readLeaseReceipt(config.resourceBudgetFile)
+  if (!Array.isArray(bounds) || !bounds.length || !bounds.every(validResourceBound)) throw Error("RESOURCE_BUDGET_INVALID")
+  const budget = bounds.map(bound => ({ ...bound, scope: bound.scope === `filesystem:${file.controller.stateDir}`
+    ? `filesystem:${nextFile.controller.stateDir}` : [
+      { id: old.containerId, before: old.startedAt, after: identity.startedAt },
+      { id: old.studioContainerId, before: old.studioStartedAt, after: identity.studioStartedAt },
+    ].reduce((scope, container) => scope === `container:${container.id}:${container.before}` || scope.startsWith(`container:${container.id}:${container.before}:`)
+      ? `container:${container.id}:${container.after}` + scope.slice(`container:${container.id}:${container.before}`.length) : scope, bound.scope) }))
+  requireResourceBudgetScopes(budget, { paths: [nextFile.controller.stateDir, ...nextFile.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])],
+    containers: [{ role: "server", id: identity.containerId, startedAt: identity.startedAt },
+      { role: "studio", id: identity.studioContainerId, startedAt: identity.studioStartedAt }] })
+  if (!selected) {
+    await mkdir(nextFile.controller.stateDir, { recursive: true, mode: 0o700 })
+    await stageGenerationFile(path.join(nextFile.controller.stateDir, "pair.json"), await Bun.file(pairFile).text())
+    await stageGenerationFile(slotsFile, JSON.stringify(nextFile))
+    await stageGenerationFile(resourceBudgetFile, JSON.stringify(budget))
+    await prepareEnvironment({ slotsFile, parallel: file.slots.length, previousSlotsFile: config.slotsFile,
+      config: { ...preparedConfig, parallel: file.slots.length, slotsFile, resourceBudgetFile } })
+  }
+  const verified = await verifyEnvironment({ slotsFile, parallel: file.slots.length,
+    config: { ...preparedConfig, parallel: file.slots.length, slotsFile, resourceBudgetFile } })
+  if (!verified.ready || JSON.stringify(verified.identity) !== JSON.stringify(identity)) throw Error("CAMPAIGN_GENERATION_NOT_READY")
+  return { file: nextFile, identity, next: { ...config, slotsFile, resourceBudgetFile,
+    verifyCommand: config.verifyCommand.map(value => value === config.slotsFile ? slotsFile : value) } }
+}
+
+async function requireReleasedReservation(reservation: Reservation | undefined) {
+  if (reservation?.state !== "released") throw Error("CAMPAIGN_GENERATION_RELEASE_UNCONFIRMED")
+  const proof = await readLeaseReceipt(reservation.releaseEvidence!.path)
+  if (new Bun.CryptoHasher("sha256").update(JSON.stringify(proof)).digest("hex") !== reservation.releaseEvidence!.sha256)
+    throw Error("CAMPAIGN_GENERATION_RELEASE_UNCONFIRMED")
+}
+
+async function stageGenerationFile(file: string, content: string) {
+  const existing = await readLeaseReceipt(file).then(() => Bun.file(file).text()).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+  if (existing !== undefined) {
+    if (existing !== content) throw Error("CAMPAIGN_GENERATION_CONFIG_CONFLICT")
+    return
+  }
+  const temporary = `${file}.${crypto.randomUUID()}.tmp`
+  const handle = await open(temporary, "wx", 0o600)
+  try { await handle.writeFile(content); await handle.sync() } finally { await handle.close() }
+  await rename(temporary, file)
+  const directory = await open(path.dirname(file), "r")
+  try { await directory.sync() } finally { await directory.close() }
+}
+
 async function command(args: string[], cwd: string) {
   const child = Bun.spawn(args, { cwd, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
   const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
@@ -495,12 +618,12 @@ async function observeUnit(unit: string, cwd: string): Promise<UnitState> {
     invocation: fields.InvocationID ?? "", exitCode: Number(fields.ExecMainStatus) }
 }
 
-export async function controlCampaign(manifestFile: string, serverFile: string, operation: "reserve" | "repair" | "resume", repairer?: string) {
+export async function controlCampaign(manifestFile: string, serverFile: string, operation: "reserve" | "repair" | "resume" | "prepare-generation", repairer?: string) {
   return runCampaign(manifestFile, serverFile, true, operation, repairer)
 }
 
 export async function runCampaign(manifestFile: string, serverFile: string, once = false, operation?: string, repairer?: string) {
-  if (operation !== undefined && !["reserve", "repair", "resume"].includes(operation)) throw Error("CAMPAIGN_OPERATION_INVALID")
+  if (operation !== undefined && !["reserve", "repair", "resume", "prepare-generation"].includes(operation)) throw Error("CAMPAIGN_OPERATION_INVALID")
   const manifest = await readLeaseReceipt(manifestFile) as CampaignManifest
   const config = await readLeaseReceipt(serverFile) as CampaignServerConfig
   const safeId = (value: unknown) => typeof value === "string" && /^[a-zA-Z0-9_-]+$/.test(value)
@@ -556,6 +679,8 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
       const owner = await Bun.file(ownerFile).exists() ? await readLeaseReceipt(ownerFile) as { campaignId: string } : undefined
       if (owner && !safeId(owner.campaignId)) throw Error("CAMPAIGN_OWNER_INVALID")
       if (owner && owner.campaignId !== manifest.id && !previous.final) throw Error("CAMPAIGN_SERVER_BUSY")
+      if (operation === "prepare-generation" && (!exists || owner?.campaignId !== manifest.id)) throw Error("CAMPAIGN_OWNER_MISMATCH")
+      if (operation === "prepare-generation" && (!previous.repairing || previous.repairer !== repairer)) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
       if (operation === "reserve") {
         if (previous.final || previous.published) throw Error("CAMPAIGN_FINAL")
         if (owner?.campaignId === manifest.id) {
@@ -570,6 +695,51 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
           String(first.round), String(manifest.parallel)], config.harnessRoot)
         if (!exists) await writeLeaseReceipt(journalFile, previous)
         await claim()
+        return previous
+      }
+      if (operation === "prepare-generation") {
+        const unit = await observeUnit(unitName, config.harnessRoot)
+        if (unit.active) throw Error("CAMPAIGN_BATCH_ACTIVE")
+        previous = (await campaignTick(manifest, previous, unit, Date.now(), config)).journal
+        await writeLeaseReceipt(journalFile, previous)
+        const admit = async () => {
+          const owner = await readLeaseReceipt(ownerFile) as { campaignId: string }
+          const current = await readLeaseReceipt(journalFile) as CampaignJournal
+          if (owner.campaignId !== manifest.id) throw Error("CAMPAIGN_OWNER_MISMATCH")
+          if (current.manifestHash !== manifestHash || JSON.stringify(await readLeaseReceipt(manifestFile)) !== JSON.stringify(manifest))
+            throw Error("CAMPAIGN_MANIFEST_CHANGED")
+          if (!current.repairing || current.repairer !== repairer) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
+          previous = current
+          await syncCampaignIssue(manifest, previous, publication).catch(async () => {
+            previous.reportingError = "MULTICA_UNAVAILABLE"
+            await writeLeaseReceipt(journalFile, previous)
+            throw Error("CAMPAIGN_STATE_UNAVAILABLE")
+          })
+          if (JSON.stringify(await readLeaseReceipt(serverFile)) !== JSON.stringify(config)) throw Error("CAMPAIGN_SERVER_CONFIG_CHANGED")
+          if ((await observeUnit(unitName, config.harnessRoot)).active) throw Error("CAMPAIGN_BATCH_ACTIVE")
+          if (previous.final || previous.published) return false
+          if (Date.now() - previous.lastProgressAt >= campaignLimits(manifest).noProgressMs) {
+            previous.final = "partial"
+            previous.blocker = "NO_PROGRESS_LIMIT"
+            await writeLeaseReceipt(journalFile, previous)
+            return false
+          }
+          return true
+        }
+        if (!await admit()) return previous
+        if (previous.batches.at(-1) && !previous.batches.at(-1)!.accounted) throw Error("CAMPAIGN_BATCH_UNCONFIRMED")
+        if (["CAMPAIGN_RECONCILIATION_FAILED", "ADMISSION_STATE_UNCONFIRMED"].includes(previous.blocker ?? "")) throw Error(previous.blocker)
+        if (manifest.pins.LOGINOM_USERNAME !== undefined) throw Error("CAMPAIGN_USERNAME_PINNED")
+        if (await realpath(config.harnessRoot) !== await realpath(evalsRoot) ||
+          (await command(["git", "rev-parse", "HEAD"], config.harnessRoot)).trim() !== config.acceptedHarness ||
+          (await command(["git", "status", "--porcelain", "--untracked-files=normal"], config.harnessRoot)).trim())
+          throw Error("CAMPAIGN_HARNESS_CHANGED")
+        const generation = await prepareGeneration(manifest, config)
+        if (!await admit()) return previous
+        const { readServerIdentity } = await import("../src/parallel-pair")
+        if (JSON.stringify(await readServerIdentity(generation.file)) !== JSON.stringify(generation.identity)) throw Error("CAMPAIGN_GENERATION_IDENTITY_CHANGED")
+        await writeLeaseReceipt(serverFile, generation.next)
+        if (JSON.stringify(await readLeaseReceipt(serverFile)) !== JSON.stringify(generation.next)) throw Error("CAMPAIGN_SERVER_CONFIG_READBACK_FAILED")
         return previous
       }
       if ((operation === "repair" || operation === "resume") && exists) {
@@ -742,7 +912,7 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
 if (import.meta.main) {
   const args = parseArgs({ args: Bun.argv.slice(2), options: { manifest: { type: "string" }, server: { type: "string" }, once: { type: "boolean" },
     operation: { type: "string" }, repairer: { type: "string" } } }).values
-  if (!args.manifest || !args.server) throw Error("usage: bun script/run-campaign.ts --manifest /private/manifest.json --server /private/server.json [--once | --operation reserve|repair|resume [--repairer agent]]")
+  if (!args.manifest || !args.server) throw Error("usage: bun script/run-campaign.ts --manifest /private/manifest.json --server /private/server.json [--once | --operation reserve|repair|resume|prepare-generation [--repairer agent]]")
   await runCampaign(args.manifest, args.server, args.once, args.operation, args.repairer)
     .then(journal => { if (args.operation) console.log(JSON.stringify(journal)) })
     .catch(error => { console.error(error instanceof Error ? error.message : "CAMPAIGN_FAILED"); process.exitCode = 2 })
