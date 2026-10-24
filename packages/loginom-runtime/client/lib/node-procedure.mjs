@@ -216,6 +216,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       checkBudget();
       if(!valid||!result.verified||!operation.cleanupConfirmed)throw Error('Direct output read refused'+(valid&&!result.verified?': '+result.reason:''));
       await entry('node_port_output_read',{outcome:structuredClone(result)});
+      checkBudget();
       return structuredClone(result);
     },
     async openJavascriptPreview(port){

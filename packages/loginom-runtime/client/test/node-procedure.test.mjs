@@ -861,13 +861,13 @@ test('root refusal retains bounded code and trace without payloads, retries or u
  assert.ok(!f.events.includes('mutated'));
 });
 
-function portReadFixture({signal,afterDispatch,executeFailure,envelope}={}) {
+function portReadFixture({signal,afterDispatch,executeFailure,envelope,now=()=>1,onRecord}={}) {
  const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Scenario',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
  const request={port:0,sampleRows:1,requireExactNumbers:true,execution:{verified:true,owner_verified:true,status:'completed',execution_id:'doc:root:1',process_id:'1.1',process_record_id:'child'}};
  const records=[],calls=[],operation={id:'read-port',deadline:10000,cleanupConfirmed:true,action:{action_key:'node.apply',revision:'1'}};
  const result={verified:true,cleanup_complete:true,node_context:{verified:true,document_id:'doc',workflow_id:'flow',node_id:'node'},output:{port:0,port_guid:'11111111-1111-1111-1111-111111111111',fresh:true,execution_id:'doc:root:1',freshness_basis:'completed_execution_port_source',schema:[],sample:[],row_count:0,sample_rows:0,sample_complete:true,precision:{numbers_verified:true,limitations:[]}}};
- const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:'http://example.test',targetBuild:'7.4.2',signal,now:()=>1,
-  record:async r=>{records.push(r);return structuredClone(r)},wrapMutation:()=>{throw Error('Unexpected mutation')},execute:async(code,options)=>{calls.push({code,options});if(executeFailure)throw Error('transport');afterDispatch?.();return envelope??result;}});
+ const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:'http://example.test',targetBuild:'7.4.2',signal,now,
+  record:async r=>{await onRecord?.(r);records.push(r);return structuredClone(r)},wrapMutation:()=>{throw Error('Unexpected mutation')},execute:async(code,options)=>{calls.push({code,options});if(executeFailure)throw Error('transport');afterDispatch?.();return envelope??result;}});
  return {channel,operation,request,records,calls,result};
 }
 test('direct output read dispatches once and journals only confirmed bounded result',async()=>{
@@ -901,5 +901,23 @@ test('direct output unknown reply cannot confirm cleanup or publish values',asyn
  const f=portReadFixture({envelope:{cleanup_complete:true}});
  await assert.rejects(f.channel.readOutputPort(f.request),/refused/);
  assert.equal(f.calls.length,1);assert.equal(f.records.length,0);assert.equal(f.operation.cleanupConfirmed,false);
+ assert.notEqual(f.operation.transportUncertain,true);
+});
+
+
+test('direct output abort during journal ACK prevents late return and preserves cleanup',async()=>{
+ const controller=new AbortController(),f=portReadFixture({signal:controller.signal,onRecord:async()=>{await Promise.resolve();controller.abort(Error('cancelled during journal'));}});
+ let published=false;
+ await assert.rejects(f.channel.readOutputPort(f.request).then(()=>{published=true;}),/cancelled during journal/);
+ assert.equal(published,false);assert.equal(f.calls.length,1);assert.equal(f.records.length,1);assert.equal(f.operation.cleanupConfirmed,true);
+ assert.notEqual(f.operation.transportUncertain,true);
+});
+
+test('direct output deadline during journal ACK prevents late return and preserves cleanup',async()=>{
+ let time=1;
+ const f=portReadFixture({now:()=>time,onRecord:async()=>{await Promise.resolve();time=10000;}});
+ let published=false;
+ await assert.rejects(f.channel.readOutputPort(f.request).then(()=>{published=true;}),/budget exhausted/);
+ assert.equal(published,false);assert.equal(f.calls.length,1);assert.equal(f.records.length,1);assert.equal(f.operation.cleanupConfirmed,true);
  assert.notEqual(f.operation.transportUncertain,true);
 });
