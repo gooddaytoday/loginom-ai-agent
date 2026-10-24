@@ -149,7 +149,9 @@ export async function readNodeTable(page,binding,table,request,readOutputs=readO
         // Native string CRLF is rendered as LF in the DOM. Compare only this
         // observed display transformation; return the original cached text.
         const display=text===''||(field.type==='string'&&text===' ')?'\u00a0':text;
-        if(typeof text!=='string'||text.length>16384
+        // String length is not a render mismatch. Compare the complete native
+        // UI text; the public preview budget handles delivery separately.
+        if(typeof text!=='string'||field.type!=='string'&&text.length>16384
           ||els[0].textContent!==display&&!(field.type==='string'&&text.includes('\r\n')&&els[0].textContent===text.replace(/\r\n/g,'\n')))
           return fail('cell_render_mismatch');
         cells.push({column:field.index,is_null:false,text});

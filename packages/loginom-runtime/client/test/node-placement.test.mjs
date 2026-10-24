@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {createNodeTargetBrowserAdapter,mutateGraph} from '../lib/node-target-browser.mjs';
 import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
-import {nodePlacementPoint,nodePlacementPosition,nodePlacementGap,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from '../lib/node-placement.mjs';
+import {nodePlacementPoint,nodePlacementPosition,nodePlacementGap,nodePlacementOverflow,revealNodePlacement,revealPreparedGraphNode,samePlacementGraph} from '../lib/node-placement.mjs';
 
 function gapFixture(occupied=[]){
  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type:'integration.rest_request'},inputs:[]};
@@ -360,4 +360,63 @@ for(const fault of ['visible-toggle','overflow-open','overflow-toggle','zoom','o
  // the known-open outline. That cleanup must not erase the original fault.
  if(fault==='menu-cleanup'){assert.equal(triggers,4);assert.equal(items,2);assert.equal(f.state().open,false);}
  assert.equal(f.state().clicks,fault==='zoom'?1:fault==='overflow-close'?2:0);
+});
+
+// LAB-151 line 3905: pinning the process console clips a minimum-scale node.
+for(const maxScroll of [151,148])test('D28 minimum zoom scroll range '+maxScroll+' preserves full drawing inset',async()=>{
+ const f=fixture({stuck:true});Object.assign(f.state().v,{x:324,y:100,width:950,height:494,viewportWidth:1280,viewportHeight:800,scale:0.3855432894295314});
+ f.args.nodeId='rest-country-de';f.args.position={x:208,y:1536};let top=0;
+ const canvas={scrollLeft:0,get scrollTop(){return top;},set scrollTop(value){top=Math.max(0,Math.min(maxScroll,value));}};
+ f.args.root.evaluate=async(fn,arg)=>{
+  if(typeof arg==='object'){fn(canvas,arg);canvas.scrollLeft=0;return;}
+  return {...structuredClone(f.state().v),scroll:{x:0,y:top},node_bounds:{x:398,y:673-top,width:34.5,height:61.5}};
+ };
+ const run=runInNewContext('('+revealNodePlacement.toString()+')');
+ const r=await run(f.args);
+ assert.equal(r.fully_visible,maxScroll===151);assert.equal(top,maxScroll);
+ assert.equal(r.view.scale,0.3855432894295314);assert.equal(r.zoom_steps,1);assert.equal(f.state().open,false);
+ assert.equal(r.navigation_steps.filter(s=>s.action==='scroll').length,1);
+ assert.equal(r.view.node_bounds.y+r.view.node_bounds.height<=586,maxScroll===151);
+});
+
+// Connection placement has no nodeId: its projected point still needs the inset.
+for(const maxScroll of [8,7])test('D28 connection point 398.024/793.978 native scroll range '+maxScroll,async()=>{
+ const f=fixture({stuck:true});Object.assign(f.state().v,{x:324,y:100,width:950,height:694,viewportWidth:1280,viewportHeight:800,scale:0.3855432894295314});
+ f.args.position={x:192,y:1800};let top=0;
+ const canvas={scrollLeft:0,get scrollTop(){return top;},set scrollTop(value){top=Math.max(0,Math.min(maxScroll,value));}};
+ f.args.root.evaluate=async(fn,arg)=>{
+  if(typeof arg==='object'){fn(canvas,arg);canvas.scrollLeft=0;return;}
+  return {...structuredClone(f.state().v),scroll:{x:0,y:top}};
+ };
+ const before=nodePlacementPoint(f.state().v,f.args.position);
+ assert.ok(Math.abs(before.x-398.024)<.001);assert.ok(Math.abs(before.y-793.978)<.001);
+ const run=runInNewContext('('+revealNodePlacement.toString()+')'),r=await run(f.args);
+ assert.equal(r.fully_visible,maxScroll===8);assert.equal(top,maxScroll);assert.equal(r.zoom_steps,1);
+ assert.equal(r.point.y<=786,maxScroll===8);assert.equal(f.state().open,false);
+ assert.equal(r.navigation_steps.filter(s=>s.action==='scroll').length,1);
+});
+
+// The cold prepared-node path serializes these same viewport helpers.
+for(const available of [12,11,0])test('D28 prepared cold top96 requires12px upward scroll; available '+available,async()=>{
+ const f=fixture({stuck:true});Object.assign(f.state().v,{x:324,y:100,width:950,height:694,viewportWidth:1280,viewportHeight:800});
+ f.args.nodeId='cold-node';f.args.position={x:192,y:80};let top=available;
+ const canvas={scrollLeft:0,get scrollTop(){return top;},set scrollTop(value){top=Math.max(0,Math.min(available,value));}};
+ f.args.root.evaluate=async(fn,arg)=>{
+  if(typeof arg==='object'){fn(canvas,arg);canvas.scrollLeft=0;return;}
+  return {...structuredClone(f.state().v),scroll:{x:0,y:top},node_bounds:{x:646.5,y:96+available-top,width:43.2952880859375,height:61.5}};
+ };
+ const locate=f.args.page.locator;
+ f.args.page.locator=selector=>{
+  if(selector.endsWith(';cmpDiagram"]'))return {...f.args.root,count:async()=>1,isVisible:async()=>true};
+  const owner=locate(selector);if(!selector.endsWith(';cntDiagram"]'))return owner;
+  return {...owner,locator:child=>{const zoom=owner.locator(child);return {...zoom,click:async()=>{await zoom.click();if(f.state().clicks<=10)f.state().v.scale/=1.1;}};}};
+ };
+ const ref={document_id:'doc',workflow_id:'flow',node_id:'cold-node'};
+ const graph={complete:true,interaction_ready:true,nodes:[{ref,locked:false,position:f.args.position}],links:[]};
+ const args={binding:{document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF'},node:ref},deadline:Date.now()+10000};
+ const r=await revealPreparedGraphNode(f.args.page,args,async()=>structuredClone(graph),revealNodePlacement,f.args.readViewport,nodePlacementPoint,samePlacementGraph);
+ assert.equal(r.fully_visible,available===12);assert.equal(r.status,available===12?'SUCCEEDED':'FAILED');
+ assert.equal(r.zoom_steps,11);assert.equal(top,0);assert.equal(r.graph_unchanged,true);assert.equal(r.settings_applied,false);
+ const scroll=r.navigation_steps.find(s=>s.action==='scroll');assert.ok(scroll);assert.equal(scroll.before.node_bounds.y,96);
+ assert.equal(scroll.after.node_bounds.y,96+available);assert.equal(scroll.after.scroll.y,0);assert.equal(f.state().open,false);
 });
