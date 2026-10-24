@@ -221,7 +221,18 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
     const navigation=await reveal({page,root:canvas,position,prefix:t.workflow_ref.prefix,remaining,readViewport,project,guard:placementGuard});
     totalZoomSteps+=navigation.zoom_steps;
     placementNavigation={...navigation,initial_viewport:initialViewport,passes:pass+1,total_zoom_steps:totalZoomSteps};
-    await placementGuard();need(navigation.fully_visible===true,'connection placement is not fully visible');
+    await placementGuard();
+    if(navigation.fully_visible!==true){
+     // The connection settings were committed and reread; no reference drag
+     // has started. Preserve these settled effects in the existing step receipt.
+     await quiet();await placementGuard();
+     const graph=await readPlacementGraph(page,graphTask);
+     need(graph.complete===true&&graph.interaction_ready===true&&sameGraph(before,graph),
+      'complete unchanged idle graph required for connection checkpoint');
+     return {verified:false,cleanup_complete:true,effect_possible:true,
+      pre_target_checkpoint:{graph,connection:persisted},placement_navigation:placementNavigation,
+      error:'REST connection: connection placement is not fully visible'};
+    }
     // Zoom redraws the graph. Recheck occupied rectangles and the hit surface;
     // never reuse pre-navigation screen pixels.
     target=await chooseTarget();
