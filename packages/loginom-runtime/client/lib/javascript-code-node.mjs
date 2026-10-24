@@ -408,11 +408,12 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           evidence_ref:ctx.receipt_id,ports:[{port:0,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data}],
           table_creation:table,format_restoration:restoration,workflow_return:returned});
       },
-      // Public release phases stay unchanged. The retained REST child calls
-      // this private verifier directly for its independently settled Done.
-      releasePendingPhases:['input_mapping','open','configure'],
+      // A materialization launch may settle before its process identity can
+      // be read. Release proves cleanup only, never completion or a replay.
+      // The retained REST child also uses the independently settled Done.
+      releasePendingPhases:['input_mapping','open','configure','materialization_start'],
       async releasePending(state,{signal:releaseSignal}={}) {
-        const afterDone=state.pending?.phase==='node_finish'&&committed?.owned_done_settled===true
+        const afterDone=['node_finish','materialization_start'].includes(state.pending?.phase)&&committed?.owned_done_settled===true
           &&adapter?.active===false&&adapter.uncertain===false
           &&lastSourceAdapter?.active===false&&lastSourceAdapter.uncertain===false;
         need(['input_mapping','open','configure'].includes(state.pending?.phase)||afterDone,

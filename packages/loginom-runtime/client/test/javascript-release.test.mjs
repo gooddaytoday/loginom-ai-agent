@@ -5,6 +5,15 @@ import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {releaseNodeApply} from '../lib/node-apply.mjs';
 import {createRedactor} from '../lib/redact.mjs';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+
+for(const fault of ['safe','owner','locked','toast','graph','opening','source-uncertain','transport','receipt','cleanup','ack'])
+test('D48 public release after materialization launch: '+fault,()=>{
+ const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
+  fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),fault],{encoding:'utf8',timeout:10000});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+});
 
 const node={document_id:'doc',workflow_id:'flow',node_id:'js'};
 const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema);
@@ -51,7 +60,7 @@ for(const phase of ['configure','open','input_mapping'])test('script JS releases
  const checked=validate(r);assert.equal(checked.valid,true,checked.errorMessage);
  assert.deepEqual(f.gestures,[{verb:'click',ref:'ui-close'}]);assert.equal(f.operation.nodeApply.pending,null);
  assert.ok(f.events.some(e=>e.phase==='node_operation_released'&&e.receipt.proof.cleanup.wizard_closed));
- assert.deepEqual(f.drivers.releasePendingPhases,['input_mapping','open','configure']);
+ assert.deepEqual(f.drivers.releasePendingPhases,['input_mapping','open','configure','materialization_start']);
 });
 for(const fault of ['foreign','graph','transport','receipt','cleanup','lost'])test('script JS release refuses '+fault+' and retains the pending operation',async()=>{
  const f=fixture('configure',fault);await assert.rejects(f.run());
@@ -61,7 +70,7 @@ for(const fault of ['foreign','graph','transport','receipt','cleanup','lost'])te
  if(fault==='lost'){assert.equal(f.gestures.length,1);assert.equal(f.operation.transportUncertain,true);}
 });
 test('script JS release does not extend or replay unsupported execution/read phases',async()=>{
- for(const phase of ['target','node_finish','materialization_execute','finish','read']){
+ for(const phase of ['target','node_finish','materialization_start','materialization_execute','finish','read']){
   const f=fixture(phase);await assert.rejects(f.run(),/stopped JavaScript draft/);
   assert.deepEqual(f.gestures,[]);assert.equal(f.operation.deadline,1);
  }
