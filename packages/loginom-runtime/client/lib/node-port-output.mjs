@@ -82,7 +82,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    need(Number.isInteger(value(identity,'$OW'))&&Number.isInteger(value(identity,'$O'))&&outputIdentity,'source_identity');
    return {helper,identity,session:value(dataSource,'$S'),owner:value(identity,'$OW'),object:value(identity,'$O'),outputIdentity,outputOwner:value(outputIdentity,'$OW'),outputObject:value(outputIdentity,'$O')};
   };
-  const stable=()=>{need(same(baseline,snapshot()),'binding_changed');if(sourceBaseline)need(same(sourceBaseline,source()),'source_changed');if(cacheBaseline)need(value(sourceBaseline.helper,'$FData')===cacheBaseline.data&&value(sourceBaseline.helper,'$FCacheInitialized')===cacheBaseline.initialized,'cache_changed');};
+  const stable=()=>{need(same(baseline,snapshot()),'binding_changed');if(sourceBaseline){need(same(sourceBaseline,source()),'source_changed');if(!cacheBaseline&&value(sourceBaseline.helper,'$FCacheInitialized')===true)cacheBaseline={data:value(sourceBaseline.helper,'$FData'),initialized:true};}if(cacheBaseline)need(value(sourceBaseline.helper,'$FData')===cacheBaseline.data&&value(sourceBaseline.helper,'$FCacheInitialized')===cacheBaseline.initialized,'cache_changed');};
   try {
    live();baseline=snapshot();
    output=await baseline.portData.get_Output();live();stable();
@@ -100,13 +100,12 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    }
    const sample=[],values=[],requested=Math.min(rowCount,q.sampleRows,Math.floor(10000/total));
    const helper=sourceBaseline.helper;
-   if(value(helper,'$FCacheInitialized')===true)cacheBaseline={data:value(helper,'$FData'),initialized:true};
    let limited=requested<Math.min(rowCount,q.sampleRows);
    for(let row=0;row<requested;row++){
     const cells=[];
     for(let column=0;column<total;column++){
      live();stable();const raw=await dataSource.AsVariant(row,column);live();stable();
-     if(!cacheBaseline){need(value(helper,'$FCacheInitialized')===true&&value(helper,'$FData'),'cache_uninitialized');cacheBaseline={data:value(helper,'$FData'),initialized:true};}
+     need(value(helper,'$FCacheInitialized')===true&&value(helper,'$FData'),'cache_uninitialized');
      const type=schema[column].type;
      if(raw===null||raw===undefined){cells.push({type,is_null:true,value:null,precision:'exact_null'});continue;}
      if(type==='integer'){

@@ -100,3 +100,11 @@ test('shared channel reads the actual serialized native callback and keeps priva
  assert.deepEqual(result.output.sample[0].map(c=>c.value),['9007199254740993',1.2345678901234567,'']);
  assert.doesNotMatch(JSON.stringify(records),/\$FData|\$S|\$OW|\$O|cookie|session|dispose|QueryInterface/);
 });
+
+test('an already initialized cache cannot be replaced while metadata is read',async()=>{
+ const f=fixture(),read=f.dataSource.get_Columns;f.helper.$FCacheInitialized=true;f.helper.$FData={};
+ f.dataSource.get_Columns=async()=>{f.helper.$FData={};return read();};
+ const result=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:true});
+ assert.equal(result.verified,false);assert.equal(result.output,undefined);assert.equal(result.reason,'cache_changed');
+ assert.equal(result.cleanup_complete,true);
+});
