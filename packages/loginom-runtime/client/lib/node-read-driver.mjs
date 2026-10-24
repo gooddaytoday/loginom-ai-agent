@@ -64,7 +64,21 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
     const graph=await channel.observe({condition:'saved Join graph before mode read',ready:s=>s.prepared_node_context?.surface==='graph'});
     await selectPreparedGraphNode(channel,graph,'select saved Join before mode read',{refreshReplacedBody:true});
     await openPreparedWizard(channel);
-    const state=await channel.observe({condition:'saved Join mode before execution',readJoin:true,ready:joinReady});
+    const owned=s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='wizard'
+     &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===ctx.node[k]);
+    let state=await channel.observe({condition:'saved Join initial page before mode read',readJoin:true,
+     ready:s=>owned(s)&&['input_mapping','join'].includes(s.wizard?.stage)});
+    if(state.wizard.stage==='input_mapping'){
+     const root=state.wizard.root_tid;
+     await channel.perform({condition:'advance saved Join input page to its mode settings',initialObservation:state,
+      ready:s=>owned(s)&&s.wizard?.stage==='input_mapping'&&s.wizard.root_tid===root,
+      identity:()=>({node:ctx.node,wizard_root:root}),resolve:s=>{
+       const next=s.ui.elements.filter(e=>e.tid===root+';btnNext'&&e.allowed_actions.includes('wizard_step'));
+       need(next.length===1,'Saved Join Next unavailable');
+       return {verb:'wizard_step',ref:next[0].ref,expected_stage:'join'};
+      }});
+    }
+    state=await channel.observe({condition:'saved Join mode before execution',readJoin:true,ready:s=>owned(s)&&joinReady(s)});
     const native=state.node_join;
     need(native.node_context?.verified===true&&['document_id','workflow_id','node_id'].every(k=>native.node_context[k]===ctx.node[k]),
      'Saved Join mode owner differs');

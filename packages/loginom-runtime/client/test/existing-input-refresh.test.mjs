@@ -12,7 +12,7 @@ import * as contract from '../lib/node-read-contract.mjs';
 
 const isUnchangedTransformExecution=contract.isUnchangedTransformExecution??(()=>false);
 const workflow={workflow_id:'flow',prefix:'MF;TF',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
-function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=false}={}){
+function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=false,initialStage='join',missingNext=false,foreignAfterNext=false,unknownNext=false}={}){
  const node={document_id:'doc',workflow_id:'flow',node_id:'saved'},calls=[],records=[];
  const request={operation_id:'saved-apply',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
   target:{kind:'existing',type,ref:node},inputs:[],mode:type==='transform.join_data'?mode:'scalar',
@@ -27,10 +27,16 @@ function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=fals
  const wizard=stage=>{
   active=false;state.node_outputs.ports[0].active=false;
   state.wizard={status:'observed',root_tid:'W',stage};state.prepared_node_context.surface='wizard';
-  state.ui.elements=[{tid:'W;btnDone',ref:'done',allowed_actions:['finish_wizard']}];
+  state.ui.elements=[{tid:'W;btnDone',ref:'done',allowed_actions:['finish_wizard']},...(!missingNext?[{tid:'W;btnNext',ref:'next',allowed_actions:['wizard_step']}]:[])];
  };
  const channel={async observe(options){assert.ok(options.ready(state),options.condition);return structuredClone(state);},
-  async perform(){graph();},async openOutputPort(){wizard('output_mapping');}};
+  async perform(options){
+   if(state.wizard.stage==='input_mapping'){
+    assert.ok(options.ready(state));assert.deepEqual({...options.resolve(state)},{verb:'wizard_step',ref:'next',expected_stage:'join'});
+    calls.push('next');if(unknownNext)throw Error('Unknown Next reply');wizard('join');
+    if(foreignAfterNext){state.prepared_node_context.node_id='other';state.node_join.node_context.node_id='other';}
+   }else graph();
+  },async openOutputPort(){wizard('output_mapping');}};
  const execution={verified:true,owner_verified:true,cleanup_complete:true,status:'completed',execution_id:'fresh',node};
  // Replace browser/execution dependencies only; execute product dispatch, the
  // read-driver methods and the entire applyNode phase machine together.
@@ -39,7 +45,7 @@ function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=fals
   need:(ok,message)=>{if(!ok)throw Error(message);},verified:v=>({verified:true,cleanup_complete:true,effect_possible:false,...v}),
   createNodeProcedure:()=>channel,
   selectPreparedGraphNode:async()=>{calls.push('select');},
-  openPreparedWizard:async()=>{calls.push('open');wizard('join');},
+  openPreparedWizard:async()=>{calls.push('open');wizard(initialStage);},
   closePreparedWizard:async()=>{calls.push('close');graph();return {verified:true,draft_discarded:true,cleanup_complete:true};},
   joinReady:s=>s.wizard?.stage==='join'&&s.node_join?.verified===true,
   createNodeExecutionProcedure:()=>({prepare:async()=>{calls.push('baseline');},waitCompleted:async()=>execution}),
@@ -118,4 +124,22 @@ test('D46 unchanged execution predicate excludes every configuration edit and ot
  for(const change of [r=>r.parameters.changes=[{}],r=>r.parameters.extra=true,r=>r.mode='other']){
   const r=fixture('transform.reform_columns').request;change(r);assert.equal(isUnchangedTransformExecution(r),false);
  }
+});
+
+for(const mode of ['inner','left'])test('D46 whole node.apply advances observed input_mapping before saved Join '+mode,async()=>{
+ const f=fixture('transform.join_data',{savedMode:mode,mode,initialStage:'input_mapping'}),result=await f.run();
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.deepEqual(f.calls,['select','open','next','close','baseline','Execute']);
+ assert.equal(result.configuration.status,'not_requested');
+});
+test('D46 observed input_mapping still rejects a saved Join mode mismatch before Execute',async()=>{
+ const f=fixture('transform.join_data',{initialStage:'input_mapping',mode:'left'}),result=await f.run();
+ assert.notEqual(result.status,'SUCCEEDED');assert.match(JSON.stringify(result),/Preserved join mode differs/);
+ assert.deepEqual(f.calls,['select','open','next','close']);
+});
+for(const options of [{missingNext:true},{foreign:true},{foreignAfterNext:true},{unknownNext:true},{initialStage:'output_mapping'}])test('D46 observed Join initial page refuses invalid navigation '+JSON.stringify(options),async()=>{
+ const f=fixture('transform.join_data',{initialStage:'input_mapping',...options}),result=await f.run();
+ assert.notEqual(result.status,'SUCCEEDED');assert.equal(f.calls.includes('Execute'),false);
+ if(options.foreign||options.missingNext||options.initialStage==='output_mapping')assert.equal(f.calls.includes('next'),false);
+ assert.ok(f.calls.filter(c=>c==='next').length<=1);
 });
