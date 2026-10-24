@@ -76,17 +76,45 @@ const record = createExecutionJournal({
   metadata,
   knownSecrets: [config.api_key, loginPassword].filter(Boolean),
 })
-const { context } = await loginBrowser({
+const state = { prepared: undefined, closed: false, cleanupAttempted: false }
+let context, page
+const rawExecute = (code) => new Function("page", `return (${code})(page)`)(page)
+const execute = (code) => {
+  if (state.cancelled) throw Error("COLD_CANCELLED")
+  return rawExecute(code)
+}
+const cancel = (signal) => {
+  if (state.cancelled) return
+  state.cancelled = signal
+  state.failure = "COLD_CANCELLED"
+  process.exitCode = signal === "SIGINT" ? 130 : signal === "SIGTERM" ? 143 : 129
+  // Do not close Chromium while the admitted gesture/read is settling. The
+  // normal finally owns native cleanup; this bounds an unresponsive transport.
+  state.cancelTimer = setTimeout(async () => {
+    state.cleanupExpired = true
+    const failure = {status:"FAIL", phase:"independent_cold_reopen_readback", path:saved.path,
+      error:"COLD_CANCELLED", settingsReapplied:false, cancellation:{signal,
+        cleanup_budget_exhausted:true, lock_may_remain:state.cleanup?.package_closed!==true},
+      cleanup:{package_closed:state.cleanup?.package_closed===true,logged_out:state.cleanup?.logged_out===true}}
+    const forced = setTimeout(() => process.exit(1), 5000)
+    try { await writeFile(join(args.output,"result.json"),JSON.stringify(failure,null,2)+"\n") }
+    finally { await context?.close().catch(()=>undefined); clearTimeout(forced); process.exit(1) }
+  }, 30000)
+}
+const signals = ["SIGINT","SIGTERM","SIGHUP"]
+const handlers = signals.map(signal => () => cancel(signal))
+signals.forEach((signal,i) => process.on(signal,handlers[i]))
+try {
+const authenticated = await loginBrowser({
   browserPath: resources.browserPath,
   profile: join(args.output, "browser"),
   candidate: { url: config.loginom_url, username: config.workflow_profile.loginom_user, password: loginPassword },
   headless: process.env.LOGINOM_AI_AGENT_TEST_HEADLESS !== "0",
   keepOpen: true,
+  onContextCreated: created => { context = created },
 })
-const page = context.pages()[0]
-const execute = (code) => new Function("page", `return (${code})(page)`)(page)
-const state = { prepared: undefined, closed: false, cleanupAttempted: false }
-try {
+context = authenticated.context
+page = context.pages()[0]
   let prepared = await execute(
     makeWorkspacePrepareCode({
       loginomUrl: page.url(),
@@ -98,6 +126,8 @@ try {
     }),
   )
   state.prepared = prepared
+  await record({phase:"cold_package_opened",prepared,settings_applied:false})
+  if (state.cancelled) throw Error("COLD_CANCELLED")
   if (
     prepared.status !== "READY" ||
     prepared.package_ref.path !== saved.path ||
@@ -318,6 +348,7 @@ try {
 
   // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.
   // Cleanup проверяет точное владение пакетом/аккаунтом перед discard.
+  if (state.cancelled) throw Error("COLD_CANCELLED")
   state.cleanupAttempted=true;
   const cleanup = await execute(
     makePackageCleanupCode({
@@ -365,12 +396,18 @@ try {
     }),
   )
 } catch(error) {
-  state.failure=String(error?.message??error)
+  state.failure=state.cancelled?"COLD_CANCELLED":String(error?.message??error)
   for(const secret of [config.api_key,loginPassword].filter(Boolean))state.failure=state.failure.split(secret).join('[REDACTED]')
-  throw error
+  if (!state.cancelled) throw error
 } finally {
-  if (!state.closed && !state.cleanupAttempted && state.prepared?.status === "READY" && state.prepared.package_ref?.path === saved.path) {
-    await execute(
+  // Cold teardown: one native cleanup, then browser, including cancellation.
+  try {
+  if (!state.cleanupExpired && !state.closed && !state.cleanupAttempted && state.prepared?.status === "READY" && state.prepared.package_ref?.path === saved.path) {
+    // A rejected readonly opening owns only this diagnostic copy, never the
+    // writer's lock. Native cleanup rechecks its mode and refuses dirty copies.
+    const readOnly = state.prepared.workflow_ref.navigation_path.some(item => item.label.endsWith("(только чтение)"))
+    state.cleanupAttempted=true
+    await rawExecute(
       makePackageCleanupCode({
         sessionId: session,
         documentId: state.prepared.document_id,
@@ -379,19 +416,29 @@ try {
         loginomUrl: config.loginom_url,
         loginomBuild: "7.4.2",
         tabTid: state.prepared.workflow_ref.tab_tid,
-        diagnosticDiscard: true,
-        diagnosticWaitForIdle: true,
+        diagnosticReadOnly: readOnly,
+        // Cancellation has no complete persisted-change inventory proving
+        // Table-only changes. Never turn package ownership into discard proof.
+        // Clean packages close normally; dirty/unknown ones retain BLOCKED.
+        diagnosticDiscard: !readOnly && !state.cancelled,
+        diagnosticWaitForIdle: !readOnly && !state.cancelled,
       }),
     )
       .then((result) => {state.cleanup=result;return writeFile(join(args.output, "cleanup.json"), JSON.stringify(result, null, 2) + "\n")})
       .catch(() => console.error("COLD_PACKAGE_CLEANUP_UNCONFIRMED"))
   }
-  if(state.failure)await writeFile(join(args.output,'result.json'),JSON.stringify({status:'FAIL',
+  if(state.failure&&!state.cleanupExpired)await writeFile(join(args.output,'result.json'),JSON.stringify({status:'FAIL',
    phase:'independent_cold_reopen_readback',path:saved.path,settingsReapplied:false,error:state.failure,
    ...(state.exportObservation?{export_observation:state.exportObservation}:{}),
+   ...(state.cancelled?{cancellation:{signal:state.cancelled,cleanup_budget_exhausted:false,
+    lock_may_remain:state.cleanup?.package_closed!==true}}:{}),
    cleanup:{package_closed:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.package_closed===true,
     logged_out:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.logged_out===true}},null,2)+'\n')
-  await context.close()
+  } finally {
+    await context?.close()
+    clearTimeout(state.cancelTimer)
+    signals.forEach((signal,i) => process.off(signal,handlers[i]))
+  }
 }
 
 async function loadSaved(value) {

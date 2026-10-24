@@ -59,15 +59,25 @@ function close() {
   return state.closing
 }
 const stop = (exitCode = 0) => {
+  if (state.stopping) return
+  state.stopping = true
   terminalTrace("stop_requested")
+  // Separate shutdown allowance, never an extension of an admitted operation.
+  const timer = setTimeout(() => {
+    terminalTrace("cleanup_budget_exhausted_lock_may_remain")
+    setTimeout(() => process.exit(1), 5000).unref()
+    void Promise.resolve().then(() => state.browser?.close()).finally(() => process.exit(1))
+  }, 30000)
   void close().then(
-    () => { terminalTrace("exit_requested"); process.exit(exitCode) },
-    () => { terminalTrace("cleanup_rejected"); process.exit(1) },
+    () => { clearTimeout(timer); terminalTrace("exit_requested"); process.exit(exitCode) },
+    () => { clearTimeout(timer); terminalTrace("cleanup_rejected_lock_may_remain"); process.exit(1) },
   )
 }
 process.on("exit", () => terminalTrace("exit_event"))
 process.on("disconnect", () => stop())
 process.on("SIGTERM", () => stop())
+process.on("SIGINT", () => stop())
+process.on("SIGHUP", () => stop())
 process.on("message", (message) => {
   const request = handle(message)
   requests.add(request)
@@ -116,7 +126,8 @@ async function handle(message) {
         send({ id: message.id, result: { checked: true, protocol: 1, generation: input.generation } })
         return
       }
-      const authenticated = await loginBrowser({ ...login, keepOpen: true })
+      const authenticated = await loginBrowser({ ...login, keepOpen: true,
+        onContextCreated: context => { state.browser = context } })
       state.browser = authenticated.context
       const config = {
         resources: input.resources,
