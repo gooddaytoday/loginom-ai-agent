@@ -99,6 +99,7 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
     return verified({effect_possible:true,source_identity_verified:true,native_mapping:inputMapping,definition,finish:completed});
    },
    async openWizard(ctx){enter(ctx);if(operation.nodeApply.request.finish==='execute'){driver=createNodeExecutionProcedure(channel,ctx.node);await driver.prepare();}
+    await channel.revealGraphNode();
     const s=await channel.observe({condition:'export graph ready',ready:s=>s.prepared_node_context?.surface==='graph'});await selectPreparedGraphNode(channel,s,'select export node');await openPreparedWizard(channel);
     const opened=await channel.observe({condition:'export configuration opened',ready:s=>s.wizard?.stage==='text_export_params'||s.wizard?.stage==='input_mapping'});
     if(opened.wizard.stage==='input_mapping')await channel.perform({condition:'export inline input complete',initialObservation:opened,ready:s=>s.wizard?.stage==='input_mapping',identity:()=>ctx.node,
