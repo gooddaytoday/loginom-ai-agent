@@ -124,7 +124,14 @@ for(const [stage,title]of Object.entries(cases))test(title,async()=>{
   if(['animation','expander','confirm','mime','refresh','render_wait','placement_below','placement_scrolled','placement_crowded','placement_native'].includes(stage)){assert.equal(result.connection.reference_node_id,'rest-reference');assert.equal(result.cleanup_complete,true);}
   else if(['placement_changed','placement_unknown','placement_hidden','placement_late_changed'].includes(stage)){
    assert.match(result.error,['placement_changed','placement_late_changed'].includes(stage)?/Graph changed/:stage==='placement_unknown'?/Lost viewport reply/:/not fully visible/);
-   assert.equal(navigationCalls,1);assert.equal(downCount,0);assert.equal(upCount,0);assert.equal(result.effect_possible,true);assert.equal(result.cleanup_complete,false);return;
+   assert.equal(navigationCalls,1);assert.equal(downCount,0);assert.equal(upCount,0);assert.equal(result.effect_possible,true);
+   assert.equal(result.cleanup_complete,stage==='placement_hidden');
+   if(stage==='placement_hidden'){
+    assert.deepEqual(result.pre_target_checkpoint.graph,placementGraph);
+    assert.equal(result.pre_target_checkpoint.connection.name,'Echo');
+    assert.equal(result.pre_target_checkpoint.connection.base_url,'https://httpbin.org/anything');
+   }else assert.equal(result.pre_target_checkpoint,undefined);
+   return;
   }
   else if(stage==='placement_still_full'){assert.match(result.error,/no free visible connection position after navigation/);assert.equal(navigationCalls,3);assert.equal(downCount,0);assert.equal(upCount,0);assert.equal(result.effect_possible,true);assert.equal(result.cleanup_complete,false);return;}
   else if(stage==='placement_full'){assert.match(result.error,/no free visible connection position/);assert.equal(downCount,0);assert.equal(upCount,0);return;}
