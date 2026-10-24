@@ -5,6 +5,7 @@ import {withBrowserReceipt} from './executor.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {resolveCrossTableParameters} from './crosstable-parameters.mjs';
+import {restorePreflightSourceActivity} from './sorting-preflight.mjs';
 const need=(v,m)=>{if(!v)throw Error('CrossTable preflight: '+m);};
 // DataKind comes from the existing owned output definition. Generic F3 preview
 // omits it; do not infer discrete from string or create an incompatible target.
@@ -33,10 +34,12 @@ export async function preflightCrossTableSource(options,ctx,config){
  need(cancelled.verified===true&&cancelled.settings_applied===false,'preflight cancellation unconfirmed');
  const returned=await channel.observe({condition:'upstream graph after CrossTable preflight cancellation',ready:s=>s.prepared_node_context?.surface==='graph'});
  await selectPreparedGraphNode(channel,returned,'refresh upstream after cancelled definition',{refreshReplacedBody:true});
- const after=await channel.observe({condition:'upstream activity after cancelled definition',readOutputs:true,
+ const observeSource=async()=>{const after=await channel.observe({condition:'upstream activity after cancelled definition',readOutputs:true,
   ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_outputs?.verified===true&&s.node_outputs.ports.some(p=>p.index===input.output)});
- const current=after.node_outputs.ports.find(p=>p.index===input.output);need(current.port_guid===ports[0].port_guid,'source port identity changed');
- const proof={verified:true,cleanup_complete:true,effect_possible:ports[0].active!==current.active,settings_changed:false,source:input.source,port:input.output,
+  return after.node_outputs.ports.find(p=>p.index===input.output);};
+ const restored=await restorePreflightSourceActivity(channel,input.source,ports[0],observeSource,ctx),current=restored.port;
+ const proof={verified:true,cleanup_complete:true,effect_possible:restored.execution!==null,settings_changed:false,source:input.source,port:input.output,
+  source_restoration:restored.execution,
   source_activity:{before:ports[0].active,after:current.active,changed:ports[0].active!==current.active},
   schema:fields,definition,cancelled,parameters_valid:!refusal};
  const saved=await onRecord({phase:'crosstable_preflight_completed',operation_id:operation.id,proof});

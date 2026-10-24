@@ -4,7 +4,26 @@ import {alignReadSchema} from './node-read-contract.mjs';
 import {createNodeProcedure} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {resolveSortingParameters} from './sorting-parameters.mjs';
+import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
+// Cancel discards the port draft, but Loginom keeps the source inactive.
+// Restore only activity lost by this inspection, through the ordinary owned
+// execution driver under this channel's original deadline and cancellation.
+export async function restorePreflightSourceActivity(channel,node,before,observeSource,ctx){
+ const after=await observeSource();
+ need(typeof before.active==='boolean'&&after.port_guid===before.port_guid,'Preflight source port identity changed');
+ if(after.active===before.active)return {port:after,execution:null};
+ need(before.active===true&&after.active===false,'Unexpected preflight source activation');
+ const driver=createNodeExecutionProcedure(channel,node);
+ await driver.prepare();
+ await finishConfiguredGraph(channel,driver,'execute',node);
+ const execution=await driver.waitCompleted({signal:ctx.signal,stopSignal:ctx.stopSignal});
+ need(execution.verified===true&&execution.owner_verified===true&&execution.status==='completed'
+  &&execution.cleanup_complete===true,'Preflight source execution unconfirmed');
+ const port=await observeSource();
+ need(port.port_guid===before.port_guid&&port.active===before.active,'Preflight source activity was not restored');
+ return {port,execution};
+}
 export async function preflightSortingSource(options,ctx,config){
  return preflightTabularSource(options,ctx,config,{required:options.operation.parameters.parameters.keys!==undefined,resolve:resolveSortingParameters,label:'sorting'});
 }
@@ -76,8 +95,12 @@ export async function preflightTabularSource(options,ctx,config,{required,resolv
  const root=preview.node_preview_schema.root_tid;
  await channel.perform({condition:'close temporary '+label+' preflight preview',initialObservation:preview,ready:s=>s.node_preview_schema?.verified===true&&s.node_preview_schema.port_guid===port.port_guid,
   identity:()=>({node:input.source,port_guid:port.port_guid,root}),resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===root+';p.h;close'&&e.allowed_actions.includes('click'));need(es.length===1,'Preview close unavailable');return {verb:'click',ref:es[0].ref};}});
- const returned=await channel.observe({condition:'upstream graph restored after '+label+' validation',ready:graph});
+ const returned=await channel.observe({condition:'upstream graph restored after '+label+' validation',readOutputs:true,
+  ready:s=>graph(s)&&s.node_outputs?.verified===true});
+ const after=returned.node_outputs.ports.filter(p=>p.index===input.output);
+ need(after.length===1&&after[0].port_guid===port.port_guid&&after[0].active===port.active,'Preview changed upstream port identity or activity');
  const proof={verified:true,cleanup_complete:true,settings_changed:false,source:input.source,port:input.output,schema:fields,preview:preview.node_preview_schema,node_context:returned.prepared_node_context,parameters_valid:!error,
+  source_activity:{before:port.active,after:after[0].active,changed:false},
   ...(admission?{managed_javascript_source:{source_operation_id:admission.source_operation_id,execution_id:admission.execution_id}}:{})};
  const completed=label+'_preflight_completed',saved=await onRecord({phase:completed,operation_id:operation.id,proof});
  need(saved?.phase===completed&&JSON.stringify(saved.proof)===JSON.stringify(proof),label+' preflight was not durably acknowledged');
