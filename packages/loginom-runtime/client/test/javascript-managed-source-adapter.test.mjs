@@ -5,6 +5,7 @@ import {createJavascriptManagedSourceAdapter, javascriptManagedSourceSettings} f
 import {createJavascriptSourceAdmission, javascriptSourceSettingsDigest} from '../lib/javascript-source-admission.mjs';
 import {waitManagedJavascriptCodeSettlement} from '../lib/javascript-managed-code-settlement.mjs';
 import {createRedactor} from '../lib/redact.mjs';
+import {openManagedJavascriptExistingWizard} from '../lib/javascript-managed-existing.mjs';
 
 const deadline = Date.now() + 60000;
 const prepared = {document_id: 'document', workflow_ref: {workflow_id: 'workflow', prefix: 'MF;TF-1',
@@ -16,6 +17,74 @@ const task = {operation_id: 'managed-js-1', owner: node,
   workflow_ref:{prefix:prepared.workflow_ref.prefix,tab_tid:prepared.workflow_ref.tab_tid},
   targetOrigin: 'http://logi-test-plan.bg.local', targetBuild: '7.4.2', deadline,
   prepared: {...prepared, node}, allowDeactivation: true};
+
+function openingFixture({visible=false, fault}={}) {
+  const calls=[];
+  let navigated=false;
+  const tid='MF;TF-1;Graph;Собрать_Compact';
+  const graph=()=>({prepared_node_context:{...node,verified:true,surface:'graph',tid,locked:false},
+    wizard:{status:'absent'},ui:{elements:[{tid,graph_node:{part:'body'},
+      interaction:{state:visible||navigated?'point_observed':'outside_viewport',point:visible||navigated?{x:500,y:250}:null}}]}});
+  const channel={
+    observe:async({ready})=>{
+      calls.push('observe');const state=graph();
+      if(navigated){
+        if(['document_id','workflow_id','node_id'].includes(fault))state.prepared_node_context[fault]='foreign';
+        if(fault==='tid')state.prepared_node_context.tid='MF;TF-1;Graph;Other';
+        if(fault==='locked')state.prepared_node_context.locked=true;
+        if(fault==='wizard')state.wizard.status='present';
+        if(fault==='outside')state.ui.elements[0].interaction.state='outside_viewport';
+        if(fault==='covered')state.ui.elements[0].interaction.state='covered';
+        if(fault==='duplicate')state.ui.elements.push(structuredClone(state.ui.elements[0]));
+        if(fault==='missing')state.ui.elements=[];
+      }
+      if(!ready(state))throw Error('revealed graph not ready');
+      return state;
+    },
+    revealGraphNode:async()=>{
+      calls.push('reveal');
+      if(fault==='lost')throw Error('lost navigation reply');
+      navigated=true;
+    }
+  };
+  const args={prepared,node,deadline:Date.now()+60000,targetOrigin:'http://logi-test-plan.bg.local',channel,
+    record:async e=>e,receiptOptions:()=>({}),execute:async code=>{
+      calls.push('capture');assert.ok(code.includes('"mode":"capture"'));
+      if(visible||navigated)throw Error('capture reached after fresh graph');
+      return {ready:false,body_point:null};
+    }};
+  return {calls,args,channel};
+}
+
+test('managed existing source/context opening reveals an offscreen node before capturing its selection',async()=>{
+  const f=openingFixture();
+  await assert.rejects(openManagedJavascriptExistingWizard(f.args),/capture reached after fresh graph/);
+  assert.deepEqual(f.calls,['observe','reveal','observe','capture']);
+});
+
+test('managed existing opening captures a visible node without viewport navigation',async()=>{
+  const f=openingFixture({visible:true});
+  await assert.rejects(openManagedJavascriptExistingWizard(f.args),/capture reached after fresh graph/);
+  assert.deepEqual(f.calls,['observe','capture']);
+});
+
+for(const fault of ['document_id','workflow_id','node_id','tid','locked','wizard','outside','covered','duplicate','missing','lost'])
+test('managed existing opening refuses before capture after viewport '+fault,async()=>{
+  const f=openingFixture({fault});
+  await assert.rejects(openManagedJavascriptExistingWizard(f.args),/graph owner unavailable|graph not ready|node not revealed|lost navigation reply/);
+  assert.equal(f.calls.includes('capture'),false);
+  assert.equal(f.calls.filter(c=>c==='reveal').length,1);
+});
+
+test('managed existing viewport navigation cannot renew the original opening deadline',async()=>{
+  const f=openingFixture();f.args.deadline=Date.now()+30;
+  f.channel.revealGraphNode=async()=>{
+    f.calls.push('reveal');
+    await new Promise(resolve=>setTimeout(resolve,Math.max(1,f.args.deadline-Date.now()+5)));
+  };
+  await assert.rejects(openManagedJavascriptExistingWizard(f.args),/deadline|node not revealed|graph not ready/);
+  assert.equal(f.calls.includes('capture'),false);
+});
 
 for(const [fault,field] of [['generation','settings.generation_checked'],['grids','mappings.grids'],
   ['grid_tid','mappings.grid_tid'],['grid_fields','mappings.grid_fields'],
