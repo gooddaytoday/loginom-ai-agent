@@ -257,8 +257,25 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       if(choice==='choose'){const data=find(tid+';Input_Add;Data');await point(data);await data.click({timeout:remaining()});}
 
     }else if(kind==='remove_link'){
-      const source=await targetTid({node_id:p.edge.source}),target=await targetTid({node_id:p.edge.target});
-      const linkTid=source+'|Output_Data-'+p.edge.output+'|'+target.split(';Graph;')[1]+'|Input_Data-'+p.edge.input;
+      // Logical tabular indexes exclude service ports. REST input 0 is
+      // rendered as Input_Data-2; resolve both ends with the same native reader
+      // used by link creation before selecting the exact owned edge.
+      const {native_bindings:bindings,...boundGraph}=await read(page,{...task,read_bindings:true});
+      if(JSON.stringify(boundGraph)!==JSON.stringify(before))throw Error('Graph changed before owned link binding');
+      const resolve=(id,direction,index)=>{
+        const matches=bindings.filter(b=>b.node_id===id);
+        if(matches.length!==1||!Number.isInteger(matches[0][direction][index]))throw Error('Exact owned tabular port disappeared');
+        return {label:matches[0].label,index:matches[0][direction][index]};
+      };
+      const source=resolve(p.edge.source,'outputs',p.edge.output),target=resolve(p.edge.target,'inputs',p.edge.input);
+      const linkTid=task.request.workflow_ref.prefix+';Graph;'+source.label+'|Output_Data-'+source.index+'|'+target.label+'|Input_Data-'+target.index;
+      const nativeLinks=()=>page.evaluate(()=>{
+        const links=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FLinks.FCollection;
+        if(!Array.isArray(links)||links.length>400)throw Error('Bounded native link identities unavailable');
+        return links.map(l=>{if(!l.FGuid||!l.FSourcePort?.FGuid||!l.FTargetPort?.FGuid)throw Error('Native link identity unavailable');
+          return [l.FGuid,l.FSourcePort.parent.FGuid,l.FSourcePort.FGuid,l.FTargetPort.parent.FGuid,l.FTargetPort.FGuid];}).sort((a,b)=>a[0].localeCompare(b[0]));
+      });
+      const linkIdentities=await nativeLinks();
       const link=find(linkTid);
       if(await link.count()!==1)throw new Error('Owned link is not uniquely rendered');
       const hit=await link.evaluate(e=>{
@@ -280,7 +297,11 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       const remove=find(task.request.workflow_ref.prefix+';ModelForm;btnRemoveSelected');
       await wait('single_link_delete_toolbar_reachable',async()=>{try{await point(remove);return true;}catch{return false;}});
       const stillSelected=await page.evaluate(tid=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;const cells=d.FmxGraph.getSelectionCells();return cells.length===1&&cells[0].edge===true&&d.FmxGraph.view.getState(cells[0])?.shape?.node?.getAttribute('data-tid')===tid;},linkTid);
-      if(!stillSelected || JSON.stringify(await read(page,task))!==JSON.stringify(before))throw new Error('Owned link selection or graph changed before deletion');
+      const selectedGraph=await read(page,task);
+      if(!stillSelected || !sameGraph(before,selectedGraph) || JSON.stringify(await nativeLinks())!==JSON.stringify(linkIdentities))throw new Error('Owned link selection or graph changed before deletion');
+      // Selection redraws node bodies. Rebind only after the complete graph,
+      // native link GUIDs and exact single-edge selection have been preserved.
+      gestureBefore=selectedGraph;
       await remove.click({timeout:remaining()});transient='delete';
       const message=find('msgbox;cnt;cnt;cmp');
       await message.waitFor({state:'visible',timeout:Math.min(15000,remaining())});

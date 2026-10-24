@@ -89,12 +89,17 @@ export function createRestRequestNodeSupport(config){
   return createTabularTransformNodeSupport(config,{...implementation,
    preflight:async(options,ctx)=>{
     if(!request.parameters.connection)return {verified:true,cleanup_complete:true,effect_possible:false,not_applicable:true};
+    let existingInput=null;
     if(request.target.kind==='existing'&&request.inputs.length){
      const graph=await options.operation.nodeTargetAdapter.observe({document_id:request.document_id,workflow_ref:request.workflow_ref},ctx.deadline,ctx.signal);
-     need(graph.complete===true&&graph.document_id===request.document_id&&graph.workflow_ref.workflow_id===request.workflow_ref.workflow_id,'complete owned graph is required before query encoding');
-     if(graph.links.some(link=>link.target===request.target.ref.node_id&&link.input===0)){
-      const error=Error('REST request: input 0 is already connected; no encoder or connection was created. next_step: dock_node_apply with a NEW operation_id, target:'+JSON.stringify(request.target)
-       +', inputs:[], parameters:{}, finish:"done". This preserves the existing input and saved bindings; inspect them before execution.');
+     need(graph.complete===true&&graph.document_id===request.document_id&&JSON.stringify(graph.workflow_ref)===JSON.stringify(request.workflow_ref),'complete owned graph is required before query encoding');
+     const target=graph.nodes.filter(n=>n.ref.node_id===request.target.ref.node_id);
+     need(target.length===1&&target[0].type==='integration.rest_request'&&['document_id','workflow_id','node_id'].every(k=>target[0].ref[k]===request.target.ref[k]),'existing REST identity differs');
+     const links=graph.links.filter(link=>link.target===request.target.ref.node_id&&link.input===0);
+     need(links.length<=1,'input 0 is ambiguous');
+     existingInput=links[0]??null;
+     if(existingInput&&(existingInput.source!==request.inputs[0].source.node_id||existingInput.output!==request.inputs[0].output)){
+      const error=Error('REST request: input 0 is connected to a different raw source or output; no encoder or connection was created. next_step: dock_node_apply with a NEW operation_id and a NEW integration.rest_request target, the requested raw inputs, the same connection/query_parameters and finish:"execute". The existing REST and its input are preserved.');
       error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
       throw error;
      }
@@ -103,6 +108,7 @@ export function createRestRequestNodeSupport(config){
     // Prepare values through the existing JS lifecycle, rather than requiring
     // the model to author a codec or changing the caller's source table.
     const target_inputs=request.inputs.length?[await prepareQueryEncoder(options,ctx,config)]:null;
+    if(existingInput)options.operation.restQueryInput={edge:existingInput,encoder:target_inputs[0].source};
     const result=await runRestStep(options,{...ctx,document_id:request.document_id,workflow_ref:request.workflow_ref},'connection',makeRestConnectionCode,request.parameters,config);
     connection=result.connection;return {...result,...(target_inputs?{target_inputs}:{})};
    },
