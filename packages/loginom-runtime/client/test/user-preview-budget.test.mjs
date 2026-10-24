@@ -8,6 +8,15 @@ const real=value=>({type:'real',value,decimal:value.toExponential(16).toUpperCas
 const integer=value=>({type:'integer',value:String(value),precision:'exact_integer',representation:'decimal_integer',is_null:false});
 const string=value=>({type:'string',value,precision:'display_text',representation:'cached_display_text',is_null:false});
 const raw=sample=>({operation_id:'preview',state:'settled',outcome:{status:'SUCCEEDED',effect_possible:true,cleanup_complete:true,output:{output:{ports:[{port:0,row_count:sample.length,sample,sample_rows:sample.length,sample_complete:true,schema:sample[0].map((c,index)=>({index,name:'field'+index,label:'Field '+index,type:c.type})),precision:{numbers_verified:true}}]}}}});
+test('a single oversized JSON cell is explicitly omitted with a full-text export path',()=>{
+ const text=JSON.stringify({products:Array.from({length:100},(_,id)=>({id,title:'Товар "особый"',description:'данные '.repeat(100)}))});
+ const source=raw([[string(text)]]),before=JSON.stringify(source),reply=nodeResultReply(source,{userProfile:true});
+ assert.equal(reply.isError,undefined);assert.ok(Buffer.byteLength(JSON.stringify(reply))<=46000);
+ const value=reply.structuredContent,port=value.output.ports[0];
+ assert.equal(value.status,'SUCCEEDED');assert.equal(port.sample_rows,0);assert.equal(port.sample_complete,false);
+ assert.equal(port.row_count,1);assert.equal(JSON.stringify(source),before);
+ assert.ok(value.limitations.some(s=>s.includes('exports.text')&&s.includes('full text')));
+});
 test('actual MCP delivery budgets both copies of the 72-row retention preview without losing the whole result',()=>{
  const sample=Array.from({length:72},(_,i)=>[real((i+1)/101*100),string('Cohort_'+(i%6+1)),integer(i%12+1),integer(101),real(i+1)]);
  const source=raw(sample),before=JSON.stringify(source),reply=nodeResultReply(source,{userProfile:true});
