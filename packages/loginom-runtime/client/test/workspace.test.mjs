@@ -51,7 +51,7 @@ test('bootstrap stops the DOM walk at its budget and cannot claim readiness',asy
   assert.equal(scanned,4000);assert.equal(result.output.scan.complete,false);
   assert.equal(result.output.target_state,'indeterminate');
 });
-function pageFixture({ authenticated = false, workflow = false, actualBuild = build, loseReply = false, blocked = false, entryDelay = 0, busyTicks = 0 } = {}) {
+function pageFixture({ authenticated = false, workflow = false, actualBuild = build, loseReply = false, blocked = false, entryDelay = 0, busyTicks = 0, fileExists = true, fileRead = null } = {}) {
   const events = [], tabs = [], packages = new Map();
   let url = 'about:blank', active = null, openedPath = null;
   const element = (tid, text = '') => ({tid,textContent:text,innerHTML:'',isConnected:true,
@@ -82,6 +82,10 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
     }},bg:{app:{Version:actualBuild,PackageTreeNode:PackageNode,Application:{FInstance:{FMainForm:{Items:{Workspace:{
       getActiveTab:()=>({Controller:{Node:{data:{node:packages.get(active)}}}}),
     }},FMapTree:{FServerConnection:{UserName:'test-account'}}}}}}}});
+  const map=context.bg.app.Application.FInstance.FMainForm.FMapTree;
+  map.PackageNodes={get Count(){return packages.size;}};
+  map.FServerConnection.Connected=true;
+  map.FServerConnection.Session={async get_FileStorage(){return {async FileExists(path){events.push({file_exists:path});await fileRead?.(context);return fileExists;}};}};
   const locator = selector => ({
     or() { return this; }, first() { return this; }, async waitFor() {}, async inputValue() { return ''; },
     async isVisible() {
@@ -285,6 +289,54 @@ test('opening an exact package verifies its cached path without executing or sav
   assert.equal(state.ownership_verified,false);assert.equal(state.created_draft,false);
   assert.equal(fixture.events.filter(e=>e==='open_package').length,1);
   assert.equal(state.preserved_workflows[0].graph_unchanged,true);
+});
+
+test('D60 nonexistent future Save path refuses before Open and permits explicit new draft', async () => {
+  const fixture=pageFixture({authenticated:true,fileExists:false});
+  const request={operation_id:'missing',intent:'open_package',package_path:'/test-account/future.lgp'};
+  const metadata={skillRevision:'skill'};
+  const args={metadata,assertAllowed(){},assertTarget(){},record:async()=>{},save:async()=>{}};
+  const prepare=request=>prepareWorkspaceSession({...args,request,prepare:({recoverOnly})=>execute(fixture,{
+    operationId:request.operation_id,intent:request.intent,packagePath:request.package_path??null,recoverOnly})});
+  const state=await prepare(request);
+  assert.equal(state.reason,'PACKAGE_OPEN_REJECTED');assert.equal(state.effect_possible,false);
+  assert.equal(state.package_absence_verified,true);assert.equal(state.created_draft,false);
+  assert.equal(state.next_step.intent,'new_draft');assert.equal(state.next_step.save_path,request.package_path);
+  assert.match(state.message,/new_draft/);
+  assert.ok(!fixture.events.includes('open_package'));assert.ok(!fixture.events.includes('create_draft'));
+  const replay=await prepare(request);assert.equal(replay.reason,'PACKAGE_OPEN_REJECTED');
+  assert.equal(fixture.events.filter(e=>e?.file_exists).length,1,'terminal refusal is replayed without a second server read');
+  const ready=await prepare({operation_id:'create',intent:'new_draft'});
+  assert.equal(ready.status,'READY');assert.equal(ready.created_draft,true);
+  assert.equal(fixture.events.filter(e=>e==='create_draft').length,1);
+});
+
+for(const variant of ['exists','unavailable','account-changed','inventory-changed','session-changed','late-blocker'])
+test('D60 missing-file recovery needs bound native absence: '+variant,async()=>{
+ const fixture=pageFixture({authenticated:true,fileExists:variant==='exists',fileRead:context=>{
+  const m=context.bg.app.Application.FInstance.FMainForm.FMapTree;
+  if(variant==='unavailable')throw Error('native read failed');
+  if(variant==='account-changed')m.FServerConnection.UserName='other';
+  if(variant==='inventory-changed')Object.defineProperty(m.PackageNodes,'Count',{value:1});
+  if(variant==='session-changed')m.FServerConnection.Session={};
+  if(variant==='late-blocker'){
+   const original=context.document.querySelectorAll;
+   context.document.querySelectorAll=selector=>selector.startsWith('[role=')
+    ? [{getBoundingClientRect:()=>({width:100,height:100}),matches:()=>false}] : original(selector);
+  }
+ }});
+ const state=await execute(fixture,{operationId:'missing',intent:'open_package',packagePath:'/test-account/future.lgp'});
+ assert.notEqual(state.package_absence_verified,true);
+ if(variant==='exists')assert.equal(state.status,'READY');
+ else {assert.equal(state.status,'NOT_READY');assert.ok(!fixture.events.includes('open_package'));}
+});
+
+for(const variant of ['unproven','effect','created','same-id'])
+test('D60 uncertain rejected Open still refuses a different preparation: '+variant,async()=>{
+ const request={operation_id:'old',intent:'open_package',package_path:'/test-account/future.lgp'};
+ const metadata={workspaceReady:false,workspacePreparation:{identity:JSON.stringify(request),operation_id:'old',effect_possible:variant==='effect',state:{
+  status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED',authenticated:true,created_draft:variant==='created',effect_possible:variant==='effect',package_absence_verified:variant!=='unproven',package_path:request.package_path}}};
+ await assert.rejects(prepareWorkspaceSession({metadata,request:{operation_id:variant==='same-id'?'old':'new',intent:'new_draft'},assertAllowed(){},prepare(){assert.fail('must not dispatch');}}),/conflict/);
 });
 
 test('preparation deadline returns the last named phase with no mutation', async () => {
