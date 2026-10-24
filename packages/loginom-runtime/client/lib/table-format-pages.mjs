@@ -32,12 +32,15 @@ export async function readTableFormatDefinitions(channel,table) {
   throw Error('Table format page budget exceeded');
 }
 
-export async function revealTableFormatField(channel,table,definition,target) {
+export async function revealTableFormatField(channel,table,definition,target,initialObservation) {
   const offset=Math.floor(target.index/8)*8;
   let previousTop;
   for(let scrolls=0;scrolls<=128;scrolls++) {
-    const s=await channel.observe({condition:'Table format field '+target.index+' available',tableDialog:{table,kind:'format'},tableFormatPage:{offset,limit:8},
-      ready:s=>!!formatOf(s)?.page?.schema_id});
+    // Only the first iteration can consume the caller's current snapshot.
+    // A scroll or a metadata-page change always requires a fresh observation.
+    const s=scrolls===0&&initialObservation&&formatOf(initialObservation)?.page?.offset===offset?initialObservation
+      :await channel.observe({condition:'Table format field '+target.index+' available',tableDialog:{table,kind:'format'},tableFormatPage:{offset,limit:8},
+        ready:s=>!!formatOf(s)?.page?.schema_id});
     verifyTableFormatPage(s,{offset,identity:definition});
     const f=formatOf(s),actual=f.metadata_fields.find(f=>f.index===target.index);
     requireValue(actual?.name_key===target.name_key&&actual.source_index===target.source_index&&actual.type===target.type&&actual.record_id===target.record_id,
