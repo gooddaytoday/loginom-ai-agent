@@ -5,6 +5,7 @@ import {openPreparedWizard} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {createNodeExecutionProcedure} from './node-execution-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
+import {configureOutputAutosync,reorderOutputFields} from './port-mapping-procedure.mjs';
 import {validateTextExportParameters} from './text-export-parameters.mjs';
 import {configureTextExport} from './text-export-procedure.mjs';
 import {textExportParametersSchema} from './node-api.mjs';
@@ -33,13 +34,28 @@ export async function synchronizeTextExportInput(channel,state){
   ready:s=>bound(s)&&same(s.node_mapping,before),identity:s=>({wizard:s.wizard.root_ref,mapping:s.node_mapping}),
   resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';TuneDataSourceMappingWizard;btnSyncThroughColumns'
    &&e.allowed_actions.includes('click'))).ref})});
- const after=(await channel.observe({condition:'automatic export input after synchronization',readMappings:true,ready:bound})).node_mapping;
- need(same(after.source_fields,before.source_fields)&&after.autosync===before.autosync
-  &&after.target_fields.length===before.target_fields.length,'Export input synchronization changed source or inventory');
- need(after.target_fields.every((f,i)=>{
-  const original=before.target_fields.find(t=>t.source.record_id===before.source_fields[i].record_id);
-  return same({...f,index:original.index},original);
- }),'Export input synchronization did not preserve fields in source order');
+ const retained=({record_id,index,...field})=>field;
+ const unchanged=(mapping,autosync)=>same(mapping.source_fields,before.source_fields)&&mapping.autosync===autosync
+  &&mapping.target_fields.length===before.target_fields.length
+  &&new Set(mapping.target_fields.map(f=>f.source?.record_id)).size===before.source_fields.length
+  &&mapping.target_fields.every((f,i)=>{
+   const original=before.target_fields.find(t=>t.source.record_id===f.source?.record_id);
+   return f.index===i&&original&&same(retained(f),retained(original));
+  });
+ const ordered=mapping=>mapping.target_fields.every((f,i)=>f.source.record_id===before.source_fields[i].record_id);
+ let after=(await channel.observe({condition:'automatic export input after synchronization',readMappings:true,ready:bound})).node_mapping;
+ need(unchanged(after,true),'Export input synchronization changed source or field properties');
+ if(!ordered(after)){
+  // Loginom 7.4.2 Sync recreates cached target records but retains their order.
+  // Use the existing guarded field moves; restore the automatic option before Done.
+  await configureOutputAutosync(channel,false);
+  const manual=(await channel.observe({condition:'export input before order repair',readMappings:true,ready:bound})).node_mapping;
+  need(unchanged(manual,false),'Export input autosync toggle changed field properties');
+  await reorderOutputFields(channel,before.source_fields.map(source=>manual.target_fields.find(f=>f.source.record_id===source.record_id).record_id));
+  await configureOutputAutosync(channel,true);
+  after=(await channel.observe({condition:'automatic export input after order repair',readMappings:true,ready:bound})).node_mapping;
+ }
+ need(unchanged(after,true)&&ordered(after),'Export input synchronization did not preserve fields in source order');
  return after;
 }
 export function textExportReadback({node,phases}){
