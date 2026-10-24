@@ -4100,6 +4100,28 @@ test('JavaScript input0 overflow preserves the owned typed close confirmation',a
  }
 });
 
+test('D44 Join input0/input1 keep typed close when the input folder also overflows',async()=>{
+ for(const port of [0,1])for(const mode of ['valid','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','wrong_native_index','wrong_icon','missing_native_icon','wrong_native_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
+  const {page}=await joinInputPortOverflowFixture(mode,port);
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
+  if(mode==='wrong_folder_icon')crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const result=await page.execute({mode:'observe'}),snapshot=result.output;
+  const yes=snapshot?.ui?.elements?.find(e=>e.tid==='msgbox;tlb;yes');
+  assert.equal(yes?.allowed_actions.includes('confirm_wizard_close')===true,mode==='valid',port+':'+mode);
+  if(mode==='valid')assert.doesNotThrow(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},snapshot));
+  else if(yes)assert.throws(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},snapshot),/UI reference/);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('owned Join input observes its actual hidden joined-table breadcrumb',async()=>{
   const {page}=await joinInputPortOverflowFixture();
   const full=await page.observe(),narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
