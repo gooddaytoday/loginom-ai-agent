@@ -563,7 +563,12 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
       :{tool:'dock_node_apply',original_operation_id:operation.id,
       instruction:'Configuration: '+configuration.status+'. Execution: '+execution.status+'. Do not recreate the node and do not resume this released operation. To continue with this node, submit a NEW operation_id with target:'
         +JSON.stringify({kind:'existing',type:request.target.type,ref:state.node})
-        +' and inputs:[] (existing links stay), supplying the complete intended settings for an existing node of this type; choose finish:"execute" when output is needed. Saving the package and work on other nodes are allowed now.'}};
+        +(request.target.type==='transform.cross_table'
+          ?' and inputs:'+JSON.stringify(request.inputs)+(request.inputs.length
+            ?' (reuse the same input-zero source/output), supplying the complete intended CrossTable settings'
+            :' and parameters:{} to execute the retained CrossTable configuration. To change roles or facts, supply complete settings and one explicit input zero from the observed source/output')
+          :' and inputs:[] (existing links stay), supplying the complete intended settings for an existing node of this type')
+        +'; choose finish:"execute" when output is needed. Saving the package and work on other nodes are allowed now.'}};
   const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,
     phase:'node_operation_released',signature:state.signature,receipt:{...pending,proof},result};
   const saved=await record(event);

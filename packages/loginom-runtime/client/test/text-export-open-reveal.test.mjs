@@ -5,7 +5,7 @@ import {createTextExportNodeSupport} from '../lib/text-export-node.mjs';
 // D30, LAB-82 head189 q3: bbox=(1256,172,42,78), viewport=1280x800.
 // The observed point (1268,211) is valid, but the full body centre (1277,211)
 // is obscured. Model the browser boundary; run the real export/channel drivers.
-function fixture({fault,finish='execute'}={}) {
+function fixture({fault,finish='execute',targetKind='existing'}={}) {
  const node={document_id:'doc',workflow_id:'flow',node_id:'export'};
  const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
  const deadline=Date.now()+10000,records=[],gestures=[];
@@ -22,7 +22,7 @@ function fixture({fault,finish='execute'}={}) {
    ...(menu?[element('mnContextMenu;mniShowCompletedProcesses',['click','press'])]:[]),
    element('body',['click'],{ref:revealed?'ui-fresh-body':'ui-clipped-body',graph_node:{part:'body'},interaction:{state:'point_observed',point:{x:revealed?700:1268,y:211}},bounding_box:{x:revealed?679:1256,y:172,width:42,height:78}}),
    element('body;Setting',['begin_wizard'],{wizard_open:{node:{node_label:'Export'},workflow_path:workflow.navigation_path}})]}});
- const operation={id:'export',action:{action_key:'node.apply',revision:'1'},nodeApply:{request:{target:{kind:'existing',ref:node},finish}}};
+ const operation={id:'export',action:{action_key:'node.apply',revision:'1'},nodeApply:{request:{target:{kind:targetKind,ref:node},finish}}};
  const support=createTextExportNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2'});
  const driver=support.nodeApplyDriverFactory({operation,now:Date.now,
   receiptOptions:(id,key,signature)=>({id,action_key:key,signature}),
@@ -33,6 +33,8 @@ function fixture({fault,finish='execute'}={}) {
    const step=pending;pending=null;const action=step.action;
    const receipt={status:'SUCCEEDED',operation_id:step.internal_operation_id,action_key:'ui.act',effect_possible:true,cleanup_complete:true};
    if(action.verb==='reveal_prepared_node') {
+    assert.equal(action.target,targetKind==='existing'?'body':'drawing');
+    assert.ok(code.includes(JSON.stringify({target:action.target}).slice(1,-1)),'viewport evaluator retains the same target');
     assert.equal(consoleOpen,false,'reveal must follow execution preparation');
     if(fault==='unknown')throw Error('Lost viewport reply');
     revealed=true;gestures.push('reveal');
@@ -64,4 +66,9 @@ for(const fault of ['owner','unknown'])test('existing Export stops on viewport '
  assert.equal(f.records.filter(e=>e.phase==='node_step_prepared'&&e.action.verb==='reveal_prepared_node').length,1);
  assert.equal(f.gestures.some(g=>g==='click:ui-fresh-body'||g.startsWith('begin_wizard:')),false);
  assert.equal(f.operation.deadline,f.deadline);
+});
+
+test('new Export keeps its complete drawing reveal',async()=>{
+ const f=fixture({targetKind:'new'});assert.equal((await f.run()).verified,true);
+ assert.equal(f.records.find(e=>e.action?.verb==='reveal_prepared_node').action.target,'drawing');
 });

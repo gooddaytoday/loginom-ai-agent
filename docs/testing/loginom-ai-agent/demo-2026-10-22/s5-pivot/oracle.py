@@ -33,7 +33,7 @@ expected = {
     "outputs": [{
         "output_node_type": OUTPUT_TYPE,
         "ordered": ORDERED,
-        "columns": [{"name": name, "label": name, "type": kind} for name, kind in COLUMNS],
+        "columns": [{"name": name, "label_any": True, "type": kind} for name, kind in COLUMNS],
         "rows": rows,
     }],
 }

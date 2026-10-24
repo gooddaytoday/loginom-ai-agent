@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {wizardReadiness} from '../lib/javascript-wizard-page.mjs';
 import {inspectManagedJavascriptPage, makeJavascriptManagedPageCode, runManagedJavascriptPageRead} from '../lib/javascript-managed-page.mjs';
 
 const task = {operation_id:'managed-page',owner:{document_id:'doc',workflow_id:'flow',node_id:'node'},
@@ -61,4 +62,30 @@ test('managed page code validates the exact prepared owner and serializes the sh
   assert.equal(typeof vm.runInNewContext('('+code+')'),'function');
   assert.ok(code.includes('wizardReadiness'));
   assert.throws(()=>makeJavascriptManagedPageCode({...task,prepared:{...task.prepared,node:{...task.owner,node_id:'other'}}}));
+});
+
+
+test('managed wizard address reads overflow breadcrumbs but preserves native identity and visible page guards',()=>{
+ for(const fault of ['overflow','foreign_node','foreign_control','wrong_text','duplicate','hidden','transparent','visibility']) {
+  const document={},cell={},nodeData={},workflow={},node={FGuid:'node',data:nodeData,FCell:cell};
+  node.FLabel={parent:node,FCell:{parent:cell},FRawValue:'Развернуть позиции корзин'};
+  const tree={FGuid:'node',FModelNode:nodeData,FParentNode:workflow},native={FParentNode:tree},model={FModelNode:nodeData};
+  const prefix='MF;TF-1',base=prefix+';cnrNaviMode;b.s_Workflow>Развернуть_позиции_корзин';
+  const element=(id,tid,text)=>({id,textContent:text,isConnected:true,getAttribute:key=>key==='data-tid'?tid:null,
+   hasAttribute:key=>fault==='hidden'&&key==='hidden',getBoundingClientRect:()=>({x:0,y:0,width:0,height:0})});
+  const crumbs=[element('node',base,node.FLabel.FRawValue),element('wizard',base+'>Настройка','Настройка')];
+  const controls={node:{el:{dom:crumbs[0]},_node:{data:{node:tree}}},wizard:{el:{dom:crumbs[1]},_node:{data:{node:native}}}};
+  if(fault==='foreign_node')tree.FGuid='foreign';
+  if(fault==='foreign_control')controls.node._node.data.node={...tree};
+  if(fault==='wrong_text')crumbs[0].textContent='Other';
+  if(fault==='duplicate')crumbs.unshift(crumbs[0]);
+  document.querySelectorAll=q=>q.startsWith('[data-tid^=')?crumbs:[];
+  const binding={document,native:node,cell,nodeData,workflow};
+  const realm=vm.createContext({document,Ext:{getCmp:id=>controls[id]},getComputedStyle:()=>({display:'none',visibility:fault==='visibility'?'hidden':'visible',opacity:fault==='transparent'?'0':'1'}),
+   bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node:native}},FController:model}})}}}}}}}});
+  const result=vm.runInContext('('+wizardReadiness.toString()+')',realm)({prefix,id:'node',binding,addressEpoch:0,inspect:true});
+  assert.equal(result.checks.node_breadcrumb,fault==='overflow',fault);
+  assert.equal(result.ready,false,fault); // A native address never substitutes for a visible page/Close.
+  assert.equal(result.checks.page_unique,false);assert.equal(result.checks.close_unique,false);
+ }
 });

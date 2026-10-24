@@ -49,7 +49,16 @@ export function parseExpectedOutputs(expected){
   const names=output.columns.map(c=>c.name);
   need(new Set(names).size===names.length&&output.columns.every(c=>typeof c.name==='string'&&c.name.length>0
    &&typeof (c.label??c.name)==='string'&&['string','integer','real','boolean','datetime','variant'].includes(c.type)
-   &&(!Object.hasOwn(c,'label_any')||typeof c.label_any==='boolean')),'EXPECTED_COLUMNS_INVALID');
+   &&['label_any','name_any','category_labels_any'].every(k=>!Object.hasOwn(c,k)||typeof c[k]==='boolean')
+   &&!(c.name_any&&c.category_labels_any)),'EXPECTED_COLUMNS_INVALID');
+  need(output.columns.filter(c=>c.name_any).length<=8,'EXPECTED_NAME_MATCH_BOUND');
+  for(const c of output.columns)if(Object.hasOwn(c,'types'))need(Array.isArray(c.types)&&c.types.length>0
+   &&new Set(c.types).size===c.types.length&&c.types.includes(c.type)
+   &&(c.types.every(t=>['integer','real'].includes(t))
+    ||c.category_labels_any&&c.types.every(t=>['string','integer','real'].includes(t))),'EXPECTED_TYPES_INVALID');
+  for(const c of output.columns)if(c.category_labels_any)need(['string','integer','real'].includes(c.type)
+   &&output.rows.every(r=>typeof r[c.name]==='string'&&r[c.name].trim().length>0
+    ||typeof r[c.name]==='number'&&Number.isFinite(r[c.name])),'EXPECTED_CATEGORIES_INVALID');
   for(const c of output.columns)if(Object.hasOwn(c,'tolerance')){
    const t=c.tolerance;
    need(c.type==='real'&&t&&typeof t==='object'&&!Array.isArray(t)&&Object.keys(t).length>0
@@ -123,12 +132,24 @@ function exportInputData(data,fields){
 export function matchesExpectedOutput(data,expected){
  if(data.row_count!==expected.rows.length||!data.sample_complete||!data.precision?.numbers_verified
   ||data.sample?.length!==expected.rows.length||data.schema?.length!==expected.columns.length)return false;
- if(expected.column_order==='exact'&&expected.columns.some((c,i)=>data.schema[i].name!==c.name||!c.label_any&&data.schema[i].label!==(c.label??c.name)||data.schema[i].type!==c.type))return false;
- const indices=new Map(data.schema.map((f,i)=>[f.name,i]));
- if(indices.size!==expected.columns.length||expected.columns.some(c=>{
-  const f=data.schema[indices.get(c.name)];return !f||!c.label_any&&f.label!==(c.label??c.name)||f.type!==c.type;
- }))return false;
- const matchesRow=(row,want)=>expected.columns.every(c=>matchesCell(row[indices.get(c.name)],c,want[c.name]));
+ if(new Set(data.schema.map(f=>f.name)).size!==expected.columns.length)return false;
+ const indices=columnIndices(data,expected);if(!indices)return false;
+ const categories=expected.columns.flatMap((c,i)=>c.category_labels_any?[i]:[]);
+ const matchesRow=(row,want)=>expected.columns.every((c,i)=>row[indices[i]]?.type===data.schema[indices[i]].type
+  &&(c.category_labels_any?categoryKey(row[indices[i]],c)!==undefined:matchesCell(row[indices[i]],c,want[c.name])));
+ if(categories.length){
+  const pairs=expected.ordered?expected.rows.map((want,i)=>matchesRow(data.sample[i],want)?i:-1)
+   :matchIndices(expected.rows.map(want=>data.sample.flatMap((row,i)=>matchesRow(row,want)?[i]:[])),true);
+  if(!pairs||pairs.includes(-1))return false;
+  return categories.every(i=>{
+   const forward=new Map(),reverse=new Map(),column=expected.columns[i];
+   return pairs.every((row,want)=>{
+    const value=categoryKey(data.sample[row][indices[i]],column),key=JSON.stringify(expected.rows[want][column.name]);
+    if(forward.has(key)&&forward.get(key)!==value||reverse.has(value)&&reverse.get(value)!==key)return false;
+    forward.set(key,value);reverse.set(value,key);return true;
+   });
+  });
+ }
  if(expected.ordered)return expected.rows.every((want,i)=>matchesRow(data.sample[i],want));
  // Tolerance ranges can overlap: a greedy first match can consume the only
  // row suitable for a later expectation. Reassign along an augmenting path.
@@ -144,8 +165,9 @@ export function matchesExpectedOutput(data,expected){
  return expected.rows.every((_,i)=>assign(i,new Set()));
 }
 function matchesCell(cell,column,want){
- if(!cell||cell.type!==column.type)return false;
+ if(!cell||!allowsType(column,cell.type))return false;
  const nativeRequired=column.type==='variant'||want&&typeof want==='object';
+ if(nativeRequired&&cell.type!==column.type)return false;
  if(nativeRequired){
   const tags={null:1,real:5,datetime:7,string:8,boolean:11,integer:20};
   if(cell.precision!=='exact_native'||cell.native?.tag!==tags[cell.cell_type])return false;
@@ -165,10 +187,10 @@ function matchesCell(cell,column,want){
    ||cell.precision!=='millisecond'||cell.representation!=='local_datetime'||cell.timezone!=='unspecified')return false;
  }
  let value=cell.value;
- if(type==='integer'){
+ if(cell.type==='integer'||column.type==='variant'&&type==='integer'){
   if(typeof value!=='string'||!/^[-]?[0-9]+$/.test(value))return false;
   const n=Number(value);value=Number.isSafeInteger(n)?n:value;
- }else if(type==='real'&&cell.precision==='exact_native'){
+ }else if((cell.type==='real'||column.type==='variant'&&type==='real')&&cell.precision==='exact_native'){
   if(typeof value!=='string'||!Number.isFinite(Number(value)))return false;
   value=Number(value);
  }
@@ -213,12 +235,59 @@ export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,e
 }
 function matchesContentSchema(data,want){
  return data.schema?.length===want.columns.length&&new Set(data.schema.map(c=>c.name)).size===want.columns.length
-  &&want.columns.every(c=>data.schema.some(f=>f.name===c.name&&f.type===c.type));
+  &&want.columns.every(c=>data.schema.some(f=>(c.name_any||f.name===c.name)&&allowsType(c,f.type)));
 }
 function matchesExportCsvOrder(data,want,csv){
  if(!['names','labels'].includes(csv?.header)||!Array.isArray(csv.columns))return false;
- const columns=want.columns.map(c=>csv.header==='names'?c.name:data.schema.find(f=>f.name===c.name)?.label);
+ const indices=columnIndices(data,{...want,column_order:'any'});if(!indices)return false;
+ const columns=indices.map(i=>csv.header==='names'?data.schema[i].name:data.schema[i].label);
  // Duplicate labels cannot prove which source column occupies a CSV position.
  return columns.every(c=>typeof c==='string')&&new Set(columns).size===columns.length
   &&csv.columns.length===columns.length&&columns.every((c,i)=>csv.columns[i]===c);
+}
+
+const allowsType=(column,type)=>type===column.type||column.types?.includes(type)===true;
+const fitsColumn=(field,column)=>field&&allowsType(column,field.type)&&(column.name_any||field.name===column.name)
+ &&(column.label_any||field.label===(column.label??column.name));
+
+// Freely named columns still need a unique semantic binding. Match complete
+// column values first, then check whole rows so associations cannot be swapped.
+function columnIndices(data,expected){
+ if(data.schema?.length!==expected.columns.length)return null;
+ if(expected.column_order==='exact')return expected.columns.every((c,i)=>fitsColumn(data.schema[i],c))?expected.columns.map((_,i)=>i):null;
+ if(!expected.columns.some(c=>c.name_any)){
+  const indices=expected.columns.map(c=>data.schema.findIndex(f=>fitsColumn(f,c)));
+  return indices.includes(-1)?null:indices;
+ }
+ if(!Array.isArray(data.sample))return null;
+ return matchIndices(expected.columns.map(c=>data.schema.flatMap((field,i)=>fitsColumn(field,c)
+  &&matchIndices(expected.rows.map(want=>data.sample.flatMap((row,j)=>matchesCell(row[i],c,want[c.name])?[j]:[])))?[i]:[])),true);
+}
+
+function categoryKey(cell,column){
+ if(!cell||cell.is_null||!allowsType(column,cell.type))return;
+ if(cell.type==='string')return typeof cell.value==='string'&&cell.value.trim()?JSON.stringify(['string',cell.value]):undefined;
+ if(cell.type==='integer')return typeof cell.value==='string'&&/^-?[0-9]+$/.test(cell.value)?JSON.stringify(['number',BigInt(cell.value).toString()]):undefined;
+ const value=cell.precision==='exact_native'&&typeof cell.value==='string'&&cell.value.trim()?Number(cell.value):cell.value;
+ return typeof value==='number'&&Number.isFinite(value)?JSON.stringify(['real',value]):undefined;
+}
+
+// A second complete assignment means the relaxed binding is ambiguous, rather
+// than authorizing a guess. Strict unordered row matching keeps its old policy.
+function matchIndices(options,unique=false){
+ const run=(blockedRow=-1,blockedColumn=-1)=>{
+  const owners=new Map();
+  const assign=(row,seen)=>{
+   for(const column of options[row]){
+    if(row===blockedRow&&column===blockedColumn||seen.has(column))continue;
+    seen.add(column);
+    if(!owners.has(column)||assign(owners.get(column),seen)){owners.set(column,row);return true;}
+   }
+   return false;
+  };
+  if(!options.every((_,row)=>assign(row,new Set())))return null;
+  const result=[];for(const [column,row] of owners)result[row]=column;return result;
+ };
+ const result=run();
+ return result&&(!unique||!result.some((column,row)=>run(row,column)!==null))?result:null;
 }

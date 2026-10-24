@@ -1,0 +1,493 @@
+{
+  "package_path": "/stability-2026-10-20/n18.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "programming.javascript"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/lab-69-catcher-ce2ec6f9-c525-4b44-ac5e-235e832dac4f/n194-n18-1-1792436652179212587-baskets-clean.csv",
+      "columns": [
+        {
+          "name": "OrderID",
+          "type": "integer",
+          "label_any": true,
+          "types": [
+            "integer",
+            "real"
+          ]
+        },
+        {
+          "name": "Items",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Compact",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "TotalUnits",
+          "type": "integer",
+          "label_any": true,
+          "types": [
+            "integer",
+            "real"
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "OrderID": 1,
+          "Items": "B:2|A:1|B:3",
+          "Compact": "A:1|B:5",
+          "TotalUnits": 6
+        },
+        {
+          "OrderID": 2,
+          "Items": "Z:1",
+          "Compact": "Z:1",
+          "TotalUnits": 1
+        },
+        {
+          "OrderID": 3,
+          "Items": "A:9|C:2|A:4|C:1",
+          "Compact": "A:13|C:3",
+          "TotalUnits": 16
+        },
+        {
+          "OrderID": 4,
+          "Items": "C:2|D:9|E:2",
+          "Compact": "C:2|D:9|E:2",
+          "TotalUnits": 13
+        },
+        {
+          "OrderID": 5,
+          "Items": "A:10|C:5|E:3",
+          "Compact": "A:10|C:5|E:3",
+          "TotalUnits": 18
+        },
+        {
+          "OrderID": 6,
+          "Items": "E:9|A:4|B:11|A:2|E:4|E:4|E:9",
+          "Compact": "A:6|B:11|E:26",
+          "TotalUnits": 43
+        },
+        {
+          "OrderID": 7,
+          "Items": "A:11|D:1",
+          "Compact": "A:11|D:1",
+          "TotalUnits": 12
+        },
+        {
+          "OrderID": 8,
+          "Items": "E:2|B:2",
+          "Compact": "B:2|E:2",
+          "TotalUnits": 4
+        },
+        {
+          "OrderID": 9,
+          "Items": "E:1|E:1|C:9|A:5|A:10|A:2|D:9",
+          "Compact": "A:17|C:9|D:9|E:2",
+          "TotalUnits": 37
+        },
+        {
+          "OrderID": 10,
+          "Items": "D:8|E:7|E:4",
+          "Compact": "D:8|E:11",
+          "TotalUnits": 19
+        },
+        {
+          "OrderID": 11,
+          "Items": "D:10|B:4",
+          "Compact": "B:4|D:10",
+          "TotalUnits": 14
+        },
+        {
+          "OrderID": 12,
+          "Items": "A:3|E:2|C:7|B:1|A:6|C:12|D:4",
+          "Compact": "A:9|B:1|C:19|D:4|E:2",
+          "TotalUnits": 35
+        },
+        {
+          "OrderID": 13,
+          "Items": "E:2|E:4",
+          "Compact": "E:6",
+          "TotalUnits": 6
+        },
+        {
+          "OrderID": 14,
+          "Items": "B:9|E:2|E:11",
+          "Compact": "B:9|E:13",
+          "TotalUnits": 22
+        },
+        {
+          "OrderID": 15,
+          "Items": "E:11|B:7|E:7|B:10",
+          "Compact": "B:17|E:18",
+          "TotalUnits": 35
+        },
+        {
+          "OrderID": 16,
+          "Items": "D:4|E:5|D:8|C:2|A:4",
+          "Compact": "A:4|C:2|D:12|E:5",
+          "TotalUnits": 23
+        },
+        {
+          "OrderID": 17,
+          "Items": "A:9|E:9|C:12",
+          "Compact": "A:9|C:12|E:9",
+          "TotalUnits": 30
+        },
+        {
+          "OrderID": 18,
+          "Items": "C:7|A:8|E:7",
+          "Compact": "A:8|C:7|E:7",
+          "TotalUnits": 22
+        },
+        {
+          "OrderID": 19,
+          "Items": "D:7|E:4|C:2|E:8|B:3|B:2",
+          "Compact": "B:5|C:2|D:7|E:12",
+          "TotalUnits": 26
+        },
+        {
+          "OrderID": 20,
+          "Items": "B:3|B:10|A:10|A:10|D:3",
+          "Compact": "A:20|B:13|D:3",
+          "TotalUnits": 36
+        },
+        {
+          "OrderID": 21,
+          "Items": "E:12|E:5|E:7|C:7",
+          "Compact": "C:7|E:24",
+          "TotalUnits": 31
+        },
+        {
+          "OrderID": 22,
+          "Items": "E:10|D:12|B:1|E:3",
+          "Compact": "B:1|D:12|E:13",
+          "TotalUnits": 26
+        },
+        {
+          "OrderID": 23,
+          "Items": "E:6|E:5|A:11|E:6|A:8|B:4",
+          "Compact": "A:19|B:4|E:17",
+          "TotalUnits": 40
+        },
+        {
+          "OrderID": 24,
+          "Items": "B:12|E:6|D:1",
+          "Compact": "B:12|D:1|E:6",
+          "TotalUnits": 19
+        },
+        {
+          "OrderID": 25,
+          "Items": "C:5|C:5|D:1",
+          "Compact": "C:10|D:1",
+          "TotalUnits": 11
+        },
+        {
+          "OrderID": 26,
+          "Items": "E:9|A:4|B:12|E:10",
+          "Compact": "A:4|B:12|E:19",
+          "TotalUnits": 35
+        },
+        {
+          "OrderID": 27,
+          "Items": "A:1|E:12|A:1|E:9|C:12|C:3|A:7",
+          "Compact": "A:9|C:15|E:21",
+          "TotalUnits": 45
+        },
+        {
+          "OrderID": 28,
+          "Items": "D:7|E:3|B:4|E:7|B:9|B:10",
+          "Compact": "B:23|D:7|E:10",
+          "TotalUnits": 40
+        },
+        {
+          "OrderID": 29,
+          "Items": "E:11|A:8|A:11",
+          "Compact": "A:19|E:11",
+          "TotalUnits": 30
+        },
+        {
+          "OrderID": 30,
+          "Items": "A:2|C:9|B:2|C:10|C:12",
+          "Compact": "A:2|B:2|C:31",
+          "TotalUnits": 35
+        },
+        {
+          "OrderID": 31,
+          "Items": "A:9|C:2|D:7",
+          "Compact": "A:9|C:2|D:7",
+          "TotalUnits": 18
+        },
+        {
+          "OrderID": 32,
+          "Items": "D:12|E:11",
+          "Compact": "D:12|E:11",
+          "TotalUnits": 23
+        },
+        {
+          "OrderID": 33,
+          "Items": "B:5|A:10|B:5",
+          "Compact": "A:10|B:10",
+          "TotalUnits": 20
+        },
+        {
+          "OrderID": 34,
+          "Items": "E:1|B:3|A:2|D:10",
+          "Compact": "A:2|B:3|D:10|E:1",
+          "TotalUnits": 16
+        },
+        {
+          "OrderID": 35,
+          "Items": "A:3|C:3|E:12|D:2|B:4|D:2|A:9",
+          "Compact": "A:12|B:4|C:3|D:4|E:12",
+          "TotalUnits": 35
+        },
+        {
+          "OrderID": 36,
+          "Items": "B:1|A:5|D:1|E:8",
+          "Compact": "A:5|B:1|D:1|E:8",
+          "TotalUnits": 15
+        },
+        {
+          "OrderID": 37,
+          "Items": "A:3|E:8|C:3|D:1|B:5|A:8|C:7",
+          "Compact": "A:11|B:5|C:10|D:1|E:8",
+          "TotalUnits": 35
+        },
+        {
+          "OrderID": 38,
+          "Items": "D:5|A:7",
+          "Compact": "A:7|D:5",
+          "TotalUnits": 12
+        },
+        {
+          "OrderID": 39,
+          "Items": "C:8|E:1|C:3|E:5",
+          "Compact": "C:11|E:6",
+          "TotalUnits": 17
+        },
+        {
+          "OrderID": 40,
+          "Items": "B:4|D:11|E:4|D:10",
+          "Compact": "B:4|D:21|E:4",
+          "TotalUnits": 29
+        },
+        {
+          "OrderID": 41,
+          "Items": "B:10|D:4|A:8|E:9|D:10|B:8|D:5",
+          "Compact": "A:8|B:18|D:19|E:9",
+          "TotalUnits": 54
+        },
+        {
+          "OrderID": 42,
+          "Items": "D:9|B:4|D:6",
+          "Compact": "B:4|D:15",
+          "TotalUnits": 19
+        },
+        {
+          "OrderID": 43,
+          "Items": "C:4|A:1|D:7|B:7",
+          "Compact": "A:1|B:7|C:4|D:7",
+          "TotalUnits": 19
+        },
+        {
+          "OrderID": 44,
+          "Items": "B:5|C:9|E:1|D:4|B:3",
+          "Compact": "B:8|C:9|D:4|E:1",
+          "TotalUnits": 22
+        },
+        {
+          "OrderID": 45,
+          "Items": "C:1|A:2|C:9",
+          "Compact": "A:2|C:10",
+          "TotalUnits": 12
+        },
+        {
+          "OrderID": 46,
+          "Items": "A:3|C:6|E:6|B:7|A:1|A:2|B:1",
+          "Compact": "A:6|B:8|C:6|E:6",
+          "TotalUnits": 26
+        },
+        {
+          "OrderID": 47,
+          "Items": "B:10|C:7",
+          "Compact": "B:10|C:7",
+          "TotalUnits": 17
+        },
+        {
+          "OrderID": 48,
+          "Items": "C:11|C:4|E:8|C:3|E:4|A:11|B:9",
+          "Compact": "A:11|B:9|C:18|E:12",
+          "TotalUnits": 50
+        },
+        {
+          "OrderID": 49,
+          "Items": "D:10|D:7|C:9|C:4|E:12|B:10",
+          "Compact": "B:10|C:13|D:17|E:12",
+          "TotalUnits": 52
+        },
+        {
+          "OrderID": 50,
+          "Items": "D:10|E:3|A:3",
+          "Compact": "A:3|D:10|E:3",
+          "TotalUnits": 16
+        },
+        {
+          "OrderID": 51,
+          "Items": "A:2|B:2",
+          "Compact": "A:2|B:2",
+          "TotalUnits": 4
+        },
+        {
+          "OrderID": 52,
+          "Items": "C:1|C:11|A:9|A:11|E:6",
+          "Compact": "A:20|C:12|E:6",
+          "TotalUnits": 38
+        },
+        {
+          "OrderID": 53,
+          "Items": "C:8|B:8|A:2",
+          "Compact": "A:2|B:8|C:8",
+          "TotalUnits": 18
+        },
+        {
+          "OrderID": 54,
+          "Items": "A:4|B:1",
+          "Compact": "A:4|B:1",
+          "TotalUnits": 5
+        },
+        {
+          "OrderID": 55,
+          "Items": "D:5|D:6|C:1",
+          "Compact": "C:1|D:11",
+          "TotalUnits": 12
+        },
+        {
+          "OrderID": 56,
+          "Items": "A:2|B:10|D:9|D:5",
+          "Compact": "A:2|B:10|D:14",
+          "TotalUnits": 26
+        },
+        {
+          "OrderID": 57,
+          "Items": "E:11|D:7|B:8|E:6|A:2|E:5|E:11",
+          "Compact": "A:2|B:8|D:7|E:33",
+          "TotalUnits": 50
+        },
+        {
+          "OrderID": 58,
+          "Items": "A:1|B:4|A:3|B:12|D:6|C:8",
+          "Compact": "A:4|B:16|C:8|D:6",
+          "TotalUnits": 34
+        },
+        {
+          "OrderID": 59,
+          "Items": "C:10|B:8|D:2|E:12|D:4|A:12|A:2",
+          "Compact": "A:14|B:8|C:10|D:6|E:12",
+          "TotalUnits": 50
+        },
+        {
+          "OrderID": 60,
+          "Items": "C:9|D:11|A:2|A:2|E:11",
+          "Compact": "A:4|C:9|D:11|E:11",
+          "TotalUnits": 35
+        },
+        {
+          "OrderID": 61,
+          "Items": "C:9|B:7|A:8",
+          "Compact": "A:8|B:7|C:9",
+          "TotalUnits": 24
+        },
+        {
+          "OrderID": 62,
+          "Items": "D:4|E:10|D:10|E:10|A:12",
+          "Compact": "A:12|D:14|E:20",
+          "TotalUnits": 46
+        },
+        {
+          "OrderID": 63,
+          "Items": "C:7|D:6|B:6",
+          "Compact": "B:6|C:7|D:6",
+          "TotalUnits": 19
+        },
+        {
+          "OrderID": 64,
+          "Items": "B:6|B:1|A:2|B:1|B:5|A:6|C:1",
+          "Compact": "A:8|B:13|C:1",
+          "TotalUnits": 22
+        },
+        {
+          "OrderID": 65,
+          "Items": "E:10|C:8|D:1|A:11|E:12",
+          "Compact": "A:11|C:8|D:1|E:22",
+          "TotalUnits": 42
+        },
+        {
+          "OrderID": 66,
+          "Items": "E:4|A:5|D:1",
+          "Compact": "A:5|D:1|E:4",
+          "TotalUnits": 10
+        },
+        {
+          "OrderID": 67,
+          "Items": "E:8|D:12|C:6|E:11|C:10",
+          "Compact": "C:16|D:12|E:19",
+          "TotalUnits": 47
+        },
+        {
+          "OrderID": 68,
+          "Items": "A:11|C:2|A:5",
+          "Compact": "A:16|C:2",
+          "TotalUnits": 18
+        },
+        {
+          "OrderID": 69,
+          "Items": "B:7|E:10",
+          "Compact": "B:7|E:10",
+          "TotalUnits": 17
+        },
+        {
+          "OrderID": 70,
+          "Items": "D:7|C:7|B:3|B:2|D:7|E:4",
+          "Compact": "B:5|C:7|D:14|E:4",
+          "TotalUnits": 30
+        },
+        {
+          "OrderID": 71,
+          "Items": "C:5|A:3",
+          "Compact": "A:3|C:5",
+          "TotalUnits": 8
+        },
+        {
+          "OrderID": 72,
+          "Items": "E:1|C:10|C:9|A:8",
+          "Compact": "A:8|C:19|E:1",
+          "TotalUnits": 28
+        }
+      ],
+      "ordered": true,
+      "column_order": "exact"
+    }
+  ],
+  "request_constraints": [
+    {
+      "source": "prompt.md:1",
+      "quote": "В baskets.csv состав корзины записан в Items вроде B:2|A:1|B:3: собери одинаковые товары и сложи их количества, чтобы получилось A:1|B:5, коды по алфавиту. Для каждой корзины добавь такой Compact и общее количество TotalUnits; сохрани baskets-clean.csv с колонками OrderID, Items, Compact, TotalUnits по возрастанию OrderID.",
+      "reason": "Native integer/real type is not prescribed; numeric values, named columns and requested order remain required."
+    }
+  ]
+}

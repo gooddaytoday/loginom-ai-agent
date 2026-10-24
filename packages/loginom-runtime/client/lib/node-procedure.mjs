@@ -242,19 +242,20 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
-    async revealGraphNode() {
+    async revealGraphNode({target='drawing'}={}) {
+      if(!['drawing','body'].includes(target))throw Error('Unknown node viewport target');
       checkBudget();
       if(!preparedNodeContext)throw Error('Viewport navigation requires a prepared node');
       const before=await channel.observe({condition:'prepared graph before node viewport navigation',
         ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'});
       assertContext(before);checkBudget();
-      const step=nextStep(),id=operation.id+':n'+step,action={verb:'reveal_prepared_node'},actionKey='node.viewport.reveal.internal';
+      const step=nextStep(),id=operation.id+':n'+step,action={verb:'reveal_prepared_node',target},actionKey='node.viewport.reveal.internal';
       const signature=digest([id,action,evidenceSnapshot]),observationHash=digest(evidenceSnapshot);
       snapshot=null;evidenceSnapshot=null;
       const prepared=await entry('node_step_prepared',{step,internal_operation_id:id,action,observation_sha256:observationHash,signature});
       if(prepared?.signature!==signature||JSON.stringify(prepared.action)!==JSON.stringify(action))throw Error('Node viewport navigation was not durably prepared');
       signal?.throwIfAborted();checkBudget();
-      const code=`async page=>(${revealPreparedGraphNode.toString()})(page,${JSON.stringify({binding:preparedNodeContext,origin:targetOrigin,build:targetBuild,deadline:operation.deadline,types:NODE_TYPES})},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${samePlacementGraph.toString()})`;
+      const code=`async page=>(${revealPreparedGraphNode.toString()})(page,${JSON.stringify({binding:preparedNodeContext,origin:targetOrigin,build:targetBuild,deadline:operation.deadline,types:NODE_TYPES,target})},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${samePlacementGraph.toString()})`;
       const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'node_viewport',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.status==='SUCCEEDED'?null:{code:'NODE_VIEWPORT_NOT_REVEALED',message:'Prepared node viewport: node not revealed'},trace:[]}}`;
       let result;
       try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:Math.max(1,operation.deadline-now())});}
@@ -736,9 +737,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     // Fixed handlers supply the readiness condition and domain identity. Caller
     // input never contains a resolver or a recipe. Only a durably recorded,
-    // strictly pre-gesture epoch/scan refusal or proved body replacement
+    // strictly pre-gesture epoch/scan refusal, owned busy mask or proved body replacement
     // permits a new local attempt with unchanged identity and intent.
-    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, processControl }) {
+    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, processControl }) {
       if (typeof resolve !== 'function' || typeof identity !== 'function') {
         throw new Error('A bound action resolver and domain identity are required');
       }
@@ -806,12 +807,43 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const scanRefusal=timeScanRefusal(r,'ui.act');
           const graphRefusal=action.verb==='execute_graph_node'&&r.phase==='preconditions'
             &&r.error?.code==='GRAPH_EXECUTION_CONTEXT_CHANGED';
+          const nodeChanges=r.trace.filter(e=>e.event==='prepared_node_context_changed_before_gesture');
+          const before=nodeChanges[0]?.before,after=nodeChanges[0]?.after;
+          // The strict pre-gesture guard did not dispatch. Only a lock-only
+          // change of this same native graph node permits a full fresh read;
+          // neither the rejected snapshot nor its UI refs can be reused.
+          const nodeLockRefusal=!!preparedNodeContext&&r.phase==='preconditions'
+            &&r.error?.code==='PREPARED_NODE_CONTEXT_CHANGED'&&nodeChanges.length===1
+            &&before?.verified===true&&after?.verified===true&&before.surface==='graph'&&after.surface==='graph'
+            &&typeof before.locked==='boolean'&&typeof after.locked==='boolean'&&before.locked!==after.locked
+            &&JSON.stringify(canonical({...before,locked:false}))===JSON.stringify(canonical({...after,locked:false}))
+            &&JSON.stringify(canonical({...before,locked:false}))===JSON.stringify(canonical({...observed.prepared_node_context,locked:false}));
           // Only an opting-in source selector can prove a replaced native body.
           // This remains a new observation and bound attempt, never a raw retry.
           const bodyRefusal=r.phase==='preconditions'&&['UI_REFERENCE_STALE','UI_REFERENCE_OBSCURED'].includes(r.error?.code)
             &&bodyRefreshes===0&&typeof refreshReplacedBody==='function'
             &&refreshReplacedBody({receipt:r,observation:observed,action})===true;
-          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal)throw error;
+          const wizard=observed.wizard,masked=r.output,control=observed.ui.elements.find(e=>e.ref===action.ref);
+          const covered=masked?.ui?.elements?.filter(e=>e.tid===control?.tid);
+          // An opting-in picker may wait for its own late loading mask only
+          // after a matched no-effect refusal. A new read must clear every
+          // blocker and rebind the same owner/field before another guarded act.
+          const busyRefusal=refreshWizardBusy===true&&!!preparedNodeContext&&action.verb==='click'
+            &&r.phase==='preconditions'&&r.error?.code==='UI_REFERENCE_OBSCURED'
+            &&wizard?.status==='observed'&&masked?.wizard?.status==='observed'
+            &&['root_ref','root_tid','stage'].every(k=>wizard[k]&&wizard[k]===masked.wizard[k])
+            &&[observed,masked].every(s=>s.prepared_node_context?.surface==='wizard'&&s.prepared_node_context.tid===wizard.root_tid)
+            &&control?.wizard_combo?.kind==='picker'&&control.wizard_combo.field?.root_ref===wizard.root_ref
+            &&covered?.length===1&&covered[0].wizard_combo?.kind==='picker'
+            &&covered[0].wizard_combo.field?.root_ref===wizard.root_ref
+            &&covered[0].wizard_combo.field.name===control.wizard_combo.field.name
+            &&covered[0].interaction?.state==='point_not_observed'
+            &&covered[0].interaction.covering?.length===1&&covered[0].interaction.covering[0].tid===wizard.root_tid
+            &&masked.ui.dialogs?.length===0&&masked.ui.masks?.length===1
+            &&masked.ui.masks[0].kind==='busy'&&masked.ui.masks[0].ref===wizard.root_ref
+            &&masked.ui.masks[0].target_tid===wizard.root_tid&&masked.ui.masks[0].dialog_ref===null;
+          if(busyRefusal)assertContext(masked,true);
+          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal&&!nodeLockRefusal&&!busyRefusal)throw error;
           if(bodyRefusal)bodyRefreshes++;
           const event = await entry('node_step_refresh_authorized', {
             step:operation.nodeStepSequence,internal_operation_id:r.operation_id,
@@ -821,6 +853,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             ...(bodyRefusal?{reason:'prepared_graph_body_replaced'}:{}),
             ...(scanRefusal?{reason:'read_scan_time_limit'}:{}),
             ...(graphRefusal?{reason:'graph_execution_context_changed'}:{}),
+            ...(nodeLockRefusal?{reason:'prepared_node_lock_changed',before:structuredClone(before),after:structuredClone(after)}:{}),
+            ...(busyRefusal?{reason:'owned_wizard_busy_mask'}:{}),
           });
           if (event?.rejected_operation_id !== r.operation_id || event.retry !== attempt + 1
             || event.binding_sha256 !== binding || event.intent_sha256 !== intent) {

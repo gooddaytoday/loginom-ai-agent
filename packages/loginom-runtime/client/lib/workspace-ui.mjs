@@ -424,20 +424,41 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return visibleAncestors(element);
     });
     const sensitivePattern = /password|passwd|\bpwd\b|secret|token|credential|authorization|api[_ -]?key|private[_ -]?key|one[_ -]?time|\botp\b|парол|секрет|токен/i;
+    // Inline definition pages have no separate port opening. Their native-bound
+    // node wizard and exact current breadcrumb supply the node type, read-only.
+    const inlineDefinitionIcon=(()=>{
+      if(!preparedNodeWizard||!preparedNodeId||!definitionPrefix||!preparedWorkflowPath?.length||preparedInputPort||preparedOutputPort)return null;
+      const panels=tids.get(definitionPrefix+';NavigationBar;NavigationPanel')??[];
+      if(panels.length!==1||!visible(panels[0]))return null;
+      const prefix=definitionPrefix+';cnrNaviMode;b.s_',crumbs=all.filter(e=>{charge();return panels[0].contains(e)&&(getTid(e)??'').startsWith(prefix);});
+      const count=preparedWorkflowPath.length,node=crumbs[count],settings=crumbs[count+1];
+      if(crumbs.length!==count+2||!preparedWorkflowPath.every((c,i)=>getTid(crumbs[i])===c.tid&&crumbs[i].textContent.trim()===c.label)
+        ||!getTid(node)?.startsWith(preparedWorkflowPath.at(-1).tid+'>')||getTid(node).slice(preparedWorkflowPath.at(-1).tid.length+1).includes('>')
+        ||settings.textContent.trim()!=='Настройка'||getTid(settings)!==getTid(node)+'>Настройка')return null;
+      const icons=[...node.querySelectorAll('[class*="bg-vendor-icon-"]')];charge();
+      if(icons.length!==1)return null;
+      return ['importtextfile','joindata','exporttextfile'].map(n=>'bg-vendor-icon-'+n).find(n=>icons[0].classList.contains(n))??null;
+    })();
     const definitionMetadataTid=memoRead(element=>{
       const tid=getTid(element)??'';
       const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard|DerivedDataSourceOutputSocketWizard|TuneDataSourceMappingWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_|colDataKind_|colDefaultUsageType_|colUsageType_|colSourceDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
       if(!match || element.tagName!=='TD' || !sensitivePattern.test(tid))return tid;
       const input=match[2]==='TuneDataSourceMappingWizard',output=match[2]!=='CalcDataWizard';
       const port=input?preparedInputPort:preparedOutputPort,usage=input?'colUsageType_':'colDefaultUsageType_';
+      const inline=!port&&(match[2]==='ColumnsMappingEngineOutputPortWizard'&&inlineDefinitionIcon==='bg-vendor-icon-importtextfile'
+        ||match[2]==='DerivedDataSourceOutputSocketWizard'&&inlineDefinitionIcon==='bg-vendor-icon-joindata'
+        ||input&&inlineDefinitionIcon==='bg-vendor-icon-exporttextfile');
       if(output ? !['colName_','colDisplayName_','colDataKind_',usage,'colSourceDisplayName_'].includes(match[3])
-        || definitionPrefix!==match[1] || port?.direction!==(input?'input':'output')
-        || (input ? port.node_icon_class!=='bg-vendor-icon-sorting'
-          : port.node_icon_class!=='bg-vendor-icon-calcdata'
-            && !(match[2]==='DerivedDataSourceOutputSocketWizard'&&port.node_icon_class==='bg-vendor-icon-sorting'))
-        || port.port!==0 || port.native_index!==0
-        || typeof port.port_guid!=='string' || !port.port_guid
-        || typeof port.opening_operation_id!=='string' || !port.opening_operation_id
+        || definitionPrefix!==match[1] || !(inline||port?.direction===(input?'input':'output')&&(input
+          ? port.node_icon_class==='bg-vendor-icon-sorting'&&port.port===0&&port.native_index===0
+            || port.node_icon_class==='bg-vendor-icon-joindata'&&[0,1].includes(port.port)&&port.native_index===port.port
+            || port.node_icon_class==='bg-vendor-icon-exporttextfile'&&port.port===0&&port.native_index===1
+          : port.port===0&&port.native_index===0&&(port.node_icon_class==='bg-vendor-icon-calcdata'
+            || match[2]==='DerivedDataSourceOutputSocketWizard'&&port.node_icon_class==='bg-vendor-icon-sorting'
+            || match[2]==='ColumnsMappingEngineOutputPortWizard'&&port.node_icon_class==='bg-vendor-icon-importtextfile'
+            || match[2]==='DerivedDataSourceOutputSocketWizard'&&port.node_icon_class==='bg-vendor-icon-joindata'))
+          &&typeof port.port_guid==='string'&&!!port.port_guid
+          &&typeof port.opening_operation_id==='string'&&!!port.opening_operation_id)
         : !['colExpressionName_','colExpressionDisplayName_'].includes(match[3]))return tid;
       const base=match[1]+';WizrdMCF;',tab='MF;cntMain;cntWorkspace;Workspace;t.br;tb'+match[1].slice('MF;TF'.length);
       const prefix=base+match[2]+';';
@@ -456,7 +477,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         if(cells.length!==1 || cells[0].tagName!=='TD' || cells[0].closest('table')!==row)return tid;
         metadata.push(cells[0]);
       }
-      // Only technical-name suffixes of owned Calculator/Sorting definition cells are data.
+      // Only technical-name suffixes of the owned field-definition cells are data.
       // Never exempt secret attributes, ancestors, editors or dataset values.
       for(const cell of metadata) {
         const children=[...cell.querySelectorAll('*')];charge();
@@ -695,14 +716,18 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // Long export/package captions can overflow the node breadcrumb itself.
     // This is context text only: gestures still require visible controls and
     // the current native node wizard or exact input0/native input1 opening.
-    const hiddenExportNode=e=>(preparedNodeWizard&&['text_export_params','text_export_format','done'].includes(wizard.stage)
+    const hiddenExportNode=e=>(e.querySelectorAll('.bg-vendor-icon-exporttextfile').length===1&&(preparedNodeWizard&&['text_export_params','text_export_format','done'].includes(wizard.stage)
         ||preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===1
           &&preparedInputPort.node_icon_class==='bg-vendor-icon-exporttextfile')
+      // Restored dense packages often have long captions. Import's node and
+      // Settings breadcrumbs overflow too; the native GUID-bound wizard is
+      // already verified. Read their context without making hidden controls actionable.
+      ||preparedNodeWizard&&['text_import_file','text_import_format','output_mapping','done'].includes(wizard.stage)
+        &&e.querySelectorAll('.bg-vendor-icon-importtextfile').length===1)
       &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'
       &&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')&&!sensitive(e)
       &&(tids.get(getTid(e))??[]).length===1
       &&e.querySelectorAll('[class*="bg-vendor-icon-"]').length===1
-      &&e.querySelectorAll('.bg-vendor-icon-exporttextfile').length===1
       &&e.textContent.trim().length>0&&(getTid(e)??'').endsWith('>'+e.textContent.trim().replace(/\s/g,'_').replace(/,/g,''));
     if(workflow) {
       // E2E navigation.GetCurrentTabPath: inspect the current tab's visible
@@ -727,7 +752,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&(tids.get(getTid(e)+'>Настройка')??[]).filter(child=>panels[0].contains(child)
             &&child.querySelectorAll('.maptree-icon-wizard').length===1).length===1;
         const overflowOutputFolder=e=>boundOutputOverflow&&(preparedOutputPort.port===0||preparedOutputPort.node_icon_class==='bg-vendor-icon-filterdata'&&preparedOutputPort.port===1)
-          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-uniondata','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript'].includes(preparedOutputPort.node_icon_class)
+          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-uniondata','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-joindata'].includes(preparedOutputPort.node_icon_class)
           &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
           &&e.textContent.trim()==='Выходные порты'&&(getTid(e)??'').endsWith('>Выходные_порты')
           &&e.querySelectorAll('.maptree-icon-modeloutputports').length===1
@@ -2874,7 +2899,8 @@ function readRenderedInputMapping(observation) {
     const elements = controls.slice(0, 240).map(element => {
       const identity = identityOf(element), tag = element.tagName.toLowerCase(), tid = getTid(element);
       const editable = element.matches('textarea,input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),[contenteditable="true"]') && !element.readOnly;
-      const label = tableScrollers.has(state.ids.get(element))?'':short(element.getAttribute('aria-label') || element.getAttribute('placeholder') || element.getAttribute('title') || textOf(element));
+      // Data-preview scrollers carry navigation identity, never row values.
+      const label = tableScrollers.has(state.ids.get(element))||importScroller(element)?'':short(element.getAttribute('aria-label') || element.getAttribute('placeholder') || element.getAttribute('title') || textOf(element));
       const role = element.getAttribute('role'), kind = /;(?:Input|Output)_/.test(tid ?? '') ? 'port' : editable ? 'field' : /;Graph;/.test(tid ?? '') ? 'graph' : 'control';
       const isEnabled = enabled(element), allowed = identity && isEnabled && !dangerous(element);
       const scroll = scrollOf(element);
@@ -3776,8 +3802,10 @@ function readRenderedInputMapping(observation) {
           targets.push(await checkedHandle(before, item));
         }
         const nodeBeforeGesture=await boundNode();
-        if(nodeBeforeGesture && !same(current.prepared_node_context,nodeBeforeGesture))
+        if(nodeBeforeGesture && !same(current.prepared_node_context,nodeBeforeGesture)) {
+          record('prepared_node_context_changed_before_gesture',{before:current.prepared_node_context,after:nodeBeforeGesture});
           fail('PREPARED_NODE_CONTEXT_CHANGED','The node surface changed before the gesture');
+        }
         if(['execute_graph_node','deactivate_graph_node'].includes(task.action.verb)) {
           const launch=await readUi(),before=current.ui.elements.find(e=>e.ref===task.action.ref),after=launch.ui.elements.find(e=>e.ref===task.action.ref);
           if(!before?.graph_execution||!after?.allowed_actions.includes(task.action.verb)||!same(before.graph_execution,after.graph_execution))

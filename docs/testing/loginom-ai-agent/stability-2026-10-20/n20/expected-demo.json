@@ -1,0 +1,514 @@
+{
+  "package_path": "/stability-2026-10-20/n20.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.lin_regression"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/lab-69-catcher-ce2ec6f9-c525-4b44-ac5e-235e832dac4f/n194-n20-1-1792435900800118038-delivery-fit.csv",
+      "columns": [
+        {
+          "name": "ID",
+          "type": "integer",
+          "label_any": true,
+          "types": [
+            "integer",
+            "real"
+          ]
+        },
+        {
+          "name": "Hours",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-09
+          },
+          "types": [
+            "integer",
+            "real"
+          ]
+        },
+        {
+          "name": "Distance",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-09
+          },
+          "types": [
+            "integer",
+            "real"
+          ]
+        },
+        {
+          "name": "Cost",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-09
+          },
+          "types": [
+            "integer",
+            "real"
+          ]
+        },
+        {
+          "name": "Forecast",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 0.02,
+            "rel": 1e-09
+          },
+          "types": [
+            "integer",
+            "real"
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "ID": 1,
+          "Hours": 1.0,
+          "Distance": 1.0,
+          "Cost": 9.182,
+          "Forecast": 9.097786580086584
+        },
+        {
+          "ID": 2,
+          "Hours": 1.0,
+          "Distance": 2.0,
+          "Cost": 11.574,
+          "Forecast": 11.49867800865801
+        },
+        {
+          "ID": 3,
+          "Hours": 1.0,
+          "Distance": 3.0,
+          "Cost": 13.995,
+          "Forecast": 13.899569437229434
+        },
+        {
+          "ID": 4,
+          "Hours": 1.0,
+          "Distance": 4.0,
+          "Cost": 16.214,
+          "Forecast": 16.30046086580086
+        },
+        {
+          "ID": 5,
+          "Hours": 1.0,
+          "Distance": 5.0,
+          "Cost": 18.569,
+          "Forecast": 18.70135229437229
+        },
+        {
+          "ID": 6,
+          "Hours": 1.0,
+          "Distance": 6.0,
+          "Cost": 21.208,
+          "Forecast": 21.10224372294371
+        },
+        {
+          "ID": 7,
+          "Hours": 2.0,
+          "Distance": 1.0,
+          "Cost": 10.799,
+          "Forecast": 10.796635064935067
+        },
+        {
+          "ID": 8,
+          "Hours": 2.0,
+          "Distance": 2.0,
+          "Cost": 13.094,
+          "Forecast": 13.197526493506494
+        },
+        {
+          "ID": 9,
+          "Hours": 2.0,
+          "Distance": 3.0,
+          "Cost": 15.547,
+          "Forecast": 15.598417922077921
+        },
+        {
+          "ID": 10,
+          "Hours": 2.0,
+          "Distance": 4.0,
+          "Cost": 17.911,
+          "Forecast": 17.999309350649348
+        },
+        {
+          "ID": 11,
+          "Hours": 2.0,
+          "Distance": 5.0,
+          "Cost": 20.324,
+          "Forecast": 20.40020077922077
+        },
+        {
+          "ID": 12,
+          "Hours": 2.0,
+          "Distance": 6.0,
+          "Cost": 22.677,
+          "Forecast": 22.8010922077922
+        },
+        {
+          "ID": 13,
+          "Hours": 3.0,
+          "Distance": 1.0,
+          "Cost": 12.417,
+          "Forecast": 12.495483549783554
+        },
+        {
+          "ID": 14,
+          "Hours": 3.0,
+          "Distance": 2.0,
+          "Cost": 14.951,
+          "Forecast": 14.896374978354979
+        },
+        {
+          "ID": 15,
+          "Hours": 3.0,
+          "Distance": 3.0,
+          "Cost": 17.214,
+          "Forecast": 17.297266406926404
+        },
+        {
+          "ID": 16,
+          "Hours": 3.0,
+          "Distance": 4.0,
+          "Cost": 19.565,
+          "Forecast": 19.69815783549783
+        },
+        {
+          "ID": 17,
+          "Hours": 3.0,
+          "Distance": 5.0,
+          "Cost": 21.997,
+          "Forecast": 22.099049264069258
+        },
+        {
+          "ID": 18,
+          "Hours": 3.0,
+          "Distance": 6.0,
+          "Cost": 24.64,
+          "Forecast": 24.499940692640685
+        },
+        {
+          "ID": 19,
+          "Hours": 4.0,
+          "Distance": 1.0,
+          "Cost": 14.273,
+          "Forecast": 14.194332034632037
+        },
+        {
+          "ID": 20,
+          "Hours": 4.0,
+          "Distance": 2.0,
+          "Cost": 16.531,
+          "Forecast": 16.59522346320346
+        },
+        {
+          "ID": 21,
+          "Hours": 4.0,
+          "Distance": 3.0,
+          "Cost": 18.972,
+          "Forecast": 18.996114891774887
+        },
+        {
+          "ID": 22,
+          "Hours": 4.0,
+          "Distance": 4.0,
+          "Cost": 21.549,
+          "Forecast": 21.397006320346314
+        },
+        {
+          "ID": 23,
+          "Hours": 4.0,
+          "Distance": 5.0,
+          "Cost": 23.942,
+          "Forecast": 23.79789774891774
+        },
+        {
+          "ID": 24,
+          "Hours": 4.0,
+          "Distance": 6.0,
+          "Cost": 26.112,
+          "Forecast": 26.198789177489168
+        },
+        {
+          "ID": 25,
+          "Hours": 5.0,
+          "Distance": 1.0,
+          "Cost": 15.956,
+          "Forecast": 15.893180519480524
+        },
+        {
+          "ID": 26,
+          "Hours": 5.0,
+          "Distance": 2.0,
+          "Cost": 18.425,
+          "Forecast": 18.29407194805195
+        },
+        {
+          "ID": 27,
+          "Hours": 5.0,
+          "Distance": 3.0,
+          "Cost": 20.768,
+          "Forecast": 20.694963376623374
+        },
+        {
+          "ID": 28,
+          "Hours": 5.0,
+          "Distance": 4.0,
+          "Cost": 23.247,
+          "Forecast": 23.0958548051948
+        },
+        {
+          "ID": 29,
+          "Hours": 5.0,
+          "Distance": 5.0,
+          "Cost": 25.589,
+          "Forecast": 25.496746233766228
+        },
+        {
+          "ID": 30,
+          "Hours": 5.0,
+          "Distance": 6.0,
+          "Cost": 27.988,
+          "Forecast": 27.89763766233765
+        },
+        {
+          "ID": 31,
+          "Hours": 6.0,
+          "Distance": 1.0,
+          "Cost": 17.478,
+          "Forecast": 17.592029004329007
+        },
+        {
+          "ID": 32,
+          "Hours": 6.0,
+          "Distance": 2.0,
+          "Cost": 20.024,
+          "Forecast": 19.992920432900434
+        },
+        {
+          "ID": 33,
+          "Hours": 6.0,
+          "Distance": 3.0,
+          "Cost": 22.265,
+          "Forecast": 22.393811861471857
+        },
+        {
+          "ID": 34,
+          "Hours": 6.0,
+          "Distance": 4.0,
+          "Cost": 24.95,
+          "Forecast": 24.794703290043284
+        },
+        {
+          "ID": 35,
+          "Hours": 6.0,
+          "Distance": 5.0,
+          "Cost": 27.349,
+          "Forecast": 27.19559471861471
+        },
+        {
+          "ID": 36,
+          "Hours": 6.0,
+          "Distance": 6.0,
+          "Cost": 29.515,
+          "Forecast": 29.596486147186134
+        },
+        {
+          "ID": 37,
+          "Hours": 7.0,
+          "Distance": 1.0,
+          "Cost": 19.436,
+          "Forecast": 19.29087748917749
+        },
+        {
+          "ID": 38,
+          "Hours": 7.0,
+          "Distance": 2.0,
+          "Cost": 21.601,
+          "Forecast": 21.691768917748917
+        },
+        {
+          "ID": 39,
+          "Hours": 7.0,
+          "Distance": 3.0,
+          "Cost": 24.121,
+          "Forecast": 24.09266034632034
+        },
+        {
+          "ID": 40,
+          "Hours": 7.0,
+          "Distance": 4.0,
+          "Cost": 26.634,
+          "Forecast": 26.493551774891767
+        },
+        {
+          "ID": 41,
+          "Hours": 7.0,
+          "Distance": 5.0,
+          "Cost": 28.778,
+          "Forecast": 28.894443203463194
+        },
+        {
+          "ID": 42,
+          "Hours": 7.0,
+          "Distance": 6.0,
+          "Cost": 31.164,
+          "Forecast": 31.295334632034617
+        },
+        {
+          "ID": 43,
+          "Hours": 8.0,
+          "Distance": 1.0,
+          "Cost": 20.878,
+          "Forecast": 20.989725974025976
+        },
+        {
+          "ID": 44,
+          "Hours": 8.0,
+          "Distance": 2.0,
+          "Cost": 23.308,
+          "Forecast": 23.3906174025974
+        },
+        {
+          "ID": 45,
+          "Hours": 8.0,
+          "Distance": 3.0,
+          "Cost": 25.678,
+          "Forecast": 25.791508831168827
+        },
+        {
+          "ID": 46,
+          "Hours": 8.0,
+          "Distance": 4.0,
+          "Cost": 28.258,
+          "Forecast": 28.192400259740253
+        },
+        {
+          "ID": 47,
+          "Hours": 8.0,
+          "Distance": 5.0,
+          "Cost": 30.507,
+          "Forecast": 30.59329168831168
+        },
+        {
+          "ID": 48,
+          "Hours": 8.0,
+          "Distance": 6.0,
+          "Cost": 33.015,
+          "Forecast": 32.99418311688311
+        },
+        {
+          "ID": 49,
+          "Hours": 9.0,
+          "Distance": 1.0,
+          "Cost": 22.671,
+          "Forecast": 22.68857445887446
+        },
+        {
+          "ID": 50,
+          "Hours": 9.0,
+          "Distance": 2.0,
+          "Cost": 25.112,
+          "Forecast": 25.089465887445883
+        },
+        {
+          "ID": 51,
+          "Hours": 9.0,
+          "Distance": 3.0,
+          "Cost": 27.501,
+          "Forecast": 27.49035731601731
+        },
+        {
+          "ID": 52,
+          "Hours": 9.0,
+          "Distance": 4.0,
+          "Cost": 29.934,
+          "Forecast": 29.891248744588736
+        },
+        {
+          "ID": 53,
+          "Hours": 9.0,
+          "Distance": 5.0,
+          "Cost": 32.352,
+          "Forecast": 32.29214017316016
+        },
+        {
+          "ID": 54,
+          "Hours": 9.0,
+          "Distance": 6.0,
+          "Cost": 34.67,
+          "Forecast": 34.69303160173159
+        },
+        {
+          "ID": 55,
+          "Hours": 10.0,
+          "Distance": 1.0,
+          "Cost": 24.313,
+          "Forecast": 24.387422943722946
+        },
+        {
+          "ID": 56,
+          "Hours": 10.0,
+          "Distance": 2.0,
+          "Cost": 26.846,
+          "Forecast": 26.788314372294373
+        },
+        {
+          "ID": 57,
+          "Hours": 10.0,
+          "Distance": 3.0,
+          "Cost": 29.134,
+          "Forecast": 29.189205800865796
+        },
+        {
+          "ID": 58,
+          "Hours": 10.0,
+          "Distance": 4.0,
+          "Cost": 31.594,
+          "Forecast": 31.590097229437223
+        },
+        {
+          "ID": 59,
+          "Hours": 10.0,
+          "Distance": 5.0,
+          "Cost": 33.986,
+          "Forecast": 33.990988658008646
+        },
+        {
+          "ID": 60,
+          "Hours": 10.0,
+          "Distance": 6.0,
+          "Cost": 36.388,
+          "Forecast": 36.39188008658007
+        }
+      ],
+      "ordered": true,
+      "column_order": "exact"
+    }
+  ],
+  "request_constraints": [
+    {
+      "source": "prompt.md:1",
+      "quote": "Оцени по всем строкам deliveries.csv, как стоимость Cost линейно зависит от Hours и Distance, со свободным членом, без штрафов за коэффициенты. Добавь расчётную стоимость Forecast для каждой исходной строки и сохрани delivery-fit.csv с колонками ID, Hours, Distance, Cost, Forecast по возрастанию ID, без округления.",
+      "reason": "Native integer/real type is not prescribed; numeric values, named columns and requested order remain required."
+    }
+  ]
+}

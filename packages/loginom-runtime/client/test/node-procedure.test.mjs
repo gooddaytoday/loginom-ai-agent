@@ -366,6 +366,61 @@ test('native process, port and mapping reads share the prepared node and durable
  await assert.rejects(fixture().channel.observe({condition:'unbound controls',readProcessControls:true,ready:()=>true}),/prepared node/);
 });
 
+function preparedLockStepFixture({locked=true,change={},fault,continuous=false}={}) {
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'crumb',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,dom_epoch:{document:'dom',revision:1},scan:{complete:true},wizard:{status:'absent'},
+  prepared_node_context:{verified:true,...binding.node,surface:'graph',tid:'MF;TF-1;Graph;Reform',locked:!locked},
+  ui:{elements:[{ref:'ui-old',tid:'progress',allowed_actions:['click']}],dialogs:[],masks:[],truncated:{dialogs:false,masks:false}}};
+ const records=[],actions=[],ready=[];let reads=0,clock=1,gestures=0;const controller=new AbortController();
+ const operation={id:'cold',deadline:10000,action:{action_key:'acceptance.cold_read',revision:'1'}};
+ const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>clock,signal:controller.signal,
+  record:async e=>{records.push(structuredClone(e));if(e.phase==='node_step_refresh_authorized'){if(fault==='cancel')controller.abort();if(fault==='deadline')clock=operation.deadline;}return structuredClone(e)},
+  wrapMutation:(code,r)=>({code,r}),execute:async code=>{
+   if(typeof code==='string'){reads++;return {status:'SUCCEEDED',output:structuredClone(state)}}
+   actions.push(code.r);
+   if(actions.length===1||continuous){
+    if(fault==='transport')throw Error('unknown reply');
+    const before=structuredClone(state.prepared_node_context),after={...before,locked:!before.locked,...change};
+    const trace=[{event:'prepared_node_context_changed_before_gesture',before,after}];
+    if(fault==='missing_pair')delete trace[0].after;
+    if(fault==='duplicate_pair')trace.push(structuredClone(trace[0]));
+    if(fault==='gesture')trace.push({event:'ui_gesture_applied'});
+    state.prepared_node_context=after;state.ui.elements[0].ref='ui-fresh';
+    return {status:'NOT_APPLIED',action_key:'ui.act',operation_id:code.r.id,phase:fault==='phase'?'observing':'preconditions',effect_possible:fault==='effect',cleanup_complete:fault!=='cleanup',
+     error:{code:'PREPARED_NODE_CONTEXT_CHANGED'},trace,output:structuredClone(state)};
+   }
+   assert.ok(code.code.includes('"ref":"ui-fresh"'),'freshly resolved UI ref replaces the rejected ref');gestures++;
+   return {status:'SUCCEEDED',action_key:'ui.act',operation_id:code.r.id,effect_possible:true,cleanup_complete:true,output:structuredClone(state),trace:[]};
+  }});
+ return {channel,records,actions,ready,operation,get reads(){return reads},get gestures(){return gestures},
+  run:()=>channel.perform({condition:'cold process console',ready:s=>{ready.push(structuredClone(s));return true},
+   resolve:s=>({verb:'click',ref:s.ui.elements[0].ref}),identity:s=>({tid:s.ui.elements[0].tid})})};
+}
+
+for(const locked of [false,true])test('D50 lock-only precondition refusal obtains a full fresh observation before one gesture: '+locked,async()=>{
+ const f=preparedLockStepFixture({locked});await f.run();
+ assert.equal(f.actions.length,2);assert.equal(f.gestures,1);assert.equal(f.reads,4);assert.equal(f.ready.length,2);
+ assert.equal(f.ready[0].prepared_node_context.locked,!locked);assert.equal(f.ready[1].prepared_node_context.locked,locked);
+ assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized'&&e.reason==='prepared_node_lock_changed').length,1);
+});
+
+for(const change of [{document_id:'foreign'},{workflow_id:'foreign'},{node_id:'foreign'},{tid:'other'},{surface:'wizard'},{verified:false},{locked:undefined},{navigation_node:{tid:'foreign'}}])
+test('D50 retry refuses another native context difference '+JSON.stringify(change),async()=>{
+ const f=preparedLockStepFixture({change});await assert.rejects(f.run());assert.equal(f.actions.length,1);assert.equal(f.gestures,0);
+ assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,0);
+});
+
+for(const fault of ['missing_pair','duplicate_pair','phase','effect','cleanup','gesture','transport','cancel','deadline'])test('D50 retry retains '+fault+' guard',async()=>{
+ const f=preparedLockStepFixture({fault});await assert.rejects(f.run());assert.equal(f.actions.length,1);assert.equal(f.gestures,0);
+ if(!['cancel','deadline'].includes(fault))assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,0);
+ assert.equal(f.operation.deadline,10000);
+});
+
+test('D50 continuous pre-gesture lock churn stays bounded without a gesture',async()=>{
+ const f=preparedLockStepFixture({continuous:true});await assert.rejects(f.run());assert.equal(f.actions.length,3);assert.equal(f.gestures,0);
+ assert.equal(f.operation.deadline,10000);assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,2);
+});
+
 function processLockFixture(onProcessRead,{deadline=10000}={}) {
  const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'crumb',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
  const node={verified:true,...binding.node,surface:'graph',tid:'MF;TF-1;Graph;JS',locked:true};
