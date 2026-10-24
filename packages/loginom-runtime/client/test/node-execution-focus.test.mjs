@@ -6,7 +6,7 @@ const button='MF;cntMain;tlbMainToolbar;btnProgress',grid='ConsoleForm;ProgressF
 async function fixture({hide=true,replace=false,lost=false,failure=false,closeFault=false,failedChild=false,
  training=false,trainUnknown=false,verifyFailedChild=false,ownerNode='node',childState='failed',showMismatch=false,changedError=false,replaceAtMenu=false,deadlineFault=false,cachedGroup=false,groupFault}={}){
  let opened=true,launched=false,selected=false,menu=false,shown=false,trainMenu=false,groupVisible=!cachedGroup,groupExpanded=!cachedGroup;
- const actions=[],el=(tid,allowed_actions=['click'])=>({tid,ref:tid,allowed_actions});
+ const observations=[],actions=[],el=(tid,allowed_actions=['click'])=>({tid,ref:tid,allowed_actions});
  const state=()=>({prepared_node_context:{...node,...(showMismatch&&shown?{node_id:'foreign'}:{}),verified:true,surface:'graph',tid:'graph-node'},wizard:{status:'absent'},navigation_context:{status:'observed'},
   node_outputs:{verified:true,node_selected:shown},
   node_processes:{verified:opened,inventory_complete:true,show_completed:true,root_id:groupVisible&&groupFault==='root'?'foreign':'root',node_context:{...node,verified:true,surface:'graph'},processes:launched?[
@@ -17,7 +17,7 @@ async function fixture({hide=true,replace=false,lost=false,failure=false,closeFa
       owner:{verified:true,node_id:ownerNode,source:'native_process_model_identity'}}:{})}]:[]},
   ui:{elements:[el(button),{...el('graph-node',['right_click']),graph_node:{part:'body'}},{...el('graph-node;Label;Label',['right_click']),graph_node:{part:'label'}},...(trainMenu?[{...el('mn;mniTrain'),label:'Обучить узел'}]:[]),...(opened?[el(grid,['right_click']),el('ConsoleForm;btnClose'),...(!cachedGroup||groupVisible?[el('child-row',['right_click'])]:[]),...(cachedGroup?[{...el('ConsoleForm;ProgressForm;trpProgress;treepanel;tree',['scroll']),process_grid:{grid_id:'tree'},scroll:{ref:'ConsoleForm;ProgressForm;trpProgress;treepanel;tree',top:groupVisible?96:0,max_top:96}},...(groupVisible?[el('group-row'),el('group-expander')]:[])]:[])]:[]),
    ...(menu?[el('mnContextMenu;mniShowCompletedProcesses',['click','press']),el('mnContextMenu;mniShowNodeToProcess',['show_process_node'])]:[])]}});
- const channel={observe:async o=>{if(deadlineFault&&o.condition==='new process selects the prepared graph node')throw Error('Original deadline expired');
+ const channel={observe:async o=>{observations.push(o);if(deadlineFault&&o.condition==='new process selects the prepared graph node')throw Error('Original deadline expired');
   const s=state();assert.ok(o.ready(s),o.condition);return structuredClone(s);},perform:async o=>{
   const s=state();assert.ok(o.ready(s));o.identity(s);const a=o.resolve(s);actions.push(a);
   if(a.verb==='scroll'){if(groupFault==='unknown')throw Error('Unknown scroll reply');groupVisible=true;}
@@ -33,7 +33,7 @@ async function fixture({hide=true,replace=false,lost=false,failure=false,closeFa
  }};
  if(training)return {actions,run:()=>trainConfiguredNode(channel,node)};
  const driver=createNodeExecutionProcedure(channel,node,{verifyFailedChild});await driver.prepare();launched=true;await driver.identify();actions.length=0;
- return {driver,actions};
+ return {driver,actions,observations};
 }
 for(const hide of [false,true])test('completion verifies the same process after Show Node, hidden console: '+hide,async()=>{
  const f=await fixture({hide}),r=await f.driver.waitCompleted();assert.equal(r.execution_id,'doc:root:1');assert.equal(r.owner_verified,true);
@@ -113,4 +113,18 @@ for(const groupFault of ['root','record','unknown'])test('cached group reveal re
  const f=await fixture({cachedGroup:true,groupFault});await assert.rejects(f.driver.waitCompleted());
  assert.equal(f.actions.filter(a=>a.verb==='scroll').length,1);
  assert.equal(f.actions.some(a=>a.ref==='group-expander'||a.verb==='execute_graph_node'||a.verb==='show_process_node'),false);
+});
+
+for(const hide of [false,true])test('console consumers obtain one fresh inventory without a discarded visibility read: '+hide,async()=>{
+ const f=await fixture({hide});await f.driver.waitCompleted();
+ assert.equal(f.observations.filter(o=>o.condition==='process console visible').length,0,
+  'prepare, identify and Show Node must use their consumer read as the inventory refresh');
+ for(const condition of ['process console menu settled','one new node execution group','new process selects the prepared graph node']) {
+  const reads=f.observations.filter(o=>o.condition===condition);assert.equal(reads.length,1);
+  assert.equal(reads[0].readProcesses,true,'control-only visibility cannot replace inventory');
+  assert.equal(reads[0].ready({ui:{elements:[]}}),false,'native cache alone cannot prove a visible console');
+ }
+ const menu=f.observations.find(o=>o.condition==='process console menu settled');
+ assert.equal(typeof menu.confirmIdentity,'function','the two matching menu samples remain required');
+ assert.equal(f.actions.filter(a=>a.verb==='show_process_node').length,1);
 });

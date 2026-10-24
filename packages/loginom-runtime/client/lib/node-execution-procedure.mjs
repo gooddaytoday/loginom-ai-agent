@@ -86,7 +86,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
     ...(tid===grid?{confirmIdentity:consoleMenuIdentity}:{}),
     resolve:s=>({verb,ref:one(control(s,tid,verb),'Unique execution control required').ref,...(key?{key}:{})}),identity});
   const consoleVisible=s=>s.ui.elements.filter(e=>consoleTid(e.tid,grid)).length===1;
-  async function openConsole() {
+  async function openConsole(condition='process console visible',ready=()=>true,extra={}) {
     let s=await observe('prepared node available for process console',s=>consoleVisible(s)||control(s,button).length===1,{readProcesses:false,readProcessControls:true,
       ...(launchSucceeded&&consoleControl?{settleProcessConsole:consoleControl}:{})});
     if(!launchSucceeded){
@@ -95,8 +95,9 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
     }
     if(!consoleVisible(s))await act(s,button);
     // The control-only read above has no native inventory, even when the
-    // console was already open. Stop must refresh its root/process proof.
-    return observe('process console visible',consoleVisible);
+    // console was already open. Refresh inventory in the consumer's own
+    // readiness read instead of discarding one full inventory immediately.
+    return observe(condition,s=>consoleVisible(s)&&ready(s),extra);
   }
   async function closeConsole(s) {
     if(consoleVisible(s))await act(s,'ConsoleForm;btnClose');
@@ -130,7 +131,9 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
     async prepare({keepConsoleOpen=false}={}) {
       requireValue(typeof keepConsoleOpen==='boolean','Owned process console mode must be boolean');
       requireValue(!baseline,'Execution baseline has already been captured');
-      let s=await openConsole();
+      const menuReady=s=>consoleVisible(s)&&control(s,grid,'right_click').length===1;
+      let s=await (keepConsoleOpen?openConsole():openConsole('process console menu settled',menuReady,
+        {confirmIdentity:consoleMenuIdentity}));
       if(keepConsoleOpen) {
         const pinned=s=>consoleVisible(s)&&control(s,'ConsoleForm;btnPin').length===1
           &&control(s,'ConsoleForm;btnUnpin').length===0;
@@ -144,8 +147,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       // A long buffered process list can repaint after the panel becomes
       // visible. Require two matching epochs before its menu gesture, and
       // retain this readiness check on strictly pre-gesture recovery.
-      s=await observe('process console menu settled',s=>consoleVisible(s)&&control(s,grid,'right_click').length===1,
-        {confirmIdentity:consoleMenuIdentity});
+      if(keepConsoleOpen)s=await observe('process console menu settled',menuReady,{confirmIdentity:consoleMenuIdentity});
       // Opening the native menu establishes the filter's actual cached state,
       // including an empty history. Never clear or delete earlier processes.
       await act(s,grid,'right_click');
@@ -230,8 +232,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
     },
     async identify() {
       requireValue(baseline&&!execution,'A pre-launch baseline without an identified execution is required');
-      await openConsole();
-      const s=await observe('one new node execution group',s=>{
+      const s=await openConsole('one new node execution group',s=>{
         if(!processes(s))return false;
         const old=new Set(baseline.roots.map(p=>p.process_id));
         return s.node_processes.processes.some(p=>p.parent_id===null&&!old.has(p.process_id));
@@ -373,8 +374,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       });
       // Switching back from Files can hide the process panel. Reopen it for
       // a fresh check of the same execution; this never launches the node.
-      await openConsole();
-      s=await observe('new process selects the prepared graph node',s=>processes(s)&&s.node_outputs?.verified===true
+      s=await openConsole('new process selects the prepared graph node',s=>processes(s)&&s.node_outputs?.verified===true
         &&s.node_outputs.node_selected===true&&s.prepared_node_context.surface==='graph',{readOutputs:true});
       const owner={verified:true,process_id:child.process_id,record_id:child.record_id,
         node_selected:s.node_outputs.node_selected,node:s.prepared_node_context};
