@@ -195,8 +195,9 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
    };
    // Prefer existing visible space; navigate only when that space is full.
    if(y<=10000&&free(project(128,y)))return project(128,y);
-   for(let py=Math.max(0,r.y)+80;py<Math.min(r.bottom,innerHeight)-80;py+=128)
-    for(let px=Math.max(0,r.x)+80;px<Math.min(r.right,innerWidth)-96;px+=160){
+   for(const step of [128,32])
+    for(let py=Math.max(0,r.y)+80;py<Math.min(r.bottom,innerHeight)-80;py+=step)
+     for(let px=Math.max(0,r.x)+80;px<Math.min(r.right,innerWidth)-96;px+=step===128?160:step){
      const x=Math.round(((px-r.x+e.scrollLeft)/g.view.scale-g.view.translate.x)/8)*8;
      const y=Math.round(((py-r.y+e.scrollTop)/g.view.scale-g.view.translate.y)/8)*8;
      if(x<64||y<64||x>10000||y>10000)continue;
@@ -211,6 +212,9 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
    need(before.complete===true&&before.interaction_ready===true,'complete idle graph required for placement');
    placementGuard=async()=>{await guard();need(sameGraph(before,await readPlacementGraph(page,graphTask)),'Graph changed during connection placement');};
    placementCheckpoint=async message=>{
+    // Restore Components before a settled refusal, as on success. Connections
+    // otherwise covers the next generated encoder's admitted palette row.
+    await click(t.workflow_ref.prefix+';ModelForm;pnlVendorsContainer;p.h;p.t');
     // The connection settings were committed and reread; no reference drag
     // has started. Preserve these settled effects in the existing step receipt.
     await quiet();await placementGuard();
@@ -233,12 +237,12 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
     totalZoomSteps+=navigation.zoom_steps;
     placementNavigation={...navigation,initial_viewport:initialViewport,passes:pass+1,total_zoom_steps:totalZoomSteps};
     await placementGuard();
-    if(navigation.fully_visible!==true){
+    // Overflow is only a navigation hint, not the future reference's identity.
+    // The last zoom may expose a different free point outside that hint.
+    target=await chooseTarget();
+    if(!target&&navigation.fully_visible!==true){
      return await placementCheckpoint('connection placement is not fully visible');
     }
-    // Zoom redraws the graph. Recheck occupied rectangles and the hit surface;
-    // never reuse pre-navigation screen pixels.
-    target=await chooseTarget();
    }
    if(!target)return await placementCheckpoint('no free visible connection position after navigation');
   }

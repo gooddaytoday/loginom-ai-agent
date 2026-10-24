@@ -10,6 +10,8 @@ import {createRestRequestNodeSupport} from '../lib/rest-request-node.mjs';
 const cases={render_wait:'REST waits for the created connection port to render without repeating the drag',wrongref:'REST rejects a rendered port belonging to another node type',refresh:'REST refreshes its loaded empty palette once, then waits for rows before one drag',refresh_foreign:'REST refuses refreshing a palette after its workflow owner changes',refresh_populated:'REST does not refresh a palette that already contains tree rows',mime:'REST explicitly writes and rereads the saved allowed response Content-Type',mime_stale:'REST refuses an allowed response Content-Type that did not persist',input:'a retained visible REST container cannot authorize filling its zero-sized input',parameter:'REST waits for the added parameter type before checking string bindings',palette:'REST waits for the newly expanded palette item before its single drag',animation:'REST does not start a drag from a hit-testable row inside its native tree animation',expander:'REST expands the moving connection tree with one stable locator click',confirm:'REST confirms one owned active-connection deactivation',foreign:'REST refuses a deactivation question belonging to another connection tree'};
 Object.assign(cases,{placement_below:'REST finds a free visible drop when its preferred row is below the canvas',placement_scrolled:'REST places one connection inside a zoomed translated and scrolled canvas',placement_full:'REST refuses an unconfirmed crowded-canvas reveal without starting a drag'});
 Object.assign(cases,{placement_native:'serialized REST capability reveals real free space using bounded native outline zoom',placement_crowded:'REST reveals bounded model space on a crowded canvas before its sole connection drag',placement_changed:'REST refuses a changed graph after connection placement navigation',placement_unknown:'REST retains uncertainty after an unconfirmed viewport gesture',placement_still_full:'REST bounds settled viewport passes and never drags onto a still crowded canvas',placement_late_changed:'REST rechecks the graph after waiting for its connection palette item',placement_hidden:'REST refuses a connection drop when navigation cannot reveal model space'});
+Object.assign(cases,{placement_reselect:'D28 J2 reselects a free visible connection point after zoom with overflow y843 and zero native scroll'});
+Object.assign(cases,{placement_dense:'D28 connection searches a narrow visible gap before unreachable overflow'});
 Object.assign(cases,{placement_before_drag:'REST checkpoints its unchanged graph when free space disappears before drag'});
 for(const stage of ['placement_still_full','placement_before_drag'])for(const fault of ['changed','incomplete','busy','owner'])
  cases[stage+':'+fault]='REST refuses '+stage+' checkpoint with '+fault+' graph or owner';
@@ -20,7 +22,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
  let urlPoints=0,tileReads=0,fills=0,visibleChecks=0,parameterReads=0,queryFills=0,palettePoints=0,added=false,label='REST-сервис',url='',paramName='param0',lastSelector='';
  let held=false,dragMoves=0,downCount=0,upCount=0,expanded=stage!=='expander',expansions=0;
  let opening=false,confirmations=0,responseType='application/json',responseFills=0,wizardCloses=0,referenceReads=0;
- let refreshes=0,paletteReads=0,navigationCalls=0,navigated=false,nativeScale=1,outline=false,zoomClicks=0;
+ let refreshes=0,paletteReads=0,navigationCalls=0,navigated=false,nativeScale=stage==='placement_reselect'?0.4240976183724846:1,outline=false,zoomClicks=0,vendorRestores=0;
  let checkpointPending=false,checkpointReads=0;
  const workflow={workflow_id:'flow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix,navigation_path:[{tid:'module',label:'Module'},{tid:'flow',label:'Сценарий'}]};
  const placementGraph={complete:true,interaction_ready:true,document_id:'doc',workflow_ref:workflow,
@@ -46,7 +48,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
  globalThis.innerWidth=1280;globalThis.innerHeight=800;
  const locator=(selector,input=false)=>({
   count:async()=>selector.startsWith('.x-mask')?0:selector==='.x-window:visible'?(opening&&!confirmations?1:0):selector.includes('pnlConnections;headercontainer;text_Root>Текущий_модуль>')&&!expanded?0:1,
-  click:async()=>{if(selector.includes('btnShowOutline')){outline=!outline;return;}if(selector.includes('bg-workflow-outline-toolbar')){nativeScale/=1.1;zoomClicks++;return;}assert.ok(selector.includes(';TreeExpander'));expanded=true;expansions++;},
+  click:async()=>{if(selector.includes('btnShowOutline')){outline=!outline;return;}if(selector.includes('bg-workflow-outline-toolbar')){nativeScale=stage==='placement_reselect'?Math.max(0.3855432894295314,nativeScale/1.1):nativeScale/1.1;zoomClicks++;if(stage==='placement_reselect')navigated=true;return;}assert.ok(selector.includes(';TreeExpander'));expanded=true;expansions++;},
   getAttribute:async()=> 'Уменьшить масштаб',waitFor:async()=>{},
   locator:child=>child==='input'?locator(selector,true):locator(selector+' '+child),
   // This is the observed Ext failure: its container claims visibility before
@@ -77,10 +79,12 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
    if(stage==='placement_late_changed'&&navigated&&selector.includes(item))placementGraph.nodes[0].position.x++;
    if(selector.includes('cmpDiagram')){
     if(!stage.startsWith('placement_'))return {x:500,y:400};
-    const box={x:300,y:100,right:850,bottom:400,width:550,height:300};
-    const occupied=stage==='placement_native'?[{left:300,right:300+550*nativeScale,top:100,bottom:100+300*nativeScale,width:550*nativeScale,height:300*nativeScale}]:(stage==='placement_full'||stage==='placement_still_full'||stage==='placement_before_drag'&&palettePoints>0||['placement_crowded','placement_changed','placement_unknown','placement_hidden','placement_late_changed','placement_before_drag'].includes(stage)&&!navigated)?[{left:300,right:850,top:100,bottom:400,width:550,height:300}]:[];
+    const box=['placement_reselect','placement_dense'].includes(stage)?{x:324,y:100,right:1274,bottom:794,width:950,height:694}:{x:300,y:100,right:850,bottom:400,width:550,height:300};
+    const occupied=stage==='placement_reselect'?[{left:324,right:navigated?940:1082,top:100,bottom:100+1928*nativeScale-128-.01,width:navigated?616:758,height:694}]:stage==='placement_native'?[{left:300,right:300+550*nativeScale,top:100,bottom:100+300*nativeScale,width:550*nativeScale,height:300*nativeScale}]:(['placement_full','placement_still_full','placement_hidden'].includes(stage)||stage==='placement_before_drag'&&palettePoints>0||['placement_crowded','placement_changed','placement_unknown','placement_late_changed','placement_before_drag'].includes(stage)&&!navigated)?[{left:300,right:850,top:100,bottom:400,width:550,height:300}]:[];
+    if(stage==='placement_dense')occupied.push({left:324,right:700,top:100,bottom:794,width:376,height:694},{left:950,right:1274,top:100,bottom:794,width:324,height:694});
     const element={scrollLeft:stage==='placement_scrolled'?180:0,scrollTop:stage==='placement_scrolled'?350:0,getBoundingClientRect:()=>box,querySelectorAll:()=>occupied.map(r=>({getBoundingClientRect:()=>r})),contains:()=>false};
-    const graph={container:element,view:{scale:stage==='placement_native'?nativeScale:stage==='placement_scrolled'?0.75:1,translate:{x:-40,y:-20}}};
+    if(stage==='placement_reselect')for(const key of ['scrollLeft','scrollTop'])Object.defineProperty(element,key,{get:()=>0,set:()=>{}});
+    const graph={container:element,view:{scale:stage==='placement_reselect'?(navigated?0.3855432894295314:0.4240976183724846):stage==='placement_native'?nativeScale:stage==='placement_scrolled'?0.75:1,translate:stage==='placement_reselect'?{x:0,y:0}:{x:-40,y:-20}}};
     const result=vm.runInNewContext('('+fn.toString()+')',{innerWidth:1280,innerHeight:800,document:{elementFromPoint:()=>element},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:{FDiagram:{FmxGraph:graph}}}})}}}}}}}})(element,arg);
     if(fn.toString().includes('const free=')&&result===null&&navigated
      &&(stage==='placement_still_full'&&navigationCalls===3||stage==='placement_before_drag'&&palettePoints>0))checkpointPending=true;
@@ -101,7 +105,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
   },
   press:async()=>{},
  });
- const page={locator,mouse:{click:async()=>{if(lastSelector.includes(';WizardModelConnectionForm;btnDone'))wizardCloses++;if(lastSelector.includes('btnAdd'))added=true;if(lastSelector.includes('btnConfigConnection')&&['confirm','foreign'].includes(stage))opening=true;if(lastSelector.includes('msgbox;tlb;yes')){confirmations++;assert.equal(confirmations,1);}},dblclick:async()=>{},
+ const page={locator,mouse:{click:async()=>{if(lastSelector.includes('pnlVendorsContainer;p.h;p.t'))vendorRestores++;if(lastSelector.includes(';WizardModelConnectionForm;btnDone'))wizardCloses++;if(lastSelector.includes('btnAdd'))added=true;if(lastSelector.includes('btnConfigConnection')&&['confirm','foreign'].includes(stage))opening=true;if(lastSelector.includes('msgbox;tlb;yes')){confirmations++;assert.equal(confirmations,1);}},dblclick:async()=>{},
   move:async()=>{if(held){dragMoves++;}},
   down:async()=>{assert.equal(palettePoints,2);if(stage==='palette')throw Error('fixture stopped before the sole palette drag');held=true;downCount++;},
   up:async()=>{held=false;upCount++;}},waitForTimeout:async()=>{if(stage==='refresh_populated')throw Error('fixture stopped while waiting for existing rows');},
@@ -124,7 +128,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
   const task={deadline:Date.now()+10000,document_id:'doc',origin:'http://example.test',build:'7.4.2',
    workflow_ref:workflow,
    connection:{name:'Echo',base_url:'https://httpbin.org/anything',...(['mime','mime_stale'].includes(stage)?{response_content_type:'text/html'}:{})},query_parameters:[{name:'Key',field:'Key'}]};
-  const result=stage==='placement_native'?await vm.runInNewContext('('+makeRestConnectionCode(task)+')',{get document(){return globalThis.document;},innerWidth:1280,innerHeight:800})(page):await restConnectionCapability(page,task,async()=>{
+  const result=['placement_native','placement_reselect'].includes(stage)?await vm.runInNewContext('('+makeRestConnectionCode(task)+')',{get document(){return globalThis.document;},innerWidth:1280,innerHeight:800})(page):await restConnectionCapability(page,task,async()=>{
    const graph=structuredClone(placementGraph);
    if(checkpointPending&&++checkpointReads===2){
     if(fault==='changed')graph.nodes[0].position.x++;
@@ -139,8 +143,16 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
    if(stage==='placement_unknown'){const e=Error('Lost viewport reply');e.placement_navigation_unverified=true;throw e;}
    navigated=true;placementGraph.nodes[0].dom_epoch++;
    if(stage==='placement_changed')placementGraph.nodes[0].position.x++;
-   await args.guard();return {fully_visible:stage!=='placement_hidden',zoom_steps:3,navigation_steps:[]};
+   await args.guard();return {fully_visible:!['placement_hidden','placement_reselect'].includes(stage),zoom_steps:3,navigation_steps:[]};
   },nodePlacementViewport,nodePlacementPoint,nodePlacementOverflow,samePlacementGraph,{});
+  if(stage==='placement_dense'){assert.equal(result.verified,true,result.error);assert.equal(navigationCalls,0);assert.equal(downCount,1);assert.equal(upCount,1);return;}
+  if(stage==='placement_reselect'){
+   assert.equal(result.verified,true,result.error);assert.equal(zoomClicks,2);assert.equal(outline,false);
+   assert.equal(downCount,1);assert.equal(upCount,1);assert.equal(vendorRestores,1);
+   assert.equal(result.placement_navigation.fully_visible,false,'the old overflow hint is still outside');
+   assert.ok(Math.abs(result.placement_navigation.point.y-843.3274620201366)<.001);
+   assert.equal(result.placement_navigation.view.scroll.y,0);return;
+  }
   assert.equal(result.verified,['animation','expander','confirm','mime','refresh','render_wait','placement_below','placement_scrolled','placement_crowded','placement_native'].includes(stage),result.error);
   if(['animation','expander','confirm','mime','refresh','render_wait','placement_below','placement_scrolled','placement_crowded','placement_native'].includes(stage)){assert.equal(result.connection.reference_node_id,'rest-reference');assert.equal(result.cleanup_complete,true);}
   else if(['placement_changed','placement_unknown','placement_hidden','placement_late_changed'].includes(stage)){
@@ -148,6 +160,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
    assert.equal(navigationCalls,1);assert.equal(downCount,0);assert.equal(upCount,0);assert.equal(result.effect_possible,true);
    assert.equal(result.cleanup_complete,stage==='placement_hidden');
    if(stage==='placement_hidden'){
+    assert.equal(vendorRestores,1,'settled placement refusal restores Components for the next encoder');
     assert.deepEqual(result.pre_target_checkpoint.graph,placementGraph);
     assert.equal(result.pre_target_checkpoint.connection.name,'Echo');
     assert.equal(result.pre_target_checkpoint.connection.base_url,'https://httpbin.org/anything');
