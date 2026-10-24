@@ -22,7 +22,7 @@ function fake(mode){
  const links=[{FGuid:'edge',FSourcePort:sourcePort,FTargetPort:inputPort}];
  root.childNodes.unshift({internalId:0,data:{id:'1',Status:3,ErrorDetails:'',loaded:true},childNodes:[{internalId:10,data:{id:'1.1',Status:3,ErrorDetails:'',ModelNode:sourceNode.data},childNodes:[]}]});
  const card={Controller:{Node:{data:{node:workflow}},FController:{FPreviewManager:manager,FCreateDraggedNodeStarted:false,FDraggingOverGraph:false,FDiagram:{FNodes:{FCollection:[node,sourceNode]},FLinks:{FCollection:links},FmxGraph:{container:{querySelectorAll:()=>[{dataset:{tid:'TF;Graph;Source|Output_Data-0|Target|Input_Data-0'}}]}}}}}};
- const env={document,location:{origin:'http://test'},bg:{app:{Version:'7.4.2',WorkFlowTreeNode:Workflow,PackageTreeNode:Package,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>card}}}}}}},Ext:{getCmp:id=>id==='preview'?{Controller:dc}:{getStore:()=>({getRoot:()=>root,isLoading:()=>false})}},Uint8Array,DataView,TextDecoder,TextEncoder,setTimeout,clearTimeout};
+ const env={document,location:{origin:'http://test'},bg:{app:{Version:'7.4.2',WorkFlowTreeNode:Workflow,PackageTreeNode:Package,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>card}}}}}}},Ext:{getCmp:id=>id==='preview'?{Controller:dc}:{getStore:()=>({getRoot:()=>root,isLoading:()=>false})}},Uint8Array,DataView,TextDecoder,TextEncoder,Date,setTimeout,clearTimeout};
  env.__loginomDockPreparationV1={document,id:'d',receipts:new Map([['r',{phase:'verified',workflowId:'w',tab,nodeTargetWorkflowNode:workflow,packageNode:pack}]])};
  const b={runtime_binding_id:'test-binding_id',package_id:'pkg',static_source:{node_id:'source',execution_id:'d:1:1'},method:321,interface:116,port:0,offset:0,rows:1,columns:[0],execution:{status:'completed',execution_id:'d:1:2'},document_id:'d',workflow_id:'w',tab_tid:'tab',prefix:'TF',node_id:'n',port_guid:'p',origin:'http://test',source:{owner:0,object:9},schema:[{name:'Scalar',label:'Scalar',type:6}],row_count:1};
  env.__loginomDockCollapseRuntimeV1={document,binding_id:'test-binding_id',check:s=>assert.equal(s,session)};
@@ -32,23 +32,33 @@ function fake(mode){
 test('fixed321 only and local buffers released',async()=>{const f=fake();const r=await readNativeVariant(f.page,f.b,decodeVariantFrame);assert.equal(r.cells[0].decoded.type,'real');assert.deepEqual(f.counters,{sent:1,released:2});});
 for(const mode of ['changed-cache','new-execution','stale-response'])test('reject '+mode+' after response and release buffers',async()=>{const f=fake(mode);await assert.rejects(()=>readNativeVariant(f.page,f.b,decodeVariantFrame));assert.deepEqual(f.counters,{sent:1,released:2});});
 
-for(const kind of ['cancelled','deadline_exceeded'])test(kind+' rejects once, retires session and releases late response',async()=>{
+for(const kind of ['cancelled','deadline_exceeded'])test(kind+' rejects once, retires session and releases late response',async t=>{
+ t.mock.timers.enable({apis:['Date','setTimeout']});
  const f=fake('deferred'),promise=readNativeVariant(f.page,f.b,decodeVariantFrame,{operationId:'x',timeoutMs:kind==='cancelled'?1000:5});
  const rejected=assert.rejects(promise,new RegExp(kind));
+ assert.equal((await nativeVariantStatus(f.page)).pending,1);
  if(kind==='cancelled')assert.equal((await cancelNativeVariant(f.page,'x')).cancelled,true);
+ if(kind==='deadline_exceeded'){
+  t.mock.timers.tick(4);assert.equal((await nativeVariantStatus(f.page)).status,'running');
+  t.mock.timers.tick(1);
+ }
  await rejected;
  assert.equal((await nativeVariantStatus(f.page)).pending,1);assert.equal(f.counters.released,0);
  await assert.rejects(()=>readNativeVariant(f.page,f.b,decodeVariantFrame),/retired/);
- f.finish();await new Promise(r=>setTimeout(r,0));
+ f.finish();
  const status=await nativeVariantStatus(f.page);
  assert.equal(status.status,kind);assert.equal(status.published,false);assert.equal(status.nativeCancelled,false);
  assert.equal(status.pending,0);assert.equal(status.lateResponses,1);assert.equal(status.releasedRequests,1);assert.equal(status.releasedResponses,1);
  assert.deepEqual(f.counters,{sent:1,released:2});
 });
-test('hung response retains native buffers; cancellation is never cleanup proof',async()=>{
- const f=fake('deferred'),p=readNativeVariant(f.page,f.b,decodeVariantFrame,{timeoutMs:5});await assert.rejects(p,/deadline/);
+test('hung response retains native buffers; cancellation is never cleanup proof',async t=>{
+ t.mock.timers.enable({apis:['Date','setTimeout']});
+ const f=fake('deferred'),p=readNativeVariant(f.page,f.b,decodeVariantFrame,{timeoutMs:5});
+ const rejected=assert.rejects(p,/deadline/);
+ assert.equal((await nativeVariantStatus(f.page)).pending,1);
+ t.mock.timers.tick(5);await rejected;
  const s=await nativeVariantStatus(f.page);assert.equal(s.pending,1);assert.equal(s.releasedRequests,0);assert.equal(s.retired,true);assert.equal(s.nativeCancelled,false);
- f.finish(true);await new Promise(r=>setTimeout(r,0));assert.equal((await nativeVariantStatus(f.page)).pending,0);assert.equal(f.counters.released,1);
+ f.finish(true);assert.equal((await nativeVariantStatus(f.page)).pending,0);assert.equal(f.counters.released,1);
 });
 test('wrong cancellation id and overlapping reader cannot affect current operation',async()=>{
  const f=fake('deferred'),p=readNativeVariant(f.page,f.b,decodeVariantFrame,{operationId:'owned'});
