@@ -8,7 +8,8 @@ export function inspectManagedJavascriptGeneration({held, task, expected = null}
   const state = inspectPage({held, task});
   if (state.ready !== true || state.node_guid !== task.owner.node_id
     || state.page?.tid !== task.workflow_ref.prefix + ';WizrdMCF;JavaScriptColumnsWizard'
-    || state.page.index !== 0 || state.page.indicator_count !== 4)
+    || !(state.page.index === 0 && state.page.indicator_count === 4
+      || state.page.index === 1 && state.page.indicator_count === 5))
     throw Error('Managed JavaScript generation page changed');
   const tab = globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.();
   const root = held.wizardRoot;

@@ -19,18 +19,19 @@ const pageState = {ready: true, node_guid: 'node', page: {
 const point = {x: 30, y: 40, tid: 'MF;TF-1;WizrdMCF;btnNext',
   page_tid: pageState.page.tid, page_index: 1, node_id: 'node'};
 
-test('managed Code Next point requires the retained wizard and uncovered native control', () => {
+for(const offset of [0,1])
+test('managed Code Next point requires the retained wizard and uncovered native control / offset '+offset, () => {
   const button = {id: 'button', isConnected: true, getBoundingClientRect: () => ({x: 10, y: 20, width: 40, height: 40}),
     closest: () => null, getAttribute: () => null, contains: () => false};
   const root = {isConnected: true, getAttribute: () => 'MF;TF-1;WizrdMCF', querySelectorAll: () => [button]};
   const wizard = {}, tab = {Controller: {Node: {data: {node: wizard}}, FController: {FView: {el: {dom: root}}}}};
-  const context = {args: {held: {binding: {tab}, wizard, wizardRoot: root}, task}, read: () => pageState,
+  const context = {args: {held: {binding: {tab}, wizard, wizardRoot: root}, task}, read: () => ({...pageState,page:{...pageState.page,index:1+offset,indicator_count:4+offset}}),
     bg: {app: {Application: {FInstance: {FMainForm: {Items: {Workspace: {getActiveTab: () => tab}}}}}}},
     Ext: {getCmp: () => ({el: {dom: button}, disabled: false})},
     document: {elementFromPoint: () => button}, innerWidth: 100, innerHeight: 100,
     getComputedStyle: () => ({visibility: 'visible'})};
   const inspect = () => vm.runInNewContext('(' + inspectManagedJavascriptCodeNextPoint.toString() + ')(args,read)', context);
-  assert.deepEqual({...inspect()}, point);
+  assert.deepEqual({...inspect()}, {...point,page_index:1+offset});
   context.document.elementFromPoint = () => null;
   assert.throws(inspect, /covered/);
   context.document.elementFromPoint = () => button;

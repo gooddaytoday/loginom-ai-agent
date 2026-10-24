@@ -15,7 +15,11 @@ const from={tid:'MF;TF-1;WizrdMCF;JavaScriptColumnsWizard',index:0,indicator_cou
 const before={ready:true,node_guid:'node',page:from};
 const point={x:30,y:40,tid:'MF;TF-1;WizrdMCF;btnNext',from_index:0,from_tid:from.tid};
 
-test('managed Next point binds the owned wizard and uncovered native button',()=>{
+for(const [form,index,count] of [['JavaScriptColumnsWizard',0,4],['TuneDataSourceInputPortWizard',0,5],['JavaScriptColumnsWizard',1,5]])
+test('managed Next point binds the owned wizard and uncovered native button '+form+count,()=>{
+  const from={tid:task.workflow_ref.prefix+';WizrdMCF;'+form,index,indicator_count:count,visible_editors:0};
+  const before={ready:true,node_guid:'node',page:from};
+  const point={x:30,y:40,tid:task.workflow_ref.prefix+';WizrdMCF;btnNext',from_index:index,from_tid:from.tid};
   const button={id:'btn',isConnected:true,getBoundingClientRect:()=>({x:10,y:20,width:40,height:40}),
     getAttribute:key=>key==='data-tid'?point.tid:null,closest:()=>null,contains:()=>false};
   const root={isConnected:true,getAttribute:()=>task.workflow_ref.prefix+';WizrdMCF',
@@ -32,7 +36,7 @@ test('managed Next point binds the owned wizard and uncovered native button',()=
   context.document.elementFromPoint=()=>null;
   assert.throws(inspect,/covered/);
   context.document.elementFromPoint=()=>button;
-  context.args.expected.page={...from,index:1};
+  context.args.expected.page={...from,index:3};
   assert.throws(inspect,/source page changed/);
 });
 
@@ -69,4 +73,25 @@ test('managed Next requires exact journal ACK before browser gesture',async()=>{
   calls=0;
   const result=await dispatchManagedJavascriptNext({task,execute,record:async event=>event,receiptOptions});
   assert.equal(result.status,'SUCCEEDED');assert.equal(calls,3);
+});
+
+for(const [form,index,count] of [['TuneDataSourceInputPortWizard',0,5],['JavaScriptColumnsWizard',1,5]])
+test('existing JS five-page route admits exactly one Next from '+form,async()=>{
+ const source={...before,page:{...from,tid:task.workflow_ref.prefix+';WizrdMCF;'+form,index,indicator_count:count}};
+ const input=form==='TuneDataSourceInputPortWizard',suffix=input?':next-input-columns':':next-columns-code';
+ const target={...point,from_tid:source.page.tid,from_index:index};
+ const gesture={...task,gesture_id:task.operation_id+suffix,expected:source,point:target};
+ const code=makeJavascriptManagedNextCode(gesture);
+ assert.equal(typeof vm.runInNewContext('('+code+')'),'function');
+ const lease={identity:JSON.stringify([task.owner,task.workflow_ref,task.targetOrigin,task.targetBuild,task.deadline]),
+   settingAttempted:true,wizardCaptured:{},handle:{}};
+ let clicks=0;
+ const page={[Symbol.for('loginom-dock.javascript-owned-selection-v1')]:new Map([[task.operation_id,lease]]),
+   evaluate:async()=>target,mouse:{click:async()=>{clicks++}}};
+ assert.equal((await runManagedJavascriptNext(page,gesture,()=>{})).status,'SUCCEEDED');
+ assert.equal((await runManagedJavascriptNext(page,gesture,()=>{})).status,'NOT_APPLIED');
+ assert.equal(clicks,1);
+ assert.equal(lease.nextAttempted,input?undefined:true);
+ assert.throws(()=>makeJavascriptManagedNextCode({...gesture,expected:{...source,page:{...source.page,index:3}}}),/source page/);
+ assert.throws(()=>makeJavascriptManagedNextCode({...gesture,gesture_id:task.operation_id+':wrong'}),/gesture/);
 });
