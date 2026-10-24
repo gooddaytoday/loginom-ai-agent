@@ -134,6 +134,11 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
       executablePath: browserPath,
       headless,
       chromiumSandbox: true,
+      // A retained context belongs to its runtime/cold owner. Its native
+      // package close/logout must finish before Playwright closes Chromium.
+      handleSIGINT: !keepOpen,
+      handleSIGTERM: !keepOpen,
+      handleSIGHUP: !keepOpen,
       // Chrome for Testing otherwise writes debug.log beside chrome.exe on
       // Windows, mutating the signed/manifested application payload. Keep all
       // browser state and diagnostics inside the disposable session profile.
