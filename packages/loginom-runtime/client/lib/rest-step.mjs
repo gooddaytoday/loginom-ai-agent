@@ -25,7 +25,8 @@ export async function runRestStep(options,ctx,kind,makeCode,parameters,config){
  if(checkpoint)operation.cleanupConfirmed=false;
  const completed=await entry('node_step_completed',{outcome:result});
  if(JSON.stringify(completed?.outcome)!==JSON.stringify(result))throw Error('REST step outcome was not durably preserved');
- if(checkpoint&&result.cleanup_complete===true&&checkpoint.graph?.complete===true
+ if(checkpoint&&!operation.targetPhase&&!operation.nodeApply?.node&&operation.nodeApply?.pending?.phase==='target'
+   &&result.cleanup_complete===true&&checkpoint.graph?.complete===true
    &&checkpoint.graph.interaction_ready===true&&checkpoint.graph.document_id===ctx.document_id
    &&JSON.stringify(checkpoint.graph.workflow_ref)===JSON.stringify(ctx.workflow_ref)
    &&checkpoint.connection?.name===parameters.connection?.name){
@@ -33,6 +34,7 @@ export async function runRestStep(options,ctx,kind,makeCode,parameters,config){
   operation.preTargetWarnings=['The saved REST connection '+JSON.stringify(checkpoint.connection.name)
    +' remains in the module with its reread settings. Its graph reference and the REST target were not created.'];
   operation.cleanupConfirmed=true;
+  operation.nodeApply.cleanup_complete=true;
  }
  if(result.status!=='SUCCEEDED'||!operation.cleanupConfirmed||result.output?.verified!==true)throw Error(result.error?.message??'REST step did not confirm completion');
  return result.output;

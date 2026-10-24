@@ -4,6 +4,7 @@ import {runRestStep} from '../lib/rest-step.mjs';
 import {releaseNodeTarget} from '../lib/node-target.mjs';
 import {releaseNodeApply} from '../lib/node-apply.mjs';
 import {createRestRequestNodeSupport} from '../lib/rest-request-node.mjs';
+import {createActionRuntime} from '../lib/executor.mjs';
 
 const workflow={workflow_id:'flow',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
 const request={operation_id:'countries-rest',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
@@ -55,4 +56,39 @@ test('D33 settled connection placement refusal releases only its checkpoint: '+f
   if(fault!=='changed_graph')assert.equal(operation.preTargetGraph,undefined);
  }
  assert.equal(calls,1,'release never repeats connection creation or the drag');
+});
+
+test('D33 parent runtime retains settled cleanup through delivery and permits release',async()=>{
+ const graph={complete:true,interaction_ready:true,document_id:'doc',workflow_ref:workflow,dom_epoch:1,
+  nodes:[{ref:{document_id:'doc',workflow_id:'flow',node_id:'encoder'},type:'programming.javascript',label:'URL query encoding',
+   inputs:[0],outputs:[0],position:{x:64,y:64},locked:false}],links:[],foreign_links:[]};
+ const outcome={status:'AMBIGUOUS',action_key:'node.rest.connection.internal',action_revision:'1',operation_id:'countries-rest:n1',
+  phase:'connection',effect_possible:true,cleanup_complete:true,
+  output:{verified:false,effect_possible:true,cleanup_complete:true,pre_target_checkpoint:{graph,connection:request.parameters.connection}},
+  error:{code:'REST_STEP_UNCONFIRMED',message:'REST connection: connection placement is not fully visible'},trace:[]};
+ const ok={verified:true,cleanup_complete:true,effect_possible:false};
+ let calls=0;
+ const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},
+  nodeApplyHandlers:createRestRequestNodeSupport({}).nodeApplyHandlers,onRecord:async e=>e,
+  execute:async code=>{
+   if(code.includes('"receipt_read":true'))return {status:'SUCCEEDED',action_key:'operation.receipt',action_revision:'1',
+    operation_id:request.operation_id,phase:'observed',effect_possible:false,error:null,trace:[],output:{state:'completed',receipt:outcome}};
+   calls++;return {status:'SUCCEEDED',output:{value:outcome}};
+  },nodeTargetAdapterFactory:()=>({observe:async()=>structuredClone(graph),
+   activateWorkflow:async()=>ok,
+   verifyWorkflow:async()=>({...ok,status:'SUCCEEDED',document_id:'doc',workflow_ref:workflow})}),
+  nodeApplyDriverFactory:options=>({verifySource:async()=>ok,mapPorts:async()=>ok,verifyContinuation:async()=>true,
+   openWizard:async()=>assert.fail('REST target was not created'),finish:async()=>ok,finishGraph:async()=>ok,
+   configureOutputs:async()=>ok,waitExecution:async()=>ok,readOutput:async()=>ok,
+   beforeTarget:ctx=>runRestStep(options,{...ctx,document_id:'doc',workflow_ref:workflow},'connection',()=> 'async()=>({})',request.parameters,{})})});
+ runtime.startNodeApply(request);
+ const job=await runtime.waitNodeApply(request.operation_id,{timeoutMs:1000});
+ assert.ok(job.outcome,JSON.stringify(job));
+ assert.equal(job.outcome.status,'AMBIGUOUS',JSON.stringify(job));assert.equal(job.outcome.output.pending_phase,'target');
+ assert.equal(job.outcome.cleanup_complete,true,JSON.stringify(job));
+ const result=await runtime.recover(request.operation_id,{strategy:'abandon_operation',recoveryOperationId:'release-countries'});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(result.output.original_outcome.output.node,null);
+ assert.equal(runtime.hasUnsettledWork(),false);runtime.assertPreparationAllowed();
+ assert.equal(calls,1);
 });
