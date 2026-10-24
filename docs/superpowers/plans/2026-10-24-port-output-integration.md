@@ -159,14 +159,13 @@
 ## Checkpoint реализации
 
 - Tasks 1 и 2 завершены; независимое ревью соответствия и качества PASS. Все восемь ordinary callers используют один port reader.
-- Специализированные пары Filter/Regression/Clustering/REST/Text Import и JS/read приняты на том же выполнении до удаления старых цепочек; независимые CSV/business ожидаемые результаты сохранены.
-- Native full, civil/cold Table helpers и исторические captures сохранены. Import civil собирает независимые Table receipts отдельно.
-- Read release требует очистки последнего собственного портового обращения и unchanged quiet graph; неизвестный ответ не освобождается. JavaScript recovery не расширена.
-- Task 3: output reread allowance 300000 ms и актуальные инструкции готовы. Client 77 PASS, native 105 PASS; полный upstream на закреплённых Node/Chromium — 4746 PASS / 2 Windows SKIP.
-- Дополнительно: Task 2 client 103 PASS, runtime 637 PASS, eval 12 PASS и typecheck; Python 8 PASS / 16 SKIP без приватных captures. Cold PASS не заявляется.
-- Свежая матрица: Calculator strict/ordinary, REST, Filter [0]/[1]/[1,0], JS full и reread 100/0 PASS; исходные source/settings и число финальных выполнений сохранены.
-- Live stale-schema отказ и release PASS: Id→IdAlias, новое выполнение сохранено, старый source не принят, Execute при освобождении не повторялся.
-- Свежий Regression: 6 прогнозов / 2 коэффициента совпали с authored oracle; пустой Text Import вернул полную схему и 0 строк. JS dirty false→false проверен до Table на чистом пакете.
-- Evidence вне Git: `/tmp/port-read-implementation-{LUEAYO,rVw8qy,76D4np,GZzpqF,q37u1w,JlgNOg,gWxwBR}/`; предыдущие ошибки не переименованы в успешные результаты.
-- Ошибки стенда: console buffering обойдён ограниченной историей/viewport, offscreen Regression — сдвигом вида после safe release. Дополнительный JS source probe выявил прежнюю QA-wire schema ошибку; production bridge корректен, source cleanup подтверждён.
-- Далее: числовой Import/ordinary Collapse, длинный текст, пять пар/медианы, native F3/sliding CrossTable, Clustering, cleanup и итоговое ревью. Installed и другие платформы не проверены.
+- Task 3: allowance 300000 ms и инструкции готовы; client 77 PASS, native 105 PASS, полный upstream на закреплённых Node/Chromium — 4746 PASS / 2 Windows SKIP.
+- Task 2 дополнительно: client 103 / runtime 637 / eval 12 PASS и typecheck; Python 8 PASS / 16 SKIP без приватных captures. Cold PASS не заявляется.
+- Свежая обычная матрица PASS: Calculator strict/ordinary и Collapse, Filter [0]/[1]/[1,0], Regression, Clustering, REST, Text Import mixed/empty, JS full и reread 100/0. CSV/business oracle независимы; source/settings и число финальных выполнений сохранены.
+- Live stale-schema отказ и release PASS: Id→IdAlias, старый source не принят, новое завершённое выполнение сохранено, Execute при освобождении не повторялся.
+- Int64 MIN/MAX, >2^53, полный текст 20 000 символов и 5 001 emoji PASS; strict/ordinary равны. JS и CSV dirty false→false проверены до Table на сохранённых чистых пакетах.
+- Пять пар на одном выполнении 3×4: медианы port 563,857 ms / Table 31 451,821 ms (≈55,8×); все строки/значения сохранены с согласованным −0. MCP envelope 10 586 байт, 3 строки, лимит 46 000. Длинный CSV отдельно 799/914 ms; старый reader >16 384 отказывает.
+- Native/civil/cold helpers и исторические captures сохранены. Native F3/sliding ещё не приняты: смешанный стенд отвергнут до Execute из-за REST foreign link; защита сохранена, новый изолированный draft имеет complete graph / foreign_links=[] до выполнения.
+- Временные стендовые ошибки (console buffering, offscreen control, повтор ID Save) разрешались через известные no-effect/cleanup proofs; исходные неуспехи сохранены. Дополнительный JS source probe выявил прежнюю QA-wire schema ошибку; production bridge корректен, source cleanup подтверждён.
+- Evidence вне Git: `/tmp/port-read-implementation-{LUEAYO,rVw8qy,76D4np,GZzpqF,q37u1w,JlgNOg,gWxwBR,fa5jMG,JVcMzN}/`. Закрытие/logout предыдущих стендов подтверждены; текущий изолированный ещё открыт.
+- Далее: native F3 и sliding в одном runtime, собственный server-file cleanup/logout, финальные diff/links и независимое итоговое ревью. Installed и другие платформы не проверены.
