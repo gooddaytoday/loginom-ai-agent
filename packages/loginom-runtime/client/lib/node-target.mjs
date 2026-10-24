@@ -350,7 +350,7 @@ export async function releaseNodeTarget({operation,adapter,record,readReceipt,de
     &&g.nodes.every(n=>n.locked===false&&n.ref.document_id===request.document_id&&n.ref.workflow_id===request.workflow_ref.workflow_id)
     &&new Set(g.nodes.map(n=>n.ref.node_id)).size===g.nodes.length;
   if(!quiet(first))throw Error('Complete quiet original graph required for pre-target release');
-  const baseline=target?.final_graph??target?.last_graph??target?.baseline;
+  const baseline=target?.final_graph??target?.last_graph??target?.baseline??operation.preTargetGraph;
   if(baseline&&!sameDomainGraph(baseline,first))throw Error('Pre-target graph differs from its settled checkpoint');
   if(!baseline&&(target?.effect_possible||target?.receipts?.length||target?.targetId))
     throw Error('Target effects have no settled graph checkpoint');
@@ -364,7 +364,7 @@ export async function releaseNodeTarget({operation,adapter,record,readReceipt,de
   check();
   if(!quiet(second)||!same(first,second))throw Error('Graph changed during pre-target release');
   return {verified:true,cleanup_complete:true,node:matches[0]?.ref??null,graph:second,
-    target_state:id?'found':'not_created',cleanup:{wizard_closed:false,read_view_restored:false,views_returned:false}};
+    target_state:id?'found':'not_created',warnings:operation.preTargetWarnings??[],cleanup:{wizard_closed:false,read_view_restored:false,views_returned:false}};
 }
 
 // Activation uses its own browser ledger, not operation.lastReceipt. A visible
