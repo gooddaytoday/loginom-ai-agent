@@ -38,6 +38,7 @@ function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=fals
   structuredClone,Date,isUnchangedTransformExecution,isUnchangedTextImportExecution:contract.isUnchangedTextImportExecution,
   need:(ok,message)=>{if(!ok)throw Error(message);},verified:v=>({verified:true,cleanup_complete:true,effect_possible:false,...v}),
   createNodeProcedure:()=>channel,
+  selectPreparedGraphNode:async()=>{calls.push('select');},
   openPreparedWizard:async()=>{calls.push('open');wizard('join');},
   closePreparedWizard:async()=>{calls.push('close');graph();return {verified:true,draft_discarded:true,cleanup_complete:true};},
   joinReady:s=>s.wizard?.stage==='join'&&s.node_join?.verified===true,
@@ -93,13 +94,13 @@ for(const type of ['transform.join_data','transform.reform_columns'])test('D46 w
  assert.equal(result.execution.status,'completed');assert.equal(result.output.status,'complete');
  assert.equal(result.configuration.status,'not_requested');
  assert.deepEqual(result.phases.map(p=>p.phase),['source','target','finish','execute','read']);
- assert.deepEqual(f.calls,type==='transform.join_data'?['open','close','baseline','Execute']:['baseline','Execute']);
+ assert.deepEqual(f.calls,type==='transform.join_data'?['select','open','close','baseline','Execute']:['baseline','Execute']);
 });
 test('D46 whole node.apply rejects saved inner / requested left before any Execute',async()=>{
  const f=fixture('transform.join_data',{mode:'left'}),result=await f.run();
  assert.notEqual(result.status,'SUCCEEDED');assert.match(JSON.stringify(result),/Preserved join mode differs/);
  assert.equal(f.calls.filter(x=>x==='Execute').length,0);
- assert.deepEqual(f.calls,['open','close']);
+ assert.deepEqual(f.calls,['select','open','close']);
 });
 test('D46 whole node.apply cannot accept a foreign Join mode owner',async()=>{
  const f=fixture('transform.join_data',{foreign:true}),result=await f.run();

@@ -9,6 +9,7 @@ import {alignReadSchema,isUnchangedTextImportExecution,isUnchangedTransformExecu
 import {openPreparedWizard} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {joinReady} from './join-procedure.mjs';
+import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {createJavascriptSourceAdmission} from './javascript-source-admission.mjs';
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
 import {openManagedJavascriptOutputViews} from './javascript-managed-views.mjs';
@@ -60,6 +61,8 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    if(unchangedTransform&&request.target.type==='transform.join_data'){
     // Read the native saved mode before the only Execute. Close discards the
     // untouched draft; no input/output mapping is opened or committed.
+    const graph=await channel.observe({condition:'saved Join graph before mode read',ready:s=>s.prepared_node_context?.surface==='graph'});
+    await selectPreparedGraphNode(channel,graph,'select saved Join before mode read',{refreshReplacedBody:true});
     await openPreparedWizard(channel);
     const state=await channel.observe({condition:'saved Join mode before execution',readJoin:true,ready:joinReady});
     const native=state.node_join;
