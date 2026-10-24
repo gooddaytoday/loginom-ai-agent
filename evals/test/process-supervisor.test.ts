@@ -386,12 +386,13 @@ test("a refused child of a proven peer quarantines its owner without blocking A 
   await cp(Bun.which("node")!, path.join(bundle, "chrome"), { dereference: true })
   await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
   const script = path.join(root, "browser.mjs"), trigger = path.join(root, "trigger"), pidFile = path.join(root, "bad.pid")
-  await Bun.write(script, `import {spawn} from "node:child_process";import {access,writeFile} from "node:fs/promises";
+  await Bun.write(script, `import {spawn} from "node:child_process";import {access,writeFile,rename} from "node:fs/promises";
 setInterval(()=>{},1000);
 if(process.argv.some(arg=>arg.startsWith(${JSON.stringify("--user-data-dir=" + b + path.sep)}))){
   while(!await access(${JSON.stringify(trigger)}).then(()=>true,()=>false)) await new Promise(resolve=>setTimeout(resolve,10));
   const child=spawn(process.execPath,[${JSON.stringify(script)},"--type=helper",${JSON.stringify("--user-data-dir=" + path.join(root, "outside"))}],{stdio:"ignore",env:process.env});
-  await writeFile(${JSON.stringify(pidFile)},String(child.pid));
+  await writeFile(${JSON.stringify(pidFile + ".tmp")},String(child.pid));
+  await rename(${JSON.stringify(pidFile + ".tmp")},${JSON.stringify(pidFile)});
 }`)
   const abort = new AbortController()
   const commandA = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: a })
