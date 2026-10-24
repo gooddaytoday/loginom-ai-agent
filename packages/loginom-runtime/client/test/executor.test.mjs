@@ -753,3 +753,34 @@ test('host lifecycle distinguishes an active operation from retained uncertainty
     assert.equal(engine.hasUnsettledWork(), ambiguous);
   }
 });
+
+test('Save-copy before the first node read retains the prepared native workflow and refreshes navigation',async()=>{
+ const {page,flow}=await continuationPage(),receipt=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ receipt.crumbs=page.elements().filter(e=>['save_crumb','save_nav_parent'].includes(e.kind))
+   .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent}));
+ delete receipt.nodeTargetWorkflowNode;
+ const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/copied-before-read.lgp',conflict_policy:'fail'});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ const [continuation]=result.output.workflow_continuations;
+ assert.ok(continuation,'an unopened prepared workflow must not disappear from Save continuations');
+ assert.equal(receipt.nodeTargetWorkflowNode,flow);
+ assert.equal(continuation.previous_workflow_ref.navigation_path[2].label,'Draft');
+ assert.equal(continuation.workflow_ref.navigation_path[2].label,'Saved');
+ assert.ok(result.trace.some(row=>row.event==='saved_navigation_workflow_returned'));
+ assert.equal(page.events.includes('package_closed'),false);
+});
+for(const fault of ['package','crumb','missing crumbs','workflow class'])
+test('unread prepared Save-copy rejects a changed initial binding: '+fault,async()=>{
+ const {page}=await continuationPage(),receipt=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ delete receipt.nodeTargetWorkflowNode;
+ receipt.crumbs=page.elements().filter(e=>['save_crumb','save_nav_parent'].includes(e.kind))
+   .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent}));
+ if(fault==='package')receipt.packageNode=new page.app.PackageTreeNode();
+ if(fault==='crumb')receipt.crumbs[2].tid='foreign';
+ if(fault==='missing crumbs')delete receipt.crumbs;
+ if(fault==='workflow class')delete page.app.WorkFlowTreeNode;
+ const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/must-not-save.lgp',conflict_policy:'fail'});
+ assert.notEqual(result.status,'SUCCEEDED');
+ assert.equal(page.storage.size,0,'reject before Save');
+ assert.equal(receipt.nodeTargetWorkflowNode,undefined);
+});
