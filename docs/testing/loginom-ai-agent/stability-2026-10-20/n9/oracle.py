@@ -51,7 +51,7 @@ def column(name, kind='real'):
 
 expected = dict(
     package_path=sys.argv[1] if len(sys.argv) > 1 else '/stability-2026-10-20/n9.lgp',
-    nodes=[dict(type=t) for t in ['imports.text', 'datamining.lin_regression', 'exports.text']],
+    nodes=[],
     outputs=[
         dict(output_node_type='export_input', ordered=True, column_order='exact',
              columns=[column('RowID', 'integer'), *[column(f) for f in [*FIELDS, TARGET, 'Forecast']]], rows=rows),

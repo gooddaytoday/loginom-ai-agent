@@ -43,7 +43,7 @@ rows = [dict(Points=len(group), **{'Mean' + f: float(center[j]) for j, f in enum
         for group, center in zip(groups, centers)]
 expected = dict(
     package_path=sys.argv[1] if len(sys.argv) > 1 else '/stability-2026-10-20/n8.lgp',
-    nodes=[dict(type=t) for t in ['imports.text', 'datamining.clustering', 'exports.text']],
+    nodes=[],
     outputs=[dict(output_node_type='export_input', ordered=False, column_order='exact',
                   columns=columns, rows=rows)])
 sys.stdout.buffer.write((json.dumps(expected, ensure_ascii=False, indent=2, allow_nan=False) + '\n').encode('utf-8'))

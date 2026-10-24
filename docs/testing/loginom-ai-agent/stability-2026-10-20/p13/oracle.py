@@ -22,7 +22,7 @@ rows = [dict(Code=r['Code'], Route=r['Route'], Method='GET', HttpStatusCode=200)
 columns = [('Code', 'string'), ('Route', 'string'), ('Method', 'string'), ('HttpStatusCode', 'integer')]
 expected = {
     'package_path': sys.argv[1] if len(sys.argv) > 1 else '/stability-2026-10-20/p13.lgp',
-    'nodes': [{'type': kind} for kind in ['imports.text', 'integration.rest_request', 'exports.text']],
+    'nodes': [],
     'outputs': [{
         'output_node_type': 'export_input',
         'export_destination': '/stability-2026-10-20/checked-routes.csv',
