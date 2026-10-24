@@ -204,12 +204,23 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
     }
    return null;
   },Math.max(64,...beforeGraph.map(n=>n.y))+150);
-  let target=await chooseTarget(),placementGuard;
+  let target=await chooseTarget(),placementGuard,placementCheckpoint;
   if(!target){
    const graphTask={request:{document_id:t.document_id,workflow_ref:t.workflow_ref},origin:t.origin,build:t.build,types};
    const before=await readPlacementGraph(page,graphTask);
    need(before.complete===true&&before.interaction_ready===true,'complete idle graph required for placement');
    placementGuard=async()=>{await guard();need(sameGraph(before,await readPlacementGraph(page,graphTask)),'Graph changed during connection placement');};
+   placementCheckpoint=async message=>{
+    // The connection settings were committed and reread; no reference drag
+    // has started. Preserve these settled effects in the existing step receipt.
+    await quiet();await placementGuard();
+    const graph=await readPlacementGraph(page,graphTask);
+    need(graph.complete===true&&graph.interaction_ready===true&&sameGraph(before,graph),
+     'complete unchanged idle graph required for connection checkpoint');
+    return {verified:false,cleanup_complete:true,effect_possible:true,
+     pre_target_checkpoint:{graph,connection:persisted},placement_navigation:placementNavigation,
+     error:'REST connection: '+message};
+   };
    let initialViewport,totalZoomSteps=0;
    // A visible point alone may still leave no room for the connection's
    // footprint. Continue only settled view navigation, never the drag.
@@ -223,24 +234,16 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
     placementNavigation={...navigation,initial_viewport:initialViewport,passes:pass+1,total_zoom_steps:totalZoomSteps};
     await placementGuard();
     if(navigation.fully_visible!==true){
-     // The connection settings were committed and reread; no reference drag
-     // has started. Preserve these settled effects in the existing step receipt.
-     await quiet();await placementGuard();
-     const graph=await readPlacementGraph(page,graphTask);
-     need(graph.complete===true&&graph.interaction_ready===true&&sameGraph(before,graph),
-      'complete unchanged idle graph required for connection checkpoint');
-     return {verified:false,cleanup_complete:true,effect_possible:true,
-      pre_target_checkpoint:{graph,connection:persisted},placement_navigation:placementNavigation,
-      error:'REST connection: connection placement is not fully visible'};
+     return await placementCheckpoint('connection placement is not fully visible');
     }
     // Zoom redraws the graph. Recheck occupied rectangles and the hit surface;
     // never reuse pre-navigation screen pixels.
     target=await chooseTarget();
    }
-   need(target,'no free visible connection position after navigation');
+   if(!target)return await placementCheckpoint('no free visible connection position after navigation');
   }
   const source=await wait('reachable connection palette item',async()=>{try{return await point(find(item));}catch{return null;}});
-  if(placementGuard){await placementGuard();target=await chooseTarget();need(target,'no free visible connection position before drag');}
+  if(placementGuard){await placementGuard();target=await chooseTarget();if(!target)return await placementCheckpoint('no free visible connection position before drag');}
   await guard();effect=true;await page.mouse.move(source.x,source.y);await page.mouse.down();
   try{await page.mouse.move(target.x,target.y,{steps:12});}finally{await page.mouse.up();}
   const reference=await wait('connection graph reference',()=>page.evaluate(before=>{const m=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;const added=m.FDiagram.FNodes.FCollection.filter(n=>!before.some(b=>b.id===n.FGuid));if(added.length>1)throw Error('Unexpected graph additions');const n=added[0];if(!n)return null;const ports=(n.FPorts??[]).flatMap(p=>p.FCollection??[]);if(ports.length!==1)throw Error('New node is not a connection reference');const tid=m.FDiagram.FmxGraph.view.getState(ports[0].FCell)?.shape?.node?.getAttribute('data-tid');if(!tid)return null;if(!tid.endsWith(';Output_Connection-0'))throw Error('New node is not a connection reference');return {node_id:n.FGuid};},beforeGraph));
