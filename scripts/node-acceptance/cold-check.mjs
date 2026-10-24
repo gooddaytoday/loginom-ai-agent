@@ -1,4 +1,4 @@
-import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput} from "./expected-outputs.mjs"
+import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput,parseExportCsvHeader} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
 import { readFile, mkdir, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
@@ -18,6 +18,9 @@ const args = parseArgs({
     saved: { type: "string" },
     expected: { type: "string" },
     output: { type: "string" },
+    csv: { type: "string" },
+    'csv-delimiter': { type: "string", default: ',' },
+    'csv-header': { type: "string", default: 'names' },
   },
   strict: true,
 }).values
@@ -52,6 +55,11 @@ if (config.workflow_profile?.passwordless_login === true && loginPassword !== ""
 if (config.workflow_profile?.passwordless_login !== true && loginPassword === "") throw Error("TEST_PASSWORD_UNAVAILABLE")
 const expected = JSON.parse(await readFile(args.expected, "utf8"))
 const {multiple,outputs:expectedOutputs}=parseExpectedOutputs(expected)
+if(!['names','labels'].includes(args['csv-header']))throw Error('COLD_EXPORT_CSV_HEADER_MODE_INVALID')
+// --csv is the actual runtime-downloaded export, already checked in full by
+// the scenario's file oracle. It supplies order only, never cold cell values.
+const exportCsv=args.csv?{columns:parseExportCsvHeader(await readFile(resolve(args.csv),'utf8'),args['csv-delimiter']),
+ header:args['csv-header'],delimiter:args['csv-delimiter']}:undefined
 
 const saved = await loadSaved(args.saved)
 if (saved.path !== expected.package_path) throw Error("PACKAGE_PATH_MISMATCH")
@@ -305,8 +313,12 @@ try {
    if(savedExport.node_id!==exportInput.export_node_id)throw Error('COLD_EXPORT_INPUT_MAPPING_CHANGED');
    exportInput.input_fields=savedExport.input_fields;
    await record({phase:'cold_export_input_mapping',...savedExport,settings_applied:false});
+   state.exportObservation={node_id:savedExport.node_id,input_fields:savedExport.input_fields,
+    ...(exportCsv?{csv_order:exportCsv}: {})};
+   if(expectedOutputs.some(o=>o.output_node_type==='export_input'&&o.column_order==='exact')&&!exportCsv)
+    throw Error('COLD_EXPORT_CSV_REQUIRED');
   }
-  const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput});
+  const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
 
   // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.
@@ -335,6 +347,7 @@ try {
     status: "PASS",
     phase: "independent_cold_reopen_readback",
     path: saved.path,
+    ...(state.exportObservation?{export_observation:state.exportObservation}:{}),
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
@@ -351,6 +364,7 @@ try {
       status: result.status,
       phase: result.phase,
       path: saved.path,
+      ...(state.exportObservation?{export_observation:state.exportObservation}:{}),
       settingsReapplied: false,
       cleanup: result.cleanup,
     }),
@@ -379,6 +393,7 @@ try {
   }
   if(state.failure)await writeFile(join(args.output,'result.json'),JSON.stringify({status:'FAIL',
    phase:'independent_cold_reopen_readback',path:saved.path,settingsReapplied:false,error:state.failure,
+   ...(state.exportObservation?{export_observation:state.exportObservation}:{}),
    cleanup:{package_closed:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.package_closed===true,
     logged_out:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.logged_out===true}},null,2)+'\n')
   await context.close()
