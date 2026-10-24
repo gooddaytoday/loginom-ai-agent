@@ -16,10 +16,10 @@ const node={document_id:'document',workflow_id:'workflow',node_id:'javascript-no
 const initial={kind:'source',operation_id:'public-source',document_id:'document',workflow_ref,node,budget_ms:60000};
 const hash=value=>createHash('sha256').update(value).digest('hex');
 
-function fixture({source='const привет = "😀";\n',secret,failClose=false,pauseOpen}={}){
+function fixture({source='const привет = "😀";\n',secret,failClose=false,pauseOpen,graphRefused=false}={}){
   const calls=[];
   const adapter={active:false,uncertain:false,
-    async open({owner}){calls.push('open');this.active=true;if(pauseOpen)await pauseOpen;return {owner};},
+    async open({owner}){assert.ok(calls.includes('graph'),'prepare the existing graph before source opening');calls.push('open');this.active=true;if(pauseOpen)await pauseOpen;return {owner};},
     async read(handle,{owner}){calls.push('read');assert.deepEqual(owner,handle.owner);
       return {owner,source,settings:{generation:true}};},
     async discard(handle,{owner}){calls.push('discard');assert.deepEqual(owner,handle.owner);
@@ -27,6 +27,11 @@ function fixture({source='const привет = "😀";\n',secret,failClose=false
       this.active=false;return {closed:true,owner};}};
   const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},
     allowCandidate:true,nodeApplyHandlers:new Map([['imports.text',{}]]),nodeApplyDriverFactory:()=>({}),
+    nodeTargetAdapterFactory:()=>({observe:async(request,deadline)=>{calls.push('graph');
+      assert.deepEqual(request,{document_id:initial.document_id,workflow_ref,target:{kind:'existing',type:'programming.javascript',ref:node},inputs:[]});
+      assert.ok(deadline>Date.now()&&deadline<=Date.now()+initial.budget_ms);
+      if(graphRefused)throw Error('prepared graph identity changed');
+      return {nodes:[{ref:node,type:'programming.javascript'}],links:[]};}}),
     targetOrigin:'http://loginom.test',targetBuild:'7.4.2',redactor:createRedactor(secret?[secret]:[]),
     execute:async()=>{throw Error('Unexpected browser transport');},
     onRecord:async event=>event,javascriptSourceAdapterFactory:()=>adapter});
@@ -61,11 +66,11 @@ test('public source route returns exact text to full and user replies without ou
   assert.equal(receipt.kind,'source');
   assert.equal(receipt.source_text,'const привет = "😀";\n');
   assert.equal(receipt.source_sha256,hash(receipt.source_text));
-  assert.deepEqual(f.calls,['open','read','read','read','discard']);
+  assert.deepEqual(f.calls,['graph','open','read','read','read','discard']);
   assert.deepEqual(nodeResultReply(receipt,{userProfile:true}).structuredContent,receipt);
   assert.equal(JSON.parse(nodeResultReply(receipt,{userProfile:true}).content[0].text).source_text,receipt.source_text);
   assert.deepEqual(await dispatchNodeApi(f.runtime,'dock_node_read',initial),receipt);
-  assert.deepEqual(f.calls,['open','read','read','read','discard']);
+  assert.deepEqual(f.calls,['graph','open','read','read','read','discard']);
   const schema=nodeApiTools.find(tool=>tool.name==='dock_node_read').outputSchema;
   assert.equal(new AjvJsonSchemaValidator().getValidator(schema)(receipt).valid,true);
 });
@@ -127,4 +132,12 @@ test('secret refusal closes before delivery; lost Close holds the host gate',asy
   await assert.rejects(()=>dispatchNodeApi(lost.runtime,'dock_node_read',
     {...initial,operation_id:'new-source'}),/pending Dock operation/);
   assert.equal(lost.calls.filter(call=>call==='open').length,1);
+});
+
+test('initial source refuses a foreign graph before opening the adapter',async()=>{
+ const f=fixture({graphRefused:true});
+ await assert.rejects(dispatchNodeApi(f.runtime,'dock_node_read',initial),/prepared graph identity changed/);
+ assert.deepEqual(f.calls,['graph']);
+ assert.equal(f.adapter.active,false);
+ assert.equal(f.runtime.hasUnsettledWork(),false);
 });

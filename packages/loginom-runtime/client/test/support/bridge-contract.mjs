@@ -66,6 +66,10 @@ test('MCP application refusals remain typed normal content and the same connecti
     executorTools,makeArtifactUploadCode,makeNativeOutputDownloadCode,makeArtifactDownloadCode,
     rebindNodeTargetLinkEpochs,readNodeTargetLinkValidation,makeCapabilityCode,withBrowserReceipt,parseCapabilityResult,
     createActionRuntime: options => createActionRuntime({...options,
+      nodeTargetAdapterFactory:()=>({observe:async request=>{
+        assert.equal(request.target.kind,'existing');assert.equal(request.target.type,'programming.javascript');
+        sourceCalls.push('graph');return {nodes:[{ref:request.target.ref,type:'programming.javascript'}],links:[]};
+      }}),
       javascriptSourceAdapterFactory: () => ({active:false,uncertain:false,
       async open({owner}) {sourceCalls.push('open');return {owner};},
       async read(handle,{owner}) {assert.deepEqual(handle.owner,owner);sourceCalls.push('read');
@@ -177,11 +181,11 @@ test('MCP application refusals remain typed normal content and the same connecti
     assert.equal(sourceReceipt.source_text,'const sample = "Привет 😀";\n');
     assert.equal(sourceReceipt.source_sha256,createHash('sha256').update(sourceReceipt.source_text).digest('hex'));
     assert.deepEqual(sourceResponse.structuredContent,sourceReceipt);
-    assert.deepEqual(sourceCalls,['open','read','read','read','discard']);
+    assert.deepEqual(sourceCalls,['graph','open','read','read','read','discard']);
     assert.equal(browserCalls,beforeSource,'the fixture adapter owns the source path without output Execute');
     const replay=await client.callTool({name:'dock_node_read',arguments:sourceRequest});
     assert.deepEqual(replay.structuredContent,sourceReceipt);
-    assert.deepEqual(sourceCalls,['open','read','read','read','discard']);
+    assert.deepEqual(sourceCalls,['graph','open','read','read','read','discard']);
     const cards=await client.callTool({name:'dock_action_describe',arguments:{node_types:['imports.text','transform.calculator']}});
     const nodeCards=JSON.parse(cards.content[0].text).node_types;
     assert.equal(nodeCards[0].candidate_node_apply_available,true);
@@ -277,7 +281,7 @@ test('MCP application refusals remain typed normal content and the same connecti
     assert.equal(compactReceipt.kind,'source');
     assert.equal(compactReceipt.source_text,sourceReceipt.source_text);
     assert.deepEqual(compactResponse.structuredContent,compactReceipt);
-    assert.deepEqual(sourceCalls,['open','read','read','read','discard']);
+    assert.deepEqual(sourceCalls,['graph','open','read','read','read','discard']);
     assert.equal(browserCalls,beforeCompact);
   } finally {
     await client?.close();

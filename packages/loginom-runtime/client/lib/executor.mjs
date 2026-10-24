@@ -1058,7 +1058,15 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if(crumbs.length<3||crumbs.length>32)throw Error('Saved continuation navigation unavailable');
     const result=new Map();
     for(const record of preparation.receipts.values()) {
-      if(record.phase!=='verified'||record.tab!==tabs[0]||!record.nodeTargetWorkflowNode)continue;
+      if(record.phase!=='verified'||record.tab!==tabs[0]||typeof record.workflowId!=='string')continue;
+      // An opened package may be copied before any node read populates this
+      // cache. Bind it against the original prepared path before Save, so the
+      // existing navigation refresh is not skipped for that workflow.
+      if(!record.nodeTargetWorkflowNode) {
+        if(record.packageNode!==packageNode||!workflowNode||JSON.stringify(record.crumbs)!==JSON.stringify(crumbs))
+          throw Error('Saved continuation initial native identity changed');
+        record.nodeTargetWorkflowNode=workflowNode;
+      }
       if(record.packageNode!==packageNode||record.nodeTargetWorkflowNode!==workflowNode)throw Error('Saved continuation native identity changed');
       result.set(record.workflowId,{document_id:preparation.id,workflow_ref:{...binding,workflow_id:record.workflowId,navigation_path:crumbs}});
       if(result.size>32)throw Error('Saved continuation bound exceeded');
@@ -2285,6 +2293,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     };
     const graphRequest={document_id:request.document_id,workflow_ref:request.workflow_ref,
       target:{kind:'existing',type:'programming.javascript',ref:request.node},inputs:[]};
+    // Source-only requests need the same initial native graph binding as context
+    // reads. Observing never activates, executes or changes the requested node.
+    if(request.kind==='source')await targetAdapter(operation).observe(graphRequest,deadline);
     const session=request.kind==='context'?createJavascriptContextReadSession({request,uiEpoch,deadline,adapter,redactor,record:onRecord,
       channel:contextChannel,observeGraph:()=>targetAdapter(operation).observe(graphRequest,deadline)}):
       createJavascriptSourceReadSession({request,uiEpoch,deadline,adapter,redactor,record:onRecord});
