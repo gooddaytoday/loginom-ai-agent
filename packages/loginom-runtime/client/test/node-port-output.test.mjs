@@ -47,6 +47,20 @@ test('reads_bound_port_without_table',async()=>{
  assert.deepEqual(f.disposed.sort(),['columns','dataSource','integerColumn','output','realColumn','stringColumn']);
 });
 
+test('reads native tabular output with FParam 2',async()=>{
+ const f=fixture();f.port.FParam=2;
+ const result=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:true});
+ assert.equal(result.verified,true);assert.equal(result.cleanup_complete,true);
+ assert.deepEqual(result.output.sample[0].map(c=>c.value),['9007199254740993',1.2345678901234567,'']);
+ assert.equal(result.output.port_guid,portGuid);assert.equal(f.rpcCalls.length,3);
+});
+
+for(const [property,wrong] of [['FType',0],['FSubType',0],['FPortIndex',1]])test('FParam 2 preserves '+property+' guard',async()=>{
+ const f=fixture();f.port.FParam=2;f.port[property]=wrong;
+ const result=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:true});
+ assert.equal(result.verified,false);assert.equal(result.output,undefined);assert.deepEqual(f.rpcCalls,[]);
+});
+
 test('refuses foreign port ownership without publishing values',async()=>{
  const f=fixture();f.port.parent={...f.node};
  const result=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:true});

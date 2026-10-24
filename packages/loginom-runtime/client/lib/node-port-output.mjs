@@ -99,7 +99,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    for(const list of node.FPorts){need(Array.isArray(list.FCollection)&&list.FCollection.length<=100,'port_bound');candidates.push(...list.FCollection);}
    const ports=candidates.filter(p=>p.FGuid===target.port_guid);need(ports.length===1,'port_changed');
    const port=ports[0],dom=graph.view.getState(port.FCell)?.shape?.node,tid=before.tid+';Output_Data-'+target.native_index;
-   need(port.parent===node&&port.data&&port.FType===1&&port.FSubType===1&&port.FParam===0&&port.FStatus===1
+   need(port.parent===node&&port.data&&port.FType===1&&port.FSubType===1&&port.FStatus===1
     &&(port.FPortIndex===undefined||port.FPortIndex===target.native_index)&&dom?.getAttribute('data-tid')===tid
     &&roots[0].contains(dom)&&exact(tid).filter(e=>roots[0].contains(e)).length===1,'port_binding_changed');
    const images=[...dom.querySelectorAll('image')],icon=images.length===1?(images[0].getAttribute('href')??images[0].getAttribute('xlink:href'))?.split('/').at(-1):null;
