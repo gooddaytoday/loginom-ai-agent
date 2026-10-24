@@ -695,14 +695,18 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // Long export/package captions can overflow the node breadcrumb itself.
     // This is context text only: gestures still require visible controls and
     // the current native node wizard or exact input0/native input1 opening.
-    const hiddenExportNode=e=>(preparedNodeWizard&&['text_export_params','text_export_format','done'].includes(wizard.stage)
+    const hiddenExportNode=e=>(e.querySelectorAll('.bg-vendor-icon-exporttextfile').length===1&&(preparedNodeWizard&&['text_export_params','text_export_format','done'].includes(wizard.stage)
         ||preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===1
           &&preparedInputPort.node_icon_class==='bg-vendor-icon-exporttextfile')
+      // Restored dense packages often have long captions. Import's node and
+      // Settings breadcrumbs overflow too; the native GUID-bound wizard is
+      // already verified. Read their context without making hidden controls actionable.
+      ||preparedNodeWizard&&['text_import_file','text_import_format','output_mapping','done'].includes(wizard.stage)
+        &&e.querySelectorAll('.bg-vendor-icon-importtextfile').length===1)
       &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'
       &&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')&&!sensitive(e)
       &&(tids.get(getTid(e))??[]).length===1
       &&e.querySelectorAll('[class*="bg-vendor-icon-"]').length===1
-      &&e.querySelectorAll('.bg-vendor-icon-exporttextfile').length===1
       &&e.textContent.trim().length>0&&(getTid(e)??'').endsWith('>'+e.textContent.trim().replace(/\s/g,'_').replace(/,/g,''));
     if(workflow) {
       // E2E navigation.GetCurrentTabPath: inspect the current tab's visible
@@ -3776,8 +3780,10 @@ function readRenderedInputMapping(observation) {
           targets.push(await checkedHandle(before, item));
         }
         const nodeBeforeGesture=await boundNode();
-        if(nodeBeforeGesture && !same(current.prepared_node_context,nodeBeforeGesture))
+        if(nodeBeforeGesture && !same(current.prepared_node_context,nodeBeforeGesture)) {
+          record('prepared_node_context_changed_before_gesture',{before:current.prepared_node_context,after:nodeBeforeGesture});
           fail('PREPARED_NODE_CONTEXT_CHANGED','The node surface changed before the gesture');
+        }
         if(['execute_graph_node','deactivate_graph_node'].includes(task.action.verb)) {
           const launch=await readUi(),before=current.ui.elements.find(e=>e.ref===task.action.ref),after=launch.ui.elements.find(e=>e.ref===task.action.ref);
           if(!before?.graph_execution||!after?.allowed_actions.includes(task.action.verb)||!same(before.graph_execution,after.graph_execution))

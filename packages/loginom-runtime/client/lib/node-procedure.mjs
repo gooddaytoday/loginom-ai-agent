@@ -242,19 +242,20 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
-    async revealGraphNode() {
+    async revealGraphNode({target='drawing'}={}) {
+      if(!['drawing','body'].includes(target))throw Error('Unknown node viewport target');
       checkBudget();
       if(!preparedNodeContext)throw Error('Viewport navigation requires a prepared node');
       const before=await channel.observe({condition:'prepared graph before node viewport navigation',
         ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'});
       assertContext(before);checkBudget();
-      const step=nextStep(),id=operation.id+':n'+step,action={verb:'reveal_prepared_node'},actionKey='node.viewport.reveal.internal';
+      const step=nextStep(),id=operation.id+':n'+step,action={verb:'reveal_prepared_node',target},actionKey='node.viewport.reveal.internal';
       const signature=digest([id,action,evidenceSnapshot]),observationHash=digest(evidenceSnapshot);
       snapshot=null;evidenceSnapshot=null;
       const prepared=await entry('node_step_prepared',{step,internal_operation_id:id,action,observation_sha256:observationHash,signature});
       if(prepared?.signature!==signature||JSON.stringify(prepared.action)!==JSON.stringify(action))throw Error('Node viewport navigation was not durably prepared');
       signal?.throwIfAborted();checkBudget();
-      const code=`async page=>(${revealPreparedGraphNode.toString()})(page,${JSON.stringify({binding:preparedNodeContext,origin:targetOrigin,build:targetBuild,deadline:operation.deadline,types:NODE_TYPES})},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${samePlacementGraph.toString()})`;
+      const code=`async page=>(${revealPreparedGraphNode.toString()})(page,${JSON.stringify({binding:preparedNodeContext,origin:targetOrigin,build:targetBuild,deadline:operation.deadline,types:NODE_TYPES,target})},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${samePlacementGraph.toString()})`;
       const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'node_viewport',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.status==='SUCCEEDED'?null:{code:'NODE_VIEWPORT_NOT_REVEALED',message:'Prepared node viewport: node not revealed'},trace:[]}}`;
       let result;
       try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:Math.max(1,operation.deadline-now())});}
@@ -806,12 +807,23 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const scanRefusal=timeScanRefusal(r,'ui.act');
           const graphRefusal=action.verb==='execute_graph_node'&&r.phase==='preconditions'
             &&r.error?.code==='GRAPH_EXECUTION_CONTEXT_CHANGED';
+          const nodeChanges=r.trace.filter(e=>e.event==='prepared_node_context_changed_before_gesture');
+          const before=nodeChanges[0]?.before,after=nodeChanges[0]?.after;
+          // The strict pre-gesture guard did not dispatch. Only a lock-only
+          // change of this same native graph node permits a full fresh read;
+          // neither the rejected snapshot nor its UI refs can be reused.
+          const nodeLockRefusal=!!preparedNodeContext&&r.phase==='preconditions'
+            &&r.error?.code==='PREPARED_NODE_CONTEXT_CHANGED'&&nodeChanges.length===1
+            &&before?.verified===true&&after?.verified===true&&before.surface==='graph'&&after.surface==='graph'
+            &&typeof before.locked==='boolean'&&typeof after.locked==='boolean'&&before.locked!==after.locked
+            &&JSON.stringify(canonical({...before,locked:false}))===JSON.stringify(canonical({...after,locked:false}))
+            &&JSON.stringify(canonical({...before,locked:false}))===JSON.stringify(canonical({...observed.prepared_node_context,locked:false}));
           // Only an opting-in source selector can prove a replaced native body.
           // This remains a new observation and bound attempt, never a raw retry.
           const bodyRefusal=r.phase==='preconditions'&&['UI_REFERENCE_STALE','UI_REFERENCE_OBSCURED'].includes(r.error?.code)
             &&bodyRefreshes===0&&typeof refreshReplacedBody==='function'
             &&refreshReplacedBody({receipt:r,observation:observed,action})===true;
-          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal)throw error;
+          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal&&!nodeLockRefusal)throw error;
           if(bodyRefusal)bodyRefreshes++;
           const event = await entry('node_step_refresh_authorized', {
             step:operation.nodeStepSequence,internal_operation_id:r.operation_id,
@@ -821,6 +833,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             ...(bodyRefusal?{reason:'prepared_graph_body_replaced'}:{}),
             ...(scanRefusal?{reason:'read_scan_time_limit'}:{}),
             ...(graphRefusal?{reason:'graph_execution_context_changed'}:{}),
+            ...(nodeLockRefusal?{reason:'prepared_node_lock_changed',before:structuredClone(before),after:structuredClone(after)}:{}),
           });
           if (event?.rejected_operation_id !== r.operation_id || event.retry !== attempt + 1
             || event.binding_sha256 !== binding || event.intent_sha256 !== intent) {

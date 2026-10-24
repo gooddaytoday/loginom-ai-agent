@@ -19,17 +19,31 @@
         {
           "name": "ABCClass",
           "label": "ABCClass",
-          "type": "string"
+          "type": "string",
+          "name_any": true,
+          "label_any": true
         },
         {
           "name": "Products",
           "label": "Products",
-          "type": "integer"
+          "type": "integer",
+          "name_any": true,
+          "label_any": true,
+          "types": [
+            "integer",
+            "real"
+          ]
         },
         {
           "name": "Revenue",
           "label": "Revenue",
-          "type": "real"
+          "type": "real",
+          "name_any": true,
+          "label_any": true,
+          "types": [
+            "integer",
+            "real"
+          ]
         }
       ],
       "rows": [
@@ -49,6 +63,13 @@
           "Revenue": 5000.0
         }
       ]
+    }
+  ],
+  "request_constraints": [
+    {
+      "source": "prompt.md:1",
+      "quote": "Сделай ABC по накопленной доле Reveneu: A≤80%, B≤95%, остальные C; количество и выручка, включая нулевые. Выгрузи abc.csv, сохрани сценарий.",
+      "reason": "Output names, labels and native numeric types are not prescribed. Bind each semantic column uniquely by its complete values; preserve ABC classes, product counts, revenue, NULL and row-count checks."
     }
   ]
 }

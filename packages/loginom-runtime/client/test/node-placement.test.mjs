@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
+import {readFile} from 'node:fs/promises';
 import {createNodeTargetBrowserAdapter,mutateGraph} from '../lib/node-target-browser.mjs';
 import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
-import {nodePlacementPoint,nodePlacementPosition,nodePlacementGap,nodePlacementOverflow,revealNodePlacement,revealPreparedGraphNode,samePlacementGraph} from '../lib/node-placement.mjs';
+import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlacementGap,nodePlacementOverflow,revealNodePlacement,revealPreparedGraphNode,samePlacementGraph} from '../lib/node-placement.mjs';
 
 function gapFixture(occupied=[]){
  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type:'integration.rest_request'},inputs:[]};
@@ -76,6 +77,26 @@ test('D32 clearance keeps the observed 120-unit native auto-link case apart at e
   assert.equal(nodePlacementGap(v,nodePlacementPoint(v,{x:600,y:144}),occupied),true);
  }
  assert.throws(()=>nodePlacementGap({scale:1},{x:0,y:0},[{left:0,right:1,top:NaN,bottom:2}]),/clearance bounds/);
+});
+
+test('D28 late automatic JS uses a visible gap missed by the coarse grid, retaining the same clearance',async()=>{
+ const recorded=JSON.parse(await readFile(new URL('./fixtures/d28-js-placement.json',import.meta.url),'utf8'));
+ const v=recorded.view,box={...v,right:v.x+v.width,bottom:v.y+v.height};
+ const occupied=recorded.rects.map(([x,y,width,height])=>({x,y,width,height,left:x,top:y,right:x+width,bottom:y+height}));
+ const canvas={getBoundingClientRect:()=>box,querySelectorAll:()=>occupied.map(b=>({getBoundingClientRect:()=>b})),scrollLeft:0,scrollTop:0,contains:()=>false};
+ const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:v.scale,translate:v.translate}}}}};
+ const context={innerWidth:1280,innerHeight:800,document:{elementFromPoint:()=>canvas},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
+ for(const type of ['programming.javascript','imports.text']){
+  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type},inputs:[]};
+  const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
+  let calls=0;const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>++calls===1?graph:runInNewContext('('+code+')',context)({locator:()=>({evaluate:async fn=>fn(canvas)})})});
+  const position=structuredClone(await adapter.choosePosition(request,graph,Date.now()+10000));
+  // JS retains its earlier 40px result; other types now exhaust the added
+  // 32px pass before overflow, with the same point clearance in both cases.
+  assert.deepEqual(position,type==='imports.text'?{x:2200,y:208}:{x:2176,y:520});
+  const point=nodePlacementPoint(v,position);assert.ok(point.y<=v.y+v.height-8&&point.x<=v.x+v.width-8);
+  assert.equal(occupied.some(r=>point.x>r.left-72&&point.x<r.right+96&&point.y>r.top-56&&point.y<r.bottom+72),false);
+ }
 });
 
 for(const {scale,translate,expected} of [
@@ -428,4 +449,53 @@ for(const available of [12,11,0])test('D28 prepared cold top96 requires12px upwa
  assert.equal(r.zoom_steps,11);assert.equal(top,0);assert.equal(r.graph_unchanged,true);assert.equal(r.settings_applied,false);
  const scroll=r.navigation_steps.find(s=>s.action==='scroll');assert.ok(scroll);assert.equal(scroll.before.node_bounds.y,96);
  assert.equal(scroll.after.node_bounds.y,96+available);assert.equal(scroll.after.scroll.y,0);assert.equal(f.state().open,false);
+});
+
+// LAB-82 main-0-execution-events.jsonl:443: full body (1163,140,56,104),
+// label (1136,90,111,48). The body is inside the eight-pixel canvas inset.
+for(const target of ['body','drawing'])test('D28 Export open uses the full selected footprint: '+target,async()=>{
+ const bodyBox={x:1163,y:140,width:56,height:104},labelBox={x:1136,y:90,width:111,height:48};
+ const body={getAttribute:()=> 'owned',getBoundingClientRect:()=>bodyBox};
+ const label={getAttribute:()=> 'owned;Label;Label',getBoundingClientRect:()=>labelBox};
+ const canvas={getBoundingClientRect:()=>({x:324,y:100,width:950,height:694}),contains:e=>e===body,
+  querySelectorAll:()=>[body,label],scrollLeft:0,scrollTop:0};
+ const diagram={FNodes:{FCollection:[{FGuid:'export',FCell:{}}]},FmxGraph:{container:canvas,
+  view:{scale:1,translate:{x:0,y:0},getState:()=>({shape:{node:body}})}}};
+ const context={innerWidth:1280,innerHeight:800,bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{
+  getActiveTab:()=>({Controller:{FController:{FDiagram:diagram}}})
+ }}}}}}}};
+ const read=runInNewContext('('+nodePlacementViewport.toString()+')',context);
+ const id=target==='body'?{node_id:'export',body_only:true}:'export';
+ const v=structuredClone(read(canvas,id));
+ assert.deepEqual(v.node_bounds,target==='body'?bodyBox:{x:1136,y:90,width:111,height:154});
+ if(target==='drawing')return;
+ const f=fixture();f.args.nodeId=id;f.args.root.evaluate=async()=>structuredClone(read(canvas,id));
+ assert.equal((await revealNodePlacement(f.args)).fully_visible,true);assert.equal(f.state().clicks,0);
+ const ref={document_id:'doc',workflow_id:'flow',node_id:'export'};
+ const graph={complete:true,interaction_ready:true,nodes:[{ref,locked:false,position:{x:864,y:40}}],links:[]};
+ const args={target:'body',binding:{document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF'},node:ref},deadline:Date.now()+10000};
+ const root={count:async()=>1,isVisible:async()=>true,evaluate:async(fn,arg)=>fn(canvas,arg)};
+ const page={locator:()=>root};
+ const result=await revealPreparedGraphNode(page,args,async()=>structuredClone(graph),revealNodePlacement,read,nodePlacementPoint,samePlacementGraph);
+ assert.equal(result.status,'SUCCEEDED');assert.equal(result.zoom_steps,0);assert.equal(result.graph_unchanged,true);
+ assert.deepEqual(structuredClone(result.viewport.node_bounds),bodyBox);
+ await assert.rejects(revealPreparedGraphNode(page,{...args,deadline:0},async()=>graph,revealNodePlacement,read,nodePlacementPoint,samePlacementGraph),/deadline/);
+ let calls=0;
+ await assert.rejects(revealPreparedGraphNode(page,args,async()=>{const g=structuredClone(graph);if(++calls>1)g.nodes[0].position.x++;return g;},
+  revealNodePlacement,read,nodePlacementPoint,samePlacementGraph),/graph changed/);
+ // A visible centre still cannot authorize a clipped body, on any edge.
+ for(const box of [{x:331,y:140},{x:1211,y:140},{x:1163,y:107},{x:1163,y:683}]){
+  Object.assign(bodyBox,box);const clipped=fixture({stuck:true});clipped.args.nodeId=id;
+  clipped.args.root.evaluate=async(fn,arg)=>typeof arg==='object'&&arg.node_id===undefined?undefined:structuredClone(read(canvas,id));
+  const locate=clipped.args.page.locator;clipped.args.page.locator=selector=>{
+   const owner=locate(selector);if(!selector.endsWith(';cntDiagram\"]'))return owner;
+   return {...owner,locator:child=>{const z=owner.locator(child.replace(';tlb;b-1',';tlb;b'));
+    return {...z,getAttribute:async()=>child.includes(';tlb;b-1')?'Увеличить масштаб':'Уменьшить масштаб'};}};
+  };
+  const r=await revealNodePlacement(clipped.args);
+  assert.equal(r.fully_visible,false);assert.ok(clipped.state().clicks>0);
+ }
+ // The native node GUID and canvas body membership remain authoritative.
+ assert.throws(()=>read(canvas,{node_id:'foreign',body_only:true}),/identity unavailable/);
+ canvas.contains=()=>false;assert.throws(()=>read(canvas,id),/drawing unavailable/);
 });
