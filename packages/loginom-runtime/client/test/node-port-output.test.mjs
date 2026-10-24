@@ -367,3 +367,11 @@ test('shared CrossTable ordinary read materializes its observed schema; native f
  const overridden=await sharedOutputFixture({override:true});
  await overridden.drivers.readOutput({ports:[0]},overridden.ctx);assert.deepEqual(overridden.calls,['override']);
 });
+
+test('shared ordinary output refuses reordered fields and cells even when every field identity remains known',async()=>{
+ const f=await sharedOutputFixture();
+ f.output.schema=f.output.schema.toReversed().map((field,index)=>({...field,index}));
+ f.output.sample=f.output.sample.map(row=>row.toReversed());
+ await assert.rejects(f.drivers.readOutput({ports:[0],sample_rows:1,require_exact_numbers:true},f.ctx),
+  /Output field order differs from the configured output/);
+});
