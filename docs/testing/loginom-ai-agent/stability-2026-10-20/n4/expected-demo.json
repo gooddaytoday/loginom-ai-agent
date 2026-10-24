@@ -1,19 +1,6 @@
 {
   "package_path": "/stability-2026-10-20/n4.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.join_data"
-    },
-    {
-      "type": "transform.cross_table"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",

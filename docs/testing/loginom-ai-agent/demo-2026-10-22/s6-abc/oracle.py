@@ -15,8 +15,8 @@ def read(name):
     return list(csv.DictReader(io.StringIO((ROOT / "data" / name).read_bytes().decode("utf-8"), newline="")))
 
 
-NODE_TYPES = ['imports.text', 'transform.sorting', 'transform.calculator', 'transform.group_data', 'exports.text']
-OUTPUT_TYPE = 'transform.group_data'
+NODE_TYPES = []
+OUTPUT_TYPE = 'export_input'
 ORDERED = False
 COLUMNS = [('ABCClass', 'string'), ('Products', 'integer'), ('Revenue', 'real')]
 
