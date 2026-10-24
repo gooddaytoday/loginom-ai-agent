@@ -480,7 +480,8 @@ export type CampaignServerConfig = {
 
 async function prepareGeneration(manifest: CampaignManifest, config: CampaignServerConfig) {
   const { prepareEnvironment, verifyEnvironment } = await import("../src/environment-preparation")
-  const { createPair, readServerIdentity, verifyParallelPair } = await import("../src/parallel-pair")
+  const { createPair, readServerObservation, verifyParallelPair } = await import("../src/parallel-pair")
+  const { parseStableConfiguration } = await import("../src/user-environment")
   const { releaseClosedEnvironment } = await import("../src/startup-reconciliation")
   const preparedConfig = loadConfig(["--skip-judge", "--parallel", String(manifest.parallel)],
     { ...process.env, ...campaignEnvironment(manifest, config) })
@@ -495,6 +496,7 @@ async function prepareGeneration(manifest: CampaignManifest, config: CampaignSer
   const preparations = await Promise.all(file.slots.map(async slot => {
     const prepared = await readLeaseReceipt(path.join(file.controller.stateDir, `prepare-${slot.id}.json`)) as {
       version: number; kind: string; state: string; slotId: string; username: string; endpoint: string; identity: ServerIdentity
+      stableConfiguration?: unknown
     }
     if (prepared?.version !== 2 || prepared.kind !== "user-preparation" || prepared.state !== "staged" ||
       prepared.slotId !== slot.id || prepared.username !== slot.username || prepared.endpoint !== file.server.url ||
@@ -502,10 +504,11 @@ async function prepareGeneration(manifest: CampaignManifest, config: CampaignSer
         !/^[a-f0-9]{64}$/.test(prepared.identity[key as keyof ServerIdentity])) ||
       !Number.isFinite(Date.parse(prepared.identity.startedAt)) || !Number.isFinite(Date.parse(prepared.identity.studioStartedAt)))
       throw Error("CAMPAIGN_PREPARATION_UNCONFIRMED")
-    return prepared.identity
+    return { identity: prepared.identity, stableConfiguration: parseStableConfiguration(prepared.stableConfiguration) }
   }))
-  const old = preparations[0]!
-  if (preparations.some(identity => JSON.stringify(identity) !== JSON.stringify(old))) throw Error("CAMPAIGN_PREPARATION_UNCONFIRMED")
+  const old = preparations[0]!.identity, stableConfiguration = preparations[0]!.stableConfiguration
+  if (preparations.some(prepared => JSON.stringify(prepared.identity) !== JSON.stringify(old) ||
+    prepared.stableConfiguration?.hash !== stableConfiguration?.hash)) throw Error("CAMPAIGN_PREPARATION_UNCONFIRMED")
   const pairFile = path.join(file.controller.stateDir, "pair.json")
   const pair = await readLeaseReceipt(pairFile) as { version: number; kind: string; phase: string; purpose: "acceptance" | "research";
     nonce: string; resources: { server: string; studio: string; network: string } }
@@ -520,7 +523,8 @@ async function prepareGeneration(manifest: CampaignManifest, config: CampaignSer
   if (!Array.isArray(containers) || containers.length !== 2 || containers.some((container, index) =>
     container?.Id !== [old.containerId, old.studioContainerId][index] || typeof container.State?.Running !== "boolean"))
     throw Error("CAMPAIGN_PAIR_UNCONFIRMED")
-  const observed = containers.every(container => container.State.Running) ? await readServerIdentity(file) : undefined
+  const observation = containers.every(container => container.State.Running) ? await readServerObservation(file) : undefined
+  const observed = observation?.identity
   if (observed) await verifyParallelPair(file, observed)
   const retainedPreparation = reservation.state === "retained" && observed && JSON.stringify(reservation.identity) === JSON.stringify(observed) &&
     path.dirname(reservation.journal) === path.join(config.stateRoot, "environment-generations", observed.serverEpoch, "state")
@@ -538,10 +542,14 @@ async function prepareGeneration(manifest: CampaignManifest, config: CampaignSer
         throw Error("CAMPAIGN_GENERATION_OWNERSHIP_UNCONFIRMED")
     }
   }
-  const identity = observed ?? (await createPair(file, { purpose: pair.purpose,
+  const bootstrapped = observed ?? (await createPair(file, { purpose: pair.purpose,
     out: path.join(file.controller.stateDir, "pair-bootstrap"), lockRoot: globalLockRoot })).identity
+  const current = observation ?? await readServerObservation(file)
+  const identity = current.identity
+  if (JSON.stringify(identity) !== JSON.stringify(bootstrapped)) throw Error("CAMPAIGN_GENERATION_IDENTITY_CHANGED")
   if (identity.containerId !== old.containerId || identity.studioContainerId !== old.studioContainerId ||
-    identity.configurationHash !== old.configurationHash) throw Error("CAMPAIGN_GENERATION_IDENTITY_CHANGED")
+    (stableConfiguration ? current.stableConfiguration.hash !== stableConfiguration.hash : identity.configurationHash !== old.configurationHash))
+    throw Error("CAMPAIGN_GENERATION_IDENTITY_CHANGED")
   const root = path.join(config.stateRoot, "environment-generations", identity.serverEpoch)
   const slotsFile = path.join(root, "slots.json"), resourceBudgetFile = path.join(root, "budget.json")
   const selected = config.slotsFile === slotsFile

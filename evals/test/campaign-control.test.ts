@@ -28,6 +28,110 @@ await Bun.write(file, JSON.stringify(count + 1))
   return { root, manifest, manifestFile, serverFile, config, async close() { await rm(root, { recursive: true, force: true }) } }
 }
 
+test.skipIf(process.env.EVAL_PAIR_INTEGRATION !== "1" || process.env.EVAL_SYSTEMD_TESTS !== "1")(
+  "generation continuity uses stable proof and preserves legacy and ownership guards", async () => {
+    const { createPair, destroyPair, readServerObservation } = await import("../src/parallel-pair")
+    const { acquireResourceLease, globalLockRoot } = await import("../src/lease")
+    const { parseSlots } = await import("../src/slots")
+    const { evalsRoot } = await import("../src/config")
+    const { parallelFixture } = await import("./helpers/parallel-fixture")
+    const fixture = await controlFixture(), native = await parallelFixture(fixture.root)
+    const name = `eval-continuity-${crypto.randomUUID().slice(0, 8)}`
+    const listener = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
+    const url = `http://127.0.0.1:${listener.port}/app/`
+    listener.stop(true)
+    const slots = parseSlots({ ...native.slots, server: { ...native.slots.server, container: `${name}-server`,
+      studioContainer: `${name}-studio`, network: name, alias: "loginom-server-7.4.2-test", url } }, 1)
+    const options = { purpose: "research" as const, out: path.join(fixture.root, "evidence"), lockRoot: globalLockRoot }
+    const api = Bun.serve({ port: 0, fetch() { return Response.json([]) } })
+    try {
+      const created = await createPair(slots, options), before = await readServerObservation(slots)
+      await writeLeaseReceipt(slots.controller.adminCredentialsFile, { username: "unused", password: "unused" })
+      await writeLeaseReceipt(fixture.config.slotsFile, slots)
+      // These real reservations are never used by a CLI or judge; release proves only that fact.
+      for (const key of [`judge:${slots.judge.codexHome}`, ...slots.slots.map(slot => `profile:${slot.profileDir}`)]) {
+        const commandId = crypto.randomUUID(), journal = path.join(fixture.root, `${commandId}.json`)
+        await writeLeaseReceipt(journal, { commandId, kind: "unused-continuity-probe", key })
+        const lease = await acquireResourceLease({ key, journal, commandId, lockRoot: globalLockRoot })
+        try {
+          const proof = path.join(fixture.root, `${commandId}-released.json`)
+          await writeLeaseReceipt(proof, { version: 2, status: "confirmed", key, token: lease.reservation.token, revision: lease.reservation.revision })
+          await lease.release(proof)
+        } finally { await lease.close() }
+      }
+      // Data-only receipt inputs; this does not simulate native account preparation or CLI execution.
+      const writePreparations = async (identity: typeof before.identity, proofs: unknown[]) => {
+        for (const [index, slot] of slots.slots.entries()) await writeLeaseReceipt(path.join(slots.controller.stateDir, `prepare-${slot.id}.json`), {
+          version: 2, kind: "user-preparation", state: "staged", slotId: slot.id, username: slot.username, endpoint: url, identity,
+          ...(proofs[index] === undefined ? {} : { stableConfiguration: proofs[index] }),
+        })
+      }
+      await writePreparations(before.identity, slots.slots.map(() => before.stableConfiguration))
+      fixture.manifest.pins = { EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: process.execPath, EVAL_AGENT_MODEL: "unused/model",
+        EVAL_AGENT_VARIANT: "medium", JUDGE_MODEL: "unused", JUDGE_REASONING: "xhigh" }
+      await writeLeaseReceipt(fixture.manifestFile, fixture.manifest)
+      await writeLeaseReceipt(fixture.config.experimentPinsFile, { cli: process.execPath,
+        cliBinarySha256: new Bun.CryptoHasher("sha256").update(await Bun.file(process.execPath).bytes()).digest("hex") })
+      await writeLeaseReceipt(fixture.config.resourceBudgetFile, [])
+      await Bun.write(fixture.config.multica.tokenFile, "fixture-token", { mode: 0o600 })
+      await writeLeaseReceipt(fixture.serverFile, { ...fixture.config, harnessRoot: evalsRoot,
+        acceptedHarness: (await Bun.$`git -C ${evalsRoot} rev-parse HEAD`.quiet()).text().trim(),
+        verifyCommand: [process.execPath, fixture.config.slotsFile, "{verificationDir}"],
+        multica: { ...fixture.config.multica, url: `http://127.0.0.1:${api.port}` } })
+      const reserved = await controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")
+      await writeLeaseReceipt(path.join(fixture.root, "control/journal.json"), { ...reserved, repairing: true, repairer: "EvalBaseline" })
+      await Bun.$`docker restart ${created.identity.containerId} ${created.identity.studioContainerId}`.quiet()
+      const after = await readServerObservation(slots)
+      expect(after.identity.configurationHash).not.toBe(before.identity.configurationHash)
+      expect(after.stableConfiguration).toEqual(before.stableConfiguration)
+      const server = await Bun.file(fixture.serverFile).text()
+      const check = async (error: string) => {
+        await expect(controlCampaign(fixture.manifestFile, fixture.serverFile, "prepare-generation", "EvalBaseline")).rejects.toThrow(error)
+        expect(await Bun.file(fixture.serverFile).text()).toBe(server)
+        expect(await Bun.file(path.join(fixture.root, "environment-generations")).exists()).toBe(false)
+        expect(await Bun.file(fixture.config.batchEnvFile).exists()).toBe(false)
+        expect(await readLeaseReceipt(path.join(fixture.root, "control/journal.json"))).toMatchObject({ attempts: [], batches: [], repairing: true })
+      }
+      await check("RESOURCE_BUDGET_INVALID")
+      await writePreparations(before.identity, [])
+      await check("CAMPAIGN_GENERATION_IDENTITY_CHANGED")
+      await writePreparations(after.identity, [])
+      await check("CAMPAIGN_GENERATION_UNCHANGED")
+      for (const proofs of [[before.stableConfiguration], [before.stableConfiguration, null],
+        [before.stableConfiguration, { version: 1, hash: "f".repeat(64) }]]) {
+        await writePreparations(before.identity, proofs)
+        await check(proofs[1] === null ? "USER_PREPARATION_CONFLICT" : "CAMPAIGN_PREPARATION_UNCONFIRMED")
+      }
+      await writePreparations({ ...before.identity, containerId: "f".repeat(64) }, slots.slots.map(() => before.stableConfiguration))
+      await check("CAMPAIGN_PAIR_UNCONFIRMED")
+      await writePreparations(before.identity, slots.slots.map(() => before.stableConfiguration))
+      const components = (await Bun.$`docker exec ${created.identity.containerId} cat /workdir/Components.cfg`.quiet()).text()
+      try {
+        await Bun.$`docker exec ${created.identity.containerId} sh -c ${'printf "\\n" >> /workdir/Components.cfg'}`.quiet()
+        await check("CAMPAIGN_GENERATION_IDENTITY_CHANGED")
+      } finally {
+        await Bun.$`docker exec ${created.identity.containerId} sh -c ${'printf %s "$1" > /workdir/Components.cfg'} sh ${components}`.quiet()
+      }
+      const commandId = crypto.randomUUID(), journal = path.join(fixture.root, `${commandId}.json`)
+      await writeLeaseReceipt(journal, { commandId, kind: "unused-continuity-probe" })
+      const lease = await acquireResourceLease({ key: `profile:${slots.slots[0]!.profileDir}`, journal, commandId, lockRoot: globalLockRoot })
+      try { await check("CAMPAIGN_GENERATION_RELEASE_UNCONFIRMED") }
+      finally {
+        const proof = path.join(fixture.root, `${commandId}-released.json`)
+        await writeLeaseReceipt(proof, { version: 2, status: "confirmed", key: lease.reservation.key, token: lease.reservation.token, revision: lease.reservation.revision })
+        await lease.release(proof)
+      }
+      await Bun.$`docker stop ${created.identity.containerId} ${created.identity.studioContainerId}`.quiet()
+      await check("RESOURCE_BUDGET_INVALID")
+    } finally {
+      api.stop(true)
+      await destroyPair(slots, options)
+      // Keep private release proofs referenced by the native global reservations.
+      console.error(`continuity probe evidence: ${fixture.root}`)
+    }
+  }, 90_000,
+)
+
 test("prepare generation requires the campaign owner before touching infrastructure", async () => {
   const fixture = await controlFixture()
   try {

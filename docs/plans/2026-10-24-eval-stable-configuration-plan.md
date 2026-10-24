@@ -51,9 +51,13 @@
 
 Файлы: `evals/script/run-campaign.ts`, существующий `campaign-control.test.ts`; ссылки и checkpoint в двух исходных планах.
 
-- [ ] Публичным controller-тестом получить RED→GREEN: одинаковый новый stable proof допускает новую epoch тех же owned контейнеров при изменившемся legacy hash. При all-legacy оставить прежний exact guard; смешанные/повреждённые/разные proofs, реальные config/foreign-resource изменения и незакрытое прежнее использование отклоняются.
-- [ ] Сравнивать старые proofs только с новым fenced observation; bootstrap identity должна точно совпасть с наблюдением. Сохранить все имеющиеся final/deadline/ownership/config-publish guards. Пройти целевые suite/typecheck и независимое ревью, коммит.
+- [x] Публичным controller-тестом получить RED→GREEN: одинаковый новый stable proof допускает новую epoch тех же owned контейнеров при изменившемся legacy hash. При all-legacy оставить прежний exact guard; смешанные/повреждённые/разные proofs, реальные config/foreign-resource изменения и незакрытое прежнее использование отклоняются.
+- [x] Сравнивать старые proofs только с новым fenced observation; bootstrap identity должна точно совпасть с наблюдением. Сохранить все имеющиеся final/deadline/ownership/config-publish guards. Пройти целевые suite/typecheck и независимое ревью, коммит.
 - [ ] После завершения LAB-134 поставить принятый frozen SHA штатно. В следующей согласованной полной кампании получить новые preparations до reboot и выполнить saved-node/controller-gap/host-reboot путь исходных планов. Сохранённое качество учитывается один раз, missing продолжается, очистка и публикация подтверждены. Не добавлять отдельную модельную кампанию только ради нового механизма.
+
+Локальная часть шага 3 проверена: public controller RED→GREEN на настоящей owned pair — 1 тест / 52 assertions; 167 связанных regression-тестов / 980 assertions и typecheck прошли; независимое ревью — PASS. Positive проверяет прохождение continuity guard до намеренно пустого budget, без вызова CLI preparation. Проверены legacy exact/drift, mixed/corrupt proofs, чужой ID, изменение Components.cfg, retained profile и stopped-pair bootstrap. Server config, admission и файлы generation не меняются. Новая полная preparation, поставка и host reboot ещё не подтверждены.
+
+Native controller требует чистый accepted checkout и штатный приватный `/var/lib/loginom-evals/locks`. Для RED→GREEN используется закрытый одноразовый Git-снимок текущих tracked evals; guard не отключается. Команда из его `evals/`: `LOGINOM_DOCK_API_KEY=unused-native-probe EVAL_PAIR_INTEGRATION=1 EVAL_SYSTEMD_TESTS=1 bun run test test/campaign-control.test.ts -t "generation continuity"`. Ключ в этой проверке — неиспользуемая строка, запрос модели не выполняется. Тест сохраняет private release proofs, на которые ссылаются реально освобождённые native reservations; собственная pair удаляется штатно.
 
 **Проверяемый результат:** полный reboot-путь кампании работает при неизменных закреплённых условиях; local restart test не заменяет эту проверку.
 
