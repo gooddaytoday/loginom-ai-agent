@@ -4,16 +4,22 @@ import vm from 'node:vm';
 import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
 import {verifyNodeTargetEffect} from '../lib/node-target.mjs';
 
-function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,contextLost=false,inputPort=0,outputPort=0,bindingsFault=null,selectionChange=null,selectionGuidChanged=false}={}) {
+function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,contextLost=false,inputPort=0,outputPort=0,bindingsFault=null,selectionChange=null,selectionGuidChanged=false,service=false}={}) {
   const start=Date.now();let clock=start,clicked=0,deleted=0,contextChecks=0;
   const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1'}};
   const edge={source:'source',output:0,target:'target',input:0};
   const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,dom_epoch:1,interaction_ready:true,
     nodes:['source','target'].map(id=>({ref:{document_id:'doc',workflow_id:'wf',node_id:id},label:id,dom_epoch:1})),links:[edge],foreign_links:[]};
-  const tid='MF;TF-1;Graph;source|Output_Data-'+outputPort+'|target|Input_Data-'+inputPort;
+  const tid=service?'MF;TF-1;Graph;source|Output_Connection-0|target|Input_Connection-0':'MF;TF-1;Graph;source|Output_Data-'+outputPort+'|target|Input_Data-'+inputPort;
+  if(service){
+    Object.assign(edge,{tid,output:'connection:0',input:'connection:0'});
+    graph.links=[];graph.foreign_links=[tid];graph.rest_connection_links=[edge];
+    graph.nodes[0].type='bg-vendor-icon-restclientconnection';graph.nodes[0].other_ports=['Output_Connection-0'];
+    graph.nodes[1].type='integration.rest_request';graph.nodes[1].other_ports=['Input_Connection-0'];
+  }
   const page={
     evaluate:async(fn,arg)=>{
-      if(fn.toString().includes('FLinks.FCollection'))return graph.links.map(e=>[selectionGuidChanged&&clicked?'changed':e.guid??'link',e.source,'source-port',e.target,'target-port']);
+      if(fn.toString().includes('FLinks.FCollection'))return (graph.rest_connection_links??graph.links).map(e=>[selectionGuidChanged&&clicked?'changed':e.guid??'link',e.source,'source-port',e.target,'target-port']);
       if(arg?.types){
         const result=structuredClone(graph);
         if(arg.read_bindings){
@@ -38,7 +44,7 @@ function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,c
       evaluate:async()=>({x:100,y:100}),
       waitFor:async()=>{},
       textContent:async()=> 'Удалить выделенную связь?',
-      click:async()=>{if(selector.includes('msgbox;tlb;yes')){deleted++;graph.links=[];}},
+      click:async()=>{if(selector.includes('msgbox;tlb;yes')){deleted++;graph.links=[];if(service){graph.foreign_links=[];graph.rest_connection_links=[];}}},
     }),
     mouse:{click:async()=>{clicked++;selectionChange?.(graph);},move:async()=>{}},
     waitForTimeout:async ms=>{clock+=ms;},
@@ -81,6 +87,13 @@ test('visible bend cannot authorize deleting another selected object',async()=>{
 test('unique selected owned link deletes once and passes full graph verification',async()=>{
   const f=await run({});assert.equal(f.receipt.status,'SUCCEEDED');assert.equal(f.receipt.cleanup_complete,true);
   assert.equal(f.stats().clicked,1);assert.equal(f.stats().deleted,1);assert.ok(verifyNodeTargetEffect(f.effect,f.graph));
+});
+test('D31 native removal resolves the typed service edge rather than tabular port 0',async()=>{
+  const f=await run({service:true});assert.equal(f.receipt.status,'SUCCEEDED',f.receipt.error);
+  assert.equal(f.stats().clicked,1);assert.equal(f.stats().deleted,1);assert.ok(verifyNodeTargetEffect(f.effect,f.graph));
+});
+for(const fault of ['wrongSelection','selectionGuidChanged'])test('D31 service deletion preserves '+fault+' guard',async()=>{
+  const f=await run({service:true,[fault]:true});assert.equal(f.receipt.status,'AMBIGUOUS');assert.equal(f.stats().deleted,0);
 });
 
 test('D19 removal resolves logical input 0 to the rendered REST Input_Data-2',async()=>{

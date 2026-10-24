@@ -23,16 +23,30 @@ const node = (graph, id) => {
 // One comparison is shared by immediate verification and lost-reply recovery.
 export function verifyNodeTargetEffect(effect, after, positionMatches) {
   const before=effect.before,p=effect.parameters,kind=effect.kind;
-  if(!after.complete || after.dom_epoch!==before.dom_epoch || after.document_id!==before.document_id || !same(after.workflow_ref,before.workflow_ref)
-    || !same(after.foreign_links,before.foreign_links))return null;
+  if(!after.complete || after.dom_epoch!==before.dom_epoch || after.document_id!==before.document_id || !same(after.workflow_ref,before.workflow_ref))return null;
   const keep=(g,ids,edges=[])=>({nodes:g.nodes.filter(n=>!ids.includes(n.ref.node_id)).map(domainNode),links:g.links.filter(e=>!edges.includes(edgeKey(e)))});
   if(kind==='create'){
     const added=after.nodes.filter(n=>!before.nodes.some(b=>b.ref.node_id===n.ref.node_id));
     if(added.length!==1 || added[0].type!==p.type)return null;
     const id=added[0].ref.node_id,auto=after.links.filter(e=>!before.links.some(b=>edgeKey(b)===edgeKey(e)));
+    // Loginom 7.4.2 also connects a nearby REST reference on a manual drop.
+    // Only the native reader's typed GUID pair may explain a new foreign tid.
+    const service=(after.rest_connection_links??[]).filter(e=>!(before.foreign_links??[]).includes(e.tid));
+    if(service.length>1 || service.some(e=>p.type!=='integration.rest_request'||e.target!==id
+      ||!before.nodes.some(n=>n.ref.node_id===e.source)||!nativeRestServiceEdge(after,e))
+      ||!same(after.foreign_links?.filter(tid=>!service.some(e=>e.tid===tid)),before.foreign_links)
+      ||!same((after.rest_connection_links??[]).filter(e=>!service.includes(e)),before.rest_connection_links??[]))return null;
     if(auto.some(e=>e.source!==id&&e.target!==id) || !same(keep(before,[id],auto.map(edgeKey)),keep(after,[id],auto.map(edgeKey))))return null;
-    return {node_id:id,auto_created_links:auto};
+    return {node_id:id,auto_created_links:auto,auto_created_service_links:service};
   }
+  if(kind==='remove_link'&&p.edge.output==='connection:0'&&p.edge.input==='connection:0'){
+    const service=(before.rest_connection_links??[]).filter(e=>same(e,p.edge));
+    return service.length===1&&nativeRestServiceEdge(before,service[0])
+      &&same(after.foreign_links,before.foreign_links.filter(tid=>tid!==service[0].tid))
+      &&same(after.rest_connection_links??[],before.rest_connection_links.filter(e=>e!==service[0]))
+      &&same(keep(before,[]),keep(after,[]))?{}:null;
+  }
+  if(!same(after.foreign_links,before.foreign_links))return null;
   if(['rename','move','add_input'].includes(kind)){
     let current,original;try{current=node(after,p.ref.node_id);original=node(before,p.ref.node_id);}catch{return null;}
     const field=kind==='rename'?'label':kind==='move'?'position':'inputs';
@@ -44,6 +58,14 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
     return present===(kind==='connect') && same(keep(before,[],[key]),keep(after,[],[key]))?{}:null;
   }
   return null;
+}
+
+function nativeRestServiceEdge(graph,edge){
+  const source=graph.nodes.filter(n=>n.ref.node_id===edge.source),target=graph.nodes.filter(n=>n.ref.node_id===edge.target);
+  return edge.output==='connection:0'&&edge.input==='connection:0'&&graph.foreign_links?.filter(tid=>tid===edge.tid).length===1
+    &&source.length===1&&target.length===1&&source[0].type==='bg-vendor-icon-restclientconnection'&&target[0].type==='integration.rest_request'
+    &&source[0].other_ports?.includes('Output_Connection-0')&&target[0].other_ports?.includes('Input_Connection-0')
+    &&[source[0],target[0]].every(n=>n.ref.document_id===graph.document_id&&n.ref.workflow_id===graph.workflow_ref.workflow_id);
 }
 
 // Internal graph phase of node.apply. The enclosing runtime owns the gate and
@@ -94,6 +116,9 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       budget();
       const before=refresh===0?original:await observe();
       if(!same(before,original))throw new Error('Graph target changed before local refresh');
+      if(kind==='remove_link'&&parameters.edge.output==='connection:0'
+        &&(request.target.kind!=='new'||parameters.edge.target!==state.targetId
+          ||!(state.auto_created_service_links??[]).some(e=>same(e,parameters.edge))))throw Error('Unowned REST service connection');
       if(operation.restQueryInput&&['remove_link','connect'].includes(kind)&&parameters.edge.target===request.target.ref.node_id
         &&(!restInputReplacement(before)||kind==='remove_link'&&!same(parameters.edge,operation.restQueryInput.edge)))
         throw Error('REST encoder input authorization changed before graph effect');
@@ -162,7 +187,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       const proof=verifyNodeTargetEffect(state.pending,graph,adapter.positionMatches);
       if (!recovery?.verified || recovery.cleanup_complete !== true || !proof) throw new Error('Pending graph effect is unresolved');
       state.receipts.push({ id: state.pending.id, kind: state.pending.kind, parameters: state.pending.parameters, verified: true, receipt: recovery });
-      if (state.pending.kind === 'create') {state.targetId = proof.node_id;state.auto_created_links=proof.auto_created_links;}
+      if (state.pending.kind === 'create') {state.targetId = proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;}
       state.pending = null;state.last_graph=structuredClone(graph); await commit(); graph = await observe();
       }
     }
@@ -219,14 +244,18 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     }
     if (!state.targetId) {
       const after = await change('create', {...request.target,position:request.target.position??state.newPosition}, (before, after) => {
-        const added = after.nodes.filter(n => !before.nodes.some(b => b.ref.node_id === n.ref.node_id));
-        if (added.length !== 1 || added[0].type !== request.target.type) return false;
-        const id = added[0].ref.node_id;
-        const auto = after.links.filter(e => !before.links.some(b => edgeKey(e) === edgeKey(b)));
-        if (auto.some(e => e.target !== id && e.source !== id) || !unchangedExcept(before, after, [id], auto.map(edgeKey))) return false;
-        state.targetId = id; state.auto_created_links = auto; return true;
+        const proof=verifyNodeTargetEffect({kind:'create',parameters:request.target,before},after,adapter.positionMatches);
+        if(!proof)return false;
+        state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;return true;
       });
       graph = after;
+    }
+    // An automatic service choice is not the caller's requested connection.
+    // Remove only this creation's proven edge through the existing native
+    // deletion procedure; the REST handler subsequently binds its own choice.
+    for(const edge of state.auto_created_service_links??[]){
+      if(!(graph.rest_connection_links??[]).some(e=>same(e,edge)))continue;
+      graph=await change('remove_link',{edge},(before,after)=>!!verifyNodeTargetEffect({kind:'remove_link',parameters:{edge},before},after,adapter.positionMatches));
     }
     let target = node(graph, state.targetId);
     if (request.target.label !== undefined && target.label !== request.target.label) {
@@ -301,7 +330,7 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
     }else{
     const proof=verifyNodeTargetEffect(effect,graph,adapter.positionMatches);
     if(!recovery.verified || recovery.cleanup_complete!==true || !proof)return {status:'AMBIGUOUS',phase:'target_incomplete',cleanup_complete:recovery.cleanup_complete===true,pending:effect.id};
-    if(effect.kind==='create'){state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;}
+    if(effect.kind==='create'){state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;}
     state.receipts.push({id:effect.id,kind:effect.kind,parameters:effect.parameters,verified:true,receipt:recovery});
     state.pending=null;state.last_graph=structuredClone(graph);
     }
