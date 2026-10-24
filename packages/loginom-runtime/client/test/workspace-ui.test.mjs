@@ -5826,6 +5826,23 @@ test('Files root breadcrumb exposes only a click owned by the unique current nav
  }
 });
 
+for(const locked of [false,true])test('D50 pre-gesture lock drift refuses without clicking and retains both exact contexts: '+locked,async()=>{
+ const page=new Page();page.add('button','MF;cntMain;tlbMainToolbar;btnProgress','Процессы');
+ const owner={verified:true,document_id:'doc',workflow_id:'workflow',node_id:'node',surface:'graph',tid:'MF;TF-1;Graph;Reform'};
+ let reads=0,acting=false;
+ const reader=async()=>({...owner,locked:acting&&++reads>=3?locked:!locked});
+ const run=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},reader);
+ const observed=await run({mode:'observe'}),control=observed.output.ui.elements.find(e=>e.tid.endsWith(';btnProgress'));
+ acting=true;
+ const refused=await run({mode:'act',operation_id:'lock-drift',action:{verb:'click',ref:control.ref},snapshot:observed.output});
+ assert.equal(refused.status,'NOT_APPLIED');assert.equal(refused.phase,'preconditions');
+ assert.equal(refused.error.code,'PREPARED_NODE_CONTEXT_CHANGED');assert.equal(refused.effect_possible,false);assert.equal(refused.cleanup_complete,true);
+ assert.deepEqual(page.events,[]);
+ const drift=refused.trace.find(e=>e.event==='prepared_node_context_changed_before_gesture');
+ assert.ok(drift);assert.deepEqual(clone(drift.before),{...owner,locked:!locked});assert.deepEqual(clone(drift.after),{...owner,locked});
+});
+
 test('read-only graph unlock discards a mixed snapshot and preserves identity guards',async()=>{
  for(const mode of ['unlock','foreign','unstable']) {
   const page=new Page();page.add('div','MF;TF-1;ModelForm;cmpDiagram');

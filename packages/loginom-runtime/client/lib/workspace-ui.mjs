@@ -3773,8 +3773,10 @@ function readRenderedInputMapping(observation) {
           targets.push(await checkedHandle(before, item));
         }
         const nodeBeforeGesture=await boundNode();
-        if(nodeBeforeGesture && !same(current.prepared_node_context,nodeBeforeGesture))
+        if(nodeBeforeGesture && !same(current.prepared_node_context,nodeBeforeGesture)) {
+          record('prepared_node_context_changed_before_gesture',{before:current.prepared_node_context,after:nodeBeforeGesture});
           fail('PREPARED_NODE_CONTEXT_CHANGED','The node surface changed before the gesture');
+        }
         if(['execute_graph_node','deactivate_graph_node'].includes(task.action.verb)) {
           const launch=await readUi(),before=current.ui.elements.find(e=>e.ref===task.action.ref),after=launch.ui.elements.find(e=>e.ref===task.action.ref);
           if(!before?.graph_execution||!after?.allowed_actions.includes(task.action.verb)||!same(before.graph_execution,after.graph_execution))
