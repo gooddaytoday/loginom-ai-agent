@@ -4,6 +4,58 @@ import { validateActionParameters } from '../lib/action-catalog.mjs';
 import { actions, selectors, build, Page, nodeParameters, linkPage, linkParameters, run, runtime } from './support/executor-fixture.mjs';
 import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from '../../tools/loginom-acceptance/javascript-persistence-save.mjs';
 
+test('both saves refuse a read-only native package self-path before any gesture', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) {
+    const page = linkPage(); page.packagePath = '\\user\\data\\packages\\locked.lgp';
+    Object.defineProperty(page.app.PackageTreeNode.prototype, 'ReadOnly', { get: () => true });
+    const clicked = [], click = page.click.bind(page);
+    page.click = async item => { clicked.push(item.symbol); return click(item); };
+    const outcome = await run(page, action, { path: '/user/data/packages/locked.lgp', conflict_policy: 'replace' });
+    assert.equal(outcome.status, 'FAILED', JSON.stringify(outcome));
+    assert.equal(outcome.effect_possible, false);
+    assert.equal(outcome.cleanup_complete, true);
+    assert.match(outcome.error.message, /read.only.*different.*path/i);
+    assert.deepEqual(clicked, []);
+    assert.equal(page.storage.size, 0);
+  }
+});
+
+test('read-only native packages can save an explicit copy and writable packages can replace themselves', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) for (const readOnly of [false,true]) {
+    const page = linkPage(); page.packagePath = '/user/data/packages/source.lgp';
+    Object.defineProperty(page.app.PackageTreeNode.prototype, 'ReadOnly', { get: () => readOnly });
+    const path = readOnly ? '/user/data/packages/copy.lgp' : page.packagePath;
+    const outcome = await run(page, action, { path, conflict_policy: 'replace' });
+    assert.equal(outcome.status, 'SUCCEEDED', JSON.stringify(outcome));
+    assert.ok(page.storage.has(path));
+  }
+});
+
+test('both saves reuse an already open Packages menu without a closing toggle', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) {
+    const page = linkPage(); page.menu = true;
+    const clicked = [], click = page.click.bind(page);
+    page.click = async item => {
+      clicked.push(item.symbol);
+      if (item.symbol === 'packages.menu') { page.menu = !page.menu; return; }
+      return click(item);
+    };
+    const outcome = await run(page, action, { path: '/user/data/packages/open-menu.lgp', conflict_policy: 'fail' });
+    assert.equal(outcome.status, 'SUCCEEDED', JSON.stringify(outcome));
+    assert.equal(clicked[0], 'packages.save_as');
+  }
+});
+
+test('a cleanup failure keeps the original Save exception in its existing trace', async () => {
+  const page = linkPage(), click = page.click.bind(page);
+  page.click = async item => { if (item.symbol === 'packages.save_as') throw Error('Primary Save refusal'); return click(item); };
+  page.keyboard.press = async () => {};
+  const outcome = await run(page, 'package.save_checkpoint', { path: '/user/data/packages/refused.lgp', conflict_policy: 'fail' });
+  assert.equal(outcome.error.code, 'CLEANUP_FAILED');
+  assert.equal(outcome.cleanup_complete, false);
+  assert.equal(outcome.trace.find(item => item.event === 'action_failed').message, 'Primary Save refusal');
+});
+
 async function arrangePage({ intent = 'new_draft', running = false, wizard = false } = {}) {
   const page = linkPage(), packageNode = new page.app.PackageTreeNode();
   page.storageBinding = { session_id: 'own-session', document_id: 'own-document' };
