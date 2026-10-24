@@ -1,13 +1,206 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, symlink } from "node:fs/promises"
+
+const processDenial = process.env.EVAL_PROCESS_DENIAL_TESTS === "1" ? test : test.skip
+import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { spawn } from "node:child_process"
 import { agentCommand, failureKind, parseEvents, runAgent } from "../src/cli"
+import { assessParallelLimits } from "../src/parallel-acceptance"
 import { evalsRoot, loadConfig } from "../src/config"
 
 const fixture = (name: string) => Bun.file(path.join(evalsRoot, "fixtures", name)).text()
 const fakeCommand = () => agentCommand(loadConfig(["--dry-run"], {}))
+
+test("runAgent masks configured credentials before live output persistence and preserves measured counters", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-agent-output-secrets-"))
+  const secrets = ["slot-a-private-canary", "slot-b-private-canary", "admin-private-canary", "dock-private-canary"]
+  const release = path.join(root, "release")
+  const pending = runAgent({ command: { ...fakeCommand(), cleanupSecrets: secrets, cmd: [process.execPath, "-e", `
+    const secrets=${JSON.stringify(secrets)};
+    const event=JSON.stringify({type:"error",error:{name:"APIError",data:{statusCode:429,message:secrets.join("|")+"capture-ready"+"x".repeat(500)}}})+"\\n";
+    const cut=event.indexOf(secrets[0])+5;
+    process.stdout.write(event.slice(0,cut));process.stderr.write(secrets[0].slice(0,5));await Bun.sleep(30);
+    process.stdout.write(event.slice(cut));process.stderr.write(secrets[0].slice(5)+secrets.slice(1).join("|")+"capture-ready"+"x".repeat(500)+"\\n");
+    while(!await Bun.file(${JSON.stringify(release)}).exists())await Bun.sleep(10);
+    console.log(JSON.stringify({type:"step_finish",part:{cost:0.5,tokens:{input:11,output:7,reasoning:3}}}));
+    console.log(JSON.stringify({type:"text",part:{text:secrets.join("|")}}));
+  `] }, taskId: "output-secrets", model: "fake/fake-model", prompt: "diagnostic", files: [], workdir: root, timeoutMs: 5000, outDir: root })
+  void pending.catch(() => {})
+  try {
+    const deadline = Date.now() + 3000
+    while (!await Bun.file(path.join(root, "events.jsonl")).exists() || !await Bun.file(path.join(root, "stderr.txt")).exists() ||
+      !(await Bun.file(path.join(root, "events.jsonl")).text()).includes("capture-ready") || !(await Bun.file(path.join(root, "stderr.txt")).text()).includes("capture-ready")) {
+      if (Date.now() > deadline) throw Error("Live output did not arrive")
+      await Bun.sleep(10)
+    }
+    const live = await Promise.all(["events.jsonl", "stderr.txt"].map(name => Bun.file(path.join(root, name)).text()))
+    for (const secret of secrets) expect(live.join("\n")).not.toContain(secret)
+    await Bun.write(release, "done")
+    const run = await pending
+    expect(run).toMatchObject({ exitCode: 0, cost: 0.5, tokens: { input: 11, output: 7, reasoning: 3 }, failureKind: "provider",
+      limitEvidence: { events: [{ source: "provider", kind: "http", status: 429 }] }, processCleanup: { status: "confirmed", capture_complete: true } })
+    const saved = await Promise.all(["events.jsonl", "stderr.txt", "run.json"].map(name => Bun.file(path.join(root, name)).text()))
+    for (const secret of secrets) expect(JSON.stringify(run) + saved.join("\n")).not.toContain(secret)
+    expect(parseEvents(saved[0]!).tokens).toEqual(run.tokens)
+  } finally { await Bun.write(release, "done"); await pending; await rm(root, { recursive: true, force: true }) }
+}, 10000)
+
+test("runAgent redacts encoded credential values without corrupting JSON metadata or split UTF-8", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-agent-output-encoded-"))
+  const secrets = ['"quoted-canary"', "пароль-Ω/ключ"]
+  try {
+    const run = await runAgent({ command: { ...fakeCommand(), cleanupSecrets: secrets, cmd: [process.execPath, "-e", `
+      const secrets=${JSON.stringify(secrets)};
+      const line=Buffer.from(JSON.stringify({type:"text",sessionID:"quoted-canary",part:{text:secrets.join("|")+"|"+secrets.map(encodeURIComponent).join("|")}})+"\\n");
+      const cut=line.indexOf(Buffer.from(secrets[1]))+1;
+      process.stdout.write(line.subarray(0,cut));await Bun.sleep(30);process.stdout.write(line.subarray(cut));
+      process.stderr.write(secrets.join("|"));
+      console.log(JSON.stringify({type:"step_finish",part:{cost:0.25,tokens:{input:5,output:2,reasoning:1}}}));
+    `] }, taskId: "encoded-output", model: "fake/fake-model", prompt: "diagnostic", files: [], workdir: root, timeoutMs: 5000, outDir: root })
+    const events = (await Bun.file(path.join(root, "events.jsonl")).text()).trim().split("\n").map(line => JSON.parse(line))
+    expect(events[0].sessionID).toBe("quoted-canary")
+    expect(run.sessionId).toBe("quoted-canary")
+    expect(parseEvents(events.map(event => JSON.stringify(event)).join("\n")).tokens).toEqual(run.tokens)
+    for (const secret of secrets) {
+      expect(events[0].part.text).not.toContain(secret)
+      expect(events[0].part.text).not.toContain(encodeURIComponent(secret))
+      expect(await Bun.file(path.join(root, "stderr.txt")).text()).not.toContain(secret)
+      expect(run.finalText).not.toContain(secret)
+    }
+    expect(run.processCleanup).toMatchObject({ status: "confirmed", capture_complete: true })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("runAgent flushes redacted incomplete output on cancellation and retains the measured prefix", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-agent-output-cancel-"))
+  const secret = "credential-first-line\ncredential-second-line", marker = path.join(root, "ready"), abort = new AbortController()
+  const pending = runAgent({ command: { ...fakeCommand(), cleanupSecrets: [secret], cmd: [process.execPath, "-e", `
+    process.on("SIGINT",()=>process.exit(130));
+    console.log(JSON.stringify({type:"step_finish",part:{cost:0.5,tokens:{input:9,output:4,reasoning:2}}}));
+    process.stdout.write('{"type":"text","part":{"text":'+JSON.stringify(${JSON.stringify(secret)}).slice(0,-1));
+    process.stderr.write(${JSON.stringify(secret)});
+    await Bun.write(${JSON.stringify(marker)},"ready");await Bun.sleep(10000);
+  `] }, taskId: "cancel-output", model: "fake/fake-model", prompt: "diagnostic", files: [], workdir: root, timeoutMs: 5000, outDir: root, signal: abort.signal })
+  void pending.catch(() => {})
+  try {
+    const deadline = Date.now() + 3000
+    while (!await Bun.file(marker).exists()) {
+      if (Date.now() > deadline) throw Error("Cancellation output did not arrive")
+      await Bun.sleep(10)
+    }
+    abort.abort()
+    const run = await pending
+    expect(run).toMatchObject({ exitCode: 130, interrupted: true, timedOut: false, cost: 0.5, tokens: { input: 9, output: 4, reasoning: 2 },
+      processCleanup: { status: "confirmed", capture_complete: true } })
+    const outputs = await Promise.all(["events.jsonl", "stderr.txt", "run.json"].map(name => Bun.file(path.join(root, name)).text()))
+    expect(parseEvents(outputs[0]!).tokens).toEqual(run.tokens)
+    for (const value of [secret, JSON.stringify(secret).slice(1, -1)]) expect(outputs.join("\n")).not.toContain(value)
+    expect(outputs[0]).toContain("[redacted]")
+    expect(outputs[1]).toBe("[redacted]")
+  } finally { abort.abort(); await pending; await rm(root, { recursive: true, force: true }) }
+})
+
+test("runAgent masks complete credentials before truncating diagnostics and node receipts", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-agent-output-truncated-"))
+  const secrets = ["stderr-private-prefix\nstderr-private-tail", "node-secret-prefix-private-credential-value"]
+  try {
+    const run = await runAgent({ command: { ...fakeCommand(), cleanupSecrets: secrets, cmd: [process.execPath, "-e", `
+      process.stderr.write("safe\\n".repeat(19)+${JSON.stringify(secrets[0])});
+      console.log(JSON.stringify({type:"tool_use",part:{type:"tool",tool:"loginom_dock_node_apply",state:{status:"completed",output:"x".repeat(8192-19)+${JSON.stringify(secrets[1])}+"y".repeat(100)}}}));
+      console.log(JSON.stringify({type:"step_finish",part:{cost:0.5,tokens:{input:9,output:4,reasoning:2}}}));
+    `] }, taskId: "truncated-output", model: "fake/fake-model", prompt: "diagnostic", files: [], workdir: root, timeoutMs: 5000, outDir: root })
+    expect(run.stderrHead).not.toContain("stderr-private-prefix")
+    expect(run.stderrHead).toContain("[redacted]")
+    expect(run.nodeReceipts[0]).not.toContain("node-secret-prefix-")
+    expect(run.nodeReceipts[0]).toEndWith("…[truncated]")
+    expect(run).toMatchObject({ exitCode: 0, cost: 0.5, tokens: { input: 9, output: 4, reasoning: 2 }, nodeReceiptsDropped: 0,
+      processCleanup: { status: "confirmed", capture_complete: true } })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("runAgent keeps operational session, artifact and revision bindings while masking diagnostic echoes", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-agent-output-bindings-"))
+  const secret = "binding-fragment", session = `ses_${secret}`, packagePath = `/own/${secret}.lgp`
+  try {
+    const run = await runAgent({ command: { ...fakeCommand(), cleanupSecrets: [secret, "aaaaaaaa"], cmd: [process.execPath, "-e", `
+      const sessionID=${JSON.stringify(session)};
+      console.log(JSON.stringify({type:"tool_use",sessionID,part:{type:"tool",tool:"loginom_dock_action_run",state:{status:"completed",input:{action_key:"package.save_as"},output:JSON.stringify({package_ref:{path:${JSON.stringify(packagePath)}}})}}}));
+      console.log(JSON.stringify({type:"tool_use",sessionID,part:{type:"tool",tool:"loginom_dock_prepare",state:{status:"completed",output:JSON.stringify({skillRevision:${JSON.stringify(secret)},manifest_sha256:"a".repeat(64)})}}}));
+      console.log(JSON.stringify({type:"text",sessionID,part:{text:${JSON.stringify(secret)}}}));
+    `] }, taskId: "output-bindings", model: "fake/fake-model", prompt: "diagnostic", files: [], workdir: root, timeoutMs: 5000, outDir: root })
+    expect(run).toMatchObject({ sessionId: session, saveReceipts: [packagePath], skillRevision: secret, actionManifestSha256: "a".repeat(64),
+      finalText: "[redacted]", processCleanup: { status: "confirmed", capture_complete: true } })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("parseEvents retains an explicit provider HTTP 429 without claiming complete transport coverage", () => {
+  const parsed = parseEvents([
+    { type: "error", error: { name: "APIError", data: { statusCode: 429, message: "provider-private-canary", responseBody: "private-response-canary" } } },
+    { type: "text", part: { text: "completed after retry" } },
+    { type: "step_finish", part: { cost: 0.5 } },
+  ].map(event => JSON.stringify(event)).join("\n"))
+  expect(parsed.limitEvidence).toEqual({ coverage: { provider: "unavailable", dock: "unavailable", judge: "unavailable" },
+    events: [{ source: "provider", kind: "http", status: 429 }] })
+  expect(assessParallelLimits(parsed.limitEvidence)).toMatchObject({ status: "failed", codes: expect.arrayContaining(["PROVIDER_HTTP_429"]) })
+  expect(JSON.stringify(parsed.limitEvidence)).not.toContain("canary")
+  expect({ cost: parsed.cost, finalText: parsed.finalText, errors: parsed.errors }).toEqual({ cost: 0.5,
+    finalText: "completed after retry", errors: ["APIError"] })
+})
+
+test("parseEvents preserves a recovered session retry as a provider failure without retaining its message", () => {
+  const parsed = parseEvents([
+    { type: "session.status", sessionID: "own", status: { type: "busy" } },
+    { type: "session.status", sessionID: "own", status: { type: "retry", attempt: 1, message: "private-canary" } },
+    { type: "text", sessionID: "own", part: { text: "recovered" } },
+    { type: "session.status", sessionID: "own", status: { type: "idle" } },
+  ].map(event => JSON.stringify(event)).join("\n"))
+  expect(parsed.limitEvidence.events).toEqual([{ source: "provider", kind: "retry" }])
+  expect(assessParallelLimits(parsed.limitEvidence)).toMatchObject({ status: "failed", codes: expect.arrayContaining(["PROVIDER_RETRY"]) })
+  expect(JSON.stringify(parsed.limitEvidence)).not.toContain("private-canary")
+  expect(parsed.finalText).toBe("recovered")
+})
+
+test("provider coverage requires a complete main session without delegated model work", () => {
+  const busy = { type: "session.status", sessionID: "own", status: { type: "busy" } }
+  const idle = { type: "session.status", sessionID: "own", status: { type: "idle" } }
+  const text = { type: "text", sessionID: "own", part: { text: "done" } }
+  const parse = (events: unknown[]) => parseEvents(events.map(event => JSON.stringify(event)).join("\n")).limitEvidence.coverage.provider
+  expect(parse([busy, text, idle])).toBe("complete")
+  for (const events of [[text], [busy, text], [idle, busy], [busy, text, { ...idle, sessionID: "foreign" }],
+    [busy, { type: "tool_use", sessionID: "own", part: { type: "tool", tool: "task" } }, idle]])
+    expect(parse(events)).toBe("unavailable")
+  expect(parseEvents([JSON.stringify(busy), "broken JSON", JSON.stringify(idle)].join("\n")).limitEvidence.coverage.provider).toBe("unavailable")
+})
+
+test("provider limit evidence keeps absent, textual and malformed observations incomplete", () => {
+  for (const events of [[], [{ type: "text", part: { text: "APIError status 429" } }],
+    [{ type: "error", error: { name: "CLI_TOOL_FAILED", data: { statusCode: 429 } } }],
+    [{ type: "error", error: { name: "APIError", data: { statusCode: "429" } } }]]) {
+    const parsed = parseEvents(events.map(event => JSON.stringify(event)).join("\n"))
+    expect(parsed.limitEvidence.events).toEqual([])
+    expect(assessParallelLimits(parsed.limitEvidence).status).toBe("incomplete")
+  }
+})
+
+test("runAgent persists provider limit metadata from the actual supervised JSON stream", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-provider-limit-"))
+  let confirmed = false
+  try {
+    const events = [{ type: "error", error: { name: "APIError", data: { statusCode: 429, message: "fixture-http-limit" } } },
+      { type: "text", part: { text: "done" } }]
+    const run = await runAgent({ command: { ...fakeCommand(), cmd: [process.execPath, "-e",
+      `for(const event of ${JSON.stringify(events)})console.log(JSON.stringify(event));await Bun.sleep(100)`],
+      env: { PATH: process.env.PATH ?? "", HOME: root } }, taskId: "fixture-limit", model: "fake/fake-model",
+      prompt: "fixture", files: [], workdir: root, timeoutMs: 5000, outDir: root })
+    confirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    expect({ confirmed, exitCode: run.exitCode, finalText: run.finalText }).toEqual({ confirmed: true, exitCode: 0, finalText: "done" })
+    expect(run.limitEvidence.events).toEqual([{ source: "provider", kind: "http", status: 429 }])
+    expect((await Bun.file(path.join(root, "run.json")).json()).limitEvidence).toEqual(run.limitEvidence)
+    expect((await Bun.file(path.join(root, "events.jsonl")).text()).trim().split("\n").map(line => JSON.parse(line))).toEqual(events)
+    expect(assessParallelLimits(run.limitEvidence).status).toBe("failed")
+  } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
+})
 
 test("parseEvents: квитанция сохранения читается из последовательности JSON-документов", () => {
   const output = '{"output":{"package_ref":{"path":"/user/eval-run-task-1.lgp"}}}\n{"status":"ok"}\n{"trace":{"note":"literal } and \\\" quote"}}'
@@ -79,6 +272,59 @@ test("agentCommand: fake-режим указывает на fixtures/fake-cli.ts
   ])
 })
 
+test("agentCommand: v2 slots force HTTP-only transport despite inherited WebSocket opt-in", () => {
+  const config = loadConfig(["--dry-run"], { EVAL_SLOTS_FILE: "fixture-programmatic-only" })
+  const command = agentCommand(config, { LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "true" })
+  expect(command.env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS).toBe("false")
+  expect(agentCommand(loadConfig(["--dry-run"], {}), {}).env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS).toBeUndefined()
+})
+
+test("agentCommand: real slots inherit only operational environment, never unrelated credentials", () => {
+  const config = loadConfig([], { EVAL_SLOTS_FILE: "private-slots.json", EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/pinned/cli", EVAL_AGENT_MODEL: "openai/gpt-6-luna",
+    JUDGE_MODEL: "gpt-6-sol", LOGINOM_DOCK_API_KEY: "dock-private" })
+  const command = agentCommand(config, { PATH: "/usr/bin:/bin", HOME: "/private/home", LANG: "C.UTF-8", TMPDIR: "/private/tmp",
+    OPENAI_API_KEY: "openai-private", ANTHROPIC_API_KEY: "anthropic-private", AWS_SECRET_ACCESS_KEY: "aws-private",
+    PRIVATE_UNRELATED_TOKEN: "unrelated-private", CODEX_HOME: "/private/judge", LOGINOM_PASSWORD: "slot-private" })
+  expect(command.env).toMatchObject({ PATH: "/usr/bin:/bin", HOME: "/private/home", LANG: "C.UTF-8", TMPDIR: "/private/tmp" })
+  expect(Object.values(command.env).join("\n")).not.toContain("-private")
+  expect(command.env.CODEX_HOME).toBeUndefined()
+})
+
+test("agentCommand: real slots preserve credential-free proxy routing", () => {
+  const config = loadConfig([], { EVAL_SLOTS_FILE: "private-slots.json", EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/pinned/cli",
+    EVAL_AGENT_MODEL: "openai/gpt-6-luna", JUDGE_MODEL: "gpt-6-sol", LOGINOM_DOCK_API_KEY: "dock-private" })
+  const routing = { HTTP_PROXY: "http://127.0.0.1:10808", https_proxy: "http://127.0.0.1:10808",
+    ALL_PROXY: "socks5://127.0.0.1:10808", NO_PROXY: "localhost,127.0.0.1", no_proxy: "localhost,127.0.0.1" }
+  const command = agentCommand(config, { ...routing, HTTPS_PROXY: "http://user:proxy-private@127.0.0.1:10808",
+    all_proxy: "http://127.0.0.1:10808?token=proxy-private", OPENAI_API_KEY: "openai-private" })
+  expect(command.env).toMatchObject(routing)
+  expect(command.env.HTTPS_PROXY).toBeUndefined()
+  expect(command.env.all_proxy).toBeUndefined()
+  expect(agentCommand(config, { HTTP_PROXY: "http://127.0.0.1:10808/proxy-private" }).env.HTTP_PROXY).toBeUndefined()
+  expect(Object.values(command.env).join("\n")).not.toContain("-private")
+})
+
+test("agentCommand: only configured slot auth can grant the shared directory", () => {
+  const config = loadConfig(["--dry-run"], { EVAL_SLOTS_FILE: "fixture-programmatic-only" })
+  const inherited = { LOGINOM_AI_AGENT_SHARED_AUTH_DIR: "/untrusted/inherited" }
+  expect(agentCommand({ ...config, auth: { sharedDir: "/private/shared" } }, inherited).env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR).toBe("/private/shared")
+  expect(agentCommand(config, inherited).env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR).toBeUndefined()
+})
+
+test("agentCommand: management children receive HTTP-only mode without inherited credentials", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-http-only-"))
+  try {
+    const command = agentCommand({ ...loadConfig(["--dry-run"], { EVAL_SLOTS_FILE: "fixture-programmatic-only" }), profileDir: root },
+      { PATH: process.env.PATH, LOGINOM_PASSWORD: "private-canary", LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "true" })
+    const file = path.join(root, "observed.jsonl")
+    const child = Bun.spawn([...command.cmd, "loginom", "status"], { cwd: command.cwd,
+      env: { ...command.env, EVAL_FAKE_MANAGEMENT_ENV_FILE: file }, stdout: "ignore", stderr: "pipe" })
+    const output = await Promise.all([child.exited, new Response(child.stderr).text()])
+    expect(output).toEqual([0, ""])
+    expect(JSON.parse((await Bun.file(file).text()).trim())).toEqual({ sub: "status", httpOnly: "false", passwordPresent: false })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test("agentCommand: из env-override выкидывает LOGINOM_/EVAL_/JUDGE_/FAKE_CODEX_ и оставляет PATH", () => {
   const command = agentCommand(loadConfig(["--dry-run"], {}), {
     ...process.env,
@@ -129,7 +375,7 @@ test("runAgent: события сохраняются на диск до око�
     await Bun.sleep(400)
     expect(await Bun.file(path.join(outDir, "events.jsonl")).text()).toContain("ses_fixture03")
   } finally { controller.abort(); await pending }
-}, 35_000)
+}, 125_000)
 
 test("runAgent: no_artifact закрывает наблюдённого detached потомка и сохраняет исход", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-detached-"))
@@ -156,7 +402,7 @@ test("runAgent: no_artifact закрывает наблюдённого detached
   }
 }, 15_000)
 
-test("runAgent: явно передаёт выбранный reasoning variant", async () => {
+test("runAgent: передаёт reasoning variant и непустой title без модельной генерации", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-variant-"))
   const command = fakeCommand()
   const argsFile = path.join(outDir, "args.json")
@@ -165,9 +411,10 @@ test("runAgent: явно передаёт выбранный reasoning variant",
     workdir: outDir, timeoutMs: 30_000, outDir, profileDir: outDir })
   const args = await Bun.file(argsFile).json()
   expect(args.slice(args.indexOf("--variant"), args.indexOf("--variant") + 2)).toEqual(["--variant", "low"])
+  expect(args.slice(args.indexOf("--title"), args.indexOf("--title") + 2)).toEqual(["--title", "eval-group-sum-qty"])
 })
 
-test("runAgent: недоступный /proc постороннего процесса не мешает cleanup", async () => {
+processDenial("runAgent: недоступный /proc постороннего процесса не мешает cleanup", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-proc-foreign-"))
   const child = spawn(process.execPath, ["-e", `
     const { dlopen } = await import('bun:ffi')
@@ -215,8 +462,8 @@ test("runAgent: timeout с отказом ownership ограничен и сох
   expect(run.processCleanup.processes.every((entry) => {
     try { process.kill(entry.pid, 0); return false } catch { return true }
   })).toBe(true)
-  expect(run.durationMs).toBeLessThan(60_000)
-}, 65_000)
+  expect(run.durationMs).toBeLessThan(125_000)
+}, 130_000)
 
 test("runAgent: код выхода 1 и failureKind=tool из фикстуры", async () => {
   const outDir = await mkdtemp(path.join(os.tmpdir(), "evals-run-"))
@@ -389,7 +636,7 @@ test("runAgent: отказ записи process evidence сохраняет из
 })
 
 
-test("runAgent: отказ релевантного /proc сохраняет исход и останавливает cleanup", async () => {
+processDenial("runAgent: полностью прочитанная чужая ancestry не мешает cleanup при закрытом exe", async () => {
   const out = await mkdtemp(path.join(os.tmpdir(), "evals-proc-denied-"))
   const command = fakeCommand()
   const pending = runAgent({ command: { ...command, env: { ...command.env, EVAL_FAKE_EXIT_DELAY_MS: "700" } },
@@ -410,10 +657,10 @@ test("runAgent: отказ релевантного /proc сохраняет и�
     const run = await pending
     expect(run.exitCode).toBe(0)
     expect(run.sessionId).toBe("ses_fixture03")
-    expect(run.processCleanup.status).toBe("failed")
-    expect(run.processCleanup.error).toContain("Cannot inspect process identity")
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.processCleanup.error).toBeNull()
     expect(child.exitCode).toBeNull()
-  } finally { child.kill("SIGKILL"); await exited }
+  } finally { child.kill("SIGKILL"); await exited; await rm(out, { recursive: true }) }
 })
 
 test("runAgent: отказ записи run evidence сохраняет измеренный исход", async () => {

@@ -1,11 +1,11 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { cp, mkdtemp, rm } from "node:fs/promises"
+import { chmod, cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
 import os from "node:os"
 import { fetchArtifact, parseArtifactSource } from "../src/artifact"
 import { evalsRoot, loadConfig } from "../src/config"
 import { EvalFailure } from "../src/fail"
-import { judgeCommand, judgedFields, judgeInfo, judgeTask, prepareJudgeDir, scoreVerdict, type JudgeSettings, type Verdict } from "../src/judge"
+import { createJudgeGate, judgeCommand, judgedFields, judgeInfo, judgeTask, prepareJudgeDir, scoreVerdict, type JudgeSettings, type Verdict } from "../src/judge"
 import { aggregate } from "../src/report"
 import { loadTasks } from "../src/task"
 import { analyzeComparison, parseComparisonSummary } from "../src/compare-analysis"
@@ -63,12 +63,86 @@ test("judgeCommand: флаги codex exec и абсолютные пути", () 
   expect(cmd.join(" ")).toContain("--output-schema /tmp/j/verdict.schema.json -o /tmp/j/verdict.json -")
 })
 
+test("judgeCommand disables hidden HTTP and stream retries for its selected provider", () => {
+  const cmd = judgeCommand({ command: ["codex"], dir: "/judge", model: "gpt-6-sol", reasoning: "xhigh" })
+  const config = cmd.flatMap((arg, index) => arg === "-c" ? [cmd[index + 1]] : [])
+  expect(config).toContain("model_provider=evals-openai")
+  expect(config).toContain("model_providers.evals-openai.requires_openai_auth=true")
+  expect(config).toContain("model_providers.evals-openai.request_max_retries=0")
+  expect(config).toContain("model_providers.evals-openai.stream_max_retries=0")
+})
+
 test("judgeInfo: версия судьи и sha256 промпта", async () => {
   const info = await judgeInfo(loadConfig(["--judge-only", "x"], { JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: fakeJudge }))
   expect(info).toMatchObject({ backend: "codex", codex_version: "fake-codex 0.0.0", model: "fake", reasoning: "high" })
   expect(info.prompt_sha256).toMatch(/^[0-9a-f]{64}$/)
   expect(info.schema_sha256).toMatch(/^[0-9a-f]{64}$/)
 })
+
+test("judgeInfo: version probe drains its child before returning metadata", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-version-child-"))
+  const pidFile = path.join(root, "child.pid")
+  const pending = judgeInfo(loadConfig(["--judge-only", "x"], { JUDGE_MODEL: "fake",
+    EVAL_JUDGE_COMMAND: `${fakeJudge} --child-pid-file ${pidFile}` }))
+  const state = async () => {
+    if (!await Bun.file(pidFile).exists()) return undefined
+    const raw = await readFile(`/proc/${(await Bun.file(pidFile).text()).trim()}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return ""
+      throw error
+    })
+    return raw ? raw.slice(raw.lastIndexOf(")") + 2).split(" ") : undefined
+  }
+  try {
+    for (let wait = 0; wait < 500 && !await Bun.file(pidFile).exists(); wait++) await Bun.sleep(10)
+    const birth = (await state())![19]
+    expect((await pending).codex_version).toBe("fake-codex 0.0.0")
+    const current = await state()
+    expect(!current || current[19] !== birth || ["Z", "X"].includes(current[0]!)).toBe(true)
+  } finally {
+    await pending
+    // The unqualified version path leaves this self-expiring fixture alive; never signal by PID alone.
+    for (let wait = 0; wait < 1200; wait++) {
+      const current = await state()
+      if (!current || ["Z", "X"].includes(current[0]!)) break
+      await Bun.sleep(10)
+    }
+    await rm(root, { recursive: true, force: true })
+  }
+}, 20_000)
+
+test("judgeInfo: abort during a version probe drains its child and refuses metadata", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-version-abort-"))
+  const pidFile = path.join(root, "child.pid")
+  const abort = new AbortController()
+  const pending = judgeInfo(loadConfig(["--judge-only", "x"], { JUDGE_MODEL: "fake",
+    EVAL_JUDGE_COMMAND: `${fakeJudge} --child-pid-file ${pidFile}` }), abort.signal)
+  const state = async () => {
+    if (!await Bun.file(pidFile).exists()) return undefined
+    const raw = await readFile(`/proc/${(await Bun.file(pidFile).text()).trim()}/stat`, "utf8").catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return ""
+      throw error
+    })
+    return raw ? raw.slice(raw.lastIndexOf(")") + 2).split(" ") : undefined
+  }
+  try {
+    for (let wait = 0; wait < 500 && !await Bun.file(pidFile).exists(); wait++) await Bun.sleep(10)
+    expect(await Bun.file(pidFile).exists()).toBe(true)
+    const birth = (await state())![19]
+    abort.abort()
+    await expect(pending).rejects.toThrow("JUDGE_VERSION_UNCONFIRMED")
+    const current = await state()
+    expect(!current || current[19] !== birth || ["Z", "X"].includes(current[0]!)).toBe(true)
+  } finally {
+    abort.abort()
+    await pending.catch(() => {})
+    for (let wait = 0; wait < 1200; wait++) {
+      const current = await state()
+      if (!current || ["Z", "X"].includes(current[0]!)) break
+      await Bun.sleep(10)
+    }
+    await rm(root, { recursive: true, force: true })
+  }
+}, 20_000)
 
 test("judgeInfo: --version не наследует секреты harness и сохраняет обычное окружение", async () => {
   const probe = await probeJudgeEnvironment("info")
@@ -134,6 +208,216 @@ const settings = (env: Record<string, string> = {}): JudgeSettings => ({
   timeoutMs: 30_000,
   passThreshold: 70,
   env,
+})
+
+async function gateFixture() {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-gate-"))
+  const artifact = await fixtureArtifact()
+  const [task] = await loadTasks(path.join(evalsRoot, "tasks"), ["group-sum-qty"])
+  const trace = path.join(root, "intervals.jsonl")
+  const records = async () => await Bun.file(trace).exists()
+    ? (await Bun.file(trace).text()).trim().split("\n").map(line => JSON.parse(line) as { kind: "start" | "end"; pid: number; dir: string; at: string }) : []
+  return {
+    root, records,
+    input(id: string, env: Record<string, string> = {}, signal?: AbortSignal) {
+      return { task: task!, artifactDir: path.dirname(artifact.unpackedDir), prompt: "p", outDir: path.join(root, id, "judge"),
+        judge: settings({ FAKE_CODEX_GATE_LOG: trace, FAKE_CODEX_DELAY_MS: "200", ...env }), signal }
+    },
+    async started(id: string) {
+      const deadline = Date.now() + 5_000
+      while (Date.now() < deadline) {
+        const row = (await records()).find(row => row.kind === "start" && row.dir === path.join(root, id, "judge"))
+        if (row) return row
+        await Bun.sleep(5)
+      }
+      throw Error("fake-codex did not start")
+    },
+    async close() { await rm(root, { recursive: true, force: true }); await rm(path.dirname(artifact.unpackedDir), { recursive: true, force: true }) },
+  }
+}
+
+test("judgeTask: supervisor drains the judge's child before returning a verdict", async () => {
+  const fixture = await gateFixture()
+  const pidFile = path.join(fixture.root, "judge-child.pid")
+  const active = async () => {
+    if (!await Bun.file(pidFile).exists()) return false
+    const raw = await Bun.file(`/proc/${(await Bun.file(pidFile).text()).trim()}/stat`).text().catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return ""
+      throw error
+    })
+    return raw !== "" && !["Z", "X"].includes(raw.slice(raw.lastIndexOf(")") + 2).split(" ")[0]!)
+  }
+  try {
+    const input = fixture.input("owned-child")
+    const result = await judgeTask({ ...input, judge: { ...input.judge,
+      command: [...input.judge.command, "--child-pid-file", pidFile] } })
+    expect(result).toMatchObject({ ok: true, attempts: 1 })
+    expect(await active()).toBe(false)
+    const proof = await Bun.file(path.join(fixture.root, "owned-child/judge-processes-1/process-cleanup.json")).json()
+    expect(proof.status).toBe("confirmed")
+    const pid = Number(await Bun.file(pidFile).text())
+    expect(proof.processes.some((entry: { pid: number }) => entry.pid === pid)).toBe(true)
+  } finally {
+    const deadline = Date.now() + 15_000
+    while (await active()) {
+      if (Date.now() > deadline) throw Error("Fixture child did not finish")
+      await Bun.sleep(25)
+    }
+    await fixture.close()
+  }
+}, 20_000)
+
+test("judgeTask: unconfirmed process evidence refuses verdict and retry", async () => {
+  const fixture = await gateFixture()
+  try {
+    await mkdir(path.join(fixture.root, "failed-proof/judge-processes-1/process-cleanup.json"), { recursive: true, mode: 0o700 })
+    const result = await judgeTask(fixture.input("failed-proof"))
+    expect(result).toMatchObject({ ok: false, cleanupUnconfirmed: true, attempts: 1 })
+    expect(result.ok ? "" : result.error).toContain("Process evidence persistence failed")
+    expect((await fixture.records()).filter(row => row.kind === "start")).toHaveLength(1)
+  } finally { await fixture.close() }
+})
+
+test("judgeTask: cleanup uncertainty during the second invocation remains in the outcome", async () => {
+  const fixture = await gateFixture()
+  try {
+    await mkdir(path.join(fixture.root, "failed-second/judge-processes-2/process-cleanup.json"), { recursive: true, mode: 0o700 })
+    const result = await judgeTask(fixture.input("failed-second", { FAKE_CODEX_EXIT: "9" }))
+    expect(result).toMatchObject({ ok: false, cleanupUnconfirmed: true, attempts: 2 })
+  } finally { await fixture.close() }
+})
+
+test("judge gate: unknown cleanup blocks waiting and future invocations without spawning children", async () => {
+  const fixture = await gateFixture()
+  const gate = createJudgeGate()
+  try {
+    await mkdir(path.join(fixture.root, "a/judge-processes-1/process-cleanup.json"), { recursive: true, mode: 0o700 })
+    const [a, b] = await Promise.all([gate(fixture.input("a")), gate(fixture.input("b"))])
+    expect(a).toMatchObject({ ok: false, cleanupUnconfirmed: true, attempts: 1 })
+    expect(b).toMatchObject({ ok: false, cleanupUnconfirmed: true, attempts: 0 })
+    expect(await gate(fixture.input("c"))).toMatchObject({ ok: false, cleanupUnconfirmed: true, attempts: 0 })
+    expect((await fixture.records()).filter(row => row.kind === "start")).toHaveLength(1)
+  } finally { await fixture.close() }
+})
+
+test("judge gate: failed process-output persistence blocks later invocations", async () => {
+  const fixture = await gateFixture()
+  const gate = createJudgeGate()
+  try {
+    await mkdir(path.join(fixture.root, "a/judge-events-1.jsonl"), { recursive: true, mode: 0o700 })
+    const a = await gate(fixture.input("a"))
+    expect(a).toMatchObject({ ok: false, cleanupUnconfirmed: true })
+    expect(await gate(fixture.input("b"))).toMatchObject({ ok: false, cleanupUnconfirmed: true, attempts: 0 })
+    expect((await fixture.records()).filter(row => row.kind === "start")).toHaveLength(1)
+  } finally { await fixture.close() }
+})
+
+test("judge gate: actual fake-codex intervals do not overlap", async () => {
+  const fixture = await gateFixture()
+  const gate = createJudgeGate()
+  try {
+    const [a, b] = await Promise.all([gate(fixture.input("a")), gate(fixture.input("b"))])
+    expect(a).toMatchObject({ ok: true, attempts: 1 })
+    expect(b).toMatchObject({ ok: true, attempts: 1 })
+    const rows = await fixture.records()
+    expect(rows.map(row => [path.basename(path.dirname(row.dir)), row.kind])).toEqual([["a", "start"], ["a", "end"], ["b", "start"], ["b", "end"]])
+    expect(BigInt(rows[2]!.at)).toBeGreaterThanOrEqual(BigInt(rows[1]!.at))
+  } finally { await fixture.close() }
+})
+
+test("judge gate: abort during waiting skips the child and preserves the queue predecessor", async () => {
+  const fixture = await gateFixture()
+  const gate = createJudgeGate()
+  const abort = new AbortController()
+  let aSettled = false
+  const a = gate(fixture.input("a", { FAKE_CODEX_DELAY_MS: "1000" })).finally(() => { aSettled = true })
+  const b = gate(fixture.input("b", {}, abort.signal))
+  const pending = [a, b]
+  try {
+    await fixture.started("a")
+    abort.abort()
+    expect(await b).toEqual({ ok: false, error: "interrupted before judge", attempts: 0 })
+    expect(aSettled).toBe(false)
+    expect(await Bun.file(path.join(fixture.root, "b/judge/TASK.md")).exists()).toBe(false)
+    const c = gate(fixture.input("c"))
+    pending.push(c)
+    expect(await a).toMatchObject({ ok: true })
+    expect(await c).toMatchObject({ ok: true })
+    expect((await fixture.records()).map(row => [path.basename(path.dirname(row.dir)), row.kind]))
+      .toEqual([["a", "start"], ["a", "end"], ["c", "start"], ["c", "end"]])
+  } finally { abort.abort(); await Promise.allSettled(pending); await fixture.close() }
+})
+
+test("judge gate: the entire internal retry precedes the next actual child", async () => {
+  const fixture = await gateFixture()
+  const gate = createJudgeGate()
+  try {
+    const [a, b] = await Promise.all([gate(fixture.input("a", { FAKE_CODEX_FLAKY_MARKER: path.join(fixture.root, "flaky") })), gate(fixture.input("b"))])
+    expect(a).toMatchObject({ ok: true, attempts: 2 })
+    expect(b).toMatchObject({ ok: true, attempts: 1 })
+    const rows = await fixture.records()
+    expect(rows.map(row => [path.basename(path.dirname(row.dir)), row.kind]))
+      .toEqual([["a", "start"], ["a", "end"], ["a", "start"], ["a", "end"], ["b", "start"], ["b", "end"]])
+    expect(BigInt(rows[4]!.at)).toBeGreaterThanOrEqual(BigInt(rows[3]!.at))
+  } finally { await fixture.close() }
+})
+
+test("judge gate: a preparation exception releases the next judge", async () => {
+  const fixture = await gateFixture()
+  const gate = createJudgeGate()
+  const input = fixture.input("a")
+  try {
+    await cp(input.task.dir, path.join(fixture.root, "bad-task"), { recursive: true })
+    await cp(path.join(evalsRoot, "fixtures/storage/not-a-package.lgp"), path.join(fixture.root, "bad-task", input.task.reference))
+    const [a, b] = await Promise.allSettled([gate({ ...input, task: { ...input.task, dir: path.join(fixture.root, "bad-task") } }), gate(fixture.input("b"))])
+    expect(a).toMatchObject({ status: "rejected", reason: expect.any(EvalFailure) })
+    expect(b).toMatchObject({ status: "fulfilled", value: { ok: true, attempts: 1 } })
+    expect((await fixture.records()).map(row => [path.basename(path.dirname(row.dir)), row.kind])).toEqual([["b", "start"], ["b", "end"]])
+  } finally { await fixture.close() }
+})
+
+for (const stop of ["error", "timeout", "abort"] as const) test(`judge gate: ${stop} drains A before releasing B`, async () => {
+  const fixture = await gateFixture()
+  const gate = createJudgeGate()
+  const abort = new AbortController()
+  const input = fixture.input("a", { FAKE_CODEX_DELAY_MS: stop === "error" ? "200" : "5000", ...(stop === "error" ? { FAKE_CODEX_EXIT: "9" } : {}) }, abort.signal)
+  let finishedAt = 0
+  const a = gate({ ...input, judge: { ...input.judge, timeoutMs: stop === "timeout" ? 500 : 30_000 } }).finally(() => { finishedAt = Date.now() })
+  const b = gate(fixture.input("b"))
+  try {
+    if (stop === "abort") { await fixture.started("a"); abort.abort() }
+    const [first, second] = await Promise.all([a, b])
+    expect(first).toMatchObject({ ok: false, attempts: stop === "abort" ? 1 : 2 })
+    expect(second).toMatchObject({ ok: true, attempts: 1 })
+    const rows = await fixture.records()
+    const owned = rows.filter(row => row.kind === "start" && row.dir === path.join(fixture.root, "a/judge"))
+    expect(owned).toHaveLength(stop === "abort" ? 1 : 2)
+    expect(await Promise.all(owned.map(row => Bun.file(`/proc/${row.pid}/stat`).exists()))).toEqual(owned.map(() => false))
+    expect(Number(rows.find(row => row.kind === "start" && row.dir === path.join(fixture.root, "b/judge"))!.at)).toBeGreaterThanOrEqual(finishedAt)
+  } finally { abort.abort(); await Promise.allSettled([a, b]); await fixture.close() }
+})
+
+test("judge gate: actual child uses judge CODEX_HOME without inherited model or admin environment", async () => {
+  const fixture = await gateFixture()
+  const probe = path.join(fixture.root, "environment.json")
+  const wrapper = path.join(fixture.root, "probe.ts")
+  await Bun.write(wrapper, `await Bun.write(${JSON.stringify(probe)},JSON.stringify(Object.fromEntries(["LOGINOM_AI_AGENT_SHARED_AUTH_DIR","LOGINOM_DOCK_API_KEY","LOGINOM_AI_AGENT_CLI_PROFILE","EVAL_ADMIN_CREDENTIALS_FILE","CODEX_HOME"].map(key=>[key,process.env[key]??null]))));await import(${JSON.stringify(path.join(evalsRoot, "fixtures/fake-codex.ts"))});`)
+  const input = fixture.input("probe")
+  const configured = { ...input, judge: { ...input.judge, command: [process.execPath, wrapper],
+    env: { ...input.judge.env, CODEX_HOME: path.join(fixture.root, "judge-codex") }, timeoutMs: 2_000 } }
+  const child = Bun.spawn([process.execPath, "-e", `import {createJudgeGate} from ${JSON.stringify(path.join(evalsRoot, "src/judge.ts"))};console.log(JSON.stringify(await createJudgeGate()(${JSON.stringify(configured)})));`], {
+    env: { ...process.env, LOGINOM_AI_AGENT_SHARED_AUTH_DIR: "model-auth-canary", LOGINOM_DOCK_API_KEY: "dock-canary",
+      LOGINOM_AI_AGENT_CLI_PROFILE: "agent-profile-canary", EVAL_ADMIN_CREDENTIALS_FILE: "admin-canary", CODEX_HOME: "desktop-home-canary" },
+    stdout: "pipe", stderr: "pipe",
+  })
+  try {
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect(code).toBe(0)
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, attempts: 1 })
+    expect(await Bun.file(probe).json()).toEqual({ LOGINOM_AI_AGENT_SHARED_AUTH_DIR: null, LOGINOM_DOCK_API_KEY: null,
+      LOGINOM_AI_AGENT_CLI_PROFILE: null, EVAL_ADMIN_CREDENTIALS_FILE: null, CODEX_HOME: path.join(fixture.root, "judge-codex") })
+    expect(stdout + stderr).not.toContain("canary")
+  } finally { child.kill(); await child.exited; await fixture.close() }
 })
 
 const judgeFixture = async (env: Record<string, string> = {}) => {
@@ -368,4 +652,22 @@ test("scoreVerdict: дробные веса полного успеха оста
   const saved = parseComparisonSummary(JSON.parse(JSON.stringify(run)))
   expect(analyzeComparison(saved, saved).axes.structure.observed).toEqual({ a: 1, b: 1, drop: 0 })
   expect(scored.structural_score).toBe(100)
+})
+
+test("judgeTask: VPN verdict requires terminal named unit and unconfirmed cleanup prevents retry", async () => {
+  const fixture = await gateFixture()
+  try {
+    const query = path.join(fixture.root, "queried")
+    const systemctl = path.join(fixture.root, "systemctl")
+    for (const state of ["inactive", "active"]) {
+      await Bun.write(systemctl, `#!/bin/sh\nprintf '%s\n' "$@" > '${query}'\nprintf 'LoadState=loaded\nActiveState=${state}\nMainPID=0\n'\n`)
+      await chmod(systemctl, 0o700)
+      const input = fixture.input(state, { PATH: fixture.root + ":" + process.env.PATH! })
+      input.judge = { ...input.judge, systemd: true, command: [process.execPath, path.join(evalsRoot, "fixtures/fake-codex.ts")] }
+      const result = await judgeTask(input)
+      expect(result).toMatchObject(state === "inactive" ? { ok: true, pass: true, attempts: 1 }
+        : { ok: false, cleanupUnconfirmed: true, attempts: 1 })
+      expect(await Bun.file(query).text()).toContain("loginom-evals-judge-")
+    }
+  } finally { await fixture.close() }
 })

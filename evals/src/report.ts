@@ -1,5 +1,7 @@
 import { rename } from "node:fs/promises"
 import path from "node:path"
+import type { AgentRun } from "./cli"
+import { assessParallelLimits } from "./parallel-acceptance"
 
 export type Status = "completed" | "failed" | "timeout" | "interrupted" | "no_artifact" | "harness_error" | "infra_error"
 export type JudgeStatus = "scored" | "no_artifact" | "skipped" | "error"
@@ -32,6 +34,8 @@ export function statusFor(
 }
 
 export type AttemptResult = {
+  limit_evidence?: AgentRun["limitEvidence"]
+  slot_id?: string
   task_id: string
   attempt: number
   infra_retry?: { initial: AttemptResult }
@@ -48,6 +52,7 @@ export type AttemptResult = {
   oracle_error?: string | null
   judge_status: JudgeStatus
   judge_attempts: number
+  judge_cleanup_unconfirmed?: boolean
   judge_confidence: string | null
   judge_summary: string | null
   checklist: { id: string; passed: boolean; evidence: string }[] | null
@@ -118,6 +123,17 @@ function runsOf(attempts: AttemptResult[]) {
   return attempts.flatMap((item) => item.infra_retry ? [item.infra_retry.initial, item] : [item])
 }
 
+export function aggregateLimits(attempts: AttemptResult[], requiredSources?: readonly ("provider" | "dock" | "judge")[]) {
+  const runs = runsOf(attempts)
+  return assessParallelLimits({
+    coverage: Object.fromEntries((["provider", "dock", "judge"] as const).map(source =>
+      [source, runs.length && runs.every(run => run.limit_evidence?.coverage[source] === "complete" ||
+        requiredSources && source === "judge" && !run.judge_cleanup_unconfirmed &&
+        (run.judge_status === "scored" && run.judge_attempts > 0 || ["no_artifact", "skipped"].includes(run.judge_status) && run.judge_attempts === 0)) ? "complete" : "unavailable"])),
+    events: runs.flatMap(run => run.limit_evidence?.events ?? []),
+  }, requiredSources)
+}
+
 export function aggregateTask(attempts: AttemptResult[], skipJudge: boolean) {
   const base = aggregate(attempts, skipJudge)
   const scores = scoresOf(attempts.filter((item) => item.status !== "interrupted" && item.status !== "harness_error" && item.status !== "infra_error"))
@@ -142,6 +158,9 @@ export type RubricSnapshot = {
   oracle_tolerance: number
 }
 export type RunSummary = {
+  parallel_limits?: ReturnType<typeof aggregateLimits> & { required_sources?: ("provider" | "dock" | "judge")[] }
+  resources?: { status: "passed" | "failed" | "incomplete"; evidence: string; codes: string[] }
+  slots?: { id: string; username: string; profileDir: string; workspaceRoot: string; historyDir: string; liveQualified: boolean; state?: "planned" | "closed" | "quarantined"; lease_receipt?: string; cleanup_receipt?: string; storage_root?: string; storage_leftovers?: string[] | null; storage_error?: string | null }[]
   run_id: string
   label: string | null
   started_at: string
@@ -162,6 +181,7 @@ export type RunSummary = {
   rubric_hash: string
   task_ids: string[]
   config: {
+    parallel?: number
     repeat: number; timeout_ms: number; judge_timeout_ms: number; pass_threshold: number; keep_storage: boolean
     tasks_dir?: string; task_timeout_ms?: Record<string, number>
   }
@@ -183,10 +203,15 @@ const cell = (text: string) => text.replaceAll("|", "\\|").replace(/(?:\r?\n)+/g
 
 export function renderReport(summary: RunSummary) {
   const m = summary.metrics
+  const scoped = Boolean(summary.slots?.length || (summary.config.parallel ?? 1) > 1)
+  const wall = Date.parse(summary.finished_at) - Date.parse(summary.started_at)
   const head = [
     `# Eval ${summary.run_id}${summary.label ? ` (${summary.label})` : ""}`,
     "",
     `Агент: ${summary.agent.model} · ${summary.agent.cli_mode} · CLI ${summary.agent.cli_version ?? "неизвестен"} · variant ${summary.agent.variant ?? "неизвестен"} · source ${summary.agent.source_commit ?? (summary.agent.cli_mode === "source" ? summary.agent.git_sha : null) ?? "неизвестен"}${summary.agent.source_dirty ? "-dirty" : ""} · binary sha256 ${summary.agent.binary_sha256 ?? "—"}. Судья: ${summary.judge ? `${summary.judge.model}/${summary.judge.reasoning}` : "пропущен"}. Повторов: ${summary.config.repeat}.`,
+    `Параллельность: ${summary.config.parallel ?? 1}. Длительность прогона: ${Number.isFinite(wall) && wall >= 0 ? (wall / 1000).toFixed(1) + "s" : "—"}. Сумма времени агентов: ${(m.total_duration_ms / 1000).toFixed(1)}s.`,
+    ...(summary.parallel_limits ? [`Проверка лимитов${summary.parallel_limits.required_sources ? ` обязательных источников (${summary.parallel_limits.required_sources.join(", ")})` : ""}: ${summary.parallel_limits.status} · ${cell(summary.parallel_limits.codes.join(", ") || "—")}`] : []),
+    ...(summary.resources ? [`Ресурсы: ${summary.resources.status} · [evidence](${summary.resources.evidence}) · ${cell(summary.resources.codes.join(", ") || "—")}`] : []),
     summary.interrupted ? "**Прогон прерван (Ctrl+C): метрики по завершённым попыткам.**" : "",
     summary.stopped_reason ? `**Прогон остановлен: ${cell(summary.stopped_reason)}**` : "",
     "",
@@ -202,6 +227,8 @@ export function renderReport(summary: RunSummary) {
     `- failure_kinds: ${Object.entries(m.failure_kinds).map(([kind, count]) => `${kind}=${count}`).join(", ") || "—"}`,
     `- tool_calls: ${m.tool_calls}, tool_errors: ${m.tool_errors}, memory_tool_calls: ${m.memory_tool_calls}${m.memory_tool_calls > 0 ? " **(агент писал в память Dock)**" : ""}`,
     `- total_cost: ${m.total_cost}, total_duration: ${Math.round(m.total_duration_ms / 60000)} мин`,
+    ...(summary.slots?.length ? ["", "## Слоты", "", "| Слот | Пользователь | Состояние | Cleanup receipt |", "|---|---|---|---|",
+      ...summary.slots.map(slot => `| ${cell(slot.id)} | ${cell(slot.username)} | ${cell(slot.state ?? "unknown")} | ${cell(slot.cleanup_receipt ?? slot.lease_receipt ?? "—")} |`)] : []),
     "",
     "## Задачи",
     "",
@@ -214,12 +241,12 @@ export function renderReport(summary: RunSummary) {
     "",
     "## Попытки",
     "",
-    "| Задача | # | Статус | Код | failure_kind | score | pass | oracle | Время | Стоимость | Судья | Cleanup |",
-    "|---|---|---|---|---|---|---|---|---|---|---|---|",
+    `| Задача | # | ${scoped ? "Слот | " : ""}Статус | Код | failure_kind | score | pass | oracle | Время | Стоимость | Судья | Cleanup |`,
+    `|---|---|${scoped ? "---|" : ""}---|---|---|---|---|---|---|---|---|---|`,
     ...summary.tasks.flatMap((task) =>
       runsOf(task.attempts).map(
         (item) =>
-          `| ${task.id} | ${item.attempt}${item.infra_retry ? " (повтор)" : ""} | ${item.status} | ${item.exit_code ?? "—"} | ${item.failure_kind ?? "—"} | ${item.score ?? "—"} | ${item.pass === null ? "—" : item.pass ? "✓" : "✗"} | ${item.oracle_pass === undefined || item.oracle_pass === null ? "—" : item.oracle_pass ? "✓" : `✗ ${cell(item.oracle_error ?? "")}`} | ${Math.round(item.duration_ms / 1000)}s | ${item.cost.toFixed(4)} | ${cell(item.judge_summary ?? item.judge_status)} | ${item.environment_cleanup?.status === "confirmed" ? "confirmed" : item.environment_cleanup?.status === "failed" ? "failed" : "не проверялось"} |`,
+          `| ${task.id} | ${item.attempt}${item.infra_retry ? " (повтор)" : ""} | ${scoped ? `${cell(item.slot_id ?? "default")} | ` : ""}${item.status} | ${item.exit_code ?? "—"} | ${item.failure_kind ?? "—"} | ${item.score ?? "—"} | ${item.pass === null ? "—" : item.pass ? "✓" : "✗"} | ${item.oracle_pass === undefined || item.oracle_pass === null ? "—" : item.oracle_pass ? "✓" : `✗ ${cell(item.oracle_error ?? "")}`} | ${Math.round(item.duration_ms / 1000)}s | ${item.cost.toFixed(4)} | ${cell(item.judge_summary ?? item.judge_status)} | ${item.environment_cleanup?.status === "confirmed" ? "confirmed" : item.environment_cleanup?.status === "failed" ? "failed" : "не проверялось"} |`,
       ),
     ),
   ]
@@ -241,7 +268,7 @@ export function renderReport(summary: RunSummary) {
             "## Остатки в хранилище",
             "",
             ...summary.storage_leftovers.map((name) => `- ${name}`),
-            ...(summary.loginom.container && summary.loginom.storage_dir
+            ...(!scoped && summary.loginom.container && summary.loginom.storage_dir
               ? [
                   "",
                   "```bash",
@@ -251,5 +278,13 @@ export function renderReport(summary: RunSummary) {
               : []),
           ]
         : []
-  return [...head, "", "## Отказы", "", ...(failures.length ? failures : ["— нет"]), ...leftovers, ""].join("\n")
+  const storage = summary.slots?.filter(slot => slot.storage_leftovers !== undefined) ?? []
+  return [...head, "", "## Отказы", "", ...(failures.length ? failures : ["— нет"]), ...leftovers,
+    ...(storage.length ? ["", "## Хранилища слотов", "", ...storage.map(slot =>
+      `- ${cell(slot.id)}: ${cell(slot.storage_root ?? "—")} — ${slot.storage_leftovers === null
+        ? `не удалось получить листинг: ${cell(slot.storage_error ?? "причина неизвестна")}`
+        : slot.storage_leftovers!.length ? slot.storage_leftovers!.map(cell).join(", ") : "остатков нет"}`)] : []),
+    ...(scoped && (summary.storage_leftovers === null || summary.storage_leftovers.length)
+      ? ["", summary.resources ? "Карантин сохраняется до проверки остатков в начале следующего run; неизвестность требует решения владельца."
+        : "Адресное восстановление: `parallel-env recover` со slot_id и сохранённым incident/lease receipt."] : []), ""].join("\n")
 }

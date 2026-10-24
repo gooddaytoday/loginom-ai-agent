@@ -6,18 +6,24 @@ import { evaluationContractHash, rubricSnapshot } from "./evaluation"
 import { agentInputsHash, buildAgentPrompt, loadTasks, rubricHash, taskTimeoutMs, type Task } from "./task"
 import { agentCommand, runAgent, type AgentCommand } from "./cli"
 import { cleanupArtifact, cleanupIsolatedStorage, cleanupOrphanResult, fetchArtifact, listStorage, parseArtifactSource, storageEntryExists, type ArtifactSource } from "./artifact"
-import { checkIsolatedLoginom, preflight } from "./preflight"
+import { checkIsolatedLoginom, preflight, type SlotStorageContext } from "./preflight"
 import { archiveProfileHistory, assertAuth, ensureProfile, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "./profile"
-import { judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
+import { createJudgeGate, judgeInfo, judgeTask, judgedFields, type JudgeSettings } from "./judge"
 import { archiveDiagnostics } from "./diagnostics"
+import { redactKnownSecrets } from "./output-redaction"
 import type { ProcessCleanup } from "./process-supervisor"
 import { acquireRunHarnessLease } from "./node-eval-ops"
 import { SandboxFailure } from "./sandbox"
 import { reserveRunDirectory } from "./run-directory"
-import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
+import { writeLeaseReceipt } from "./lease"
+import { aggregate, aggregateLimits, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
 export async function main(argv: string[], env: Record<string, string | undefined> = process.env) {
   const config = loadConfig(argv, env)
+  if (config.slotsFile && (config.judgeOnly !== undefined || config.calibrate)) {
+    const { runOfflineJudge } = await import("./judge-environment")
+    return runOfflineJudge(config)
+  }
   if (config.judgeOnly !== undefined) {
     const { rejudge } = await import("./rejudge")
     return rejudge(config, config.judgeOnly)
@@ -26,6 +32,12 @@ export async function main(argv: string[], env: Record<string, string | undefine
     const { calibrate } = await import("./calibrate")
     return calibrate(config)
   }
+  if (config.slotsFile && !config.dryRun && !config.resourceBudgetFile) throw new EvalFailure("RESOURCE_BUDGET_REQUIRED", 2)
+  if (config.slotsFile && !config.dryRun) {
+    const { runPreparedSlots } = await import("./prepared-run")
+    return runPreparedSlots(config)
+  }
+  if (config.slotsFile) throw new EvalFailure("SLOTS_ADMISSION_UNAVAILABLE", 2)
   const lease = config.dryRun ? undefined : await acquireRunHarnessLease(config.profileDir, env)
   if (lease) config.profileDir = lease.profileDir
   const result = await executeRun(config)
@@ -34,13 +46,17 @@ export async function main(argv: string[], env: Record<string, string | undefine
 }
 
 async function executeRun(config: EvalConfig) {
+  const controller = new AbortController()
+  const removeSigint = installSigint(controller)
+  return executeRunBody(config, controller).finally(removeSigint)
+}
+
+async function executeRunBody(config: EvalConfig, controller: AbortController) {
   const tasks = await loadTasks(config.tasksDir, config.only)
   if (!config.skipJudge && tasks.some(task => task.outputMode === "diagnostic"))
     throw new EvalFailure("diagnostic tasks require --skip-judge", 2)
   const source = parseArtifactSource(config.artifactSource, config.loginom)
-  const environment = await preflight(config, source)
-  const controller = new AbortController()
-  installSigint(controller)
+  const environment = await preflight(config, source, controller.signal)
   const startedAt = new Date()
   const runDir = await reserveRunDirectory(config.resultsDir,
     `${stamp(startedAt)}-${environment.git?.sha ?? "nogit"}${environment.git?.dirty ? "-dirty" : ""}`)
@@ -48,7 +64,9 @@ async function executeRun(config: EvalConfig) {
   await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2))
   const command: AgentCommand = { ...agentCommand(config), cleanupDir: path.join(runDir, "preparation"),
     cleanupSecrets: [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""] }
-  const judge = config.skipJudge ? null : await judgeInfo(config)
+  const inputsHash = await agentInputsHash(tasks)
+  const rubric = await rubricHash(tasks)
+  const judge = config.skipJudge ? null : await judgeInfo(config, controller.signal)
   const settings: JudgeSettings | undefined = judge
     ? {
         command: config.judge.command,
@@ -56,16 +74,14 @@ async function executeRun(config: EvalConfig) {
         reasoning: config.judge.reasoning,
         timeoutMs: config.judgeTimeoutMs,
         passThreshold: config.passThreshold,
+        env: config.judge.env,
+        systemd: config.judge.systemd,
       }
     : undefined
-  const inputsHash = await agentInputsHash(tasks)
-  const rubric = await rubricHash(tasks)
+  const judgeGate = createJudgeGate()
   const evaluationHash = evaluationContractHash({ rubric_hash: rubric, judge, pass_threshold: config.passThreshold })
   const attempts: AttemptResult[] = []
-  const state: { stopped: string | null; interruptedCleanup: { recovered: boolean } | null } = {
-    stopped: null,
-    interruptedCleanup: null,
-  }
+  const state: { stopped: string | null } = { stopped: null }
   if (!config.dryRun) await prepareProfile(config, command, runId).catch((error) => { state.stopped = describe(error) })
   // Round-robin: сбой окружения размазывается по задачам, Ctrl+C после первого круга оставляет полное покрытие.
   outer: for (const attempt of Array.from({ length: config.repeat }, (_, index) => index + 1)) {
@@ -107,7 +123,6 @@ async function executeRun(config: EvalConfig) {
           })
           if (state.stopped) break outer
           if ("stop" in after) { state.stopped = after.stop ?? "Environment cleanup failed"; break outer }
-          if (result.status === "interrupted") state.interruptedCleanup = { recovered: after.recovered }
         }
         if (result.cleanup_error || result.environment_cleanup?.status === "failed" || result.status === "harness_error" && stop) {
           state.stopped = result.cleanup_error ?? result.environment_cleanup?.error ?? result.harness_error ?? "harness_error"
@@ -126,13 +141,18 @@ async function executeRun(config: EvalConfig) {
       }
     }
   }
+  const interruptedAttempts = attempts.filter(result => result.status === "interrupted")
   const summary: RunSummary = {
     run_id: runId,
+    slots: [{ id: "default", username: config.loginom.username, profileDir: config.profileDir,
+        historyDir: `${config.profileDir}.history`, workspaceRoot: path.resolve(config.agent.workspaceRoot), liveQualified: false,
+        state: config.dryRun ? "planned" : state.stopped || attempts.some(result => result.environment_cleanup?.status !== "confirmed") ? "quarantined" : "closed",
+        ...(attempts.at(-1) ? { cleanup_receipt: path.join(runDir, attempts.at(-1)!.task_id, String(attempts.at(-1)!.attempt), "cleanup.json") } : {}) }],
     label: config.label,
     started_at: startedAt.toISOString(),
     finished_at: new Date().toISOString(),
     interrupted: controller.signal.aborted,
-    interrupted_cleanup: state.interruptedCleanup,
+    interrupted_cleanup: interruptedAttempts.length ? { recovered: interruptedAttempts.some(result => result.profile_recovered) } : null,
     stopped_reason: state.stopped,
     agent: {
       cli_mode: config.agent.cliMode,
@@ -163,6 +183,7 @@ async function executeRun(config: EvalConfig) {
     rubric_hash: rubric,
     task_ids: tasks.map((task) => task.id),
     config: {
+      parallel: config.parallel,
       repeat: config.repeat,
       tasks_dir: config.tasksDir,
       task_timeout_ms: Object.fromEntries(tasks.map((task) => [task.id, taskTimeoutMs(config, task)])),
@@ -172,6 +193,7 @@ async function executeRun(config: EvalConfig) {
       keep_storage: config.keepStorage,
     },
     metrics: aggregate(attempts, config.skipJudge),
+    parallel_limits: aggregateLimits(attempts),
     tasks: tasks.map((task) => {
       const own = attempts.filter((item) => item.task_id === task.id)
       return { id: task.id, rubric_snapshot: rubricSnapshot(task), metrics: aggregateTask(own, config.skipJudge), attempts: own }
@@ -194,13 +216,17 @@ export async function runAttempt(input: {
   runDir: string
   signal: AbortSignal
   profileRecovered: boolean
+  slotId?: string
+  slot?: SlotStorageContext
   initialInfraAttempt?: AttemptResult
   skipJudge: boolean
   judge?: JudgeSettings
+  judgeGate?: ReturnType<typeof createJudgeGate>
   evaluationHash?: string
 }): Promise<{ result: AttemptResult; stop: boolean }> {
   const base: AttemptResult = {
     ...emptyResult(input.task.id, input.attempt, input.profileRecovered),
+    slot_id: input.slot?.lease.slot.id ?? input.slotId ?? "default",
     ...(input.initialInfraAttempt ? { infra_retry: { initial: input.initialInfraAttempt } } : {}),
   }
   return attemptBody(input, base).catch(async (error: unknown) => {
@@ -218,9 +244,17 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const { config, task, attempt } = input
   const outDir = path.join(input.runDir, task.id, String(attempt))
   const workdir = path.join(config.agent.workspaceRoot, input.runId, task.id, String(attempt))
-  await mkdir(outDir, { recursive: true })
-  if (!config.dryRun && config.agent.cliMode === "binary")
-    await checkIsolatedLoginom(input.source).catch((error: unknown) => { throw new SandboxFailure(describe(error)) })
+  await mkdir(outDir, { recursive: true, mode: 0o700 })
+  if (!config.dryRun && (config.agent.cliMode === "binary" || input.slot)) {
+    if (config.agent.cliMode === "binary" && config.slotsFile && !input.slot) throw new SandboxFailure("SLOT_CONTEXT_REQUIRED")
+    if (input.slot && (config.profileDir !== input.slot.lease.slot.profileDir || path.resolve(config.agent.workspaceRoot) !== input.slot.lease.slot.workspaceRoot ||
+      config.loginom.url !== input.slot.file.server.url || config.loginom.username !== input.slot.lease.slot.username ||
+      config.loginom.container !== input.slot.lease.identity.containerId || config.loginom.storageDir !== `${input.slot.file.server.storageRoot}/${input.slot.lease.slot.username}` ||
+      input.command.mode !== config.agent.cliMode ||
+      input.command.env.LOGINOM_AI_AGENT_CLI_PROFILE !== input.slot.lease.slot.profileDir || input.slotId && input.slotId !== input.slot.lease.slot.id))
+      throw new SandboxFailure("SLOT_CONTEXT_MISMATCH")
+    await checkIsolatedLoginom(input.source, input.slot).catch((error: unknown) => { throw new SandboxFailure(describe(error)) })
+  }
   await mkdir(workdir, { recursive: true })
   const files = await Promise.all(
     task.inputs.map(async (rel) => {
@@ -242,6 +276,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     model: config.agent.model,
     variant: config.agent.variant,
     profileDir: config.dryRun ? undefined : config.profileDir,
+    slotId: input.slot?.lease.slot.id ?? input.slotId ?? "default",
     prompt,
     files,
     workdir,
@@ -253,7 +288,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   // This measured checkpoint survives failures in artifact/judge/evidence persistence.
   Object.assign(base, { status: early.status, exit_code: run.exitCode, timed_out: run.timedOut, interrupted: run.interrupted,
     duration_ms: run.durationMs, cost: run.cost, tokens: run.tokens, counters: run.counters,
-    session_id: run.sessionId ?? null, errors: run.errors, stderr_head: run.stderrHead })
+    session_id: run.sessionId ?? null, errors: run.errors, stderr_head: run.stderrHead, limit_evidence: run.limitEvidence })
   const fetched =
     early.status === "interrupted" || early.status === "harness_error" || early.status === "infra_error"
       ? undefined
@@ -269,20 +304,24 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const artifactError = fetched && "error" in fetched ? fetched.error : undefined
   const artifact = fetched && !("error" in fetched) ? fetched : undefined
   const { status, stop } = artifactError ? { status: "harness_error" as const, stop: false } : statusFor(run, artifact !== undefined || task.outputMode === "diagnostic")
-  const cleanupError =
-    !config.keepStorage && (artifact || !config.dryRun)
+  const deferredCleanupError = artifact && input.slot
+    ? await Bun.write(path.join(outDir, "storage-cleanup.json"), JSON.stringify({ status: "pending", removed: false,
+        verified_absent: false, deletion_deferred: true, files: artifact.cleanupFiles }, null, 2)).then(() => null, (error: unknown) => describe(error))
+    : null
+  const cleanupError = deferredCleanupError ?? (
+    !config.keepStorage && !(artifact && input.slot) && (artifact || !config.dryRun)
       ? await (artifact ? cleanupArtifact(input.source, artifact) : cleanupOrphanResult({
           source: input.source, name: `${name}.result.csv`, outDir, existingNames: storageBefore,
-          processesConfirmed: run.processCleanup.status === "confirmed",
+          processesConfirmed: run.processCleanup.status === "confirmed", deferDeletion: Boolean(input.slot),
         })).then(
           () => null,
           (error: unknown) => describe(error),
         )
-      : null
+      : null)
   const noJudge = status === "harness_error" || status === "interrupted" || status === "infra_error"
   const judged =
     artifact && !noJudge && !input.signal.aborted && input.judge && !input.skipJudge
-      ? await judgeTask({
+      ? await (input.judgeGate ?? judgeTask)({
           task,
           run,
           artifactDir: path.dirname(artifact.unpackedDir),
@@ -293,6 +332,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
         }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
       : undefined
   const skippedJudge = input.skipJudge || artifact !== undefined || noJudge
+  const judgeCleanupFailed = judged && "cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed
   const judgeFields = judged
     ? judgedFields(judged)
     : {
@@ -310,6 +350,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   const result: AttemptResult = {
     ...base,
     ...judgeFields,
+    ...(judgeCleanupFailed ? { judge_cleanup_unconfirmed: true } : {}),
     ...((judged || !skippedJudge) && input.evaluationHash ? { evaluation_contract_hash: input.evaluationHash } : {}),
     status,
     exit_code: run.exitCode,
@@ -325,8 +366,9 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     artifact_ambiguous: artifact?.ambiguous ?? [],
     cleanup_error: cleanupError,
     environment_cleanup: {
-      status: run.processCleanup.status === "failed" ? "failed" : "not_run",
-      evidence: "cleanup.json", error: run.processCleanup.error,
+      status: judgeCleanupFailed || run.processCleanup.status === "failed" ? "failed" : "not_run",
+      evidence: judgeCleanupFailed ? judged.attempts ? `judge-processes-${judged.attempts}/process-cleanup.json` : null : "cleanup.json",
+      error: judgeCleanupFailed && !judged.ok ? judged.error : run.processCleanup.error,
     },
     action_manifest_sha256: run.actionManifestSha256 ?? null,
     skill_revision: run.skillRevision ?? null,
@@ -340,15 +382,17 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
         : null),
   }
   Object.assign(base, result)
-  await Bun.write(path.join(outDir, "cleanup.json"), JSON.stringify({ processes: run.processCleanup }, null, 2))
+  await writeLeaseReceipt(path.join(outDir, "cleanup.json"), { processes: run.processCleanup,
+    ...(input.slot ? { slotId: input.slot.lease.slot.id, serverEpoch: input.slot.lease.identity.serverEpoch,
+      serverSessions: "unknown", storageDeletionAllowed: false, nextAdmissionAllowed: false } : {}) })
   await Bun.write(path.join(outDir, "result.json"), JSON.stringify(result, null, 2))
-  return { result, stop: stop || run.processCleanup.status === "failed" }
+  return { result, stop: stop || run.processCleanup.status === "failed" || Boolean(judgeCleanupFailed) }
 }
 
 async function archiveInfraAttempt(outDir: string) {
   const files = await readdir(outDir)
   const archive = path.join(outDir, "infra-error")
-  await mkdir(archive)
+  await mkdir(archive, { mode: 0o700 })
   // Корневой результат нужен и при прерывании до повторного запуска.
   await Promise.all(files.map((file) => file === "result.json"
     ? cp(path.join(outDir, file), path.join(archive, file))
@@ -365,18 +409,24 @@ async function prepareProfile(config: EvalConfig, command: AgentCommand, runId: 
 }
 
 export async function afterAttempt(config: EvalConfig, command: AgentCommand, result: AttemptResult, outDir?: string) {
-  const evidence: { processes?: ProcessCleanup; stages: { stage: string; status: string; path?: string }[] } = { stages: [] }
+  const evidence: { processes?: ProcessCleanup; stages: { stage: string; status: string; path?: string }[];
+    slotId?: string; serverEpoch?: string; serverSessions?: "unknown"; storageDeletionAllowed?: false; nextAdmissionAllowed?: false } = { stages: [] }
   try {
     if (!outDir) throw Error("Attempt cleanup evidence directory required")
-    evidence.processes = (await Bun.file(path.join(outDir, "cleanup.json")).json()).processes as ProcessCleanup
+    const stored = await Bun.file(path.join(outDir, "cleanup.json")).json()
+    evidence.processes = stored.processes as ProcessCleanup
+    if (config.slotsFile || stored.storageDeletionAllowed === false) Object.assign(evidence, { slotId: result.slot_id,
+      serverEpoch: typeof stored.serverEpoch === "string" && /^[a-f0-9]{64}$/.test(stored.serverEpoch) ? stored.serverEpoch : undefined,
+      serverSessions: "unknown", storageDeletionAllowed: false, nextAdmissionAllowed: false })
     if (evidence.processes?.status !== "confirmed") throw Error(evidence.processes?.error ?? "Process cleanup unconfirmed")
     evidence.stages.push({ stage: "processes", status: "confirmed" })
+    if (evidence.storageDeletionAllowed === false) throw Error("SLOT_CLEANUP_REQUIRED")
     if (result.environment_cleanup?.status === "failed") throw Error(result.environment_cleanup.error ?? "Attempt persistence failed")
     await archiveDiagnostics(config.profileDir, evidence.processes.runtimeDirectories, outDir,
       [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""])
     evidence.stages.push({ stage: "diagnostics", status: "confirmed" })
     if (!(await waitProfileIdle(config.profileDir, 1_000))) throw Error("Profile still has process owners")
-    const released = await releaseStaleWriter(config.profileDir, evidence.processes.writer)
+    const released = await releaseStaleWriter(config.profileDir, evidence.processes.writerRefusal ? undefined : evidence.processes.writer)
     evidence.stages.push({ stage: "writer", status: "confirmed" })
     const recovery = await recoverIfNeeded(command, 1)
     result.profile_recovered = released || recovery.recovered
@@ -402,26 +452,31 @@ export async function afterAttempt(config: EvalConfig, command: AgentCommand, re
 }
 
 export function installSigint(controller: AbortController) {
-  process.on("SIGINT", () => {
+  const handler = () => {
     if (controller.signal.aborted) {
       console.error("\nПовторный Ctrl+C — немедленный выход без summary.")
       process.exit(130)
     }
     console.error("\nCtrl+C: останавливаю текущую попытку и дописываю summary. Ещё раз Ctrl+C — выход немедленно.")
     controller.abort()
-  })
+  }
+  process.on("SIGINT", handler)
+  return () => { process.off("SIGINT", handler) }
 }
 
 export const stamp = (date: Date) =>
   date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "").replace("T", "-")
 
 export function redact(config: EvalConfig) {
-  return {
+  return redactKnownSecrets({
     ...config,
     loginom: { ...config.loginom, password: config.loginom.password ? "<set>" : "<unset>" },
     dock: { ...config.dock, apiKey: config.dock.apiKey ? "<set>" : "<unset>" },
     agent: { ...config.agent, provider: config.agent.provider ? { ...config.agent.provider, apiKey: "<set>" } : undefined },
-  }
+    judge: { ...config.judge, env: config.judge.env && Object.fromEntries(
+      Object.entries(config.judge.env).map(([key, value]) => [key, value ? "<set>" : "<unset>"]),
+    ) },
+  }, [config.loginom.password, config.dock.apiKey, config.agent.provider?.apiKey ?? ""])
 }
 
 export const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
@@ -445,7 +500,7 @@ async function leftovers(source: ArtifactSource, runId: string) {
     .sort()
 }
 
-function emptyResult(taskId: string, attempt: number, profileRecovered: boolean): AttemptResult {
+export function emptyResult(taskId: string, attempt: number, profileRecovered: boolean): AttemptResult {
   return {
     task_id: taskId,
     attempt,

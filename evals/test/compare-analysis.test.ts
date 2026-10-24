@@ -1,6 +1,29 @@
 import { expect, test } from "bun:test"
 import { analyzeComparison } from "../src/compare-analysis"
 import { comparisonSummary } from "./helpers/compare-summary"
+import { aggregate, aggregateTask } from "../src/report"
+
+test("analysis: slot metadata and an infra retry preserve legacy quality denominators", () => {
+  const legacy = comparisonSummary([{ successes: 2, attempts: 3 }, { successes: 1, attempts: 3 }])
+  const modern = structuredClone(legacy)
+  modern.config.parallel = 2
+  modern.slots = ["a", "b"].map(id => ({ id, username: `eval-${id}`, profileDir: `/fixture/profile-${id}`,
+    historyDir: `/fixture/history-${id}`, workspaceRoot: `/fixture/work-${id}`, liveQualified: false }))
+  modern.tasks.forEach((task, index) => task.attempts.forEach(attempt => { attempt.slot_id = modern.slots![index]!.id }))
+  const first = modern.tasks[0]!.attempts[0]!
+  first.infra_retry = { initial: { ...first, status: "infra_error", score: null, pass: null, structural_score: null,
+    oracle_pass: null, judge_status: "skipped", duration_ms: 500, cost: 0.01 } }
+  modern.tasks.forEach(task => { task.metrics = aggregateTask(task.attempts, false) })
+  modern.metrics = aggregate(modern.tasks.flatMap(task => task.attempts), false)
+  expect(modern.metrics.total).toBe(6)
+  expect(modern.metrics.pass_evaluated_count).toBe(6)
+  expect(modern.metrics.pass_rate).toBe(0.5)
+  expect(modern.metrics.infra_error_count).toBe(1)
+  expect(modern.metrics.total_duration_ms).toBe(legacy.metrics.total_duration_ms + 500)
+  expect(analyzeComparison(legacy, modern)).toEqual(analyzeComparison(legacy, legacy))
+  expect(legacy.slots).toBeUndefined()
+  expect(legacy.config.parallel).toBeUndefined()
+})
 
 test("analysis: задачи имеют равный вес при разных числах попыток", () => {
   const a = comparisonSummary([{ successes: 3, attempts: 3 }, { successes: 0, attempts: 1 }])

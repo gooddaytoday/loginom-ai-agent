@@ -9,6 +9,40 @@ import { gitInfo } from "../src/preflight"
 import { afterAttempt, main, redact, runAttempt, stamp } from "../src/run"
 import type { RunSummary } from "../src/report"
 import { loadTasks } from "../src/task"
+import { readStartupCleanup } from "../src/startup-reconciliation"
+
+test("runAttempt: startup accepts the emitted cleanup receipt", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-attempt-startup-receipt-"))
+  try {
+    const config = loadConfig(["--dry-run"], { EVAL_WORKSPACE_ROOT: path.join(root, "workspace"), EVAL_PROFILE_DIR: path.join(root, "profile") })
+    const [task] = await loadTasks(config.tasksDir, ["calc-data-double"])
+    const runDir = path.join(root, "results")
+    await runAttempt({ config, command: agentCommand(config), source: parseArtifactSource(config.artifactSource, config.loginom),
+      task: task!, attempt: 1, runId: "startup", runDir, signal: new AbortController().signal, profileRecovered: false, skipJudge: true })
+    expect(await readStartupCleanup(path.join(runDir, task!.id, "1/cleanup.json"), process.pid))
+      .toMatchObject({ status: "confirmed", capture_complete: true, unknownProcesses: [] })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("main: unfinished v2 admission cannot fall through to legacy dispatch", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-v2-admission-"))
+  try {
+    await expect(main(["--dry-run", "--only", "group-sum-qty"], {
+      EVAL_SLOTS_FILE: path.join(root, "slots.json"), EVAL_RESULTS_DIR: path.join(root, "results"), EVAL_WORKSPACE_ROOT: path.join(root, "workspace"),
+    })).rejects.toThrow("SLOTS_ADMISSION_UNAVAILABLE")
+    expect(await readdir(root)).toEqual([])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("main: real slots require a recorded resource budget before reading private config or dispatch", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-slot-budget-admission-"))
+  try {
+    await expect(main([], { EVAL_SLOTS_FILE: path.join(root, "slots.json"), EVAL_CLI_MODE: "binary", EVAL_CLI_BIN: "/pinned/cli",
+      EVAL_AGENT_MODEL: "openai/gpt-6-luna", JUDGE_MODEL: "gpt-6-sol", LOGINOM_DOCK_API_KEY: "canary" }))
+      .rejects.toThrow("RESOURCE_BUDGET_REQUIRED")
+    expect(await readdir(root)).toEqual([])
+  } finally { await rm(root, { recursive: true }) }
+})
 
 test("runAttempt: live binary без выделенного Loginom останавливается до агента и судьи", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "evals-storage-admission-run-"))
@@ -80,6 +114,8 @@ test("main --dry-run --repeat 2: статусы по фикстурам, поп�
     const summary = (await Bun.file(path.join(runDir!, "summary.json")).json()) as RunSummary
     expect(summary.label).toBe("dry")
     expect(summary.config.repeat).toBe(2)
+    expect(summary.config.parallel).toBe(1)
+    expect(summary.slots).toMatchObject([{ id: "default", username: "user", state: "planned", liveQualified: false }])
     expect(summary.metrics.total).toBe(6)
     expect(summary.metrics.completed).toBe(2)
     expect(summary.metrics.mean_score).toBeNull()
@@ -87,6 +123,7 @@ test("main --dry-run --repeat 2: статусы по фикстурам, поп�
     const byTask = Object.fromEntries(summary.tasks.map((task) => [task.id, task]))
     const attempts = byTask["group-sum-qty"]!.attempts
     expect(attempts.map((item) => item.status)).toEqual(["completed", "completed"])
+    expect(attempts.map((item) => item.slot_id)).toEqual(["default", "default"])
     expect(attempts[0]!.artifact_origin).toBe("receipt")
     expect(attempts[0]!.judge_status).toBe("skipped")
     expect(Object.keys(attempts[0]!).includes("stop")).toBe(false)
@@ -197,6 +234,27 @@ test("main --dry-run --only: подмножество задач", async () => {
     if (result.runDir) await rm(result.runDir, { recursive: true, force: true })
   }
 }, 30_000)
+
+test("redact masks known credentials repeated in other snapshot fields without changing runtime config", () => {
+  const config = loadConfig(["--skip-judge"], {
+    LOGINOM_PASSWORD: "loginom-private-canary",
+    LOGINOM_URL: "https://loginom.test/?key=provider-private-canary",
+    LOGINOM_DOCK_API_KEY: "dock-private-canary/Ω",
+    LOGINOM_DOCK_BASE_URL: "https://dock.test/?key=loginom-private-canary",
+    EVAL_AGENT_MODEL: "fake/fake-model",
+    EVAL_AGENT_PROVIDER_ID: "fake", EVAL_AGENT_PROVIDER_BASE_URL: `https://provider.test/?key=${encodeURIComponent("dock-private-canary/Ω")}`,
+    EVAL_AGENT_PROVIDER_API_KEY: "provider-private-canary", EVAL_AGENT_PROVIDER_MODEL_ID: "model",
+  })
+  const original = JSON.stringify(config)
+  const snapshot = JSON.stringify(redact(config))
+  for (const secret of [config.loginom.password, config.dock.apiKey, config.agent.provider!.apiKey]) {
+    expect(snapshot).not.toContain(secret)
+    expect(snapshot).not.toContain(encodeURIComponent(secret))
+  }
+  expect(JSON.stringify(config)).toBe(original)
+  expect(redact(config)).toMatchObject({ parallel: 1, loginom: { password: "<set>" }, dock: { apiKey: "<set>" },
+    agent: { provider: { apiKey: "<set>" } } })
+})
 
 test("redact: password, dock.apiKey и provider.apiKey не попадают в JSON", () => {
   const loaded = loadConfig([], {
@@ -391,6 +449,23 @@ test("runAttempt: стартовый timeout host сохраняется без 
       score: null, pass: null, judge_status: "skipped", stderr_head: "LOGINOM_HOST_TIMEOUT\n" })
     expect(await Bun.file(path.join(runDir, "host-timeout", "1", "result.json")).exists()).toBe(true)
   } finally { await rm(runDir, { recursive: true, force: true }) }
+})
+
+test("runAttempt: unknown judge process cleanup preserves measurement and forbids continuation", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-cleanup-fence-"))
+  try {
+    const config = loadConfig(["--dry-run"], { EVAL_WORKSPACE_ROOT: path.join(root, "workspace") })
+    const [task] = await loadTasks(config.tasksDir, ["group-sum-qty"])
+    await mkdir(path.join(root, task!.id, "1/judge-processes-1/process-cleanup.json"), { recursive: true, mode: 0o700 })
+    const result = await runAttempt({ config, command: agentCommand(config), source: parseArtifactSource(config.artifactSource, config.loginom),
+      task: task!, attempt: 1, runId: "unknown-judge", runDir: root, signal: new AbortController().signal,
+      profileRecovered: false, skipJudge: false,
+      judge: { command: [process.execPath, path.join(evalsRoot, "fixtures/fake-codex.ts")], model: "fake", reasoning: "high", timeoutMs: 3_000, passThreshold: 70 } })
+    expect(result.result).toMatchObject({ status: "completed", exit_code: 0, judge_status: "error", judge_attempts: 1,
+      environment_cleanup: { status: "failed" } })
+    expect(result.result.environment_cleanup?.error).toContain("Judge process cleanup unconfirmed")
+    expect(result.stop).toBe(true)
+  } finally { await rm(root, { recursive: true, force: true }) }
 })
 
 test("afterAttempt: exit 1 со stale writer восстанавливает профиль до следующей попытки", async () => {

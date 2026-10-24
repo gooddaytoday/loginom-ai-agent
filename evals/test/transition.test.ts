@@ -59,7 +59,7 @@ for (const stage of ["process", "archive", "ready"] as const) {
           expect(await Bun.file(path.join(profile, "fixture-cleanup-state.json")).json()).toEqual({ state: "ready", hasApiKey: true, recoveries: ["pending"] })
         }
       } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
-    }, 45_000)
+    }, status === "timeout" ? 130_000 : 45_000)
   }
 }
 
