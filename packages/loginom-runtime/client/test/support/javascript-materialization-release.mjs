@@ -8,6 +8,7 @@ const fault=process.argv[2]??'safe',events=[],calls=[];
 const node={document_id:'doc',workflow_id:'flow',node_id:'js'};
 const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'nav',label:'Scenario'}]};
 const source='import {OutputTable} from "builtIn/Data";\n';
+const callback=Promise.withResolvers();
 let wizard=false,stopped=false,operation,sourceAdapter;
 const graph={complete:true,document_id:'doc',workflow_ref:workflow,nodes:[
  {ref:{...node,node_id:'input'},type:'imports.text',label:'Input',position:{x:64,y:64},inputs:[],outputs:[0]}],links:[],foreign_links:[]};
@@ -38,7 +39,8 @@ mock.module(new URL('../../lib/node-execution-procedure.mjs',import.meta.url),{n
  createNodeExecutionProcedure:()=>({prepare:async()=>{calls.push('prepare');},launchGraph:async()=>{
   calls.push('Execute');return {verified:true,launch_gesture_verified:true,receipt:{status:'SUCCEEDED',cleanup_complete:true,
    operation_id:'apply-js:n31',action_key:'ui.act',action_revision:'1',output:{gesture_applied:true}}};},
-  identify:async()=>{throw new procedure.NodeReadinessTimeout('prepared node available for process console');}})}});
+  identify:async()=>{if(fault==='callback-active')await callback.promise;
+   throw new procedure.NodeReadinessTimeout('prepared node available for process console');}})}});
 const {createJavascriptCodeNodeSupport}=await import('../../lib/javascript-code-node.mjs');
 const {createActionRuntime}=await import('../../lib/executor.mjs');
 const support=createJavascriptCodeNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2',redactor:createRedactor()});
@@ -46,6 +48,7 @@ const request={operation_id:'apply-js',contract_revision:'1.0.0',document_id:'do
  target:{kind:'new',type:'programming.javascript',position:{x:320,y:280}},inputs:[{source:{...node,node_id:'input'},output:0,input:0}],
  mode:'script',parameters:{source_text:source,schema_mode:'code'},mappings:[],finish:'execute',
  read:{ports:[],sample_rows:0,require_exact_numbers:false},budgets:{configure_ms:60000,execute_ms:10000,total_ms:60000}};
+if(fault==='callback-active')request.budgets={configure_ms:500,execute_ms:500,total_ms:500};
 const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},allowCandidate:true,
  nodeApplyHandlers:support.nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   operation=options.operation;return support.nodeApplyDriverFactory(options);},
@@ -64,7 +67,8 @@ const runtime=createActionRuntime({pinned:{actions:new Map(),selectors:new Map()
     operation_id:'apply-js:n31',phase:'completed',effect_possible:true,error:null,trace:[],output:{gesture_applied:true},cleanup_complete:fault!=='cleanup'}}};
  }});
 runtime.startNodeApply(request);
-const job=await runtime.waitNodeApply('apply-js',{timeoutMs:1000});
+let job;
+do{job=await runtime.waitNodeApply('apply-js',{timeoutMs:1000});}while(!job.outcome);
 assert.equal(job.outcome.output.pending_phase,'materialization_start',JSON.stringify({job,events:events.filter(e=>e.phase.includes('refused'))}));
 assert.equal(job.outcome.status,'AMBIGUOUS');
 assert.equal(operation.nodeApply.phases.at(-1).phase,'node_finish');
@@ -88,4 +92,11 @@ else {
 }
 assert.equal(JSON.stringify(calls),before,'Release must not repeat Done, source reads or Execute');
 assert.deepEqual(calls,['Done','prepare','Execute']);
+callback.resolve();
+if(fault==='callback-active'){
+ await new Promise(setImmediate);
+ const settled=await runtime.recover('apply-js',{strategy:'abandon_operation',recoveryOperationId:'release-settled'});
+ assert.equal(settled.status,'SUCCEEDED',JSON.stringify(settled));
+ assert.equal(runtime.hasUnsettledWork(),false);assert.equal(JSON.stringify(calls),before);
+}
 console.log(JSON.stringify({fault,status:'PASS',calls}));

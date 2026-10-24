@@ -105,7 +105,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       node_id:request.target.kind==='existing'?request.target.ref.node_id:null,operation_id:operation.id,ui_epoch:Date.now()};
     let expected=request.parameters.source_text===undefined?null:javascriptSourceIdentity(request.parameters.source_text);
     let owner,channel,signal,adapter,handle,admission,admitted,configured,committed,
-      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline,doneReceipt,lastSourceAdapter;
+      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline,doneReceipt,lastSourceAdapter,materializationSettled=false;
     const enter=ctx=>{
       signal=ctx.signal;signal?.throwIfAborted();operation.deadline=ctx.deadline;
       if(ctx.node){
@@ -341,7 +341,9 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       },
       async materializeOutput(ctx){
         enter(ctx);return withJavascriptSourcePolicyBoundary({phase:'materialization_start',owner,deadline:ctx.deadline,record:onRecord},
-          ()=>admission.withEffect({receipt:configured,owner},()=>launch(ctx)));
+          ()=>admission.withEffect({receipt:configured,owner},async()=>{
+            try{return await launch(ctx);}finally{materializationSettled=true;}
+          }));
       },
       async finishGraph(mode,ctx){
         enter(ctx);
@@ -414,6 +416,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       releasePendingPhases:['input_mapping','open','configure','materialization_start'],
       async releasePending(state,{signal:releaseSignal}={}) {
         const afterDone=['node_finish','materialization_start'].includes(state.pending?.phase)&&committed?.owned_done_settled===true
+          &&(state.pending.phase==='node_finish'||materializationSettled)
           &&adapter?.active===false&&adapter.uncertain===false
           &&lastSourceAdapter?.active===false&&lastSourceAdapter.uncertain===false;
         need(['input_mapping','open','configure'].includes(state.pending?.phase)||afterDone,

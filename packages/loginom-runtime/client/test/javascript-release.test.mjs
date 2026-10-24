@@ -8,7 +8,7 @@ import {createRedactor} from '../lib/redact.mjs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
-for(const fault of ['safe','owner','locked','toast','graph','opening','source-uncertain','transport','receipt','cleanup','ack'])
+for(const fault of ['safe','owner','locked','toast','graph','opening','source-uncertain','transport','receipt','cleanup','ack','callback-active'])
 test('D48 public release after materialization launch: '+fault,()=>{
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
   fileURLToPath(new URL('./support/javascript-materialization-release.mjs',import.meta.url)),fault],{encoding:'utf8',timeout:10000});
