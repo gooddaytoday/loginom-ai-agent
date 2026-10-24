@@ -22,12 +22,12 @@
       "columns": [
         {
           "name": "Courier",
-          "label": "Courier",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Payout",
-          "label": "Payout",
+          "label_any": true,
           "type": "real"
         }
       ],

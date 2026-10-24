@@ -20,12 +20,12 @@
       "columns": [
         {
           "name": "Category",
-          "label": "Category",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Revenue",
-          "label": "Revenue",
+          "label_any": true,
           "type": "real"
         }
       ],

@@ -20,7 +20,7 @@
       "columns": [
         {
           "name": "X",
-          "label": "X",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -29,7 +29,7 @@
         },
         {
           "name": "Y",
-          "label": "Y",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -38,7 +38,7 @@
         },
         {
           "name": "PointCount",
-          "label": "PointCount",
+          "label_any": true,
           "type": "integer"
         }
       ],

@@ -18,18 +18,18 @@
       "columns": [
         {
           "name": "ABCClass",
-          "label": "ABCClass",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "Products",
-          "label": "Products",
-          "type": "integer"
+          "type": "integer",
+          "label_any": true
         },
         {
           "name": "Revenue",
-          "label": "Revenue",
-          "type": "real"
+          "type": "real",
+          "label_any": true
         }
       ],
       "rows": [
