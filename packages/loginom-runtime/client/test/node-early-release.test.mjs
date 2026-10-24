@@ -31,7 +31,8 @@ function fixture(phase='target',type='imports.text'){
       ...(type==='programming.javascript'?{releasePendingPhases:['input_mapping','open','configure'],
         releasePending:async()=>{throw Error('Early target must use its graph release verifier');}}:{}),
       verifySource:async()=>{if(phase==='source')throw Error('Injected source failure');return ok();},
-      ...(['target_before_create','target_source_child'].includes(phase)?{beforeTarget:async()=>{
+      ...(['target_before_create','target_source_child','target_release_hook'].includes(phase)?{beforeTarget:async()=>{
+        if(phase==='target_release_hook'){operation.nodeEffectPossible=true;operation.cleanupConfirmed=false;}
         if(phase==='target_source_child'){
           state.preflightCalls=(state.preflightCalls??0)+1;
           assert.ok(events.find(e=>e.phase==='node_target_checkpoint'&&e.target_state.last_graph));
@@ -40,6 +41,11 @@ function fixture(phase='target',type='imports.text'){
           if(state.preflightSuccess)return ok();
         }
         throw Error('Injected preflight failure before creation');
+      }}:{}),
+      ...(phase==='target_release_hook'?{releaseBeforeTarget:async({deadline})=>{
+        state.releaseCalls=(state.releaseCalls??0)+1;assert.ok(deadline>Date.now());
+        if(!state.allowChildRelease)throw Error('child still unsettled');
+        operation.preTargetGraph=structuredClone(graph);operation.cleanupConfirmed=true;
       }}:{}),
       openWizard:async()=>{throw Error('No wizard should open');},mapPorts:async()=>ok(),verifyContinuation:async()=>true,
       finish:async()=>ok(),waitExecution:async()=>ok(),readOutput:async()=>ok()};},
@@ -360,4 +366,14 @@ test('graph interaction guard '+route+' / '+ready+' / read '+at,async()=>{
   const result=route==='release'?await release(f):await f.runtime.verifyBrowserRecovery({operationId:'apply',step,attested:{}});
   if(route==='release')assert.equal(result.error.code,'NODE_RELEASE_REFUSED');else assert.equal(result.status,'unresolved');
   assert.throws(()=>f.runtime.assertPreparationAllowed());assert.equal(f.state.operation.nodeApply.result,undefined);assert.deepEqual(f.calls,[]);
+});
+
+test('early REST child release hook must settle before the parent graph release',async()=>{
+ const f=fixture('target_release_hook');await stop(f);
+ assert.equal((await release(f)).error.code,'NODE_RELEASE_REFUSED');assert.equal(f.state.releaseCalls,1);
+ assert.throws(()=>f.runtime.assertPreparationAllowed());
+ f.state.allowChildRelease=true;
+ const released=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release2'});
+ assert.equal(released.status,'SUCCEEDED',JSON.stringify(released));assert.equal(f.state.releaseCalls,2);
+ f.runtime.assertPreparationAllowed();assert.deepEqual(f.calls,[]);
 });
