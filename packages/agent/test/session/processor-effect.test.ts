@@ -26,6 +26,7 @@ import { ProviderV2 } from "@loginom-ai-agent/core/provider"
 import { ModelV2 } from "@loginom-ai-agent/core/model"
 import { SessionProjector } from "@loginom-ai-agent/core/session/projector"
 import { LLMEvent } from "@loginom-ai-agent/llm"
+import { runToolOutcome } from "../../src/cli/run-outcome"
 
 const summary = Layer.succeed(
   SessionSummary.Service,
@@ -185,6 +186,115 @@ const env = LayerNode.compile(
 )
 
 const it = testEffect(env)
+
+for (const state of ["pending", "running", "error", "terminal"] as const) {
+  const retryLLM = Layer.sync(LLM.Service, () => {
+    let calls = 0
+    return LLM.Service.of({
+      stream: () => {
+        calls++
+        if (calls === 1) {
+          const start: LLMEvent[] = [
+            LLMEvent.stepStart({ index: 0 }),
+            LLMEvent.toolInputStart({ id: "old-call", name: "todowrite" }),
+          ]
+          if (state === "running" || state === "error") {
+            start.push(
+              LLMEvent.toolCall({
+                id: "old-call",
+                name: "todowrite",
+                input: { todos: [{ content: "unfinished" }] },
+                providerExecuted: true,
+              }),
+            )
+          }
+          if (state === "error") {
+            start.push(
+              LLMEvent.toolResult({
+                id: "old-call",
+                name: "todowrite",
+                result: { type: "error", value: "tool failed" },
+                providerExecuted: true,
+              }),
+            )
+          }
+          return Stream.concat(
+            Stream.fromIterable(start),
+            Stream.fail(new Error(state === "terminal" ? "unrecoverable failure" : "connection reset before headers")),
+          )
+        }
+        return Stream.make(
+          LLMEvent.stepStart({ index: 0 }),
+          LLMEvent.toolInputStart({ id: "new-call", name: "todowrite" }),
+          LLMEvent.toolCall({ id: "new-call", name: "todowrite", input: { todos: [] }, providerExecuted: true }),
+          LLMEvent.toolResult({
+            id: "new-call",
+            name: "todowrite",
+            result: { type: "json", value: { output: "[]", title: "0 todos", metadata: {} } },
+            providerExecuted: true,
+          }),
+          LLMEvent.stepFinish({ index: 0, reason: "tool-calls" }),
+          LLMEvent.finish({ reason: "tool-calls" }),
+        )
+      },
+    })
+  })
+  const retryEnv = LayerNode.compile(root, [...replacements, [LLM.node, retryLLM]])
+  const itRetry = testEffect(retryEnv)
+  itRetry.live(`session.processor D24 preserves ${state} outcome across stream failure`, () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const { processors, session, provider } = yield* boot()
+          const chat = yield* session.create({})
+          const parent = yield* user(chat.id, "retry tool input")
+          const msg = yield* assistant(chat.id, parent.id, path.resolve(dir))
+          const mdl = yield* provider.getModel(ref.providerID, ref.modelID)
+          const handle = yield* processors.create({ assistantMessage: msg, sessionID: chat.id, model: mdl })
+          const result = yield* handle.process({
+            user: parent,
+            sessionID: chat.id,
+            model: mdl,
+            agent: agent(),
+            system: [],
+            messages: [{ role: "user", content: "retry tool input" }],
+            tools: {},
+          })
+          const parts = yield* MessageV2.parts(msg.id)
+          const old = parts.find(
+            (part): part is SessionV1.ToolPart => part.type === "tool" && part.callID === "old-call",
+          )
+          const current = parts.find(
+            (part): part is SessionV1.ToolPart => part.type === "tool" && part.callID === "new-call",
+          )
+          const outcome = runToolOutcome()
+          parts
+            .filter((part): part is SessionV1.ToolPart => part.type === "tool")
+            .forEach((part) => outcome.observe(part))
+          expect(result).toBe(state === "terminal" ? "stop" : "continue")
+          if (state === "terminal") {
+            expect(handle.message.error).toBeDefined()
+            expect(current).toBeUndefined()
+          } else {
+            expect(handle.message.error).toBeUndefined()
+            expect(current?.state.status).toBe("completed")
+          }
+          if (state === "pending") {
+            expect(old).toBeUndefined()
+            expect(outcome.failed()).toBe(false)
+            return
+          }
+          expect(old?.state.status).toBe("error")
+          if (old?.state.status === "error") {
+            expect(old.state.error).toBe(state === "error" ? "tool failed" : "Tool execution aborted")
+            if (state !== "error") expect(old.state.metadata?.interrupted).toBe(true)
+          }
+          expect(outcome.failed()).toBe(true)
+        }),
+      { config: cfg },
+    ),
+  )
+}
 
 const providerErrorLLM = Layer.succeed(
   LLM.Service,
