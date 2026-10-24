@@ -10,6 +10,7 @@ import {joinParametersSchema} from './node-api.mjs';
 import {preflightTabularSource} from './sorting-preflight.mjs';
 import {configureDerivedInlineMapping} from './grouping-inline-mapping.mjs';
 import {verifyJoinOutputSync} from './join-output-sync.mjs';
+import {prepareExistingInput} from './node-execution-procedure.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 export async function preflightJoin(options,ctx,config){
  const request=options.operation.parameters;
@@ -49,8 +50,9 @@ export function validateJoinInlineSources(configuration,native){
  return native.target_fields.filter(f=>!f.excluded&&f.source===null);
 }
 export function createJoinNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'transform.join_data',modes:['inner','left'],revision:'join-v4-internal-1',readback:joinConfigurationReadback,parameterSchema:joinParametersSchema,
+ type:'transform.join_data',modes:['inner','left'],revision:'join-v4-internal-2',readback:joinConfigurationReadback,parameterSchema:joinParametersSchema,
  validate:validateJoinParameters,preflight:preflightJoin,configureInputs:configureJoinInputs,
+ beforeInput:prepareExistingInput,
  configurationObservation:{condition:'join configuration page',readJoin:true,ready:joinReady},
  async configure(channel,p,{request}){
   const changed=await configureJoin(channel,p,{request});if(request.finish==='close')return changed;
