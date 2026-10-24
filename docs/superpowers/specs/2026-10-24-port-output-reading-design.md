@@ -1,12 +1,12 @@
 # Чтение результатов Loginom напрямую от выходного порта
 
-Статус: проект дизайна, редакция 2, для утверждения владельцем. Решения владельца — 24.10.2026. Реализация и план реализации не разрешены.
+Статус: дизайн, редакция 2, утверждён владельцем 24.10.2026 с сохранением F3 для native full. Реализация и план реализации не разрешены; для них требуется отдельное явное разрешение.
 
 ## Результат и границы
 
 После выполнения узла агент получает схему и значения от выходного порта. Для обычной выборки и JavaScript full исчезают создание Table, настройка форматов, листание и восстановление отображения. Настройка узлов, выполнение, проверки принадлежности и ограничения full сохраняются. Обычный режим тоже возвращает точные значения, когда они доступны; неоднозначность обозначается явно.
 
-Владелец выбрал штатный пакетный DataSource для обычного чтения и сохранение исходных байтов для native full. По результату живой сверки дополнительно разрешено сохранять исходный `−0`, хотя Table превращает его в `+0`. Native full по умолчанию не меняется; выбор при утверждении описан отдельно.
+Владелец выбрал штатный пакетный DataSource для обычного чтения и сохранение исходных байтов для native full. По результату живой сверки дополнительно разрешено сохранять исходный `−0`, хотя Table превращает его в `+0`. Native full сохраняет существующий путь через F3.
 
 Владелец также одобрил исключение для потенциально усечённого строкового текста: после пакетного чтения он дочитывается штатным `column.AsString(row)` в том же browser-вызове. Это сохраняет полноту String и строк внутри Variant, но такие ячейки требуют дополнительных запросов данных.
 
@@ -101,30 +101,20 @@ freshness_basis уже есть как необязательная строка
 
 `dock_node_read` строится из завершённой локальной операции, не из переданных моделью source identities. Сам reader никогда не вызывает Execute; существующие пути ожидания и восстановления не меняются. В частности, предложенный после остановки dock_node_read выполняет узел заново, включая REST/JavaScript. Text Export сохраняет файловый путь, bytes/SHA и cleanup.
 
-## Native full: выбор при утверждении
+## Native full: сохраняется F3
 
 Native full Collapse/CrossTable уже не создаёт Table и не меняет форматы: клик порта → F3 → схема Preview → raw 321 → закрытие. JavaScript full относится к обычному пути выше.
 
 | Вариант | Стоимость и риск |
 | --- | --- |
-| **Оставить F3: основной и рекомендуемый** | Сохраняет проверенный native-контракт; медиана повторного F3-цикла в probe 66,9 мс; не меняет native binding/cleanup |
-| Перенести источник на порт | Шесть пар тегов/байтов совпали; источник отвечает на 321. Но полная привязка с метаданными заняла медианно 479 мс; выигрыш не доказан, нужны новые основания provenance и отказа |
+| **Оставить F3: выбран владельцем** | Сохраняет проверенный native-контракт; медиана повторного F3-цикла в probe 66,9 мс; не меняет native binding/cleanup |
+| Перенести источник на порт: отклонён для этой задачи | Шесть пар тегов/байтов совпали; источник отвечает на 321. Но полная привязка с метаданными заняла медианно 479 мс; выигрыш не доказан, нужны новые основания provenance и отказа |
 
-Это накладные этапы на маленьком наборе, не end-to-end native full; Preview повторно использует свой кэш. Замеры не оправдывают расширение изменения сейчас. Решение о переносе остаётся владельцу.
+Это накладные этапы на маленьком наборе, не end-to-end native full; Preview повторно использует свой кэш. Замеры не оправдывают расширение изменения сейчас. Перенос native full на порт исключён из утверждённого объёма.
 
-При выборе переноса сохраняются interface 116 / method 321, decoder/adapter, native tags/bytes, 50×8, предел байтов, статический импорт, топология, свежесть предков и exact_table/read_coverage/cell_precision/read_consistency. ReadVariant теряет исходный tag, ReadDateTime превращает serial в Date — обычный AsVariant их не заменяет.
+Существующий [native full](../../../packages/loginom-runtime/client/lib/collapse-native-output.mjs) сохраняет interface 116 / method 321, decoder/adapter, native tags/bytes, 50×8, предел байтов, статический импорт, топологию, свежесть предков и exact_table/read_coverage/cell_precision/read_consistency. Привязка к Preview, её pins, закрытие и preview_closed в отказе не меняются. ReadVariant теряет исходный tag, ReadDateTime превращает serial в Date — обычный AsVariant их не заменяет.
 
-| Основание Preview | Требуемое основание при переносе |
-| --- | --- |
-| Manager current node/port и FShowDataLastCall | Удержанные node/port, GUID, тип/подтип/индекс; данный вызов получения источника привязан к ним и завершённому execution |
-| Controller/table/store DataSource | `$I===116`, session, `$OW/$O`; schema, count и 321 от одного удалённого объекта, полученного от этого порта |
-| Headers/FColumnInfosStore | Полная фактическая схема и прежняя проверка схемы |
-| Count/store/proxy/cache, включая пустой случай | Завершённый count 0 плюс полная схема; без cell RPC для пустого выхода |
-| UI-кэш/loading | Идентичность `$FData`, `$FCacheInitialized`, источник и execution до/после |
-| Close и preview_closed в отказе >50×8 | Собственные ссылки/запросы освобождены, тот же граф, нет незавершённого чтения; обновить native-read-refusal.mjs, не фабриковать закрытие |
-| Хэши функций загрузки Preview | Проверки фактически используемого пути; старые pins его не доказывают |
-
-Remote identity порта не обязана совпадать с UI-wrapper. Message Release, retirement при неопределённости и запрет поздней публикации сохраняются. Это не атомарный серверный снимок; невидимое изменение с возвратом к исходному состоянию не обнаруживается.
+Message Release, retirement при неопределённости и запрет поздней публикации сохраняются. Это не атомарный серверный снимок; невидимое изменение с возвратом к исходному состоянию не обнаруживается.
 
 ## Стабильность, отмена и освобождение
 
@@ -149,7 +139,7 @@ Remote identity порта не обязана совпадать с UI-wrapper.
 | Обработчики | Calculator; Filter оба порта; Regression; Clustering; REST; Text Import; JavaScript sample/full; CrossTable, включая отдельный dock_node_read sliding-сценарий; обычный Collapse |
 | Данные | >2^53, границы Int64; дробные после 9-го знака, −0, крайние real и сохраняемые NaN/∞; миллисекунды/граничные даты; NULL/пустая/пробел/NBSP/CRLF; >16 384 символов; Boolean/Variant; пустой выход/sample_rows=0; границы 10 000 ячеек/512 KiB |
 | Unit | Int64/−0/nonfinite/Variant/бюджет; даты с фиксированным TZ, OLE, DST; снимок до/после отказывает чужому/заменённому порту, старому execution, сброшенному кэшу; отмена и поздняя публикация |
-| Live | Парная сверка; существующее изменение схемы NODE_READ_SCHEMA_CHANGED; время чтения; отсутствие новых Table/смены форматов/листования и изменения dirty от обычного чтения и JavaScript full. Для native Preview — по выбранному варианту |
+| Live | Парная сверка; существующее изменение схемы NODE_READ_SCHEMA_CHANGED; время чтения; отсутствие новых Table/смены форматов/листования и изменения dirty от обычного чтения и JavaScript full. Native full продолжает использовать Preview через F3 |
 
 Переиспользуются runtime tools `collapse/fixtures/types.csv`, `collapse/acceptance-kit/fixtures/{mixed,all-null,header-only}.csv`, `javascript-native-fixtures.mjs`, `fixtures/row-filter/golden.csv` с математическим row_filter_oracle.py; evals `tasks/node-evals/crosstable-sliding-source-refresh/{oracle.py,oracle.csv,initial-oracle.csv,data/sales-initial.csv,data/sales-updated.csv}`. Отдельная live-матрица отрицательных проверок binding/cache не нужна.
 
@@ -162,7 +152,6 @@ Remote identity порта не обязана совпадать с UI-wrapper.
 - text-import-node.mjs меняет hook onTableRead/его содержимое для нового результата и потребителя javascript-native-input-driver.mjs; независимый Table-оракул остаётся.
 - [node-api](../../../packages/loginom-runtime/client/lib/node-api.mjs), [workflow skill](../../../packages/product/skills/loginom-automation/references/workflow.md), [user-workflow](../../../packages/loginom-runtime/client/lib/user-workflow.mjs): убрать инструкции о форматировании, округлении false, «512 KiB UI row data» и многоминутном запасе на форматы.
 - [Table procedure](../../../packages/loginom-runtime/client/lib/node-output-procedure.mjs), [страницы](../../../packages/loginom-runtime/client/lib/table-output-pages.mjs), [старый decoder](../../../packages/loginom-runtime/client/lib/table-output-values.mjs), [observer](../../../packages/loginom-runtime/client/lib/node-table-context.mjs), [output context](../../../packages/loginom-runtime/client/lib/node-output-context.mjs), [read contract](../../../packages/loginom-runtime/client/lib/node-read-contract.mjs), [apply](../../../packages/loginom-runtime/client/lib/node-apply.mjs), [release](../../../packages/loginom-runtime/client/lib/node-pending-release.mjs): убрать рабочую зависимость от Table, сохранить нужные oracle-функции.
-- Только при выборе переноса native full: [output](../../../packages/loginom-runtime/client/lib/collapse-native-output.mjs), [source](../../../packages/loginom-runtime/client/lib/collapse-native-source.mjs), [raw read](../../../packages/loginom-runtime/client/lib/variant-native-read.mjs), [refusal](../../../packages/loginom-runtime/client/lib/native-read-refusal.mjs); decoder и гарантии остаются.
 
 Файлы таблицы — в `packages/loginom-runtime/tools/loginom-acceptance`. «Обновить» означает новый producer-контракт, не замену независимого оракула тем же reader-ом.
 
@@ -180,7 +169,7 @@ Remote identity порта не обязана совпадать с UI-wrapper.
 | javascript-native-input-driver.mjs | Обновить hook/base.readOutput, сохранить независимое наблюдение |
 | javascript-mismatch-probe.mjs | Обновить интеграцию действующих проб, сохранить Table-оракул |
 | collapse/acceptance-kit/audit.py | Только для исторических отчётов/закреплённого набора; не переписывать frozen контракт ради ordinary sample |
-| collapse/exact-wiring/public-audit.py | Только для исторических отчётов/закреплённого native full; основной вариант его не меняет |
+| collapse/exact-wiring/public-audit.py | Только для исторических отчётов/закреплённого native full; утверждённый дизайн его не меняет |
 
 Table-функции нужны также `scripts/node-acceptance/cold-check.mjs`; runtime tools `rc-combined-reopen.mjs`, `rc-combined-reopen-v2.mjs`, `date-time-saved-import.mjs`, `collect_missing_values_table.mjs`, живым cold/civil веткам `javascript-execution-runtime.mjs`; `packages/loginom-host/script/skills-acceptance/cold.mjs`; `packages/desktop/test/loginom/cold-readback.mjs`; `evals/script/text-import-cold/reader.mjs`; `docs/node-development/nodes/text-import/acceptance/matrix-cold-check.mjs`. Helper целиком не удаляется.
 
@@ -221,8 +210,8 @@ Offline-probe точной копии FromOADate/AddBias: 44 случая UTC/Mo
 
 Один дополнительный column.AsString для 20 000 символов занял 131 мс; это одиночный замер, не медиана. Неуспешные попытки настройки временного UI-probe в пять успешных циклов Table не включены. Коэффициент ускорения не обещается: основной прямой замер содержит усечённую строку. Dirty оставался true→true — проверена неизменность флага, не отсутствие изменения чистого пакета.
 
-Все собственные пакеты, включая дополнительную проверку строк, закрыты без сохранения, выполнен logout, браузеры закрыты. Сырые данные/временный код — вне Git в каталоге визуализаций чата, rev2. Продукт, тесты и fixtures не менялись. Пока не проверены реализация reader-а, compact/46 000, границы 10 000/512 KiB, все семейства узлов, live schema change, весь перенос native full. Эти проверки относятся к будущей реализации. Дополнительное дочитывание проверено на отдельном тестовом выполнении; общий reader и его полная парная приёмка ещё не реализованы.
+Все собственные пакеты, включая дополнительную проверку строк, закрыты без сохранения, выполнен logout, браузеры закрыты. Сырые данные/временный код — вне Git в каталоге визуализаций чата, rev2. Продукт, тесты и fixtures не менялись. Пока не проверены реализация reader-а, compact/46 000, границы 10 000/512 KiB, все семейства узлов, live schema change. Эти проверки относятся к будущей реализации. Дополнительное дочитывание проверено на отдельном тестовом выполнении; общий reader и его полная парная приёмка ещё не реализованы.
 
-Внутренние имена/размещение функций и адресных тестов оставлены исполнителю. Видимый контракт, режимы, provenance/full/cleanup и правило дат — нет. После builder check документ передаётся владельцу; план требует отдельного явного разрешения.
+Внутренние имена/размещение функций и адресных тестов оставлены исполнителю. Видимый контракт, режимы, provenance/full/cleanup и правило дат — нет.
 
 Проверка редакции: независимый builder check — `nothing important left`; относительные ссылки проверены, `git diff --check` чистый. Это подтверждение готовности документа, не реализации.
