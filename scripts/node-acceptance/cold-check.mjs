@@ -370,6 +370,9 @@ try {
   throw error
 } finally {
   if (!state.closed && !state.cleanupAttempted && state.prepared?.status === "READY" && state.prepared.package_ref?.path === saved.path) {
+    // A rejected readonly opening owns only this diagnostic copy, never the
+    // writer's lock. Native cleanup rechecks its mode and refuses dirty copies.
+    const readOnly = state.prepared.workflow_ref.navigation_path.some(item => item.label.endsWith("(только чтение)"))
     await execute(
       makePackageCleanupCode({
         sessionId: session,
@@ -379,8 +382,9 @@ try {
         loginomUrl: config.loginom_url,
         loginomBuild: "7.4.2",
         tabTid: state.prepared.workflow_ref.tab_tid,
-        diagnosticDiscard: true,
-        diagnosticWaitForIdle: true,
+        diagnosticReadOnly: readOnly,
+        diagnosticDiscard: !readOnly,
+        diagnosticWaitForIdle: !readOnly,
       }),
     )
       .then((result) => {state.cleanup=result;return writeFile(join(args.output, "cleanup.json"), JSON.stringify(result, null, 2) + "\n")})
