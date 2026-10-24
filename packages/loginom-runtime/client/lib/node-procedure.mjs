@@ -345,14 +345,19 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const observationNow = () => started + monotonicNow() - monotonicStarted;
       let deadline = settleOutputPort?operation.deadline:Math.min(operation.deadline, started + timeoutMs);
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false;
+      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, sampleStarted = observationNow();
       try {
       for (let sample = 0; settleOutputPort || settleProcessConsole || sample < 80; sample++) {
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
-        if (sample) await wait(Math.min(200, Math.max(0, deadline - observationNow())));
+        // Pending reads already spend time polling. Keep a 200 ms start-to-start
+        // interval instead of adding that delay to a slow read. A ready identity
+        // still gets the full existing pause before its second confirmation.
+        const pause = satisfied ? 200 : Math.max(0, 200 - (observationNow() - sampleStarted));
+        if (sample && pause > 0) await wait(Math.min(pause, Math.max(0, deadline - observationNow())));
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
+        sampleStarted = observationNow();
         // Rediscover the root: wizard transitions and combo portals can replace it.
         const roots = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
           ...boundOptions,
