@@ -197,7 +197,7 @@ export async function configureTablePrecision(channel,table,{alreadyOpen=false,r
   const select=async target=>{
     const native=definition.fields.find(f=>f.index===target.definition_index);
     offset=Math.floor(native.index/8)*8;
-    s=await revealTableFormatField(channel,table,definition,native);
+    s=await revealTableFormatField(channel,table,definition,native,s);
     await action(s,'select Table format field '+target.index,s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.table_field?.source_index===target.index
       &&e.table_field.name_key===target.key&&e.table_field.type===target.type),'Bound Table field missing').ref}),()=>({field:target}));
     s=await read('Table format field '+target.index+' selected',s=>s.table_settings.format.fields.some(f=>f.selected&&f.source_index===target.index&&f.name_key===target.key));
@@ -337,8 +337,10 @@ export async function restoreTablePrecision(channel,proof) {
 
 export async function prepareTableRead(channel,table) {
   const observe=(condition,ready)=>channel.observe({condition,readOutputs:true,ready});
+  let s;
   for(const kind of ['nulls','data_types']) {
-    let s=await observe('Table '+kind+' toggle available',s=>s.ui.elements.some(e=>e.view_toggle?.kind===kind));
+    if(!s?.ui.elements.some(e=>e.view_toggle?.kind===kind))
+      s=await observe('Table '+kind+' toggle available',s=>s.ui.elements.some(e=>e.view_toggle?.kind===kind));
     const control=one(s.ui.elements.filter(e=>e.view_toggle?.kind===kind),'Table display toggle ambiguous');
     if(!control.view_toggle.pressed) {
       await channel.perform({condition:'enable Table '+kind,initialObservation:s,ready:s=>s.ui.elements.filter(e=>e.view_toggle?.kind===kind&&!e.view_toggle.pressed).length===1,
@@ -346,7 +348,8 @@ export async function prepareTableRead(channel,table) {
       s=await observe('Table '+kind+' enabled',s=>s.ui.elements.some(e=>e.view_toggle?.kind===kind&&e.view_toggle.pressed));
     }
   }
-  let s=await observe('Table Filter available',s=>s.ui.elements.some(e=>e.tid===table.table_tid+';btnDataGridFilter'));
+  if(!s.ui.elements.some(e=>e.tid===table.table_tid+';btnDataGridFilter'))
+    s=await observe('Table Filter available',s=>s.ui.elements.some(e=>e.tid===table.table_tid+';btnDataGridFilter'));
   await channel.perform({condition:'open bound Table filter',initialObservation:s,ready:s=>s.ui.elements.some(e=>e.tid===table.table_tid+';btnDataGridFilter'),
     resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===table.table_tid+';btnDataGridFilter'),'Unique Table Filter required').ref}),identity:()=>({table})});
   const read=()=>channel.observe({condition:'Table filter setting ready',tableDialog:{table,kind:'filter'},ready:s=>s.table_settings?.filter?.enabled?.status==='observed'});
