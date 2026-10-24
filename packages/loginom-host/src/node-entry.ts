@@ -45,7 +45,7 @@ process.on("disconnect", () => {
     process.exitCode = 1
   })
 })
-process.on("SIGTERM", () => {
+for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(signal, () => {
   void stop()
     .finally(() => {
       if (process.connected) process.disconnect()
