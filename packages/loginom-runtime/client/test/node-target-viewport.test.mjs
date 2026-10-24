@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {mutateGraph} from '../lib/node-target-browser.mjs';
+import {NODE_TYPES} from '../lib/node-contracts.mjs';
 import {samePlacementGraph} from '../lib/node-placement.mjs';
 import {verifyNodeTargetEffect} from '../lib/node-target.mjs';
 
@@ -17,31 +18,34 @@ function fixture(kind,fault) {
  const tab={classList:{contains:()=>true}},document={querySelectorAll:q=>q==='[data-tid="tab"]'?[tab]:q==='[data-tid="'+prefix+';ModelForm;cmpDiagram"]'?[canvas]:[],elementFromPoint:(x,y)=>{
   for(const e of [label,body]){const b=e.getBoundingClientRect();if(x>=b.x&&x<=b.x+b.width&&y>=b.y&&y<=b.y+b.height&&x<1280)return e;}return x<1280&&y<800?canvas:null;
  }};
- const nativeNode={FGuid:'node',FCell:{}},view={scale:1,getState:()=>({shape:{node:body}})};
- const controller={FController:{FInitialScale:1,FDiagram:{FNodes:{FCollection:[nativeNode]},FmxGraph:{view,getSelectionCells:()=>[]}}}};
+ const nativeNode={FGuid:'node',FCell:{}},nativeNodes=[nativeNode],view={scale:1,getState:()=>({shape:{node:body}})};
+ const controller={FController:{FInitialScale:1,FDiagram:{FNodes:{FCollection:nativeNodes},FmxGraph:{view,getSelectionCells:()=>[]}}}};
  const app={Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}};
  const context={innerWidth:1280,innerHeight:800,document,__loginomDockPreparationV1:{document,id:'doc',receipts:new Map([['prepare',{phase:'verified',workflowId:'flow',tab}]]),nodeTargetDomEpochs:{objects:new Map([[canvas,1]])}},
   bg:{app}};
  const evaluate=(fn,...args)=>runInNewContext('('+fn.toString()+')',context)(...args);
  const locator=selector=>{
   const element=selector.includes('Label;Label')?label:selector.includes(';Graph;Sort')?body:canvas;
-  return {locator,count:async()=>1,isVisible:async()=>true,isEnabled:async()=>true,evaluate:async(fn,arg)=>evaluate(fn,element,arg),
+  return {locator,boundingBox:async()=>canvas.getBoundingClientRect(),count:async()=>1,isVisible:async()=>true,isEnabled:async()=>true,evaluate:async(fn,arg)=>evaluate(fn,element,arg),
    dblclick:async()=>{assert.ok(revealed);order.push('rename');},click:async()=>{},press:async key=>{
     if(key==='Enter'){graph.nodes[0].label=edited;graph.nodes[0].dom_epoch++;}
    }};
  };
  const page={locator,evaluate:async(fn,arg)=>evaluate(fn,arg),waitForTimeout:async()=>{},keyboard:{type:async text=>{edited=text;},press:async()=>{}},mouse:{
-  click:async()=>{},move:async()=>{},down:async()=>{assert.ok(revealed);order.push('move');held=true;},up:async()=>{if(held){graph.nodes[0].position={x:648,y:400};graph.nodes[0].dom_epoch++;held=false;}}
+  click:async()=>{},move:async()=>{},down:async()=>{assert.ok(revealed);order.push('move');held=true;},up:async()=>{if(held){if(kind==='create'){nativeNodes.push({FGuid:'created',FIconCls:fault==='foreign_icon'?'foreign':NODE_TYPES['programming.javascript'].icon_class});graph.nodes.push({...structuredClone(graph.nodes[0]),ref:{...ref,node_id:'created'},type:'programming.javascript',position:{x:400,y:80}});}else{graph.nodes[0].position={x:648,y:400};graph.nodes[0].dom_epoch++;}held=false;}}
  }};
  const reveal=async args=>{
-  order.push('reveal');assert.equal(args.nodeId,'node');assert.deepEqual(args.position,{x:936,y:80});
+  order.push('reveal');
+  if(kind!=='create'){assert.equal(args.nodeId,'node');assert.deepEqual(args.position,{x:936,y:80});}
   revealed=true;view.scale=.75;graph.nodes[0].dom_epoch++;
   if(fault==='unknown'){const e=Error('Lost viewport reply');e.placement_navigation_unverified=true;throw e;}
   if(fault==='foreign')graph.nodes[0].ref.node_id='foreign';
-  await args.guard();return {fully_visible:fault!=='not_visible',zoom_steps:2,outline_closed:true};
+  await args.guard();return {point:{x:400,y:180},fully_visible:fault!=='not_visible',zoom_steps:2,outline_closed:true};
  };
- const effect={id:'effect',kind,before,parameters:{ref,...(kind==='rename'?{label:'Debt descending'}:{position:{x:648,y:400}})}};
- return {order,effect,run:()=>mutateGraph(page,{effect,request:{document_id:'doc',workflow_ref},deadline:Date.now()+15000},async()=>structuredClone(graph),null,null,null,reveal,samePlacementGraph)};
+ let pendingReads=0;
+ const read=async()=>{if(kind==='create'&&graph.nodes.length===2&&pendingReads++<2)throw Error('Node identity is not rendered');return structuredClone(graph);};
+ const effect={id:'effect',kind,before,parameters:kind==='create'?{type:'programming.javascript',position:{x:400,y:80}}:{ref,...(kind==='rename'?{label:'Debt descending'}:{position:{x:648,y:400}})}};
+ return {order,effect,run:()=>mutateGraph(page,{effect,request:{document_id:'doc',workflow_ref},types:NODE_TYPES,deadline:Date.now()+15000},read,null,null,null,reveal,samePlacementGraph)};
 }
 for(const kind of ['rename','move'])test('target '+kind+' reveals its exact offscreen node and rebinds only drawing epochs',async()=>{
  const f=fixture(kind),r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);
@@ -51,4 +55,12 @@ for(const kind of ['rename','move'])test('target '+kind+' reveals its exact offs
 for(const kind of ['rename','move'])for(const fault of ['unknown','foreign','not_visible'])test('target '+kind+' refuses '+fault+' viewport before its node gesture',async()=>{
  const f=fixture(kind,fault),r=await f.run();assert.notEqual(r.status,'SUCCEEDED');assert.deepEqual(f.order,['reveal']);
  if(fault==='unknown'){assert.equal(r.status,'AMBIGUOUS');assert.equal(r.cleanup_complete,false);}
+});
+
+for(const fault of ['settles','foreign_icon'])test('one JavaScript drop waits for its native body and rejects '+fault+' owner',async()=>{
+ const f=fixture('create',fault),r=await f.run();
+ assert.equal(r.status,fault==='settles'?'SUCCEEDED':'AMBIGUOUS',r.error);
+ assert.equal(f.order.filter(e=>e==='move').length,1);
+ if(fault==='settles')assert.equal(r.after.nodes.length,2);
+ else assert.match(r.error,/Created JavaScript rendering owner changed/);
 });
