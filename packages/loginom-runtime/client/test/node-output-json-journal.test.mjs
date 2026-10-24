@@ -31,9 +31,10 @@ test('output redaction failure cannot become accepted table evidence',()=>{
 test('JavaScript product read normalizes echo URL cells before the exact durable phase ACK',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'javascript-url-ack-'));
  try{
-  const raw={verified:true,cleanup_complete:true,execution_id:'doc:1:1',ports:[{port:0,
-   sample:[[{type:'string',value:'https://httpbin.org/anything/audience?RequestId=r-a&Key=a%20b%26%D1%8F'},
-    {type:'string',value:'a b&я'}]]}]};
+  const raw={verified:true,cleanup_complete:true,execution_id:'doc:1:1',ports:[{port:0,port_guid:'js-output0',
+   freshness_basis:'completed_execution_port_source',fresh:true,execution_id:'doc:1:1',
+   sample:[[{type:'string',representation:'data_source_string',precision:'source_text',value:'https://httpbin.org/anything/audience?RequestId=r-a&Key=a%20b%26%D1%8F'},
+    {type:'string',representation:'data_source_string',precision:'source_text',value:'a b&я'}]]}]};
   const before=structuredClone(raw),redactor=createRedactor(),calls=[];
   // Replace browser driver dependencies only; execute the actual product dispatch.
   const context={createRedactor,nodeOutputForJournal,NODE_READ_MODE:'read',createNodeReadDrivers:()=>assert.fail('Wrong driver')};
@@ -52,6 +53,8 @@ test('JavaScript product read normalizes echo URL cells before the exact durable
   assert.deepEqual(ack.receipt.value,value);
   assert.equal(value.ports[0].sample[0][0].value.includes('Key=a'),false);
   assert.equal(value.ports[0].sample[0][1].value,'a b&я');
+  assert.equal(value.ports[0].freshness_basis,'completed_execution_port_source');
+  assert.equal(value.ports[0].sample[0][1].precision,'source_text');
   assert.equal(drivers.configureJavascript,configureJavascript);
   assert.deepEqual(calls,[[read,ctx]]);assert.deepEqual(raw,before);
  }finally{await rm(directory,{recursive:true,force:true});}

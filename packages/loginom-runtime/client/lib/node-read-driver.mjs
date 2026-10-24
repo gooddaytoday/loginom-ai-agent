@@ -2,13 +2,9 @@ import {resolveCrossTableSchema} from './crosstable-schema.mjs';
 import {createNodeProcedure} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
-import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
-import {readTableOutputPages} from './table-output-pages.mjs';
-import {decodeTableOutput} from './table-output-values.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
 import {createJavascriptSourceAdmission} from './javascript-source-admission.mjs';
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
-import {openManagedJavascriptOutputViews} from './javascript-managed-views.mjs';
 import {withJavascriptSourcePolicyBoundary} from './javascript-source-policy-refusal.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
@@ -19,7 +15,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
  const request=operation.parameters,javascript=request.target.type==='programming.javascript';
  const owner=javascript?{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,
   node_id:request.target.ref.node_id,operation_id:operation.id,ui_epoch:Date.now()}:null;
- let channel,signal,driver,execution,sourceReceipt;
+ let channel,signal,driver,execution,sourceReceipt,readCleanupComplete=false;
  const enter=ctx=>{
   signal=ctx.signal;signal?.throwIfAborted();operation.deadline=ctx.deadline;
   if(javascript)need(['document_id','workflow_id','node_id'].every(key=>ctx.node?.[key]===owner[key]),
@@ -75,49 +71,42 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
   async readOutput(read,ctx){
    enter(ctx);need(execution?.verified===true&&execution.owner_verified===true&&execution.execution_id===ctx.execution.execution_id,
     'Fresh owned execution required for reread');
-   const ports=[];let restoration,returned;
+   const ports=[];
    for(const port of read.ports){
     const schema=operation.parameters.parameters.schemas.find(s=>s.port===port)?.schema;
     need(schema||schema===null&&operation.parameters.parameters.observed_schema===true,'Retained output schema missing');
-    const table=await openNewOutputTable(channel,port,javascript?{openViews:({output})=>openManagedJavascriptOutputViews({
-     prepared:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},node:ctx.node,output,
-     deadline:ctx.deadline,targetOrigin,execute,record:onRecord,receiptOptions,
-     wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{
-      ...receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})})}:{});
-    const format=read.require_exact_numbers?await configureTablePrecision(channel,table.table):null;
-    let data;
-    try{
-     const settings=await prepareTableRead(channel,table.table);
-     const raw=await readTableOutputPages(channel,table.table,{sampleRows:read.sample_rows});
-     const policy=operation.parameters.parameters.cross_table_policy;
-     let materialized;
-     if(policy){
-      need(operation.parameters.target.type==='transform.cross_table'&&policy.kind==='crosstable_sliding'
-       &&policy.configuration.category_mode==='sliding'&&port===0&&table.port_guid===policy.port_guid
-       &&ctx.execution.execution_id!==policy.source_execution_id
-       &&['document_id','workflow_id','node_id'].every(k=>policy.node[k]===ctx.node[k]),'CrossTable reread owner/port differs');
-      materialized=resolveCrossTableSchema(raw.columns,policy.configuration);
-     }
-     data=decodeTableOutput(raw,{formatProof:format,readSettings:settings,expectedColumns:materialized?.columns??alignReadSchema(raw.columns,schema),requireExactNumbers:read.require_exact_numbers});
-     if(materialized)data.category_fields=materialized.category_fields;
-    }finally{if(format)restoration=await restoreTablePrecision(channel,format);}
-    returned=await returnFromOutputTable(channel,table.table);
-    ports.push({port,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data});
+    readCleanupComplete=false;operation.cleanupConfirmed=false;
+    let result;
+    try{result=await channel.readOutputPort({port,execution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});}
+    // The enclosing failed phase later clears cleanupConfirmed; retain only this read's settlement.
+    finally{readCleanupComplete=operation.cleanupConfirmed===true&&!operation.transportUncertain;}
+    const output=result.output;
+    const policy=operation.parameters.parameters.cross_table_policy;
+    let materialized;
+    if(policy){
+     need(operation.parameters.target.type==='transform.cross_table'&&policy.kind==='crosstable_sliding'
+      &&policy.configuration.category_mode==='sliding'&&port===0&&output.port_guid===policy.port_guid
+      &&ctx.execution.execution_id!==policy.source_execution_id
+      &&['document_id','workflow_id','node_id'].every(k=>policy.node[k]===ctx.node[k]),'CrossTable reread owner/port differs');
+     materialized=resolveCrossTableSchema(output.schema,policy.configuration);
+    }
+    ports.push({...output,schema:materialized?.columns??alignReadSchema(output.schema,schema),
+     ...(materialized?{category_fields:materialized.category_fields}:{})});
    }
    return verified({effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',
     execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports,
     ...(javascript?{javascript_source:{...request.parameters.javascript_source,
      source_operation_id:request.parameters.source_operation_id,settings_sha256:sourceReceipt.settings_sha256,
-     policy:sourceReceipt.effective_source.policy}}:{}),
-    ...(restoration?{format_restoration:restoration}:{}),workflow_return:returned});
+     policy:sourceReceipt.effective_source.policy}}:{})});
   },
   // Same-ID delivery retries return the original worker. Unknown browser effects
   // stay blocked; this route never restarts an uncertain execution automatically.
   verifyContinuation:async()=>false,
   ...(!javascript?{
-   releasePendingPhases:['finish'],
+   releasePendingPhases:['finish','read'],
    async releasePending(state,{signal}={}){
-    need(state.pending?.phase==='finish','Only a stopped output-read graph finish can be released here');
+    need(['finish','read'].includes(state.pending?.phase),'Only a stopped output-read finish or read can be released here');
+    if(state.pending.phase==='read')need(readCleanupComplete,'The last output-port read has no confirmed settled cleanup');
     enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
      workflow_ref:state.request.workflow_ref,node:state.node});
     return releasePendingNode({operation,channel,readReceipt:options.readReceipt});
@@ -125,6 +114,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    // Browser recovery runs the same proof for any stopped phase: the model, not
    // this driver, restored the page, and the proof rechecks the quiet graph.
    async recoveryReleasePending(state,{signal}={}){
+    if(state.pending?.phase==='read')need(readCleanupComplete,'The last output-port read has no confirmed settled cleanup');
     enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
      workflow_ref:state.request.workflow_ref,node:state.node});
     return releasePendingNode({operation,channel,readReceipt:options.readReceipt});

@@ -67,6 +67,18 @@ test('fresh changed-source execution observes materialized schema and fixed manu
  assert.equal(javascriptBatchVerdict('code-table-mismatch',probe,{owner_verified:true,wizard_closed:true,quiet:true,node_count:2}).gate_passed,true);
 });
 
+test('mismatch observes new source-port output while preserving the independent Table producer',async()=>{
+ const f=fixture();delete f.output.table;delete f.output.filter_enabled;
+ Object.assign(f.output,{port:0,port_guid:'port',execution_id:f.execution.execution_id,fresh:true,freshness_basis:'completed_execution_port_source'});
+ f.output.sample.forEach(row=>Object.assign(row[1],{precision:'source_text',representation:'data_source_string'}));
+ assert.equal((await runJavascriptMismatchMaterialization(f.args)).gate_passed,true);
+ for(const mutate of [output=>output.port_guid='foreign',output=>output.freshness_basis='unknown',output=>output.fresh=false,
+  output=>output.execution_id='stale',output=>output.sample[0][1].precision='display_text']){
+  const changed=structuredClone(f.output);mutate(changed);
+  await assert.rejects(()=>runJavascriptMismatchMaterialization({...f.args,readOutput:async()=>changed}));
+ }
+});
+
 test('fixed output oracle distinguishes generated, manual, baseline and unexpected layouts',()=>{
  const f=fixture();
  for(const [name,layout,pass] of [['GeneratedMarker','generated',true],['ManualMarker','manual',true],['PhaseMarker','baseline',false],['Other','unexpected',false]]){

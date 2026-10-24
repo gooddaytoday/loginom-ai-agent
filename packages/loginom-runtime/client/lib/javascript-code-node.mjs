@@ -10,15 +10,11 @@ import {createNodeProcedure} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 import {closeJavascriptPortMapping} from './javascript-port-mapping-close.mjs';
-import {openManagedJavascriptOutputViews} from './javascript-managed-views.mjs';
-import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
-import {readTableOutputPages} from './table-output-pages.mjs';
-import {decodeTableOutput} from './table-output-values.mjs';
 import {validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
 import {javascriptExistingLifecycleBaseline} from './javascript-existing-lifecycle.mjs';
 import {admitJavascriptExistingSchema} from './javascript-existing-schema-refusal.mjs';
 import {javascriptExecutionWaitContext} from './javascript-execution-continuation.mjs';
-import {NODE_READ_MODE} from './node-read-contract.mjs';
+import {NODE_READ_MODE,alignReadSchema} from './node-read-contract.mjs';
 import {createNodeReadDrivers} from './node-read-driver.mjs';
 import {withJavascriptSourcePolicyBoundary} from './javascript-source-policy-refusal.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
@@ -385,26 +381,15 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           &&executionReceipt.execution_id===ctx.execution.execution_id&&outputMapping,
         'JavaScript final owned execution and output mapping required');
         if(!read.ports.length)return verified({status:'complete',ports:[],execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id});
-        const table=await openNewOutputTable(channel,0,{openViews:({output})=>openManagedJavascriptOutputViews({
-          prepared:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},node:ctx.node,output,
-          deadline:ctx.deadline,targetOrigin,execute,record:onRecord,receiptOptions,
-          wrapMutation:(code,reference)=>withBrowserReceipt('('+code+')(page)',{
-            ...receiptOptions(reference.id,reference.action_key,reference.signature),operation_id:reference.id})})});
-        need(table.port_guid===outputMapping.node_context.output_port.port_guid,'JavaScript physical output port changed');
-        const format=read.require_exact_numbers?await configureTablePrecision(channel,table.table):null;
-        let data,restoration;
-        try{
-          const settings=await prepareTableRead(channel,table.table);
-          const raw=await readTableOutputPages(channel,table.table,{sampleRows:read.sample_rows});
-          data=decodeTableOutput(raw,{formatProof:format,readSettings:settings,
-            expectedColumns:outputMapping.target_fields.filter(field=>!field.excluded),requireExactNumbers:read.require_exact_numbers});
-        }finally{if(format)restoration=await restoreTablePrecision(channel,format);}
-        const returned=await returnFromOutputTable(channel,table.table);
+        const {output}=await channel.readOutputPort({port:0,execution:executionReceipt,
+          sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
+        need(output.port===0&&output.port_guid===outputMapping.node_context.output_port.port_guid,'JavaScript physical output port changed');
+        const aligned=alignReadSchema(output.schema,outputMapping.target_fields.filter(field=>!field.excluded));
+        const data={...output,schema:output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}))};
         if(read.coverage==='full')need(data.sample_complete===true&&data.sample_rows===data.row_count&&!data.limitations?.length,
-          'Full JavaScript UI output exceeds bounded read coverage');
+          'Full JavaScript output exceeds bounded read coverage');
         return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,
-          evidence_ref:ctx.receipt_id,ports:[{port:0,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data}],
-          table_creation:table,format_restoration:restoration,workflow_return:returned});
+          evidence_ref:ctx.receipt_id,ports:[data]});
       },
       releasePendingPhases:['input_mapping','open','configure'],
       async releasePending(state,{signal:releaseSignal}={}) {
