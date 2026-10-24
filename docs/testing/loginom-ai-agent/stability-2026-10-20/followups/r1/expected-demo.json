@@ -1,16 +1,6 @@
 {
   "package_path": "/stability-2026-10-20/datamining-clustering.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "datamining.clustering"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",

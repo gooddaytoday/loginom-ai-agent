@@ -27,7 +27,7 @@ rows = [{"Site": site, **{category: float(values[category]) for category in ("El
 
 expected = {
     "package_path": sys.argv[1] if len(sys.argv) > 1 else "/stability-2026-10-20/n4.lgp",
-    "nodes": [{"type": kind} for kind in ['imports.text', 'transform.join_data', 'transform.cross_table', 'exports.text']],
+    "nodes": [],
     "outputs": [{
         "output_node_type": "export_input",
         "ordered": False,

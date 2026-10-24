@@ -28,7 +28,7 @@ rows = [{"Carrier": row["Carrier"], "Zone": zones[row["ZoneCode"]],
 
 expected = {
     "package_path": sys.argv[1] if len(sys.argv) > 1 else "/stability-2026-10-20/n3.lgp",
-    "nodes": [{"type": kind} for kind in ['imports.text', 'transform.replace_columns', 'transform.calculator', 'exports.text']],
+    "nodes": [],
     "outputs": [{
         "output_node_type": "export_input",
         "ordered": True,

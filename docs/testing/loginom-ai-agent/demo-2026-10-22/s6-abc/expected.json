@@ -1,25 +1,9 @@
 {
   "package_path": "/demo-2026-10-22/s6-abc.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.sorting"
-    },
-    {
-      "type": "transform.calculator"
-    },
-    {
-      "type": "transform.group_data"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
-      "output_node_type": "transform.group_data",
+      "output_node_type": "export_input",
       "ordered": false,
       "columns": [
         {

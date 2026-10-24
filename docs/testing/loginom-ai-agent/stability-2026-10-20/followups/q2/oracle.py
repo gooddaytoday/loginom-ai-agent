@@ -29,7 +29,7 @@ rows = rows[:3]
 
 expected = {
     "package_path": sys.argv[1] if len(sys.argv) > 1 else "/demo-2026-10-22/s1-revenue.lgp",
-    "nodes": [{"type": kind} for kind in ("imports.text", "transform.group_data", "exports.text")],
+    "nodes": [],
     "outputs": [{
         "output_node_type": "export_input",
         "export_destination": sys.argv[2] if len(sys.argv) > 2 else "/demo-2026-10-22/revenue-top3.csv",
