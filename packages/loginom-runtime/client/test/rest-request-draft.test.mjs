@@ -6,7 +6,7 @@ import {restRequestCapability} from '../lib/rest-request.mjs';
 function fixture(foreign=null,manual=false,duplicate=null){
  const root='MF;TF-1;WizrdMCF',base=root+';RESTRequestWizard;ParamLinks';
  const node={document_id:'doc',workflow_id:'flow',node_id:'rest'};
- const names=['RequestId','Key'],columnRows=names.map((Name,i)=>({id:[17,0][i],data:{Name,DataType:5}})),parameterRows=names.map(Name=>({data:{Name:manual?Name.toLowerCase():Name,DataType:5}}));
+ const names=['RequestId','Key'],columnRows=names.map((Name,i)=>({id:Name,data:{Index:[17,0][i],Name,DataType:5}})),parameterRows=names.map(Name=>({data:{Name:manual?Name.toLowerCase():Name,DataType:5}}));
  let stage=0,lastSelector='',autoLinks=0,nextClicks=0,drags=0;
  const points=[];
  const store=rows=>({loading:false,getRange:()=>rows});
@@ -28,7 +28,7 @@ function fixture(foreign=null,manual=false,duplicate=null){
  const page={evaluate,waitForTimeout:async()=>{},locator:selector=>({
   count:async()=>{
    if(selector.startsWith('.x-mask')||selector.includes(';btnError'))return 0;
-   if(selector.includes(';colColumnName_'))return columnRows.some(r=>selector==='[data-tid='+JSON.stringify(base+';colColumnName_'+r.id)+']')?(duplicate==='column'?2:1):0;
+   if(selector.includes(';colColumnName_'))return columnRows.some(r=>selector==='[data-tid='+JSON.stringify(base+';colColumnName_'+r.data.Index)+']')?(duplicate==='column'?2:1):0;
    if(selector.includes(';colParam_'))return parameterRows.some(r=>selector==='[data-tid='+JSON.stringify(base+';colParam_'+r.data.Name)+']')?(duplicate==='parameter'?2:1):0;
    return 1;
   },
@@ -39,7 +39,7 @@ function fixture(foreign=null,manual=false,duplicate=null){
    autoLinks++;draw.FLinks=Object.fromEntries(columnRows.map((c,i)=>[i,[foreign==='column'?{data:{...c.data}}:c,foreign==='parameter'?{data:{...parameterRows[i].data}}:parameterRows[i]]]));
   }else if(lastSelector.includes(';btnNext')){stage++;nextClicks++;}
  },move:async()=>{},down:async()=>{drags++;},up:async()=>{
-  const [source,target]=points.slice(-2),column=columnRows.find(r=>source==='[data-tid='+JSON.stringify(base+';colColumnName_'+r.id)+']'),parameter=parameterRows.find(r=>target==='[data-tid='+JSON.stringify(base+';colParam_'+r.data.Name)+']');
+  const [source,target]=points.slice(-2),column=columnRows.find(r=>source==='[data-tid='+JSON.stringify(base+';colColumnName_'+r.data.Index)+']'),parameter=parameterRows.find(r=>target==='[data-tid='+JSON.stringify(base+';colParam_'+r.data.Name)+']');
   assert.ok(column&&parameter,'the drag must use the owned native records');
   draw.FLinks[parameter.data.Name]=[column,parameter];
  }}};
@@ -61,7 +61,7 @@ for(const foreign of ['column','parameter'])test('REST draft refuses a '+foreign
  assert.deepEqual(f.counts(),{autoLinks:1,nextClicks:0});
 });
 
-test('REST manual bindings use native column record keys, including zero, rather than field names or row positions',async()=>{
+test('REST manual bindings use native column Index values, including zero, rather than record IDs, field names or row positions',async()=>{
  const f=fixture(null,true),result=await f.run();
  assert.equal(result.verified,true,result.error);
  assert.deepEqual(result.configuration.query_parameters,[{name:'requestid',field:'RequestId'},{name:'key',field:'Key'}]);
