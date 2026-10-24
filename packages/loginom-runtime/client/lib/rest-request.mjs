@@ -69,7 +69,7 @@ export async function restRequestCapability(page,t,readContext){
     if(!p||exact(root).length!==1||c.FView.el.dom!==exact(root)[0]||exact(base.slice(0,-1)).length!==1||p.FView.el.dom!==exact(base.slice(0,-1))[0]||!c.FCardLayout.getActiveItem().el.dom.contains(p.FView.el.dom)
      ||p.FItems.grdFields.getStore()!==p.FColumnsStore||p.FItems.grdParams.getStore()!==p.FGrdParamStore||p.FColumnsStore.loading||p.FGrdParamStore.loading||p.FRequestParamLinks.loading||p.FRequestParamLinks.complete!==true)throw Error('Native REST binding inventories are unavailable');
     const columnRows=p.FColumnsStore.getRange(),parameterRows=p.FParamStore.getRange();
-    const columns=columnRows.map(r=>({name:r.data.Name,type:r.data.DataType}));
+    const columns=columnRows.map(r=>({name:r.data.Name,type:r.data.DataType,index:r.data.Index}));
     const parameters=parameterRows.map(r=>({name:r.data.Name,type:r.data.DataType}));
     // AutoLink changes the rendered draft; FRequestParamLinks still contains
     // the saved bindings until the wizard commits its page.
@@ -94,7 +94,10 @@ export async function restRequestCapability(page,t,readContext){
     if(current.links.length)await click(base+'btnLinksDel');
     if(t.query_parameters.every(q=>q.name===q.field))await click(base+'btnAutoLink');
     else for(const q of t.query_parameters){
-     await quiet();await guard();const source=await point(base+'colColumnName_'+q.field),target=await point(base+'colParam_'+q.name);effect=true;
+     const columns=current.columns.filter(c=>c.name===q.field);
+     need(columns.length===1&&Number.isSafeInteger(columns[0].index)&&columns[0].index>=0,'input field index is ambiguous');
+     // Field cells use the native column Index; record IDs are field names.
+     await quiet();await guard();const source=await point(base+'colColumnName_'+columns[0].index),target=await point(base+'colParam_'+q.name);effect=true;
      await page.mouse.move(source.x,source.y);await page.mouse.down();try{await page.mouse.move(target.x,target.y,{steps:12});}finally{await page.mouse.up();}
     }
     current=await wait('requested query bindings',async()=>{const r=await read();return same(r.links,t.query_parameters)?r:null;});

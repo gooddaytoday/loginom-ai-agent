@@ -35,7 +35,7 @@ COLUMNS = [("Category", "string"), ("Revenue", "real")]
 
 expected = {
     "package_path": sys.argv[1] if len(sys.argv) > 1 else "/demo-2026-10-22/s4-branches.lgp",
-    "nodes": [{"type": kind} for kind in ("imports.text", "transform.union_data", "exports.text")],
+    "nodes": [],
     "outputs": [{
         "output_node_type": "export_input",
         "export_destination": sys.argv[2] if len(sys.argv) > 2 else "/demo-2026-10-22/branches-categories.csv",

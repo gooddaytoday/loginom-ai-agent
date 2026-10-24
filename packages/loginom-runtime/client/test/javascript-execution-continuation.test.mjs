@@ -53,3 +53,25 @@ test('native read wait accepts later completion but rejects foreign, replaced, c
   const bad=structuredClone(f.native);mutate(bad);assert.throws(()=>verifyExecutionReadWait(f.execution,bad,binding));
  }
 });
+test('native read wait retains the same pending child while its upstream group runs',()=>{
+ const f=fixture(),s=structuredClone(f.native);
+ s.processes[0].error=false;
+ s.processes[1]={...s.processes[1],error:false,progress_state:{...s.processes[1].progress_state,state:'not_started',terminal:false,can_cancel:false}};
+ s.processes.push({process_id:'1.2',parent_id:'1',record_id:'upstream',error:false,
+  owner:{verified:true,node_id:'upstream',source:'native_process_model_identity'},progress_state:{...s.processes[0].progress_state}});
+ const binding=verifyExecutionReadWait(f.execution,s);
+ assert.equal(binding.process_record_id,'child');
+ for(const state of ['running','completed']){
+  const later=structuredClone(s);later.processes[1].progress_state={...later.processes[1].progress_state,state,terminal:state==='completed',can_cancel:state==='running'};
+  assert.deepEqual(verifyExecutionReadWait(f.execution,later,binding),binding);
+ }
+ f.state.execution_wait.native_execution=binding;
+ assert.equal(javascriptExecutionWaitContext(f.state,f.retained).deadline,900);
+ for(const mutate of [x=>x.processes[0].progress_state.state='completed',x=>x.processes[0].progress_state.state='not_started',
+  x=>x.processes[0].progress_state.terminal=true,x=>x.processes[0].progress_state.can_cancel=false,x=>x.processes[0].error=true,
+  x=>x.processes[1].progress_state.verified=false,x=>x.processes[1].progress_state.source='caption',
+  x=>x.processes[1].progress_state.terminal=true,x=>x.processes[1].progress_state.can_cancel=true,x=>x.processes[1].error=true,
+  x=>x.processes[1].owner.node_id='foreign',x=>x.processes[1].record_id='replaced']){
+  const bad=structuredClone(s);mutate(bad);assert.throws(()=>verifyExecutionReadWait(f.execution,bad,binding));
+ }
+});

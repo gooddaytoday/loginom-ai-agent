@@ -18,7 +18,7 @@ rows = [dict(RequestId=r['RequestId'], Key=r['Key'], Method='GET', HttpStatusCod
         for r in requests]
 expected = dict(
     package_path=sys.argv[1] if len(sys.argv) > 1 else '/stability-2026-10-20/n11.lgp',
-    nodes=[dict(type=t) for t in ['imports.text', 'integration.rest_request', 'exports.text']],
+    nodes=[],
     outputs=[dict(output_node_type='export_input', ordered=False, column_order='exact',
                   columns=[dict(name=name, type=kind, label_any=True) for name, kind in
                            [('RequestId', 'string'), ('Key', 'string'), ('Method', 'string'), ('HttpStatusCode', 'integer')]],

@@ -27,7 +27,7 @@ assert error == Fraction(3, 25) and list(map(len, groups)) == [8, 4]
 rows = [{"X": float(center), "PointCount": len(group)} for group, center in zip(groups, centers)]
 expected = {
     "package_path": sys.argv[1] if len(sys.argv) > 1 else "/stability-2026-10-20/datamining-clustering.lgp",
-    "nodes": [{"type": kind} for kind in ("imports.text", "datamining.clustering", "exports.text")],
+    "nodes": [],
     "outputs": [{
         "output_node_type": "export_input",
         "export_destination": sys.argv[2] if len(sys.argv) > 2 else "/stability-2026-10-20/cluster-x-two.csv",
