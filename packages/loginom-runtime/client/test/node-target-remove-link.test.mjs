@@ -4,8 +4,8 @@ import vm from 'node:vm';
 import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
 import {verifyNodeTargetEffect} from '../lib/node-target.mjs';
 
-function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,contextLost=false,inputPort=0,outputPort=0,bindingsFault=null,selectionChange=null,selectionGuidChanged=false,service=false}={}) {
-  const start=Date.now();let clock=start,clicked=0,deleted=0,contextChecks=0;
+function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,contextLost=false,inputPort=0,outputPort=0,bindingsFault=null,selectionChange=null,selectionGuidChanged=false,service=false,selectionMasks=0,maskSelectionChanged=false}={}) {
+  const start=Date.now();let clock=start,clicked=0,deleted=0,contextChecks=0,masked=0;
   const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1'}};
   const edge={source:'source',output:0,target:'target',input:0};
   const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,dom_epoch:1,interaction_ready:true,
@@ -21,6 +21,7 @@ function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,c
     evaluate:async(fn,arg)=>{
       if(fn.toString().includes('FLinks.FCollection'))return (graph.rest_connection_links??graph.links).map(e=>[selectionGuidChanged&&clicked?'changed':e.guid??'link',e.source,'source-port',e.target,'target-port']);
       if(arg?.types){
+        if(clicked&&!deleted&&selectionMasks>0){selectionMasks--;masked++;throw Error('Graph is blocked');}
         const result=structuredClone(graph);
         if(arg.read_bindings){
           result.native_bindings=[{node_id:'source',label:'source',inputs:[],outputs:[outputPort]},{node_id:'target',label:'target',inputs:[inputPort],outputs:[]}];
@@ -32,7 +33,7 @@ function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,c
       }
       if(arg?.epoch){contextChecks++;if(contextLost&&clicked)throw Error('Node target document/workflow/DOM epoch changed');return;}
       if(typeof arg==='string' && ['source','target'].includes(arg))return 'MF;TF-1;Graph;'+arg;
-      if(arg===tid)return true;
+      if(arg===tid)return !(maskSelectionChanged&&masked>0);
       if(arg===undefined && fn.toString().includes('getSelectionCells'))return [{edge:true,tid:wrongSelection?'another-link':tid}];
       throw Error('Unexpected evaluate: '+fn);
     },
@@ -51,7 +52,7 @@ function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,c
   };
   class Clock extends Date {static now(){return clock;}}
   const adapter=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',execute:code=>vm.runInNewContext('('+code+')',{Date:Clock})(page)});
-  return {adapter,request,edge,graph,page,start,deadline:start+budget,stats:()=>({clicked,deleted,contextChecks,elapsed:clock-start})};
+  return {adapter,request,edge,graph,page,start,deadline:start+budget,stats:()=>({clicked,deleted,contextChecks,masked,elapsed:clock-start})};
 }
 async function run(options) {
   const f=fixture(options);const before=await f.adapter.observe(f.request,f.deadline);
@@ -138,4 +139,19 @@ test('same endpoints cannot hide a changed native link GUID after selection',asy
   const f=await run({selectionGuidChanged:true,selectionChange:g=>{for(const n of g.nodes)n.dom_epoch++;}});
   assert.equal(f.receipt.status,'AMBIGUOUS');assert.match(f.receipt.error,/graph changed before deletion/);
   assert.equal(f.stats().deleted,0);
+});
+
+for(const selectionMasks of [1,3])test('D45 waits through the selected-link loading mask without replay: '+selectionMasks,async()=>{
+ const f=await run({selectionMasks});
+ assert.equal(f.receipt.status,'SUCCEEDED',f.receipt.error);assert.equal(f.stats().clicked,1);assert.equal(f.stats().deleted,1);
+ assert.equal(f.stats().masked,selectionMasks);assert.ok(verifyNodeTargetEffect(f.effect,f.graph));
+});
+for(const fault of ['maskSelectionChanged','selectionGuidChanged'])test('D45 mask wait retains fresh '+fault+' refusal',async()=>{
+ const f=await run({selectionMasks:2,[fault]:true});
+ assert.equal(f.receipt.status,'AMBIGUOUS');assert.equal(f.stats().clicked,1);assert.equal(f.stats().deleted,0);
+});
+test('D45 persistent selected-link mask retains ambiguity under the original deadline',async()=>{
+ const f=await run({budget:2000,selectionMasks:1000});
+ assert.equal(f.receipt.status,'AMBIGUOUS');assert.equal(f.stats().clicked,1);assert.equal(f.stats().deleted,0);
+ assert.ok(f.stats().elapsed<=1000);assert.ok(f.stats().masked>1);assert.equal(f.receipt.cleanup_complete,true);
 });

@@ -299,8 +299,15 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       if(selected.length!==1 || selected[0].edge!==true || selected[0].tid!==linkTid)throw new Error('Deletion selection includes another object');
       const remove=find(task.request.workflow_ref.prefix+';ModelForm;btnRemoveSelected');
       await wait('single_link_delete_toolbar_reachable',async()=>{try{await point(remove);return true;}catch{return false;}});
+      // A loading mask may appear after the owned selection click. Read only
+      // until it clears; never replay selection or accept changed graph/GUIDs.
+      const selectedGraph=await wait('owned_link_selection_graph_ready',async()=>{
+        try{return await read(page,task);}catch(error){
+          if(String(error.message).includes('Graph is blocked'))return null;
+          throw error;
+        }
+      },1000);
       const stillSelected=await page.evaluate(tid=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;const cells=d.FmxGraph.getSelectionCells();return cells.length===1&&cells[0].edge===true&&d.FmxGraph.view.getState(cells[0])?.shape?.node?.getAttribute('data-tid')===tid;},linkTid);
-      const selectedGraph=await read(page,task);
       if(!stillSelected || !sameGraph(before,selectedGraph) || JSON.stringify(await nativeLinks())!==JSON.stringify(linkIdentities))throw new Error('Owned link selection or graph changed before deletion');
       // Selection redraws node bodies. Rebind only after the complete graph,
       // native link GUIDs and exact single-edge selection have been preserved.
