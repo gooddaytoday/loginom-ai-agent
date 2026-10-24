@@ -26,3 +26,26 @@ test('vertical owner mismatch refuses before scroll',async()=>{const ch=fixture(
 test('stalled vertical movement is bounded',async()=>{const ch=fixture({count:2});ch.stuck=true;await assert.rejects(readTableOutputPages(ch,table,{sampleRows:32}),/no progress/);assert.equal(ch.scrolls,1);});
 test('oversized strings limit preview with an explicit reason and no complete claim',async()=>{const ch=fixture({count:14,longText:true});const out=await readTableOutputPages(ch,table,{sampleRows:100});assert.equal(out.read_limit,'preview_cell_or_byte_budget');assert.equal(out.sample_complete,false);assert.equal(out.rows.length,2);});
 test('negative or unbounded row requests are rejected before observation',async()=>{for(const sampleRows of [-1,101,Infinity,1.2])await assert.rejects(readTableOutputPages({observe:()=>{throw Error('must not run')}},table,{sampleRows}),/0–100/);});
+
+test('212x4 full read refuses with actual count only after normal Table workflow return',async()=>{
+ const {returnFromOutputTable}=await import('../lib/node-output-procedure.mjs');
+ const {refuseJavascriptFullRead}=await import('../lib/native-read-refusal.mjs');
+ const raw=await readTableOutputPages(fixture({rowCount:212,count:4}),table,{sampleRows:100});
+ assert.equal(raw.rows.length,100);assert.equal(raw.sample_complete,false);
+ const node={document_id:'doc',workflow_id:'wf',node_id:'js'},path=[{tid:'scenario'}];let surface='views',returns=0;
+ const channel={observe:async({ready})=>{
+  const state={prepared_node_context:{...node,verified:true,surface},
+   node_outputs:{verified:true,surface,tables:[{...table,active:true}],ports:[{port_guid:'port',active:true}]},
+   workflow_navigation:{status:'observed',path,control_ref:'back',control_tid:'back-tid'},navigation_context:{status:'observed',path},
+   ui:{elements:[{ref:'back',tid:'back-tid',allowed_actions:['click']}]}};
+  assert.equal(ready(state),true);return state;
+ },perform:async step=>{assert.equal(step.ready(step.initialObservation),true);
+  assert.deepEqual(step.resolve(step.initialObservation),{verb:'click',ref:'back'});surface='graph';returns++;}};
+ const returned=await returnFromOutputTable(channel,table);
+ assert.throws(()=>refuseJavascriptFullRead({coverage:'full',sample_rows:100,require_exact_numbers:true},
+  {table:raw.table,row_count:raw.row_total,sample_rows:raw.rows.length},returned,{node,execution:{status:'completed',execution_id:'exec'}}),error=>{
+   assert.match(error.message,/212.*100/);assert.match(error.message,/sample.*CSV/);
+   assert.equal(error.nodePhaseRefusal.effect_possible,false);assert.equal(error.nodePhaseRefusal.cleanup_complete,true);return true;
+ });
+ assert.equal(surface,'graph');assert.equal(returns,1);
+});

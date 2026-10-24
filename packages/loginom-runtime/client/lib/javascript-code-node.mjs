@@ -13,6 +13,7 @@ import {closeJavascriptPortMapping} from './javascript-port-mapping-close.mjs';
 import {openManagedJavascriptOutputViews} from './javascript-managed-views.mjs';
 import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
 import {readTableOutputPages} from './table-output-pages.mjs';
+import {refuseJavascriptFullRead} from './native-read-refusal.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
 import {validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
 import {javascriptExistingLifecycleBaseline} from './javascript-existing-lifecycle.mjs';
@@ -400,6 +401,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
             expectedColumns:outputMapping.target_fields.filter(field=>!field.excluded),requireExactNumbers:read.require_exact_numbers});
         }finally{if(format)restoration=await restoreTablePrecision(channel,format);}
         const returned=await returnFromOutputTable(channel,table.table);
+        if(read.coverage==='full'&&data.row_count>100)refuseJavascriptFullRead(read,data,returned,ctx);
         if(read.coverage==='full')need(data.sample_complete===true&&data.sample_rows===data.row_count&&!data.limitations?.length,
           'Full JavaScript UI output exceeds bounded read coverage');
         return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,
