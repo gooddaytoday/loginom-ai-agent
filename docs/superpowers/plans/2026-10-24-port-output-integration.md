@@ -53,7 +53,7 @@
 - Text Import сохраняет `createTextImportNodeSupport({targetOrigin,targetBuild,...})` и `readOutput(read,ctx)`; удаляется утративший источник private onTableRead. Его единственный civil-потребитель самостоятельно получает Table receipts после base.readOutput, без Execute. Новый универсальный hook не нужен.
 - Python consumers используют `verify_port_output(...)` первого плана; Table-verifier не подменяется.
 
-- [ ] **Step 1: Проверить первый multi-output caller тестом `filter_reads_only_requested_ports`.** Новый test-файл вызывает настоящий экспорт readFilterOutputs с узким channel fixture, у которого только readOutputPort и запись аргументов; UI-методы бросают ошибку. Сначала один выход, затем оба в запрошенном порядке; результаты задать в новом public формате:
+- [x] **Step 1: Проверить первый multi-output caller тестом `filter_reads_only_requested_ports`.** Новый test-файл вызывает настоящий экспорт readFilterOutputs с узким channel fixture, у которого только readOutputPort и запись аргументов; UI-методы бросают ошибку. Сначала один выход, затем оба в запрошенном порядке; результаты задать в новом public формате:
 
   ```js
   const result = await readFilterOutputs(channel, {...read,ports:[1]}, ctx, mapped);
@@ -64,12 +64,12 @@
   assert.equal(Object.hasOwn(result, 'port_evidence'), false);
   ```
 
-- [ ] **Step 2: RED/GREEN Filter.** Из client: `node --test --test-name-pattern=filter_reads_only_requested_ports test/node-port-output-callers.test.mjs`. После парной сверки данного выхода заменить Table-цепочку на channel reader, сохранить mapped schema, отдельные GUID и настройку обоих портов. В calculator-node вызов implementation.readOutputs получает `{...ctx,portExecution:executionReceipt}`; добавить этот единственный необходимый файл в commit задачи. Результат теста — PASS.
-- [ ] **Step 3: Аналогично по одному подключить Regression, Clustering и REST.** В том же test-файле проверять Regression prediction/coefficients, отсутствие исключённых коэффициентов; Clustering Cluster/Distance и разрешённый порядок passthrough через alignClusteringOutput; два разных port_guid; REST собственные фиксированные схемы и отсутствие повторного HTTP-запроса. Схема наблюдается reader-ом, data_kind копируется из проверенного mapping. Перед удалением каждой Table-цепочки выполнить её пару в текущем operator-сеансе; исходное Execute/обучение не повторять внутри пары. REST проверить через фактический createRestRequestNodeSupport или live request counter, не экспортировать private функцию только ради теста.
-- [ ] **Step 4: Подключить Text Import и отделить civil-оракул.** После его пары использовать собственный executionReceipt/outputColumns; убрать readView и onTableRead. В createJavascriptNativeInputSupport после base.readOutput создать существующий createNodeProcedure с теми же options/ctx/execute, собрать прежние Table receipts штатными helpers, restore/return, затем вызвать неизменный verifyNativeCivil. Сохранить one-read/no-replay и native input byte-проверки. Не использовать текст нового reader-а как civil expected.
+- [x] **Step 2: RED/GREEN Filter.** Из client: `node --test --test-name-pattern=filter_reads_only_requested_ports test/node-port-output-callers.test.mjs`. После парной сверки данного выхода заменить Table-цепочку на channel reader, сохранить mapped schema, отдельные GUID и настройку обоих портов. В calculator-node вызов implementation.readOutputs получает `{...ctx,portExecution:executionReceipt}`; добавить этот единственный необходимый файл в commit задачи. Результат теста — PASS.
+- [x] **Step 3: Аналогично по одному подключить Regression, Clustering и REST.** В том же test-файле проверять Regression prediction/coefficients, отсутствие исключённых коэффициентов; Clustering Cluster/Distance и разрешённый порядок passthrough через alignClusteringOutput; два разных port_guid; REST собственные фиксированные схемы и отсутствие повторного HTTP-запроса. Схема наблюдается reader-ом, data_kind копируется из проверенного mapping. Перед удалением каждой Table-цепочки выполнить её пару в текущем operator-сеансе; исходное Execute/обучение не повторять внутри пары. REST проверить через фактический createRestRequestNodeSupport или live request counter, не экспортировать private функцию только ради теста.
+- [x] **Step 4: Подключить Text Import и отделить civil-оракул.** После его пары использовать собственный executionReceipt/outputColumns; убрать readView и onTableRead. В createJavascriptNativeInputSupport после base.readOutput создать существующий createNodeProcedure с теми же options/ctx/execute, собрать прежние Table receipts штатными helpers, restore/return, затем вызвать неизменный verifyNativeCivil. Сохранить one-read/no-replay и native input byte-проверки. Не использовать текст нового reader-а как civil expected.
 
   Переписать тест извлечённого production readOutput в javascript-native-datetime.test.mjs: новая base-ветка не вызывает Table, но civil driver отдельно вызывает Table-оракул на том же execution/port. Проверки: `assert.equal(executeCount,1)`, `assert.equal(civil.receipts.raw.table.port_guid, output.ports[0].port_guid)` и verifyNativeCivil принимает именно независимые receipts. Убраный hook не заменять фиктивным port evidence в поле civil.
-- [ ] **Step 5: Обновить действующие Python-проверки.** Import и Filter проверяют новый provenance/execution/schema/count/values, а не количество Add Table/format actions. full_read_evidence обслуживает ordinary sample: убрать обязательность filter_enabled, сохранить локальные ограничения его callers. Положительные случаи плюс повреждённые port/execution/schema/fullness обязаны различаться:
+- [x] **Step 5: Обновить действующие Python-проверки.** Import и Filter проверяют новый provenance/execution/schema/count/values, а не количество Add Table/format actions. full_read_evidence обслуживает ordinary sample: убрать обязательность filter_enabled, сохранить локальные ограничения его callers. Положительные случаи плюс повреждённые port/execution/schema/fullness обязаны различаться:
 
   ```python
   self.assertEqual(verify_port_output(port, columns, rows, 'exec', 0), [])
@@ -78,8 +78,8 @@
   ```
 
   verify_internal_sequence/verify_execution_observations и независимые CSV/business expected сохраняются. Новый test_port_output_evidence проверяет реальные consumers, а не копию их алгоритма. Сначала RED конкретного изменённого consumer, затем минимальная правка и GREEN.
-- [ ] **Step 6: Проверки задачи.** Из client: `node --test test/node-port-output-callers.test.mjs test/filter-procedure.test.mjs test/linregression-output.test.mjs test/clustering-output.test.mjs test/text-import-node.test.mjs`. Из runtime: `node --test tools/loginom-acceptance/javascript-native-input.test.mjs tools/loginom-acceptance/javascript-native-integer.test.mjs tools/loginom-acceptance/javascript-native-typed.test.mjs tools/loginom-acceptance/javascript-native-datetime.test.mjs`. Из acceptance: `python3 -m unittest test_import_output_evidence test_full_read_evidence test_port_output_evidence`. Всё PASS; старые mapping-тесты сами по себе не доказывают переключение reader-а.
-- [ ] **Step 7: Коммит.** `git commit -m "feat(runtime): read specialized node outputs from ports"` с файлами задачи и необходимым вызовом в calculator-node; не включать raw captures и временный скрипт.
+- [x] **Step 6: Проверки задачи.** Из client: `node --test test/node-port-output-callers.test.mjs test/filter-procedure.test.mjs test/linregression-output.test.mjs test/clustering-output.test.mjs test/text-import-node.test.mjs`. Из runtime: `node --test tools/loginom-acceptance/javascript-native-input.test.mjs tools/loginom-acceptance/javascript-native-integer.test.mjs tools/loginom-acceptance/javascript-native-typed.test.mjs tools/loginom-acceptance/javascript-native-datetime.test.mjs`. Из acceptance: `python3 -m unittest test_import_output_evidence test_full_read_evidence test_port_output_evidence`. Всё PASS; старые mapping-тесты сами по себе не доказывают переключение reader-а.
+- [x] **Step 7: Коммит.** `git commit -m "feat(runtime): read specialized node outputs from ports"` с файлами задачи и необходимым вызовом в calculator-node; не включать raw captures и временный скрипт.
 
 ### Task 2: JavaScript, dock_node_read и оба формата eval evidence
 
@@ -155,3 +155,13 @@
 ## Передача
 
 Выполнение разрешено владельцем 25.10.2026 и идёт последовательно после первого плана через subagent-driven-development с TDD. Общий reader имеет одну реализацию, consumers переходят на неё без временного пользовательского переключателя.
+
+## Checkpoint реализации
+
+- Task 1 завершена: Filter, Regression, Clustering, REST и Text Import читают общий порт; независимое ревью соответствия и качества PASS.
+- Civil-проверка Import отдельно собирает прежние Table receipts на том же выполнении; native full и исторические оракулы сохранены.
+- Проверки на закреплённом Node: client 49 PASS, native 2178 PASS, дополнительный shared reader 27 PASS; Python 45 PASS.
+- Живые пары всех пяти callers приняты до удаления старого чтения; Filter/ML/REST дополнительно сверены с независимыми CSV/business expected. Одиночные времена не являются benchmark.
+- REST-пара использовала исходное выполнение без повторного HTTP. Первоначальный public apply остался FAILED/unknown после унаследованного отказа консоли; новое успешное публичное выполнение ещё требуется в финальной матрице.
+- Evidence вне Git: `/tmp/port-read-implementation-LUEAYO/`. Собственный пакет сохранён, закрыт без discard; logout, ноль пакетов и закрытие браузера подтверждены.
+- Следующая задача: JavaScript, повторное чтение, release и оба формата eval; общая приёмка и медианы пока не завершены.
