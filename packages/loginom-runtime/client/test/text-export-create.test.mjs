@@ -9,7 +9,7 @@ function fixture(mode={}){
  const prefix='MF;TF-1',ownerTid=prefix+';ModelForm;pnlVendors;tree',palette=prefix+';ModelForm;colVendors_Компоненты>Экспорт>Текстовый_файл;TreeText',rootTid=prefix+';ModelForm;cmpDiagram',tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';
  let top=0,scrolls=0,drags=0,held=false,created=false;
  const rect=(x,y,width,height)=>({x,y,width,height,right:x+width,bottom:y+height});
- const canvas={getBoundingClientRect:()=>rect(300,100,1100,720),contains:e=>e===canvas},tab={classList:{contains:()=>true}};
+ const canvas={getBoundingClientRect:()=>rect(300,100,1100,720),contains:e=>e===canvas,querySelectorAll:()=>[]},tab={classList:{contains:()=>true}};
  const row={contains:e=>e===item,querySelectorAll:()=>mode.icon?[]:[{}]};
  const owner={isConnected:true,contains:e=>e===row||e===item,checkVisibility:()=>true,getBoundingClientRect:()=>rect(10,100,280,600),clientHeight:600,scrollHeight:2001,
   get scrollTop(){return top;},set scrollTop(v){scrolls++;top=v;if(mode.cancelAfterScroll)page[Symbol.for('loginom-dock.node-target-cancel')]=new Set(['effect']);if(mode.scrollFailure)throw Error('scroll failed');}};
