@@ -3,7 +3,7 @@ import { withBrowserReceipt, makeCapabilityCode } from './executor.mjs';
 import { NODE_TYPES, NODE_POSITION_MIN } from './node-contracts.mjs';
 import {activatePreparedWorkflow} from './node-workflow-activation.mjs';
 import {exportPaletteScroll} from './text-export-palette.mjs';
-import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from './node-placement.mjs';
+import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlacementGap,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from './node-placement.mjs';
 
 // Read cached graph objects and rendered SVG only. Never dereference the data
 // proxy or call Loginom server methods. GUID + prepared document/workflow is the
@@ -493,7 +493,10 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
       }
     },
     observe:observeGraph,
-    async choosePosition(value,graph,deadline,signal){
+    async choosePosition(value,graph,deadline,signal,reserved){
+      // Only new REST auto-placement and its private implicit encoder (the
+      // reserved argument) use the larger footprint; other nodes keep policy.
+      const clearance=value.target.kind==='new'&&!value.target.position&&(value.target.type==='integration.rest_request'||reserved!==undefined);
       signal?.throwIfAborted();
       if(JSON.stringify(await observeGraph(value,deadline))!==JSON.stringify(graph))
         throw Object.assign(Error('Graph changed before automatic placement'),{code:'NODE_PLACEMENT_GRAPH_CHANGED'});
@@ -502,16 +505,22 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         const b=e.getBoundingClientRect(),width=Math.min(b.right,innerWidth)-b.x,height=Math.min(b.bottom,innerHeight)-b.y;
         const view=(${nodePlacementViewport.toString()})(e);
         const occupied=[...e.querySelectorAll('[data-tid*=";Graph;"]')].map(n=>n.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
+        // The private REST encoder must not occupy the caller's explicit
+        // future REST location. No synthetic node or public parameter is added.
+        for(const position of ${JSON.stringify(reserved??[])}){
+          const p=(${nodePlacementPoint.toString()})(view,position),s=view.scale;
+          occupied.push({left:p.x-32*s,right:p.x+96*s,top:p.y-40*s,bottom:p.y+160*s});
+        }
         for(let y=80;y<height-80;y+=128)for(let x=80;x<width-96;x+=160){
           const position=(${nodePlacementPosition.toString()})(view,{x:b.x+x,y:b.y+y});
           if(position.x<${NODE_POSITION_MIN}||position.y<${NODE_POSITION_MIN}||position.x>10000||position.y>10000)continue;
           const screen=(${nodePlacementPoint.toString()})(view,position),px=screen.x,py=screen.y,hit=document.elementFromPoint(px,py);
           if(px<0||py<0||!hit||!(hit===e||e.contains(hit)))continue;
-          if(occupied.some(r=>px>r.left-72&&px<r.right+96&&py>r.top-56&&py<r.bottom+72))continue;
+          if(${clearance}?!(${nodePlacementGap.toString()})(view,screen,occupied):occupied.some(r=>px>r.left-72&&px<r.right+96&&py>r.top-56&&py<r.bottom+72))continue;
           return position;
         }
-        const overflow=(${nodePlacementOverflow.toString()})(view,occupied,${NODE_POSITION_MIN},10000);
-        if(overflow)return overflow;
+        const overflow=(${nodePlacementOverflow.toString()})(view,occupied,${NODE_POSITION_MIN},10000,${clearance?112:0});
+        if(overflow&&(!${clearance}||(${nodePlacementGap.toString()})(view,(${nodePlacementPoint.toString()})(view,overflow),occupied)))return overflow;
         throw Error('target.position: no free visible canvas position or bounded model position; enlarge the canvas or supply an explicit position');
       })`,deadline);
     },

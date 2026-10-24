@@ -3,7 +3,71 @@ import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {createNodeTargetBrowserAdapter,mutateGraph} from '../lib/node-target-browser.mjs';
 import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
-import {nodePlacementPoint,nodePlacementPosition,nodePlacementOverflow,revealNodePlacement,revealPreparedGraphNode,samePlacementGraph} from '../lib/node-placement.mjs';
+import {nodePlacementPoint,nodePlacementPosition,nodePlacementGap,nodePlacementOverflow,revealNodePlacement,revealPreparedGraphNode,samePlacementGraph} from '../lib/node-placement.mjs';
+
+function gapFixture(occupied=[]){
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type:'integration.rest_request'},inputs:[]};
+ const graph={complete:true,interaction_ready:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
+ const box={x:0,y:0,left:0,right:800,top:0,bottom:600,width:800,height:600};
+ const canvas={getBoundingClientRect:()=>box,querySelectorAll:()=>occupied.map(r=>({getBoundingClientRect:()=>({...r,width:r.right-r.left,height:r.bottom-r.top})})),scrollLeft:0,scrollTop:0};
+ const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:1,translate:{x:0,y:0}}}}}};
+ const context={innerWidth:800,innerHeight:600,document:{elementFromPoint:()=>canvas},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
+ const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>{
+  if(code.includes('async function readGraph'))return graph;
+  if(code.includes('evaluateAll')||code.includes('const row=page.locator'))return true;
+  return runInNewContext('('+code+')',context)({locator:()=>({evaluate:async(fn,arg)=>fn(canvas,arg)})});
+ }});
+ return {adapter,request,graph};
+}
+test('D32 automatic placement reserves the whole REST footprint above an observed encoder port',async()=>{
+ const f=gapFixture([{left:80,right:136,top:160,bottom:244},{left:140,right:149,top:192,bottom:204}]);
+ const p=await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000);
+ // Observed native REST body is 56x104; the old point-only choice (80,80)
+ // intersected the encoder body below it even though the drop point was free.
+ assert.equal(p.x<149&&p.x+72>80&&p.y<244&&p.y+104>160,false);
+});
+test('D32 an implicit encoder reserves its parent REST requested location without changing it',async()=>{
+ const f=gapFixture(),reserved={x:80,y:80};
+ const p=await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000,undefined,[reserved]);
+ assert.ok(Math.abs(p.x-reserved.x)>=128||Math.abs(p.y-reserved.y)>=160);
+ assert.deepEqual(reserved,{x:80,y:80});
+});
+test('D32 explicit REST coordinates retain their prior preflight without a new clearance refusal',async()=>{
+ const f=gapFixture([{left:400,right:456,top:336,bottom:420},{left:460,right:469,top:368,bottom:380}]);
+ f.request.target.position={x:400,y:300};
+ await f.adapter.preflight(f.request,f.graph,Date.now()+10000);
+ assert.deepEqual(f.request.target.position,{x:400,y:300});
+});
+test('D32 explicit Import beside the observed scenario variables retains its prior preflight',async()=>{
+ const occupied=[{left:17,right:73,top:193,bottom:249},...Array.from({length:5},(_,i)=>({left:17,right:32,top:53+i*28,bottom:77+i*28}))];
+ for(const position of [{x:100,y:300},{x:80,y:280},{x:80,y:320}]){
+  const f=gapFixture(occupied);f.request.target={kind:'new',type:'imports.text',position};
+  await f.adapter.preflight(f.request,f.graph,Date.now()+10000);
+  assert.deepEqual(f.request.target.position,position);
+ }
+});
+test('D32 automatic placement of unrelated node types keeps the old point clearance',async()=>{
+ const f=gapFixture([{left:80,right:136,top:160,bottom:244}]);
+ f.request.target.type='imports.text';
+ assert.deepEqual(structuredClone(await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000)),{x:80,y:80});
+ f.request.target.type='programming.javascript';
+ assert.deepEqual(structuredClone(await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000)),{x:80,y:80});
+});
+test('D32 implicit encoder alone opts into REST clearance even without a reserved explicit REST',async()=>{
+ const f=gapFixture([{left:80,right:136,top:160,bottom:244}]);f.request.target.type='programming.javascript';
+ const p=await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000,undefined,[]);
+ assert.notDeepEqual(structuredClone(p),{x:80,y:80});
+});
+test('D32 clearance keeps the observed 120-unit native auto-link case apart at every scale',()=>{
+ for(const scale of [.5,1,2]){
+  const v={x:324,y:100,scale,translate:{x:32,y:-16},scroll:{x:40,y:24}};
+  const source=nodePlacementPoint(v,{x:184,y:144});
+  const occupied=[{left:source.x,right:source.x+72*scale,top:source.y,bottom:source.y+80*scale}];
+  assert.equal(nodePlacementGap(v,nodePlacementPoint(v,{x:304,y:144}),occupied),false);
+  assert.equal(nodePlacementGap(v,nodePlacementPoint(v,{x:600,y:144}),occupied),true);
+ }
+ assert.throws(()=>nodePlacementGap({scale:1},{x:0,y:0},[{left:0,right:1,top:NaN,bottom:2}]),/clearance bounds/);
+});
 
 for(const {scale,translate,expected} of [
  {scale:1.5,translate:{x:0,y:0},expected:{x:160,y:136}},
