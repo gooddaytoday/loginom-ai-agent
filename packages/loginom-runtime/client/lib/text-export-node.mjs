@@ -13,6 +13,35 @@ import {exportContinuationSurface,verifyExportContinuation} from './text-export-
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);},one=xs=>{need(xs.length===1,'Unique export control required');return xs[0];};
 const verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
+export async function synchronizeTextExportInput(channel,state){
+ const before=state.node_mapping,same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+ // Sync only a complete, uncustomized automatic mapping. Manual layouts and
+ // renamed/excluded/unlinked fields retain their existing semantics.
+ if(before.autosync!==true||before.source_fields.length!==before.target_fields.length
+  ||!before.source_fields.length||before.target_fields.some(f=>!f.source||f.excluded||f.origin_type!==0
+   ||!['name','label','type','required'].every(k=>f[k]===f.source[k]))
+  ||new Set(before.target_fields.map(f=>f.source.record_id)).size!==before.source_fields.length
+  ||before.target_fields.some(f=>!before.source_fields.some(s=>same(s,f.source)))
+  ||before.target_fields.every((f,i)=>f.source.record_id===before.source_fields[i].record_id))return before;
+ const bound=s=>s.wizard?.stage==='input_mapping'&&s.wizard.root_ref===state.wizard.root_ref
+  &&s.wizard.root_tid===state.wizard.root_tid&&s.node_mapping?.verified===true
+  &&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true
+  &&s.node_mapping.mapping_wizard==='TuneDataSourceMappingWizard'
+  &&same(s.node_mapping.node_context,before.node_context);
+ need(bound(state),'Export input synchronization owner is unverified');
+ await channel.perform({condition:'synchronize automatic export input order',initialObservation:state,
+  ready:s=>bound(s)&&same(s.node_mapping,before),identity:s=>({wizard:s.wizard.root_ref,mapping:s.node_mapping}),
+  resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';TuneDataSourceMappingWizard;btnSyncThroughColumns'
+   &&e.allowed_actions.includes('click'))).ref})});
+ const after=(await channel.observe({condition:'automatic export input after synchronization',readMappings:true,ready:bound})).node_mapping;
+ need(same(after.source_fields,before.source_fields)&&after.autosync===before.autosync
+  &&after.target_fields.length===before.target_fields.length,'Export input synchronization changed source or inventory');
+ need(after.target_fields.every((f,i)=>{
+  const original=before.target_fields.find(t=>t.source.record_id===before.source_fields[i].record_id);
+  return same({...f,index:original.index},original);
+ }),'Export input synchronization did not preserve fields in source order');
+ return after;
+}
 export function textExportReadback({node,phases}){
  const configured=phases.find(p=>p.phase==='configure'),input=phases.find(p=>p.phase==='input_mapping'),finish=phases.find(p=>p.phase==='finish');
  need(configured?.value?.configuration&&input?.value?.source_identity_verified&&finish?.status==='verified','Export readback chain incomplete');
@@ -91,7 +120,7 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
     }
     await channel.openInputPort(0);
     const s=await channel.observe({condition:'complete native export input mapping',readMappings:true,ready:s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified===true});
-    inputMapping=s.node_mapping;
+    inputMapping=operation.nodeApply.request.target?.kind==='existing'?await synchronizeTextExportInput(channel,s):s.node_mapping;
     need(inputMapping.target_fields.length>0&&inputMapping.target_fields.length<=1000&&inputMapping.target_fields.every(f=>f.source&&!f.excluded),'Export input has missing fields');
     const definition=await readOutputDefinitionPages(channel,{expectedCount:inputMapping.target_fields.length});
     need(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===inputMapping.target_fields[i][k])),'Export input definition differs');
