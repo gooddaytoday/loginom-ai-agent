@@ -204,7 +204,7 @@ Metadata preflight требует в **каждом** новом slot profile lo
 
 ## 9. Размер изменений, откат и решения владельца
 
-Поставка runner3 обошлась **без изменений TypeScript harness, публичных протоколов, scheduler, БД состояния и продукта**. Выявленный после reboot DNS-дефект воспроизведён без изменений среды; [адресный план](2026-10-24-eval-stable-dns-plan.md) получил независимое ревью. Реализация, TDD/проверки по `evals/AGENTS.md` и решение о live поставке переданы в канонический чат; здесь код исправления не начат.
+Поставка runner3 обошлась **без изменений TypeScript harness, публичных протоколов, scheduler, БД состояния и продукта**. Выявленный после reboot DNS-дефект воспроизведён без изменений среды; [адресный план](2026-10-24-eval-stable-dns-plan.md) получил независимое ревью. Локальная правка и проверки выполняются в каноническом `1c6f` по `evals/AGENTS.md`; live поставка требует принятия конкретного SHA владельцем.
 
 Оценка Git-изменений: **3–5 файлов, 320–450 добавленных/удалённых строк вместе с этим планом** — этот документ, узкое изменение исходного плана, один VM unit template в `evals/ops/` и при необходимости пара proxy unit templates (штатный socket-proxyd). Вариант без новых templates допустим, если достаточно существующей принятой процедуры; установщик/общий deploy-script не нужен. Текущий документ измерять через `git diff --no-index --stat /dev/null <этот файл>`; до добавления в Git он не входит в обычный `git diff --stat`. При реализации считать весь итоговый diff, включая документы и проверки, после добавления нужных файлов в Git. Ничего не коммитить из чужой незавершённой работы.
 
@@ -235,7 +235,7 @@ Checkpoint (передача, не закрытие этапов 5–7):
 - Настоящий reboot VM: новый boot/epoch, прежние container IDs; сохранены 63 файла/22 копии proofs и manifest. Два quality FAIL учтены ровно один раз, без повторного измерения; proof `reboot-independent-readback.json`.
 - LAB-170 / `full234-LAB-170`, срез 24.10 18:25:31 UTC: blocked, repairing=true/EvalRunner, controller active/parked, batch inactive, counted=2, missing=232, startedAttempts=2, final=null, published=false; два будильника enabled.
 - Действующий предел без прогресса LAB-170: **25.10.2026 17:37:29.350 UTC / 20:37:29.350 МСК**; не продлевался. Срез и поля manifest — `final-handoff-state.json`.
-- Блокер generation: только Docker `HostConfig.Dns: null→[]` в обоих контейнерах. Fenced proof `stable-dns-readonly-reproduction.json`; старые receipts/config/pins не менялись. [План исправления](2026-10-24-eval-stable-dns-plan.md): независимое ревью PASS, код/поставка не начаты.
+- Блокер generation: только Docker `HostConfig.Dns: null→[]` в обоих контейнерах. Fenced proof `stable-dns-readonly-reproduction.json`; старые receipts/config/pins не менялись. [Адресная правка](2026-10-24-eval-stable-dns-plan.md) проверяется локально в `1c6f`, live поставка не выполнена.
 - Все перечисленные private proofs — `/home/george/.codex/tmp/runner3-deploy/`; native reboot proofs — guest campaign `evidence/evalrunner-reboot-01a16ef4-d259-7432-9305-82d89889863f/`. Секреты остаются вне Git.
 - Следующий шаг канонического чата: адресная правка/проверенный кандидат/решение о поставке → prepare-generation/restart/resume → только missing; затем независимость слотов, оставшиеся два сочетания runner2 после release и итог 234.
 - Этапы 5–7 открыты; runner1 непроверен, LAB-134 не менялась. Здесь новых кампаний, reboot, диагностики причины и ожидания полного прогона нет; службы и Multica продолжают сопровождение.

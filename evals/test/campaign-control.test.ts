@@ -93,6 +93,10 @@ test.skipIf(process.env.EVAL_PAIR_INTEGRATION !== "1" || process.env.EVAL_SYSTEM
         expect(await readLeaseReceipt(path.join(fixture.root, "control/journal.json"))).toMatchObject({ attempts: [], batches: [], repairing: true })
       }
       await check("RESOURCE_BUDGET_INVALID")
+      const dnsEquivalent = after.compatibleStableHashes.find(hash => hash !== before.stableConfiguration.hash)
+      expect(dnsEquivalent).toBeDefined()
+      await writePreparations(before.identity, slots.slots.map(() => ({ version: 1, hash: dnsEquivalent })))
+      await check("RESOURCE_BUDGET_INVALID")
       await writePreparations(before.identity, [])
       await check("CAMPAIGN_GENERATION_IDENTITY_CHANGED")
       await writePreparations(after.identity, [])

@@ -86,6 +86,14 @@ export function stablePairConfiguration(input: PairConfiguration) {
     serverNetworks: networks(input.serverNetworks), studioNetworks: networks(input.studioNetworks) }))).digest("hex") }
 }
 
+export function compatibleStablePairHashes(input: PairConfiguration) {
+  // Docker serializes an unset DNS override as null or []; keep both historical v1 proofs valid.
+  const hosts = (host: Record<string, unknown>) => host.Dns === null || Array.isArray(host.Dns) && host.Dns.length === 0
+    ? [{ ...host, Dns: null }, { ...host, Dns: [] }] : [host]
+  return [...new Set(hosts(input.serverHost).flatMap(serverHost => hosts(input.studioHost)
+    .map(studioHost => stablePairConfiguration({ ...input, serverHost, studioHost }).hash)))]
+}
+
 function canonicalConfiguration(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalConfiguration)
   if (!value || typeof value !== "object") return value
@@ -120,7 +128,7 @@ export async function readServerObservation(file: SlotFile) {
     serverEpoch: serverEpoch({ containerId: server.Id, startedAt: server.State.StartedAt,
       hostBootId: (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim(), daemonExe: daemonExe.trim(), daemonCmdline, daemonStat }),
     configurationHash: new Bun.CryptoHasher("sha256").update(JSON.stringify({ version: 1, ...configuration })).digest("hex") },
-    stableConfiguration: stablePairConfiguration(configuration) }
+    stableConfiguration: stablePairConfiguration(configuration), compatibleStableHashes: compatibleStablePairHashes(configuration) }
 }
 
 type PairCreated = { version: number; status: "infrastructure-ready"; purpose: PairOptions["purpose"]; nonce: string;

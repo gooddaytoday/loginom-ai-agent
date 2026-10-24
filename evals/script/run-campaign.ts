@@ -548,7 +548,7 @@ async function prepareGeneration(manifest: CampaignManifest, config: CampaignSer
   const identity = current.identity
   if (JSON.stringify(identity) !== JSON.stringify(bootstrapped)) throw Error("CAMPAIGN_GENERATION_IDENTITY_CHANGED")
   if (identity.containerId !== old.containerId || identity.studioContainerId !== old.studioContainerId ||
-    (stableConfiguration ? current.stableConfiguration.hash !== stableConfiguration.hash : identity.configurationHash !== old.configurationHash))
+    (stableConfiguration ? !current.compatibleStableHashes.includes(stableConfiguration.hash) : identity.configurationHash !== old.configurationHash))
     throw Error("CAMPAIGN_GENERATION_IDENTITY_CHANGED")
   const root = path.join(config.stateRoot, "environment-generations", identity.serverEpoch)
   const slotsFile = path.join(root, "slots.json"), resourceBudgetFile = path.join(root, "budget.json")

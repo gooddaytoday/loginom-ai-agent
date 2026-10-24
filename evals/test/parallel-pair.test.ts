@@ -1,10 +1,50 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { planPair, reconcilePairResource, serverEpoch, stablePairConfiguration, usersMarker } from "../src/parallel-pair"
+import { compatibleStablePairHashes, planPair, reconcilePairResource, serverEpoch, stablePairConfiguration, usersMarker } from "../src/parallel-pair"
 
 const server = { container: "loginom-evals-users", studioContainer: "loginom-evals-studio", network: "loginom-evals-users",
   alias: "loginom-server-7.4.2-test", url: "http://127.0.0.1:32771/app/", storageRoot: "/workdir/UserStorage", backupRoot: "/workdir/SessionBackup" }
 const nonce = "11111111-1111-4111-8111-111111111111"
+
+test("stable pair comparison accepts only empty DNS representations without changing v1 proofs or input", () => {
+  const input = { server, serverImage: "c".repeat(64), studioImage: "d".repeat(64),
+    serverHost: { NetworkMode: server.network, Dns: null }, studioHost: { NetworkMode: server.network, Dns: [] },
+    serverNetworks: {}, studioNetworks: {}, components: "components", initial: "initial", served: "served", proxy: "proxy" }
+  const forms = [
+    { ...input, serverHost: { ...input.serverHost, Dns: null }, studioHost: { ...input.studioHost, Dns: null } },
+    input,
+    { ...input, serverHost: { ...input.serverHost, Dns: [] }, studioHost: { ...input.studioHost, Dns: null } },
+    { ...input, serverHost: { ...input.serverHost, Dns: [] }, studioHost: { ...input.studioHost, Dns: [] } },
+  ]
+  const hashes = forms.map(form => stablePairConfiguration(form).hash).sort()
+  expect(new Set(hashes).size).toBe(4)
+  for (const form of forms) {
+    const saved = JSON.stringify(form)
+    expect(compatibleStablePairHashes(form).sort()).toEqual(hashes)
+    expect(JSON.stringify(form)).toBe(saved)
+  }
+})
+
+test("stable pair comparison preserves missing DNS, configured DNS order and other HostConfig fields", () => {
+  const input = { server, serverImage: "c".repeat(64), studioImage: "d".repeat(64),
+    serverHost: { NetworkMode: server.network }, studioHost: { NetworkMode: server.network },
+    serverNetworks: {}, studioNetworks: {}, components: "components", initial: "initial", served: "served", proxy: "proxy" }
+  expect(compatibleStablePairHashes(input)).toEqual([stablePairConfiguration(input).hash])
+  expect(compatibleStablePairHashes(input)).not.toContain(stablePairConfiguration({ ...input,
+    serverHost: { ...input.serverHost, Dns: null } }).hash)
+  const configured = { ...input, serverHost: { ...input.serverHost, Dns: ["one", "two"], DnsOptions: [], DnsSearch: null,
+    Unknown: { enabled: true } }, studioHost: { ...input.studioHost, Dns: ["three"] } }
+  const hashes = compatibleStablePairHashes(configured)
+  expect(hashes).toEqual([stablePairConfiguration(configured).hash])
+  for (const change of [
+    { serverHost: { ...configured.serverHost, Dns: ["two", "one"] } },
+    { serverHost: { ...configured.serverHost, Dns: [] } },
+    { studioHost: { ...configured.studioHost, Dns: null } },
+    { serverHost: { ...configured.serverHost, DnsOptions: null } },
+    { serverHost: { ...configured.serverHost, DnsSearch: [] } },
+    { serverHost: { ...configured.serverHost, Unknown: { enabled: false } } },
+  ]) expect(hashes).not.toContain(stablePairConfiguration({ ...configured, ...change }).hash)
+})
 
 test("stable pair configuration survives endpoint runtime changes", () => {
   const network = { NetworkID: "a".repeat(64), Aliases: [server.alias, server.container], IPAMConfig: null,
