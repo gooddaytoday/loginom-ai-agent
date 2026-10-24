@@ -89,7 +89,7 @@ test('wide precision readback visits stored fields once without returning to col
  for(const corrupt of [false,true]) {
   const table={table_tid:'table',view_guid:'view',port_guid:'port'},count=27;
   const stored=Array.from({length:count},()=>({formatting:true,custom:true,format_string:'0.00',thousands:false,scientific:false,decimal_digits:'0',currency:''}));
-  let selected=null,draft,offset=0,open=true;const selections=[];
+  let selected=null,draft,offset=0,open=true;const selections=[],observations=[];
   const fields=()=>stored.map((v,index)=>({index,source_index:index,name_key:'F'+index,type:'real',record_id:'r'+index,status:'observed',selected:selected===index,format_string:v.format_string}));
   const control=(ref,extra={})=>({ref,tid:ref,allowed_actions:['click','fill','press','set_checked'],interaction:{state:'point_observed'},...extra});
   const state=()=>({table_settings:{status:'observed',kind:'format',format:{
@@ -98,7 +98,7 @@ test('wide precision readback visits stored fields once without returning to col
    selected_numeric:selected===null?null:{source_index:selected,name_key:'F'+selected,...Object.fromEntries(Object.entries(draft).map(([k,value])=>[k,{status:'observed',value,input_ref:k}]))}}},
    ui:{dialogs:open?['format']:[],elements:[...fields().map(f=>control('f'+f.index,{table_field:f})),control('format_string'),control('table;ModalWindow_BrowseFormat;btnApply')]},
    node_outputs:{tables:[{active:true,view_guid:'view'}]}});
-  const channel={observe:async o=>{offset=o.tableFormatPage?.offset??offset;const s=state();assert.equal(o.ready(s),true,o.condition);return s;},perform:async o=>{
+  const channel={observe:async o=>{observations.push(o.condition);offset=o.tableFormatPage?.offset??offset;const s=state();assert.equal(o.ready(s),true,o.condition);return s;},perform:async o=>{
    const s=state();assert.equal(o.ready(s),true,o.condition);const a=o.resolve(s);
    if(/^f\d+$/.test(a.ref)){
     if(selected!==null)stored[selected]={...draft, ...(corrupt&&selected===12?{format_string:'0.00'}:{})};
@@ -110,6 +110,8 @@ test('wide precision readback visits stored fields once without returning to col
   else {
    const proof=await configureTablePrecision(channel,table,{alreadyOpen:true});
    assert.equal(proof.numeric_formats.length,count);assert.equal(proof.dialog_readback_verified,true);
+   assert.equal(observations.filter(c=>/^Table format field .* available$/.test(c)).length,8,
+    'only the first selection and metadata-page transitions need field availability reads');
    assert.deepEqual(selections,[...Array(count).keys(),...Array(count).keys()]);
    assert.equal(stored.every(s=>s.format_string==='0.################E+00'),true);
    open=true;selections.length=0;
@@ -119,4 +121,32 @@ test('wide precision readback visits stored fields once without returning to col
    assert.equal(stored.every(s=>s.format_string==='0.00'),true);
   }
  }
+});
+
+for(const pressed of [false,true])for(const omit of [null,'data_types','filter'])test('Table settings reuse the latest observation with fallback: '+pressed+'/'+omit,async()=>{
+ const {prepareTableRead}=await import('../lib/node-output-procedure.mjs');
+ const table={table_tid:'table',view_guid:'view',port_guid:'port'},toggles={nulls:pressed,data_types:pressed};
+ const reads=[],actions=[];let filtering=true,dialog=false,latest;
+ const state=(missing)=>({node_outputs:{tables:[{...table,active:true}]},ui:{dialogs:dialog?['filter']:[],elements:[
+  ...Object.entries(toggles).filter(([kind])=>missing!==kind).map(([kind,pressed])=>({ref:kind,view_toggle:{kind,pressed},allowed_actions:['click']})),
+  ...(missing==='filter'?[]:[{ref:'filter',tid:'table;btnDataGridFilter',allowed_actions:['click']}]),
+  {ref:'enabled',interaction:{state:'point_observed'},allowed_actions:['set_checked']},
+  {ref:'apply',tid:'table;ModalWindow_BrowseFilter;btnApply',allowed_actions:['click']}
+ ]},table_settings:{filter:{enabled:{status:'observed',value:filtering,input_ref:'enabled'}}}});
+ const channel={observe:async o=>{reads.push(o.condition);
+  latest=state(o.condition==='Table nulls toggle available'||o.condition==='Table nulls enabled'?omit:null);
+  assert.equal(o.ready(latest),true,o.condition);return latest;
+ },perform:async o=>{assert.equal(o.initialObservation,latest,'the consumed snapshot must still be current');assert.equal(o.ready(latest),true);
+  const a=o.resolve(latest);actions.push(a);latest=null;
+  if(a.ref in toggles)toggles[a.ref]=true;
+  if(a.ref==='filter')dialog=true;
+  if(a.ref==='enabled')filtering=false;
+  if(a.ref==='apply')dialog=false;
+ }};
+ const proof=await prepareTableRead(channel,table);
+ assert.equal(proof.filter_enabled,false);assert.equal(toggles.nulls&&toggles.data_types,true);
+ assert.equal(reads.includes('Table data_types toggle available'),omit==='data_types');
+ assert.equal(reads.includes('Table Filter available'),omit==='filter'&&pressed,
+  'a subsequent toggle read may already restore the missing Filter');
+ assert.equal(actions.filter(a=>a.ref==='filter').length,1);assert.equal(actions.filter(a=>a.ref==='apply').length,1);
 });
