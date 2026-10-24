@@ -158,14 +158,15 @@
 
 ## Checkpoint реализации
 
-- Task 1 завершена: Filter, Regression, Clustering, REST и Text Import читают общий порт; независимое ревью соответствия и качества PASS.
-- Civil-проверка Import отдельно собирает прежние Table receipts на том же выполнении; native full и исторические оракулы сохранены.
-- Проверки на закреплённом Node: client 49 PASS, native 2178 PASS, дополнительный shared reader 27 PASS; Python 45 PASS.
-- Живые пары всех пяти callers приняты до удаления старого чтения; Filter/ML/REST дополнительно сверены с независимыми CSV/business expected. Одиночные времена не являются benchmark.
-- REST-пара использовала исходное выполнение без повторного HTTP. Первоначальный public apply остался FAILED/unknown после унаследованного отказа консоли; новое успешное публичное выполнение ещё требуется в финальной матрице.
-- Evidence вне Git: `/tmp/port-read-implementation-LUEAYO/`. Собственный пакет сохранён, закрыт без discard; logout, ноль пакетов и закрытие браузера подтверждены.
-- Task 2 завершена: JavaScript и повторное чтение используют собственные полные execution receipts; source/settings, physical GUID, full и sliding schema сохранены. Независимое ревью PASS.
-- Read release требует очистки последнего собственного портового обращения на обоих входах; неизвестный ответ или чужой контекст не освобождаются. JavaScript recovery не расширена.
-- Task 2 проверки: client 103 PASS, runtime 637 PASS, eval 12 PASS и typecheck; последующие узкие исправления — release 17 PASS / JavaScript 2 PASS. Python 8 PASS / 16 SKIP без приватных captures; cold PASS не заявляется.
-- Обе живые JS/read пары приняты до переключения, включая полный текст 5 006 символов и прежние source/settings; evidence `/tmp/port-read-implementation-rVw8qy/`. Собственный пакет сохранён, закрыт без discard; logout и закрытие браузера подтверждены.
-- Следующая задача: актуальные описания/бюджет, свежая общая матрица, native full, медианы и итоговая регрессия/ревью. Installed acceptance остаётся вне области.
+- Tasks 1 и 2 завершены; независимое ревью соответствия и качества PASS. Все восемь ordinary callers используют один port reader.
+- Специализированные пары Filter/Regression/Clustering/REST/Text Import и JS/read приняты на том же выполнении до удаления старых цепочек; независимые CSV/business ожидаемые результаты сохранены.
+- Native full, civil/cold Table helpers и исторические captures сохранены. Import civil собирает независимые Table receipts отдельно.
+- Read release требует очистки последнего собственного портового обращения и unchanged quiet graph; неизвестный ответ не освобождается. JavaScript recovery не расширена.
+- Task 3: output reread allowance 300000 ms и актуальные инструкции готовы. Client 77 PASS, native 105 PASS; полный upstream на закреплённых Node/Chromium — 4746 PASS / 2 Windows SKIP.
+- Дополнительно: Task 2 client 103 PASS, runtime 637 PASS, eval 12 PASS и typecheck; Python 8 PASS / 16 SKIP без приватных captures. Cold PASS не заявляется.
+- Свежая матрица: Calculator strict/ordinary, REST, Filter [0]/[1]/[1,0], JS full и reread 100/0 PASS; исходные source/settings и число финальных выполнений сохранены.
+- Live stale-schema отказ и release PASS: Id→IdAlias, новое выполнение сохранено, старый source не принят, Execute при освобождении не повторялся.
+- Свежий Regression: 6 прогнозов / 2 коэффициента совпали с authored oracle; пустой Text Import вернул полную схему и 0 строк. JS dirty false→false проверен до Table на чистом пакете.
+- Evidence вне Git: `/tmp/port-read-implementation-{LUEAYO,rVw8qy,76D4np,GZzpqF,q37u1w,JlgNOg,gWxwBR}/`; предыдущие ошибки не переименованы в успешные результаты.
+- Ошибки стенда: console buffering обойдён ограниченной историей/viewport, offscreen Regression — сдвигом вида после safe release. Дополнительный JS source probe выявил прежнюю QA-wire schema ошибку; production bridge корректен, source cleanup подтверждён.
+- Далее: числовой Import/ordinary Collapse, длинный текст, пять пар/медианы, native F3/sliding CrossTable, Clustering, cleanup и итоговое ревью. Installed и другие платформы не проверены.
