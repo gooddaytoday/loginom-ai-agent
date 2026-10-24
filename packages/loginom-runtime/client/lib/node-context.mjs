@@ -43,7 +43,7 @@ export async function readPreparedNodeContext(page, binding) {
     }
     if(b.workflow_ref.navigation_path.some((c,i)=>c.tid!==crumbs[i].tid || c.label!==crumbs[i].label))return reject('navigation');
     const model=card?.Controller?.FController;
-    let surface, tid, locked, outputPort, graphRoot, pendingWizardNode;
+    let surface, tid, locked, outputPort, graphRoot, pendingWizardNode, inputNavigationNode;
     if(app.ModelForm && model instanceof app.ModelForm) {
       const d=model.FDiagram, nodes=d?.FNodes?.FCollection, roots=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
       if(roots.length===0)return pending();
@@ -86,6 +86,17 @@ export async function readPreparedNodeContext(page, binding) {
           ||portTree.FIndex!==o.nativeIndex||!o.enginePort||(input?model.FModelSocket:model.FModelEnginePort)!==o.enginePort||model.FModelNode
           ||roots.length!==1||model.FView?.el?.dom!==roots[0])return reject('wizard_model');
         outputPort={direction:input?'input':'output',port:o.portIndex,native_index:o.nativeIndex,port_guid:o.port.FGuid,opening_operation_id:o.operation_id,node_icon_class:o.node.FIconCls};
+        // Breadcrumb overflow may hide the node itself. Retain context only
+        // when every rendered component still owns this exact opened input0.
+        if(input&&o.portIndex===0&&o.nativeIndex===0&&typeof o.portGuid==='string'&&o.portGuid.length>0
+          &&typeof o.operation_id==='string'&&o.operation_id.length>0&&crumbs.length===b.workflow_ref.navigation_path.length+4){
+          const ancestry=[nodeTree,group,portTree,w],path=crumbs.slice(-4);
+          if(path.every((crumb,i)=>{
+            const es=exact(crumb.tid),c=es.length===1&&globalThis.Ext?.getCmp(es[0].id);
+            return c?.el?.dom===es[0]&&c?._node?.data?.node===ancestry[i];
+          }))inputNavigationNode=path[0];
+        }
+
       }
       tid=b.workflow_ref.prefix+';WizrdMCF'; surface='wizard';
     } else if(model?.constructor?.name==='ViewsForm') {
@@ -102,6 +113,7 @@ export async function readPreparedNodeContext(page, binding) {
       || getComputedStyle(elements[0]).visibility==='hidden')return pending();
     return {verified:true,document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,surface,tid,
       ...(outputPort?{[outputPort.direction==='input'?'input_port':'output_port']:outputPort}:{}),
+      ...(inputNavigationNode?{navigation_node:inputNavigationNode}:{}),
       ...(surface==='graph'?{locked,...(nodeTree&&crumbs.length===b.workflow_ref.navigation_path.length+1?{navigation_node:crumbs.at(-1)}:{}),
         ...(pendingWizardNode?{pending_wizard_node:pendingWizardNode}:{})}:{} )};
   },binding);

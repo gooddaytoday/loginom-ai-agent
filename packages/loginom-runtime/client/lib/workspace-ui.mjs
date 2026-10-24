@@ -869,17 +869,29 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const singleInputOverflow=preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===0
           &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-clusterization','bg-vendor-icon-linregression'].includes(preparedInputPort.node_icon_class)
           &&crumbs.length===9&&crumbs[5].querySelectorAll('.'+preparedInputPort.node_icon_class).length===1;
+        const modes=['rbTable','rbLinks'].map(name=>(tids.get(wizard.root_tid+';TuneDataSourceMappingWizard;'+name)??[])
+          .filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e)&&enabled(e)));
+        const knownMode=modes.every(es=>es.length===1)
+          &&modes[0][0].classList.contains('x-form-cb-checked')!==modes[1][0].classList.contains('x-form-cb-checked');
+        const hiddenInputNode=e=>singleInputOverflow&&knownMode
+          &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+          &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+          &&preparedNavigationNode?.tid===getTid(e)&&preparedNavigationNode.label===e.textContent.trim()
+          &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'
+          &&!e.hasAttribute('hidden')&&!sensitive(e)&&(tids.get(getTid(e))??[]).length===1
+          &&e.querySelectorAll('[class*="bg-vendor-icon-"]').length===1
+          &&e.textContent.trim().length>0&&(getTid(e)??'').endsWith('>'+e.textContent.trim().replace(/\s/g,'_').replace(/,/g,''));
         const joinInputOverflow=preparedInputPort?.direction==='input'&&[0,1].includes(preparedInputPort.port)
           &&preparedInputPort.native_index===preparedInputPort.port&&preparedInputPort.node_icon_class==='bg-vendor-icon-joindata'
           &&crumbs.length===9&&crumbs[5].querySelectorAll('.bg-vendor-icon-joindata').length===1;
         if(crumbs.length>32)context.status='bounded';
-        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&hiddenExportNode(e)||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
+        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
               ||singleInputOverflow||joinInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1))&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
           // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
           // Join input roles have fixed captions; retain the native port and node icon binding.
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
-            &&(i===5&&hiddenExportNode(e)||i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
+            &&(i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
               &&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
               ||singleInputOverflow||joinInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1)
@@ -908,7 +920,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             &&folder.tid===node.tid+'>Входные_порты'&&port.tid===folder.tid+'>'+format(port.label)
             &&last.tid===port.tid+'>Настройка';
           const iconCount=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1
-            &&(inside(found[0],e)||e===crumbs[5]&&hiddenExportNode(e)||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
+            &&(inside(found[0],e)||e===crumbs[5]&&(hiddenExportNode(e)||hiddenInputNode(e))||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
           const icons=iconCount(crumbs[4],'.maptree-icon-workflow')===1
             &&iconCount(crumbs[5],'[class*="bg-vendor-icon-"]')===1
             &&iconCount(crumbs[8],'.maptree-icon-wizard')===1;
@@ -3498,7 +3510,8 @@ function readRenderedInputMapping(observation) {
     preparedWorkflowPath:task.prepared_node_context?.workflow_ref.navigation_path??null,
     preparedNodeId:task.prepared_node_context?.node.node_id??null,
     preparedGraphTid:nodeContext?.surface==='graph'?nodeContext.tid:null,
-    preparedNavigationNode:nodeContext?.surface==='graph'?nodeContext.navigation_node??null:null,
+    preparedNavigationNode:nodeContext?.surface==='graph'||nodeContext?.surface==='wizard'&&nodeContext.input_port
+      &&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.navigation_node??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
     preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
