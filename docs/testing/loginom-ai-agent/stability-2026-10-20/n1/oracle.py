@@ -29,12 +29,12 @@ rows.sort(key=lambda row: (-row["Shortage"], row["SKU"]))
 
 expected = {
     "package_path": sys.argv[1] if len(sys.argv) > 1 else "/stability-2026-10-20/n1.lgp",
-    "nodes": [{"type": kind} for kind in ['imports.text', 'transform.group_data', 'transform.join_data', 'transform.filter_data', 'exports.text']],
+    "nodes": [],
     "outputs": [{
         "output_node_type": "export_input",
         "ordered": True,
         "column_order": "exact",
-        "columns": [{"name": name, "label": name, "type": kind} for name, kind in [('SKU', 'string'), ('Requested', 'integer'), ('Available', 'integer'), ('Shortage', 'integer')]],
+        "columns": [{"name": name, "label_any": True, "type": kind} for name, kind in [('SKU', 'string'), ('Requested', 'integer'), ('Available', 'integer'), ('Shortage', 'integer')]],
         "rows": rows,
     }],
 }

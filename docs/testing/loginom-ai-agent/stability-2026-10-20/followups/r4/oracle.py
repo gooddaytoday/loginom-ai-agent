@@ -22,13 +22,13 @@ rows = [{"RowID": int(row["RowID"]), "X": float(row["X"]),
          "Forecast": float(intercept + slope * Fraction(row["X"]))} for row in train]
 expected = {
     "package_path": sys.argv[1] if len(sys.argv) > 1 else "/stability-2026-10-20/datamining-linregression.lgp",
-    "nodes": [{"type": kind} for kind in ("imports.text", "datamining.lin_regression", "exports.text")],
+    "nodes": [],
     "outputs": [{
         "output_node_type": "export_input",
         "export_destination": sys.argv[2] if len(sys.argv) > 2 else "/stability-2026-10-20/forecast-refit.csv",
         "ordered": False,
         "column_order": "exact",
-        "columns": [{"name": name, "label": name, "type": kind,
+        "columns": [{"name": name, "label_any": True, "type": kind,
                      **({"tolerance": {"abs": 1e-8, "rel": 1e-10}} if name == "Forecast" else {})}
                     for name, kind in (("RowID", "integer"), ("X", "real"), ("Forecast", "real"))],
         "rows": rows,

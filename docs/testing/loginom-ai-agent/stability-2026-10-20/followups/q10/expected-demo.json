@@ -1,16 +1,6 @@
 {
   "package_path": "/demo-2026-10-22/s6-abc.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.group_data"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -20,22 +10,22 @@
       "columns": [
         {
           "name": "ABCClass",
-          "label": "ABCClass",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Products",
-          "label": "Products",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Revenue",
-          "label": "Revenue",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "AverageRevenue",
-          "label": "AverageRevenue",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-06

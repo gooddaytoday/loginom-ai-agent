@@ -54,6 +54,27 @@ test('sorting input validation rejects text flags against effective types before
   }
  }
 });
-test('sorting input validation is a no-op when keys are not being replaced',()=>{
- for(const p of [{},{compare_with_locale:false}])assert.doesNotThrow(()=>validateSortingInputParameters(p,null,null));
+test('sorting preserves bound input mappings when keys are not being replaced',()=>{
+ const f=mappedInputFixture();
+ for(const p of [{},{compare_with_locale:false}])assert.doesNotThrow(()=>validateSortingInputParameters(p,f.resolve({}),f.native));
+});
+
+// LAB-106/#281 and LAB-139: retained OrderPosition survives after upstream
+// projection to Debt. Reject before input Done; accepting it strands readback.
+test('sorting refuses unbound retained inputs before conditional output, with unchanged or replacement keys',()=>{
+ const f=mappedInputFixture();
+ f.native.target_fields.unshift({record_id:'retained',name:'OrderPosition',label:'OrderPosition',type:'integer',source:null});
+ for(const p of [{},{compare_with_locale:false},{keys:[{field:field('OrderPosition'),direction:'ASC'}]},
+  {keys:[{field:field('RevenueAlias'),direction:'DESC'}]}]){
+  const before=structuredClone(f.native);
+  assert.throws(()=>validateSortingInputParameters(p,f.resolve({}),f.native),/Sorting input source is missing or changed: OrderPosition/);
+  assert.deepEqual(f.native,before);
+ }
+});
+test('sorting never substitutes an exclusion link or a foreign source for an input binding',()=>{
+ for(const change of [f=>f.source=null,f=>f.source.record_id='foreign',f=>f.source.name='foreign',f=>f.source.field_id='foreign',f=>f.source.type='integer',
+  f=>{f.exclusion_source=f.source;f.source=null;}]){
+  const f=mappedInputFixture();f.native.target_fields[0].source=structuredClone(f.native.target_fields[0].source);change(f.native.target_fields[0]);
+  assert.throws(()=>validateSortingInputParameters({},f.resolve({}),f.native),/Sorting input source is missing or changed: RevenueAlias/);
+ }
 });

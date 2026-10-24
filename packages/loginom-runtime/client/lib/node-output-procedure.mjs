@@ -29,12 +29,17 @@ export async function returnFromOutputTable(channel,table) {
 // A stopped read can leave its own Table with a Format or Filter dialog open.
 // Format edits reach the Table only through Apply, so an unapplied draft is
 // cancelled; precision is restored only when Apply may have committed it.
-export async function restoreStoppedTableRead(channel,view) {
+export async function restoreStoppedTableRead(channel,view,primaryError) {
+  try {
   const cancelled=await cancelOwnTableDialog(channel,view.table);
   const proof=view.formatProof??(view.formatting?.apply_issued?{table:view.table,original_formats:view.formatting.originals}:null);
   if(proof&&!view.restored){await restoreTablePrecision(channel,proof);view.restored=true;}
   const returned=await returnFromOutputTable(channel,view.table);
   return {dialog_cancelled:cancelled,precision_restored:!!proof,returned};
+  } catch(error) {
+    // Cleanup must not replace the failed read's original browser receipt.
+    throw primaryError??error;
+  }
 }
 
 async function cancelOwnTableDialog(channel,table) {

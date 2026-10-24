@@ -225,13 +225,16 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRea
           resolve:s=>({verb,ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';'+button),'Unique wizard completion control required').ref}),
           identity:s=>s.prepared_node_context});
         const graph=await channel.observe({condition:'same configured node returned to graph',ready:s=>s.wizard?.status==='absent' && s.prepared_node_context?.surface==='graph'});
+        const label=one(graph.ui.elements.filter(e=>e.tid===graph.prepared_node_context.tid+';Label;Label'
+          &&e.graph_node?.part==='label'),'Configured Import caption is unavailable').graph_node.label_text;
+        requireValue(typeof label==='string'&&label.length>0,'Configured Import caption is empty');
         const execution=executeRequested?await executionDriver.identify():null;
         const continuationSurface=executeRequested?finishedImportSurface(await channel.observe({
           condition:'identified execution and graph continuity checkpoint',readProcesses:true,readOutputs:true,
           ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true&&s.node_outputs?.verified===true})):null;
         return verified({effect_possible:true,mode,execution_started:executeRequested,settings_applied:true,
           ...(execution?{execution_id:execution.execution_id,execution_group:execution,continuation_surface:continuationSurface}:{}),
-          node_context:graph.prepared_node_context,package_saved:false,reopen_performed:false});
+          node_context:graph.prepared_node_context,node_label:label,package_saved:false,reopen_performed:false});
       },
       async waitExecution(ctx) {
         enter(ctx);requireValue(executionDriver,'Execution driver is unavailable');
@@ -261,7 +264,16 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRea
           readSettings=await prepareTableRead(channel,opened.table);
           raw=await readTableOutputPages(channel,opened.table,{sampleRows:read.sample_rows});
           data=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:outputColumns,requireExactNumbers:read.require_exact_numbers});
-        } finally { if(formatProof){formatRestoration=await restoreTablePrecision(channel,formatProof);readView.restored=true;} }
+        } catch(error) {
+          // A settled ambiguous Filter click can leave our own draft open.
+          // Cancel it before restoring Format; never clean up a lost transport
+          // call or replace its primary error with a secondary cleanup failure.
+          if(!operation.transportUncertain&&operation.cleanupConfirmed===true) {
+            await restoreStoppedTableRead(channel,readView,error);readView=null;
+          }
+          throw error;
+        }
+        if(formatProof){formatRestoration=await restoreTablePrecision(channel,formatProof);readView.restored=true;}
         const workflowReturn=await returnFromOutputTable(channel,opened.table);readView=null;
         // Private acceptance may retain raw civil evidence; no public response/schema changes.
         await onTableRead?.({raw,table_creation:opened,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:workflowReturn});

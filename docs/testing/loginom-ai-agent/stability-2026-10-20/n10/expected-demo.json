@@ -1,16 +1,6 @@
 {
   "package_path": "/stability-2026-10-20/n10.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "datamining.lin_regression"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -19,12 +9,12 @@
       "columns": [
         {
           "name": "RowID",
-          "label": "RowID",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "X",
-          "label": "X",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -33,7 +23,7 @@
         },
         {
           "name": "Z",
-          "label": "Z",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -42,7 +32,7 @@
         },
         {
           "name": "Y",
-          "label": "Y",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -51,7 +41,7 @@
         },
         {
           "name": "Forecast",
-          "label": "Forecast",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,

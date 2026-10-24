@@ -129,6 +129,26 @@ test('created node without verified rendered bounds cannot silently use a point'
  await assert.rejects(revealNodePlacement(f.args),/footprint unavailable/);assert.equal(f.state().clicks,0);
 });
 
+for(const edge of ['canvas','browser'])for(const axis of ['right','bottom'])test('rendered node exactly eight pixels inside '+edge+' '+axis+' boundary needs no navigation',async()=>{
+ const f=fixture();f.args.nodeId='edge';
+ const v={...structuredClone(f.state().v),y:80,...(edge==='browser'?{viewportWidth:1280,viewportHeight:800}:{})};
+ f.args.root.evaluate=async()=>({...v,node_bounds:{
+  x:axis==='right'?Math.min(v.x+v.width,v.viewportWidth)-8-111:500,
+  y:axis==='bottom'?Math.min(v.y+v.height,v.viewportHeight)-8-154:106,width:111,height:154}});
+ const r=await revealNodePlacement(f.args);
+ assert.equal(r.fully_visible,true);assert.equal(r.zoom_steps,0);
+ assert.equal(f.state().clicks,0);assert.equal(f.state().open,false);
+});
+test('navigation accepts an eight pixel inset after zoom and outline cleanup, but never a smaller inset',async()=>{
+ const f=fixture();f.args.nodeId='edge';
+ f.args.root.evaluate=async()=>({...structuredClone(f.state().v),y:80,viewportWidth:1280,viewportHeight:800,node_bounds:{
+  x:f.state().clicks?1161:1161.01,y:106,width:111,height:154}});
+ const r=await revealNodePlacement(f.args);
+ assert.equal(r.fully_visible,true);assert.equal(r.zoom_steps,1);
+ assert.equal(f.state().clicks,1);assert.equal(f.state().open,false);
+ assert.equal(r.view.node_bounds.x+r.view.node_bounds.width,1272);
+});
+
 for(const fault of [null,'foreign','lost'])test('existing target scroll preserves native scale and refuses '+(fault??'no owner change'),async()=>{
  const f=fixture();f.args.nodeId='existing';f.args.scrollNode=true;let scrolled=false;
  const canvas={scrollLeft:0,scrollTop:0};
@@ -145,6 +165,38 @@ for(const fault of [null,'foreign','lost'])test('existing target scroll preserve
  if(fault){await assert.rejects(revealNodePlacement(f.args),e=>fault==='lost'?e.placement_navigation_unverified===true:e.message==='Graph changed');}
  else {const r=await revealNodePlacement(f.args);assert.equal(r.fully_visible,true);assert.equal(r.view.scale,1);assert.equal(r.zoom_steps,0);}
  assert.equal(f.state().clicks,0);assert.ok(canvas.scrollLeft>0);
+});
+
+function insetFixture({lost=false}={}){
+ const f=fixture();Object.assign(f.state().v,{width:950,height:694,viewportWidth:1280,viewportHeight:800});
+ f.args.nodeId='long-label';f.args.position={x:864,y:56};let left=0,increases=0;
+ const canvas={get scrollLeft(){return left;},set scrollLeft(x){left=Math.max(0,Math.min(x,975*f.state().v.scale-950));},scrollTop:0};
+ f.args.root.evaluate=async(fn,arg)=>{
+  if(typeof arg==='object'){fn(canvas,arg);canvas.scrollTop=0;if(lost)throw Error('Lost scroll reply');return;}
+  const v=structuredClone(f.state().v),s=v.scale;
+  return {...v,scroll:{x:left,y:0},node_bounds:{x:v.x+836*s-left,y:v.y+Math.round(6*s),width:112*s,height:158*s}};
+ };
+ const locate=f.args.page.locator;
+ f.args.page.locator=s=>{
+  const owner=locate(s);if(!s.endsWith(';cntDiagram"]'))return owner;
+  return {...owner,locator:s=>s.endsWith(';tlb;b-1"]')?{count:async()=>1,isVisible:async()=>f.state().open,
+   getAttribute:async()=> 'Увеличить масштаб',click:async()=>{increases++;f.state().v.scale*=1.1;},
+   waitFor:async({state})=>assert.equal(f.state().open,state==='visible')}:owner.locator(s)};
+ };
+ return {...f,increases:()=>increases};
+}
+test('D15 top inset grows through native zoom-in and scroll without moving the model node',async()=>{
+ const f=insetFixture(),position=structuredClone(f.args.position),r=await revealNodePlacement(f.args);
+ assert.equal(r.fully_visible,true);assert.equal(f.increases(),3);assert.equal(f.state().clicks,0);
+ assert.ok(r.view.node_bounds.y>=108);assert.ok(r.view.scroll.x>0);assert.equal(f.state().open,false);
+ assert.deepEqual(f.args.position,position);
+ assert.ok(r.navigation_steps.some(s=>s.action==='zoom_in'&&s.before.scale<s.after.scale));
+ assert.ok(r.navigation_steps.some(s=>s.action==='scroll'&&s.after.scroll.x>s.before.scroll.x));
+});
+test('D15 lost native scroll reply stops navigation and retains uncertainty',async()=>{
+ const f=insetFixture({lost:true});
+ await assert.rejects(revealNodePlacement(f.args),e=>e.placement_navigation_unverified===true&&/Lost scroll reply/.test(e.message));
+ assert.equal(f.increases(),1);assert.equal(f.state().clicks,0);assert.equal(f.state().open,false);
 });
 
 function overflowFixture({foreign=false,missing=false,wrongIcon=false,ambiguous=false,changed=false,buffered=false}={}){

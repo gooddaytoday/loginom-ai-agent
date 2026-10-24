@@ -1,19 +1,6 @@
 {
   "package_path": "/demo-2026-10-22/s2-customers.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.replace_columns"
-    },
-    {
-      "type": "transform.filter_data"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -21,23 +8,23 @@
       "columns": [
         {
           "name": "Code",
-          "label": "Code",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "Name",
-          "label": "Name",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "CreditLimit",
-          "label": "CreditLimit",
-          "type": "real"
+          "type": "real",
+          "label_any": true
         },
         {
           "name": "Status",
-          "label": "Status",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         }
       ],
       "rows": [

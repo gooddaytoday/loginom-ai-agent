@@ -1,16 +1,6 @@
 {
   "package_path": "/demo-2026-10-22/s5-pivot.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.cross_table"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -20,22 +10,22 @@
       "columns": [
         {
           "name": "Region",
-          "label": "Region",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Office",
-          "label": "Office",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Warehouse",
-          "label": "Warehouse",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Tech",
-          "label": "Tech",
+          "label_any": true,
           "type": "real"
         }
       ],

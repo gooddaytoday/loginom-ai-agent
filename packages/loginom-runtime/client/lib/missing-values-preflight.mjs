@@ -4,12 +4,13 @@ import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {showMissingValuesMappingTable} from './missing-values-output.mjs';
 import {resolveMissingValuesParameters} from './missing-values-parameters.mjs';
+import {restorePreflightSourceActivity} from './sorting-preflight.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 
 // Preview column infos contain type but no data kind. The output-port editor
 // exposes the effective kind; cancel its unchanged draft before creating a node.
-// Loginom may deactivate the source on opening. Cancellation discards settings,
-// but does not reactivate data: execution remains the requested node phase.
+// Loginom may deactivate the source on opening. After cancellation, restore
+// its original activity before reporting validation or creating the target.
 export async function preflightMissingValuesSource(options,ctx,config){
  const {operation,execute,onRecord,now,receiptOptions}=options,request=operation.parameters;
  if(request.target.kind==='existing')return {verified:true,not_applicable:true,validation_deferred:'input_mapping'};
@@ -37,15 +38,15 @@ export async function preflightMissingValuesSource(options,ctx,config){
   }
   resolveMissingValuesParameters(request.parameters,fields);
  }catch(e){error=e;}
- const cancelled=await closePreparedWizard(channel),after=await observeSource();
- need(cancelled.draft_discarded===true&&after.port_guid===before.port_guid,'Source port cancellation or identity was not verified');
- const proof={verified:true,cleanup_complete:true,effect_possible:before.active!==after.active,settings_changed:false,source:input.source,port:input.output,port_guid:before.port_guid,schema:fields,source_activity:{before:before.active,after:after.active,changed:before.active!==after.active},cancellation:cancelled,parameters_valid:!error};
+ const cancelled=await closePreparedWizard(channel);
+ need(cancelled.verified===true&&cancelled.draft_discarded===true&&cancelled.settings_applied===false,'Source port cancellation was not verified');
+ const restored=await restorePreflightSourceActivity(channel,input.source,before,observeSource,ctx),after=restored.port;
+ const proof={verified:true,cleanup_complete:true,effect_possible:restored.execution!==null,settings_changed:false,source:input.source,port:input.output,port_guid:before.port_guid,schema:fields,source_activity:{before:before.active,after:after.active,changed:before.active!==after.active},source_restoration:restored.execution,cancellation:cancelled,parameters_valid:!error};
  const phase='missing_values_preflight_completed',saved=await onRecord({phase,operation_id:operation.id,proof});
  need(saved?.phase===phase&&JSON.stringify(saved.proof)===JSON.stringify(proof),'Missing values source proof was not durably acknowledged');
  if(error){error.nodePhaseRefusal={phase:'target',status:'FAILED',effect_possible:true,cleanup_complete:true,settings_unchanged:true,verification:'missing_values_preflight_completed'};throw error;}
- // A later graph refusal may still be terminal although this inspection
- // deactivated the source. Carry only the durably acknowledged, unchanged
- // settings proof; lost replies and unfinished editors never reach this point.
+ // Carry only the durably acknowledged unchanged-settings proof; a lost
+ // restoration reply or unfinished editor never reaches this point.
  return {...proof,target_refusal:{phase:'target',status:'FAILED',effect_possible:true,
   cleanup_complete:true,settings_unchanged:true,verification:phase}};
 }

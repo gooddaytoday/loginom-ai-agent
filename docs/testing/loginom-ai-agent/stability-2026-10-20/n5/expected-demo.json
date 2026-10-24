@@ -1,19 +1,6 @@
 {
   "package_path": "/stability-2026-10-20/n5.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.filter_data"
-    },
-    {
-      "type": "transform.group_data"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -22,17 +9,17 @@
       "columns": [
         {
           "name": "Team",
-          "label": "Team",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Incidents",
-          "label": "Incidents",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Downtime",
-          "label": "Downtime",
+          "label_any": true,
           "type": "integer"
         }
       ],

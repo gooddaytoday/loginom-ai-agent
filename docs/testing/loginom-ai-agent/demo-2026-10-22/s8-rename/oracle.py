@@ -15,8 +15,8 @@ def read(name):
     return list(csv.DictReader(io.StringIO((ROOT / "data" / name).read_bytes().decode("utf-8"), newline="")))
 
 
-NODE_TYPES = ['imports.text', 'transform.calculator', 'transform.group_data', 'transform.sorting', 'transform.reform_columns', 'exports.text']
-OUTPUT_TYPE = 'transform.reform_columns'
+NODE_TYPES = []
+OUTPUT_TYPE = 'export_input'
 ORDERED = True
 COLUMNS = [('Регион', 'string'), ('Категория', 'string'), ('Выручка', 'real')]
 

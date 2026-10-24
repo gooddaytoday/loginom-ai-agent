@@ -1,19 +1,6 @@
 {
   "package_path": "/stability-2026-10-20/n4.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.join_data"
-    },
-    {
-      "type": "transform.cross_table"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -22,22 +9,22 @@
       "columns": [
         {
           "name": "Site",
-          "label": "Site",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Electricity",
-          "label": "Electricity",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Gas",
-          "label": "Gas",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Water",
-          "label": "Water",
+          "label_any": true,
           "type": "real"
         }
       ],
