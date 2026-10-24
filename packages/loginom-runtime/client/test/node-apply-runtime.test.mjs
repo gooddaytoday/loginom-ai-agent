@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createActionRuntime,parseCapabilityResult} from '../lib/executor.mjs';
 import vm from 'node:vm';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
-import {nodeJobResultSchema} from '../lib/node-result-schema.mjs';
+import {nodeJobResultSchema,nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {inspectPendingWizardOpen} from '../lib/node-wizard-open.mjs';
 import {preflightCalculatorSource} from '../lib/calculator-preflight.mjs';
 import {actions} from './support/executor-fixture.mjs';
@@ -751,6 +751,47 @@ test('public node inspect/resume recovers a lost precondition refusal without re
  const result=await f.runtime.runNodeApply(r,{resume:true});assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
  assert.equal(f.calls.filter(c=>c==='create').length,1);assert.equal(f.calls.filter(c=>c==='connect').length,1);
  assert.equal(f.graph.nodes.length,2);assert.equal(f.graph.links.length,1);
+});
+
+for(const fault of [null,'cleanup','foreign','table','execution','inbound','transport','journal'])test('JavaScript 212x4 full refusal frees the gate only after workflow return: '+fault,async()=>{
+ const f=fixture({wrapDrivers:(context,drivers)=>({...drivers,
+  finish:async mode=>({verified:true,cleanup_complete:true,mode,execution_started:mode==='execute',execution_id:mode==='execute'?'exec':null}),
+  waitExecution:async()=>({verified:true,cleanup_complete:true,status:'completed',execution_id:'exec'}),
+  readOutput:async(read,ctx)=>{
+   context.operation.cleanupConfirmed=true;
+   if(read.coverage!=='full')return {verified:true,cleanup_complete:true,execution_id:ctx.execution.execution_id,status:'partial',evidence_ref:'sample',
+    ports:[{port:0,port_guid:'port',fresh:true,execution_id:ctx.execution.execution_id,schema:[],row_count:212,sample:[],sample_rows:0,sample_complete:false,
+     precision:{numbers_verified:true,limitations:[],strings:'exact'}}]};
+   const returned={verified:true,source_table:{view_guid:'view',port_guid:'port',table_tid:'table'},
+    node_context:{...ctx.node,verified:true,surface:'graph'},execution_started:false,reopen_performed:false};
+   const refusal={phase:'read',status:'FAILED',verification:'javascript_full_bound_refused',effect_possible:false,
+    cleanup_complete:true,settings_unchanged:true,proof:{table:structuredClone(returned.source_table),row_count:212,sample_rows:100,execution:structuredClone(ctx.execution),returned}};
+   if(fault==='cleanup')returned.verified=false;
+   if(fault==='foreign')returned.node_context.node_id='other';
+   if(fault==='table')returned.source_table.port_guid='other';
+   if(fault==='execution')refusal.proof.execution.execution_id='other';
+   if(fault==='inbound')refusal.proof.row_count=100;
+   if(fault==='transport')context.operation.transportUncertain=true;
+   const error=Error('JavaScript full output has 212 rows; limit is 100. Read a sample of at most 100 rows or verify the downloaded CSV Export.');
+   error.nodePhaseRefusal=refusal;throw error;
+  }})});
+ f.handlers.set('programming.javascript',{...f.handler,modes:['script'],fullUiOutput:true});
+ const p=request();p.target.type='programming.javascript';p.mode='script';p.finish='execute';
+ p.read={ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'};
+ if(fault==='journal')f.failRecord('node_phase_refused');
+ const r=await f.runtime.runNodeApply(p);
+ assert.equal(new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(r.output).valid,true);
+ assert.equal(r.status,fault?'AMBIGUOUS':'FAILED',JSON.stringify(r));assert.equal(r.cleanup_complete,!fault);
+ if(fault){assert.throws(()=>f.runtime.assertPreparationAllowed());await assert.rejects(f.runtime.runNodeApply({...request(),operation_id:'next'}),/pending/);}
+ else{
+  assert.match(r.output.error.message,/212.*100/);assert.match(r.output.next_step.instruction,/sample.*CSV/);
+  assert.equal(r.output.pending_phase,null);assert.equal(r.output.execution.status,'completed');
+  assert.equal(r.output.output.status,'not_refreshed');
+  assert.equal((await f.runtime.inspect({operationId:'apply'})).output.state,'resolved');
+  f.runtime.assertPreparationAllowed();
+  const next=await f.runtime.runNodeApply({...p,operation_id:'next',target:{kind:'existing',type:'programming.javascript',ref:r.output.node},read:{ports:[0],sample_rows:100,require_exact_numbers:true}});assert.equal(next.status,'SUCCEEDED',JSON.stringify(next));
+  assert.ok(f.events.some(e=>e.phase==='node_phase_refused'&&e.receipt.effect_possible===false));
+ }
 });
 
 for(const fault of [null,'cleanup','foreign','execution','inbound','transport','journal'])test('native full refusal frees the runtime gate only with owned cleanup: '+fault,async()=>{
