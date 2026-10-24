@@ -222,9 +222,16 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
     totalZoomSteps+=navigation.zoom_steps;
     placementNavigation={...navigation,initial_viewport:initialViewport,passes:pass+1,total_zoom_steps:totalZoomSteps};
     await placementGuard();
-    if(navigation.fully_visible!==true){
+    // Overflow is only a navigation hint, not the future reference's identity.
+    // A smaller scale may expose a different free point even when native scroll
+    // cannot reach that hint beyond the current drawing extent.
+    target=await chooseTarget();
+    if(!target&&navigation.fully_visible!==true){
      // The connection settings were committed and reread; no reference drag
      // has started. Preserve these settled effects in the existing step receipt.
+     // Restore Components as on success: an exposed Connections tree otherwise
+     // covers the next generated encoder's admitted palette row after release.
+     await click(t.workflow_ref.prefix+';ModelForm;pnlVendorsContainer;p.h;p.t');
      await quiet();await placementGuard();
      const graph=await readPlacementGraph(page,graphTask);
      need(graph.complete===true&&graph.interaction_ready===true&&sameGraph(before,graph),
@@ -233,9 +240,6 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
       pre_target_checkpoint:{graph,connection:persisted},placement_navigation:placementNavigation,
       error:'REST connection: connection placement is not fully visible'};
     }
-    // Zoom redraws the graph. Recheck occupied rectangles and the hit surface;
-    // never reuse pre-navigation screen pixels.
-    target=await chooseTarget();
    }
    need(target,'no free visible connection position after navigation');
   }
