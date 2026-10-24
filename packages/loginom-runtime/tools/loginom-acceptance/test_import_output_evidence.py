@@ -349,3 +349,102 @@ class TableFormatRestorationEvidenceTests(unittest.TestCase):
                 if variant=='no_workflow_return':self.checkpoint['output'].pop('workflow_return')
                 self.observations.sort(key=lambda row:row[0]);self.mutations.sort(key=lambda row:row[0])
                 self.assertTrue(self.audit())
+
+
+class PortOutputEvidenceTests(unittest.TestCase):
+    def setUp(self):
+        self.columns = [dict(name='Id', label='Identifier', type='integer'), dict(name='Text', label='Text', type='string'),
+                        dict(name='Amount', label='Amount', type='real'), dict(name='Flag', label='Flag', type='boolean'),
+                        dict(name='When', label='When', type='datetime')]
+        self.rows = [['9007199254740993', '  \r\n😀', '-0', True, '2026-10-25T01:02:03.004'],
+                     [None, '', '1.2345678901234567', False, None]]
+        self.port = dict(port=0, port_guid='port', fresh=True, execution_id='execution',
+                         freshness_basis='completed_execution_port_source',
+                         schema=[dict(c, index=i) for i,c in enumerate(self.columns)], row_count=2,
+                         sample_rows=2, sample_complete=True, sample=[[
+                             dict(type=c['type'], is_null=v is None, value=v,
+                                  **(dict(decimal=v) if c['type']=='real' else {}))
+                             for c,v in zip(self.columns,row)] for row in self.rows])
+        for row in self.port['sample']:
+            for cell in row:
+                if cell['type']=='real':cell['value']=float(cell['value'])
+
+    def audit(self):
+        from import_output_evidence import verify_port_output
+        return verify_port_output(self.port, self.columns, self.rows, 'execution', 0)
+
+    def test_independent_fixture_accepts_port_values_without_table_evidence(self):
+        self.assertEqual(self.audit(), [])
+
+    def test_json_roundtrip_restores_negative_zero_from_decimal(self):
+        self.port['sample'][0][2]['value'] = 0
+        self.assertEqual(self.audit(), [])
+
+    def test_corrupted_identity_schema_value_and_coverage_are_refused(self):
+        original = copy.deepcopy(self.port)
+        changes = [lambda p:p.update(execution_id='old'), lambda p:p.update(port=1), lambda p:p.update(fresh=False),
+                   lambda p:p.update(freshness_basis='table'), lambda p:p['schema'][0].update(label='Wrong'),
+                   lambda p:p['schema'].reverse(), lambda p:p['sample'][0][0].update(value='9007199254740992'),
+                   lambda p:p['sample'][0][1].update(value=''), lambda p:p['sample'][0][2].update(decimal='0'),
+                   lambda p:p['sample'][1][0].update(is_null=False, value='0'), lambda p:p['sample'][0].pop(),
+                   lambda p:p.update(sample_rows=1), lambda p:p.update(row_count=3),
+                   lambda p:p.update(sample_complete=False), lambda p:p.update(read_limit='new_enum')]
+        for change in changes:
+            with self.subTest(change=change):
+                self.port=copy.deepcopy(original);change(self.port);self.assertTrue(self.audit())
+
+    def test_zero_and_partial_prefixes_keep_total_count_and_explicit_coverage(self):
+        sample=copy.deepcopy(self.port['sample'])
+        for count in (0, 1):
+            self.port['sample']=sample[:count]
+            self.port.update(sample_rows=count, sample_complete=False)
+            self.assertEqual(self.audit(), [])
+
+    def test_calculator_uses_port_fixture_and_retains_execution_and_sequence_audits(self):
+        from calculator_output_evidence import verify_calculator_output
+        from node_procedure_evidence import digest
+        node=dict(verified=True,document_id='doc',workflow_id='flow',node_id='node')
+        request=dict(operation_id='calc',read=dict(ports=[0],sample_rows=10))
+        self.port['execution_id']='doc:root:1'
+        def process(identity,parent=None):
+            return dict(process_id=identity,record_id='r'+identity,parent_id=parent,state='completed',error=False,
+                        children_loaded=True,rendered=True,selected=parent is not None)
+        def state(rows,elements):
+            return dict(dom_epoch=dict(document='doc',revision=1),workflow_ref=dict(workflow_id='flow'),origin='https://test',loginom_build='7.4.2',
+                scan=dict(complete=True),ui=dict(dialogs=[],masks=[],elements=elements),wizard=dict(status='absent'),
+                prepared_node_context=node,node_outputs=dict(verified=True,node_selected=True,surface='graph',node_context=node),
+                node_processes=dict(verified=True,inventory_complete=True,show_completed=True,root_id='root',node_context=node,processes=rows))
+        states=[state([],[dict(ref='launch',allowed_actions=['execute_graph_node'],graph_execution=dict(node_id='node',source='native_selected_graph_node'))]),
+                state([process('1'),process('1.1','1')],[dict(ref='go',allowed_actions=['show_process_node'],process_menu=dict(action='mniShowNodeToProcess',process=dict(record_id='r1.1')))]),
+                state([process('1'),process('1.1','1')],[])]
+        events=[]
+        def entry(phase,**details):
+            events.append(dict(session_id='test',runtime_revision='test',target=dict(origin='https://test',build='7.4.2'),
+                operation_id='calc',phase=phase,internal_provenance='client_node_procedure_v1',**details))
+        for step,s in zip((1,3,5),states):
+            outcome=dict(status='SUCCEEDED',output=s)
+            for sample in range(4):entry('node_observation_sample',step=step,internal_operation_id='calc:n'+str(step),sample=sample,outcome=outcome)
+            entry('node_observation_completed',step=step,internal_operation_id='calc:n'+str(step),outcome=outcome)
+            if step==5:continue
+            action=dict(verb='execute_graph_node' if step==1 else 'show_process_node',ref='launch' if step==1 else 'go')
+            identity='calc:n'+str(step+1)
+            entry('node_step_prepared',step=step+1,internal_operation_id=identity,action=action,
+                  observation_sha256=digest(s),signature=digest([identity,action,s]))
+            trace=[dict(event='ui_preconditions_verified',verb='execute_graph_node',refs=['launch']),dict(event='ui_gesture_applied',verb='execute_graph_node')] if step==1 else []
+            entry('node_step_completed',step=step+1,internal_operation_id=identity,
+                  outcome=dict(status='SUCCEEDED',cleanup_complete=True,operation_id=identity,action_key='ui.act',output=dict(gesture_applied=True),trace=trace))
+        entry('node_port_output_read',outcome=dict(verified=True,cleanup_complete=True,node_context=node,output=self.port))
+        checkpoint=dict(status='SUCCEEDED',node=node,execution=dict(status='completed',execution_id='doc:root:1'),output=dict(ports=[self.port]))
+        events.append(dict(operation_id='calc',phase='node_checkpoint',result=checkpoint))
+        audit=lambda:verify_calculator_output(events,request,self.columns,self.rows)
+        self.assertTrue(audit()['passed'],audit())
+        # A valid smaller requested prefix and an explicit budget stop are allowed.
+        full=copy.deepcopy(self.port)
+        self.port.update(sample=self.port['sample'][:1],sample_rows=1,sample_complete=False)
+        self.assertIn('port_output_requested_coverage',audit()['failures'])
+        self.port['read_limit']='preview_cell_or_byte_budget';self.assertTrue(audit()['passed'],audit())
+        self.port.pop('read_limit');request['read']['sample_rows']=1;self.assertTrue(audit()['passed'],audit())
+        self.port.update(full);request['read']['sample_rows']=10
+        events[-2]['outcome']['cleanup_complete']=False;self.assertFalse(audit()['passed'])
+        events[-2]['outcome']['cleanup_complete']=True
+        checkpoint['execution']['execution_id']='old';self.assertFalse(audit()['passed'])

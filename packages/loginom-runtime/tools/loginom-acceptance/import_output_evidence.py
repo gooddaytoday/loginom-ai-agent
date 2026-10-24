@@ -60,6 +60,71 @@ def equal_number(a, b):
         return False
 
 
+def verify_port_output(port, expected_columns, expected_rows, execution_id, port_index):
+    """Compare a source-port prefix with an independent complete fixture."""
+    failures = []
+    try:
+        if (port.get('port') != port_index or not port.get('port_guid') or port.get('fresh') is not True
+                or not execution_id or port.get('execution_id') != execution_id
+                or port.get('freshness_basis') != 'completed_execution_port_source'):
+            failures.append('port_output_identity')
+        schema = port['schema']
+        if (not expected_columns or len({c['name'] for c in expected_columns}) != len(expected_columns)
+                or any(len(row) != len(expected_columns) for row in expected_rows)):
+            return failures + ['port_output_oracle_shape']
+        if (len(schema) != len(expected_columns) or any(c.get('index') != i
+                or any(c.get(k) != expected_columns[i][k] for k in ('name', 'label', 'type'))
+                or 'data_kind' in expected_columns[i] and c.get('data_kind') != expected_columns[i]['data_kind']
+                for i,c in enumerate(schema))):
+            failures.append('port_output_schema')
+        sample = port['sample']
+        if (type(port.get('row_count')) is not int or port['row_count'] != len(expected_rows)
+                or type(port.get('sample_rows')) is not int or port['sample_rows'] != len(sample)
+                or not 0 <= len(sample) <= min(100, len(expected_rows))
+                or port.get('sample_complete') is not (len(sample) == len(expected_rows))
+                or any(len(row) != len(expected_columns) for row in sample)
+                or port.get('read_limit') not in (None, 'preview_cell_or_byte_budget')
+                or port.get('read_limit') and port.get('sample_complete') is True):
+            failures.append('port_output_coverage')
+        for i,row in enumerate(sample):
+            for j,cell in enumerate(row):
+                expected = expected_rows[i][j]
+                kind = expected_columns[j]['type']
+                ok = cell.get('type') == kind and cell.get('is_null') is (expected is None)
+                if expected is None:
+                    ok &= cell.get('value') is None
+                elif kind == 'real':
+                    ok &= equal_number(expected, cell.get('decimal')) and (equal_number(expected, cell.get('value'))
+                        or float(expected) == 0 and type(cell.get('value')) in (int, float) and cell['value'] == 0)
+                elif kind == 'integer':
+                    ok &= isinstance(cell.get('value'), str) and str(int(expected)) == cell['value']
+                elif kind == 'boolean':
+                    boolean = expected if type(expected) is bool else {'true': True, 'истина': True, 'да': True,
+                        'false': False, 'ложь': False, 'нет': False}.get(str(expected).casefold())
+                    ok &= boolean is not None and cell.get('value') is boolean
+                elif kind == 'datetime':
+                    parsed = None
+                    for source_format in ['%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S',
+                            '%d.%m.%Y %H:%M:%S.%f', '%d.%m.%Y %H:%M:%S', '%d.%m.%Y',
+                            '%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            parsed = datetime.strptime(expected, source_format); break
+                        except ValueError:
+                            pass
+                    ok &= parsed is not None and parsed.microsecond % 1000 == 0 and cell.get('value') == parsed.isoformat(timespec='milliseconds')
+                elif kind == 'string':
+                    ok &= cell.get('value') == expected
+                elif kind == 'variant':
+                    ok &= cell.get('precision') == 'unverified' and cell.get('display_text') == expected
+                else:
+                    ok = False
+                if not ok:
+                    failures.append('port_output_value_'+str(i)+'_'+str(j))
+    except (KeyError, IndexError, TypeError, AttributeError, ValueError, OverflowError):
+        failures.append('port_output_malformed')
+    return sorted(set(failures))
+
+
 def verify_table_format_restoration(observations, mutations, table, expected, first_apply, last_page, restore_apply, proof):
     """Admit a second Apply only from raw, owner-bound restoration readbacks."""
     before = lambda step: next((s for n, s in reversed(observations) if n < step), {})

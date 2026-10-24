@@ -351,6 +351,21 @@ def verify_internal_sequence(events, operation_id, *, max_steps=96, cold_read_ce
         if identity != session or not identity[0] or not identity[1]:
             failures.append('journal_session_mismatch')
         phase, step = row.get('phase'), row.get('step')
+        if phase == 'node_port_output_read':
+            result = row.get('outcome', {})
+            owner = (observations[-1][1] if observations else {}).get('prepared_node_context', {})
+            context = result.get('node_context', {})
+            port = result.get('output', {})
+            if (pending or rejected or refresh_authorized or samples or result.get('verified') is not True
+                    or result.get('cleanup_complete') is not True or context.get('verified') is not True
+                    or owner.get('verified') is not True
+                    or any(not owner.get(k) or context.get(k) != owner[k] for k in ('document_id', 'workflow_id', 'node_id'))
+                    or port.get('fresh') is not True or not port.get('execution_id') or not port.get('port_guid')
+                    or type(port.get('port')) is not int or port['port'] < 0
+                    or port.get('freshness_basis') != 'completed_execution_port_source'):
+                failures.append('unbound_port_read')
+            current = None
+            continue
         if not isinstance(step, int) or step < 1 or step > max_steps:
             failures.append('invalid_step'); continue
         if row.get('internal_operation_id') != f'{operation_id}:n{step}':

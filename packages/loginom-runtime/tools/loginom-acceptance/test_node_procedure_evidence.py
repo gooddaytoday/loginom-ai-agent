@@ -258,3 +258,43 @@ class PreparedSelectionRefreshTests(unittest.TestCase):
                        lambda s,c:c['identity'].update(path=[0]),lambda s,c:s['prepared_node_context'].update(verified=False)]:
             s=copy.deepcopy(state);c=control('label');mutate(s,c)
             self.assertNotEqual(base,refresh_control_binding(s,dict(verb='click'),c))
+
+
+class PortReadSequenceTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture=json.loads(FIXTURE.read_text())
+        self.events=self.fixture['events']
+        last=next(r for r in reversed(self.events) if r['phase']=='node_observation_completed')
+        self.node=dict(verified=True,document_id=last['outcome']['output']['dom_epoch']['document'],workflow_id='flow',node_id='node')
+        final=[copy.deepcopy(r) for r in self.events if r.get('step')==last['step']]
+        for row in final:
+            row.update(step=65,internal_operation_id=self.fixture['operation_id']+':n65')
+            row['outcome']['output']['prepared_node_context']=self.node
+        self.events.extend(final);last=final[-1]
+        self.read={k:copy.deepcopy(last[k]) for k in ('session_id','runtime_revision','target','operation_id','internal_provenance')}
+        self.read.update(phase='node_port_output_read',outcome=dict(verified=True,cleanup_complete=True,node_context=self.node,
+            output=dict(port=0,port_guid='p',fresh=True,execution_id='e',freshness_basis='completed_execution_port_source')))
+        self.events.append(self.read)
+
+    def audit(self):
+        from node_procedure_evidence import verify_internal_sequence
+        return verify_internal_sequence(self.events,self.fixture['operation_id'],max_steps=4096)
+
+    def test_read_only_port_event_needs_no_ui_step_and_two_consecutive_reads_are_valid(self):
+        self.assertTrue(self.audit()['passed'],self.audit()['failures'])
+        self.events.append(copy.deepcopy(self.read));self.events[-1]['outcome']['output']['port']=1
+        self.assertTrue(self.audit()['passed'],self.audit()['failures'])
+
+    def test_read_event_refuses_changed_owner_or_missing_cleanup(self):
+        for change in [lambda r:r['outcome'].update(cleanup_complete=False),
+                       lambda r:r['outcome'].update(node_context=dict(self.node,node_id='foreign'))]:
+            original=copy.deepcopy(self.read);change(self.read)
+            self.assertIn('unbound_port_read',self.audit()['failures']);self.read.clear();self.read.update(original)
+
+    def test_read_cannot_hide_pending_ui_mutation_or_allow_a_stale_gesture(self):
+        prepared=next(copy.deepcopy(r) for r in reversed(self.events) if r['phase']=='node_step_prepared')
+        prepared.update(step=66,internal_operation_id=self.fixture['operation_id']+':n66')
+        self.events.insert(-1,prepared)
+        self.assertIn('unbound_port_read',self.audit()['failures'])
+        self.events.pop(-2);self.events.append(prepared)
+        self.assertIn('mutation_without_fresh_observation',self.audit()['failures'])

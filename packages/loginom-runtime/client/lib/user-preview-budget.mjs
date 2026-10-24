@@ -24,7 +24,8 @@ export function budgetUserPreview(reply,{wireSize=previewWireSize}={}) {
    delete cell.representation;
   }else if(cell.is_null===false&&cell.type==='integer'&&cell.precision==='exact_integer'&&cell.representation==='decimal_integer'
     &&typeof cell.value==='string'&&/^-?\d+$/.test(cell.value))delete cell.representation;
-  else if(cell.is_null===false&&cell.type==='string'&&cell.precision==='display_text'&&cell.representation==='cached_display_text'
+  else if(cell.is_null===false&&cell.type==='string'&&((cell.precision==='display_text'&&cell.representation==='cached_display_text')
+    ||(cell.precision==='source_text'&&cell.representation==='data_source_string'))
     &&typeof cell.value==='string')delete cell.representation;
  }
  if(wireSize(reply)>USER_PREVIEW_WIRE_BUDGET&&reply.configuration){

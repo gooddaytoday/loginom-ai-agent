@@ -300,3 +300,70 @@ test('reader_applies_datetime_limitations_without_downgrading_numeric_precision'
   assert.deepEqual(result.output.precision.limitations,['datetime_display_precision']);
  }
 });
+
+// Keep browser/UI boundaries inert while exercising the actual shared driver
+// lifecycle and the real schema/materialization contracts.
+async function sharedOutputFixture({cross=false,mapped=false,native=false,override=false}={}){
+ const {createTabularTransformNodeSupport}=await import('../lib/calculator-node.mjs');
+ const {alignReadSchema}=await import('../lib/node-read-contract.mjs');
+ const {materializeCrossTableOutput}=await import('../lib/crosstable-output.mjs');
+ const node={document_id:'doc',workflow_id:'wf',node_id:'node'},calls=[];
+ const schema=[{index:0,name:'Region',label:'Region',type:'string',data_kind:'Дискретный'},
+  {index:1,name:'C_1',label:'A',type:'real',data_kind:'Непрерывный'}];
+ const configuration={kind:'crosstable',node_context:node,category_mode:'sliding',row_keys:[schema[0]],
+  column:{name:'Category',label:'Category',type:'string'},facts:[{name:'Amount',label:'Amount',type:'real',functions:['sum']}],
+  options:{separator:'|',unique_names:false,limit:0,min_values:0}};
+ if(mapped){
+  const sources=schema.map((field,index)=>({...field,record_id:String(index),required:true}));
+  configuration.output_mapping={verified:true,inventory_complete:true,source_identity_verified:true,node_context:{...node,output_port:{port:0}},
+   source_fields:sources,target_fields:schema.map((field,index)=>({...field,source:sources[index]}))};
+ }
+ const execution={verified:true,owner_verified:true,status:'completed',execution_id:'e',process_id:'1.1',process_record_id:'child'};
+ const output={port:0,port_guid:'port',fresh:true,execution_id:'e',freshness_basis:'completed_execution_port_source',
+  schema:schema.map(c=>({index:c.index,name:c.name,label:c.label,type:c.type,...(!cross?{data_kind:'poisoned untrusted kind'}:{})})),row_count:1,sample_rows:1,sample_complete:true,
+  sample:[[{type:'string',value:'Europe',is_null:false,precision:'source_text',representation:'data_source_string'},
+   {type:'real',value:-0,decimal:'-0',is_null:false,precision:'17_significant_digits',representation:'binary64'}]],
+  precision:{numbers_verified:true,limitations:[]}};
+ const channel={observe:async()=>({prepared_node_context:node,wizard:{root_tid:'wizard'},ui:{elements:[]}}),
+  perform:async()=>{},openOutputPort:async()=>{},readOutputPort:async request=>{calls.push(structuredClone(request));return {output:structuredClone(output)};}};
+ const context={structuredClone,calculatorConfigurationReadback:()=>{},calculatorParametersSchema:{},alignReadSchema,
+  requireValue:(ok,message)=>{if(!ok)throw Error(message);},verified:value=>({verified:true,cleanup_complete:true,effect_possible:false,...value}),
+  createNodeProcedure:()=>channel,createNodeExecutionProcedure:()=>({prepare:async()=>{},waitCompleted:async()=>execution}),
+  selectPreparedGraphNode:async()=>{},openPreparedWizard:async()=>{},readOutputDefinitionPages:async()=>({fields:schema,total_columns:2}),
+  openNewOutputTable:()=>assert.fail('Ordinary read must not open Table'),readCollapseNativeOutput:async()=>{calls.push('native');return {ports:[structuredClone(output)]};}};
+ const implementation={type:cross?'transform.cross_table':'transform.group_data',revision:'test',configure:async()=>({configuration}),
+  configureOutput:async()=>({native_mapping:{target_fields:schema}}),...(cross?{materializedSchema:materializeCrossTableOutput}:{}),
+  ...(native?{nativeFullOutput:true}:{}),...(override?{configureAllOutputs:async()=>({verified:true}),readOutputs:async()=>{calls.push('override');return {override:true};}}:{})};
+ const support=vm.runInNewContext('('+createTabularTransformNodeSupport.toString()+')',context)({},implementation);
+ const ctx={node,document_id:'doc',workflow_ref:{workflow_id:'wf'},deadline:10000,execution:{status:'completed',execution_id:'e'}};
+ const drivers=support.nodeApplyDriverFactory({operation:{id:'shared',nodeApply:{phases:[],request:{parameters:{},target:{kind:'new'},finish:'execute'}}},now:()=>1});
+ await drivers.openWizard(ctx);await drivers.configureCalculator(ctx,{});await drivers.mapPorts([],ctx);await drivers.waitExecution(ctx);
+ return {drivers,ctx,calls,output,schema,execution};
+}
+
+test('shared ordinary output passes the full execution receipt, preserves exact values and mapping data kinds',async()=>{
+ const f=await sharedOutputFixture();
+ for(const strict of [false,true]){
+  const result=await f.drivers.readOutput({ports:[0],sample_rows:10,require_exact_numbers:strict},f.ctx);
+  assert.equal(result.ports[0].freshness_basis,'completed_execution_port_source');
+  assert.deepEqual(structuredClone(result.ports[0].schema),f.schema);assert.deepEqual(result.ports[0].sample,f.output.sample);
+  assert.equal(Object.hasOwn(result,'workflow_return'),false);
+  assert.deepEqual(f.calls.at(-1),{port:0,sampleRows:10,requireExactNumbers:strict,execution:f.execution});
+ }
+ f.output.schema[1].type='integer';
+ await assert.rejects(f.drivers.readOutput({ports:[0],sample_rows:1,require_exact_numbers:true},f.ctx),{code:'NODE_READ_SCHEMA_CHANGED'});
+});
+
+test('shared CrossTable ordinary read materializes its observed schema; native full and overrides retain dispatch',async()=>{
+ const f=await sharedOutputFixture({cross:true});
+ const result=await f.drivers.readOutput({ports:[0],sample_rows:1,require_exact_numbers:true},f.ctx);
+ assert.equal(result.ports[0].category_fields[0].category,'A');
+ assert.ok(JSON.parse(JSON.stringify(result.ports[0].schema)).every(field=>!Object.hasOwn(field,'data_kind')));
+ const mapped=await sharedOutputFixture({cross:true,mapped:true});
+ const mappedResult=await mapped.drivers.readOutput({ports:[0],sample_rows:1,require_exact_numbers:true},mapped.ctx);
+ assert.deepEqual(structuredClone(mappedResult.ports[0].schema),mapped.schema);
+ const full=await sharedOutputFixture({native:true});
+ await full.drivers.readOutput({ports:[0],coverage:'full'},full.ctx);assert.deepEqual(full.calls,['native']);
+ const overridden=await sharedOutputFixture({override:true});
+ await overridden.drivers.readOutput({ports:[0]},overridden.ctx);assert.deepEqual(overridden.calls,['override']);
+});

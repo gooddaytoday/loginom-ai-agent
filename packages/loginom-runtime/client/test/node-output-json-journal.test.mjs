@@ -56,3 +56,34 @@ test('JavaScript product read normalizes echo URL cells before the exact durable
   assert.deepEqual(calls,[[read,ctx]]);assert.deepEqual(raw,before);
  }finally{await rm(directory,{recursive:true,force:true});}
 });
+
+test('shared ordinary product output is normalized before durable ACK without mutating exact cells',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'ordinary-port-ack-'));
+ try{
+  const redactor=createRedactor(['fixture-secret-token']);
+  const raw={verified:true,cleanup_complete:true,ports:[{port:0,freshness_basis:'completed_execution_port_source',sample:[[
+   {type:'string',value:JSON.stringify({url:'https://echo.test/?Key=secret'},null,2)},
+   {type:'string',value:'https://user:password@echo.test/?token=secret'},
+   {type:'string',value:'long 😀'.repeat(3000)+'fixture-secret-token'},
+   {type:'integer',value:'9223372036854775807'},
+   {type:'real',value:-0,decimal:'-0'}]]}]};
+  const original=structuredClone(raw),native={ports:[{exact_table:{complete:true}}]};
+  let returned=raw;
+  const context={createRedactor,nodeOutputForJournal,NODE_READ_MODE:'read',createNodeReadDrivers:()=>assert.fail('Wrong driver')};
+  for(const name of ['ExcelImport','RestRequest','LinRegression','Clustering','CrossTable','Replacement','Duplicates',
+   'DateTime','MissingValues','Collapse','Union','TextExport','Join','Filter','TextImport','Sorting','Grouping','Reform','Calculator','JavascriptCode'])
+   context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:new Map(),nodeApplyDriverFactory:()=>({readOutput:async()=>returned})});
+  const support=vm.runInNewContext('('+createCandidateNodeSupport.toString()+')',context)({redactor});
+  const drivers=support.nodeApplyDriverFactory({operation:{parameters:{target:{type:'transform.calculator'}}}});
+  const value=await drivers.readOutput({ports:[0]},{});
+  const record=createExecutionJournal({directory,metadata:{sessionId:'test'},redactor});
+  const ack=await record({phase:'node_phase_completed',receipt:{phase:'read',value}});
+  assert.deepEqual(ack.receipt.value,value);assert.deepEqual(raw,original);
+  assert.equal(JSON.stringify(value).includes('fixture-secret-token'),false);
+  assert.equal(JSON.stringify(value).includes('password'),false);
+  assert.equal(value.ports[0].sample[0][2].value,'long 😀'.repeat(3000)+'[redacted]');
+  assert.equal(value.ports[0].sample[0][3].value,'9223372036854775807');
+  assert.equal(value.ports[0].sample[0][4].decimal,'-0');
+  returned=native;assert.equal(await drivers.readOutput({},{}),native);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
