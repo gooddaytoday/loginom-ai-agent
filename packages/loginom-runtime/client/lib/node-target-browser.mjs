@@ -267,8 +267,11 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         if(matches.length!==1||!Number.isInteger(matches[0][direction][index]))throw Error('Exact owned tabular port disappeared');
         return {label:matches[0].label,index:matches[0][direction][index]};
       };
-      const source=resolve(p.edge.source,'outputs',p.edge.output),target=resolve(p.edge.target,'inputs',p.edge.input);
-      const linkTid=task.request.workflow_ref.prefix+';Graph;'+source.label+'|Output_Data-'+source.index+'|'+target.label+'|Input_Data-'+target.index;
+      const service=p.edge.output==='connection:0'&&p.edge.input==='connection:0';
+      const serviceEdges=service?(before.rest_connection_links??[]).filter(e=>JSON.stringify(e)===JSON.stringify(p.edge)):[];
+      if(service&&(serviceEdges.length!==1||!before.foreign_links.includes(serviceEdges[0].tid)))throw Error('Exact owned REST service edge disappeared');
+      const source=service?null:resolve(p.edge.source,'outputs',p.edge.output),target=service?null:resolve(p.edge.target,'inputs',p.edge.input);
+      const linkTid=service?serviceEdges[0].tid:task.request.workflow_ref.prefix+';Graph;'+source.label+'|Output_Data-'+source.index+'|'+target.label+'|Input_Data-'+target.index;
       const nativeLinks=()=>page.evaluate(()=>{
         const links=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FLinks.FCollection;
         if(!Array.isArray(links)||links.length>400)throw Error('Bounded native link identities unavailable');
