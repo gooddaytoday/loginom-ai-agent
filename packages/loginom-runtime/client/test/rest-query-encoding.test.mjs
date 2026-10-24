@@ -51,6 +51,18 @@ test('generated child request uses the installed JavaScript contract and bounded
  assert.notEqual(child.operation_id,restQueryEncoderRequest({...r,operation_id:'y'.repeat(128)},2500,1000).operation_id);
 });
 
+test('D17 third REST encoder does not reuse the two preceding rendered node labels',()=>{
+ const children=['rest-ruble','rest-weather','rest-currency'].map(operation_id=>
+  restQueryEncoderRequest({...request(),operation_id},2500,1000));
+ const labels=children.map(child=>child.target.label);
+ assert.equal(new Set(labels).size,3,'independent encoders must not rename to the same rendered label');
+ assert.equal(restQueryEncoderRequest({...request(),operation_id:'rest-currency'},3500,1100).target.label,labels[2]);
+ const support=createJavascriptCodeNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2',redactor:createRedactor()});
+ for(const child of children)assert.doesNotThrow(()=>validateNodeApplyRequest(child,support.nodeApplyHandlers));
+ assert.equal(new Set(children.map(child=>child.operation_id)).size,3);
+ assert.ok(children.every(child=>child.parameters.source_text===children[0].parameters.source_text));
+});
+
 test('existing connected REST refuses before creating another codec or connection and points to the same node',async()=>{
  for(const source of ['owned-encoder','foreign-source']) {
   const r={...request(),target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'flow',node_id:'rest'}},

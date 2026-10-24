@@ -31,9 +31,11 @@ export function restQueryEncoderRequest(request,deadline,now=Date.now()){
  need(request.inputs.length===1,'raw query values require one explicit table input');
  const budget=Math.min(request.budgets.total_ms,deadline-now);
  need(budget>0,'query encoding deadline elapsed');
- return {operation_id:'rest-url-'+createHash('sha256').update(request.operation_id).digest('hex').slice(0,32),
+ const operation_id='rest-url-'+createHash('sha256').update(request.operation_id).digest('hex').slice(0,32);
+ return {operation_id,
   contract_revision:request.contract_revision,document_id:request.document_id,workflow_ref:request.workflow_ref,
-  target:{kind:'new',type:'programming.javascript',label:'URL query encoding'},inputs:request.inputs,
+  // Repeated REST branches must not rename their generated nodes to one rendered label.
+  target:{kind:'new',type:'programming.javascript',label:'URL query encoding '+operation_id.slice(9)},inputs:request.inputs,
   mode:'script',parameters:{schema_mode:'declared',columns:fields.map(name=>({name,label:name,type:'string',data_kind:'Дискретный',usage:'Не задано'})),
    source_text:'import {InputTable,OutputTable} from "builtIn/Data";\n'
     +'for(let row=0;row<InputTable.RowCount;row++){\n OutputTable.Append();\n for(const name of '+JSON.stringify(fields)+'){\n'
@@ -44,8 +46,12 @@ export function restQueryEncoderRequest(request,deadline,now=Date.now()){
 
 async function prepareQueryEncoder(options,ctx,config){
  const request=restQueryEncoderRequest(options.operation.parameters,ctx.deadline,options.now());
+ const adapter=options.operation.nodeTargetAdapter,parent=options.operation.parameters.target;
  const operation={id:request.operation_id,parameters:request,action:options.operation.action,
-  deadline:ctx.deadline,nodeTargetAdapter:options.operation.nodeTargetAdapter};
+  deadline:ctx.deadline,nodeTargetAdapter:{...adapter,
+   choosePosition:(value,graph,deadline,signal)=>parent.kind==='new'
+    ?adapter.choosePosition(value,graph,deadline,signal,parent.position?[parent.position]:[])
+    :adapter.choosePosition(value,graph,deadline,signal)}};
  const support=createJavascriptCodeNodeSupport({...config,redactor:config.redactor??createRedactor()});
  const drivers=support.nodeApplyDriverFactory({...options,operation});
  const child={operation,drivers,handlers:support.nodeApplyHandlers,result:null};

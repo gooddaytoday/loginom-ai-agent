@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { prepareNodeTarget } from '../lib/node-target.mjs';
+import { prepareNodeTarget, verifyNodeTargetEffect } from '../lib/node-target.mjs';
 import { describeNodeTypes, validateNodeTargetRequest } from '../lib/node-contracts.mjs';
 const ref = id => ({ document_id: 'doc', workflow_id: 'wf', node_id: id });
 const workflow = { workflow_id: 'wf', tab_tid: 'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1', prefix: 'MF;TF-1', navigation_path: [{tid:'path',label:'Scenario'}] };
@@ -22,6 +22,60 @@ function fixture() {
   }};
  return {adapter,operation,calls,events,get graph(){return graph;},run:(r=request())=>prepareNodeTarget({request:r,operation,adapter,record:async e=>{events.push(e);return e;}})};
 }
+// Reduced from rest-countries:graph:0, 2026-10-24T11:02:34.527Z:
+// native dropped (520,580) at (520,584) and connected a nearby REST reference.
+function restServiceCase() {
+ const before={complete:true,document_id:'doc',workflow_ref:workflow,dom_epoch:1,nodes:[structuredClone(source),
+  {ref:ref('6189a786-6e61-4e63-baf5-d339c733a2dd'),type:'bg-vendor-icon-restclientconnection',label:'↶Frankfurter REST',position:{x:400,y:592},inputs:[],outputs:[],other_ports:['Output_Connection-0']}],links:[],foreign_links:[]};
+ const created={ref:ref('3be12285-f45f-4e5b-980b-0f2dd980c3fe'),type:'integration.rest_request',label:'REST-запрос',position:{x:520,y:584},inputs:[0],outputs:[0,1],other_ports:['Input_Connection-0']};
+ const edge={tid:'MF;TF-1;Graph;↶Frankfurter_REST|Output_Connection-0|REST-запрос|Input_Connection-0',source:before.nodes[1].ref.node_id,target:created.ref.node_id,output:'connection:0',input:'connection:0'};
+ const after={...structuredClone(before),nodes:[...structuredClone(before.nodes),created],foreign_links:[edge.tid],rest_connection_links:[edge]};
+ const effect={id:'rest-countries:graph:0',kind:'create',parameters:{kind:'new',type:'integration.rest_request',position:{x:520,y:580}},before};
+ return {before,after,effect,edge,created};
+}
+test('D31 saved REST creation accepts only the native service edge to its new GUID',()=>{
+ const c=restServiceCase(),proof=verifyNodeTargetEffect(c.effect,c.after,()=>true);
+ assert.equal(proof?.node_id,c.created.ref.node_id);
+ assert.deepEqual(proof.auto_created_service_links,[c.edge]);
+});
+for(const changed of ['untyped','source GUID','source type','target GUID','target document','service output','service input','second service','unknown foreign','unrelated graph','wrong created type'])test('D31 rejects '+changed+' in REST auto connection',()=>{
+ const c=restServiceCase(),e=c.after.rest_connection_links[0];
+ if(changed==='untyped')delete c.after.rest_connection_links;
+ if(changed==='source GUID')e.source='foreign';
+ if(changed==='source type')c.after.nodes[1].type=c.before.nodes[1].type='imports.text';
+ if(changed==='target GUID')e.target=source.ref.node_id;
+ if(changed==='target document')c.created.ref.document_id='foreign';
+ if(changed==='service output')e.output=0;
+ if(changed==='service input')e.input=0;
+ if(changed==='second service'){c.after.rest_connection_links.push({...e,tid:'second'});c.after.foreign_links.push('second');}
+ if(changed==='unknown foreign')c.after.foreign_links.push('untyped-new-link');
+ if(changed==='unrelated graph')c.after.nodes[0].label='changed';
+ if(changed==='wrong created type')c.created.type='transform.union_data';
+ assert.equal(verifyNodeTargetEffect(c.effect,c.after,()=>true),null);
+});
+for(const lostReply of [null,'create','remove_link'])test('D31 removes only its auto service edge without replay after lost '+lostReply,async()=>{
+ const c=restServiceCase(),f=fixture();let graph=structuredClone(c.before),lost=false;
+ const {createNodeTargetBrowserAdapter}=await import('../lib/node-target-browser.mjs');
+ f.adapter.positionMatches=createNodeTargetBrowserAdapter({origin:'http://example.test',build:'7.4.2',execute:async()=>{throw Error('No browser in graph fixture');}}).positionMatches;
+ f.adapter.observe=async()=>structuredClone(graph);
+ f.adapter.mutate=async effect=>{
+  f.calls.push(effect.kind);
+  if(effect.kind==='create')graph=structuredClone(c.after);
+  if(effect.kind==='remove_link'){
+   assert.deepEqual(effect.parameters.edge,c.edge);graph.foreign_links=[];graph.rest_connection_links=[];
+  }
+  if(effect.kind==='rename'){
+   assert.deepEqual(graph.foreign_links,[]);graph.nodes.find(n=>n.ref.node_id===c.created.ref.node_id).label=effect.parameters.label;
+  }
+  if(effect.kind===lostReply&&!lost){lost=true;throw Error('lost reply');}
+  return {status:'SUCCEEDED',effect_possible:true,cleanup_complete:true};
+ };
+ const r={document_id:'doc',workflow_ref:workflow,target:{...c.effect.parameters,label:'Countries'},inputs:[]},deadline=f.operation.deadline;
+ if(lostReply){assert.equal((await f.run(r)).status,'AMBIGUOUS');f.adapter.reconcile=async()=>({verified:true,cleanup_complete:true});}
+ const result=await f.run(r);assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.deepEqual(f.calls,['create','remove_link','rename']);assert.equal(result.node.ref.node_id,c.created.ref.node_id);
+ assert.equal(f.operation.deadline,deadline);assert.equal((await f.run(r)).replayed,true);assert.equal(f.calls.length,3);
+});
 test('graph phase creates, renames and connects three inputs under one operation; replay is read-only',async()=>{
  const f=fixture(),r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);assert.equal(r.configured,false);assert.equal(f.graph.links.length,3);
  assert.deepEqual(f.calls,['create','rename','connect','connect','add_input','connect']);const again=await f.run();assert.equal(again.replayed,true);assert.equal(f.calls.length,6);

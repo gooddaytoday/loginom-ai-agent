@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
-import {verifiedNativeReadRefusal,verifiedExportReadRefusal} from './native-read-refusal.mjs';
+import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUiReadRefusal} from './native-read-refusal.mjs';
 import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-schema-refusal.mjs';
 import {verifiedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
 import {verifiedJavascriptSourcePolicyRefusal} from './javascript-source-policy-refusal.mjs';
@@ -211,6 +211,13 @@ export async function applyNode({request, operation, handlers, drivers, record,
       // Explicit trusted-driver proof is required: a transport exception alone
       // never clears uncertainty, even in a nominally non-mutating phase.
       const refusal=error.nodePhaseRefusal;
+      if(name==='read'&&request.target.type==='programming.javascript'
+        &&operation.cleanupConfirmed===true&&!operation.transportUncertain
+        &&verifiedJavascriptUiReadRefusal(refusal,state.node,state.execution,request.read)){
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+        state.javascript_read_refusal=true;
+      }
       if(name==='read'&&request.target.type==='exports.text'&&operation.cleanupConfirmed===true&&!operation.transportUncertain
         &&verifiedExportReadRefusal(refusal,state.node,state.execution,operation.id)){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
@@ -460,6 +467,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
             +'. Preserve inputs:[] and mappings:[]. Do not recreate or save the package; no explicit Execute was sent.'}
           :state.export_download_refusal?{tool:'dock_action_run',original_operation_id:operation.id,
           instruction:'The native export completed, but its download was not confirmed. The original scenario is restored, its temporary download lease released and no phase remains unresolved. Save the scenario with dock_action_run using action_key package.save_checkpoint, a NEW operation_id and the task package path in parameters.path. Report the download as unconfirmed. Do not resume this failed operation, repeat export, or recreate the node.'}
+          :state.javascript_read_refusal?{tool:'dock_node_apply',original_operation_id:operation.id,
+          instruction:'JavaScript full reading exceeds the 100-row UI limit. The Table read has returned to the workflow, precision restored and execution retained. No phase remains unresolved; saving or another action is allowed. Do not recreate or reconfigure the node. Use a NEW operation_id on the SAME existing target with parameters:{}, inputs:[], mappings:[], finish:"execute" and read:{ports:[0],sample_rows:100,require_exact_numbers:true} without full coverage for a sample, or verify the complete downloaded CSV Export.'}
           :state.native_read_refusal?{tool:'dock_node_apply',original_operation_id:operation.id,
           instruction:'Full native reading was refused by the unchanged 50x8 limit. The owned Preview is closed, workflow restored and execution retained. No operation remains unresolved; saving or another action is allowed. Do not recreate or reconfigure the node. For a scalar report use a NEW operation_id with the SAME existing target, parameters:{}, inputs:[], mappings:[], finish:"execute" and read:{ports:[0],sample_rows:100,require_exact_numbers:true} without full coverage. This does not authorize ordinary reading of Variant values.'}:correctNodeRequest(request,state.node,state.export_destination_conflict===true)}:{}),
       ...(state.correctable_import_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,

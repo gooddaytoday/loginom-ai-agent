@@ -3,7 +3,7 @@ import { withBrowserReceipt, makeCapabilityCode } from './executor.mjs';
 import { NODE_TYPES, NODE_POSITION_MIN } from './node-contracts.mjs';
 import {activatePreparedWorkflow} from './node-workflow-activation.mjs';
 import {exportPaletteScroll} from './text-export-palette.mjs';
-import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from './node-placement.mjs';
+import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlacementGap,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from './node-placement.mjs';
 
 // Read cached graph objects and rendered SVG only. Never dereference the data
 // proxy or call Loginom server methods. GUID + prepared document/workflow is the
@@ -267,8 +267,11 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
         if(matches.length!==1||!Number.isInteger(matches[0][direction][index]))throw Error('Exact owned tabular port disappeared');
         return {label:matches[0].label,index:matches[0][direction][index]};
       };
-      const source=resolve(p.edge.source,'outputs',p.edge.output),target=resolve(p.edge.target,'inputs',p.edge.input);
-      const linkTid=task.request.workflow_ref.prefix+';Graph;'+source.label+'|Output_Data-'+source.index+'|'+target.label+'|Input_Data-'+target.index;
+      const service=p.edge.output==='connection:0'&&p.edge.input==='connection:0';
+      const serviceEdges=service?(before.rest_connection_links??[]).filter(e=>JSON.stringify(e)===JSON.stringify(p.edge)):[];
+      if(service&&(serviceEdges.length!==1||!before.foreign_links.includes(serviceEdges[0].tid)))throw Error('Exact owned REST service edge disappeared');
+      const source=service?null:resolve(p.edge.source,'outputs',p.edge.output),target=service?null:resolve(p.edge.target,'inputs',p.edge.input);
+      const linkTid=service?serviceEdges[0].tid:task.request.workflow_ref.prefix+';Graph;'+source.label+'|Output_Data-'+source.index+'|'+target.label+'|Input_Data-'+target.index;
       const nativeLinks=()=>page.evaluate(()=>{
         const links=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FLinks.FCollection;
         if(!Array.isArray(links)||links.length>400)throw Error('Bounded native link identities unavailable');
@@ -296,8 +299,15 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       if(selected.length!==1 || selected[0].edge!==true || selected[0].tid!==linkTid)throw new Error('Deletion selection includes another object');
       const remove=find(task.request.workflow_ref.prefix+';ModelForm;btnRemoveSelected');
       await wait('single_link_delete_toolbar_reachable',async()=>{try{await point(remove);return true;}catch{return false;}});
+      // A loading mask may appear after the owned selection click. Read only
+      // until it clears; never replay selection or accept changed graph/GUIDs.
+      const selectedGraph=await wait('owned_link_selection_graph_ready',async()=>{
+        try{return await read(page,task);}catch(error){
+          if(String(error.message).includes('Graph is blocked'))return null;
+          throw error;
+        }
+      },1000);
       const stillSelected=await page.evaluate(tid=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;const cells=d.FmxGraph.getSelectionCells();return cells.length===1&&cells[0].edge===true&&d.FmxGraph.view.getState(cells[0])?.shape?.node?.getAttribute('data-tid')===tid;},linkTid);
-      const selectedGraph=await read(page,task);
       if(!stillSelected || !sameGraph(before,selectedGraph) || JSON.stringify(await nativeLinks())!==JSON.stringify(linkIdentities))throw new Error('Owned link selection or graph changed before deletion');
       // Selection redraws node bodies. Rebind only after the complete graph,
       // native link GUIDs and exact single-edge selection have been preserved.
@@ -490,7 +500,10 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
       }
     },
     observe:observeGraph,
-    async choosePosition(value,graph,deadline,signal){
+    async choosePosition(value,graph,deadline,signal,reserved){
+      // Only new REST auto-placement and its private implicit encoder (the
+      // reserved argument) use the larger footprint; other nodes keep policy.
+      const clearance=value.target.kind==='new'&&!value.target.position&&(value.target.type==='integration.rest_request'||reserved!==undefined);
       signal?.throwIfAborted();
       if(JSON.stringify(await observeGraph(value,deadline))!==JSON.stringify(graph))
         throw Object.assign(Error('Graph changed before automatic placement'),{code:'NODE_PLACEMENT_GRAPH_CHANGED'});
@@ -499,6 +512,12 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         const b=e.getBoundingClientRect(),width=Math.min(b.right,innerWidth)-b.x,height=Math.min(b.bottom,innerHeight)-b.y;
         const view=(${nodePlacementViewport.toString()})(e);
         const occupied=[...e.querySelectorAll('[data-tid*=";Graph;"]')].map(n=>n.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
+        // The private REST encoder must not occupy the caller's explicit
+        // future REST location. No synthetic node or public parameter is added.
+        for(const position of ${JSON.stringify(reserved??[])}){
+          const p=(${nodePlacementPoint.toString()})(view,position),s=view.scale;
+          occupied.push({left:p.x-32*s,right:p.x+96*s,top:p.y-40*s,bottom:p.y+160*s});
+        }
         // At minimum native zoom the coarse grid can miss the remaining gap
         // and choose an overflow row beyond the native scroll range (D28).
         // Only automatic JS gets a bounded finer pass, with identical bounds,
@@ -510,11 +529,11 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
           if(position.x<${NODE_POSITION_MIN}||position.y<${NODE_POSITION_MIN}||position.x>10000||position.y>10000)continue;
           const screen=(${nodePlacementPoint.toString()})(view,position),px=screen.x,py=screen.y,hit=document.elementFromPoint(px,py);
           if(px<0||py<0||!hit||!(hit===e||e.contains(hit)))continue;
-          if(occupied.some(r=>px>r.left-72&&px<r.right+96&&py>r.top-56&&py<r.bottom+72))continue;
+          if(${clearance}?!(${nodePlacementGap.toString()})(view,screen,occupied):occupied.some(r=>px>r.left-72&&px<r.right+96&&py>r.top-56&&py<r.bottom+72))continue;
           return position;
         }
-        const overflow=(${nodePlacementOverflow.toString()})(view,occupied,${NODE_POSITION_MIN},10000);
-        if(overflow)return overflow;
+        const overflow=(${nodePlacementOverflow.toString()})(view,occupied,${NODE_POSITION_MIN},10000,${clearance?112:0});
+        if(overflow&&(!${clearance}||(${nodePlacementGap.toString()})(view,(${nodePlacementPoint.toString()})(view,overflow),occupied)))return overflow;
         throw Error('target.position: no free visible canvas position or bounded model position; enlarge the canvas or supply an explicit position');
       })`,deadline);
     },
