@@ -8,7 +8,7 @@
 
 **Tech Stack:** JavaScript ESM, Node test runner, закреплённые Node/Playwright/Chromium из [release manifest](../../../packages/product/loginom-release.json), встроенный Temporal браузера, существующие Python-проверки.
 
-**Spec:** [утверждённая редакция 2 с дополнением](../specs/2026-10-24-port-output-reading-design.md). Продолжение — [остальные обработчики и приёмка](2026-10-24-port-output-integration.md). Читать оба документа; реализация ещё не разрешена.
+**Spec:** [утверждённая редакция 2 с дополнением](../specs/2026-10-24-port-output-reading-design.md). Продолжение — [остальные обработчики и приёмка](2026-10-24-port-output-integration.md). Читать оба документа; реализация разрешена владельцем 25.10.2026.
 
 ## Global Constraints
 
@@ -64,7 +64,7 @@
 - Produces: `makeNodePortOutputCode(binding, request, {origin,build,deadline}) → string`, `readNodePortOutput(page,binding,request,options) → Promise<envelope>` в новом модуле. Envelope отказа: `{verified:false,cleanup_complete:boolean,reason:string}` без значений и сырых исключений; channel отказывает вызывающему, сохранив подтверждённое состояние cleanup.
 - `output` — существующий `NodeOutputPort`: port/port_guid/fresh/execution_id/freshness_basis, observed schema `{index,name,label,type}`, row_count/sample/sample_rows/sample_complete/precision, при бюджете `limitations:['preview_cell_or_byte_budget']`. Приватные node_context/cleanup не распространяются в публичный порт. data_kind добавляет caller после проверки mapping.
 
-- [ ] **Step 1: Добавить один тест `reads_bound_port_without_table`** в новый test-файл. Локальная fixture воспроизводит native graph/port и RPC-объекты по образцу `node-output-context.test.mjs`; исполняет настоящий сериализованный callback в VM, подменяя только окружение. У неё `run(request)`, `rpcCalls`, `uiCalls`, `disposed`; новый общий mock-framework не нужен.
+- [x] **Step 1: Добавить один тест `reads_bound_port_without_table`** в новый test-файл. Локальная fixture воспроизводит native graph/port и RPC-объекты по образцу `node-output-context.test.mjs`; исполняет настоящий сериализованный callback в VM, подменяя только окружение. У неё `run(request)`, `rpcCalls`, `uiCalls`, `disposed`; новый общий mock-framework не нужен.
 
   ```js
   const result = await f.run({port:0, execution, sampleRows:1, requireExactNumbers:true});
@@ -75,18 +75,18 @@
   assert.deepEqual(f.disposed.sort(), ['columns','dataSource','integerColumn','output','realColumn','stringColumn']);
   ```
 
-- [ ] **Step 2: Получить RED.** Из `packages/loginom-runtime/client`: `node --test --test-name-pattern=reads_bound_port_without_table test/node-port-output.test.mjs`. Ожидается отсутствие новой реализации, не ошибка окружения.
-- [ ] **Step 3: Реализовать один dispatch и минимальный реальный проход.** Не добавлять чтение флагом в `observe`, где есть polling/retry. Внутри одного основного async `page.evaluate` удержать native node/port, получить output → IBGDataSource → schema/count → AsVariant → JSON; освободить приобретённые proxy в finally. Размер итогового ответа и временные объекты проверяются в браузере до передачи; 512 KiB считаются отдельно по значениям. Для первого прогона достаточно Integer/Real/String/NULL; ещё не реализованные случаи явно отказывают, рабочие callers пока не переключены.
+- [x] **Step 2: Получить RED.** Из `packages/loginom-runtime/client`: `node --test --test-name-pattern=reads_bound_port_without_table test/node-port-output.test.mjs`. Ожидается отсутствие новой реализации, не ошибка окружения.
+- [x] **Step 3: Реализовать один dispatch и минимальный реальный проход.** Не добавлять чтение флагом в `observe`, где есть polling/retry. Внутри одного основного async `page.evaluate` удержать native node/port, получить output → IBGDataSource → schema/count → AsVariant → JSON; освободить приобретённые proxy в finally. Размер итогового ответа и временные объекты проверяются в браузере до передачи; 512 KiB считаются отдельно по значениям. Для первого прогона достаточно Integer/Real/String/NULL; ещё не реализованные случаи явно отказывают, рабочие callers пока не переключены.
 
   До данных подтвердить active output, исходную document/package/workflow/node/port identity, направление/подтип/индекс/GUID и завершённое выполнение. Для execution переиспользовать образец `variant-native-read.mjs`: сохранённый Ext process store/root, завершённая группа из execution_id, child с ModelNode===node.data, process_id/process_record_id из receipt, отсутствие более новой группы этого узла; node.FStatus===1/FRunning===false, port.FStatus===1. Не переносить static-ancestor ограничения native full на ordinary чтение. Снимок до/после включает те же native ссылки и relevant process records, session/$OW/$O, `$FData`/`$FCacheInitialized` после инициализации. Не открывать console ради проверки и не считать GUID достаточным. Playwright-side readPreparedNodeContext/readOutputContext сами вызывают evaluate: их проверки можно включить в тот же execute, но не вставлять как browser-функции внутрь callback.
 
   Channel использует имеющийся execute с timeout `Math.max(5000,deadline-now()+5000)`, а browser получает исходный абсолютный deadline. Перед dispatch инвалидировать gesture snapshots и снять возможность считать работу завершённой; после ответа проверить envelope/контекст, обновить cleanupConfirmed из подтверждённого cleanup и проверить signal/deadline до журналирования данных. Только ошибка самого dispatch помечает transportUncertain; post-return отмена не превращает завершённый вызов в потерянный. Повторного dispatch и новой долговечной записи владения нет.
 
-- [ ] **Step 4: Получить GREEN и первый live-результат.** Тот же тест PASS. В существующей авторизованной сессии временный модуль экспортирует `comparePortRead({channel,port,execution,expectedColumns,sampleRows})`: сначала `channel.readOutputPort`, затем существующие openNewOutputTable → configureTablePrecision → prepareTableRead → readTableOutputPages → decodeTableOutput; restoreTablePrecision/returnFromOutputTable выполняются при завершении. Он не вызывает Execute и не создаёт второй браузер.
+- [x] **Step 4: Получить GREEN и первый live-результат.** Тот же тест PASS. В существующей авторизованной сессии временный модуль экспортирует `comparePortRead({channel,port,execution,expectedColumns,sampleRows})`: сначала `channel.readOutputPort`, затем существующие openNewOutputTable → configureTablePrecision → prepareTableRead → readTableOutputPages → decodeTableOutput; restoreTablePrecision/returnFromOutputTable выполняются при завершении. Он не вызывает Execute и не создаёт второй браузер.
 
   До вызова один раз выполнить узел штатным `createNodeExecutionProcedure`: prepare → launchGraph → identify → waitCompleted. Для Int64 использовать Text Import CSV `collapse/acceptance-kit/fixtures/mixed.csv`; для первой пары штатным mapping оставить только Id/I/R/S, исключив B/D, ещё не поддержанные этим шагом. Полную схему проверить в задаче 2. Результат прогона: одинаковые port/execution/schema/count/значения с разрешённым исключением −0; отсутствие Table-действий у прямого чтения. Готовой универсальной CLI-команды здесь нет: использовать execute/channel текущего operator-сеанса, не переносить старый macOS `calculator-live.mjs` как Linux launcher. Если сессии нет, сообщить конкретный блокер; не заменять этот шаг unit-тестами.
-- [ ] **Step 5: По одному добавить негативные тесты, затем прогнать адресный набор.** Изменять только одну из реальных границ fixture: чужой node/port, inactive output, старый execution, замена `$FData`/сброс cache, отмена до/после dispatch, потерянный ответ. Условия: `assert.equal(published,false)`, `assert.equal(dispatches,1)` после dispatch; до dispatch — 0; неизвестный ответ не подтверждает cleanup. Проверить отсутствие session/cookies/proxy в сериализованном результате и журнале. Команда: `node --test test/node-port-output.test.mjs test/node-procedure.test.mjs test/node-output-context.test.mjs` — PASS.
-- [ ] **Step 6: Коммит.** `git add` только перечисленных production/test файлов; `git commit -m "feat(runtime): read bound output ports directly"`. Live evidence хранить вне Git, зафиксировать вывод и ограничение в checkpoint не более 20 строк этого плана.
+- [x] **Step 5: По одному добавить негативные тесты, затем прогнать адресный набор.** Изменять только одну из реальных границ fixture: чужой node/port, inactive output, старый execution, замена `$FData`/сброс cache, отмена до/после dispatch, потерянный ответ. Условия: `assert.equal(published,false)`, `assert.equal(dispatches,1)` после dispatch; до dispatch — 0; неизвестный ответ не подтверждает cleanup. Проверить отсутствие session/cookies/proxy в сериализованном результате и журнале. Команда: `node --test test/node-port-output.test.mjs test/node-procedure.test.mjs test/node-output-context.test.mjs` — PASS.
+- [x] **Step 6: Коммит.** `git add` только перечисленных production/test файлов; `git commit -m "feat(runtime): read bound output ports directly"`. Live evidence хранить вне Git, зафиксировать вывод и ограничение в checkpoint не более 20 строк этого плана.
 
 ### Task 2: Довести типы, длинные строки и бюджеты до утверждённого контракта
 
@@ -158,6 +158,15 @@
 
 ## Передача
 
-План подготовлен по коду; команды реализации и live-приёмка здесь ещё не выполнялись. Разрешение на написание планов не является разрешением на реализацию. Перед началом нужен просмотр владельцем и выбранный способ выполнения; после любого изменения контракта/гарантий — новая независимая проверка плана.
+Владелец разрешил реализацию 25.10.2026: последовательное выполнение через subagent-driven-development, TDD и проверки executing-plans. Выполненные задачи отмечаются ниже; после любого изменения контракта/гарантий — новая независимая проверка плана.
 
 Проверка обоих планов: самостоятельная сверка покрытия спецификации, шагов, интерфейсов и объёма выполнена; независимое ревью завершено, обязательные замечания устранены. Проверены относительные ссылки и diff. Это проверка документов, не программной реализации.
+
+## Checkpoint реализации
+
+- Task 1 выполнена: приватный channel reader, минимальные типы и guards; независимое ревью PASS после исправления отмены во время journal ACK.
+- Закреплённый Node: адресный набор 170 PASS, 0 FAIL, 0 SKIP.
+- Live-пара: один Execute Text Import, 3×4 Id/I/R/S; 9007199254740993 точен, отличие только согласованный −0, cleanup подтверждён.
+- Один замер: прямое чтение 1 168 мс, строгая Table 25 522 мс; это не медиана и не обещание ускорения.
+- Evidence вне Git: `/tmp/port-read-implementation-UQXxUL/{first-pair,paired-direct,paired-table}.json`.
+- Рабочие callers пока не переключены; полные типы/строки/лимиты и браузерные даты — Task 2, затем интеграция.
