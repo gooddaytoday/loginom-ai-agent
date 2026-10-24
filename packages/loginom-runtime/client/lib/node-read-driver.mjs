@@ -5,7 +5,10 @@ import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-executi
 import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
 import {readTableOutputPages} from './table-output-pages.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
-import {alignReadSchema,isUnchangedTextImportExecution} from './node-read-contract.mjs';
+import {alignReadSchema,isUnchangedTextImportExecution,isUnchangedTransformExecution} from './node-read-contract.mjs';
+import {openPreparedWizard} from './node-wizard-open.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
+import {joinReady} from './join-procedure.mjs';
 import {createJavascriptSourceAdmission} from './javascript-source-admission.mjs';
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
 import {openManagedJavascriptOutputViews} from './javascript-managed-views.mjs';
@@ -17,7 +20,8 @@ const verified=value=>({verified:true,cleanup_complete:true,effect_possible:fals
 export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor}){
  const {operation,execute,onRecord,now,receiptOptions}=options;
  const request=operation.parameters,javascript=request.target.type==='programming.javascript';
- const unchangedImport=isUnchangedTextImportExecution(request);
+ const unchangedImport=isUnchangedTextImportExecution(request),unchangedTransform=isUnchangedTransformExecution(request);
+ const unchanged=unchangedImport||unchangedTransform;
  const owner=javascript?{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,
   node_id:request.target.ref.node_id,operation_id:operation.id,ui_epoch:Date.now()}:null;
  let channel,signal,driver,execution,sourceReceipt;
@@ -38,8 +42,8 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    channel:remaining=>{operation.deadline=remaining;return channel;},openingBudgetMs:180000})});
  const forbidden=()=>{throw Error('A read operation cannot open or configure node/port wizards');};
  return {
-  verifySource:async()=>verified(unchangedImport
-   ?{source_kind:'unchanged_existing_text_import',node:structuredClone(request.target.ref),settings_changed:false}
+  verifySource:async()=>verified(unchanged
+   ?{source_kind:unchangedImport?'unchanged_existing_text_import':'unchanged_existing_transform',node:structuredClone(request.target.ref),settings_changed:false}
    :{source_kind:'completed_local_node',source_operation_id:request.parameters.source_operation_id}),
   ...(javascript?{async beforeTarget(ctx){
    enter({...ctx,node:request.target.ref});
@@ -53,6 +57,17 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
   async finishGraph(mode,ctx){
    need(mode==='execute','Existing output read requires a fresh execution');enter(ctx);
    const launch=async()=>{
+   if(unchangedTransform&&request.target.type==='transform.join_data'){
+    // Read the native saved mode before the only Execute. Close discards the
+    // untouched draft; no input/output mapping is opened or committed.
+    await openPreparedWizard(channel);
+    const state=await channel.observe({condition:'saved Join mode before execution',readJoin:true,ready:joinReady});
+    const native=state.node_join;
+    need(native.node_context?.verified===true&&['document_id','workflow_id','node_id'].every(k=>native.node_context[k]===ctx.node[k]),
+     'Saved Join mode owner differs');
+    await closePreparedWizard(channel);
+    need(native.mode===request.mode,'Preserved join mode differs from requested mode');
+   }
    driver=createNodeExecutionProcedure(channel,ctx.node,{allowDeactivate:true});await driver.prepare();
    const result=await finishConfiguredGraph(channel,driver,mode,ctx.node);
    // finishConfiguredGraph normally follows a committed wizard; here only
@@ -80,8 +95,8 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
     'Fresh owned execution required for reread');
    const ports=[];let restoration,returned;
    for(const port of read.ports){
-    const schema=unchangedImport?null:request.parameters.schemas.find(s=>s.port===port)?.schema;
-    need(schema||schema===null&&(unchangedImport||request.parameters.observed_schema===true),'Retained output schema missing');
+    const schema=unchanged?null:request.parameters.schemas.find(s=>s.port===port)?.schema;
+    need(schema||schema===null&&(unchanged||request.parameters.observed_schema===true),'Retained output schema missing');
     const table=await openNewOutputTable(channel,port,javascript?{openViews:({output})=>openManagedJavascriptOutputViews({
      prepared:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},node:ctx.node,output,
      deadline:ctx.deadline,targetOrigin,execute,record:onRecord,receiptOptions,

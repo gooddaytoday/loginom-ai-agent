@@ -1,62 +1,120 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-const {prepareExistingInput}=await import('../lib/node-execution-procedure.mjs');
-const node={document_id:'doc',workflow_id:'flow',node_id:'group'};
-function fixture({active=false,lost=false,foreign=false,incomplete=false,type='transform.join_data',changedGuid=false,inactiveAfter=false,foreignOutput=false}={}){
- let opened=false,launched=false,menu=false,selected=false;
- const actions=[],el=(tid,allowed_actions=['click'])=>({tid,ref:tid,allowed_actions});
- const state=()=>({prepared_node_context:{...node,...(foreign?{node_id:'other'}:{}),verified:true,surface:'graph',tid:'graph-node',locked:false},wizard:{status:'absent'},navigation_context:{status:'observed'},
-  node_outputs:{verified:true,node_selected:true,node_context:{...node,...(foreignOutput?{node_id:'other'}:{}),verified:true},ports:(incomplete?[]:[0]).map(index=>({index,port_guid:changedGuid&&launched?'changed-output-port':'saved-output-port',active:active||launched&&!inactiveAfter}))},
-  node_processes:{verified:true,inventory_complete:true,show_completed:true,root_id:'root',node_context:{...node,verified:true,surface:'graph'},processes:launched?[
-   {process_id:'1',record_id:'group',parent_id:null,state:'completed',error:false,children_loaded:true,expanded:true,rendered:true},
-   {process_id:'1.1',record_id:'child',parent_id:'1',state:'completed',error:false,rendered:true,selected,process_tid:'child-row'}]:[]},
-  ui:{elements:[el('MF;cntMain;tlbMainToolbar;btnProgress'),{...el('graph-node'),graph_node:{part:'body'}},
-   {...el('execute',['execute_graph_node']),graph_execution:{node_id:node.node_id,mode:'execute'}},
-   ...(opened?[el('ConsoleForm;ProgressForm;trpProgress;grd;tbl',['right_click']),el('ConsoleForm;btnClose'),el('child-row',['right_click'])]:[]),
-   ...(menu?[el('mnContextMenu;mniShowCompletedProcesses',['click','press']),el('mnContextMenu;mniShowNodeToProcess',['show_process_node'])]:[])]}});
- const channel={async observe(o){const s=state();assert.ok(o.ready(s),o.condition);return structuredClone(s);},async perform(o){
-  const s=state();assert.ok(o.ready(s),o.condition);const a=o.resolve(s);actions.push(a);
-  if(a.ref==='MF;cntMain;tlbMainToolbar;btnProgress')opened=true;
-  if(a.ref==='ConsoleForm;btnClose')opened=false;
-  if(a.verb==='right_click'){menu=true;if(a.ref==='child-row')selected=true;}
-  if(a.verb==='press'||a.verb==='show_process_node')menu=false;
-  if(a.verb==='execute_graph_node'){launched=true;if(lost)throw Error('Unknown launch reply');}
-  return {status:'SUCCEEDED',cleanup_complete:true,operation_id:'refresh:launch',action_key:'ui.act',action_revision:'1',output:{gesture_applied:true}};
- }};
- const options={operation:{nodeApply:{request:{target:{kind:'existing',type},parameters:type==='transform.join_data'?{}:{changes:[]},mappings:[],finish:'execute',inputs:[]}}}};
- return {channel,options,actions,run:()=>prepareExistingInput(options,{node},{channel})};
-}
-for(const type of ['transform.join_data','transform.reform_columns'])test('D46 inactive saved '+type+' materializes once before input settings',async()=>{
- const f=fixture({type});await f.run();
- assert.equal(f.actions.filter(a=>a.verb==='execute_graph_node').length,1);
- assert.equal(f.actions.filter(a=>a.verb==='show_process_node').length,1);
- assert.equal(f.actions.some(a=>['open_wizard','finish_wizard','wizard_step','deactivate_graph_node'].includes(a.verb)),false);
-});
-test('D46 refresh never executes a new, unexecuted, changed or rewired request, or an already active node',async()=>{
- for(const patch of [{target:{kind:'new'}},{finish:'done'},{finish:'close'},{inputs:[{input:0}]},{parameters:{keys:[{left:'A',right:'A'}]}},{mappings:[{direction:'input',port:0}]},{target:{kind:'existing',type:'programming.javascript'}}]){
-  const f=fixture();Object.assign(f.options.operation.nodeApply.request,patch);
-  f.channel.observe=async()=>{throw Error('Unexpected browser read');};await f.run();assert.deepEqual(f.actions,[]);
- }
- const active=fixture({active:true});await active.run();assert.deepEqual(active.actions,[]);
-});
-for(const options of [{foreign:true},{incomplete:true}])test('D46 refuses foreign or incomplete output activity before execution '+JSON.stringify(options),async()=>{
- const f=fixture(options);await assert.rejects(f.run());assert.deepEqual(f.actions,[]);
-});
-test('D46 unknown materialization launch stops after one gesture',async()=>{
- const f=fixture({lost:true});await assert.rejects(f.run(),/Unknown launch reply/);
- assert.equal(f.actions.filter(a=>a.verb==='execute_graph_node').length,1);
- assert.equal(f.actions.some(a=>a.verb==='show_process_node'),false);
-});
+import vm from 'node:vm';
+import {applyNode} from '../lib/node-apply.mjs';
+import {createCandidateNodeSupport,nodeOutputForJournal} from '../lib/node-support.mjs';
+import {createNodeReadDrivers} from '../lib/node-read-driver.mjs';
+import {createRedactor} from '../lib/redact.mjs';
+import {createTabularTransformNodeSupport} from '../lib/calculator-node.mjs';
+import {configureJoin} from '../lib/join-procedure.mjs';
+import * as executionProcedure from '../lib/node-execution-procedure.mjs';
+import * as contract from '../lib/node-read-contract.mjs';
 
-for(const mode of ['changedGuid','inactiveAfter'])test('D46 materialization refuses '+mode+' before input mapping',async()=>{
- const f=fixture({[mode]:true});await assert.rejects(f.run(),/Saved output identity changed/);
- assert.equal(f.actions.filter(a=>a.verb==='execute_graph_node').length,1);
- assert.equal(f.actions.some(a=>a.verb==='open_input_port'),false);
+const isUnchangedTransformExecution=contract.isUnchangedTransformExecution??(()=>false);
+const workflow={workflow_id:'flow',prefix:'MF;TF',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
+function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=false}={}){
+ const node={document_id:'doc',workflow_id:'flow',node_id:'saved'},calls=[],records=[];
+ const request={operation_id:'saved-apply',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
+  target:{kind:'existing',type,ref:node},inputs:[],mode:type==='transform.join_data'?mode:'scalar',
+  parameters:type==='transform.join_data'?{}:{changes:[]},mappings:[],finish:'execute',
+  read:{ports:[0],sample_rows:10,require_exact_numbers:false},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ let active=false;
+ const owner={...node,node_id:foreign?'other':node.node_id,verified:true};
+ const state={prepared_node_context:{...owner,surface:'graph'},wizard:{status:'absent'},
+  node_join:{verified:true,mode:savedMode,keys:[{left:'A',right:'A'}],node_context:owner},
+  node_outputs:{verified:true,node_context:owner,ports:[{index:0,port_guid:'saved-port',active}]},node_processes:{verified:true},ui:{elements:[]}};
+ const graph=()=>{state.wizard={status:'absent'};state.prepared_node_context.surface='graph';};
+ const wizard=stage=>{
+  active=false;state.node_outputs.ports[0].active=false;
+  state.wizard={status:'observed',root_tid:'W',stage};state.prepared_node_context.surface='wizard';
+  state.ui.elements=[{tid:'W;btnDone',ref:'done',allowed_actions:['finish_wizard']}];
+ };
+ const channel={async observe(options){assert.ok(options.ready(state),options.condition);return structuredClone(state);},
+  async perform(){graph();},async openOutputPort(){wizard('output_mapping');}};
+ const execution={verified:true,owner_verified:true,cleanup_complete:true,status:'completed',execution_id:'fresh',node};
+ // Replace browser/execution dependencies only; execute product dispatch, the
+ // read-driver methods and the entire applyNode phase machine together.
+ const driverContext={
+  structuredClone,Date,isUnchangedTransformExecution,isUnchangedTextImportExecution:contract.isUnchangedTextImportExecution,
+  need:(ok,message)=>{if(!ok)throw Error(message);},verified:v=>({verified:true,cleanup_complete:true,effect_possible:false,...v}),
+  createNodeProcedure:()=>channel,
+  openPreparedWizard:async()=>{calls.push('open');wizard('join');},
+  closePreparedWizard:async()=>{calls.push('close');graph();return {verified:true,draft_discarded:true,cleanup_complete:true};},
+  joinReady:s=>s.wizard?.stage==='join'&&s.node_join?.verified===true,
+  createNodeExecutionProcedure:()=>({prepare:async()=>{calls.push('baseline');},waitCompleted:async()=>execution}),
+  finishConfiguredGraph:async()=>{calls.push('Execute');if(unknown)throw Error('Unknown launch reply');active=true;state.node_outputs.ports[0].active=true;return {verified:true,cleanup_complete:true,mode:'execute',execution_id:'fresh',settings_applied:true};},
+ };
+ const readFactory=vm.runInNewContext('('+createNodeReadDrivers.toString()+')',driverContext);
+ const config={targetOrigin:'https://loginom.invalid',targetBuild:'7.4.2'},real=createCandidateNodeSupport(config);
+ // Also run the old tabular lifecycle on the red revision. This demonstrates
+ // the two actual launches and the late mode refusal, rather than failing on
+ // a missing dispatch stub. Native mapping contents are outside this regression.
+ const oldHook=executionProcedure.prepareExistingInput
+  ?vm.runInNewContext('('+executionProcedure.prepareExistingInput.toString()+')',{
+   ...driverContext,requireValue:driverContext.need}):undefined;
+ const tabularFactory=vm.runInNewContext('('+createTabularTransformNodeSupport.toString()+')',{
+  ...driverContext,requireValue:driverContext.need,Map,structuredClone,
+  calculatorConfigurationReadback:()=>{},calculatorParametersSchema:{},validateCalculatorParameters:()=>{},
+  selectPreparedGraphNode:async()=>{},finishedImportSurface:()=>({}),
+  readOutputDefinitionPages:async()=>({fields:[],total_columns:0}),
+  control:(s,key,verb)=>s.ui.elements.find(e=>e.tid===s.wizard.root_tid+';'+key&&e.allowed_actions.includes(verb)),
+ });
+ const configuredSupport=()=>tabularFactory(config,{
+  type,revision:'native-fixture',modes:type==='transform.join_data'?['inner','left']:['scalar'],
+  validate:real.nodeApplyHandlers.get(type).validate,readback:()=>({}),
+  ...(oldHook?{beforeInput:oldHook}:{}),
+  configureInputs:async()=>({verified:true,cleanup_complete:true}),
+  configure:async(channel,p,{request})=>type==='transform.join_data'?configureJoin(channel,p,{request})
+   :{verified:true,cleanup_complete:true,configuration:{node_context:owner}},
+  configurationObservation:{condition:'owned settings fixture',ready:s=>s.wizard.status==='observed'},
+  configureOutput:async()=>({verified:true,cleanup_complete:true,native_mapping:{target_fields:[]}}),
+ });
+ const context={createRedactor,nodeOutputForJournal,NODE_READ_MODE:contract.NODE_READ_MODE,
+  isUnchangedTextImportExecution:contract.isUnchangedTextImportExecution,isUnchangedTransformExecution,
+  createNodeReadDrivers:readFactory};
+ for(const name of ['ExcelImport','LinRegression','Clustering','RestRequest','CrossTable','TextExport','Collapse','MissingValues',
+  'DateTime','Duplicates','Replacement','Union','Join','Filter','TextImport','Calculator','Grouping','Sorting','Reform','JavascriptCode'])
+  context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:real.nodeApplyHandlers,
+   nodeApplyDriverFactory:options=>configuredSupport().nodeApplyDriverFactory(options)});
+ const support=vm.runInNewContext('('+createCandidateNodeSupport.toString()+')',context)(config);
+ const operation={id:request.operation_id,parameters:request};
+ const drivers=support.nodeApplyDriverFactory({operation,now:Date.now,onRecord:async e=>e});
+ drivers.prepareTarget=async()=>({verified:true,cleanup_complete:true,effect_possible:false,node});
+ drivers.readOutput=async()=>({verified:true,cleanup_complete:true,effect_possible:false,execution_id:'fresh',status:'complete',
+  evidence_ref:'native-table',ports:[{port:0,fresh:true,schema:[{name:'A',label:'A',type:'integer'}],sample:[],row_count:0}]});
+ return {request,calls,records,run:()=>applyNode({request,operation,handlers:support.nodeApplyHandlers,drivers,
+  record:async e=>{records.push(structuredClone(e));return e;}})};
+}
+
+for(const type of ['transform.join_data','transform.reform_columns'])test('D46 whole node.apply executes unchanged inactive '+type+' exactly once',async()=>{
+ const f=fixture(type),result=await f.run();
+ assert.equal(f.calls.filter(x=>x==='Execute').length,1);
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(result.execution.status,'completed');assert.equal(result.output.status,'complete');
+ assert.equal(result.configuration.status,'not_requested');
+ assert.deepEqual(result.phases.map(p=>p.phase),['source','target','finish','execute','read']);
+ assert.deepEqual(f.calls,type==='transform.join_data'?['open','close','baseline','Execute']:['baseline','Execute']);
 });
-test('D46 output owner mismatch refuses before execution',async()=>{
- const f=fixture({foreignOutput:true});await assert.rejects(f.run());assert.deepEqual(f.actions,[]);
+test('D46 whole node.apply rejects saved inner / requested left before any Execute',async()=>{
+ const f=fixture('transform.join_data',{mode:'left'}),result=await f.run();
+ assert.notEqual(result.status,'SUCCEEDED');assert.match(JSON.stringify(result),/Preserved join mode differs/);
+ assert.equal(f.calls.filter(x=>x==='Execute').length,0);
+ assert.deepEqual(f.calls,['open','close']);
 });
-test('D46 changed Reform settings do not execute the saved configuration first',async()=>{
- const f=fixture({type:'transform.reform_columns'});f.options.operation.nodeApply.request.parameters={changes:[{field:{kind:'input_field',name:'A'},name:'B'}]};
- f.channel.observe=async()=>{throw Error('Unexpected browser read');};await f.run();assert.deepEqual(f.actions,[]);
+test('D46 whole node.apply cannot accept a foreign Join mode owner',async()=>{
+ const f=fixture('transform.join_data',{foreign:true}),result=await f.run();
+ assert.notEqual(result.status,'SUCCEEDED');assert.equal(f.calls.includes('Execute'),false);
+});
+test('D46 whole node.apply never repeats an unknown Execute',async()=>{
+ const f=fixture('transform.reform_columns',{unknown:true}),result=await f.run();
+ assert.notEqual(result.status,'SUCCEEDED');assert.equal(f.calls.filter(x=>x==='Execute').length,1);
+});
+test('D46 unchanged execution predicate excludes every configuration edit and other handler',()=>{
+ for(const change of [r=>r.target.kind='new',r=>r.inputs=[{}],r=>r.mappings=[{}],r=>r.finish='done',r=>r.finish='close',
+  r=>r.parameters={keys:[]},r=>r.parameters=[],r=>r.mode='leftish',r=>r.target.type='programming.javascript']){
+  const r=fixture('transform.join_data').request;change(r);assert.equal(isUnchangedTransformExecution(r),false);
+ }
+ for(const change of [r=>r.parameters.changes=[{}],r=>r.parameters.extra=true,r=>r.mode='other']){
+  const r=fixture('transform.reform_columns').request;change(r);assert.equal(isUnchangedTransformExecution(r),false);
+ }
 });

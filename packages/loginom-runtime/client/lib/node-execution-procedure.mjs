@@ -13,38 +13,6 @@ const consoleMenuIdentity=s=>({epoch:s.dom_epoch,root:s.node_processes?.root_id,
 const processControl=(process,part='process_tid')=>s=>s.node_processes?.processes.find(p=>
   p.process_id===process.process_id&&p.record_id===process.record_id)?.[part];
 
-// Dynamic upstream fields are not persisted as an active source cache. An
-// explicit execution of unchanged saved settings must materialize that cache
-// before the input editor can prove its source identities.
-export async function prepareExistingInput(options,ctx,{channel}) {
-  const request=options.operation.nodeApply.request;
-  const unchanged=request.target.type==='transform.join_data'
-    ?Object.keys(request.parameters).length===0
-    :request.target.type==='transform.reform_columns'&&Object.keys(request.parameters).join(',')==='changes'
-      &&Array.isArray(request.parameters.changes)&&request.parameters.changes.length===0;
-  if(!unchanged||request.target.kind!=='existing'||request.finish!=='execute'
-    ||request.inputs.length!==0||request.mappings.length!==0)return;
-  const owned=s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
-    &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===ctx.node[k]
-      &&s.node_outputs?.node_context?.[k]===ctx.node[k])
-    &&s.wizard?.status==='absent'&&s.node_outputs?.verified===true&&s.node_outputs.node_context.verified===true;
-  const before=await channel.observe({condition:'unchanged saved node before input schema materialization',readOutputs:true,ready:owned});
-  const ports=before.node_outputs.ports;
-  requireValue(ports.length===1&&ports[0].index===0&&typeof ports[0].active==='boolean'
-    &&typeof ports[0].port_guid==='string'&&ports[0].port_guid.length>0,'Saved input output activity is incomplete');
-  if(ports[0].active)return;
-  const execution=createNodeExecutionProcedure(channel,ctx.node);
-  await execution.prepare();
-  await finishConfiguredGraph(channel,execution,'execute',ctx.node);
-  const completed=await execution.waitCompleted({signal:ctx.signal,stopSignal:ctx.stopSignal});
-  requireValue(completed.verified===true&&completed.owner_verified===true&&completed.status==='completed'
-    &&completed.cleanup_complete===true,'Saved input schema execution is unconfirmed');
-  const after=await channel.observe({condition:'same saved output active before input mapping',readOutputs:true,ready:owned});
-  requireValue(after.node_outputs.ports.length===1&&after.node_outputs.ports[0].index===0
-    &&after.node_outputs.ports[0].port_guid===ports[0].port_guid&&after.node_outputs.ports[0].active===true,
-    'Saved output identity changed during input schema materialization');
-}
-
 export async function returnToExecutedWorkflow(channel,node) {
   const sameNode=s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
     &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k]);

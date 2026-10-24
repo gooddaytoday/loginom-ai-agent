@@ -6,7 +6,6 @@ import {configureReformOutput,reformOutputSources,verifyReformInlineSync} from '
 import {reformConfigurationReadback} from './reform-readback.mjs';
 import {reformParametersSchema} from './node-api.mjs';
 import {configureDerivedInlineMapping} from './grouping-inline-mapping.mjs';
-import {prepareExistingInput} from './node-execution-procedure.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
 export function validateReformParameters(p,mode,r){
  need(mode==='scalar','Reform supports scalar mode');validateReformChanges(p);
@@ -28,7 +27,6 @@ export function validateReformInlineSources(c,m){
 export function createReformNodeSupport(config){return createTabularTransformNodeSupport(config,{
  type:'transform.reform_columns',mode:'scalar',revision:'reform-v3-internal-2',readback:reformConfigurationReadback,parameterSchema:reformParametersSchema,
  validate:validateReformParameters,validateInput:validateReformInputParameters,preflight:preflightReformSource,
- beforeInput:prepareExistingInput,
  afterOpen:advanceReformInputColumns,
  configurationObservation:{condition:'reform configuration page',readReform:true,ready:s=>s.wizard?.stage==='field_parameters'&&s.node_reform?.verified===true},
  async configure(channel,p,{request,inputMapping}){

@@ -19,7 +19,7 @@ import {createReformNodeSupport} from './reform-node.mjs';
 import {createCalculatorNodeSupport} from './calculator-node.mjs';
 import {createJavascriptCodeNodeSupport} from './javascript-code-node.mjs';
 import {createRedactor} from './redact.mjs';
-import {NODE_READ_MODE,isUnchangedTextImportExecution} from './node-read-contract.mjs';
+import {NODE_READ_MODE,isUnchangedTextImportExecution,isUnchangedTransformExecution} from './node-read-contract.mjs';
 import {createNodeReadDrivers} from './node-read-driver.mjs';
 
 // The journal canonicalizes JSON text and redacts URL credentials. Prepare
@@ -41,7 +41,7 @@ export function createCandidateNodeSupport(config) {
  const nodeApplyHandlers=new Map([...excel.nodeApplyHandlers,...linregression.nodeApplyHandlers,...clustering.nodeApplyHandlers,...rest.nodeApplyHandlers,...crosstable.nodeApplyHandlers,...exports.nodeApplyHandlers,...collapse.nodeApplyHandlers,...missingValues.nodeApplyHandlers,...dateTime.nodeApplyHandlers,...duplicates.nodeApplyHandlers,...replacement.nodeApplyHandlers,...imports.nodeApplyHandlers,...calculator.nodeApplyHandlers,...grouping.nodeApplyHandlers,...sorting.nodeApplyHandlers,...reform.nodeApplyHandlers,...filter.nodeApplyHandlers,...join.nodeApplyHandlers,...union.nodeApplyHandlers,...(javascript?.nodeApplyHandlers??[])]);
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
-  const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters);
+  const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||isUnchangedTransformExecution(options.operation.parameters);
   if(readOnly||['integration.rest_request','transform.join_data'].includes(type)){
    const drivers=readOnly?createNodeReadDrivers(options,{...config,redactor})
     :(type==='integration.rest_request'?rest:join).nodeApplyDriverFactory(options);
