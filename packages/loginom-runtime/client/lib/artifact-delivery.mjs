@@ -223,14 +223,13 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    }
    requireValue(upload.status!=='NOT_APPLIED','Upload refusal requires inspection');
    check();
-   if(upload.status==='FAILED'&&upload.output?.conflict_rejected===true&&upload.cleanup_complete===true) {
-    const refused={status:'FAILED',code:'UPLOAD_PATH_CONFLICT',destination:artifact.upload.destination,
-      upload_operation_id:job.uploadId,upload_completion_verified:false,cleanup_complete:true};
-    await acknowledge(job,'artifact_delivery_rejected',{result:refused});job.outcome=refused;job.phase='rejected';job.state='settled';return snapshot(job);
+   job.conflictRejected=artifact.upload.overwrite==='reject'&&upload.status==='FAILED'
+     &&upload.output?.conflict_rejected===true&&upload.output.upload_submitted===false&&upload.cleanup_complete===true;
+   if(!job.conflictRejected){
+    requireValue(upload.output?.upload_submitted===true&&upload.cleanup_complete===true,'Upload submission requires inspection');
+    inspected??=await runtime.inspect({operationId:job.uploadId});
+    requireValue(inspected.output?.cleanup_confirmed===true&&inspected.output?.outcome?.output?.upload_submitted===true,'Upload cleanup is not confirmed');
    }
-   requireValue(upload.output?.upload_submitted===true&&upload.cleanup_complete===true,'Upload submission requires inspection');
-   inspected??=await runtime.inspect({operationId:job.uploadId});
-   requireValue(inspected.output?.cleanup_confirmed===true&&inspected.output?.outcome?.output?.upload_submitted===true,'Upload cleanup is not confirmed');
    job.phase='verify';
    const destination=await directory();
    requireValue(destination.file_storage.directory===artifact.upload.directory,'Verification directory changed');
@@ -241,12 +240,21 @@ export function createArtifactDelivery({runtime,artifactStore,record,admit,admit
    check();job.verificationState='preflight';
    const verification=await runtime.verifyDeliveredArtifact({operationId:job.uploadId,verificationId:job.id+':verify',
     observationId:destination.observation_id,signal,onDispatched:()=>{job.verificationStarted=true;job.verificationState='dispatched';}});
+   if(job.conflictRejected&&verification.status!=='SUCCEEDED'&&verification.cleanup_complete===true)job.verificationState='settled';
    const lostVerification=verification.error?.code==='BROWSER_CALL_UNCERTAIN';
    requireValue(lostVerification||verification.status==='SUCCEEDED'&&verification.cleanup_complete===true&&verification.output?.bytes_verified===true,'Destination bytes require inspection');
    check();const final=await runtime.inspect({operationId:job.uploadId});
    if(lostVerification)await acknowledge(job,'artifact_delivery_verification_reconciled',{inspection:final});
    await finish(job,artifact,final);
   } catch(error) {
+   // A known Skip wrote nothing. If its current bytes cannot be compared,
+   // retain the original conflict. Unknown download cleanup stays uncertain.
+   if(job.conflictRejected&&(!job.verificationStarted||job.verificationState==='settled')){
+    const refused={status:'FAILED',code:'UPLOAD_PATH_CONFLICT',destination:artifact.upload.destination,
+      upload_operation_id:job.uploadId,upload_completion_verified:false,cleanup_complete:true};
+    await acknowledge(job,'artifact_delivery_rejected',{result:refused});job.outcome=refused;job.phase='rejected';job.state='settled';job.error=null;
+    return snapshot(job);
+   }
    if(job.verificationStarted)job.verificationState='uncertain';
    // A completed navigation followed by a failed read has no unknown gesture
    // and no upload to repeat. Retain the attachment and continue the same job
