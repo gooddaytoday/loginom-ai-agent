@@ -4940,7 +4940,7 @@ test('typed output-port finish requires complete output mapping and its own port
 });
 
 test('overflow output socket requires a current native owner and visible actionable Done',async()=>{
-  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns','filterdata','javascript'])for(const outputPort of vendor==='filterdata'?[0,1]:[0])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
+  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns','filterdata','javascript','joindata'])for(const outputPort of vendor==='filterdata'?[0,1]:[0])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','bound_folder_wrong_path','bound_folder_duplicate','bound_folder_hidden_owner','bound_folder_hidden_visibility','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
     'duplicate_socket','wrong_socket_icon','missing_settings','hidden_ancestor','hidden_visibility','disabled_done','hidden_done']){
     const {page}=outputPortFinishFixture();
     const find=suffix=>page.document.all().find(e=>e.attrs['data-tid']?.endsWith(suffix));
@@ -4954,6 +4954,10 @@ test('overflow output socket requires a current native owner and visible actiona
       folder.ownText=mode==='bound_folder_wrong_caption'?'Other':'Выходные порты';folder.style.display='none';
       find('>Calc').children[0].attrs.class=mode==='bound_folder_wrong_type'?'bg-vendor-icon-'+(vendor==='calcdata'?'groupdata':'calcdata'):'bg-vendor-icon-'+vendor;
       if(mode==='bound_folder_wrong_icon')folder.children[0].attrs.class='maptree-icon-modelinputports';
+      if(mode==='bound_folder_wrong_path')folder.attrs['data-tid']=folder.attrs['data-tid'].replace('>Calc>', '>Foreign>');
+      if(mode==='bound_folder_duplicate'){const duplicate=page.add('a',folder.attrs['data-tid'],'Выходные порты',undefined,folder.parentElement);duplicate.style.display='none';page.add('span',null,'',undefined,duplicate).attrs.class='maptree-icon-modeloutputports';}
+      if(mode==='bound_folder_hidden_owner')find('>Calc').style.display='none';
+      if(mode==='bound_folder_hidden_visibility')folder.style.visibility='hidden';
     }
     const port={direction:'output',port:outputPort,native_index:outputPort,port_guid:'out-guid',opening_operation_id:'open-output',node_icon_class:'bg-vendor-icon-'+vendor};
     if(mode==='bound_folder_missing_native_icon')delete port.node_icon_class;
@@ -4985,7 +4989,7 @@ test('overflow output socket requires a current native owner and visible actiona
     const controls=raw.output.ui.elements.filter(e=>e.allowed_actions.includes('finish_wizard'));
     assert.equal(controls.length,['valid','bound_folder'].includes(mode)?1:0,vendor+': '+socketIcon+': '+mode);
     if(['valid','bound_folder'].includes(mode)){assert.equal(raw.output.wizard.port_context.status,'observed');assert.equal(controls[0].wizard_finish.mode,'output_port');}
-    if(vendor==='javascript'&&mode.startsWith('bound_folder')) {
+    if(['javascript','joindata'].includes(vendor)&&mode.startsWith('bound_folder')) {
       const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
       page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
       page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
