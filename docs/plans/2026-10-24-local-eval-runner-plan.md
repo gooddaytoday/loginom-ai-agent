@@ -1,0 +1,242 @@
+# Дополнительный eval-runner на рабочем ноутбуке
+
+Исследование и независимое ревью выполнены 24 октября 2026 года. Владелец поручил реализацию этого плана, включая выделение VM и выбранную разовую привязку EvalRunner; повторное согласование этих действий не требуется. Реализация ведётся в worktree `bdd0`, ветка `runner3-deploy` от принятого `autonomous-evals`; worktree `1c6f` не изменяется.
+
+## 1. Результат и рекомендуемая схема
+
+Подготовить **eval-runner-3 в одной Ubuntu Linux VM под QEMU/KVM** на `george-Nitro-ANV15-41`: 8 vCPU, 16 ГиБ RAM, диск 64 ГиБ, swap внутри VM 8 ГиБ, два eval-слота. Использовать существующий TypeScript harness и штатные systemd/native операции. Перезагружать только гостевую ОС.
+
+**Новый Multica runtime сейчас не обязателен.** Рекомендуемый минимальный путь — оставить EvalOps и EvalBaseline в `Codex (swarm)` и один раз привязать к этому же online runtime существующего EvalRunner. У daemon уже есть общая ёмкость 3 задачи; во время проверки видимых активных задач на нём не было. Это обычная разделяемая очередь, без гарантии приоритета. EvalRunner сможет управлять VM по VPN/SSH, а reboot VM не остановит runtime.
+
+Это предложение **меняет два решения основного плана**, а не объявляет его завершённым:
+
+1. Этап 5 выполняется на паре **eval-runner-2 + eval-runner-3**, с четырьмя сочетаниями исполнителя и сервера. Runner1 остаётся недоступным и непроверенным; его ожидаемое возвращение 26 октября — оценка владельца, не техническая гарантия.
+2. Прежнее «runtime-привязки сохраняются» получает одно исключение: разовая смена `runtime_id` EvalRunner после проверки его задач. Идентичность, модель, thinking, предметная роль и членство в Eval Operations сохраняются. Автоматической миграции нет.
+
+Если владелец предпочитает отдельный runtime на ноутбуке, предусмотрен узкий альтернативный путь в разделе 5. Он добавляет установку, авторизацию, daemon и обслуживание, поэтому не входит в рекомендуемый минимум. Другие online runtimes без необходимости не занимать.
+
+Завершение будущей работы: доступы всех трёх агентов проверены из фактических task-окружений; оба исполнителя работают на выбранной паре через controller; выполнены оставшиеся живые сценарии; полная кампания на 234 ключа закончила учёт, cleanup, публикацию/read-back и выключение будильников. Частичный финал допустим по действующим правилам, но не подтверждает успешное закрытие полной кампании.
+
+## 2. Проверенные основания и границы доказательств
+
+### Git, исходники и материалы
+
+Канонический worktree — `/home/george/.codex/worktrees/1c6f/loginom-ai-agent`, ветка `autonomous-evals`, HEAD при начале исследования **`9bc818fd3aecc93bff5a8e8b399287becd79efa8`**, рабочее дерево было чистым. Ветка не переключалась. Канонический чат — [исходная сессия](codex://threads/01a1677c-5b41-7780-a7b1-db70e49ba1e4); его работа не изменялась.
+
+Прочитаны корневой и evals `AGENTS.md`, [основной план](2026-10-23-autonomous-evals-plan.md), [reboot-generation](2026-10-23-eval-reboot-generation-plan.md), [stable-configuration](2026-10-24-eval-stable-configuration-plan.md), controller/preflight/pair/preparation и systemd templates. Их текущие контракты сохраняются. Этапы 1–4 не разрабатываются заново от `loginom`.
+
+Все пять указанных временных материалов существуют в `/home/george/.codex/tmp/`. Bundle проверен через `git bundle verify`, его размер/hash совпали с `eval-stable-configuration-delivery.json`. Он содержит кандидат поставки **S = `c82cd1d3c88816ebafa546952a3acdf8248a904f`**, но требует базовый commit, указанный в delivery JSON. Это delta, не установка на пустую VM. Текущий HEAD отличается от S только checkpoint-документацией; исполняемые evals совпадают. Для новой VM нужен полный frozen Git checkout S со всеми tracked assets, без development-профилей и `node_modules` из рабочего дерева. До реализации повторно проверить Git и принять S либо явно согласовать иной SHA; не подменять его текущим изменяемым worktree.
+
+`eval-stable-configuration-full-unit.log` подтверждает прежние **1238 pass, 41 skip, 0 fail**; suite в этом исследовании не запускалась. Native restart и controller continuity не доказывают полный reboot ОС.
+
+### Хост и доступные средства
+
+- Ubuntu 24.04.4, Ryzen 7535HS: 6 физических / 12 логических CPU, 30,65 ГиБ RAM. Наблюдались MemAvailable 20–20,7 ГиБ, свободный диск `/home` около 149 ГиБ, около 55,7 млн inode. Host swap 8 ГиБ почти заполнен: свободно около 47 МиБ. Это снимок, не резерв.
+- Docker 27.4.1, systemd 255, `kvm_amd` есть. `/dev/kvm` доступен текущему пользователю через персональный ACL; постоянная VM-служба должна получить собственный явный доступ к группе `kvm`.
+- QEMU/libvirt/virsh/virt-install не установлены: проверены PATH, стандартные каталоги и dpkg. `cloud-image-utils` отсутствует. Для выбранного пути нужны только QEMU system-x86, qemu-utils и cloud-image-utils; libvirt, bridge и несколько гипервизоров не нужны.
+- Оба требуемых Docker image имеются; их IDs соответствуют закреплённым `pairImages` в `evals/src/parallel-pair.ts`. При переносе проверять полные IDs, а не теги.
+- Есть Bun 1.3.14, настоящий Node 20.19.2 и Codex CLI 0.158.0. Desktop 0.3.2 не является установленным eval CLI. Точная eval CLI distribution и Multica CLI в проверенных локальных местах не найдены; их отсутствие установлено шире, чем проверкой PATH.
+- Чужие `lrs-dev-minio`, `lrs-dev-mailpit`, `lrs-dev-postgres` работают; их loopback-порты 9000/9001, 1025/8025 и 5432 сохраняются. Ни процессы, ни данные, ни глобальные лимиты не менять.
+- У текущего UID почти исчерпаны inotify watches: наблюдалось около 65304 из 65536. VM получает собственное ядро и квоты. Новый daemon под этим же host UID без необходимости не запускать.
+
+### Runner2, Multica и LAB-134
+
+Runner2 прочитан по SSH. Его ОС имеет 8 CPU, около 15,25 ГиБ RAM и swap 4 ГиБ. Активный `server.json` ссылается на прежний принятый harness, а не S; новый stable producer на него этим исследованием не поставлялся.
+
+Фактические numeric bounds его budget:
+
+- host MemAvailable ≥3 ГиБ, SwapFree ≥3 ГиБ, CPU utilization ≤100%;
+- каждый из двух контейнеров общей Server/Studio-пары: CPU ≤8 cores, memory.current_bytes ≤16372260864 байт;
+- каждый предусмотренный filesystem scope: свободно ≥5 ГиБ и ≥10000 inode, включая profile/workspace/history, controller state, UserStorage и SessionBackup.
+
+Это sampled failure bounds, **не резервации**. Docker hard CPU/RAM limits у пары равны нулю; складывать два memory maximum как требование 32 ГиБ неверно. Текущее idle-потребление Server/Studio около 69/47 МиБ не доказывает пиковое потребление двух измеряемых CLI. На runner2 четыре подготовленных пользователя; runner3 нужны только два для согласованного N=2.
+
+Свежие GET Multica показали сервер **v0.7.0**, группу Eval Operations из EvalOps, EvalBaseline, EvalRunner; модели соответственно gpt-6-astra, gpt-6.1-sol, gpt-6.1-sol. EvalOps/Baseline привязаны к online `Codex (swarm)`, EvalRunner — к offline `Codex (eval-tests)`. Его видимая история содержала 41 terminal task: 31 completed, 4 failed, 6 cancelled. Это снимок до реализации. На swarm также привязан посторонний агент; общая ёмкость не становится выделенной.
+
+Runner2 daemon active/enabled, `/usr/local/bin/multica` — официальный установленный CLI 0.7.0. Его unit уже использует `--max-concurrent-tasks 3`, `--no-auto-update`, `--no-auto-reload`. Перезапуск или изменение daemon для рекомендуемой схемы не нужны. У всех трёх агентов существуют защищённые env-ключи доступов runner1/runner2; значения не переносятся в этот документ.
+
+[LAB-134](https://mas.kartamyshev.dev/lab/issues/LAB-134), `phase6-LAB-134`: campaign unit active/running/enabled, `repairing=true`, repairer EvalBaseline, одна начатая и учтённая ordinary попытка, `final=null`; карточка `in_progress`, оба wakeup enabled. Её legacy drift остаётся недоказуемым задним числом. Не менять manifest, deadline, pins, историю, preparations, результаты, owner и будильники; не переносить batch на VM. Финал этой кампании **не является зависимостью подготовки runner3**. Свободный runner2 потребуется только для его собственной новой поставки и живых запусков матрицы.
+
+Имя `eval-runner-3` не найдено среди семи runtime/custom names Multica, в исследованных evals/plans, `/etc/hosts`, SSH config и DNS lookup. Локальной VM с этим именем не обнаружено. Имя пока не зарезервировано; повторить проверку непосредственно перед созданием, не переименовывать найденный чужой ресурс.
+
+## 3. Почему VM и достаточно ли ресурсов
+
+**VM:** позволяет проверить настоящий reboot eval-ОС и Docker/systemd отдельно от ноутбука; изолирует `/proc`, inotify и проверку отсутствия debugger/CDP в preflight. Цена — QEMU, гостевая ОС и постоянный диск. Прямой QEMU/KVM с одним systemd unit достаточен; универсальный deploy-инструмент не нужен.
+
+**Окружение на хосте:** использовало бы уже установленный Docker и экономило память гостевой ОС, но не закрывает обязательный reboot без перезагрузки ноутбука. Кроме того, `assertNoDebuggers` сканирует host listeners и может мешать обычной разработке. Поэтому этот вариант не достигает всей цели без изменения требований и не рекомендуется.
+
+Выделение VM из раздела 1 не меньше фактической CPU/RAM ёмкости runner2; 8 ГиБ guest swap дают запас над неизменным gate 3 ГиБ свободного swap. После 16 ГиБ VM остаётся примерно 4–4,7 ГиБ текущего MemAvailable до overhead QEMU. Этого достаточно для условного плана размещения, но из-за занятого host swap нельзя обещать отсутствие memory pressure. Не уменьшать N, память VM или experiment bounds ради старта; перед реализацией владелец подтверждает выделение ресурсов и окно работы ноутбука.
+
+Диск 64 ГиБ включает guest swap. При полном использовании этого объёма на хосте останется около 85 ГиБ текущего свободного места. Baseline/artifact tree runner2 занимает около 2 ГиБ, весь его исторический state — около 13 ГиБ; историю не переносить. Окончательную достаточность определят реальные свободные байты/inode после установки и sampler первых N=2 batch. Новых ресурсных критериев сверх прежних bounds нет.
+
+Если перед запуском память/диск заняты соседней работой либо существующий preflight/sampler отказывает, продолжение — после освобождения владельцами нужных ресурсов или согласования другой машины. Не выключать соседние задачи, не менять глобальный swap/sysctl и не ослаблять проверки. При значимом давлении памяти приостановить новые admissions штатным repair; не разрушать уже сохранённое качество.
+
+## 4. Сеть, изоляция и постоянные каталоги
+
+Есть enabled WireGuard `wg0` и ZeroTier; маршруты хоста к runner2 идут через WireGuard. Обратный read-only ICMP probe runner2 → приватный WireGuard-адрес ноутбука успешен, около 22 мс. Host sshd отсутствует и для выбранной схемы не нужен.
+
+Выбран один путь: QEMU user-mode NAT, hostfwd **только на приватном VPN-адресе ноутбука**, свободный сейчас TCP 2223 → SSH 22 гостя. Не использовать публичный bind или `0.0.0.0`. Возможность привязки hostfwd к конкретному адресу подтверждает [официальная документация QEMU](https://www.qemu.org/docs/master/system/qemu-manpage.html). Доступен пока только адрес хоста: будущий SSH listener, firewall и авторизация ещё не проверены.
+
+На фактическом пользователе runtime swarm добавить отдельный SSH alias runner3 с private endpoint/Port и проверенным host key. Все три агента при рекомендуемой схеме используют этот runtime, но каждый должен получить собственную проверку доступа из task с его защищённым env. При выборе host-runtime alias нужен также его Unix-пользователю; loopback ноутбука сам по себе для swarm не работает. Новый endpoint и секреты хранить вне Git; порт относится к SSH config, не к неподдерживаемым полям `server.json`.
+
+В госте Studio слушает только `127.0.0.1:8083/app/`; Server/Studio имеют собственную Docker network и имена `eval-runner-3-server`, `eval-runner-3-studio`, `eval-runner-3-net`. Native alias `loginom-server-7.4.2-test` сохраняется внутри этой отдельной сети. Наружу открывается только SSH. Порт 8083 проверить в госте до создания pair.
+
+Судье нужен отдельный egress: его существующий root launcher разрешает loopback proxy и запрещает прямой внешний IP traffic. На ноутбуке работает локальный HTTP proxy 10809; запрос через него к MAS `/health` дал 200. Минимальный кандидат для гостя — loopback socket + штатный `systemd-socket-proxyd` к этому host proxy через QEMU user-network gateway; бинарник socket-proxyd уже есть в systemd. Это сохраняет сетевую границу judge без копии sing-box/xray. Стоимость — одна socket/service пара, нужная именно для loopback policy судьи. Достижимость gateway→host proxy, OpenAI/OAuth, Dock и MAS из VM пока не доказана; проверить до preparations. Если путь не работает, остановиться на сетевом блокере и согласовать конкретный egress, не строить набор fallback/VPN.
+
+Разделение постоянных данных будущего runner3:
+
+- host: отдельный служебный Unix-пользователь `eval3`, приватный `/var/lib/loginom-eval-runner3/` для qcow2/seed/консоли; только доступ `kvm`, без членства в host Docker и общего sudo;
+- guest: отдельный пользователь `eval3` с разрешённым управлением только своей eval-средой и гостевой ОС; корень `~/.local/state/loginom-evals/runner3/` для `autonomous/server.json`, campaign state, generation state, двух slot profile/workspace/history и отдельных secrets;
+- frozen checkout: внутри guest runner root `autonomous/checkouts/<S>/evals`; CLI installation — отдельный immutable tree вне checkout; judge distribution/home — отдельные private каталоги;
+- `slots.json` лежит вне своего `controller.stateDir`; native lock root остаётся штатным `/var/lib/loginom-evals/locks`. Не создавать общий NFS/state с runner2.
+
+Host systemd unit запускает QEMU от `eval3` с явным KVM-доступом и зависимостью от VPN; гостевой reboot не должен завершать VM (`-no-reboot` не использовать). Guest Docker и SSH enabled; campaign instance включается до старта. Campaign unit берётся из готового template, batch unit — из действующего принятого runner2 template с заменой только путей/имени. `WorkingDirectory`, `ExecStart`, `server.json`, preflight и verify обязаны указывать один checkout S.
+
+Контейнеры native pair намеренно имеют `restart=no`: после reboot их запускает guarded `prepare-generation` на прежних owned IDs. Не заменять это `restart=always`. Автозагрузка ноутбука может быть настроена для новой VM, но reboot ноутбука не проводится и не засчитывается. Sleep/выключение ноутбука и пользовательского proxy — внешняя причина недоступности.
+
+При поставке выявлено различие image store: свежий Docker 29 в госте использует containerd, а хост/runner2 — classic overlay2. Archive config hashes совпали с pins, но containerd import изменил наблюдаемые image IDs. До создания pair гостевой Docker настраивается на `storage-driver=overlay2`, `features.containerd-snapshotter=false`; [Docker поддерживает этот выбор](https://docs.docker.com/engine/storage/drivers/select-storage-driver/). Это одна настройка существующего Docker для exact image pins, без изменения образов или native guard. Повторный import обязан подтвердить исходные IDs.
+
+В Ubuntu 24.04 audit выявил отказ bwrap при записи uid_map из-за отсутствующего AppArmor-профиля. В госте применяется штатное разрешение userns только для `/usr/bin/bwrap`: профиль `bwrap` с `flags=(unconfined)` и `userns,` по [документации Ubuntu](https://documentation.ubuntu.com/release-notes/24.04/). Глобальные userns ограничения остаются включёнными; host не меняется. Исходный отказ воспроизведён, после загрузки профиля та же bwrap-команда обязана завершиться успешно. Docker/AppArmor решения независимо проверены до native preparation, обязательных замечаний нет.
+
+## 5. Минимальные изменения Multica и безопасная привязка
+
+Актуальные правила проверены по официальному **v0.7.0**, а не устаревшему локальному v0.6.5: [UpdateAgent](https://github.com/multica-ai/multica/blob/v0.7.0/server/internal/handler/agent.go#L2015), [SQL claim](https://github.com/multica-ai/multica/blob/v0.7.0/server/pkg/db/queries/agent.sql#L747), [retry binding test](https://github.com/multica-ai/multica/blob/v0.7.0/server/internal/service/runtime_retry_binding_test.go#L18). PUT агента не переносит старые task rows; claim требует совпадения task/runtime с текущей привязкой. Running/dispatched не мигрируют, retry сохраняет runtime родителя.
+
+Порядок будущих действий:
+
+1. Подготовить SSH и guest sudo для runner3. Через существующий защищённый agent env API **слить**, не заменить целиком, новые `EVAL_RUNNER_3`, `EVAL_RUNNER_3_USER`, `EVAL_RUNNER_3_PASSWORD`, `EVAL_RUNNER_3_SUDO_PASSWORD` в env EvalOps/Baseline/Runner. Проверить read-back внутри процесса без вывода значений. Старые ключи сохранить.
+2. В инструкциях только этих трёх агентов добавить server3/config и выбранную пару для новых кампаний. Сохранить роли, модели, разрешения, squad и все действующие процедуры. Явно сохранить runner2-привязку текущей LAB-134 и правило «runtime не мигрировать автоматически». Смена инструкции не должна переназначать уже идущую кампанию.
+3. Для EvalRunner выбрать короткое окно без новых адресных назначений и его собственных wakeup/autopilot triggers. Проверить всю историю через paginated `GET /api/agents/{id}/tasks` с `X-Agent-Tasks-Next-Cursor`, а не только `idle`: queued, dispatched, running, waiting_local_directory, deferred. Сверить только относящиеся к нему активные triggers/поручения. Сопровождение LAB-134 на Ops/Baseline не останавливать.
+4. При конкретной незавершённой задаче отложить rebind и штатно разрешить именно её. Не массово отменять очередь и не копировать задачу на новый runtime. Не требовать общего аудита БД: в v0.7.0 прежние неактивные fallback выведены из работы [миграцией 456](https://github.com/multica-ai/multica/blob/v0.7.0/server/migrations/456_cancel_comment_assignee_fallbacks.up.sql#L1); inert исторические строки сами по себе не блокируют перенос.
+5. Сохранить снимок полей EvalRunner и один раз PUT только `runtime_id` в выбранный runtime. Проверить доступ **исполняющего API-запрос участника и владельца агента** к private runtime (в v0.7.0 возможен `shared_with`) и model/thinking compatibility. Workspace admin сам по себе не получает право использования чужого private runtime: служебный API-аккаунт получил 403, binding не изменился. Принятый путь — существующий авторизованный CLI-профиль владельца на runner2; `/api/me` подтвердил совпадение с владельцем агента и runtime. Видимость и grants не меняются, credentials не переносятся. Прочитать обратно identity/model/thinking/role/squad/env; сразу повторить чтение задач. Новое поручение должно получить новый runtime_id. Если возникла гонка со старой task, не дублировать её, временно прекратить новые назначения и разобрать конкретный ID штатно.
+
+Не удалять offline runtime: он нужен другим агентам, включая Evaler. Общие project resources/local_directory и чужие агенты не меняются; task cwd исполнителя остаётся управляющим каталогом, eval-команды выполняются по SSH в принятом checkout сервера.
+
+**Только если выбран отдельный host-runtime:** использовать официальный [Multica CLI 0.7.0 Linux amd64](https://github.com/multica-ai/multica/releases/tag/v0.7.0) с проверкой release checksums, отдельные HOME/profile/daemon UUID/workspace root/health port от пользователя `eval3`, доступный ему Codex и собственную авторизацию. Не копировать daemon state/runtime identity runner2. Штатные named profile и [daemon autostart](https://github.com/multica-ai/multica/blob/v0.7.0/CLI_AND_DAEMON.md#L172), user systemd + linger обеспечивают запуск без login; ёмкости 1 достаточно только для EvalRunner. До rebind проверить online/model и SSH к runner2/VM из его фактической task. Эта дополнительная служба переживает reboot VM, но не sleep ноутбука. EvalOps/Baseline сохраняют swarm.
+
+## 6. Полная поставка, pins и авторизация
+
+Ниже `R2` — `~/.local/state/loginom-evals/runner2` на сервере, найденный из его действующего config. Полные текущие hashes и версии остаются в существующих manifests/pins; не заводить второй реестр доказательств.
+
+1. **Harness/корпус:** полный clean Git checkout S, включая все tracked tasks, reference/spec/oracle/checker assets. Проверка публичными `loadTasks/agentInputsHash/rubricHash` показала совпадение локального корпуса с актуальными runner2 corpus pins: 3 ordinary, 65 analytic, 10 node задач. Нужен весь tree; delta bundle и один каталог скриптов недостаточны. Runtime npm dependencies у harness нет.
+2. **Оцениваемый CLI:** источник `R2/baseline/cli-home/.local/share/loginom-ai-agent-cli/0.0.0-evals-parallel-20261020-7e9d7d134f-prod/`. Реальный binary hash совпал с pins. Перенести полный immutable tree с `cli-manifest.json` (6016 entries), resources/loginom, bundled Node **24.19.0**, Chromium **1246**, Playwright/MCP/client/node_modules. Host Node 20.19.2 и Desktop не являются заменой. Native `verifyAdminRuntime` проверяет inventory/modes/links/hashes; выполнить его и `ldd` точных ELF в VM, затем sandbox check. Не устанавливать свежий browser/CLI вместо закреплённого.
+3. **Каталог моделей:** отдельный публичный `R2/runtime-v5/slots/a/profile/cache/models.json`, совпавший с `public_models_sha256`; переносить только файл, не профиль. Bundled models manifest имеет другой hash и не заменяет этот pin.
+4. **Судья:** полная `~/.local/share/loginom-evals-runtime/runner2-tools/codex-0.157.0/` с bin/code-mode-host/resources/package metadata; actual executable hashes совпали с `pins.codex_distribution`. Host Codex 0.158.0 не заменяет его. Публичный wrapper из `runner2-tools/bin/codex` и root launcher `/usr/local/libexec/loginom-evals-runner2-judge` требуют однократной адаптации путей/UID/home/state/checkouts и своей узкой sudo rule для guest. Сохранить exact модель/аргументы, env cleanup, named transient unit, RuntimeMaxSec/TimeoutStopSec и network restriction. Это перенос существующей политики, не новый judge launcher/framework.
+5. **OS prerequisites:** Docker/systemd/SSH, Bun 1.3.14, bubblewrap/user namespaces, git, unzip/zip, xmllint, pgrep/ps, CA/fonts и библиотеки pinned Chromium/Node. Python3 нужен существующему root launcher судьи; это реальная deployment-зависимость, хотя campaign controller написан на TS. Ставить по фактически отсутствующим библиотекам точных artifacts; проверка `ldd` на runner2 не доказывает их наличие в пустой VM.
+6. **Auth:** новые Loginom accounts/credentials/profile setup; отдельный judgeHome без истории; разрешённая свежая OAuth-авторизация оцениваемого CLI и судьи, Dock API key и Multica token через прежний защищённый способ. Не клонировать рабочие профили, leases, owner, runtime identity, receipts или auth с историей как заготовку. При переносе разрешённых credentials передавать только необходимый материал с правами 600/каталогами 700, без логов и аргументов с секретами.
+
+Metadata preflight требует в **каждом** новом slot profile local OpenAI OAuth с остатком ≥8,25 часа и exact models hash перед batch. Штатный auth/refresh путь должен обеспечивать это без обхода gate; при невозможности получить/обновить auth — блокер доступа до кампании. Проверить из VM OAuth/provider, Dock и judge egress. Общая поддержка shared OAuth не отменяет конкретную local-auth проверку campaign-preflight.
+
+Новые `server.json`, slots и budget создаются для VM. Числа/метрики budget, model/variant/judge/timeout/pass threshold и hashes содержательных pins сохраняются; меняются только локальные пути, own usernames, container IDs/StartedAt и соответствующие scopes. `pins.cli` и `EVAL_CLI_BIN` должны указывать один новый installation path. Старые `activeGeneration`, receipts и environment observations runner2 не являются доказательствами runner3. Все новые preparations сразу сохраняют `stableConfiguration` штатным producer.
+
+## 7. Этапы будущей реализации и проверяемый результат
+
+### A. Первая независимая среда без ожидания LAB-134
+
+- [x] Повторить Git/resource/name/port checks; получить отдельное поручение и согласовать выделение VM из раздела 1. На хосте создать только own user/каталог и один VM unit. Использовать один официальный Ubuntu 24.04 amd64 cloud image, закрепить выбранный image/checksum из [официального источника](https://cloud-images.ubuntu.com/noble/current/) перед загрузкой, создать private disk/seed. Установить только отсутствующие необходимые пакеты. Сетевые secrets/cloud-init seed не включать в Git.
+- [x] Поднять VM, guest Docker/SSH и egress из раздела 4. Проверить `uname`/boot ID гостя, его RAM/vCPU/swap/disk и SSH с проверенным host key из swarm. Не использовать общий filesystem mount с рабочими профилями ноутбука.
+- [x] Перенести immutable artifacts раздела 6 и две images через save/load с hash verification. Новый clean checkout и unit/config paths прочитать обратно. Собрать private server/slots/budget и отдельные profiles, выполнить штатные `parallel-pair.ts create --purpose acceptance`, `parallel-env.ts prepare --parallel 2`, fresh `verify --parallel 2`, каждый с собственным private `--out` вне state/profile. Проверить stable proof, released leases, auth/catalogue и resource scopes.
+
+**Проверяемый результат:** собственная VM доступна из существующего runtime, две штатные preparations/verify завершены без заимствованных proofs, запускается точный принятый CLI/судья. Пока нет запуска Multica→результат, работоспособность всей кампании не заявлять. Здесь не нужны свободная pair runner2, её новая поставка или финал LAB-134; runner2 используется только как read-only источник artifacts.
+
+### Коррекция первой подготовки: Chrome sandbox и чистая VM
+
+Первый `prepare` новой среды создал пользователя a, но получил EACCES при наблюдении Chromium и `ADMIN_DISPOSE_UNKNOWN`; OAuth не является причиной. Admin logout/disconnect подтверждены, process cleanup — нет. AppArmor отдельно подтвердил отказ userns для exact Chromium, который `loginom setup` запускает вне bwrap. Адресное разрешение только установленному Chrome по тому же штатному шаблону AppArmor необходимо проверить изолированным sandbox smoke; global userns restriction и browser sandbox сохраняются.
+
+В S нет штатного выпуска этого quarantine: admin receipt не `disposed`, writer settlement не допускает EACCES, а SSH-запуск не сохранил настоящий unit binding. Переписывать proofs или разрабатывать новый native recovery для единственного bootstrap не требуется. Предлагаемое исправление после независимого ревью: штатно выключить только собственную VM, сохранить её qcow2 как недействующий quarantine-артефакт и развернуть runner3 заново из исходного проверенного cloud image с исправленной политикой Chrome. Одновременно работает только одна VM. Перенести только immutable artifacts/config и свежие OAuth credentials без профилей/истории; создать новые native pair/IDs, budget scopes и preparations. Старые leases, user receipts, Docker state и machine identity не переносить и не объявлять released. Кампаний и измерений в этой VM ещё не было; результаты не теряются. Старый диск не удалять при неясных proofs. Это сохраняет frozen harness и требует одного дополнительного архивного qcow2 (~размер занятого диска), одной guest AppArmor policy и повторного bootstrap; ориентир 20–40 минут, без нового кода harness.
+
+Проверяемый результат: sandbox smoke подтверждает работающий namespace sandbox; прежняя VM остановлена, её диск сохранён; новая VM имеет новую OS/Docker identity и собственные pair/preparations; затем обычные prepare/verify N=2 проходят без обхода cleanup. Независимое ревью коррекции — PASS, обязательных замечаний нет. Для fresh VM создать новый seed с новыми SSH host keys и instance-id; закрепить проверенный новый host key в known_hosts управляющего пользователя и swarm. Свежие auth-only credentials сохранить до выключения, проверить формат/права после переноса; работоспособность native cleanup подтверждается только prepare/verify, не raw Chrome smoke.
+
+### B. Первый короткий реальный путь, одновременно часть этапа 5
+
+- [x] Передать доступы/instructions раздела 5. Назначить **EvalOps**, не squad, одну необходимую короткую кампанию сочетания **EvalBaseline → runner3**, N=2, 2–4 существующих ключа. EvalOps проверяет занятый owner/native state runner2 и выбирает свободный совместимый runner3. Реальный отказ резервирования не обходить.
+- [x] Штатно reserve под controller flock, сохранить manifest и wakeup IDs, enable campaign instance, запустить через адресное поручение. Подтвердить реальные measurement admissions, два слота, корректное качество PASS или FAIL, native cleanup/releases. После постановки Codex/владелец выполняют только чтение; исправления поручает EvalOps по прежним ролям.
+- [x] Подтвердить единственный финал, архив/состав и hash при независимом скачивании, прочитать публикацию обратно, статус `in_review`, оба wakeup disabled, owner освобождён при подтверждённых ресурсах, service завершилась штатно.
+- [ ] Подтвердить повтор controller-входа без новых измерений/публикации. Для LAB-169 штатный `--once` поручен EvalOps перед reserve LAB-170; для LAB-168 дополнительный ручной запуск не нужен, её enabled instance также можно проверить при обязательном reboot D.
+
+**Проверяемый результат:** подготовка → Multica → controller → измерение → учёт → cleanup → опубликованный и прочитанный итог на новой VM. Ресурсная годность N=2 проверяется теми же preflight/sampler. Отдельной квалификационной кампании сверх необходимой матрицы нет.
+
+Первый batch будущей 234-key кампании нельзя честно использовать для этого **финала**: controller публикует full лишь после всех manifest keys и cleanup. Поэтому короткий публикационный E2E совмещён с уже обязательным сочетанием этапа 5. Первый batch полной кампании используется ниже для saved-node/reboot, без усечения её manifest.
+
+### C. EvalRunner и изменённый этап 5: runner2 + runner3
+
+- [x] Выполнить one-time rebind EvalRunner по разделу 5. Первое новое поручение и `runtime_id` прочитать обратно. Подтвердить его SSH к обоим серверам и доступ EvalOps/Baseline к runner3; записи `idle/online` не заменяют фактическую проверку.
+- [x] Выполнить второе короткое сочетание **EvalRunner → runner3** через тот же цикл. Это проверяет исполнителя после rebind, а не только общий SSH одного Unix-пользователя.
+- [ ] Для **EvalBaseline → runner2** и **EvalRunner → runner2** дождаться освобождения его pair/leases/owner и отсутствия активных batch. Финал LAB-134 сам по себе не доказывает освобождение: retained/unknown owner требует штатной сверки. После этого поставить S с согласованными unit/config paths и новыми stable preparations; исходную LAB-134 не менять. Выполнить два оставшихся коротких сочетания последовательно, каждый с cleanup/publication.
+
+**Проверяемый результат:** четыре сочетания подтверждены задачами/кампаниями, при реально занятом сервере выбран другой совместимый. Исторический EvalBaseline→runner2 служит справкой, но не подменяет проверку новой принятой среды. Пока runner2 занят, эти два пункта и весь этап 5 открыты; runner3 и его полная кампания могут работать независимо. На обоих серверах server choice делает EvalOps, новый scheduler/пул не вводится. При потерянном SSH-ответе искать прежний campaignId на обоих серверах; неизвестный результат не разрешает второй запуск.
+
+**Явная замена этапа 5 основного плана:** «Подготовить пару runner2+runner3; дать EvalOps и обоим исполнителям доступ; подтвердить четыре сочетания и выбор свободного совместимого сервера. Runtime EvalRunner меняется один раз по этому подплану. Runner1 остаётся непроверенным до отдельного доступного окна». В worktree реализации основной документ изменён только в этой строке и исключении для runtime; история и worktree `1c6f` сохранены.
+
+### D. Полная кампания и saved-node/controller-gap/reboot
+
+- [ ] На свободном runner3 поставить новую кампанию через EvalOps; исполнитель — EvalRunner после C либо EvalBaseline, если rebind ещё объективно блокирован. Input взять из `eval-full-campaign-input.json`: **234 ключа (ordinary 9, node 30, analytic 195), parallel=2, batchSize=4, максимум 281 начатая попытка, 24 часа без прогресса, три последовательные технические ошибки; openai/gpt-6.1-sol/medium, gpt-6-sol/xhigh**. Task timeouts 15/30/60 минут, judge 5 минут, batch limit 8 часов и остальные pins сохраняются. Это input proposal: до старта создать собственные campaign/issue IDs, runner3/server paths/wakeup IDs, убрать все runner2 operational paths, сверить hashes/keys/числа. Manifest после старта не менять.
+- [ ] До постановки закрепить порядок с первым node-batch и оставшимися missing. Во время подтверждённого `purpose=measurement` admission исполнитель штатным `repair` закрывает новые admissions и останавливает **только campaign-controller**, оставляя instance enabled. Batch продолжает работу. Не использовать active unit вместо доказательства measurement: preflight тоже работает внутри unit.
+- [ ] Дождаться сохранённого node-result с завершённым quality PASS/FAIL, inactive batch и подтверждённых native final releases, включая judge. Проверить, что batch ещё не accounted, сохранить доказательства Result/артефактов и guest boot ID. Если controller уже учёл результат, не откатывать journal и не повторять качество: controller-gap остаётся открытым до другого допустимого missing batch.
+- [ ] Перезагрузить **ОС VM** через SSH. Boot ID гостя должен измениться, ноутбук/runtime swarm продолжают работу. Проверить автоматическую загрузку Docker/SSH/campaign instance. Controller остаётся parked; контейнеры поднимаются штатной guarded процедурой, а не пересоздаются.
+- [ ] EvalOps диагностирует новую epoch и поручает тому же repairer `prepare-generation`; операция сначала учитывает старый batch прежними proofs, затем создаёт новую generation на тех же owned container IDs и сверяет stable configuration. Далее штатный restart campaign instance для перечитывания config и `resume`. Проверить неизменные Result/артефакт/manifest/pins, единственный учёт сохранённого node и продолжение только missing; повтор prepare-generation/resume не создаёт новых generation/users или измерений при тех же входах.
+
+**Проверяемый результат:** живые №4 и node-часть №5 исходного плана, новая epoch после настоящего guest OS reboot и продолжение missing. Старый ordinary PASS LAB-134 не засчитывается как saved-node. Retained/unknown proof, changed IDs/config или отсутствие stable proof — blocker, не повод ослаблять native identity. Уже принятые локальные tests повторять только при новых изменениях или конкретном дефекте.
+
+### E. Два слота, завершение этапов 6–7
+
+- [ ] В той же полной кампании сохранить естественный provider retry/технический сбой одного слота и временную шкалу, показывающую продолжение и результат здорового соседа при N≥2. При отсутствии события/доказательств сценарий остаётся непроверенным. Искусственно убивать измеряемый CLI нельзя: это может превратиться в ложный quality FAIL. Новый fault-injection механизм не создаётся.
+- [ ] Довести прежнюю полную кампанию до обычного финала без внешних исправлений/команд пользователя или Codex после постановки; контролируемые действия D заранее поручены EvalOps/исполнителю. Проверить все 234 ключа по собственным regular/analytic/node контрактам, native cleanup/releases, archive/report и публикацию read-back. Quality FAIL не препятствует полному технически корректному итогу.
+- [ ] Проверить `in_review`, явное выключение всех manifest wakeupIds, отсутствие новых admissions, корректный owner и завершившиеся units. Если получен partial, сохранить точную причину/недостающие ключи и ограничения; не переименовывать его в full. Основной план закрывать только по фактическим доказательствам каждого пункта.
+
+**Проверяемый результат:** полный автономный цикл и честно размеченные оставшиеся проверки. Рабочий ноутбук не перезагружается. Для продолжения D/E на runner3 свободный runner2 не нужен; для полного закрытия C нужен.
+
+## 8. Сохранность, пределы и внешние блокеры
+
+Существующие journal/manifest/native receipts — единственный рабочий источник состояния. Один campaignId и один закреплённый сервер; повтор доставки сверяет состояние под flock. Никакого переноса живого batch. Сохранённый PASS **и quality FAIL** засчитываются один раз и исключаются из missing; pending judge продолжает только оценку в прежнем бюджете invoke. Поздний сбой cleanup/publication не запускает измерение заново и не стирает качество.
+
+Три последовательные технические ошибки закрывают admissions и запускают штатный ремонт; здоровые уже начатые слоты дорабатывают. Обычный restart не сбрасывает счётчик; успешный подтверждённый repair/resume сбрасывает только предусмотренные счётчики, а не общий бюджет/lastProgressAt. Предел 24 часа без прогресса действует и при незавершённом ремонте; просмотр, тик, restart, смена причины или неудачный ремонт его не продлевают. По пределу — доступная cleanup, partial, `in_review`, выключение будильников. При недоступном host EvalOps использует прежний last-known snapshot/publisher с неподтверждёнными ресурсами; при недоступном runtime/API доставка завершается после возврата. После опубликованного финала измерения не возобновляются.
+
+Конкретные блокеры и условия продолжения:
+
+- **RAM/swap/disk/соседняя нагрузка:** нет безопасного ресурса для согласованной VM или не проходит прежний budget — продолжить после выделения ресурса владельцем, без уменьшения N/лимитов и без остановки чужой работы.
+- **Точных artifacts нет либо hashes/inventory не сходятся:** получить тот же immutable комплект с runner2/проверенного архива; не собирать произвольный CLI. Если read-only копирование невозможно, это зависимость от доступности источника, а не от финала LAB-134.
+- **SSH/firewall/VPN или guest proxy/provider/Dock недоступны:** до кампании подтвердить действительный путь из runtime и VM; при отсутствии маршрута согласовать узкое сетевое изменение. ICMP/host proxy HTTP200 не заменяют будущий SSH/model path.
+- **Auth/quota/licence/создание новых accounts:** штатная авторизация/refresh и квота либо выдача доступа владельцем. Не менять модель/судью, срок OAuth gate или критерии ради прохождения.
+- **Задача EvalRunner в старом runtime или гонка rebind:** завершить/разобрать конкретное поручение и повторить scoped проверку; не создавать дубликат и не трогать Evaler/offline runtime.
+- **LAB-134/retained resources runner2:** ждать её native финала и проверенного release только для runner2 rollout/запусков. Не применять это ожидание к независимой VM. Legacy receipts LAB-134 не дополнять текущими наблюдениями.
+- **Сценарий controller-gap/slot fault не возник:** оставить соответствующую проверку открытой; не повторять качественные результаты ради нужного окна и не добавлять новые критерии/аварийный механизм молча.
+- **Sleep/питание/общий отказ swarm или ноутбука:** вернуть питание/маршрут/runtime и сверить прежний campaignId/финал; автоматическую runtime migration не разрабатывать. Для длительной кампании владелец обеспечивает окно питания и отсутствие sleep, не изменяя глобальные настройки в рамках исследования.
+
+## 9. Размер изменений, откат и решения владельца
+
+Будущая реализация должна обойтись **без изменений TypeScript harness, публичных протоколов, scheduler, БД состояния и продукта**. Если первый путь выявит дефект, сначала воспроизведение и отдельное обоснование адресной правки; для кода — TDD/независимое ревью по `evals/AGENTS.md`.
+
+Оценка Git-изменений: **3–5 файлов, 320–450 добавленных/удалённых строк вместе с этим планом** — этот документ, узкое изменение исходного плана, один VM unit template в `evals/ops/` и при необходимости пара proxy unit templates (штатный socket-proxyd). Вариант без новых templates допустим, если достаточно существующей принятой процедуры; установщик/общий deploy-script не нужен. Текущий документ измерять через `git diff --no-index --stat /dev/null <этот файл>`; до добавления в Git он не входит в обычный `git diff --stat`. При реализации считать весь итоговый diff, включая документы и проверки, после добавления нужных файлов в Git. Ничего не коммитить из чужой незавершённой работы.
+
+Кроме Git: ориентировочно **12–18 новых deployment/config файлов, 450–800 строк** — VM unit/seed, guest server/slots/budget/env/pins, campaign/batch units, private credentials/config, адаптированные existing judge wrapper/launcher/sudo и proxy socket/service. Secrets не считать исходниками и не публиковать. Число operational files зависит от штатной генерации и не является новым inventory-механизмом. Immutable trees/images и runtime-generated receipts не выдавать за написанный код. Если выбран host-runtime — ещё один named profile/daemon unit/SSH config и отдельная авторизация; это добавочная стоимость, не обязательный механизм. При превышении удвоенной оценки пересмотреть подход до продолжения.
+
+При неудаче сохранить результаты/receipts и пользоваться штатным destroy только для **своей** pair с matching labels/IDs/nonce после проверки inactive/released состояния. Перед остановкой host QEMU unit штатно выключить гостя по SSH и подтвердить его остановку; затем отключить только новые VM/proxy/campaign units, убрать только новые SSH alias/agent-env ключи после проверки отсутствия зависящих задач. VM unit ожидает VPN при старте, но не останавливает гостя при перезапуске VPN. Перед удалением qcow2 вынести необходимые результаты; при неизвестном владении ничего не удалять. Не выполнять Docker/system prune, удаление общих images, чужих сетей/volumes или очистку runner2. Откат rebind допустим только после такой же проверки задач; это не автоматический rollback. Установленные общие пакеты при частичной неудаче автоматически не удалять.
+
+При отдельном поручении владельцу достаточно решить:
+
+1. Принять замену пары этапа 5 на runner2+runner3 и разовую привязку EvalRunner к swarm. Отдельный host-runtime выбирать только при требовании отделить исполнителя от общего отказа runner2.
+2. Разрешить установку минимальных VM-пакетов, создание указанных новых ресурсов и выделение VM 16 ГиБ/8 vCPU/64 ГиБ с учётом ограниченного запаса RAM и питания ноутбука.
+3. Предоставить отсутствующие права/авторизации или согласовать конкретный сетевой путь, только если проверки обнаружат такой блокер. Пересмотр моделей, pins, лимитов и критериев в эту реализацию не включён.
+
+## 10. Независимое ревью и checkpoint
+
+Независимое ревью плана отдельным агентом 24.10.2026 — **PASS**, обязательных и необязательных замечаний нет. Ревьюер сверил требования с controller/preflight, pair/env scripts, systemd template и тремя каноническими планами. Подтверждены необходимость VM, достаточность повторного использования swarm для требуемого reboot VM, безопасный порядок rebind, независимость runner3 от LAB-134 и границы живых доказательств.
+
+Инфраструктурное ревью нашло одно обязательное замечание: `Requires=wg-quick` мог остановить QEMU при обслуживании VPN. Заменено на `Wants` с сохранением `After`; effective properties проверены, PID VM не изменился. Отдельное ревью Docker classic store и адресного AppArmor userns allowance — PASS. Неразрешённых замечаний нет; работоспособность полной кампании этими проверками не заявляется.
+
+Checkpoint:
+
+- Реализация разрешена владельцем; ветка `runner3-deploy` в `bdd0` основана на исходном `autonomous-evals`, `1c6f` не изменён.
+- QEMU/KVM VM active/enabled, cloud-init done: 8 vCPU, ~16 ГиБ RAM, 8 ГиБ свободного swap. Ubuntu image прошёл GPG+SHA-256; private bootstrap/логи находятся в `/home/george/.codex/tmp/runner3-deploy` с правами 700, секреты в Git не входят.
+- Поставлены clean checkout S, Bun 1.3.14, exact CLI и judge 0.157.0; native CLI inventory и Node/Chromium libraries проверены. Root judge policy/units установлены; `codex --version` через ограниченный wrapper прошёл.
+- В новой VM Docker classic overlay2 и exact image IDs подтверждены; собственные pair identity и budget scopes проверены, все прежние числа/метрики сохранены. WorkingDirectory/ExecStart обеих units согласованы с server.json и checkout S.
+- Bwrap RED на Ubuntu userns → адресный AppArmor profile → GREEN той же команды; global restrictions остаются включёнными. Proxy guest2080→host10809→MAS HTTP200.
+- SSH swarm→новая VM прошёл с новым pinned host key и паролем через временный SSH_ASKPASS, без установки на runner2. Доступы runner3 слиты в env всех трёх агентов и прочитаны обратно; прежние ключи сохранены.
+- Bootstrap quarantine сохранён в выключенном отдельном qcow2; новая VM получила новые OS/Docker/SSH identities, без старых native proofs. Перенесены immutable artifacts/config и только свежие auth credentials. Sandbox smoke через pinned Playwright прошёл; global userns restrictions сохранены.
+- Все три native OAuth подтверждены; exact models и judge login status=ChatGPT проверены. Свежие prepare и verify N=2: exit0, ready=true, finalization=released; prepare-a/b содержат stableConfiguration. Доказательства — штатные receipts новой VM и private fresh-native-infrastructure.log.
+- EvalRunner разово привязан к swarm через существующий owner CLI-profile после повторного аудита 20+20+1 terminal tasks и scoped triggers. Root read-back: identity/model/thinking/role/env/squad сохранены; после смены те же 41 terminal task, без новых задач. Proof — private rebind-applied.json. Evaler и LAB-134 не изменялись.
+- Инструкции только EvalOps/Baseline/Runner обновлены для runner2+runner3; read-back подтвердил сохранение identity/runtime/model/role/env. Доступ каждого агента из реальной task ещё предстоит подтвердить.
+- LAB-168 / e2e-LAB-168 завершена автономно: 2/2 PASS100, N=2, resources passed, native cleanup/released, full/published. Независимо подтверждены unique report, archive hash/состав, in_review, 2 disabled wakeups, released owner и exit0 обеих units. Proof — private first-campaign-independent-readback.json; повтор входа остаётся для C/D.
+- LAB-169 завершена через EvalRunner на swarm: фактический SSH к обоим серверам, запуск controller исполнителем, 2/2 PASS100, full/published/cleanup, independent archive/read-back, in_review и два disabled wakeup подтверждены. Его task завершилась до финала, поэтому --once не выполнен; эта оставшаяся проверка поручена EvalOps перед следующим reserve.
+- LAB-170 поставлена EvalOps одной task на swarm: полные 234 keys с прежними pins/лимитами загружены на runner3 и прочитаны обратно. Поручены закрытие --once LAB-169 и весь контролируемый D/E (repair/stop controller, saved node, guest reboot, prepare-generation/resume, full cleanup/publication); root далее читает состояние. Полный manifest/reserve и reboot пока не подтверждены; этапы 5–7 открыты.

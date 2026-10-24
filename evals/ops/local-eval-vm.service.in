@@ -1,0 +1,18 @@
+[Unit]
+Description=Local eval-runner-3 VM
+After=network-online.target wg-quick@wg0.service
+Wants=network-online.target wg-quick@wg0.service
+
+[Service]
+Type=simple
+User=eval3
+SupplementaryGroups=kvm
+WorkingDirectory=@VM_ROOT@
+ExecStart=/usr/bin/qemu-system-x86_64 -name eval-runner-3 -machine accel=kvm -cpu host -smp 8 -m 16384 -display none -nodefaults -no-user-config -device virtio-rng-pci -drive file=@VM_ROOT@/disk.qcow2,if=virtio,format=qcow2 -drive file=@VM_ROOT@/seed.img,if=virtio,format=raw,readonly=on -nic user,model=virtio-net-pci,hostfwd=tcp:@VPN_ADDRESS@:2223-:22 -serial file:@VM_ROOT@/console.log -monitor none
+UMask=0077
+Restart=on-failure
+RestartSec=10s
+TimeoutStopSec=60s
+
+[Install]
+WantedBy=multi-user.target
