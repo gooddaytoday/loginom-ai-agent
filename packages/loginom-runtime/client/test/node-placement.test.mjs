@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
+import {readFile} from 'node:fs/promises';
 import {createNodeTargetBrowserAdapter,mutateGraph} from '../lib/node-target-browser.mjs';
 import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
 import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlacementGap,nodePlacementOverflow,revealNodePlacement,revealPreparedGraphNode,samePlacementGraph} from '../lib/node-placement.mjs';
@@ -67,6 +68,25 @@ test('D32 clearance keeps the observed 120-unit native auto-link case apart at e
   assert.equal(nodePlacementGap(v,nodePlacementPoint(v,{x:600,y:144}),occupied),true);
  }
  assert.throws(()=>nodePlacementGap({scale:1},{x:0,y:0},[{left:0,right:1,top:NaN,bottom:2}]),/clearance bounds/);
+});
+
+test('D28 late automatic JS uses a visible gap missed by the coarse grid, retaining the same clearance',async()=>{
+ const recorded=JSON.parse(await readFile(new URL('./fixtures/d28-js-placement.json',import.meta.url),'utf8'));
+ const v=recorded.view,box={...v,right:v.x+v.width,bottom:v.y+v.height};
+ const occupied=recorded.rects.map(([x,y,width,height])=>({x,y,width,height,left:x,top:y,right:x+width,bottom:y+height}));
+ const canvas={getBoundingClientRect:()=>box,querySelectorAll:()=>occupied.map(b=>({getBoundingClientRect:()=>b})),scrollLeft:0,scrollTop:0,contains:()=>false};
+ const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:v.scale,translate:v.translate}}}}};
+ const context={innerWidth:1280,innerHeight:800,document:{elementFromPoint:()=>canvas},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
+ for(const type of ['programming.javascript','imports.text']){
+  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type},inputs:[]};
+  const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
+  let calls=0;const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>++calls===1?graph:runInNewContext('('+code+')',context)({locator:()=>({evaluate:async fn=>fn(canvas)})})});
+  const position=structuredClone(await adapter.choosePosition(request,graph,Date.now()+10000));
+  if(type==='imports.text'){assert.deepEqual(position,{x:208,y:2056});continue;}
+  assert.deepEqual(position,{x:2176,y:520});
+  const point=nodePlacementPoint(v,position);assert.ok(point.y<=v.y+v.height-8&&point.x<=v.x+v.width-8);
+  assert.equal(occupied.some(r=>point.x>r.left-72&&point.x<r.right+96&&point.y>r.top-56&&point.y<r.bottom+72),false);
+ }
 });
 
 for(const {scale,translate,expected} of [
