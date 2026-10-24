@@ -377,3 +377,21 @@ test('early REST child release hook must settle before the parent graph release'
  assert.equal(released.status,'SUCCEEDED',JSON.stringify(released));assert.equal(f.state.releaseCalls,2);
  f.runtime.assertPreparationAllowed();assert.deepEqual(f.calls,[]);
 });
+
+for(const confirmed of [true,false])test('D49 pending move release requires native requested position: '+confirmed,async()=>{
+ const f=fixture('target_pending','transform.calculator');
+ // Reduced J2 graph: the same GUID at (152,1528), requested (180,400).
+ f.state.graph.nodes.push({ref:node,type:'transform.calculator',label:'Поля справочника стран',position:{x:152,y:1528},inputs:[0],outputs:[0],locked:false,dom_epoch:468});
+ f.request.target={kind:'existing',type:'transform.calculator',ref:node,position:{x:180,y:400}};
+ f.adapter.positionMatches=(n,p)=>n.position.x===Math.round(p.x/8)*8&&n.position.y===Math.round(p.y/8)*8;
+ f.adapter.mutate=async e=>{
+  f.calls.push(e.kind);
+  if(confirmed){f.state.graph.nodes[0].position={x:184,y:400};f.state.graph.nodes[0].dom_epoch++;}
+  return {status:'AMBIGUOUS',effect_possible:true,cleanup_complete:true};
+ };
+ await stop(f);
+ const result=await release(f);
+ if(confirmed){assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.doesNotThrow(()=>f.runtime.assertPreparationAllowed());}
+ else{assert.equal(result.error.code,'NODE_RELEASE_REFUSED');assert.throws(()=>f.runtime.assertPreparationAllowed(),/pending|unsettled|uncertain/);}
+ assert.deepEqual(f.calls,['move'],'release never replays a move');
+});
