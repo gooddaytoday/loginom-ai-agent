@@ -6607,11 +6607,14 @@ test('fractional geometry accepts only bounded edge error and retains refusal di
 test('fractional geometry preserves calculator definitions and buffered native identities',async()=>{
   for(const scale of [1,1.25,1.5,1.75,2]) {
     const f=calculatorManifestFixture(3);
+    f.page.context.Date=fixtureClock().Date;
     fractionalRows(f.container,f.records.map(r=>r.row),scale);
     assert.equal((await f.page.observe()).wizard.calculator_expressions.definition_coverage.status,'complete_configured_rows',String(scale));
     const b=bufferedMappingFixture();
+    b.page.context.Date=fixtureClock().Date;
     fractionalRows(b.c.container,b.c.rows,scale);
     const r=await b.page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+    assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));
     assert.equal(r.output.wizard.output_columns.page.status,'complete_definition_page',String(scale));
     b.c.rows[0].attrs['data-recordid']='foreign';
     assert.equal((await b.page.execute({mode:'observe',output_column_page:{offset:0,limit:8}})).output.wizard.output_columns.page.status,'unverified_definition_page');
@@ -6765,6 +6768,7 @@ for(const [card,family] of [['LAB-66','DerivedDataSourceOutputSocketWizard'],['L
  test(card+' mapping rows admit 0.5/1 CSS px and reject 2 CSS px overflow within owned definition pages',async()=>{
   for(const fault of ['observed','half_pixel','one_pixel','overflow','foreign_record','group','left','cell']) {
    const {page,c,records}=bufferedMappingFixture();
+   page.context.Date=fixtureClock().Date;
    for(const e of page.document.all())if(e.attrs['data-tid']?.startsWith(c.base))e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard',family);
    records.forEach((r,i)=>{r.data.GroupField=i<10?'':'Исключенные';r.data.Index=i<10?i:i-10;});
    c.rows[11].box.width+=fault==='overflow'?2:fault==='half_pixel'?0.5:fault==='one_pixel'?1:1/32;
@@ -6773,6 +6777,7 @@ for(const [card,family] of [['LAB-66','DerivedDataSourceOutputSocketWizard'],['L
    if(fault==='left')c.rows[11].box.x-=1/32;
    if(fault==='cell')c.rows[11].children[4].box.width+=1/16;
    const result=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+   assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
    assert.equal(result.output.wizard.output_columns.page.status,['observed','half_pixel','one_pixel'].includes(fault)?'complete_definition_page':'unverified_definition_page',fault);
   }
  });
