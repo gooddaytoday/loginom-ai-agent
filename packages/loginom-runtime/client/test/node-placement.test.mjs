@@ -58,6 +58,15 @@ test('D32 implicit encoder alone opts into REST clearance even without a reserve
  const p=await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000,undefined,[]);
  assert.notDeepEqual(structuredClone(p),{x:80,y:80});
 });
+test('D28/D32 search the visible gap missed by the coarse grid before choosing unreachable overflow',async()=>{
+ for(const implicit of [false,true]){
+  const occupied=[{left:0,right:180,top:0,bottom:600},{left:500,right:800,top:0,bottom:600}],f=gapFixture(occupied);
+  if(implicit)f.request.target.type='programming.javascript';
+  const p=await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000,undefined,implicit?[]:undefined);
+  assert.ok(p.x>=276&&p.x<=340&&p.y>=64&&p.y<520,JSON.stringify(p));
+  assert.equal(nodePlacementGap({scale:1},p,occupied),true);
+ }
+});
 test('D32 clearance keeps the observed 120-unit native auto-link case apart at every scale',()=>{
  for(const scale of [.5,1,2]){
   const v={x:324,y:100,scale,translate:{x:32,y:-16},scroll:{x:40,y:24}};

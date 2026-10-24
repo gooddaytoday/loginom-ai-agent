@@ -195,8 +195,9 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
    };
    // Prefer existing visible space; navigate only when that space is full.
    if(y<=10000&&free(project(128,y)))return project(128,y);
-   for(let py=Math.max(0,r.y)+80;py<Math.min(r.bottom,innerHeight)-80;py+=128)
-    for(let px=Math.max(0,r.x)+80;px<Math.min(r.right,innerWidth)-96;px+=160){
+   for(const step of [128,32])
+    for(let py=Math.max(0,r.y)+80;py<Math.min(r.bottom,innerHeight)-80;py+=step)
+     for(let px=Math.max(0,r.x)+80;px<Math.min(r.right,innerWidth)-96;px+=step===128?160:step){
      const x=Math.round(((px-r.x+e.scrollLeft)/g.view.scale-g.view.translate.x)/8)*8;
      const y=Math.round(((py-r.y+e.scrollTop)/g.view.scale-g.view.translate.y)/8)*8;
      if(x<64||y<64||x>10000||y>10000)continue;

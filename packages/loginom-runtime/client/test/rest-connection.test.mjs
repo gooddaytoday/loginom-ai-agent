@@ -8,6 +8,7 @@ const cases={render_wait:'REST waits for the created connection port to render w
 Object.assign(cases,{placement_below:'REST finds a free visible drop when its preferred row is below the canvas',placement_scrolled:'REST places one connection inside a zoomed translated and scrolled canvas',placement_full:'REST refuses an unconfirmed crowded-canvas reveal without starting a drag'});
 Object.assign(cases,{placement_native:'serialized REST capability reveals real free space using bounded native outline zoom',placement_crowded:'REST reveals bounded model space on a crowded canvas before its sole connection drag',placement_changed:'REST refuses a changed graph after connection placement navigation',placement_unknown:'REST retains uncertainty after an unconfirmed viewport gesture',placement_still_full:'REST bounds settled viewport passes and never drags onto a still crowded canvas',placement_late_changed:'REST rechecks the graph after waiting for its connection palette item',placement_hidden:'REST refuses a connection drop when navigation cannot reveal model space'});
 Object.assign(cases,{placement_reselect:'D28 J2 reselects a free visible connection point after zoom with overflow y843 and zero native scroll'});
+Object.assign(cases,{placement_dense:'D28 connection searches a narrow visible gap before unreachable overflow'});
 for(const [stage,title]of Object.entries(cases))test(title,async()=>{
  const prefix='MF;TF-1',fields=prefix+';WizardModelConnectionForm;ConnectionWizard;';
  const item=prefix+';ModelForm;pnlConnections;headercontainer;text_Root>Текущий_модуль>Echo;TreeText';
@@ -68,8 +69,9 @@ for(const [stage,title]of Object.entries(cases))test(title,async()=>{
    if(stage==='placement_late_changed'&&navigated&&selector.includes(item))placementGraph.nodes[0].position.x++;
    if(selector.includes('cmpDiagram')){
     if(!stage.startsWith('placement_'))return {x:500,y:400};
-    const box=stage==='placement_reselect'?{x:324,y:100,right:1274,bottom:794,width:950,height:694}:{x:300,y:100,right:850,bottom:400,width:550,height:300};
-    const occupied=stage==='placement_reselect'?[{left:324,right:navigated?940:1006,top:100,bottom:100+1928*nativeScale-128-.01,width:682,height:694}]:stage==='placement_native'?[{left:300,right:300+550*nativeScale,top:100,bottom:100+300*nativeScale,width:550*nativeScale,height:300*nativeScale}]:(['placement_full','placement_still_full','placement_hidden'].includes(stage)||['placement_crowded','placement_changed','placement_unknown','placement_late_changed'].includes(stage)&&!navigated)?[{left:300,right:850,top:100,bottom:400,width:550,height:300}]:[];
+    const box=['placement_reselect','placement_dense'].includes(stage)?{x:324,y:100,right:1274,bottom:794,width:950,height:694}:{x:300,y:100,right:850,bottom:400,width:550,height:300};
+    const occupied=stage==='placement_reselect'?[{left:324,right:navigated?940:1082,top:100,bottom:100+1928*nativeScale-128-.01,width:navigated?616:758,height:694}]:stage==='placement_native'?[{left:300,right:300+550*nativeScale,top:100,bottom:100+300*nativeScale,width:550*nativeScale,height:300*nativeScale}]:(['placement_full','placement_still_full','placement_hidden'].includes(stage)||['placement_crowded','placement_changed','placement_unknown','placement_late_changed'].includes(stage)&&!navigated)?[{left:300,right:850,top:100,bottom:400,width:550,height:300}]:[];
+    if(stage==='placement_dense')occupied.push({left:324,right:700,top:100,bottom:794,width:376,height:694},{left:950,right:1274,top:100,bottom:794,width:324,height:694});
     const element={scrollLeft:stage==='placement_scrolled'?180:0,scrollTop:stage==='placement_scrolled'?350:0,getBoundingClientRect:()=>box,querySelectorAll:()=>occupied.map(r=>({getBoundingClientRect:()=>r})),contains:()=>false};
     if(stage==='placement_reselect')for(const key of ['scrollLeft','scrollTop'])Object.defineProperty(element,key,{get:()=>0,set:()=>{}});
     const graph={container:element,view:{scale:stage==='placement_reselect'?(navigated?0.3855432894295314:0.4240976183724846):stage==='placement_native'?nativeScale:stage==='placement_scrolled'?0.75:1,translate:stage==='placement_reselect'?{x:0,y:0}:{x:-40,y:-20}}};
@@ -122,6 +124,7 @@ for(const [stage,title]of Object.entries(cases))test(title,async()=>{
    if(stage==='placement_changed')placementGraph.nodes[0].position.x++;
    await args.guard();return {fully_visible:!['placement_hidden','placement_reselect'].includes(stage),zoom_steps:3,navigation_steps:[]};
   },nodePlacementViewport,nodePlacementPoint,nodePlacementOverflow,samePlacementGraph,{});
+  if(stage==='placement_dense'){assert.equal(result.verified,true,result.error);assert.equal(navigationCalls,0);assert.equal(downCount,1);assert.equal(upCount,1);return;}
   if(stage==='placement_reselect'){
    assert.equal(result.verified,true,result.error);assert.equal(zoomClicks,2);assert.equal(outline,false);
    assert.equal(downCount,1);assert.equal(upCount,1);assert.equal(vendorRestores,1);

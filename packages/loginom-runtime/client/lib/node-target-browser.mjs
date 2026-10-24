@@ -511,7 +511,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
           const p=(${nodePlacementPoint.toString()})(view,position),s=view.scale;
           occupied.push({left:p.x-32*s,right:p.x+96*s,top:p.y-40*s,bottom:p.y+160*s});
         }
-        for(let y=80;y<height-80;y+=128)for(let x=80;x<width-96;x+=160){
+        for(const step of [128,32])for(let y=80;y<height-80;y+=step)for(let x=80;x<width-96;x+=step===128?160:step){
           const position=(${nodePlacementPosition.toString()})(view,{x:b.x+x,y:b.y+y});
           if(position.x<${NODE_POSITION_MIN}||position.y<${NODE_POSITION_MIN}||position.x>10000||position.y>10000)continue;
           const screen=(${nodePlacementPoint.toString()})(view,position),px=screen.x,py=screen.y,hit=document.elementFromPoint(px,py);
