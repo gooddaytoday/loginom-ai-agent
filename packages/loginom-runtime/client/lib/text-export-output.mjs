@@ -95,7 +95,7 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
  guard();
  const initial=await read({discover_roots:true,storage_name:name});
  const issued=initial.ui.elements.filter(e=>e.tid===initial.workflow_ref?.prefix+suffix);need(issued.length<=1,'Export file row is ambiguous');
- if(issued.length){const found=await read({root_ref:issued[0].ref});bind(found);need(found.ui.elements.filter(e=>e.tid===found.workflow_ref.prefix+suffix&&e.label===name).length===1,'Export file name changed');return found;}
+ if(issued.length){const found=await read({root_ref:issued[0].ref,storage_name:name});bind(found);need(found.ui.elements.filter(e=>e.tid===found.workflow_ref.prefix+suffix&&e.label===name).length===1,'Export file name changed');return found;}
  let s=await table();bind(s);
  // Shared storage folders grow with every export; t11 needed ~19600 px.
  // The operation deadline still bounds the whole search through guard().
@@ -104,7 +104,7 @@ export async function findNativeStorageRow({name,read,roots,ready,act,guard}) {
   const r=await read({discover_roots:true,storage_name:name});
   const matches=r.ui.elements.filter(e=>e.tid===r.workflow_ref?.prefix+suffix);
   need(matches.length<=1,'Export file row is ambiguous');
-  if(matches.length){const found=await read({root_ref:matches[0].ref});bind(found);need(found.ui.elements.filter(e=>e.tid===found.workflow_ref.prefix+suffix&&e.label===name).length===1,'Export file name changed');return found;}
+  if(matches.length){const found=await read({root_ref:matches[0].ref,storage_name:name});bind(found);need(found.ui.elements.filter(e=>e.tid===found.workflow_ref.prefix+suffix&&e.label===name).length===1,'Export file name changed');return found;}
   s=await table();bind(s);
   const anchors=s.ui.elements.filter(e=>e.tid?.startsWith(s.workflow_ref.prefix+';FileStorageForm;colName_')&&e.scroll&&e.allowed_actions.includes('scroll')&&e.interaction?.state==='point_observed');
   if(!anchors.length)throw unavailable(s,'no_scroll_owner');
@@ -140,11 +140,36 @@ export async function readNativeExportFile(options,ctx,configuration,execution){
  const record=async(phase,data)=>{try{const r=await onRecord({phase,operation_id:operation.id,...data});need(r?.phase===phase&&r.operation_id===operation.id,'Export file receipt not acknowledged');}catch(error){journalFailed=true;throw error;}};
  const base={expected_origin:targetOrigin,expected_build:targetBuild};
  const read=async options=>{
-  guard();const r=await execute(makeWorkspaceUiCode({mode:'observe',...base,...options}));
-  if(r.status!=='SUCCEEDED')throw Object.assign(Error('Export storage observation failed: '+(r.error?.code??'UNKNOWN')+' '+(r.error?.message??'')),{code:r.error?.code});
-  const document=r.output?.dom_epoch?.document;
-  need(typeof document==='string'&&document.length>0&&(!observationDocument||document===observationDocument),'Export observation document changed');
-  observationDocument??=document;return r.output;
+  for(let attempt=0;attempt<3;attempt++){
+   guard();
+   if(attempt&&options.root_ref){
+    const roots=await read({discover_roots:true,...(options.storage_name?{storage_name:options.storage_name}:{})});
+    const matches=roots.ui.elements.filter(e=>e.ref===options.root_ref);
+    need(matches.length===1&&roots.ui.elements.filter(e=>e.tid===matches[0].tid).length===1,'Export observation root changed during scan refresh');
+   }
+   guard();const r=await execute(makeWorkspaceUiCode({mode:'observe',...base,...options}));
+   if(r.status!=='SUCCEEDED'){
+    const limits=r.trace?.filter(t=>t.event==='ui_scan_limit'),scan=limits?.at(-1);
+    const timeRefusal=observationDocument!==null&&readStep==='storage_navigation'&&r.status==='NOT_APPLIED'&&r.action_key==='workspace.observe'&&r.phase==='observing'
+     &&r.effect_possible===false&&r.cleanup_complete===true&&r.error?.code==='UI_SCAN_LIMIT'
+     &&r.output?.observation_required===true&&r.output.scan?.complete===false&&r.output.scan.limit_exceeded===true
+     &&limits?.length>0&&limits.every(t=>t.limit_kind==='time')
+     &&!r.trace.some(t=>['ui_preconditions_verified','ui_gesture_applied'].includes(t.event));
+    if(timeRefusal){
+     // Rediscover this exact DOM root before another no-effect detail read.
+     // Keep the requested name and original node deadline; never replay navigation.
+     await record('export_file_observation_scan_refused',{attempt:attempt+1,
+      scope:options.discover_roots?'roots':options.root_ref?'region':'workspace',
+      limit_kind:'time',scan_stage:['collect','metadata','output_definitions','import_definitions','controls','data_views'].includes(scan.scan_stage)?scan.scan_stage:'unknown',
+      retry:attempt<2});
+     if(attempt<2)continue;
+    }
+    throw Object.assign(Error('Export storage observation failed: '+(r.error?.code??'UNKNOWN')+' '+(r.error?.message??'')),{code:r.error?.code});
+   }
+   const document=r.output?.dom_epoch?.document;
+   need(typeof document==='string'&&document.length>0&&(!observationDocument||document===observationDocument),'Export observation document changed');
+   observationDocument??=document;return r.output;
+  }
  };
  const quiet=s=>s.authenticated&&s.origin===targetOrigin&&s.loginom_build===targetBuild&&!s.ui.dialogs.length&&!s.ui.masks.length;
  const ready=async(observe,condition)=>{
