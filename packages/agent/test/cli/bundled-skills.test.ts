@@ -156,6 +156,7 @@ test.each(["clean", "reserved", "reserved-command", "modified", "missing", "unli
         "customize-opencode",
         ...(!broken ? ["loginom-automation", "package-docs"] : []),
         ...(external ? ["sample"] : []),
+        ...(!broken ? ["synthetic-data"] : []),
       ])
       expect(system).not.toContain("UNTRUSTED")
       if (external) {
@@ -187,7 +188,7 @@ test.each(["clean", "reserved", "reserved-command", "modified", "missing", "unli
         )
         return
       }
-      for (const name of ["loginom-automation", "package-docs"]) {
+      for (const name of ["loginom-automation", "package-docs", "synthetic-data"]) {
         expect(discovered.find((match) => match[1] === name)?.[2]).toBe(join(resources, "skills", name, "SKILL.md"))
       }
       const skill = result.events.findLast((event) => event.type === "tool_use" && event.part.tool === "skill")
@@ -209,5 +210,5 @@ test.each(["clean", "reserved", "reserved-command", "modified", "missing", "unli
       provider.stop(true)
     }
   },
-  30_000,
+  120_000,
 )

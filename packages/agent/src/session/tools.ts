@@ -158,6 +158,11 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     const docs = yield* PackageDocsTool
     definitions.push({ ...(yield* Tool.init(docs)), origin: "builtin" })
   }
+  if (profile !== "package-docs") {
+    const { SyntheticDataTool } = yield* Effect.promise(() => import("@/tool/synthetic-data"))
+    const synthetic = yield* SyntheticDataTool
+    definitions.push({ ...(yield* Tool.init(synthetic)), origin: "builtin" })
+  }
   for (const item of definitions) {
     const origin = item.origin
     const id = item.id
