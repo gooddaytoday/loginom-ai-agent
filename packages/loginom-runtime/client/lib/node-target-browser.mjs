@@ -520,10 +520,10 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         }
         // At minimum native zoom the coarse grid can miss the remaining gap
         // and choose an overflow row beyond the native scroll range (D28).
-        // Only automatic JS gets a bounded finer pass, with identical bounds,
+        // Only automatic JS/Sorting get a bounded finer pass, with identical bounds,
         // model snapping, hit testing and spacing before the usual overflow.
         const grids=[[160,128]];
-        if(${value.target.kind==='new'&&value.target.type==='programming.javascript'&&!value.target.position})grids.push([40,40]);
+        if(${value.target.kind==='new'&&['programming.javascript','transform.sorting'].includes(value.target.type)&&!value.target.position})grids.push([40,40]);
         for(const [dx,dy] of grids)for(let y=80;y<height-80;y+=dy)for(let x=80;x<width-96;x+=dx){
           const position=(${nodePlacementPosition.toString()})(view,{x:b.x+x,y:b.y+y});
           if(position.x<${NODE_POSITION_MIN}||position.y<${NODE_POSITION_MIN}||position.x>10000||position.y>10000)continue;
