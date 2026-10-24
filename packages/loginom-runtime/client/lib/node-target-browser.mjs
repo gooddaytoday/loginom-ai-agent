@@ -330,9 +330,9 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       catch(error){
         if(!settleJavascript)return null;
         if(String(error.message).includes('Graph is blocked') && Date.now()<maskDeadline)return null;
-        if(!String(error.message).includes('Visible port identity is not rendered'))throw error;
+        if(!['Visible port identity is not rendered','Node identity is not rendered'].some(message=>String(error.message).includes(message)))throw error;
         // One create already happened. Wait only for that native JavaScript's
-        // port rendering, under the original deadline; never repeat the drag.
+        // body/port rendering, under the original deadline; never repeat the drag.
         const id=await page.evaluate(({before,icon})=>{
           const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;
           const added=d.FNodes.FCollection.filter(n=>!before.some(id=>id===n.FGuid));
@@ -459,9 +459,9 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         try{return await call(readCode(task({read_bindings:readBindings})),deadline);}
         catch(error){
           const message=String(error.message);
-          if(message.includes('Visible port identity is not rendered')&&Date.now()<renderDeadline){
-            // Headed Chromium can expose the cached port's visible flag one
-            // animation frame before mxGraph attaches its SVG element. This is
+          if(['Visible port identity is not rendered','Node identity is not rendered'].some(value=>message.includes(value))&&Date.now()<renderDeadline){
+            // Restored mxGraph can publish a cached node/port one animation
+            // frame before attaching its SVG. Re-read the complete graph. This is
             // a read-only observation retry; no gesture is repeated.
             // A background document may suspend frames entirely; it must not
             // keep this read pending beyond the enclosing observation budget.

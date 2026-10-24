@@ -15,9 +15,9 @@ function fixture(){
  Object.assign(port,{FGuid:'port-guid',data:{},parent:node,FType:1,FSubType:1});port.FCell.parent=node.FCell;
  let portTid='MF;TF-1;Graph;Calc;Output_Data-0';portDom.getAttribute=()=>portTid;
  node.FLabel={parent:node,FCell:{parent:node.FCell,visible:true},FRawValue:'Calc'};
- let rendered=true,labelRendered=true,onPaint=()=>{},pausedPaint=false;
+ let bodyRendered=true,rendered=true,labelRendered=true,onPaint=()=>{},pausedPaint=false;
  const extraStates=new Map();
- const graph={container:root,getCellAt:()=>wrongHit?{}:port.FCell,view:{getState:cell=>extraStates.get(cell)??(cell===node.FCell?{shape:{node:body}}:cell===node.FLabel.FCell?(labelRendered?{text:{node:labelDom}}:null):rendered?{shape:{node:duplicateShape?alternatePortDom:portDom}}:null)}};
+ const graph={container:root,getCellAt:()=>wrongHit?{}:port.FCell,view:{getState:cell=>extraStates.get(cell)??(cell===node.FCell?(bodyRendered?{shape:{node:body}}:null):cell===node.FLabel.FCell?(labelRendered?{text:{node:labelDom}}:null):rendered?{shape:{node:duplicateShape?alternatePortDom:portDom}}:null)}};
  const model=Object.assign(new ModelForm(),{FCreateDraggedNodeStarted:false,FDraggingOverGraph:false,FDiagram:{FmxGraph:graph,FNodes:{FCollection:[node]}}});
  const packageNode=new PackageTreeNode(),workflowNode=Object.assign(new WorkFlowTreeNode(),{ParentNode:packageNode});
  const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node:workflowNode}},FController:model}})}}}}}};
@@ -45,7 +45,7 @@ function fixture(){
   node.FPorts[0].FCollection.push(port);inside.push(dom);extraStates.set(port.FCell,{shape:{node:dom}});
   return {port,dom,hide:()=>{port.FCell.visible=false;extraStates.set(port.FCell,{});},unrender:()=>extraStates.set(port.FCell,{}),render:()=>extraStates.set(port.FCell,{shape:{node:dom}})};
  };
- return {restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
+ return {hideBody:()=>{bodyRendered=false;},showBody:()=>{bodyRendered=true;},changeDocument:()=>{preparation.id='foreign';},restLink,addService,binding:()=>readGraph(page,{request,types:NODE_TYPES,origin:'http://loginom.test',build:'7.4.2',read_bindings:true}),outline:()=>{outside.push(element(portTid),element(labelDom.getAttribute()));},duplicatePort:()=>{inside.push(element(portTid));},read:()=>adapter.observe(request,Date.now()+1000),input:()=>{portTid='MF;TF-1;Graph;Calc;Input_Data-0';port.FType=0;},alternateShape:()=>{duplicateShape=true;},wrongHit:()=>{wrongHit=true;},losePortTid:()=>{portTid=null;},hide:()=>{rendered=false;},show:()=>{rendered=true;},paintWith:callback=>{onPaint=callback;},pausePaint:()=>{pausedPaint=true;},hideLabel:()=>{labelRendered=false;},port,node,labelDom};
 }
 test('REST service edge is identified by native node/port types and the exact rendered edge, never labels',async()=>{
  const f=fixture(),link=f.restLink(),g=await f.read();
@@ -167,4 +167,18 @@ test('only one owned unlinked output AddPort is outside the JavaScript data-port
  const changed=fixture();changed.node.FIconCls='bg-vendor-icon-javascript';await changed.binding();
  changed.port.FSubType=10;delete changed.port.FGuid;changed.losePortTid();
  await assert.rejects(changed.binding(),/port.*(identity|native type)/i);
+});
+
+
+test('pending native node body is fully rebound on the next paint without skipping its identity',async()=>{
+ const f=fixture();f.hideBody();
+ await assert.rejects(f.binding(),/Node identity is not rendered/);
+ f.paintWith(()=>f.showBody());
+ const graph=await f.read();assert.equal(graph.complete,true);assert.equal(graph.nodes[0].ref.node_id,'n');
+});
+test('node body rendering wait rechecks the prepared document and keeps a finite deadline',async()=>{
+ const foreign=fixture();foreign.hideBody();foreign.paintWith(()=>foreign.changeDocument());
+ await assert.rejects(foreign.read(),/Prepared graph document changed/);
+ const absent=fixture();absent.hideBody();absent.pausePaint();
+ await assert.rejects(absent.read(),/Node identity is not rendered/);
 });
