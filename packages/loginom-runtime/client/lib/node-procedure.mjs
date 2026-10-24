@@ -695,7 +695,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (preparedSteps.length > 512) { preparedSteps.shift(); preparedStepsTrimmed = true; }
       signal?.throwIfAborted();
       if (now() >= operation.deadline) throw new Error('Node procedure deadline elapsed before mutation');
-      const openingWait=preparedNodeContext&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(action.verb)
+      // A dispatched visualizers opening replaces the graph asynchronously,
+      // just like a wizard opening. Settle it once within the original budget.
+      const openingWait=preparedNodeContext&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views'].includes(action.verb)
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
       const settlementWait=preparedNodeContext&&['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(action.verb)
         ?Math.max(1,Math.floor(operation.deadline-now())):null;

@@ -4463,9 +4463,9 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) 
     ||options.settlement_timeout_ms<1||options.settlement_timeout_ms>1800000))
     throw Error('Mask settlement requires a bound completion action and the remaining node deadline');
   if(options.opening_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
-    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(options.action?.verb)
+    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views'].includes(options.action?.verb)
     ||!Number.isInteger(options.opening_timeout_ms)||options.opening_timeout_ms<1||options.opening_timeout_ms>1800000))
-    throw Error('Extended opening wait requires a bound node wizard and the remaining node deadline');
+    throw Error('Extended opening wait requires a bound node opening and the remaining node deadline');
   if(options.mode==='act'&&['begin_wizard','confirm_wizard_deactivation','cancel_process'].includes(options.action?.verb)
     &&!options.prepared_node_context)throw Error('Node wizard deactivation requires a prepared native node binding');
   if(options.prepared_node_context!==undefined)validatePreparedNodeContext(options.prepared_node_context);
