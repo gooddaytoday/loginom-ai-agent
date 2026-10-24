@@ -120,6 +120,39 @@ test('ready condition completes without redundant identical snapshots', async ()
   const f = fixture(); await f.channel.observe({ condition: 'button usable', ready: () => true });
   assert.equal(f.records.filter(r => r.phase === 'node_observation_sample').length, 1);
 });
+for(const readMs of [20,350])test('pending polling includes the read time in its 200 ms interval: '+readMs,async()=>{
+  let clock=1,checks=0,reads=0;const starts=[],waits=[];
+  const f=fixture({now:()=>clock,monotonicNow:()=>clock,
+    onRead:()=>{if(++reads%2)starts.push(clock);clock+=readMs;},
+    wait:async ms=>{waits.push(ms);clock+=ms;}});
+  await f.channel.observe({condition:'prepared node available for process console',ready:()=>++checks===3});
+  assert.deepEqual(starts,readMs===350?[1,701,1401]:[1,201,401]);
+  assert.deepEqual(waits,readMs===350?[]:[160,160]);
+  assert.equal(f.records.at(-1).readiness.elapsed_ms,readMs===350?2100:440);
+  assert.equal(f.records.filter(r=>r.phase==='node_observation_sample').length,3);
+  assert.ok(!f.events.includes('mutated'));
+});
+test('pending polls accelerate without shortening the two ready identity confirmations',async()=>{
+  let clock=1,checks=0;const waits=[];
+  const f=fixture({now:()=>clock,monotonicNow:()=>clock,onRead:()=>{clock+=350;},
+    wait:async ms=>{waits.push(ms);clock+=ms;}});
+  await f.channel.observe({condition:'new Table card bound to output',ready:()=>++checks>1,
+    confirmIdentity:()=>({view:'same-owned-table'})});
+  assert.deepEqual(waits,[200]);
+  assert.deepEqual(f.records.filter(r=>r.phase==='node_observation_sample').map(r=>r.readiness.satisfied),[false,true,true]);
+  assert.equal(f.records.at(-1).readiness.required_samples,2);
+  assert.equal(f.records.at(-1).readiness.elapsed_ms,2300);
+});
+test('pending polling retains the original deadline and leaves no refs after expiry',async()=>{
+  let clock=1;const f=fixture({now:()=>clock,monotonicNow:()=>clock,onRead:()=>{clock+=350;},
+    wait:async ms=>{clock+=ms;}});
+  const deadline=f.operation.deadline;
+  await assert.rejects(f.channel.observe({condition:'pending table',timeoutMs:1500,ready:()=>false}),/readiness timeout/);
+  assert.equal(f.operation.deadline,deadline);
+  assert.equal(f.records.find(r=>r.phase==='node_observation_timeout').effect_possible,false);
+  await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+  assert.ok(!f.events.includes('mutated'));
+});
 test('foreign receipt cannot confirm original cleanup', async () => {
   const f = fixture({ foreignReceipt: true }); await f.channel.observe({ condition: 'button usable', ready: s => s.ui.elements.some(e => e.ref === 'ui-button') });
   await assert.rejects(f.channel.act({ verb: 'click', ref: 'ui-button' }), /receipt identity differs/);
