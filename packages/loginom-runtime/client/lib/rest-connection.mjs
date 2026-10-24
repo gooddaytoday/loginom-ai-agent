@@ -1,7 +1,11 @@
+import {readGraph} from './node-target-browser.mjs';
+import {NODE_TYPES} from './node-contracts.mjs';
+import {nodePlacementViewport,nodePlacementPoint,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from './node-placement.mjs';
+
 // Fixed native UI procedure, invoked under the node operation's existing gate,
 // journal and browser receipt. No connection RPC or Loginom mutation API is used.
-export function makeRestConnectionCode(task){return `async page=>(${restConnectionCapability.toString()})(page,${JSON.stringify(task)})`;}
-export async function restConnectionCapability(page,t){
+export function makeRestConnectionCode(task){return `async page=>(${restConnectionCapability.toString()})(page,${JSON.stringify(task)},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${nodePlacementOverflow.toString()},${samePlacementGraph.toString()},${JSON.stringify(NODE_TYPES)})`;}
+export async function restConnectionCapability(page,t,readPlacementGraph=readGraph,reveal=revealNodePlacement,readViewport=nodePlacementViewport,project=nodePlacementPoint,overflow=nodePlacementOverflow,sameGraph=samePlacementGraph,types=NODE_TYPES){
  const need=(v,m)=>{if(!v)throw Error('REST connection: '+m);};
  const remaining=()=>{const ms=t.deadline-Date.now();need(ms>0,'operation deadline exceeded');return ms;};
  const find=tid=>page.locator('[data-tid='+JSON.stringify(tid)+']');
@@ -11,7 +15,7 @@ export async function restConnectionCapability(page,t){
   if(p?.document!==document||p.id!==t.document_id||!r)throw Error('Prepared workflow is unavailable');
   return {p,r,workflow:r.nodeTargetWorkflowNode,module:r.nodeTargetWorkflowNode.ParentNode,packageNode:r.packageNode,tab:r.tab};
  },t);
- let effect=false;
+ let effect=false,placementNavigation;
  try{
   const guard=async()=>{
    remaining();need(await page.evaluate(({b,t})=>{
@@ -178,7 +182,8 @@ export async function restConnectionCapability(page,t){
   });
   const beforeGraph=await page.evaluate(b=>{const m=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;if(m?.constructor.name!=='ModelForm')throw Error('Original graph is unavailable');return m.FDiagram.FNodes.FCollection.map(n=>({id:n.FGuid,y:n.FCell.geometry.y}));},owner);
   need(beforeGraph.length<50,'graph exceeds stage-1 bound');
-  const target=await find(graphTid).evaluate((e,y)=>{
+  const canvas=find(graphTid);
+  const chooseTarget=()=>canvas.evaluate((e,y)=>{
    const m=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController,g=m.FDiagram.FmxGraph,r=e.getBoundingClientRect();
    if(g.container!==e||!Number.isFinite(g.view.scale)||g.view.scale<=0||![g.view.translate.x,g.view.translate.y,e.scrollLeft,e.scrollTop].every(Number.isFinite))throw Error('Native canvas transform unavailable');
    const occupied=[...e.querySelectorAll('[data-tid*=";Graph;"]')].map(n=>n.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
@@ -188,9 +193,7 @@ export async function restConnectionCapability(page,t){
     const hit=document.elementFromPoint(p.x,p.y);
     return !!hit&&(hit===e||e.contains(hit))&&!occupied.some(r=>p.x>r.left-72&&p.x<r.right+96&&p.y>r.top-56&&p.y<r.bottom+72);
    };
-   // The preferred row below all nodes can be outside a reopened/scrolled
-   // graph. Find free visible space before the sole drag, without navigation
-   // or replaying connection creation when the graph grows.
+   // Prefer existing visible space; navigate only when that space is full.
    if(y<=10000&&free(project(128,y)))return project(128,y);
    for(let py=Math.max(0,r.y)+80;py<Math.min(r.bottom,innerHeight)-80;py+=128)
     for(let px=Math.max(0,r.x)+80;px<Math.min(r.right,innerWidth)-96;px+=160){
@@ -199,13 +202,39 @@ export async function restConnectionCapability(page,t){
      if(x<64||y<64||x>10000||y>10000)continue;
      const p=project(x,y);if(free(p))return p;
     }
-   throw Error('REST connection: no free visible connection position');
+   return null;
   },Math.max(64,...beforeGraph.map(n=>n.y))+150);
-  const source=await wait('reachable connection palette item',async()=>{try{return await point(find(item));}catch{return null;}});await guard();effect=true;await page.mouse.move(source.x,source.y);await page.mouse.down();
+  let target=await chooseTarget(),placementGuard;
+  if(!target){
+   const graphTask={request:{document_id:t.document_id,workflow_ref:t.workflow_ref},origin:t.origin,build:t.build,types};
+   const before=await readPlacementGraph(page,graphTask);
+   need(before.complete===true&&before.interaction_ready===true,'complete idle graph required for placement');
+   placementGuard=async()=>{await guard();need(sameGraph(before,await readPlacementGraph(page,graphTask)),'Graph changed during connection placement');};
+   let initialViewport,totalZoomSteps=0;
+   // A visible point alone may still leave no room for the connection's
+   // footprint. Continue only settled view navigation, never the drag.
+   for(let pass=0;!target&&pass<3;pass++){
+    await placementGuard();const view=await canvas.evaluate(readViewport);initialViewport??=view;
+    const occupied=await canvas.evaluate(e=>[...e.querySelectorAll('[data-tid*=";Graph;"]')].map(n=>{const r=n.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};}).filter(r=>r.width>0&&r.height>0));
+    const position=overflow(view,occupied,64,10000);
+    need(position,'no free visible connection position or bounded model position');
+    const navigation=await reveal({page,root:canvas,position,prefix:t.workflow_ref.prefix,remaining,readViewport,project,guard:placementGuard});
+    totalZoomSteps+=navigation.zoom_steps;
+    placementNavigation={...navigation,initial_viewport:initialViewport,passes:pass+1,total_zoom_steps:totalZoomSteps};
+    await placementGuard();need(navigation.fully_visible===true,'connection placement is not fully visible');
+    // Zoom redraws the graph. Recheck occupied rectangles and the hit surface;
+    // never reuse pre-navigation screen pixels.
+    target=await chooseTarget();
+   }
+   need(target,'no free visible connection position after navigation');
+  }
+  const source=await wait('reachable connection palette item',async()=>{try{return await point(find(item));}catch{return null;}});
+  if(placementGuard){await placementGuard();target=await chooseTarget();need(target,'no free visible connection position before drag');}
+  await guard();effect=true;await page.mouse.move(source.x,source.y);await page.mouse.down();
   try{await page.mouse.move(target.x,target.y,{steps:12});}finally{await page.mouse.up();}
   const reference=await wait('connection graph reference',()=>page.evaluate(before=>{const m=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;const added=m.FDiagram.FNodes.FCollection.filter(n=>!before.some(b=>b.id===n.FGuid));if(added.length>1)throw Error('Unexpected graph additions');const n=added[0];if(!n)return null;const ports=(n.FPorts??[]).flatMap(p=>p.FCollection??[]);if(ports.length!==1)throw Error('New node is not a connection reference');const tid=m.FDiagram.FmxGraph.view.getState(ports[0].FCell)?.shape?.node?.getAttribute('data-tid');if(!tid)return null;if(!tid.endsWith(';Output_Connection-0'))throw Error('New node is not a connection reference');return {node_id:n.FGuid};},beforeGraph));
   await click(t.workflow_ref.prefix+';ModelForm;pnlVendorsContainer;p.h;p.t');await quiet();
-  return {verified:true,cleanup_complete:true,effect_possible:true,connection:{name:persisted.name,base_url:persisted.base_url,method:'GET',url_mode:'query',authentication:'none',verify_server_certificate:true,...(t.connection.response_content_type!==undefined?{response_content_type:persisted.response_content_type}:{}),query_parameters:persisted.parameters.map(p=>p.name),reference_node_id:reference.node_id},document_id:t.document_id,workflow_id:t.workflow_ref.workflow_id};
- }catch(error){return {verified:false,cleanup_complete:!effect,effect_possible:effect,error:String(error.message).slice(0,1000)};}
+  return {verified:true,cleanup_complete:true,effect_possible:true,...(placementNavigation?{placement_navigation:placementNavigation}:{}),connection:{name:persisted.name,base_url:persisted.base_url,method:'GET',url_mode:'query',authentication:'none',verify_server_certificate:true,...(t.connection.response_content_type!==undefined?{response_content_type:persisted.response_content_type}:{}),query_parameters:persisted.parameters.map(p=>p.name),reference_node_id:reference.node_id},document_id:t.document_id,workflow_id:t.workflow_ref.workflow_id};
+ }catch(error){return {verified:false,cleanup_complete:!effect,effect_possible:effect,...(placementNavigation?{placement_navigation:placementNavigation}:{}),error:String(error.message).slice(0,1000)};}
  finally{await owner.dispose();}
 }
