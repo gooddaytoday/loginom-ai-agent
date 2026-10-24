@@ -737,9 +737,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     // Fixed handlers supply the readiness condition and domain identity. Caller
     // input never contains a resolver or a recipe. Only a durably recorded,
-    // strictly pre-gesture epoch/scan refusal or proved body replacement
+    // strictly pre-gesture epoch/scan refusal, owned busy mask or proved body replacement
     // permits a new local attempt with unchanged identity and intent.
-    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, processControl }) {
+    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, processControl }) {
       if (typeof resolve !== 'function' || typeof identity !== 'function') {
         throw new Error('A bound action resolver and domain identity are required');
       }
@@ -812,7 +812,27 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const bodyRefusal=r.phase==='preconditions'&&['UI_REFERENCE_STALE','UI_REFERENCE_OBSCURED'].includes(r.error?.code)
             &&bodyRefreshes===0&&typeof refreshReplacedBody==='function'
             &&refreshReplacedBody({receipt:r,observation:observed,action})===true;
-          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal)throw error;
+          const wizard=observed.wizard,after=r.output,control=observed.ui.elements.find(e=>e.ref===action.ref);
+          const covered=after?.ui?.elements?.filter(e=>e.tid===control?.tid);
+          // An opting-in picker may wait for its own late loading mask only
+          // after a matched no-effect refusal. A new read must clear every
+          // blocker and rebind the same owner/field before another guarded act.
+          const busyRefusal=refreshWizardBusy===true&&!!preparedNodeContext&&action.verb==='click'
+            &&r.phase==='preconditions'&&r.error?.code==='UI_REFERENCE_OBSCURED'
+            &&wizard?.status==='observed'&&after?.wizard?.status==='observed'
+            &&['root_ref','root_tid','stage'].every(k=>wizard[k]&&wizard[k]===after.wizard[k])
+            &&[observed,after].every(s=>s.prepared_node_context?.surface==='wizard'&&s.prepared_node_context.tid===wizard.root_tid)
+            &&control?.wizard_combo?.kind==='picker'&&control.wizard_combo.field?.root_ref===wizard.root_ref
+            &&covered?.length===1&&covered[0].wizard_combo?.kind==='picker'
+            &&covered[0].wizard_combo.field?.root_ref===wizard.root_ref
+            &&covered[0].wizard_combo.field.name===control.wizard_combo.field.name
+            &&covered[0].interaction?.state==='point_not_observed'
+            &&covered[0].interaction.covering?.length===1&&covered[0].interaction.covering[0].tid===wizard.root_tid
+            &&after.ui.dialogs?.length===0&&after.ui.masks?.length===1
+            &&after.ui.masks[0].kind==='busy'&&after.ui.masks[0].ref===wizard.root_ref
+            &&after.ui.masks[0].target_tid===wizard.root_tid&&after.ui.masks[0].dialog_ref===null;
+          if(busyRefusal)assertContext(after,true);
+          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal&&!busyRefusal)throw error;
           if(bodyRefusal)bodyRefreshes++;
           const event = await entry('node_step_refresh_authorized', {
             step:operation.nodeStepSequence,internal_operation_id:r.operation_id,
@@ -822,6 +842,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             ...(bodyRefusal?{reason:'prepared_graph_body_replaced'}:{}),
             ...(scanRefusal?{reason:'read_scan_time_limit'}:{}),
             ...(graphRefusal?{reason:'graph_execution_context_changed'}:{}),
+            ...(busyRefusal?{reason:'owned_wizard_busy_mask'}:{}),
           });
           if (event?.rejected_operation_id !== r.operation_id || event.retry !== attempt + 1
             || event.binding_sha256 !== binding || event.intent_sha256 !== intent) {
