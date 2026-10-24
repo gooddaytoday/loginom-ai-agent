@@ -716,6 +716,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // Long export/package captions can overflow the node breadcrumb itself.
     // This is context text only: gestures still require visible controls and
     // the current native node wizard or exact input0/native input1 opening.
+    const javascriptPort=preparedInputPort??preparedOutputPort;
     const hiddenExportNode=e=>(e.querySelectorAll('.bg-vendor-icon-exporttextfile').length===1&&(preparedNodeWizard&&['text_export_params','text_export_format','done'].includes(wizard.stage)
         ||preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===1
           &&preparedInputPort.node_icon_class==='bg-vendor-icon-exporttextfile')
@@ -724,10 +725,11 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // already verified. Read their context without making hidden controls actionable.
       ||preparedNodeWizard&&['text_import_file','text_import_format','output_mapping','done'].includes(wizard.stage)
         &&e.querySelectorAll('.bg-vendor-icon-importtextfile').length===1
-      ||preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===0
-        &&preparedInputPort.node_icon_class==='bg-vendor-icon-javascript'
-        &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
-        &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+      ||(preparedInputPort?.direction==='input'&&!preparedOutputPort||preparedOutputPort?.direction==='output'&&!preparedInputPort)
+        &&javascriptPort.port===0&&javascriptPort.native_index===0
+        &&javascriptPort.node_icon_class==='bg-vendor-icon-javascript'
+        &&typeof javascriptPort.port_guid==='string'&&javascriptPort.port_guid.length>0
+        &&typeof javascriptPort.opening_operation_id==='string'&&javascriptPort.opening_operation_id.length>0
         &&e.querySelectorAll('.bg-vendor-icon-javascript').length===1
       // Show Node can leave the same caption hidden in the node overview.
       // Its exact native navigation binding distinguishes it from the workflow.
@@ -767,7 +769,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&e.textContent.trim()==='Выходные порты'&&(getTid(e)??'').endsWith('>Выходные_порты')
           &&e.querySelectorAll('.maptree-icon-modeloutputports').length===1
           &&(tids.get((getTid(e)??'').slice(0,-'>Выходные_порты'.length))??[]).filter(parent=>panels[0].contains(parent)
-            &&visible(parent)&&parent.querySelectorAll('.'+preparedOutputPort.node_icon_class).length===1).length===1;
+            &&(visible(parent)||hiddenExportNode(parent))&&parent.querySelectorAll('.'+preparedOutputPort.node_icon_class).length===1).length===1;
         const overflowNodeSettings=e=>preparedNodeWizard===true&&getComputedStyle(e).display==='none'
           &&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
           &&e.textContent.trim()==='Настройка'&&(getTid(e)??'').endsWith('>Настройка')
