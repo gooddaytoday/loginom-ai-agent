@@ -3481,6 +3481,40 @@ test('Sorting input definition never exempts secret cells or incomplete rendered
   }
 });
 
+function sortingOutputMetadataFixture(last='Quantity') {
+  const f=sortingInputMetadataFixture(last);
+  for(const e of [f.form,...f.form.descendants()])if(e.attrs['data-tid'])
+    e.attrs['data-tid']=e.attrs['data-tid'].replace('TuneDataSourceMappingWizard','DerivedDataSourceOutputSocketWizard').replace('colUsageType_','colDefaultUsageType_');
+  f.base=f.base.replace('TuneDataSourceMappingWizard','DerivedDataSourceOutputSocketWizard');
+  f.port.direction='output';f.port.opening_operation_id='sort-codes:output';
+  f.read=(options={})=>vm.runInContext('('+workspaceUiCapability.toString()+')',f.page.context)(f.page,
+    {expected_build:build,expected_origin:origin,prepared_node_context:f.binding,mode:'observe',...options},
+    async()=>({verified:true,surface:'wizard',output_port:f.port}));
+  return f;
+}
+test('Sorting output definition reads Token after the verified input page',async()=>{
+  const f=sortingOutputMetadataFixture(),r=await f.read({output_column_page:{offset:0,limit:8}});
+  assert.equal(r.output.wizard.output_columns?.page?.status,'complete_definition_page');
+  assert.equal(r.output.wizard.output_columns.page.total_columns,5);
+  assert.deepEqual(Array.from(r.output.wizard.output_columns.fields,x=>x.name),f.names);
+  assert.deepEqual(f.page.events,[]);assert.ok(!JSON.stringify(r).includes('PRIVATE_DATA_VALUE'));
+});
+test('Sorting output metadata requires its exact owned output0 and secret-free definition cells',async()=>{
+  for(const mode of ['unbound','foreign_node','direction','port','index','guid','opening','family','secret']) {
+    const f=sortingOutputMetadataFixture();
+    if(mode==='foreign_node')f.port.node_icon_class='bg-vendor-icon-groupdata';
+    if(mode==='direction')f.port.direction='input';
+    if(mode==='port')f.port.port=1;
+    if(mode==='index')f.port.native_index=1;
+    if(mode==='guid')delete f.port.port_guid;
+    if(mode==='opening')delete f.port.opening_operation_id;
+    if(mode==='family')for(const e of [f.form,...f.form.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('DerivedDataSourceOutputSocketWizard','ColumnsMappingEngineOutputPortWizard');
+    if(mode==='secret')f.rows[0].children[4].attrs['aria-label']='secret';
+    const r=await f.read({output_column_page:{offset:0,limit:8},...(mode==='unbound'?{prepared_node_context:undefined}:{})});
+    assert.notEqual(r.output.wizard.output_columns?.page?.status,'complete_definition_page',mode);assert.deepEqual(f.page.events,[],mode);
+  }
+});
+
 test('Calculator output definition completes Token metadata without exposing dataset values',async()=>{
   for(const family of ['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard'])for(const name of ['OrdinaryName','Token']) {
     const f=calculatorOutputMetadataFixture(name,family),result=await f.read({output_column_page:{offset:0,limit:8}});

@@ -432,7 +432,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       const port=input?preparedInputPort:preparedOutputPort,usage=input?'colUsageType_':'colDefaultUsageType_';
       if(output ? !['colName_','colDisplayName_','colDataKind_',usage,'colSourceDisplayName_'].includes(match[3])
         || definitionPrefix!==match[1] || port?.direction!==(input?'input':'output')
-        || port.node_icon_class!==(input?'bg-vendor-icon-sorting':'bg-vendor-icon-calcdata')
+        || (input ? port.node_icon_class!=='bg-vendor-icon-sorting'
+          : port.node_icon_class!=='bg-vendor-icon-calcdata'
+            && !(match[2]==='DerivedDataSourceOutputSocketWizard'&&port.node_icon_class==='bg-vendor-icon-sorting'))
         || port.port!==0 || port.native_index!==0
         || typeof port.port_guid!=='string' || !port.port_guid
         || typeof port.opening_operation_id!=='string' || !port.opening_operation_id
