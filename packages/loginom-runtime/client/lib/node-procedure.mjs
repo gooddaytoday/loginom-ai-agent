@@ -543,8 +543,22 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(readProcesses) {
           result.output.node_processes=nativeProcesses;
           if(nativeProcesses.node_context&&JSON.stringify(canonical(nativeProcesses.node_context))
-            !==JSON.stringify(canonical(result.output.prepared_node_context)))
+            !==JSON.stringify(canonical(result.output.prepared_node_context))) {
+            const {locked:nativeLocked,...nativeOwner}=nativeProcesses.node_context;
+            const {locked:uiLocked,...uiOwner}=result.output.prepared_node_context;
+            // Execute/completion can change FLocked between these two reads.
+            // Discard the mixed snapshot; never use it to authorize a gesture.
+            if(nativeOwner.verified===true&&nativeOwner.surface==='graph'
+              &&typeof nativeLocked==='boolean'&&typeof uiLocked==='boolean'&&nativeLocked!==uiLocked
+              &&JSON.stringify(canonical(nativeOwner))===JSON.stringify(canonical(uiOwner))) {
+              await entry('node_observation_lock_retried',{step,sample,internal_operation_id:id,condition,
+                native_node_context:structuredClone(nativeProcesses.node_context),
+                ui_node_context:structuredClone(result.output.prepared_node_context)});
+              satisfied=false;confirmations=0;previousIdentity=undefined;
+              continue;
+            }
             throw new Error('Native process/output context changed during observation');
+          }
         }
         if(readTraining)result.output.node_training_read=true;
         if(boundWizardConfirmation(result.output,wizardConfirmation))result.output.node_wizard_confirmation=structuredClone(wizardConfirmation);
