@@ -4720,6 +4720,35 @@ async function restInputPortOverflowFixture() {
   return fixture;
 }
 
+test('D47b native REST input0/index2 keeps hidden node and folder context',async()=>{
+ for(const mode of ['valid','missing_opening','foreign_port','wrong_port','wrong_native_index','wrong_icon','wrong_caption','foreign_path','hidden_panel','hidden_workflow','missing_icon','hidden_visibility','hidden_attribute','zero_opacity','secret_node','duplicate_icon','wrong_folder']){
+  const {page,binding,crumbs,panel,opening,preparation}=await restInputPortOverflowFixture();
+  opening.node.FIconCls='bg-vendor-icon-restclient';
+  for(const i of [5,6]){crumbs[i].style.display='none';crumbs[i].box={x:0,y:0,width:0,height:0};for(const icon of crumbs[i].children)icon.box={x:0,y:0,width:0,height:0};}
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='missing_opening')preparation.inputPortOpenReceipts.clear();
+  if(mode==='foreign_port')opening.port.FGuid='foreign';
+  if(mode==='wrong_port')opening.portIndex=1;
+  if(mode==='wrong_native_index'){opening.nativeIndex=1;opening.portTree.FIndex=1;opening.port.FPortIndex=1;}
+  if(mode==='wrong_icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
+  if(mode==='wrong_caption')crumbs[7].ownText='Источник данных запроса 2';
+  if(mode==='foreign_path')crumbs[7].attrs['data-tid']=crumbs[7].attrs['data-tid'].replace('TF-5','TF-3');
+  if(mode==='hidden_panel')panel.style.display='none';
+  if(mode==='hidden_workflow')crumbs[4].style.display='none';
+  if(mode==='missing_icon')crumbs[8].children[0].remove();
+  if(mode==='hidden_visibility')crumbs[5].style.visibility='hidden';
+  if(mode==='hidden_attribute')crumbs[5].attrs.hidden='';
+  if(mode==='zero_opacity')crumbs[5].style.opacity='0';
+  if(mode==='secret_node')crumbs[5].attrs['aria-label']='password';
+  if(mode==='duplicate_icon')page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[5]).attrs.class='bg-vendor-icon-restclient';
+  if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
+  const result=await page.execute({mode:'observe',prepared_node_context:binding});
+  if(result.status==='SUCCEEDED')assert.equal(result.output.wizard.input_port_context?.status==='observed',mode==='valid',mode);
+  else assert.notEqual(mode,'valid',mode);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('owned REST input recognizes its request-data caption in breadcrumb overflow',async()=>{
   const {page,binding}=await restInputPortOverflowFixture();
   const full=await page.execute({mode:'observe',prepared_node_context:binding});

@@ -731,6 +731,11 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         &&typeof javascriptPort.port_guid==='string'&&javascriptPort.port_guid.length>0
         &&typeof javascriptPort.opening_operation_id==='string'&&javascriptPort.opening_operation_id.length>0
         &&e.querySelectorAll('.bg-vendor-icon-javascript').length===1
+      ||preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===2
+        &&preparedInputPort.node_icon_class==='bg-vendor-icon-restclient'
+        &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+        &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+        &&e.querySelectorAll('.bg-vendor-icon-restclient').length===1
       // Show Node can leave the same caption hidden in the node overview.
       // Its exact native navigation binding distinguishes it from the workflow.
       ||wizard.status==='absent'&&preparedNodeId&&preparedGraphTid?.startsWith(workflow?.prefix+';Graph;')
@@ -884,16 +889,21 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const joinInputOverflow=preparedInputPort?.direction==='input'&&[0,1].includes(preparedInputPort.port)
           &&preparedInputPort.native_index===preparedInputPort.port&&preparedInputPort.node_icon_class==='bg-vendor-icon-joindata'
           &&crumbs.length===9&&crumbs[5].querySelectorAll('.bg-vendor-icon-joindata').length===1;
+        const restInputOverflow=preparedInputPort?.direction==='input'&&preparedInputPort.port===0
+          &&preparedInputPort.native_index===2&&preparedInputPort.node_icon_class==='bg-vendor-icon-restclient'
+          &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+          &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+          &&crumbs.length===9&&crumbs[5].querySelectorAll('.bg-vendor-icon-restclient').length===1;
         if(crumbs.length>32)context.status='bounded';
         else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&hiddenExportNode(e)||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
-              ||singleInputOverflow||joinInputOverflow
+              ||singleInputOverflow||joinInputOverflow||restInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1))&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
           // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
           // Join input roles have fixed captions; retain the native port and node icon binding.
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
             &&(i===5&&hiddenExportNode(e)||i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
               &&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
-              ||singleInputOverflow||joinInputOverflow
+              ||singleInputOverflow||joinInputOverflow||restInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1)
               ||i===8&&e.textContent.trim()==='Настройка'||i===7&&(e.textContent.trim()==='Входной источник данных'
               ||preparedInputPort.port===0&&e.textContent.trim()==='Источник данных'
