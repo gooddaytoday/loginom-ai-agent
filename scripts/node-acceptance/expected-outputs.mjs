@@ -41,6 +41,8 @@ export function parseExpectedOutputs(expected){
    &&Array.isArray(output.rows)&&output.rows.length<=100,'EXPECTED_SHAPE_INVALID');
   need(output.output_node_type!=='export_input'||!['output_port','output_node_label'].some(k=>Object.hasOwn(output,k)),
    'EXPECTED_EXPORT_INPUT_OPTIONS_INVALID');
+  need(output.output_node_type!=='table_content'||!['output_port','output_node_label'].some(k=>Object.hasOwn(output,k)),
+   'EXPECTED_CONTENT_OPTIONS_INVALID');
   if(Object.hasOwn(output,'export_destination'))need(output.output_node_type==='export_input'
    &&typeof output.export_destination==='string'&&/^\/(?:[^/\\\x00-\x1f]+\/)*[^/\\\x00-\x1f]+$/.test(output.export_destination)
    &&!output.export_destination.split('/').some(p=>p==='.'||p==='..'),'EXPECTED_EXPORT_DESTINATION_INVALID');
@@ -61,7 +63,34 @@ export function parseExpectedOutputs(expected){
   }
  }
  need(!outputs.some(o=>Object.hasOwn(o,'export_destination'))||outputs.filter(o=>o.output_node_type==='export_input').length===1,'EXPECTED_EXPORT_INPUT_OPTIONS_INVALID');
- return {multiple,outputs};
+ // Compatibility with the coefficient oracles: once nodes no longer requires
+ // Regression, its old port-1 selector must not reintroduce that requirement.
+ // Explicit node requirements and unrelated typed outputs retain their meaning.
+ return {multiple,outputs:outputs.map(output=>{
+  if(output.output_node_type!=='datamining.lin_regression'||output.output_port!==1
+   ||output.output_node_label!==undefined||expected.nodes.some(n=>n.type===output.output_node_type)
+   ||output.columns.length!==2||!output.columns.some(c=>c.name==='Name'&&c.type==='string')
+   ||!output.columns.some(c=>c.name.endsWith('_coefficients')&&c.type==='real'))return output;
+  const {output_port,...content}=output;
+  return {...content,output_node_type:'table_content'};
+ })};
+}
+export function selectColdOutputReads(graph,outputs,{exportInput,savedNode}={}){
+ // Without a prescribed node/port, only reading all exposed tabular outputs
+ // can establish both presence and uniqueness. Read failures remain failures.
+ const content=outputs.some(o=>o.output_node_type==='table_content');
+ const types=new Set(outputs.filter(o=>o.output_node_type!=='table_content').map(o=>o.output_node_type));
+ const nodes=graph.nodes.filter(n=>types.has(n.type)&&(!savedNode||n.ref.node_id===savedNode)
+  ||exportInput&&n.ref.node_id===exportInput.node.ref.node_id||content&&n.outputs.length>0);
+ need(nodes.length>0&&(content||nodes.length<=outputs.length),'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
+ return nodes.map(node=>{
+  const requested=outputs.filter(o=>o.output_node_type===node.type
+   &&(o.output_node_label===undefined||o.output_node_label===node.label)).map(o=>o.output_port??0)
+   .concat(exportInput&&node.ref.node_id===exportInput.node.ref.node_id?[exportInput.output_port]:[]);
+  const ports=[...new Set(requested.concat(content?node.outputs:[]))];
+  need(ports.length>0,'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
+  return {node,ports:ports.map(port=>({port,content_candidate:!requested.includes(port)}))};
+ });
 }
 export function resolveExportInput(graph,{destination,destinations}={}){
  const error='COLD_EXTRA_OR_MISSING_OUTPUT_NODE';
@@ -156,24 +185,35 @@ export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,e
  need(allowExtraPortReads?actual.length>=outputs.length:actual.length===outputs.length,'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
  need(new Set(actual.map(a=>JSON.stringify([a.node.node_id,a.output_port??0]))).size===actual.length,'COLD_DUPLICATE_OUTPUT_PORT');
  const used=new Set(),matches=[];
+ const contentOutputs=outputs.filter(o=>o.output_node_type==='table_content');
  for(const [index,want] of outputs.entries()){
   const port=want.output_node_type==='export_input'?exportInput?.output_port:want.output_port??0;
   const csvOrder=want.output_node_type==='export_input'&&want.column_order==='exact'&&exportCsv!==undefined;
-  const candidates=actual.filter(a=>(want.output_node_type==='export_input'
+  const content=want.output_node_type==='table_content';
+  const candidates=content?actual.filter(a=>matchesContentSchema(a.data,want)):actual.filter(a=>(want.output_node_type==='export_input'
    ?exportInput&&a.node.node_id===exportInput.node.ref.node_id&&(a.output_port??0)===exportInput.output_port
    :a.type===want.output_node_type&&(a.output_port??0)===port
     &&(want.output_node_label===undefined||a.label===want.output_node_label))
      &&(!csvOrder||matchesExportCsvOrder(a.data,want,exportCsv))
      &&matchesExpectedOutput(want.output_node_type==='export_input'?exportInputData(a.data,exportInput?.input_fields):a.data,
       csvOrder?{...want,column_order:'any'}:want));
-  const key=candidates.length===1?JSON.stringify([candidates[0].node.node_id,port]):undefined;
-  need(candidates.length===1&&!used.has(key),'COLD_OUTPUT_NOT_UNIQUELY_MATCHED');
-  used.add(key);matches.push({expected_index:index,node:candidates[0].node,output_port:port,execution:candidates[0].execution});
+  const matchedPort=content?candidates[0]?.output_port??0:port;
+  const key=candidates.length===1?JSON.stringify([candidates[0].node.node_id,matchedPort]):undefined;
+  need(candidates.length===1&&!used.has(key)&&(!content||matchesExpectedOutput(candidates[0].data,want)),
+   'COLD_OUTPUT_NOT_UNIQUELY_MATCHED');
+  used.add(key);matches.push({expected_index:index,node:candidates[0].node,output_port:matchedPort,execution:candidates[0].execution});
  }
  // The cold reader may inspect requested ports on indistinguishable nodes
- // before values identify each report. Every observed node must be used.
- need(actual.every(a=>matches.some(m=>m.node.node_id===a.node.node_id)),'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
+ // before values identify each report. Only explicitly marked discovery reads
+ // with unrelated schemas may be unused; extra coefficient tables still refuse.
+ need(actual.every(a=>matches.some(m=>m.node.node_id===a.node.node_id)
+  ||allowExtraPortReads&&contentOutputs.length>0&&a.content_candidate===true
+   &&!contentOutputs.some(want=>matchesContentSchema(a.data,want))),'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
  return matches;
+}
+function matchesContentSchema(data,want){
+ return data.schema?.length===want.columns.length&&new Set(data.schema.map(c=>c.name)).size===want.columns.length
+  &&want.columns.every(c=>data.schema.some(f=>f.name===c.name&&f.type===c.type));
 }
 function matchesExportCsvOrder(data,want,csv){
  if(!['names','labels'].includes(csv?.header)||!Array.isArray(csv.columns))return false;
