@@ -5,7 +5,7 @@ Source upload and persisted package identities must be audited separately.
 """
 from node_procedure_evidence import verify_internal_sequence
 from import_execution_evidence import verify_execution_observations
-from import_output_evidence import verify_port_output
+from import_output_evidence import verify_port_output, verify_port_output_receipts
 
 
 def verify_calculator_output(events,request,expected_columns,expected_rows, *, launch_mode='graph'):
@@ -33,13 +33,7 @@ def verify_calculator_output(events,request,expected_columns,expected_rows, *, l
         if (type(count) is not int or not 0<=count<=wanted
                 or count<wanted and port.get('read_limit')!='preview_cell_or_byte_budget'):
             failures.append('port_output_requested_coverage')
-        reads=[r.get('outcome',{}).get('output',{}) for r in events
-            if r.get('operation_id')==request['operation_id'] and r.get('phase')=='node_port_output_read']
-        if (len(reads)!=1 or any(reads[0].get(k)!=port.get(k) for k in
-                ('port','port_guid','execution_id','sample','row_count','sample_rows','sample_complete','read_limit'))
-                or [{k:c.get(k) for k in ('index','name','label','type')} for c in reads[0].get('schema',[])]
-                !=[{k:c.get(k) for k in ('index','name','label','type')} for c in port.get('schema',[])]):
-            failures.append('port_output_read_receipt')
+        failures.extend(verify_port_output_receipts(events, request['operation_id'], ports))
     except (KeyError,IndexError,TypeError,AttributeError,ValueError) as error:
         failures.append(str(error) if isinstance(error,ValueError) else 'calculator_output_malformed')
     return dict(passed=not failures,failures=sorted(set(failures)),execution_id=execution_id,

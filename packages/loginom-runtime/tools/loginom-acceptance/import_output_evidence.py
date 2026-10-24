@@ -1,4 +1,4 @@
-"""Independent CSV/source, execution and Table audit; no persistence/Hermes proof."""
+"""Independent CSV/source and execution audits with port and retained Table readers."""
 from import_limits import import_operation_step_budget
 
 import csv
@@ -123,6 +123,18 @@ def verify_port_output(port, expected_columns, expected_rows, execution_id, port
     except (KeyError, IndexError, TypeError, AttributeError, ValueError, OverflowError):
         failures.append('port_output_malformed')
     return sorted(set(failures))
+
+
+def verify_port_output_receipts(events, operation_id, ports):
+    """Bind public samples to the actual reader receipts in requested order."""
+    reads = [e.get('outcome', {}).get('output', {}) for e in events
+        if e.get('operation_id') == operation_id and e.get('phase') == 'node_port_output_read']
+    keys = ('port', 'port_guid', 'execution_id', 'sample', 'row_count', 'sample_rows', 'sample_complete', 'read_limit')
+    schema = lambda port: [{k:c.get(k) for k in ('index', 'name', 'label', 'type')} for c in port.get('schema', [])]
+    if len(reads) != len(ports) or any(any(read.get(k) != port.get(k) for k in keys)
+            or schema(read) != schema(port) for read,port in zip(reads,ports)):
+        return ['port_output_read_receipt']
+    return []
 
 
 def verify_table_format_restoration(observations, mutations, table, expected, first_apply, last_page, restore_apply, proof):
@@ -504,6 +516,48 @@ def verify_table_output_observations(observations, mutations, request, source_by
     return sorted(set(failures))
 
 
+def verify_import_port_output(events, operation_id, request, source_bytes, checkpoint, execution_id):
+    """Compare imported output with independently decoded original CSV bytes."""
+    try:
+        settings = request['parameters']['settings']
+        if request.get('target', {}).get('kind') == 'new':
+            settings = source_ordered_settings(settings, source_bytes)
+        expected = [c for c in settings['columns'] if c['used']]
+        if request.get('mappings'):
+            from port_mapping_evidence import configured_mapping_goal
+            if len(request['mappings']) != 1: raise ValueError('one_output_mapping_required')
+            expected = configured_mapping_goal(request['mappings'][0], settings['columns'])
+        groups = [('utf-8-sig', ['UTF-8', '65001', 'UTF-8 (65001)']),
+            ('cp1251', ['Windows-1251', 'CP1251', '1251', 'Кириллическая (1251)']),
+            ('cp1252', ['Windows-1252', 'CP1252', '1252', 'Западноевропейская (1252)']),
+            ('utf-16-le', ['UTF-16 LE', 'UTF-16LE', '1200', 'UTF-16 LE (1200)']),
+            ('utf-16-be', ['UTF-16 BE', 'UTF-16BE', '1201', 'UTF-16 BE (1201)'])]
+        codec = next((codec for codec, aliases in groups if settings['source'].get('encoding', 'UTF-8') in aliases), None)
+        if codec is None: raise ValueError('unsupported_source_encoding')
+        fmt = settings['format']; qualifier = fmt['text_qualifier']
+        records = list(csv.reader(io.StringIO(source_bytes.decode(codec).removeprefix('\ufeff'), newline=''),
+            delimiter=fmt['delimiter'], quotechar=qualifier or None, quoting=csv.QUOTE_MINIMAL if qualifier else csv.QUOTE_NONE))
+        records = records[settings['source']['rows_to_skip']:]
+        names = records.pop(0) if settings['source']['first_line_as_title'] else [c.get('source_name', c['name']) for c in settings['columns']]
+        if len(set(names)) != len(names) or any(len(row) != len(names) for row in records): raise ValueError('source_fixture_shape')
+        indexes = [names.index(c.get('source_name', c['name'])) for c in expected]
+        rows = [[None if row[index] == fmt['null_marker'] or row[index] == '' and c['type'] in ('integer', 'real')
+            else row[index].replace(fmt['decimal_separator'], '.') if c['type'] == 'real' else row[index]
+            for c,index in zip(expected,indexes)] for row in records]
+        ports = checkpoint['output']['ports']
+        if len(ports) != 1 or request['read']['ports'] != [0]: raise ValueError('typed_port_missing')
+        failures = verify_port_output(ports[0], expected, rows, execution_id, 0)
+        failures += verify_port_output_receipts(events, operation_id, ports)
+        if checkpoint.get('execution', {}).get('execution_id') != execution_id: failures.append('output_checkpoint_execution_identity')
+        wanted = min(request['read']['sample_rows'], len(rows))
+        count = ports[0].get('sample_rows')
+        if type(count) is not int or not 0 <= count <= wanted or count < wanted and ports[0].get('read_limit') != 'preview_cell_or_byte_budget':
+            failures.append('port_output_requested_coverage')
+        return failures
+    except (KeyError, IndexError, TypeError, AttributeError, ValueError, UnicodeError):
+        return ['source_port_output_malformed']
+
+
 def _verify_text_import_output(events, request, source_bytes, *, settings_override=None, output_columns_override=None, target_label_override=None):
     base = _verify_text_import(events, request, source_bytes, 'execute', settings_override=settings_override, output_columns_override=output_columns_override, target_label_override=target_label_override)
     seq = verify_internal_sequence(events, request['operation_id'], max_steps=import_operation_step_budget(events, request['operation_id']))
@@ -517,10 +571,10 @@ def _verify_text_import_output(events, request, source_bytes, *, settings_overri
     if len(checkpoints) != 1:
         failures.append('output_checkpoint_missing')
     else:
-        table_request = request if settings_override is None else {**request, 'parameters': {**request['parameters'], 'settings': settings_override}}
+        output_request = request if settings_override is None else {**request, 'parameters': {**request['parameters'], 'settings': settings_override}}
         if output_columns_override is not None:
-            table_request = {**table_request, 'parameters': {**table_request['parameters'], 'settings': {**table_request['parameters']['settings'], 'columns': output_columns_override}}}
-        failures += verify_table_output_observations(seq['observations'], seq['mutations'], table_request, source_bytes, checkpoints[0], execution['execution_id'])
+            output_request = {**output_request, 'parameters': {**output_request['parameters'], 'settings': {**output_request['parameters']['settings'], 'columns': output_columns_override}}}
+        failures += verify_import_port_output(events, request['operation_id'], output_request, source_bytes, checkpoints[0], execution['execution_id'])
     return dict(base, scope='verified_upload_execution_and_output', passed=not failures, failures=sorted(set(failures)), execution_id=execution['execution_id'], execution_verified=not execution['failures'],
                 output_data_verified=not failures, package_persistence_verified=False)
 

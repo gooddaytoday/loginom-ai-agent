@@ -1,14 +1,7 @@
-"""Audit both native filter outputs against independently supplied expected rows.
-
-Each Table retains its real port index/GUID. The complete procedure and execution
-are audited once; the existing Table auditor checks each bounded read/return
-interval with that port's original format and return evidence.
-"""
-import csv
-import io
+"""Audit requested Filter port samples against independent business expectations."""
 from node_procedure_evidence import verify_internal_sequence
 from import_execution_evidence import verify_execution_observations
-from import_output_evidence import verify_table_output_observations
+from import_output_evidence import verify_port_output, verify_port_output_receipts
 
 
 def verify_filter_output(events, request, expected_columns, expected_ports):
@@ -26,63 +19,21 @@ def verify_filter_output(events, request, expected_columns, expected_ports):
         failures.extend(proof['failures'])
         execution_id = proof['execution_id']
         output = checkpoint['output']
-        ports, evidence = output['ports'], output['port_evidence']
+        ports = output['ports']
         if (len(ports) != 2 or [p['port'] for p in ports] != request['read']['ports']
                 or set(request['read']['ports']) != {0, 1} or len(expected_ports) != 2
-                or len({p['port_guid'] for p in ports}) != 2
-                or len(evidence) != 2 or [e['port'] for e in evidence] != request['read']['ports']):
+                or len({p['port_guid'] for p in ports}) != 2):
             raise ValueError('filter_both_distinct_outputs')
-        before = lambda step: next((s for n, s in reversed(observations) if n < step), {})
-        additions = []
-        for step, action, _ in mutations:
-            controls = [e for e in before(step).get('ui', {}).get('elements', []) if e.get('ref') == action.get('ref')]
-            if len(controls) == 1 and controls[0].get('viewer_card', {}).get('kind') == 'add':
-                additions.append((step, controls[0]['viewer_card']['port_guid']))
-        if len(additions) != 2 or [p for _, p in additions] != [p['port_guid'] for p in ports]:
-            raise ValueError('filter_one_new_table_per_port')
-        previous_end, shared_end = 0, additions[0][0] - 1
-        for port, item in zip(ports, evidence):
+        if checkpoint.get('execution', {}).get('execution_id') != execution_id or checkpoint.get('execution', {}).get('status') != 'completed':
+            failures.append('output_checkpoint_execution_identity')
+        failures.extend(verify_port_output_receipts(events, request['operation_id'], ports))
+        for port in ports:
             index = port['port']
-            table = item['table_creation']['table']
-            if (table['port_guid'] != port['port_guid'] or port['table'] != table
-                    or port.get('execution_id') != execution_id or port.get('fresh') is not True):
-                raise ValueError('filter_port_table_execution_identity')
-            returns = []
-            for step, action, _ in mutations:
-                state = before(step)
-                active = state.get('node_outputs', {}).get('tables', [])
-                if (action.get('verb') == 'click'
-                        and action.get('ref') == state.get('workflow_navigation', {}).get('control_ref')
-                        and any(t.get('active') is True and t.get('view_guid') == table['view_guid'] and t.get('port_guid') == table['port_guid'] for t in active)):
-                    returns.append(step)
-            if len(returns) != 1 or returns[0] <= previous_end:
-                raise ValueError('filter_unique_table_return')
-            end = next((n for n, state in observations if n > returns[0]
-                        and state.get('prepared_node_context', {}).get('surface') == 'graph'), None)
-            if end is None:
-                raise ValueError('filter_return_graph_missing')
-            selected = lambda n: n <= shared_end or previous_end < n <= end
-            observed = [(n, state) for n, state in observations if selected(n)]
-            changed = [(n, action, receipt) for n, action, receipt in mutations if selected(n)]
-            selected_checkpoint = {**checkpoint, 'output': {**output, 'ports': [port],
-                'format_restoration': item.get('format_restoration'), 'workflow_return': item['workflow_return']}}
-            marker = '__FILTER_ORACLE_NULL__'
-            rows = expected_ports[index]
-            if (not expected_columns or len({c['name'] for c in expected_columns}) != len(expected_columns)
-                    or any(len(row) != len(expected_columns) or marker in row for row in rows)):
-                raise ValueError('filter_oracle_shape')
-            stream = io.StringIO(newline='')
-            writer = csv.writer(stream, delimiter=';', lineterminator='\n')
-            writer.writerow([c['name'] for c in expected_columns])
-            writer.writerows([[marker if value is None else value for value in row] for row in rows])
-            settings = dict(source=dict(encoding='UTF-8', rows_to_skip=0, first_line_as_title=True),
-                format=dict(delimiter=';', text_qualifier='"', decimal_separator='.', null_marker=marker),
-                columns=[dict(c, used=True) for c in expected_columns])
-            comparison = {**request, 'target': {**request['target'], 'kind': 'existing'}, 'mappings': [], 'parameters': dict(settings=settings)}
-            errors = verify_table_output_observations(observed, changed, comparison, stream.getvalue().encode(),
-                selected_checkpoint, execution_id, output_port_index=index)
-            failures.extend('port_'+str(index)+':'+error for error in errors)
-            previous_end = end
+            failures.extend('port_'+str(index)+':'+error for error in verify_port_output(port, expected_columns, expected_ports[index], execution_id, index))
+            wanted = min(request['read']['sample_rows'], len(expected_ports[index]))
+            count = port.get('sample_rows')
+            if type(count) is not int or not 0 <= count <= wanted or count < wanted and port.get('read_limit') != 'preview_cell_or_byte_budget':
+                failures.append('port_'+str(index)+':port_output_requested_coverage')
     except (KeyError, IndexError, TypeError, AttributeError, ValueError) as error:
         failures.append(str(error) if isinstance(error, ValueError) else 'filter_output_malformed')
     return dict(passed=not failures, failures=sorted(set(failures)), execution_id=execution_id,

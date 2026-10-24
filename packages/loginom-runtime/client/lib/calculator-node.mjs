@@ -338,7 +338,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     }
     if(read.coverage==='full')requireValue(implementation?.fullUiOutput===true&&read.sample_rows===100,
      'Full bounded UI output is unavailable for this handler');
-    if(implementation?.readOutputs){requireValue(multipleOutputs?.verified,'Verified output schemas missing');return implementation.readOutputs(channel,read,ctx,multipleOutputs);}
+    if(implementation?.readOutputs){requireValue(multipleOutputs?.verified,'Verified output schemas missing');return implementation.readOutputs(channel,read,{...ctx,portExecution:executionReceipt},multipleOutputs);}
     const {output}=await channel.readOutputPort({port:0,execution:executionReceipt,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
     const materialized=implementation?.type==='transform.cross_table'&&implementation.materializedSchema
      ?implementation.materializedSchema(output.schema,configured,{node:ctx.node,execution:ctx.execution}):null;

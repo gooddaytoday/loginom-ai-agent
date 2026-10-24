@@ -3,9 +3,7 @@ import {validateRestRequestParameters,restRequestParametersSchema} from './rest-
 import {makeRestConnectionCode} from './rest-connection.mjs';
 import {makeRestRequestCode,makeRestLinkCode} from './rest-request.mjs';
 import {runRestStep} from './rest-step.mjs';
-import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
-import {readTableOutputPages} from './table-output-pages.mjs';
-import {decodeTableOutput} from './table-output-values.mjs';
+import {alignReadSchema} from './node-read-contract.mjs';
 import {createJavascriptCodeNodeSupport} from './javascript-code-node.mjs';
 import {createRedactor} from './redact.mjs';
 import {applyNode,validateNodeApplyRequest} from './node-apply.mjs';
@@ -64,21 +62,18 @@ async function prepareQueryEncoder(options,ctx,config){
  return {source:result.node,output:0,input:0};
 }
 async function readRestOutputs(channel,read,ctx){
- const ports=[],evidence=[];
+ const ports=[];
  for(const port of read.ports){
-  const table=await openNewOutputTable(channel,port),formatProof=read.require_exact_numbers?await configureTablePrecision(channel,table.table):null;
-  let data,settings,restoration;
-  try{
-   settings=await prepareTableRead(channel,table.table);
-   const raw=await readTableOutputPages(channel,table.table,{sampleRows:read.sample_rows});
-   data=decodeTableOutput(raw,{formatProof,readSettings:settings,expectedColumns:outputs[port],requireExactNumbers:read.require_exact_numbers});
-  }finally{if(formatProof)restoration=await restoreTablePrecision(channel,formatProof);}
-  const returned=await returnFromOutputTable(channel,table.table);
-  ports.push({port,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data});
-  evidence.push({port,table_creation:table,format_proof:formatProof,format_restoration:restoration,read_settings:settings,workflow_return:returned});
+  const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
+  need(output.schema.every((field,index)=>field.name===outputs[port][index]?.name),'output field order differs from the native REST schema');
+  const aligned=alignReadSchema(output.schema,outputs[port]);
+  output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
+  ports.push(output);
  }
- return {verified:true,cleanup_complete:true,effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports,port_evidence:evidence};
+ need(new Set(ports.map(p=>p.port_guid)).size===ports.length,'outputs must have distinct native ports');
+ return {verified:true,cleanup_complete:true,effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports};
 }
+
 export function createRestRequestNodeSupport(config){
  const implementation={type:'integration.rest_request',mode:'request',revision:'rest-request-get-v2',parameterSchema:restRequestParametersSchema,validate:validateRestRequestParameters,readback:restRequestReadback,keepExecutionConsoleOpen:true,
   configurationObservation:{condition:'owned REST wizard',ready:s=>s.wizard?.status==='observed'&&s.prepared_node_context?.surface==='wizard'},

@@ -16,7 +16,7 @@ def verify_full_read(events, request, expected_rows):
         need(port['port']==0 and port['fresh'] is True and port['execution_id']==execution['execution_id'], 'fresh_port')
         need(type(port['row_count']) is int and port['row_count']==expected_rows and port['sample_rows']==expected_rows
              and len(port['sample'])==expected_rows and port['sample_complete'] is True, 'complete_counts')
-        need(not any(port.get(k) for k in ('truncated','schema_truncated','sample_truncated')) and port.get('filter_enabled') is False,'untruncated_unfiltered')
+        need(not any(port.get(k) for k in ('truncated','schema_truncated','sample_truncated')) and port.get('filter_enabled') is not True,'untruncated_unfiltered')
         need(bool(port['schema']) and all(len(row)==len(port['schema']) for row in port['sample']), 'complete_width')
         return dict(passed=True,rows=expected_rows,capacity=capacity,scope='read_capacity_and_envelope_only',values_verified=False,schema_verified=False)
     except (KeyError,TypeError,ValueError) as error:
