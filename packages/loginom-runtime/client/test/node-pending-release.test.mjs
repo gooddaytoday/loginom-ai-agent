@@ -4,7 +4,8 @@ import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {createActionRuntime} from '../lib/executor.mjs';
 import {releasePendingNode,proveFinishLaunchRefused,NodeReleaseBlocked} from '../lib/node-pending-release.mjs';
 import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
-import {releaseNodeApply} from '../lib/node-apply.mjs';
+import {applyNode,releaseNodeApply} from '../lib/node-apply.mjs';
+import {validateSortingInputParameters,validateSortingParameters} from '../lib/sorting-parameters.mjs';
 import {nodeJobResultSchema} from '../lib/node-result-schema.mjs';
 import {actions} from './support/executor-fixture.mjs';
 
@@ -246,4 +247,32 @@ test('a refused finish proof keeps the operation and leaves only release',async(
  assert.equal(f.calls.filter(c=>c==='finish').length,1);
  const released=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-1'});
  assert.equal(released.status,'SUCCEEDED');
+});
+
+// #281 reached final readback with no pending phase and could not release.
+// The retained input must instead stop before input Done, using normal release.
+test('Sorting with the retained unbound OrderPosition stops in input_mapping and can release its own draft',async()=>{
+ const ui=surface({wizard:true}),op={...stopped(),id:'sort-retained'};delete op.nodeApply;
+ const native={source_fields:[{record_id:'s',name:'Debt',type:'real'}],
+  target_fields:[{name:'OrderPosition',type:'integer',source:null},{name:'Debt',type:'real',source:{record_id:'s',name:'Debt',type:'real'}}]};
+ const handlers=new Map([['transform.sorting',{revision:'1',modes:['keys'],validate:validateSortingParameters,configure(){assert.fail('Sorting must not configure');},
+  configurationReadback(){assert.fail('Unbound input must never reach final readback');}}]]);
+ const calls=[],verified=async()=>({verified:true,cleanup_complete:true,effect_possible:false});
+ const drivers={verifySource:verified,prepareTarget:async()=>({...await verified(),node}),
+  async mapPorts(){calls.push('input_mapping');validateSortingInputParameters({}, {fields:null},native);assert.fail('Invalid input must not be committed');},
+  async openWizard(){assert.fail('Sorting configuration must not open');},
+  finish:verified,waitExecution:verified,readOutput:verified,
+  releasePending:()=>releasePendingNode({operation:op,channel:ui.channel,readReceipt:async()=>op.receipt})};
+ const request={operation_id:op.id,contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
+  target:{kind:'existing',type:'transform.sorting',ref:node},inputs:[],mode:'keys',parameters:{},mappings:[],finish:'execute',
+  read:{ports:[0],sample_rows:10,require_exact_numbers:true},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const record=async e=>structuredClone(e);
+ const stoppedResult=await applyNode({request,operation:op,handlers,drivers,record});
+ assert.equal(stoppedResult.pending_phase,'input_mapping');assert.match(stoppedResult.error.message,/Sorting input source is missing or changed: OrderPosition/);
+ assert.deepEqual(calls,['input_mapping']);assert.ok(!op.nodeApply.phases.some(p=>['configure','finish','read'].includes(p.phase)));
+ const released=await releaseNodeApply({operation:op,handlers,drivers,record});
+ assert.equal(released.released_phase,'input_mapping');assert.equal(released.pending_phase,null);
+ assert.equal(released.cleanup_complete,true);assert.equal(released.execution.status,'not_requested');
+ assert.equal(released.configuration.status,'discarded');assert.deepEqual(ui.gestures,[{verb:'click',ref:'ui-close'}]);
+ assert.equal(op.nodeApply.pending,null);assert.deepEqual(calls,['input_mapping']);
 });

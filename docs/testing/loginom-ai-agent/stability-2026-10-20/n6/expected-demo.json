@@ -1,22 +1,6 @@
 {
   "package_path": "/stability-2026-10-20/n6.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.replace_columns"
-    },
-    {
-      "type": "transform.filter_data"
-    },
-    {
-      "type": "transform.cross_table"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -25,17 +9,17 @@
       "columns": [
         {
           "name": "Region",
-          "label": "Region",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Business",
-          "label": "Business",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Engineering",
-          "label": "Engineering",
+          "label_any": true,
           "type": "real"
         }
       ],

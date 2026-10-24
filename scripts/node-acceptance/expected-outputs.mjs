@@ -1,4 +1,27 @@
 const need=(v,m)=>{if(!v)throw Error(m);};
+// Read the first CSV record, including quoted separators/newlines and UTF-8 BOM.
+// The complete downloaded file is checked by the scenario's file oracle.
+export function parseExportCsvHeader(text,delimiter=','){
+ need(typeof text==='string'&&text.length<=16777216&&[',',';','\t'].includes(delimiter),'COLD_EXPORT_CSV_INVALID');
+ const fields=[];let value='',quoted=false,closed=false;
+ if(text.startsWith('\uFEFF'))text=text.slice(1);
+ for(let i=0;i<text.length;i++){
+  need(i<65536,'COLD_EXPORT_CSV_HEADER_BOUND');
+  const c=text[i];
+  if(quoted){
+   if(c!=='"'){value+=c;continue;}
+   if(text[i+1]==='"'){value+='"';i++;continue;}
+   quoted=false;closed=true;continue;
+  }
+  if(c===delimiter){fields.push(value);value='';closed=false;continue;}
+  if(c==='\r'||c==='\n'){fields.push(value);return fields;}
+  need(!closed,'COLD_EXPORT_CSV_INVALID');
+  if(c==='"'){need(value==='','COLD_EXPORT_CSV_INVALID');quoted=true;continue;}
+  value+=c;
+ }
+ need(!quoted&&text.length>0,'COLD_EXPORT_CSV_INVALID');
+ fields.push(value);return fields;
+}
 export function parseExpectedOutputs(expected){
  need(expected&&typeof expected.package_path==='string'&&expected.package_path.endsWith('.lgp'),'EXPECTED_PACKAGE_PATH_REQUIRED');
  need(Array.isArray(expected.nodes),'EXPECTED_SHAPE_INVALID');
@@ -129,17 +152,20 @@ function matchesCell(cell,column,want){
  }
  return Object.is(value,want)||value===want;
 }
-export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,exportInput}={}){
+export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,exportInput,exportCsv}={}){
  need(allowExtraPortReads?actual.length>=outputs.length:actual.length===outputs.length,'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
  need(new Set(actual.map(a=>JSON.stringify([a.node.node_id,a.output_port??0]))).size===actual.length,'COLD_DUPLICATE_OUTPUT_PORT');
  const used=new Set(),matches=[];
  for(const [index,want] of outputs.entries()){
   const port=want.output_node_type==='export_input'?exportInput?.output_port:want.output_port??0;
+  const csvOrder=want.output_node_type==='export_input'&&want.column_order==='exact'&&exportCsv!==undefined;
   const candidates=actual.filter(a=>(want.output_node_type==='export_input'
    ?exportInput&&a.node.node_id===exportInput.node.ref.node_id&&(a.output_port??0)===exportInput.output_port
    :a.type===want.output_node_type&&(a.output_port??0)===port
     &&(want.output_node_label===undefined||a.label===want.output_node_label))
-     &&matchesExpectedOutput(want.output_node_type==='export_input'?exportInputData(a.data,exportInput?.input_fields):a.data,want));
+     &&(!csvOrder||matchesExportCsvOrder(a.data,want,exportCsv))
+     &&matchesExpectedOutput(want.output_node_type==='export_input'?exportInputData(a.data,exportInput?.input_fields):a.data,
+      csvOrder?{...want,column_order:'any'}:want));
   const key=candidates.length===1?JSON.stringify([candidates[0].node.node_id,port]):undefined;
   need(candidates.length===1&&!used.has(key),'COLD_OUTPUT_NOT_UNIQUELY_MATCHED');
   used.add(key);matches.push({expected_index:index,node:candidates[0].node,output_port:port,execution:candidates[0].execution});
@@ -148,4 +174,11 @@ export function matchExpectedOutputs(actual,outputs,{allowExtraPortReads=false,e
  // before values identify each report. Every observed node must be used.
  need(actual.every(a=>matches.some(m=>m.node.node_id===a.node.node_id)),'COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
  return matches;
+}
+function matchesExportCsvOrder(data,want,csv){
+ if(!['names','labels'].includes(csv?.header)||!Array.isArray(csv.columns))return false;
+ const columns=want.columns.map(c=>csv.header==='names'?c.name:data.schema.find(f=>f.name===c.name)?.label);
+ // Duplicate labels cannot prove which source column occupies a CSV position.
+ return columns.every(c=>typeof c==='string')&&new Set(columns).size===columns.length
+  &&csv.columns.length===columns.length&&columns.every((c,i)=>csv.columns[i]===c);
 }

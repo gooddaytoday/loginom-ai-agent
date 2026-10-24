@@ -304,3 +304,40 @@ for(const complete of [true,false])test('read-only inspection resolves only conf
  assert.equal(!!f.operation.targetPhase.pending,!complete);
  if(complete){assert.equal((await f.run()).status,'SUCCEEDED');assert.equal(f.calls.filter(x=>x==='create').length,1);}
 });
+
+function restReplacementFixture(){
+ const f=fixture(),raw={source:'source',output:0,target:'rest',input:0};
+ f.graph.nodes.push({ref:ref('rest'),type:'integration.rest_request',label:'REST',position:{x:160,y:160},inputs:[0],outputs:[0,1]},
+  {ref:ref('encoder'),type:'programming.javascript',label:'URL query encoding',position:{x:320,y:160},inputs:[0],outputs:[0]});
+ f.graph.links.push(raw,{source:'source',output:0,target:'encoder',input:0});
+ const r={document_id:'doc',workflow_ref:workflow,target:{kind:'existing',type:'integration.rest_request',ref:ref('rest')},inputs:[{source:ref('encoder'),output:0,input:0}]};
+ f.operation.parameters={...structuredClone(r),inputs:[{source:ref('source'),output:0,input:0}],mode:'request',finish:'execute',parameters:{connection:{name:'Echo'},query_parameters:[{name:'Key',field:'Key'}]}};
+ f.operation.restQueryInput={edge:raw,encoder:ref('encoder')};
+ return {f,r,raw};
+}
+test('D19 inserts the generated encoder only into the confirmed existing REST input',async()=>{
+ const {f,r}=restReplacementFixture(),before=structuredClone(f.graph);
+ const result=await f.run(r);assert.equal(result.status,'SUCCEEDED',result.error);
+ assert.deepEqual(f.calls,['remove_link','connect']);
+ assert.deepEqual(f.graph.nodes,before.nodes);
+ assert.deepEqual(f.graph.links,[{source:'source',output:0,target:'encoder',input:0},{source:'encoder',output:0,target:'rest',input:0}]);
+ assert.equal((await f.run(r)).replayed,true);assert.deepEqual(f.calls,['remove_link','connect']);
+});
+for(const mutation of ['different source','different output','foreign encoder','different target','unexecuted','missing authorization','encoder input changed'])test('D19 refuses '+mutation+' before disconnecting an existing input',async()=>{
+ const {f,r}=restReplacementFixture();
+ if(mutation==='different source')f.operation.parameters.inputs[0].source=ref('rest');
+ if(mutation==='different output')f.operation.parameters.inputs[0].output=1;
+ if(mutation==='foreign encoder')f.operation.restQueryInput.encoder.workflow_id='foreign';
+ if(mutation==='different target')f.operation.parameters.target.ref=ref('encoder');
+ if(mutation==='unexecuted')f.operation.parameters.finish='done';
+ if(mutation==='missing authorization')delete f.operation.restQueryInput;
+ if(mutation==='encoder input changed')f.graph.links[1].source='rest';
+ const before=structuredClone(f.graph),result=await f.run(r);assert.equal(result.status,'NOT_APPLIED');
+ assert.deepEqual(f.calls,[]);assert.deepEqual(f.graph,before);
+});
+test('D19 lost disconnect reply remains uncertain and is never repeated',async()=>{
+ const {f,r}=restReplacementFixture(),mutate=f.adapter.mutate;
+ f.adapter.mutate=async e=>{await mutate(e);throw Error('lost reply');};
+ assert.equal((await f.run(r)).status,'AMBIGUOUS');assert.equal((await f.run(r)).status,'AMBIGUOUS');
+ assert.deepEqual(f.calls,['remove_link']);assert.ok(f.operation.targetPhase.pending);
+});

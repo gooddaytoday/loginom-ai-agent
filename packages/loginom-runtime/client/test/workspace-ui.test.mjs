@@ -2352,8 +2352,8 @@ test('wizard cancellation confirms the original graph after one exact affirmativ
 });
 
 for(const completion of ['done','execute'])test('wizard '+completion+' waits for the expected graph node without claiming execution completion',async()=>{
-  for(const mode of ['success','bound_surface','bound_multiline','bound_multiline_wrong_text','bound_foreign','bound_graph_unlock','bound_graph_lock_churn','wrapped_label','wrapped_filename','wrapped_grouping','different_key','comma_collision','duplicate_label','duplicate_body','actual_space','wrong_label','dialog','still_open','lost_reply','empty_label','stale_region','late_body','late_epoch','epoch_churn','late_mask','late_tab','late_duplicate']) {
-    const expected=mode.startsWith('bound_multiline')?'Дубликаты: out: Value, Amount; in: Key (+1)':mode==='wrapped_filename'?'sales 2026.csv':mode==='wrapped_grouping'?'Quantity, Revenue, Id по Region':mode==='comma_collision'?'A, B':mode==='empty_label'?'':'Сумма';
+  for(const mode of ['bound_rename','bound_rename_document_id','bound_rename_workflow_id','bound_rename_node_id','bound_rename_navigation_node','bound_rename_wrong_tid','bound_rename_user_label','bound_rename_unbound','success','bound_surface','bound_multiline','bound_multiline_wrong_text','bound_foreign','bound_graph_unlock','bound_graph_lock_churn','wrapped_label','wrapped_filename','wrapped_grouping','different_key','comma_collision','duplicate_label','duplicate_body','actual_space','wrong_label','dialog','still_open','lost_reply','empty_label','stale_region','late_body','late_epoch','epoch_churn','late_mask','late_tab','late_duplicate']) {
+    const expected=mode.startsWith('bound_rename')?'data.csv':mode.startsWith('bound_multiline')?'Дубликаты: out: Value, Amount; in: Key (+1)':mode==='wrapped_filename'?'sales 2026.csv':mode==='wrapped_grouping'?'Quantity, Revenue, Id по Region':mode==='comma_collision'?'A, B':mode==='empty_label'?'':'Сумма';
     const page=new Page(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
     let path='';const breadcrumbs=[];
     for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий','Old','Настройка']) {
@@ -2364,7 +2364,7 @@ for(const completion of ['done','execute'])test('wizard '+completion+' waits for
       if(label==='Настройка')page.add('span',null,'',undefined,crumb).attrs.class='maptree-icon-wizard';
     }
     const wizard=page.add('div',base+'WizrdMCF');
-    for(const [key,value] of [['edtDisplayName',expected],['cbxNodeTitleMode','Автоматическая метка']]) {
+    for(const [key,value] of [['edtDisplayName',expected],['cbxNodeTitleMode',mode==='bound_rename_user_label'?'Пользовательская метка':'Автоматическая метка']]) {
       const owner=page.add('div',base+'WizrdMCF;DoneWizard;'+key,'',undefined,wizard);
       page.add('input',null,'',undefined,owner).value=value;
     }
@@ -2372,9 +2372,12 @@ for(const completion of ['done','execute'])test('wizard '+completion+' waits for
     if(mode.startsWith('bound_')) {
       let postClickReads=0;
       const readNode=async()=>{const graph=page.events.includes('click')&&++postClickReads>1;
-        return {verified:true,document_id:'doc',workflow_id:'workflow',node_id:graph&&mode==='bound_foreign'?'foreign':'node',
-          surface:graph?'graph':'wizard',tid:base+(graph?'Graph;'+(mode.startsWith('bound_multiline')?'Дубликаты:__out:_Value_Amount;_in:_Key_(+1)':'Сумма'):'WizrdMCF'),
-          ...(graph&&['bound_graph_unlock','bound_graph_lock_churn'].includes(mode)?{locked:mode==='bound_graph_unlock'?postClickReads<4:postClickReads%2===1}:{})};};
+        const value={verified:true,document_id:'doc',workflow_id:'workflow',node_id:graph&&mode==='bound_foreign'?'foreign':'node',
+          surface:graph?'graph':'wizard',tid:base+(graph?'Graph;'+(mode.startsWith('bound_rename')?(postClickReads<4?'Old':mode==='bound_rename_wrong_tid'?'Other.csv':'data.csv'):mode.startsWith('bound_multiline')?'Дубликаты:__out:_Value_Amount;_in:_Key_(+1)':'Сумма'):'WizrdMCF'),
+          ...(graph&&['bound_graph_unlock','bound_graph_lock_churn'].includes(mode)?{locked:mode==='bound_graph_unlock'?postClickReads<4:postClickReads%2===1}:{})};
+        if(graph&&postClickReads>=4&&['bound_rename_document_id','bound_rename_workflow_id','bound_rename_node_id','bound_rename_navigation_node'].includes(mode))
+          value[mode.slice('bound_rename_'.length)]='foreign';
+        return value;};
       page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
         {expected_build:build,expected_origin:origin,kind:'workspace-ui',prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},readNode));
     }
@@ -2423,8 +2426,9 @@ for(const completion of ['done','execute'])test('wizard '+completion+' waits for
       if(mode==='late_tab' && waits===2)page.tab.attrs['data-tid']='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';
       if(mode==='late_duplicate' && waits===2)page.add('span',base+'Graph;Сумма;Label;Label','Сумма',undefined,finishedNode);
     };
+    if(mode==='bound_rename_unbound')delete snapshot.prepared_node_context;
     const result=await page.act({verb:completion==='done'?'finish_wizard':'execute_wizard',ref:button.ref},snapshot);
-    const success=['success','bound_surface','bound_multiline','bound_graph_unlock','wrapped_label','wrapped_filename','wrapped_grouping','stale_region','late_body','late_epoch'].includes(mode);
+    const success=['bound_rename','success','bound_surface','bound_multiline','bound_graph_unlock','wrapped_label','wrapped_filename','wrapped_grouping','stale_region','late_body','late_epoch'].includes(mode);
     assert.equal(result.status,success?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
     assert.equal(page.events.filter(e=>e==='click').length,1);
     if(completion==='execute' && success) {
@@ -2442,6 +2446,7 @@ for(const completion of ['done','execute'])test('wizard '+completion+' waits for
       assert.equal(result.output.ui.elements.find(e=>e.ref===finalNode.ref).tid,finishedNode.attrs['data-tid']);
     }
     if(mode==='epoch_churn'){assert.equal(waits,12);assert.equal(result.error.code,'WIZARD_FINISH_NOT_SETTLED');}
+    if(mode==='bound_rename'){assert.equal(result.output.prepared_node_context.tid,base+'Graph;data.csv');assert.equal(result.trace.filter(e=>e.event==='wizard_finish_label_rediscovery').length,1);}
     if(mode==='bound_graph_unlock')assert.equal(result.trace.filter(e=>e.event==='node_graph_lock_rediscovery').length,1);
     if(mode==='bound_graph_lock_churn'){assert.equal(result.error.code,'PREPARED_NODE_CONTEXT_CHANGED');assert.equal(result.trace.filter(e=>e.event==='node_graph_lock_rediscovery').length,2);}
     if(mode==='stale_region')assert.equal(result.trace.filter(e=>e.event==='wizard_region_rediscovery').length,1);

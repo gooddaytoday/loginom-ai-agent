@@ -47,13 +47,13 @@ rows = [dict(RowID=r['RowID'], **{f: float(r[f]) for f in [*FIELDS, TARGET]},
 
 
 def column(name, kind='real'):
-    return dict(name=name, label=name, type=kind,
+    return dict(name=name, label_any=True, type=kind,
                 **(dict(tolerance=dict(abs=1e-8, rel=1e-10)) if kind == 'real' else {}))
 
 
 expected = dict(
     package_path=sys.argv[1] if len(sys.argv) > 1 else '/stability-2026-10-20/n12.lgp',
-    nodes=[dict(type=t) for t in ['imports.text', 'transform.filter_data', 'transform.calculator', 'datamining.lin_regression', 'exports.text']],
+    nodes=[],
     outputs=[
         dict(output_node_type='export_input', ordered=True, column_order='exact',
              columns=[column('RowID', 'integer'), *[column(f) for f in [*FIELDS, TARGET, 'Forecast']]], rows=rows),

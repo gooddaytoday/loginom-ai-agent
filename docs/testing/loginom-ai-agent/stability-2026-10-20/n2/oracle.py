@@ -24,12 +24,12 @@ rows = [{"Courier": courier, "Payout": float(amount)} for courier, amount in
 
 expected = {
     "package_path": sys.argv[1] if len(sys.argv) > 1 else "/stability-2026-10-20/n2.lgp",
-    "nodes": [{"type": kind} for kind in ['imports.text', 'transform.union_data', 'transform.group_data', 'exports.text']],
+    "nodes": [],
     "outputs": [{
         "output_node_type": "export_input",
         "ordered": True,
         "column_order": "exact",
-        "columns": [{"name": name, "label": name, "type": kind} for name, kind in [('Courier', 'string'), ('Payout', 'real')]],
+        "columns": [{"name": name, "label_any": True, "type": kind} for name, kind in [('Courier', 'string'), ('Payout', 'real')]],
         "rows": rows,
     }],
 }

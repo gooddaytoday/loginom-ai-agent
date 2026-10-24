@@ -1633,7 +1633,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }
     attempt.byteOutcome=structuredClone(outcome);
     if(!attempt.byteRecorded) {await remember(attempt,'download_verified',outcome);attempt.byteRecorded=true;}
-    if(outcome.output.bytes_verified===true && operation.outcome.output.upload_submitted===true
+    if(outcome.output.bytes_verified===true && (operation.outcome.output.upload_submitted===true||attempt.checkpoint.existing_file_check===true)
       && operation.outcome.cleanup_complete===true && raw.cleanup_complete===true) {
       // The transfer contract's postcondition is exact destination bytes/size/
       // digest, not a visible filename or a network-idle heuristic. Both native
@@ -1650,6 +1650,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         destination:artifact.upload.destination,bytes:artifact.bytes,sha256:artifact.sha256};
       const completedUpload={...structuredClone(operation.outcome),status:'SUCCEEDED',phase:'verified',error:null,
         cleanup_complete:true,output:{...structuredClone(operation.outcome.output),verification_required:false,
+          ...(attempt.checkpoint.existing_file_check?{existing_file_reused:true,artifact_id:artifact.artifact_id,bytes:artifact.bytes,sha256:artifact.sha256}:{}),
           transfer_postcondition:'destination_bytes_digest_and_size',server_copy_verification:summary}};
       const completedVerification={...structuredClone(outcome),output:{...outcome.output,upload_completion_verified:true}};
       if(!attempt.transferRecorded) {await remember(operation,'transfer_completed',completedUpload);attempt.transferRecorded=true;}
@@ -1660,13 +1661,23 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(pending===operation)pending=null;
       return completedVerification;
     }
+    if(attempt.checkpoint.existing_file_check&&raw.cleanup_complete===true){
+      try{await attempt.lease.release();}
+      catch{
+        operation.cleanupConfirmed=false;
+        attempt.outcome={...structuredClone(outcome),status:'AMBIGUOUS',phase:'cleanup',cleanup_complete:false,
+          error:{code:'TRANSFER_CLEANUP_FAILED',message:'Existing file was not accepted; temporary file cleanup is unconfirmed'}};
+        return attempt.outcome;
+      }
+      if(pending===operation)pending=null;
+    }
     attempt.outcome=outcome;attempt.settled=true;
     auxiliary.set(attempt.id,{signature:attempt.signature,outcome:structuredClone(outcome)});
     operation.transportUncertain=false;operation.cleanupConfirmed=raw.cleanup_complete===true;
     operation.outcome.output.server_copy_verification={verification_id:attempt.id,status:outcome.status,
       bytes_verified:outcome.output.bytes_verified===true,upload_completion_verified:false,
       ...(outcome.output.bytes_verified ? {destination:artifact.upload.destination,bytes:artifact.bytes,sha256:artifact.sha256} : {})};
-    if(raw.status==='NOT_APPLIED' && raw.cleanup_complete===true)await attempt.lease.release();
+    if(!attempt.checkpoint.existing_file_check&&raw.status==='NOT_APPLIED' && raw.cleanup_complete===true)await attempt.lease.release();
     return outcome;
   };
   const nodeTargetOutcome=(operation,result)=>({status:result.status,action_key:operation.action.action_key,action_revision:'1',operation_id:operation.id,
@@ -2622,11 +2633,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return structuredClone(outcome);
       } finally {running=false;}
     },
-    async verifyArtifact({operationId,verificationId,observationId,fileRef,signal,discover=false,onDispatched}={}) {
+    async verifyArtifact({operationId,verificationId,observationId,fileRef,signal,discover=false,compareExisting=false,onDispatched}={}) {
       signal?.throwIfAborted();checkId(operationId);checkId(verificationId);
       if(!allowCandidate || !artifactStore)throw new Error('Artifact verification is available only in a candidate session');
-      const signature=fingerprint(discover?'artifact.verify.discovery':'artifact.verify',[operationId,observationId,fileRef]);
+      const signature=fingerprint(discover?'artifact.verify.discovery':'artifact.verify',[operationId,observationId,fileRef,compareExisting]);
       const operation=operations.get(operationId);
+      // Only the private delivery's confirmed Skip can compare a pre-existing
+      // file. The admitted current-session artifact still owns the exact path
+      // and byte identity; uncertain submission never enters this branch.
+      const existingFile=compareExisting&&operation?.deliveryOperationId&&operation.parameters.overwrite==='reject'
+        &&operation.outcome?.status==='FAILED'&&operation.outcome.error?.code==='UPLOAD_PATH_CONFLICT'
+        &&operation.outcome.output?.conflict_rejected===true&&operation.outcome.output.upload_submitted===false
+        &&operation.outcome.output.destination===operation.parameters.destination;
       if(operations.has(verificationId))throw new Error('Verification ID conflicts with an existing operation');
       if(auxiliary.has(verificationId)) {
         const previous=auxiliary.get(verificationId);
@@ -2637,7 +2655,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if(operation.verification.signature!==signature)throw new Error('Verification ID was already used with different parameters');
         return structuredClone(operation.verification.outcome ?? failed(operation.verification,'OPERATION_STILL_PENDING','Inspect the original upload to reconcile its download'));
       }
-      if(running || !operation || pending!==operation || operation.action.capability!=='artifact.upload'
+      if(running || !operation || (pending!==operation&&!(existingFile&&!pending)) || operation.action.capability!=='artifact.upload'
         || operation.transportUncertain || !operation.cleanupConfirmed || (operation.verification && !operation.verification.settled))
         throw new Error('Inspect and confirm the pending upload browser receipt before verifying its file');
       const snapshot=observations.get(observationId);
@@ -2654,13 +2672,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const lease=await artifactStore.stageDownload(operation.parameters.artifact_id);
         const attempt={id:verificationId,signature,lease,action:{action_key:'artifact.verify',revision:'1',capability:'artifact.verify'},
           parameters:{upload_operation_id:operationId,observation_id:observationId,file_ref:fileRef},checkpoint:{artifact:options.artifact,
+            ...(existingFile?{existing_file_check:true}:{}),
             ...(discover?{discovery:{workflow_ref:snapshot.workflow_ref,document:snapshot.dom_epoch.document,active_tab_ref:snapshot.active_tab_ref}}:{})},deadline:now()+60000};
         try {signal?.throwIfAborted();await remember(attempt,'download_prepared');signal?.throwIfAborted();}
         catch(error){await lease.release();throw error;}
         let code;
         try {signal?.throwIfAborted();code=buildDownload({...options,download_path:lease.path});}
         catch(error){await lease.release();throw error;}
-        operation.verification=attempt;observations.clear();
+        operation.verification=attempt;pending=operation;observations.clear();
         const receipt=receiptOptions(operation,verificationId,'artifact.download',signature);
         let raw;
         try {
@@ -2681,7 +2700,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(snapshot)makeArtifactDiscoveryDownloadCode({artifact,snapshot},{download:browserArtifactDownload,reveal:browserArtifactReveal});
     },
     uploadDeliveredArtifact:options=>runtime.upload({...options,decideConflicts:true}),
-    verifyDeliveredArtifact:options=>runtime.verifyArtifact({...options,discover:true}),
+    verifyDeliveredArtifact:options=>runtime.verifyArtifact({...options,discover:true,compareExisting:true}),
     // Private entry point for the node.apply shell (03). No new public MCP
     // action: the graph phase shares this runtime's gate, IDs and journal.
     async runNodeTarget(request,{operationId,signal,resume=false}={}) {
