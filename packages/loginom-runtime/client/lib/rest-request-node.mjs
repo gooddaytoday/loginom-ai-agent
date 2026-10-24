@@ -31,9 +31,12 @@ export function restQueryEncoderRequest(request,deadline,now=Date.now()){
  need(request.inputs.length===1,'raw query values require one explicit table input');
  const budget=Math.min(request.budgets.total_ms,deadline-now);
  need(budget>0,'query encoding deadline elapsed');
- return {operation_id:'rest-url-'+createHash('sha256').update(request.operation_id).digest('hex').slice(0,32),
+ const identity=createHash('sha256').update(request.operation_id).digest('hex').slice(0,32);
+ return {operation_id:'rest-url-'+identity,
   contract_revision:request.contract_revision,document_id:request.document_id,workflow_ref:request.workflow_ref,
-  target:{kind:'new',type:'programming.javascript',label:'URL query encoding'},inputs:request.inputs,
+  // Loginom 7.4.2 reuses the @1 DOM identity on a third equal label.
+  // Keep independent generated encoders distinct before native rename.
+  target:{kind:'new',type:'programming.javascript',label:'URL query encoding '+identity},inputs:request.inputs,
   mode:'script',parameters:{schema_mode:'declared',columns:fields.map(name=>({name,label:name,type:'string',data_kind:'Дискретный',usage:'Не задано'})),
    source_text:'import {InputTable,OutputTable} from "builtIn/Data";\n'
     +'for(let row=0;row<InputTable.RowCount;row++){\n OutputTable.Append();\n for(const name of '+JSON.stringify(fields)+'){\n'

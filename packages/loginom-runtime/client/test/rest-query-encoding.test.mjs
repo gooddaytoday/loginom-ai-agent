@@ -51,6 +51,17 @@ test('generated child request uses the installed JavaScript contract and bounded
  assert.notEqual(child.operation_id,restQueryEncoderRequest({...r,operation_id:'y'.repeat(128)},2500,1000).operation_id);
 });
 
+test('D35 independent REST encoders have distinct stable native labels before the third rename',()=>{
+ const parents=['rest-meteo','rest-frankfurter','rest-countries','rest-products'];
+ const children=parents.map(operation_id=>restQueryEncoderRequest({...request(),operation_id},2500,1000));
+ assert.equal(new Set(children.map(child=>child.target.label)).size,parents.length);
+ for(const [index,child] of children.entries()){
+  assert.match(child.target.label,/^URL query encoding [a-f0-9]{32}$/);
+  assert.equal(restQueryEncoderRequest({...request(),operation_id:parents[index]},3000,1000).target.label,child.target.label);
+  assert.doesNotThrow(()=>validateNodeApplyRequest(child,createJavascriptCodeNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2',redactor:createRedactor()}).nodeApplyHandlers));
+ }
+});
+
 test('existing connected REST refuses before creating another codec or connection and points to the same node',async()=>{
  for(const source of ['owned-encoder','foreign-source']) {
   const r={...request(),target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'flow',node_id:'rest'}},
