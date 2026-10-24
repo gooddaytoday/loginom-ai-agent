@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {restRequestCapability} from '../lib/rest-request.mjs';
 
-function fixture(foreign=null){
+function fixture(foreign=null,manual=false,duplicate=null){
  const root='MF;TF-1;WizrdMCF',base=root+';RESTRequestWizard;ParamLinks';
  const node={document_id:'doc',workflow_id:'flow',node_id:'rest'};
- const names=['RequestId','Key'],columnRows=names.map(Name=>({data:{Name,DataType:5}})),parameterRows=names.map(Name=>({data:{Name,DataType:5}}));
- let stage=0,lastSelector='',autoLinks=0,nextClicks=0;
+ const names=['RequestId','Key'],columnRows=names.map((Name,i)=>({id:[17,0][i],data:{Name,DataType:5}})),parameterRows=names.map(Name=>({data:{Name:manual?Name.toLowerCase():Name,DataType:5}}));
+ let stage=0,lastSelector='',autoLinks=0,nextClicks=0,drags=0;
+ const points=[];
  const store=rows=>({loading:false,getRange:()=>rows});
  const columns=store(columnRows),parameters=store(parameterRows),saved=store([]);
  saved.complete=true;
@@ -25,16 +26,25 @@ function fixture(foreign=null){
  const evaluate=(fn,arg)=>structuredClone(vm.runInContext('('+fn.toString()+')',scope)(arg));
  const captions=['Настройка запроса','Настройка пользовательских заголовков','Дополнительные параметры','Описание узла'];
  const page={evaluate,waitForTimeout:async()=>{},locator:selector=>({
-  count:async()=>selector.startsWith('.x-mask')||selector.includes(';btnError')?0:1,
+  count:async()=>{
+   if(selector.startsWith('.x-mask')||selector.includes(';btnError'))return 0;
+   if(selector.includes(';colColumnName_'))return columnRows.some(r=>selector==='[data-tid='+JSON.stringify(base+';colColumnName_'+r.id)+']')?(duplicate==='column'?2:1):0;
+   if(selector.includes(';colParam_'))return parameterRows.some(r=>selector==='[data-tid='+JSON.stringify(base+';colParam_'+r.data.Name)+']')?(duplicate==='parameter'?2:1):0;
+   return 1;
+  },
   isVisible:async()=>true,innerText:async()=>captions[stage],
-  evaluate:async fn=>{lastSelector=selector;return evaluate(fn,element);},
+  evaluate:async fn=>{lastSelector=selector;points.push(selector);return evaluate(fn,element);},
  }),mouse:{click:async()=>{
   if(lastSelector.includes(';btnAutoLink')){
    autoLinks++;draw.FLinks=Object.fromEntries(columnRows.map((c,i)=>[i,[foreign==='column'?{data:{...c.data}}:c,foreign==='parameter'?{data:{...parameterRows[i].data}}:parameterRows[i]]]));
   }else if(lastSelector.includes(';btnNext')){stage++;nextClicks++;}
+ },move:async()=>{},down:async()=>{drags++;},up:async()=>{
+  const [source,target]=points.slice(-2),column=columnRows.find(r=>source==='[data-tid='+JSON.stringify(base+';colColumnName_'+r.id)+']'),parameter=parameterRows.find(r=>target==='[data-tid='+JSON.stringify(base+';colParam_'+r.data.Name)+']');
+  assert.ok(column&&parameter,'the drag must use the owned native records');
+  draw.FLinks[parameter.data.Name]=[column,parameter];
  }}};
- return {saved,counts:()=>({autoLinks,nextClicks}),run:()=>restRequestCapability(page,{deadline:Date.now()+2000,document_id:'doc',origin:'http://loginom.test',build:'7.4.2',workflow_ref:{prefix:'MF;TF-1'},node,
-  query_parameters:names.map(name=>({name,field:name}))},async()=>({...node,verified:true,surface:'wizard'}))};
+ return {saved,drags:()=>drags,counts:()=>({autoLinks,nextClicks}),run:()=>restRequestCapability(page,{deadline:Date.now()+2000,document_id:'doc',origin:'http://loginom.test',build:'7.4.2',workflow_ref:{prefix:'MF;TF-1'},node,
+  query_parameters:names.map((field,i)=>({name:parameterRows[i].data.Name,field}))},async()=>({...node,verified:true,surface:'wizard'}))};
 }
 
 test('REST configure accepts the live AutoLink draft while the saved binding store remains empty',async()=>{
@@ -49,4 +59,21 @@ for(const foreign of ['column','parameter'])test('REST draft refuses a '+foreign
  assert.equal(result.verified,false);
  assert.match(result.error,/draft link records differ/);
  assert.deepEqual(f.counts(),{autoLinks:1,nextClicks:0});
+});
+
+test('REST manual bindings use native column record keys, including zero, rather than field names or row positions',async()=>{
+ const f=fixture(null,true),result=await f.run();
+ assert.equal(result.verified,true,result.error);
+ assert.deepEqual(result.configuration.query_parameters,[{name:'requestid',field:'RequestId'},{name:'key',field:'Key'}]);
+ assert.deepEqual(f.counts(),{autoLinks:0,nextClicks:3});
+ assert.equal(f.drags(),2);
+});
+for(const duplicate of ['column','parameter'])test('REST refuses duplicate '+duplicate+' controls before starting a manual drag',async()=>{
+ const f=fixture(null,true,duplicate),result=await f.run();
+ assert.equal(result.verified,false);
+ assert.match(result.error,/control is ambiguous/);
+ assert.equal(result.effect_possible,false);
+ assert.equal(result.cleanup_complete,true);
+ assert.equal(f.drags(),0);
+ assert.deepEqual(f.counts(),{autoLinks:0,nextClicks:0});
 });
