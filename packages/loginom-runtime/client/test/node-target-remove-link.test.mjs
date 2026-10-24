@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
 import {verifyNodeTargetEffect} from '../lib/node-target.mjs';
 
-function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,contextLost=false,inputPort=0,outputPort=0,bindingsFault=null,selectionChange=null}={}) {
+function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,contextLost=false,inputPort=0,outputPort=0,bindingsFault=null,selectionChange=null,selectionGuidChanged=false}={}) {
   const start=Date.now();let clock=start,clicked=0,deleted=0,contextChecks=0;
   const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1'}};
   const edge={source:'source',output:0,target:'target',input:0};
@@ -13,7 +13,7 @@ function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,c
   const tid='MF;TF-1;Graph;source|Output_Data-'+outputPort+'|target|Input_Data-'+inputPort;
   const page={
     evaluate:async(fn,arg)=>{
-      if(fn.toString().includes('FLinks.FCollection'))return graph.links.map(e=>[e.guid??'link',e.source,'source-port',e.target,'target-port']);
+      if(fn.toString().includes('FLinks.FCollection'))return graph.links.map(e=>[selectionGuidChanged&&clicked?'changed':e.guid??'link',e.source,'source-port',e.target,'target-port']);
       if(arg?.types){
         const result=structuredClone(graph);
         if(arg.read_bindings){
@@ -119,4 +119,10 @@ for(const [name,change] of Object.entries({
   const f=await run({selectionChange:g=>{for(const n of g.nodes)n.dom_epoch++;change(g);}});
   assert.equal(f.receipt.status,'AMBIGUOUS');assert.equal(f.receipt.effect_possible,true);
   assert.equal(f.stats().clicked,1);assert.equal(f.stats().deleted,0);
+});
+
+test('same endpoints cannot hide a changed native link GUID after selection',async()=>{
+  const f=await run({selectionGuidChanged:true,selectionChange:g=>{for(const n of g.nodes)n.dom_epoch++;}});
+  assert.equal(f.receipt.status,'AMBIGUOUS');assert.match(f.receipt.error,/graph changed before deletion/);
+  assert.equal(f.stats().deleted,0);
 });
