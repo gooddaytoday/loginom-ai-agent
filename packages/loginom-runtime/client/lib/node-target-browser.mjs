@@ -243,7 +243,11 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       });
       effectPossible=true;await page.mouse.click(blank.x,blank.y);
       await wait('node_selection_controls_closed',()=>page.evaluate(()=>bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram.FmxGraph.getSelectionCells().length===0));
-      if(JSON.stringify(await read(page,task))!==JSON.stringify(gestureBefore))throw new Error('Graph changed while deselecting');
+      const deselected=await read(page,task);
+      if(!sameGraph(gestureBefore,deselected))throw new Error('Graph changed while deselecting');
+      // Selection can redraw SVG. Rebind only drawing epochs after the full
+      // native graph comparison; drag still requires this exact fresh snapshot.
+      gestureBefore=deselected;
       const source=find(tid),from=await point(source);
       const scale=await page.evaluate(()=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;return d.FmxGraph.view.scale/d.FInitialScale;});
       await drag(source,{x:from.x+(p.position.x-old.x)*scale,y:from.y+(p.position.y-old.y)*scale});
