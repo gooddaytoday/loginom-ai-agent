@@ -19,17 +19,23 @@
         {
           "name": "Region",
           "label": "Region",
-          "type": "string"
+          "type": "string",
+          "name_any": true,
+          "label_any": true
         },
         {
           "name": "Category",
           "label": "Category",
-          "type": "string"
+          "type": "string",
+          "name_any": true,
+          "label_any": true
         },
         {
           "name": "Revenue",
           "label": "Revenue",
-          "type": "real"
+          "type": "real",
+          "name_any": true,
+          "label_any": true
         }
       ],
       "rows": [
