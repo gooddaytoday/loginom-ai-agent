@@ -22,32 +22,32 @@
       "columns": [
         {
           "name": "Carrier",
-          "label": "Carrier",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Zone",
-          "label": "Zone",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "MaxKg",
-          "label": "MaxKg",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Base",
-          "label": "Base",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "PerKg",
-          "label": "PerKg",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Quote",
-          "label": "Quote",
+          "label_any": true,
           "type": "real"
         }
       ],

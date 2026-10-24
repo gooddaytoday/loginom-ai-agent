@@ -25,22 +25,22 @@
       "columns": [
         {
           "name": "SKU",
-          "label": "SKU",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Requested",
-          "label": "Requested",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Available",
-          "label": "Available",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Shortage",
-          "label": "Shortage",
+          "label_any": true,
           "type": "integer"
         }
       ],

@@ -7,7 +7,7 @@ function fixture({start=0,at=1500,end=3000,stuck=false,changeFolder=false,change
  const snapshot=elements=>({workflow_ref,file_storage:{status:'observed',directory:changeFolder&&moves?'/other':'/test-2'},ui:{elements,dialogs:[],masks:[]}});
  const anchor=()=>({ref:'anchor',tid:workflow_ref.prefix+';FileStorageForm;colName_anchor',scroll:{ref:changeOwner&&moves?'other':'owner',top,max_top:end},allowed_actions:['scroll'],interaction:{state:'point_observed'}});
  const target=()=>({ref:'target',tid,label:'wanted.csv'});
- const read=async o=>o.storage_name?snapshot(top>=at?[{...target(),label:''}]:[]):snapshot(o.root_ref==='target'?[target()]:[anchor()]);
+ const read=async o=>o.discover_roots?snapshot(top>=at?[{...target(),label:''}]:[]):snapshot(o.root_ref==='target'?[target()]:[anchor()]);
  return {trace,args:{name:'wanted.csv',read,roots:async()=>snapshot([{ref:'table',tid:workflow_ref.prefix+';FileStorageForm;pnlFileStorage;tbl'}]),ready:async fn=>fn(),guard:()=>{},act:async(s,e,v,extra)=>{assert.equal(v,'scroll');assert.ok(Math.abs(extra.delta_y)<=1000);trace.push(extra.delta_y);moves++;if(!stuck)top+=extra.delta_y;}}};
 }
 test('virtual file search renders a missing row with bounded scrolling',async()=>{const f=fixture();const r=await findNativeStorageRow(f.args);assert.equal(r.ui.elements[0].label,'wanted.csv');assert.deepEqual(f.trace,[1000,1000]);});

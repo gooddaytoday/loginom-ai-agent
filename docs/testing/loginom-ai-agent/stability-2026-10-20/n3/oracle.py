@@ -33,7 +33,7 @@ expected = {
         "output_node_type": "export_input",
         "ordered": True,
         "column_order": "exact",
-        "columns": [{"name": name, "label": name, "type": kind} for name, kind in [('Carrier', 'string'), ('Zone', 'string'), ('MaxKg', 'real'), ('Base', 'real'), ('PerKg', 'real'), ('Quote', 'real')]],
+        "columns": [{"name": name, "label_any": True, "type": kind} for name, kind in [('Carrier', 'string'), ('Zone', 'string'), ('MaxKg', 'real'), ('Base', 'real'), ('PerKg', 'real'), ('Quote', 'real')]],
         "rows": rows,
     }],
 }

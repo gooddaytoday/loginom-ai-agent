@@ -4,7 +4,7 @@ import {validateTextExportParameters} from '../lib/text-export-parameters.mjs';
 import {compactNodeRequestFailure} from '../lib/user-results.mjs';
 
 test('rejected export mappings identify the complete corrected request without changing the contract',()=>{
- const request={operation_id:'export-large-debts',target:{kind:'existing',type:'exports.text'},inputs:[],
+ const request={operation_id:'export-large-debts',target:{kind:'existing',type:'exports.text',ref:{document_id:'doc',workflow_id:'wf',node_id:'saved-export'}},inputs:[],
   parameters:{destination:'/test-2/debts-large.csv',overwrite:'reject'},
   mappings:[{direction:'input',port:0,fields:[{source:{kind:'configured_field',name:'Debt'}}]}],
   mode:'delimited',finish:'execute',read:{ports:[]}};
@@ -19,6 +19,11 @@ test('rejected export mappings identify the complete corrected request without c
  assert.match(reply.next_step.instruction,/mappings:\[\]/);
  assert.match(reply.next_step.instruction,/transform.reform_columns/);
  assert.match(reply.next_step.instruction,/COMPLETE request with a NEW operation_id/);
+ assert.match(reply.next_step.instruction,/SAME existing export.*target.kind.*existing.*target.ref.*inputs:\[\]/);
+ assert.match(reply.next_step.instruction,/Do not create a second export for the same destination/);
+ assert.match(reply.error.message,/SAME existing export/);
+ const newExport=compactNodeRequestFailure(outcome,{...request,target:{kind:"new",type:"exports.text"}});
+ assert.doesNotMatch(newExport.next_step.instruction,/SAME existing export/);
  assert.deepEqual(request,before);
  const corrected={...request,operation_id:'export-large-debts-v2',mappings:[]};
  assert.doesNotThrow(()=>validateTextExportParameters(corrected.parameters,corrected.mode,corrected));

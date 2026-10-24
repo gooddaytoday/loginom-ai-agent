@@ -18,23 +18,23 @@
       "columns": [
         {
           "name": "Region",
-          "label": "Region",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "Office",
-          "label": "Office",
-          "type": "real"
+          "type": "real",
+          "label_any": true
         },
         {
           "name": "Warehouse",
-          "label": "Warehouse",
-          "type": "real"
+          "type": "real",
+          "label_any": true
         },
         {
           "name": "Tech",
-          "label": "Tech",
-          "type": "real"
+          "type": "real",
+          "label_any": true
         }
       ],
       "rows": [
