@@ -135,7 +135,12 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
     do {view=await root.evaluate(readViewport,nodeId);if(view.scale!==old)break;await page.waitForTimeout(Math.min(50,Math.max(0,end-Date.now())));}while(Date.now()<end);
     await guard();
     navigationSteps[navigationSteps.length-1].after=view;
-    if(!(grow?view.scale>old:view.scale<old))break;
+    if(!(grow?view.scale>old:view.scale<old)){
+     // A pinned process console can clip the drawing at minimum zoom.
+     // Native scroll remains bounded by the canvas and the same graph guards.
+     if(!grow&&nodeId!==undefined)await scroll();
+     break;
+    }
     point=project(view,position);
     if(grow&&!within(view,point))await scroll();
    }

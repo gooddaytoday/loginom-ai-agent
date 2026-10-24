@@ -297,3 +297,20 @@ for(const fault of ['visible-toggle','overflow-open','overflow-toggle','zoom','o
  if(fault==='menu-cleanup'){assert.equal(triggers,4);assert.equal(items,2);assert.equal(f.state().open,false);}
  assert.equal(f.state().clicks,fault==='zoom'?1:fault==='overflow-close'?2:0);
 });
+
+// LAB-151 line 3905: pinning the process console clips a minimum-scale node.
+for(const maxScroll of [151,148])test('D28 minimum zoom scroll range '+maxScroll+' preserves full drawing inset',async()=>{
+ const f=fixture({stuck:true});Object.assign(f.state().v,{x:324,y:100,width:950,height:494,viewportWidth:1280,viewportHeight:800,scale:0.3855432894295314});
+ f.args.nodeId='rest-country-de';f.args.position={x:208,y:1536};let top=0;
+ const canvas={scrollLeft:0,get scrollTop(){return top;},set scrollTop(value){top=Math.max(0,Math.min(maxScroll,value));}};
+ f.args.root.evaluate=async(fn,arg)=>{
+  if(typeof arg==='object'){fn(canvas,arg);canvas.scrollLeft=0;return;}
+  return {...structuredClone(f.state().v),scroll:{x:0,y:top},node_bounds:{x:398,y:673-top,width:34.5,height:61.5}};
+ };
+ const run=runInNewContext('('+revealNodePlacement.toString()+')');
+ const r=await run(f.args);
+ assert.equal(r.fully_visible,maxScroll===151);assert.equal(top,maxScroll);
+ assert.equal(r.view.scale,0.3855432894295314);assert.equal(r.zoom_steps,1);assert.equal(f.state().open,false);
+ assert.equal(r.navigation_steps.filter(s=>s.action==='scroll').length,1);
+ assert.equal(r.view.node_bounds.y+r.view.node_bounds.height<=586,maxScroll===151);
+});
