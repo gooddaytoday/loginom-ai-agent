@@ -11,7 +11,7 @@ const validate=new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema);
 const workflow={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',
  navigation_path:[{tid:'path',label:'Scenario'}]};
 function fixture(phase='configure',fault){
- let open=true,action,reads=0;const gestures=[],events=[];
+ let open=phase!=='read',action,reads=0;const gestures=[],events=[];
  const request={operation_id:'apply-js',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
   target:{kind:'existing',type:'programming.javascript',ref:node},inputs:[],mode:'script',
   parameters:{source_text:'import {InputTable,OutputTable} from "builtIn/Data";\n',expected_source_sha256:'a'.repeat(64)},
@@ -20,7 +20,7 @@ function fixture(phase='configure',fault){
  const operation={id:'apply-js',action:{action_key:'node.apply',revision:'1'},parameters:request,deadline:1,
   transportUncertain:fault==='transport',lastReceipt:{id:'apply-js:n1'},
   nodeApply:{request,node,pending:{phase},phases:[],signature:'signature',
-   execution:{status:'not_started',execution_id:null},output:{status:'not_refreshed',evidence_ref:null,ports:[]}},
+   execution:phase==='read'?{status:'completed',execution_id:'own-execution'}:{status:'not_started',execution_id:null},output:{status:'not_refreshed',evidence_ref:null,ports:[]}},
   nodeTargetAdapter:{observe:async()=>({complete:true,document_id:'doc',workflow_ref:workflow,
    nodes:[{ref:node,type:'programming.javascript',label:'JS',position:{x:320+(fault==='graph'&&reads++?8:0),y:280},inputs:[0],outputs:[0]}],
    links:[],foreign_links:[]})}};
@@ -51,7 +51,7 @@ for(const phase of ['configure','open','input_mapping'])test('script JS releases
  const checked=validate(r);assert.equal(checked.valid,true,checked.errorMessage);
  assert.deepEqual(f.gestures,[{verb:'click',ref:'ui-close'}]);assert.equal(f.operation.nodeApply.pending,null);
  assert.ok(f.events.some(e=>e.phase==='node_operation_released'&&e.receipt.proof.cleanup.wizard_closed));
- assert.deepEqual(f.drivers.releasePendingPhases,['input_mapping','open','configure']);
+ assert.deepEqual(f.drivers.releasePendingPhases,['input_mapping','open','configure','read']);
 });
 for(const fault of ['foreign','graph','transport','receipt','cleanup','lost'])test('script JS release refuses '+fault+' and retains the pending operation',async()=>{
  const f=fixture('configure',fault);await assert.rejects(f.run());
@@ -60,11 +60,19 @@ for(const fault of ['foreign','graph','transport','receipt','cleanup','lost'])te
  if(['foreign','transport','receipt','cleanup'].includes(fault))assert.deepEqual(f.gestures,[]);
  if(fault==='lost'){assert.equal(f.gestures.length,1);assert.equal(f.operation.transportUncertain,true);}
 });
-test('script JS release does not extend or replay unsupported execution/read phases',async()=>{
- for(const phase of ['target','node_finish','materialization_execute','finish','read']){
+test('script JS release does not extend or replay unsupported execution phases',async()=>{
+ for(const phase of ['target','node_finish','materialization_execute','finish']){
   const f=fixture(phase);await assert.rejects(f.run(),/stopped JavaScript draft/);
   assert.deepEqual(f.gestures,[]);assert.equal(f.operation.deadline,1);
  }
+});
+test('script JS releases a restored output read on the same quiet graph without Save or Execute',async()=>{
+ const f=fixture('read'),r=await f.run();
+ assert.equal(r.status,'FAILED');assert.equal(r.released_phase,'read');assert.equal(r.cleanup_complete,true);
+ assert.equal(r.pending_phase,null);assert.equal(r.package_saved,false);assert.deepEqual(f.gestures,[]);
+ assert.deepEqual(r.execution,{status:'completed',execution_id:'own-execution'});
+ const checked=validate(r);assert.equal(checked.valid,true,checked.errorMessage);
+ assert.ok(f.events.some(e=>e.phase==='node_operation_released'&&e.receipt.proof.verified));
 });
 test('script JS release honors cancellation before observing or closing',async()=>{
  const f=fixture(),c=new AbortController();c.abort(Error('release cancelled'));
