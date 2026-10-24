@@ -1028,7 +1028,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       seen.add(node);
       if (app.PackageTreeNode && node instanceof app.PackageTreeNode) {
         const path = node.PackageFileName;
-        return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null };
+        return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null, read_only: node.ReadOnly === true };
       }
       node = node.ParentNode;
     }
@@ -1131,6 +1131,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
   const runPackageSaveAs = async ({ keepOpen = false } = {}) => {
     const before = await packageCheckpoint();
     if (task.checkpoint && !same(before, task.checkpoint)) throw new Error('Package changed after save preflight');
+    if (before.package_identity.read_only && normalizeStoredPath(before.package_identity.path) === before.path)
+      throw new Error('The active package is read-only. Save a copy to an explicitly different package path.');
     let arrangement = { status: 'skipped', reason: 'ownership_unconfirmed' };
     try {
       const admission = await page.evaluate(binding => {
@@ -1181,7 +1183,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const continuationsBefore = keepOpen ? await packageContinuations(before.workflow_ref) : [];
     const click = async (symbol, effect = false) => interact(timeout => resolve(symbol).then(item => item.click({ timeout })), effect);
     transientDialog = true;
-    await click('packages.menu');
+    if (!(await resolve('packages.save_as', {}, { cardinality: 'zeroOrOne' }))) await click('packages.menu');
     await click('packages.save_as');
     const input = await poll(() => resolve('file_dialog.file_name', {}, { cardinality: 'zeroOrOne', stable: false }));
     await writeFileName(input, before.path);
@@ -1365,7 +1367,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       } else if (!task.mode || task.mode === 'apply') outcome = await handler.apply();
       else throw new Error('Unknown capability execution mode');
     } catch (error) {
-      record('action_failed', { phase, effect_possible: effectPossible });
+      record('action_failed', { phase, effect_possible: effectPossible, message: safeMessage(error) });
       outcome = result(effectPossible || task.mode === 'reconcile' ? 'AMBIGUOUS' : 'FAILED', {}, { code: 'CAPABILITY_ERROR', message: safeMessage(error) });
     } finally {
       const cleanup = async (name, operation) => {
