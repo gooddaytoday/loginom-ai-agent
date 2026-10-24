@@ -5561,6 +5561,64 @@ test('action deadline expires before the gesture with a controlled clock', async
   assert.deepEqual(page.events, []);
 });
 
+function importPreviewScrollerFixture() {
+ const page=new Page(),c=importCoverageFixture(page),base='MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;ColumnDefsTuning;grdData';
+ const preview=page.add('div',base,'',{x:100,y:500,width:600,height:100},c.form);
+ const scroller=page.add('div',base+';grd-1;tbl','',{x:100,y:500,width:600,height:100},preview);
+ Object.assign(scroller,{scrollLeft:0,scrollWidth:1200,clientWidth:600,style:{overflowX:'auto'}});
+ page.add('td',base+';colValue_0','D53_PREVIEW_PRIVATE_VALUE',{x:110,y:510,width:100,height:20},scroller);
+ const next=page.add('button','MF;TF-1;WizrdMCF;btnNext','Далее',{x:750,y:650,width:100,height:25},c.form);
+ const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+ const execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:binding,...options},async()=>({verified:true,surface:'wizard',node_id:'node'})));
+ const observe=async()=>{
+  const roots=await execute({mode:'observe',discover_roots:true,import_column_page:{offset:0,limit:8}});
+  return execute({mode:'observe',root_ref:roots.output.wizard.root_ref,import_column_page:{offset:0,limit:8}});
+ };
+ return {page,c,scroller,next,execute,observe};
+}
+
+test('owned import preview scroller excludes data text from observations and paged signatures',async()=>{
+ const f=importPreviewScrollerFixture();
+ const first=await f.observe();
+ assert.equal(first.status,'SUCCEEDED');
+ assert.equal(first.output.wizard.import_columns.page.status,'complete_definition_page');
+ const ref=first.output.ui.elements.find(e=>e.tid===f.scroller.attrs['data-tid'])?.ref;assert.ok(ref);
+ for(const offset of [0,1]) {
+  const result=await f.execute({mode:'observe',root_ref:first.output.wizard.root_ref,import_column_page:{offset,limit:8}});
+  assert.equal(result.status,'SUCCEEDED');
+  const control=result.output.ui.elements.find(e=>e.ref===ref);assert.ok(control);
+  assert.equal(control.label,'');assert.equal(control.signature.label,'');
+  assert.ok(!JSON.stringify(result).includes('D53_PREVIEW_PRIVATE_VALUE'));
+  const pager=createObservationPages(),paged=pager.retain(result);
+  assert.ok(!JSON.stringify(paged).includes('D53_PREVIEW_PRIVATE_VALUE'));
+ }
+});
+
+test('owned import preview preserves scroll identity geometry schema and wizard navigation',async()=>{
+ const f=importPreviewScrollerFixture(),first=await f.observe();
+ const before=first.output.ui.elements.find(e=>e.tid===f.scroller.attrs['data-tid']);assert.ok(before);
+ assert.deepEqual(before.allowed_actions,['scroll_horizontal']);
+ assert.deepEqual(before.bounding_box,f.scroller.box);
+ const pager=createObservationPages(),delivered=pager.retain(clone(first));
+ assert.doesNotThrow(()=>pager.assertIssued(delivered.output.observation_id,{verb:'scroll_horizontal',ref:before.ref,delta_x:200}));
+ const moved=await f.execute({mode:'act',operation_id:'d53-scroll',snapshot:first.output,action:{verb:'scroll_horizontal',ref:before.ref,delta_x:200}});
+ assert.equal(moved.status,'SUCCEEDED',JSON.stringify(moved.error));assert.equal(f.scroller.scrollLeft,200);
+ const after=moved.output.ui.elements.find(e=>e.ref===before.ref);assert.ok(after);
+ assert.deepEqual(after.identity,before.identity);assert.deepEqual(after.bounding_box,before.bounding_box);
+ assert.deepEqual(moved.output.wizard.import_columns,first.output.wizard.import_columns);
+ const next=moved.output.ui.elements.find(e=>e.tid===f.next.attrs['data-tid']);assert.ok(next?.allowed_actions.includes('wizard_step'));
+ const click=f.page.mouse.click;f.page.mouse.click=async(...args)=>{
+  await click(...args);
+  f.c.form.querySelector('[data-tid="MF;TF-1;WizrdMCF;ImportTextFileParamsWizard;edtValueNull"]').remove();
+  f.page.add('button','MF;TF-1;WizrdMCF;ColumnsMappingEngineOutputPortWizard;btnAddMappingColumn','Добавить',undefined,f.c.form);
+ };
+ const navigated=await f.execute({mode:'act',operation_id:'d53-next',snapshot:moved.output,action:{verb:'wizard_step',ref:next.ref,expected_stage:'output_mapping'}});
+ assert.equal(navigated.status,'SUCCEEDED',JSON.stringify(navigated.error));
+ assert.equal(navigated.output.wizard.stage,'output_mapping');
+ assert.equal(f.page.events.filter(e=>e==='click').length,1);
+});
+
 test('wide import definitions have addressed pages with one schema identity and explicit completeness',async()=>{
  const page=new Page(),c=importCoverageFixture(page,12);c.body.scrollWidth=c.header.scrollWidth=1620;
  const read=async offset=>(await page.execute({mode:'observe',import_column_page:{offset,limit:8}})).output.wizard.import_columns;
