@@ -28,6 +28,7 @@ import {makeJavascriptSchemaContextCode} from './javascript-schema-context.mjs';
 import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode} from './node-port-open.mjs';
 import {makeNodeProcessContextCode} from './node-process-context.mjs';
 import {makeNodeOutputContextCode} from './node-output-context.mjs';
+import {makeNodePortOutputCode} from './node-port-output.mjs';
 import {makeNodeTableContextCode} from './node-table-context.mjs';
 import {boundWizardCloseConfirmation,wizardCloseDialogOwner,wizardCloseBinding,boundInputMappingConflict} from './node-wizard-close.mjs';
 import {boundWizardDeactivationConfirmation,wizardDeactivationDialogOwner} from './node-wizard-open.mjs';
@@ -195,6 +196,28 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     return structuredClone(result.output);
   };
   const channel = {
+    async readOutputPort(request) {
+      checkBudget();
+      if(!preparedNodeContext)throw Error('Prepared node required for direct output read');
+      const code=makeNodePortOutputCode(preparedNodeContext,request,{origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
+      snapshot=null;evidenceSnapshot=null;
+      operation.cleanupConfirmed=false;
+      let result;
+      try{result=await execute(code,{timeout:Math.max(5000,operation.deadline-now()+5000)});}
+      catch(error){operation.transportUncertain=true;throw error;}
+      const context=result?.node_context;
+      const owner=context?.verified===true&&context.document_id===preparedNodeContext.document_id
+        &&context.workflow_id===preparedNodeContext.workflow_ref.workflow_id&&context.node_id===preparedNodeContext.node.node_id;
+      const valid=!!result&&typeof result.verified==='boolean'&&typeof result.cleanup_complete==='boolean'
+        &&(result.verified?owner&&result.output?.port===request.port&&result.output.fresh===true
+          &&result.output.execution_id===request.execution.execution_id&&result.output.freshness_basis==='completed_execution_port_source'
+          :typeof result.reason==='string');
+      operation.cleanupConfirmed=valid&&result.cleanup_complete===true;
+      checkBudget();
+      if(!valid||!result.verified||!operation.cleanupConfirmed)throw Error('Direct output read refused'+(valid&&!result.verified?': '+result.reason:''));
+      await entry('node_port_output_read',{outcome:structuredClone(result)});
+      return structuredClone(result);
+    },
     async openJavascriptPreview(port){
       checkBudget();
       if(!preparedNodeContext||!['transform.group_data','transform.sorting','transform.calculator','transform.join_data'].includes(operation.parameters?.target?.type))
