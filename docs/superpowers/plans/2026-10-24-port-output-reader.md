@@ -98,7 +98,7 @@
 - Consumes: envelope и channel задачи 1.
 - Produces: `decodePortCell(value,type) → {cell,limitations}` в том же модуле; функция сериализуется в основной browser callback без closure-imports и вызывается там. `cell` использует существующий тип ячейки; limitations — действующие numeric/variant/datetime precision limitations. Strict-проверка и общий precision выполняются reader-ом; новый parser транспорта не появляется.
 
-- [ ] **Step 1: Добавить тесты по одному с RED/GREEN.** Сначала `preserves_native_scalar_values`: все NULL, Int64 MIN/MAX и 9007199254740993 как строки, Boolean true/false, пустая/пробел/NBSP/CRLF, real после 9-го знака/5e−324/MAX/−0. Затем `marks_variant_and_nonfinite_unverified`: ненулевой Variant и NaN/±Infinity в false дают unverified, в true отказывают; VT_UNKNOWN не сериализуется; NULL Variant допустим. Проверять точные метки из спецификации, например:
+- [x] **Step 1: Добавить тесты по одному с RED/GREEN.** Сначала `preserves_native_scalar_values`: все NULL, Int64 MIN/MAX и 9007199254740993 как строки, Boolean true/false, пустая/пробел/NBSP/CRLF, real после 9-го знака/5e−324/MAX/−0. Затем `marks_variant_and_nonfinite_unverified`: ненулевой Variant и NaN/±Infinity в false дают unverified, в true отказывают; VT_UNKNOWN не сериализуется; NULL Variant допустим. Проверять точные метки из спецификации, например:
 
   ```js
   assert.equal(integer.cell.value, '9223372036854775807');
@@ -111,7 +111,7 @@
   ```
 
   Run: `node --test test/node-port-output.test.mjs` из client после каждого изменения; ожидается PASS. `precision.strings` точно `data source text; existing secret redaction applies; original byte encoding is not attested`. numbers_verified остаётся false при numeric/variant limitation; одна datetime limitation его не сбрасывает. Считать 512 KiB по простым значениям (у VT_UNKNOWN без текста — null), не по typed metadata. Не делать Int64 → Number.
-- [ ] **Step 2: Добавить `rereads_strings_one_row_at_a_time` и реализовать адресное дочитывание.** Условия ровно `value.length >= 5000 || value.endsWith('…')`; String и строковый Variant, включая 4 999/5 000/5 001/20 000, настоящий суффикс и emoji. Ячейки текущей строки запускаются параллельно; перед dispose дождаться всех начатых обращений даже при ошибке одного. Следующую строку не запускать, если полная текущая не помещается. Тест использует управляемые promises, не тайминги:
+- [x] **Step 2: Добавить `rereads_strings_one_row_at_a_time` и реализовать адресное дочитывание.** Условия ровно `value.length >= 5000 || value.endsWith('…')`; String и строковый Variant, включая 4 999/5 000/5 001/20 000, настоящий суффикс и emoji. Ячейки текущей строки запускаются параллельно; перед dispose дождаться всех начатых обращений даже при ошибке одного. Следующую строку не запускать, если полная текущая не помещается. Тест использует управляемые promises, не тайминги:
 
   ```js
   assert.deepEqual(f.startedRows, [0]);
@@ -122,11 +122,11 @@
   ```
 
   Отдельными случаями проверить ошибку AsString, отсутствие публикации префикса, нулевой count и sampleRows=0 без cell RPC, ровно 100 строк/10 000 ячеек/524 288 байт и первую непомещающуюся целую строку. При 0 запрошенных строк непустой источник остаётся неполным. RED/GREEN: тот же test-файл.
-- [ ] **Step 3: Добавить browser-тест `civil_dates_use_bounded_transition_scan`, затем реализовать даты.** Исполнять настоящую decodePortCell в закреплённом Chromium с timezoneId контекста, а не предполагать Temporal в Node. Перенести в test-file 44 набора входов/ожиданий из `/home/george/.codex/visualizations/2026/10/23/01a16a4b-9b0a-7472-a239-75200e80360e/rev2/offline-datetime-probe.cjs`, перечисленных в спецификации, не копируя production-алгоритм в expected; после переноса тест не зависит от этого временного файла. До OLE-коррекции пройти переходы от instant+1ns до null или первого `T ≤ instant − 48ч`; положительная Δ и `[T,T+Δ)` означают неоднозначность. Сохранить проверку суток 1900+Y для годов 0–99; затем UTC-компоненты и формулу x<0 из спецификации.
+- [x] **Step 3: Добавить browser-тест `civil_dates_use_bounded_transition_scan`, затем реализовать даты.** Исполнять настоящую decodePortCell в закреплённом Chromium с timezoneId контекста, а не предполагать Temporal в Node. Перенести в test-file 44 набора входов/ожиданий из `/home/george/.codex/visualizations/2026/10/23/01a16a4b-9b0a-7472-a239-75200e80360e/rev2/offline-datetime-probe.cjs`, перечисленных в спецификации, не копируя production-алгоритм в expected; после переноса тест не зависит от этого временного файла. До OLE-коррекции пройти переходы от instant+1ns до null или первого `T ≤ instant − 48ч`; положительная Δ и `[T,T+Δ)` означают неоднозначность. Сохранить проверку суток 1900+Y для годов 0–99; затем UTC-компоненты и формулу x<0 из спецификации.
 
   Assertions: `assert.equal(actual.value, expectedCivil)` для точных случаев; `assert.equal(actual.precision,'unverified')` и datetime limitation для неоднозначных, strict отказ; Date внутри Variant проходит ту же проверку. Для 9999-12-31 проверить равенство вердикта и ограничение сканирования, не фиксировать миллисекунды производительности. Команда из client: `LOGINOM_DOCK_TEST_BROWSER="$PORT_READ_CHROMIUM" node --test test/node-port-output-datetime.integration.test.mjs`; переменная указывает на проверенный Chromium из manifest. Отсутствие браузера — невыполненная проверка, не PASS/SKIP.
-- [ ] **Step 4: Повторить парную сверку сложных значений до переключения callers.** На одном выполнении сначала новый reader, затем Table. Для >16 384 символов использовать исходный текст либо Table ValueText: старый reader откажет. Int64 — через CSV, не JS-запись. Разрешённые расхождения только из спецификации, включая −0 и неоднозначные даты/Variant. Измерить dirty перед новым чтением и сразу после на сохранённом чистом пакете, до открытия Table. Адресные тесты задачи 1 и оба новых test-файла — PASS.
-- [ ] **Step 5: Коммит.** `git commit -m "feat(runtime): preserve port values and bounded full strings"` с тремя файлами этой задачи. Не включать временный probe и raw evidence.
+- [x] **Step 4: Повторить парную сверку сложных значений до переключения callers.** На одном выполнении сначала новый reader, затем Table. Для >16 384 символов использовать исходный текст либо Table ValueText: старый reader откажет. Int64 — через CSV, не JS-запись. Разрешённые расхождения только из спецификации, включая −0 и неоднозначные даты/Variant. Измерить dirty перед новым чтением и сразу после на сохранённом чистом пакете, до открытия Table. Адресные тесты задачи 1 и оба новых test-файла — PASS.
+- [x] **Step 5: Коммит.** `git commit -m "feat(runtime): preserve port values and bounded full strings"` с тремя файлами этой задачи. Не включать временный probe и raw evidence.
 
 ### Task 3: Подключить общий путь Calculator, журнал и доставку
 
@@ -169,4 +169,8 @@
 - Live-пара: один Execute Text Import, 3×4 Id/I/R/S; 9007199254740993 точен, отличие только согласованный −0, cleanup подтверждён.
 - Один замер: прямое чтение 1 168 мс, строгая Table 25 522 мс; это не медиана и не обещание ускорения.
 - Evidence вне Git: `/tmp/port-read-implementation-UQXxUL/{first-pair,paired-direct,paired-table}.json`.
-- Рабочие callers пока не переключены; полные типы/строки/лимиты и браузерные даты — Task 2, затем интеграция.
+- Task 2 выполнена: типы/даты/строки/лимиты; 182 теста до live и 185 адресных после исправления FParam, отдельные 44 браузерных случая дат проверены. Ревью основного изменения и исправления PASS.
+- Live: CSV 5×4 с >2^53/Int64 MIN/MAX, 20 000 символов/5 001 emoji; JavaScript 10×6, первые 5 строк сверены с Table на том же выполнении, остальные длинные строки — с фикстурой. Отличия только согласованные −0 и неоднозначные даты; Variant unverified/strict отказ.
+- Оба прямых чтения на чистом сохранённом пакете сохранили dirty false→false; sample_rows=0 и cleanup подтверждены. Evidence: `task2-{long-values,js-values-managed,js-direct,js-table}.json` в том же каталоге вне Git.
+- Live обнаружил лишнее ограничение FParam=0: удалено, штатный JS output с FParam=2 принят при прежних owner/direction/subtype/index/GUID guards.
+- Рабочие callers пока не переключены; следующий шаг — Task 3: Calculator, журнал и доставка. JavaScript full на публичном caller проверяется во втором плане.
