@@ -1,0 +1,619 @@
+{
+  "package_path": "/stability-2026-10-20/n19.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "datamining.clustering"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/lab-69-monkey-79baa057-b199-4aa2-9a59-e1e393651767/n194-n19-1-1792436451846017292-workshop-groups.csv",
+      "columns": [
+        {
+          "name": "ID",
+          "type": "integer",
+          "label_any": true,
+          "types": [
+            "integer",
+            "real"
+          ]
+        },
+        {
+          "name": "Hours",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-06,
+            "rel": 1e-09
+          },
+          "types": [
+            "integer",
+            "real"
+          ]
+        },
+        {
+          "name": "Materials",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-06,
+            "rel": 1e-09
+          },
+          "types": [
+            "integer",
+            "real"
+          ]
+        },
+        {
+          "name": "Group",
+          "type": "string",
+          "label_any": true,
+          "types": [
+            "string",
+            "integer",
+            "real"
+          ],
+          "category_labels_any": true
+        }
+      ],
+      "rows": [
+        {
+          "ID": 1,
+          "Hours": 2.053,
+          "Materials": 2.278,
+          "Group": "small"
+        },
+        {
+          "ID": 2,
+          "Hours": 2.272,
+          "Materials": 1.827,
+          "Group": "small"
+        },
+        {
+          "ID": 3,
+          "Hours": 2.024,
+          "Materials": 1.86,
+          "Group": "small"
+        },
+        {
+          "ID": 4,
+          "Hours": 1.717,
+          "Materials": 1.783,
+          "Group": "small"
+        },
+        {
+          "ID": 5,
+          "Hours": 2.135,
+          "Materials": 1.876,
+          "Group": "small"
+        },
+        {
+          "ID": 6,
+          "Hours": 2.086,
+          "Materials": 1.863,
+          "Group": "small"
+        },
+        {
+          "ID": 7,
+          "Hours": 1.889,
+          "Materials": 1.747,
+          "Group": "small"
+        },
+        {
+          "ID": 8,
+          "Hours": 2.086,
+          "Materials": 1.838,
+          "Group": "small"
+        },
+        {
+          "ID": 9,
+          "Hours": 1.748,
+          "Materials": 1.942,
+          "Group": "small"
+        },
+        {
+          "ID": 10,
+          "Hours": 2.207,
+          "Materials": 1.712,
+          "Group": "small"
+        },
+        {
+          "ID": 11,
+          "Hours": 2.032,
+          "Materials": 2.099,
+          "Group": "small"
+        },
+        {
+          "ID": 12,
+          "Hours": 1.901,
+          "Materials": 2.189,
+          "Group": "small"
+        },
+        {
+          "ID": 13,
+          "Hours": 2.044,
+          "Materials": 2.245,
+          "Group": "small"
+        },
+        {
+          "ID": 14,
+          "Hours": 1.921,
+          "Materials": 1.723,
+          "Group": "small"
+        },
+        {
+          "ID": 15,
+          "Hours": 2.05,
+          "Materials": 1.7,
+          "Group": "small"
+        },
+        {
+          "ID": 16,
+          "Hours": 2.131,
+          "Materials": 2.22,
+          "Group": "small"
+        },
+        {
+          "ID": 17,
+          "Hours": 1.896,
+          "Materials": 2.047,
+          "Group": "small"
+        },
+        {
+          "ID": 18,
+          "Hours": 1.86,
+          "Materials": 1.882,
+          "Group": "small"
+        },
+        {
+          "ID": 19,
+          "Hours": 1.85,
+          "Materials": 1.765,
+          "Group": "small"
+        },
+        {
+          "ID": 20,
+          "Hours": 2.121,
+          "Materials": 1.997,
+          "Group": "small"
+        },
+        {
+          "ID": 21,
+          "Hours": 1.982,
+          "Materials": 1.842,
+          "Group": "small"
+        },
+        {
+          "ID": 22,
+          "Hours": 1.829,
+          "Materials": 1.729,
+          "Group": "small"
+        },
+        {
+          "ID": 23,
+          "Hours": 1.909,
+          "Materials": 2.297,
+          "Group": "small"
+        },
+        {
+          "ID": 24,
+          "Hours": 2.055,
+          "Materials": 1.847,
+          "Group": "small"
+        },
+        {
+          "ID": 25,
+          "Hours": 2.054,
+          "Materials": 2.128,
+          "Group": "small"
+        },
+        {
+          "ID": 26,
+          "Hours": 2.268,
+          "Materials": 1.933,
+          "Group": "small"
+        },
+        {
+          "ID": 27,
+          "Hours": 2.138,
+          "Materials": 1.853,
+          "Group": "small"
+        },
+        {
+          "ID": 28,
+          "Hours": 1.89,
+          "Materials": 2.016,
+          "Group": "small"
+        },
+        {
+          "ID": 29,
+          "Hours": 2.097,
+          "Materials": 2.184,
+          "Group": "small"
+        },
+        {
+          "ID": 30,
+          "Hours": 2.056,
+          "Materials": 2.267,
+          "Group": "small"
+        },
+        {
+          "ID": 31,
+          "Hours": 11.862,
+          "Materials": 12.231,
+          "Group": "medium"
+        },
+        {
+          "ID": 32,
+          "Hours": 12.262,
+          "Materials": 11.88,
+          "Group": "medium"
+        },
+        {
+          "ID": 33,
+          "Hours": 12.269,
+          "Materials": 11.994,
+          "Group": "medium"
+        },
+        {
+          "ID": 34,
+          "Hours": 11.759,
+          "Materials": 12.078,
+          "Group": "medium"
+        },
+        {
+          "ID": 35,
+          "Hours": 11.881,
+          "Materials": 12.125,
+          "Group": "medium"
+        },
+        {
+          "ID": 36,
+          "Hours": 12.189,
+          "Materials": 11.897,
+          "Group": "medium"
+        },
+        {
+          "ID": 37,
+          "Hours": 11.857,
+          "Materials": 12.066,
+          "Group": "medium"
+        },
+        {
+          "ID": 38,
+          "Hours": 11.852,
+          "Materials": 12.148,
+          "Group": "medium"
+        },
+        {
+          "ID": 39,
+          "Hours": 11.894,
+          "Materials": 12.037,
+          "Group": "medium"
+        },
+        {
+          "ID": 40,
+          "Hours": 12.213,
+          "Materials": 12.278,
+          "Group": "medium"
+        },
+        {
+          "ID": 41,
+          "Hours": 12.122,
+          "Materials": 11.79,
+          "Group": "medium"
+        },
+        {
+          "ID": 42,
+          "Hours": 12.269,
+          "Materials": 12.013,
+          "Group": "medium"
+        },
+        {
+          "ID": 43,
+          "Hours": 11.957,
+          "Materials": 11.882,
+          "Group": "medium"
+        },
+        {
+          "ID": 44,
+          "Hours": 12.264,
+          "Materials": 12.046,
+          "Group": "medium"
+        },
+        {
+          "ID": 45,
+          "Hours": 11.859,
+          "Materials": 11.913,
+          "Group": "medium"
+        },
+        {
+          "ID": 46,
+          "Hours": 11.74,
+          "Materials": 11.914,
+          "Group": "medium"
+        },
+        {
+          "ID": 47,
+          "Hours": 11.772,
+          "Materials": 12.188,
+          "Group": "medium"
+        },
+        {
+          "ID": 48,
+          "Hours": 12.299,
+          "Materials": 12.273,
+          "Group": "medium"
+        },
+        {
+          "ID": 49,
+          "Hours": 11.833,
+          "Materials": 12.213,
+          "Group": "medium"
+        },
+        {
+          "ID": 50,
+          "Hours": 11.826,
+          "Materials": 12.196,
+          "Group": "medium"
+        },
+        {
+          "ID": 51,
+          "Hours": 12.215,
+          "Materials": 12.13,
+          "Group": "medium"
+        },
+        {
+          "ID": 52,
+          "Hours": 12.294,
+          "Materials": 11.813,
+          "Group": "medium"
+        },
+        {
+          "ID": 53,
+          "Hours": 11.977,
+          "Materials": 12.005,
+          "Group": "medium"
+        },
+        {
+          "ID": 54,
+          "Hours": 11.711,
+          "Materials": 11.985,
+          "Group": "medium"
+        },
+        {
+          "ID": 55,
+          "Hours": 12.081,
+          "Materials": 11.807,
+          "Group": "medium"
+        },
+        {
+          "ID": 56,
+          "Hours": 12.087,
+          "Materials": 11.918,
+          "Group": "medium"
+        },
+        {
+          "ID": 57,
+          "Hours": 12.151,
+          "Materials": 11.712,
+          "Group": "medium"
+        },
+        {
+          "ID": 58,
+          "Hours": 11.745,
+          "Materials": 11.773,
+          "Group": "medium"
+        },
+        {
+          "ID": 59,
+          "Hours": 12.291,
+          "Materials": 12.24,
+          "Group": "medium"
+        },
+        {
+          "ID": 60,
+          "Hours": 11.718,
+          "Materials": 11.96,
+          "Group": "medium"
+        },
+        {
+          "ID": 61,
+          "Hours": 22.1,
+          "Materials": 22.163,
+          "Group": "large"
+        },
+        {
+          "ID": 62,
+          "Hours": 22.096,
+          "Materials": 21.736,
+          "Group": "large"
+        },
+        {
+          "ID": 63,
+          "Hours": 22.245,
+          "Materials": 22.026,
+          "Group": "large"
+        },
+        {
+          "ID": 64,
+          "Hours": 22.063,
+          "Materials": 21.899,
+          "Group": "large"
+        },
+        {
+          "ID": 65,
+          "Hours": 22.018,
+          "Materials": 22.273,
+          "Group": "large"
+        },
+        {
+          "ID": 66,
+          "Hours": 21.862,
+          "Materials": 22.201,
+          "Group": "large"
+        },
+        {
+          "ID": 67,
+          "Hours": 21.964,
+          "Materials": 21.917,
+          "Group": "large"
+        },
+        {
+          "ID": 68,
+          "Hours": 21.976,
+          "Materials": 21.81,
+          "Group": "large"
+        },
+        {
+          "ID": 69,
+          "Hours": 22.03,
+          "Materials": 22.046,
+          "Group": "large"
+        },
+        {
+          "ID": 70,
+          "Hours": 21.908,
+          "Materials": 22.245,
+          "Group": "large"
+        },
+        {
+          "ID": 71,
+          "Hours": 22.083,
+          "Materials": 21.762,
+          "Group": "large"
+        },
+        {
+          "ID": 72,
+          "Hours": 21.717,
+          "Materials": 22.018,
+          "Group": "large"
+        },
+        {
+          "ID": 73,
+          "Hours": 21.818,
+          "Materials": 21.901,
+          "Group": "large"
+        },
+        {
+          "ID": 74,
+          "Hours": 21.78,
+          "Materials": 22.013,
+          "Group": "large"
+        },
+        {
+          "ID": 75,
+          "Hours": 22.178,
+          "Materials": 21.843,
+          "Group": "large"
+        },
+        {
+          "ID": 76,
+          "Hours": 22.294,
+          "Materials": 22.087,
+          "Group": "large"
+        },
+        {
+          "ID": 77,
+          "Hours": 21.735,
+          "Materials": 21.993,
+          "Group": "large"
+        },
+        {
+          "ID": 78,
+          "Hours": 21.774,
+          "Materials": 22.097,
+          "Group": "large"
+        },
+        {
+          "ID": 79,
+          "Hours": 21.871,
+          "Materials": 21.719,
+          "Group": "large"
+        },
+        {
+          "ID": 80,
+          "Hours": 21.769,
+          "Materials": 22.018,
+          "Group": "large"
+        },
+        {
+          "ID": 81,
+          "Hours": 22.23,
+          "Materials": 21.974,
+          "Group": "large"
+        },
+        {
+          "ID": 82,
+          "Hours": 22.247,
+          "Materials": 21.998,
+          "Group": "large"
+        },
+        {
+          "ID": 83,
+          "Hours": 21.725,
+          "Materials": 22.094,
+          "Group": "large"
+        },
+        {
+          "ID": 84,
+          "Hours": 21.957,
+          "Materials": 22.113,
+          "Group": "large"
+        },
+        {
+          "ID": 85,
+          "Hours": 21.886,
+          "Materials": 22.115,
+          "Group": "large"
+        },
+        {
+          "ID": 86,
+          "Hours": 22.063,
+          "Materials": 21.8,
+          "Group": "large"
+        },
+        {
+          "ID": 87,
+          "Hours": 21.922,
+          "Materials": 22.006,
+          "Group": "large"
+        },
+        {
+          "ID": 88,
+          "Hours": 21.883,
+          "Materials": 21.921,
+          "Group": "large"
+        },
+        {
+          "ID": 89,
+          "Hours": 22.126,
+          "Materials": 22.248,
+          "Group": "large"
+        },
+        {
+          "ID": 90,
+          "Hours": 21.977,
+          "Materials": 22.052,
+          "Group": "large"
+        }
+      ],
+      "ordered": false,
+      "column_order": "exact"
+    }
+  ],
+  "request_constraints": [
+    {
+      "source": "prompt.md:1",
+      "quote": "Раздели мастерские из workshops.csv на три похожие группы по Hours и Materials, без учёта ID. Сохрани workshop-groups.csv с колонками ID, Hours, Materials, Group: по строке на каждую мастерскую, обозначения групп любые.",
+      "reason": "Native numeric types and the Group native type are not prescribed; group identifiers are explicitly arbitrary. Preserve the complete partition, source coordinates and named columns."
+    }
+  ]
+}

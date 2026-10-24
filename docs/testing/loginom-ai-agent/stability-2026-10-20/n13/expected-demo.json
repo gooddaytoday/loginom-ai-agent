@@ -1,0 +1,89 @@
+{
+  "package_path": "/stability-2026-10-20/n13.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.cross_table"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/lab-69-monkey-79baa057-b199-4aa2-9a59-e1e393651767/n194-n13-1-1792434372784533893-rentals-summary.csv",
+      "columns": [
+        {
+          "name": "Shop",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Sep",
+          "type": "integer",
+          "label_any": true,
+          "types": [
+            "integer",
+            "real"
+          ]
+        },
+        {
+          "name": "Oct",
+          "type": "integer",
+          "label_any": true,
+          "types": [
+            "integer",
+            "real"
+          ]
+        },
+        {
+          "name": "Nov",
+          "type": "integer",
+          "label_any": true,
+          "types": [
+            "integer",
+            "real"
+          ]
+        }
+      ],
+      "rows": [
+        {
+          "Shop": "East",
+          "Sep": 118,
+          "Oct": 106,
+          "Nov": 124
+        },
+        {
+          "Shop": "North",
+          "Sep": 130,
+          "Oct": 104,
+          "Nov": 94
+        },
+        {
+          "Shop": "South",
+          "Sep": 109,
+          "Oct": 136,
+          "Nov": 151
+        },
+        {
+          "Shop": "West",
+          "Sep": 103,
+          "Oct": 0,
+          "Nov": 137
+        }
+      ],
+      "ordered": true,
+      "column_order": "exact"
+    }
+  ],
+  "request_constraints": [
+    {
+      "source": "prompt.md:1",
+      "quote": "Хочу увидеть, сколько вещей выдали в каждом пункте проката за сентябрь, октябрь и ноябрь: сложи Quantity из rentals.csv по Shop и Month, а месяцы поставь рядом. Сохрани rentals-summary.csv с колонками Shop, Sep, Oct, Nov, пункты по алфавиту, а где выдач не было — поставь ноль.",
+      "reason": "Native integer/real type is not prescribed; numeric values, named columns and requested order remain required."
+    }
+  ]
+}
