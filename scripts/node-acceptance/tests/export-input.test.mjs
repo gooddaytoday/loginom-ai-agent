@@ -199,6 +199,28 @@ test('exact destination selects renamed report while the earlier s1 export remai
  }
 });
 
+test('s8 cold selects an observed owned body despite a clipped label; hidden points still require reveal',async()=>{
+ const {observeExportDestinations}=await import('../static-source-proof.mjs');
+ const {preparedGraphSelection}=await import('../../../packages/loginom-runtime/client/lib/node-graph-selection.mjs');
+ for(const mode of ['body','label','hidden','foreign']){
+  const ref={document_id:'doc',workflow_id:'wf',node_id:'export'},tid='MF;TF-1;Graph;Экспорт_выручки_с_русскими_заголовками';
+  // head69/s8 cold journal: body (1188,140)56x104, label (1161,90)111x48;
+  // canvas starts y=100, scrollTop=0. Both gesture centers were observed.
+  const state={prepared_node_context:{...ref,verified:true,surface:'graph',locked:false,tid},wizard:{status:'absent'},ui:{elements:[
+   {tid,ref:'body',graph_node:{part:'body'},bounding_box:{x:1188,y:140,width:56,height:104},allowed_actions:['click'],interaction:{state:'point_observed'}},
+   {tid:tid+';Label;Label',ref:'label',graph_node:{part:'label'},bounding_box:{x:1161,y:90,width:111,height:48},allowed_actions:['click'],interaction:{state:'point_observed'}}]}};
+  if(mode!=='body')state.ui.elements[0].interaction.state='outside_viewport';
+  if(mode==='hidden')state.ui.elements[1].interaction.state='outside_viewport';
+  if(mode==='foreign')state.prepared_node_context.node_id='foreign';
+  let reveals=0,selected=0;
+  const channel={observe:async()=>structuredClone(state),revealGraphNode:async()=>{reveals++;if(mode!=='hidden')throw Error('unnecessary full bbox reveal');state.ui.elements[0].interaction.state='point_observed';}};
+  const helpers={selectPreparedGraphNode:async(c,s)=>{assert.equal(preparedGraphSelection(s).ref,mode==='label'?'label':'body');selected++;throw Error('SELECTION_REACHED');}};
+  const result=observeExportDestinations({load:async()=>helpers,graph:{nodes:[{type:'exports.text',ref}]},channelFor:()=>channel});
+  await assert.rejects(result,mode==='foreign'?/export selection owner/:/SELECTION_REACHED/);
+  assert.equal(reveals,mode==='hidden'?1:0);assert.equal(selected,mode==='foreign'?0:1);
+ }
+});
+
 test('cold observes both destinations through cancelled owned wizards without exporting or saving',async()=>{
  const {observeExportDestinations}=await import('../static-source-proof.mjs');
  const owner=id=>({document_id:'doc',workflow_id:'wf',node_id:id,verified:true,surface:'wizard'});
