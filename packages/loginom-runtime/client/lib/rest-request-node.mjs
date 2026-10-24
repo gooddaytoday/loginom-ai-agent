@@ -141,6 +141,9 @@ export function createRestRequestNodeSupport(config){
     workflow_ref:request.workflow_ref},deadline,signal);
    need(graph.complete===true&&graph.document_id===request.document_id
     &&JSON.stringify(graph.workflow_ref)===JSON.stringify(request.workflow_ref),'query encoder release graph differs');
+   need(!child.releaseGraph||JSON.stringify(child.releaseGraph)===JSON.stringify(graph),
+    'query encoder release graph changed before checkpoint acknowledgement');
+   child.releaseGraph??=structuredClone(graph);
    const event={operation_id:options.operation.id,phase:'rest_query_encoder_released',
     child_operation_id:original.id,result,graph};
    const saved=await options.onRecord(structuredClone(event));

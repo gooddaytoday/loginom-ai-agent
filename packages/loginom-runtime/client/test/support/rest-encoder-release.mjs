@@ -67,6 +67,8 @@ if(fault==='safe'){
  await assert.rejects(releaseNodeTarget({operation:parent,adapter,record,readReceipt:async()=>null,deadline:Date.now()+90000}),/graph differs/);
 }else{
  await assert.rejects(release());assert.equal(parent.cleanupConfirmed,false);assert.equal(parent.preTargetGraph,undefined);
+ if(fault==='ack'){graph.nodes[0].label='foreign edit';await assert.rejects(release(),/graph changed/);
+  assert.equal(parent.cleanupConfirmed,false);assert.equal(parent.preTargetGraph,undefined);}
 }
 assert.deepEqual(calls,fault==='done-unknown'?['Done']:['Done','source-read-refused']);
 console.log(JSON.stringify({fault,status:'PASS',calls}));
