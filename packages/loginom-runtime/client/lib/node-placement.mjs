@@ -35,16 +35,27 @@ export function nodePlacementPosition(view,point) {
  return {x:Math.round(((point.x-view.x+view.scroll.x)/view.scale-view.translate.x)/8)*8,
   y:Math.round(((point.y-view.y+view.scroll.y)/view.scale-view.translate.y)/8)*8};
 }
+// Conservative initial drawing envelope from the observed REST/encoder case:
+// native REST body 56x104, plus its label, ports and selection controls. Keep
+// another 64 model units clear of existing rendered drawings/hover sources.
+// This is reserved space, not a claim about an uncreated native node's bounds.
+export function nodePlacementGap(view,point,occupied){
+ if(![view.scale,point?.x,point?.y].every(Number.isFinite)||view.scale<=0
+   ||occupied.some(r=>![r.left,r.right,r.top,r.bottom].every(Number.isFinite)||r.left>r.right||r.top>r.bottom))throw Error('Invalid placement clearance bounds');
+ const s=view.scale;
+ return !occupied.some(r=>point.x-32*s<r.right+64*s&&point.x+96*s>r.left-64*s
+   &&point.y-40*s<r.bottom+64*s&&point.y+160*s>r.top-64*s);
+}
 // A crowded viewport does not imply a crowded model. Choose a fresh row below
 // every observed drawing; the existing guarded UI navigation reveals it before
 // any creation gesture. This helper is serialized into the browser evaluator.
-export function nodePlacementOverflow(view,occupied,min,max) {
+export function nodePlacementOverflow(view,occupied,min,max,clearance=0) {
  if(!occupied.length)return null;
- if(![view.x,view.y,view.scale,view.translate?.x,view.translate?.y,view.scroll?.x,view.scroll?.y,min,max].every(Number.isFinite)||view.scale<=0
+ if(![view.x,view.y,view.scale,view.translate?.x,view.translate?.y,view.scroll?.x,view.scroll?.y,min,max,clearance].every(Number.isFinite)||view.scale<=0||clearance<0
   ||occupied.some(r=>![r.left,r.right,r.top,r.bottom].every(Number.isFinite)||r.left>r.right||r.top>r.bottom))throw Error('Invalid placement overflow bounds');
  const x=Math.round(Math.max(min,(80+view.scroll.x)/view.scale-view.translate.x)/8)*8;
  const bottom=Math.max(...occupied.map(r=>(r.bottom-view.y+view.scroll.y)/view.scale-view.translate.y));
- const y=Math.ceil(Math.max(min,bottom+128/view.scale)/8)*8;
+ const y=Math.ceil(Math.max(min,bottom+128/view.scale+clearance)/8)*8;
  if(x<min||y<min||x>max||y>max)return null;
  return {x,y};
 }

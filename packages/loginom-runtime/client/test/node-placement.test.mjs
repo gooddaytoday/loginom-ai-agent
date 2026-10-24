@@ -3,7 +3,63 @@ import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {createNodeTargetBrowserAdapter,mutateGraph} from '../lib/node-target-browser.mjs';
 import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
-import {nodePlacementPoint,nodePlacementPosition,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from '../lib/node-placement.mjs';
+import {nodePlacementPoint,nodePlacementPosition,nodePlacementGap,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from '../lib/node-placement.mjs';
+
+function gapFixture(occupied=[]){
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type:'integration.rest_request'},inputs:[]};
+ const graph={complete:true,interaction_ready:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
+ const box={x:0,y:0,left:0,right:800,top:0,bottom:600,width:800,height:600};
+ const canvas={getBoundingClientRect:()=>box,querySelectorAll:()=>occupied.map(r=>({getBoundingClientRect:()=>({...r,width:r.right-r.left,height:r.bottom-r.top})})),scrollLeft:0,scrollTop:0};
+ const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:1,translate:{x:0,y:0}}}}}};
+ const context={innerWidth:800,innerHeight:600,document:{elementFromPoint:()=>canvas},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
+ const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>{
+  if(code.includes('async function readGraph'))return graph;
+  if(code.includes('evaluateAll')||code.includes('const row=page.locator'))return true;
+  return runInNewContext('('+code+')',context)({locator:()=>({evaluate:async(fn,arg)=>fn(canvas,arg)})});
+ }});
+ return {adapter,request,graph};
+}
+test('D32 automatic placement reserves the whole REST footprint above an observed encoder port',async()=>{
+ const f=gapFixture([{left:80,right:136,top:160,bottom:244},{left:140,right:149,top:192,bottom:204}]);
+ const p=await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000);
+ // Observed native REST body is 56x104; the old point-only choice (80,80)
+ // intersected the encoder body below it even though the drop point was free.
+ assert.equal(p.x<149&&p.x+72>80&&p.y<244&&p.y+104>160,false);
+});
+test('D32 an implicit encoder reserves its parent REST requested location without changing it',async()=>{
+ const f=gapFixture(),reserved={x:80,y:80};
+ const p=await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000,undefined,[reserved]);
+ assert.ok(Math.abs(p.x-reserved.x)>=128||Math.abs(p.y-reserved.y)>=160);
+ assert.deepEqual(reserved,{x:80,y:80});
+});
+test('D32 recorded explicit REST400,300 refuses before creation beside encoder400,336',async()=>{
+ const f=gapFixture([{left:400,right:456,top:336,bottom:420},{left:460,right:469,top:368,bottom:380}]);
+ f.request.target.position={x:400,y:300};
+ await assert.rejects(f.adapter.preflight(f.request,f.graph,Date.now()+10000),/target.position.*overlap.*omit/i);
+ assert.deepEqual(f.request.target.position,{x:400,y:300});
+});
+test('D32 clearance keeps the observed 120-unit native auto-link case apart at every scale',()=>{
+ for(const scale of [.5,1,2]){
+  const v={x:324,y:100,scale,translate:{x:32,y:-16},scroll:{x:40,y:24}};
+  const source=nodePlacementPoint(v,{x:184,y:144});
+  const occupied=[{left:source.x,right:source.x+72*scale,top:source.y,bottom:source.y+80*scale}];
+  assert.equal(nodePlacementGap(v,nodePlacementPoint(v,{x:304,y:144}),occupied),false);
+  assert.equal(nodePlacementGap(v,nodePlacementPoint(v,{x:600,y:144}),occupied),true);
+ }
+ assert.throws(()=>nodePlacementGap({scale:1},{x:0,y:0},[{left:0,right:1,top:NaN,bottom:2}]),/clearance bounds/);
+});
+test('D32 a late overlapping drawing refuses before the sole creation drag',async()=>{
+ const graph={complete:true,interaction_ready:true,document_id:'doc',dom_epoch:1,nodes:[],links:[]};
+ const viewport={x:0,y:0,scale:1,translate:{x:0,y:0},scroll:{x:0,y:0}},readViewport=()=>{};
+ let downs=0;
+ const root={boundingBox:async()=>({x:0,y:0,width:800,height:600}),evaluate:async(fn,arg)=>fn===readViewport?viewport:arg?{reachable:true}:[{left:400,right:456,top:336,bottom:420,width:56,height:84}]};
+ const page={locator:()=>root,evaluate:async()=>true,mouse:{move:async()=>{},down:async()=>{downs++;}}};
+ const task={deadline:Date.now()+10000,request:{document_id:'doc',workflow_ref:{prefix:'MF;TF'}},types:{'integration.rest_request':{title:'REST',palette_group:'Integration'}},
+  effect:{id:'d32-late',kind:'create',before:graph,parameters:{type:'integration.rest_request',position:{x:400,y:300}}}};
+ const result=await mutateGraph(page,task,async()=>graph,()=>{},readViewport,nodePlacementPoint,async()=>({point:{x:400,y:300},zoom_steps:0,navigation_steps:[]}),samePlacementGraph);
+ assert.equal(result.status,'NOT_APPLIED',result.error);assert.equal(result.effect_possible,false);assert.equal(downs,0);
+ assert.match(result.error,/target.position overlaps/);assert.deepEqual(graph.nodes,[]);
+});
 
 for(const {scale,translate,expected} of [
  {scale:1.5,translate:{x:0,y:0},expected:{x:160,y:136}},
@@ -56,7 +112,7 @@ test('browser automatic placement retains overflow coordinates in its serialized
  const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:1,translate:{x:0,y:0}}}}}};
  const context={innerWidth:800,innerHeight:600,document:{elementFromPoint:()=>canvas},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
  let calls=0;const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>++calls===1?graph:runInNewContext('('+code+')',context)({locator:()=>({evaluate:async fn=>fn(canvas)})})});
- assert.deepEqual(structuredClone(await adapter.choosePosition(request,graph,Date.now()+10000)),{x:80,y:728});
+ assert.deepEqual(structuredClone(await adapter.choosePosition(request,graph,Date.now()+10000)),{x:80,y:840});
 });
 test('overflow remains beyond occupied drawings under zoom, translation and scroll',()=>{
  for(const scale of [.5,1,2]){
