@@ -1,6 +1,56 @@
 import {readPreparedNodeContext,validatePreparedNodeContext} from './node-context.mjs';
 import {readOutputContext} from './node-output-context.mjs';
 
+// Serialized into the native callback; keep this decoder independent of module closures.
+export function decodePortCell(raw,type) {
+ if(raw===null||raw===undefined)return {cell:{type,is_null:true,value:null,precision:'exact_null'},limitations:[]};
+ const exact=(value,representation,precision,extra={})=>({cell:{type,is_null:false,value,representation,precision,...extra},limitations:[]});
+ if(type==='integer'){
+  if(!(typeof raw==='number'?Number.isSafeInteger(raw):['Int64','UInt64'].includes(raw?.constructor?.name)))throw Error('integer_value');
+  const text=raw.toString();if(!/^-?(?:0|[1-9][0-9]*)$/.test(text))throw Error('integer_text');
+  return exact(text,'decimal_integer','exact_integer');
+ }
+ if(type==='real'&&typeof raw==='number'&&Number.isFinite(raw))return exact(raw,'binary64','17_significant_digits',{decimal:Object.is(raw,-0)?'-0':String(raw)});
+ if(type==='string'&&typeof raw==='string')return exact(raw,'data_source_string','source_text');
+ if(type==='boolean'&&typeof raw==='boolean')return exact(raw,'data_source_boolean','exact_boolean');
+ if((type==='datetime'||type==='variant')&&raw instanceof Date){
+  if(!Number.isFinite(raw.getTime()))throw Error('datetime_value');
+  const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const instant=Temporal.Instant.fromEpochMilliseconds(raw.getTime()).toZonedDateTimeISO(timezone);
+  const limit=instant.epochNanoseconds-48n*3600n*1000000000n;
+  let transition=instant.add({nanoseconds:1}).getTimeZoneTransition('previous'),ambiguous=false;
+  while(transition&&transition.epochNanoseconds>limit){
+   const delta=transition.offsetNanoseconds-transition.subtract({nanoseconds:1}).offsetNanoseconds;
+   if(delta>0&&instant.epochNanoseconds<transition.epochNanoseconds+BigInt(delta)){ambiguous=true;break;}
+   transition=transition.getTimeZoneTransition('previous');
+  }
+  const year=raw.getFullYear(),month=raw.getMonth(),day=raw.getDate();
+  // AddBias constructs years 0..99 through 1900+Y before restoring the real year.
+  if(year>=0&&year<100){
+   const date=Temporal.PlainDate.from({year:1900+year,month:month+1,day}),start=date.toZonedDateTime(timezone),end=date.add({days:1}).toZonedDateTime(timezone);
+   if(!start.toPlainDate().equals(date)||start.hour||start.minute||start.second||start.millisecond)ambiguous=true;
+   let surrogate=start.subtract({nanoseconds:1}).getTimeZoneTransition('next');
+   while(surrogate&&surrogate.epochNanoseconds<=end.epochNanoseconds){
+    if(surrogate.offsetNanoseconds>surrogate.subtract({nanoseconds:1}).offsetNanoseconds){ambiguous=true;break;}
+    surrogate=surrogate.getTimeZoneTransition('next');
+   }
+  }
+  const civil=new Date(0);civil.setUTCFullYear(year,month,day);civil.setUTCHours(raw.getHours(),raw.getMinutes(),raw.getSeconds(),raw.getMilliseconds());
+  const epoch=Date.UTC(1899,11,30),linear=civil.getTime()-epoch;
+  const corrected=new Date(epoch+(linear<0?Math.trunc(linear/86400000)*86400000+Math.abs(linear%86400000):linear));
+  const pad=(value,width=2)=>String(value).padStart(width,'0');
+  const text=pad(corrected.getUTCFullYear(),4)+'-'+pad(corrected.getUTCMonth()+1)+'-'+pad(corrected.getUTCDate())+'T'+pad(corrected.getUTCHours())+':'+pad(corrected.getUTCMinutes())+':'+pad(corrected.getUTCSeconds())+'.'+pad(corrected.getUTCMilliseconds(),3);
+  const limitations=[...(type==='variant'?['variant_display_precision']:[]),...(ambiguous?['datetime_display_precision']:[])];
+  if(!limitations.length)return exact(text,'local_datetime','millisecond',{timezone:'unspecified'});
+  return {cell:{type,is_null:false,display_text:text,representation:'formatted_display',precision:'unverified'},limitations};
+ }
+ if(type==='variant'||type==='real'&&typeof raw==='number'){
+  const text=typeof raw==='number'?Object.is(raw,-0)?'-0':String(raw):['string','boolean'].includes(typeof raw)?String(raw):['Int64','UInt64'].includes(raw?.constructor?.name)?raw.toString():undefined;
+  return {cell:{type,is_null:false,...(text===undefined?{}:{display_text:text}),representation:'formatted_display',precision:'unverified'},limitations:[type==='variant'?'variant_display_precision':'numeric_display_precision']};
+ }
+ throw Error('unsupported_type');
+}
+
 export function makeNodePortOutputCode(binding,request,options) {
  validatePreparedNodeContext(binding);
  if(!request||Object.keys(request).sort().join(',')!=='execution,port,requireExactNumbers,sampleRows'
@@ -11,18 +61,19 @@ export function makeNodePortOutputCode(binding,request,options) {
   ||typeof request.execution.execution_id!=='string'||typeof request.execution.process_id!=='string'||typeof request.execution.process_record_id!=='string'
   ||!options||Object.keys(options).sort().join(',')!=='build,deadline,origin'
   ||typeof options.origin!=='string'||typeof options.build!=='string'||!Number.isSafeInteger(options.deadline))throw Error('Exact bounded completed port read required');
- return `async page=>(${readNodePortOutput.toString()})(page,${JSON.stringify(binding)},${JSON.stringify(request)},${JSON.stringify(options)},${readPreparedNodeContext.toString()},${readOutputContext.toString()})`;
+ return `async page=>(${readNodePortOutput.toString()})(page,${JSON.stringify(binding)},${JSON.stringify(request)},${JSON.stringify(options)},${readPreparedNodeContext.toString()},${readOutputContext.toString()},${decodePortCell.toString()})`;
 }
 
 // One dispatch retains native identity and owns only the proxies acquired here.
-export async function readNodePortOutput(page,binding,request,options,readNode=readPreparedNodeContext,readOutputs=readOutputContext) {
+export async function readNodePortOutput(page,binding,request,options,readNode=readPreparedNodeContext,readOutputs=readOutputContext,decodeCell=decodePortCell) {
  const before=await readNode(page,binding);
  if(before.verified!==true||before.surface!=='graph')return {verified:false,cleanup_complete:false,reason:'node_context'};
  const inventory=await readOutputs(page,binding,readNode);
  const target=inventory.ports?.find(p=>p.index===request.port);
  if(!inventory.verified||JSON.stringify(inventory.node_context)!==JSON.stringify(before))return {verified:false,cleanup_complete:false,reason:'output_context'};
  if(!target?.active)return {verified:false,cleanup_complete:true,reason:'inactive_output'};
- const result=await page.evaluate(async ({binding:b,request:q,options:o,before,target})=>{
+ const result=await page.evaluate(async ({binding:b,request:q,options:o,before,target,decoder})=>{
+  const decode=eval(' ('+decoder+')');
   const need=(ok,code)=>{if(!ok){reason=code;throw Error('Port read refused');}},value=(obj,key)=>Object.getOwnPropertyDescriptor(obj??{},key)?.value;
   const exact=tid=>[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')];
   const live=()=>need(Date.now()<o.deadline,'deadline');
@@ -98,38 +149,33 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
     live();stable();need(typeof name==='string'&&typeof label==='string'&&name.length<=16384&&label.length<=16384&&type,'column_metadata');
     schema.push({index,name,label,type});
    }
-   const sample=[],values=[],requested=Math.min(rowCount,q.sampleRows,Math.floor(10000/total));
+   const sample=[],values=[],limits=new Set(),requested=Math.min(rowCount,q.sampleRows,Math.floor(10000/total));
    const helper=sourceBaseline.helper;
    let limited=requested<Math.min(rowCount,q.sampleRows);
    for(let row=0;row<requested;row++){
-    const cells=[];
+    const rawValues=[];
     for(let column=0;column<total;column++){
      live();stable();const raw=await dataSource.AsVariant(row,column);live();stable();
      need(value(helper,'$FCacheInitialized')===true&&value(helper,'$FData'),'cache_uninitialized');
-     const type=schema[column].type;
-     if(raw===null||raw===undefined){cells.push({type,is_null:true,value:null,precision:'exact_null'});continue;}
-     if(type==='integer'){
-      need(typeof raw==='number'?Number.isSafeInteger(raw):['Int64','UInt64'].includes(raw?.constructor?.name),'integer_value');
-      const text=raw.toString();need(/^-?(?:0|[1-9][0-9]*)$/.test(text),'integer_text');
-      cells.push({type,is_null:false,value:text,representation:'decimal_integer',precision:'exact_integer'});continue;
-     }
-     if(type==='real'){
-      need(typeof raw==='number'&&Number.isFinite(raw),'unsupported_real');
-      cells.push({type,is_null:false,value:raw,decimal:Object.is(raw,-0)?'-0':String(raw),representation:'binary64',precision:'17_significant_digits'});continue;
-     }
-     need(type==='string'&&typeof raw==='string','unsupported_type');
-     // Long cached strings require the separately tested scalar extension (Task 2).
-     need(raw.length<5000&&!raw.endsWith('…'),'unsupported_long_string');
-     cells.push({type,is_null:false,value:raw,representation:'data_source_string',precision:'source_text'});
+     rawValues.push(raw);
     }
-    need(new TextEncoder().encode(JSON.stringify(cells)).length<=2*1024*1024,'temporary_byte_budget');
-    const rowValues=cells.map(c=>c.value);
+    // Settle every started full-text RPC before refusing or disposing its column.
+    const fullValues=await Promise.allSettled(rawValues.map(async(raw,column)=>{
+     if(!['string','variant'].includes(schema[column].type)||typeof raw!=='string'||raw.length<5000&&!raw.endsWith('…'))return raw;
+     live();stable();const full=await items[column].AsString(row);live();stable();
+     need(typeof full==='string','string_value');return full;
+    }));
+    need(fullValues.every(item=>item.status==='fulfilled'),'cell_read_failed');
+    const decoded=fullValues.map((item,column)=>decode(item.value,schema[column].type)),cells=decoded.map(item=>item.cell);
+    const rowValues=cells.map(c=>c.value??c.display_text??null);
     if(new TextEncoder().encode(JSON.stringify([...values,rowValues])).length>512*1024){limited=true;break;}
+    need(!q.requireExactNumbers||decoded.every(item=>item.limitations.length===0),'unverified_precision');
+    decoded.forEach(item=>item.limitations.forEach(limit=>limits.add(limit)));
     values.push(rowValues);sample.push(cells);
    }
    live();stable();
    result={port:q.port,port_guid:baseline.portGuid,fresh:true,execution_id:q.execution.execution_id,freshness_basis:'completed_execution_port_source',schema,row_count:rowCount,sample,sample_rows:sample.length,sample_complete:sample.length===rowCount,
-    precision:{numbers_verified:true,limitations:[],strings:'data source text; existing secret redaction applies; original byte encoding is not attested'},...(limited?{limitations:['preview_cell_or_byte_budget']}: {})};
+    precision:{numbers_verified:!limits.has('numeric_display_precision')&&!limits.has('variant_display_precision'),limitations:[...limits],strings:'data source text; existing secret redaction applies; original byte encoding is not attested'},...(limited?{read_limit:'preview_cell_or_byte_budget'}: {})};
    need(new TextEncoder().encode(JSON.stringify(result)).length<=4*1024*1024,'response_byte_budget');
   }catch{result=undefined;
   }finally{
@@ -139,7 +185,7 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
   if(!released||!context)return {verified:false,cleanup_complete:false,reason:released?'context_changed':'dispose_failed'};
   if(!result)return {verified:false,cleanup_complete:true,reason};
   return {verified:true,cleanup_complete:true,output:result};
- },{binding,request,options,before,target});
+ },{binding,request,options,before,target,decoder:decodeCell.toString()});
  const after=await readNode(page,binding);
  if(JSON.stringify(before)!==JSON.stringify(after))return {verified:false,cleanup_complete:false,reason:'node_context_changed'};
  return result.verified?{...result,node_context:after}:result;
