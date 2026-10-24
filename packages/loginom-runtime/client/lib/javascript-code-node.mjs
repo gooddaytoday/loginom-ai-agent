@@ -11,7 +11,7 @@ import {withBrowserReceipt} from './executor.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 import {closeJavascriptPortMapping} from './javascript-port-mapping-close.mjs';
 import {openManagedJavascriptOutputViews} from './javascript-managed-views.mjs';
-import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
+import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable,restoreStoppedTableRead} from './node-output-procedure.mjs';
 import {readTableOutputPages} from './table-output-pages.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
 import {validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
@@ -104,7 +104,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       node_id:request.target.kind==='existing'?request.target.ref.node_id:null,operation_id:operation.id,ui_epoch:Date.now()};
     let expected=request.parameters.source_text===undefined?null:javascriptSourceIdentity(request.parameters.source_text);
     let owner,channel,signal,adapter,handle,admission,admitted,configured,committed,
-      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline,doneReceipt;
+      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline,doneReceipt,readView;
     const enter=ctx=>{
       signal=ctx.signal;signal?.throwIfAborted();operation.deadline=ctx.deadline;
       if(ctx.node){
@@ -391,28 +391,42 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           wrapMutation:(code,reference)=>withBrowserReceipt('('+code+')(page)',{
             ...receiptOptions(reference.id,reference.action_key,reference.signature),operation_id:reference.id})})});
         need(table.port_guid===outputMapping.node_context.output_port.port_guid,'JavaScript physical output port changed');
-        const format=read.require_exact_numbers?await configureTablePrecision(channel,table.table):null;
-        let data,restoration;
+        readView={table:table.table,formatProof:null,restored:false,formatting:{}};
+        let data,restoration,format;
         try{
+          format=read.require_exact_numbers?await configureTablePrecision(channel,table.table,{progress:readView.formatting}):null;
+          readView.formatProof=format;
           const settings=await prepareTableRead(channel,table.table);
           const raw=await readTableOutputPages(channel,table.table,{sampleRows:read.sample_rows});
           data=decodeTableOutput(raw,{formatProof:format,readSettings:settings,
             expectedColumns:outputMapping.target_fields.filter(field=>!field.excluded),requireExactNumbers:read.require_exact_numbers});
-        }finally{if(format)restoration=await restoreTablePrecision(channel,format);}
+        }catch(error){
+          // A settled Filter click may leave this read's own dialog open.
+          // Cancel it before Format restoration; keep the original receipt.
+          if(!operation.transportUncertain&&operation.cleanupConfirmed===true){
+            await restoreStoppedTableRead(channel,readView,error);readView=null;
+          }
+          throw error;
+        }
+        if(format){restoration=await restoreTablePrecision(channel,format);readView.restored=true;}
         const returned=await returnFromOutputTable(channel,table.table);
+        readView=null;
         if(read.coverage==='full')need(data.sample_complete===true&&data.sample_rows===data.row_count&&!data.limitations?.length,
           'Full JavaScript UI output exceeds bounded read coverage');
         return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,
           evidence_ref:ctx.receipt_id,ports:[{port:0,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data}],
           table_creation:table,format_restoration:restoration,workflow_return:returned});
       },
-      releasePendingPhases:['input_mapping','open','configure'],
+      releasePendingPhases:['input_mapping','open','configure','read'],
       async releasePending(state,{signal:releaseSignal}={}) {
-        need(['input_mapping','open','configure'].includes(state.pending?.phase),
-          'Only a stopped JavaScript draft can be released here');
+        need(['input_mapping','open','configure','read'].includes(state.pending?.phase),
+          'Only a stopped JavaScript draft or output read can be released here');
         enter({signal:releaseSignal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
           workflow_ref:state.request.workflow_ref,node:state.node});
-        return releasePendingNode({operation,channel,readReceipt});
+        const view=state.pending.phase==='read'?readView:null;
+        return releasePendingNode({operation,channel,readReceipt,restoreRead:view?async()=>{
+          await restoreStoppedTableRead(channel,view);readView=null;return true;
+        }:undefined});
       },
       async verifyContinuation(state,{signal:nextSignal}) {
         const ctx=javascriptExecutionWaitContext(state,{operation,owner,expected,configured,committed,inputMapping,outputMapping,now:now()});

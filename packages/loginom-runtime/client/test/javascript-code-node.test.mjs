@@ -16,6 +16,13 @@ const request={target:{kind:'new',type:'programming.javascript',position:{x:256,
   inputs:[{source,output:0,input:0}],parameters:{source_text:'import {OutputTable} from "builtIn/Data";\n',schema_mode:'code'},
   mappings:[],finish:'execute',read:{ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'}};
 
+for(const fault of ['owned','transport','cleanup-unconfirmed','cancel-failed'])test('D9(c) JS stopped output preserves its primary receipt: '+fault,()=>{
+ const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
+  fileURLToPath(new URL('./support/javascript-stopped-output.mjs',import.meta.url)),fault],{encoding:'utf8',timeout:10000});
+ assert.equal(result.error,undefined,String(result.error));
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+});
+
 for(const point of ['read','replace'])test('configure cancellation during managed '+point+' retains pending without later effects',()=>{
  const result=spawnSync(process.execPath,['--experimental-test-module-mocks',
   fileURLToPath(new URL('./support/javascript-configure-cancel.mjs',import.meta.url)),point],{encoding:'utf8',timeout:10000});
