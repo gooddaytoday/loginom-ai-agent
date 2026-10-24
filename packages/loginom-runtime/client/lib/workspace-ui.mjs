@@ -723,7 +723,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // Settings breadcrumbs overflow too; the native GUID-bound wizard is
       // already verified. Read their context without making hidden controls actionable.
       ||preparedNodeWizard&&['text_import_file','text_import_format','output_mapping','done'].includes(wizard.stage)
-        &&e.querySelectorAll('.bg-vendor-icon-importtextfile').length===1)
+        &&e.querySelectorAll('.bg-vendor-icon-importtextfile').length===1
+      ||preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===0
+        &&preparedInputPort.node_icon_class==='bg-vendor-icon-javascript'
+        &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+        &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+        &&e.querySelectorAll('.bg-vendor-icon-javascript').length===1)
       &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'
       &&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')&&!sensitive(e)
       &&(tids.get(getTid(e))??[]).length===1

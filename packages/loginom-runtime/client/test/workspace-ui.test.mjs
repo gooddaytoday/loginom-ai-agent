@@ -4327,6 +4327,8 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
   const binding={verified:true,surface:'wizard',document_id:'doc',workflow_id:'flow',node_id:'node',
     input_port:{direction:'input',port:mode==='wrong_port'?1-port:mode==='unknown_port'?2:port,native_index:mode==='wrong_native_index'?1-port:port,port_guid:'input-'+port,opening_operation_id:'join-open-'+port,node_icon_class:nodeIcon}};
   if(mode==='missing_native_icon')delete binding.input_port.node_icon_class;
+  if(mode==='missing_guid')delete binding.input_port.port_guid;
+  if(mode==='missing_opening')delete binding.input_port.opening_operation_id;
   if(mode==='wrong_native_icon')binding.input_port.node_icon_class='bg-vendor-icon-unknown';
   let reads=0;
   if(mode!=='unbound')page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
@@ -4363,6 +4365,30 @@ test('JavaScript input0 overflow preserves the owned typed close confirmation',a
   assert.equal(yes?.allowed_actions.includes('confirm_wizard_close')===true,accepted,mode);
   if(accepted)assert.doesNotThrow(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},snapshot));
   else if(yes)assert.throws(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},snapshot),/UI reference/);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+test('D47b owned JS input0 keeps context when the node caption itself overflows',async()=>{
+ for(const mode of ['valid','wrong_port','wrong_native_index','missing_native_icon','wrong_native_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor','missing_guid','missing_opening','hidden_visibility','hidden_attribute','zero_opacity','duplicate_icon','secret_node']) {
+  const {page}=await joinInputPortOverflowFixture(mode,0,'javascript');
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  for(const i of [5,6]){crumbs[i].style.display='none';crumbs[i].box={x:0,y:0,width:0,height:0};for(const icon of crumbs[i].children)icon.box={x:0,y:0,width:0,height:0};}
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='hidden_visibility')crumbs[5].style.visibility='hidden';
+  if(mode==='hidden_attribute')crumbs[5].attrs.hidden='';
+  if(mode==='zero_opacity')crumbs[5].style.opacity='0';
+  if(mode==='duplicate_icon')page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[5]).attrs.class='bg-vendor-icon-javascript';
+  if(mode==='secret_node')crumbs[5].attrs['aria-label']='password';
+  const observed=await page.execute({mode:'observe'});
+  if(observed.status!=='SUCCEEDED'){assert.equal(mode==='valid',false,mode);continue;}
+  const full=observed.output;
+  assert.equal(full.wizard.input_port_context?.status==='observed',mode==='valid',mode);
+  if(mode==='valid'){
+   const narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+   assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
+   assert.equal(full.ui.elements.some(e=>e.tid===crumbs[5].attrs['data-tid']&&e.allowed_actions.length>0),false);
+  }
   assert.deepEqual(page.events,[]);
  }
 });
