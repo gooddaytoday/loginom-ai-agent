@@ -424,20 +424,41 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return visibleAncestors(element);
     });
     const sensitivePattern = /password|passwd|\bpwd\b|secret|token|credential|authorization|api[_ -]?key|private[_ -]?key|one[_ -]?time|\botp\b|парол|секрет|токен/i;
+    // Inline definition pages have no separate port opening. Their native-bound
+    // node wizard and exact current breadcrumb supply the node type, read-only.
+    const inlineDefinitionIcon=(()=>{
+      if(!preparedNodeWizard||!preparedNodeId||!definitionPrefix||!preparedWorkflowPath?.length||preparedInputPort||preparedOutputPort)return null;
+      const panels=tids.get(definitionPrefix+';NavigationBar;NavigationPanel')??[];
+      if(panels.length!==1||!visible(panels[0]))return null;
+      const prefix=definitionPrefix+';cnrNaviMode;b.s_',crumbs=all.filter(e=>{charge();return panels[0].contains(e)&&(getTid(e)??'').startsWith(prefix);});
+      const count=preparedWorkflowPath.length,node=crumbs[count],settings=crumbs[count+1];
+      if(crumbs.length!==count+2||!preparedWorkflowPath.every((c,i)=>getTid(crumbs[i])===c.tid&&crumbs[i].textContent.trim()===c.label)
+        ||!getTid(node)?.startsWith(preparedWorkflowPath.at(-1).tid+'>')||getTid(node).slice(preparedWorkflowPath.at(-1).tid.length+1).includes('>')
+        ||settings.textContent.trim()!=='Настройка'||getTid(settings)!==getTid(node)+'>Настройка')return null;
+      const icons=[...node.querySelectorAll('[class*="bg-vendor-icon-"]')];charge();
+      if(icons.length!==1)return null;
+      return ['importtextfile','joindata','exporttextfile'].map(n=>'bg-vendor-icon-'+n).find(n=>icons[0].classList.contains(n))??null;
+    })();
     const definitionMetadataTid=memoRead(element=>{
       const tid=getTid(element)??'';
       const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard|DerivedDataSourceOutputSocketWizard|TuneDataSourceMappingWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_|colDataKind_|colDefaultUsageType_|colUsageType_|colSourceDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
       if(!match || element.tagName!=='TD' || !sensitivePattern.test(tid))return tid;
       const input=match[2]==='TuneDataSourceMappingWizard',output=match[2]!=='CalcDataWizard';
       const port=input?preparedInputPort:preparedOutputPort,usage=input?'colUsageType_':'colDefaultUsageType_';
+      const inline=!port&&(match[2]==='ColumnsMappingEngineOutputPortWizard'&&inlineDefinitionIcon==='bg-vendor-icon-importtextfile'
+        ||match[2]==='DerivedDataSourceOutputSocketWizard'&&inlineDefinitionIcon==='bg-vendor-icon-joindata'
+        ||input&&inlineDefinitionIcon==='bg-vendor-icon-exporttextfile');
       if(output ? !['colName_','colDisplayName_','colDataKind_',usage,'colSourceDisplayName_'].includes(match[3])
-        || definitionPrefix!==match[1] || port?.direction!==(input?'input':'output')
-        || (input ? port.node_icon_class!=='bg-vendor-icon-sorting'
-          : port.node_icon_class!=='bg-vendor-icon-calcdata'
-            && !(match[2]==='DerivedDataSourceOutputSocketWizard'&&port.node_icon_class==='bg-vendor-icon-sorting'))
-        || port.port!==0 || port.native_index!==0
-        || typeof port.port_guid!=='string' || !port.port_guid
-        || typeof port.opening_operation_id!=='string' || !port.opening_operation_id
+        || definitionPrefix!==match[1] || !(inline||port?.direction===(input?'input':'output')&&(input
+          ? port.node_icon_class==='bg-vendor-icon-sorting'&&port.port===0&&port.native_index===0
+            || port.node_icon_class==='bg-vendor-icon-joindata'&&[0,1].includes(port.port)&&port.native_index===port.port
+            || port.node_icon_class==='bg-vendor-icon-exporttextfile'&&port.port===0&&port.native_index===1
+          : port.port===0&&port.native_index===0&&(port.node_icon_class==='bg-vendor-icon-calcdata'
+            || match[2]==='DerivedDataSourceOutputSocketWizard'&&port.node_icon_class==='bg-vendor-icon-sorting'
+            || match[2]==='ColumnsMappingEngineOutputPortWizard'&&port.node_icon_class==='bg-vendor-icon-importtextfile'
+            || match[2]==='DerivedDataSourceOutputSocketWizard'&&port.node_icon_class==='bg-vendor-icon-joindata'))
+          &&typeof port.port_guid==='string'&&!!port.port_guid
+          &&typeof port.opening_operation_id==='string'&&!!port.opening_operation_id)
         : !['colExpressionName_','colExpressionDisplayName_'].includes(match[3]))return tid;
       const base=match[1]+';WizrdMCF;',tab='MF;cntMain;cntWorkspace;Workspace;t.br;tb'+match[1].slice('MF;TF'.length);
       const prefix=base+match[2]+';';
@@ -456,7 +477,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         if(cells.length!==1 || cells[0].tagName!=='TD' || cells[0].closest('table')!==row)return tid;
         metadata.push(cells[0]);
       }
-      // Only technical-name suffixes of owned Calculator/Sorting definition cells are data.
+      // Only technical-name suffixes of the owned field-definition cells are data.
       // Never exempt secret attributes, ancestors, editors or dataset values.
       for(const cell of metadata) {
         const children=[...cell.querySelectorAll('*')];charge();
@@ -731,7 +752,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&(tids.get(getTid(e)+'>Настройка')??[]).filter(child=>panels[0].contains(child)
             &&child.querySelectorAll('.maptree-icon-wizard').length===1).length===1;
         const overflowOutputFolder=e=>boundOutputOverflow&&(preparedOutputPort.port===0||preparedOutputPort.node_icon_class==='bg-vendor-icon-filterdata'&&preparedOutputPort.port===1)
-          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-uniondata','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript'].includes(preparedOutputPort.node_icon_class)
+          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-uniondata','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-joindata'].includes(preparedOutputPort.node_icon_class)
           &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
           &&e.textContent.trim()==='Выходные порты'&&(getTid(e)??'').endsWith('>Выходные_порты')
           &&e.querySelectorAll('.maptree-icon-modeloutputports').length===1

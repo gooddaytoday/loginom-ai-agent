@@ -12,6 +12,12 @@ ROOT = Path(__file__).resolve().parents[3] / 'docs/testing/loginom-ai-agent/stab
 
 
 class RequestedSchemaOracle(unittest.TestCase):
+    def test_s5_oracle_preserves_canonical_label_policy_and_values(self):
+        scenario = ROOT.parent / 'demo-2026-10-22/s5-pivot'
+        result = subprocess.run([sys.executable, '-B', str(scenario / 'oracle.py')], capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout), json.loads((scenario / 'expected-demo.json').read_text()))
+
     def test_cold_references_and_wrong_csv_against_independent_oracles(self):
         with tempfile.TemporaryDirectory(prefix='requested-schema-') as directory:
             for name in ['n13', 'n18', 'n19', 'n20']:

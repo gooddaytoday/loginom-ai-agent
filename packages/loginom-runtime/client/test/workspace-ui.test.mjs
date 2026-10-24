@@ -3367,6 +3367,136 @@ function mappingCoverageFixture(page,count=2) {
   return {form,base,body,container,filter,input,tableMode,linksMode,auto,rows};
 }
 
+const d51Ports=[
+  ['Import','output','ColumnsMappingEngineOutputPortWizard','importtextfile',0,0],
+  ['JoinLeft','input','TuneDataSourceMappingWizard','joindata',0,0],
+  ['JoinRight','input','TuneDataSourceMappingWizard','joindata',1,1],
+  ['JoinOutput','output','DerivedDataSourceOutputSocketWizard','joindata',0,0],
+  ['Export','input','TuneDataSourceMappingWizard','exporttextfile',0,1],
+];
+const d51Inline=[
+  ['InlineImport','output','ColumnsMappingEngineOutputPortWizard','importtextfile',0,0,true],
+  ['InlineJoin','output','DerivedDataSourceOutputSocketWizard','joindata',0,0,true],
+  ['InlineExport','input','TuneDataSourceMappingWizard','exporttextfile',0,1,true],
+];
+function d51MetadataFixture(role,name='Password') {
+  const [node,direction,family,icon,index,native_index]=role,page=new Page(),f=mappingCoverageFixture(page,3);
+  for(const e of [f.form,...f.form.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid']
+    .replace('ColumnsMappingEngineOutputPortWizard',family).replace('colDefaultUsageType_',direction==='input'?'colUsageType_':'colDefaultUsageType_');
+  f.base=f.base.replace('ColumnsMappingEngineOutputPortWizard',family);
+  for(const cell of f.rows[0].children) {
+    cell.attrs['data-tid']=cell.attrs['data-tid'].replace(/Field0$/,name);
+    if(cell.ownText==='Field0')cell.ownText=name;
+  }
+  const port={direction,port:index,native_index,port_guid:'d51-port',opening_operation_id:'d51-open',node_icon_class:'bg-vendor-icon-'+icon};
+  const binding={node:{node_id:'d51-node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+  let panel,nodeCrumb,iconElement;
+  if(role[6]) {
+    panel=page.add('div','MF;TF-1;NavigationBar;NavigationPanel');let tid='MF;TF-1;cnrNaviMode;b.s_';
+    for(const label of ['Сервер','Пакеты','Case','Модуль1','Сценарий']) {
+      tid+=(binding.workflow_ref.navigation_path.length?'>':'')+label;
+      page.add('a',tid,label,undefined,panel);binding.workflow_ref.navigation_path.push({tid,label});
+    }
+    nodeCrumb=page.add('a',tid+'>Owned','Owned',undefined,panel);
+    iconElement=page.add('span',null,'',undefined,nodeCrumb);iconElement.attrs.class='bg-vendor-icon-'+icon;
+    page.add('a',tid+'>Owned>Настройка','Настройка',undefined,panel);
+  }
+  const native={verified:true,surface:'wizard',...(role[6]?{}:{[direction+'_port']:port})};
+  const read=(options={})=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {expected_build:build,expected_origin:origin,prepared_node_context:binding,mode:'observe',...options},
+    async()=>native);
+  return {page,...f,port,binding,read,node,family,panel,nodeCrumb,iconElement,native};
+}
+
+test('D51 owned Import Join Export definitions keep sensitive-looking column names on complete pages',async()=>{
+  for(const role of [...d51Ports,...d51Inline])for(const name of ['Password','Secret','ApiKey','Token','Key']) {
+    const f=d51MetadataFixture(role,name),r=await f.read({output_column_page:{offset:0,limit:8}});
+    assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));
+    const c=r.output.wizard.output_columns,message=role[0]+':'+name;
+    assert.equal(c?.page?.status,'complete_definition_page',message);
+    assert.deepEqual(Array.from(c.fields,x=>x.name),[name,'Field1','Field2'],message);
+    assert.equal(c.page.returned,3);assert.equal(c.page.total_columns,3);
+    assert.equal(c.settings_applied,false);assert.deepEqual(f.page.events,[]);
+    if(role[6])for(const scope of [{root_ref:r.output.wizard.root_ref},{discover_roots:true}]) {
+      const narrow=await f.read({...scope,output_column_page:{offset:0,limit:8}});
+      assert.equal(narrow.output.wizard.output_columns?.page?.status,'complete_definition_page',message);
+    }
+  }
+});
+
+test('D51 metadata never exposes dataset values secret inputs or REST credentials in snapshots',async()=>{
+  for(const role of [...d51Ports,...d51Inline])for(const index of [0,1,2,3,4])for(const mode of ['name','id','aria','autocomplete','child','input','editable','link']) {
+    const f=d51MetadataFixture(role),cell=f.rows[0].children[index];
+    cell.ownText='PRIVATE_VALUE_SENTINEL';
+    if(['name','id','aria','autocomplete'].includes(mode))cell.attrs[mode==='aria'?'aria-label':mode]='secret';
+    if(mode==='child')f.page.add('span','secret','PRIVATE_CHILD_SENTINEL',undefined,cell);
+    if(mode==='input'){const e=f.page.add('input',null,'',undefined,cell);e.attrs.type='password';e.value='PRIVATE_INPUT_SENTINEL';}
+    if(mode==='editable')cell.attrs.contenteditable='true';
+    if(mode==='link')f.page.add('a',null,'',undefined,cell).attrs.href='https://outside.test/?token=PRIVATE_URL_SENTINEL';
+    f.page.add('td','MF;TF-1;ViewsForm;BrowseView;grdData;grd-1;tbl;col_Password','PRIVATE_DATASET_SENTINEL');
+    f.page.add('td',f.base+'colValue_Password','PRIVATE_NON_METADATA_SENTINEL',undefined,f.rows[0]);
+    const password=f.page.add('input','Connection;Password');password.attrs.type='password';password.value='PRIVATE_CONNECTION_SENTINEL';
+    const url=f.page.add('input','RestService;TokenUrl');url.value='https://outside.test/?token=PRIVATE_REST_URL_SENTINEL';
+    f.page.add('td','RestService;Headers;colValue_ApiKey','PRIVATE_HEADER_SENTINEL');
+    for(const options of [{},{output_column_page:{offset:0,limit:8}}]) {
+      const r=await f.read(options);assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));
+      assert.ok(!/PRIVATE_[A-Z_]+SENTINEL/.test(JSON.stringify(r)),role[0]+':'+index+':'+mode);
+      assert.notEqual(r.output.wizard.output_columns?.page?.status,'complete_definition_page');
+    }
+    assert.deepEqual(f.page.events,[]);
+  }
+});
+
+test('D51 definitions require exact owned family port native index and complete row identities',async()=>{
+  for(const role of d51Ports)for(const mode of ['unbound','icon','direction','port','native_index','guid','opening','workflow','tab','grid','view','duplicate','key','tag','family','ancestor','missing']) {
+    const f=d51MetadataFixture(role),cell=f.rows[0].children[0];
+    if(mode==='icon')f.port.node_icon_class='bg-vendor-icon-groupdata';
+    if(mode==='direction')f.port.direction=role[1]==='input'?'output':'input';
+    if(mode==='port')f.port.port=2;
+    if(mode==='native_index')f.port.native_index=role[5]===0?1:0;
+    if(mode==='guid')delete f.port.port_guid;
+    if(mode==='opening')delete f.port.opening_operation_id;
+    if(mode==='workflow')f.binding.workflow_ref.prefix='MF;TF-2';
+    if(mode==='tab')f.page.tab.attrs.class='';
+    if(mode==='grid')f.body.attrs['data-tid']=f.base+'foreign;tbl';
+    if(mode==='view')f.rows[0].attrs['data-boundview']='foreign';
+    if(mode==='duplicate')f.page.add('td',cell.attrs['data-tid'],'Password',cell.box,f.rows[0]);
+    if(mode==='key')cell.ownText='OtherName';
+    if(mode==='tag')cell.tagName='INPUT';
+    if(mode==='ancestor')f.rows[0].attrs.name='password';
+    if(mode==='missing')f.rows[0].children[3].remove();
+    if(mode==='family')for(const e of [f.form,...f.form.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace(f.family,'DataSetOutputSocketWizard');
+    const options=mode==='unbound'?{prepared_node_context:undefined}:{};
+    const r=await f.read(options);assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));
+    assert.ok(!r.output.wizard.output_columns?.fields?.some(x=>x.name==='Password'),role[0]+':'+mode);
+    const p=await f.read({...options,output_column_page:{offset:0,limit:8}});
+    assert.notEqual(p.output.wizard.output_columns?.page?.status,'complete_definition_page',role[0]+':'+mode);
+    assert.deepEqual(f.page.events,[]);
+  }
+});
+
+test('D51 inline definitions require the native node wizard and exact unique typed breadcrumb',async()=>{
+  for(const role of d51Inline)for(const mode of ['unbound','surface','tab','panel','duplicate_panel','path','node','settings','icon','duplicate_icon','family','missing','ancestor']) {
+    const f=d51MetadataFixture(role);
+    if(mode==='surface')f.native.surface='graph';
+    if(mode==='tab')f.page.tab.attrs.class='';
+    if(mode==='panel')f.panel.style.display='none';
+    if(mode==='duplicate_panel')f.page.add('div','MF;TF-1;NavigationBar;NavigationPanel');
+    if(mode==='path')f.binding.workflow_ref.navigation_path[0].label='Foreign';
+    if(mode==='node')f.nodeCrumb.attrs['data-tid']+='>Foreign';
+    if(mode==='settings')f.panel.children.at(-1).ownText='Other';
+    if(mode==='icon')f.iconElement.attrs.class='bg-vendor-icon-groupdata';
+    if(mode==='duplicate_icon')f.page.add('span',null,'',undefined,f.nodeCrumb).attrs.class=f.iconElement.attrs.class;
+    if(mode==='family')for(const e of [f.form,...f.form.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace(f.family,'DataSetOutputSocketWizard');
+    if(mode==='missing')f.rows[0].children[3].remove();
+    if(mode==='ancestor')f.rows[0].attrs.name='password';
+    const r=await f.read({...(mode==='unbound'?{prepared_node_context:undefined}:{}),output_column_page:{offset:0,limit:8}});
+    assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));
+    assert.notEqual(r.output.wizard.output_columns?.page?.status,'complete_definition_page',role[0]+':'+mode);
+    assert.deepEqual(f.page.events,[]);
+  }
+});
+
 function calculatorOutputMetadataFixture(name='Token',family='ColumnsMappingEngineOutputPortWizard') {
   // An ordinary neighbour keeps a partially redacted page observable, as in
   // the live Calculator output, rather than removing output_columns entirely.
@@ -5077,7 +5207,7 @@ test('typed output-port finish requires complete output mapping and its own port
 });
 
 test('overflow output socket requires a current native owner and visible actionable Done',async()=>{
-  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns','filterdata','javascript'])for(const outputPort of vendor==='filterdata'?[0,1]:[0])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
+  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns','filterdata','javascript','joindata'])for(const outputPort of vendor==='filterdata'?[0,1]:[0])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','bound_folder_wrong_path','bound_folder_duplicate','bound_folder_hidden_owner','bound_folder_hidden_visibility','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
     'duplicate_socket','wrong_socket_icon','missing_settings','hidden_ancestor','hidden_visibility','disabled_done','hidden_done']){
     const {page}=outputPortFinishFixture();
     const find=suffix=>page.document.all().find(e=>e.attrs['data-tid']?.endsWith(suffix));
@@ -5091,6 +5221,10 @@ test('overflow output socket requires a current native owner and visible actiona
       folder.ownText=mode==='bound_folder_wrong_caption'?'Other':'Выходные порты';folder.style.display='none';
       find('>Calc').children[0].attrs.class=mode==='bound_folder_wrong_type'?'bg-vendor-icon-'+(vendor==='calcdata'?'groupdata':'calcdata'):'bg-vendor-icon-'+vendor;
       if(mode==='bound_folder_wrong_icon')folder.children[0].attrs.class='maptree-icon-modelinputports';
+      if(mode==='bound_folder_wrong_path')folder.attrs['data-tid']=folder.attrs['data-tid'].replace('>Calc>', '>Foreign>');
+      if(mode==='bound_folder_duplicate'){const duplicate=page.add('a',folder.attrs['data-tid'],'Выходные порты',undefined,folder.parentElement);duplicate.style.display='none';page.add('span',null,'',undefined,duplicate).attrs.class='maptree-icon-modeloutputports';}
+      if(mode==='bound_folder_hidden_owner')find('>Calc').style.display='none';
+      if(mode==='bound_folder_hidden_visibility')folder.style.visibility='hidden';
     }
     const port={direction:'output',port:outputPort,native_index:outputPort,port_guid:'out-guid',opening_operation_id:'open-output',node_icon_class:'bg-vendor-icon-'+vendor};
     if(mode==='bound_folder_missing_native_icon')delete port.node_icon_class;
@@ -5122,7 +5256,7 @@ test('overflow output socket requires a current native owner and visible actiona
     const controls=raw.output.ui.elements.filter(e=>e.allowed_actions.includes('finish_wizard'));
     assert.equal(controls.length,['valid','bound_folder'].includes(mode)?1:0,vendor+': '+socketIcon+': '+mode);
     if(['valid','bound_folder'].includes(mode)){assert.equal(raw.output.wizard.port_context.status,'observed');assert.equal(controls[0].wizard_finish.mode,'output_port');}
-    if(vendor==='javascript'&&mode.startsWith('bound_folder')) {
+    if(['javascript','joindata'].includes(vendor)&&mode.startsWith('bound_folder')) {
       const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
       page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
       page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
