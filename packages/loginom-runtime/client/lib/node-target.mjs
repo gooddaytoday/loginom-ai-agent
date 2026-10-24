@@ -72,12 +72,31 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
     return graph;
   };
   const commit = async () => save('node_target_checkpoint', { target_state: state });
+  // Private REST preflight authorizes only inserting its generated encoder
+  // between the caller-confirmed raw source and the same existing REST node.
+  const restInputReplacement = graph => {
+    const p=operation.restQueryInput,r=operation.parameters;
+    if(!p||r?.finish!=='execute'||r.mode!=='request'||!r.parameters?.connection||!r.parameters.query_parameters?.length
+      ||r.target.kind!=='existing'||r.target.type!=='integration.rest_request'
+      ||!same(r.target,request.target)||r.document_id!==request.document_id||!same(r.workflow_ref,request.workflow_ref)
+      ||r.inputs.length!==1||request.inputs.length!==1)return false;
+    const raw=r.inputs[0],encoded=request.inputs[0];
+    return p.edge.target===request.target.ref.node_id&&p.edge.input===0&&raw.input===0&&encoded.input===0&&encoded.output===0
+      &&p.edge.source===raw.source.node_id&&p.edge.output===raw.output&&same(encoded.source,p.encoder)
+      &&p.encoder.document_id===request.document_id&&p.encoder.workflow_id===request.workflow_ref.workflow_id
+      &&node(graph,p.encoder.node_id).type==='programming.javascript'
+      &&graph.links.filter(e=>e.target===p.encoder.node_id&&e.input===0).length===1
+      &&graph.links.some(e=>e.source===raw.source.node_id&&e.output===raw.output&&e.target===p.encoder.node_id&&e.input===0);
+  };
   const change = async (kind, parameters, verify) => {
     let original = await observe();
     for(let refresh=0;refresh<3;refresh++){
       budget();
       const before=refresh===0?original:await observe();
       if(!same(before,original))throw new Error('Graph target changed before local refresh');
+      if(operation.restQueryInput&&['remove_link','connect'].includes(kind)&&parameters.edge.target===request.target.ref.node_id
+        &&(!restInputReplacement(before)||kind==='remove_link'&&!same(parameters.edge,operation.restQueryInput.edge)))
+        throw Error('REST encoder input authorization changed before graph effect');
       const effect = { id: operation.id + ':graph:' + (state.receipts.length+(state.refusals?.length??0)), kind, parameters: structuredClone(parameters), before };
       await save('node_target_effect_prepared', { effect });
       budget();
@@ -166,9 +185,12 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       if (request.target.kind === 'existing') {
         const existing = node(graph, request.target.ref.node_id);
         if (existing.type !== request.target.type) throw new Error('Existing node has a different component type');
+        if(operation.restQueryInput&&(!restInputReplacement(graph)||!graph.links.some(e=>edgeKey(e)===edgeKey(operation.restQueryInput.edge))))
+          throw Error('REST encoder input authorization differs from the existing graph');
         for(const input of request.inputs){
           const occupied=graph.links.find(e=>e.target===existing.ref.node_id&&e.input===input.input);
-          if(occupied&&(occupied.source!==input.source.node_id||occupied.output!==input.output))throw new Error('Requested input is occupied by an unowned link'
+          if(occupied&&(occupied.source!==input.source.node_id||occupied.output!==input.output)
+            &&!(restInputReplacement(graph)&&edgeKey(occupied)===edgeKey(operation.restQueryInput.edge)))throw new Error('Requested input is occupied by an unowned link'
             +(existing.type==='exports.text'?'. dock_node_apply does not replace existing connections. For a different source or output, use a NEW exports.text target with target.kind:"new", complete export settings and a NEW operation_id; preserve the existing export and its link. To keep the same source and only reconfigure the existing export, use inputs:[].':''));
         }
         state.targetId = existing.ref.node_id;
@@ -224,9 +246,10 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     }
     const desired = request.inputs.map(i => ({ source: i.source.node_id, output: i.output, target: state.targetId, input: i.input }));
     for (const edge of graph.links.filter(e => e.target === state.targetId && !desired.some(d => edgeKey(d) === edgeKey(e)))) {
-      const owned = (state.auto_created_links ?? []).some(a => edgeKey(a) === edgeKey(edge));
-      // Existing links not mentioned by the caller are preserved. Conflicting
-      // existing links require an explicit future edit contract, never deletion.
+      const owned = (state.auto_created_links ?? []).some(a => edgeKey(a) === edgeKey(edge))
+        ||restInputReplacement(graph)&&edgeKey(edge)===edgeKey(operation.restQueryInput.edge);
+      // Other existing links not mentioned by the caller are preserved.
+      // Conflicting links require an explicit edit contract, never deletion.
       if (!owned) {
         if (desired.some(d => d.input === edge.input)) throw new Error('Requested input is occupied by an unowned link');
         continue;
