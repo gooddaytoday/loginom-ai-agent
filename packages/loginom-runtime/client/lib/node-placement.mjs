@@ -9,13 +9,14 @@ export function nodePlacementViewport(element,nodeId) {
  if(g?.container!==element||!g.view||!Number.isFinite(g.view.scale)||g.view.scale<=0||!Number.isFinite(g.view.translate?.x)||!Number.isFinite(g.view.translate?.y))throw Error('Native canvas transform unavailable');
  let nodeBounds;
  if(nodeId!==undefined){
-  const nodes=d.FNodes?.FCollection?.filter(n=>n.FGuid===nodeId);
+  const nodes=d.FNodes?.FCollection?.filter(n=>n.FGuid===(typeof nodeId==='object'?nodeId.node_id:nodeId));
   if(nodes?.length!==1)throw Error('Placement node identity unavailable');
   const body=g.view.getState(nodes[0].FCell)?.shape?.node,tid=body?.getAttribute('data-tid');
   if(!tid||!element.contains(body))throw Error('Placement node drawing unavailable');
   const drawings=[...element.querySelectorAll('[data-tid]')].filter(e=>{const id=e.getAttribute('data-tid');return id===tid||id.startsWith(tid+';');});
   if(drawings.length>128||!drawings.includes(body))throw Error('Placement node drawing bound exceeded');
-  const boxes=drawings.map(e=>e.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
+  // Existing Export settings open targets the full native body, not its label/ports.
+  const boxes=(nodeId?.body_only===true?[body]:drawings).map(e=>e.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
   if(!boxes.length)throw Error('Placement node has no rendered bounds');
   const x=Math.min(...boxes.map(r=>r.x)),y=Math.min(...boxes.map(r=>r.y));
   nodeBounds={x,y,width:Math.max(...boxes.map(r=>r.x+r.width))-x,height:Math.max(...boxes.map(r=>r.y+r.height))-y};
@@ -183,7 +184,7 @@ export async function revealPreparedGraphNode(page,args,read,reveal,readViewport
  const root=page.locator('[data-tid='+JSON.stringify(args.binding.workflow_ref.prefix+';ModelForm;cmpDiagram')+']');
  need(await root.count()===1&&await root.isVisible(),'owned canvas');
  const guard=async()=>{remaining();need(sameGraph(before,await read(page,task)),'graph changed during navigation');};
- const navigation=await reveal({page,root,position,nodeId:ref.node_id,prefix:args.binding.workflow_ref.prefix,
+ const navigation=await reveal({page,root,position,nodeId:args.target==='body'?{node_id:ref.node_id,body_only:true}:ref.node_id,prefix:args.binding.workflow_ref.prefix,
   remaining,guard,readViewport,project});
  await guard();const visible=navigation.fully_visible===true;
  return {status:visible?'SUCCEEDED':'FAILED',verified:visible,node:ref,graph_unchanged:true,settings_applied:false,
