@@ -39,6 +39,6 @@ export function budgetUserPreview(reply,{wireSize=previewWireSize}={}) {
   if(!candidates.length)break;
   const port=candidates.reduce((a,b)=>JSON.stringify(a.sample).length>=JSON.stringify(b.sample).length?a:b);
   port.sample.pop();port.sample_rows=port.sample.length;port.sample_complete=false;omitted++;
-  reply.limitations[limitationIndex]='Preview response budget omitted '+omitted+' already-read rows. Full local receipts are retained. Returned samples are incomplete; use smaller analytical outputs, not an unavailable filesystem tool.';
+  reply.limitations[limitationIndex]='Preview response budget omitted '+omitted+' already-read rows. Full local receipts are retained. Returned samples are incomplete. For full text, connect the original output to an exports.text node and download its UTF-8 file; for analysis, compute smaller analytical outputs in nodes.';
  }
 }
