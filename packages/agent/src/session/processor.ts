@@ -648,6 +648,14 @@ const layer = Layer.effect(
 
         return yield* Effect.gen(function* () {
           yield* Effect.gen(function* () {
+            // A retried stream replaces incomplete input from its previous attempt.
+            // Running calls retain their effects and must still go through cleanup.
+            for (const toolCallID of Object.keys(ctx.toolcalls)) {
+              const match = yield* readToolCall(toolCallID)
+              if (match?.part.state.status !== "pending") continue
+              yield* session.removePart(match.call)
+              yield* settleToolCall(toolCallID)
+            }
             ctx.currentText = undefined
             ctx.reasoningMap = {}
             yield* status.set(ctx.sessionID, { type: "busy" })
