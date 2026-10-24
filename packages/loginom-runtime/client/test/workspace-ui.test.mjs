@@ -4031,7 +4031,7 @@ test('input port overflow caption requires native binding and the exact hidden c
 });
 
 async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
-  const caption=['group','sorting','crosstable','calculator','reform','filter'].includes(vendor)?'Входной источник данных':port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
+  const caption=['group','sorting','crosstable','calculator','reform','filter','javascript'].includes(vendor)?'Входной источник данных':port===0?'Главная таблица':vendor==='union'?'Присоединяемая таблица '+(mode==='union_wrong_number'?port-1:port):'Присоединяемая таблица';
   const {page,panel,crumbs}=await inputPortContextFixture();
   // Loginom 7.4.2 native diagnostic: 1280x800, input1 and Настройка hidden
   // by breadcrumb overflow; node/input/wizard icons remain in the same DOM.
@@ -4046,7 +4046,7 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
     if(i>=7)c.style.display='none';
     for(const icon of c.children)icon.box={x:c.box.x+1,y:c.box.y+1,width:16,height:16};
   }
-  const nodeIcon={calculator:'bg-vendor-icon-calcdata',crosstable:'bg-vendor-icon-crosstab',sorting:'bg-vendor-icon-sorting',union:'bg-vendor-icon-uniondata',group:'bg-vendor-icon-groupdata',join:'bg-vendor-icon-joindata',reform:'bg-vendor-icon-reformcolumns',filter:'bg-vendor-icon-filterdata'}[vendor];
+  const nodeIcon={javascript:'bg-vendor-icon-javascript',calculator:'bg-vendor-icon-calcdata',crosstable:'bg-vendor-icon-crosstab',sorting:'bg-vendor-icon-sorting',union:'bg-vendor-icon-uniondata',group:'bg-vendor-icon-groupdata',join:'bg-vendor-icon-joindata',reform:'bg-vendor-icon-reformcolumns',filter:'bg-vendor-icon-filterdata'}[vendor];
   crumbs[5].children[0].attrs.class=nodeIcon;
   page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[7]).attrs.class='bg-vendor-icon-tunedatasourcesocketdef';
   if(mode==='wrong_icon')crumbs[5].children[0].attrs.class=vendor==='calculator'?'bg-vendor-icon-groupdata':'bg-vendor-icon-calcdata';
@@ -4076,6 +4076,29 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
     }));
   return {page};
 }
+
+test('JavaScript input0 overflow preserves the owned typed close confirmation',async()=>{
+ for(const mode of ['valid','wrong_folder','wrong_folder_icon','wrong_caption','wrong_port','wrong_native_index','wrong_icon','missing_native_icon','wrong_native_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor']) {
+  const {page}=await joinInputPortOverflowFixture(mode,0,'javascript');
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
+  if(mode==='wrong_folder_icon')crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const close=await page.execute({mode:'observe'}),snapshot=close.output;
+  const yes=snapshot.ui?.elements?.find(e=>e.tid==='msgbox;tlb;yes');
+  const accepted=mode==='valid';
+  assert.equal(yes?.allowed_actions.includes('confirm_wizard_close')===true,accepted,mode);
+  if(accepted)assert.doesNotThrow(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},snapshot));
+  else if(yes)assert.throws(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},snapshot),/UI reference/);
+  assert.deepEqual(page.events,[]);
+ }
+});
 
 test('owned Join input observes its actual hidden joined-table breadcrumb',async()=>{
   const {page}=await joinInputPortOverflowFixture();
