@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
 import {NODE_TYPES} from '../lib/node-contracts.mjs';
 import {mutateGraph} from '../lib/node-target-browser.mjs';
-import {nodePlacementPoint,samePlacementGraph} from '../lib/node-placement.mjs';
+import {samePlacementGraph} from '../lib/node-placement.mjs';
 
 function fixture(t, fault) {
  t.mock.timers.enable({apis:['Date'],now:10000});
@@ -11,7 +11,7 @@ function fixture(t, fault) {
  const palette=prefix+';ModelForm;colVendors_Компоненты>Программирование>JavaScript;TreeText';
  let created=false,held=false,drags=0,reads=0;
  const rect={x:300,y:100,width:1000,height:700,right:1300,bottom:800};
- const canvas={getBoundingClientRect:()=>rect,contains:e=>e===canvas,querySelectorAll:()=>[]};
+ const canvas={getBoundingClientRect:()=>rect,contains:e=>e===canvas};
  const item={getBoundingClientRect:()=>({x:50,y:200,width:100,height:20}),contains:e=>e===item};
  const tab={classList:{contains:()=>true}},elements=new Map([[rootTid,canvas],[palette,item],[tabTid,tab]]);
  const document={querySelectorAll:q=>{const e=elements.get(JSON.parse(q.slice(10,-1)));return e?[e]:[];},elementFromPoint:x=>x<300?item:canvas};
@@ -38,8 +38,7 @@ function fixture(t, fault) {
   return {...before,nodes:[{ref:{node_id:native.FGuid},type:'programming.javascript',position:{x:600,y:380}}]};
  };
  const reveal=async args=>{await args.guard();return {fully_visible:true,point:{x:900,y:480}};};
- const viewport=()=>({x:300,y:100,width:1000,height:700,viewportWidth:1400,viewportHeight:900,scale:1,translate:{x:0,y:0},scroll:{x:0,y:0}});
- return {run:()=>mutateGraph(page,task,read,null,viewport,nodePlacementPoint,reveal,samePlacementGraph),counts:()=>({drags,reads}),now:()=>Date.now()};
+ return {run:()=>mutateGraph(page,task,read,null,null,null,reveal,samePlacementGraph),counts:()=>({drags,reads}),now:()=>Date.now()};
 }
 test('one JavaScript create waits read-only past 15s for its port under the original deadline',async t=>{
  const f=fixture(t),r=await f.run();assert.equal(r.status,'SUCCEEDED',r.error);

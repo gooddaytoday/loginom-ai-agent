@@ -146,7 +146,7 @@ export async function readGraph(page, task) {
 
 // Fixed UI gestures used only through the enclosing graph phase. The complete
 // pre-effect snapshot must still match immediately before the gesture.
-export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph,placementGap=nodePlacementGap) {
+export async function mutateGraph(page, task, read, scrollExport, readViewport, projectPosition, revealPosition, sameGraph) {
   let effectPossible=false, held=false, transient=false, outcome,placementRefusal,placementNavigation,placementNavigationUncertain=false,paletteScroll=null,paletteScrollUncertain=false;
   let gestureBefore=task.effect.before;
   const remaining=()=>{if(page[Symbol.for('loginom-dock.node-target-cancel')]?.has(task.effect.id))throw new Error('Node target cancelled');const value=task.deadline-Date.now();if(value<=0)throw new Error('Graph deadline');return value;};
@@ -202,9 +202,6 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
           graph_rect:{x:b.x,y:b.y,width:b.width,height:b.height},viewport:{width:innerWidth,height:innerHeight},screen_point:p,hit_inside:!!hit&&(hit===e||e.contains(hit))};
       },target);
       if(!reachable.reachable){placementRefusal={kind:'unreachable_drop_surface',requested_position:p.position,...reachable};throw new Error('Requested drop surface is not reachable');}
-      const view=await canvas.evaluate(readViewport);
-      const occupied=await canvas.evaluate(e=>[...e.querySelectorAll('[data-tid*=";Graph;"]')].map(n=>{const r=n.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};}).filter(r=>r.width>0&&r.height>0));
-      if(!placementGap(view,projectPosition(view,p.position),occupied))throw Error('target.position overlaps an existing node or port clearance; omit target.position for automatic free placement with a NEW operation_id');
       if(p.type==='exports.text'){
         const args={owner_tid:task.request.workflow_ref.prefix+';ModelForm;pnlVendors;tree',item_tid:palette};
         const owner=find(args.owner_tid);if(await owner.count()!==1)throw Error('Export palette owner is ambiguous');
@@ -493,7 +490,10 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
       }
     },
     observe:observeGraph,
-    async choosePosition(value,graph,deadline,signal,reserved=[]){
+    async choosePosition(value,graph,deadline,signal,reserved){
+      // Only new REST auto-placement and its private implicit encoder (the
+      // reserved argument) use the larger footprint; other nodes keep policy.
+      const clearance=value.target.kind==='new'&&!value.target.position&&(value.target.type==='integration.rest_request'||reserved!==undefined);
       signal?.throwIfAborted();
       if(JSON.stringify(await observeGraph(value,deadline))!==JSON.stringify(graph))
         throw Object.assign(Error('Graph changed before automatic placement'),{code:'NODE_PLACEMENT_GRAPH_CHANGED'});
@@ -504,7 +504,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         const occupied=[...e.querySelectorAll('[data-tid*=";Graph;"]')].map(n=>n.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
         // The private REST encoder must not occupy the caller's explicit
         // future REST location. No synthetic node or public parameter is added.
-        for(const position of ${JSON.stringify(reserved)}){
+        for(const position of ${JSON.stringify(reserved??[])}){
           const p=(${nodePlacementPoint.toString()})(view,position),s=view.scale;
           occupied.push({left:p.x-32*s,right:p.x+96*s,top:p.y-40*s,bottom:p.y+160*s});
         }
@@ -513,11 +513,11 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
           if(position.x<${NODE_POSITION_MIN}||position.y<${NODE_POSITION_MIN}||position.x>10000||position.y>10000)continue;
           const screen=(${nodePlacementPoint.toString()})(view,position),px=screen.x,py=screen.y,hit=document.elementFromPoint(px,py);
           if(px<0||py<0||!hit||!(hit===e||e.contains(hit)))continue;
-          if(!(${nodePlacementGap.toString()})(view,screen,occupied))continue;
+          if(${clearance}?!(${nodePlacementGap.toString()})(view,screen,occupied):occupied.some(r=>px>r.left-72&&px<r.right+96&&py>r.top-56&&py<r.bottom+72))continue;
           return position;
         }
-        const overflow=(${nodePlacementOverflow.toString()})(view,occupied,${NODE_POSITION_MIN},10000,112);
-        if(overflow&&(${nodePlacementGap.toString()})(view,(${nodePlacementPoint.toString()})(view,overflow),occupied))return overflow;
+        const overflow=(${nodePlacementOverflow.toString()})(view,occupied,${NODE_POSITION_MIN},10000,${clearance?112:0});
+        if(overflow&&(!${clearance}||(${nodePlacementGap.toString()})(view,(${nodePlacementPoint.toString()})(view,overflow),occupied)))return overflow;
         throw Error('target.position: no free visible canvas position or bounded model position; enlarge the canvas or supply an explicit position');
       })`,deadline);
     },
@@ -529,14 +529,6 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
         const tid=value.workflow_ref.prefix+';ModelForm;colVendors_Компоненты>'+NODE_TYPES[value.target.type].palette_group+'>'+title+';TreeText';
         const available=await call(`async page => page.locator('[data-tid='+${JSON.stringify(JSON.stringify(tid))}+']').evaluateAll(es=>es.length===1 && !!es[0].getBoundingClientRect().width && !es[0].closest('.x-item-disabled,.x-grid-row-disabled'))`,deadline);
         if(!available)throw new Error('Component unavailable in the observed platform/license or palette');
-        if(value.target.position){
-          const free=await call(`async page=>page.locator('[data-tid='+${JSON.stringify(JSON.stringify(value.workflow_ref.prefix+';ModelForm;cmpDiagram'))}+']').evaluate(e=>{
-            const view=(${nodePlacementViewport.toString()})(e),point=(${nodePlacementPoint.toString()})(view,${JSON.stringify(value.target.position)});
-            const occupied=[...e.querySelectorAll('[data-tid*=";Graph;"]')].map(n=>n.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
-            return (${nodePlacementGap.toString()})(view,point,occupied);
-          })`,deadline);
-          if(!free)throw Error('target.position overlaps an existing node or port clearance; omit target.position for automatic free placement with a NEW operation_id');
-        }
         // Palette rows below the viewport still have nonzero DOM bounds. Bring
         // this exact admitted component into view before capturing the drag.
         if(value.target.type!=='exports.text')await call(`async page => {const row=page.locator('[data-tid='+${JSON.stringify(JSON.stringify(tid))}+']');await row.scrollIntoViewIfNeeded({timeout:${Math.max(1,Math.min(15000,deadline-Date.now()))}});return row.evaluate(e=>{const b=e.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,hit=document.elementFromPoint(x,y);if(x<0||y<0||x>=innerWidth||y>=innerHeight||!(hit===e||e.contains(hit)))throw Error('Palette row is covered after scrolling');return true;});}`,deadline);
@@ -585,7 +577,7 @@ export function createNodeTargetBrowserAdapter({execute,origin,build,pinned}) {
       }
       const options={receipt_namespace:'node-target:'+request.document_id,receipt_id:effect.id,
         operation_id:effect.id,receipt_signature:createHash('sha256').update(JSON.stringify(effect)).digest('hex')};
-      return await call(withBrowserReceipt(`(${mutateGraph.toString()})(page,${JSON.stringify(t)},${readGraph.toString()},${exportPaletteScroll.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${revealNodePlacement.toString()},${samePlacementGraph.toString()},${nodePlacementGap.toString()})`,options),deadline);
+      return await call(withBrowserReceipt(`(${mutateGraph.toString()})(page,${JSON.stringify(t)},${readGraph.toString()},${exportPaletteScroll.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${revealNodePlacement.toString()},${samePlacementGraph.toString()})`,options),deadline);
       }finally{signal?.removeEventListener('abort',cancel);if(cancellation){await cancellation;await call(`async page=>{page[Symbol.for('loginom-dock.node-target-cancel')]?.delete(${JSON.stringify(effect.id)});return true;}`,Date.now()+3000);}}
     },
     async reconcile(effect,graph,deadline){

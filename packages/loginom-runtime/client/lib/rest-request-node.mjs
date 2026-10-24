@@ -47,7 +47,9 @@ async function prepareQueryEncoder(options,ctx,config){
  const adapter=options.operation.nodeTargetAdapter,parent=options.operation.parameters.target;
  const operation={id:request.operation_id,parameters:request,action:options.operation.action,
   deadline:ctx.deadline,nodeTargetAdapter:{...adapter,
-   choosePosition:(value,graph,deadline,signal)=>adapter.choosePosition(value,graph,deadline,signal,parent.kind==='new'&&parent.position?[parent.position]:[])}};
+   choosePosition:(value,graph,deadline,signal)=>parent.kind==='new'
+    ?adapter.choosePosition(value,graph,deadline,signal,parent.position?[parent.position]:[])
+    :adapter.choosePosition(value,graph,deadline,signal)}};
  const support=createJavascriptCodeNodeSupport({...config,redactor:config.redactor??createRedactor()});
  const drivers=support.nodeApplyDriverFactory({...options,operation});
  const child={operation,drivers,handlers:support.nodeApplyHandlers,result:null};
