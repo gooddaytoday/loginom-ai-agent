@@ -3367,6 +3367,11 @@ const d51Ports=[
   ['JoinOutput','output','DerivedDataSourceOutputSocketWizard','joindata',0,0],
   ['Export','input','TuneDataSourceMappingWizard','exporttextfile',0,1],
 ];
+const d51Inline=[
+  ['InlineImport','output','ColumnsMappingEngineOutputPortWizard','importtextfile',0,0,true],
+  ['InlineJoin','output','DerivedDataSourceOutputSocketWizard','joindata',0,0,true],
+  ['InlineExport','input','TuneDataSourceMappingWizard','exporttextfile',0,1,true],
+];
 function d51MetadataFixture(role,name='Password') {
   const [node,direction,family,icon,index,native_index]=role,page=new Page(),f=mappingCoverageFixture(page,3);
   for(const e of [f.form,...f.form.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid']
@@ -3378,14 +3383,26 @@ function d51MetadataFixture(role,name='Password') {
   }
   const port={direction,port:index,native_index,port_guid:'d51-port',opening_operation_id:'d51-open',node_icon_class:'bg-vendor-icon-'+icon};
   const binding={node:{node_id:'d51-node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+  let panel,nodeCrumb,iconElement;
+  if(role[6]) {
+    panel=page.add('div','MF;TF-1;NavigationBar;NavigationPanel');let tid='MF;TF-1;cnrNaviMode;b.s_';
+    for(const label of ['Сервер','Пакеты','Case','Модуль1','Сценарий']) {
+      tid+=(binding.workflow_ref.navigation_path.length?'>':'')+label;
+      page.add('a',tid,label,undefined,panel);binding.workflow_ref.navigation_path.push({tid,label});
+    }
+    nodeCrumb=page.add('a',tid+'>Owned','Owned',undefined,panel);
+    iconElement=page.add('span',null,'',undefined,nodeCrumb);iconElement.attrs.class='bg-vendor-icon-'+icon;
+    page.add('a',tid+'>Owned>Настройка','Настройка',undefined,panel);
+  }
+  const native={verified:true,surface:'wizard',...(role[6]?{}:{[direction+'_port']:port})};
   const read=(options={})=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
     {expected_build:build,expected_origin:origin,prepared_node_context:binding,mode:'observe',...options},
-    async()=>({verified:true,surface:'wizard',[direction+'_port']:port}));
-  return {page,...f,port,binding,read,node,family};
+    async()=>native);
+  return {page,...f,port,binding,read,node,family,panel,nodeCrumb,iconElement,native};
 }
 
 test('D51 owned Import Join Export definitions keep sensitive-looking column names on complete pages',async()=>{
-  for(const role of d51Ports)for(const name of ['Password','Secret','ApiKey','Token','Key']) {
+  for(const role of [...d51Ports,...d51Inline])for(const name of ['Password','Secret','ApiKey','Token','Key']) {
     const f=d51MetadataFixture(role,name),r=await f.read({output_column_page:{offset:0,limit:8}});
     assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));
     const c=r.output.wizard.output_columns,message=role[0]+':'+name;
@@ -3393,11 +3410,15 @@ test('D51 owned Import Join Export definitions keep sensitive-looking column nam
     assert.deepEqual(Array.from(c.fields,x=>x.name),[name,'Field1','Field2'],message);
     assert.equal(c.page.returned,3);assert.equal(c.page.total_columns,3);
     assert.equal(c.settings_applied,false);assert.deepEqual(f.page.events,[]);
+    if(role[6])for(const scope of [{root_ref:r.output.wizard.root_ref},{discover_roots:true}]) {
+      const narrow=await f.read({...scope,output_column_page:{offset:0,limit:8}});
+      assert.equal(narrow.output.wizard.output_columns?.page?.status,'complete_definition_page',message);
+    }
   }
 });
 
 test('D51 metadata never exposes dataset values secret inputs or REST credentials in snapshots',async()=>{
-  for(const role of d51Ports)for(const index of [0,1,2,3,4])for(const mode of ['name','id','aria','autocomplete','child','input','editable','link']) {
+  for(const role of [...d51Ports,...d51Inline])for(const index of [0,1,2,3,4])for(const mode of ['name','id','aria','autocomplete','child','input','editable','link']) {
     const f=d51MetadataFixture(role),cell=f.rows[0].children[index];
     cell.ownText='PRIVATE_VALUE_SENTINEL';
     if(['name','id','aria','autocomplete'].includes(mode))cell.attrs[mode==='aria'?'aria-label':mode]='secret';
@@ -3443,6 +3464,28 @@ test('D51 definitions require exact owned family port native index and complete 
     assert.ok(!r.output.wizard.output_columns?.fields?.some(x=>x.name==='Password'),role[0]+':'+mode);
     const p=await f.read({...options,output_column_page:{offset:0,limit:8}});
     assert.notEqual(p.output.wizard.output_columns?.page?.status,'complete_definition_page',role[0]+':'+mode);
+    assert.deepEqual(f.page.events,[]);
+  }
+});
+
+test('D51 inline definitions require the native node wizard and exact unique typed breadcrumb',async()=>{
+  for(const role of d51Inline)for(const mode of ['unbound','surface','tab','panel','duplicate_panel','path','node','settings','icon','duplicate_icon','family','missing','ancestor']) {
+    const f=d51MetadataFixture(role);
+    if(mode==='surface')f.native.surface='graph';
+    if(mode==='tab')f.page.tab.attrs.class='';
+    if(mode==='panel')f.panel.style.display='none';
+    if(mode==='duplicate_panel')f.page.add('div','MF;TF-1;NavigationBar;NavigationPanel');
+    if(mode==='path')f.binding.workflow_ref.navigation_path[0].label='Foreign';
+    if(mode==='node')f.nodeCrumb.attrs['data-tid']+='>Foreign';
+    if(mode==='settings')f.panel.children.at(-1).ownText='Other';
+    if(mode==='icon')f.iconElement.attrs.class='bg-vendor-icon-groupdata';
+    if(mode==='duplicate_icon')f.page.add('span',null,'',undefined,f.nodeCrumb).attrs.class=f.iconElement.attrs.class;
+    if(mode==='family')for(const e of [f.form,...f.form.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace(f.family,'DataSetOutputSocketWizard');
+    if(mode==='missing')f.rows[0].children[3].remove();
+    if(mode==='ancestor')f.rows[0].attrs.name='password';
+    const r=await f.read({...(mode==='unbound'?{prepared_node_context:undefined}:{}),output_column_page:{offset:0,limit:8}});
+    assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));
+    assert.notEqual(r.output.wizard.output_columns?.page?.status,'complete_definition_page',role[0]+':'+mode);
     assert.deepEqual(f.page.events,[]);
   }
 });
