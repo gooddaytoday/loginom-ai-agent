@@ -57,17 +57,26 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
    &&bounds.x+bounds.width<=Math.min(v.x+v.width,v.viewportWidth)-8&&bounds.y+bounds.height<=Math.min(v.y+v.height,v.viewportHeight)-8;
  };
  let view=await root.evaluate(readViewport,nodeId),point=project(view,position),opened=false,steps=0,error,zoom;
+ const navigationSteps=[];
  // A rejected gesture reply does not prove that the native UI stayed unchanged.
  // Preserve that uncertainty even if a later owned-menu cleanup succeeds.
- const gesture=async dispatch=>{
-  try{return await dispatch();}
+ const gesture=async(dispatch,action)=>{
+  remaining();const before=await root.evaluate(readViewport,nodeId);
+  try{const result=await dispatch();navigationSteps.push({action,before,after:await root.evaluate(readViewport,nodeId)});return result;}
   catch(e){e.placement_navigation_unverified=true;throw e;}
+ };
+ const scroll=async()=>{
+  await guard();remaining();const b=view.node_bounds;
+  await gesture(()=>root.evaluate((e,delta)=>{e.scrollLeft+=delta.x;e.scrollTop+=delta.y;},
+   {x:b.x+b.width/2-(Math.max(view.x,0)+Math.min(view.x+view.width,view.viewportWidth))/2,
+    y:b.y+b.height/2-(Math.max(view.y,0)+Math.min(view.y+view.height,view.viewportHeight))/2}),'scroll');
+  await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
  };
  const toggle=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;btnShowOutline')+']');
  const setOutline=async opening=>{
   if(await toggle.count()!==1)throw Error('Canvas outline control unavailable');
   if(await toggle.isVisible()){
-   await guard();await gesture(()=>toggle.click({timeout:remaining()}));if(opening)opened=true;return;
+   await guard();await gesture(()=>toggle.click({timeout:remaining()}),opening?'outline_open':'outline_close');if(opening)opened=true;return;
   }
   // At 1280px the native toolbar moves this button into its own overflow
   // menu. Bind that portal by the prepared form, never by a global label.
@@ -79,16 +88,16 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
   // second reveal immediately; settle before its single opening gesture.
   await page.waitForTimeout(Math.min(300,remaining()));await guard();remaining();
   if(await menu.isVisible())throw Error('Owned canvas outline menu changed');
-  await guard();await gesture(()=>trigger.click({timeout:remaining()}));
+  await guard();await gesture(()=>trigger.click({timeout:remaining()}),'outline_menu_open');
   try {
    await menu.waitFor({state:'visible',timeout:Math.min(2000,remaining())});
    const item=menu.locator('[role="menuitem"][data-qtip="Показать карту сценария"]');
    if(await menu.count()!==1||await item.count()!==1||!await item.isVisible()||await item.locator('.bg-icon-preview').count()!==1)throw Error('Owned canvas outline menu item unavailable');
-   await guard();await gesture(()=>item.click({timeout:remaining()}));if(opening)opened=true;
+   await guard();await gesture(()=>item.click({timeout:remaining()}),opening?'outline_open':'outline_close');if(opening)opened=true;
   } finally {
    // Native check items keep the menu open and can cover the outline.
    if(await menu.isVisible()){
-    try {await guard();await trigger.click({timeout:remaining()});await menu.waitFor({state:'hidden',timeout:Math.min(2000,remaining())});}
+    try {await guard();await gesture(()=>trigger.click({timeout:remaining()}),'outline_menu_close');await menu.waitFor({state:'hidden',timeout:Math.min(2000,remaining())});}
     catch(e){e.placement_navigation_unverified=true;throw e;}
    }
   }
@@ -98,33 +107,37 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
  try {
   // Existing targets can already have native scrollable canvas space. Reveal
   // that exact drawing before zooming, preserving model-grid drag coordinates.
-  if(scrollNode&&nodeId!==undefined&&!within(view,point)){
-   await guard();remaining();
-   const b=view.node_bounds;
-   await gesture(()=>root.evaluate((e,delta)=>{e.scrollLeft+=delta.x;e.scrollTop+=delta.y;},
-    {x:b.x+b.width/2-(Math.max(view.x,0)+Math.min(view.x+view.width,view.viewportWidth))/2,
-     y:b.y+b.height/2-(Math.max(view.y,0)+Math.min(view.y+view.height,view.viewportHeight))/2}));
-   await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
-  }
+  if(scrollNode&&nodeId!==undefined&&!within(view,point))await scroll();
   if(!within(view,point)) {
    await guard();remaining();
    const owner=page.locator('[data-tid='+JSON.stringify(prefix+';ModelForm;cntDiagram')+']');
    if(await owner.count()!==1||!await owner.isVisible())throw Error('Owned canvas outline container unavailable');
-   zoom=owner.locator('.bg-workflow-outline-toolbar [data-tid$=";tlb;b"]');
+   // Zooming out shrinks a small positive top/left inset towards zero. Grow
+   // that inset instead, then use native scroll to reveal the enlarged node.
+   const b=view.node_bounds,left=Math.max(view.x,0),top=Math.max(view.y,0);
+   const grow=nodeId!==undefined&&b.width<Math.min(view.x+view.width,view.viewportWidth)-left-16
+    &&b.height<Math.min(view.y+view.height,view.viewportHeight)-top-16
+    &&(view.scroll.x===0&&b.x>=left&&b.x<left+8||view.scroll.y===0&&b.y>=top&&b.y<top+8);
+   const tip=grow?'Увеличить масштаб':'Уменьшить масштаб';
+   zoom=owner.locator('.bg-workflow-outline-toolbar [data-tid$=";tlb;'+(grow?'b-1':'b')+'"]');
    if(await zoom.count()>1)throw Error('Owned canvas zoom-out control is ambiguous');
    if(await zoom.count()===0||!await zoom.isVisible()){
     await setOutline(true);
     await zoom.waitFor({state:'visible',timeout:Math.min(2000,remaining())});
    }
-   if(await zoom.count()!==1||!await zoom.isVisible()||await zoom.getAttribute('data-qtip')!=='Уменьшить масштаб')throw Error('Exact canvas zoom-out control unavailable');
+   if(await zoom.count()!==1||!await zoom.isVisible()||await zoom.getAttribute('data-qtip')!==tip)throw Error('Exact canvas zoom-out control unavailable');
    while(!within(view,point)&&steps<12){
+    if(grow&&(view.node_bounds.width>=Math.min(view.x+view.width,view.viewportWidth)-left-16
+     ||view.node_bounds.height>=Math.min(view.y+view.height,view.viewportHeight)-top-16))break;
     await guard();remaining();const old=view.scale;
-    await gesture(()=>zoom.click({timeout:remaining()}));steps++;
+    await gesture(()=>zoom.click({timeout:remaining()}),grow?'zoom_in':'zoom_out');steps++;
     const end=Math.min(Date.now()+1500,Date.now()+remaining());
     do {view=await root.evaluate(readViewport,nodeId);if(view.scale!==old)break;await page.waitForTimeout(Math.min(50,Math.max(0,end-Date.now())));}while(Date.now()<end);
     await guard();
-    if(!(view.scale<old))break;
+    navigationSteps[navigationSteps.length-1].after=view;
+    if(!(grow?view.scale>old:view.scale<old))break;
     point=project(view,position);
+    if(grow&&!within(view,point))await scroll();
    }
   }
  }catch(e){error=e;}
@@ -136,7 +149,7 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
  }
  if(error)throw error;
  await guard();view=await root.evaluate(readViewport,nodeId);point=project(view,position);
- return {view,point,zoom_steps:steps,outline_closed:opened,fully_visible:within(view,point)};
+ return {view,point,zoom_steps:steps,outline_closed:opened,fully_visible:within(view,point),navigation_steps:navigationSteps};
 }
 
 // View navigation only: retain the prepared document and every graph setting.
@@ -156,8 +169,8 @@ export async function revealPreparedGraphNode(page,args,read,reveal,readViewport
  const guard=async()=>{remaining();need(sameGraph(before,await read(page,task)),'graph changed during navigation');};
  const navigation=await reveal({page,root,position,nodeId:ref.node_id,prefix:args.binding.workflow_ref.prefix,
   remaining,guard,readViewport,project});
- await guard();need(navigation.fully_visible===true,'node not revealed: '+JSON.stringify({viewport:navigation.view,zoom_steps:navigation.zoom_steps,outline_closed:navigation.outline_closed}));
- return {status:'SUCCEEDED',verified:true,node:ref,graph_unchanged:true,settings_applied:false,
-  fully_visible:true,cleanup_complete:true,effect_possible:navigation.zoom_steps>0,
-  zoom_steps:navigation.zoom_steps,outline_closed:navigation.outline_closed,viewport:navigation.view};
+ await guard();const visible=navigation.fully_visible===true;
+ return {status:visible?'SUCCEEDED':'FAILED',verified:visible,node:ref,graph_unchanged:true,settings_applied:false,
+  fully_visible:visible,cleanup_complete:true,effect_possible:navigation.zoom_steps>0||navigation.navigation_steps?.length>0,
+  zoom_steps:navigation.zoom_steps,outline_closed:navigation.outline_closed,viewport:navigation.view,navigation_steps:navigation.navigation_steps};
 }

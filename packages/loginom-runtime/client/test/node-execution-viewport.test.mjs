@@ -109,7 +109,8 @@ test('prepared viewport preserves node GUID, settings and complete graph while u
    if(fault==='locked')g.interaction_ready=false;if(fault==='changed'&&reads>1)g.nodes[0].position.x++;
    return g;};
   const navigate=async o=>{calls++;await o.guard();return {fully_visible:fault!=='not_visible',zoom_steps:1};};
-  await assert.rejects(revealPreparedGraphNode(page,{...args,deadline:fault==='deadline'?0:args.deadline},read,navigate,()=>{},()=>{},samePlacementGraph),/Prepared node viewport/);
+  if(fault==='not_visible'){const r=await revealPreparedGraphNode(page,args,read,navigate,()=>{},()=>{},samePlacementGraph);assert.equal(r.status,'FAILED');assert.equal(r.verified,false);assert.equal(r.fully_visible,false);}
+  else await assert.rejects(revealPreparedGraphNode(page,{...args,deadline:fault==='deadline'?0:args.deadline},read,navigate,()=>{},()=>{},samePlacementGraph),/Prepared node viewport/);
   if(['foreign','missing','locked','deadline'].includes(fault))assert.equal(calls,0);
  }
 });
