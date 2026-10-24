@@ -406,7 +406,9 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           evidence_ref:ctx.receipt_id,ports:[{port:0,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data}],
           table_creation:table,format_restoration:restoration,workflow_return:returned});
       },
-      releasePendingPhases:['input_mapping','open','configure','node_finish'],
+      // Public release phases stay unchanged. The retained REST child calls
+      // this private verifier directly for its independently settled Done.
+      releasePendingPhases:['input_mapping','open','configure'],
       async releasePending(state,{signal:releaseSignal}={}) {
         const afterDone=state.pending?.phase==='node_finish'&&committed?.owned_done_settled===true
           &&adapter?.active===false&&adapter.uncertain===false
