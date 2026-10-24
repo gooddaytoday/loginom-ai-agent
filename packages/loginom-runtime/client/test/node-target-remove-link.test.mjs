@@ -4,15 +4,16 @@ import vm from 'node:vm';
 import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
 import {verifyNodeTargetEffect} from '../lib/node-target.mjs';
 
-function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,contextLost=false,inputPort=0,outputPort=0,bindingsFault=null}={}) {
+function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,contextLost=false,inputPort=0,outputPort=0,bindingsFault=null,selectionChange=null}={}) {
   const start=Date.now();let clock=start,clicked=0,deleted=0,contextChecks=0;
   const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1'}};
   const edge={source:'source',output:0,target:'target',input:0};
   const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,dom_epoch:1,interaction_ready:true,
-    nodes:['source','target'].map(id=>({ref:{document_id:'doc',workflow_id:'wf',node_id:id},label:id})),links:[edge],foreign_links:[]};
+    nodes:['source','target'].map(id=>({ref:{document_id:'doc',workflow_id:'wf',node_id:id},label:id,dom_epoch:1})),links:[edge],foreign_links:[]};
   const tid='MF;TF-1;Graph;source|Output_Data-'+outputPort+'|target|Input_Data-'+inputPort;
   const page={
     evaluate:async(fn,arg)=>{
+      if(fn.toString().includes('FLinks.FCollection'))return graph.links.map(e=>[e.guid??'link',e.source,'source-port',e.target,'target-port']);
       if(arg?.types){
         const result=structuredClone(graph);
         if(arg.read_bindings){
@@ -39,7 +40,7 @@ function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,c
       textContent:async()=> 'Удалить выделенную связь?',
       click:async()=>{if(selector.includes('msgbox;tlb;yes')){deleted++;graph.links=[];}},
     }),
-    mouse:{click:async()=>{clicked++;},move:async()=>{}},
+    mouse:{click:async()=>{clicked++;selectionChange?.(graph);},move:async()=>{}},
     waitForTimeout:async ms=>{clock+=ms;},
   };
   class Clock extends Date {static now(){return clock;}}
@@ -93,4 +94,29 @@ test('removal resolves both source and target native indexes from the same owned
 for(const bindingsFault of ['missing','port','graph'])test('removal refuses '+bindingsFault+' native binding before a click',async()=>{
   const f=await run({inputPort:2,bindingsFault});assert.equal(f.receipt.status,'NOT_APPLIED');
   assert.equal(f.receipt.effect_possible,false);assert.equal(f.stats().clicked,0);assert.equal(f.stats().deleted,0);
+});
+
+test('owned link selection may redraw node DOM without changing the graph',async()=>{
+  const f=await run({inputPort:2,selectionChange:g=>{for(const n of g.nodes)n.dom_epoch++;}});
+  assert.equal(f.receipt.status,'SUCCEEDED',f.receipt.error);assert.equal(f.stats().deleted,1);
+  assert.ok(verifyNodeTargetEffect(f.effect,f.graph));
+});
+for(const [name,change] of Object.entries({
+  document:g=>{g.document_id='other';},
+  workflow:g=>{g.workflow_ref.workflow_id='other';},
+  graph_epoch:g=>{g.dom_epoch++;},
+  node_identity:g=>{g.nodes[0].ref.node_id='other';},
+  node_label:g=>{g.nodes[0].label='other';},
+  node_added:g=>{g.nodes.push(structuredClone(g.nodes[0]));},
+  link_identity:g=>{g.links[0].guid='other';},
+  link_source:g=>{g.links[0].source='other';},
+  link_output:g=>{g.links[0].output++;},
+  link_target:g=>{g.links[0].target='other';},
+  link_input:g=>{g.links[0].input++;},
+  link_added:g=>{g.links.push({...g.links[0]});},
+  foreign_link:g=>{g.foreign_links.push({...g.links[0]});},
+}))test('selection redraw cannot hide a changed '+name,async()=>{
+  const f=await run({selectionChange:g=>{for(const n of g.nodes)n.dom_epoch++;change(g);}});
+  assert.equal(f.receipt.status,'AMBIGUOUS');assert.equal(f.receipt.effect_possible,true);
+  assert.equal(f.stats().clicked,1);assert.equal(f.stats().deleted,0);
 });
