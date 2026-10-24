@@ -298,3 +298,54 @@ class PortReadSequenceTests(unittest.TestCase):
         self.assertIn('unbound_port_read',self.audit()['failures'])
         self.events.pop(-2);self.events.append(prepared)
         self.assertIn('mutation_without_fresh_observation',self.audit()['failures'])
+
+    def console_fixture(self):
+        from node_procedure_evidence import digest
+        self.events.pop()  # Replace the port read with the existing console wait path.
+        button=dict(tid='MF;cntMain;tlbMainToolbar;btnProgress',ref='console-button',
+                    signature=dict(tid='MF;cntMain;tlbMainToolbar;btnProgress',tag='a'),enabled=True,allowed_actions=['click'])
+        launch=dict(ref='launch',allowed_actions=['execute_graph_node'])
+        for row in self.events:
+            if row.get('step')==65:
+                state=row['outcome']['output']
+                state.update(prepared_node_context=dict(self.node,surface='graph'),wizard=dict(status='absent'))
+                state['ui'].update(elements=[button,launch],masks=[],dialogs=[])
+        state=copy.deepcopy(self.events[-1]['outcome']['output'])
+        common={k:copy.deepcopy(self.read[k]) for k in ('session_id','runtime_revision','target','operation_id','internal_provenance')}
+        operation=self.fixture['operation_id'];identity=operation+':n66';action=dict(verb='execute_graph_node',ref='launch')
+        self.events.insert(0,dict(operation_id=operation,phase='node_apply_prepared',deadline_at=30000,request=dict(budgets=dict(total_ms=30000))))
+        self.events.append(dict(operation_id=operation,phase='node_phase_prepared',receipt=dict(phase='finish',deadline=30000,before_node=self.node)))
+        self.events.append(dict(common,phase='node_step_prepared',step=66,internal_operation_id=identity,action=action,
+                                observation_sha256=digest(state),signature=digest([identity,action,state])))
+        self.events.append(dict(common,phase='node_step_completed',step=66,internal_operation_id=identity,
+                                outcome=dict(operation_id=identity,action_key='ui.act',status='SUCCEEDED',cleanup_complete=True)))
+        for index in range(101):
+            current=copy.deepcopy(state);current['ui']['elements']=[copy.deepcopy(button)]
+            current['ui']['masks']=[dict(kind='busy',target_tid=current['workflow_ref']['prefix']+';ModelForm',dialog_ref=None)] if index<100 else []
+            ready=dict(policy='semantic_condition_v2',required_samples=1,condition='prepared node available for process console',
+                       satisfied=index==100,timeout_ms=30000,elapsed_ms=index*200)
+            self.events.append(dict(common,phase='node_observation_sample',step=67,internal_operation_id=operation+':n67',
+                                    sample=index,readiness=ready,outcome=dict(status='SUCCEEDED',output=current)))
+        self.events.append(dict(common,phase='node_observation_completed',step=67,internal_operation_id=operation+':n67',
+                                readiness=copy.deepcopy(ready),outcome=dict(status='SUCCEEDED',output=copy.deepcopy(current))))
+
+    def test_owned_console_loading_keeps_its_existing_twenty_second_parent_budget(self):
+        self.console_fixture()
+        self.assertTrue(self.audit()['passed'],self.audit()['failures'])
+
+    def test_console_settlement_rejects_changed_launch_owner_control_mask_and_budget(self):
+        self.console_fixture();original=copy.deepcopy(self.events)
+        for fault in ('launch','owner','control','mask','budget','deadline','ordinary'):
+            with self.subTest(fault=fault):
+                self.events=copy.deepcopy(original)
+                samples=[r for r in self.events if r.get('phase')=='node_observation_sample' and r.get('step')==67]
+                state=samples[0]['outcome']['output']
+                if fault=='launch':next(r for r in self.events if r.get('phase')=='node_step_completed' and r.get('step')==66)['outcome']['status']='FAILED'
+                if fault=='owner':state['prepared_node_context']['node_id']='foreign'
+                if fault=='control':state['ui']['elements'][0]['ref']='foreign'
+                if fault=='mask':state['ui']['masks'][0]['target_tid']='Other;ModelForm'
+                if fault=='budget':self.events[0]['request']['budgets']['total_ms']=15000
+                if fault=='deadline':next(r for r in self.events if r.get('phase')=='node_phase_prepared')['receipt']['deadline']=30001
+                if fault=='ordinary':
+                    for row in samples+[self.events[-1]]:row['readiness']['condition']='ordinary condition'
+                self.assertFalse(self.audit()['passed'],fault)
