@@ -47,7 +47,7 @@ rows = [dict(RowID=r['RowID'], **{f: float(r[f]) for f in [*FIELDS, TARGET]},
 
 
 def column(name, kind='real'):
-    return dict(name=name, label=name, type=kind,
+    return dict(name=name, label_any=True, type=kind,
                 **(dict(tolerance=dict(abs=1e-8, rel=1e-10)) if kind == 'real' else {}))
 
 

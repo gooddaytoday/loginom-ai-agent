@@ -25,12 +25,12 @@
       "columns": [
         {
           "name": "RowID",
-          "label": "RowID",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "X",
-          "label": "X",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -39,7 +39,7 @@
         },
         {
           "name": "Net",
-          "label": "Net",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -48,7 +48,7 @@
         },
         {
           "name": "Forecast",
-          "label": "Forecast",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,

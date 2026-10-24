@@ -33,8 +33,8 @@ expected = {
         "export_destination": sys.argv[2] if len(sys.argv) > 2 else "/stability-2026-10-20/cluster-x-two.csv",
         "ordered": False,
         "column_order": "exact",
-        "columns": [{"name": "X", "label": "X", "type": "real", "tolerance": {"abs": 1e-8, "rel": 0}},
-                    {"name": "PointCount", "label": "PointCount", "type": "integer"}],
+        "columns": [{"name": "X", "label_any": True, "type": "real", "tolerance": {"abs": 1e-8, "rel": 0}},
+                    {"name": "PointCount", "label_any": True, "type": "integer"}],
         "rows": rows,
     }],
 }

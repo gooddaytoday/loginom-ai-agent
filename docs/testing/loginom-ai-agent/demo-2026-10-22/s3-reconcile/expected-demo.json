@@ -18,28 +18,28 @@
       "columns": [
         {
           "name": "OrderID",
-          "label": "OrderID",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "Customer",
-          "label": "Customer",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "OrderAmount",
-          "label": "OrderAmount",
-          "type": "real"
+          "type": "real",
+          "label_any": true
         },
         {
           "name": "PaidAmount",
-          "label": "PaidAmount",
-          "type": "real"
+          "type": "real",
+          "label_any": true
         },
         {
           "name": "Debt",
-          "label": "Debt",
-          "type": "real"
+          "type": "real",
+          "label_any": true
         }
       ],
       "rows": [

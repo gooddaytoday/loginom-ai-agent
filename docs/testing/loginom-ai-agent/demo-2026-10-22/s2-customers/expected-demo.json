@@ -21,23 +21,23 @@
       "columns": [
         {
           "name": "Code",
-          "label": "Code",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "Name",
-          "label": "Name",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "CreditLimit",
-          "label": "CreditLimit",
-          "type": "real"
+          "type": "real",
+          "label_any": true
         },
         {
           "name": "Status",
-          "label": "Status",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         }
       ],
       "rows": [

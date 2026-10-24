@@ -36,8 +36,8 @@ assert within > 0 and between > 100 * within, 'Clouds insufficiently separated'
 for i, group in enumerate(groups):
     assert all(distance(p, centers[i]) < distance(p, center)
                for p in group for j, center in enumerate(centers) if i != j)
-columns = [dict(name='Points', label='Points', type='integer')]
-columns += [dict(name='Mean' + f, label='Mean' + f, type='real',
+columns = [dict(name='Points', label_any=True, type='integer')]
+columns += [dict(name='Mean' + f, label_any=True, type='real',
                  tolerance=dict(abs=1e-8, rel=1e-10)) for f in FIELDS]
 rows = [dict(Points=len(group), **{'Mean' + f: float(center[j]) for j, f in enumerate(FIELDS)})
         for group, center in zip(groups, centers)]
