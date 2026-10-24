@@ -42,9 +42,15 @@ expected = {
     "outputs": [{
         "output_node_type": OUTPUT_TYPE,
         "ordered": ORDERED,
-        "columns": [{"name": name, "label": name, "type": kind} for name, kind in COLUMNS],
+        "columns": [{"name": name, "label": name, "type": kind, "name_any": True, "label_any": True,
+                     **({"types": ["integer", "real"]} if kind in ("integer", "real") else {})}
+                    for name, kind in COLUMNS],
         "rows": rows,
     }],
 }
+expected["request_constraints"] = [{
+    "source": "prompt.md:1", "quote": (ROOT / "prompt.md").read_text(encoding="utf-8").strip(),
+    "reason": "Output names, labels and native numeric types are not prescribed. Bind each semantic column uniquely by its complete values; preserve ABC classes, product counts, revenue, NULL and row-count checks.",
+}]
 encoded = json.dumps(expected, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
 sys.stdout.buffer.write(encoded.encode("utf-8"))
