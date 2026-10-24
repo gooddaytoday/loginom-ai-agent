@@ -257,8 +257,18 @@ export async function mutateGraph(page, task, read, scrollExport, readViewport, 
       if(choice==='choose'){const data=find(tid+';Input_Add;Data');await point(data);await data.click({timeout:remaining()});}
 
     }else if(kind==='remove_link'){
-      const source=await targetTid({node_id:p.edge.source}),target=await targetTid({node_id:p.edge.target});
-      const linkTid=source+'|Output_Data-'+p.edge.output+'|'+target.split(';Graph;')[1]+'|Input_Data-'+p.edge.input;
+      // Logical tabular indexes exclude service ports. REST input 0 is
+      // rendered as Input_Data-2; resolve both ends with the same native reader
+      // used by link creation before selecting the exact owned edge.
+      const {native_bindings:bindings,...boundGraph}=await read(page,{...task,read_bindings:true});
+      if(JSON.stringify(boundGraph)!==JSON.stringify(before))throw Error('Graph changed before owned link binding');
+      const resolve=(id,direction,index)=>{
+        const matches=bindings.filter(b=>b.node_id===id);
+        if(matches.length!==1||!Number.isInteger(matches[0][direction][index]))throw Error('Exact owned tabular port disappeared');
+        return {label:matches[0].label,index:matches[0][direction][index]};
+      };
+      const source=resolve(p.edge.source,'outputs',p.edge.output),target=resolve(p.edge.target,'inputs',p.edge.input);
+      const linkTid=task.request.workflow_ref.prefix+';Graph;'+source.label+'|Output_Data-'+source.index+'|'+target.label+'|Input_Data-'+target.index;
       const link=find(linkTid);
       if(await link.count()!==1)throw new Error('Owned link is not uniquely rendered');
       const hit=await link.evaluate(e=>{

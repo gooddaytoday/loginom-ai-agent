@@ -4,16 +4,25 @@ import vm from 'node:vm';
 import {createNodeTargetBrowserAdapter} from '../lib/node-target-browser.mjs';
 import {verifyNodeTargetEffect} from '../lib/node-target.mjs';
 
-function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,contextLost=false}={}) {
+function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,contextLost=false,inputPort=0,outputPort=0,bindingsFault=null}={}) {
   const start=Date.now();let clock=start,clicked=0,deleted=0,contextChecks=0;
   const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1'}};
   const edge={source:'source',output:0,target:'target',input:0};
   const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,dom_epoch:1,interaction_ready:true,
     nodes:['source','target'].map(id=>({ref:{document_id:'doc',workflow_id:'wf',node_id:id},label:id})),links:[edge],foreign_links:[]};
-  const tid='MF;TF-1;Graph;source|Output_Data-0|target|Input_Data-0';
+  const tid='MF;TF-1;Graph;source|Output_Data-'+outputPort+'|target|Input_Data-'+inputPort;
   const page={
     evaluate:async(fn,arg)=>{
-      if(arg?.types)return structuredClone(graph);
+      if(arg?.types){
+        const result=structuredClone(graph);
+        if(arg.read_bindings){
+          result.native_bindings=[{node_id:'source',label:'source',inputs:[],outputs:[outputPort]},{node_id:'target',label:'target',inputs:[inputPort],outputs:[]}];
+          if(bindingsFault==='missing')result.native_bindings.pop();
+          if(bindingsFault==='port')result.native_bindings[1].inputs=[];
+          if(bindingsFault==='graph')result.nodes[0].label='changed';
+        }
+        return result;
+      }
       if(arg?.epoch){contextChecks++;if(contextLost&&clicked)throw Error('Node target document/workflow/DOM epoch changed');return;}
       if(typeof arg==='string' && ['source','target'].includes(arg))return 'MF;TF-1;Graph;'+arg;
       if(arg===tid)return true;
@@ -22,7 +31,7 @@ function fixture({budget=180000,bend=true,duplicate=false,wrongSelection=false,c
     },
     locator:selector=>({
       locator:child=>page.locator(child),
-      count:async()=>selector.includes('TargetBend')&&duplicate?2:1,
+      count:async()=>selector.includes(';Graph;source|')&&!selector.includes(tid)?0:selector.includes('TargetBend')&&duplicate?2:1,
       isVisible:async()=>selector.includes('TargetBend')?bend:true,
       isEnabled:async()=>true,
       evaluate:async()=>({x:100,y:100}),
@@ -71,4 +80,17 @@ test('visible bend cannot authorize deleting another selected object',async()=>{
 test('unique selected owned link deletes once and passes full graph verification',async()=>{
   const f=await run({});assert.equal(f.receipt.status,'SUCCEEDED');assert.equal(f.receipt.cleanup_complete,true);
   assert.equal(f.stats().clicked,1);assert.equal(f.stats().deleted,1);assert.ok(verifyNodeTargetEffect(f.effect,f.graph));
+});
+
+test('D19 removal resolves logical input 0 to the rendered REST Input_Data-2',async()=>{
+  const f=await run({inputPort:2});assert.equal(f.receipt.status,'SUCCEEDED',f.receipt.error);
+  assert.equal(f.stats().deleted,1);assert.ok(verifyNodeTargetEffect(f.effect,f.graph));
+});
+test('removal resolves both source and target native indexes from the same owned graph',async()=>{
+  const f=await run({inputPort:2,outputPort:3});assert.equal(f.receipt.status,'SUCCEEDED',f.receipt.error);
+  assert.equal(f.stats().clicked,1);assert.equal(f.stats().deleted,1);
+});
+for(const bindingsFault of ['missing','port','graph'])test('removal refuses '+bindingsFault+' native binding before a click',async()=>{
+  const f=await run({inputPort:2,bindingsFault});assert.equal(f.receipt.status,'NOT_APPLIED');
+  assert.equal(f.receipt.effect_possible,false);assert.equal(f.stats().clicked,0);assert.equal(f.stats().deleted,0);
 });
