@@ -129,6 +129,26 @@ test('created node without verified rendered bounds cannot silently use a point'
  await assert.rejects(revealNodePlacement(f.args),/footprint unavailable/);assert.equal(f.state().clicks,0);
 });
 
+for(const edge of ['canvas','browser'])for(const axis of ['right','bottom'])test('rendered node exactly eight pixels inside '+edge+' '+axis+' boundary needs no navigation',async()=>{
+ const f=fixture();f.args.nodeId='edge';
+ const v={...structuredClone(f.state().v),y:80,...(edge==='browser'?{viewportWidth:1280,viewportHeight:800}:{})};
+ f.args.root.evaluate=async()=>({...v,node_bounds:{
+  x:axis==='right'?Math.min(v.x+v.width,v.viewportWidth)-8-111:500,
+  y:axis==='bottom'?Math.min(v.y+v.height,v.viewportHeight)-8-154:106,width:111,height:154}});
+ const r=await revealNodePlacement(f.args);
+ assert.equal(r.fully_visible,true);assert.equal(r.zoom_steps,0);
+ assert.equal(f.state().clicks,0);assert.equal(f.state().open,false);
+});
+test('navigation accepts an eight pixel inset after zoom and outline cleanup, but never a smaller inset',async()=>{
+ const f=fixture();f.args.nodeId='edge';
+ f.args.root.evaluate=async()=>({...structuredClone(f.state().v),y:80,viewportWidth:1280,viewportHeight:800,node_bounds:{
+  x:f.state().clicks?1161:1161.01,y:106,width:111,height:154}});
+ const r=await revealNodePlacement(f.args);
+ assert.equal(r.fully_visible,true);assert.equal(r.zoom_steps,1);
+ assert.equal(f.state().clicks,1);assert.equal(f.state().open,false);
+ assert.equal(r.view.node_bounds.x+r.view.node_bounds.width,1272);
+});
+
 for(const fault of [null,'foreign','lost'])test('existing target scroll preserves native scale and refuses '+(fault??'no owner change'),async()=>{
  const f=fixture();f.args.nodeId='existing';f.args.scrollNode=true;let scrolled=false;
  const canvas={scrollLeft:0,scrollTop:0};

@@ -52,8 +52,9 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
  const within=(v,p)=>{
   const bounds=nodeId===undefined?{x:p.x,y:p.y,width:0,height:0}:v.node_bounds;
   if(!bounds||!Object.values(bounds).every(Number.isFinite))throw Error('Placement footprint unavailable');
+  // The complete drawing may sit exactly at the eight CSS pixel inset.
   return bounds.x>=Math.max(v.x,0)+8&&bounds.y>=Math.max(v.y,0)+8
-   &&bounds.x+bounds.width<Math.min(v.x+v.width,v.viewportWidth)-8&&bounds.y+bounds.height<Math.min(v.y+v.height,v.viewportHeight)-8;
+   &&bounds.x+bounds.width<=Math.min(v.x+v.width,v.viewportWidth)-8&&bounds.y+bounds.height<=Math.min(v.y+v.height,v.viewportHeight)-8;
  };
  let view=await root.evaluate(readViewport,nodeId),point=project(view,position),opened=false,steps=0,error,zoom;
  // A rejected gesture reply does not prove that the native UI stayed unchanged.
@@ -155,8 +156,8 @@ export async function revealPreparedGraphNode(page,args,read,reveal,readViewport
  const guard=async()=>{remaining();need(sameGraph(before,await read(page,task)),'graph changed during navigation');};
  const navigation=await reveal({page,root,position,nodeId:ref.node_id,prefix:args.binding.workflow_ref.prefix,
   remaining,guard,readViewport,project});
- await guard();need(navigation.fully_visible===true,'node not revealed');
+ await guard();need(navigation.fully_visible===true,'node not revealed: '+JSON.stringify({viewport:navigation.view,zoom_steps:navigation.zoom_steps,outline_closed:navigation.outline_closed}));
  return {status:'SUCCEEDED',verified:true,node:ref,graph_unchanged:true,settings_applied:false,
   fully_visible:true,cleanup_complete:true,effect_possible:navigation.zoom_steps>0,
-  zoom_steps:navigation.zoom_steps,outline_closed:navigation.outline_closed};
+  zoom_steps:navigation.zoom_steps,outline_closed:navigation.outline_closed,viewport:navigation.view};
 }

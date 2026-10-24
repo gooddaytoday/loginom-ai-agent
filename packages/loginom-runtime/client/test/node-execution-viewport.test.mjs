@@ -133,6 +133,7 @@ test('actual serialized viewport step returns a valid durable capability receipt
   }});
  const result=await channel.revealGraphNode();assert.equal(result.action_key,'node.viewport.reveal.internal');
  assert.equal(result.output.fully_visible,true);assert.equal(operation.cleanupConfirmed,true);
+ assert.deepEqual(result.output.viewport.node_bounds,{x:200,y:200,width:70,height:80});
  assert.equal(events.at(-1).phase,'node_step_completed');assert.deepEqual(events.at(-1).outcome,result);
  await assert.rejects(channel.act({verb:'click',ref:'old'}),/fresh internal observation/);
 });
