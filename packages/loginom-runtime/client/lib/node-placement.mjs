@@ -66,7 +66,7 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
   catch(e){e.placement_navigation_unverified=true;throw e;}
  };
  const scroll=async()=>{
-  await guard();remaining();const b=view.node_bounds;
+  await guard();remaining();const b=nodeId===undefined?{...point,width:0,height:0}:view.node_bounds;
   await gesture(()=>root.evaluate((e,delta)=>{e.scrollLeft+=delta.x;e.scrollTop+=delta.y;},
    {x:b.x+b.width/2-(Math.max(view.x,0)+Math.min(view.x+view.width,view.viewportWidth))/2,
     y:b.y+b.height/2-(Math.max(view.y,0)+Math.min(view.y+view.height,view.viewportHeight))/2}),'scroll');
@@ -136,9 +136,9 @@ export async function revealNodePlacement({page,root,position,prefix,guard,remai
     await guard();
     navigationSteps[navigationSteps.length-1].after=view;
     if(!(grow?view.scale>old:view.scale<old)){
-     // A pinned process console can clip the drawing at minimum zoom.
+     // Minimum zoom can still leave a drawing or placement point clipped.
      // Native scroll remains bounded by the canvas and the same graph guards.
-     if(!grow&&nodeId!==undefined)await scroll();
+     if(!grow)await scroll();
      break;
     }
     point=project(view,position);
