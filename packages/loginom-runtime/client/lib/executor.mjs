@@ -1818,8 +1818,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const earlyNodePhase=operation=>!operation?.nodeApply?.node&&!operation?.nodeApply?.result
     &&(['source','workflow','target'].includes(operation?.nodeApply?.pending?.phase)
       ||operation?.nodeApply?.target_reconciled===true);
-  const earlyRelease=(operation,signal)=>earlyNodePhase(operation)?()=>releaseNodeTarget({operation,adapter:operation.nodeTargetAdapter,
-    record:nodeTargetRecord,readReceipt:ref=>readReceipt(operation,ref),deadline:now()+NODE_RELEASE_BUDGET_MS,signal,now}):undefined;
+  const earlyRelease=(operation,signal)=>earlyNodePhase(operation)?async()=>{
+    const deadline=now()+NODE_RELEASE_BUDGET_MS;
+    await operation.nodeApplyDrivers?.releaseBeforeTarget?.({signal,deadline});
+    return releaseNodeTarget({operation,adapter:operation.nodeTargetAdapter,
+      record:nodeTargetRecord,readReceipt:ref=>readReceipt(operation,ref),deadline,signal,now});
+  }:undefined;
   const nodeReleaseStep=operation=>!operation.transportUncertain&&!nodeJobs.busy&&(earlyNodePhase(operation)
     ||operation.nodeApply?.pending&&(!operation.nodeApplyDrivers?.releasePendingPhases||operation.nodeApplyDrivers.releasePendingPhases.includes(operation.nodeApply.pending.phase))
     &&operation.nodeApply.node&&typeof operation.nodeApplyDrivers?.releasePending==='function')?{tool:'dock_operation_recover',

@@ -486,7 +486,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
         &&proof.node?.workflow_id===request.workflow_ref.workflow_id&&id(proof.node.node_id)), 'Pre-target release proof differs');
     const result={operation_id:operation.id,status:'FAILED',effect_possible:state.effect_possible,
       phases:state.phases.map(({value,...p})=>p),node:proof.node,execution:state.execution,output:state.output,
-      package_saved:false,cleanup_complete:true,configuration:{status:'not_requested'},warnings:[],
+      package_saved:false,cleanup_complete:true,configuration:{status:'not_requested'},warnings:proof.warnings??[],
       checkpoint_kind:'local_node_released',persisted_package_verified:false,pending_phase:null,released_phase:pending.phase,
       error:{code:'NODE_OPERATION_RELEASED',message:'Early node phase released after confirmed browser completion and a quiet original graph; the stopped phase was not repeated.'},
       next_step:request.mode===NODE_READ_MODE?{tool:'dock_node_read',original_operation_id:operation.id,
@@ -520,7 +520,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   // Closing a stopped script wizard proves release, not the retained source,
   // settings or any internal JavaScript materialization effects.
   const javascriptDraft=request.target.type==='programming.javascript'&&request.mode==='script'
-    &&['input_mapping','open','configure'].includes(pending.phase);
+    &&['input_mapping','open','configure','node_finish'].includes(pending.phase);
   const configuration=readingOnly?{status:'not_requested'}:exportRelease||javascriptDraft?{status:'unknown'}:committed?{status:'applied',...(verified('finish')&&handler.configurationReadback
     ?{readback:handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id})}:{})}
     :{status:proof.cleanup.wizard_closed&&!verified('node_finish')?'discarded':'unknown'};

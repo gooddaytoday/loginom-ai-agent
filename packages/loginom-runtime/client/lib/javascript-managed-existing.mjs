@@ -22,7 +22,13 @@ export async function openManagedJavascriptExistingWizard({prepared, node, deadl
     ||!['document_id','workflow_id','node_id'].every(key=>context[key]===task.owner[key])
     ||typeof context.tid!=='string'||!context.tid.startsWith(task.workflow_ref.prefix+';Graph;'))
     throw Error('Managed JavaScript existing graph owner unavailable');
-  const before = await execute(makeJavascriptManagedSelectionReadCode({...task, mode: 'capture'}));
+  let before;
+  try { before = await execute(makeJavascriptManagedSelectionReadCode({...task, mode: 'capture'})); }
+  catch(error) {
+    // The capture only reads. No body or Setting gesture has been prepared.
+    error.nodePhaseRefusal={phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+    throw error;
+  }
   const selected = before.ready === true ? before
     : (await dispatchManagedJavascriptBody({task, before, execute, record, receiptOptions})).output?.selection;
   if (selected?.ready !== true || selected.node_tid!==context.tid || Date.now() >= deadline)

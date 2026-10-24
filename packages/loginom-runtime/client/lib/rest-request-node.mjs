@@ -8,8 +8,8 @@ import {readTableOutputPages} from './table-output-pages.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
 import {createJavascriptCodeNodeSupport} from './javascript-code-node.mjs';
 import {createRedactor} from './redact.mjs';
-import {applyNode,validateNodeApplyRequest} from './node-apply.mjs';
-import {prepareNodeTarget} from './node-target.mjs';
+import {applyNode,validateNodeApplyRequest,releaseNodeApply} from './node-apply.mjs';
+import {prepareNodeTarget,releaseNodeTarget} from './node-target.mjs';
 import {createHash} from 'node:crypto';
 
 const need=(v,m)=>{if(!v)throw Error('REST request: '+m);};
@@ -48,6 +48,8 @@ async function prepareQueryEncoder(options,ctx,config){
   deadline:ctx.deadline,nodeTargetAdapter:options.operation.nodeTargetAdapter};
  const support=createJavascriptCodeNodeSupport({...config,redactor:config.redactor??createRedactor()});
  const drivers=support.nodeApplyDriverFactory({...options,operation});
+ const child={operation,drivers,handlers:support.nodeApplyHandlers,result:null};
+ options.operation.restQueryEncoder=child;
  const {graph}=validateNodeApplyRequest(request,support.nodeApplyHandlers);
  const result=await applyNode({request,operation,handlers:support.nodeApplyHandlers,
   drivers:{...drivers,
@@ -58,6 +60,7 @@ async function prepareQueryEncoder(options,ctx,config){
     need(target.status==='SUCCEEDED',target.error??'query encoder target was not created');
     return {verified:true,cleanup_complete:true,effect_possible:true,node:target.node.ref,target};
    }},record:options.onRecord,signal:ctx.signal,stopSignal:ctx.stopSignal,now:options.now});
+ child.result=result;
  options.operation.nodeEffectPossible ||= result.effect_possible===true;
  if(operation.transportUncertain||result.cleanup_complete!==true){options.operation.transportUncertain ||= operation.transportUncertain===true;options.operation.cleanupConfirmed=false;}
  need(result.status==='SUCCEEDED'&&result.cleanup_complete===true&&result.execution.status==='completed','query encoder did not complete');
@@ -86,7 +89,7 @@ export function createRestRequestNodeSupport(config){
  return {nodeApplyHandlers:createTabularTransformNodeSupport(config,implementation).nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   let connection=null;
   const request=options.operation.parameters;
-  return createTabularTransformNodeSupport(config,{...implementation,
+  const drivers=createTabularTransformNodeSupport(config,{...implementation,
    preflight:async(options,ctx)=>{
     if(!request.parameters.connection)return {verified:true,cleanup_complete:true,effect_possible:false,not_applicable:true};
     if(request.target.kind==='existing'&&request.inputs.length){
@@ -118,5 +121,35 @@ export function createRestRequestNodeSupport(config){
     return {...result,configuration:{...result.configuration,connection}};
    },
   }).nodeApplyDriverFactory(options);
+  return {...drivers,async releaseBeforeTarget({signal,deadline}){
+   const child=options.operation.restQueryEncoder;
+   if(!child||child.result?.status==='SUCCEEDED'||options.operation.preTargetGraph)return;
+   const original=child.operation,childRequest=original.parameters;
+   need(!options.operation.targetPhase&&options.operation.nodeApply?.pending?.phase==='target'
+    &&original.id===restQueryEncoderRequest(request,deadline,options.now()).operation_id
+    &&childRequest.document_id===request.document_id
+    &&JSON.stringify(childRequest.workflow_ref)===JSON.stringify(request.workflow_ref)
+    &&childRequest.target.kind==='new'&&childRequest.target.type==='programming.javascript',
+    'query encoder release owner differs');
+   need(!original.transportUncertain,'query encoder transport remains uncertain');
+   const result=original.nodeApply?.result??(child.result?.cleanup_complete===true&&child.result.pending_phase===null?child.result:null)??await releaseNodeApply({operation:original,
+    handlers:child.handlers,drivers:child.drivers,record:options.onRecord,signal,
+    releaseBeforeTarget:()=>releaseNodeTarget({operation:original,adapter:original.nodeTargetAdapter,
+     record:options.onRecord,readReceipt:options.readReceipt,deadline,signal,now:options.now})});
+   need(result.cleanup_complete===true&&result.pending_phase===null,'query encoder release remains unresolved');
+   const graph=await options.operation.nodeTargetAdapter.observe({document_id:request.document_id,
+    workflow_ref:request.workflow_ref},deadline,signal);
+   need(graph.complete===true&&graph.document_id===request.document_id
+    &&JSON.stringify(graph.workflow_ref)===JSON.stringify(request.workflow_ref),'query encoder release graph differs');
+   const event={operation_id:options.operation.id,phase:'rest_query_encoder_released',
+    child_operation_id:original.id,result,graph};
+   const saved=await options.onRecord(structuredClone(event));
+   need(JSON.stringify(Object.fromEntries(Object.keys(event).map(k=>[k,saved?.[k]])))===JSON.stringify(event),
+    'query encoder release journal acknowledgement differs');
+   options.operation.preTargetGraph=structuredClone(graph);
+   options.operation.preTargetWarnings=result.node?['The incomplete URL query encoder '+JSON.stringify(result.node)
+    +' remains in the graph. Its settings and execution are unverified; release did not delete or execute it.']:[];
+   options.operation.cleanupConfirmed=true;
+  }};
  }};
 }

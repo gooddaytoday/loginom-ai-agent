@@ -179,8 +179,15 @@ export function createJavascriptManagedSourceAdapter({page, prepared, node, uiEp
       // An ambiguous opening is terminal: a second Setting could edit a draft.
       uncertain = true;
       const openingDeadline = Math.min(deadline, Date.now() + openingBudgetMs);
-      const opened = await driver.openManagedJavascriptExistingWizard({prepared, node, deadline: openingDeadline,
-        targetOrigin, execute, record, receiptOptions, channel: channel(openingDeadline)});
+      let opened;
+      try { opened = await driver.openManagedJavascriptExistingWizard({prepared, node, deadline: openingDeadline,
+        targetOrigin, execute, record, receiptOptions, channel: channel(openingDeadline)}); }
+      catch(error) {
+        const refusal=error.nodePhaseRefusal;
+        if(refusal?.phase==='open'&&refusal.status==='NOT_APPLIED'&&refusal.effect_possible===false
+          &&refusal.cleanup_complete===true)uncertain=false;
+        throw error;
+      }
       const task = opened.task;
       need(same(task.owner, {document_id: node.document_id, workflow_id: node.workflow_id, node_id: node.node_id}),
         'Managed JavaScript opened another node');

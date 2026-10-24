@@ -50,7 +50,7 @@ test('source boundary journals only the failed predicate: '+fault,async()=>{
 });
 
 function fixture({closeFails = false, pageTransientOnce = false, wrongType = false,
-  schemaOverride,
+  schemaOverride,openingFault,
   settingsAckChanged = false,
   nativeRefusal=false,doneRefusal=false,captureFails=false,recoveryAckChanged=false,closeRefusalFails=false,
   generationFalse = false, generationFails = false, declaredFails = false, doneFails = false,
@@ -58,7 +58,9 @@ function fixture({closeFails = false, pageTransientOnce = false, wrongType = fal
   const calls = [], events = [];
   let pageReads = 0, graphReads = 0, codeNextSent = false,doneSent=false,handleDraft;
   const driver = {
-    openManagedJavascriptExistingWizard: async args => {calls.push('open'); assert.equal(args.node, node); return {task};},
+    openManagedJavascriptExistingWizard: async args => {calls.push('open'); assert.equal(args.node, node);
+      if(openingFault){const error=Error('opening failed');if(openingFault==='capture')error.nodePhaseRefusal={phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};throw error;}
+      return {task};},
     dispatchManagedJavascriptGeneration: async () => {calls.push('generation');
       if (generationFails) throw Error('lost generation reply');
       return {status: 'SUCCEEDED', output: {generation_readback_verified: true, schema: {verified: true,
@@ -397,4 +399,26 @@ for(const failure of [null,'capture','close','ACK'])test('known Done refusal clo
  assert.equal(error.javascriptWizardRefusal.closed.settings_applied,null);
  assert.equal(error.javascriptWizardRefusal.closed.execution_started,null);
  assert.equal(f.calls.filter(x=>x==='close').length,1);assert.equal(f.calls.includes('graph'),false);
+});
+
+for(const openingFault of ['capture','unknown'])test('D17 source adapter preserves opening certainty: '+openingFault,async()=>{
+ const f=fixture({openingFault}),adapter=await f.sourceAdapter();
+ await assert.rejects(adapter.open({owner,deadline}));
+ assert.equal(adapter.active,false);assert.equal(adapter.uncertain,openingFault==='unknown');
+ assert.deepEqual(f.calls,['type','open']);
+});
+
+test('D17 only the read-only selection capture can report an opening with no effect',async()=>{
+ const {openManagedJavascriptExistingWizard}=await import('../lib/javascript-managed-existing.mjs');
+ for(const failCapture of [true,false]){
+  let reads=0;const events=[];
+  await assert.rejects(openManagedJavascriptExistingWizard({prepared,node,deadline,targetOrigin:'http://test',
+   channel:{observe:async()=>({prepared_node_context:{...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;JS'},wizard:{status:'absent'}})},
+   execute:async()=>{if(++reads===1&&!failCapture)return {ready:true,node_tid:'MF;TF-1;Graph;JS',dom_replacements:0,setting_point:{x:10,y:20}};throw Error('lost reply');},
+   record:async e=>{events.push(e);return e;},receiptOptions:()=>({})}),error=>{
+    assert.equal(error.nodePhaseRefusal?.cleanup_complete,failCapture?true:undefined);
+    assert.equal(error.nodePhaseRefusal?.effect_possible,failCapture?false:undefined);return true;
+   });
+  assert.equal(events.length,failCapture?0:1);assert.equal(reads,failCapture?1:2);
+ }
 });
