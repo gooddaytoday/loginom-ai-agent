@@ -3385,6 +3385,102 @@ function calculatorOutputMetadataFixture(name='Token',family='ColumnsMappingEngi
   return {page,...c,row,port,binding,read};
 }
 
+function sortingInputMetadataFixture(last='Quantity') {
+  const page=new Page(),c=mappingCoverageFixture(page,5),names=['Token','OrderID','Items','Code',last];
+  for(const e of [c.form,...c.form.descendants()])if(e.attrs['data-tid'])
+    e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard').replace('colDefaultUsageType_','colUsageType_');
+  c.base=c.base.replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard');
+  for(const [i,row] of c.rows.entries())for(const cell of row.children) {
+    cell.attrs['data-tid']=cell.attrs['data-tid'].replace('Field'+i,names[i]);
+    if(cell.ownText==='Field'+i)cell.ownText=names[i];
+  }
+  page.add('td','MF;TF-1;ViewsForm;BrowseView;grdData;grd-1;tbl;col_Token','PRIVATE_DATA_VALUE');
+  const port={direction:'input',port:0,native_index:0,port_guid:'sorting-input-guid',
+    opening_operation_id:'sort-codes:input',node_icon_class:'bg-vendor-icon-sorting'};
+  const binding={node:{node_id:'sorting-guid'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+  const read=(options={})=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+    {expected_build:build,expected_origin:origin,prepared_node_context:binding,mode:'observe',...options},
+    async()=>({verified:true,surface:'wizard',input_port:port}));
+  return {page,...c,port,binding,read,names};
+}
+
+test('Sorting input definition reads all five rendered fields including Token from both D42 traces',async()=>{
+  for(const last of ['Quantity','Units']) {
+    const f=sortingInputMetadataFixture(last),r=await f.read({output_column_page:{offset:0,limit:8}});
+    assert.equal(r.status,'SUCCEEDED',JSON.stringify(r.error));
+    const c=r.output.wizard.output_columns;
+    assert.equal(c.page.status,'complete_definition_page');assert.equal(c.page.total_columns,5);
+    assert.equal(c.page.returned,5);assert.equal(c.page.next_offset,null);
+    assert.deepEqual(Array.from(c.fields,x=>x.name),f.names);assert.ok(c.fields.every(x=>x.status==='observed'));
+    assert.ok(!JSON.stringify(r).includes('PRIVATE_DATA_VALUE'));assert.deepEqual(f.page.events,[]);
+  }
+});
+
+test('Sorting input definition retains secret, native owner and complete page guards for Token',async()=>{
+  for(const mode of ['name','id','aria','autocomplete','ancestor','child','editable','input','link','duplicate','foreign_row','wrong_tag','missing',
+    'unbound','foreign_node','wrong_direction','wrong_port','wrong_native_index','missing_guid','missing_opening','foreign_workflow','foreign_grid','foreign_view','foreign_tab','wrong_key','foreign_page']) {
+    const f=sortingInputMetadataFixture(),row=f.rows[0],cell=row.children[0];
+    if(['name','id','aria','autocomplete'].includes(mode))cell.attrs[mode==='aria'?'aria-label':mode]='secret';
+    if(mode==='ancestor')row.attrs.name='password';
+    if(mode==='child')f.page.add('span','secret','PRIVATE_CHILD',undefined,cell);
+    if(mode==='editable')cell.attrs.contenteditable='true';
+    if(mode==='input')f.page.add('input',null,'',undefined,cell).attrs.type='password';
+    if(mode==='link')f.page.add('a',null,'',undefined,cell).attrs.href='https://outside.test';
+    if(mode==='duplicate')f.page.add('td',cell.attrs['data-tid'],'Token',cell.box,row);
+    if(mode==='foreign_row'){cell.remove();f.page.add('table',null,'',row.box,f.container).append(cell);}
+    if(mode==='wrong_tag')cell.tagName='INPUT';
+    if(mode==='missing')cell.remove();
+    if(mode==='foreign_node')f.port.node_icon_class='bg-vendor-icon-calcdata';
+    if(mode==='wrong_direction')f.port.direction='output';
+    if(mode==='wrong_port')f.port.port=1;
+    if(mode==='wrong_native_index')f.port.native_index=1;
+    if(mode==='missing_guid')delete f.port.port_guid;
+    if(mode==='missing_opening')delete f.port.opening_operation_id;
+    if(mode==='foreign_workflow')f.binding.workflow_ref.prefix='MF;TF-2';
+    if(mode==='foreign_grid')f.body.attrs['data-tid']=f.base+'Foreign;tbl';
+    if(mode==='foreign_view')row.attrs['data-boundview']='other';
+    if(mode==='foreign_tab')f.page.tab.attrs.class='';
+    if(mode==='wrong_key')cell.ownText='Other';
+    if(mode==='foreign_page')for(const e of [f.form,...f.form.descendants()])if(e.attrs['data-tid'])
+      e.attrs['data-tid']=e.attrs['data-tid'].replace('TuneDataSourceMappingWizard','ColumnsMappingEngineOutputPortWizard');
+    const r=await f.read({output_column_page:{offset:0,limit:8},...(mode==='unbound'?{prepared_node_context:undefined}:{})});
+    assert.equal(r.status,'SUCCEEDED',mode+JSON.stringify(r.error));
+    assert.notEqual(r.output.wizard.output_columns?.page?.status,'complete_definition_page',mode);
+    assert.ok(!JSON.stringify(r).includes('PRIVATE_CHILD'),mode);assert.ok(!JSON.stringify(r).includes('PRIVATE_DATA_VALUE'),mode);
+    assert.deepEqual(f.page.events,[],mode);
+  }
+});
+
+test('Sorting input definition never exempts secret cells or incomplete rendered rows',async()=>{
+  for(const index of [0,1,2,3,4])for(const mode of ['name','id','aria','autocomplete','child','editable','input','link','duplicate','foreign_row','wrong_tag','missing']) {
+    const f=sortingInputMetadataFixture(),row=f.rows[0],cell=row.children[index];
+    if(['name','id','aria','autocomplete'].includes(mode))cell.attrs[mode==='aria'?'aria-label':mode]='secret';
+    if(mode==='child')f.page.add('span','secret','PRIVATE_CHILD',undefined,cell);
+    if(mode==='editable')cell.attrs.contenteditable='true';
+    if(mode==='input')f.page.add('input',null,'',undefined,cell).attrs.type='password';
+    if(mode==='link')f.page.add('a',null,'',undefined,cell).attrs.href='https://outside.test';
+    if(mode==='duplicate')f.page.add('td',cell.attrs['data-tid'],'PRIVATE_CHILD',cell.box,row);
+    if(mode==='foreign_row'){cell.remove();f.page.add('table',null,'',row.box,f.container).append(cell);}
+    if(mode==='wrong_tag')cell.tagName='INPUT';
+    if(mode==='missing')cell.remove();
+    const r=await f.read({output_column_page:{offset:0,limit:8}}),message=index+':'+mode;
+    assert.equal(r.status,'SUCCEEDED',message+JSON.stringify(r.error));
+    assert.notEqual(r.output.wizard.output_columns?.page?.status,'complete_definition_page',message);
+    assert.ok(!JSON.stringify(r).includes('PRIVATE_CHILD'),message);assert.ok(!JSON.stringify(r).includes('PRIVATE_DATA_VALUE'),message);
+    assert.deepEqual(f.page.events,[],message);
+  }
+  for(const mode of ['record_index','row_gap','clipped_cell','missing_neighbor','duplicate_neighbor']) {
+    const f=sortingInputMetadataFixture();
+    if(mode==='record_index')f.rows[0].attrs['data-recordindex']='9';
+    if(mode==='row_gap')f.rows[1].box.y+=2;
+    if(mode==='clipped_cell')f.rows[0].children[4].box.width+=2;
+    if(mode==='missing_neighbor')f.rows[1].remove();
+    if(mode==='duplicate_neighbor')f.page.add('td',f.rows[1].children[0].attrs['data-tid'],'OrderID',f.rows[1].children[0].box,f.rows[1]);
+    const r=await f.read({output_column_page:{offset:0,limit:8}});
+    assert.notEqual(r.output.wizard.output_columns?.page?.status,'complete_definition_page',mode);assert.deepEqual(f.page.events,[],mode);
+  }
+});
+
 test('Calculator output definition completes Token metadata without exposing dataset values',async()=>{
   for(const family of ['ColumnsMappingEngineOutputPortWizard','DerivedDataSourceOutputSocketWizard'])for(const name of ['OrdinaryName','Token']) {
     const f=calculatorOutputMetadataFixture(name,family),result=await f.read({output_column_page:{offset:0,limit:8}});

@@ -424,17 +424,18 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return visibleAncestors(element);
     });
     const sensitivePattern = /password|passwd|\bpwd\b|secret|token|credential|authorization|api[_ -]?key|private[_ -]?key|one[_ -]?time|\botp\b|парол|секрет|токен/i;
-    const calculatorMetadataTid=memoRead(element=>{
+    const definitionMetadataTid=memoRead(element=>{
       const tid=getTid(element)??'';
-      const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard|DerivedDataSourceOutputSocketWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_|colDataKind_|colDefaultUsageType_|colSourceDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
+      const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard|DerivedDataSourceOutputSocketWizard|TuneDataSourceMappingWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_|colDataKind_|colDefaultUsageType_|colUsageType_|colSourceDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
       if(!match || element.tagName!=='TD' || !sensitivePattern.test(tid))return tid;
-      const output=match[2]!=='CalcDataWizard';
-      if(output ? !['colName_','colDisplayName_','colDataKind_','colDefaultUsageType_','colSourceDisplayName_'].includes(match[3])
-        || definitionPrefix!==match[1] || preparedOutputPort?.direction!=='output'
-        || preparedOutputPort.node_icon_class!=='bg-vendor-icon-calcdata'
-        || preparedOutputPort.port!==0 || preparedOutputPort.native_index!==0
-        || typeof preparedOutputPort.port_guid!=='string' || !preparedOutputPort.port_guid
-        || typeof preparedOutputPort.opening_operation_id!=='string' || !preparedOutputPort.opening_operation_id
+      const input=match[2]==='TuneDataSourceMappingWizard',output=match[2]!=='CalcDataWizard';
+      const port=input?preparedInputPort:preparedOutputPort,usage=input?'colUsageType_':'colDefaultUsageType_';
+      if(output ? !['colName_','colDisplayName_','colDataKind_',usage,'colSourceDisplayName_'].includes(match[3])
+        || definitionPrefix!==match[1] || port?.direction!==(input?'input':'output')
+        || port.node_icon_class!==(input?'bg-vendor-icon-sorting':'bg-vendor-icon-calcdata')
+        || port.port!==0 || port.native_index!==0
+        || typeof port.port_guid!=='string' || !port.port_guid
+        || typeof port.opening_operation_id!=='string' || !port.opening_operation_id
         : !['colExpressionName_','colExpressionDisplayName_'].includes(match[3]))return tid;
       const base=match[1]+';WizrdMCF;',tab='MF;cntMain;cntWorkspace;Workspace;t.br;tb'+match[1].slice('MF;TF'.length);
       const prefix=base+match[2]+';';
@@ -448,12 +449,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         || names.length!==1 || labels.length!==1 || names[0].closest('table')!==row || labels[0].closest('table')!==row
         || names[0].tagName!=='TD' || labels[0].tagName!=='TD')return tid;
       const metadata=[names[0],labels[0]];
-      if(output)for(const key of ['colDataKind_','colDefaultUsageType_','colSourceDisplayName_']) {
+      if(output)for(const key of ['colDataKind_',usage,'colSourceDisplayName_']) {
         const cells=tids.get(prefix+key+match[4])??[];
         if(cells.length!==1 || cells[0].tagName!=='TD' || cells[0].closest('table')!==row)return tid;
         metadata.push(cells[0]);
       }
-      // Only technical-name suffixes of the owned definition cells are data.
+      // Only technical-name suffixes of owned Calculator/Sorting definition cells are data.
       // Never exempt secret attributes, ancestors, editors or dataset values.
       for(const cell of metadata) {
         const children=[...cell.querySelectorAll('*')];charge();
@@ -467,7 +468,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return prefix+match[3];
     });
     const safeAncestors=ancestorCheck(parent=>!parent.matches('input[type="password"],input[type="hidden"],input[type="file"]')
-      &&!sensitivePattern.test(['name','id','data-tid','autocomplete','aria-label'].map(name=>name==='data-tid'?calculatorMetadataTid(parent):parent.getAttribute(name)??'').join(' '))
+      &&!sensitivePattern.test(['name','id','data-tid','autocomplete','aria-label'].map(name=>name==='data-tid'?definitionMetadataTid(parent):parent.getAttribute(name)??'').join(' '))
       &&!(getTid(parent)??'').startsWith('LoginForm;'),document.body);
     const sensitive = memoRead(element => !safeAncestors(element));
     const short = (value, limit = 240) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, limit);
