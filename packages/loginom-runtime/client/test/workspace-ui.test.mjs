@@ -5012,6 +5012,36 @@ test('node overview rejects incomplete foreign clipped and unowned icon breadcru
     const {page}=await nodeOverviewContextFixture(mode);assert.notEqual((await page.observe()).node_context.status,'observed',mode);
   }
 });
+test('D47b native JS overview does not become a false workflow when its caption overflows',async()=>{
+ for(const mode of ['bound','unbound','foreign_tid','foreign_label','foreign_icon','hidden','hidden_attribute','zero_opacity','secret','duplicate_icon','duplicate_panel']) {
+  const {page,panel}=await nodeOverviewContextFixture(mode==='duplicate_panel'?mode:'valid');
+  const crumb=panel.children.at(-1),caption='URL query encoding '+('a'.repeat(32)),key=caption.replaceAll(' ','_');
+  crumb.attrs['data-tid']=crumb.attrs['data-tid'].replace(/Изменение$/,key);crumb.ownText=caption;
+  crumb.style.display='none';crumb.box={x:0,y:0,width:0,height:0};
+  crumb.children[0].attrs.class=mode==='foreign_icon'?'bg-vendor-icon-reformcolumns':'bg-vendor-icon-javascript';
+  crumb.children[0].box={x:0,y:0,width:0,height:0};
+  if(mode==='hidden')crumb.style.visibility='hidden';
+  if(mode==='hidden_attribute')crumb.attrs.hidden='';
+  if(mode==='zero_opacity')crumb.style.opacity='0';
+  if(mode==='secret')crumb.attrs['aria-label']='password';
+  if(mode==='duplicate_icon')page.add('span',null,'',{x:0,y:0,width:0,height:0},crumb).attrs.class='bg-vendor-icon-javascript';
+  const workflowPath=panel.children.slice(0,5).map(e=>({tid:e.attrs['data-tid'],label:e.ownText.trim()}));
+  const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:workflowPath}};
+  const reader=async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'graph',tid:'MF;TF-5;Graph;'+key,
+   ...(mode==='unbound'?{}:{navigation_node:{tid:mode==='foreign_tid'?crumb.attrs['data-tid']+'-foreign':crumb.attrs['data-tid'],label:mode==='foreign_label'?'Foreign':caption}})});
+  const result=await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:binding},reader);
+  assert.equal(result.output.node_context?.status==='observed',mode==='bound',mode);
+  if(mode!=='unbound')assert.notEqual(result.output.navigation_context.status,'observed',mode+' must not claim workflow');
+  if(mode==='bound'){
+   assert.equal(result.output.node_context.node.label,caption);
+   assert.equal(result.output.node_context.path.length,6);
+   assert.ok(result.output.workflow_navigation.control_ref);
+   assert.equal(result.output.ui.elements.some(e=>e.tid===crumb.attrs['data-tid']&&e.allowed_actions.length>0),false);
+  }
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('prepared node overview binds a multiline automatic key without trusting collapsed label text',async()=>{
  for(const mode of ['bound','unbound','foreign_key']) {
   const {page,panel}=await nodeOverviewContextFixture(),crumb=panel.children.at(-1);
