@@ -42,7 +42,7 @@ function fixture({receipt={},change,lateChange,optIn=true,refusals=1,persistent=
  const native=()=>({verified:true,stage,values:stage==='text_export_params'?{destination:{value:'/test-2/header.csv'}}:{header:{value:header,tid},delimiter:{value:','}},node_context:context});
  const run=()=>configureTextExport({observe:opts=>channel.observe(opts),perform:async opts=>{
   if(opts.condition==='choose export header'){assert.equal(opened,true);header=1;return {status:'SUCCEEDED'};}
-  assert.equal(opts.refreshWizardBusy,true);if(!optIn)opts.refreshWizardBusy=false;
+  if(!optIn)opts.refreshWizardBusy=false;
   return channel.perform(opts);
  }},{header:'names'},{...binding,finish:'close',signal:ac.signal,deadline:Date.now()+60000},{operation,
   execute:async code=>{

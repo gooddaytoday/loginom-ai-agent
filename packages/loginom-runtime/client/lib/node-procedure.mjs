@@ -807,32 +807,43 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const scanRefusal=timeScanRefusal(r,'ui.act');
           const graphRefusal=action.verb==='execute_graph_node'&&r.phase==='preconditions'
             &&r.error?.code==='GRAPH_EXECUTION_CONTEXT_CHANGED';
+          const nodeChanges=r.trace.filter(e=>e.event==='prepared_node_context_changed_before_gesture');
+          const before=nodeChanges[0]?.before,after=nodeChanges[0]?.after;
+          // The strict pre-gesture guard did not dispatch. Only a lock-only
+          // change of this same native graph node permits a full fresh read;
+          // neither the rejected snapshot nor its UI refs can be reused.
+          const nodeLockRefusal=!!preparedNodeContext&&r.phase==='preconditions'
+            &&r.error?.code==='PREPARED_NODE_CONTEXT_CHANGED'&&nodeChanges.length===1
+            &&before?.verified===true&&after?.verified===true&&before.surface==='graph'&&after.surface==='graph'
+            &&typeof before.locked==='boolean'&&typeof after.locked==='boolean'&&before.locked!==after.locked
+            &&JSON.stringify(canonical({...before,locked:false}))===JSON.stringify(canonical({...after,locked:false}))
+            &&JSON.stringify(canonical({...before,locked:false}))===JSON.stringify(canonical({...observed.prepared_node_context,locked:false}));
           // Only an opting-in source selector can prove a replaced native body.
           // This remains a new observation and bound attempt, never a raw retry.
           const bodyRefusal=r.phase==='preconditions'&&['UI_REFERENCE_STALE','UI_REFERENCE_OBSCURED'].includes(r.error?.code)
             &&bodyRefreshes===0&&typeof refreshReplacedBody==='function'
             &&refreshReplacedBody({receipt:r,observation:observed,action})===true;
-          const wizard=observed.wizard,after=r.output,control=observed.ui.elements.find(e=>e.ref===action.ref);
-          const covered=after?.ui?.elements?.filter(e=>e.tid===control?.tid);
+          const wizard=observed.wizard,masked=r.output,control=observed.ui.elements.find(e=>e.ref===action.ref);
+          const covered=masked?.ui?.elements?.filter(e=>e.tid===control?.tid);
           // An opting-in picker may wait for its own late loading mask only
           // after a matched no-effect refusal. A new read must clear every
           // blocker and rebind the same owner/field before another guarded act.
           const busyRefusal=refreshWizardBusy===true&&!!preparedNodeContext&&action.verb==='click'
             &&r.phase==='preconditions'&&r.error?.code==='UI_REFERENCE_OBSCURED'
-            &&wizard?.status==='observed'&&after?.wizard?.status==='observed'
-            &&['root_ref','root_tid','stage'].every(k=>wizard[k]&&wizard[k]===after.wizard[k])
-            &&[observed,after].every(s=>s.prepared_node_context?.surface==='wizard'&&s.prepared_node_context.tid===wizard.root_tid)
+            &&wizard?.status==='observed'&&masked?.wizard?.status==='observed'
+            &&['root_ref','root_tid','stage'].every(k=>wizard[k]&&wizard[k]===masked.wizard[k])
+            &&[observed,masked].every(s=>s.prepared_node_context?.surface==='wizard'&&s.prepared_node_context.tid===wizard.root_tid)
             &&control?.wizard_combo?.kind==='picker'&&control.wizard_combo.field?.root_ref===wizard.root_ref
             &&covered?.length===1&&covered[0].wizard_combo?.kind==='picker'
             &&covered[0].wizard_combo.field?.root_ref===wizard.root_ref
             &&covered[0].wizard_combo.field.name===control.wizard_combo.field.name
             &&covered[0].interaction?.state==='point_not_observed'
             &&covered[0].interaction.covering?.length===1&&covered[0].interaction.covering[0].tid===wizard.root_tid
-            &&after.ui.dialogs?.length===0&&after.ui.masks?.length===1
-            &&after.ui.masks[0].kind==='busy'&&after.ui.masks[0].ref===wizard.root_ref
-            &&after.ui.masks[0].target_tid===wizard.root_tid&&after.ui.masks[0].dialog_ref===null;
-          if(busyRefusal)assertContext(after,true);
-          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal&&!busyRefusal)throw error;
+            &&masked.ui.dialogs?.length===0&&masked.ui.masks?.length===1
+            &&masked.ui.masks[0].kind==='busy'&&masked.ui.masks[0].ref===wizard.root_ref
+            &&masked.ui.masks[0].target_tid===wizard.root_tid&&masked.ui.masks[0].dialog_ref===null;
+          if(busyRefusal)assertContext(masked,true);
+          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal&&!nodeLockRefusal&&!busyRefusal)throw error;
           if(bodyRefusal)bodyRefreshes++;
           const event = await entry('node_step_refresh_authorized', {
             step:operation.nodeStepSequence,internal_operation_id:r.operation_id,
@@ -842,6 +853,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             ...(bodyRefusal?{reason:'prepared_graph_body_replaced'}:{}),
             ...(scanRefusal?{reason:'read_scan_time_limit'}:{}),
             ...(graphRefusal?{reason:'graph_execution_context_changed'}:{}),
+            ...(nodeLockRefusal?{reason:'prepared_node_lock_changed',before:structuredClone(before),after:structuredClone(after)}:{}),
             ...(busyRefusal?{reason:'owned_wizard_busy_mask'}:{}),
           });
           if (event?.rejected_operation_id !== r.operation_id || event.retry !== attempt + 1
