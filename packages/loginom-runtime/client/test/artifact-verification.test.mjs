@@ -7,12 +7,12 @@ import {createHash} from 'node:crypto';
 import {createArtifactStore} from '../lib/artifacts.mjs';
 import {Page,runtime} from './support/executor-fixture.mjs';
 
-async function fixture({submissionFailure=false,name='sales.csv',bytes=Buffer.from('abc')}={}) {
+async function fixture({submissionFailure=false,name='sales.csv',bytes=Buffer.from('abc'),conflict=false}={}) {
   const directory=await mkdtemp(join(tmpdir(),'dock-verify-'));
   const sourcePath=join(directory,'source');await writeFile(sourcePath,bytes);
   const store=await createArtifactStore({directory:join(directory,'store')});
   const artifact=await store.admit({sourcePath,name,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),
-    upload:{directory:'/test',overwrite:'replace'}});
+    upload:{directory:'/test',overwrite:conflict?'reject':'replace'}});
   const page=new Page(),elements=page.elements.bind(page),snapshot=page.uiSnapshot.bind(page),locator=page.locator.bind(page);
   const tid=page.prefix+';FileStorageForm;colName_'+name;
   page.elements=()=>[...elements(),page.element(tid,{label:name,kind:'file'})];
@@ -39,18 +39,74 @@ async function fixture({submissionFailure=false,name='sales.csv',bytes=Buffer.fr
     if(page.failJournalPhase===record.phase){page.failJournalPhase=null;throw new Error('journal unavailable');}
     events.push(record);
   },execute:async code=>{
+    if(conflict&&code.includes('async function browserArtifactUpload'))return {
+      status:'FAILED',action_key:'artifact.upload',action_revision:'1',operation_id:'upload',phase:'submitted',
+      effect_possible:true,cleanup_complete:true,error:{code:'UPLOAD_PATH_CONFLICT',message:'UPLOAD_PATH_CONFLICT'},trace:[],
+      output:{upload_submitted:false,conflict_rejected:true,destination:'/test/'+name}};
     const result=await page.execute(code);
     if(page.dropReply && result.action_key==='artifact.download'){page.dropReply=false;throw new Error('response lost');}
     return result;
   }});
   const observed=await rt.observe();
-  await rt.upload({artifactId:artifact.artifact_id,grantId:artifact.upload.grant_id,observationId:observed.output.observation_id,operationId:'upload'});
+  await rt[conflict?'uploadDeliveredArtifact':'upload']({artifactId:artifact.artifact_id,grantId:artifact.upload.grant_id,
+    observationId:observed.output.observation_id,operationId:'upload',...(conflict?{deliveryOperationId:'delivery'}:{})});
   const request=async()=>{
     const row=await rt.observe();return {operationId:'upload',verificationId:'verify',observationId:row.output.observation_id,
       fileRef:row.output.ui.elements.find(item=>item.tid===tid).ref};
   };
-  return {rt,page,events,counts,request,cleanup:async()=>{await store.releaseUploads();await rm(directory,{recursive:true,force:true});}};
+  return {rt,page,events,counts,request,artifact,cleanup:async()=>{await store.releaseUploads();await rm(directory,{recursive:true,force:true});}};
 }
+
+for(const content of ['abc','bad','longer'])test('current server bytes settle an owned reject conflict: '+content,async()=>{
+ const f=await fixture({conflict:true});
+ try {
+  const request=await f.request();f.page.downloadBytes=content;
+  await assert.rejects(()=>f.rt.verifyArtifact(request),/pending upload browser/);
+  const result=await f.rt.verifyArtifact({...request,compareExisting:true});
+  const inspected=await f.rt.inspect({operationId:'upload'});
+  assert.equal(inspected.output.state,'resolved');assert.equal(inspected.output.outcome.output.upload_submitted,false);
+  assert.equal(inspected.output.outcome.status,content==='abc'?'SUCCEEDED':'FAILED');
+  assert.equal(result.output.bytes_verified,content==='abc');
+  assert.deepEqual(f.counts,{uploads:0,downloads:1,verifications:1});
+  if(content==='abc'){
+   const {verifyTextImportSource}=await import('../lib/text-import-node.mjs');
+   const outcome=inspected.output.outcome;
+   const source=verifyTextImportSource({source:{artifact_id:f.artifact.artifact_id,upload_operation_id:'upload'},settings:{}},
+    [{operation_id:'upload',artifact:f.artifact,outcome}],{complete:true,records:[{sequence:0,operation_id:'upload',
+     destination:f.artifact.upload.destination,artifact:f.artifact,outcome,cleanup_confirmed:true}]}).source;
+   assert.equal(source.destination,'/test/sales.csv');assert.equal(source.bytes,3);assert.equal(source.sha256,f.artifact.sha256);
+  }
+  assert.doesNotThrow(()=>f.rt.assertPreparationAllowed());
+  assert.deepEqual(await f.rt.verifyArtifact({...request,compareExisting:true}),result);
+ }finally{await f.cleanup();}
+});
+
+test('lost response during an existing-file comparison reconciles without another download',async()=>{
+ const f=await fixture({conflict:true});
+ try{
+  const request={...await f.request(),compareExisting:true};f.page.dropReply=true;
+  assert.equal((await f.rt.verifyArtifact(request)).error.code,'BROWSER_CALL_UNCERTAIN');
+  assert.throws(()=>f.rt.assertPreparationAllowed(),/action/);
+  const inspected=await f.rt.inspect({operationId:'upload'});
+  assert.equal(inspected.output.state,'resolved');assert.equal(inspected.output.outcome.status,'SUCCEEDED');
+  assert.deepEqual(f.counts,{uploads:0,downloads:1,verifications:1});
+  assert.equal((await f.rt.verifyArtifact(request)).status,'SUCCEEDED');
+ }finally{await f.cleanup();}
+});
+
+test('failed comparison with unconfirmed local cleanup keeps the runtime blocked',async()=>{
+ const f=await fixture({conflict:true});
+ try{
+  const request={...await f.request(),compareExisting:true};f.page.downloadBytes='bad';f.page.failDownloadRelease=true;
+  const result=await f.rt.verifyArtifact(request);
+  assert.equal(result.status,'AMBIGUOUS');assert.equal(result.cleanup_complete,false);
+  assert.equal(result.error.code,'TRANSFER_CLEANUP_FAILED');
+  assert.throws(()=>f.rt.assertPreparationAllowed(),/action/);
+  f.page.failDownloadRelease=false;
+  assert.equal((await f.rt.inspect({operationId:'upload'})).output.state,'resolved');
+  assert.deepEqual(f.counts,{uploads:0,downloads:1,verifications:1});
+ }finally{f.page.failDownloadRelease=false;await f.cleanup();}
+});
 
 test('verification hashes downloaded bytes once and completes the confirmed transfer',async()=>{
   const f=await fixture();
