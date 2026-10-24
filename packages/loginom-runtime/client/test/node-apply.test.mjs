@@ -21,6 +21,18 @@ function fixture({badPhase,badResult,failJournal,failAfter,signal}={}){
  const run=(r=request(),extra={})=>applyNode({request:r,operation,handlers,drivers,record,signal,now:()=>time,...extra});
  return {run,calls,records,operation,handlers,drivers,setTime:v=>{time=v}};
 }
+for(const mode of ['done','execute'])test('Import reports its observed Finish caption and an existing-node correction: '+mode,async()=>{
+ const f=fixture(),p=request();p.finish=mode;if(mode==='done')p.read.ports=[];
+ const finish=f.drivers.finish;
+ f.drivers.finish=async mode=>({...await finish(mode),node_label:'data.csv'});
+ const result=await f.run(p);
+ assert.equal(result.status,'SUCCEEDED');
+ assert.match(result.warnings.join(' '),/data\.csv/);
+ assert.match(result.warnings.join(' '),/target.label/);
+ assert.match(result.warnings.join(' '),/settings:\{\}/);
+ assert.match(result.warnings.join(' '),/node1/);
+ assert.deepEqual(await f.run(p),result);
+});
 test('full shell orders configuration before execution and binds empty fresh output',async()=>{
  const f=fixture(),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.equal(r.execution.status,'completed');assert.equal(r.output.ports[0].row_count,0);
  assert.deepEqual(f.calls,['source','target','mapping','open','configure','mapping','finish','execute','read']);
