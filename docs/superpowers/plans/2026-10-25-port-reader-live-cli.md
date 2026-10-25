@@ -177,6 +177,9 @@ Dirty проверяется существующим idempotent Save: повт�
 отсутствие новых Save. Это доказывает false до и после полного публичного чтения,
 а не непрерывную неизменность внутри RPC. Путь и контроллер прошли независимое ревью.
 
+Для wide-cell фикстур сохраняется native вид «Непрерывный» у целых полей:
+это убирает 100 ненужных правок UI, не меняя CSV, типы, строки и проверяемые лимиты.
+
 В `/user` наблюдалось 685 файлов: проверка новой загрузки после 27 прокруток
 отказала с `DOWNLOAD_CONTEXT_CHANGED` до скачивания. Закрытые jobs не возобновляются.
 Для оставшихся управляемых обычных проверок используется существующая собственная
@@ -188,18 +191,17 @@ Dirty проверяется существующим idempotent Save: повт�
 
 ## Checkpoint
 
-- Private artifacts/evidence: /tmp/loginom-port-live-20261025-gxg7qus9/; clean candidate4399/baseline9495 и отдельные diagnostic/diagnostic-fixed verified. Ordinary runtime не менялся; credentials вне git.
-- Device OAuth/models refresh и Luna/high, Sol/xhigh compiled smoke PASS. После Xorg09:49:38Z новый mainpatheec4b9dc exact3×4/Save/nativeclose/logout/ACK/window/PIDs PASS; первопричина X-сбоя неизвестна.
-- Interrupted densebfbca8db/seedSol92db50d8/multifacts7ab6486c/cartesian10242f6a quarantined с raw/audit; nativecleanup неизвестен. Старые Package1/user sessions не закрывать без точной принадлежности.
-- Luna lowliqa3b9fc4e и baselinef888bd65: все35×5/CSV1508bytes одногоhash/cleanup PASS. Candidate647779ms/baseline993830ms — один functional pair, не benchmark. Ранняя1d12ceba exportFAIL сохранена.
-- Cold lowliq обеих сборок: Import16fields/source/format/Filter/Sort/Reform/Export PASS; physical order переставляется после activation при autosync=true в обеих сборках, существующее отличие. OwnPendingDisconnect user:7514 адресно закрыта поexactpath; неизвестные сессии не трогали.
-- Zscore candidate91376509/baselinec62f14cc: независимые500rows/доставленныеcells/CSV45bytes/cleanup PASS; графы без Join/Filter, coveragegap. Candidate547408ms/baseline867405ms descriptive only. Initialcandidatef5f3setupFAIL сохранён.
-- Sliding candidatebe052d9f: initialnativefull+ordinary/updatedordinary6cells/CSV24bytes/cleanup PASS; updatednativefull/cold не проверены. Baselinecfad0d4d prepareFAIL/CALL_UNCERTAIN, guard retained:105s host короче120/125s browser, исходнаяUI-причина неизвестна.
-- Multifactscc1setupFAILgeneric; exactknowledgeprobe3bdaf2f9READY/ACK. Multifacts2a17108f MODELFAIL: выдуманныйskillpath/external_directory→permissionreject, nativeprepareсоздалdraft, Save/cleanupнеподтверждены. Не повторятьдоPASS.
-- Cartesianf8483eea: analytics/60ordinarycells/CSV50bytes/cleanup PASS; nativefull отказал на Sort ancestry, агент честно сообщил. Stringcounts40b0fed5:35ordinary+28nativefullcells/Int64bytes/CSV83bytes/cleanup PASS; blank отсутствует, cold не проверен.
-- CP1251 candidate84fceb3c values15/15/cleanupPASS; metadataDateНепрерывный vsdraftSPECДискретныйFAIL, readerточен. Multiline2618bc62 values15/15/cleanupPASS, такоежеdraftDatekindFAIL. JoinFiltera97945ca остановлен доExecute: Importdelimiter input UI_REFERENCE_OBSCURED, draft discarded/settings unchanged, nativepackagecleanup не доказан.
-- Fidelity00d5385a raw45cells PASS; reread послеSave отказал настаромbreadcrumb (код такойжеbaseline). Fidelityfbe5b334 raw45/Int64/realbits/−0/JSONredaction/20kdoubleLF/0,1,100/101доExecute PASS; public0/1из9, MCPmax отдельноdense. ProductCLI0/cleanupPASS; outerproviderGETaux1 исправлен минимальнымPOSTguard,3testsPASS.
-- Dense5b62053e raw100×10/public21/44292bytes,next46096/maxprefix21/6negative/cleanupPASS; independent review confirms serializer bytes4399. Actual Import+Calc validators coherent false-read_limit0rows отвергают именно requestedcoverage; Filteractuale4f3d067 позитив+обаcoherent4copyzero-rowfalse-limit отклоненыименноrequestedcoverage;rawunchanged.
-- Seeds Luna dcc1bccc и Sol fdf56b52 wrong10rows/Save/cleanupPASS; rendered prepared-task.json для отдельных modelcorrection попыток. Dates5ef5ffe4 two nativeOADate bytes доordinary PASS, cleanupPASS; auxposthocparser save-adviceFAIL исправляется без повторногоCLI.
-- Diagnostic4file77linepatch/151focused/actualserialized scope PASS; ownfaultaccount/admincleanupPASS. Earlyd1ef16f7SaveдоidentityFAILED/guard; correctedImport→Save→Filter c6b45eff cache0 expectedfault/restored/allsettled/all7dispose/recovery/normalcleanupPASS.
-- Diagnostic-fixed payload verified, operation selector/deadline scope testsPASS; fault-matrix141LOC selfcheck18+72negative+4held+24temporalMissPASS/reviewPASS. c03bd34e12cache/AsString plain/cancel/deadline×ports PASS/allsettled/released_after_proof/normalcleanup/PIDs[]. Disposeотдельнонепроверен. Boundary12 offlinecases+5negativePASS; rows-0ccab6eb0 preuploadWorkspaceChanged; rows-042262697 uploadAMBIGUOUS/downloadEpochChanged(685files/27scroll), обеquarantined; normaldirtyвisolatedаккаунтеlive. ReviewboundedcontinuationPASS; JoinFiltere4f3d067 Import/Filter[1,0]/Join/reread/Save/nativecleanup/PIDs[] PASS. Offline44/7TZ currentdecoderPASS/maxloopbody1. LinearRegression5f1e8a9b иKmeans8a92c705 CLI0/cleanupPASS, independent audit ожидает; RESTf1da5af8 initial200/503/2GET/cleanupPASS;repeatread[1,0]admissionFAIL(RESTreceiptIDsнесовместимыgenericretainedMappingSchemas,sourcebugестьbaseline),independentauditидёт. JSdae2ae05 CLI0/cleanupPASS,auditожидает. FidelityLunalive. Очередь: остальные модели/границы/18faults/датыTZ/dirty/freshness/Variant/cold.
+- Выполнение продолжается. Подробные проверенные результаты и ограничения: [живой отчёт](../../testing/loginom-ai-agent/port-output-live-2026-10-25.md).
+- Private artifacts/evidence: /tmp/loginom-port-live-20261025-gxg7qus9/; frozen ordinary payload verified, runtime/установка не менялись, секреты вне Git.
+- После Xorg-сбоя mainpatheec4b9dc exact3×4/Save/nativeclose/logout/ACK/window/PIDs PASS; первопричина Xorg не установлена, interrupted profiles quarantined.
+- 18 назначенных model attempts завершены с раздельными PASS/FAIL/gaps; Sol preview d5a9b0af выполняется, две correction-задачи ещё не запускались. Seeds Luna dcc1bccc/Sol fdf56b52 prepared-task.json готовы.
+- Lowliq обе версии и zscore обе версии: значения/CSV/cleanup PASS; cold пока только lowliq. REST reread admission несовместим с собственными receipt IDs уже в baseline. Multi-facts model permission FAIL; остальные gaps см. отчёт.
+- Fidelity Luna/Sol/controlled PASS; dense5b62053e max whole-row MCP prefix21/44292bytes,next46096/cleanup PASS; Import+Calc+обаFilter actual validators отвергают coherent false-read_limit.
+- JoinFiltere4f3d067 [1,0]/Join/reread/Save/cleanup PASS; dirtyab2a5879 false до/после2reads и SaveReplay без новых Save PASS; rows1 0c4e80d1 PASS.
+- Rows0 header-only три сбоя доreader; VariantIS c6d3f889 deliveryDISCOVERY_FILE_NOT_FOUND. Каждая попытка сохранена; пустой результат проверяется отдельным Filter без совпадений, не повтором upload доPASS.
+- Default Date5ef5ffe4 two native serials→ordinary PASS/cleanupPASS (aux parser failure записан отдельно). Offline44/7TZ+extra9999 PASS; Date46 live controller reviewed/selfchecks PASS, зоны ещё не запущены.
+- Diagnostic-fixed c03bd34e12cache/AsString plain/cancel/deadline×ports PASS/allsettled/recovery/cleanup. Dispose0 5b565b1d expectedfault/heldgate, nativecleanupBLOCKED. Dispose1bb8cc22f prepareFAILED; новый eb3a4f66 после адресной own-idle очистки выполняется.
+- Own fault account: 9 PendingDisconnect sessions адресно закрыты stockhelper; первый admin helper завершил native close, но Node не поддержал Bun observer (aux failure). Повтор Bun15b2d553 подтвердил0оставшихся/adminlogout/windowclose; исходныеBLOCKED не менялись, shareduser не затронут.
+- Оставшаяся controlled очередь: dispose, emptyFilter/10boundaries, VariantRB/DS, Date7TZ/native admission, nonfinite witness, foreign receipt admission, cold settings. Nativeforeignbinding/inactive guard недостижимы детерминированно текущим public API; не засчитывать другие отказы вместо них.
+- Private controllers: main-path.ts временно у resume_fault_controller (nonfinite adapter), cold-settings.mjs у diagnose_boundary_interrupt (readonly persisted settings); root review доlive, обычный runtime не менять.
+- Завершение: независимые raw audits/21model attempts, раздельный final report и gaps, diff--check/relative links/clean frozen worktrees. Без push/PR/install.
