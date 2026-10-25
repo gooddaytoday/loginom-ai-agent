@@ -4336,6 +4336,48 @@ function readRenderedInputMapping(observation) {
         }
         if(task.action.verb==='wizard_step') {
           const destination=stage=>Array.isArray(task.action.expected_stage)?task.action.expected_stage.includes(stage):stage===task.action.expected_stage;
+          // An unchanged saved Join may first open its input page while an
+          // upstream output is inactive. Keep every link in this disposable
+          // draft; this private read path never approves deleting lost links.
+          let savedJoinQuestionAnswered=false;
+          const continueSavedJoin=async observed=>{
+          if(task.preserve_join_mapping===true&&!savedJoinQuestionAnswered&&observed.ui.dialogs.length===1){
+            const dialog=observed.ui.dialogs[0],wizardRoot=postActionRoot;
+            const owned=s=>s.authenticated&&s.origin===current.origin&&s.loginom_build==='7.4.2'
+              &&same(s.workflow_ref,current.workflow_ref)&&same(s.package_identity,current.package_identity)
+              &&s.active_tab_ref===current.active_tab_ref&&same(s.active_identity,current.active_identity)
+              &&s.dom_epoch.document===current.dom_epoch.document&&s.wizard.status==='observed'
+              &&s.wizard.stage==='input_mapping'&&s.wizard.root_ref===current.wizard.root_ref
+              &&s.wizard.owner_context?.status==='observed'&&same(s.wizard.owner_context,current.wizard.owner_context)
+              &&same(s.prepared_node_context,current.prepared_node_context)
+              &&s.ui.dialogs.length===1&&s.ui.dialogs[0].ref===dialog.ref
+              &&s.ui.masks.every(m=>m.kind==='modal_background'&&m.ref===current.wizard.root_ref&&m.target_tid===current.wizard.root_tid&&!m.dialog_ref);
+            if(owned(observed)){
+              postActionRoot=dialog.ref;
+              try{
+                const prompt=await readUi(),title='Loginom 7.4.2';
+                const buttons=Object.entries({yes:'Удалить и продолжить',no:'Не удалять и продолжить',cancel:'Отмена'}).map(([name,label])=>
+                  prompt.ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name&&e.label===label&&e.signature?.dialog_ref===dialog.ref&&e.allowed_actions.includes('click')));
+                if(owned(prompt)&&prompt.ui.dialogs[0].title===title&&buttons.every(b=>b.length===1)
+                  &&prompt.ui.dialogs[0].text===title+' Обнаружены связи с несуществующими объектами. Вы хотите удалить все потерянные связи и продолжить? Удалить и продолжить Не удалять и продолжить Отмена'){
+                  const checked=await readUi();
+                  if(!owned(checked)||!same(prompt.ui.dialogs,checked.ui.dialogs)||!same(prompt.dom_epoch,checked.dom_epoch))
+                    fail('WIZARD_CONTEXT_CHANGED','The saved Join mapping question changed before its answer');
+                  const target=await checkedHandle(buttons[1][0],checked.ui.elements.find(e=>e.ref===buttons[1][0].ref),'click');
+                  if(!same(await boundNode(),current.prepared_node_context))fail('PREPARED_NODE_CONTEXT_CHANGED','Saved Join owner changed before continuing');
+                  const epoch=await page.evaluate(()=>{const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+                    if(!state?.observer)return null;state.captureMutations(state.observer.takeRecords());return {document:state.epoch,revision:state.revision};});
+                  if(!same(checked.dom_epoch,epoch))fail('UI_EPOCH_CHANGED','The saved Join question changed before continuing');
+                  savedJoinQuestionAnswered=true;timeout();mouseHeld=true;await page.mouse.click(target.point.x,target.point.y,{clickCount:1,button:'left'});mouseHeld=false;
+                  record('saved_join_mapping_preserved',{dialog_ref:dialog.ref,button:'msgbox;tlb;no',settings_applied:false});
+                }
+              }finally{postActionRoot=wizardRoot;}
+              observed=await readUi();
+            }
+          }
+          return observed;
+          };
+          observed=await continueSavedJoin(observed);
           const unchangedContext=fresh=>fresh.authenticated && fresh.origin===current.origin && fresh.loginom_build===current.loginom_build
             && same(fresh.workflow_ref,current.workflow_ref) && same(fresh.package_identity,current.package_identity)
             && same(fresh.active_identity,current.active_identity) && fresh.wizard.status==='observed'
@@ -4349,14 +4391,14 @@ function readRenderedInputMapping(observation) {
             if(!observed.ui.masks.length && observed.wizard.stage===current.wizard.stage
               && validation?.status==='observed' && validation.root_ref===current.wizard.root_ref) {
               // Confirm the owned error once more without issuing another gesture.
-              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await readUi();
+              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await continueSavedJoin(await readUi());
               if(unchangedContext(fresh) && !fresh.ui.masks.length && fresh.wizard.stage===current.wizard.stage
                 && same(calculatorValidation?fresh.wizard.calculator_validation:fresh.wizard.source_validation,validation)) {
                 observed=fresh;record(calculatorValidation?'wizard_calculator_validation_failed':'wizard_source_validation_failed',validation);
                 fail(calculatorValidation?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_SOURCE_VALIDATION_FAILED',validation.message);
               }
               observed=fresh;
-            } else { timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readUi(); }
+            } else { timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await continueSavedJoin(await readUi()); }
           }
           if(!unchangedContext(observed) || observed.ui.masks.length || !destination(observed.wizard.stage))
             fail('WIZARD_STEP_NOT_CONFIRMED','The requested destination stage was not confirmed after one click; inspect before retry');
@@ -4470,6 +4512,11 @@ function readRenderedInputMapping(observation) {
 
 export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
+  if(options.preserve_join_mapping!==undefined&&(options.preserve_join_mapping!==true||!options.prepared_node_context
+    ||options.mode!=='act'||options.action?.verb!=='wizard_step'||options.action.expected_stage!=='join'
+    ||options.snapshot?.wizard?.stage!=='input_mapping'||options.snapshot?.wizard?.owner_context?.status!=='observed'
+    ||options.snapshot?.prepared_node_context?.input_port||options.snapshot?.prepared_node_context?.output_port))
+    throw Error('Preserved Join mapping requires a bound input-to-Join node read');
   if(options.settlement_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
     ||!['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
     ||options.opening_timeout_ms!==undefined||!Number.isInteger(options.settlement_timeout_ms)
