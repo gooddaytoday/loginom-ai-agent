@@ -12,7 +12,7 @@ import * as contract from '../lib/node-read-contract.mjs';
 
 const isUnchangedTransformExecution=contract.isUnchangedTransformExecution??(()=>false);
 const workflow={workflow_id:'flow',prefix:'MF;TF',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
-function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=false,initialStage='join',missingNext=false,foreignAfterNext=false,unknownNext=false}={}){
+function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=false,initialStage='join',missingNext=false,foreignAfterNext=false,unknownNext=false,lostLinks=false,unknownAnswer=false}={}){
  const node={document_id:'doc',workflow_id:'flow',node_id:'saved'},calls=[],records=[];
  const request={operation_id:'saved-apply',contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
   target:{kind:'existing',type,ref:node},inputs:[],mode:type==='transform.join_data'?mode:'scalar',
@@ -33,7 +33,17 @@ function fixture(type,{savedMode='inner',mode='inner',foreign=false,unknown=fals
   async perform(options){
    if(state.wizard.stage==='input_mapping'){
     assert.ok(options.ready(state));assert.deepEqual({...options.resolve(state)},{verb:'wizard_step',ref:'next',expected_stage:'join'});
-    calls.push('next');if(unknownNext)throw Error('Unknown Next reply');wizard('join');
+    calls.push('next');if(unknownNext)throw Error('Unknown Next reply');
+    if(lostLinks){
+     state.ui.dialogs=[{text:'Обнаружены связи с несуществующими объектами.',controls:['yes','no','cancel']}];
+     state.ui.masks=[{kind:'modal_background',ref:'W'}];
+     // The real Next leaves the original input page masked by a portal. Only
+     // the private unchanged-read option can preserve links and complete it.
+     if(options.preserveJoinMapping!==true)throw Error('WIZARD_STEP_NOT_CONFIRMED');
+     calls.push('no');if(unknownAnswer)throw Error('Unknown No reply');
+     state.ui.dialogs=[];state.ui.masks=[];
+    }
+    wizard('join');
     if(foreignAfterNext){state.prepared_node_context.node_id='other';state.node_join.node_context.node_id='other';}
    }else graph();
   },async openOutputPort(){wizard('output_mapping');}};
@@ -142,4 +152,19 @@ for(const options of [{missingNext:true},{foreign:true},{foreignAfterNext:true},
  assert.notEqual(result.status,'SUCCEEDED');assert.equal(f.calls.includes('Execute'),false);
  if(options.foreign||options.missingNext||options.initialStage==='output_mapping')assert.equal(f.calls.includes('next'),false);
  assert.ok(f.calls.filter(c=>c==='next').length<=1);
+});
+
+test('D46 whole apply handles the observed same-page lost-links portal before the only Join Execute',async()=>{
+ const f=fixture('transform.join_data',{initialStage:'input_mapping',lostLinks:true}),result=await f.run();
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.deepEqual(f.calls,['select','open','next','no','close','baseline','Execute']);
+});
+test('D46 same-page portal still checks saved mode before any Execute',async()=>{
+ const f=fixture('transform.join_data',{initialStage:'input_mapping',lostLinks:true,mode:'left'}),result=await f.run();
+ assert.notEqual(result.status,'SUCCEEDED');assert.match(JSON.stringify(result),/Preserved join mode differs/);
+ assert.deepEqual(f.calls,['select','open','next','no','close']);
+});
+test('D46 whole apply never replays Next or its unknown No answer',async()=>{
+ const f=fixture('transform.join_data',{initialStage:'input_mapping',lostLinks:true,unknownAnswer:true}),result=await f.run();
+ assert.notEqual(result.status,'SUCCEEDED');assert.deepEqual(f.calls,['select','open','next','no']);
 });

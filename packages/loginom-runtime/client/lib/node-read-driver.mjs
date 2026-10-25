@@ -71,6 +71,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
     if(state.wizard.stage==='input_mapping'){
      const root=state.wizard.root_tid;
      await channel.perform({condition:'advance saved Join input page to its mode settings',initialObservation:state,
+      preserveJoinMapping:true,
       ready:s=>owned(s)&&s.wizard?.stage==='input_mapping'&&s.wizard.root_tid===root,
       identity:()=>({node:ctx.node,wizard_root:root}),resolve:s=>{
        const next=s.ui.elements.filter(e=>e.tid===root+';btnNext'&&e.allowed_actions.includes('wizard_step'));
