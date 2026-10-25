@@ -49,7 +49,7 @@ export function validateJoinInlineSources(configuration,native){
  return native.target_fields.filter(f=>!f.excluded&&f.source===null);
 }
 export function createJoinNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'transform.join_data',modes:['inner','left'],revision:'join-v4-internal-1',readback:joinConfigurationReadback,parameterSchema:joinParametersSchema,
+ type:'transform.join_data',modes:['inner','left'],revision:'join-v4-internal-2',readback:joinConfigurationReadback,parameterSchema:joinParametersSchema,
  validate:validateJoinParameters,preflight:preflightJoin,configureInputs:configureJoinInputs,
  configurationObservation:{condition:'join configuration page',readJoin:true,ready:joinReady},
  async configure(channel,p,{request}){
