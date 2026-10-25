@@ -6,6 +6,14 @@ import {assertActionOutcome} from '../../lib/action-catalog.mjs';
 export const build = '7.5.0-alpha+build.49202', origin = 'https://loginom.test';
 export const clone = value => JSON.parse(JSON.stringify(value));
 
+// Fake DOM traversal measures ownership/geometry, not selector speed under load.
+// Timing tests advance their own clock; separate pages never share elapsed time.
+export function fixtureClock() {
+  let elapsed = 0;
+  class Clock extends Date { static now() { return elapsed; } }
+  return { Date: Clock, advance(ms) { elapsed += ms; } };
+}
+
 // This small DOM is an external UI double, not a replacement of the production
 // observer/guards. Every test executes the full serialized browser capability.
 function matches(element, selector) {
@@ -98,7 +106,8 @@ class Handle {
   async dispose() { this.page.disposed++; }
 }
 export class Page {
-  constructor({ clock = Date } = {}) {
+  constructor({ clock } = {}) {
+    this.clock = clock === undefined ? fixtureClock() : null;
     this.document = new Document(); this.events = []; this.disposed = 0; this.location = { origin }; this.clickedPoints = []; this.playwrightBoxReads = 0;
     this.app = { Version: build };
     this.avatar = this.add('button', 'MF;cntMain;tlbMainToolbar;btnAvatar', '', { x: 950, y: 0, width: 30, height: 20 });
@@ -112,7 +121,7 @@ export class Page {
     }
     this.context = vm.createContext({ document: this.document, location: this.location, bg: { app: this.app },
       MutationObserver: MutationObserverFixture,
-      getComputedStyle: element => ({ display: 'block', visibility: 'visible', opacity: '1', transform:'none', zoom:'1', scale:'none', rotate:'none', borderLeftWidth:'0px', ...element.style }), Date: clock, Math });
+      getComputedStyle: element => ({ display: 'block', visibility: 'visible', opacity: '1', transform:'none', zoom:'1', scale:'none', rotate:'none', borderLeftWidth:'0px', ...element.style }), Date: clock ?? this.clock.Date, Math });
     this.keyboard = { type: async text => {
       this.events.push('keyboard_type'); const element = this.document.activeElement;
       element.value = this.selectedAll ? text : element.value + text; this.selectedAll = false;
