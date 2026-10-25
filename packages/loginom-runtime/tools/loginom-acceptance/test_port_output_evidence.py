@@ -46,6 +46,7 @@ class FullPortConsumerTests(unittest.TestCase):
         from test_full_read_evidence import FullReadTests
         request, events = FullReadTests().fixture()
         del events[0]['result']['output']['ports'][0]['filter_enabled']
+        events[0]['result']['output']['ports'][0]['freshness_basis']='completed_execution_port_source'
         self.assertTrue(verify_full_read(events, request, 8)['passed'])
 
 

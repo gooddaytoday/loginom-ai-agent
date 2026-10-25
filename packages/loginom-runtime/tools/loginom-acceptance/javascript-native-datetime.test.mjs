@@ -133,7 +133,7 @@ test('Date baseline digest tolerates normalized transport origin, never altered 
 
 test('native input value consumer accepts port source text and refuses altered fixture values',()=>{
  const fixture=javascriptNativeFixture('string');
- const table={row_count:fixture.rows,sample_rows:fixture.rows,sample_complete:true,precision:{numbers_verified:true,limitations:[]},limitations:[],
+ const table={row_count:fixture.rows,sample_rows:fixture.rows,sample_complete:true,freshness_basis:'completed_execution_port_source',precision:{numbers_verified:true,limitations:[]},limitations:[],
   schema:[{name:'Value',label:'Value',type:'string'}],sample:fixture.values.map(value=>[{type:'string',value,is_null:value===null,
    precision:value===null?'exact_null':'source_text',representation:'data_source_string'}])};
  assert.equal(verifyNativeInputUi(table,'string').verified,true);
@@ -166,6 +166,7 @@ for(const mode of ['pass','bad-civil','restoration-fails','return-fails'])test('
  let executeCount=0,captured;
  const table={...decodeTableOutput(r.raw,{formatProof:r.format_proof,readSettings:r.read_settings,expectedColumns:r.raw.columns,requireExactNumbers:true}),port_guid:'p'};
  delete table.filter_enabled;
+ table.freshness_basis='completed_execution_port_source';
  const source=readFileSync(new URL('./javascript-native-input-driver.mjs',import.meta.url),'utf8');
  const start=source.indexOf('export function createJavascriptNativeInputSupport');
  const create=vm.runInNewContext('('+source.slice(start).replace('export function','function')+')',{
