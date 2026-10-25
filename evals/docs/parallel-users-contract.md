@@ -178,3 +178,14 @@ supervisor cleanup for every prior attempt; missing or incomplete evidence fails
 closed without moving historical admin receipts. A published partial with durable
 `cleanupVerified=true` completes matching-owner release on re-entry and preserves
 any different owner.
+
+Terminal cancellation is scoped to surrendering the campaign's own resources.
+The historical creation→storage receipt chain and fresh pair/nonce/empty-storage
+observation establish resource ownership. Current exact username/userKind scope
+inventory only; proxy-object-ID equality across epochs is not an account-continuity
+proof. Terminal evidence records both observations and explicitly declares
+`releaseScope=owned-resources-only`, `accountIdentityContinuity=false` and
+`accountMutationAllowed=false`, alongside the existing deletion/admission bans.
+No preparation, account mutation, or storage deletion guard changes. Qualification
+uses an owned research pair restart, old preparation rejection, wrong-nonce and
+foreign-pair refusals; it does not recover historical account continuity for LAB-134.

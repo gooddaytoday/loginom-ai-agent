@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { parallelFixture } from "./helpers/parallel-fixture"
 import { loadSlots, parseSlots } from "../src/slots"
-import { createPair, destroyPair } from "../src/parallel-pair"
+import { createPair, destroyPair, readServerIdentity, inspectUserStorage, verifyParallelPair } from "../src/parallel-pair"
 import { acquireJudgeLease, globalLockRoot, readLeaseReceipt, readResourceReservation, writeLeaseReceipt } from "../src/lease"
 import { cancelUnusedVerification } from "../src/terminal-verification"
 
@@ -22,7 +22,7 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.EVAL_CLI_BIN)("u
   const options = { purpose: "research" as const, out: path.join(root, "evidence"), lockRoot: globalLockRoot }
   const pair = await createPair(file, options)
   console.error(`terminal native fixture: ${root}`)
-  const commandId = crypto.randomUUID(), journal = path.join(file.controller.stateDir, `verify-command-${commandId}.json`)
+  let commandId = crypto.randomUUID(), journal = path.join(file.controller.stateDir, `verify-command-${commandId}.json`)
   await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId, identity: pair.identity, slotIds: ["a"], phase: "unactivated" })
   const child = Bun.spawn([process.execPath, "--no-env-file", "-e", `
     const {acquireEnvironmentLeases}=await import('./src/slots');
@@ -60,12 +60,59 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.EVAL_CLI_BIN)("u
   await expect(cancel()).rejects.toThrow("TERMINAL_STORAGE_NOT_EMPTY")
   expect((await Bun.$`docker exec ${pair.identity.containerId} cat /workdir/UserStorage/eval-a/control`.quiet()).text()).toBe("preserve")
   await Bun.$`docker exec ${pair.identity.containerId} rm /workdir/UserStorage/eval-a/control`.quiet()
-  const result = await cancelUnusedVerification(file, { stateRoot: root, campaignId: "campaign" }, process.env.EVAL_CLI_BIN!, globalLockRoot)
+  let result = await cancelUnusedVerification(file, { stateRoot: root, campaignId: "campaign" }, process.env.EVAL_CLI_BIN!, globalLockRoot)
   expect(await readLeaseReceipt(result.slotProof)).toMatchObject({ terminalOnly: true, storageDeletionAllowed: false, nextAdmissionAllowed: false })
   expect(await Bun.file(receipt).text()).toBe(original)
   for (const key of [`server:${pair.identity.containerId}`, `profile:${file.slots[0]!.profileDir}`])
     expect((await readResourceReservation({ key, lockRoot: globalLockRoot }))?.state).toBe("released")
   expect(await cancelUnusedVerification(file, { stateRoot: root, campaignId: "campaign" }, process.env.EVAL_CLI_BIN!, globalLockRoot)).toEqual(result)
+  // Real epoch change on only this owned, already-released research pair.
+  // We do not claim account continuity: qualify surrender of owned resources,
+  // while leaving original account/preparation/storage receipts unchanged.
+  const historicalFiles = ["prepare-a.json", "user-a.json", "storage-a.json"]
+  const historical = await Promise.all(historicalFiles.map(name => Bun.file(path.join(file.controller.stateDir, name)).text()))
+  await verifyParallelPair(file, pair.identity)
+  await Bun.$`docker restart ${pair.identity.containerId} ${pair.identity.studioContainerId}`.quiet()
+  const current = await readServerIdentity(file)
+  expect(current.containerId).toBe(pair.identity.containerId)
+  expect(current.serverEpoch).not.toBe(pair.identity.serverEpoch)
+  await verifyParallelPair(file, current)
+  commandId = crypto.randomUUID(); journal = path.join(file.controller.stateDir, `verify-command-${commandId}.json`)
+  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId, identity: current, slotIds: ["a"], phase: "unactivated" })
+  const retain = Bun.spawn([process.execPath, "--no-env-file", "-e", `
+    const {acquireEnvironmentLeases}=await import('./src/slots');
+    const {readUserPreparation}=await import('./src/user-environment');
+    const {openLoginomAdmin}=await import('./src/loginom-admin');
+    const file=${JSON.stringify(file)},identity=${JSON.stringify(current)};
+    const e=await acquireEnvironmentLeases(file,1,identity,${JSON.stringify(journal)},${JSON.stringify(globalLockRoot)});
+    try {
+      let rejected=false;
+      try { await readUserPreparation(file,e.slots[0],file.controller.stateDir+'/prepare-a.secret.json'); }
+      catch(error) { if(error.message!=='USER_PREPARATION_CONFLICT') throw error; rejected=true; }
+      if(!rejected) throw Error('OLD_PREPARATION_ADMITTED');
+      const admin=await openLoginomAdmin(file,identity,{serverLease:e.server,binary:process.env.EVAL_CLI_BIN});
+      try { console.log(JSON.stringify(await admin.inspectUserAccount('eval-a'))); }
+      finally { await admin.dispose(); }
+    } finally { await e.slots[0].close();await e.server.close(); }
+  `], { cwd: path.resolve(import.meta.dir, ".."), stdout: "pipe", stderr: "pipe" })
+  const observedAccount = await new Response(retain.stdout).text(), retainErrors = await new Response(retain.stderr).text()
+  expect(await retain.exited, retainErrors).toBe(0)
+  expect(JSON.parse(observedAccount).objectId).not.toBe(JSON.parse(historical[1]!).objectId)
+  const nextReceipt = path.join(file.controller.stateDir, `verification-${commandId}.json`)
+  const nextFailure = { ...failure, commandId, journal, receipt: nextReceipt, identity: current }
+  await writeLeaseReceipt(nextReceipt, nextFailure); await writeLeaseReceipt(path.join(verificationDir, "receipt.json"), nextFailure)
+  await expect(inspectUserStorage(file, current, file.slots[0]!, crypto.randomUUID())).rejects.toThrow("USER_STORAGE_OWNERSHIP")
+  await expect(cancelUnusedVerification({ ...file, server: { ...file.server, network: "foreign-network" } },
+    { stateRoot: root, campaignId: "campaign" }, process.env.EVAL_CLI_BIN!, globalLockRoot)).rejects.toThrow()
+  expect((await readResourceReservation({ key: `server:${current.containerId}`, lockRoot: globalLockRoot }))?.state).toBe("retained")
+  result = await cancel()
+  const afterEpochProof = await readLeaseReceipt(result.slotProof)
+  expect(afterEpochProof).toMatchObject({ releaseScope: "owned-resources-only", accountIdentityContinuity: false,
+    accountMutationAllowed: false, storageDeletionAllowed: false, nextAdmissionAllowed: false })
+  expect(await Promise.all(historicalFiles.map(name => Bun.file(path.join(file.controller.stateDir, name)).text()))).toEqual(historical)
+  console.error(JSON.stringify({ qualification: "resource-only-after-owned-pair-restart", oldEpoch: pair.identity.serverEpoch,
+    currentEpoch: current.serverEpoch, oldObjectId: JSON.parse(historical[1]!).objectId, observedAccount: JSON.parse(observedAccount),
+    oldPreparationRefused: true, wrongNonceRefused: true, foreignPairRefused: true, accountContinuityClaimed: false }))
   // The public published-controller path consumes the same terminal proof and releases only its matching owner.
   const { runCampaign } = await import("../script/run-campaign")
   const harnessRoot = path.resolve(import.meta.dir, ".."), manifestFile = path.join(root, "manifest.json"), serverFile = path.join(root, "server.json")
@@ -99,4 +146,4 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.EVAL_CLI_BIN)("u
   await destroyPair(file, options)
   await rm(root, { recursive: true })
   expect(terminalProof).toMatchObject({ releaseScope: "owned-resources-only", accountIdentityContinuity: false, accountMutationAllowed: false })
-}, 120_000)
+}, 180_000)

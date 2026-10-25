@@ -102,9 +102,14 @@ export async function cancelUnusedVerification(file: SlotFile, scope: { stateRoo
     const storage = await inspectUserStorage(file, identity, lease.slot, prepared.nonce)
     if (storage.entries.length) throw new EvalFailure("TERMINAL_STORAGE_NOT_EMPTY", 2)
     const admin = await openLoginomAdmin({ ...file, controller: { ...file.controller, stateDir: adminRoot } }, identity, { serverLease: environment.server, binary })
+    let account: Awaited<ReturnType<typeof admin.inspectUserAccount>> | undefined
     let sessions: Awaited<ReturnType<typeof admin.inspectSessionInventory>> | undefined
     try {
-      if ((await admin.inspectUserAccount(lease.slot.username)).objectId !== owned.objectId) throw new EvalFailure("TERMINAL_STORAGE_OWNERSHIP", 2)
+      // Inventory boundary only: proxy IDs are not used to establish historical
+      // account continuity. This operation releases owned resources without
+      // mutating an account or deleting storage; the nonce/marker chain above
+      // proves storage ownership independently of this account observation.
+      account = await admin.inspectUserAccount(lease.slot.username)
       sessions = await admin.inspectSessionInventory()
       if (sessions.sessions.some(row => row.name.toLowerCase() === lease.slot.username.toLowerCase() || row.name.toLowerCase().startsWith(lease.slot.username.toLowerCase() + ":")))
         throw new EvalFailure("TERMINAL_SESSIONS_ACTIVE", 2)
@@ -128,6 +133,8 @@ export async function cancelUnusedVerification(file: SlotFile, scope: { stateRoo
     await writeLeaseReceipt(proof, { version: 2, kind: "unused-verify-cancellation", status: "confirmed", commandId: reservation.commandId,
       campaignId: scope.campaignId, slotId: lease.slot.id, leaseToken: lease.token, serverEpoch: identity.serverEpoch,
       processes: "confirmed", serverSessions: "confirmed", archive: "unchanged-clean", storageDeletionAllowed: false, nextAdmissionAllowed: false,
+      releaseScope: "owned-resources-only", accountIdentityContinuity: false, accountMutationAllowed: false,
+      accountObservation: account, historicalAccountObjectId: owned.objectId,
       terminalOnly: true, profileClean: true, ownedStorageEmpty: true, serverFilesClosed: true, backupEmpty: true, adminDisposed: true,
       storage, sessions: sessions!.source, adminFile, verification: verification.receipt })
     const serverProof = path.join(file.controller.stateDir, `terminal-${reservation.commandId}-server.json`)
