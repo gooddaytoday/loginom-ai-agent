@@ -44,14 +44,20 @@ async function closeOwnedPackage(page, options, deadline) {
     // a prompt, or promote its outcome from this diagnostic readback.
     if(closeStarted&&!receipt.native_close_readback) {
       receipt.native_close_readback={status:'unavailable'};
-      if(Date.now()<deadline)try {
-        receipt.native_close_readback=await page.evaluate(o=>{
-          const s=globalThis.__loginomDockCleanupV1,m=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree;
-          if(s?.document!==document||s.identity!==JSON.stringify(o))return {status:'identity_changed'};
-          return {status:'observed',done:s.done===true,closed:s.closed===true,failed:s.failed===true,result:s.result??'pending',
-            packages_after:m?.PackageNodes?.Count??null,original_tab_attached:document.contains(s.tab)};
-        },options);
-      } catch {}
+      const budget=deadline-Date.now();
+      if(budget>0) {
+        try {
+          // The decision is final; a slow read must not extend its original deadline.
+          receipt.native_close_readback=await Promise.race([
+            page.waitForTimeout(budget).then(()=>({status:'unavailable',reason:'deadline_exceeded'})),
+            page.evaluate(o=>{
+            const s=globalThis.__loginomDockCleanupV1,m=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree;
+            if(s?.document!==document||s.identity!==JSON.stringify(o))return {status:'identity_changed'};
+            return {status:'observed',done:s.done===true,closed:s.closed===true,failed:s.failed===true,result:s.result??'pending',
+              packages_after:m?.PackageNodes?.Count??null,original_tab_attached:document.contains(s.tab)};
+          },options)]);
+        } catch {}
+      } else receipt.native_close_readback.reason='deadline_exceeded';
     }
     return {...receipt,...extra,status,reason,completed_at:new Date().toISOString()};
   };

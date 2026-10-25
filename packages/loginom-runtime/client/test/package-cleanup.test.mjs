@@ -81,6 +81,10 @@ function fixture(overrides = {}) {
   });
   const page = {locator,
     async waitForTimeout(ms){
+      if(events.includes('close')){
+        (state.diagnosticWaitBudgets??=[]).push(ms);
+        return new Promise(resolve=>{const timer=setTimeout(resolve,ms);timer.unref?.();});
+      }
       assert.ok(ms>0&&ms<=100);events.push('idle-wait');state.clock+=state.idleElapsed??ms;
       if(state.clearBlocker){state.mask=false;state.dialog=false;}
       Object.assign(state,state.idleChange??{});
@@ -88,6 +92,7 @@ function fixture(overrides = {}) {
     },
     async evaluate(fn,arg){
       if(state.failDiagnostic&&fn.toString().includes("s?.document!==document"))throw Error('Diagnostic transport unavailable');
+      if(state.diagnosticDelay&&fn.toString().includes("s?.document!==document"))await new Promise(resolve=>setTimeout(resolve,state.diagnosticDelay));
       if(fn.toString().includes('m.ClosePackage(node, false, true)'))fail('close_request');
       if(fn.toString().includes('remaining:globalThis'))fail('close_readback');
       if(fn.toString().includes('m?.PackageNodes?.Count === 0'))fail('logout_inventory_readback');
@@ -399,4 +404,32 @@ test('D70 diagnostic transport failure cannot change cleanup refusal or repeat C
  assert.equal(r.status,'BLOCKED');assert.equal(r.reason,'DIAGNOSTIC_SAVE_PROMPT_MISSING');
  assert.equal(r.native_close_readback.status,'unavailable');assert.equal(r.unsaved_changes_discarded,false);
  assert.equal(f.events.filter(e=>e==='close').length,1);assert.equal(f.events.includes('logout'),false);
+});
+
+for(const elapsed of [0,27500])test('D70 delayed diagnostic respects original deadline after '+elapsed+' ms',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const f=fixture({modified:true,closeWithoutPrompt:true,modifiedReadElapsed:elapsed,diagnosticDelay:31000});
+ let result,settledAt;
+ const pending=f.run({diagnosticDiscard:true}).then(value=>{result=value;settledAt=f.state.clock;});
+ const flush=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
+ await flush();
+ const remaining=f.state.deadline-f.state.clock;
+ assert.equal(remaining,30000-elapsed);
+ f.state.clock+=remaining;t.mock.timers.tick(remaining);await flush();
+ const resultAtDeadline=result;
+ // Also settle the late read, proving it cannot replace the published refusal.
+ const late=31000-remaining;
+ f.state.clock+=late;t.mock.timers.tick(late);await pending;
+ t.diagnostic(JSON.stringify({diagnostic_delay_ms:31000,remaining_ms:remaining,receipt_elapsed_ms:settledAt-(f.state.deadline-30000)}));
+ assert.ok(resultAtDeadline,'diagnostic must not delay an accepted refusal beyond its original deadline');
+ assert.ok(settledAt<=f.state.deadline);
+ assert.deepEqual(f.state.diagnosticWaitBudgets,[remaining]);
+ assert.equal(result,resultAtDeadline);
+ assert.equal(result.status,'BLOCKED');assert.equal(result.reason,'DIAGNOSTIC_SAVE_PROMPT_MISSING');
+ assert.equal(result.native_close_readback.status,'unavailable');
+ assert.equal(result.native_close_readback.reason,'deadline_exceeded');
+ assert.equal(result.package_closed,false);assert.equal(result.logged_out,false);
+ assert.equal(result.unsaved_changes_discarded,false);
+ assert.equal(f.events.filter(e=>e==='close').length,1);
+ assert.equal(f.events.includes('discard'),false);assert.equal(f.events.includes('logout'),false);
 });
