@@ -1,5 +1,5 @@
 import path from "node:path"
-import { readdir } from "node:fs/promises"
+import { readdir, mkdir, lstat, realpath } from "node:fs/promises"
 import { openLoginomAdmin } from "./loginom-admin"
 import { inspectUserStorage, readServerIdentity, verifyParallelPair } from "./parallel-pair"
 import { assertProfileClean } from "./profile"
@@ -59,6 +59,31 @@ export async function cancelUnusedVerification(file: SlotFile, scope: { stateRoo
       matchingAdmins++
     }
     if (!matchingAdmins) throw new EvalFailure("TERMINAL_ADMIN_UNCONFIRMED", 2)
+    // Dedicated durable namespace binds every cancellation admin to this command.
+    // It exists before openLoginomAdmin can create a profile or start any process.
+    const adminRoot = path.join(file.controller.stateDir, `terminal-${verification.commandId}-admins`)
+    const binding = { version: 1, campaignId: scope.campaignId, commandId: verification.commandId, identity }
+    try {
+      await mkdir(adminRoot, { mode: 0o700 })
+      await writeLeaseReceipt(path.join(adminRoot, "operation.json"), binding)
+    } catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error }
+    try {
+      const info = await lstat(adminRoot)
+      if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || (info.mode & 0o777) !== 0o700 ||
+        await realpath(adminRoot) !== adminRoot || JSON.stringify(await readLeaseReceipt(path.join(adminRoot, "operation.json"))) !== JSON.stringify(binding))
+        throw Error("invalid cancellation binding")
+      for (const name of await readdir(adminRoot)) {
+        if (name === "operation.json") continue
+        if (!/^admin-[a-zA-Z0-9_-]+$/.test(name)) throw Error("unknown cancellation entry")
+        const source = path.join(adminRoot, name, "connection.json")
+        const prior = await readLeaseReceipt(source) as { status: string; transportDisconnect: string; identity: ServerIdentity;
+          processes?: { lifetime?: { producer_pid: number } } }
+        const pid = prior.processes?.lifetime?.producer_pid
+        if (prior.status !== "disposed" || prior.transportDisconnect !== "confirmed" || !Number.isSafeInteger(pid) || !pid || pid < 1 ||
+          JSON.stringify(prior.identity) !== JSON.stringify(identity)) throw Error("unknown cancellation admin")
+        await readStartupCleanup(source, pid)
+      }
+    } catch { throw new EvalFailure("TERMINAL_CANCELLATION_ADMIN_UNCONFIRMED", 2) }
     if (JSON.stringify(await readServerIdentity(file)) !== JSON.stringify(identity)) throw new EvalFailure("SERVER_EPOCH_CHANGED", 2)
     await verifyParallelPair(file, identity)
     await assertProfileClean(lease.slot.profileDir)
@@ -76,7 +101,7 @@ export async function cancelUnusedVerification(file: SlotFile, scope: { stateRoo
       throw new EvalFailure("TERMINAL_STORAGE_OWNERSHIP", 2)
     const storage = await inspectUserStorage(file, identity, lease.slot, prepared.nonce)
     if (storage.entries.length) throw new EvalFailure("TERMINAL_STORAGE_NOT_EMPTY", 2)
-    const admin = await openLoginomAdmin(file, identity, { serverLease: environment.server, binary })
+    const admin = await openLoginomAdmin({ ...file, controller: { ...file.controller, stateDir: adminRoot } }, identity, { serverLease: environment.server, binary })
     let sessions: Awaited<ReturnType<typeof admin.inspectSessionInventory>> | undefined
     try {
       if ((await admin.inspectUserAccount(lease.slot.username)).objectId !== owned.objectId) throw new EvalFailure("TERMINAL_STORAGE_OWNERSHIP", 2)

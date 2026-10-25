@@ -699,7 +699,7 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
       if (operation === "prepare-generation" && (!previous.repairing || previous.repairer !== repairer)) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
       if (operation === "cancel-unused-verify") {
         if (previous.final !== "partial" || !previous.published) throw Error("TERMINAL_CAMPAIGN_REQUIRED")
-        if (previous.cleanupVerified) return previous
+        if (previous.cleanupVerified) { await release(previous); return previous }
         if (owner?.campaignId !== manifest.id || previous.repairer !== repairer) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
         const { loadSlots } = await import("../src/slots")
         const { cancelUnusedVerification } = await import("../src/terminal-verification")

@@ -143,7 +143,7 @@ test("terminal cancellation refuses a nonterminal campaign before touching nativ
   } finally { await rm(root, { recursive: true }) }
 })
 
-test.each(["live", "admitted"] as const)("terminal cancellation refuses %s verify owner", async mode => {
+test.each(["live", "admitted", "interrupted-admin"] as const)("terminal cancellation refuses %s verify owner", async mode => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-terminal-live-")), fixture = await parallelFixture(root)
   const { acquireEnvironmentLeases } = await import("../src/slots")
   const { cancelUnusedVerification } = await import("../src/terminal-verification")
@@ -156,7 +156,19 @@ test.each(["live", "admitted"] as const)("terminal cancellation refuses %s verif
   } else {
     const child = Bun.spawn([process.execPath, "-e", `const {acquireEnvironmentLeases}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))}); const e=await acquireEnvironmentLeases(${JSON.stringify(fixture.slots)},1,${JSON.stringify(identity)},${JSON.stringify(command)},${JSON.stringify(fixture.lockRoot)}); await e.server.close();await e.slots[0].close()`], { stdout: "ignore", stderr: "pipe" })
     expect(await child.exited).toBe(0)
-    await writeLeaseReceipt(command, { version: 2, kind: "unactivated-preparation", commandId, identity, slotIds: ["a"], phase: "cli_admitted" })
+    if (mode === "admitted") await writeLeaseReceipt(command, { version: 2, kind: "unactivated-preparation", commandId, identity, slotIds: ["a"], phase: "cli_admitted" })
+    else {
+      await mkdir(path.join(fixture.slots.controller.stateDir, "admin-original"), { mode: 0o700 })
+      await writeLeaseReceipt(path.join(fixture.slots.controller.stateDir, "admin-original/connection.json"), {
+        status: "disposed", transportDisconnect: "confirmed", identity,
+        processes: { status: "confirmed", capture_complete: true, unknownProcesses: [], lifetime: { producer_pid: child.pid } },
+      })
+      const prior = path.join(fixture.slots.controller.stateDir, `terminal-${commandId}-admins/admin-interrupted`)
+      await mkdir(prior, { recursive: true, mode: 0o700 })
+      await writeLeaseReceipt(path.join(path.dirname(prior), "operation.json"), { version: 1, campaignId: "campaign", commandId, identity })
+      await writeLeaseReceipt(path.join(prior, "connection.json"), { status: "ready", identity,
+        processes: { lifetime: { producer_pid: 999999 } } })
+    }
   }
   try {
     await mkdir(path.join(root, "campaign/verification/check"), { recursive: true, mode: 0o700 })
@@ -167,7 +179,7 @@ test.each(["live", "admitted"] as const)("terminal cancellation refuses %s verif
     const failure = { version: 2, commandId, identity, journal: command, receipt, status: "quarantined", ready: false, reason: "USER_PREPARATION_CONFLICT" }
     await writeLeaseReceipt(receipt, failure)
     await writeLeaseReceipt(path.join(root, "campaign/verification/check/receipt.json"), failure)
-    await expect(cancelUnusedVerification(fixture.slots, { stateRoot: root, campaignId: "campaign" }, "/missing-cli", fixture.lockRoot)).rejects.toThrow(mode === "live" ? "BUSY" : "TERMINAL_VERIFY_USED")
+    await expect(cancelUnusedVerification(fixture.slots, { stateRoot: root, campaignId: "campaign" }, "/missing-cli", fixture.lockRoot)).rejects.toThrow(mode === "live" ? "BUSY" : mode === "admitted" ? "TERMINAL_VERIFY_USED" : "TERMINAL_CANCELLATION_ADMIN_UNCONFIRMED")
     expect((await readResourceReservation({ key: `server:${identity.containerId}`, lockRoot: fixture.lockRoot }))?.state).toBe("retained")
   } finally { await rm(root, { recursive: true }) }
 })

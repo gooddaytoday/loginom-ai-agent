@@ -587,3 +587,22 @@ test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("terminal cancellation requi
     expect(await Bun.file(fixture.config.batchEnvFile).exists()).toBe(false)
   } finally { await fixture.close() }
 })
+
+
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("terminal cancellation completes interrupted verified owner release and preserves foreign owner", async () => {
+  const fixture = await controlFixture()
+  try {
+    const reserved = await controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")
+    const final = { ...reserved, final: "partial" as const, published: true, cleanupVerified: true, repairer: "EvalBaseline" }
+    const journal = path.join(fixture.root, "control/journal.json"), owner = path.join(fixture.root, "owner.json")
+    await writeLeaseReceipt(journal, final)
+    const before = await Bun.file(journal).text()
+    expect(await runCampaign(fixture.manifestFile, fixture.serverFile, true, "cancel-unused-verify", "EvalBaseline")).toEqual(final)
+    expect(await Bun.file(owner).exists()).toBe(false)
+    await writeLeaseReceipt(owner, { campaignId: "foreign" })
+    expect(await runCampaign(fixture.manifestFile, fixture.serverFile, true, "cancel-unused-verify", "EvalBaseline")).toEqual(final)
+    expect(await readLeaseReceipt(owner)).toEqual({ campaignId: "foreign" })
+    expect(await Bun.file(journal).text()).toBe(before)
+    expect(await Bun.file(fixture.config.batchEnvFile).exists()).toBe(false)
+  } finally { await fixture.close() }
+})
