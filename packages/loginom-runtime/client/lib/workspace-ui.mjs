@@ -2729,6 +2729,7 @@ function readRenderedInputMapping(observation) {
       // Show Node leaves a node breadcrumb above the same graph. Expose only
       // its observed parent scenario for a prepared-node return operation.
       || !!definitionPrefix && workflowNavigation.status==='observed'&&workflowNavigation.control_ref===refOf(element)
+      || !!definitionPrefix && workflowNavigation.status==='observed'&&workflowNavigation.overflow?.trigger_ref===refOf(element)
       || !!definitionPrefix && nodeContext.status==='observed' && nodeContext.kind==='node'
         && nodeContext.path?.at(-2)?.ref===refOf(element)
       // E2E bg/selectors.ts:1068 and bg/helpers/wizard.ts:29: the node

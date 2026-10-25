@@ -5112,6 +5112,31 @@ test('D52b hidden main wizard owner requires complete native node and workflow m
  }
 });
 
+test('D52b native overflow anchor without ARIA or label is issued only through its owned metadata',async()=>{
+ for(const fault of ['valid','unbound','foreign','hidden','covered']) {
+  const {page,panel}=await nodeOverviewContextFixture(),crumbs=[...panel.children],flow=crumbs[4];
+  const path=crumbs.slice(0,5).map(e=>({tid:e.attrs['data-tid'],label:e.textContent.trim()}));
+  flow.style.display='none';flow.box={x:0,y:0,width:0,height:0};
+  const tid='MF;TF-5;cnrNaviMode;b-2',trigger=page.add('a',tid,'',{x:1300,y:41,width:24,height:24},panel);
+  if(fault==='hidden')trigger.style.display='none';if(fault==='covered')page.add('div',null,'',{x:1300,y:41,width:24,height:24});
+  const reader=async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'graph',tid:'MF;TF-5;Graph;Изменение',navigation_workflow:path[4],
+    ...(fault==='unbound'?{}:{workflow_overflow:{trigger_tid:fault==='foreign'?'foreign':tid,menu_tid:tid+';mn'}})});
+  const r=await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}}},reader);
+  const control=r.output.ui.elements.find(e=>e.tid===tid);
+  assert.equal(control?.allowed_actions.includes('click')===true,['valid','covered'].includes(fault),fault);
+  if(fault==='covered') {
+    assert.notEqual(control.interaction.state,'point_observed');
+    const acted=await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+      {mode:'act',expected_build:build,expected_origin:origin,operation_id:'covered-overflow',snapshot:r.output,action:{verb:'click',ref:control.ref},
+        prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}}},reader);
+    assert.equal(acted.status,'NOT_APPLIED');assert.equal(acted.effect_possible,false);
+  }
+  assert.equal(r.output.ui.elements.some(e=>e.tid===flow.attrs['data-tid']&&e.allowed_actions.length>0),false);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 function smallTableCoverageFixture() {
  const page=new Page(),key='MF;TF-1;ViewsForm;BrowseView';page.context.innerWidth=1000;page.context.innerHeight=800;
  const view=page.add('div',key,'',{x:10,y:50,width:950,height:700});
