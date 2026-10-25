@@ -5107,7 +5107,7 @@ test('D52b hidden main wizard owner requires complete native node and workflow m
     ...(fault==='workflow'?{}:{navigation_workflow:path[4]}),navigation_node:{tid:fault==='foreign_node'?'foreign':node.attrs['data-tid'],label:node.textContent.trim(),native_bound:fault!=='node'}});
   const r=await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
    {mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}}},reader);
-  assert.equal(r.output.wizard.owner_context.status==='observed',fault==='valid',fault);
+  assert.equal(r.output.wizard.owner_context.status==='observed',fault==='valid',fault+JSON.stringify({wizard:r.output.wizard,nav:r.output.workflow_navigation,context:r.output.prepared_node_context}));
   assert.equal(r.output.ui.elements.some(e=>[flow,node,settings].some(n=>n.attrs['data-tid']===e.tid)&&e.allowed_actions.length>0),false);
  }
 });

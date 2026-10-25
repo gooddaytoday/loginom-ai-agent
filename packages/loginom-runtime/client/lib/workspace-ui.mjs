@@ -3552,7 +3552,7 @@ function readRenderedInputMapping(observation) {
     preparedWorkflowPath:task.prepared_node_context?.workflow_ref.navigation_path??null,
     preparedNodeId:task.prepared_node_context?.node.node_id??null,
     preparedGraphTid:nodeContext?.surface==='graph'?nodeContext.tid:null,
-    preparedNavigationNode:nodeContext?.surface==='graph'||nodeContext?.surface==='wizard'&&nodeContext.input_port
+    preparedNavigationNode:nodeContext?.verified===true&&['graph','wizard'].includes(nodeContext.surface)
       &&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.navigation_node??null:null,
     preparedWorkflowOverflow:nodeContext?.verified===true&&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.workflow_overflow??null:null,
     preparedNavigationWorkflow:nodeContext?.verified===true&&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.navigation_workflow??null:null,
