@@ -111,6 +111,20 @@ export async function management(command: AgentCommand, args: string[], stdin?: 
     profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs, signal }
   const result = await superviseProcess(input)
   if (out) await writeLeaseReceipt(path.join(out, "cleanup.json"), { command: args.slice(0, 2), processes: result.processCleanup })
+  // Diagnostic only: never substitutes for process cleanup or connection-check proof.
+  if (out && args[0] === "loginom" && args[1] === "check") {
+    const receipt = parseJson(result.stdout.trim().split("\n").at(-1) ?? "") as
+      { ok?: unknown; code?: unknown; help?: { state?: unknown } } | null | undefined
+    await writeLeaseReceipt(path.join(out, "connection-check-outcome.json"), {
+      version: 1, kind: "connection-check-outcome", exitCode: result.exitCode,
+      timedOut: result.timedOut, interrupted: result.interrupted, sandboxRefused: Boolean(result.sandboxError),
+      stdoutLength: result.stdout.length, stderrLength: result.stderr.length,
+      jsonShape: receipt === undefined ? "invalid" : receipt === null ? "null" : Array.isArray(receipt) ? "array" : typeof receipt,
+      predicates: { exitCodeZero: result.exitCode === 0, sandboxAccepted: !result.sandboxError,
+        withinTimeout: !result.timedOut, uninterrupted: !result.interrupted,
+        okTrue: receipt?.ok === true, connectionValid: receipt?.code === "LOGINOM_CONNECTION_VALID", helpReady: receipt?.help?.state === "ready" },
+    })
+  }
   if (result.processCleanup.status !== "confirmed")
     throw new EvalFailure(`Management cleanup failed: ${result.processCleanup.error ?? "unconfirmed"}`, 1)
   if (out && command.env.LOGINOM_AI_AGENT_CLI_PROFILE)

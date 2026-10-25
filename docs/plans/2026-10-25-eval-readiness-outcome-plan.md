@@ -1,0 +1,11 @@
+# Management readiness outcome evidence
+
+LAB-170's standalone verify b0d5 failed the existing composite Help readiness guard after confirmed management process cleanup. The original outcome was not persisted, so the exact historical failing predicate cannot be reconstructed. This change does not claim to repair that historical response.
+
+Preserve the existing cleanup receipt first. For loginom check only, then save a private, versioned diagnostic outcome with exit status, timeout/interruption/sandbox flags, output lengths, last-line JSON shape and the seven existing admission predicates. Never copy stdout, stderr, arbitrary parsed strings or sandbox errors. This diagnostic is not a connection-check or cleanup proof and changes no readiness thresholds, timeouts, parsing semantics, process supervision or admission rules. Existing connection-check.json remains success-only.
+
+TDD: public management fixtures first fail due to the missing outcome receipt; implementation then passes. Cover positive, nonzero exit, null/missing/invalid payload, trailing logs, arrays/string payloads, secret canaries, timeout and interruption. Run the entire profile test file and typecheck. Independently review before accepting the candidate.
+
+Delivery: create a clean child checkout of exact55; preserve that checkout and all historical receipts. Under native controller lock, with parked EvalRunner, inactive batch, matching ownership/boot/deadline and no other active repair, switch the three config source fields and both service source paths coherently, with backups and rollback. Never restart/reset-failed batch. Read back exact clean SHA, config and unit paths, original results and command hashes.
+
+Then delegate one native verify (new directory) and, only after successful confirmed cleanup/release, one resume to the same EvalRunner. Existing native reconciliation must qualify b0d5's own confirmed management/admin evidence and all session/storage/archive conditions; no fabricated binding or manual release. If readiness fails, collect the new diagnostic and personally investigate the concrete failure. Preserve all six results, generation, pins and quality; repair itself never updates lastProgressAt. Keep wakeups until normal final delivery.
