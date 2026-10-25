@@ -195,7 +195,8 @@ async function closeOwnedPackage(page, options, deadline) {
         if ([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)) return {reason:'DIALOG_OR_OPERATION_OPEN'};
       }
       if(Date.now()>=deadline)return {reason:'CLEANUP_DEADLINE_EXCEEDED'};
-      const state = globalThis.__loginomDockCleanupV1 = {identity, document, tab:prepared.tab, done:false, closed:false};
+      const state = globalThis.__loginomDockCleanupV1 = {identity, document, tab:prepared.tab,
+        connection:m.FServerConnection,serverSession:m.FServerConnection.Session,done:false,closed:false};
       Promise.resolve().then(() => m.ClosePackage(node, false, true)).then(value => {
         state.closed = value === true && m.PackageNodes.Count === 0;
         state.result=value===true?'true':value===false?'false':'other';
@@ -293,10 +294,17 @@ async function closeOwnedPackage(page, options, deadline) {
     if ((await at('MF;AppMenuForm;p.h;p.t').innerText({timeout:remaining()})).trim() !== account) return finish('BLOCKED', 'LOGOUT_ACCOUNT_CHANGED');
     // Native close already removed every package; logout cannot discard work.
     receipt.stage = 'logout_inventory_readback';
-    if (!await page.evaluate(expected => {
+    const logoutGuard = await page.evaluate(o => {
       const m = globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree;
-      return m?.PackageNodes?.Count === 0 && m.FServerConnection.UserName === expected;
-    }, account)) return finish('BLOCKED', 'LOGOUT_INVENTORY_CHANGED');
+      const state = globalThis.__loginomDockCleanupV1;
+      // Close may await native callbacks. Its original session must still own
+      // this tail even when the replacement has the same account and no package.
+      if(state?.document!==document||state.identity!==JSON.stringify(o)
+        ||state.connection!==m?.FServerConnection||!state.serverSession
+        ||state.serverSession!==m?.FServerConnection?.Session)return 'LOGOUT_SESSION_CHANGED';
+      return m?.PackageNodes?.Count === 0 && m.FServerConnection.UserName === o.account ? null : 'LOGOUT_INVENTORY_CHANGED';
+    }, options);
+    if(logoutGuard)return finish('BLOCKED',logoutGuard);
     receipt.stage = 'logout_click';
     await at('MF;AppMenuForm;btnLogOut').click({timeout:remaining()});
     receipt.stage = 'login_form_wait';

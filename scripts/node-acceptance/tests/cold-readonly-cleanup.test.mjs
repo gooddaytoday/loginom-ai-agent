@@ -10,6 +10,33 @@ const body=source.slice(source.indexOf('} finally {\n  // Cold teardown:')+11,so
 const run=new (Object.getPrototypeOf(async function(){}).constructor)('f',
  `const {state,saved,session,config,makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode,rawExecute,record,page,writeFile,join,args,context}=f;const signals=[],handlers=[];const process={off(){}};${body.slice(0,body.lastIndexOf('}'))}`);
 const path='/own/saved.lgp';
+
+const catchStart=source.indexOf('} catch(error) {\n  state.failure=');
+const catchEnd=source.indexOf('} finally {\n  // Cold teardown:',catchStart);
+const handleFailure=new Function('state','config','loginPassword','error',source.slice(catchStart+'} catch(error) {'.length,catchEnd));
+for(const scenario of ['fallback error','prepared reason','preclassified reason'])test('cold refusal redacts known secrets before recording '+scenario,async()=>{
+ const {makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode}=await import('../../../packages/loginom-runtime/client/lib/package-cleanup.mjs');
+ const config={api_key:'SYNTHETIC_API_KEY_CANARY',loginom_url:'http://loginom.invalid/app/',workflow_profile:{loginom_user:'own'}};
+ const loginPassword='SYNTHETIC_PASSWORD_CANARY',reason=`Open failed: ${config.api_key}; ${loginPassword}`;
+ const error=Error(reason),state={openAttempted:true,openDeadline:Date.now()};
+ if(scenario==='prepared reason')state.prepared={status:'NOT_READY',reason,effect_possible:true};
+ if(scenario==='preclassified reason'){
+  state.prepared={status:'NOT_READY',reason,effect_possible:true};
+  state.openFailure={status:'NOT_READY',reason};
+ }
+ assert.throws(()=>handleFailure(state,config,loginPassword,error),e=>e===error);
+ const writes=new Map(),records=[];
+ await run({state,saved:{path},session:'own-session',config,makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode,page:{},
+  rawExecute:async()=>({status:'BLOCKED',reason:'FAILED_OPEN_OWNER_UNCONFIRMED',package_closed:false,logged_out:false}),
+  record:async event=>records.push(event),writeFile:async(name,body)=>writes.set(name,JSON.parse(body)),join:(...p)=>p.join('/'),
+  args:{output:'cold'},context:{close:async()=>{}}});
+ const result=writes.get('cold/result.json'),redacted='Open failed: [REDACTED]; [REDACTED]';
+ assert.equal(result.error,redacted);assert.equal(result.reason,redacted);assert.equal(result.open_failure.reason,redacted);
+ assert.equal(result.status,'FAIL');assert.equal(result.cleanup.status,'BLOCKED');
+ const recorded=JSON.stringify({result,records});
+ assert.ok(!recorded.includes(config.api_key)&&!recorded.includes(loginPassword));
+});
+
 const prepared={status:'READY',document_id:'own-document',package_ref:{path},workflow_ref:{tab_tid:'own-tab',
  navigation_path:[{label:'Saved (только чтение)'}]}};
 

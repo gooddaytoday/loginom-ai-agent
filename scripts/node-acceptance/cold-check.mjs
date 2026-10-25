@@ -411,7 +411,10 @@ page = context.pages()[0]
   state.failure=state.cancelled?"COLD_CANCELLED":String(error?.message??error)
   if(state.openAttempted&&state.prepared?.status!=='READY'&&!state.openFailure)
     state.openFailure={status:state.prepared?.status??'UNCONFIRMED',reason:state.prepared?.reason??state.failure}
-  for(const secret of [config.api_key,loginPassword].filter(Boolean))state.failure=state.failure.split(secret).join('[REDACTED]')
+  for(const secret of [config.api_key,loginPassword].filter(Boolean)){
+    state.failure=state.failure.split(secret).join('[REDACTED]')
+    if(state.openFailure)state.openFailure.reason=String(state.openFailure.reason).split(secret).join('[REDACTED]')
+  }
   if (!state.cancelled) throw error
 } finally {
   // Cold teardown: one native cleanup, then browser, including cancellation.

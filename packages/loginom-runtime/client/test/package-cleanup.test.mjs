@@ -132,6 +132,28 @@ test('saved owned package closes with native guards, tabs disappear, then logout
   const again=await f.run();assert.equal(again.reason,'CLEANUP_ALREADY_ATTEMPTED');assert.equal(f.events.filter(e=>e==='close').length,1);
 });
 
+for(const mode of ['saved','readonly','diagnostic discard'])for(const changedAt of ['native Close','logout account readback'])
+test('cleanup refuses a replacement server session after '+changedAt+' for '+mode,async()=>{
+ const f=fixture({readonly:mode==='readonly',modified:mode==='diagnostic discard'});
+ const m=f.context.bg.app.Application.FInstance.FMainForm.FMapTree;
+ const foreignSession={marker:'foreign-session'};
+ if(changedAt==='native Close'){
+  const close=m.ClosePackage;
+  m.ClosePackage=async(...args)=>{const result=await close(...args);m.FServerConnection.Session=foreignSession;return result;};
+ }else{
+  const locator=f.page.locator;
+  f.page.locator=query=>{
+   const target=locator(query),read=target.innerText;
+   target.innerText=async(...args)=>{const text=await read(...args);if(query.includes('MF;AppMenuForm;p.h;p.t'))m.FServerConnection.Session=foreignSession;return text;};
+   return target;
+  };
+ }
+ const result=await f.run({diagnosticReadOnly:mode==='readonly',diagnosticDiscard:mode==='diagnostic discard'});
+ assert.equal(result.status,'BLOCKED');assert.equal(result.reason,'LOGOUT_SESSION_CHANGED');
+ assert.equal(result.package_closed,true);assert.equal(result.logged_out,false);
+ assert.equal(f.events.filter(e=>e==='close').length,1);assert.equal(f.events.includes('logout'),false);
+});
+
 for(const blocker of ['mask','dialog'])test('cold cleanup waits read-only for a transient '+blocker+' before one native close/logout',async()=>{
  const f=fixture({[blocker]:true,clearBlocker:true,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
  assert.equal(r.status,'SUCCEEDED');assert.equal(r.package_closed,true);assert.equal(r.logged_out,true);
@@ -434,7 +456,7 @@ for(const elapsed of [0,27500])test('D70 delayed diagnostic respects original de
  assert.equal(f.events.includes('discard'),false);assert.equal(f.events.includes('logout'),false);
 });
 
-for(const fault of ['none','dirty','foreign path','foreign account','connection','existing inventory','old tab','not submitted','wrong request','readonly','server session','foreign document','two packages','unknown mode','reserve account','expired','session changes during read','foreign window','own hidden picker','own active picker','foreign hidden picker'])test('D56c failed Open uses only the new owned package: '+fault,async()=>{
+for(const fault of ['none','dirty','foreign path','foreign account','connection','existing inventory','old tab','not submitted','wrong request','readonly','server session','foreign document','two packages','unknown mode','reserve account','expired','session changes during read','session changes after close','foreign window','own hidden picker','own active picker','foreign hidden picker'])test('D56c failed Open uses only the new owned package: '+fault,async()=>{
  const {makeFailedOpenCleanupCode}=await import('../lib/package-cleanup.mjs');
  const f=fixture({modified:fault==='dirty',readonly:fault==='readonly'}),c=f.context;
  const m=c.bg.app.Application.FInstance.FMainForm.FMapTree;
@@ -471,11 +493,14 @@ for(const fault of ['none','dirty','foreign path','foreign account','connection'
  const code=makeFailedOpenCleanupCode({...options,operationId:'prepare'});
  if(fault==='expired'){const deadline=Number(code.match(/deadline=(\d+)/)[1]);c.Date=class extends Date {static now(){return deadline;}};}
  if(fault==='session changes during read'){const read=m.FServerConnection.Session.IsPackageModified;m.FServerConnection.Session.IsPackageModified=async()=>{const result=await read();m.FServerConnection.Session={};return result;};}
+ if(fault==='session changes after close'){const close=m.ClosePackage;m.ClosePackage=async(...args)=>{const result=await close(...args);m.FServerConnection.Session={};return result;};}
  const result=await vm.runInContext('('+code+')',c)(f.page);
  const success=['none','readonly','own hidden picker'].includes(fault);
  assert.equal(result.status,success?'SUCCEEDED':'BLOCKED',JSON.stringify(result));
- assert.equal(result.package_closed,success);assert.equal(result.logged_out,success);
- assert.equal(f.events.includes('close'),success);assert.equal(f.events.includes('discard'),false);
+ const closed=success||fault==='session changes after close';
+ assert.equal(result.package_closed,closed);assert.equal(result.logged_out,success);
+ assert.equal(f.events.includes('close'),closed);assert.equal(f.events.includes('discard'),false);
+ if(fault==='session changes after close'){assert.equal(result.reason,'LOGOUT_SESSION_CHANGED');assert.equal(f.events.includes('logout'),false);}
  if(fault==='dirty')assert.equal(result.reason,'UNSAVED_CHANGES');
 });
 
