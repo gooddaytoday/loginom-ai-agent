@@ -606,3 +606,103 @@ test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("terminal cancellation compl
     expect(await Bun.file(fixture.config.batchEnvFile).exists()).toBe(false)
   } finally { await fixture.close() }
 })
+
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("reserve persists authenticated initial progress before failed preflight and keeps it on retry", async () => {
+  const fixture = await controlFixture()
+  const initial = new Date(Date.now() - 3600000).toISOString()
+  const api = Bun.serve({ port: 0, fetch() { return Response.json({ id: "issue", created_at: initial, status: "in_progress" }) } })
+  try {
+    await Bun.write(fixture.config.multica.tokenFile, "fixture-token", { mode: 0o600 })
+    await writeLeaseReceipt(fixture.serverFile, { ...fixture.config,
+      multica: { ...fixture.config.multica, url: `http://127.0.0.1:${api.port}` } })
+    await Bun.write(path.join(fixture.root, "preflight.ts"), "process.exit(2)")
+    const args = [process.execPath, "--no-env-file", path.resolve(import.meta.dir, "../script/run-campaign.ts"),
+      "--manifest", fixture.manifestFile, "--server", fixture.serverFile, "--operation", "reserve", "--initial-progress-at", initial]
+    const first = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" })
+    await new Response(first.stderr).text()
+    expect(await first.exited).toBe(2)
+    const journalFile = path.join(fixture.root, "control/journal.json")
+    expect(await readLeaseReceipt(journalFile)).toMatchObject({ lastProgressAt: Date.parse(initial), attempts: [], batches: [] })
+    expect(await Bun.file(path.join(fixture.root, "owner.json")).exists()).toBe(false)
+    expect(await readLeaseReceipt(path.join(fixture.root, "control/manifest.json"))).toEqual(fixture.manifest)
+    await Bun.write(path.join(fixture.root, "preflight.ts"), "process.exit(0)")
+    const retried = await controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")
+    expect(retried.lastProgressAt).toBe(Date.parse(initial))
+    expect(retried.batches).toEqual([])
+  } finally { api.stop(true); await fixture.close() }
+})
+
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1").each(["foreign-issue", "wrong-date", "final", "unavailable", "future"])(
+  "anchored reserve rejects %s without a journal or owner", async condition => {
+    const fixture = await controlFixture()
+    const initial = new Date(Date.now() + (condition === "future" ? 3600000 : -3600000)).toISOString()
+    const api = Bun.serve({ port: 0, fetch() {
+      if (condition === "unavailable") return new Response(null, { status: 503 })
+      return Response.json({ id: condition === "foreign-issue" ? "another" : "issue",
+        created_at: condition === "wrong-date" ? new Date(0).toISOString() : initial,
+        status: condition === "final" ? "in_review" : "in_progress" })
+    } })
+    try {
+      await Bun.write(fixture.config.multica.tokenFile, "fixture-token", { mode: 0o600 })
+      await writeLeaseReceipt(fixture.serverFile, { ...fixture.config,
+        multica: { ...fixture.config.multica, url: `http://127.0.0.1:${api.port}` } })
+      const child = Bun.spawn([process.execPath, "--no-env-file", path.resolve(import.meta.dir, "../script/run-campaign.ts"),
+        "--manifest", fixture.manifestFile, "--server", fixture.serverFile, "--operation", "reserve", "--initial-progress-at", initial],
+        { stdout: "pipe", stderr: "pipe" })
+      await new Response(child.stderr).text()
+      expect(await child.exited).toBe(2)
+      for (const name of ["control/journal.json", "owner.json", "preflights.json"])
+        expect(await Bun.file(path.join(fixture.root, name)).exists()).toBe(false)
+    } finally { api.stop(true); await fixture.close() }
+  })
+
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("expired anchored reserve preserves deadline and refuses unanchored retry before preflight", async () => {
+  const fixture = await controlFixture()
+  const initial = new Date(Date.now() - 86400001).toISOString()
+  const api = Bun.serve({ port: 0, fetch() { return Response.json({ id: "issue", created_at: initial, status: "in_progress" }) } })
+  try {
+    await Bun.write(fixture.config.multica.tokenFile, "fixture-token", { mode: 0o600 })
+    await writeLeaseReceipt(fixture.serverFile, { ...fixture.config,
+      multica: { ...fixture.config.multica, url: `http://127.0.0.1:${api.port}` } })
+    const child = Bun.spawn([process.execPath, "--no-env-file", path.resolve(import.meta.dir, "../script/run-campaign.ts"),
+      "--manifest", fixture.manifestFile, "--server", fixture.serverFile, "--operation", "reserve", "--initial-progress-at", initial],
+      { stdout: "pipe", stderr: "pipe" })
+    expect(await new Response(child.stderr).text()).toContain("NO_PROGRESS_LIMIT")
+    expect(await child.exited).toBe(2)
+    const before = await Bun.file(path.join(fixture.root, "control/journal.json")).text()
+    expect(JSON.parse(before).lastProgressAt).toBe(Date.parse(initial))
+    await expect(controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")).rejects.toThrow("NO_PROGRESS_LIMIT")
+    expect(await Bun.file(path.join(fixture.root, "control/journal.json")).text()).toBe(before)
+    for (const name of ["owner.json", "preflights.json"])
+      expect(await Bun.file(path.join(fixture.root, name)).exists()).toBe(false)
+  } finally { api.stop(true); await fixture.close() }
+})
+
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("anchored reserve recovers manifest-only write but rejects a different frozen manifest", async () => {
+  const fixture = await controlFixture()
+  const initial = new Date(Date.now() - 3600000).toISOString()
+  const api = Bun.serve({ port: 0, fetch() { return Response.json({ id: "issue", created_at: initial, status: "in_progress" }) } })
+  try {
+    await Bun.write(fixture.config.multica.tokenFile, "fixture-token", { mode: 0o600 })
+    await writeLeaseReceipt(fixture.serverFile, { ...fixture.config,
+      multica: { ...fixture.config.multica, url: `http://127.0.0.1:${api.port}` } })
+    await mkdir(path.join(fixture.root, "control"), { mode: 0o700 })
+    const saved = path.join(fixture.root, "control/manifest.json")
+    await writeLeaseReceipt(saved, { ...fixture.manifest, executor: "someone-else" })
+    const invoke = () => Bun.spawn([process.execPath, "--no-env-file", path.resolve(import.meta.dir, "../script/run-campaign.ts"),
+      "--manifest", fixture.manifestFile, "--server", fixture.serverFile, "--operation", "reserve", "--initial-progress-at", initial],
+      { stdout: "pipe", stderr: "pipe" })
+    const rejected = invoke()
+    expect(await new Response(rejected.stderr).text()).toContain("CAMPAIGN_MANIFEST_CHANGED")
+    expect(await rejected.exited).toBe(2)
+    expect(await Bun.file(path.join(fixture.root, "control/journal.json")).exists()).toBe(false)
+    await writeLeaseReceipt(saved, fixture.manifest)
+    const accepted = invoke()
+    await new Response(accepted.stdout).text()
+    expect(await accepted.exited).toBe(0)
+    expect(await readLeaseReceipt(path.join(fixture.root, "control/journal.json"))).toMatchObject({ lastProgressAt: Date.parse(initial) })
+    const original = await Bun.file(path.join(fixture.root, "control/journal.json")).text()
+    expect((await controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")).lastProgressAt).toBe(Date.parse(initial))
+    expect(await Bun.file(path.join(fixture.root, "control/journal.json")).text()).toBe(original)
+  } finally { api.stop(true); await fixture.close() }
+})

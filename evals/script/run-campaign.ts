@@ -34,6 +34,7 @@ export type CampaignJournal = {
   verificationDir?: string
   reportingError?: string
   snapshotObservedAt?: number
+  initialProgressAt?: number
 }
 type UnitState = { active: boolean; invocation: string; exitCode: number }
 const keyId = (key: CampaignKey) => `${key.corpus}/${key.taskId}/${key.round}`
@@ -638,7 +639,9 @@ export async function controlCampaign(manifestFile: string, serverFile: string, 
   return runCampaign(manifestFile, serverFile, true, operation, repairer)
 }
 
-export async function runCampaign(manifestFile: string, serverFile: string, once = false, operation?: string, repairer?: string) {
+export async function runCampaign(manifestFile: string, serverFile: string, once = false, operation?: string, repairer?: string, initialProgressAt?: string) {
+  if (initialProgressAt !== undefined && (operation !== "reserve" || !Number.isSafeInteger(Date.parse(initialProgressAt)) ||
+    Date.parse(initialProgressAt) < 0 || Date.parse(initialProgressAt) > Date.now())) throw Error("CAMPAIGN_INITIAL_PROGRESS_INVALID")
   if (operation !== undefined && !["reserve", "repair", "resume", "prepare-generation", "cancel-unused-verify"].includes(operation)) throw Error("CAMPAIGN_OPERATION_INVALID")
   const manifest = await readLeaseReceipt(manifestFile) as CampaignManifest
   const config = await readLeaseReceipt(serverFile) as CampaignServerConfig
@@ -724,6 +727,26 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
         return previous
       }
       if (operation === "reserve") {
+        if (initialProgressAt !== undefined) {
+          const anchor = Date.parse(initialProgressAt)
+          const issue = await campaignRequest(publication, `/api/issues/${encodeURIComponent(manifest.issueId!)}`) as
+            { id?: string; created_at?: string; status?: string }
+          if (issue.id !== manifest.issueId || typeof issue.created_at !== "string" || Date.parse(issue.created_at) !== anchor ||
+            !["in_progress", "blocked"].includes(issue.status ?? "")) throw Error("CAMPAIGN_INITIAL_PROGRESS_UNCONFIRMED")
+          if (exists && previous.initialProgressAt !== anchor) throw Error("CAMPAIGN_INITIAL_PROGRESS_CHANGED")
+          if (!exists) {
+            // Persist the authenticated start before readiness can fail. This grants no owner or admission.
+            previous.lastProgressAt = anchor
+            previous.initialProgressAt = anchor
+            const saved = path.join(stateDir, "manifest.json")
+            if (await Bun.file(saved).exists() && JSON.stringify(await readLeaseReceipt(saved)) !== JSON.stringify(manifest))
+              throw Error("CAMPAIGN_MANIFEST_CHANGED")
+            await writeLeaseReceipt(saved, manifest)
+            await writeLeaseReceipt(journalFile, previous)
+          }
+        }
+        if (previous.initialProgressAt !== undefined && Date.now() - previous.lastProgressAt >= campaignLimits(manifest).noProgressMs)
+          throw Error("NO_PROGRESS_LIMIT")
         if (previous.final || previous.published) throw Error("CAMPAIGN_FINAL")
         if (owner?.campaignId === manifest.id) {
           if (!exists) throw Error("CAMPAIGN_OWNER_STATE_MISSING")
@@ -954,9 +977,9 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
 
 if (import.meta.main) {
   const args = parseArgs({ args: Bun.argv.slice(2), options: { manifest: { type: "string" }, server: { type: "string" }, once: { type: "boolean" },
-    operation: { type: "string" }, repairer: { type: "string" } } }).values
+    operation: { type: "string" }, repairer: { type: "string" }, "initial-progress-at": { type: "string" } } }).values
   if (!args.manifest || !args.server) throw Error("usage: bun script/run-campaign.ts --manifest /private/manifest.json --server /private/server.json [--once | --operation reserve|repair|resume|prepare-generation|cancel-unused-verify [--repairer agent]]")
-  await runCampaign(args.manifest, args.server, args.once, args.operation, args.repairer)
+  await runCampaign(args.manifest, args.server, args.once, args.operation, args.repairer, args["initial-progress-at"])
     .then(journal => { if (args.operation) console.log(JSON.stringify(journal)) })
     .catch(error => { console.error(error instanceof Error ? error.message : "CAMPAIGN_FAILED"); process.exitCode = 2 })
 }
