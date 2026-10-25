@@ -354,3 +354,23 @@ async function interruptedSlotRelease() {
   expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
   return { ...item, file, lockRoot, journal, cleanup, receipt: (JSON.parse(stdout) as { receipt: string }).receipt }
 }
+
+test("terminal verify cancellation releases a slot without benchmark readiness", async () => {
+  const item = await fixture(), locks = path.join(item.root, "locks")
+  const file = parseSlots(item.value, 1), journal = path.join(file.controller.stateDir, "verify-command-terminal.json")
+  try {
+    await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId: "terminal", identity, phase: "unactivated", slotIds: ["a"] })
+    const env = await acquireEnvironmentLeases(file, 1, identity, journal, locks)
+    const lease = env.slots[0]!, proof = path.join(file.controller.stateDir, "terminal-a.json")
+    const evidence = { version: 2, kind: "unused-verify-cancellation", status: "confirmed", commandId: "terminal",
+      slotId: "a", leaseToken: lease.token, serverEpoch: identity.serverEpoch, processes: "confirmed", serverSessions: "confirmed",
+      archive: "unchanged-clean", storageDeletionAllowed: false, nextAdmissionAllowed: false,
+      terminalOnly: true, profileClean: true, ownedStorageEmpty: true, serverFilesClosed: true, backupEmpty: true, adminDisposed: true }
+    try {
+      await writeLeaseReceipt(proof, evidence)
+      await lease.release(proof)
+      expect((await readResourceReservation({ key: `profile:${lease.slot.profileDir}`, lockRoot: locks }))?.state).toBe("released")
+      expect(await readLeaseReceipt(proof)).toEqual(evidence)
+    } finally { await lease.close(); await env.server.close() }
+  } finally { await rm(item.root, { recursive: true }) }
+})
