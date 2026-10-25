@@ -24,6 +24,10 @@ export async function cancelUnusedVerification(file: SlotFile, scope: { stateRoo
   const environment = await reopenEnvironmentLeases(file, verification.identity, lockRoot)
   if (!environment) throw new EvalFailure("TERMINAL_VERIFICATION_UNCONFIRMED", 2)
   try {
+    const command = await readLeaseReceipt(verification.journal)
+    if (JSON.stringify(command) !== JSON.stringify({ version: 2, kind: "unactivated-preparation", commandId: verification.commandId,
+      identity: verification.identity, slotIds: [file.slots[0]!.id], phase: "unactivated" }) || environment.server.reservation.commandId !== verification.commandId)
+      throw new EvalFailure("TERMINAL_VERIFY_USED", 2)
     throw new EvalFailure("TERMINAL_OBSERVATION_REQUIRED", 2)
   } finally { await environment.server.close(); await Promise.all(environment.slots.map(slot => slot.close())) }
 }

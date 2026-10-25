@@ -143,15 +143,21 @@ test("terminal cancellation refuses a nonterminal campaign before touching nativ
   } finally { await rm(root, { recursive: true }) }
 })
 
-test("terminal cancellation does not steal a live verify owner", async () => {
+test.each(["live", "admitted"] as const)("terminal cancellation refuses %s verify owner", async mode => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-terminal-live-")), fixture = await parallelFixture(root)
   const { acquireEnvironmentLeases } = await import("../src/slots")
   const { cancelUnusedVerification } = await import("../src/terminal-verification")
   const identity = { containerId: "a".repeat(64), studioContainerId: "c".repeat(64), startedAt: "old", studioStartedAt: "old", serverEpoch: "b".repeat(64), configurationHash: "d".repeat(64) }
   const commandId = "terminal", command = path.join(fixture.slots.controller.stateDir, `verify-command-${commandId}.json`)
   await writeLeaseReceipt(command, { version: 2, kind: "unactivated-preparation", commandId, identity, slotIds: ["a"], phase: "unactivated" })
-  const env = await acquireEnvironmentLeases(fixture.slots, 1, identity, command, fixture.lockRoot)
-  await env.server.close(); await env.slots[0]!.close()
+  if (mode === "live") {
+    const env = await acquireEnvironmentLeases(fixture.slots, 1, identity, command, fixture.lockRoot)
+    await env.server.close(); await env.slots[0]!.close()
+  } else {
+    const child = Bun.spawn([process.execPath, "-e", `const {acquireEnvironmentLeases}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/slots.ts"))}); const e=await acquireEnvironmentLeases(${JSON.stringify(fixture.slots)},1,${JSON.stringify(identity)},${JSON.stringify(command)},${JSON.stringify(fixture.lockRoot)}); await e.server.close();await e.slots[0].close()`], { stdout: "ignore", stderr: "pipe" })
+    expect(await child.exited).toBe(0)
+    await writeLeaseReceipt(command, { version: 2, kind: "unactivated-preparation", commandId, identity, slotIds: ["a"], phase: "cli_admitted" })
+  }
   try {
     await mkdir(path.join(root, "campaign/verification/check"), { recursive: true, mode: 0o700 })
     await writeLeaseReceipt(path.join(root, "owner.json"), { campaignId: "campaign" })
@@ -161,7 +167,7 @@ test("terminal cancellation does not steal a live verify owner", async () => {
     const failure = { version: 2, commandId, identity, journal: command, receipt, status: "quarantined", ready: false, reason: "USER_PREPARATION_CONFLICT" }
     await writeLeaseReceipt(receipt, failure)
     await writeLeaseReceipt(path.join(root, "campaign/verification/check/receipt.json"), failure)
-    await expect(cancelUnusedVerification(fixture.slots, { stateRoot: root, campaignId: "campaign" }, "/missing-cli", fixture.lockRoot)).rejects.toThrow("BUSY")
+    await expect(cancelUnusedVerification(fixture.slots, { stateRoot: root, campaignId: "campaign" }, "/missing-cli", fixture.lockRoot)).rejects.toThrow(mode === "live" ? "BUSY" : "TERMINAL_VERIFY_USED")
     expect((await readResourceReservation({ key: `server:${identity.containerId}`, lockRoot: fixture.lockRoot }))?.state).toBe("retained")
   } finally { await rm(root, { recursive: true }) }
 })
