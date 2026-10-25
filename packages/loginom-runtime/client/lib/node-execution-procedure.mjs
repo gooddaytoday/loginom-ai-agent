@@ -78,19 +78,20 @@ export async function revealExecutionControl(channel,node,initial,process,tid,ve
 
 export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false,verifyFailedChild=false,retainReadWait=false}={}) {
   let baseline,execution,stopPromise,readWaitBinding,consoleControl,launchSucceeded=false,launchAttempted=false,deactivationAttempted=false,failedChildAttempted=false;
+  const launched=()=>launchSucceeded||channel.launchConfirmed===true;
   const observe=(condition,ready=()=>true,extra={})=>channel.observe({condition,readProcesses:true,ready,...extra});
   const control=(s,tid,verb='click')=>{const current=typeof tid==='function'?tid(s):tid;
     return typeof current==='string'&&current.length?s.ui.elements.filter(e=>consoleTid(e.tid,current)&&e.allowed_actions.includes(verb)):[];};
   const act=async(s,tid,verb='click',identity=()=>node,key)=>channel.perform({condition:'execution control '+tid,
     initialObservation:s,ready:s=>control(s,tid,verb).length===1,
-    ...(launchSucceeded&&consoleControl&&tid===button&&verb==='click'?{settleProcessConsole:consoleControl}:{}),
+    ...(launched()&&consoleControl&&tid===button&&verb==='click'?{settleProcessConsole:consoleControl}:{}),
     ...(tid===grid?{confirmIdentity:consoleMenuIdentity}:{}),
     resolve:s=>({verb,ref:one(control(s,tid,verb),'Unique execution control required').ref,...(key?{key}:{})}),identity});
   const consoleVisible=s=>s.ui.elements.filter(e=>consoleTid(e.tid,grid)).length===1;
   async function openConsole(condition='process console visible',ready=()=>true,extra={}) {
     let s=await observe('prepared node available for process console',s=>consoleVisible(s)||control(s,button).length===1,{readProcesses:false,readProcessControls:true,
-      ...(launchSucceeded&&consoleControl?{settleProcessConsole:consoleControl}:{})});
-    if(!launchSucceeded){
+      ...(launched()&&consoleControl?{settleProcessConsole:consoleControl}:{})});
+    if(!launched()){
       const buttons=control(s,button);
       consoleControl=buttons.length===1&&buttons[0].signature?{ref:buttons[0].ref,signature:structuredClone(buttons[0].signature)}:undefined;
     }

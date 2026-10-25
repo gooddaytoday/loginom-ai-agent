@@ -77,6 +77,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   let evidenceSnapshot = null;
   let snapshotTableDialog = null;
   let snapshotWizardConfirmation = null;
+  let launchConfirmed = false;
   if(preparedNodeContext)validatePreparedNodeContext(preparedNodeContext);
   const boundOptions=preparedNodeContext?{prepared_node_context:structuredClone(preparedNodeContext)}:{};
   let uiContext=preparedNodeContext?null:operation.checkpoint;
@@ -362,6 +363,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(settleProcessConsole!==undefined&&(!readProcessControls||readProcesses||!preparedNodeContext
         ||typeof settleProcessConsole.ref!=='string'||!settleProcessConsole.signature))
         throw Error('Process console settlement requires its prepared control');
+      if(settleProcessConsole?.quiet&&!launchConfirmed)throw Error('Console epoch settlement requires a confirmed launch');
       readOutputs ||= !!tablePage || !!tableDialog;
       if(wizardConfirmation && (!preparedNodeContext || !['close','deactivation'].includes(wizardConfirmation.kind)))throw Error('A prepared wizard confirmation binding is required');
       if(releaseWizard&&!preparedNodeContext)throw Error('Wizard release requires its prepared node');
@@ -382,15 +384,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       snapshotTableDialog=null;
       snapshotWizardConfirmation=null;
       const step = nextStep(), id = operation.id + ':n' + step;
-      // Wall time binds the parent deadline once; elapsed waits must survive clock corrections.
+      // Post-launch console settling shares the parent's clock and deadline.
+      // Other observation windows retain their monotonic elapsed-time policy.
       const started = now(), monotonicStarted = monotonicNow();
-      const observationNow = () => started + monotonicNow() - monotonicStarted;
-      let deadline = Math.min(settleWizard?.deadline??Infinity,settleOutputPort?operation.deadline:Math.min(operation.deadline, started + timeoutMs));
-      const readTimeout = () => Math.min(35000, Math.max(settleWizard?0:MIN_OBSERVATION_READ_MS, Math.min(deadline,settleWizard?.deadline??Infinity) - observationNow()));
+      const observationNow = settleProcessConsole?.quiet ? now : () => started + monotonicNow() - monotonicStarted;
+      let deadline = Math.min(settleWizard?.deadline??Infinity,settleOutputPort||settleProcessConsole?.quiet?operation.deadline:Math.min(operation.deadline, started + timeoutMs));
+      const readTimeout = () => Math.min(35000, Math.max(settleWizard||settleProcessConsole?.quiet?0:MIN_OBSERVATION_READ_MS, Math.min(deadline,settleWizard?.deadline??Infinity) - observationNow()));
       const read = async (code,options) => {
-        if(settleWizard&&observationNow()>=Math.min(deadline,settleWizard.deadline))throw new NodeReadinessTimeout(condition);
+        if((settleWizard||settleProcessConsole?.quiet)&&observationNow()>=deadline)throw new NodeReadinessTimeout(condition);
         const value=await execute(code,options);
-        if(settleWizard&&observationNow()>=Math.min(deadline,settleWizard.deadline))throw new NodeReadinessTimeout(condition);
+        if((settleWizard||settleProcessConsole?.quiet)&&observationNow()>=deadline)throw new NodeReadinessTimeout(condition);
         return value;
       };
       const assertSettlement = state => {
@@ -680,7 +683,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             throw Error('Owned wizard loading context changed');
           if(ownWizardMask||returnedGraph&&ws.ui.masks.length){settlingWizard=expected;deadline=Math.min(operation.deadline,settleWizard?.deadline??Infinity);}
         }
-        if(settleProcessConsole&&(settlingConsole||result.output.prepared_node_context?.locked===true||result.output.ui.masks.length
+        if(settleProcessConsole&&(settleProcessConsole.quiet||settlingConsole||result.output.prepared_node_context?.locked===true||result.output.ui.masks.length
           &&result.output.ui.elements.some(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress'))){
           const state=result.output,buttons=state.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress');
           const owned=state.prepared_node_context?.surface==='graph'&&typeof state.prepared_node_context.locked==='boolean'&&state.ui.dialogs.length===0
@@ -722,7 +725,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         confirmations = satisfied ? (confirmIdentity ? (identity === previousIdentity ? confirmations + 1 : 1) : 1) : 0;
         previousIdentity = identity;
         await entry('node_observation_sample', { step, sample, internal_operation_id: id,
-          readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), elapsed_ms: observationNow() - started },
+          readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observationNow() - started },
           outcome: structuredClone(result) });
         // The action transport checks the exact document epoch again before
         // the gesture. Repeating already satisfied observations adds latency
@@ -737,7 +740,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeReadinessTimeout(condition);
       }
       const persisted = await entry('node_observation_completed', { step, internal_operation_id: id,
-        readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), elapsed_ms: observationNow() - started }, outcome: structuredClone(result) });
+        readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observationNow() - started }, outcome: structuredClone(result) });
       if (!persisted?.outcome?.output) throw new Error('Node observation requires a durable journal acknowledgement');
       if(settleWizard&&observationNow()>=Math.min(deadline,settleWizard.deadline))throw new NodeReadinessTimeout(condition);
       evidenceSnapshot = structuredClone(persisted.outcome.output);
@@ -831,6 +834,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (result.status !== 'SUCCEEDED' || !operation.cleanupConfirmed) {
         throw new NodeProcedureStepError(result);
       }
+      if(preparedNodeContext&&['execute_graph_node','execute_wizard'].includes(action.verb))launchConfirmed=true;
       // Even a successful gesture does not authorize the next one with old refs.
       return structuredClone(result);
     },
@@ -843,9 +847,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new Error('A bound action resolver and domain identity are required');
       }
       let binding, intent, bodyRefreshes = 0;
+      const quietConsole=settleProcessConsole&&launchConfirmed;
       const initialPage=initialObservation?.wizard?.import_columns?.page;
       const initialOutputPage=initialObservation?.wizard?.output_columns?.page;
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; quietConsole || attempt < 3; attempt++) {
         let observed;
         if (!attempt && initialObservation !== undefined) {
           checkBudget();
@@ -887,14 +892,17 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw Error('Running node console owner is unknown');
         // Only the driver's succeeded launch opts in. Poll before a console
         // gesture; keep the original deadline and every later epoch guard.
-        if(settleProcessConsole&&observed.prepared_node_context.locked===true){
+        if(settleProcessConsole&&(quietConsole||observed.prepared_node_context.locked===true)){
           const originalIdentity=digest(canonical(identity(observed)));
           const originalAction=resolve(observed),button=observed.ui.elements.find(e=>e.ref===originalAction.ref);
           if(originalAction.verb!=='click'||button?.tid!=='MF;cntMain;tlbMainToolbar;btnProgress'
             ||button.ref!==settleProcessConsole.ref||digest(canonical(button.signature))!==digest(canonical(settleProcessConsole.signature)))
             throw Error('Running node settlement requires its original console control');
           observed=await channel.observe({condition:'launched own node stops repainting its console control',readProcessControls:true,
-            settleProcessConsole,ready:s=>s.prepared_node_context?.locked===false&&ready(s)});
+            settleProcessConsole:{...settleProcessConsole,...(quietConsole?{quiet:true}:{})},
+            ...(quietConsole?{confirmIdentity:s=>s.dom_epoch}:{}),
+            ready:s=>s.prepared_node_context?.locked===false&&(!quietConsole||typeof s.dom_epoch?.document==='string'
+              &&Number.isFinite(s.dom_epoch.revision))&&ready(s)});
           const freshAction=resolve(observed);
           if(digest(canonical(identity(observed)))!==originalIdentity||freshAction.verb!==originalAction.verb
             ||freshAction.ref!==settleProcessConsole.ref)
@@ -915,12 +923,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         try { return await channel.act(action,processControl,{preserveJoinMapping}); }
         catch (error) {
           const r = error instanceof NodeProcedureStepError ? error.receipt : null;
-          if (attempt === 2 || r?.status !== 'NOT_APPLIED'
+          if (r?.status !== 'NOT_APPLIED'
             || r.effect_possible !== false || r.cleanup_complete !== true
             || r.trace?.some(e => ['ui_preconditions_verified','ui_gesture_applied'].includes(e.event))
             || !Array.isArray(r.trace)) throw error;
           const epochRefusal=r.phase==='preconditions'&&r.error?.code==='UI_EPOCH_CHANGED'
             ||r.phase==='observing'&&r.error?.code==='UI_ROOT_STALE';
+          const consoleEpochRefusal=quietConsole&&epochRefusal&&r.error?.code==='UI_EPOCH_CHANGED';
+          if(attempt>=2&&!consoleEpochRefusal)throw error;
           const scanRefusal=timeScanRefusal(r,'ui.act');
           const graphRefusal=action.verb==='execute_graph_node'&&r.phase==='preconditions'
             &&r.error?.code==='GRAPH_EXECUTION_CONTEXT_CHANGED';
@@ -971,6 +981,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             rejected_operation_id: r.operation_id, retry: attempt + 1,
             condition, binding_sha256: binding, intent_sha256: intent,
             effect_possible: false,
+            ...(consoleEpochRefusal?{reason:'launched_console_epoch_changed'}:{}),
             ...(bodyRefusal?{reason:'prepared_graph_body_replaced'}:{}),
             ...(scanRefusal?{reason:'read_scan_time_limit'}:{}),
             ...(graphRefusal?{reason:'graph_execution_context_changed'}:{}),
@@ -985,6 +996,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       }
     },
     get steps() { return sequence; },
+    get launchConfirmed() { return launchConfirmed; },
     get lastPreparedStep() { return structuredClone(lastPreparedStep); },
     stepsSince(step) {
       if (preparedStepsTrimmed && !(preparedSteps[0]?.step <= step + 1)) throw new Error('Prepared step log no longer covers this boundary');
