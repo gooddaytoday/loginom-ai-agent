@@ -99,7 +99,9 @@ export async function confirmedProfileArchive(attemptDir: string, profileDir: st
 }
 
 async function confirmedRecoveredArchive(attemptDir: string, profileDir: string, historyDir: string, original: Partial<ProcessCleanup>) {
-  const refuse = () => { throw Error("native evidence requires own confirmed recovery archive") }
+  const refuse = () => { throw Error("native evidence requires own confirmed history archive") }
+  if (original.status !== "failed" || original.observation_mode !== "continuous" || original.capture_complete !== true ||
+    !Array.isArray(original.unknownProcesses) || original.unknownProcesses.length || original.lifetime?.owner.kind !== "slot") return refuse()
   const runDir = path.dirname(path.dirname(attemptDir))
   const config = await Bun.file(path.join(runDir, "config.json")).json() as { commandJournal: string; slotsFile: string }
   const file = await loadResourceSlots(config.slotsFile)
@@ -116,9 +118,7 @@ async function confirmedRecoveredArchive(attemptDir: string, profileDir: string,
   const sourceFile = path.join(attemptDir, "cleanup.json"), bytes = await Bun.file(sourceFile).arrayBuffer()
   const proof = await readLeaseReceipt(`${sourceFile}.unit-exit.json`) as UnitExitProof
   if (JSON.stringify(JSON.parse(Buffer.from(bytes).toString()).processes) !== JSON.stringify(original) ||
-    original.status !== "failed" || original.observation_mode !== "continuous" || original.capture_complete !== true ||
-    !Array.isArray(original.unknownProcesses) || original.unknownProcesses.length ||
-    original.lifetime?.producer_pid !== command.unitBinding?.producer.pid || original.lifetime?.owner.kind !== "slot" || original.lifetime.owner.id !== slot.id ||
+    original.lifetime?.producer_pid !== command.unitBinding?.producer.pid || original.lifetime.owner.id !== slot.id ||
     proof.version !== 1 || proof.kind !== "systemd-unit-exit" || proof.source?.file !== sourceFile ||
     proof.source.sha256 !== new Bun.CryptoHasher("sha256").update(bytes).digest("hex") || proof.profile !== profileDir ||
     JSON.stringify(proof.binding) !== JSON.stringify(command.unitBinding) ||
