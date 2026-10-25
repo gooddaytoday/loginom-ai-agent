@@ -33,7 +33,7 @@ function fixture() {
     const opening={phase:'verified',document_id:'doc',workflow_id:'flow',node_id:'node',wizard:model,nodeTree,portTree,
       workflow:workflowNode,packageNode,node,port,nodeData:node.data,portData:port.data,portGuid:port.FGuid,
       nativeIndex:0,portIndex:0,enginePort:model[input?'FModelSocket':'FModelEnginePort'],operation_id:'open-port',...(input?{direction:'input'}:{})};
-    preparation[input?'inputPortOpenReceipts':'outputPortOpenReceipts']=new Map([['open-port',opening]]);return {opening,model,portTree,group};
+    preparation[input?'inputPortOpenReceipts':'outputPortOpenReceipts']=new Map([['open-port',opening]]);return {opening,model,portTree,group,w};
   };
   return{binding,page,controller,enterPendingWizard:()=>{class WizardTreeNode{};app.WizardTreeNode=WizardTreeNode;
       const nt=nodeTree,wt=Object.assign(new WizardTreeNode(),{ParentNode:nt});graph.FDiagram.FNodes.FCollection[0].data=nt.FModelNode;
@@ -41,7 +41,16 @@ function fixture() {
       const we={...element(binding.workflow_ref.navigation_path[0].tid+'>Import-3>Настройка'),id:'pending-wizard',textContent:'Настройка'};
       crumbs.push(ne,we);activeElements.push(ne,we);
       const nc={el:{dom:ne},_node:{data:{node:nt}}},wc={el:{dom:we},_node:{data:{node:wt}}};
-      context.Ext={getCmp:id=>id===ne.id?nc:id===we.id?wc:null};return {nt,wt,nc,wc};},enterOverview:()=>{controller.Node.data.node=nodeTree;crumbs.push({...element(binding.workflow_ref.navigation_path[0].tid+'>Import-3'),textContent:'Import'});},enterViews,record,preparation,workflowNode,nodeTree,enterWizard,enterPortWizard,tab,graph,
+      context.Ext={getCmp:id=>id===ne.id?nc:id===we.id?wc:null};return {nt,wt,nc,wc};},enterInputBreadcrumbs:()=>{
+      const port=enterPortWizard(true),native=[nodeTree,port.group,port.portTree,port.w],components=[];
+      let tid=binding.workflow_ref.navigation_path[0].tid;
+      for(const [i,label]of ['Import','Входные порты','Входной источник данных','Настройка'].entries()){
+        tid+='>'+label.replaceAll(' ','_');const e={...element(tid),id:'input-crumb-'+i,textContent:label};
+        crumbs.push(e);activeElements.push(e);components.push({el:{dom:e},_node:{data:{node:native[i]}}});
+      }
+      context.Ext={getCmp:id=>components[Number(id.slice('input-crumb-'.length))]};
+      return {...port,components};
+    },enterOverview:()=>{controller.Node.data.node=nodeTree;crumbs.push({...element(binding.workflow_ref.navigation_path[0].tid+'>Import-3'),textContent:'Import'});},enterViews,record,preparation,workflowNode,nodeTree,enterWizard,enterPortWizard,tab,graph,
     cloneNode:inside=>{const clone=element(dom.getAttribute());activeElements.push(clone);if(inside)root.contains=e=>e===dom||e===clone;},changeCrumb:()=>crumbs[0].textContent='Other',duplicateTab:()=>activeElements.push(tab)};
 }
 test('graph context ignores outline copies outside the native canvas but rejects duplicate nodes inside it',async()=>{
@@ -119,5 +128,23 @@ test('pending deactivation rejects mismatched breadcrumb native objects',async()
   p=>p.wt.ParentNode={},p=>p.nc.el.dom={},p=>p.wc.el.dom={},p=>p.nc._node.data.node={},p=>p.wc._node.data.node={}]){
   const f=fixture(),p=f.enterPendingWizard();change(p);
   assert.equal((await readPreparedNodeContext(f.page,f.binding)).pending_wizard_node,undefined);
+ }
+});
+
+test('D52 input breadcrumb binding requires the exact native node, port and opening context',async()=>{
+ for(const fault of ['valid','same_type_foreign_node','node_guid','port_guid','port_index','native_index','opening','folder','port_tree','wizard_tree','component_dom']){
+  const f=fixture(),p=f.enterInputBreadcrumbs();p.opening.node.FIconCls='bg-vendor-icon-clusterization';
+  if(fault==='same_type_foreign_node')p.components[0]._node.data.node=Object.assign(Object.create(Object.getPrototypeOf(f.nodeTree)),f.nodeTree);
+  if(fault==='node_guid')f.nodeTree.FGuid='foreign';
+  if(fault==='port_guid')p.opening.port.FGuid='foreign';
+  if(fault==='port_index')p.opening.portIndex=1;
+  if(fault==='native_index')p.opening.nativeIndex=1;
+  if(fault==='opening')f.preparation.inputPortOpenReceipts.clear();
+  if(fault==='folder')p.components[1]._node.data.node={};
+  if(fault==='port_tree')p.components[2]._node.data.node={};
+  if(fault==='wizard_tree')p.components[3]._node.data.node={};
+  if(fault==='component_dom')p.components[0].el.dom={};
+  const r=await readPreparedNodeContext(f.page,f.binding);
+  assert.equal(!!r.navigation_node,fault==='valid',fault);
  }
 });
