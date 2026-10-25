@@ -130,3 +130,15 @@ test("releaseClosedEnvironment uses saved final proofs", async () => {
       expect((await readResourceReservation({ key: `profile:${slot.profileDir}`, lockRoot: fixture.lockRoot }))?.state).toBe("released")
   } finally { await rm(root, { recursive: true }) }
 })
+
+test("terminal cancellation refuses a nonterminal campaign before touching native resources", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-terminal-")), fixture = await parallelFixture(root)
+  try {
+    const { cancelUnusedVerification } = await import("../src/terminal-verification")
+    await writeLeaseReceipt(path.join(root, "owner.json"), { campaignId: "campaign" })
+    await mkdir(path.join(root, "campaign"), { mode: 0o700 })
+    await writeLeaseReceipt(path.join(root, "campaign/journal.json"), { campaignId: "campaign", final: null, published: false })
+    await expect(cancelUnusedVerification(fixture.slots, { stateRoot: root, campaignId: "campaign" }, "/missing-cli", fixture.lockRoot))
+      .rejects.toThrow("TERMINAL_CAMPAIGN_REQUIRED")
+  } finally { await rm(root, { recursive: true }) }
+})
