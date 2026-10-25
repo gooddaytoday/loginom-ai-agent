@@ -697,6 +697,9 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
       if (previous.manifestHash !== manifestHash) throw Error("CAMPAIGN_MANIFEST_CHANGED")
       const owner = await Bun.file(ownerFile).exists() ? await readLeaseReceipt(ownerFile) as { campaignId: string } : undefined
       if (owner && !safeId(owner.campaignId)) throw Error("CAMPAIGN_OWNER_INVALID")
+      if (owner?.campaignId === manifest.id && !exists) throw Error("CAMPAIGN_OWNER_STATE_MISSING")
+      if (!exists && initialProgressAt === undefined && await Bun.file(path.join(stateDir, "manifest.json")).exists())
+        throw Error("CAMPAIGN_INITIAL_PROGRESS_REQUIRED")
       if (owner && owner.campaignId !== manifest.id && !previous.final) throw Error("CAMPAIGN_SERVER_BUSY")
       if (operation === "prepare-generation" && (!exists || owner?.campaignId !== manifest.id)) throw Error("CAMPAIGN_OWNER_MISMATCH")
       if (operation === "prepare-generation" && (!previous.repairing || previous.repairer !== repairer)) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
