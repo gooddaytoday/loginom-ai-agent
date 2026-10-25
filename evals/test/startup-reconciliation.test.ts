@@ -142,3 +142,26 @@ test("terminal cancellation refuses a nonterminal campaign before touching nativ
       .rejects.toThrow("TERMINAL_CAMPAIGN_REQUIRED")
   } finally { await rm(root, { recursive: true }) }
 })
+
+test("terminal cancellation does not steal a live verify owner", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-terminal-live-")), fixture = await parallelFixture(root)
+  const { acquireEnvironmentLeases } = await import("../src/slots")
+  const { cancelUnusedVerification } = await import("../src/terminal-verification")
+  const identity = { containerId: "a".repeat(64), studioContainerId: "c".repeat(64), startedAt: "old", studioStartedAt: "old", serverEpoch: "b".repeat(64), configurationHash: "d".repeat(64) }
+  const commandId = "terminal", command = path.join(fixture.slots.controller.stateDir, `verify-command-${commandId}.json`)
+  await writeLeaseReceipt(command, { version: 2, kind: "unactivated-preparation", commandId, identity, slotIds: ["a"], phase: "unactivated" })
+  const env = await acquireEnvironmentLeases(fixture.slots, 1, identity, command, fixture.lockRoot)
+  await env.server.close(); await env.slots[0]!.close()
+  try {
+    await mkdir(path.join(root, "campaign/verification/check"), { recursive: true, mode: 0o700 })
+    await writeLeaseReceipt(path.join(root, "owner.json"), { campaignId: "campaign" })
+    await writeLeaseReceipt(path.join(root, "campaign/journal.json"), { campaignId: "campaign", final: "partial", published: true,
+      verificationDir: path.join(root, "campaign/verification/check") })
+    const receipt = path.join(fixture.slots.controller.stateDir, `verification-${commandId}.json`)
+    const failure = { version: 2, commandId, identity, journal: command, receipt, status: "quarantined", ready: false, reason: "USER_PREPARATION_CONFLICT" }
+    await writeLeaseReceipt(receipt, failure)
+    await writeLeaseReceipt(path.join(root, "campaign/verification/check/receipt.json"), failure)
+    await expect(cancelUnusedVerification(fixture.slots, { stateRoot: root, campaignId: "campaign" }, "/missing-cli", fixture.lockRoot)).rejects.toThrow("BUSY")
+    expect((await readResourceReservation({ key: `server:${identity.containerId}`, lockRoot: fixture.lockRoot }))?.state).toBe("retained")
+  } finally { await rm(root, { recursive: true }) }
+})
