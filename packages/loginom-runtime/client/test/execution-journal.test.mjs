@@ -21,9 +21,16 @@ for(const value of ['{ "password": "first-private", "password": "safe-value" }',
  '{ "nested": { "api_key": "first-private" } }',
  '{ "escaped": "first\\u002dprivate" }'])
 test('JSON text preservation cannot retain discarded or sensitive input: '+value,()=>{
- const cleaned=createRedactor(['first-private']).redact({value}).value;
+ const cleaned=createRedactor(['first-private']).redact({value},{preserveJsonText:true}).value;
  assert.doesNotMatch(cleaned,/first-private|first\\u002dprivate/);
  assert.notEqual(cleaned,value);
+});
+
+test('journal JSON preservation does not change default source redaction',()=>{
+ const redactor=createRedactor(),value='[ 1, 2 ]';
+ assert.equal(redactor.redact({value}).value,'[1,2]');
+ assert.equal(redactor.redact({value},{preserveJsonText:true}).value,value);
+ assert.equal(redactor.redact({value}).value,'[1,2]');
 });
 
 test('operation evidence is durable, ordered and redacted independently of transcripts', async t => {
