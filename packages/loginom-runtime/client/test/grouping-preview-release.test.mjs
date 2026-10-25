@@ -74,7 +74,7 @@ function fixture(fault='none'){
  },preflight:async()=>{},activateWorkflow:async()=>({verified:true,cleanup_complete:true,effect_possible:false}),
  verifyWorkflow:async()=>({status:'SUCCEEDED',verified:true,cleanup_complete:true,effect_possible:false,document_id:'doc',workflow_ref:workflow})};
  const drivers=createGroupingNodeSupport(config).nodeApplyDriverFactory(options);
- return {operation,records,actions,clock:()=>time,previewReads:()=>previewReads,publicRuntime(){
+ return {operation,records,actions,receipts,clock:()=>time,previewReads:()=>previewReads,publicRuntime(){
   return createActionRuntime({pinned:{actions:new Map(),selectors:new Map(),pins:{}},now:()=>time,
    targetOrigin:config.targetOrigin,targetBuild:config.targetBuild,execute:options.execute,onRecord:options.onRecord,
    nodeTargetAdapterFactory:()=>adapter,
@@ -117,6 +117,18 @@ for(const fault of ['none','slow_loading'])test('D68b public release uses the pr
   assert.ok(f.clock()>=21000&&f.clock()<1000+NODE_RELEASE_BUDGET_MS);
   assert.ok(f.records.some(r=>r.phase==='node_observation_timeout'&&r.condition==='original grouping preview before release'));
  }
+});
+
+for(const disposed of [false,true])test('shared release requires managed F3 lease disposal before closing its own preview: '+disposed,async()=>{
+ const f=fixture();await f.stop();f.operation.cleanupConfirmed=false;
+ const p=f.operation.groupingPreview;
+ p.managed=true;p.lease_disposed=disposed;
+ p.receipt.action_key='node.javascript.preview.open.internal';p.receipt.cleanup_complete=false;
+ p.reference.action_key=p.receipt.action_key;f.operation.lastReceipt=structuredClone(p.reference);
+ f.receipts.set(p.reference.id,structuredClone(p.receipt));
+ if(disposed){await f.release();assert.equal((await f.releaseTarget()).verified,true);}
+ else{await assert.rejects(f.release(),/completion is unconfirmed/);assert.equal(f.actions.filter(a=>a.ref==='ui-close').length,0);}
+ assert.equal(f.actions.filter(a=>a.key==='F3').length,1);
 });
 
 for(const fault of ['never_ready','late_ready','read_error','wrong_timeout'])
