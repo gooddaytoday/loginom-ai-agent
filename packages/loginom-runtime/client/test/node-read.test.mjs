@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {createNodeReadDrivers} from '../lib/node-read-driver.mjs';
 import {resolveCrossTableSchema} from '../lib/crosstable-schema.mjs';
-import {buildNodeReadRequest,alignReadSchema} from '../lib/node-read-contract.mjs';
+import {buildNodeReadRequest,alignReadSchema,isUnchangedTextImportExecution,isUnchangedTransformExecution} from '../lib/node-read-contract.mjs';
 import {applyNode,releaseNodeApply,validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {dispatchNodeApi,nodeApiTools} from '../lib/node-api.mjs';
 import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
@@ -22,7 +22,7 @@ function portReadFixture(request,output){
   createNodeProcedure:()=>channel,createNodeExecutionProcedure:()=>({async prepare(){},async waitCompleted(){return execution;}}),
   finishConfiguredGraph:async()=>({verified:true,cleanup_complete:true,execution_id:'fresh'}),
   need:(ok,message)=>{if(!ok)throw Error(message);},verified:value=>({verified:true,cleanup_complete:true,...value}),
-  alignReadSchema,resolveCrossTableSchema,openNewOutputTable:table,
+  alignReadSchema,isUnchangedTextImportExecution,isUnchangedTransformExecution,resolveCrossTableSchema,openNewOutputTable:table,
  });
  const driver=create({operation:{id:'read',parameters:request},now:()=>1},{});
  const ctx={node,execution:{execution_id:'fresh'},portExecution:{execution_id:'foreign-shell'},receipt_id:'read',deadline:1000};

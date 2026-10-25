@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import {alignReadSchema,buildNodeReadRequest} from '../lib/node-read-contract.mjs';
+import {alignReadSchema,buildNodeReadRequest,isUnchangedTextImportExecution,isUnchangedTransformExecution} from '../lib/node-read-contract.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from '../lib/node-pending-release.mjs';
 import {createNodeReadDrivers} from '../lib/node-read-driver.mjs';
 import {Page,runtime,build} from './support/executor-fixture.mjs';
@@ -45,7 +45,7 @@ async function fixture(fault,phase='finish'){
     finishConfiguredGraph:async()=>{calls.push('finish');operation.lastReceipt={id:'read-ru:n19'};
      return {verified:true,cleanup_complete:true,mode:'execute',execution_id:'fresh'};},
     need:(ok,message)=>{if(!ok)throw Error(message);},verified:value=>({verified:true,cleanup_complete:true,...value}),
-    alignReadSchema,releasePendingNode,NODE_RELEASE_BUDGET_MS,
+    alignReadSchema,isUnchangedTextImportExecution,isUnchangedTransformExecution,releasePendingNode,NODE_RELEASE_BUDGET_MS,
    });
    const drivers=create({...options,readReceipt},{targetOrigin:'https://loginom.invalid',targetBuild:build});
    if(phase==='read')return drivers;

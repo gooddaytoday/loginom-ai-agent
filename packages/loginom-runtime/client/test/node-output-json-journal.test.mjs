@@ -102,7 +102,7 @@ test('shared ordinary product output is normalized before durable ACK without mu
    {type:'real',value:-0,decimal:'-0'}]]}]};
   const original=structuredClone(raw),native={ports:[{exact_table:{complete:true}}]};
   let returned=raw;
-  const context={createRedactor,nodeOutputForJournal,NODE_READ_MODE:'read',createNodeReadDrivers:()=>assert.fail('Wrong driver')};
+  const context={createRedactor,nodeOutputForJournal,isUnchangedTextImportExecution,isUnchangedTransformExecution,NODE_READ_MODE:'read',createNodeReadDrivers:()=>assert.fail('Wrong driver')};
   for(const name of ['ExcelImport','RestRequest','LinRegression','Clustering','CrossTable','Replacement','Duplicates',
    'DateTime','MissingValues','Collapse','Union','TextExport','Join','Filter','TextImport','Sorting','Grouping','Reform','Calculator','JavascriptCode'])
    context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:new Map(),nodeApplyDriverFactory:()=>({readOutput:async()=>returned})});
