@@ -1,0 +1,64 @@
+# Разовое восстановление runner3 — план подготовки
+
+> Для исполнителя: готовить операцию по `executing-plans`, с независимым ревью до кода и перед предъявлением. Отмеченные ниже шаги подготовки разрешены владельцем 25.10.2026. Поставка, reboot и исполнение требуют принятия готовой процедуры и конкретного кандидата.
+
+**Цель:** подготовить проверяемую разовую очистку неудачной подготовки LAB-170, после которой существующий controller сможет продолжить только недостающие измерения.
+
+**Устройство:** один временный Bun-скрипт использует существующие native reservations и APIs. Новый proof подтверждает текущее завершение использования ресурсов после reboot; исходный failed cleanup остаётся failed. Постоянной команды, scheduler или изменения lease-контракта в коде harness нет.
+
+**Средства:** Bun 1.3.14, существующие systemd/flock, Docker, `reopenEnvironmentLeases`, native admin/readers, `setupProfile`, архивирование профиля и native release.
+
+**Основание:** [основной план](2026-10-23-autonomous-evals-plan.md), [проверенная правка launcher и граница quarantine](2026-10-24-eval-process-dispatch-plan.md), разрешение владельца подготовить разовое восстановление. Оно разрешает подготовку скрипта, а не его применение.
+
+## Ограничения и фактическое состояние
+
+- Ресурсы — только существующая VM runner3 и прежние owned Server/Studio IDs. LAB-134, runner2, runner1, agents/squad/runtime не меняются.
+- Сохраняются manifest, CLI/corpus/model/judge pins, числовые budgets/timeouts, два готовых FAIL, результаты и история. No-progress deadline LAB-170 из [плана runner3](2026-10-24-local-eval-runner-plan.md) не продлевать.
+- Исторический command не имел unitBinding и оставил 13 unknown processes; отсутствие нынешнего PID не заменяет доказательства. Нужны новый boot той же VM и неизменные исходные reservations/receipts.
+- Объём исключения: перенести точно засвидетельствованный старый registration marker в evidence после boot-fence; подтвердить нынешнюю очистку отдельно от исторической; освободить прежние reservations штатными APIs. Не подменять `ServerIdentity`, `SlotLease` или `ProcessCleanup`.
+- Fresh read-only preflight 25.10 подтвердил: A storage пуст, B storage отсутствует, SessionBackup пуст, server files закрыты, profiles idle, writer отсутствует, pending/recovery отсутствуют. Marker есть только у A; это предварительная проверка, не proof после будущего reboot.
+- У A есть planned activation. Native `readUserOwnership` считает любой activation record пересечением этой границы. Не удалять запись и не использовать `inspectUnactivatedUser`.
+- Выбранная конфигурация по-прежнему указывает исходных пользователей; профиль A хранит промежуточного пользователя неудачной generation. Без настоящего `setupProfile` обратно к выбранному пользователю следующая generation откажет с `PROFILE_CONNECTION_MISMATCH`.
+
+## Область и стоимость
+
+В Git: этот план и обновление ссылки/checkpoint launcher-плана, **2 файла / 80–120 строк**. Production-код `evals/` не меняется. В private каталоге `/home/george/.codex/tmp/runner3-once-recovery/`: один временный `retire.mjs` (ориентир **220–320 строк**), небольшой assert-based `check.mjs`, `scope.json` с проверенными исходными hashes и `proposal.json` с точными кандидатами поставки. Secrets не копируются в эти артефакты: credentials читаются на VM только из существующих закрытых файлов и передаются native CLI через stdin.
+
+Разовые start-marker и proof нужны для аудита и запрета повторного запуска при потерянном SSH-ответе. Они относятся к одной принятой операции; нового общего журнала или механизма retry нет. После выполнения scripts удаляются, исходные и новые proofs сохраняются.
+
+## На что направлено ревью
+
+1. Иной boot должен принадлежать той же VM; неизменность old CAS и source receipts проверяется до первого изменяющего действия.
+2. Перед `docker start` проверяются прежние IDs, images, owner labels, network и неизменность конфигурации контейнеров. `createPair` здесь неприменим из-за retained server reservation.
+3. Marker разрешено перенести только при точном совпадении содержимого и file identity; появившийся writer, pending/recovery или новый процесс профиля останавливает операцию.
+4. Текущий admin используется только для inspect/dispose с текущей identity; несовместимость old/current identity не обходится через `cleanupSlotStorage` или изменяющие admin-методы.
+5. Восстановление A credentials не меняет условия эксперимента. Неизвестный username/URL, отказ auth, непустой storage или оставшаяся сессия означает STOP с retained resources, без попыток удалить чужое состояние.
+
+## Шаги подготовки
+
+- [x] **1. Свежая сверка и проверка пути.** Снять read-only snapshot native reservations, исходных records, профилей, контейнеров, результатов и предела. Проверить публичные APIs. Результат: preflight выше и подтверждённая необходимость A←промежуточного пользователя; private evidence — `runner3-dns-canonical/oneoff-{recovery-preparation-state,native-readonly-preflight,source-records}.json`.
+- [x] **2. Независимое ревью плана до скрипта.** Сверены гарантии, native APIs, необходимость исключительных действий и простой путь. PASS, обязательных замечаний нет.
+- [x] **3. Подготовить scope и один временный скрипт.** Скрипт привязан к одной LAB-170/VM/command, трём исходным retained reservations и проверенному harness. `--check` только проверяет допуск; `--execute` требует нового boot и захватывает собственный start-marker через `wx`. Успех старого запуска возвращается как no-op; неизвестный/неуспешный исход требует сверки прежнего unit, не автоматического повтора. Private `retire.mjs` — 245 строк; source bundle, config/units и порядок команд подготовлены без поставки.
+- [x] **4. Проверить границы.** Реальные функции в `check.mjs` запрещают тот же boot, иную VM, изменённый файл reservation и изменённый/появившийся marker. Настоящий atomic rename сохраняет bytes/inode; fake SlotLease и исторический confirmed cleanup не использованы. Assert-based checks из `evals/` прошли; локальный `--check` отверг иной хост до создания evidence. Синтаксис JS и временного unit проверен; source bundle проверен Git. Реальные reboot, auth и native release этим не объявляются проверенными.
+- [x] **5. Независимое ревью готовых артефактов и предъявление.** Скрипт/scope прошли ревью; два обязательных уточнения процедуры устранены: полный откат config/двух units при частичной поставке и возврат controller до принятия cleanup job. Повторное ревью — PASS. `evals/` совпадает с квалифицированным source; source bundle, script SHA и комплект поставки закреплены в private `proposal.json`, проверки — `checks.json`, команды — `RUN.md`. Финальный read-only read-back в 09:48 МСК подтвердил неизменность исходных файлов, marker и CAS, два результата, прежний boot/accepted harness, active controller и inactive batch. Операция подготовлена к предъявлению без применения.
+
+## Порядок после отдельного принятия готовой операции
+
+1. **Поставка и baseline.** Согласованно поставить проверенный launcher-кандидат отдельным clean checkout, как предыдущую поставку: единые harnessRoot/acceptedHarness/entrypoint и unit paths, старый checkout сохранён. Под controller lock сверить scope, manifest/results, old command/CAS, исходные selected slots/budget, original credentials hashes, marker и текущий boot. Не менять campaign journal вручную. Остановить только campaign controller перед reboot; batch должен быть inactive. При частичном отказе восстановить весь комплект config и двух units из backup, проверить согласованность и вернуть parked controller; reboot запрещён.
+2. **Reboot одной VM.** Выполнить один guest reboot и сверить её machine ID, новый boot ID, прежние файлы/IDs. Автозагрузка существующего controller сохраняется. Если SSH-ответ потерян, сначала сверить тот же boot и задачу; второй reboot не выдавать. До начала операции при уже наступившем final/deadline кампанию не возобновлять; срок не сбрасывать.
+3. **Один ограниченный job.** После возврата SSH установить и проверить временный unit, пока parked controller работает. Затем одним вызовом с EXIT/HUP fallback остановить controller и передать job системе. Он работает от прежнего UID, под существующим controller flock и тем же `controller.env`; после принятия job возврат controller обеспечивает `ExecStopPost`, в том числе при ошибке. Job ограничен 15 минутами; это предел служебной операции, не изменение eval timeout. При потере связи наблюдать этот unit/receipt, не создавать второй запуск.
+4. **Принять прежние ресурсы.** Проверить boot-fence, invariants и unchanged source hashes. Через `reopenEnvironmentLeases(oldFile, oldIdentity)` удерживать настоящие server/profile guards с теми же token/revision. Адресно запустить только прежние контейнеры при необходимости. Получить current `readServerObservation`, проверить stable configuration и `verifyParallelPair`.
+5. **Текущая проверка и архив.** Открыть native admin с current identity для read-only observations в отдельном evidence state. Под реальными old guards проверить A ownership и nonce, пустой A storage, отсутствующий B, пустой SessionBackup, закрытые server files и отсутствие сессий затронутых пользователей. Повторно проверить idle/writer/pending/recovery. Перенести только исходный A marker в evidence, архивировать историю native `archiveProfileHistory`. Старые receipts/activation records не изменять.
+6. **Вернуть operational connection.** Прочитать проверенные intent/secret исходного selected пользователя без fake lease. Из `campaignEnvironment`/`loadConfig` и исходного profile path собрать прямой scoped config. Через `agentCommand`/`management` проверить status: selected username — no-op; только ожидаемый промежуточный username при прежнем URL — native `setupProfile`; иной ответ — STOP. Требовать confirmed cleanup настоящих management-команд; сохранённые credentials и pins не редактировать. Архивировать созданную ими историю.
+7. **Подтвердить и освободить.** Повторить current sessions/storage/files/profile checks, успешно выполнить `admin.dispose`. Новые proofs явно содержат old resource identity, observed current identity/boot, hashes исходного failed cleanup и новые наблюдения/архивы. `processes=confirmed` обозначает нынешнее завершение использования после boot-fence, а не успешную историческую попытку. Выполнить native `slot.release`, затем `server.release`; проверить released read-back и неизменность данных. При частичном отказе не снимать оставшиеся guards/receipts вручную.
+8. **Вернуться к controller.** При прежнем repairer выполнить штатные `prepare-generation` → restart → `resume` с fresh verify. До нового admission проверить сохранённые два ключа и набор missing; после него доказать отсутствие повторного измерения FAIL. Если успел наступить partial/deadline, не возобновлять измерения: сохраняется итог, cleanup отражается отдельно. Независимость слотов, runner2 matrix и полный итог остаются отдельными проверками этапов 5–7.
+
+## Остановка и границы доказательств
+
+При любом несовпадении snapshot, live owner/CAS, config/IDs, marker или filesystem, при незавершённом product recovery, непустом storage, оставшейся сессии, unknown cleanup нового процесса — STOP. Старые proofs не переписываются. Уже сделанные архивы сохраняются; unit outcome и evidence определяют дальнейший шаг. `ExecStopPost` возвращает parked controller, чтобы исходный предел и публикация partial продолжали работать. Внешняя разовая операция не считается доказательством автономности LAB-170.
+
+Checkpoint:
+
+- Разрешена только подготовка; reboot, новая поставка и разовый release не выполнялись.
+- План, временный скрипт и готовая процедура прошли независимое ревью; локальные проверки и свежая сверка исходного состояния прошли.
+- Для применения требуется отдельное принятие процедуры и source SHA из private proposal; этапы 5–7 основного плана остаются открытыми.
