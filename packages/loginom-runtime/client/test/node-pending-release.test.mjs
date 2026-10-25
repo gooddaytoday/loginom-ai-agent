@@ -42,8 +42,10 @@ test('release proves a quiet unchanged graph without a gesture',async()=>{
  assert.deepEqual(proof.cleanup,{wizard_closed:false,read_view_restored:false,views_returned:false});assert.deepEqual(s.gestures,[]);
  assert.equal(proof.node_context.node_id,'new');assert.equal(proof.graph.nodes.length,1);
 });
-test('D74 release settles only its exact ambiguous wizard receipt within the original deadline',async()=>{
- for(const fault of [null,'field','cancel_graph','missing_identity','receipt','graph','expired']) {
+test('D74 release settles only its exact ambiguous wizard receipt within the original deadline',async t=>{
+ let clock=1;t.mock.method(Date,'now',()=>clock);
+ for(const fault of [null,'field','cancel_graph','missing_identity','receipt','graph','expired','late_graph_before','late_graph_after']) {
+  clock=1;
   const s=surface({wizard:fault!=='cancel_graph'}),operation=stopped();let reads=0,settled=false;
   operation.nodeApply.deadline=Date.now()+(fault==='expired'?-1:5000);
   operation.nodeApply.pending.deadline=operation.nodeApply.deadline;
@@ -54,7 +56,11 @@ test('D74 release settles only its exact ambiguous wizard receipt within the ori
    trace:[{event:'ui_gesture_applied',verb:fault==='field'?'set_wizard_field':fault==='cancel_graph'?'confirm_wizard_close':'wizard_step'}],
    output:{prepared_node_context:{...node,verified:true,surface:fault==='cancel_graph'?'graph':'wizard'},wizard:fault==='cancel_graph'?{status:'absent'}:{status:'observed',root_ref:'ui-w'}}}};
   if(fault==='missing_identity'){delete operation.lastReceipt.operation_id;delete operation.receipt.receipt.operation_id;}
-  operation.nodeTargetAdapter.observe=async()=>{const g=graphOf();if(fault==='graph'&&reads++)g.links.push({source:'foreign'});return g;};
+  operation.nodeTargetAdapter.observe=async(_context,deadline)=>{
+   reads++;if(fault!=='missing_identity'&&reads<=2)assert.equal(deadline,operation.nodeApply.deadline);
+   const g=graphOf();if(fault==='graph'&&reads>1)g.links.push({source:'foreign'});
+   if(fault==='late_graph_before'&&reads===1||fault==='late_graph_after'&&reads===2)clock=operation.nodeApply.deadline;
+   return g;};
   const observe=s.channel.observe;s.channel.observe=async options=>{
    if(!settled){if(fault==='missing_identity')assert.equal(options.settleWizard,undefined);
     else{assert.ok(options.settleWizard);assert.equal(options.settleWizard.deadline,operation.nodeApply.deadline);}settled=true;}
@@ -63,6 +69,7 @@ test('D74 release settles only its exact ambiguous wizard receipt within the ori
   if(fault&&!['field','cancel_graph','missing_identity'].includes(fault))await assert.rejects(release(operation,s.channel));
   else assert.equal((await release(operation,s.channel)).verified,true);
   if(fault&&!['field','missing_identity'].includes(fault))assert.equal(s.gestures.length,0);
+  if(fault==='expired')assert.equal(reads,0);
  }
 });
 test('release cancels only the stopped node\'s own wizard draft',async()=>{

@@ -953,6 +953,35 @@ test('an incomplete observation preserves the original refusal in the journal',a
  assert.ok(!f.events.includes('mutated'));
 });
 
+test('D74 receipt guards every unmasked read and the first transport deadline',async()=>{
+ for(const fault of [null,'graph_return','replacement','late_replacement','graph_only','port','expired','slow_roots','slow_detail','slow_ack']) {
+  let clock=fault==='expired'?1000:1,reads=0;
+  const ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]},node={document_id:'doc',workflow_id:'wf',node_id:'node'};
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:ref,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+   prepared_node_context:{...node,verified:true,surface:fault==='graph_return'?'graph':'wizard',tid:'MF;TF-1;WizrdMCF'},
+   wizard:fault==='graph_return'?{status:'absent'}:{status:'observed',root_ref:fault==='replacement'?'ui-replacement':'ui-original',root_tid:'MF;TF-1;WizrdMCF',stage:'sorting',owner_context:{status:'observed'}},
+   ui:{elements:[],dialogs:[],masks:[],truncated:{dialogs:false,masks:false}}};
+  const operation={id:'release',deadline:90000,action:{action_key:'node.apply',revision:'1'}};
+  const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:ref,node},targetOrigin:state.origin,targetBuild:state.loginom_build,
+   now:()=>clock,monotonicNow:()=>clock,record:async e=>{if(fault==='slow_ack'&&e.phase==='node_observation_completed')clock=1000;return structuredClone(e);},
+   execute:async(_code,options)=>{
+    assert.ok(options.timeout>0&&options.timeout<=1000-clock);reads++;
+    if(fault==='slow_roots')clock+=1200;
+    if(fault==='slow_detail')clock+=600;
+    if(fault==='late_replacement'&&reads===2)state.wizard.root_ref='ui-replacement';
+    return {status:'SUCCEEDED',output:structuredClone(state)};
+   },wrapMutation:()=>{throw Error('No gesture permitted');}});
+  const run=()=>channel.observe({condition:'receipt-bound release',releaseWizard:true,
+   settleWizard:{root_ref:'ui-original',graph_only:['graph_only','graph_return'].includes(fault),deadline:1000,
+    node:{...node,...(fault==='port'?{input_port:{port_guid:'original'}}:{})}},ready:()=>true});
+  if(!fault||fault==='graph_return')await run();else await assert.rejects(run(),/context|deadline|timeout/i);
+  if(fault==='expired')assert.equal(reads,0);
+  if(fault==='slow_roots')assert.equal(reads,1);
+  if(fault==='slow_detail')assert.equal(reads,2);
+  assert.equal(operation.deadline,90000);
+ }
+});
+
 test('D74 ordinary readiness waits only for its own wizard mask under the original deadline',async()=>{
  for(const fault of [null,'foreign','node','expired']) {
   let time=1,mutations=0;

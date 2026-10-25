@@ -357,8 +357,23 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       // Wall time binds the parent deadline once; elapsed waits must survive clock corrections.
       const started = now(), monotonicStarted = monotonicNow();
       const observationNow = () => started + monotonicNow() - monotonicStarted;
-      let deadline = settleOutputPort?operation.deadline:Math.min(operation.deadline, started + timeoutMs);
-      const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
+      let deadline = Math.min(settleWizard?.deadline??Infinity,settleOutputPort?operation.deadline:Math.min(operation.deadline, started + timeoutMs));
+      const readTimeout = () => Math.min(35000, Math.max(settleWizard?0:MIN_OBSERVATION_READ_MS, Math.min(deadline,settleWizard?.deadline??Infinity) - observationNow()));
+      const read = async (code,options) => {
+        if(settleWizard&&observationNow()>=Math.min(deadline,settleWizard.deadline))throw new NodeReadinessTimeout(condition);
+        const value=await execute(code,options);
+        if(settleWizard&&observationNow()>=Math.min(deadline,settleWizard.deadline))throw new NodeReadinessTimeout(condition);
+        return value;
+      };
+      const assertSettlement = state => {
+        if(!settleWizard)return;
+        const n=state.prepared_node_context,w=state.wizard;
+        if(n?.verified!==true||!['document_id','workflow_id','node_id','input_port','output_port'].every(k=>
+          JSON.stringify(n[k])===JSON.stringify(settleWizard.node[k]))
+          ||!(n.surface==='graph'&&w?.status==='absent'
+            ||!settleWizard.graph_only&&n.surface==='wizard'&&w?.status==='observed'&&w.root_ref===settleWizard.root_ref))
+          throw Error('Original wizard receipt context changed');
+      };
       let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, settlingWizard, sampleStarted = observationNow();
       try {
       for (let sample = 0; settleOutputPort || settleProcessConsole || settlingWizard || sample < 80; sample++) {
@@ -373,7 +388,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if (observationNow() >= deadline) break;
         sampleStarted = observationNow();
         // Rediscover the root: wizard transitions and combo portals can replace it.
-        const roots = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
+        const roots = await read(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
           ...boundOptions,
           discover_roots: true, expected_origin: targetOrigin, expected_build: targetBuild }),
         { timeout: readTimeout() });
@@ -399,6 +414,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           error.nodeObservationRefusal=outcome;
           throw error;
         }
+        assertSettlement(roots.output);
         const wizard = roots.output.wizard;
         if(releaseWizard&&wizard?.status==='observed') {
           assertContext(roots.output,true,null,true);
@@ -450,10 +466,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         // Polling repaints the native process console. Read its cache before
         // issuing final UI refs/epoch, so those refs do not age across the
         // separate native transport. The exact node context must still match.
-        const nativeProcesses=readProcesses?await execute(makeNodeProcessContextCode(preparedNodeContext),
+        const nativeProcesses=readProcesses?await read(makeNodeProcessContextCode(preparedNodeContext),
           {timeout:readTimeout()}):null;
         if (observationNow() >= deadline) break;
-        result = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
+        result = await read(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
           ...boundOptions,
           root_ref: root, expected_origin: targetOrigin, expected_build: targetBuild,
           ...(importColumnPage===undefined?{}:{import_column_page:importColumnPage}),
@@ -463,14 +479,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(result.status==='SUCCEEDED'&&readMissingValues&&result.output.wizard?.stage==='missing_values'&&result.output.ui.dialogs.length===1){
           // Ext's message box has no root data-tid. Re-read its observed portal;
           // native field ownership and exact prompt controls are checked below.
-          result=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
+          result=await read(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
             root_ref:result.output.ui.dialogs[0].ref,expected_origin:targetOrigin,expected_build:targetBuild}),
           {timeout:readTimeout()});
         }
         if(result.status==='SUCCEEDED' && wizardConfirmationOwner(result.output,wizardConfirmation)) {
           // The native message box is a portal outside the wizard subtree.
           const dialog=result.output.ui.dialogs[0];
-          result=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
+          result=await read(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
             root_ref:dialog.ref,expected_origin:targetOrigin,expected_build:targetBuild}),
           {timeout:readTimeout()});
         }
@@ -504,31 +520,32 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           error.nodeObservationRefusal = structuredClone(result);
           throw error;
         }
+        assertSettlement(result.output);
         if(readPreview){
-          result.output.node_preview_schema=await execute(makeNodePreviewSchemaCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_preview_schema=await read(makeNodePreviewSchemaCode(preparedNodeContext),{timeout:readTimeout()});
         }
         if(readFilter){
-          result.output.node_filter=await execute(makeFilterContextCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_filter=await read(makeFilterContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_filter.node_context&&JSON.stringify(canonical(result.output.node_filter.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Native filter context changed during observation');
         }
         if(readMissingValues){
-          result.output.node_missing_values=await execute(makeMissingValuesContextCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_missing_values=await read(makeMissingValuesContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_missing_values.node_context&&JSON.stringify(canonical(result.output.node_missing_values.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Native missing values context changed during observation');
         }
         // CrossTable modal ownership is attested by its native cached record,
         // before a modal can pass the context gate or authorize any action.
         if(readCrossTable&&result.output.wizard?.stage==='crosstable'){
-          result.output.node_crosstable=await execute(makeCrossTableContextCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_crosstable=await read(makeCrossTableContextCode(preparedNodeContext),{timeout:readTimeout()});
           const native=result.output.node_crosstable;
           if(native.node_context&&JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
             throw Error('CrossTable native owner changed during observation');
         }
         if(readLinRegression){
-          result.output.node_linregression=await execute(makeLinRegressionContextCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_linregression=await read(makeLinRegressionContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_linregression.node_context&&JSON.stringify(canonical(result.output.node_linregression.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Linear regression native owner changed during observation');
         }
         if(readClustering){
-          result.output.node_clustering=await execute(makeClusteringContextCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_clustering=await read(makeClusteringContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_clustering.node_context&&JSON.stringify(canonical(result.output.node_clustering.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Clustering native owner changed during observation');
         }
         try {
@@ -542,7 +559,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           if(error.message==='Node procedure is blocked by a mask or dialog'&&dialogs?.length
               &&!signal?.aborted&&observationNow()+MIN_OBSERVATION_READ_MS<deadline) {
             try {
-              const snapshot=await execute(makeBlockingWindowDiagnosticCode({refs:dialogs.map(d=>d.ref),origin:targetOrigin,build:targetBuild}),{timeout:readTimeout()});
+              const snapshot=await read(makeBlockingWindowDiagnosticCode({refs:dialogs.map(d=>d.ref),origin:targetOrigin,build:targetBuild}),{timeout:readTimeout()});
               await entry('node_blocking_window_native',{step,sample,internal_operation_id:id,condition,snapshot});
             } catch {
               await entry('node_blocking_window_native_unavailable',{step,sample,internal_operation_id:id,condition}).catch(()=>{});
@@ -554,7 +571,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           if(error.message==='Node procedure is blocked by a mask or dialog'&&typeof blocker?.ref==='string'
               &&!signal?.aborted&&observationNow()+MIN_OBSERVATION_READ_MS<deadline) {
             try {
-              const detail=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
+              const detail=await read(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
                 root_ref:blocker.ref,expected_origin:targetOrigin,expected_build:targetBuild}),{timeout:readTimeout()});
               await entry('node_blocking_dialog_observed',{step,sample,internal_operation_id:id,
                 condition,dialog_ref:blocker.ref,outcome:structuredClone(detail)});
@@ -597,7 +614,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           [readCollapse,'node_collapse',makeCollapseContextCode], [readDateTime,'node_date_time',makeDateTimeContextCode], [readDuplicates,'node_duplicates',makeDuplicatesContextCode], [readUnion,'node_union',makeUnionContextCode], [readJoin,'node_join',makeJoinContextCode], [readCalculator,'node_calculator',makeCalculatorContextCode], [readJavascript,'node_javascript_schema',makeJavascriptSchemaContextCode], [readGrouping,'node_grouping',makeGroupingContextCode], [readReplacement,'node_replacement',makeReplacementContextCode], [readSorting,'node_sorting',makeSortingContextCode], [readReform,'node_reform',makeReformContextCode]]) {
           if (!requested) continue;
           if (observationNow() >= deadline) break;
-          const native=await execute(key==='node_mapping'?makeCode(preparedNodeContext,mappingEditorBinding):makeCode(preparedNodeContext),{timeout:readTimeout()});
+          const native=await read(key==='node_mapping'?makeCode(preparedNodeContext,mappingEditorBinding):makeCode(preparedNodeContext),{timeout:readTimeout()});
           result.output[key]=native;
           if(key==='node_mapping'&&mappingEditorBinding)result.output.node_mapping_editor=structuredClone(mappingEditorBinding);
           if(native.node_context && JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
@@ -606,7 +623,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(tablePage) {
           if(observationNow()>=deadline)break;
           result.output.node_table_request=structuredClone(tablePage);
-          result.output.node_table=await execute(makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page),
+          result.output.node_table=await read(makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page),
             {timeout:readTimeout()});
         }
         if(observationNow()>=deadline)break;
@@ -694,6 +711,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const persisted = await entry('node_observation_completed', { step, internal_operation_id: id,
         readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), elapsed_ms: observationNow() - started }, outcome: structuredClone(result) });
       if (!persisted?.outcome?.output) throw new Error('Node observation requires a durable journal acknowledgement');
+      if(settleWizard&&observationNow()>=Math.min(deadline,settleWizard.deadline))throw new NodeReadinessTimeout(condition);
       evidenceSnapshot = structuredClone(persisted.outcome.output);
       snapshot = structuredClone(result.output);
       snapshotTableDialog=tableDialog?structuredClone(tableDialog):null;
