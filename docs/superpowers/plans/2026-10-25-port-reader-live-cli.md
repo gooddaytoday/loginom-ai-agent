@@ -157,7 +157,7 @@ Cold audit сначала штатно активирует сохранённы
 - Luna lowliqa3b9fc4e: port35×5 + native CSV1508bytes + cleanup PASS; независимое ревью подтверждено.
 - Model controller gate проверяет nativeclose/logout/ACK/visible/свои процессы до authcopy; self-check/review PASS; checker отверг0rows с ложным read_limit.
 - Cold Import16cols+source/format/Filter<1/topology5nodes4links подтверждены; после nativeactivation сохранённые Sort/Reform выполнены без перенастройки/Save/ExportExecute, обеASCkeys/exclusions/ExportUTF8comma/path сохранены.
-- Cold definition order отличается от explicit mapping операции; physicalDataSourceeffect/причина не установлены. Functional PASS сохраняется; cold-settings PARTIAL, не общий PASS.
+- Coldcb9743ce: независимый DataSource.Columns подтвердил физическую перестановку Reform после activation при autosync=true; nativeclose/logout/discardfalse/browserclose PASS. Исторически устойчивый explicit order проверялся с autosync=false; причина текущего отличия и baseline cold ещё не установлены.
 - Cold0d3b21bd cleanupBLOCKED: адресно закрыта одна PendingDisconnect session с exact ownpath; отсутствие/nativeadminlogout/browserclose подтверждены. Старый Package1 не трогали.
-- Последний cold4a89dc2c завершён nativeclose/logout/discardfalse/browserclose; collection исходных наблюдений требует отдельной оценки orderразличия.
-- Запущена baseline Luna low-liquidity как A/B-диагностика первого gate. Прочая серия/точная матрица/fault artifact ещё не запускались.
+- Baseline Luna lowliqf888bd65: все35×5 + nativeCSV1508bytes с тем же hash + cleanup PASS; candidate647779ms/baseline993830ms, один функциональный прогон с разными выбранными моделями read samples, не статистическая оценка.
+- Первый functional gate принят независимым ревью; cold order PARTIAL не запрещает проверять остальные границы. Запущен candidate zscore; остальная серия/точная матрица/fault artifact ещё не запускались.
