@@ -95,6 +95,8 @@ test.skipIf(!process.env.EVAL_ADMIN_LIVE_CONFIG || !process.env.EVAL_CLI_BIN)("u
   expect(await Bun.file(path.join(root, "owner.json")).exists()).toBe(false)
   expect(await Bun.file(path.join(root, "unused.env")).exists()).toBe(false)
   expect(await runCampaign(manifestFile, serverFile, true, "cancel-unused-verify", "EvalBaseline")).toEqual(finalized)
+  const terminalProof = await readLeaseReceipt(result.slotProof)
   await destroyPair(file, options)
   await rm(root, { recursive: true })
+  expect(terminalProof).toMatchObject({ releaseScope: "owned-resources-only", accountIdentityContinuity: false, accountMutationAllowed: false })
 }, 120_000)
