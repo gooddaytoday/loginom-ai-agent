@@ -10,8 +10,8 @@ function fixture(count=66) {
   const rendered=fields.slice(offset,end).filter(f=>f.index>=start&&f.index<stop).map(f=>({...f,status:'observed'}));
   const s={table_settings:{status:'observed',kind:'format',format:{page:{schema_id:'schema',status:rendered.length===end-offset?'complete_definition_page':'rendered_definition_window',offset,limit,total_columns:count,next_offset:end===count?null:end,rendered_start:start,rendered_end:stop},metadata_fields:structuredClone(fields.slice(offset,end)),fields:rendered,definition_scroll_ref:'scroll'}},
     ui:{elements:[{ref:'scroll',scroll:{ref:'scroll',top,max_top:(count-13)*24},allowed_actions:['scroll'],bounding_box:{height:312}}]}};
-  ch.mutate?.(s,++reads);assert.equal(ready(s),true);return s;
- },async perform(step){assert.equal(step.ready(step.initialObservation),true);const a=step.resolve(step.initialObservation);assert.equal(a.verb,'scroll');assert.equal(a.ref,'scroll');assert.ok(Math.abs(a.delta_y)<=1000);actions++;if(!ch.stuck)top=Math.max(0,Math.min((count-13)*24,top+a.delta_y));},get actions(){return actions;}};
+  reads++;ch.mutate?.(s,reads);assert.equal(ready(s),true);return s;
+ },async perform(step){assert.equal(step.ready(step.initialObservation),true);const a=step.resolve(step.initialObservation);assert.equal(a.verb,'scroll');assert.equal(a.ref,'scroll');assert.ok(Math.abs(a.delta_y)<=1000);actions++;if(!ch.stuck)top=Math.max(0,Math.min((count-13)*24,top+a.delta_y));},get actions(){return actions;},get reads(){return reads;}};
  return {ch,fields};
 }
 test('Table metadata assembles unrendered fields and reveals last then first without changing identity',async()=>{
@@ -31,4 +31,23 @@ test('Table field reveal stops when native scrolling does not move',async()=>{
 test('Table field reveal rejects a changed record before scrolling',async()=>{
  const {ch,fields}=fixture(),d=await readTableFormatDefinitions(ch,table);fields[65]={...fields[65],record_id:'new-record'};
  await assert.rejects(revealTableFormatField(ch,table,d,d.fields[65]),/field changed/);assert.equal(ch.actions,0);
+});
+
+test('field reveal reuses its current page and verifies the same field before any scroll',async()=>{
+ const {ch,fields}=fixture(),d=await readTableFormatDefinitions(ch,table);
+ const initial=await revealTableFormatField(ch,table,d,fields[0]),before=ch.reads;
+ const reused=await revealTableFormatField(ch,table,d,fields[1],initial);
+ assert.equal(reused,initial);assert.equal(ch.reads,before);assert.equal(ch.actions,0);
+ const other=await revealTableFormatField(ch,table,d,fields[9],initial);
+ assert.notEqual(other,initial);assert.equal(ch.reads,before+1,'a different metadata page needs a new read');
+});
+for(const [name,change] of Object.entries({schema:s=>s.table_settings.format.page.schema_id='foreign',
+ record:s=>s.table_settings.format.metadata_fields[1].record_id='foreign',
+ source:s=>s.table_settings.format.metadata_fields[1].source_index=2,
+ key:s=>s.table_settings.format.metadata_fields[1].name_key='foreign',
+ type:s=>s.table_settings.format.metadata_fields[1].type='real'}))test('current field snapshot refuses changed '+name+' before reuse or scroll',async()=>{
+ const {ch,fields}=fixture(),d=await readTableFormatDefinitions(ch,table);
+ const initial=await revealTableFormatField(ch,table,d,fields[0]),before=ch.reads;change(initial);
+ await assert.rejects(revealTableFormatField(ch,table,d,fields[1],initial));
+ assert.equal(ch.reads,before);assert.equal(ch.actions,0);
 });

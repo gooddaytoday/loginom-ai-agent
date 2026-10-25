@@ -50,7 +50,12 @@ export const wizardReadiness=withJavascriptWizardAddress(withJavascriptWizardMas
     &&indicatorDom.length===indicators.length&&indicatorDom.every((e,i)=>e.id===indicators[i].id);
   const checked=indicators.map((e,i)=>e.checked===true?i:-1).filter(i=>i>=0);
   const pageIndex=indicatorBinding&&checked.length===1&&indicators[checked[0]].visible?checked[0]:null;
-  const crumbs=[...document.querySelectorAll('[data-tid^='+JSON.stringify(prefix+';cnrNaviMode;b.s_')+']')].filter(visible);
+  // The toolbar overflows node/Settings breadcrumbs with display:none. They
+  // are context only: address verification below still binds both Ext controls
+  // to the retained native node/wizard. Pages, editors and gesture controls stay visible.
+  const crumbs=[...document.querySelectorAll('[data-tid^='+JSON.stringify(prefix+';cnrNaviMode;b.s_')+']')].filter(e=>visible(e)
+    ||getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'
+      &&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden'));
   const overlays=[...document.querySelectorAll('.bg-mask-message,.x-mask-msg,.x-mask,[role="dialog"],.x-message-box')].filter(visible);
   // Ext masks a disabled delete-all column even when the wizard is ready.
   // Match only that observed control, never arbitrary .x-mask elements.

@@ -4,6 +4,58 @@ import { validateActionParameters } from '../lib/action-catalog.mjs';
 import { actions, selectors, build, Page, nodeParameters, linkPage, linkParameters, run, runtime } from './support/executor-fixture.mjs';
 import {createJavascriptPersistenceSaver, javascriptPersistenceSaveAction} from '../../tools/loginom-acceptance/javascript-persistence-save.mjs';
 
+test('both saves refuse a read-only native package self-path before any gesture', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) {
+    const page = linkPage(); page.packagePath = '\\user\\data\\packages\\locked.lgp';
+    Object.defineProperty(page.app.PackageTreeNode.prototype, 'ReadOnly', { get: () => true });
+    const clicked = [], click = page.click.bind(page);
+    page.click = async item => { clicked.push(item.symbol); return click(item); };
+    const outcome = await run(page, action, { path: '/user/data/packages/locked.lgp', conflict_policy: 'replace' });
+    assert.equal(outcome.status, 'FAILED', JSON.stringify(outcome));
+    assert.equal(outcome.effect_possible, false);
+    assert.equal(outcome.cleanup_complete, true);
+    assert.match(outcome.error.message, /read.only.*different.*path/i);
+    assert.deepEqual(clicked, []);
+    assert.equal(page.storage.size, 0);
+  }
+});
+
+test('read-only native packages can save an explicit copy and writable packages can replace themselves', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) for (const readOnly of [false,true]) {
+    const page = linkPage(); page.packagePath = '/user/data/packages/source.lgp';
+    Object.defineProperty(page.app.PackageTreeNode.prototype, 'ReadOnly', { get: () => readOnly });
+    const path = readOnly ? '/user/data/packages/copy.lgp' : page.packagePath;
+    const outcome = await run(page, action, { path, conflict_policy: 'replace' });
+    assert.equal(outcome.status, 'SUCCEEDED', JSON.stringify(outcome));
+    assert.ok(page.storage.has(path));
+  }
+});
+
+test('both saves reuse an already open Packages menu without a closing toggle', async () => {
+  for (const action of ['package.save_checkpoint','package.save_as']) {
+    const page = linkPage(); page.menu = true;
+    const clicked = [], click = page.click.bind(page);
+    page.click = async item => {
+      clicked.push(item.symbol);
+      if (item.symbol === 'packages.menu') { page.menu = !page.menu; return; }
+      return click(item);
+    };
+    const outcome = await run(page, action, { path: '/user/data/packages/open-menu.lgp', conflict_policy: 'fail' });
+    assert.equal(outcome.status, 'SUCCEEDED', JSON.stringify(outcome));
+    assert.equal(clicked[0], 'packages.save_as');
+  }
+});
+
+test('a cleanup failure keeps the original Save exception in its existing trace', async () => {
+  const page = linkPage(), click = page.click.bind(page);
+  page.click = async item => { if (item.symbol === 'packages.save_as') throw Error('Primary Save refusal'); return click(item); };
+  page.keyboard.press = async () => {};
+  const outcome = await run(page, 'package.save_checkpoint', { path: '/user/data/packages/refused.lgp', conflict_policy: 'fail' });
+  assert.equal(outcome.error.code, 'CLEANUP_FAILED');
+  assert.equal(outcome.cleanup_complete, false);
+  assert.equal(outcome.trace.find(item => item.event === 'action_failed').message, 'Primary Save refusal');
+});
+
 async function arrangePage({ intent = 'new_draft', running = false, wizard = false } = {}) {
   const page = linkPage(), packageNode = new page.app.PackageTreeNode();
   page.storageBinding = { session_id: 'own-session', document_id: 'own-document' };
@@ -700,4 +752,35 @@ test('host lifecycle distinguishes an active operation from retained uncertainty
     assert.equal(engine.hasActiveWork(), ambiguous);
     assert.equal(engine.hasUnsettledWork(), ambiguous);
   }
+});
+
+test('Save-copy before the first node read retains the prepared native workflow and refreshes navigation',async()=>{
+ const {page,flow}=await continuationPage(),receipt=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ receipt.crumbs=page.elements().filter(e=>['save_crumb','save_nav_parent'].includes(e.kind))
+   .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent}));
+ delete receipt.nodeTargetWorkflowNode;
+ const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/copied-before-read.lgp',conflict_policy:'fail'});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ const [continuation]=result.output.workflow_continuations;
+ assert.ok(continuation,'an unopened prepared workflow must not disappear from Save continuations');
+ assert.equal(receipt.nodeTargetWorkflowNode,flow);
+ assert.equal(continuation.previous_workflow_ref.navigation_path[2].label,'Draft');
+ assert.equal(continuation.workflow_ref.navigation_path[2].label,'Saved');
+ assert.ok(result.trace.some(row=>row.event==='saved_navigation_workflow_returned'));
+ assert.equal(page.events.includes('package_closed'),false);
+});
+for(const fault of ['package','crumb','missing crumbs','workflow class'])
+test('unread prepared Save-copy rejects a changed initial binding: '+fault,async()=>{
+ const {page}=await continuationPage(),receipt=page.context.__loginomDockPreparationV1.receipts.get('prepared');
+ delete receipt.nodeTargetWorkflowNode;
+ receipt.crumbs=page.elements().filter(e=>['save_crumb','save_nav_parent'].includes(e.kind))
+   .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent}));
+ if(fault==='package')receipt.packageNode=new page.app.PackageTreeNode();
+ if(fault==='crumb')receipt.crumbs[2].tid='foreign';
+ if(fault==='missing crumbs')delete receipt.crumbs;
+ if(fault==='workflow class')delete page.app.WorkFlowTreeNode;
+ const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/must-not-save.lgp',conflict_policy:'fail'});
+ assert.notEqual(result.status,'SUCCEEDED');
+ assert.equal(page.storage.size,0,'reject before Save');
+ assert.equal(receipt.nodeTargetWorkflowNode,undefined);
 });

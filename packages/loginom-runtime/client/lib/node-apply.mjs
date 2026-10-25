@@ -1,11 +1,11 @@
 import {createHash} from 'node:crypto';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
-import {verifiedNativeReadRefusal,verifiedExportReadRefusal} from './native-read-refusal.mjs';
+import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUiReadRefusal} from './native-read-refusal.mjs';
 import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-schema-refusal.mjs';
 import {verifiedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
 import {verifiedJavascriptSourcePolicyRefusal} from './javascript-source-policy-refusal.mjs';
 import {NODE_CONTRACT_REVISION, validateNodeTargetRequest} from './node-contracts.mjs';
-import {NODE_READ_MODE,nodeReadHandler} from './node-read-contract.mjs';
+import {NODE_READ_MODE,nodeReadHandler,isUnchangedTextImportExecution,isUnchangedTransformExecution} from './node-read-contract.mjs';
 
 const stable = v => Array.isArray(v) ? v.map(stable) : v && typeof v === 'object'
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, stable(v[k])])) : v;
@@ -211,6 +211,13 @@ export async function applyNode({request, operation, handlers, drivers, record,
       // Explicit trusted-driver proof is required: a transport exception alone
       // never clears uncertainty, even in a nominally non-mutating phase.
       const refusal=error.nodePhaseRefusal;
+      if(name==='read'&&request.target.type==='programming.javascript'
+        &&operation.cleanupConfirmed===true&&!operation.transportUncertain
+        &&verifiedJavascriptUiReadRefusal(refusal,state.node,state.execution,request.read)){
+        await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
+        state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
+        state.javascript_read_refusal=true;
+      }
       if(name==='read'&&request.target.type==='exports.text'&&operation.cleanupConfirmed===true&&!operation.transportUncertain
         &&verifiedExportReadRefusal(refusal,state.node,state.execution,operation.id)){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
@@ -328,7 +335,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
     requireValue(now()<pending.deadline,'node.apply phase deadline elapsed: '+name);
     return value;
   };
-  const readingOnly=request.mode===NODE_READ_MODE;
+  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request);
   const waitForExecution=async name=>{
       const execution=await phase(name,ctx=>drivers.waitExecution(ctx),{budget:request.budgets.execute_ms,mutation:false,
         verify:value=>requireValue(value.execution_id===state.execution.execution_id
@@ -431,7 +438,13 @@ export async function applyNode({request, operation, handlers, drivers, record,
     }
     check();
     const result={operation_id:operation.id,status:'SUCCEEDED',effect_possible:state.effect_possible,phases:state.phases.map(({value,...p})=>p),node:state.node,
-      execution:state.execution,output:state.output,package_saved:false,cleanup_complete:true,warnings:[],
+      execution:state.execution,output:state.output,package_saved:false,cleanup_complete:true,
+      warnings:request.target.type==='imports.text'&&typeof finish.node_label==='string'
+        ?['Import node '+JSON.stringify(state.node)+' has observed caption '+JSON.stringify(finish.node_label)+' after Finish. '
+          +'Loginom may replace its default caption with the source filename. If the user requested a different caption, including “Текстовый файл”, '
+          +'use a NEW dock_node_apply operation_id on this SAME existing node with target.label set to the requested caption, '
+          +'parameters:{settings:{}}, inputs:[], mappings:[], finish:"execute" and read.ports:[0]. This preserves the saved import configuration without uploading again. '
+          +'Otherwise report this actual caption.']:[],
       configuration:{status:readingOnly?'not_requested':request.finish==='close'?'discarded':'applied',
         ...(!readingOnly&&request.finish!=='close'&&handler.configurationReadback?{readback:handler.configurationReadback({
           node:state.node,phases:state.phases,operation_id:operation.id})}:{})},
@@ -453,7 +466,9 @@ export async function applyNode({request, operation, handlers, drivers, record,
             +' with expected_source_sha256:'+state.javascript_wizard_refusal.retained_source.source_sha256
             +'. Preserve inputs:[] and mappings:[]. Do not recreate or save the package; no explicit Execute was sent.'}
           :state.export_download_refusal?{tool:'dock_action_run',original_operation_id:operation.id,
-          instruction:'The native export completed, but its download was not confirmed. The original scenario is restored, its temporary download lease released and no phase remains unresolved. Save the scenario with dock_action_run, action_key:"package.save_checkpoint", a NEW operation_id and the task package path in parameters.path. Report the download as unconfirmed. Do not resume this failed operation, repeat export, or recreate the node.'}
+          instruction:'The native export completed, but its download was not confirmed. The original scenario is restored, its temporary download lease released and no phase remains unresolved. Save the scenario with dock_action_run using action_key package.save_checkpoint, a NEW operation_id and the task package path in parameters.path. Report the download as unconfirmed. Do not resume this failed operation, repeat export, or recreate the node.'}
+          :state.javascript_read_refusal?{tool:'dock_node_apply',original_operation_id:operation.id,
+          instruction:'JavaScript full reading exceeds the 100-row UI limit. The Table read has returned to the workflow, precision restored and execution retained. No phase remains unresolved; saving or another action is allowed. Do not recreate or reconfigure the node. Use a NEW operation_id on the SAME existing target with parameters:{}, inputs:[], mappings:[], finish:"execute" and read:{ports:[0],sample_rows:100,require_exact_numbers:true} without full coverage for a sample, or verify the complete downloaded CSV Export.'}
           :state.native_read_refusal?{tool:'dock_node_apply',original_operation_id:operation.id,
           instruction:'Full native reading was refused by the unchanged 50x8 limit. The owned Preview is closed, workflow restored and execution retained. No operation remains unresolved; saving or another action is allowed. Do not recreate or reconfigure the node. For a scalar report use a NEW operation_id with the SAME existing target, parameters:{}, inputs:[], mappings:[], finish:"execute" and read:{ports:[0],sample_rows:100,require_exact_numbers:true} without full coverage. This does not authorize ordinary reading of Variant values.'}:correctNodeRequest(request,state.node,state.export_destination_conflict===true)}:{}),
       ...(state.correctable_import_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
@@ -486,7 +501,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
         &&proof.node?.workflow_id===request.workflow_ref.workflow_id&&id(proof.node.node_id)), 'Pre-target release proof differs');
     const result={operation_id:operation.id,status:'FAILED',effect_possible:state.effect_possible,
       phases:state.phases.map(({value,...p})=>p),node:proof.node,execution:state.execution,output:state.output,
-      package_saved:false,cleanup_complete:true,configuration:{status:'not_requested'},warnings:[],
+      package_saved:false,cleanup_complete:true,configuration:{status:'not_requested'},warnings:proof.warnings??[],
       checkpoint_kind:'local_node_released',persisted_package_verified:false,pending_phase:null,released_phase:pending.phase,
       error:{code:'NODE_OPERATION_RELEASED',message:'Early node phase released after confirmed browser completion and a quiet original graph; the stopped phase was not repeated.'},
       next_step:request.mode===NODE_READ_MODE?{tool:'dock_node_read',original_operation_id:operation.id,
@@ -513,14 +528,14 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   const verified=name=>state.phases.some(p=>p.phase===name);
   const committed=request.finish!=='close'&&(verified('finish')||handler.output_wizard==='separate'&&verified('node_finish')&&verified('output_mapping'));
   const launch=['materialization_start','materialization_execute','execute'].includes(pending.phase)||pending.phase==='finish'&&request.finish==='execute';
-  const readingOnly=request.mode===NODE_READ_MODE;
+  const readingOnly=request.mode===NODE_READ_MODE||isUnchangedTextImportExecution(request)||isUnchangedTransformExecution(request);
   // Export release proves only workspace cleanup. An unconfirmed launch may
   // already have written a file; never infer its settings or offer a replay.
   const exportRelease=request.target.type==='exports.text';
   // Closing a stopped script wizard proves release, not the retained source,
   // settings or any internal JavaScript materialization effects.
   const javascriptDraft=request.target.type==='programming.javascript'&&request.mode==='script'
-    &&['input_mapping','open','configure'].includes(pending.phase);
+    &&['input_mapping','open','configure','node_finish'].includes(pending.phase);
   const configuration=readingOnly?{status:'not_requested'}:exportRelease||javascriptDraft?{status:'unknown'}:committed?{status:'applied',...(verified('finish')&&handler.configurationReadback
     ?{readback:handler.configurationReadback({node:state.node,phases:state.phases,operation_id:operation.id})}:{})}
     :{status:proof.cleanup.wizard_closed&&!verified('node_finish')?'discarded':'unknown'};
@@ -540,7 +555,7 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
     next_step:exportRelease?{tool:'dock_action_run',original_operation_id:operation.id,
       instruction:'The stopped text export was released, but its settings, execution and file output remain unverified. '
         +'Do not resume this operation, repeat the export or recreate the node: a file may already have been written. '
-        +'Save the retained scenario with dock_action_run, action_key:"package.save_checkpoint", a NEW operation_id '
+        +'Save the retained scenario with dock_action_run using action_key package.save_checkpoint, a NEW operation_id '
         +'and the task package path in parameters.path, or continue work on other nodes. Report export and download as unconfirmed.'}
       :readSource?{tool:'dock_node_read',original_operation_id:operation.id,
       instruction:(readingOnly?'This output read was released. ':'The node is configured and executed; only reading its output stopped. ')
@@ -548,7 +563,12 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
       :{tool:'dock_node_apply',original_operation_id:operation.id,
       instruction:'Configuration: '+configuration.status+'. Execution: '+execution.status+'. Do not recreate the node and do not resume this released operation. To continue with this node, submit a NEW operation_id with target:'
         +JSON.stringify({kind:'existing',type:request.target.type,ref:state.node})
-        +' and inputs:[] (existing links stay), supplying the complete intended settings for an existing node of this type; choose finish:"execute" when output is needed. Saving the package and work on other nodes are allowed now.'}};
+        +(request.target.type==='transform.cross_table'
+          ?' and inputs:'+JSON.stringify(request.inputs)+(request.inputs.length
+            ?' (reuse the same input-zero source/output), supplying the complete intended CrossTable settings'
+            :' and parameters:{} to execute the retained CrossTable configuration. To change roles or facts, supply complete settings and one explicit input zero from the observed source/output')
+          :' and inputs:[] (existing links stay), supplying the complete intended settings for an existing node of this type')
+        +'; choose finish:"execute" when output is needed. Saving the package and work on other nodes are allowed now.'}};
   const event={operation_id:operation.id,action_key:'node.apply',action_revision:NODE_CONTRACT_REVISION,
     phase:'node_operation_released',signature:state.signature,receipt:{...pending,proof},result};
   const saved=await record(event);

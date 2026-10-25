@@ -5,7 +5,11 @@ import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-executi
 import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
 import {readTableOutputPages} from './table-output-pages.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
-import {alignReadSchema} from './node-read-contract.mjs';
+import {alignReadSchema,isUnchangedTextImportExecution,isUnchangedTransformExecution} from './node-read-contract.mjs';
+import {openPreparedWizard} from './node-wizard-open.mjs';
+import {closePreparedWizard} from './node-wizard-close.mjs';
+import {joinReady} from './join-procedure.mjs';
+import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {createJavascriptSourceAdmission} from './javascript-source-admission.mjs';
 import {createJavascriptManagedSourceAdapter} from './javascript-managed-source-adapter.mjs';
 import {openManagedJavascriptOutputViews} from './javascript-managed-views.mjs';
@@ -17,6 +21,8 @@ const verified=value=>({verified:true,cleanup_complete:true,effect_possible:fals
 export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor}){
  const {operation,execute,onRecord,now,receiptOptions}=options;
  const request=operation.parameters,javascript=request.target.type==='programming.javascript';
+ const unchangedImport=isUnchangedTextImportExecution(request),unchangedTransform=isUnchangedTransformExecution(request);
+ const unchanged=unchangedImport||unchangedTransform;
  const owner=javascript?{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,
   node_id:request.target.ref.node_id,operation_id:operation.id,ui_epoch:Date.now()}:null;
  let channel,signal,driver,execution,sourceReceipt;
@@ -37,7 +43,9 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    channel:remaining=>{operation.deadline=remaining;return channel;},openingBudgetMs:180000})});
  const forbidden=()=>{throw Error('A read operation cannot open or configure node/port wizards');};
  return {
-  verifySource:async()=>verified({source_kind:'completed_local_node',source_operation_id:operation.parameters.parameters.source_operation_id}),
+  verifySource:async()=>verified(unchanged
+   ?{source_kind:unchangedImport?'unchanged_existing_text_import':'unchanged_existing_transform',node:structuredClone(request.target.ref),settings_changed:false}
+   :{source_kind:'completed_local_node',source_operation_id:request.parameters.source_operation_id}),
   ...(javascript?{async beforeTarget(ctx){
    enter({...ctx,node:request.target.ref});
    sourceReceipt=await withJavascriptSourcePolicyBoundary({phase:'target',owner,deadline:ctx.deadline,record:onRecord},
@@ -50,6 +58,34 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
   async finishGraph(mode,ctx){
    need(mode==='execute','Existing output read requires a fresh execution');enter(ctx);
    const launch=async()=>{
+   if(unchangedTransform&&request.target.type==='transform.join_data'){
+    // Read the native saved mode before the only Execute. Close discards the
+    // untouched draft; no input/output mapping is opened or committed.
+    const graph=await channel.observe({condition:'saved Join graph before mode read',ready:s=>s.prepared_node_context?.surface==='graph'});
+    await selectPreparedGraphNode(channel,graph,'select saved Join before mode read',{refreshReplacedBody:true});
+    await openPreparedWizard(channel);
+    const owned=s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='wizard'
+     &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===ctx.node[k]);
+    let state=await channel.observe({condition:'saved Join initial page before mode read',readJoin:true,
+     ready:s=>owned(s)&&['input_mapping','join'].includes(s.wizard?.stage)});
+    if(state.wizard.stage==='input_mapping'){
+     const root=state.wizard.root_tid;
+     await channel.perform({condition:'advance saved Join input page to its mode settings',initialObservation:state,
+      preserveJoinMapping:true,
+      ready:s=>owned(s)&&s.wizard?.stage==='input_mapping'&&s.wizard.root_tid===root,
+      identity:()=>({node:ctx.node,wizard_root:root}),resolve:s=>{
+       const next=s.ui.elements.filter(e=>e.tid===root+';btnNext'&&e.allowed_actions.includes('wizard_step'));
+       need(next.length===1,'Saved Join Next unavailable');
+       return {verb:'wizard_step',ref:next[0].ref,expected_stage:'join'};
+      }});
+    }
+    state=await channel.observe({condition:'saved Join mode before execution',readJoin:true,ready:s=>owned(s)&&joinReady(s)});
+    const native=state.node_join;
+    need(native.node_context?.verified===true&&['document_id','workflow_id','node_id'].every(k=>native.node_context[k]===ctx.node[k]),
+     'Saved Join mode owner differs');
+    await closePreparedWizard(channel);
+    need(native.mode===request.mode,'Preserved join mode differs from requested mode');
+   }
    driver=createNodeExecutionProcedure(channel,ctx.node,{allowDeactivate:true});await driver.prepare();
    const result=await finishConfiguredGraph(channel,driver,mode,ctx.node);
    // finishConfiguredGraph normally follows a committed wizard; here only
@@ -77,8 +113,8 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
     'Fresh owned execution required for reread');
    const ports=[];let restoration,returned;
    for(const port of read.ports){
-    const schema=operation.parameters.parameters.schemas.find(s=>s.port===port)?.schema;
-    need(schema||schema===null&&operation.parameters.parameters.observed_schema===true,'Retained output schema missing');
+    const schema=unchanged?null:request.parameters.schemas.find(s=>s.port===port)?.schema;
+    need(schema||schema===null&&(unchanged||request.parameters.observed_schema===true),'Retained output schema missing');
     const table=await openNewOutputTable(channel,port,javascript?{openViews:({output})=>openManagedJavascriptOutputViews({
      prepared:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},node:ctx.node,output,
      deadline:ctx.deadline,targetOrigin,execute,record:onRecord,receiptOptions,

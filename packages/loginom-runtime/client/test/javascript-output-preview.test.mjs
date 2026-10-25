@@ -15,6 +15,7 @@ import {preflightGroupingSource} from '../lib/grouping-preflight.mjs';
 import {preflightCalculatorSource} from '../lib/calculator-preflight.mjs';
 import {preflightSortingSource,preflightTabularSource} from '../lib/sorting-preflight.mjs';
 import {preflightJoin} from '../lib/join-node.mjs';
+import {resolveFilterConditions} from '../lib/filter-parameters.mjs';
 const source=()=>JSON.parse(readFileSync(new URL('./fixtures/javascript-preflight-source.json',import.meta.url),'utf8'));
 function fixture(){
  const history=source(),node=history.outcome.output.node;
@@ -164,10 +165,21 @@ test('managed preview journals each fixed gesture and keeps cleanup pending unti
  assert.equal(f.records.filter(r=>r.phase==='node_step_completed').length,2);
  assert.equal(new Set(steps.map(r=>r.internal_operation_id)).size,2);
 });
+test('shared preview settlement admits managed lease disposal only with its exact journal acknowledgement',async()=>{
+ for(const refused of [false,true]){
+  const f=channelFixture();f.operation.groupingPreview={managed:true};
+  const record=f.options.record;
+  f.options.record=async e=>refused&&e.phase==='node_preview_lease_disposed'?{}:record(e);
+  const opening=createNodeProcedure(f.options).openJavascriptPreview(f.task.output);
+  if(refused)await assert.rejects(opening,/disposal was not durably acknowledged/);else await opening;
+  assert.equal(f.operation.groupingPreview.lease_disposed,refused?undefined:true);
+  assert.deepEqual(f.events,['click','F3']);
+ }
+});
 
 function preflightFixture(type){
  const f=fixture(),port={...f.port,tid:f.binding.workflow_ref.prefix+';Graph;Сортировка_и_накопленная_доля_выручки;Output_Data-0'};
- const context={verified:true,...f.binding.node,surface:'graph',locked:false};
+ const context={verified:true,...f.binding.node,surface:'graph',locked:false,tid:port.tid.replace(/;Output_Data-0$/,'')};
  const state={origin:'http://localhost',loginom_build:'7.4.2',workflow_ref:f.binding.workflow_ref,dom_epoch:{document:f.binding.document_id},
   scan:{complete:true},wizard:{status:'absent'},prepared_node_context:context,
   ui:{masks:[],dialogs:[],truncated:{elements:false,masks:false,dialogs:false},elements:[{tid:port.tid,ref:'script-port',kind:'port',
@@ -178,10 +190,13 @@ function preflightFixture(type){
     ?{group_by:[{kind:'input_field',name:'abc_class'}],measures:[{field:{kind:'input_field',name:'annual_revenue'},function:'sum',name:'revenue',label:'Revenue'}]}
     :type==='transform.calculator'
      ?{expressions:[{target:{kind:'new'},name:'revenue_tax',label:'Revenue tax',type:'real',formula:'annual_revenue*0.2'}]}
-     :{keys:[{field:{kind:'input_field',name:'annual_revenue'},direction:'DESC'}]}}};
+     :type==='transform.filter_data'
+      ?{groups:[[{field:{kind:'input_field',name:'annual_revenue'},type:'real',operator:'>=',value:100}]]}
+      :{keys:[{field:{kind:'input_field',name:'annual_revenue'},direction:'DESC'}]}}};
  const options={operation,nodeHistory:()=>[f.history],onRecord:async r=>structuredClone(r),
   receiptOptions:()=>assert.fail('no mutation before private capture'),execute:async code=>{
    calls.push(code);
+   if(code.includes('runManagedJavascriptSelectionRead'))return code.includes('"mode":"dispose"')?{disposed:true}:{ready:true,node_tid:context.tid};
    if(code.includes('runJavascriptOutputPreview'))throw Error('reached owned preview capture');
    if(code.includes('readOutputContext'))return {verified:true,node_context:context,ports:[port],execution_freshness_verified:false};
    return {status:'SUCCEEDED',output:structuredClone(state)};
@@ -190,7 +205,9 @@ function preflightFixture(type){
  if(type.startsWith('join_input_')){options.operation.parameters.target.type='transform.join_data';options.operation.parameters.inputs[0].input=Number(type.at(-1));}
  return {history:f.history,binding:f.binding,context,state,port,calls,options,run:()=>type.startsWith('join_input_')
   ?preflightTabularSource(options,{},config,{required:true,inputPort:Number(type.at(-1)),label:type,resolve:()=>{}})
-  :(type==='transform.group_data'?preflightGroupingSource:type==='transform.calculator'?preflightCalculatorSource:preflightSortingSource)(options,{},config)};
+  :type==='transform.filter_data'
+   ?preflightTabularSource(options,{},config,{required:true,label:'filter',resolve:resolveFilterConditions})
+   :(type==='transform.group_data'?preflightGroupingSource:type==='transform.calculator'?preflightCalculatorSource:preflightSortingSource)(options,{},config)};
 }
 test('actual denied JS port routes Group preflight to owned fresh preview before any target creation',async()=>{
  const f=preflightFixture('transform.group_data');await assert.rejects(f.run(),/reached owned preview capture/);
@@ -208,6 +225,19 @@ test('Calculator after managed JS uses owned preview while generic port actions 
 test('Calculator cannot preview an unsettled or foreign managed JavaScript source',async()=>{
  for(const change of [f=>f.history.cleanup_confirmed=false,f=>f.history.outcome.output.node={...f.history.outcome.output.node,node_id:'foreign'}]){
   const f=preflightFixture('transform.calculator');change(f);await assert.rejects(f.run(),/not settled|ambiguous/);
+  assert.equal(f.calls.filter(code=>code.includes('runJavascriptOutputPreview')).length,0);
+ }
+});
+test('Filter after managed JS uses owned preview while its generic port remains denied',async()=>{
+ const f=preflightFixture('transform.filter_data');await assert.rejects(f.run(),/reached owned preview capture/);
+ assert.equal(f.calls.filter(code=>code.includes('runJavascriptOutputPreview')).length,1);
+ assert.deepEqual(f.state.ui.elements[0].allowed_actions,[]);
+});
+test('Filter refuses unconfirmed, stale or foreign managed JS before preview',async()=>{
+ for(const change of [f=>f.history.cleanup_confirmed=false,
+  f=>f.history.outcome.output.output.ports[0].fresh=false,
+  f=>f.history.outcome.output.node={...f.history.outcome.output.node,node_id:'foreign'}]){
+  const f=preflightFixture('transform.filter_data');change(f);await assert.rejects(f.run(),/not settled|ambiguous|freshly executed/);
   assert.equal(f.calls.filter(code=>code.includes('runJavascriptOutputPreview')).length,0);
  }
 });
@@ -256,7 +286,7 @@ for(const type of ['transform.filter_rows','transform.union_data'])test('private
  await assert.rejects(f.channel.openJavascriptPreview(f.task.output),/restricted/);assert.deepEqual(f.events,[]);
 });
 
-for(const type of ['transform.group_data','transform.sorting','transform.calculator','join_input_0','join_input_1'])test(type+' reads the fresh full preview and closes it even if schema changed',async()=>{
+for(const type of ['transform.group_data','transform.sorting','transform.calculator','transform.filter_data','join_input_0','join_input_1'])test(type+' reads the fresh full preview and closes it even if schema changed',async()=>{
  for(const changed of [false,true]){
   const f=preflightFixture(type),browser=channelFixture(),records=[];
   const original=f.options.execute,root=f.binding.workflow_ref.prefix+';ModelForm;PreviewWindow';
@@ -270,7 +300,7 @@ for(const type of ['transform.group_data','transform.sorting','transform.calcula
    if(code.includes('browserReceipt')){
     browser.events.push('close');return {status:'SUCCEEDED',action_key:receipt.action_key,operation_id:receipt.id,effect_possible:true,cleanup_complete:true};
    }
-   if(code.includes('readNodePreviewSchema'))return {verified:true,inventory_complete:true,fields:schema,root_tid:root,
+   if(code.includes('readNodePreviewSchema'))return {verified:true,inventory_complete:true,settings_changed:false,fields:schema,root_tid:root,
     port:0,port_guid:f.port.port_guid,node_id:f.binding.node.node_id,node_context:f.context};
    if(browser.events.includes('F3')&&!browser.events.includes('close')){
     const state=structuredClone(f.state);state.ui.elements=[{ref:'ui-preview',tid:root,allowed_actions:[]},
@@ -334,6 +364,60 @@ function redrawPort(f,{keepOld=false}={}){
  f.context.document.elementFromPoint=()=>replacement;
  return replacement;
 }
+function redrawNode(f,{keepOld=false,tid}={}){
+ const graph=f.held.retained.graph,current=graph.view.getState(f.native.FCell).shape.node,getState=graph.view.getState;
+ const replacement=new Element('g',{...current.attrs,...(tid?{'data-tid':tid}:{})},'',current.box);
+ if(!keepOld)current.remove();graph.container.append(replacement);
+ graph.view.getState=cell=>cell===f.native.FCell?{shape:{node:replacement}}:getState(cell);
+ return replacement;
+}
+test('confirmed node and port redraw keeps the exact native owner and permits one F3',async()=>{
+ const f=channelFixture(),click=f.page.mouse.click,old=f.held.retained.graph.view.getState(f.native.FCell).shape.node;
+ let replacement,port;
+ f.page.mouse.click=async(...args)=>{await click(...args);replacement=redrawNode(f);port=redrawPort(f);};
+ await f.channel.openJavascriptPreview(f.task.output);
+ assert.equal(old.isConnected,false);assert.equal(replacement.isConnected,true);
+ assert.deepEqual(f.events,['click','F3']);assert.deepEqual(f.pressedElements,[port]);
+ assert.equal(f.records.find(r=>r.action?.verb==='javascript_preview_open').action.expected.port_element_replacements,1);
+});
+for(const [name,change] of Object.entries({
+ connectedOldNode:(f,old)=>{const root=new Element('div');root.root=true;root.append(old);},
+ foreignNodeTid:f=>redrawNode(f,{tid:'foreign'}),
+ ownNodeAndPort:f=>f.selected.unshift(f.native.FCell),
+ nativePortData:f=>{f.port.data={};},
+ nativePortCell:f=>{f.port.FCell={parent:f.native.FCell};},
+}))test('joint node redraw refuses '+name+' before F3 or ticket rebinding',async()=>{
+ const f=channelFixture(),task={...f.task,operation_id:'joint-redraw-refusal'};
+ const run=extra=>f.options.execute(makeJavascriptOutputPreviewCode({...task,...extra}));
+ const before=await run({mode:'capture'}),old=f.held.retained.graph.view.getState(f.native.FCell).shape.node,oldPort=f.portShape,click=f.page.mouse.click;
+ f.page.mouse.click=async(...args)=>{await click(...args);redrawNode(f);redrawPort(f);change(f,old);};
+ await run({mode:'select',gesture_id:'select-once',expected:before});
+ await assert.rejects(run({mode:'inspect'}));
+ const ticket=f.page[Symbol.for('loginom-dock.javascript-output-preview-v1')].get(task.operation_id).ticket.handleValue;
+ assert.equal(ticket.shape,old);assert.equal(ticket.portElement,oldPort);assert.equal(ticket.portElementReplacements,0);
+ assert.deepEqual(f.events,['click']);await run({mode:'dispose'});
+});
+test('node-only redraw is refused even after the confirmed port click',async()=>{
+ const f=channelFixture(),click=f.page.mouse.click;
+ f.page.mouse.click=async(...args)=>{await click(...args);redrawNode(f);};
+ await assert.rejects(f.channel.openJavascriptPreview(f.task.output),/Managed preview native port changed/);
+ assert.deepEqual(f.events,['click']);
+});
+test('joint redraw before selection or a second redraw never authorizes F3',async()=>{
+ for(const afterSelect of [false,true]){
+  const f=channelFixture(),task={...f.task,operation_id:'joint-redraw-bounds'};
+  const run=extra=>f.options.execute(makeJavascriptOutputPreviewCode({...task,...extra}));
+  const before=await run({mode:'capture'});
+  if(afterSelect){
+   const click=f.page.mouse.click;f.page.mouse.click=async(...args)=>{await click(...args);redrawNode(f);redrawPort(f);};
+   await run({mode:'select',gesture_id:'select-once',expected:before});
+   assert.equal((await run({mode:'inspect'})).port_element_replacements,1);
+  }
+  redrawNode(f);redrawPort(f);
+  await assert.rejects(run({mode:'inspect'}),/Managed preview native port changed/);
+  assert.deepEqual(f.events,afterSelect?['click']:[]);await run({mode:'dispose'});
+ }
+});
 test('one confirmed post-select port redraw never authorizes a second replacement',async()=>{
  const f=channelFixture(),task={...f.task,operation_id:'preview-repeat'};
  const run=extra=>f.options.execute(makeJavascriptOutputPreviewCode({...task,...extra}));
@@ -384,5 +468,63 @@ test('Join after REST JSON parsing admits the managed JS preview before target c
 test('Join denies unsettled JS history before preview or graph mutation',async()=>{
  const f=preflightFixture('join_input_0');f.history.cleanup_confirmed=false;
  await assert.rejects(f.run(),/not settled/);
+ assert.equal(f.calls.filter(code=>code.includes('runJavascriptOutputPreview')).length,0);
+});
+
+for(const inputPort of [0,1])test('Join input '+inputPort+' selects its JS producer before strict native port capture',async()=>{
+ const f=preflightFixture('join_input_'+inputPort),browser=channelFixture(),records=[];
+ const previousSourceCell={};
+ if(inputPort===1){
+  browser.selected.push(previousSourceCell);
+  assert.throws(()=>browser.inspect(null,true),/Managed preview native port changed/);
+  assert.deepEqual(browser.events,[]);
+ }
+ const tid=browser.held.node.tid,setting=new Element('g',{'data-tid':tid+';Setting'},'',{x:130,y:10,width:15,height:15});
+ browser.held.retained.graph.container.append(setting);
+ browser.context.document.elementFromPoint=(x,y)=>x>=130?setting:y<50?browser.held.retained.shape:browser.portShape;
+ browser.page.mouse.click=async(x,y)=>{
+  browser.events.push(y<50?'body':'click');
+  browser.selected.splice(0,browser.selected.length,y<50?browser.native.FCell:browser.port.FCell);
+ };
+ const original=f.options.execute,root=f.binding.workflow_ref.prefix+';ModelForm;PreviewWindow';
+ let receipt;
+ f.options.onRecord=async r=>{records.push(r);return structuredClone(r);};
+ f.options.receiptOptions=(id,action_key,signature)=>{receipt={id,action_key};return {receipt_namespace:'test',receipt_id:id,receipt_signature:signature};};
+ f.options.execute=async code=>{
+  if(code.includes('runManagedJavascriptSelectionRead')||code.includes('runManagedJavascriptSelectionBody')||code.includes('runJavascriptOutputPreview'))
+   return runInNewContext('('+code+')',{Symbol,Map,Date})(browser.page);
+  if(code.includes('browserReceipt')){browser.events.push('close');return {status:'SUCCEEDED',action_key:receipt.action_key,operation_id:receipt.id,effect_possible:true,cleanup_complete:true};}
+  if(code.includes('readNodePreviewSchema'))return {verified:true,inventory_complete:true,settings_changed:false,
+   fields:f.history.outcome.output.configuration.readback.output_mapping.fields.map(({index,name,label,type})=>({index,name,label,type})),
+   root_tid:root,port:0,port_guid:f.port.port_guid,node_id:f.binding.node.node_id,node_context:f.context};
+  if(browser.events.includes('F3')&&!browser.events.includes('close')){
+   const state=structuredClone(f.state);state.ui.elements=[{ref:'ui-preview',tid:root,allowed_actions:[]},{ref:'ui-close',tid:root+';p.h;close',allowed_actions:['click']}];
+   state.ui.dialogs=[{ref:'ui-preview',identity:{anchor_tid:root}}];return {status:'SUCCEEDED',output:state};
+  }
+  return original(code);
+ };
+ const proof=await f.run();
+ assert.equal(proof.verified,true);assert.equal(proof.parameters_valid,true);
+ assert.deepEqual(browser.events,['body','click','F3','close']);
+ assert.equal(records.filter(r=>r.phase==='javascript_managed_body_prepared').length,1);
+ assert.equal(f.options.operation.cleanupConfirmed,true);
+ assert.equal(browser.page[Symbol.for('loginom-dock.javascript-owned-selection-v1')].size,0);
+ assert.equal(browser.page[Symbol.for('loginom-dock.javascript-output-preview-v1')].size,0);
+});
+
+test('lost producer body selection does not capture or open a JS port preview',async()=>{
+ const f=preflightFixture('join_input_1'),original=f.options.execute,records=[];
+ f.options.onRecord=async r=>{records.push(r);return structuredClone(r);};
+ f.options.receiptOptions=(id,action_key,signature)=>({receipt_namespace:'test',receipt_id:id,receipt_signature:signature});
+ f.options.execute=async code=>{
+  if(code.includes('runManagedJavascriptSelectionRead'))return {ready:false,node_selected:false,body_point:{x:10,y:10},node_tid:f.context.tid};
+  if(code.includes('runManagedJavascriptSelectionBody'))throw Error('lost body transport');
+  return original(code);
+ };
+ await assert.rejects(f.run(),/lost body transport/);
+ assert.equal(f.options.operation.transportUncertain,true);
+ assert.equal(f.options.operation.nodeEffectPossible,true);
+ assert.equal(f.options.operation.cleanupConfirmed,false);
+ assert.equal(records.filter(r=>r.phase==='javascript_managed_body_prepared').length,1);
  assert.equal(f.calls.filter(code=>code.includes('runJavascriptOutputPreview')).length,0);
 });

@@ -89,10 +89,26 @@ for(const [name,text,dom,type] of [
  ['reverse conversion','a\nb','a\r\nb','dtString'],['bare CR conversion','a\rb','a\nb','dtString'],
  ['stripped line break','a\r\nb','ab','dtString'],['changed quote','a\r\n"b"','a\n"c"','dtString'],
  ['numeric CRLF','1\r\n2','1\n2','dtFloat'],['variant CRLF','a\r\nb','a\nb','dtVariant'],
- ['oversized string','x'.repeat(16384)+'\r\n','x'.repeat(16384)+'\n','dtString'],
 ])test('string CRLF display correspondence refuses '+name,async()=>{
  const f=fixture();f.records[1].data.Text.ValueText=text;f.cells[4].textContent=dom;
  f.columns[1].el.dom.attrs.class='bg-TBGDataType-'+type+'-before';
+ assert.equal((await read(f)).reason,'cell_render_mismatch');
+});
+test('long JSON strings return the full matching cached text including Cyrillic and quotes',async()=>{
+ for(const text of [JSON.stringify({products:Array.from({length:100},(_,id)=>({id,title:'Товар "особый"',description:'длинный текст '.repeat(30)}))}),
+  'я'.repeat(16384)+'\r\n"конец"']) {
+  const f=fixture();f.records[1].data.Text.ValueText=text;f.cells[4].textContent=text.replace(/\r\n/g,'\n');
+  const r=await read(f);assert.equal(r.verified,true,JSON.stringify(r));assert.equal(r.rows[1].cells[1].text,text);
+ }
+});
+for(const [name,change] of Object.entries({
+ truncated:s=>s.slice(0,16384),changed_suffix:s=>s.slice(0,-1)+'!',changed_prefix:s=>'!'+s.slice(1),
+}))test('long string still refuses '+name+' DOM',async()=>{
+ const f=fixture(),text='я "товар" '.repeat(3000)+'конец';f.records[1].data.Text.ValueText=text;f.cells[4].textContent=change(text);
+ assert.equal((await read(f)).reason,'cell_render_mismatch');
+});
+test('long non-string display retains its existing bound',async()=>{
+ const f=fixture(),text='1'.repeat(16385);f.records[0].data.Id.ValueText=text;f.cells[0].textContent=text;
  assert.equal((await read(f)).reason,'cell_render_mismatch');
 });
 for(const [name,change] of Object.entries({

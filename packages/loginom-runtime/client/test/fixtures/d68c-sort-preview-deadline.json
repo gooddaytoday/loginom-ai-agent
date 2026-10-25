@@ -1,0 +1,38 @@
+{
+  "status": "AMBIGUOUS",
+  "action_key": "ui.act",
+  "action_revision": "1",
+  "operation_id": "rank-debts:n6",
+  "phase": "observing",
+  "effect_possible": true,
+  "output": {},
+  "error": {
+    "code": "UI_DEADLINE_EXCEEDED",
+    "message": "Observed UI action deadline exceeded"
+  },
+  "trace": [
+    {
+      "at_ms": 0,
+      "event": "ui_observation_started"
+    },
+    {
+      "at_ms": 152,
+      "event": "ui_preconditions_verified",
+      "verb": "press",
+      "refs": [
+        "ui-907753a4-93c3-48b0-9359-1ae89d1f65a3-1030"
+      ]
+    },
+    {
+      "at_ms": 624,
+      "event": "ui_gesture_applied",
+      "verb": "press"
+    },
+    {
+      "at_ms": 27808,
+      "event": "ui_action_failed",
+      "code": "UI_DEADLINE_EXCEEDED"
+    }
+  ],
+  "cleanup_complete": true
+}

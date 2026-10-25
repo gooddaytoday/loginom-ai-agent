@@ -237,7 +237,9 @@ export async function configureOutputFields(channel,mapping,configured) {
   // exclusion replaces the output record and sets both name and label to the source name.
   const planned=resolved.fields.map(f=>f.excluded&&f.current.excluded!==true?{...f,current:{...f.current,name:f.source.name,label:f.source.name}}:f);
   const steps=planOutputFieldEdits(planned);
-  let expected=structuredClone(before.node_mapping);
+  // Definition reads use Table view, where Links-only source_selection is absent.
+  // Bind the full edit baseline after that guarded, mapping-preserving switch.
+  let expected=structuredClone((steps.length?await ensureMappingTableView(channel,before):before).node_mapping);
   const semantic=({rendered_indices,...rest})=>rest;
   for(const field of exclusions) {
     const state=await channel.observe({condition:'native mapping before planned exclusion',readMappings:true,ready});

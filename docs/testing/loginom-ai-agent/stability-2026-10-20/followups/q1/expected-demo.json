@@ -1,16 +1,6 @@
 {
   "package_path": "/demo-2026-10-22/s1-revenue.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.group_data"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -20,17 +10,17 @@
       "columns": [
         {
           "name": "Region",
-          "label": "Region",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Category",
-          "label": "Category",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Revenue",
-          "label": "Revenue",
+          "label_any": true,
           "type": "real"
         }
       ],

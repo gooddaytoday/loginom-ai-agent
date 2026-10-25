@@ -55,10 +55,10 @@ test('second output mapping requires the verified exact native port owner',async
  assert.throws(()=>resolve({direction:'input',port:1},configured,native),/direction/);
 });
 
-function fieldFixture() {
+function fieldFixture({links=false}={}) {
  const original={record_id:'t',field_id:'0',index:0,name:'Amount',label:'Amount',type:'real',data_kind:'Непрерывный',
   source:{record_id:'s',field_id:'0',index:0,name:'Amount',label:'Amount',type:'real'}};
- let current=structuredClone(original),editor=false,draft={},mutations=0;
+ let current=structuredClone(original),editor=false,draft={},mutations=0,table=!links;
  const field={current:structuredClone(original),source:original.source,name:'Mapped',label:'Сумма'};
  const state=()=>{
   const row={...current,status:'observed',name_ref:'name',selected:editor};
@@ -66,13 +66,18 @@ function fieldFixture() {
   const fields=[row];
   return {wizard:{status:'observed',stage:'output_mapping',root_ref:'wizard',root_tid:'W',column_parameters:params,
    output_columns:{fields,page:{status:'complete_definition_page',offset:0,limit:8,returned:1,total_columns:1,next_offset:null,schema_id:'schema'}}},
-   node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,autosync:false,source_fields:[original.source],target_fields:[current],rendered_indices:[0]},
-   ui:{elements:editor?[...['name','label'].map(k=>({ref:k,wizard_field:{scope:'output_column',name:k},allowed_actions:['set_wizard_field']})),
-    {ref:'apply',column_close:{scope:'output'},allowed_actions:['apply_output_column']}]:[{ref:'name',allowed_actions:['double_click']}]}};
+   node_mapping:{verified:true,inventory_complete:true,source_identity_verified:true,autosync:false,source_fields:[original.source],target_fields:[current],rendered_indices:[0],
+    ...(links?{mapping_wizard:'DerivedDataSourceOutputSocketWizard',node_context:{verified:true,node_id:'own'}}:{}),
+    ...(links&&!table?{source_selection:{verified:true,record_ids:[]}}:{})},
+   ui:{elements:[...(links?['Table','Links'].map(view=>({ref:view,tid:'W;DerivedDataSourceOutputSocketWizard;rb'+view+';DisplayEl',
+      signature:{check_state:{kind:'radio',source:'loginom_ext',checked:view==='Table'?table:!table}},allowed_actions:['click']})):[]),
+    ...(editor?[...['name','label'].map(k=>({ref:k,wizard_field:{scope:'output_column',name:k},allowed_actions:['set_wizard_field']})),
+      {ref:'apply',column_close:{scope:'output'},allowed_actions:['apply_output_column']}]:[{ref:'name',allowed_actions:['double_click']}])]}};
  };
  const channel={async observe(o){const s=structuredClone(state());if(!o.ready(s))throw Error('Not ready');return s;},
   async perform(o){const s=structuredClone(state());assert.ok(o.ready(s));const a=o.resolve(s);mutations++;
-   if(a.verb==='double_click'){editor=true;draft={name:current.name,label:current.label};}
+   if(a.verb==='click'&&a.ref==='Table'){table=true;channel.afterTable?.(current);}
+   else if(a.verb==='double_click'){editor=true;draft={name:current.name,label:current.label};}
    else if(a.verb==='set_wizard_field')draft[a.ref]=a.text;
    else if(a.verb==='apply_output_column'){current={...current,...draft};editor=false;channel.afterApply?.(current);}
    else throw Error('Unexpected action');
@@ -91,6 +96,24 @@ test('output field driver rejects changed identity and unexpected post-Apply sta
 test('output field driver preserves a matching field without opening its editor',async()=>{
  const {configureOutputField}=await import('../lib/port-mapping-procedure.mjs');const f=fieldFixture();f.field.name='Amount';f.field.label='Amount';
  assert.equal((await configureOutputField(f.channel,f.field)).effect_possible,false);assert.equal(f.mutations(),0);
+});
+test('planned output edits bind their baseline after the owned Links to Table switch (D69 p18)',async()=>{
+ const {configureOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ const f=fieldFixture({links:true});
+ const result=await configureOutputFields(f.channel,{direction:'output',port:0,fields:[{source:{kind:'configured_field',name:'Amount'},name:'Mapped',label:'Сумма'}]},
+  [{name:'Amount',label:'Amount',type:'real',used:true}]);
+ assert.equal(result.verified,true);assert.equal(result.definition.source_selection,undefined);
+ assert.equal(result.definition.target_fields[0].name,'Mapped');assert.equal(result.definition.target_fields[0].source.record_id,'s');
+ assert.equal(f.mutations(),5);
+});
+test('D69 output edits still reject unrelated native changes at the view switch or field Apply',async()=>{
+ const {configureOutputFields}=await import('../lib/port-mapping-procedure.mjs');
+ for(const stage of ['afterTable','afterApply']){
+  const f=fieldFixture({links:true});f.channel[stage]=c=>{c.source={...c.source,record_id:'foreign'};};
+  await assert.rejects(configureOutputFields(f.channel,{direction:'output',port:0,fields:[{source:{kind:'configured_field',name:'Amount'},name:'Mapped',label:'Сумма'}]},
+   [{name:'Amount',label:'Amount',type:'real',used:true}]),stage==='afterApply'?/unrelated/:/Not ready/);
+  assert.equal(f.mutations(),stage==='afterTable'?1:5);
+ }
 });
 
 function reorderFixture(grouped=false,sourceSelection) {

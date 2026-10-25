@@ -8,8 +8,8 @@ import {readTableOutputPages} from './table-output-pages.mjs';
 import {decodeTableOutput} from './table-output-values.mjs';
 import {createJavascriptCodeNodeSupport} from './javascript-code-node.mjs';
 import {createRedactor} from './redact.mjs';
-import {applyNode,validateNodeApplyRequest} from './node-apply.mjs';
-import {prepareNodeTarget} from './node-target.mjs';
+import {applyNode,validateNodeApplyRequest,releaseNodeApply} from './node-apply.mjs';
+import {prepareNodeTarget,releaseNodeTarget} from './node-target.mjs';
 import {createHash} from 'node:crypto';
 
 const need=(v,m)=>{if(!v)throw Error('REST request: '+m);};
@@ -31,9 +31,11 @@ export function restQueryEncoderRequest(request,deadline,now=Date.now()){
  need(request.inputs.length===1,'raw query values require one explicit table input');
  const budget=Math.min(request.budgets.total_ms,deadline-now);
  need(budget>0,'query encoding deadline elapsed');
- return {operation_id:'rest-url-'+createHash('sha256').update(request.operation_id).digest('hex').slice(0,32),
+ const operation_id='rest-url-'+createHash('sha256').update(request.operation_id).digest('hex').slice(0,32);
+ return {operation_id,
   contract_revision:request.contract_revision,document_id:request.document_id,workflow_ref:request.workflow_ref,
-  target:{kind:'new',type:'programming.javascript',label:'URL query encoding'},inputs:request.inputs,
+  // Repeated REST branches must not rename their generated nodes to one rendered label.
+  target:{kind:'new',type:'programming.javascript',label:'URL query encoding '+operation_id.slice(9)},inputs:request.inputs,
   mode:'script',parameters:{schema_mode:'declared',columns:fields.map(name=>({name,label:name,type:'string',data_kind:'Дискретный',usage:'Не задано'})),
    source_text:'import {InputTable,OutputTable} from "builtIn/Data";\n'
     +'for(let row=0;row<InputTable.RowCount;row++){\n OutputTable.Append();\n for(const name of '+JSON.stringify(fields)+'){\n'
@@ -44,10 +46,16 @@ export function restQueryEncoderRequest(request,deadline,now=Date.now()){
 
 async function prepareQueryEncoder(options,ctx,config){
  const request=restQueryEncoderRequest(options.operation.parameters,ctx.deadline,options.now());
+ const adapter=options.operation.nodeTargetAdapter,parent=options.operation.parameters.target;
  const operation={id:request.operation_id,parameters:request,action:options.operation.action,
-  deadline:ctx.deadline,nodeTargetAdapter:options.operation.nodeTargetAdapter};
+  deadline:ctx.deadline,nodeTargetAdapter:{...adapter,
+   choosePosition:(value,graph,deadline,signal)=>parent.kind==='new'
+    ?adapter.choosePosition(value,graph,deadline,signal,parent.position?[parent.position]:[])
+    :adapter.choosePosition(value,graph,deadline,signal)}};
  const support=createJavascriptCodeNodeSupport({...config,redactor:config.redactor??createRedactor()});
  const drivers=support.nodeApplyDriverFactory({...options,operation});
+ const child={operation,drivers,handlers:support.nodeApplyHandlers,result:null};
+ options.operation.restQueryEncoder=child;
  const {graph}=validateNodeApplyRequest(request,support.nodeApplyHandlers);
  const result=await applyNode({request,operation,handlers:support.nodeApplyHandlers,
   drivers:{...drivers,
@@ -58,6 +66,7 @@ async function prepareQueryEncoder(options,ctx,config){
     need(target.status==='SUCCEEDED',target.error??'query encoder target was not created');
     return {verified:true,cleanup_complete:true,effect_possible:true,node:target.node.ref,target};
    }},record:options.onRecord,signal:ctx.signal,stopSignal:ctx.stopSignal,now:options.now});
+ child.result=result;
  options.operation.nodeEffectPossible ||= result.effect_possible===true;
  if(operation.transportUncertain||result.cleanup_complete!==true){options.operation.transportUncertain ||= operation.transportUncertain===true;options.operation.cleanupConfirmed=false;}
  need(result.status==='SUCCEEDED'&&result.cleanup_complete===true&&result.execution.status==='completed','query encoder did not complete');
@@ -86,15 +95,20 @@ export function createRestRequestNodeSupport(config){
  return {nodeApplyHandlers:createTabularTransformNodeSupport(config,implementation).nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   let connection=null;
   const request=options.operation.parameters;
-  return createTabularTransformNodeSupport(config,{...implementation,
+  const drivers=createTabularTransformNodeSupport(config,{...implementation,
    preflight:async(options,ctx)=>{
     if(!request.parameters.connection)return {verified:true,cleanup_complete:true,effect_possible:false,not_applicable:true};
+    let existingInput=null;
     if(request.target.kind==='existing'&&request.inputs.length){
      const graph=await options.operation.nodeTargetAdapter.observe({document_id:request.document_id,workflow_ref:request.workflow_ref},ctx.deadline,ctx.signal);
-     need(graph.complete===true&&graph.document_id===request.document_id&&graph.workflow_ref.workflow_id===request.workflow_ref.workflow_id,'complete owned graph is required before query encoding');
-     if(graph.links.some(link=>link.target===request.target.ref.node_id&&link.input===0)){
-      const error=Error('REST request: input 0 is already connected; no encoder or connection was created. next_step: dock_node_apply with a NEW operation_id, target:'+JSON.stringify(request.target)
-       +', inputs:[], parameters:{}, finish:"done". This preserves the existing input and saved bindings; inspect them before execution.');
+     need(graph.complete===true&&graph.document_id===request.document_id&&JSON.stringify(graph.workflow_ref)===JSON.stringify(request.workflow_ref),'complete owned graph is required before query encoding');
+     const target=graph.nodes.filter(n=>n.ref.node_id===request.target.ref.node_id);
+     need(target.length===1&&target[0].type==='integration.rest_request'&&['document_id','workflow_id','node_id'].every(k=>target[0].ref[k]===request.target.ref[k]),'existing REST identity differs');
+     const links=graph.links.filter(link=>link.target===request.target.ref.node_id&&link.input===0);
+     need(links.length<=1,'input 0 is ambiguous');
+     existingInput=links[0]??null;
+     if(existingInput&&(existingInput.source!==request.inputs[0].source.node_id||existingInput.output!==request.inputs[0].output)){
+      const error=Error('REST request: input 0 is connected to a different raw source or output; no encoder or connection was created. next_step: dock_node_apply with a NEW operation_id and a NEW integration.rest_request target, the requested raw inputs, the same connection/query_parameters and finish:"execute". The existing REST and its input are preserved.');
       error.nodePhaseRefusal={phase:'target',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
       throw error;
      }
@@ -103,6 +117,7 @@ export function createRestRequestNodeSupport(config){
     // Prepare values through the existing JS lifecycle, rather than requiring
     // the model to author a codec or changing the caller's source table.
     const target_inputs=request.inputs.length?[await prepareQueryEncoder(options,ctx,config)]:null;
+    if(existingInput)options.operation.restQueryInput={edge:existingInput,encoder:target_inputs[0].source};
     const result=await runRestStep(options,{...ctx,document_id:request.document_id,workflow_ref:request.workflow_ref},'connection',makeRestConnectionCode,request.parameters,config);
     connection=result.connection;return {...result,...(target_inputs?{target_inputs}:{})};
    },
@@ -118,5 +133,38 @@ export function createRestRequestNodeSupport(config){
     return {...result,configuration:{...result.configuration,connection}};
    },
   }).nodeApplyDriverFactory(options);
+  return {...drivers,async releaseBeforeTarget({signal,deadline}){
+   const child=options.operation.restQueryEncoder;
+   if(!child||child.result?.status==='SUCCEEDED'||options.operation.preTargetGraph)return;
+   const original=child.operation,childRequest=original.parameters;
+   need(!options.operation.targetPhase&&options.operation.nodeApply?.pending?.phase==='target'
+    &&original.id===restQueryEncoderRequest(request,deadline,options.now()).operation_id
+    &&childRequest.document_id===request.document_id
+    &&JSON.stringify(childRequest.workflow_ref)===JSON.stringify(request.workflow_ref)
+    &&childRequest.target.kind==='new'&&childRequest.target.type==='programming.javascript',
+    'query encoder release owner differs');
+   need(!original.transportUncertain,'query encoder transport remains uncertain');
+   const result=original.nodeApply?.result??(child.result?.cleanup_complete===true&&child.result.pending_phase===null?child.result:null)??await releaseNodeApply({operation:original,
+    handlers:child.handlers,drivers:child.drivers,record:options.onRecord,signal,
+    releaseBeforeTarget:()=>releaseNodeTarget({operation:original,adapter:original.nodeTargetAdapter,
+     record:options.onRecord,readReceipt:options.readReceipt,deadline,signal,now:options.now})});
+   need(result.cleanup_complete===true&&result.pending_phase===null,'query encoder release remains unresolved');
+   const graph=await options.operation.nodeTargetAdapter.observe({document_id:request.document_id,
+    workflow_ref:request.workflow_ref},deadline,signal);
+   need(graph.complete===true&&graph.document_id===request.document_id
+    &&JSON.stringify(graph.workflow_ref)===JSON.stringify(request.workflow_ref),'query encoder release graph differs');
+   need(!child.releaseGraph||JSON.stringify(child.releaseGraph)===JSON.stringify(graph),
+    'query encoder release graph changed before checkpoint acknowledgement');
+   child.releaseGraph??=structuredClone(graph);
+   const event={operation_id:options.operation.id,phase:'rest_query_encoder_released',
+    child_operation_id:original.id,result,graph};
+   const saved=await options.onRecord(structuredClone(event));
+   need(JSON.stringify(Object.fromEntries(Object.keys(event).map(k=>[k,saved?.[k]])))===JSON.stringify(event),
+    'query encoder release journal acknowledgement differs');
+   options.operation.preTargetGraph=structuredClone(graph);
+   options.operation.preTargetWarnings=result.node?['The incomplete URL query encoder '+JSON.stringify(result.node)
+    +' remains in the graph. Its settings and execution are unverified; release did not delete or execute it.']:[];
+   options.operation.cleanupConfirmed=true;
+  }};
  }};
 }

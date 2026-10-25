@@ -12,7 +12,7 @@ import {makeDateTimeContextCode} from './date-time-context.mjs';
 import {makeMissingValuesContextCode} from './missing-values-context.mjs';
 import {makeCollapseContextCode} from './collapse-context.mjs';
 import { createHash } from 'node:crypto';
-import { makeWorkspaceUiCode, validateUiAction } from './workspace-ui.mjs';
+import { makeWorkspaceUiCode, validateUiAction, makeBlockingWindowDiagnosticCode } from './workspace-ui.mjs';
 import {validatePreparedNodeContext} from './node-context.mjs';
 import {makeNodeMappingContextCode} from './node-mapping-context.mjs';
 import {makeNodePreviewSchemaCode} from './node-preview-schema.mjs';
@@ -31,6 +31,7 @@ import {makeNodeOutputContextCode} from './node-output-context.mjs';
 import {makeNodeTableContextCode} from './node-table-context.mjs';
 import {boundWizardCloseConfirmation,wizardCloseDialogOwner,wizardCloseBinding,boundInputMappingConflict} from './node-wizard-close.mjs';
 import {boundWizardDeactivationConfirmation,wizardDeactivationDialogOwner} from './node-wizard-open.mjs';
+import {isUnchangedTransformExecution} from './node-read-contract.mjs';
 const boundWizardConfirmation=(...args)=>boundWizardCloseConfirmation(...args)||boundWizardDeactivationConfirmation(...args)||boundInputMappingConflict(...args);
 const wizardConfirmationOwner=(...args)=>wizardCloseDialogOwner(...args)||wizardDeactivationDialogOwner(...args);
 
@@ -110,7 +111,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     const root=preparedNodeContext?.workflow_ref.prefix+';ModelForm;PreviewWindow';
     return !!preparedNodeContext&&state.prepared_node_context?.surface==='graph'
       &&state.node_preview_schema?.verified===false&&dialog.identity?.anchor_tid===root
-      &&state.ui.masks?.some(m=>m.kind==='busy'&&m.dialog_ref===dialog.ref&&m.target_tid===root+';PreviewForm');
+      &&state.ui.masks?.some(m=>m.kind==='busy'&&m.dialog_ref===dialog.ref
+        &&[root+';PreviewForm',root+';PreviewForm;DataSetForm'].includes(m.target_tid));
   };
   const allowedReformEditor=(dialog,state)=>state.wizard?.stage==='field_parameters'
     &&state.wizard.reform_parameters?.status==='observed'&&state.wizard.reform_parameters.portal_bound===true
@@ -197,8 +199,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   const channel = {
     async openJavascriptPreview(port){
       checkBudget();
-      if(!preparedNodeContext||!['transform.group_data','transform.sorting','transform.calculator','transform.join_data'].includes(operation.parameters?.target?.type))
-        throw Error('Managed preview is restricted to native Group, Sort, Calculator and Join preflight');
+      if(!preparedNodeContext||!['transform.group_data','transform.sorting','transform.calculator','transform.filter_data','transform.join_data'].includes(operation.parameters?.target?.type))
+        throw Error('Managed preview is restricted to native Group, Sort, Calculator, Filter and Join preflight');
       const task={operation_id:operation.id+':preview'+nextStep(),owner:preparedNodeContext.node,
         workflow_ref:{prefix:preparedNodeContext.workflow_ref.prefix,tab_tid:preparedNodeContext.workflow_ref.tab_tid},
         output:{index:port.index,native_index:port.native_index,active:port.active,port_guid:port.port_guid},
@@ -237,25 +239,35 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             do{checkBudget();expected=await read('inspect');if(!expected.selected)await wait(100);}while(!expected.selected);
           }
         }
-      }finally{if(!operation.transportUncertain)await read('dispose');}
+      }finally{if(!operation.transportUncertain){
+        const disposed=await read('dispose');
+        if(operation.groupingPreview?.managed===true&&disposed?.disposed===true){
+          const saved=await entry('node_preview_lease_disposed',{lease_operation_id:task.operation_id,
+            owner:task.owner,port_guid:port.port_guid,disposed:true});
+          if(saved?.lease_operation_id!==task.operation_id||saved.port_guid!==port.port_guid||saved.disposed!==true
+            ||JSON.stringify(saved.owner)!==JSON.stringify(task.owner))throw Error('Preview disposal was not durably acknowledged');
+          operation.groupingPreview.lease_disposed=true;
+        }
+      }}
       return {verified:true,port_guid:port.port_guid,execution_started:false};
     },
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
-    async revealGraphNode() {
+    async revealGraphNode({target='drawing'}={}) {
+      if(!['drawing','body'].includes(target))throw Error('Unknown node viewport target');
       checkBudget();
       if(!preparedNodeContext)throw Error('Viewport navigation requires a prepared node');
       const before=await channel.observe({condition:'prepared graph before node viewport navigation',
         ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'});
       assertContext(before);checkBudget();
-      const step=nextStep(),id=operation.id+':n'+step,action={verb:'reveal_prepared_node'},actionKey='node.viewport.reveal.internal';
+      const step=nextStep(),id=operation.id+':n'+step,action={verb:'reveal_prepared_node',target},actionKey='node.viewport.reveal.internal';
       const signature=digest([id,action,evidenceSnapshot]),observationHash=digest(evidenceSnapshot);
       snapshot=null;evidenceSnapshot=null;
       const prepared=await entry('node_step_prepared',{step,internal_operation_id:id,action,observation_sha256:observationHash,signature});
       if(prepared?.signature!==signature||JSON.stringify(prepared.action)!==JSON.stringify(action))throw Error('Node viewport navigation was not durably prepared');
       signal?.throwIfAborted();checkBudget();
-      const code=`async page=>(${revealPreparedGraphNode.toString()})(page,${JSON.stringify({binding:preparedNodeContext,origin:targetOrigin,build:targetBuild,deadline:operation.deadline,types:NODE_TYPES})},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${samePlacementGraph.toString()})`;
-      const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'node_viewport',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:null,trace:[]}}`;
+      const code=`async page=>(${revealPreparedGraphNode.toString()})(page,${JSON.stringify({binding:preparedNodeContext,origin:targetOrigin,build:targetBuild,deadline:operation.deadline,types:NODE_TYPES,target})},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${samePlacementGraph.toString()})`;
+      const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'node_viewport',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.status==='SUCCEEDED'?null:{code:'NODE_VIEWPORT_NOT_REVEALED',message:'Prepared node viewport: node not revealed'},trace:[]}}`;
       let result;
       try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:Math.max(1,operation.deadline-now())});}
       catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
@@ -345,14 +357,19 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const observationNow = () => started + monotonicNow() - monotonicStarted;
       let deadline = settleOutputPort?operation.deadline:Math.min(operation.deadline, started + timeoutMs);
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false;
+      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, sampleStarted = observationNow();
       try {
       for (let sample = 0; settleOutputPort || settleProcessConsole || sample < 80; sample++) {
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
-        if (sample) await wait(Math.min(200, Math.max(0, deadline - observationNow())));
+        // Pending reads already spend time polling. Keep a 200 ms start-to-start
+        // interval instead of adding that delay to a slow read. A ready identity
+        // still gets the full existing pause before its second confirmation.
+        const pause = satisfied ? 200 : Math.max(0, 200 - (observationNow() - sampleStarted));
+        if (sample && pause > 0) await wait(Math.min(pause, Math.max(0, deadline - observationNow())));
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
+        sampleStarted = observationNow();
         // Rediscover the root: wizard transitions and combo portals can replace it.
         const roots = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
           ...boundOptions,
@@ -520,6 +537,15 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           await entry('node_observation_context_refused', {step, sample, internal_operation_id:id,
             condition, reason:error.message, outcome:structuredClone(result)});
           const dialogs=result.output.ui?.dialogs;
+          if(error.message==='Node procedure is blocked by a mask or dialog'&&dialogs?.length
+              &&!signal?.aborted&&observationNow()+MIN_OBSERVATION_READ_MS<deadline) {
+            try {
+              const snapshot=await execute(makeBlockingWindowDiagnosticCode({refs:dialogs.map(d=>d.ref),origin:targetOrigin,build:targetBuild}),{timeout:readTimeout()});
+              await entry('node_blocking_window_native',{step,sample,internal_operation_id:id,condition,snapshot});
+            } catch {
+              await entry('node_blocking_window_native_unavailable',{step,sample,internal_operation_id:id,condition}).catch(()=>{});
+            }
+          }
           const blocker=dialogs?.length===1&&dialogs[0].text==='[outside selected root]'?dialogs[0]:null;
           // Inspect this already observed portal for diagnostics only. It is
           // never promoted to a usable node snapshot or dismissed as owned.
@@ -543,8 +569,22 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(readProcesses) {
           result.output.node_processes=nativeProcesses;
           if(nativeProcesses.node_context&&JSON.stringify(canonical(nativeProcesses.node_context))
-            !==JSON.stringify(canonical(result.output.prepared_node_context)))
+            !==JSON.stringify(canonical(result.output.prepared_node_context))) {
+            const {locked:nativeLocked,...nativeOwner}=nativeProcesses.node_context;
+            const {locked:uiLocked,...uiOwner}=result.output.prepared_node_context;
+            // Execute/completion can change FLocked between these two reads.
+            // Discard the mixed snapshot; never use it to authorize a gesture.
+            if(nativeOwner.verified===true&&nativeOwner.surface==='graph'
+              &&typeof nativeLocked==='boolean'&&typeof uiLocked==='boolean'&&nativeLocked!==uiLocked
+              &&JSON.stringify(canonical(nativeOwner))===JSON.stringify(canonical(uiOwner))) {
+              await entry('node_observation_lock_retried',{step,sample,internal_operation_id:id,condition,
+                native_node_context:structuredClone(nativeProcesses.node_context),
+                ui_node_context:structuredClone(result.output.prepared_node_context)});
+              satisfied=false;confirmations=0;previousIdentity=undefined;
+              continue;
+            }
             throw new Error('Native process/output context changed during observation');
+          }
         }
         if(readTraining)result.output.node_training_read=true;
         if(boundWizardConfirmation(result.output,wizardConfirmation))result.output.node_wizard_confirmation=structuredClone(wizardConfirmation);
@@ -649,9 +689,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw error;
       }
     },
-    async act(action,processControl) {
+    async act(action,processControl,{preserveJoinMapping=false}={}) {
       checkBudget();
       if (!snapshot) throw new Error('A fresh internal observation is required');
+      if(preserveJoinMapping&&(!isUnchangedTransformExecution(operation.parameters)
+        ||operation.parameters.target.type!=='transform.join_data'||action.verb!=='wizard_step'||action.expected_stage!=='join'
+        ||snapshot.wizard?.stage!=='input_mapping'||snapshot.prepared_node_context?.input_port||snapshot.prepared_node_context?.output_port))
+        throw Error('Preserved Join navigation requires its unchanged node read');
       validateUiAction(action, snapshot);
       assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);
       const mappingConflict=snapshotWizardConfirmation&&boundInputMappingConflict(snapshot,snapshotWizardConfirmation);
@@ -660,26 +704,33 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const step = nextStep(), id = operation.id + ':n' + step;
       const before = snapshot;
       snapshot = null;
-      const signature = digest([id, action, evidenceSnapshot,...(processControl?[processControl]:[])]);
+      const signature = digest([id, action, evidenceSnapshot,...(processControl?[processControl]:[]),
+        ...(preserveJoinMapping?[{preserve_join_mapping:true}]:[])]);
       const processCode=processControl?makeNodeProcessControlCode(preparedNodeContext,before,action,processControl,
         {operation_id:id,deadline:operation.deadline,origin:targetOrigin,build:targetBuild}):null;
       // This write must be durable before the browser receives the mutation.
       const persisted = await entry('node_step_prepared', { step, internal_operation_id: id,
         action: structuredClone(action), observation_sha256: digest(evidenceSnapshot), signature,
-        ...(processControl?{process_control:structuredClone(processControl)}:{}) });
+        ...(processControl?{process_control:structuredClone(processControl)}:{}),
+        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}) });
       evidenceSnapshot = null;
       if (!persisted || JSON.stringify(persisted.action) !== JSON.stringify(action)
-        || persisted.signature !== signature||processControl&&JSON.stringify(persisted.process_control)!==JSON.stringify(processControl)) throw new Error('Prepared step was not durably preserved after redaction');
+        || persisted.signature !== signature||processControl&&JSON.stringify(persisted.process_control)!==JSON.stringify(processControl)
+        ||preserveJoinMapping&&persisted.preserve_join_mapping!==true) throw new Error('Prepared step was not durably preserved after redaction');
       lastPreparedStep = structuredClone(persisted);
       preparedSteps.push({ step: persisted.step, internal_operation_id: persisted.internal_operation_id, signature: persisted.signature, verb: action.verb });
       if (preparedSteps.length > 512) { preparedSteps.shift(); preparedStepsTrimmed = true; }
       signal?.throwIfAborted();
       if (now() >= operation.deadline) throw new Error('Node procedure deadline elapsed before mutation');
-      const openingWait=preparedNodeContext&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(action.verb)
+      // A dispatched visualizers opening replaces the graph asynchronously,
+      // just like a wizard opening. Settle it once within the original budget.
+      const openingWait=preparedNodeContext&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views'].includes(action.verb)
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
-      const settlementWait=preparedNodeContext&&['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(action.verb)
+      const settlementWait=preparedNodeContext&&['finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(action.verb)
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
       const code = processCode??makeWorkspaceUiCode({ mode: 'act', operation_id: id, action,
+        ...(openingWait||settlementWait?{deadline:operation.deadline}:{}),
+        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}),
         ...(settlementWait?{settlement_timeout_ms:settlementWait}:{}),
         ...(openingWait?{opening_timeout_ms:openingWait}:{}),
         ...boundOptions,
@@ -717,9 +768,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     // Fixed handlers supply the readiness condition and domain identity. Caller
     // input never contains a resolver or a recipe. Only a durably recorded,
-    // strictly pre-gesture epoch/scan refusal or proved body replacement
+    // strictly pre-gesture epoch/scan refusal, owned busy mask or proved body replacement
     // permits a new local attempt with unchanged identity and intent.
-    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, processControl }) {
+    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, processControl, preserveJoinMapping=false }) {
       if (typeof resolve !== 'function' || typeof identity !== 'function') {
         throw new Error('A bound action resolver and domain identity are required');
       }
@@ -775,7 +826,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw new Error('Node procedure recovery target or intent changed');
         }
         binding = nextBinding; intent = nextIntent;
-        try { return await channel.act(action,processControl); }
+        try { return await channel.act(action,processControl,{preserveJoinMapping}); }
         catch (error) {
           const r = error instanceof NodeProcedureStepError ? error.receipt : null;
           if (attempt === 2 || r?.status !== 'NOT_APPLIED'
@@ -787,12 +838,47 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const scanRefusal=timeScanRefusal(r,'ui.act');
           const graphRefusal=action.verb==='execute_graph_node'&&r.phase==='preconditions'
             &&r.error?.code==='GRAPH_EXECUTION_CONTEXT_CHANGED';
+          const nodeChanges=r.trace.filter(e=>['prepared_node_context_changed_before_gesture','prepared_node_surface_mismatch'].includes(e.event));
+          const before=nodeChanges[0]?.before,after=nodeChanges[0]?.after;
+          // The strict pre-gesture guard did not dispatch. Only a lock-only
+          // change of this same native graph node permits a full fresh read;
+          // neither the rejected snapshot nor its UI refs can be reused.
+          const progressReadRefusal=r.phase==='observing'&&action.verb==='click'
+            &&observed.ui.elements.find(e=>e.ref===action.ref)?.tid==='MF;cntMain;tlbMainToolbar;btnProgress'
+            &&nodeChanges[0]?.event==='prepared_node_surface_mismatch';
+          const nodeLockRefusal=!!preparedNodeContext&&(progressReadRefusal
+            ||r.phase==='preconditions'&&nodeChanges[0]?.event==='prepared_node_context_changed_before_gesture')
+            &&r.error?.code==='PREPARED_NODE_CONTEXT_CHANGED'&&nodeChanges.length===1
+            &&before?.verified===true&&after?.verified===true&&before.surface==='graph'&&after.surface==='graph'
+            &&typeof before.locked==='boolean'&&typeof after.locked==='boolean'&&before.locked!==after.locked
+            &&JSON.stringify(canonical({...before,locked:false}))===JSON.stringify(canonical({...after,locked:false}))
+            &&JSON.stringify(canonical({...before,locked:false}))===JSON.stringify(canonical({...observed.prepared_node_context,locked:false}));
           // Only an opting-in source selector can prove a replaced native body.
           // This remains a new observation and bound attempt, never a raw retry.
           const bodyRefusal=r.phase==='preconditions'&&['UI_REFERENCE_STALE','UI_REFERENCE_OBSCURED'].includes(r.error?.code)
             &&bodyRefreshes===0&&typeof refreshReplacedBody==='function'
             &&refreshReplacedBody({receipt:r,observation:observed,action})===true;
-          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal)throw error;
+          const wizard=observed.wizard,masked=r.output,control=observed.ui.elements.find(e=>e.ref===action.ref);
+          const covered=masked?.ui?.elements?.filter(e=>e.tid===control?.tid);
+          // An opting-in picker may wait for its own late loading mask only
+          // after a matched no-effect refusal. A new read must clear every
+          // blocker and rebind the same owner/field before another guarded act.
+          const busyRefusal=refreshWizardBusy===true&&!!preparedNodeContext&&action.verb==='click'
+            &&r.phase==='preconditions'&&r.error?.code==='UI_REFERENCE_OBSCURED'
+            &&wizard?.status==='observed'&&masked?.wizard?.status==='observed'
+            &&['root_ref','root_tid','stage'].every(k=>wizard[k]&&wizard[k]===masked.wizard[k])
+            &&[observed,masked].every(s=>s.prepared_node_context?.surface==='wizard'&&s.prepared_node_context.tid===wizard.root_tid)
+            &&control?.wizard_combo?.kind==='picker'&&control.wizard_combo.field?.root_ref===wizard.root_ref
+            &&covered?.length===1&&covered[0].wizard_combo?.kind==='picker'
+            &&covered[0].wizard_combo.field?.root_ref===wizard.root_ref
+            &&covered[0].wizard_combo.field.name===control.wizard_combo.field.name
+            &&covered[0].interaction?.state==='point_not_observed'
+            &&covered[0].interaction.covering?.length===1&&covered[0].interaction.covering[0].tid===wizard.root_tid
+            &&masked.ui.dialogs?.length===0&&masked.ui.masks?.length===1
+            &&masked.ui.masks[0].kind==='busy'&&masked.ui.masks[0].ref===wizard.root_ref
+            &&masked.ui.masks[0].target_tid===wizard.root_tid&&masked.ui.masks[0].dialog_ref===null;
+          if(busyRefusal)assertContext(masked,true);
+          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal&&!nodeLockRefusal&&!busyRefusal)throw error;
           if(bodyRefusal)bodyRefreshes++;
           const event = await entry('node_step_refresh_authorized', {
             step:operation.nodeStepSequence,internal_operation_id:r.operation_id,
@@ -802,6 +888,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             ...(bodyRefusal?{reason:'prepared_graph_body_replaced'}:{}),
             ...(scanRefusal?{reason:'read_scan_time_limit'}:{}),
             ...(graphRefusal?{reason:'graph_execution_context_changed'}:{}),
+            ...(nodeLockRefusal?{reason:'prepared_node_lock_changed',before:structuredClone(before),after:structuredClone(after)}:{}),
+            ...(busyRefusal?{reason:'owned_wizard_busy_mask'}:{}),
           });
           if (event?.rejected_operation_id !== r.operation_id || event.retry !== attempt + 1
             || event.binding_sha256 !== binding || event.intent_sha256 !== intent) {

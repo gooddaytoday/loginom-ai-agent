@@ -26,12 +26,15 @@ export function inspectJavascriptSelection({binding,node,icon,retained:r,require
     if(!shape?.isConnected||shape.getAttribute('data-tid')!==node.tid||!graph.contains(shape)
       ||unique.length!==1||unique[0]!==shape)throw Error('Private selection DOM changed: '+JSON.stringify({kind:'current_shape',phase:inspectPhase,connected:shape?.isConnected===true,tid_matches:typeof shape?.getAttribute==='function'&&shape.getAttribute('data-tid')===node.tid,inside_graph:!!shape&&graph.contains(shape),unique_count:unique.length,unique_matches:unique[0]===shape,after_gesture:afterGesture,node_selected:nodeSelected}));
     if(shape!==r.shape){
-      const beforeSelection=!poll&&['pre_select_click','managed_pre_select_click'].includes(inspectPhase)
+      const beforeSelection=!poll&&['pre_select_click','managed_pre_select_click','managed_observe'].includes(inspectPhase)
         &&!afterGesture&&r.initialSelected===true&&r.replacements===0;
       const managedBeforeSelection=!poll&&inspectPhase==='managed_pre_select_click'&&!afterGesture
         &&r.initialSelectionCount===0&&Array.isArray(selected)&&selected.length===0&&r.replacements===0;
       if((!afterGesture&&!beforeSelection&&!managedBeforeSelection)||r.replacements>=2||r.shape?.isConnected
         ||!nodeSelected&&!managedBeforeSelection)throw Error('Private selection DOM changed: '+JSON.stringify({kind:'replacement',phase:inspectPhase,after_gesture:afterGesture,replacements:r.replacements,previous_connected:r.shape?.isConnected===true,node_selected:nodeSelected}));
+      // A committed selected node can redraw between capture and the first
+      // managed read. Native owner/selection and the detached old shape stay
+      // mandatory; the next gesture still checks its complete fresh snapshot.
       // The managed first body click also permits one detached unselected redraw;
       // its caller still compares the complete pre-ACK snapshot and fresh point.
       r.shape=shape;r.replacements++;

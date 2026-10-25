@@ -23,16 +23,30 @@ const node = (graph, id) => {
 // One comparison is shared by immediate verification and lost-reply recovery.
 export function verifyNodeTargetEffect(effect, after, positionMatches) {
   const before=effect.before,p=effect.parameters,kind=effect.kind;
-  if(!after.complete || after.dom_epoch!==before.dom_epoch || after.document_id!==before.document_id || !same(after.workflow_ref,before.workflow_ref)
-    || !same(after.foreign_links,before.foreign_links))return null;
+  if(!after.complete || after.dom_epoch!==before.dom_epoch || after.document_id!==before.document_id || !same(after.workflow_ref,before.workflow_ref))return null;
   const keep=(g,ids,edges=[])=>({nodes:g.nodes.filter(n=>!ids.includes(n.ref.node_id)).map(domainNode),links:g.links.filter(e=>!edges.includes(edgeKey(e)))});
   if(kind==='create'){
     const added=after.nodes.filter(n=>!before.nodes.some(b=>b.ref.node_id===n.ref.node_id));
     if(added.length!==1 || added[0].type!==p.type)return null;
     const id=added[0].ref.node_id,auto=after.links.filter(e=>!before.links.some(b=>edgeKey(b)===edgeKey(e)));
+    // Loginom 7.4.2 also connects a nearby REST reference on a manual drop.
+    // Only the native reader's typed GUID pair may explain a new foreign tid.
+    const service=(after.rest_connection_links??[]).filter(e=>!(before.foreign_links??[]).includes(e.tid));
+    if(service.length>1 || service.some(e=>p.type!=='integration.rest_request'||e.target!==id
+      ||!before.nodes.some(n=>n.ref.node_id===e.source)||!nativeRestServiceEdge(after,e))
+      ||!same(after.foreign_links?.filter(tid=>!service.some(e=>e.tid===tid)),before.foreign_links)
+      ||!same((after.rest_connection_links??[]).filter(e=>!service.includes(e)),before.rest_connection_links??[]))return null;
     if(auto.some(e=>e.source!==id&&e.target!==id) || !same(keep(before,[id],auto.map(edgeKey)),keep(after,[id],auto.map(edgeKey))))return null;
-    return {node_id:id,auto_created_links:auto};
+    return {node_id:id,auto_created_links:auto,auto_created_service_links:service};
   }
+  if(kind==='remove_link'&&p.edge.output==='connection:0'&&p.edge.input==='connection:0'){
+    const service=(before.rest_connection_links??[]).filter(e=>same(e,p.edge));
+    return service.length===1&&nativeRestServiceEdge(before,service[0])
+      &&same(after.foreign_links,before.foreign_links.filter(tid=>tid!==service[0].tid))
+      &&same(after.rest_connection_links??[],before.rest_connection_links.filter(e=>e!==service[0]))
+      &&same(keep(before,[]),keep(after,[]))?{}:null;
+  }
+  if(!same(after.foreign_links,before.foreign_links))return null;
   if(['rename','move','add_input'].includes(kind)){
     let current,original;try{current=node(after,p.ref.node_id);original=node(before,p.ref.node_id);}catch{return null;}
     const field=kind==='rename'?'label':kind==='move'?'position':'inputs';
@@ -46,10 +60,18 @@ export function verifyNodeTargetEffect(effect, after, positionMatches) {
   return null;
 }
 
+function nativeRestServiceEdge(graph,edge){
+  const source=graph.nodes.filter(n=>n.ref.node_id===edge.source),target=graph.nodes.filter(n=>n.ref.node_id===edge.target);
+  return edge.output==='connection:0'&&edge.input==='connection:0'&&graph.foreign_links?.filter(tid=>tid===edge.tid).length===1
+    &&source.length===1&&target.length===1&&source[0].type==='bg-vendor-icon-restclientconnection'&&target[0].type==='integration.rest_request'
+    &&source[0].other_ports?.includes('Output_Connection-0')&&target[0].other_ports?.includes('Input_Connection-0')
+    &&[source[0],target[0]].every(n=>n.ref.document_id===graph.document_id&&n.ref.workflow_id===graph.workflow_ref.workflow_id);
+}
+
 // Internal graph phase of node.apply. The enclosing runtime owns the gate and
 // operation ID; adapters invoke fixed local primitives, never dock_action_run.
 // Effects are committed one at a time. A possible effect never retries a gesture.
-export async function prepareNodeTarget({ request, operation, adapter, record, signal, now = Date.now }) {
+export async function prepareNodeTarget({ request, operation, adapter, record, signal, now = Date.now, beforeTarget }) {
   validateNodeTargetRequest(request);
   const signature = digest(request);
   const state = operation.targetPhase ??= { signature, receipts: [], baseline: null, targetId: null, effect_possible: false };
@@ -72,12 +94,34 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
     return graph;
   };
   const commit = async () => save('node_target_checkpoint', { target_state: state });
+  // Private REST preflight authorizes only inserting its generated encoder
+  // between the caller-confirmed raw source and the same existing REST node.
+  const restInputReplacement = graph => {
+    const p=operation.restQueryInput,r=operation.parameters;
+    if(!p||r?.finish!=='execute'||r.mode!=='request'||!r.parameters?.connection||!r.parameters.query_parameters?.length
+      ||r.target.kind!=='existing'||r.target.type!=='integration.rest_request'
+      ||!same(r.target,request.target)||r.document_id!==request.document_id||!same(r.workflow_ref,request.workflow_ref)
+      ||r.inputs.length!==1||request.inputs.length!==1)return false;
+    const raw=r.inputs[0],encoded=request.inputs[0];
+    return p.edge.target===request.target.ref.node_id&&p.edge.input===0&&raw.input===0&&encoded.input===0&&encoded.output===0
+      &&p.edge.source===raw.source.node_id&&p.edge.output===raw.output&&same(encoded.source,p.encoder)
+      &&p.encoder.document_id===request.document_id&&p.encoder.workflow_id===request.workflow_ref.workflow_id
+      &&node(graph,p.encoder.node_id).type==='programming.javascript'
+      &&graph.links.filter(e=>e.target===p.encoder.node_id&&e.input===0).length===1
+      &&graph.links.some(e=>e.source===raw.source.node_id&&e.output===raw.output&&e.target===p.encoder.node_id&&e.input===0);
+  };
   const change = async (kind, parameters, verify) => {
     let original = await observe();
     for(let refresh=0;refresh<3;refresh++){
       budget();
       const before=refresh===0?original:await observe();
       if(!same(before,original))throw new Error('Graph target changed before local refresh');
+      if(kind==='remove_link'&&parameters.edge.output==='connection:0'
+        &&(request.target.kind!=='new'||parameters.edge.target!==state.targetId
+          ||!(state.auto_created_service_links??[]).some(e=>same(e,parameters.edge))))throw Error('Unowned REST service connection');
+      if(operation.restQueryInput&&['remove_link','connect'].includes(kind)&&parameters.edge.target===request.target.ref.node_id
+        &&(!restInputReplacement(before)||kind==='remove_link'&&!same(parameters.edge,operation.restQueryInput.edge)))
+        throw Error('REST encoder input authorization changed before graph effect');
       const effect = { id: operation.id + ':graph:' + (state.receipts.length+(state.refusals?.length??0)), kind, parameters: structuredClone(parameters), before };
       await save('node_target_effect_prepared', { effect });
       budget();
@@ -115,6 +159,18 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
     const retained = g => ({ nodes: g.nodes.filter(n => !ids.includes(n.ref.node_id)).map(domainNode), links: g.links.filter(e => !edges.includes(edgeKey(e))), foreign_links: g.foreign_links });
     return same(retained(before), retained(after));
   };
+  if(beforeTarget){
+    if(request.target.kind!=='new'||!['transform.cross_table','transform.calculator','preprocessing.data_recovery'].includes(request.target.type)
+      ||state.baseline||state.last_graph||state.pending||state.targetId||state.receipts.length)
+      throw Error('Source preflight already started; release without replay');
+    // The source preview or definition wizard can fail before creation begins.
+    // Retain the existing graph checkpoint before that first child gesture, so a
+    // later read-only release can compare the original graph. No target
+    // effect is prepared here; an unfinished preflight is never resumable.
+    state.last_graph=structuredClone(await observe());
+    await commit();budget();
+    await beforeTarget();
+  }
   try {
     let graph = await observe();
     if (state.pending) {
@@ -131,7 +187,7 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       const proof=verifyNodeTargetEffect(state.pending,graph,adapter.positionMatches);
       if (!recovery?.verified || recovery.cleanup_complete !== true || !proof) throw new Error('Pending graph effect is unresolved');
       state.receipts.push({ id: state.pending.id, kind: state.pending.kind, parameters: state.pending.parameters, verified: true, receipt: recovery });
-      if (state.pending.kind === 'create') {state.targetId = proof.node_id;state.auto_created_links=proof.auto_created_links;}
+      if (state.pending.kind === 'create') {state.targetId = proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;}
       state.pending = null;state.last_graph=structuredClone(graph); await commit(); graph = await observe();
       }
     }
@@ -154,9 +210,13 @@ export async function prepareNodeTarget({ request, operation, adapter, record, s
       if (request.target.kind === 'existing') {
         const existing = node(graph, request.target.ref.node_id);
         if (existing.type !== request.target.type) throw new Error('Existing node has a different component type');
+        if(operation.restQueryInput&&(!restInputReplacement(graph)||!graph.links.some(e=>edgeKey(e)===edgeKey(operation.restQueryInput.edge))))
+          throw Error('REST encoder input authorization differs from the existing graph');
         for(const input of request.inputs){
           const occupied=graph.links.find(e=>e.target===existing.ref.node_id&&e.input===input.input);
-          if(occupied&&(occupied.source!==input.source.node_id||occupied.output!==input.output))throw new Error('Requested input is occupied by an unowned link');
+          if(occupied&&(occupied.source!==input.source.node_id||occupied.output!==input.output)
+            &&!(restInputReplacement(graph)&&edgeKey(occupied)===edgeKey(operation.restQueryInput.edge)))throw new Error('Requested input is occupied by an unowned link'
+            +(existing.type==='exports.text'?'. dock_node_apply does not replace existing connections. For a different source or output, use a NEW exports.text target with target.kind:"new", complete export settings and a NEW operation_id; preserve the existing export and its link. To keep the same source and only reconfigure the existing export, use inputs:[].':''));
         }
         state.targetId = existing.ref.node_id;
       }
@@ -184,14 +244,18 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     }
     if (!state.targetId) {
       const after = await change('create', {...request.target,position:request.target.position??state.newPosition}, (before, after) => {
-        const added = after.nodes.filter(n => !before.nodes.some(b => b.ref.node_id === n.ref.node_id));
-        if (added.length !== 1 || added[0].type !== request.target.type) return false;
-        const id = added[0].ref.node_id;
-        const auto = after.links.filter(e => !before.links.some(b => edgeKey(e) === edgeKey(b)));
-        if (auto.some(e => e.target !== id && e.source !== id) || !unchangedExcept(before, after, [id], auto.map(edgeKey))) return false;
-        state.targetId = id; state.auto_created_links = auto; return true;
+        const proof=verifyNodeTargetEffect({kind:'create',parameters:request.target,before},after,adapter.positionMatches);
+        if(!proof)return false;
+        state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;return true;
       });
       graph = after;
+    }
+    // An automatic service choice is not the caller's requested connection.
+    // Remove only this creation's proven edge through the existing native
+    // deletion procedure; the REST handler subsequently binds its own choice.
+    for(const edge of state.auto_created_service_links??[]){
+      if(!(graph.rest_connection_links??[]).some(e=>same(e,edge)))continue;
+      graph=await change('remove_link',{edge},(before,after)=>!!verifyNodeTargetEffect({kind:'remove_link',parameters:{edge},before},after,adapter.positionMatches));
     }
     let target = node(graph, state.targetId);
     if (request.target.label !== undefined && target.label !== request.target.label) {
@@ -211,9 +275,10 @@ let capacity=request.target.kind==='new'?NODE_TYPES[request.target.type].tabular
     }
     const desired = request.inputs.map(i => ({ source: i.source.node_id, output: i.output, target: state.targetId, input: i.input }));
     for (const edge of graph.links.filter(e => e.target === state.targetId && !desired.some(d => edgeKey(d) === edgeKey(e)))) {
-      const owned = (state.auto_created_links ?? []).some(a => edgeKey(a) === edgeKey(edge));
-      // Existing links not mentioned by the caller are preserved. Conflicting
-      // existing links require an explicit future edit contract, never deletion.
+      const owned = (state.auto_created_links ?? []).some(a => edgeKey(a) === edgeKey(edge))
+        ||restInputReplacement(graph)&&edgeKey(edge)===edgeKey(operation.restQueryInput.edge);
+      // Other existing links not mentioned by the caller are preserved.
+      // Conflicting links require an explicit edit contract, never deletion.
       if (!owned) {
         if (desired.some(d => d.input === edge.input)) throw new Error('Requested input is occupied by an unowned link');
         continue;
@@ -265,7 +330,7 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
     }else{
     const proof=verifyNodeTargetEffect(effect,graph,adapter.positionMatches);
     if(!recovery.verified || recovery.cleanup_complete!==true || !proof)return {status:'AMBIGUOUS',phase:'target_incomplete',cleanup_complete:recovery.cleanup_complete===true,pending:effect.id};
-    if(effect.kind==='create'){state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;}
+    if(effect.kind==='create'){state.targetId=proof.node_id;state.auto_created_links=proof.auto_created_links;state.auto_created_service_links=proof.auto_created_service_links;}
     state.receipts.push({id:effect.id,kind:effect.kind,parameters:effect.parameters,verified:true,receipt:recovery});
     state.pending=null;state.last_graph=structuredClone(graph);
     }
@@ -274,7 +339,8 @@ export async function inspectNodeTarget({request,operation,adapter,record,deadli
   const event={operation_id:operation.id,phase:'node_target_checkpoint',internal_provenance:'node_target_v1',target_state:structuredClone(state)};
   const ack=await record(event);if(!same(ack?.target_state,event.target_state))throw new Error('Node target journal acknowledgement differs');
   operation.targetPhase=state;
-  return state.completed?{...structuredClone(state.result),cleanup_complete:true}:{status:'AMBIGUOUS',phase:'target_partial',cleanup_complete:true,pending:null,node_id:state.targetId,resume_available:true};
+  return state.completed?{...structuredClone(state.result),cleanup_complete:true}:{status:'AMBIGUOUS',phase:'target_partial',cleanup_complete:true,pending:null,node_id:state.targetId,
+    resume_available:!(request?.target.kind==='new'&&['transform.cross_table','transform.calculator','preprocessing.data_recovery'].includes(request.target.type)&&!state.baseline&&state.last_graph)};
 }
 
 // A pre-target release observes only. In particular, it cannot finish creation,
@@ -313,7 +379,7 @@ export async function releaseNodeTarget({operation,adapter,record,readReceipt,de
     &&g.nodes.every(n=>n.locked===false&&n.ref.document_id===request.document_id&&n.ref.workflow_id===request.workflow_ref.workflow_id)
     &&new Set(g.nodes.map(n=>n.ref.node_id)).size===g.nodes.length;
   if(!quiet(first))throw Error('Complete quiet original graph required for pre-target release');
-  const baseline=target?.final_graph??target?.last_graph??target?.baseline;
+  const baseline=target?.final_graph??target?.last_graph??target?.baseline??operation.preTargetGraph;
   if(baseline&&!sameDomainGraph(baseline,first))throw Error('Pre-target graph differs from its settled checkpoint');
   if(!baseline&&(target?.effect_possible||target?.receipts?.length||target?.targetId))
     throw Error('Target effects have no settled graph checkpoint');
@@ -327,7 +393,7 @@ export async function releaseNodeTarget({operation,adapter,record,readReceipt,de
   check();
   if(!quiet(second)||!same(first,second))throw Error('Graph changed during pre-target release');
   return {verified:true,cleanup_complete:true,node:matches[0]?.ref??null,graph:second,
-    target_state:id?'found':'not_created',cleanup:{wizard_closed:false,read_view_restored:false,views_returned:false}};
+    target_state:id?'found':'not_created',warnings:operation.preTargetWarnings??[],cleanup:{wizard_closed:false,read_view_restored:false,views_returned:false}};
 }
 
 // Activation uses its own browser ledger, not operation.lastReceipt. A visible

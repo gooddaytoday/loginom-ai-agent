@@ -12,16 +12,19 @@ import {decodeTableOutput} from './table-output-values.mjs';
 import {createNodeExecutionProcedure} from './node-execution-procedure.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {openPreparedWizard} from './node-wizard-open.mjs';
+import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {textImportConfigurationReadback} from './text-import-readback.mjs';
 import {textImportStepBudget} from './text-import-limits.mjs';
 import {textImportParametersSchema} from './node-api.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
+import {isUnchangedTextImportExecution} from './node-read-contract.mjs';
 
 const requireValue=(v,m)=>{if(!v)throw new Error(m);};
 const one=(xs,m)=>{requireValue(xs.length===1,m);return xs[0];};
 const verified=(details={})=>({verified:true,cleanup_complete:true,effect_possible:false,...details});
 
 export function validateTextImportNodeParameters(p,mode,request) {
+  if(isUnchangedTextImportExecution({...request,parameters:p,mode}))return;
   requireValue(p && Object.keys(p).sort().join(',')==='settings,source','Exact import source and settings required');
   const existing=request.target?.kind==='existing';
   if(!existing)requireValue(Array.isArray(p.settings?.columns)&&p.settings.columns.length>0,
@@ -137,10 +140,7 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRea
           await executionDriver.prepare();
         }
         let s=await channel.observe({condition:'prepared import graph ready',ready:s=>s.prepared_node_context?.surface==='graph' && s.wizard?.status==='absent'});
-        await channel.perform({condition:'bound import graph body available',initialObservation:s,
-          ready:s=>s.prepared_node_context?.surface==='graph' && s.ui.elements.some(e=>e.tid===s.prepared_node_context.tid && e.graph_node?.part==='body' && e.allowed_actions.includes('click')),
-          resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===s.prepared_node_context.tid && e.graph_node?.part==='body'),'Prepared graph body unavailable').ref}),
-          identity:s=>s.prepared_node_context});
+        await selectPreparedGraphNode(channel,s,'bound import graph selection available');
         if(operation.nodeApply.request.target.kind==='existing')await openPreparedWizard(channel);
         else {
           s=await channel.observe({condition:'prepared import settings available',ready:s=>s.prepared_node_context?.surface==='graph'
@@ -225,13 +225,16 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRea
           resolve:s=>({verb,ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';'+button),'Unique wizard completion control required').ref}),
           identity:s=>s.prepared_node_context});
         const graph=await channel.observe({condition:'same configured node returned to graph',ready:s=>s.wizard?.status==='absent' && s.prepared_node_context?.surface==='graph'});
+        const label=one(graph.ui.elements.filter(e=>e.tid===graph.prepared_node_context.tid+';Label;Label'
+          &&e.graph_node?.part==='label'),'Configured Import caption is unavailable').graph_node.label_text;
+        requireValue(typeof label==='string'&&label.length>0,'Configured Import caption is empty');
         const execution=executeRequested?await executionDriver.identify():null;
         const continuationSurface=executeRequested?finishedImportSurface(await channel.observe({
           condition:'identified execution and graph continuity checkpoint',readProcesses:true,readOutputs:true,
           ready:s=>s.prepared_node_context?.surface==='graph'&&s.node_processes?.verified===true&&s.node_outputs?.verified===true})):null;
         return verified({effect_possible:true,mode,execution_started:executeRequested,settings_applied:true,
           ...(execution?{execution_id:execution.execution_id,execution_group:execution,continuation_surface:continuationSurface}:{}),
-          node_context:graph.prepared_node_context,package_saved:false,reopen_performed:false});
+          node_context:graph.prepared_node_context,node_label:label,package_saved:false,reopen_performed:false});
       },
       async waitExecution(ctx) {
         enter(ctx);requireValue(executionDriver,'Execution driver is unavailable');
@@ -261,7 +264,16 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRea
           readSettings=await prepareTableRead(channel,opened.table);
           raw=await readTableOutputPages(channel,opened.table,{sampleRows:read.sample_rows});
           data=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:outputColumns,requireExactNumbers:read.require_exact_numbers});
-        } finally { if(formatProof){formatRestoration=await restoreTablePrecision(channel,formatProof);readView.restored=true;} }
+        } catch(error) {
+          // A settled ambiguous Filter click can leave our own draft open.
+          // Cancel it before restoring Format; never clean up a lost transport
+          // call or replace its primary error with a secondary cleanup failure.
+          if(!operation.transportUncertain&&operation.cleanupConfirmed===true) {
+            await restoreStoppedTableRead(channel,readView,error);readView=null;
+          }
+          throw error;
+        }
+        if(formatProof){formatRestoration=await restoreTablePrecision(channel,formatProof);readView.restored=true;}
         const workflowReturn=await returnFromOutputTable(channel,opened.table);readView=null;
         // Private acceptance may retain raw civil evidence; no public response/schema changes.
         await onTableRead?.({raw,table_creation:opened,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:workflowReturn});

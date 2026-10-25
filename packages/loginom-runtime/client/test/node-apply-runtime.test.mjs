@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {createActionRuntime,parseCapabilityResult} from '../lib/executor.mjs';
 import vm from 'node:vm';
 import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
-import {nodeJobResultSchema} from '../lib/node-result-schema.mjs';
+import {nodeJobResultSchema,nodeApplyResultSchema} from '../lib/node-result-schema.mjs';
 import {inspectPendingWizardOpen} from '../lib/node-wizard-open.mjs';
 import {preflightCalculatorSource} from '../lib/calculator-preflight.mjs';
 import {actions} from './support/executor-fixture.mjs';
-import {compactActionResult} from '../lib/user-results.mjs';
+import {compactActionResult,compactNodeResult} from '../lib/user-results.mjs';
 const validateJob=new AjvJsonSchemaValidator().getValidator(nodeJobResultSchema);
 const assertJob=job=>{const result=validateJob(job);assert.equal(result.valid,true,result.errorMessage);};
 const workflow={workflow_id:'wf',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',prefix:'MF;TF-1',navigation_path:[{tid:'path',label:'Scenario'}]};
@@ -92,6 +92,37 @@ test('read-only target refusal is NOT_APPLIED with confirmed cleanup and no grap
  assert.equal(result.output.node,null);assert.deepEqual(f.calls,['source']);
  assert.ok(f.events.some(e=>e.phase==='node_phase_refused'&&e.receipt.phase==='target'&&e.receipt.effect_possible===false));
  const count=f.calls.length;await f.runtime.runNodeApply(request());assert.equal(f.calls.length,count);
+});
+test('occupied existing export explains the safe new-target path without replacing its input',async()=>{
+ for(const variant of ['different source','different output','same connection','preserve input']){
+  const f=fixture(),ref=node_id=>({document_id:'doc',workflow_id:'wf',node_id});
+  f.handlers.set('exports.text',f.handler);
+  f.graph.nodes.push({ref:ref('source'),type:'imports.text',label:'Source',position:{x:96,y:96},inputs:[],outputs:[0,1]},
+   {ref:ref('other'),type:'imports.text',label:'Other',position:{x:96,y:256},inputs:[],outputs:[0]},
+   {ref:ref('export'),type:'exports.text',label:'Saved export',position:{x:320,y:96},inputs:[0],outputs:[]});
+  f.graph.links.push({source:'source',output:0,target:'export',input:0});
+  const before=structuredClone(f.graph),r=request();
+  r.target={kind:'existing',type:'exports.text',ref:ref('export')};
+  r.inputs=variant==='preserve input'?[]:[{source:ref(variant==='different source'?'other':'source'),output:variant==='different output'?1:0,input:0}];
+  const outcome=await f.runtime.runNodeApply(r),conflict=variant.startsWith('different');
+  const reply=compactNodeResult({operation_id:r.operation_id,state:'settled',outcome});
+  assert.deepEqual(f.graph,before);assert.ok(!f.events.some(e=>e.phase==='node_target_effect_prepared'));
+  if(conflict){
+   assert.equal(reply.status,'NOT_APPLIED');assert.equal(reply.effect_possible,false);assert.equal(reply.cleanup_complete,true);
+   assert.equal(reply.error.code,'NODE_APPLY_STOPPED');
+   assert.match(reply.error.message,/Requested input is occupied by an unowned link/);
+   assert.match(reply.error.message,/does not replace existing connections/);
+   assert.match(reply.error.message,/target.kind:"new".*NEW operation_id/);
+   assert.match(reply.error.message,/same source.*inputs:\[\]/);
+   assert.match(reply.next_step.instruction,/No node mutation or browser recovery is required/);
+   assert.deepEqual(f.calls,['source']);
+   assert.equal((await f.runtime.runNodeApply(r)).error.message,outcome.error.message);
+   assert.deepEqual(f.calls,['source']);
+  }else{
+   assert.equal(reply.status,'SUCCEEDED',JSON.stringify(reply));assert.equal(reply.error,null);
+   assert.ok(f.calls.includes('configure'));assert.ok(!JSON.stringify(reply).includes('target.kind:"new"'));
+  }
+ }
 });
 test('lost target mutation response retains ambiguity and pending cleanup',async()=>{
  const f=fixture();f.adapter.mutate=async()=>{throw Error('lost gesture response');};
@@ -720,6 +751,47 @@ test('public node inspect/resume recovers a lost precondition refusal without re
  const result=await f.runtime.runNodeApply(r,{resume:true});assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));
  assert.equal(f.calls.filter(c=>c==='create').length,1);assert.equal(f.calls.filter(c=>c==='connect').length,1);
  assert.equal(f.graph.nodes.length,2);assert.equal(f.graph.links.length,1);
+});
+
+for(const fault of [null,'cleanup','foreign','table','execution','inbound','transport','journal'])test('JavaScript 212x4 full refusal frees the gate only after workflow return: '+fault,async()=>{
+ const f=fixture({wrapDrivers:(context,drivers)=>({...drivers,
+  finish:async mode=>({verified:true,cleanup_complete:true,mode,execution_started:mode==='execute',execution_id:mode==='execute'?'exec':null}),
+  waitExecution:async()=>({verified:true,cleanup_complete:true,status:'completed',execution_id:'exec'}),
+  readOutput:async(read,ctx)=>{
+   context.operation.cleanupConfirmed=true;
+   if(read.coverage!=='full')return {verified:true,cleanup_complete:true,execution_id:ctx.execution.execution_id,status:'partial',evidence_ref:'sample',
+    ports:[{port:0,port_guid:'port',fresh:true,execution_id:ctx.execution.execution_id,schema:[],row_count:212,sample:[],sample_rows:0,sample_complete:false,
+     precision:{numbers_verified:true,limitations:[],strings:'exact'}}]};
+   const returned={verified:true,source_table:{view_guid:'view',port_guid:'port',table_tid:'table'},
+    node_context:{...ctx.node,verified:true,surface:'graph'},execution_started:false,reopen_performed:false};
+   const refusal={phase:'read',status:'FAILED',verification:'javascript_full_bound_refused',effect_possible:false,
+    cleanup_complete:true,settings_unchanged:true,proof:{table:structuredClone(returned.source_table),row_count:212,sample_rows:100,execution:structuredClone(ctx.execution),returned}};
+   if(fault==='cleanup')returned.verified=false;
+   if(fault==='foreign')returned.node_context.node_id='other';
+   if(fault==='table')returned.source_table.port_guid='other';
+   if(fault==='execution')refusal.proof.execution.execution_id='other';
+   if(fault==='inbound')refusal.proof.row_count=100;
+   if(fault==='transport')context.operation.transportUncertain=true;
+   const error=Error('JavaScript full output has 212 rows; limit is 100. Read a sample of at most 100 rows or verify the downloaded CSV Export.');
+   error.nodePhaseRefusal=refusal;throw error;
+  }})});
+ f.handlers.set('programming.javascript',{...f.handler,modes:['script'],fullUiOutput:true});
+ const p=request();p.target.type='programming.javascript';p.mode='script';p.finish='execute';
+ p.read={ports:[0],sample_rows:100,require_exact_numbers:true,coverage:'full'};
+ if(fault==='journal')f.failRecord('node_phase_refused');
+ const r=await f.runtime.runNodeApply(p);
+ assert.equal(new AjvJsonSchemaValidator().getValidator(nodeApplyResultSchema)(r.output).valid,true);
+ assert.equal(r.status,fault?'AMBIGUOUS':'FAILED',JSON.stringify(r));assert.equal(r.cleanup_complete,!fault);
+ if(fault){assert.throws(()=>f.runtime.assertPreparationAllowed());await assert.rejects(f.runtime.runNodeApply({...request(),operation_id:'next'}),/pending/);}
+ else{
+  assert.match(r.output.error.message,/212.*100/);assert.match(r.output.next_step.instruction,/sample.*CSV/);
+  assert.equal(r.output.pending_phase,null);assert.equal(r.output.execution.status,'completed');
+  assert.equal(r.output.output.status,'not_refreshed');
+  assert.equal((await f.runtime.inspect({operationId:'apply'})).output.state,'resolved');
+  f.runtime.assertPreparationAllowed();
+  const next=await f.runtime.runNodeApply({...p,operation_id:'next',target:{kind:'existing',type:'programming.javascript',ref:r.output.node},read:{ports:[0],sample_rows:100,require_exact_numbers:true}});assert.equal(next.status,'SUCCEEDED',JSON.stringify(next));
+  assert.ok(f.events.some(e=>e.phase==='node_phase_refused'&&e.receipt.effect_possible===false));
+ }
 });
 
 for(const fault of [null,'cleanup','foreign','execution','inbound','transport','journal'])test('native full refusal frees the runtime gate only with owned cleanup: '+fault,async()=>{

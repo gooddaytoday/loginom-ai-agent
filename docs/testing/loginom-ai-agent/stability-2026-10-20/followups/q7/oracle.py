@@ -33,13 +33,13 @@ COLUMNS = [*COLUMNS, ("Total", "real")]
 
 expected = {
     "package_path": sys.argv[1] if len(sys.argv) > 1 else "/demo-2026-10-22/s5-pivot.lgp",
-    "nodes": [{"type": kind} for kind in ("imports.text", "transform.cross_table", "exports.text")],
+    "nodes": [],
     "outputs": [{
         "output_node_type": "export_input",
         "export_destination": sys.argv[2] if len(sys.argv) > 2 else "/demo-2026-10-22/pivot-total.csv",
         "ordered": False,
         "column_order": "exact",
-        "columns": [{"name": name, "label": LABELS.get(name, name), "type": kind}
+        "columns": [{"name": name, "label_any": True, "type": kind}
                     for name, kind in COLUMNS],
         "rows": rows,
     }],

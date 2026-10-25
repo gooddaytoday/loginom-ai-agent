@@ -1,16 +1,6 @@
 {
   "package_path": "/stability-2026-10-20/datamining-clustering.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "datamining.clustering"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -20,7 +10,7 @@
       "columns": [
         {
           "name": "X",
-          "label": "X",
+          "label_any": true,
           "type": "real",
           "tolerance": {
             "abs": 1e-08,
@@ -29,7 +19,7 @@
         },
         {
           "name": "PointCount",
-          "label": "PointCount",
+          "label_any": true,
           "type": "integer"
         }
       ],

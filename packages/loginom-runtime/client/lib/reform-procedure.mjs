@@ -4,6 +4,25 @@ const need=(ok,message)=>{if(!ok)throw Error(message);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const semantic=fields=>fields.map(({selected,...f})=>f);
 
+export async function advanceReformInputColumns(channel,request){
+ const inline=s=>request.target.kind==='existing'&&s.prepared_node_context?.verified===true
+  &&s.prepared_node_context.surface==='wizard'&&!s.prepared_node_context.input_port&&!s.prepared_node_context.output_port
+  &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===request.target.ref[k])
+  &&s.wizard?.status==='observed'&&s.wizard.stage==='input_mapping'&&s.wizard.title_status==='observed'
+  &&s.wizard.title==='Настройка входных столбцов'&&s.wizard.owner_context?.status==='observed'
+  &&s.wizard.input_port_context?.status!=='observed'&&s.wizard.port_context?.status!=='observed'
+  &&s.wizard.controls.btnNext?.status==='observed'&&s.wizard.controls.btnNext.enabled===true
+  &&s.wizard.controls.btnPrev?.status==='observed'&&s.wizard.controls.btnPrev.enabled===false
+  &&s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';TuneDataSourceInputPortWizard;btnAddMappingColumn').length===1;
+ const ready=s=>s.wizard?.stage==='field_parameters'&&s.node_reform?.verified===true||inline(s);
+ const initial=await channel.observe({condition:'reform configuration or owned initial input columns',readReform:true,ready});
+ if(initial.wizard.stage==='field_parameters')return;
+ await channel.perform({condition:'advance existing Reform input columns once',initialObservation:initial,ready:inline,
+  identity:s=>({node_context:s.prepared_node_context,owner:s.wizard.owner_context,root_ref:s.wizard.root_ref}),
+  resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';btnNext'&&e.allowed_actions.includes('wizard_step'));
+   need(es.length===1,'Owned Reform input-columns Next unavailable');return {verb:'wizard_step',ref:es[0].ref,expected_stage:'field_parameters'};}});
+}
+
 export async function configureReform(channel,parameters,{inputMapping}={}) {
  const ready=s=>s.wizard?.stage==='field_parameters'&&s.node_reform?.verified===true;
  const observe=condition=>channel.observe({condition,readReform:true,ready});

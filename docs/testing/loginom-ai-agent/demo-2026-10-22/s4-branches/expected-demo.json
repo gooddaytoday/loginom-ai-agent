@@ -1,16 +1,6 @@
 {
   "package_path": "/demo-2026-10-22/s4-branches.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.union_data"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -18,18 +8,18 @@
       "columns": [
         {
           "name": "Branch",
-          "label": "Branch",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "Category",
-          "label": "Category",
-          "type": "string"
+          "type": "string",
+          "label_any": true
         },
         {
           "name": "Revenue",
-          "label": "Revenue",
-          "type": "real"
+          "type": "real",
+          "label_any": true
         }
       ],
       "rows": [

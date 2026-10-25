@@ -31,11 +31,28 @@ function fixture(phase='target',type='imports.text'){
       ...(type==='programming.javascript'?{releasePendingPhases:['input_mapping','open','configure'],
         releasePending:async()=>{throw Error('Early target must use its graph release verifier');}}:{}),
       verifySource:async()=>{if(phase==='source')throw Error('Injected source failure');return ok();},
-      ...(phase==='target_before_create'?{beforeTarget:async()=>{throw Error('Injected preflight failure before creation');}}:{}),
+      ...(['target_before_create','target_source_child','target_release_hook'].includes(phase)?{beforeTarget:async()=>{
+        if(phase==='target_release_hook'){operation.nodeEffectPossible=true;operation.cleanupConfirmed=false;}
+        if(phase==='target_source_child'){
+          state.preflightCalls=(state.preflightCalls??0)+1;
+          assert.ok(events.find(e=>e.phase==='node_target_checkpoint'&&e.target_state.last_graph));
+          operation.nodeEffectPossible=true;operation.cleanupConfirmed=false;
+          operation.lastReceipt={id:'apply:n1',operation_id:'apply:n1',action_key:'ui.act',signature:'signature'};
+          if(state.preflightSuccess)return ok();
+        }
+        throw Error('Injected preflight failure before creation');
+      }}:{}),
+      ...(phase==='target_release_hook'?{releaseBeforeTarget:async({deadline})=>{
+        state.releaseCalls=(state.releaseCalls??0)+1;assert.ok(deadline>Date.now());
+        if(!state.allowChildRelease)throw Error('child still unsettled');
+        operation.preTargetGraph=structuredClone(graph);operation.cleanupConfirmed=true;
+      }}:{}),
       openWizard:async()=>{throw Error('No wizard should open');},mapPorts:async()=>ok(),verifyContinuation:async()=>true,
       finish:async()=>ok(),waitExecution:async()=>ok(),readOutput:async()=>ok()};},
     onRecord:async event=>{
       events.push(structuredClone(event));
+      if(state.failPreflightAck&&event.phase==='node_target_checkpoint'&&event.target_state.last_graph&&!event.target_state.baseline)
+        throw Error('Injected source checkpoint acknowledgement failure');
       if(state.fail&&phase==='target'&&event.phase==='node_phase_completed'&&event.receipt?.phase==='target')throw Error('Injected target acknowledgement failure');
       if(phase==='target_pending'&&event.phase==='node_target_checkpoint'&&event.target_state.pending)throw Error('Injected graph checkpoint failure');
       if(state.failReleaseAck&&event.phase==='node_operation_released')throw Error('Injected release acknowledgement failure');
@@ -205,6 +222,79 @@ test('a hidden preflight child with possible effects cannot be cleared by a quie
   assert.deepEqual(f.calls,[]);
 });
 
+function stoppedCrossTablePreflight(type='transform.cross_table'){
+ const f=fixture('target_source_child',type);
+ for(let i=0;i<5;i++)f.state.graph.nodes.push({ref:{...node,node_id:'retained-'+i},type:i===0?'imports.text':i<3?'transform.group_data':'transform.sorting',
+  label:'Retained '+i,position:{x:100+i*100,y:100},inputs:i?[0]:[],outputs:[0],locked:false});
+ for(const [source,target] of [[0,1],[0,2],[1,3],[2,4]])f.state.graph.links.push({source:'retained-'+source,output:0,target:'retained-'+target,input:0});
+ f.state.receiptResult={state:'completed',receipt:{status:'AMBIGUOUS',action_key:'ui.act',action_revision:'1',operation_id:'apply:n1',
+  phase:'observing',effect_possible:true,output:{},error:{code:'WIZARD_CONTEXT_CHANGED',message:'Original wizard context changed'},trace:[],cleanup_complete:true}};
+ return f;
+}
+for(const type of ['transform.cross_table','transform.calculator','preprocessing.data_recovery'])
+for(const browser of [false,true])test(type+' source child failure releases the checkpointed original graph, browser='+browser,async()=>{
+ const f=stoppedCrossTablePreflight(type);await stop(f);
+ assert.equal(f.state.operation.nodeApply.pending.phase,'target');assert.equal(f.state.operation.targetPhase.baseline,null);
+ assert.equal(f.state.operation.targetPhase.last_graph.nodes.length,5);assert.equal(f.state.preflightCalls,1);
+ assert.deepEqual(f.state.operation.targetPhase.last_graph.links,f.state.graph.links);assert.equal(f.state.graph.links.length,4);
+ await f.runtime.inspect({operationId:'apply'});
+ assert.equal(f.state.operation.nodeApply.pending.phase,'target');
+ if(browser){
+  f.state.blocked=true;assert.equal((await release(f)).error.code,'NODE_RELEASE_REFUSED');
+  const basis=f.runtime.browserRecoveryBasis('apply');assert.equal(basis.step.kind,'node_target');
+  assert.equal((await f.runtime.browserRecoveryHandoff('apply')).stopped,true);f.state.blocked=false;
+  const result=await f.runtime.verifyBrowserRecovery({operationId:'apply',step:basis.step,attested:{actions_performed:['observed quiet original graph']}});
+  assert.equal(result.status,'continuable',JSON.stringify(result));assert.equal(result.original_operation.status,'FAILED');
+  assert.equal(f.state.operation.nodeApply.result.node,null);
+ }else{
+  const result=await release(f);assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+  const original=result.output.original_outcome.output;
+  assert.equal(original.node,null);assert.equal(original.package_saved,false);
+  assert.equal(original.execution.status,'not_requested');assert.equal(original.configuration.status,'not_requested');
+  assert.match(original.next_step.instruction,/did not create/);assert.match(original.next_step.instruction,/Source\/preflight effects are not undone/);
+ }
+ f.runtime.assertPreparationAllowed();assert.equal(f.runtime.hasUnsettledWork(),false);
+ assert.equal(f.state.preflightCalls,1);assert.deepEqual(f.calls,[]);
+});
+for(const type of ['transform.cross_table','transform.calculator','preprocessing.data_recovery'])
+for(const fault of ['changed_graph','extra_node','receipt_pending','receipt_cleanup','transport','release_ack'])
+ test('checkpointed '+type+' source child still refuses '+fault,async()=>{
+ const f=stoppedCrossTablePreflight(type);await stop(f);
+ if(fault==='changed_graph')f.state.graph.nodes[0].label='Changed';
+ if(fault==='extra_node')f.state.graph.nodes.push({...structuredClone(f.state.graph.nodes[0]),ref:{...node,node_id:'unexpected'}});
+ if(fault==='receipt_pending')f.state.receiptResult.state='pending';
+ if(fault==='receipt_cleanup')f.state.receiptResult.receipt.cleanup_complete=false;
+ if(fault==='transport')f.state.operation.transportUncertain=true;
+ if(fault==='release_ack')f.state.failReleaseAck=true;
+ if(fault==='transport')await assert.rejects(release(f),/unconfirmed/);
+ else assert.equal((await release(f)).error.code,'NODE_RELEASE_REFUSED');
+ assert.throws(()=>f.runtime.assertPreparationAllowed(),/pending|unsettled|uncertain/);
+ assert.deepEqual(f.calls,[]);assert.equal(f.state.preflightCalls,1);
+});
+
+for(const type of ['transform.cross_table','transform.calculator','preprocessing.data_recovery'])
+test(type+' unfinished checkpointed preflight cannot resume its source gestures',async()=>{
+ const f=stoppedCrossTablePreflight(type);await stop(f);
+ await f.runtime.startNodeApply(f.request,{resume:true});
+ const job=await f.runtime.waitNodeApply('apply',{timeoutMs:1000});
+ assert.equal(job.outcome.status,'AMBIGUOUS');assert.equal(f.state.operation.nodeApply.pending.phase,'target');
+ assert.equal(f.state.preflightCalls,1);assert.deepEqual(f.calls,[]);
+});
+
+for(const type of ['transform.cross_table','transform.calculator','preprocessing.data_recovery'])
+test(type+' source preflight checkpoint ACK failure prevents all child and target gestures',async()=>{
+ const f=stoppedCrossTablePreflight(type);f.state.failPreflightAck=true;await stop(f);
+ assert.equal(f.state.preflightCalls,undefined);assert.deepEqual(f.calls,[]);assert.equal(f.state.graph.nodes.length,5);
+});
+
+for(const type of ['transform.cross_table','transform.calculator','preprocessing.data_recovery'])
+test(type+' successful checkpointed preflight still prepares its one new target',async()=>{
+ const f=stoppedCrossTablePreflight(type);f.state.preflightSuccess=true;await stop(f);
+ assert.equal(f.state.preflightCalls,1);assert.deepEqual(f.calls,['create']);
+ assert.equal(f.state.graph.nodes.length,6);assert.equal(f.state.operation.targetPhase.completed,true);
+ assert.equal(f.state.operation.nodeApply.node.node_id,'created');
+});
+
 test('early existing-output read retains the public read continuation',async()=>{
   const f=fixture('source');
   f.request.target={kind:'existing',type:'imports.text',ref:node};
@@ -276,4 +366,32 @@ test('graph interaction guard '+route+' / '+ready+' / read '+at,async()=>{
   const result=route==='release'?await release(f):await f.runtime.verifyBrowserRecovery({operationId:'apply',step,attested:{}});
   if(route==='release')assert.equal(result.error.code,'NODE_RELEASE_REFUSED');else assert.equal(result.status,'unresolved');
   assert.throws(()=>f.runtime.assertPreparationAllowed());assert.equal(f.state.operation.nodeApply.result,undefined);assert.deepEqual(f.calls,[]);
+});
+
+test('early REST child release hook must settle before the parent graph release',async()=>{
+ const f=fixture('target_release_hook');await stop(f);
+ assert.equal((await release(f)).error.code,'NODE_RELEASE_REFUSED');assert.equal(f.state.releaseCalls,1);
+ assert.throws(()=>f.runtime.assertPreparationAllowed());
+ f.state.allowChildRelease=true;
+ const released=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release2'});
+ assert.equal(released.status,'SUCCEEDED',JSON.stringify(released));assert.equal(f.state.releaseCalls,2);
+ f.runtime.assertPreparationAllowed();assert.deepEqual(f.calls,[]);
+});
+
+for(const confirmed of [true,false])test('D49 pending move release requires native requested position: '+confirmed,async()=>{
+ const f=fixture('target_pending','transform.calculator');
+ // Reduced J2 graph: the same GUID at (152,1528), requested (180,400).
+ f.state.graph.nodes.push({ref:node,type:'transform.calculator',label:'Поля справочника стран',position:{x:152,y:1528},inputs:[0],outputs:[0],locked:false,dom_epoch:468});
+ f.request.target={kind:'existing',type:'transform.calculator',ref:node,position:{x:180,y:400}};
+ f.adapter.positionMatches=(n,p)=>n.position.x===Math.round(p.x/8)*8&&n.position.y===Math.round(p.y/8)*8;
+ f.adapter.mutate=async e=>{
+  f.calls.push(e.kind);
+  if(confirmed){f.state.graph.nodes[0].position={x:184,y:400};f.state.graph.nodes[0].dom_epoch++;}
+  return {status:'AMBIGUOUS',effect_possible:true,cleanup_complete:true};
+ };
+ await stop(f);
+ const result=await release(f);
+ if(confirmed){assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.doesNotThrow(()=>f.runtime.assertPreparationAllowed());}
+ else{assert.equal(result.error.code,'NODE_RELEASE_REFUSED');assert.throws(()=>f.runtime.assertPreparationAllowed(),/pending|unsettled|uncertain/);}
+ assert.deepEqual(f.calls,['move'],'release never replays a move');
 });

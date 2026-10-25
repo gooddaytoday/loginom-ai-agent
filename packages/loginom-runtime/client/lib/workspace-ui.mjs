@@ -1,6 +1,35 @@
 import {readPreparedNodeContext, validatePreparedNodeContext} from './node-context.mjs';
 import {captureProcessNodeFocus,restoreProcessNodeFocus} from './process-node-focus.mjs';
 
+// Execution-journal diagnostics only. Never issue refs or classify a window as
+// safe from this read; require the already observed DOM incarnation.
+export function makeBlockingWindowDiagnosticCode({refs,origin,build}) {
+  if(!Array.isArray(refs)||refs.length>12||refs.some(r=>typeof r!=='string'||r.length>128))throw Error('Bound dialog refs required');
+  return `async page=>page.evaluate(${readBlockingWindows.toString()},${JSON.stringify({refs,origin,build})})`;
+}
+
+function readBlockingWindows({refs,origin,build}) {
+  if(location.origin!==origin||globalThis.bg?.app?.Version!==build)return {status:'context_changed'};
+  const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+  if(state?.document!==document)return {status:'document_changed'};
+  const roots=[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')];
+  const short=v=>typeof v==='string'?v.slice(0,512):null;
+  return {status:'observed',viewport:{width:innerWidth,height:innerHeight,scroll_x:globalThis.scrollX??null,scroll_y:globalThis.scrollY??null,
+    visual_offset_top:globalThis.visualViewport?.offsetTop??null,visual_offset_left:globalThis.visualViewport?.offsetLeft??null},
+    windows:refs.map(ref=>{
+      const found=roots.filter(e=>state.ids.get(e)===ref);
+      if(found.length!==1)return {ref,status:'incarnation_changed'};
+      const root=found[0],box=root.getBoundingClientRect(),style=getComputedStyle(root);
+      const component=globalThis.Ext?.getCmp?.(root.id??root.getAttribute('id')),prep=globalThis.__loginomDockPreparationV1;
+      return {ref,status:'observed',tid:short(root.getAttribute('data-tid')),id:short(root.id??root.getAttribute('id')),
+        class_name:short(root.getAttribute('class')),bounding_box:{x:box.x,y:box.y,width:box.width,height:box.height},
+        style:Object.fromEntries(['display','visibility','opacity','position','top','left','width','height','transform','zIndex'].map(k=>[k,short(style[k])])),
+        native_owner:{class_name:short(component?.$className),xtype:short(component?.xtype),exact_dom:component?.el?.dom===root,
+          hidden:typeof component?.hidden==='boolean'?component.hidden:null,
+          prepared_picker:prep?.document===document&&prep.receipts instanceof Map&&[...prep.receipts.values()].some(r=>r.openDialogElement===root&&r.openDialog===component)}};
+    })};
+}
+
 // The model receives opaque observed references, never executable selectors or
 // browser code. All browser-side inspection and gestures below are client-pinned.
 export const uiActionSchema = {
@@ -61,7 +90,9 @@ export function validateUiAction(action, snapshot) {
 }
 
 export function workspaceUiCapability(page, task, readNodeContext, captureProcessFocus, restoreProcessFocus) {
-  const started = Date.now(), deadline = started + (task.settlement_timeout_ms??task.opening_timeout_ms??15000);
+  // Dispatch time consumes the bound node budget; it cannot restart in the browser.
+  const started = Date.now(), deadline = Math.min(task.deadline??Infinity,
+    started + (task.settlement_timeout_ms??task.opening_timeout_ms??15000));
   const trace = [], handles = [];
   let postActionRoot;
   let cancellationSurfaceReads=0;
@@ -84,14 +115,16 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       dialog_ref:mask.dialog_ref,...(mask.import_preview_owner_ref?{import_preview_owner_ref:mask.import_preview_owner_ref}:{})}))});
     while (observed.ui.masks.length && unchanged(observed)) {
       await page.waitForTimeout(Math.min(250,timeout()));
-      timeout();observed=await read();
+      timeout();observed=await read();timeout();
     }
     record('ui_mask_wait_finished',{elapsed_ms:Date.now()-maskStarted,mask_present:observed.ui.masks.length>0});
     return observed;
   };
   const boundNode = async () => {
+    timeout();
     if (!task.prepared_node_context) return null;
     let binding=await readNodeContext(page,task.prepared_node_context);
+    timeout();
     // Opening/finishing replaces the graph and wizard asynchronously. Observe
     // that one completed gesture; never reissue it. Foreign package/workflow
     // or GUID failures do not enter this wait.
@@ -100,13 +133,16 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         ||task.action?.verb==='click'&&task.snapshot?.node_navigation_read===true) && (task.opening_timeout_ms || sample<200);sample++) {
       record('node_surface_wait',{condition:'prepared_node_surface_ready',sample});
       await page.waitForTimeout(Math.min(50,timeout()));
+      timeout();
       binding=await readNodeContext(page,task.prepared_node_context);
+      timeout();
     }
     if(binding?.reason==='tab'&&processShowCompleted&&!processFocusAttempted&&processFocusTicket&&restoreProcessFocus){
       processFocusAttempted=true;timeout();mouseHeld=true;mouseButton='left';
       const restored=await restoreProcessFocus(page,processFocusTicket);
       mouseHeld=false;
-      if(restored.restored){record('process_node_focus_restored',restored.proof);timeout();binding=await readNodeContext(page,task.prepared_node_context);}
+      timeout();
+      if(restored.restored){record('process_node_focus_restored',restored.proof);binding=await readNodeContext(page,task.prepared_node_context);timeout();}
     }
     if(binding?.verified!==true)fail('PREPARED_NODE_CONTEXT_CHANGED','The prepared package, workflow or node changed: '+(binding?.reason??'surface_unavailable'));
     return binding;
@@ -411,10 +447,20 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // Native 1000-column definitions share almost all ancestors. Cache each
     // ancestor's checks only within this synchronous observation, without
     // weakening visibility/redaction or retaining values across UI changes.
+    // Same rule as workspace preparation; retain native and DOM incarnations.
+    // An unknown/active picker remains a blocker even above the viewport.
+    const inactivePicker=e=>{
+      if(getTid(e)!=='OpenDialogForm')return false;
+      const prep=globalThis.__loginomDockPreparationV1,component=globalThis.Ext?.getCmp?.(e.id??e.getAttribute('id'));
+      return prep?.document===document && prep.receipts instanceof Map
+        && component?.$className==='bg.filedialog.view.OpenDialogForm' && component.el?.dom===e
+        && [...prep.receipts.values()].some(r=>r.openDialogElement===e&&r.openDialog===component)
+        && component.hidden===true;
+    };
     const visibleAncestors=ancestorCheck(parent=>{
       const style=getComputedStyle(parent);
       return style.display!=='none'&&style.visibility!=='hidden'&&style.visibility!=='collapse'
-        &&style.opacity!=='0'&&!parent.hasAttribute('hidden');
+        &&style.opacity!=='0'&&!parent.hasAttribute('hidden')&&!inactivePicker(parent);
     });
     const visible = memoRead(element => {
       if (!element?.isConnected) return false;
@@ -424,17 +470,41 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return visibleAncestors(element);
     });
     const sensitivePattern = /password|passwd|\bpwd\b|secret|token|credential|authorization|api[_ -]?key|private[_ -]?key|one[_ -]?time|\botp\b|парол|секрет|токен/i;
-    const calculatorMetadataTid=memoRead(element=>{
+    // Inline definition pages have no separate port opening. Their native-bound
+    // node wizard and exact current breadcrumb supply the node type, read-only.
+    const inlineDefinitionIcon=(()=>{
+      if(!preparedNodeWizard||!preparedNodeId||!definitionPrefix||!preparedWorkflowPath?.length||preparedInputPort||preparedOutputPort)return null;
+      const panels=tids.get(definitionPrefix+';NavigationBar;NavigationPanel')??[];
+      if(panels.length!==1||!visible(panels[0]))return null;
+      const prefix=definitionPrefix+';cnrNaviMode;b.s_',crumbs=all.filter(e=>{charge();return panels[0].contains(e)&&(getTid(e)??'').startsWith(prefix);});
+      const count=preparedWorkflowPath.length,node=crumbs[count],settings=crumbs[count+1];
+      if(crumbs.length!==count+2||!preparedWorkflowPath.every((c,i)=>getTid(crumbs[i])===c.tid&&crumbs[i].textContent.trim()===c.label)
+        ||!getTid(node)?.startsWith(preparedWorkflowPath.at(-1).tid+'>')||getTid(node).slice(preparedWorkflowPath.at(-1).tid.length+1).includes('>')
+        ||settings.textContent.trim()!=='Настройка'||getTid(settings)!==getTid(node)+'>Настройка')return null;
+      const icons=[...node.querySelectorAll('[class*="bg-vendor-icon-"]')];charge();
+      if(icons.length!==1)return null;
+      return ['importtextfile','joindata','exporttextfile'].map(n=>'bg-vendor-icon-'+n).find(n=>icons[0].classList.contains(n))??null;
+    })();
+    const definitionMetadataTid=memoRead(element=>{
       const tid=getTid(element)??'';
-      const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard|DerivedDataSourceOutputSocketWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_|colDataKind_|colDefaultUsageType_|colSourceDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
+      const match=/^(MF;TF(?:-\d+)?);WizrdMCF;(CalcDataWizard|ColumnsMappingEngineOutputPortWizard|DerivedDataSourceOutputSocketWizard|TuneDataSourceMappingWizard);(colExpressionName_|colExpressionDisplayName_|colName_|colDisplayName_|colDataKind_|colDefaultUsageType_|colUsageType_|colSourceDisplayName_)([A-Za-z_][A-Za-z0-9_]{0,127})$/.exec(tid);
       if(!match || element.tagName!=='TD' || !sensitivePattern.test(tid))return tid;
-      const output=match[2]!=='CalcDataWizard';
-      if(output ? !['colName_','colDisplayName_','colDataKind_','colDefaultUsageType_','colSourceDisplayName_'].includes(match[3])
-        || definitionPrefix!==match[1] || preparedOutputPort?.direction!=='output'
-        || preparedOutputPort.node_icon_class!=='bg-vendor-icon-calcdata'
-        || preparedOutputPort.port!==0 || preparedOutputPort.native_index!==0
-        || typeof preparedOutputPort.port_guid!=='string' || !preparedOutputPort.port_guid
-        || typeof preparedOutputPort.opening_operation_id!=='string' || !preparedOutputPort.opening_operation_id
+      const input=match[2]==='TuneDataSourceMappingWizard',output=match[2]!=='CalcDataWizard';
+      const port=input?preparedInputPort:preparedOutputPort,usage=input?'colUsageType_':'colDefaultUsageType_';
+      const inline=!port&&(match[2]==='ColumnsMappingEngineOutputPortWizard'&&inlineDefinitionIcon==='bg-vendor-icon-importtextfile'
+        ||match[2]==='DerivedDataSourceOutputSocketWizard'&&inlineDefinitionIcon==='bg-vendor-icon-joindata'
+        ||input&&inlineDefinitionIcon==='bg-vendor-icon-exporttextfile');
+      if(output ? !['colName_','colDisplayName_','colDataKind_',usage,'colSourceDisplayName_'].includes(match[3])
+        || definitionPrefix!==match[1] || !(inline||port?.direction===(input?'input':'output')&&(input
+          ? port.node_icon_class==='bg-vendor-icon-sorting'&&port.port===0&&port.native_index===0
+            || port.node_icon_class==='bg-vendor-icon-joindata'&&[0,1].includes(port.port)&&port.native_index===port.port
+            || port.node_icon_class==='bg-vendor-icon-exporttextfile'&&port.port===0&&port.native_index===1
+          : port.port===0&&port.native_index===0&&(port.node_icon_class==='bg-vendor-icon-calcdata'
+            || match[2]==='DerivedDataSourceOutputSocketWizard'&&port.node_icon_class==='bg-vendor-icon-sorting'
+            || match[2]==='ColumnsMappingEngineOutputPortWizard'&&port.node_icon_class==='bg-vendor-icon-importtextfile'
+            || match[2]==='DerivedDataSourceOutputSocketWizard'&&port.node_icon_class==='bg-vendor-icon-joindata'))
+          &&typeof port.port_guid==='string'&&!!port.port_guid
+          &&typeof port.opening_operation_id==='string'&&!!port.opening_operation_id)
         : !['colExpressionName_','colExpressionDisplayName_'].includes(match[3]))return tid;
       const base=match[1]+';WizrdMCF;',tab='MF;cntMain;cntWorkspace;Workspace;t.br;tb'+match[1].slice('MF;TF'.length);
       const prefix=base+match[2]+';';
@@ -448,12 +518,12 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         || names.length!==1 || labels.length!==1 || names[0].closest('table')!==row || labels[0].closest('table')!==row
         || names[0].tagName!=='TD' || labels[0].tagName!=='TD')return tid;
       const metadata=[names[0],labels[0]];
-      if(output)for(const key of ['colDataKind_','colDefaultUsageType_','colSourceDisplayName_']) {
+      if(output)for(const key of ['colDataKind_',usage,'colSourceDisplayName_']) {
         const cells=tids.get(prefix+key+match[4])??[];
         if(cells.length!==1 || cells[0].tagName!=='TD' || cells[0].closest('table')!==row)return tid;
         metadata.push(cells[0]);
       }
-      // Only technical-name suffixes of the owned definition cells are data.
+      // Only technical-name suffixes of the owned field-definition cells are data.
       // Never exempt secret attributes, ancestors, editors or dataset values.
       for(const cell of metadata) {
         const children=[...cell.querySelectorAll('*')];charge();
@@ -467,7 +537,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return prefix+match[3];
     });
     const safeAncestors=ancestorCheck(parent=>!parent.matches('input[type="password"],input[type="hidden"],input[type="file"]')
-      &&!sensitivePattern.test(['name','id','data-tid','autocomplete','aria-label'].map(name=>name==='data-tid'?calculatorMetadataTid(parent):parent.getAttribute(name)??'').join(' '))
+      &&!sensitivePattern.test(['name','id','data-tid','autocomplete','aria-label'].map(name=>name==='data-tid'?definitionMetadataTid(parent):parent.getAttribute(name)??'').join(' '))
       &&!(getTid(parent)??'').startsWith('LoginForm;'),document.body);
     const sensitive = memoRead(element => !safeAncestors(element));
     const short = (value, limit = 240) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, limit);
@@ -500,6 +570,32 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return null;
     };
     const enabled = element => !element.matches(':disabled') && !element.closest('[aria-disabled="true"],.x-item-disabled,.x-btn-disabled,.x-menu-item-disabled');
+    // File rows share the same native container. These queries and the bounded
+    // FileStore inventory belong to this synchronous observation only; no DOM
+    // gesture or event-loop yield can intervene before the next row is checked.
+    const storageGridPeers=new Map(),storageInventories=new WeakMap();
+    const storagePeers=tid=>{
+      charge();
+      if(!storageGridPeers.has(tid))storageGridPeers.set(tid,[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')]);
+      return storageGridPeers.get(tid);
+    };
+    const storageInventory=(grid,gridTid)=>{
+      charge();
+      if(!storageInventories.has(grid)){
+        const component=globalThis.Ext?.getCmp?.(grid.id),view=component?.getView?.(),store=component?.getStore?.();
+        let inventory=null;
+        if(storagePeers(gridTid).length===1&&component?.el?.dom===grid&&grid.contains(view?.el?.dom)
+          &&store?.$className==='bg.filedialog.FileStore'&&!store.isBufferedStore&&store.isLoading?.()===false){
+          const count=store.getCount?.();
+          if(Number.isSafeInteger(count)&&count<=10000){
+            const records=store.getRange?.();
+            if(Array.isArray(records)&&records.length===count&&store.getCount()===count)inventory={view,store,count,records:new Set(records)};
+          }
+        }
+        storageInventories.set(grid,inventory);
+      }
+      return storageInventories.get(grid);
+    };
     const controlCodeIdentity = element => {
       const tid=getTid(element),stem=workflow?.prefix+';FileStorageForm;colName_';
       let controlTid=tid??'';
@@ -507,7 +603,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // identity. Keep name/id and all other dangerous-control guards intact.
       if(workflow&&element.tagName==='TD'&&!element.isContentEditable&&!element.closest('[contenteditable="true"]')&&tid?.startsWith(stem)){
         const gridTid=workflow.prefix+';FileStorageForm;pnlFileStorage;tbl';
-        const grids=[...document.querySelectorAll('[data-tid='+JSON.stringify(gridTid)+']')];charge();
+        const grids=storagePeers(gridTid);
         const row=element.closest('.x-grid-item'),label=element.textContent?.trim();
         if(grids.length===1&&row&&grids[0].contains(row)&&row.contains(element)
           &&typeof label==='string'&&label.length>0&&label.length<=240
@@ -689,6 +785,40 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     let workflowNavigation={status:'unobserved'};
     let pendingWizardOwner={status:'unobserved'};
     let nodeContext={status:'unobserved',opening_verified:false};
+    // Long export/package captions can overflow the node breadcrumb itself.
+    // This is context text only: gestures still require visible controls and
+    // the current native node wizard or exact input0/native input1 opening.
+    const javascriptPort=preparedInputPort??preparedOutputPort;
+    const hiddenExportNode=e=>(e.querySelectorAll('.bg-vendor-icon-exporttextfile').length===1&&(preparedNodeWizard&&['text_export_params','text_export_format','done'].includes(wizard.stage)
+        ||preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===1
+          &&preparedInputPort.node_icon_class==='bg-vendor-icon-exporttextfile')
+      // Restored dense packages often have long captions. Import's node and
+      // Settings breadcrumbs overflow too; the native GUID-bound wizard is
+      // already verified. Read their context without making hidden controls actionable.
+      ||preparedNodeWizard&&['text_import_file','text_import_format','output_mapping','done'].includes(wizard.stage)
+        &&e.querySelectorAll('.bg-vendor-icon-importtextfile').length===1
+      // JS input0 uses hiddenInputNode's exact native path and known-mode guard below.
+      ||preparedOutputPort?.direction==='output'&&!preparedInputPort
+        &&javascriptPort.port===0&&javascriptPort.native_index===0
+        &&javascriptPort.node_icon_class==='bg-vendor-icon-javascript'
+        &&typeof javascriptPort.port_guid==='string'&&javascriptPort.port_guid.length>0
+        &&typeof javascriptPort.opening_operation_id==='string'&&javascriptPort.opening_operation_id.length>0
+        &&e.querySelectorAll('.bg-vendor-icon-javascript').length===1
+      ||preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===2
+        &&preparedInputPort.node_icon_class==='bg-vendor-icon-restclient'
+        &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+        &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+        &&e.querySelectorAll('.bg-vendor-icon-restclient').length===1
+      // Show Node can leave the same caption hidden in the node overview.
+      // Its exact native navigation binding distinguishes it from the workflow.
+      ||wizard.status==='absent'&&preparedNodeId&&preparedGraphTid?.startsWith(workflow?.prefix+';Graph;')
+        &&preparedNavigationNode?.tid===getTid(e)&&preparedNavigationNode.label===e.textContent.trim()
+        &&e.querySelectorAll('.bg-vendor-icon-javascript').length===1)
+      &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'
+      &&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')&&!sensitive(e)
+      &&(tids.get(getTid(e))??[]).length===1
+      &&e.querySelectorAll('[class*="bg-vendor-icon-"]').length===1
+      &&e.textContent.trim().length>0&&(getTid(e)??'').endsWith('>'+e.textContent.trim().replace(/\s/g,'_').replace(/,/g,''));
     if(workflow) {
       // E2E navigation.GetCurrentTabPath: inspect the current tab's visible
       // breadcrumb buttons, not document.title. This is observed context only;
@@ -712,24 +842,24 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&(tids.get(getTid(e)+'>Настройка')??[]).filter(child=>panels[0].contains(child)
             &&child.querySelectorAll('.maptree-icon-wizard').length===1).length===1;
         const overflowOutputFolder=e=>boundOutputOverflow&&(preparedOutputPort.port===0||preparedOutputPort.node_icon_class==='bg-vendor-icon-filterdata'&&preparedOutputPort.port===1)
-          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-uniondata','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata'].includes(preparedOutputPort.node_icon_class)
+          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-uniondata','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-joindata'].includes(preparedOutputPort.node_icon_class)
           &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
           &&e.textContent.trim()==='Выходные порты'&&(getTid(e)??'').endsWith('>Выходные_порты')
           &&e.querySelectorAll('.maptree-icon-modeloutputports').length===1
           &&(tids.get((getTid(e)??'').slice(0,-'>Выходные_порты'.length))??[]).filter(parent=>panels[0].contains(parent)
-            &&visible(parent)&&parent.querySelectorAll('.'+preparedOutputPort.node_icon_class).length===1).length===1;
+            &&(visible(parent)||hiddenExportNode(parent))&&parent.querySelectorAll('.'+preparedOutputPort.node_icon_class).length===1).length===1;
         const overflowNodeSettings=e=>preparedNodeWizard===true&&getComputedStyle(e).display==='none'
           &&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
           &&e.textContent.trim()==='Настройка'&&(getTid(e)??'').endsWith('>Настройка')
           &&e.querySelectorAll('.maptree-icon-wizard').length===1
           &&(tids.get((getTid(e)??'').slice(0,-'>Настройка'.length))??[]).filter(parent=>panels[0].contains(parent)
-            &&visible(parent)&&parent.querySelectorAll('[class*="bg-vendor-icon-"]').length===1).length===1;
+            &&(visible(parent)||hiddenExportNode(parent))&&parent.querySelectorAll('[class*="bg-vendor-icon-"]').length===1).length===1;
         const crumbs=all.filter(e=>{charge();return (getTid(e)??'').startsWith(prefix) && panels[0].contains(e) && !sensitive(e)
-          && (visible(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
+          && (visible(e)||hiddenExportNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
             &&e.querySelectorAll('.maptree-icon-wizard').length===1);});
         if(crumbs.length>32)ownerContext.status='bounded';
         else if(crumbs.length) {
-          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
+          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
             overflow_context:overflowSocket(e),
             wizard_icon:e.querySelectorAll('.maptree-icon-wizard').length===1,
             workflow_icon:e.querySelectorAll('.maptree-icon-workflow').length===1,
@@ -751,7 +881,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const last=items.at(-1),node=items.at(-2);
           if(items.reduce((size,item)=>size+item.tid.length+item.label.length,0)>4096)ownerContext.status='bounded';
           else if(!unique || !chain)ownerContext.status='ambiguous';
-          else if(last.workflow_icon) {
+          else if(last.workflow_icon&&!preparedNavigationNode) {
             navigationContext={status:'observed',kind:'workflow',path:items.map(({tid,label})=>({tid,label}))};
           }
           else if(last.wizard_icon && items.filter(i=>i.wizard_icon).length===1 && node?.output_data_icon && node.label
@@ -789,8 +919,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       else if(panels.length===1&&inside(panels[0],panels[0])) {
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
         if(crumbs.length>32)nodeContext.status='bounded';
-        else if(crumbs.length===6&&crumbs.every(e=>inside(e,panel)&&(getTid(e)??'').startsWith(prefix))) {
-          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:textOf(e,true)}));
+        else if(crumbs.length===6&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&hiddenExportNode(e))&&(getTid(e)??'').startsWith(prefix))) {
+          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)?short(e.textContent):textOf(e,true)}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const bounded=items.every(i=>i.tid.length<=2048&&i.label.length<240)&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096;
           const chain=items.every((i,n)=>i.tid.slice(prefix.length).split('>').length===n+1&&(!n||i.tid.startsWith(items[n-1].tid+'>')));
@@ -801,7 +931,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const exact=items[0].tid===prefix+'Сервер'&&items[1].label==='Пакеты'&&items.slice(2).every(i=>i.label)
             &&(node.tid===items[4].tid+'>'+(nativeKey??format(node.label))
               ||preparedNodeId&&preparedNavigationNode?.tid===node.tid&&preparedNavigationNode.label===node.label);
-          const icon=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1&&inside(found[0],e);};
+          const icon=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1&&(inside(found[0],e)||e===crumbs[5]&&hiddenExportNode(e));};
           const icons=icon(crumbs[4],'.maptree-icon-workflow')&&icon(crumbs[5],'[class*="bg-vendor-icon-"]');
           if(!bounded)nodeContext.status='bounded';
           else if(!unique||!chain)nodeContext.status='ambiguous';
@@ -827,18 +957,38 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       else if(panels.length===1&&inside(panels[0],panels[0])) {
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
         const singleInputOverflow=preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===0
-          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata'].includes(preparedInputPort.node_icon_class)
+          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-clusterization','bg-vendor-icon-linregression'].includes(preparedInputPort.node_icon_class)
           &&crumbs.length===9&&crumbs[5].querySelectorAll('.'+preparedInputPort.node_icon_class).length===1;
+        const modes=['rbTable','rbLinks'].map(name=>(tids.get(wizard.root_tid+';TuneDataSourceMappingWizard;'+name)??[])
+          .filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e)&&enabled(e)));
+        const knownMode=modes.every(es=>es.length===1)
+          &&modes[0][0].classList.contains('x-form-cb-checked')!==modes[1][0].classList.contains('x-form-cb-checked');
+        const hiddenInputNode=e=>singleInputOverflow&&knownMode
+          &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+          &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+          &&preparedNavigationNode?.tid===getTid(e)&&preparedNavigationNode.label===e.textContent.trim()
+          &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'
+          &&!e.hasAttribute('hidden')&&!sensitive(e)&&(tids.get(getTid(e))??[]).length===1
+          &&e.querySelectorAll('[class*="bg-vendor-icon-"]').length===1
+          &&e.textContent.trim().length>0&&(getTid(e)??'').endsWith('>'+e.textContent.trim().replace(/\s/g,'_').replace(/,/g,''));
+        const joinInputOverflow=preparedInputPort?.direction==='input'&&[0,1].includes(preparedInputPort.port)
+          &&preparedInputPort.native_index===preparedInputPort.port&&preparedInputPort.node_icon_class==='bg-vendor-icon-joindata'
+          &&crumbs.length===9&&crumbs[5].querySelectorAll('.bg-vendor-icon-joindata').length===1;
+        const restInputOverflow=preparedInputPort?.direction==='input'&&preparedInputPort.port===0
+          &&preparedInputPort.native_index===2&&preparedInputPort.node_icon_class==='bg-vendor-icon-restclient'
+          &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+          &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+          &&crumbs.length===9&&crumbs[5].querySelectorAll('.bg-vendor-icon-restclient').length===1;
         if(crumbs.length>32)context.status='bounded';
-        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
-              ||singleInputOverflow
+        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
+              ||singleInputOverflow||joinInputOverflow||restInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1))&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
           // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
           // Join input roles have fixed captions; retain the native port and node icon binding.
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
-            &&(i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
+            &&(i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
               &&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
-              ||singleInputOverflow
+              ||singleInputOverflow||joinInputOverflow||restInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1)
               ||i===8&&e.textContent.trim()==='Настройка'||i===7&&(e.textContent.trim()==='Входной источник данных'
               ||preparedInputPort.port===0&&e.textContent.trim()==='Источник данных'
@@ -865,7 +1015,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             &&folder.tid===node.tid+'>Входные_порты'&&port.tid===folder.tid+'>'+format(port.label)
             &&last.tid===port.tid+'>Настройка';
           const iconCount=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1
-            &&(inside(found[0],e)||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
+            &&(inside(found[0],e)||e===crumbs[5]&&(hiddenExportNode(e)||hiddenInputNode(e))||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
           const icons=iconCount(crumbs[4],'.maptree-icon-workflow')===1
             &&iconCount(crumbs[5],'[class*="bg-vendor-icon-"]')===1
             &&iconCount(crumbs[8],'.maptree-icon-wizard')===1;
@@ -2856,7 +3006,8 @@ function readRenderedInputMapping(observation) {
     const elements = controls.slice(0, 240).map(element => {
       const identity = identityOf(element), tag = element.tagName.toLowerCase(), tid = getTid(element);
       const editable = element.matches('textarea,input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),[contenteditable="true"]') && !element.readOnly;
-      const label = tableScrollers.has(state.ids.get(element))?'':short(element.getAttribute('aria-label') || element.getAttribute('placeholder') || element.getAttribute('title') || textOf(element));
+      // Data-preview scrollers carry navigation identity, never row values.
+      const label = tableScrollers.has(state.ids.get(element))||importScroller(element)?'':short(element.getAttribute('aria-label') || element.getAttribute('placeholder') || element.getAttribute('title') || textOf(element));
       const role = element.getAttribute('role'), kind = /;(?:Input|Output)_/.test(tid ?? '') ? 'port' : editable ? 'field' : /;Graph;/.test(tid ?? '') ? 'graph' : 'control';
       const isEnabled = enabled(element), allowed = identity && isEnabled && !dangerous(element);
       const scroll = scrollOf(element);
@@ -2961,16 +3112,10 @@ function readRenderedInputMapping(observation) {
         // byte identity: use the cached file record bound to this exact row.
         const gridTid=tid.split(';colName_')[0]+';pnlFileStorage';
         const grid=storageRow.closest('[data-tid='+JSON.stringify(gridTid)+']');
-        const component=grid&&globalThis.Ext?.getCmp?.(grid.id);
-        const view=component?.getView?.(),store=component?.getStore?.();
-        if(grid&&document.querySelectorAll('[data-tid='+JSON.stringify(gridTid)+']').length===1
-          &&component?.el?.dom===grid&&grid.contains(view?.el?.dom)
-          &&view.el.dom.contains(storageRow)&&store?.$className==='bg.filedialog.FileStore'
-          &&!store.isBufferedStore&&store.isLoading?.()===false
-          &&Number.isSafeInteger(store.getCount?.())&&store.getCount()<=10000) {
+        const inventory=grid&&storageInventory(grid,gridTid),view=inventory?.view;
+        if(inventory&&inventory.store.isLoading?.()===false&&inventory.store.getCount()===inventory.count&&view.el.dom.contains(storageRow)) {
           const record=view.getRecord?.(storageRow),data=record?.data;
-          const records=store.getRange?.();
-          if(record?.isModel===true&&Array.isArray(records)&&records.length===store.getCount()&&records.includes(record)
+          if(record?.isModel===true&&inventory.store.getCount()===inventory.count&&inventory.records.has(record)
             &&view.getNode?.(record)===storageRow&&data?.Type===0
             &&data.FileName===textOf(element,true)&&typeof data.FilePath==='string'
             &&data.id===data.FilePath&&data.FilePath.startsWith('/')
@@ -3455,10 +3600,12 @@ function readRenderedInputMapping(observation) {
     preparedWorkflowPath:task.prepared_node_context?.workflow_ref.navigation_path??null,
     preparedNodeId:task.prepared_node_context?.node.node_id??null,
     preparedGraphTid:nodeContext?.surface==='graph'?nodeContext.tid:null,
-    preparedNavigationNode:nodeContext?.surface==='graph'?nodeContext.navigation_node??null:null,
+    preparedNavigationNode:nodeContext?.surface==='graph'||nodeContext?.surface==='wizard'&&nodeContext.input_port
+      &&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.navigation_node??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
     preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
+    timeout();
     if (observed?.ui_read_failure) {
       const code=observed.ui_read_failure.code;
       if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown'});
@@ -3563,6 +3710,25 @@ function readRenderedInputMapping(observation) {
           record('wizard_finish_surface_rediscovery',{attempt:++finishSurfaceReads,node_id:after.node_id});
           await page.waitForTimeout(Math.min(50,timeout()));
           return readUi(rediscover);
+        }
+        // Finish can paint the old graph caption before Loginom applies the
+        // automatic caption already observed on Done. Discard this mixed read
+        // only for that exact transition on the wizard's original native node.
+        const finish=task.snapshot?.ui?.elements?.find(e=>e.ref===task.action?.ref)?.wizard_finish;
+        const ownerPrefix=finish?.owner?.path?.at(-3)?.tid+'>';
+        const graphPrefix=task.prepared_node_context?.workflow_ref?.prefix+';Graph;';
+        if(['finish_wizard','execute_wizard'].includes(task.action?.verb)&&effectPossible
+          &&task.snapshot?.prepared_node_context?.verified===true&&task.snapshot.prepared_node_context.surface==='wizard'
+          &&finish?.completion?.ready===true&&finish.completion.fields.label_mode.value==='Автоматическая метка'
+          &&finish.owner.node.tid.startsWith(ownerPrefix)
+          &&nodeContext.surface==='graph'&&after.surface==='graph'
+          &&['document_id','workflow_id','node_id'].every(k=>nodeContext[k]===task.snapshot.prepared_node_context[k])
+          &&nodeContext.node_id===task.prepared_node_context?.node.node_id
+          &&nodeContext.tid===graphPrefix+finish.owner.node.tid.slice(ownerPrefix.length)
+          &&after.tid===graphPrefix+finish.completion.fields.label.value.replace(/\s/g,'_').replace(/,/g,'')
+          &&same({...nodeContext,tid:after.tid},after)&&finishSurfaceReads<2) {
+          record('wizard_finish_label_rediscovery',{attempt:++finishSurfaceReads,node_id:after.node_id,before_tid:nodeContext.tid,after_tid:after.tid});
+          timeout();return readUi(rediscover);
         }
         if(task.action?.verb==='confirm_wizard_close' && effectPossible && nodeContext.surface==='wizard'
           && after.surface==='graph' && ['document_id','workflow_id','node_id'].every(k=>nodeContext[k]===after[k])
@@ -3739,8 +3905,10 @@ function readRenderedInputMapping(observation) {
           targets.push(await checkedHandle(before, item));
         }
         const nodeBeforeGesture=await boundNode();
-        if(nodeBeforeGesture && !same(current.prepared_node_context,nodeBeforeGesture))
+        if(nodeBeforeGesture && !same(current.prepared_node_context,nodeBeforeGesture)) {
+          record('prepared_node_context_changed_before_gesture',{before:current.prepared_node_context,after:nodeBeforeGesture});
           fail('PREPARED_NODE_CONTEXT_CHANGED','The node surface changed before the gesture');
+        }
         if(['execute_graph_node','deactivate_graph_node'].includes(task.action.verb)) {
           const launch=await readUi(),before=current.ui.elements.find(e=>e.ref===task.action.ref),after=launch.ui.elements.find(e=>e.ref===task.action.ref);
           if(!before?.graph_execution||!after?.allowed_actions.includes(task.action.verb)||!same(before.graph_execution,after.graph_execution))
@@ -3758,7 +3926,7 @@ function readRenderedInputMapping(observation) {
         });
         if (!same(current.dom_epoch,epochBeforeGesture)) fail('UI_EPOCH_CHANGED','The document changed while checking the target; observe again');
         record('ui_preconditions_verified', { verb: task.action.verb, refs });
-        phase = 'applying'; effectPossible = true;
+        timeout();phase = 'applying'; effectPossible = true;
         const first = targets[0].handle;
         const clickTarget = async (clickCount, button = 'left') => {
           timeout(); mouseHeld = true; mouseButton = button;
@@ -3947,9 +4115,13 @@ function readRenderedInputMapping(observation) {
               const fresh=await readUi();
               if(!lifecycleContextMatches(fresh)){
                 if(await deleteLostLinks(fresh))continue;
-                if(['finish_wizard','execute_wizard'].includes(task.action.verb) && lifecycleContextMatches(fresh,true) && transientToastReads<50){
+                // A bound Execute can leave a native toast beyond 50 reads.
+                // Observe the same completed gesture within its remaining node
+                // budget; all owner checks and graph settlement still apply.
+                if(['finish_wizard','execute_wizard','confirm_wizard_close'].includes(task.action.verb) && lifecycleContextMatches(fresh,true)
+                  && (transientToastReads<50 || task.action.verb==='execute_wizard'&&task.prepared_node_context&&task.settlement_timeout_ms)){
                   transientToastReads++;record('wizard_toast_wait',{attempt:transientToastReads});
-                  await page.waitForTimeout(Math.min(100,timeout()));continue;
+                  await page.waitForTimeout(Math.min(100,timeout()));timeout();continue;
                 }
                 fail('WIZARD_CONTEXT_CHANGED','The original document and workspace changed while reading the wizard region');
               }
@@ -4038,7 +4210,8 @@ function readRenderedInputMapping(observation) {
             return bodies.length===1?bodies[0]:null;
           };
           for(let attempt=0;attempt<24 && contextMatches(observed) && (observed.wizard.status!=='absent' || observed.ui.masks.length || !targetNode(observed));attempt++) {
-            timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await waitForMasks(await readOpeningUi(),readOpeningUi,contextMatches);
+            timeout();await page.waitForTimeout(Math.min(200,timeout()));timeout();
+            observed=await waitForMasks(await readOpeningUi(),readOpeningUi,contextMatches);timeout();
           }
           const sameDestination=fresh=>contextMatches(fresh) && fresh.wizard.status==='absent' && !!targetNode(fresh)
             && fresh.navigation_context?.status==='observed'
@@ -4054,9 +4227,9 @@ function readRenderedInputMapping(observation) {
               && e.graph_node.node_label===targetNode(fresh)?.graph_node.node_label)?.ref});
           let quietSamples=0;
           for(let attempt=0;attempt<12 && quietSamples<3;attempt++) {
-            timeout();await page.waitForTimeout(Math.min(200,timeout()));
+            timeout();await page.waitForTimeout(Math.min(200,timeout()));timeout();
             const settling=await readOpeningUi();
-            const fresh=await waitForMasks(settling,readOpeningUi,sameDestination);
+            const fresh=await waitForMasks(settling,readOpeningUi,sameDestination);timeout();
             if(settling.ui.masks.length){quietSamples=0;attempt=-1;}
             if(!sameDestination(fresh))fail('WIZARD_FINISH_NOT_CONFIRMED','The destination changed while settling after one wizard completion click; inspect before retry');
             // A loading mask may arrive after the first graph snapshot. Keep
@@ -4257,6 +4430,48 @@ function readRenderedInputMapping(observation) {
         }
         if(task.action.verb==='wizard_step') {
           const destination=stage=>Array.isArray(task.action.expected_stage)?task.action.expected_stage.includes(stage):stage===task.action.expected_stage;
+          // An unchanged saved Join may first open its input page while an
+          // upstream output is inactive. Keep every link in this disposable
+          // draft; this private read path never approves deleting lost links.
+          let savedJoinQuestionAnswered=false;
+          const continueSavedJoin=async observed=>{
+          if(task.preserve_join_mapping===true&&!savedJoinQuestionAnswered&&observed.ui.dialogs.length===1){
+            const dialog=observed.ui.dialogs[0],wizardRoot=postActionRoot;
+            const owned=s=>s.authenticated&&s.origin===current.origin&&s.loginom_build==='7.4.2'
+              &&same(s.workflow_ref,current.workflow_ref)&&same(s.package_identity,current.package_identity)
+              &&s.active_tab_ref===current.active_tab_ref&&same(s.active_identity,current.active_identity)
+              &&s.dom_epoch.document===current.dom_epoch.document&&s.wizard.status==='observed'
+              &&s.wizard.stage==='input_mapping'&&s.wizard.root_ref===current.wizard.root_ref
+              &&s.wizard.owner_context?.status==='observed'&&same(s.wizard.owner_context,current.wizard.owner_context)
+              &&same(s.prepared_node_context,current.prepared_node_context)
+              &&s.ui.dialogs.length===1&&s.ui.dialogs[0].ref===dialog.ref
+              &&s.ui.masks.every(m=>m.kind==='modal_background'&&m.ref===current.wizard.root_ref&&m.target_tid===current.wizard.root_tid&&!m.dialog_ref);
+            if(owned(observed)){
+              postActionRoot=dialog.ref;
+              try{
+                const prompt=await readUi(),title='Loginom 7.4.2';
+                const buttons=Object.entries({yes:'Удалить и продолжить',no:'Не удалять и продолжить',cancel:'Отмена'}).map(([name,label])=>
+                  prompt.ui.elements.filter(e=>e.tid==='msgbox;tlb;'+name&&e.label===label&&e.signature?.dialog_ref===dialog.ref&&e.allowed_actions.includes('click')));
+                if(owned(prompt)&&prompt.ui.dialogs[0].title===title&&buttons.every(b=>b.length===1)
+                  &&prompt.ui.dialogs[0].text===title+' Обнаружены связи с несуществующими объектами. Вы хотите удалить все потерянные связи и продолжить? Удалить и продолжить Не удалять и продолжить Отмена'){
+                  const checked=await readUi();
+                  if(!owned(checked)||!same(prompt.ui.dialogs,checked.ui.dialogs)||!same(prompt.dom_epoch,checked.dom_epoch))
+                    fail('WIZARD_CONTEXT_CHANGED','The saved Join mapping question changed before its answer');
+                  const target=await checkedHandle(buttons[1][0],checked.ui.elements.find(e=>e.ref===buttons[1][0].ref),'click');
+                  if(!same(await boundNode(),current.prepared_node_context))fail('PREPARED_NODE_CONTEXT_CHANGED','Saved Join owner changed before continuing');
+                  const epoch=await page.evaluate(()=>{const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+                    if(!state?.observer)return null;state.captureMutations(state.observer.takeRecords());return {document:state.epoch,revision:state.revision};});
+                  if(!same(checked.dom_epoch,epoch))fail('UI_EPOCH_CHANGED','The saved Join question changed before continuing');
+                  savedJoinQuestionAnswered=true;timeout();mouseHeld=true;await page.mouse.click(target.point.x,target.point.y,{clickCount:1,button:'left'});mouseHeld=false;
+                  record('saved_join_mapping_preserved',{dialog_ref:dialog.ref,button:'msgbox;tlb;no',settings_applied:false});
+                }
+              }finally{postActionRoot=wizardRoot;}
+              observed=await readUi();
+            }
+          }
+          return observed;
+          };
+          observed=await continueSavedJoin(observed);
           const unchangedContext=fresh=>fresh.authenticated && fresh.origin===current.origin && fresh.loginom_build===current.loginom_build
             && same(fresh.workflow_ref,current.workflow_ref) && same(fresh.package_identity,current.package_identity)
             && same(fresh.active_identity,current.active_identity) && fresh.wizard.status==='observed'
@@ -4270,14 +4485,14 @@ function readRenderedInputMapping(observation) {
             if(!observed.ui.masks.length && observed.wizard.stage===current.wizard.stage
               && validation?.status==='observed' && validation.root_ref===current.wizard.root_ref) {
               // Confirm the owned error once more without issuing another gesture.
-              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await readUi();
+              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await continueSavedJoin(await readUi());
               if(unchangedContext(fresh) && !fresh.ui.masks.length && fresh.wizard.stage===current.wizard.stage
                 && same(calculatorValidation?fresh.wizard.calculator_validation:fresh.wizard.source_validation,validation)) {
                 observed=fresh;record(calculatorValidation?'wizard_calculator_validation_failed':'wizard_source_validation_failed',validation);
                 fail(calculatorValidation?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_SOURCE_VALIDATION_FAILED',validation.message);
               }
               observed=fresh;
-            } else { timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readUi(); }
+            } else { timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await continueSavedJoin(await readUi()); }
           }
           if(!unchangedContext(observed) || observed.ui.masks.length || !destination(observed.wizard.stage))
             fail('WIZARD_STEP_NOT_CONFIRMED','The requested destination stage was not confirmed after one click; inspect before retry');
@@ -4364,7 +4579,7 @@ function readRenderedInputMapping(observation) {
           if (matches.length!==1 || matches[0].check_state.checked!==task.action.checked || matches[0].check_state.indeterminate) fail('UI_STATE_NOT_CONFIRMED','The requested checked state was not confirmed; inspect before any retry');
           record('ui_state_verified',{verb:task.action.verb,ref:matches[0].ref,checked:task.action.checked});
         }
-        phase = 'completed';
+        timeout();phase = 'completed';
         outcome = result('SUCCEEDED', { ...observed, gesture_applied: effectPossible, verification_required: true });
       }
     } catch (error) {
@@ -4391,15 +4606,23 @@ function readRenderedInputMapping(observation) {
 
 export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
+  if(options.deadline!==undefined&&(!Number.isFinite(options.deadline)||options.deadline<=0
+    ||options.opening_timeout_ms===undefined&&options.settlement_timeout_ms===undefined))
+    throw Error('Absolute node deadline requires a bounded opening or settlement wait');
+  if(options.preserve_join_mapping!==undefined&&(options.preserve_join_mapping!==true||!options.prepared_node_context
+    ||options.mode!=='act'||options.action?.verb!=='wizard_step'||options.action.expected_stage!=='join'
+    ||options.snapshot?.wizard?.stage!=='input_mapping'||options.snapshot?.wizard?.owner_context?.status!=='observed'
+    ||options.snapshot?.prepared_node_context?.input_port||options.snapshot?.prepared_node_context?.output_port))
+    throw Error('Preserved Join mapping requires a bound input-to-Join node read');
   if(options.settlement_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
-    ||!['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
+    ||!['finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
     ||options.opening_timeout_ms!==undefined||!Number.isInteger(options.settlement_timeout_ms)
     ||options.settlement_timeout_ms<1||options.settlement_timeout_ms>1800000))
     throw Error('Mask settlement requires a bound completion action and the remaining node deadline');
   if(options.opening_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
-    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(options.action?.verb)
+    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views'].includes(options.action?.verb)
     ||!Number.isInteger(options.opening_timeout_ms)||options.opening_timeout_ms<1||options.opening_timeout_ms>1800000))
-    throw Error('Extended opening wait requires a bound node wizard and the remaining node deadline');
+    throw Error('Extended opening wait requires a bound node opening and the remaining node deadline');
   if(options.mode==='act'&&['begin_wizard','confirm_wizard_deactivation','cancel_process'].includes(options.action?.verb)
     &&!options.prepared_node_context)throw Error('Node wizard deactivation requires a prepared native node binding');
   if(options.prepared_node_context!==undefined)validatePreparedNodeContext(options.prepared_node_context);

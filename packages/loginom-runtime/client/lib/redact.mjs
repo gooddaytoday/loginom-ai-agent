@@ -51,11 +51,17 @@ export function createRedactor(knownValues = []) {
       else if (!forbiddenKey.test(key)) collect(item, depth + 1);
     }
   }
-  function clean(value, seen = new Set(), depth = 0) {
+  function clean(value, seen = new Set(), depth = 0, preserveJsonText = false) {
     if (depth > 40) throw new Error('Redaction nesting limit');
     if (typeof value === 'string') {
       if (/^[\s]*[\[{]/.test(value)) {
-        try { return JSON.stringify(clean(JSON.parse(value), seen, depth + 1)); }
+        try {
+          const cleaned=JSON.stringify(clean(JSON.parse(value), seen, depth + 1, preserveJsonText));
+          // Keep lossless JSON text when only insignificant whitespace differs.
+          // Duplicate keys, noncanonical escapes or any redaction still use the
+          // cleaned serialization, so discarded input cannot escape redaction.
+          return preserveJsonText&&value.replace(/"(?:\\.|[^"\\])*"|[ \t\r\n]+/g,part=>part[0]==='"'?part:'')===cleaned?value:cleaned;
+        }
         catch (error) { if (!(error instanceof SyntaxError)) throw error; }
       }
       return text(value);
@@ -66,7 +72,7 @@ export function createRedactor(knownValues = []) {
     try {
       if (Buffer.isBuffer(value) || value instanceof Uint8Array) return '[binary omitted]';
       if (['system', 'developer'].includes(value.role) || ['analysis', 'summary'].includes(value.channel)) return { omitted: 'non-visible instructions or reasoning' };
-      if (Array.isArray(value)) return value.map(item => clean(item, seen, depth + 1));
+      if (Array.isArray(value)) return value.map(item => clean(item, seen, depth + 1, preserveJsonText));
       if (['image', 'audio', 'video', 'image_url', 'input_image', 'resource'].includes(value.type)) return { type: 'text', text: '[binary artifact omitted]' };
       if ((/password|secret|token|api.key|пароль/i.test(String(value.element || value.name || '')))
           && ('text' in value || 'value' in value)) return { redacted: 'credential input' };
@@ -77,13 +83,13 @@ export function createRedactor(knownValues = []) {
         else if (secretField(key)) result[key] = marker;
         else if (['code', 'command', 'cmd'].includes(key) && typeof item === 'string'
             && /password|passwd|cookie|authorization|private.?key/i.test(item)) result[key] = '[credential operation omitted]';
-        else result[key] = clean(item, seen, depth + 1);
+        else result[key] = clean(item, seen, depth + 1, preserveJsonText);
       }
       return result;
     } finally { seen.delete(value); }
   }
-  return { redact(value) {
-    try { collect(value); return clean(value); }
+  return { redact(value, {preserveJsonText = false} = {}) {
+    try { collect(value); return clean(value, new Set(), 0, preserveJsonText); }
     catch { return { type: 'redaction_failure', omitted: true, reason: 'Content omitted because redaction could not complete' }; }
   }, prime(value) { collect(value); }, text };
 }

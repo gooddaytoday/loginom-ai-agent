@@ -3,6 +3,7 @@ import {readCalculatorOutputMapping} from './calculator-output-source.mjs';
 import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {inputMappingOrigin,inputMappingState,inputMappingGraph,verifyInputMappingFinish,inputRecoveryBoundary,sameInputRecovery} from './node-input-mapping-recovery.mjs';
 import {verifyCalculatorInlineSync} from './calculator-inline-mapping.mjs';
+import {releaseNodeSchemaPreview} from './grouping-preflight.mjs';
 import {createNodeProcedure} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {validateCalculatorParameters} from './calculator-parameters.mjs';
@@ -37,7 +38,7 @@ export function createCalculatorNodeSupport(config) {return createTabularTransfo
 // Shared lifecycle for a tabular transformation with a separate output
 // wizard. Type-specific code supplies configuration and derived-output hooks;
 // graph ownership, execution, continuation and data reading remain shared.
-export function createTabularTransformNodeSupport({targetOrigin,targetBuild},implementation=null) {
+export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait},implementation=null) {
  const nodeApplyHandlers=new Map([['transform.calculator',{revision:'calculator-v3-internal-2',modes:['expression'],output_wizard:'separate',
   configurationReadback:calculatorConfigurationReadback,parameter_schema:calculatorParametersSchema,
   validate:(p,m,r)=>{validateCalculatorParameters(p,m,r);
@@ -101,7 +102,8 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
      return true;
     },
    }:{}),
-   ...(!implementation||implementation.preflight?{beforeTarget:ctx=>(implementation?.preflight??preflightCalculatorSource)(options,ctx,{targetOrigin,targetBuild})}:{}),
+   ...(!implementation||implementation.preflight?{beforeTarget:ctx=>(implementation?.preflight??preflightCalculatorSource)(options,ctx,{targetOrigin,targetBuild,wait})}:{}),
+   releaseBeforeTarget:ctx=>releaseNodeSchemaPreview(options,ctx,{targetOrigin,targetBuild,wait}),
    verifySource:async()=>verified({not_applicable:true,source_kind:'upstream_table'}),
    ...(implementation?.openRecovery?{async verifyPendingOpen(state,{signal}={}){
     activeSignal=signal;signal?.throwIfAborted();

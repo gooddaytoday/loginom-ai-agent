@@ -15,7 +15,7 @@ export function createExecutionJournal({ directory, metadata, knownSecrets = [],
         runtime_revision: metadata.clientRevision,
         manifest_sha256: metadata.actionManifestDigest,
         target: metadata.targetIdentity ?? null, ...record,
-      });
+      }, {preserveJsonText:true});
       const handle = await open(path,
         constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | (constants.O_NOFOLLOW ?? 0), 0o600);
       try {

@@ -120,6 +120,39 @@ test('ready condition completes without redundant identical snapshots', async ()
   const f = fixture(); await f.channel.observe({ condition: 'button usable', ready: () => true });
   assert.equal(f.records.filter(r => r.phase === 'node_observation_sample').length, 1);
 });
+for(const readMs of [20,350])test('pending polling includes the read time in its 200 ms interval: '+readMs,async()=>{
+  let clock=1,checks=0,reads=0;const starts=[],waits=[];
+  const f=fixture({now:()=>clock,monotonicNow:()=>clock,
+    onRead:()=>{if(++reads%2)starts.push(clock);clock+=readMs;},
+    wait:async ms=>{waits.push(ms);clock+=ms;}});
+  await f.channel.observe({condition:'prepared node available for process console',ready:()=>++checks===3});
+  assert.deepEqual(starts,readMs===350?[1,701,1401]:[1,201,401]);
+  assert.deepEqual(waits,readMs===350?[]:[160,160]);
+  assert.equal(f.records.at(-1).readiness.elapsed_ms,readMs===350?2100:440);
+  assert.equal(f.records.filter(r=>r.phase==='node_observation_sample').length,3);
+  assert.ok(!f.events.includes('mutated'));
+});
+test('pending polls accelerate without shortening the two ready identity confirmations',async()=>{
+  let clock=1,checks=0;const waits=[];
+  const f=fixture({now:()=>clock,monotonicNow:()=>clock,onRead:()=>{clock+=350;},
+    wait:async ms=>{waits.push(ms);clock+=ms;}});
+  await f.channel.observe({condition:'new Table card bound to output',ready:()=>++checks>1,
+    confirmIdentity:()=>({view:'same-owned-table'})});
+  assert.deepEqual(waits,[200]);
+  assert.deepEqual(f.records.filter(r=>r.phase==='node_observation_sample').map(r=>r.readiness.satisfied),[false,true,true]);
+  assert.equal(f.records.at(-1).readiness.required_samples,2);
+  assert.equal(f.records.at(-1).readiness.elapsed_ms,2300);
+});
+test('pending polling retains the original deadline and leaves no refs after expiry',async()=>{
+  let clock=1;const f=fixture({now:()=>clock,monotonicNow:()=>clock,onRead:()=>{clock+=350;},
+    wait:async ms=>{clock+=ms;}});
+  const deadline=f.operation.deadline;
+  await assert.rejects(f.channel.observe({condition:'pending table',timeoutMs:1500,ready:()=>false}),/readiness timeout/);
+  assert.equal(f.operation.deadline,deadline);
+  assert.equal(f.records.find(r=>r.phase==='node_observation_timeout').effect_possible,false);
+  await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+  assert.ok(!f.events.includes('mutated'));
+});
 test('foreign receipt cannot confirm original cleanup', async () => {
   const f = fixture({ foreignReceipt: true }); await f.channel.observe({ condition: 'button usable', ready: s => s.ui.elements.some(e => e.ref === 'ui-button') });
   await assert.rejects(f.channel.act({ verb: 'click', ref: 'ui-button' }), /receipt identity differs/);
@@ -188,7 +221,7 @@ test('an unexpected dialog fails immediately without a mutation', async () => {
 
 test('a blocker outside the selected root is inspected for the journal without authorizing a gesture', async () => {
   for(const mode of ['detail','stale','transport','budget']) {
-    const records=[];let inspections=0,mutations=0,readinessCalls=0;
+    const records=[];let inspections=0,nativeInspections=0,mutations=0,readinessCalls=0;
     const operation={id:'blocked',action:{action_key:'node.apply',revision:'1'},deadline:10000,
       checkpoint:{workflow_ref:{prefix:'MF;TF-1',tab_tid:'tab'},document_id:'doc'}};
     if(mode==='budget')operation.deadline=5000;
@@ -200,6 +233,11 @@ test('a blocker outside the selected root is inspected for the journal without a
       record:async e=>{records.push(structuredClone(e));return e},wrapMutation:code=>({code}),
       execute:async code=>{
         if(typeof code!=='string'){mutations++;throw Error('Unexpected mutation')}
+        if(code.includes('function readBlockingWindows')) {
+          nativeInspections++;
+          if(mode==='transport')throw Error('Disconnected');
+          return {status:'observed',windows:[{ref:'ui-blocker',native_owner:{hidden:false},bounding_box:{y:-2327}}]};
+        }
         if(code.includes('"root_ref":"ui-blocker"')) {
           inspections++;
           if(mode==='transport')throw Error('Disconnected');
@@ -214,6 +252,8 @@ test('a blocker outside the selected root is inspected for the journal without a
       }});
     await assert.rejects(channel.observe({condition:'prepared port visualizer cards',ready:()=>{readinessCalls++;return true}}),/blocked by a mask or dialog/);
     assert.equal(inspections,mode==='budget'?0:1,mode);assert.equal(readinessCalls,0,mode);
+    assert.equal(nativeInspections,mode==='budget'?0:1,mode);
+    if(mode!=='budget')assert.ok(records.some(r=>r.phase===(mode==='transport'?'node_blocking_window_native_unavailable':'node_blocking_window_native')));
     assert.equal(records.find(r=>r.phase==='node_observation_context_refused').outcome.output.ui.dialogs[0].text,'[outside selected root]');
     if(mode==='detail') {
       const detail=records.find(r=>r.phase==='node_blocking_dialog_observed');
@@ -331,6 +371,116 @@ test('native process, port and mapping reads share the prepared node and durable
  assert.equal(controls.node_processes,undefined);
  assert.equal(records.at(-1).outcome.output.node_process_controls_read,true);
  await assert.rejects(fixture().channel.observe({condition:'unbound controls',readProcessControls:true,ready:()=>true}),/prepared node/);
+});
+
+function preparedLockStepFixture({locked=true,change={},fault,continuous=false}={}) {
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'crumb',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,dom_epoch:{document:'dom',revision:1},scan:{complete:true},wizard:{status:'absent'},
+  prepared_node_context:{verified:true,...binding.node,surface:'graph',tid:'MF;TF-1;Graph;Reform',locked:!locked},
+  ui:{elements:[{ref:'ui-old',tid:'progress',allowed_actions:['click']}],dialogs:[],masks:[],truncated:{dialogs:false,masks:false}}};
+ const records=[],actions=[],ready=[];let reads=0,clock=1,gestures=0;const controller=new AbortController();
+ const operation={id:'cold',deadline:10000,action:{action_key:'acceptance.cold_read',revision:'1'}};
+ const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>clock,signal:controller.signal,
+  record:async e=>{records.push(structuredClone(e));if(e.phase==='node_step_refresh_authorized'){if(fault==='cancel')controller.abort();if(fault==='deadline')clock=operation.deadline;}return structuredClone(e)},
+  wrapMutation:(code,r)=>({code,r}),execute:async code=>{
+   if(typeof code==='string'){reads++;return {status:'SUCCEEDED',output:structuredClone(state)}}
+   actions.push(code.r);
+   if(actions.length===1||continuous){
+    if(fault==='transport')throw Error('unknown reply');
+    const before=structuredClone(state.prepared_node_context),after={...before,locked:!before.locked,...change};
+    const trace=[{event:'prepared_node_context_changed_before_gesture',before,after}];
+    if(fault==='missing_pair')delete trace[0].after;
+    if(fault==='duplicate_pair')trace.push(structuredClone(trace[0]));
+    if(fault==='gesture')trace.push({event:'ui_gesture_applied'});
+    state.prepared_node_context=after;state.ui.elements[0].ref='ui-fresh';
+    return {status:'NOT_APPLIED',action_key:'ui.act',operation_id:code.r.id,phase:fault==='phase'?'observing':'preconditions',effect_possible:fault==='effect',cleanup_complete:fault!=='cleanup',
+     error:{code:'PREPARED_NODE_CONTEXT_CHANGED'},trace,output:structuredClone(state)};
+   }
+   assert.ok(code.code.includes('"ref":"ui-fresh"'),'freshly resolved UI ref replaces the rejected ref');gestures++;
+   return {status:'SUCCEEDED',action_key:'ui.act',operation_id:code.r.id,effect_possible:true,cleanup_complete:true,output:structuredClone(state),trace:[]};
+  }});
+ return {channel,records,actions,ready,operation,get reads(){return reads},get gestures(){return gestures},
+  run:()=>channel.perform({condition:'cold process console',ready:s=>{ready.push(structuredClone(s));return true},
+   resolve:s=>({verb:'click',ref:s.ui.elements[0].ref}),identity:s=>({tid:s.ui.elements[0].tid})})};
+}
+
+for(const locked of [false,true])test('D50 lock-only precondition refusal obtains a full fresh observation before one gesture: '+locked,async()=>{
+ const f=preparedLockStepFixture({locked});await f.run();
+ assert.equal(f.actions.length,2);assert.equal(f.gestures,1);assert.equal(f.reads,4);assert.equal(f.ready.length,2);
+ assert.equal(f.ready[0].prepared_node_context.locked,!locked);assert.equal(f.ready[1].prepared_node_context.locked,locked);
+ assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized'&&e.reason==='prepared_node_lock_changed').length,1);
+});
+
+for(const change of [{document_id:'foreign'},{workflow_id:'foreign'},{node_id:'foreign'},{tid:'other'},{surface:'wizard'},{verified:false},{locked:undefined},{navigation_node:{tid:'foreign'}}])
+test('D50 retry refuses another native context difference '+JSON.stringify(change),async()=>{
+ const f=preparedLockStepFixture({change});await assert.rejects(f.run());assert.equal(f.actions.length,1);assert.equal(f.gestures,0);
+ assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,0);
+});
+
+for(const fault of ['missing_pair','duplicate_pair','phase','effect','cleanup','gesture','transport','cancel','deadline'])test('D50 retry retains '+fault+' guard',async()=>{
+ const f=preparedLockStepFixture({fault});await assert.rejects(f.run());assert.equal(f.actions.length,1);assert.equal(f.gestures,0);
+ if(!['cancel','deadline'].includes(fault))assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,0);
+ assert.equal(f.operation.deadline,10000);
+});
+
+test('D50 continuous pre-gesture lock churn stays bounded without a gesture',async()=>{
+ const f=preparedLockStepFixture({continuous:true});await assert.rejects(f.run());assert.equal(f.actions.length,3);assert.equal(f.gestures,0);
+ assert.equal(f.operation.deadline,10000);assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,2);
+});
+
+function processLockFixture(onProcessRead,{deadline=10000}={}) {
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'crumb',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const node={verified:true,...binding.node,surface:'graph',tid:'MF;TF-1;Graph;JS',locked:true};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,dom_epoch:{document:'dom',revision:1},
+  prepared_node_context:node,scan:{complete:true},wizard:{status:'absent'},ui:{elements:[{tid:'MF;ConsoleForm',ref:'ui-console'}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+ const records=[],timeouts=[];let clock=1,reads=0,gestures=0;
+ const channel=createNodeProcedure({operation:{id:'replace',deadline,action:{action_key:'node.apply',revision:'1'}},preparedNodeContext:binding,
+  targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>clock,wait:async ms=>{clock+=ms},
+  record:async r=>{records.push(structuredClone(r));return structuredClone(r)},wrapMutation:()=>{gestures++;throw Error('unexpected gesture')},
+  execute:async(code,options)=>{
+   timeouts.push(options?.timeout);
+   if(code.includes('function workspaceUiCapability'))return {status:'SUCCEEDED',output:structuredClone(state)};
+   if(code.includes('async function readNodeProcesses')){
+    const context=structuredClone(node);onProcessRead(reads++,node,context);
+    return {verified:true,node_context:context,processes:[]};
+   }
+   throw Error('unexpected native read');
+  }});
+ return {channel,records,timeouts,state,get reads(){return reads},get gestures(){return gestures},get clock(){return clock}};
+}
+
+for(const locked of [false,true])test('process observation discards a lock-only transition to '+locked+' and rereads',async()=>{
+ const f=processLockFixture((n,node)=>{if(!n){node.locked=locked;node.tid='MF;TF-1;Graph;JS'};});
+ f.state.prepared_node_context.locked=!locked;
+ const ready=[];
+ const result=await f.channel.observe({condition:'execution after JS Done',readProcesses:true,ready:s=>{ready.push(s);return s.node_processes.verified}});
+ assert.equal(f.reads,2);assert.equal(ready.length,1,'mixed read is never passed to readiness');assert.equal(f.gestures,0);
+ assert.equal(result.prepared_node_context.locked,locked);assert.deepEqual(result.node_processes.node_context,result.prepared_node_context);
+ const retried=f.records.filter(e=>e.phase==='node_observation_lock_retried');assert.equal(retried.length,1);
+ assert.equal(retried[0].native_node_context.locked,!locked);assert.equal(retried[0].ui_node_context.locked,locked);
+});
+
+test('lock-only retry resets consecutive execution identity confirmation',async()=>{
+ const f=processLockFixture((n,node)=>{if(n===1)node.locked=false});
+ await f.channel.observe({condition:'stable execution',readProcesses:true,ready:()=>true,confirmIdentity:()=>({execution:'same'})});
+ assert.equal(f.reads,4);assert.deepEqual(f.records.filter(e=>e.phase==='node_observation_sample').map(e=>e.sample),[0,2,3]);
+ assert.equal(f.records.filter(e=>e.phase==='node_observation_completed').length,1);
+});
+
+for(const change of [{node_id:'foreign'},{document_id:'foreign'},{workflow_id:'foreign'},{surface:'wizard'},
+ {tid:'MF;TF-1;Graph;Other'},{verified:false},{locked:undefined},{navigation_node:{tid:'other',label:'Other'}}])
+test('process lock change cannot hide another context change '+JSON.stringify(change),async()=>{
+ const f=processLockFixture((n,node,native)=>{node.locked=false;Object.assign(native,change)});
+ await assert.rejects(f.channel.observe({condition:'execution',readProcesses:true,ready:()=>true}),/context changed/);
+ assert.equal(f.reads,1);assert.equal(f.records.filter(e=>e.phase==='node_observation_lock_retried').length,0);assert.equal(f.gestures,0);
+});
+
+test('continuous process lock changes exhaust the original observation deadline without a usable snapshot',async()=>{
+ const f=processLockFixture((n,node)=>{node.locked=!node.locked},{deadline:451});
+ await assert.rejects(f.channel.observe({condition:'execution',readProcesses:true,timeoutMs:1000,ready:()=>true}),/readiness timeout/);
+ assert.equal(f.clock,451);assert.equal(f.reads,3);assert.equal(f.gestures,0);
+ assert.equal(f.records.filter(e=>e.phase==='node_observation_completed').length,0);
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-console'}),/budget exhausted|observation/i);
 });
 
 for(const fault of ['other field','source connection','port owner','incomplete mapping'])
@@ -804,7 +954,7 @@ test('an incomplete observation preserves the original refusal in the journal',a
 });
 
 test('bound completion gives mask settlement only the remaining parent deadline',async()=>{
-  for(const verb of ['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column','click']) {
+  for(const verb of ['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views','finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column','click']) {
     const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
     const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
     const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},
@@ -816,8 +966,10 @@ test('bound completion gives mask settlement only the remaining parent deadline'
       execute:async(code,options)=>{
         if(typeof code==='string')return {status:'SUCCEEDED',output:structuredClone(state)};
         assert.equal(options.timeout,verb==='click'?35000:69000);
+        if(verb==='click')assert.doesNotMatch(code.code,/"deadline":/);
+        else assert.match(code.code,/"deadline":65000/);
         if(verb==='click')assert.doesNotMatch(code.code,/"settlement_timeout_ms":/);
-        else assert.match(code.code,['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(verb)?/"opening_timeout_ms":64000/:/"settlement_timeout_ms":64000/);
+        else assert.match(code.code,['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views'].includes(verb)?/"opening_timeout_ms":64000/:/"settlement_timeout_ms":64000/);
         return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state};
       }});
     if(verb==='wizard_step')state.wizard={status:'observed',stage:'text_import_file'};

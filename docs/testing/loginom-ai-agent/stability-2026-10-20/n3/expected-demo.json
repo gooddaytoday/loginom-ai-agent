@@ -1,19 +1,6 @@
 {
   "package_path": "/stability-2026-10-20/n3.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.replace_columns"
-    },
-    {
-      "type": "transform.calculator"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -22,32 +9,32 @@
       "columns": [
         {
           "name": "Carrier",
-          "label": "Carrier",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Zone",
-          "label": "Zone",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "MaxKg",
-          "label": "MaxKg",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Base",
-          "label": "Base",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "PerKg",
-          "label": "PerKg",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Quote",
-          "label": "Quote",
+          "label_any": true,
           "type": "real"
         }
       ],

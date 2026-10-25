@@ -125,6 +125,7 @@ export function selectExecutionChild(execution,snapshot) {
 
 // A read-only pause may outlive a running child. Bind native records rather
 // than its progress state; completion still requires the usual Show Node proof.
+// A running upstream group may still hold this native-owned child at not_started.
 export function verifyExecutionReadWait(execution,snapshot,expected) {
   const ps=inventory(snapshot,execution.node,execution.root_id);
   requireValue(snapshot.node_context.surface==='graph'
@@ -136,7 +137,11 @@ export function verifyExecutionReadWait(execution,snapshot,expected) {
     &&child.owner.source==='native_process_model_identity','Read wait requires the native-owned child');
   for(const item of [group,child])requireValue(item?.progress_state?.verified===true
     &&item.progress_state.source==='native_progress_record'
-    &&['running','not_responding','completed','failed'].includes(item.progress_state.state),
+    &&(['running','not_responding','completed','failed'].includes(item.progress_state.state)
+      ||item===child&&item.error===false&&item.progress_state.state==='not_started'
+        &&item.progress_state.terminal===false&&item.progress_state.can_cancel===false
+        &&group.error===false&&group.progress_state.state==='running'
+        &&group.progress_state.terminal===false&&group.progress_state.can_cancel===true),
   'Read wait native progress state is unverified or cancelled');
   const binding={execution_id:execution.execution_id,node:structuredClone(execution.node),root_id:execution.root_id,
     group_id:group.process_id,group_record_id:group.record_id,process_id:child.process_id,process_record_id:child.record_id,

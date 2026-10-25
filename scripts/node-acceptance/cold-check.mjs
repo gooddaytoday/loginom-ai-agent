@@ -1,4 +1,4 @@
-import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput} from "./expected-outputs.mjs"
+import {parseExpectedOutputs,matchExpectedOutputs,resolveExportInput,parseExportCsvHeader,selectColdOutputReads} from "./expected-outputs.mjs"
 import { parseArgs } from "node:util"
 import { readFile, mkdir, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
-import {coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews,coldProcessObservation} from './cold-reader-policy.mjs'
+import {coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -18,6 +18,9 @@ const args = parseArgs({
     saved: { type: "string" },
     expected: { type: "string" },
     output: { type: "string" },
+    csv: { type: "string" },
+    'csv-delimiter': { type: "string", default: ',' },
+    'csv-header': { type: "string", default: 'names' },
   },
   strict: true,
 }).values
@@ -40,7 +43,7 @@ const { createNodeProcedure } = await load("client/lib/node-procedure.mjs")
 const { createNodeExecutionProcedure } = await load("client/lib/node-execution-procedure.mjs")
 const { createExecutionJournal } = await load("client/lib/execution-journal.mjs")
 const { withBrowserReceipt } = await load("client/lib/executor.mjs")
-const { makePackageCleanupCode } = await load("client/lib/package-cleanup.mjs")
+const { makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode } = await load("client/lib/package-cleanup.mjs")
 const { openNewOutputTable, configureTablePrecision, prepareTableRead, returnFromOutputTable } =
   await load("client/lib/node-output-procedure.mjs")
 const { readTableOutputPages } = await load("client/lib/table-output-pages.mjs")
@@ -52,6 +55,11 @@ if (config.workflow_profile?.passwordless_login === true && loginPassword !== ""
 if (config.workflow_profile?.passwordless_login !== true && loginPassword === "") throw Error("TEST_PASSWORD_UNAVAILABLE")
 const expected = JSON.parse(await readFile(args.expected, "utf8"))
 const {multiple,outputs:expectedOutputs}=parseExpectedOutputs(expected)
+if(!['names','labels'].includes(args['csv-header']))throw Error('COLD_EXPORT_CSV_HEADER_MODE_INVALID')
+// --csv is the actual runtime-downloaded export, already checked in full by
+// the scenario's file oracle. It supplies order only, never cold cell values.
+const exportCsv=args.csv?{columns:parseExportCsvHeader(await readFile(resolve(args.csv),'utf8'),args['csv-delimiter']),
+ header:args['csv-header'],delimiter:args['csv-delimiter']}:undefined
 
 const saved = await loadSaved(args.saved)
 if (saved.path !== expected.package_path) throw Error("PACKAGE_PATH_MISMATCH")
@@ -68,17 +76,47 @@ const record = createExecutionJournal({
   metadata,
   knownSecrets: [config.api_key, loginPassword].filter(Boolean),
 })
-const { context } = await loginBrowser({
+const state = { prepared: undefined, closed: false, cleanupAttempted: false }
+let context, page
+const rawExecute = (code) => new Function("page", `return (${code})(page)`)(page)
+const execute = (code) => {
+  if (state.cancelled) throw Error("COLD_CANCELLED")
+  return rawExecute(code)
+}
+const cancel = (signal) => {
+  if (state.cancelled) return
+  state.cancelled = signal
+  state.failure = "COLD_CANCELLED"
+  process.exitCode = signal === "SIGINT" ? 130 : signal === "SIGTERM" ? 143 : 129
+  // Do not close Chromium while the admitted gesture/read is settling. The
+  // normal finally owns native cleanup; this bounds an unresponsive transport.
+  state.cancelTimer = setTimeout(async () => {
+    state.cleanupExpired = true
+    const failure = {status:"FAIL", phase:"independent_cold_reopen_readback", path:saved.path,
+      error:"COLD_CANCELLED", settingsReapplied:false, cancellation:{signal,
+        cleanup_budget_exhausted:true, lock_may_remain:state.cleanup?.package_closed!==true},
+      cleanup:{package_closed:state.cleanup?.package_closed===true,logged_out:state.cleanup?.logged_out===true}}
+    const forced = setTimeout(() => process.exit(1), 5000)
+    try { await writeFile(join(args.output,"result.json"),JSON.stringify(failure,null,2)+"\n") }
+    finally { await context?.close().catch(()=>undefined); clearTimeout(forced); process.exit(1) }
+  }, 30000)
+}
+const signals = ["SIGINT","SIGTERM","SIGHUP"]
+const handlers = signals.map(signal => () => cancel(signal))
+signals.forEach((signal,i) => process.on(signal,handlers[i]))
+try {
+const authenticated = await loginBrowser({
   browserPath: resources.browserPath,
   profile: join(args.output, "browser"),
   candidate: { url: config.loginom_url, username: config.workflow_profile.loginom_user, password: loginPassword },
   headless: process.env.LOGINOM_AI_AGENT_TEST_HEADLESS !== "0",
   keepOpen: true,
+  onContextCreated: created => { context = created },
 })
-const page = context.pages()[0]
-const execute = (code) => new Function("page", `return (${code})(page)`)(page)
-const state = { prepared: undefined, closed: false, cleanupAttempted: false }
-try {
+context = authenticated.context
+page = context.pages()[0]
+  state.openAttempted=true
+  state.openDeadline=Date.now()+120000
   let prepared = await execute(
     makeWorkspacePrepareCode({
       loginomUrl: page.url(),
@@ -90,12 +128,22 @@ try {
     }),
   )
   state.prepared = prepared
+  await record({phase:"cold_package_opened",prepared,settings_applied:false})
+  if (state.cancelled) throw Error("COLD_CANCELLED")
   if (
-    prepared.status !== "READY" ||
-    prepared.package_ref.path !== saved.path ||
-    prepared.workflow_ref.navigation_path.some((item) => item.label.endsWith("(только чтение)"))
-  )
+    prepared.status !== "READY"
+  ) {
+    state.openFailure={status:prepared.status,reason:prepared.reason??'OPEN_NOT_READY'}
+    throw Error("COLD_PACKAGE_OPEN_NOT_READY")
+  }
+  if(prepared.package_ref?.path!==saved.path) {
+    state.openFailure={status:prepared.status,reason:'PACKAGE_PATH_MISMATCH'}
+    throw Error("COLD_PACKAGE_PATH_MISMATCH")
+  }
+  if(prepared.workflow_ref.navigation_path.some(item=>item.label.endsWith("(только чтение)"))) {
+    state.openFailure={status:prepared.status,reason:'PACKAGE_READ_ONLY'}
     throw Error("COLD_PACKAGE_NOT_WRITABLE")
+  }
 
   const origin = new URL(config.loginom_url).origin
   const adapter = createNodeTargetBrowserAdapter({ execute, origin, build: "7.4.2" })
@@ -150,16 +198,10 @@ try {
     if (!graph.nodes.some((node) => node.type === want.type)) throw Error(`COLD_NODE_TYPE_MISSING:${want.type}`)
   }
 
-  const matches=graph.nodes.filter(n=>types.has(n.type)&& (multiple||!saved.node||n.ref.node_id===saved.node)
-    ||exportInput&&n.ref.node_id===exportInput.node.ref.node_id);
-  if(matches.length===0||matches.length>expectedOutputs.length)throw Error("COLD_EXTRA_OR_MISSING_OUTPUT_NODE");
+  const reads=selectColdOutputReads(graph,expectedOutputs,{exportInput,savedNode:multiple?undefined:saved.node});
   const actual=[],ownedExecutions=[];
-  for(const [outputIndex,target] of matches.entries()){
+  for(const [outputIndex,{node:target,ports}] of reads.entries()){
   const node=target.ref;
-  const ports=[...new Set(expectedOutputs.filter(o=>o.output_node_type===target.type
-    &&(o.output_node_label===undefined||o.output_node_label===target.label)).map(o=>o.output_port??0)
-    .concat(exportInput&&node.node_id===exportInput.node.ref.node_id?[exportInput.output_port]:[]))];
-  if(ports.length===0)throw Error('COLD_EXTRA_OR_MISSING_OUTPUT_NODE');
 
   const operation = {
     id: "cold-read-expected-"+outputIndex,
@@ -184,7 +226,7 @@ try {
       }),
   })
   const channel={...procedure,observe:options=>processObservation.observe(procedure,options),get lastPreparedStep(){return procedure.lastPreparedStep;},
-    get steps(){return procedure.steps;},perform:options=>performColdNodeAction(procedure,options,{node,operation,record})};
+    get steps(){return procedure.steps;},perform:options=>performColdNodeAction(procedure,options,{node,operation,record,readReceipt})};
   const nativeSource=staticSources?.crossTables.find(c=>c.node_id===node.node_id);
   const nativeConfiguration=nativeSource?.configuration;
   if(nativeConfiguration){
@@ -232,7 +274,7 @@ try {
     throw Error("COLD_EXECUTION_NOT_VERIFIED")
   ownedExecutions.push(execution);
 
-  for(const outputPort of ports){
+  for(const {port:outputPort,content_candidate} of ports){
   let useNative=false,ownedPreview;
   const ctx={document_id:prepared.document_id,workflow_ref:prepared.workflow_ref,node,execution,deadline:operation.deadline,receipt_id:operation.id};
   if(nativeConfiguration&&outputPort===0){
@@ -270,7 +312,7 @@ try {
       receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})})
    :openColdOutputViews(channel,args,{node,operation,readReceipt,record})})
   const precision = await configureTablePrecision(channel, opened.table)
-  const readSettings = await prepareTableRead(channel, opened.table)
+  const readSettings = await prepareTableRead(channel, opened.table, {openFilter:args=>openColdTableFilter(channel,args,{node,operation,readReceipt,record})})
   const raw = await readTableOutputPages(channel, opened.table, {
     sampleRows: Math.max(10, ...expectedOutputs.map(o=>o.rows.length)),
   })
@@ -289,7 +331,8 @@ try {
   await returnFromOutputTable(channel, opened.table)
   }
 
-  actual.push({node,type:target.type,label:target.label,output_port:outputPort,execution,data});
+  actual.push({node,type:target.type,label:target.label,output_port:outputPort,execution,data,
+   ...(content_candidate?{content_candidate:true}:{})});
   // Preserve independently read values before correspondence can refuse. A
   // failed match is still FAIL; this private checkpoint makes it diagnosable.
   const checkpoint=JSON.stringify({phase:'independent_cold_read_checkpoint',path:saved.path,outputs:actual});
@@ -305,12 +348,17 @@ try {
    if(savedExport.node_id!==exportInput.export_node_id)throw Error('COLD_EXPORT_INPUT_MAPPING_CHANGED');
    exportInput.input_fields=savedExport.input_fields;
    await record({phase:'cold_export_input_mapping',...savedExport,settings_applied:false});
+   state.exportObservation={node_id:savedExport.node_id,input_fields:savedExport.input_fields,
+    ...(exportCsv?{csv_order:exportCsv}: {})};
+   if(expectedOutputs.some(o=>o.output_node_type==='export_input'&&o.column_order==='exact')&&!exportCsv)
+    throw Error('COLD_EXPORT_CSV_REQUIRED');
   }
-  const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput});
+  const correspondence=matchExpectedOutputs(actual,expectedOutputs,{allowExtraPortReads:true,exportInput,exportCsv});
   const matched=correspondence.map(m=>actual.find(a=>a.node.node_id===m.node.node_id&&a.output_port===m.output_port));
 
   // Независимый reader создаёт временные визуализаторы; Loginom помечает пакет dirty.
   // Cleanup проверяет точное владение пакетом/аккаунтом перед discard.
+  if (state.cancelled) throw Error("COLD_CANCELLED")
   state.cleanupAttempted=true;
   const cleanup = await execute(
     makePackageCleanupCode({
@@ -327,6 +375,8 @@ try {
   )
   await writeFile(join(args.output, "cleanup.json"), JSON.stringify(cleanup, null, 2) + "\n")
   state.cleanup=cleanup
+  if(cleanup.native_close_readback)await record({phase:'cold_native_close_readback',readback:cleanup.native_close_readback,
+    modified_before_close:cleanup.modified_before_close,cleanup_status:cleanup.status,cleanup_reason:cleanup.reason}).catch(()=>undefined)
   if (cleanup.status !== "SUCCEEDED" || !cleanup.package_closed || !cleanup.logged_out)
     throw Error("COLD_CLEANUP_UNCONFIRMED")
   state.closed = true
@@ -335,6 +385,7 @@ try {
     status: "PASS",
     phase: "independent_cold_reopen_readback",
     path: saved.path,
+    ...(state.exportObservation?{export_observation:state.exportObservation}:{}),
     ...(multiple?{outputs:matched.map(a=>({node:a.node,execution:a.execution,output:{ports:[{...a.data,port:a.output_port}]}})),correspondence}
       :{node:matched[0].node,execution:matched[0].execution,output:{ports:[{...matched[0].data,port:matched[0].output_port}]}}),
     settingsReapplied: false,
@@ -351,18 +402,45 @@ try {
       status: result.status,
       phase: result.phase,
       path: saved.path,
+      ...(state.exportObservation?{export_observation:state.exportObservation}:{}),
       settingsReapplied: false,
       cleanup: result.cleanup,
     }),
   )
 } catch(error) {
-  state.failure=String(error?.message??error)
-  for(const secret of [config.api_key,loginPassword].filter(Boolean))state.failure=state.failure.split(secret).join('[REDACTED]')
-  throw error
+  state.failure=state.cancelled?"COLD_CANCELLED":String(error?.message??error)
+  if(state.openAttempted&&state.prepared?.status!=='READY'&&!state.openFailure)
+    state.openFailure={status:state.prepared?.status??'UNCONFIRMED',reason:state.prepared?.reason??state.failure}
+  for(const secret of [config.api_key,loginPassword].filter(Boolean)){
+    state.failure=state.failure.split(secret).join('[REDACTED]')
+    if(state.openFailure)state.openFailure.reason=String(state.openFailure.reason).split(secret).join('[REDACTED]')
+  }
+  if (!state.cancelled) throw error
 } finally {
-  if (!state.closed && !state.cleanupAttempted && state.prepared?.status === "READY" && state.prepared.package_ref?.path === saved.path) {
-    await execute(
-      makePackageCleanupCode({
+  // Cold teardown: one native cleanup, then browser, including cancellation.
+  try {
+  if(state.openFailure&&page&&!state.cleanupExpired) {
+    let timer
+    const budget=Math.max(0,Math.min(1000,(state.openDeadline??Date.now())-Date.now()))
+    let snapshot={status:'unavailable',reason:'open_deadline_exceeded'}
+    if(budget>0)try {
+      const timeout=new Promise(resolve=>{timer=setTimeout(()=>resolve({status:'unavailable',reason:'diagnostic_timeout'}),budget)})
+      snapshot=await Promise.race([timeout,rawExecute(makeColdOpenDiagnosticCode({loginomUrl:config.loginom_url,
+        loginomBuild:'7.4.2',account:config.workflow_profile.loginom_user}))])
+    } catch {snapshot={status:'unavailable',reason:'diagnostic_read_failed'}} finally {clearTimeout(timer)}
+    await record({phase:'cold_open_refused_native',open_failure:state.openFailure,snapshot})
+      .catch(()=>{state.openDiagnosticUnconfirmed=true})
+  }
+  const failedOpen=state.openFailure&&state.prepared?.status!=='READY'
+    &&(state.prepared?.effect_possible===true||!state.prepared&&state.openAttempted)
+  if (!state.cleanupExpired && !state.closed && !state.cleanupAttempted && (failedOpen || state.prepared?.status === "READY" && state.prepared.package_ref?.path === saved.path)) {
+    // A rejected readonly opening owns only this diagnostic copy, never the
+    // writer's lock. Native cleanup rechecks its mode and refuses dirty copies.
+    const readOnly = state.prepared?.workflow_ref?.navigation_path.some(item => item.label.endsWith("(только чтение)"))
+    state.cleanupAttempted=true
+    await rawExecute(
+      failedOpen?makeFailedOpenCleanupCode({sessionId:session,operationId:'cold-open',account:config.workflow_profile.loginom_user,
+        packagePath:saved.path,loginomUrl:config.loginom_url,loginomBuild:'7.4.2'}):makePackageCleanupCode({
         sessionId: session,
         documentId: state.prepared.document_id,
         account: config.workflow_profile.loginom_user,
@@ -370,18 +448,40 @@ try {
         loginomUrl: config.loginom_url,
         loginomBuild: "7.4.2",
         tabTid: state.prepared.workflow_ref.tab_tid,
-        diagnosticDiscard: true,
-        diagnosticWaitForIdle: true,
+        diagnosticReadOnly: readOnly,
+        // Cancellation has no complete persisted-change inventory proving
+        // Table-only changes. Never turn package ownership into discard proof.
+        // Clean packages close normally; dirty/unknown ones retain BLOCKED.
+        diagnosticDiscard: !readOnly && !state.cancelled,
+        diagnosticWaitForIdle: !readOnly && !state.cancelled,
       }),
     )
-      .then((result) => {state.cleanup=result;return writeFile(join(args.output, "cleanup.json"), JSON.stringify(result, null, 2) + "\n")})
-      .catch(() => console.error("COLD_PACKAGE_CLEANUP_UNCONFIRMED"))
+      .then(async (result) => {
+        state.cleanup=result
+        if(result.native_close_readback)await record({phase:'cold_native_close_readback',readback:result.native_close_readback,
+          modified_before_close:result.modified_before_close,cleanup_status:result.status,cleanup_reason:result.reason}).catch(()=>undefined)
+        return writeFile(join(args.output, "cleanup.json"), JSON.stringify(result, null, 2) + "\n")
+      })
+      .catch(async () => {
+        state.cleanup={status:'BLOCKED',reason:'COLD_PACKAGE_CLEANUP_UNCONFIRMED',package_closed:false,logged_out:false}
+        await writeFile(join(args.output,'cleanup.json'),JSON.stringify(state.cleanup,null,2)+'\n')
+      })
   }
-  if(state.failure)await writeFile(join(args.output,'result.json'),JSON.stringify({status:'FAIL',
+  if(state.failure&&!state.cleanupExpired)await writeFile(join(args.output,'result.json'),JSON.stringify({status:'FAIL',
    phase:'independent_cold_reopen_readback',path:saved.path,settingsReapplied:false,error:state.failure,
-   cleanup:{package_closed:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.package_closed===true,
+   ...(state.openFailure?{reason:state.openFailure.reason,open_failure:state.openFailure}:{}),
+   ...(state.openDiagnosticUnconfirmed?{open_diagnostic_recorded:false}:{}),
+   ...(state.exportObservation?{export_observation:state.exportObservation}:{}),
+   ...(state.cancelled?{cancellation:{signal:state.cancelled,cleanup_budget_exhausted:false,
+    lock_may_remain:state.cleanup?.package_closed!==true}}:{}),
+   cleanup:{status:state.cleanup?.status??'BLOCKED',reason:state.cleanup?.reason??(state.cleanup?'CLEANUP_UNCONFIRMED':'CLEANUP_NOT_ADMITTED'),
+    package_closed:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.package_closed===true,
     logged_out:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.logged_out===true}},null,2)+'\n')
-  await context.close()
+  } finally {
+    await context?.close()
+    clearTimeout(state.cancelTimer)
+    signals.forEach((signal,i) => process.off(signal,handlers[i]))
+  }
 }
 
 async function loadSaved(value) {
