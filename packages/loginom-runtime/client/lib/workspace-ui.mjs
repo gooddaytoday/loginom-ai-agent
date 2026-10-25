@@ -4025,8 +4025,11 @@ function readRenderedInputMapping(observation) {
               const fresh=await readUi();
               if(!lifecycleContextMatches(fresh)){
                 if(await deleteLostLinks(fresh))continue;
-                // Cancelling an owned output-port draft can also emit a toast.
-                if(['finish_wizard','execute_wizard','confirm_wizard_close'].includes(task.action.verb) && lifecycleContextMatches(fresh,true) && transientToastReads<50){
+                // A bound Execute can leave a native toast beyond 50 reads.
+                // Observe the same completed gesture within its remaining node
+                // budget; all owner checks and graph settlement still apply.
+                if(['finish_wizard','execute_wizard','confirm_wizard_close'].includes(task.action.verb) && lifecycleContextMatches(fresh,true)
+                  && (transientToastReads<50 || task.action.verb==='execute_wizard'&&task.prepared_node_context&&task.settlement_timeout_ms)){
                   transientToastReads++;record('wizard_toast_wait',{attempt:transientToastReads});
                   await page.waitForTimeout(Math.min(100,timeout()));continue;
                 }
@@ -4471,7 +4474,7 @@ function readRenderedInputMapping(observation) {
 export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
   if(options.settlement_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
-    ||!['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
+    ||!['finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
     ||options.opening_timeout_ms!==undefined||!Number.isInteger(options.settlement_timeout_ms)
     ||options.settlement_timeout_ms<1||options.settlement_timeout_ms>1800000))
     throw Error('Mask settlement requires a bound completion action and the remaining node deadline');

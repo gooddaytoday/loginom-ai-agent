@@ -697,7 +697,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (now() >= operation.deadline) throw new Error('Node procedure deadline elapsed before mutation');
       const openingWait=preparedNodeContext&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(action.verb)
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
-      const settlementWait=preparedNodeContext&&['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(action.verb)
+      const settlementWait=preparedNodeContext&&['finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(action.verb)
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
       const code = processCode??makeWorkspaceUiCode({ mode: 'act', operation_id: id, action,
         ...(settlementWait?{settlement_timeout_ms:settlementWait}:{}),
