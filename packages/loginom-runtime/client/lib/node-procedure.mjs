@@ -78,6 +78,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   let snapshotTableDialog = null;
   let snapshotWizardConfirmation = null;
   let launchConfirmed = false;
+  let launchConsoleControl;
+  const rememberConsoleControl = state => {
+    if(launchConfirmed||!preparedNodeContext||state.prepared_node_context?.surface!=='graph')return;
+    const buttons=state.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress');
+    if(buttons.length===1&&buttons[0].ref&&buttons[0].signature&&buttons[0].enabled===true
+      &&buttons[0].allowed_actions.includes('click'))
+      launchConsoleControl={ref:buttons[0].ref,signature:structuredClone(buttons[0].signature)};
+  };
   if(preparedNodeContext)validatePreparedNodeContext(preparedNodeContext);
   const boundOptions=preparedNodeContext?{prepared_node_context:structuredClone(preparedNodeContext)}:{};
   let uiContext=preparedNodeContext?null:operation.checkpoint;
@@ -747,6 +755,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       snapshot = structuredClone(result.output);
       snapshotTableDialog=tableDialog?structuredClone(tableDialog):null;
       snapshotWizardConfirmation=snapshot.node_wizard_confirmation??null;
+      if(readProcessControls)rememberConsoleControl(snapshot);
       return structuredClone(snapshot);
       } catch(error) {
         if(signal?.aborted&&error===signal.reason) {
@@ -834,7 +843,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (result.status !== 'SUCCEEDED' || !operation.cleanupConfirmed) {
         throw new NodeProcedureStepError(result);
       }
-      if(preparedNodeContext&&['execute_graph_node','execute_wizard'].includes(action.verb))launchConfirmed=true;
+      const trainCommands=before.node_training_read===true?before.ui.elements.filter(e=>
+        e.label==='Обучить узел'&&e.tid?.startsWith('mn;')&&e.allowed_actions.includes('click')):[];
+      const trainingLaunch=action.verb==='click'&&trainCommands.length===1&&trainCommands[0].ref===action.ref;
+      if(preparedNodeContext&&(['execute_graph_node','execute_wizard'].includes(action.verb)||trainingLaunch)){
+        rememberConsoleControl(before);
+        launchConfirmed=true;
+      }
       // Even a successful gesture does not authorize the next one with old refs.
       return structuredClone(result);
     },
@@ -997,6 +1012,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     },
     get steps() { return sequence; },
     get launchConfirmed() { return launchConfirmed; },
+    // Execution drivers can be recreated between JS materialization/finish.
+    // Retain the pre-launch control; never recapture its replacement afterwards.
+    get launchConsoleControl() { return launchConsoleControl&&structuredClone(launchConsoleControl); },
     get lastPreparedStep() { return structuredClone(lastPreparedStep); },
     stepsSince(step) {
       if (preparedStepsTrimmed && !(preparedSteps[0]?.step <= step + 1)) throw new Error('Prepared step log no longer covers this boundary');

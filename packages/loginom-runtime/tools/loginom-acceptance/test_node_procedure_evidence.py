@@ -361,6 +361,50 @@ class PortReadSequenceTests(unittest.TestCase):
         self.console_epoch_fixture()
         self.assertTrue(self.audit()['passed'], self.audit()['failures'])
 
+    def test_js_materialization_console_wait_in_next_phase_keeps_original_launch_binding(self):
+        self.console_epoch_fixture()
+        phase=next(r for r in self.events if r.get('phase')=='node_phase_prepared')
+        phase['receipt']['phase']='materialization_start'
+        index=next(i for i,r in enumerate(self.events) if r.get('phase')=='node_observation_sample' and r.get('step')==67)
+        self.events.insert(index,dict(operation_id=self.fixture['operation_id'],phase='node_phase_prepared',receipt=dict(phase='finish',deadline=30000)))
+        self.assertTrue(self.audit()['passed'],self.audit()['failures'])
+        self.events[index]['receipt']['deadline']=30001
+        self.assertFalse(self.audit()['passed'])
+
+    def test_native_training_launch_binds_quiet_console_to_observed_train_command(self):
+        from node_procedure_evidence import digest
+        self.console_epoch_fixture()
+        for row in self.events:
+            if row.get('step')==65:
+                state=row['outcome']['output'];state['node_training_read']=True
+                state['ui']['elements'][1].update(tid='mn;train',label='Обучить узел',allowed_actions=['click'])
+        state=next(r['outcome']['output'] for r in self.events if r.get('phase')=='node_observation_completed' and r.get('step')==65)
+        prepared=next(r for r in self.events if r.get('phase')=='node_step_prepared' and r.get('step')==66)
+        prepared['action']=dict(verb='click',ref='launch');prepared['observation_sha256']=digest(state)
+        prepared['signature']=digest([prepared['internal_operation_id'],prepared['action'],state])
+        self.assertTrue(self.audit()['passed'],self.audit()['failures'])
+        for row in self.events:
+            if row.get('step')==65:row['outcome']['output']['node_training_read']=False
+        prepared['observation_sha256']=digest(state)
+        prepared['signature']=digest([prepared['internal_operation_id'],prepared['action'],state])
+        self.assertIn('unbound_console_epoch_settlement',self.audit()['failures'])
+
+    def test_cold_console_epoch_wait_requires_explicit_original_ceiling_without_apply_rows(self):
+        from node_procedure_evidence import verify_internal_sequence
+        self.console_epoch_fixture()
+        self.events=[r for r in self.events if r.get('phase') not in ('node_apply_prepared','node_phase_prepared')]
+        ceiling=dict(operation_id=self.fixture['operation_id'],node=self.node,deadline_at=30000,total_ms=30000)
+        audit=lambda c:verify_internal_sequence(self.events,self.fixture['operation_id'],max_steps=4096,cold_read_ceiling=c)
+        self.assertFalse(audit(None)['passed'])
+        self.assertTrue(audit(ceiling)['passed'],audit(ceiling)['failures'])
+        for bad in (dict(ceiling,operation_id='foreign'),dict(ceiling,node=dict(self.node,node_id='foreign')),
+                    dict(ceiling,deadline_at=30001),dict(ceiling,deadline_at=1),dict(ceiling,total_ms=1),
+                    dict(ceiling,total_ms=True),dict(ceiling,extra=True)):
+            with self.subTest(ceiling=bad):self.assertFalse(audit(bad)['passed'])
+        for phase in ('node_apply_prepared','node_phase_prepared'):
+            self.events.insert(0,dict(phase=phase,operation_id=self.fixture['operation_id'],receipt=dict(phase='finish',deadline=30000)))
+            self.assertFalse(audit(ceiling)['passed']);self.events.pop(0)
+
     def test_console_epoch_wait_rejects_unbound_or_unsettled_evidence(self):
         self.console_epoch_fixture();original=copy.deepcopy(self.events)
         for fault in ('launch','owner','control','epoch','locked','delay','deadline','budget','ordinary'):
