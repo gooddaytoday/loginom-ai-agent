@@ -141,17 +141,20 @@ cleanup и исходный контекст подтверждены. Native fu
 
 ## Checkpoint
 
-- План сохранён; оба полных CLI payload собраны, sourceDirty=false,
-  штатная проверка манифестов и candidate --version прошли.
-- Артефакты и приватные доказательства: /tmp/loginom-port-live-20261025-gxg7qus9/.
-- Стенд разрешается в DNS и отвечает HTTP 200; вход/пакеты/Execute не выполнялись.
-- Блокер: назначение выделенных main/fault учёток не установлено.
-- Блокер: gpt-6-luna/gpt-6-sol отсутствуют в закреплённом каталоге;
-  candidate CLI вернул ProviderModelNotFoundError для Luna.
-  Предложение владельцу: gpt-5.6-luna/high и gpt-5.6-sol/xhigh, пока не принято.
-- Изолированный model-preflight-profile: providers list → 0 credentials.
-  Нужен готовый приватный профиль или штатный интерактивный вход OpenAI.
-- Выполнено 0 живых задач Loginom. Матрица/checker/fault patch не создавались,
-  поскольку основной путь заблокирован до входа.
-- Следующий шаг после ответов владельца: setup в отдельном профиле,
-  проверка сохранения exact stand URL, visible CSV→Calculator→Save→cleanup.
+- Оба полных payload собраны; sourceDirty=false, штатная проверка манифестов PASS.
+- Артефакты/приватные evidence: /tmp/loginom-port-live-20261025-gxg7qus9/.
+- Владелец назначил user с пустым паролем; admin доступен для собственных ресурсов. Секреты не хранить в git.
+- Штатный models --refresh обновил private cache: исходные модели плана доступны без изменения artifact.
+- Headless device OAuth завершён; Luna/high и Sol/xhigh реально ответили OK через candidate CLI, exit0; credentials 0600.
+- Setup подтвердил вход и сохранение origin/path logi-test-plan/app/.
+- Временный harness использует штатный --command loginom-automation, полный teardown и отдельный разбор XML skill.
+- c8d50e99: Import+Calculator вернули точные 3×4; native mapping подтверждает Ratio первым.
+- Исправлен только checker: native mapping + fixture по именам; Save перед assertions, без нового recovery-механизма.
+- c8d50e99 остановился до Save: CONFIRMED_SAVE_REQUIRED, guard retained, профиль quarantined.
+- Native закрытие его Package1 не подтверждено; runtime session ID не определяет manager row. Чужие/все user sessions не закрывались.
+- eafaa4c9: startup bridge отказал до dispatch prepare с LOGINOM_HOST_REQUEST_FAILED; ресурсы ACK/exit0, своих окон нет.
+- Read-only bundled SDK: полный remote catalog и exact pinned action catalog PASS.
+- Отдельный bundled-module startup probe дошёл до ready без prepare и подтвердил закрытие ресурсов; это не CLI acceptance.
+- Причина единичного startup-отказа не доказана; исходная неудачная попытка сохранена.
+- Normal CLI main-path 839b2bb7: PASS; точные3×4, native Save, package_closed/logged_out=true, discard=false, exit0, guard released, окон нет.
+- Запущена первая модельная задача: candidate low-liquidity, Luna/high. Остальная серия/матрица ещё не запускались.
