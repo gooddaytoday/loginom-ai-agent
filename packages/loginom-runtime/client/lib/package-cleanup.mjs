@@ -180,7 +180,9 @@ async function closeOwnedPackage(page, options, deadline) {
         });
       };
       if(!openOwnerBound())return {reason:'FAILED_OPEN_OWNER_CHANGED'};
-      if (node.HasRunningNodes() !== false || m.HasRunningNodes() !== false) return {reason:'RUNNING_NODES'};
+      const packageRunning=node.HasRunningNodes(),sessionRunning=m.HasRunningNodes();
+      if (packageRunning !== false || sessionRunning !== false)
+        return {reason:'RUNNING_NODES',own_running:packageRunning===true&&sessionRunning===true};
       const modified = await m.FServerConnection.Session.IsPackageModified(node.Package);
       if (modified !== false && !(modified === true && o.diagnosticDiscard === true)) return {reason:'UNSAVED_CHANGES'};
       // Recheck identity after the server read. The native BeforeClose handler
@@ -208,12 +210,16 @@ async function closeOwnedPackage(page, options, deadline) {
     const idleDeadline = Math.min(deadline, Date.now()+timeoutMs);
     // Cold owns an isolated diagnostic session. Wait only for a blocked gate;
     // every read repeats the original guards and never dismisses a dialog.
-    while (options.diagnosticWaitForIdle && before.reason === 'DIALOG_OR_OPERATION_OPEN') {
+    // A known running state of the exact owned package may also settle within
+    // this cleanup call's original deadline. Unknown/foreign states cannot.
+    while (options.diagnosticWaitForIdle && before.reason === 'DIALOG_OR_OPERATION_OPEN'
+      ||before.reason==='RUNNING_NODES'&&before.own_running===true) {
       receipt.stage = 'idle_wait';
-      const left = idleDeadline-Date.now();
+      const waitDeadline=before.reason==='RUNNING_NODES'?deadline:idleDeadline;
+      const left = waitDeadline-Date.now();
       if (left <= 0) return finish('BLOCKED', before.reason);
       await page.waitForTimeout(Math.min(100, left));
-      if (Date.now() >= idleDeadline) return finish('BLOCKED', before.reason);
+      if (Date.now() >= waitDeadline) return finish('BLOCKED', before.reason);
       receipt.stage = 'close_request';
       before = await beginClose();
     }

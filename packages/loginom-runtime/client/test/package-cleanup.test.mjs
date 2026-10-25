@@ -154,6 +154,17 @@ test('cleanup refuses a replacement server session after '+changedAt+' for '+mod
  assert.equal(f.events.filter(e=>e==='close').length,1);assert.equal(f.events.includes('logout'),false);
 });
 
+test('D75 cleanup waits for confirmed own running package and rechecks identity before Close',async()=>{
+ for(const fault of [null,'foreign','unknown','expired']) {
+  const f=fixture({running:fault==='unknown'?undefined:true,timeoutMs:8000,
+   idleChange:fault==='expired'?{}:fault==='foreign'?{path:'/test-2/other.lgp'}:{running:false}});
+  const r=await f.run();
+  assert.equal(r.status,fault?'BLOCKED':'SUCCEEDED',fault);
+  assert.equal(f.events.filter(e=>e==='close').length,fault?0:1);
+  if(!fault){assert.ok(f.events.includes('idle-wait'));assert.equal(r.logged_out,true);}
+ }
+});
+
 for(const blocker of ['mask','dialog'])test('cold cleanup waits read-only for a transient '+blocker+' before one native close/logout',async()=>{
  const f=fixture({[blocker]:true,clearBlocker:true,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
  assert.equal(r.status,'SUCCEEDED');assert.equal(r.package_closed,true);assert.equal(r.logged_out,true);

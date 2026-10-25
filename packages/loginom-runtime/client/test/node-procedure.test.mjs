@@ -994,6 +994,38 @@ test('D74 receipt returning to graph cannot authorize another wizard during sett
  }
 });
 
+test('D75 launched own graph waits read-only through running epochs before console gesture',async()=>{
+ for(const fault of [null,'epoch','foreign','unknown','expired']) {
+  let time=1,mutatedAt,attempts=0,gestures=0;
+  const ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]},node={document_id:'doc',workflow_id:'wf',node_id:'node'};
+  const button={tid:'MF;cntMain;tlbMainToolbar;btnProgress',ref:'ui-progress',signature:{tag:'button'},allowed_actions:['click'],enabled:true};
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:ref,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+   prepared_node_context:{...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Import',locked:fault!=='epoch'},wizard:{status:'absent'},
+   ui:{elements:[{tid:'MF;cntMain;tlbMainToolbar',ref:'toolbar'},button],dialogs:[],masks:[],truncated:{dialogs:false,masks:false}}};
+  const operation={id:'parent',deadline:30000,action:{action_key:'node.apply',revision:'1'}};
+  const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:ref,node},targetOrigin:state.origin,targetBuild:state.loginom_build,
+   now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms;state.dom_epoch.revision++;
+    if((!fault||fault==='epoch')&&time>=25000)state.prepared_node_context.locked=false;
+    if(fault==='foreign')state.prepared_node_context.node_id='other';
+    if(fault==='unknown')delete state.prepared_node_context.locked;},record:async e=>structuredClone(e),
+   execute:async code=>{
+    if(typeof code==='string')return {status:'SUCCEEDED',output:structuredClone(state)};
+    attempts++;
+    if(fault==='epoch'&&attempts===1){state.prepared_node_context.locked=true;
+     return {status:'NOT_APPLIED',operation_id:code.reference.id,action_key:'ui.act',phase:'preconditions',cleanup_complete:true,effect_possible:false,
+      error:{code:'UI_EPOCH_CHANGED'},trace:[],output:structuredClone(state)};}
+    gestures++;return {status:'SUCCEEDED',operation_id:code.reference.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state};},
+   wrapMutation:(code,reference)=>{mutatedAt=time;return {code,reference}}});
+  const initial=await channel.observe({condition:'console button',readProcessControls:true,ready:()=>true});
+  const run=()=>channel.perform({condition:'execution control '+button.tid,initialObservation:initial,ready:()=>true,
+   settleProcessConsole:{ref:button.ref,signature:button.signature},identity:()=>node,resolve:()=>({verb:'click',ref:button.ref})});
+  if(fault&&!['epoch'].includes(fault))await assert.rejects(run());else{await run();assert.ok(mutatedAt>=25000);assert.equal(gestures,1);}
+  if(fault&&fault!=='epoch')assert.equal(mutatedAt,undefined);
+  assert.equal(attempts,fault==='epoch'?2:fault?0:1);
+  assert.equal(operation.deadline,30000);
+ }
+});
+
 test('bound completion gives mask settlement only the remaining parent deadline',async()=>{
   for(const verb of ['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views','finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column','click']) {
     const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};

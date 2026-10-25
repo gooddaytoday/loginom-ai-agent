@@ -635,10 +635,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             throw Error('Owned wizard loading context changed');
           if(ownWizardMask||returnedGraph&&ws.ui.masks.length){settlingWizard=expected;deadline=Math.min(operation.deadline,settleWizard?.deadline??Infinity);}
         }
-        if(settleProcessConsole&&(settlingConsole||result.output.ui.masks.length
+        if(settleProcessConsole&&(settlingConsole||result.output.prepared_node_context?.locked===true||result.output.ui.masks.length
           &&result.output.ui.elements.some(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress'))){
           const state=result.output,buttons=state.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress');
-          const owned=state.prepared_node_context?.surface==='graph'&&state.ui.dialogs.length===0
+          const owned=state.prepared_node_context?.surface==='graph'&&typeof state.prepared_node_context.locked==='boolean'&&state.ui.dialogs.length===0
             &&state.wizard?.status==='absent'&&buttons.length===1&&buttons[0].ref===settleProcessConsole.ref
             &&buttons[0].enabled===true&&buttons[0].allowed_actions.includes('click')
             &&JSON.stringify(canonical(buttons[0].signature))===JSON.stringify(canonical(settleProcessConsole.signature))
@@ -647,7 +647,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           if(!owned)throw Error('Owned process console settlement context changed');
           // Only the confirmed launch's own loading mask may outlive the local
           // readiness window. Keep the parent deadline and authorize no action.
-          if(state.ui.masks.length){settlingConsole=true;deadline=operation.deadline;}
+          if(state.ui.masks.length||state.prepared_node_context.locked){settlingConsole=true;deadline=operation.deadline;}
         }
         if(settleOutputPort){
           const state=result.output,context=state.prepared_node_context;
@@ -792,7 +792,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     // input never contains a resolver or a recipe. Only a durably recorded,
     // strictly pre-gesture epoch/scan refusal, owned busy mask or proved body replacement
     // permits a new local attempt with unchanged identity and intent.
-    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, processControl, preserveJoinMapping=false }) {
+    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, processControl, settleProcessConsole, preserveJoinMapping=false }) {
       if (typeof resolve !== 'function' || typeof identity !== 'function') {
         throw new Error('A bound action resolver and domain identity are required');
       }
@@ -836,6 +836,24 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           readProcessControls:initialObservation?.node_process_controls_read===true,
           readProcesses:initialObservation?.node_processes!==undefined,readOutputs:initialObservation?.node_outputs!==undefined,tableDialog:initialObservation?.node_table_dialog,
           tableFormatPage:initialObservation?.table_settings?.format?.page?{offset:initialObservation.table_settings.format.page.offset,limit:initialObservation.table_settings.format.page.limit}:undefined });
+        if(settleProcessConsole&&(observed.prepared_node_context?.surface!=='graph'
+          ||observed.prepared_node_context?.verified!==true||typeof observed.prepared_node_context.locked!=='boolean'))
+          throw Error('Running node console owner is unknown');
+        // Only the driver's succeeded launch opts in. Poll before a console
+        // gesture; keep the original deadline and every later epoch guard.
+        if(settleProcessConsole&&observed.prepared_node_context.locked===true){
+          const originalIdentity=digest(canonical(identity(observed)));
+          const originalAction=resolve(observed),button=observed.ui.elements.find(e=>e.ref===originalAction.ref);
+          if(originalAction.verb!=='click'||button?.tid!=='MF;cntMain;tlbMainToolbar;btnProgress'
+            ||button.ref!==settleProcessConsole.ref||digest(canonical(button.signature))!==digest(canonical(settleProcessConsole.signature)))
+            throw Error('Running node settlement requires its original console control');
+          observed=await channel.observe({condition:'launched own node stops repainting its console control',readProcessControls:true,
+            settleProcessConsole,ready:s=>s.prepared_node_context?.locked===false&&ready(s)});
+          const freshAction=resolve(observed);
+          if(digest(canonical(identity(observed)))!==originalIdentity||freshAction.verb!==originalAction.verb
+            ||freshAction.ref!==settleProcessConsole.ref)
+            throw Error('Running node console identity or intent changed');
+        }
         const action = resolve(observed), object = identity(observed);
         if (!object || typeof object !== 'object' || !Object.keys(object).length) {
           throw new Error('A nonempty domain identity is required');
