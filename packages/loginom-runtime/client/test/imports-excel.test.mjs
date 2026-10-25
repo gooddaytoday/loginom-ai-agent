@@ -8,6 +8,7 @@ import {NODE_TYPES} from '../lib/node-contracts.mjs';
 import {createCandidateNodeSupport} from '../lib/node-support.mjs';
 import {nodeApplyInputSchema,validateNodeApplyEnvelope} from '../lib/node-api.mjs';
 import {validateUiAction} from '../lib/workspace-ui.mjs';
+import {buildNodeReadRequest,alignReadSchema} from '../lib/node-read-contract.mjs';
 const request={inputs:[],mappings:[],finish:'execute',read:{ports:[0]}};
 const parameters={source:{artifact_id:'book',upload_operation_id:'upload'},excel:{source_path:'/worker/sales.xlsx',header_rows:1,
  columns:[{name:'Id',label:'Id',type:'integer'},{name:'Region',label:'Region',type:'string'},{name:'Amount',label:'Amount',type:'real'}]}};
@@ -67,15 +68,53 @@ for(const fault of ['covered','offscreen','disabled','persistent','owner','unkno
   assert.match(result.error,fault==='unknown_fill'?/Lost fill acknowledgement/:/Reached next step/);
  }
 });
-test('Excel readback requires verified commit and exact node ownership',()=>{
+function excelReadbackFixture(){
  const node={document_id:'doc',workflow_id:'workflow',node_id:'excel'};
- const c={verified:true,node_context:node,source:{source_path:'/worker/sales.xlsx'},columns:excelColumns(parameters.excel),auto_detect:'Нет'};
- const value={node,operation_id:'op',phases:[{phase:'configure',status:'verified',receipt_id:'op:configure',value:{configuration:c}},
-  {phase:'node_finish',status:'verified',receipt_id:'op:node_finish',value:{settings_applied:true,mode:'done',node_context:node}}]};
+ const owner={...node,verified:true},c={verified:true,node_context:owner,source:{source_path:'/worker/sales.xlsx'},columns:excelColumns(parameters.excel),auto_detect:'Нет'};
+ const fields=c.columns.map((f,index)=>({...f,index,record_id:'source-'+index}));
+ const mapping={verified:true,inventory_complete:true,source_identity_verified:true,autosync:true,mapping_wizard:'DataSetOutputSocketWizard',
+  node_context:{...owner,output_port:{direction:'output',port:0}},source_fields:fields,
+  target_fields:fields.map((f,index)=>({...f,record_id:'target-'+index,excluded:false,inherited:false,source:structuredClone(f)}))};
+ const values={configure:{configuration:c},node_finish:{settings_applied:true,mode:'done',node_context:owner},
+  output_mapping:{native_mapping:mapping,source_identity_verified:true,finish:{verified:true,cleanup_complete:true,settings_applied:true,mode:'done',node_context:owner}},
+  finish:{settings_applied:true,mode:'execute',node_context:owner}};
+ return {node,operation_id:'op',phases:Object.entries(values).map(([phase,value])=>({phase,status:'verified',receipt_id:'op:'+phase,value:{verified:true,cleanup_complete:true,...value}}))};
+}
+test('Excel readback requires verified commit and exact node ownership',()=>{
+ const value=excelReadbackFixture();
  assert.equal(excelReadback(value).kind,'excel_import');
  const foreign=structuredClone(value);foreign.phases[0].value.configuration.node_context={...foreign.node,node_id:'other'};
  assert.throws(()=>excelReadback(foreign),/owner differs/);
  value.phases[1].value.settings_applied=false;assert.throws(()=>excelReadback(value),/not committed/);
+});
+
+test('D61 successful Excel apply retains its actual output mapping for a further read',()=>{
+ const value=excelReadbackFixture(),before=structuredClone(value),readback=excelReadback(value);
+ const source={parameters:{contract_revision:'1.0.0',target:{type:'imports.excel'},workflow_ref:{workflow_id:'workflow'}},outcome:{status:'SUCCEEDED',cleanup_complete:true,
+  output:{node:value.node,cleanup_complete:true,execution:{status:'completed'},phases:value.phases.map(({value,...p})=>p),configuration:{status:'applied',readback},
+   output:{ports:[{port:0,schema:excelColumns(parameters.excel).map((f,index)=>({index,name:f.name,label:f.label,type:f.type,data_kind:f.data_kind}))}]}}}};
+ for(const preview of [true,false]){
+  const s=structuredClone(source);if(!preview)s.outcome.output.output.ports=[];
+  const request=buildNodeReadRequest({operation_id:'read-again',source_operation_id:'op',read:{ports:[0],sample_rows:100,require_exact_numbers:true}},s);
+  assert.deepEqual(request.parameters.schemas[0].schema,source.outcome.output.output.ports[0].schema);
+  assert.equal(request.target.kind,'existing');assert.equal(request.mode,'read_existing_output');
+  assert.throws(()=>alignReadSchema(request.parameters.schemas[0].schema.map(f=>({...f,type:'boolean'})),request.parameters.schemas[0].schema),/identity changed/);
+ }
+ assert.deepEqual(value,before);
+});
+
+for(const [fault,mutate] of Object.entries({
+ missingMapping:v=>v.phases.splice(2,1),missingFinish:v=>v.phases.pop(),duplicate:v=>v.phases.push(structuredClone(v.phases[2])),
+ receipt:v=>v.phases[2].receipt_id='foreign:output_mapping',unverified:v=>v.phases[2].status='pending',
+ cleanup:v=>v.phases[2].value.cleanup_complete=false,owner:v=>v.phases[2].value.native_mapping.node_context.node_id='foreign',
+ document:v=>v.phases[2].value.native_mapping.node_context.document_id='foreign',workflow:v=>v.phases[2].value.native_mapping.node_context.workflow_id='foreign',
+ port:v=>v.phases[2].value.native_mapping.node_context.output_port.port=1,inventory:v=>v.phases[2].value.native_mapping.inventory_complete=false,
+ source:v=>v.phases[2].value.native_mapping.target_fields[0].source.record_id='foreign',duplicateSource:v=>v.phases[2].value.native_mapping.target_fields[1].source=structuredClone(v.phases[2].value.native_mapping.source_fields[0]),
+ fieldOrder:v=>v.phases[2].value.native_mapping.target_fields.reverse(),fieldType:v=>v.phases[2].value.native_mapping.target_fields[0].type='string',
+ excluded:v=>v.phases[2].value.native_mapping.target_fields[0].excluded=true,
+ mappingFinish:v=>v.phases[2].value.finish.settings_applied=false,foreignFinish:v=>v.phases[3].value.node_context.node_id='foreign',
+}))test('D61 Excel output readback rejects '+fault,()=>{
+ const value=excelReadbackFixture();mutate(value);assert.throws(()=>excelReadback(value));
 });
 
 for(const expires of [false,true])test('Excel waits for the sheet field after setting the source, preserving earlier effects: '+expires,async()=>{
