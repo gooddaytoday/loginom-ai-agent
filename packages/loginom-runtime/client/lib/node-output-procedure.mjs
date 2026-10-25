@@ -335,7 +335,7 @@ export async function restoreTablePrecision(channel,proof) {
     ...(applied_format?{applied_format}:{})};
 }
 
-export async function prepareTableRead(channel,table) {
+export async function prepareTableRead(channel,table,{openFilter}={}) {
   const observe=(condition,ready)=>channel.observe({condition,readOutputs:true,ready});
   let s;
   for(const kind of ['nulls','data_types']) {
@@ -350,7 +350,8 @@ export async function prepareTableRead(channel,table) {
   }
   if(!s.ui.elements.some(e=>e.tid===table.table_tid+';btnDataGridFilter'))
     s=await observe('Table Filter available',s=>s.ui.elements.some(e=>e.tid===table.table_tid+';btnDataGridFilter'));
-  await channel.perform({condition:'open bound Table filter',initialObservation:s,ready:s=>s.ui.elements.some(e=>e.tid===table.table_tid+';btnDataGridFilter'),
+  if(openFilter)await openFilter({state:s,table});
+  else await channel.perform({condition:'open bound Table filter',initialObservation:s,ready:s=>s.ui.elements.some(e=>e.tid===table.table_tid+';btnDataGridFilter'),
     resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===table.table_tid+';btnDataGridFilter'),'Unique Table Filter required').ref}),identity:()=>({table})});
   const read=()=>channel.observe({condition:'Table filter setting ready',tableDialog:{table,kind:'filter'},ready:s=>s.table_settings?.filter?.enabled?.status==='observed'});
   s=await read();
