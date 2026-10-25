@@ -24,5 +24,17 @@ class FullReadTests(unittest.TestCase):
     def test_empty_requires_schema_and_exact_zero(self):
         r,e=self.fixture(0,10);e[0]['result']['output']['ports'][0]['schema']=[]
         self.assertFalse(verify_full_read(e,r,0)['passed'])
+    def test_filter_state_is_optional_only_for_port_reading(self):
+        cases=[(source,value,False) for source in (None,'unknown') for value in ('missing',None,0,'false',True)]
+        cases += [(source,False,True) for source in (None,'unknown')]
+        cases += [('completed_execution_port_source',value,True) for value in ('missing',None,0,'false',False)]
+        cases += [('completed_execution_port_source',True,False)]
+        for source,value,expected in cases:
+            with self.subTest(source=source,value=value):
+                r,e=self.fixture();port=e[0]['result']['output']['ports'][0]
+                if source:port['freshness_basis']=source
+                if value=='missing':del port['filter_enabled']
+                else:port['filter_enabled']=value
+                self.assertEqual(verify_full_read(e,r,8)['passed'],expected)
 
 if __name__=='__main__':unittest.main()

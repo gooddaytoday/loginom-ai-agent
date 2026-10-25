@@ -22,6 +22,8 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  const state=operation.nodeApply,node=state?.node;
  requireValue(state?.pending&&node&&!state.result,'Release requires an unresolved phase of a known node');
  requireValue(!operation.transportUncertain,'The last browser call has not confirmed completion; inspect the operation again later');
+ if(operation.portReadCleanupComplete!==undefined)requireValue(operation.portReadCleanupComplete===true,
+  'The last output-port read has no confirmed settled cleanup');
  if(operation.lastReceipt){
   const response=await readReceipt(operation.lastReceipt);
   requireValue(response?.state==='completed'&&response.receipt?.cleanup_complete===true,

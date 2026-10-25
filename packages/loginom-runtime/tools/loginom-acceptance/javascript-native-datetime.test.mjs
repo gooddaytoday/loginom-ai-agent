@@ -1,3 +1,4 @@
+import {alignReadSchema} from '../../client/lib/node-read-contract.mjs';
 import {createJavascriptMetadataLifecycle} from './javascript-native-metadata.mjs';
 import vm from 'node:vm';
 import test from 'node:test';
@@ -130,28 +131,62 @@ test('Date baseline digest tolerates normalized transport origin, never altered 
  assert.throws(()=>verifyNativeRoundtripOutcome(results,id),/baseline differs/);
 });
 
-for(const mode of ['absent','capture','restoration-fails','return-fails'])test('production import Table callback preserves public response and requires cleanup: '+mode,async()=>{
- const b=binding(),p=civil(b),r=p.receipts,events=[];
+test('native input value consumer accepts port source text and refuses altered fixture values',()=>{
+ const fixture=javascriptNativeFixture('string');
+ const table={row_count:fixture.rows,sample_rows:fixture.rows,sample_complete:true,freshness_basis:'completed_execution_port_source',precision:{numbers_verified:true,limitations:[]},limitations:[],
+  schema:[{name:'Value',label:'Value',type:'string'}],sample:fixture.values.map(value=>[{type:'string',value,is_null:value===null,
+   precision:value===null?'exact_null':'source_text',representation:'data_source_string'}])};
+ assert.equal(verifyNativeInputUi(table,'string').verified,true);
+ table.sample[1][0].value='changed';assert.throws(()=>verifyNativeInputUi(table,'string'));
+});
+
+for(const mode of ['pass','reordered'])test('production import reads the port without creating Table: '+mode,async()=>{
+ const b=binding(),r=civil(b).receipts,calls=[];
+ const columns=[{...r.raw.columns[0],data_kind:'Непрерывный'},{name:'Other',label:'Other',type:'string',data_kind:'Дискретный'}];
  const source=readFileSync(new URL('../../client/lib/text-import-node.mjs',import.meta.url),'utf8');
- const start=source.indexOf('      async readOutput(read,ctx) {'),end=source.indexOf('      async verifyContinuation',start);
- let captured;
- const run=onTableRead=>vm.runInNewContext('({'+source.slice(start,end)+'})',{
+ const start=source.indexOf('      async readOutput(read,ctx) {'),end=source.indexOf('      async releasePending',start);
+ const output={port:0,port_guid:'p',fresh:true,execution_id:b.execution.execution_id,
+  schema:(mode==='reordered'?columns.toReversed():columns).map((c,index)=>({...c,index,data_kind:'untrusted'})),sample_complete:true};
+ const runtime=vm.runInNewContext('({'+source.slice(start,end)+'})',{
   enter:()=>{},requireValue:(v,m)=>{if(!v)throw Error(m);},executionReceipt:b.completed_child,
-  outputColumns:r.raw.columns,channel:{},verified:x=>({verified:true,cleanup_complete:true,effect_possible:false,...x}),
-  openNewOutputTable:async()=>r.table_creation,configureTablePrecision:async()=>r.format_proof,
-  prepareTableRead:async()=>r.read_settings,readTableOutputPages:async()=>r.raw,decodeTableOutput,
-  restoreTablePrecision:async()=>{events.push('restore');if(mode==='restoration-fails')throw Error('restoration failed');return r.format_restoration;},
-  returnFromOutputTable:async()=>{events.push('return');if(mode==='return-fails')throw Error('return failed');return r.workflow_return;},onTableRead
- }).readOutput({ports:[0],sample_rows:3,require_exact_numbers:true},{execution:b.execution,receipt_id:'receipt'});
- const capture=receipts=>{events.push('capture');captured=clone(receipts);};
- if(mode.endsWith('fails')){await assert.rejects(()=>run(capture));assert.equal(captured,undefined);return;}
- const without=await run(undefined);events.length=0;
- const result=await run(mode==='capture'?capture:undefined);
- assert.equal(JSON.stringify(result),JSON.stringify(without));assert.equal(Object.hasOwn(result,'raw'),false);
- if(mode==='capture'){
-  assert.deepEqual(events,['restore','return','capture']);assert.deepEqual(captured,r);
-  assert.equal(verifyNativeCivil({...p,receipts:captured},nativeCivilExpectation(b,'input',f.sha256)).verified,true);
- }else assert.deepEqual(events,['restore','return']);
+  outputColumns:columns,channel:{readOutputPort:async options=>{calls.push(options);return {output};}},
+  verified:x=>({verified:true,cleanup_complete:true,effect_possible:false,...x}),alignReadSchema,
+  openNewOutputTable:()=>{throw Error('base import must not create Table');}
+ });
+ const run=()=>runtime.readOutput({ports:[0],sample_rows:3,require_exact_numbers:true},{execution:b.execution,receipt_id:'receipt'});
+ if(mode==='reordered'){await assert.rejects(run,/field order/);return;}
+ const result=await run();
+ assert.equal(calls.length,1);assert.equal(calls[0].execution,b.completed_child);
+ assert.equal(result.ports[0],output);assert.equal(Object.hasOwn(result,'table_creation'),false);
+ assert.deepEqual(output.schema.map(c=>c.data_kind),columns.map(c=>c.data_kind));
+});
+
+for(const mode of ['pass','bad-civil','restoration-fails','return-fails'])test('civil input driver obtains independent Table receipts without Execute replay: '+mode,async()=>{
+ const x=sourceEvidence(id),b=binding(),p=civil(b),r=p.receipts,steps=[];
+ let executeCount=0,captured;
+ const table={...decodeTableOutput(r.raw,{formatProof:r.format_proof,readSettings:r.read_settings,expectedColumns:r.raw.columns,requireExactNumbers:true}),port_guid:'p',freshness_basis:'completed_execution_port_source'};
+ delete table.filter_enabled;
+ const source=readFileSync(new URL('./javascript-native-input-driver.mjs',import.meta.url),'utf8');
+ const start=source.indexOf('export function createJavascriptNativeInputSupport');
+ const create=vm.runInNewContext('('+source.slice(start).replace('export function','function')+')',{
+  javascriptNativeFixture:()=>f,need:(v,m)=>{if(!v)throw Error(m);},structuredClone,verifyNativeInputUi,nativeInputProvenance,
+  createNodeProcedure:options=>{assert.equal(options.execute,x.execute);return {};},withBrowserReceipt:()=>{},
+  openNewOutputTable:async()=>{steps.push('table');return r.table_creation;},
+  configureTablePrecision:async()=>r.format_proof,prepareTableRead:async()=>r.read_settings,readTableOutputPages:async()=>{if(mode==='bad-civil'){const raw=clone(r.raw);raw.rows[1].cells[0].text='2024-02-29 23:59:58.123';return raw;}return r.raw;},
+  restoreTablePrecision:async()=>{steps.push('restore');if(mode==='restoration-fails')throw Error('restoration failed');return r.format_restoration;},returnFromOutputTable:async()=>{steps.push('return');if(mode==='return-fails')throw Error('return failed');return r.workflow_return;},
+  verifyNativeCivil:(actual,expected)=>{captured=actual;return verifyNativeCivil(actual,expected);}
+ });
+ const support=create({fixtureId:id,onProof:()=>{},onState:()=>{},
+  createSupport:config=>{assert.equal(Object.hasOwn(config,'onTableRead'),false);return {nodeApplyDriverFactory:()=>({finish:async()=>{executeCount++;},waitExecution:async()=>x.execution,readOutput:async()=>{steps.push('port');return {ports:[table]};}})};},
+  readNative:async({provenance})=>{assert.equal(provenance.civil,captured);steps.push('native');return {};}});
+ const driver=support.nodeApplyDriverFactory(x);
+ await driver.finish('execute',x.ctx);await driver.waitExecution(x.ctx);
+ const run=()=>driver.readOutput({ports:[0],sample_rows:3,require_exact_numbers:true},x.ctx);
+ if(mode!=='pass'){await assert.rejects(run);assert.equal(executeCount,1);assert.equal(steps.includes('native'),false);return;}
+ const output=await run();
+ assert.equal(executeCount,1);assert.equal(captured.receipts.raw.table.port_guid,output.ports[0].port_guid);
+ assert.deepEqual(clone(captured.receipts),r);assert.deepEqual(steps,['port','table','restore','return','native']);
+ await assert.rejects(()=>driver.readOutput({},x.ctx),/no replay/);
 });
 
 for(const mode of ['pass','bad-civil-ack','cache-changed','restoration-fails'])test('production private civil OUTPUT keeps cleanup/order and exact ACK: '+mode,async()=>{

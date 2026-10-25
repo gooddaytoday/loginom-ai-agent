@@ -1,3 +1,5 @@
+import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from '../../client/lib/node-output-procedure.mjs';
+import {readTableOutputPages} from '../../client/lib/table-output-pages.mjs';
 import {verifyNativeCivil,freezeCivilEvidence} from './javascript-native-datetime-civil.mjs';
 import {javascriptNativeFixture} from './javascript-native-fixtures.mjs';
 import {createHash} from 'node:crypto';
@@ -128,8 +130,7 @@ export async function readNativeInputDuringImport({options,ctx,provenance,target
 export function createJavascriptNativeInputSupport({targetOrigin,targetBuild,onProof,onState,fixtureId='real',
   createSupport=createTextImportNodeSupport,readNative=readNativeInputDuringImport}){
   const nativeInputFixture=javascriptNativeFixture(fixtureId);
-  let civilReceipts;
-  const support=createSupport({targetOrigin,targetBuild,...(fixtureId==='civil-datetime'?{onTableRead:receipts=>{need(!civilReceipts,'civil input already captured');civilReceipts=structuredClone(receipts);}}:{})});
+  const support=createSupport({targetOrigin,targetBuild});
   return {...support,nodeApplyDriverFactory:options=>{
     const base=support.nodeApplyDriverFactory(options);let executed=false,readStarted=false,execution;
     return {...base,
@@ -144,6 +145,17 @@ export function createJavascriptNativeInputSupport({targetOrigin,targetBuild,onP
         const ui=await base.readOutput(read,ctx);verifyNativeInputUi(ui.ports?.[0],fixtureId);
         const provenance=nativeInputProvenance({...options,ctx,execution,fixtureId});
         if(fixtureId==='civil-datetime'){
+          const channel=createNodeProcedure({operation:options.operation,execute:options.execute,record:options.onRecord,now:options.now,signal:ctx.signal,maxSteps:128,targetOrigin,targetBuild,
+            preparedNodeContext:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref,node:ctx.node},
+            wrapMutation:(code,r)=>withBrowserReceipt('('+code+')(page)',{...options.receiptOptions(r.id,r.action_key,r.signature),operation_id:r.id})});
+          const opened=await openNewOutputTable(channel,0),formatProof=await configureTablePrecision(channel,opened.table);
+          let raw,readSettings,formatRestoration;
+          try{
+            readSettings=await prepareTableRead(channel,opened.table);
+            raw=await readTableOutputPages(channel,opened.table,{sampleRows:read.sample_rows});
+          }finally{formatRestoration=await restoreTablePrecision(channel,formatProof);}
+          const workflowReturn=await returnFromOutputTable(channel,opened.table);
+          const civilReceipts={raw,table_creation:opened,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:workflowReturn};
           provenance.civil={role:'input',node:structuredClone(ctx.node),execution:structuredClone(execution),source_sha256:nativeInputFixture.sha256,receipts:civilReceipts};
           verifyNativeCivil(provenance.civil,{role:'input',node:ctx.node,execution,portGuid:ui.ports[0].port_guid,sourceSha256:nativeInputFixture.sha256});
         }

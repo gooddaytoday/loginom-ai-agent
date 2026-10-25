@@ -107,7 +107,8 @@ function tableCsv(output: ObjectValue, execution: string, node: ObjectValue, id:
     if (names.length!==contract.keys.length+fields.length || !fields.every(f=>names.includes(f.field)) || port.category_fields?.length!==fields.length ||
       !fields.every(f=>port.category_fields.filter((c:ObjectValue)=>c.category===f.category && c.category_kind==="value" && c.fact==="Amount" && c.function===f.fn && c.field===f.field && c.type==="real" && c.label===port.schema.find((s:ObjectValue)=>s.name===f.field)?.label).length===1)) return null
   } else if(names.length!==3 || !["Region","A","B"].every(n=>names.includes(n))) return null
-  if(completeReread && !native && (output.workflow_returned!==true || !port.port_guid || port.table?.port_guid!==port.port_guid)) return null
+  if(completeReread && !native && (!port.port_guid || (port.freshness_basis!=="completed_execution_port_source" &&
+    (output.workflow_returned!==true || port.table?.port_guid!==port.port_guid || port.freshness_basis!==undefined)))) return null
   if (native && (identity(port.binding) !== identity(node) || port.binding?.port_guid !== port.port_guid ||
     port.binding?.execution?.execution_id !== execution || port.binding?.execution?.status !== "completed" ||
     port.read_coverage?.table_complete !== true || port.read_coverage.rows_read !== rows.length ||

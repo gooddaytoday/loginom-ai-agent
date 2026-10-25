@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {createNodeReadDrivers} from '../lib/node-read-driver.mjs';
+import {resolveCrossTableSchema} from '../lib/crosstable-schema.mjs';
 import {buildNodeReadRequest,alignReadSchema} from '../lib/node-read-contract.mjs';
 import {applyNode,releaseNodeApply,validateNodeApplyRequest} from '../lib/node-apply.mjs';
 import {dispatchNodeApi,nodeApiTools} from '../lib/node-api.mjs';
@@ -10,6 +13,55 @@ const schema=[{index:0,name:'value',label:'Value',type:'real'}];
 const source=()=>({parameters:{contract_revision:'1.0.0',target:{type:'transform.calculator',label:'Calculation'},workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;path',label:'Scenario'}]}},outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node,cleanup_complete:true,execution:{status:'completed'},output:{ports:[{port:0,schema}]}}}});
 const args={operation_id:'read',source_operation_id:'created',read:{sample_rows:100,require_exact_numbers:true}};
 const handlers=new Map([['transform.calculator',{revision:'1',modes:['expression'],validate(){throw Error('Configuration validation must not run');},configure(){throw Error('Configuration must not run');},configurationReadback(){throw Error('No configuration readback');}}]]);
+function portReadFixture(request,output){
+ const calls=[];let tableActions=0;
+ const execution={verified:true,owner_verified:true,cleanup_complete:true,status:'completed',execution_id:'fresh',process_id:'1.1',process_record_id:'child'};
+ const table=()=>{tableActions++;throw Error('Reread must not open Table or wizards');};
+ const channel={async readOutputPort(options){calls.push(options);return {output};},observe:table,perform:table};
+ const create=vm.runInNewContext('('+createNodeReadDrivers.toString()+')',{
+  createNodeProcedure:()=>channel,createNodeExecutionProcedure:()=>({async prepare(){},async waitCompleted(){return execution;}}),
+  finishConfiguredGraph:async()=>({verified:true,cleanup_complete:true,execution_id:'fresh'}),
+  need:(ok,message)=>{if(!ok)throw Error(message);},verified:value=>({verified:true,cleanup_complete:true,...value}),
+  alignReadSchema,resolveCrossTableSchema,openNewOutputTable:table,
+ });
+ const driver=create({operation:{id:'read',parameters:request},now:()=>1},{});
+ const ctx={node,execution:{execution_id:'fresh'},portExecution:{execution_id:'foreign-shell'},receipt_id:'read',deadline:1000};
+ return {async run(){await driver.finishGraph('execute',ctx);await driver.waitExecution(ctx);return driver.readOutput(request.read,ctx);},calls,execution,get tableActions(){return tableActions;}};
+}
+test('production reread uses its own completed execution and retained mapping without Table',async()=>{
+ const request=buildNodeReadRequest(args,source());
+ request.parameters.schemas[0].schema[0].data_kind='Непрерывный';
+ const output={port:0,port_guid:'p',fresh:true,freshness_basis:'completed_execution_port_source',execution_id:'fresh',schema,
+  row_count:0,sample_rows:0,sample_complete:true,sample:[],limitations:['zero_rows']};
+ const f=portReadFixture(request,output),result=await f.run();
+ assert.equal(f.calls[0].execution,f.execution);assert.equal(f.calls[0].port,0);
+ assert.equal(result.ports[0].schema[0].data_kind,'Непрерывный');assert.equal(f.tableActions,0);
+});
+test('production sliding CrossTable reread resolves fresh categories from observed output schema',async()=>{
+ const request=buildNodeReadRequest(args,source());request.target.type='transform.cross_table';
+ const configuration={kind:'crosstable',category_mode:'sliding',row_keys:[{name:'Region',label:'Region',type:'string'}],
+  column:{name:'Category',label:'Category',type:'string'},facts:[{name:'Amount',label:'Amount',type:'real',functions:['sum']}],
+  options:{separator:'|',unique_names:true,limit:0,min_values:0}};
+ request.parameters.cross_table_policy={kind:'crosstable_sliding',node,port_guid:'cross0',source_execution_id:'old',configuration};
+ const columns=[{index:0,name:'Region',label:'Region',type:'string'},...['B','C'].map((name,index)=>({index:index+1,name,label:name,type:'real'}))];
+ const output={port:0,port_guid:'cross0',fresh:true,freshness_basis:'completed_execution_port_source',execution_id:'fresh',schema:columns,
+  row_count:0,sample_rows:0,sample_complete:true,sample:[],limitations:['zero_rows']};
+ const f=portReadFixture(request,output),result=await f.run();
+ assert.equal(f.calls[0].execution,f.execution);assert.notEqual(f.execution.execution_id,request.parameters.cross_table_policy.source_execution_id);
+ assert.deepEqual(result.ports[0].category_fields,resolveCrossTableSchema(columns,configuration).category_fields);
+ assert.equal(result.ports[0].port_guid,request.parameters.cross_table_policy.port_guid);assert.equal(f.tableActions,0);
+ for(const change of [r=>r.parameters.cross_table_policy.source_execution_id='fresh',r=>r.parameters.cross_table_policy.port_guid='foreign',
+  r=>r.parameters.cross_table_policy.node={...node,node_id:'foreign'}]){
+  const changed=structuredClone(request);change(changed);await assert.rejects(()=>portReadFixture(changed,output).run(),/owner\/port differs/);
+ }
+});
+test('production reread preserves NODE_READ_SCHEMA_CHANGED for changed name label and type',async()=>{
+ const request=buildNodeReadRequest(args,source());
+ for(const field of [{...schema[0],name:'Changed'},{...schema[0],label:'Changed'},{...schema[0],type:'string'}]){
+  const output={port:0,port_guid:'p',schema:[field],sample_complete:true};
+  await assert.rejects(()=>portReadFixture(request,output).run(),error=>error.code==='NODE_READ_SCHEMA_CHANGED'&&/NEW dock_node_apply/.test(error.message));
+ }
+});
 test('read API accepts only local operation identity and bounded reading options',async()=>{
  const calls=[],runtime={tools:nodeApiTools,startNodeRead:a=>{calls.push(a);return a;}};
  await dispatchNodeApi(runtime,'dock_node_read',args);assert.deepEqual(calls,[args]);
@@ -35,7 +87,7 @@ test('JavaScript output reread refuses until it can verify the effective source'
 test('host reread allowance reaches every phase while full diagnostic defaults and explicit budgets remain unchanged',()=>{
  const s=source(),before=structuredClone(s),expanded=createUserWorkflowBindings().expandNodeRead(args);
  const request=buildNodeReadRequest(expanded,s);validateNodeApplyRequest(request,handlers);
- assert.deepEqual(request.budgets,{configure_ms:600000,execute_ms:600000,total_ms:600000});
+ assert.deepEqual(request.budgets,{configure_ms:300000,execute_ms:300000,total_ms:300000});
  assert.deepEqual(request.read,{ports:[0],sample_rows:100,require_exact_numbers:true});
  assert.deepEqual(s,before);
  for(const budget of [undefined,60000]){
@@ -43,16 +95,22 @@ test('host reread allowance reaches every phase while full diagnostic defaults a
   assert.deepEqual(explicit.budgets,{configure_ms:budget??300000,execute_ms:budget??300000,total_ms:budget??300000});
  }
 });
-test('read lifecycle skips every configuration phase and retries without another launch',async()=>{
- const request=buildNodeReadRequest(args,source()),operation={id:'read'},calls=[];
+for(const expired of [false,true])test('read lifecycle skips configuration and never relaunches after retry or expiry '+expired,async()=>{
+ const request=buildNodeReadRequest(createUserWorkflowBindings().expandNodeRead(args),source()),operation={id:'read'},calls=[];let time=1;
  const result=(phase,value={})=>async()=>{calls.push(phase);return {verified:true,cleanup_complete:true,effect_possible:false,...value};};
  const forbidden=()=>{throw Error('Wizard or mapping touched');};
  const drivers={verifySource:result('source'),prepareTarget:result('target',{node}),openWizard:forbidden,mapPorts:forbidden,finish:forbidden,
   finishGraph:result('finish',{mode:'execute',execution_id:'exec',settings_applied:false}),
   waitExecution:result('execute',{execution_id:'exec',status:'completed'}),
-  readOutput:result('read',{execution_id:'exec',status:'complete',evidence_ref:'read:output',ports:[{port:0,fresh:true}]}),verifyContinuation:async()=>false};
- const run=()=>applyNode({request,operation,handlers,drivers,record:async e=>structuredClone(e)});
- const out=await run();assert.equal(out.status,'SUCCEEDED',JSON.stringify(out));assert.equal(out.configuration.status,'not_requested');
+  readOutput:async(...params)=>{if(expired)time=300002;return result('read',{execution_id:'exec',status:'complete',evidence_ref:'read:output',ports:[{port:0,fresh:true}]})(...params);},verifyContinuation:async()=>false};
+ const run=()=>applyNode({request,operation,handlers,drivers,record:async e=>structuredClone(e),now:()=>time});
+ const out=await run();
+ if(expired){
+  assert.equal(out.status,'AMBIGUOUS');assert.match(out.error.message,/deadline/);
+  await assert.rejects(run,/Explicit inspected resume is required/);
+  assert.equal(operation.nodeApply.deadline,300001);assert.deepEqual(calls,['source','target','finish','execute','read']);return;
+ }
+ assert.equal(out.status,'SUCCEEDED',JSON.stringify(out));assert.equal(out.configuration.status,'not_requested');
  assert.deepEqual(calls,['source','target','finish','execute','read']);assert.deepEqual(await run(),out);assert.equal(calls.length,5);
 });
 test('field reordering preserves identity while type, label, missing and repeated fields refuse',()=>{
