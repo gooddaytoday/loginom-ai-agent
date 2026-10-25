@@ -36,7 +36,9 @@ export function boundWizardCloseConfirmation(state,binding,requireControls=true)
 }
 
 export function boundInputMappingConflict(state,binding,requireControls=true) {
- if(!binding?.owner?.input_port||!wizardCloseDialogOwner(state,binding))return false;
+ const nodeInput=binding?.stage==='input_mapping'&&binding.owner?.status==='observed'
+  &&!state.prepared_node_context?.input_port&&!state.prepared_node_context?.output_port;
+ if(!(binding?.owner?.input_port||nodeInput)||!wizardCloseDialogOwner(state,binding))return false;
  const ui=state.ui,dialog=ui.dialogs[0];
  if(state.loginom_build!=='7.4.2'||dialog.title!=='Loginom 7.4.2'
   ||dialog.text!=='Loginom 7.4.2 Обнаружены связи с несуществующими объектами. Вы хотите удалить все потерянные связи и продолжить? Удалить и продолжить Не удалять и продолжить Отмена')return false;

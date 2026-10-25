@@ -4383,10 +4383,14 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
   const binding={verified:true,surface:'wizard',document_id:'doc',workflow_id:'flow',node_id:'node',
     input_port:{direction:'input',port:mode==='wrong_port'?1-port:mode==='unknown_port'?2:port,native_index:mode==='wrong_native_index'?1-port:port,port_guid:'input-'+port,opening_operation_id:'join-open-'+port,node_icon_class:nodeIcon}};
   if(mode==='missing_native_icon')delete binding.input_port.node_icon_class;
+  if(mode==='missing_guid')delete binding.input_port.port_guid;
+  if(mode==='missing_opening')delete binding.input_port.opening_operation_id;
   if(mode==='wrong_native_icon')binding.input_port.node_icon_class='bg-vendor-icon-unknown';
-  if(mode.startsWith('d52_'))binding.navigation_node={tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()};
+  if(mode.startsWith('d52_')||vendor==='javascript')binding.navigation_node={tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()};
   if(mode==='d52_foreign_node')binding.node_id='foreign';
   if(mode==='d52_foreign_path')binding.navigation_node.tid+='-foreign';
+  if(mode==='d52_foreign_label')binding.navigation_node.label+=' foreign';
+  if(mode==='d52_no_navigation')delete binding.navigation_node;
   if(mode==='d52_no_opening')delete binding.input_port.opening_operation_id;
   if(mode==='d52_no_guid')delete binding.input_port.port_guid;
   if(mode==='d52_other_port')binding.input_port.port=1;
@@ -4426,6 +4430,33 @@ test('JavaScript input0 overflow preserves the owned typed close confirmation',a
   assert.equal(yes?.allowed_actions.includes('confirm_wizard_close')===true,accepted,mode);
   if(accepted)assert.doesNotThrow(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},snapshot));
   else if(yes)assert.throws(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},snapshot),/UI reference/);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+test('D47b owned JS input0 keeps context when the node caption itself overflows',async()=>{
+ for(const mode of ['valid','wrong_port','wrong_native_index','missing_native_icon','wrong_native_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor','missing_guid','missing_opening','hidden_visibility','hidden_attribute','zero_opacity','duplicate_icon','secret_node']) {
+  const {page}=await joinInputPortOverflowFixture(mode,0,'javascript');
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0];
+  page.add('div','MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;rbTable','',undefined,wizard).attrs.class='x-form-cb-checked';
+  page.add('div','MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;rbLinks','',undefined,wizard);
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  for(const i of [5,6]){crumbs[i].style.display='none';crumbs[i].box={x:0,y:0,width:0,height:0};for(const icon of crumbs[i].children)icon.box={x:0,y:0,width:0,height:0};}
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='hidden_visibility')crumbs[5].style.visibility='hidden';
+  if(mode==='hidden_attribute')crumbs[5].attrs.hidden='';
+  if(mode==='zero_opacity')crumbs[5].style.opacity='0';
+  if(mode==='duplicate_icon')page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[5]).attrs.class='bg-vendor-icon-javascript';
+  if(mode==='secret_node')crumbs[5].attrs['aria-label']='password';
+  const observed=await page.execute({mode:'observe'});
+  if(observed.status!=='SUCCEEDED'){assert.equal(mode==='valid',false,mode);continue;}
+  const full=observed.output;
+  assert.equal(full.wizard.input_port_context?.status==='observed',mode==='valid',mode);
+  if(mode==='valid'){
+   const narrow=await page.execute({mode:'observe',root_ref:full.wizard.root_ref});
+   assert.deepEqual(narrow.output.wizard.input_port_context,full.wizard.input_port_context);
+   assert.equal(full.ui.elements.some(e=>e.tid===crumbs[5].attrs['data-tid']&&e.allowed_actions.length>0),false);
+  }
   assert.deepEqual(page.events,[]);
  }
 });
@@ -4795,6 +4826,35 @@ async function restInputPortOverflowFixture() {
   return fixture;
 }
 
+test('D47b native REST input0/index2 keeps hidden node and folder context',async()=>{
+ for(const mode of ['valid','missing_opening','foreign_port','wrong_port','wrong_native_index','wrong_icon','wrong_caption','foreign_path','hidden_panel','hidden_workflow','missing_icon','hidden_visibility','hidden_attribute','zero_opacity','secret_node','duplicate_icon','wrong_folder']){
+  const {page,binding,crumbs,panel,opening,preparation}=await restInputPortOverflowFixture();
+  opening.node.FIconCls='bg-vendor-icon-restclient';
+  for(const i of [5,6]){crumbs[i].style.display='none';crumbs[i].box={x:0,y:0,width:0,height:0};for(const icon of crumbs[i].children)icon.box={x:0,y:0,width:0,height:0};}
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='missing_opening')preparation.inputPortOpenReceipts.clear();
+  if(mode==='foreign_port')opening.port.FGuid='foreign';
+  if(mode==='wrong_port')opening.portIndex=1;
+  if(mode==='wrong_native_index'){opening.nativeIndex=1;opening.portTree.FIndex=1;opening.port.FPortIndex=1;}
+  if(mode==='wrong_icon')crumbs[5].children[0].attrs.class='bg-vendor-icon-calcdata';
+  if(mode==='wrong_caption')crumbs[7].ownText='Источник данных запроса 2';
+  if(mode==='foreign_path')crumbs[7].attrs['data-tid']=crumbs[7].attrs['data-tid'].replace('TF-5','TF-3');
+  if(mode==='hidden_panel')panel.style.display='none';
+  if(mode==='hidden_workflow')crumbs[4].style.display='none';
+  if(mode==='missing_icon')crumbs[8].children[0].remove();
+  if(mode==='hidden_visibility')crumbs[5].style.visibility='hidden';
+  if(mode==='hidden_attribute')crumbs[5].attrs.hidden='';
+  if(mode==='zero_opacity')crumbs[5].style.opacity='0';
+  if(mode==='secret_node')crumbs[5].attrs['aria-label']='password';
+  if(mode==='duplicate_icon')page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[5]).attrs.class='bg-vendor-icon-restclient';
+  if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
+  const result=await page.execute({mode:'observe',prepared_node_context:binding});
+  if(result.status==='SUCCEEDED')assert.equal(result.output.wizard.input_port_context?.status==='observed',mode==='valid',mode);
+  else assert.notEqual(mode,'valid',mode);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('owned REST input recognizes its request-data caption in breadcrumb overflow',async()=>{
   const {page,binding}=await restInputPortOverflowFixture();
   const full=await page.execute({mode:'observe',prepared_node_context:binding});
@@ -4891,6 +4951,59 @@ function lostLinksPrompt(page,mode='lost_links') {
   }
   return prompt;
 }
+
+test('saved Join Next preserves links only for its exact owned question, with no repeated gesture',async()=>{
+ for(const fault of ['none','delayed','no-private-read','other-question','foreign-node','foreign-owner','busy','lost-reply','repeat','epoch']){
+  const clock=fixtureClock(),page=new Page({clock:clock.Date}),c=wizardStepFixture(page);
+  c.form.box={x:48,y:71,width:1232,height:729};c.button.box={x:1208,y:380,width:64,height:64};
+  page.app.Version='7.4.2';
+  page.context.innerWidth=1280;page.context.innerHeight=800;page.viewportSize=()=>({width:1280,height:800});
+  c.marker.attrs['data-tid']=c.base+';TuneDataSourceInputPortWizard;btnAddMappingColumn';
+  const panel=page.add('div','MF;TF-1;NavigationBar;NavigationPanel','',{x:48,y:35,width:1232,height:36});let path='';
+  for(const [label,icon] of [['Сервер',''],['Пакеты',''],['Package1',''],['Модуль1',''],['Сценарий','maptree-icon-workflow'],['Join','bg-vendor-icon-joindata'],['Настройка','maptree-icon-wizard']]){
+   path+=(path?'>':'')+label;const crumb=page.add('a','MF;TF-1;cnrNaviMode;b.s_'+path,label,{x:50+panel.children.length*100,y:40,width:90,height:22},panel);
+   if(icon)page.add('span',null,'',undefined,crumb).attrs.class=icon;
+  }
+  let prompt,clicks=0,pendingPrompt=false;
+  const native=async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:fault==='foreign-node'&&prompt?'other':'node',surface:'wizard',tid:c.base});
+  const execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:'7.4.2',expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},native));
+  const snapshot=(await execute({mode:'observe'})).output;
+  assert.equal(snapshot.wizard.owner_context.status,'observed');
+  const next=snapshot.ui.elements.find(e=>e.wizard_step);
+  const showPrompt=()=>{prompt=lostLinksPrompt(page,fault==='other-question'?'lost_links_text':'lost_links');
+    prompt.children[0].ownText='Loginom 7.4.2';
+    c.form.attrs.class='bg-mask-message';
+    if(fault==='foreign-owner')panel.children.at(-2).ownText='Other';
+    if(fault==='busy')page.add('div',null,'Loading').attrs.class='x-mask-msg';
+  };
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{
+   await click(...args);clicks++;
+   if(clicks===1){if(fault==='delayed')pendingPrompt=true;else showPrompt();}
+   else{
+    const no=page.document.querySelectorAll('[data-tid="msgbox;tlb;no"]')[0];
+    assert.ok(args[0]>=no.box.x&&args[0]<=no.box.x+no.box.width,'must answer No, never delete links');
+    if(fault==='lost-reply')throw Error('Lost No reply');
+    if(fault==='repeat')return;
+    prompt.remove();c.form.attrs.class='';c.marker.remove();page.add('div',c.base+';JoinDataWizard;grdSourceColumns;tbl','',undefined,c.form);
+   }
+  };
+  page.waitForTimeout=async ms=>{clock.advance(ms);if(pendingPrompt){pendingPrompt=false;showPrompt();}};
+  if(fault==='epoch'){
+   const evaluate=page.evaluate.bind(page);page.evaluate=(fn,arg)=>{
+    if(prompt&&fn.toString().includes('state.captureMutations(state.observer.takeRecords());')&&fn.toString().includes('return {document:state.epoch'))
+     page.mutationObserver.pending.push({type:'attributes',target:prompt,attributeName:'class'});
+    return evaluate(fn,arg);
+   };
+  }
+  const result=await execute({mode:'act',operation_id:'saved-next',snapshot,action:{verb:'wizard_step',ref:next.ref,expected_stage:'join'},
+   ...(fault==='no-private-read'?{}:{preserve_join_mapping:true})});
+  assert.equal(result.status,['none','delayed'].includes(fault)?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
+  assert.equal(clicks,['none','delayed','lost-reply','repeat'].includes(fault)?2:1,fault);
+  if(['none','delayed'].includes(fault))assert.equal(result.output.wizard.stage,'join');
+  assert.equal(result.trace.filter(e=>e.event==='saved_join_mapping_preserved').length,['none','delayed','repeat'].includes(fault)?1:0,fault);
+ }
+});
 async function inputPortFinishFixture(mode='valid') {
   const clock=fixtureClock(),f=await inputMappingLiveFixture(false,clock.Date),{page,owner,base,nodes}=f;
   const {inputPortBreadcrumbs}=await import('./input-port-breadcrumbs.fixture.mjs');
@@ -5087,6 +5200,36 @@ test('node overview rejects incomplete foreign clipped and unowned icon breadcru
     const {page}=await nodeOverviewContextFixture(mode);assert.notEqual((await page.observe()).node_context.status,'observed',mode);
   }
 });
+test('D47b native JS overview does not become a false workflow when its caption overflows',async()=>{
+ for(const mode of ['bound','unbound','foreign_tid','foreign_label','foreign_icon','hidden','hidden_attribute','zero_opacity','secret','duplicate_icon','duplicate_panel']) {
+  const {page,panel}=await nodeOverviewContextFixture(mode==='duplicate_panel'?mode:'valid');
+  const crumb=panel.children.at(-1),caption='URL query encoding '+('a'.repeat(32)),key=caption.replaceAll(' ','_');
+  crumb.attrs['data-tid']=crumb.attrs['data-tid'].replace(/Изменение$/,key);crumb.ownText=caption;
+  crumb.style.display='none';crumb.box={x:0,y:0,width:0,height:0};
+  crumb.children[0].attrs.class=mode==='foreign_icon'?'bg-vendor-icon-reformcolumns':'bg-vendor-icon-javascript';
+  crumb.children[0].box={x:0,y:0,width:0,height:0};
+  if(mode==='hidden')crumb.style.visibility='hidden';
+  if(mode==='hidden_attribute')crumb.attrs.hidden='';
+  if(mode==='zero_opacity')crumb.style.opacity='0';
+  if(mode==='secret')crumb.attrs['aria-label']='password';
+  if(mode==='duplicate_icon')page.add('span',null,'',{x:0,y:0,width:0,height:0},crumb).attrs.class='bg-vendor-icon-javascript';
+  const workflowPath=panel.children.slice(0,5).map(e=>({tid:e.attrs['data-tid'],label:e.ownText.trim()}));
+  const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:workflowPath}};
+  const reader=async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'graph',tid:'MF;TF-5;Graph;'+key,
+   ...(mode==='unbound'?{}:{navigation_node:{tid:mode==='foreign_tid'?crumb.attrs['data-tid']+'-foreign':crumb.attrs['data-tid'],label:mode==='foreign_label'?'Foreign':caption}})});
+  const result=await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:binding},reader);
+  assert.equal(result.output.node_context?.status==='observed',mode==='bound',mode);
+  if(mode!=='unbound')assert.notEqual(result.output.navigation_context.status,'observed',mode+' must not claim workflow');
+  if(mode==='bound'){
+   assert.equal(result.output.node_context.node.label,caption);
+   assert.equal(result.output.node_context.path.length,6);
+   assert.ok(result.output.workflow_navigation.control_ref);
+   assert.equal(result.output.ui.elements.some(e=>e.tid===crumb.attrs['data-tid']&&e.allowed_actions.length>0),false);
+  }
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('prepared node overview binds a multiline automatic key without trusting collapsed label text',async()=>{
  for(const mode of ['bound','unbound','foreign_key']) {
   const {page,panel}=await nodeOverviewContextFixture(),crumb=panel.children.at(-1);
@@ -5354,9 +5497,10 @@ test('overflow output socket requires a current native owner and visible actiona
     const raw=await page.execute({mode:'observe'});
     if(mode==='stale_owner'){assert.notEqual(raw.status,'SUCCEEDED');assert.equal(raw.error.code,'PREPARED_NODE_CONTEXT_CHANGED');continue;}
     assert.equal(raw.status,'SUCCEEDED',mode);
+    const accepted=['valid','bound_folder'].includes(mode)||vendor==='javascript'&&mode==='bound_folder_hidden_owner';
     const controls=raw.output.ui.elements.filter(e=>e.allowed_actions.includes('finish_wizard'));
-    assert.equal(controls.length,['valid','bound_folder'].includes(mode)?1:0,vendor+': '+socketIcon+': '+mode);
-    if(['valid','bound_folder'].includes(mode)){assert.equal(raw.output.wizard.port_context.status,'observed');assert.equal(controls[0].wizard_finish.mode,'output_port');}
+    assert.equal(controls.length,accepted?1:0,vendor+': '+socketIcon+': '+mode);
+    if(accepted){assert.equal(raw.output.wizard.port_context.status,'observed');assert.equal(controls[0].wizard_finish.mode,'output_port');}
     if(['javascript','joindata'].includes(vendor)&&mode.startsWith('bound_folder')) {
       const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
       page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
@@ -5365,8 +5509,8 @@ test('overflow output socket requires a current native owner and visible actiona
       page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
       const snapshot=(await page.execute({mode:'observe'})).output;
       const yes=snapshot.ui.elements.find(e=>e.tid==='msgbox;tlb;yes');
-      assert.equal(!!yes.wizard_close_confirmation?.output_port,mode==='bound_folder',mode);
-      if(mode==='bound_folder') {
+      assert.equal(!!yes.wizard_close_confirmation?.output_port,accepted,mode);
+      if(accepted) {
         assert.doesNotThrow(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},snapshot));
         const duplicate=structuredClone(snapshot);duplicate.ui.elements.push(structuredClone(yes));
         assert.throws(()=>validateUiAction({verb:'confirm_wizard_close',ref:yes.ref},duplicate),/UI reference/);
@@ -5374,6 +5518,38 @@ test('overflow output socket requires a current native owner and visible actiona
     }
     assert.equal(page.events.filter(e=>e==='click').length,0,mode);
   }
+});
+
+test('D47b hidden JS output0 node keeps its owned socket context and typed Close',async()=>{
+ for(const mode of ['valid','missing_guid','missing_opening','wrong_index','wrong_port','wrong_icon','hidden_visibility','hidden_attribute','zero_opacity','secret','duplicate_icon','wrong_path','unbound']) {
+  const {page}=outputPortFinishFixture();
+  const find=suffix=>page.document.all().find(e=>e.attrs['data-tid']?.endsWith(suffix));
+  const node=find('>Calc'),folder=find('>Outputs'),socket=find('>Result'),settings=find('>Settings');
+  for(const e of page.document.all())if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('>Outputs','>Выходные_порты').replace('>Settings','>Настройка');
+  folder.ownText='Выходные порты';settings.ownText='Настройка';node.children[0].attrs.class='bg-vendor-icon-javascript';
+  for(const e of [node,folder,socket,settings]){e.style.display='none';e.box={x:0,y:0,width:0,height:0};for(const icon of e.children)icon.box={x:0,y:0,width:0,height:0};}
+  const port={direction:'output',port:0,native_index:0,port_guid:'out-guid',opening_operation_id:'open-output',node_icon_class:'bg-vendor-icon-javascript'};
+  if(mode==='missing_guid')delete port.port_guid;
+  if(mode==='missing_opening')delete port.opening_operation_id;
+  if(mode==='wrong_index')port.native_index=1;
+  if(mode==='wrong_port')port.port=1;
+  if(mode==='wrong_icon')node.children[0].attrs.class='bg-vendor-icon-calcdata';
+  if(mode==='hidden_visibility')node.style.visibility='hidden';
+  if(mode==='hidden_attribute')node.attrs.hidden='';
+  if(mode==='zero_opacity')node.style.opacity='0';
+  if(mode==='secret')node.attrs['aria-label']='password';
+  if(mode==='duplicate_icon')page.add('span',null,'',{x:0,y:0,width:0,height:0},node).attrs.class='bg-vendor-icon-javascript';
+  if(mode==='wrong_path')folder.attrs['data-tid']=folder.attrs['data-tid'].replace('>Calc>','>Foreign>');
+  const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{mode:'observe',expected_build:build,expected_origin:origin,...(mode==='unbound'?{}:{prepared_node_context:binding}),...options},async()=>({verified:true,surface:'wizard',node_id:'node',output_port:port})));
+  const snapshot=(await page.execute({})).output;assert.equal(snapshot.wizard.port_context?.status==='observed',mode==='valid',mode);
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const confirmation=(await page.execute({})).output,yes=confirmation.ui.elements.find(e=>e.tid==='msgbox;tlb;yes');
+  assert.equal(!!yes?.wizard_close_confirmation?.output_port,mode==='valid',mode);
+  assert.deepEqual(page.events,[]);
+ }
 });
 
 test('typed output-port finish confirms one gesture and quiet return to the exact graph',async()=>{
@@ -6179,7 +6355,9 @@ test('file row gestures recheck the visible point when the center is covered',as
 async function cancelProcessFixture() {
   const {readFileSync}=await import('node:fs');
   const source=JSON.parse(readFileSync(new URL('./fixtures/process-console-run15.json',import.meta.url),'utf8'));
-    const page=new Page();page.context.innerWidth=1440;page.context.innerHeight=1000;
+    // This large synthetic console verifies ownership, not host scheduling.
+    // Scan time limits have separate tests with explicit clock advancement.
+    const page=new Page({clock:fixtureClock().Date});page.context.innerWidth=1440;page.context.innerHeight=1000;
     const panel=page.add('div','ConsoleForm','',{x:48,y:397,width:1392,height:603});
     const grids=[];
     for(const g of source.grids) {
@@ -6882,3 +7060,34 @@ for(const [card,family] of [['LAB-66','DerivedDataSourceOutputSocketWizard'],['L
    assert.equal(result.output.wizard.output_columns.page.status,['observed','half_pixel','one_pixel'].includes(fault)?'complete_definition_page':'unverified_definition_page',fault);
   }
  });
+
+test('independent D47b foreign native navigation remains refused for hidden JS',async()=>{
+ for(const mode of ['d52_valid','d52_foreign_path','d52_foreign_label','d52_no_navigation','d52_unknown_mode','d52_both_modes','d52_disabled_mode']){
+ const {page}=await joinInputPortOverflowFixture(mode,0,'javascript');
+ const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+ for(const i of [5,6]){crumbs[i].style.display='none';crumbs[i].box={x:0,y:0,width:0,height:0};for(const icon of crumbs[i].children)icon.box={x:0,y:0,width:0,height:0};}
+ page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+ const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0];
+ const c=mappingCoverageFixture(page,4);page.context.innerWidth=1280;
+ for(const child of [...c.form.children]){
+  if(child.attrs['data-tid']?.endsWith(';btnAddMappingColumn')){child.remove();continue;}
+  for(const e of [child,...child.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('MF;TF-1;','MF;TF-5;').replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard').replace('colDefaultUsageType_','colUsageType_');
+  wizard.append(child);
+ }
+ c.form.remove();
+ if(mode==='d52_unknown_mode')c.tableMode.attrs.class='';
+ if(mode==='d52_both_modes')c.linksMode.attrs.class='x-form-cb-checked';
+ if(mode==='d52_disabled_mode')c.tableMode.attrs['aria-disabled']='true';
+ const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+ page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+ page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+ page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+ page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+ const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+ const permitted=r.output.ui?.elements?.some(e=>e.tid==='msgbox;tlb;yes'&&e.allowed_actions.includes('confirm_wizard_close'))===true;
+ console.log(JSON.stringify({mode,status:r.status,owner_status:r.output.wizard?.input_port_context?.status,confirm_wizard_close:permitted}));
+ assert.equal(permitted,mode==='d52_valid','Native breadcrumb binding must match before Close: '+mode);
+ assert.equal(r.output.wizard?.input_port_context?.status==='observed',mode==='d52_valid',mode);
+ assert.deepEqual(page.events,[]);
+ }
+});

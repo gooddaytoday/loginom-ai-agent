@@ -25,7 +25,7 @@ export function validateReformInlineSources(c,m){
  need(obsolete.every(f=>!m.source_fields.some(s=>s.name===f.name)),'A current reform source cannot be pruned');return obsolete;
 }
 export function createReformNodeSupport(config){return createTabularTransformNodeSupport(config,{
- type:'transform.reform_columns',mode:'scalar',revision:'reform-v3-internal-1',readback:reformConfigurationReadback,parameterSchema:reformParametersSchema,
+ type:'transform.reform_columns',mode:'scalar',revision:'reform-v3-internal-2',readback:reformConfigurationReadback,parameterSchema:reformParametersSchema,
  validate:validateReformParameters,validateInput:validateReformInputParameters,preflight:preflightReformSource,
  afterOpen:advanceReformInputColumns,
  configurationObservation:{condition:'reform configuration page',readReform:true,ready:s=>s.wizard?.stage==='field_parameters'&&s.node_reform?.verified===true},
