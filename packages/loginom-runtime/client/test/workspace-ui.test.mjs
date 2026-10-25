@@ -2295,6 +2295,62 @@ test('prepared wizard opening retries one refused sample and preserves native ow
  }
 });
 
+test('D63 bound Export Execute observes a long toast within its original budget without replay',async()=>{
+ for(const fault of ['none','permanent','document','workflow','node','tab','package','dialog','lost_reply','unbound']) {
+  const clock=fixtureClock(),page=new Page({clock:clock.Date}),base='MF;TF-1;';
+  const panel=page.add('div',base+'NavigationBar;NavigationPanel');
+  let path='',toast,graph,waits=0;const crumbs=[];
+  for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий','Export','Настройка']) {
+   path+=(path?'>':'')+label;const c=page.add('a',base+'cnrNaviMode;b.s_'+path,label,undefined,panel);crumbs.push(c);
+   if(label==='Сценарий')page.add('span',null,'',undefined,c).attrs.class='maptree-icon-workflow';
+   if(label==='Export')page.add('span',null,'',undefined,c).attrs.class='bg-vendor-icon-exporttextfile';
+   if(label==='Настройка')page.add('span',null,'',undefined,c).attrs.class='maptree-icon-wizard';
+  }
+  const wizard=page.add('div',base+'WizrdMCF');
+  for(const [key,value] of [['edtDisplayName','Export'],['cbxNodeTitleMode','Пользовательская метка']]) {
+   const owner=page.add('div',base+'WizrdMCF;DoneWizard;'+key,'',undefined,wizard);
+   page.add('input',null,'',undefined,owner).value=value;
+  }
+  page.add('button',base+'WizrdMCF;btnExecute','Execute',{x:500,y:300,width:100,height:30},wizard);
+  const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}};
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,...(fault==='unbound'?{}:{prepared_node_context:binding,settlement_timeout_ms:20000}),...options},
+   // The native prepared-context reader refuses these identities rather than
+   // returning a verified binding for a foreign document/workflow/GUID.
+   async()=>graph&&waits>=2&&['document','workflow','node'].includes(fault)?{verified:false,reason:fault}:
+    {verified:true,document_id:'doc',workflow_id:'flow',node_id:'node',
+     surface:graph?'graph':'wizard',tid:base+(graph?'Graph;Export':'WizrdMCF')}));
+  const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_finish);
+  assert.ok(button,fault);
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{
+   await click(...args);wizard.remove();crumbs.at(-1).remove();crumbs.at(-2).remove();
+   graph=page.add('div',base+'ModelForm;cmpDiagram');
+   const node=page.add('g',base+'Graph;Export','',undefined,graph);
+   page.add('span',base+'Graph;Export;Label;Label','Export',undefined,node);
+   toast=page.add('div','toast','Finished',{x:950,y:606.296875,width:300,height:184});toast.attrs.role='dialog';
+   if(fault==='lost_reply')throw Error('Lost Execute reply');
+  };
+  page.waitForTimeout=async ms=>{
+   // LAB-151 J:714: 50 reads take 14.207s. Include 180ms of read cost,
+   // so the same toast remains beyond the old count and local 15s limit.
+   clock.advance(ms+180);waits++;
+   if(fault!=='permanent'&&waits===60)toast.remove();
+   if(fault==='tab'&&waits===2)page.tab.attrs['data-tid']='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';
+   if(fault==='package'&&waits===2)crumbs[2].ownText='Foreign';
+   if(fault==='dialog'&&waits===2)toast.attrs['data-tid']='foreign';
+  };
+  const result=await page.act({verb:'execute_wizard',ref:button.ref},snapshot);
+  assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1,fault);
+  assert.equal(result.effect_possible,true,fault);
+  const proof=result.trace.find(e=>e.event==='wizard_execute_graph_verified');
+  assert.equal(!!proof,fault==='none',fault);
+  if(proof){assert.equal(proof.execution_completed,false);assert.ok(result.trace.filter(e=>e.event==='wizard_toast_wait').length>50);}
+  if(fault==='permanent')assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+  if(fault==='unbound')assert.equal(result.trace.filter(e=>e.event==='wizard_toast_wait').length,50);
+ }
+});
+
 test('wizard cancellation confirms the original graph after one exact affirmative click',async()=>{
  for(const mode of ['success','wrong_question','wrong_node','still_open','bound_unlock','bound_churn','bound_relock',
   'bound_document_id','bound_workflow_id','bound_node_id','bound_tid','bound_navigation_node']) {

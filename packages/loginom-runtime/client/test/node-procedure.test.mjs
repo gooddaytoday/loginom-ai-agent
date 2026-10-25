@@ -947,7 +947,7 @@ test('an incomplete observation preserves the original refusal in the journal',a
 });
 
 test('bound completion gives mask settlement only the remaining parent deadline',async()=>{
-  for(const verb of ['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views','finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column','click']) {
+  for(const verb of ['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views','finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column','click']) {
     const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
     const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
     const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},
