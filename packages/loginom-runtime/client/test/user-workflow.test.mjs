@@ -177,7 +177,7 @@ test('compact rereads reject model deadlines and dispatch a bounded host deadlin
  validateActionParameters(compact.inputSchema,args);
  const before=structuredClone(args),calls=[],runtime={tools:nodeApiTools,startNodeRead:r=>{calls.push(r);return r;}};
  await dispatchNodeApi(runtime,'dock_node_read',bindings.expandNodeRead(args));
- assert.equal(calls[0].budget_ms,600000);
+ assert.equal(calls[0].budget_ms,300000);
  assert.deepEqual(calls[0].read,args.read);assert.equal(calls[0].source_operation_id,args.source_operation_id);
  assert.deepEqual(args,before);
  await dispatchNodeApi(runtime,'dock_node_read',short);

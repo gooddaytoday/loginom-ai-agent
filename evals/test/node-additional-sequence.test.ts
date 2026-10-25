@@ -30,6 +30,30 @@ function refreshCheck(parts=refresh) {
  return checkNodeSequence(events,"crosstable-sliding-source-refresh",node,"Region,B,C\nN,11,4\nS,6,8\n","Region,A,B\nN,10,7\nS,3,2\n").failures
 }
 const reread=(events:ReturnType<typeof readNodeEvents>)=>operationReceipts(events).receipts.find(p=>p.request.tool.endsWith("node_read"))!
+test("sliding принимает полный свежий port source reread при прежнем native initial full",()=>{
+ const events=readNodeEvents(refresh.map((p:unknown)=>JSON.stringify(p)).join("\n"))
+ const output=reread(events).receipt.output.output
+ delete output.workflow_returned
+ delete output.ports[0].table
+ output.ports[0].freshness_basis="completed_execution_port_source"
+ const node=events.calls.find(c=>c.output.configuration?.readback?.kind==="crosstable")!.output.node.node_id
+ expect(checkNodeSequence(events,"crosstable-sliding-source-refresh",node,"Region,B,C\nN,11,4\nS,6,8\n","Region,A,B\nN,10,7\nS,3,2\n").failures).toEqual([])
+ for(const mutate of [
+  (e:typeof events)=>{delete reread(e).receipt.output.output.ports[0].freshness_basis},
+  (e:typeof events)=>{reread(e).receipt.output.output.ports[0].freshness_basis="unverified"},
+  (e:typeof events)=>{delete reread(e).receipt.output.output.ports[0].port_guid},
+  (e:typeof events)=>{reread(e).receipt.output.output.ports[0].port_guid="foreign"},
+  (e:typeof events)=>{reread(e).receipt.output.output.ports[0].fresh=false},
+  (e:typeof events)=>{reread(e).receipt.output.execution.execution_id=e.calls.find(c=>c.output.configuration?.readback?.kind==="crosstable")!.output.execution.execution_id},
+  (e:typeof events)=>{reread(e).receipt.output.output.ports[0].sample.pop()},
+  (e:typeof events)=>{reread(e).receipt.output.output.ports[0].sample_complete=false},
+  (e:typeof events)=>{reread(e).receipt.output.node.node_id="foreign"},
+  (e:typeof events)=>{e.calls.find(c=>c.tool.endsWith("node_read"))!.input.source_operation_id="foreign"},
+ ]) {
+  const staleEvents=structuredClone(events);mutate(staleEvents)
+  expect(checkNodeSequence(staleEvents,"crosstable-sliding-source-refresh",node,"Region,B,C\nN,11,4\nS,6,8\n","Region,A,B\nN,10,7\nS,3,2\n").failures.length).toBeGreaterThan(0)
+ }
+})
 test("sliding требует initial full read → same import source change → same CrossTable reread без apply",()=>{
  expect(refreshCheck()).toEqual([])
  function change(mutator:(events:ReturnType<typeof readNodeEvents>)=>void) {

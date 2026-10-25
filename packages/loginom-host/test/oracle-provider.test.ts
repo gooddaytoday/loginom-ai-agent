@@ -21,6 +21,8 @@ test("scripted oracle exchanges actual HTTP tool calls and records the advertise
       }),
     })
   try {
+    const probe = await fetch(provider.config.provider.test.options.baseURL + "/json/version")
+    expect(probe.status).toBe(405)
     const result = provider.request("call", { name: "dock_prepare", arguments: { operation_id: "prepare-A" } })
     const response = await request([
       { role: "system", content: "Loginom instructions" },

@@ -1,4 +1,4 @@
-"""Exact integer/string business oracle against independently observed native Table.
+"""Exact integer/string business oracle against observed output-port or legacy Table evidence.
 
 Materialization and final Execute are separate fresh native groups. No generated
 JavaScript is executed here. Native bytes, model and saved package are out of scope.
@@ -7,7 +7,7 @@ import csv
 import io
 from javascript_configuration_evidence import javascript_operation
 from import_execution_evidence import verify_execution_observations
-from import_output_evidence import verify_table_output_observations
+from import_output_evidence import verify_table_output_observations,verify_port_output,verify_port_output_receipts
 
 
 def verify_javascript_output(events, request, expected_columns, expected_rows, *, expected_target=None, expected_origin=None):
@@ -99,13 +99,21 @@ def javascript_business_table(operation,request,expected_columns,expected_rows,o
     comparison = {**request, 'target':{**request['target'],'kind':'existing'},'mappings':[],
         'parameters':dict(settings=dict(source=dict(encoding='UTF-8',rows_to_skip=0,first_line_as_title=True),
             format=dict(delimiter=';',text_qualifier='"',decimal_separator='.',null_marker=marker),columns=columns))}
-    failures.extend(verify_table_output_observations(observations,mutations,comparison,
-        stream.getvalue().encode('utf-8'),checkpoint,execution_id))
     output = checkpoint['output']
+    port = output['ports'][0]
+    source_port = port.get('freshness_basis') == 'completed_execution_port_source'
+    if source_port:
+        failures.extend(verify_port_output(port,columns,expected_rows,execution_id,0,
+            sample_rows=request['read'].get('sample_rows',100)))
+        failures.extend(verify_port_output_receipts(operation['rows'],request['operation_id'],[port]))
+        if port.get('port_guid') != phases['output_mapping']['value']['native_mapping']['node_context']['output_port']['port_guid']:
+            failures.append('javascript_output_physical_port')
+    else:
+        failures.extend(verify_table_output_observations(observations,mutations,comparison,
+            stream.getvalue().encode('utf-8'),checkpoint,execution_id))
     if (output != phases['read']['value'] or output.get('verified') is not True
             or output.get('status') != 'complete' or checkpoint.get('execution', {}).get('execution_id') != execution_id):
         failures.append('javascript_output_checkpoint_binding')
-    port = output['ports'][0]
     if (port.get('fresh') is not True or port.get('sample_complete') is not True
             or port.get('row_count') != len(expected_rows) or port.get('sample_rows') != len(expected_rows)
             or len(port.get('schema', [])) != len(expected_columns)):
@@ -125,7 +133,7 @@ def javascript_business_table(operation,request,expected_columns,expected_rows,o
                 if cell.get('value') is not None:
                     failures.append('javascript_typed_null_value:'+str(i)+':'+str(j))
                 continue
-            representation, precision = ('decimal_integer','exact_integer') if column['type'] == 'integer' else ('cached_display_text','display_text')
+            representation, precision = ('decimal_integer','exact_integer') if column['type'] == 'integer' else ('data_source_string','source_text') if source_port else ('cached_display_text','display_text')
             wanted = str(value) if column['type'] == 'integer' else value
             if (cell.get('value') != wanted or cell.get('representation') != representation or cell.get('precision') != precision):
                 failures.append('javascript_typed_exact_value:'+str(i)+':'+str(j))

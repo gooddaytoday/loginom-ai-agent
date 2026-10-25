@@ -50,7 +50,8 @@ for(const scale of [1,1.25,1.5,1.75,2])test(`real Chromium definitions at DPR ${
     assert.equal(result.output.wizard.output_columns.definition_coverage.status,'complete_configured_rows',JSON.stringify(result.output.geometry));
     assert.equal(result.output.wizard.output_columns.page.status,'complete_definition_page');
     assert.equal(result.output.geometry.device_pixel_ratio,scale);
-    await page.locator('table').first().evaluate(e=>{e.style.width='500.5px';});
+    // Exceed the existing 1 CSS px right-edge rounding tolerance.
+    await page.locator('table').first().evaluate(e=>{e.style.width='501.5px';});
     const clipped=await observe();
     assert.equal(clipped.output.wizard.output_columns.definition_coverage.status,'partial');
     assert.equal(clipped.output.wizard.output_columns.page.status,'unverified_definition_page');

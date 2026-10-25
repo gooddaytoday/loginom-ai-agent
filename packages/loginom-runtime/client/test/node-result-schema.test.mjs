@@ -103,3 +103,13 @@ test('date/time readback crosses the public schema with complete matrices and so
   const bad=structuredClone(r);change(bad.configuration.readback);assert.equal(validate(bad).valid,false);
  }
 });
+
+test('ordinary port source needs no Table fields and retains the 100-row bound',()=>{
+ const r=result();r.output={status:'complete',evidence_ref:'read',ports:[{port:0,port_guid:'p',fresh:true,execution_id:'e',
+  freshness_basis:'completed_execution_port_source',schema:[{index:0,name:'Text',label:'Text',type:'string'}],row_count:1,
+  sample:[[{type:'string',is_null:false,value:'full text',precision:'source_text',representation:'data_source_string'}]],
+  sample_rows:1,sample_complete:true,precision:{numbers_verified:true,limitations:[],strings:'data source text'}}]};
+ assert.equal(validate(r).valid,true);
+ r.output.ports[0].sample=Array.from({length:101},()=>r.output.ports[0].sample[0]);
+ r.output.ports[0].sample_rows=101;r.output.ports[0].row_count=101;assert.equal(validate(r).valid,false);
+});

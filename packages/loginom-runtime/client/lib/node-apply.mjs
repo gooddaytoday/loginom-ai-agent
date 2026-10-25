@@ -548,8 +548,9 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   const result={operation_id:operation.id,status:'FAILED',effect_possible:true,phases:state.phases.map(({value,...p})=>p),
     node:state.node,execution,output:state.output,package_saved:false,cleanup_complete:true,
     warnings:[...(proof.cleanup.wizard_closed?['The unsaved wizard draft of this node was cancelled during release.']:[]),
-      ...(proof.cleanup.read_view_restored?['The output Table view opened for reading was restored and closed during release.']:[]),
-      ...(proof.cleanup.views_returned?['The node visualizers opened for reading were left during release; a Table visualizer added by the stopped read may remain on its output port.']:[])],
+      ...(!readingOnly&&proof.cleanup.read_view_restored?['The output Table view opened for reading was restored and closed during release.']:[]),
+      ...(proof.cleanup.views_returned?[readingOnly?'The node visualizers were left during release.'
+        :'The node visualizers opened for reading were left during release; a Table visualizer added by the stopped read may remain on its output port.']:[])],
     configuration,checkpoint_kind:'local_node_released',persisted_package_verified:false,pending_phase:null,released_phase:pending.phase,
     error:{code:'NODE_OPERATION_RELEASED',message:'Phase '+pending.phase+' stopped without a verified receipt. The operation was released after Dock proved the node rests unlocked on an unchanged quiet graph; nothing of the stopped phase was repeated.'},
     next_step:exportRelease?{tool:'dock_action_run',original_operation_id:operation.id,

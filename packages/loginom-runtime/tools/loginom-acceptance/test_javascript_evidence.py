@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import unittest
 from javascript_configuration_evidence import verify_javascript_configuration
-from javascript_output_evidence import verify_javascript_output,verify_javascript_executions
+from javascript_output_evidence import verify_javascript_output,verify_javascript_executions,javascript_business_table
 from node_procedure_evidence import bound_output_settlement, digest
 
 
@@ -75,6 +75,31 @@ class OutputSettlementTests(unittest.TestCase):
 
 
 class JavascriptEvidenceBoundaryTests(unittest.TestCase):
+    def test_business_output_accepts_source_port_receipt_and_exact_source_text(self):
+        columns = [dict(name='Value',label='Value',type='string')]
+        port = dict(port=0,port_guid='output0',fresh=True,freshness_basis='completed_execution_port_source',execution_id='fresh',
+            schema=[dict(index=0,**columns[0])],row_count=1,sample_rows=1,sample_complete=True,
+            sample=[[dict(type='string',is_null=False,value='business',representation='data_source_string',precision='source_text')]])
+        output = dict(verified=True,status='complete',ports=[port])
+        operation = dict(result=dict(output=output,execution=dict(execution_id='fresh')),
+            phases=dict(read=dict(value=copy.deepcopy(output)),output_mapping=dict(value=dict(native_mapping=dict(node_context=dict(output_port=dict(port_guid='output0')))))),
+            rows=[dict(operation_id='js',phase='node_port_output_read',outcome=dict(output=copy.deepcopy(port)))])
+        self.assertEqual(javascript_business_table(operation,dict(operation_id='js',target={},read={}),columns,[['business']],[],[],'fresh'),[])
+        for mutation in ('port','execution','value','precision','receipt','partial','count','provenance'):
+            changed = copy.deepcopy(operation)
+            actual = changed['result']['output']['ports'][0]
+            if mutation == 'port':actual['port_guid'] = 'foreign'
+            if mutation == 'execution':actual['execution_id'] = 'stale'
+            if mutation == 'value':actual['sample'][0][0]['value'] = 'wrong'
+            if mutation == 'precision':actual['sample'][0][0]['precision'] = 'display_text'
+            if mutation == 'receipt':changed['rows'].clear()
+            if mutation == 'partial':actual['sample_complete'] = False
+            if mutation == 'count':actual['row_count'] = 2
+            if mutation == 'provenance':actual['freshness_basis'] = 'unverified'
+            changed['phases']['read']['value'] = copy.deepcopy(changed['result']['output'])
+            with self.subTest(mutation=mutation):
+                self.assertNotEqual(javascript_business_table(changed,dict(operation_id='js',target={},read={}),columns,[['business']],[],[],'fresh'),[])
+
     def test_configuration_never_promotes_missing_native_journal(self):
         proof = verify_javascript_configuration([],{},b'// authored',[],[])
         self.assertFalse(proof['passed'])

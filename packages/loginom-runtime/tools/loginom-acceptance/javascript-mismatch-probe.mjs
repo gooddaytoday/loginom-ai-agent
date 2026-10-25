@@ -94,6 +94,7 @@ export function verifyJavascriptPreviousExecution(fresh,initial){
 }
 
 export function verifyJavascriptMismatchTable(table){
+  const source=table?.freshness_basis==='completed_execution_port_source';
   need(table?.sample_complete===true&&Number.isInteger(table.row_count)&&table.row_count>=0&&table.row_count<=10
     &&table.sample_rows===table.row_count&&table.sample?.length===table.row_count
     &&Array.isArray(table.schema)&&table.schema.length>0&&table.schema.length<=16
@@ -101,11 +102,12 @@ export function verifyJavascriptMismatchTable(table){
       &&['integer','real','string','boolean','datetime'].includes(c.type))
     &&new Set(table.schema.map(c=>c.name)).size===table.schema.length
     &&table.precision?.numbers_verified===true&&table.precision.limitations?.length===0
-    &&!table.limitations?.length&&table.filter_enabled===false
+    &&!table.limitations?.length&&(source?table.fresh===true&&table.port===0&&typeof table.port_guid==='string'&&table.port_guid
+      :table.freshness_basis===undefined&&table.filter_enabled===false)
     &&table.sample.every(row=>row.length===table.schema.length&&row.every((cell,i)=>cell.type===table.schema[i].type
       &&typeof cell.is_null==='boolean'&&(cell.is_null?cell.value===null&&cell.precision==='exact_null':
         cell.type==='integer'?cell.precision==='exact_integer'&&typeof cell.value==='string'&&/^-?(?:0|[1-9][0-9]*)$/.test(cell.value):
-        cell.type==='string'?typeof cell.value==='string'&&cell.precision==='display_text':
+        cell.type==='string'?typeof cell.value==='string'&&(source?cell.precision==='source_text'&&cell.representation==='data_source_string':cell.precision==='display_text'):
         cell.type==='real'?cell.precision==='17_significant_digits'&&Number.isFinite(cell.value):
         cell.type==='boolean'?cell.precision==='exact_boolean'&&typeof cell.value==='boolean':
           cell.precision==='millisecond'&&typeof cell.value==='string'))),
@@ -152,7 +154,9 @@ export function javascriptMismatchVerdict(trial,baseline){
     'Owned native mismatch failure required');
   if(execution.status==='completed'){
     verifyJavascriptMismatchTable(trial.output);
-    need(trial.output.table?.port_guid===trial.mapping.node_context.output_port.port_guid,'Mismatch output port changed');
+    need((trial.output.freshness_basis==='completed_execution_port_source'
+      ?trial.output.port_guid===trial.mapping.node_context.output_port.port_guid&&trial.output.execution_id===execution.execution_id
+      :trial.output.table?.port_guid===trial.mapping.node_context.output_port.port_guid),'Mismatch output port changed');
   }
   const native=trial.mapping.mapping;
   const materialized=native?.verified===true&&native.inventory_complete===true&&native.source_identity_verified===true
