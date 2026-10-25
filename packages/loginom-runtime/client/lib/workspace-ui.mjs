@@ -716,6 +716,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // Long export/package captions can overflow the node breadcrumb itself.
     // This is context text only: gestures still require visible controls and
     // the current native node wizard or exact input0/native input1 opening.
+    const javascriptPort=preparedInputPort??preparedOutputPort;
     const hiddenExportNode=e=>(e.querySelectorAll('.bg-vendor-icon-exporttextfile').length===1&&(preparedNodeWizard&&['text_export_params','text_export_format','done'].includes(wizard.stage)
         ||preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===1
           &&preparedInputPort.node_icon_class==='bg-vendor-icon-exporttextfile')
@@ -723,7 +724,24 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // Settings breadcrumbs overflow too; the native GUID-bound wizard is
       // already verified. Read their context without making hidden controls actionable.
       ||preparedNodeWizard&&['text_import_file','text_import_format','output_mapping','done'].includes(wizard.stage)
-        &&e.querySelectorAll('.bg-vendor-icon-importtextfile').length===1)
+        &&e.querySelectorAll('.bg-vendor-icon-importtextfile').length===1
+      // JS input0 uses hiddenInputNode's exact native path and known-mode guard below.
+      ||preparedOutputPort?.direction==='output'&&!preparedInputPort
+        &&javascriptPort.port===0&&javascriptPort.native_index===0
+        &&javascriptPort.node_icon_class==='bg-vendor-icon-javascript'
+        &&typeof javascriptPort.port_guid==='string'&&javascriptPort.port_guid.length>0
+        &&typeof javascriptPort.opening_operation_id==='string'&&javascriptPort.opening_operation_id.length>0
+        &&e.querySelectorAll('.bg-vendor-icon-javascript').length===1
+      ||preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===2
+        &&preparedInputPort.node_icon_class==='bg-vendor-icon-restclient'
+        &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+        &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+        &&e.querySelectorAll('.bg-vendor-icon-restclient').length===1
+      // Show Node can leave the same caption hidden in the node overview.
+      // Its exact native navigation binding distinguishes it from the workflow.
+      ||wizard.status==='absent'&&preparedNodeId&&preparedGraphTid?.startsWith(workflow?.prefix+';Graph;')
+        &&preparedNavigationNode?.tid===getTid(e)&&preparedNavigationNode.label===e.textContent.trim()
+        &&e.querySelectorAll('.bg-vendor-icon-javascript').length===1)
       &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'
       &&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')&&!sensitive(e)
       &&(tids.get(getTid(e))??[]).length===1
@@ -757,7 +775,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&e.textContent.trim()==='Выходные порты'&&(getTid(e)??'').endsWith('>Выходные_порты')
           &&e.querySelectorAll('.maptree-icon-modeloutputports').length===1
           &&(tids.get((getTid(e)??'').slice(0,-'>Выходные_порты'.length))??[]).filter(parent=>panels[0].contains(parent)
-            &&visible(parent)&&parent.querySelectorAll('.'+preparedOutputPort.node_icon_class).length===1).length===1;
+            &&(visible(parent)||hiddenExportNode(parent))&&parent.querySelectorAll('.'+preparedOutputPort.node_icon_class).length===1).length===1;
         const overflowNodeSettings=e=>preparedNodeWizard===true&&getComputedStyle(e).display==='none'
           &&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
           &&e.textContent.trim()==='Настройка'&&(getTid(e)??'').endsWith('>Настройка')
@@ -791,7 +809,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const last=items.at(-1),node=items.at(-2);
           if(items.reduce((size,item)=>size+item.tid.length+item.label.length,0)>4096)ownerContext.status='bounded';
           else if(!unique || !chain)ownerContext.status='ambiguous';
-          else if(last.workflow_icon) {
+          else if(last.workflow_icon&&!preparedNavigationNode) {
             navigationContext={status:'observed',kind:'workflow',path:items.map(({tid,label})=>({tid,label}))};
           }
           else if(last.wizard_icon && items.filter(i=>i.wizard_icon).length===1 && node?.output_data_icon && node.label
@@ -829,8 +847,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       else if(panels.length===1&&inside(panels[0],panels[0])) {
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
         if(crumbs.length>32)nodeContext.status='bounded';
-        else if(crumbs.length===6&&crumbs.every(e=>inside(e,panel)&&(getTid(e)??'').startsWith(prefix))) {
-          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:textOf(e,true)}));
+        else if(crumbs.length===6&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&hiddenExportNode(e))&&(getTid(e)??'').startsWith(prefix))) {
+          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)?short(e.textContent):textOf(e,true)}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const bounded=items.every(i=>i.tid.length<=2048&&i.label.length<240)&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096;
           const chain=items.every((i,n)=>i.tid.slice(prefix.length).split('>').length===n+1&&(!n||i.tid.startsWith(items[n-1].tid+'>')));
@@ -841,7 +859,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const exact=items[0].tid===prefix+'Сервер'&&items[1].label==='Пакеты'&&items.slice(2).every(i=>i.label)
             &&(node.tid===items[4].tid+'>'+(nativeKey??format(node.label))
               ||preparedNodeId&&preparedNavigationNode?.tid===node.tid&&preparedNavigationNode.label===node.label);
-          const icon=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1&&inside(found[0],e);};
+          const icon=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1&&(inside(found[0],e)||e===crumbs[5]&&hiddenExportNode(e));};
           const icons=icon(crumbs[4],'.maptree-icon-workflow')&&icon(crumbs[5],'[class*="bg-vendor-icon-"]');
           if(!bounded)nodeContext.status='bounded';
           else if(!unique||!chain)nodeContext.status='ambiguous';
@@ -884,16 +902,21 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const joinInputOverflow=preparedInputPort?.direction==='input'&&[0,1].includes(preparedInputPort.port)
           &&preparedInputPort.native_index===preparedInputPort.port&&preparedInputPort.node_icon_class==='bg-vendor-icon-joindata'
           &&crumbs.length===9&&crumbs[5].querySelectorAll('.bg-vendor-icon-joindata').length===1;
+        const restInputOverflow=preparedInputPort?.direction==='input'&&preparedInputPort.port===0
+          &&preparedInputPort.native_index===2&&preparedInputPort.node_icon_class==='bg-vendor-icon-restclient'
+          &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+          &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+          &&crumbs.length===9&&crumbs[5].querySelectorAll('.bg-vendor-icon-restclient').length===1;
         if(crumbs.length>32)context.status='bounded';
         else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
-              ||singleInputOverflow||joinInputOverflow
+              ||singleInputOverflow||joinInputOverflow||restInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1))&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
           // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
           // Join input roles have fixed captions; retain the native port and node icon binding.
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
             &&(i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
               &&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
-              ||singleInputOverflow||joinInputOverflow
+              ||singleInputOverflow||joinInputOverflow||restInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1)
               ||i===8&&e.textContent.trim()==='Настройка'||i===7&&(e.textContent.trim()==='Входной источник данных'
               ||preparedInputPort.port===0&&e.textContent.trim()==='Источник данных'
