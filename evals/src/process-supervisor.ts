@@ -300,30 +300,38 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
 /** Read only kernel ancestry; foreign executable/env permissions cannot confer ownership. */
 export async function hasOwnedAncestry(pid: number, owners: Pick<ProcessIdentity, "pid" | "starttime">[]) {
   if (!Number.isSafeInteger(pid) || pid < 1) throw Error("Invalid process identity")
-  const seen = new Set<number>()
-  let current = pid
-  while (current) {
-    if (seen.has(current)) throw Error("Process parent chain changed")
-    seen.add(current)
-    const raw = await readFile(`/proc/${current}/stat`, "utf8").catch(async error => {
+  let birth: string | undefined, retries = 2
+  while (true) {
+    try {
+      const seen = new Set<number>()
+      let current = pid
+      while (current) {
+        if (seen.has(current)) throw Error("Process parent chain changed")
+        seen.add(current)
+        const raw = await readFile(`/proc/${current}/stat`, "utf8")
+        const fields = raw.slice(raw.lastIndexOf(")") + 2).split(" ")
+        if (current === pid) {
+          if (["Z", "X"].includes(fields[0] ?? "")) return false
+          if (birth !== undefined && birth !== fields[19]) throw Error("Process birth changed during ancestry read")
+          birth = fields[19]
+        }
+        const parent = Number(fields[1])
+        if (!Number.isSafeInteger(parent) || parent < 0 || !/^\d+$/.test(fields[19] ?? "")) throw Error("Process parent chain unavailable")
+        if (owners.some(owner => owner.pid === current && owner.starttime === fields[19])) return true
+        current = parent
+      }
+      return false
+    } catch (error) {
       if (!gone(error)) throw error
       const candidate = await stat(`/proc/${pid}`).catch(error => {
         if (gone(error)) return undefined
         throw error
       })
-      // A vanished ancestor is still a refusal while the original candidate lives.
-      if (candidate) throw error
-      return undefined
-    })
-    if (raw === undefined) return false
-    const fields = raw.slice(raw.lastIndexOf(")") + 2).split(" ")
-    if (current === pid && ["Z", "X"].includes(fields[0] ?? "")) return false
-    const parent = Number(fields[1])
-    if (!Number.isSafeInteger(parent) || parent < 0 || !/^\d+$/.test(fields[19] ?? "")) throw Error("Process parent chain unavailable")
-    if (owners.some(owner => owner.pid === current && owner.starttime === fields[19])) return true
-    current = parent
+      if (!candidate) return false
+      // Reparenting can remove an ancestor between reads; prove the fresh chain, never reuse it.
+      if (!retries--) throw error
+    }
   }
-  return false
 }
 
 async function snapshot(owners: ProcessIdentity[] = []) {
