@@ -1,11 +1,23 @@
-# Management readiness outcome evidence
+# Диагностика неудачной проверки Help
 
-LAB-170's standalone verify b0d5 failed the existing composite Help readiness guard after confirmed management process cleanup. The original outcome was not persisted, so the exact historical failing predicate cannot be reconstructed. This change does not claim to repair that historical response.
+**Цель:** получить точную нарушенную проверку при следующем штатном `loginom check`, сохранив условия допуска и исходные результаты. В LAB-170 проверка слота B отказала после подтверждённой очистки процессов, но ответ CLI остался только в памяти. Историческую причину из имеющихся файлов восстановить нельзя.
 
-Preserve the existing cleanup receipt first. For loginom check only, then save a private, versioned diagnostic outcome with exit status, timeout/interruption/sandbox flags, output lengths, last-line JSON shape and the seven existing admission predicates. Never copy stdout, stderr, arbitrary parsed strings or sandbox errors. This diagnostic is not a connection-check or cleanup proof and changes no readiness thresholds, timeouts, parsing semantics, process supervision or admission rules. Existing connection-check.json remains success-only.
+**Минимальное изменение:** после существующего cleanup receipt публичный `management()` сохраняет отдельный закрытый `connection-check-outcome.json`. В нём только exit code, признаки timeout/interruption/sandbox, длина вывода, форма последней JSON-строки и результаты семи существующих условий допуска. Произвольные строки, stdout/stderr и ошибки sandbox не копируются: для поиска нарушенного условия они не нужны и могут содержать секреты. Файл не используется как доказательство готовности или очистки; успешный `connection-check.json` остаётся отдельным. Новые команды, retry, hooks и состояние кампании не нужны.
 
-TDD: public management fixtures first fail due to the missing outcome receipt; implementation then passes. Cover positive, nonzero exit, null/missing/invalid payload, trailing logs, arrays/string payloads, secret canaries, timeout and interruption. Run the entire profile test file and typecheck. Independently review before accepting the candidate.
+**Объём:** три файла, 101 добавленная строка в исходной поставке: 14 строк production, 76 строк проверок, 11 строк первоначального плана. Затронуты существующий `management()`, его публичные тесты и этот документ. Модели, таймауты, parsing, Helpguard, supervision и условия эксперимента не меняются.
 
-Delivery: create a clean child checkout of exact55; preserve that checkout and all historical receipts. Under native controller lock, with parked EvalRunner, inactive batch, matching ownership/boot/deadline and no other active repair, switch the three config source fields and both service source paths coherently, with backups and rollback. Never restart/reset-failed batch. Read back exact clean SHA, config and unit paths, original results and command hashes.
+## Выполнение и проверка
 
-Then delegate one native verify (new directory) and, only after successful confirmed cleanup/release, one resume to the same EvalRunner. Existing native reconciliation must qualify b0d5's own confirmed management/admin evidence and all session/storage/archive conditions; no fabricated binding or manual release. If readiness fails, collect the new diagnostic and personally investigate the concrete failure. Preserve all six results, generation, pins and quality; repair itself never updates lastProgressAt. Keep wakeups until normal final delivery.
+- [x] Воспроизвести потерю evidence через публичный fake CLI: RED из-за отсутствующего outcome receipt. Сохранить исходный cleanup первым; получить GREEN без ослабления отказов.
+- [x] Проверить успешный ответ, ненулевой exit, неполный/невалидный JSON, trailing output, отсутствие секретов, timeout и interruption. EvalOps выполнил весь profile-файл: 93 PASS, два opt-in SKIP, typecheck PASS. В каноническом checkout отдельно подтверждены 18 целевых тестов / 101 assertions и typecheck на Bun1.3.14.
+- [x] Сверить отдельный чистый checkout, backup, source-пути config/обеих служб, сохранность результатов и terminal binding. Установку выполнил EvalOps под существующим controller lock, без reboot и restart/reset-failed batch; независимый read-back source и трёх файлов совпал.
+- [ ] Получить штатную fresh verification с новым каталогом: reconciliation должен подтвердить retained ресурсы по собственным management/admin/session/storage/archive receipts. Только после ready/released выполнить один native resume прежним EvalRunner; следующий batch запускает служба. Проверяемый результат — реальные новые admissions только missing при сохранённых шести Results и исходных receipts. При отказе изучить новый outcome, а не повторять команду вслепую.
+
+## Ревью и ограничения
+
+Независимое ревью точных трёх файлов — PASS; подтверждение получено Codex после установки, поэтому предварительное независимое ревью этой поставки не засчитывается как доказанное. В instructions EvalOps уточнено уже действующее правило: отдельный рецензент и его проверяемый verdict должны быть сохранены до принятия и поставки; самопроверка не является независимым ревью. Отсутствие канала рецензента требует технического восстановления, а не объявления PASS.
+
+Checkpoint:
+
+- Изменение лично подготовил и установил EvalOps; код импортирован в каноническую ветку с происхождением commit. Проверки и фактический порядок ревью указаны выше; private evidence — `/home/george/.codex/tmp/preparation-accounting/native-readiness-*`.
+- Старые результаты и срок сохранены. Одно штатное продолжение поручено EvalRunner встроенной delegation; Codex параллельное восстановление не запускал. Полный итог и этапы5–7 основного плана остаются открытыми.
