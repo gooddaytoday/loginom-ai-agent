@@ -8,12 +8,38 @@ import {resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
 const need=(v,m)=>{if(!v)throw Error('Excel import: '+m);};
 const verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
 export function excelReadback({node,phases,operation_id}){
- const configured=phases.find(p=>p.phase==='configure'),saved=phases.find(p=>p.phase==='node_finish');
+ const receipt=name=>{
+  const matches=phases.filter(p=>p.phase===name),p=matches[0];
+  need(matches.length===1&&p.status==='verified'&&p.receipt_id===operation_id+':'+name
+   &&p.value?.verified===true&&p.value.cleanup_complete===true,'unique verified '+name+' required');return p;
+ };
+ const configured=receipt('configure'),saved=receipt('node_finish'),mapped=receipt('output_mapping'),finished=receipt('finish');
+ const owner=c=>c?.verified===true&&['document_id','workflow_id','node_id'].every(k=>c[k]===node[k]);
  const c=configured?.value?.configuration;
  need(configured?.status==='verified'&&c?.verified&&['document_id','workflow_id','node_id'].every(k=>c.node_context?.[k]===node[k]),'configuration owner differs');
  need(saved?.status==='verified'&&saved.value?.settings_applied===true&&saved.value.mode==='done'&&['document_id','workflow_id','node_id'].every(k=>saved.value.node_context?.[k]===node[k]),'settings were not committed to this node');
+ const m=mapped.value.native_mapping;
+ need(m?.verified===true&&m.inventory_complete===true&&m.source_identity_verified===true
+  &&m.mapping_wizard==='DataSetOutputSocketWizard'&&owner(m.node_context)
+  &&m.node_context.output_port?.direction==='output'&&m.node_context.output_port.port===0
+  &&mapped.value.source_identity_verified===true&&typeof m.autosync==='boolean'
+  &&Array.isArray(m.source_fields)&&Array.isArray(m.target_fields)&&Array.isArray(c.columns)
+  &&m.source_fields.length===c.columns.length&&m.target_fields.length===c.columns.length,'output mapping owner or inventory differs');
+ need(mapped.value.finish?.verified===true&&mapped.value.finish.cleanup_complete===true
+  &&mapped.value.finish.settings_applied===true&&mapped.value.finish.mode==='done'&&owner(mapped.value.finish.node_context)
+  &&finished.value.settings_applied===true&&['done','execute'].includes(finished.value.mode)&&owner(finished.value.node_context),'output mapping was not committed to this node');
+ const linked=new Set(),fields=m.target_fields.map((f,index)=>{
+  const source=f.source;
+  need(f.index===index&&f.excluded===false&&f.inherited===false&&source&&typeof source.record_id==='string'
+   &&!linked.has(source.record_id)&&m.source_fields.filter(s=>JSON.stringify(s)===JSON.stringify(source)).length===1
+   &&['name','label','type','data_kind'].every(k=>typeof f[k]==='string'&&f[k]===c.columns[index][k])
+   &&typeof source.name==='string','output mapping fields or sources differ');
+  linked.add(source.record_id);
+  return {index,name:f.name,label:f.label,type:f.type,data_kind:f.data_kind,excluded:false,source_name:source.name};
+ });
+ need(linked.size===m.source_fields.length,'output source coverage differs');
  return {kind:'excel_import',scope:'observed_before_verified_finish',node,values_are:'observed_ui_values',source:c.source,auto_detect:c.auto_detect,columns:c.columns,
-  receipt_ids:[configured,saved].map(p=>{need(p.receipt_id===operation_id+':'+p.phase,'phase differs');return p.receipt_id;}),package_persistence_verified:false};
+  receipt_ids:[configured,saved,mapped,finished].map(p=>p.receipt_id),output_mapping:{port:0,autosync:m.autosync,fields},package_persistence_verified:false};
 }
 
 export function createExcelImportNodeSupport(config){
