@@ -421,9 +421,10 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           &&lastSourceAdapter?.active===false&&lastSourceAdapter.uncertain===false;
         need(['input_mapping','open','configure'].includes(state.pending?.phase)||afterDone,
           'Only a stopped JavaScript draft or settled Done with no unresolved source opening can be released here');
-        enter({signal:releaseSignal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
+        const deadline=now()+NODE_RELEASE_BUDGET_MS;
+        enter({signal:releaseSignal,deadline,document_id:state.request.document_id,
           workflow_ref:state.request.workflow_ref,node:state.node});
-        return releasePendingNode({operation,channel,readReceipt});
+        return releasePendingNode({operation,channel,deadline,now,readReceipt});
       },
       async verifyContinuation(state,{signal:nextSignal}) {
         const ctx=javascriptExecutionWaitContext(state,{operation,owner,expected,configured,committed,inputMapping,outputMapping,now:now()});

@@ -154,16 +154,18 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    releasePendingPhases:['finish'],
    async releasePending(state,{signal}={}){
     need(state.pending?.phase==='finish','Only a stopped output-read graph finish can be released here');
-    enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
+    const deadline=now()+NODE_RELEASE_BUDGET_MS;
+    enter({signal,deadline,document_id:state.request.document_id,
      workflow_ref:state.request.workflow_ref,node:state.node});
-    return releasePendingNode({operation,channel,readReceipt:options.readReceipt});
+    return releasePendingNode({operation,channel,deadline,now,readReceipt:options.readReceipt});
    },
    // Browser recovery runs the same proof for any stopped phase: the model, not
    // this driver, restored the page, and the proof rechecks the quiet graph.
    async recoveryReleasePending(state,{signal}={}){
-    enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
+    const deadline=now()+NODE_RELEASE_BUDGET_MS;
+    enter({signal,deadline,document_id:state.request.document_id,
      workflow_ref:state.request.workflow_ref,node:state.node});
-    return releasePendingNode({operation,channel,readReceipt:options.readReceipt});
+    return releasePendingNode({operation,channel,deadline,now,readReceipt:options.readReceipt});
    },
   }:{}),
  };

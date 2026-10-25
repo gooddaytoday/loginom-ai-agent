@@ -442,12 +442,13 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait
     return proof;
    }}:{}),
    async releasePending(state,{signal}={}){
-    enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
+    const deadline=now()+NODE_RELEASE_BUDGET_MS;
+    enter({signal,deadline,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
     signal?.throwIfAborted();
     // A stopped read may leave its own output Table open with exact-number
     // formatting or a settings dialog. Restore that before leaving the view.
     const view=state.pending.phase==='read'?readView:null;
-    return releasePendingNode({operation,channel,readReceipt:options.readReceipt,restoreRead:view?async()=>{
+    return releasePendingNode({operation,channel,deadline,now,readReceipt:options.readReceipt,restoreRead:view?async()=>{
      await restoreStoppedTableRead(channel,view);readView=null;return true;
     }:undefined});
    },

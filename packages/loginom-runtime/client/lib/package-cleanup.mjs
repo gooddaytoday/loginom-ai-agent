@@ -150,7 +150,8 @@ async function closeOwnedPackage(page, options, deadline) {
       const prep = globalThis.__loginomDockPreparationV1;
       const identity = JSON.stringify(o);
       const previous = globalThis.__loginomDockCleanupV1;
-      if (previous) return {reason:previous.identity === identity ? 'CLEANUP_ALREADY_ATTEMPTED' : 'CLEANUP_IDENTITY_CHANGED'};
+      if (previous && (previous.identity !== identity || previous.document !== document)) return {reason:'CLEANUP_IDENTITY_CHANGED'};
+      if (previous && previous.close_started !== false) return {reason:'CLEANUP_ALREADY_ATTEMPTED'};
       const ownReceipt = prep?.receipts instanceof Map && [...prep.receipts.values()].some(r => {
         try { return JSON.parse(r.request).session === o.sessionId; } catch { return false; }
       });
@@ -158,6 +159,13 @@ async function closeOwnedPackage(page, options, deadline) {
           || prep.id !== o.documentId || !ownReceipt) return {reason:'DOCUMENT_IDENTITY_CHANGED'};
       if (m?.FServerConnection?.UserName !== o.account) return {reason:'ACCOUNT_CHANGED'};
       if (!m.FServerConnection.Connected) return {reason:'CONNECTION_DISCONNECTED'};
+      // Retain the original native handles before any idle-wait. A replacement
+      // session with the same account/package is not this cleanup's owner.
+      const state=previous??(globalThis.__loginomDockCleanupV1={identity,document,
+        connection:m.FServerConnection,serverSession:m.FServerConnection.Session,close_started:false,done:false,closed:false});
+      const ownerBound=()=>state.connection===m.FServerConnection&&state.serverSession
+        &&state.serverSession===m.FServerConnection.Session;
+      if(!ownerBound())return {reason:'CLEANUP_SESSION_CHANGED'};
       const visible = e => !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height && getComputedStyle(e).visibility !== 'hidden';
       if ([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)) return {reason:'DIALOG_OR_OPERATION_OPEN'};
       if (m.PackageNodes?.Count !== 1) return {reason:'PACKAGE_INVENTORY_CHANGED'};
@@ -180,8 +188,12 @@ async function closeOwnedPackage(page, options, deadline) {
         });
       };
       if(!openOwnerBound())return {reason:'FAILED_OPEN_OWNER_CHANGED'};
-      if (node.HasRunningNodes() !== false || m.HasRunningNodes() !== false) return {reason:'RUNNING_NODES'};
+      const packageRunning=node.HasRunningNodes(),sessionRunning=m.HasRunningNodes();
+      if (packageRunning !== false || sessionRunning !== false)
+        return {reason:'RUNNING_NODES',own_running:packageRunning===true&&sessionRunning===true};
+      if(!ownerBound())return {reason:'CLEANUP_SESSION_CHANGED'};
       const modified = await m.FServerConnection.Session.IsPackageModified(node.Package);
+      if(!ownerBound())return {reason:'CLEANUP_SESSION_CHANGED'};
       if (modified !== false && !(modified === true && o.diagnosticDiscard === true)) return {reason:'UNSAVED_CHANGES'};
       // Recheck identity after the server read. The native BeforeClose handler
       // repeats lock/dirty checks and may show a prompt. Normal shutdown never
@@ -195,9 +207,12 @@ async function closeOwnedPackage(page, options, deadline) {
         if ([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)) return {reason:'DIALOG_OR_OPERATION_OPEN'};
       }
       if(Date.now()>=deadline)return {reason:'CLEANUP_DEADLINE_EXCEEDED'};
-      const state = globalThis.__loginomDockCleanupV1 = {identity, document, tab:prepared.tab,
-        connection:m.FServerConnection,serverSession:m.FServerConnection.Session,done:false,closed:false};
-      Promise.resolve().then(() => m.ClosePackage(node, false, true)).then(value => {
+      if(!ownerBound())return {reason:'CLEANUP_SESSION_CHANGED'};
+      state.tab=prepared.tab;state.close_started=true;
+      Promise.resolve().then(() => {
+        if(!ownerBound())throw Error('Cleanup session changed before Close');
+        return m.ClosePackage(node, false, true);
+      }).then(value => {
         state.closed = value === true && m.PackageNodes.Count === 0;
         state.result=value===true?'true':value===false?'false':'other';
         state.done = true;
@@ -208,12 +223,16 @@ async function closeOwnedPackage(page, options, deadline) {
     const idleDeadline = Math.min(deadline, Date.now()+timeoutMs);
     // Cold owns an isolated diagnostic session. Wait only for a blocked gate;
     // every read repeats the original guards and never dismisses a dialog.
-    while (options.diagnosticWaitForIdle && before.reason === 'DIALOG_OR_OPERATION_OPEN') {
+    // A known running state of the exact owned package may also settle within
+    // this cleanup call's original deadline. Unknown/foreign states cannot.
+    while (options.diagnosticWaitForIdle && before.reason === 'DIALOG_OR_OPERATION_OPEN'
+      ||before.reason==='RUNNING_NODES'&&before.own_running===true) {
       receipt.stage = 'idle_wait';
-      const left = idleDeadline-Date.now();
+      const waitDeadline=before.reason==='RUNNING_NODES'?deadline:idleDeadline;
+      const left = waitDeadline-Date.now();
       if (left <= 0) return finish('BLOCKED', before.reason);
       await page.waitForTimeout(Math.min(100, left));
-      if (Date.now() >= idleDeadline) return finish('BLOCKED', before.reason);
+      if (Date.now() >= waitDeadline) return finish('BLOCKED', before.reason);
       receipt.stage = 'close_request';
       before = await beginClose();
     }
