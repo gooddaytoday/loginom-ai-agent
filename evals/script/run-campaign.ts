@@ -634,12 +634,12 @@ async function observeUnit(unit: string, cwd: string): Promise<UnitState> {
     invocation: fields.InvocationID ?? "", exitCode: Number(fields.ExecMainStatus) }
 }
 
-export async function controlCampaign(manifestFile: string, serverFile: string, operation: "reserve" | "repair" | "resume" | "prepare-generation", repairer?: string) {
+export async function controlCampaign(manifestFile: string, serverFile: string, operation: "reserve" | "repair" | "resume" | "prepare-generation" | "cancel-unused-verify", repairer?: string) {
   return runCampaign(manifestFile, serverFile, true, operation, repairer)
 }
 
 export async function runCampaign(manifestFile: string, serverFile: string, once = false, operation?: string, repairer?: string) {
-  if (operation !== undefined && !["reserve", "repair", "resume", "prepare-generation"].includes(operation)) throw Error("CAMPAIGN_OPERATION_INVALID")
+  if (operation !== undefined && !["reserve", "repair", "resume", "prepare-generation", "cancel-unused-verify"].includes(operation)) throw Error("CAMPAIGN_OPERATION_INVALID")
   const manifest = await readLeaseReceipt(manifestFile) as CampaignManifest
   const config = await readLeaseReceipt(serverFile) as CampaignServerConfig
   const safeId = (value: unknown) => typeof value === "string" && /^[a-zA-Z0-9_-]+$/.test(value)
@@ -697,6 +697,32 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
       if (owner && owner.campaignId !== manifest.id && !previous.final) throw Error("CAMPAIGN_SERVER_BUSY")
       if (operation === "prepare-generation" && (!exists || owner?.campaignId !== manifest.id)) throw Error("CAMPAIGN_OWNER_MISMATCH")
       if (operation === "prepare-generation" && (!previous.repairing || previous.repairer !== repairer)) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
+      if (operation === "cancel-unused-verify") {
+        if (previous.final !== "partial" || !previous.published) throw Error("TERMINAL_CAMPAIGN_REQUIRED")
+        if (previous.cleanupVerified) return previous
+        if (owner?.campaignId !== manifest.id || previous.repairer !== repairer) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
+        const { loadSlots } = await import("../src/slots")
+        const { cancelUnusedVerification } = await import("../src/terminal-verification")
+        const file = await loadSlots(config.slotsFile, manifest.parallel)
+        for (let count = 1; count <= file.slots.length; count++)
+          if ((await observeUnit(config.batchUnit.replace("{parallel}", String(count)), config.harnessRoot)).active) throw Error("CAMPAIGN_BATCH_ACTIVE")
+        if (await realpath(config.harnessRoot) !== await realpath(evalsRoot) ||
+          (await command(["git", "rev-parse", "HEAD"], config.harnessRoot)).trim() !== config.acceptedHarness ||
+          (await command(["git", "status", "--porcelain", "--untracked-files=normal"], config.harnessRoot)).trim()) throw Error("CAMPAIGN_HARNESS_CHANGED")
+        const binary = manifest.pins.EVAL_CLI_BIN
+        if (typeof binary !== "string" || !path.isAbsolute(binary) || manifest.pins.EVAL_CLI_MODE !== "binary") throw Error("PREPARATION_BINARY_REQUIRED")
+        const pins = await readLeaseReceipt(config.experimentPinsFile) as { cli: string; cliBinarySha256: string }
+        if (pins.cli !== binary || new Bun.CryptoHasher("sha256").update(await Bun.file(binary).bytes()).digest("hex") !== pins.cliBinarySha256)
+          throw Error("CAMPAIGN_CLI_PIN_CHANGED")
+        const cleanup = await cancelUnusedVerification(file, { stateRoot: config.stateRoot, campaignId: manifest.id }, binary)
+        await writeLeaseReceipt(path.join(stateDir, "terminal-cleanup.json"), cleanup)
+        for (const key of [`judge:${file.judge.codexHome}`, ...file.slots.map(slot => `profile:${slot.profileDir}`), `server:${cleanup.identity.containerId}`])
+          await requireReleasedReservation(await readResourceReservation({ key }))
+        previous.cleanupVerified = true
+        await writeLeaseReceipt(journalFile, previous)
+        await release(previous)
+        return previous
+      }
       if (operation === "reserve") {
         if (previous.final || previous.published) throw Error("CAMPAIGN_FINAL")
         if (owner?.campaignId === manifest.id) {
@@ -929,7 +955,7 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
 if (import.meta.main) {
   const args = parseArgs({ args: Bun.argv.slice(2), options: { manifest: { type: "string" }, server: { type: "string" }, once: { type: "boolean" },
     operation: { type: "string" }, repairer: { type: "string" } } }).values
-  if (!args.manifest || !args.server) throw Error("usage: bun script/run-campaign.ts --manifest /private/manifest.json --server /private/server.json [--once | --operation reserve|repair|resume|prepare-generation [--repairer agent]]")
+  if (!args.manifest || !args.server) throw Error("usage: bun script/run-campaign.ts --manifest /private/manifest.json --server /private/server.json [--once | --operation reserve|repair|resume|prepare-generation|cancel-unused-verify [--repairer agent]]")
   await runCampaign(args.manifest, args.server, args.once, args.operation, args.repairer)
     .then(journal => { if (args.operation) console.log(JSON.stringify(journal)) })
     .catch(error => { console.error(error instanceof Error ? error.message : "CAMPAIGN_FAILED"); process.exitCode = 2 })

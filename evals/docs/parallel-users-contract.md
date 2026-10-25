@@ -164,3 +164,9 @@
     решаются самостоятельно. Вопрос владельцу нужен только когда необходимы
     его данные, полномочия или изменение требований. Обязательные гарантии,
     ограничения удаления и отдельное утверждение бюджета N=2 сохраняются.
+
+### Terminal cancellation of unused verification
+
+`run-campaign.ts --operation cancel-unused-verify --repairer <existing repairer>` is limited to a published partial campaign with its matching owner and inactive batch units, under the campaign lock. It accepts only the first single-slot `verify` quarantined with `USER_PREPARATION_CONFLICT`, still unactivated and without a management directory, after native CAS reopening proves the producer exited. The matching producer's admin cleanup must be confirmed. Historical preparation/ownership is read only to identify the owned account and nonce; it is never qualified as current benchmark preparation.
+
+Fresh fenced identity, account, empty owned storage, clean idle profile, absent user sessions, empty backup and closed server files are required. The new admin must dispose with confirmed process cleanup. Terminal slot evidence sets `storageDeletionAllowed=false` and `nextAdmissionAllowed=false`; it permits reservation closure only. Normal preparation/benchmark admission remains unchanged. A published campaign may record late `cleanupVerified` and release its matching owner only after verifying all resource release proofs. Original report/archive and measurements remain unchanged; the operator publishes and reads back a separate cleanup supplement.

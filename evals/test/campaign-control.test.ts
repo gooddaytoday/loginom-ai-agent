@@ -576,3 +576,14 @@ test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("a late cleanup proof remain
     expect(await Bun.file(resultFile).text()).toBe(original)
   } finally { await fixture.close() }
 })
+
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("terminal cancellation requires published partial without opening measurements", async () => {
+  const fixture = await controlFixture()
+  try {
+    const reserved = await controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")
+    await writeLeaseReceipt(path.join(fixture.root, "control/journal.json"), { ...reserved, repairing: true, repairer: "EvalBaseline" })
+    await expect(runCampaign(fixture.manifestFile, fixture.serverFile, true, "cancel-unused-verify", "EvalBaseline"))
+      .rejects.toThrow("TERMINAL_CAMPAIGN_REQUIRED")
+    expect(await Bun.file(fixture.config.batchEnvFile).exists()).toBe(false)
+  } finally { await fixture.close() }
+})
