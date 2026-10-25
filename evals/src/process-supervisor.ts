@@ -84,7 +84,7 @@ export type UnitExitProof = {
   passes: { observed_at: string; inspected: number; owned_remaining: number; cgroup_remaining: number }[]
 }
 
-/** Read-only supplement for the known UID/proc refusal; never grants signal authority. */
+/** Read-only supplement for a known proc refusal; never grants signal authority. */
 export async function observeUnitExit(input: {
   sourceFile: string; profile: string; binding: UnitBinding; owner: UnitBinding["producer"] & { bootId: string }
 }): Promise<UnitExitProof> {
@@ -95,6 +95,7 @@ export async function observeUnitExit(input: {
   const sha256 = new Bun.CryptoHasher("sha256").update(bytes).digest("hex")
   const original = receipt.processes, binding = input.binding, owner = input.owner
   const errorPid = original?.error?.match(/^Cannot inspect process identity PID ([1-9]\d*): (?:Process UID changed \(|EACCES\b|EPERM\b)/)?.[1]
+    ?? original?.error?.match(/^ENOENT: no such file or directory, open '\/proc\/([1-9]\d*)\/stat'$/)?.[1]
   if (!original || original.status !== "failed" || !errorPid || !Number.isSafeInteger(Number(errorPid)) || original.capture_complete !== true ||
     original.observation_mode !== "continuous" || !Array.isArray(original.unknownProcesses) || original.unknownProcesses.length ||
     !original.launcher?.ready || !original.processes?.some(process => process.pid === original.launcher!.pid) ||

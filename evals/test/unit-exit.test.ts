@@ -23,7 +23,7 @@ for (const delegate of ["no", "yes"] as const) test.skipIf(process.env.EVAL_SYST
   expect(observed.binding.producer.starttime).toMatch(/^\d+$/)
 })
 
-test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("unit exit recovery never signals a live producer and preserves the original failed receipt across reentry", async () => {
+for (const refusal of ["UID", "ENOENT"]) test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")(`unit exit recovery never signals a live producer and preserves the original failed receipt across reentry: ${refusal}`, async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-unit-exit-")), fixture = await parallelFixture(root)
   const profile = fixture.slots.slots[0]!.profileDir
   const unit = `loginom-evals-exit-${crypto.randomUUID()}.service`, sourceFile = path.join(root, "cleanup.json")
@@ -43,7 +43,9 @@ test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("unit exit recovery never si
     const run=await superviseProcess({cmd:[process.execPath,"-e","await Bun.sleep(40)"],cwd:${JSON.stringify(root)},
       env:{PATH:process.env.PATH},timeoutMs:2000});
     if(run.processCleanup.status!=="confirmed")throw Error("Fixture supervisor failed");
-    const original={...run.processCleanup,status:"failed",error:"Cannot inspect process identity PID "+run.processCleanup.launcher.pid+": Process UID changed (proc_uid=0, starttime=unknown, state=unknown)"};
+    const original={...run.processCleanup,status:"failed",error:${JSON.stringify(refusal)}==="ENOENT"
+      ? "ENOENT: no such file or directory, open '/proc/"+run.processCleanup.launcher.pid+"/stat'"
+      : "Cannot inspect process identity PID "+run.processCleanup.launcher.pid+": Process UID changed (proc_uid=0, starttime=unknown, state=unknown)"};
     await writeLeaseReceipt(${JSON.stringify(sourceFile)},{processes:original});
     await writeFile(${JSON.stringify(`${profile}.process-group`)},String(original.launcher.pid),{mode:0o600,flag:"wx"});
     await writeLeaseReceipt(${JSON.stringify(ready)},{binding,owner:leases.server.reservation.owner});
@@ -68,6 +70,14 @@ test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("unit exit recovery never si
     while ((await Bun.$`systemctl --user show ${unit} --property=ActiveState --value`.quiet()).text().trim() !== "failed") {
       if (Date.now() > deadline) throw Error("Unit fixture did not exit"); await Bun.sleep(20)
     }
+    const source = JSON.parse(original)
+    await Bun.write(sourceFile, JSON.stringify({ ...source, processes: { ...source.processes,
+      error: `ENOENT: no such file or directory, open '/proc/${source.processes.launcher.pid}/cmdline'` } }))
+    await expect(observeUnitExit(input)).rejects.toThrow("UNIT_EXIT_SOURCE_INELIGIBLE")
+    await Bun.write(sourceFile, JSON.stringify({ ...source, processes: { ...source.processes,
+      unknownProcesses: [source.processes.processes[0]] } }))
+    await expect(observeUnitExit(input)).rejects.toThrow("UNIT_EXIT_SOURCE_INELIGIBLE")
+    await Bun.write(sourceFile, original)
     const proof = await observeUnitExit(input)
     expect(proof.processes).toMatchObject({ status: "confirmed", observation_mode: "systemd_post_exit", capture_complete: true })
     expect(proof.processes.verification).toHaveLength(2)
