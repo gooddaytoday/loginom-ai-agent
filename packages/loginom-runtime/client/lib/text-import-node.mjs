@@ -282,10 +282,11 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRea
           table_creation:opened,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:workflowReturn});
       },
       async releasePending(state,{signal}={}) {
-        enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
+        const deadline=now()+NODE_RELEASE_BUDGET_MS;
+        enter({signal,deadline,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
         signal?.throwIfAborted();
         const view=state.pending.phase==='read'?readView:null;
-        return releasePendingNode({operation,channel,readReceipt,restoreRead:view?async()=>{
+        return releasePendingNode({operation,channel,deadline,now,readReceipt,restoreRead:view?async()=>{
           await restoreStoppedTableRead(channel,view);readView=null;return true;
         }:undefined});
       },

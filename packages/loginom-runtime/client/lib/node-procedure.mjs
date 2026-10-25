@@ -197,6 +197,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     return structuredClone(result.output);
   };
   const channel = {
+    // Private cleanup proofs must use the same clock as this procedure's deadline.
+    now,
     async openJavascriptPreview(port){
       checkBudget();
       if(!preparedNodeContext||!['transform.group_data','transform.sorting','transform.calculator','transform.filter_data','transform.join_data'].includes(operation.parameters?.target?.type))

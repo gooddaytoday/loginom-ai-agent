@@ -42,6 +42,28 @@ test('release proves a quiet unchanged graph without a gesture',async()=>{
  assert.deepEqual(proof.cleanup,{wizard_closed:false,read_view_restored:false,views_returned:false});assert.deepEqual(s.gestures,[]);
  assert.equal(proof.node_context.node_id,'new');assert.equal(proof.graph.nodes.length,1);
 });
+test('release graph reads retain the explicitly supplied deadline and clock',async()=>{
+ for(const fault of [null,'before_first','after_first','before_second','after_second']) {
+  let clock=1,observations=0,reads=0;const deadline=100;
+  const operation=stopped(),s=surface(),observe=s.channel.observe;
+  delete operation.deadline; // The driver supplies this release's budget explicitly.
+  s.channel.observe=async options=>{
+   observations++;operation.deadline=90000; // Later mutation cannot replace the captured bound.
+   if(fault==='before_first'&&observations===2||fault==='before_second'&&observations===3)clock=deadline;
+   return observe(options);
+  };
+  operation.nodeTargetAdapter.observe=async(_context,bound)=>{
+   reads++;assert.equal(bound,deadline);
+   if(fault==='after_first'&&reads===1||fault==='after_second'&&reads===2)clock=deadline;
+   return graphOf();
+  };
+  const run=()=>releasePendingNode({operation,channel:s.channel,readReceipt:async()=>operation.receipt,deadline,now:()=>clock});
+  if(fault)await assert.rejects(run(),/Original release graph deadline elapsed/);
+  else assert.equal((await run()).verified,true);
+  assert.equal(reads,fault==='before_first'?0:['after_first','before_second'].includes(fault)?1:2);
+  assert.deepEqual(s.gestures,[]);
+ }
+});
 test('D74 release settles only its exact ambiguous wizard receipt within the original deadline',async t=>{
  let clock=1;t.mock.method(Date,'now',()=>clock);
  for(const fault of [null,'field','cancel_graph','missing_identity','receipt','graph','expired','late_graph_before','late_graph_after']) {
