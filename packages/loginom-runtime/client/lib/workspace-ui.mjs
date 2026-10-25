@@ -4567,14 +4567,14 @@ function readRenderedInputMapping(observation) {
 
 export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
+  if(options.deadline!==undefined&&(!Number.isFinite(options.deadline)||options.deadline<=0
+    ||options.opening_timeout_ms===undefined&&options.settlement_timeout_ms===undefined))
+    throw Error('Absolute node deadline requires a bounded opening or settlement wait');
   if(options.preserve_join_mapping!==undefined&&(options.preserve_join_mapping!==true||!options.prepared_node_context
     ||options.mode!=='act'||options.action?.verb!=='wizard_step'||options.action.expected_stage!=='join'
     ||options.snapshot?.wizard?.stage!=='input_mapping'||options.snapshot?.wizard?.owner_context?.status!=='observed'
     ||options.snapshot?.prepared_node_context?.input_port||options.snapshot?.prepared_node_context?.output_port))
     throw Error('Preserved Join mapping requires a bound input-to-Join node read');
-  if(options.deadline!==undefined&&(!Number.isFinite(options.deadline)||options.deadline<=0
-    ||options.opening_timeout_ms===undefined&&options.settlement_timeout_ms===undefined))
-    throw Error('Absolute node deadline requires a bounded opening or settlement wait');
   if(options.settlement_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
     ||!['finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
     ||options.opening_timeout_ms!==undefined||!Number.isInteger(options.settlement_timeout_ms)

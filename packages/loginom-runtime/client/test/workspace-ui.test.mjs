@@ -5,15 +5,7 @@ import { createObservationPages } from '../lib/observation-pages.mjs';
 import { makeWorkspaceUiCode, validateUiAction, workspaceUiCapability } from '../lib/workspace-ui.mjs';
 import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
-import {Page,Element,Document,build,origin,clone} from './support/workspace-ui-fixture.mjs';
-
-// Large fake-DOM tests measure traversal/ownership, not the JavaScript selector
-// double's speed under parallel test-runner load. Time guards have explicit tests.
-function fixtureClock() {
-  let elapsed = 0;
-  class Clock extends Date { static now() { return elapsed; } }
-  return { Date: Clock, advance(ms) { elapsed += ms; } };
-}
+import {Page,Element,Document,build,origin,clone,fixtureClock} from './support/workspace-ui-fixture.mjs';
 
 function tabBarFixture(options) {
   const page=new Page(options),base='MF;cntMain;cntWorkspace;Workspace;t.br';
@@ -766,7 +758,7 @@ test('oversized DOM stops observation and rejects a gesture before input without
 });
 
 test('scroll clamps to its observed owner, rejects old state and does not scroll its parent', async () => {
-  const page=new Page();page.waitForTimeout=async()=>{};
+  const page=new Page();page.waitForTimeout=async ms=>{page.clock.advance(ms);};
   page.context.innerWidth=1000;page.context.innerHeight=800;
   const outer=page.add('div','Outer','',{x:10,y:60,width:500,height:500});
   const inner=page.add('div','Inner','',{x:20,y:80,width:300,height:300},outer);
@@ -790,7 +782,7 @@ test('virtualized row replacement after scrolling issues a new incarnation', asy
   Object.assign(owner,{scrollTop:0,scrollHeight:1000,clientHeight:300,style:{overflowY:'auto'}});
   const row=page.add('button','Rows;btnItem','Old row',undefined,owner);
   const snapshot=await page.observe(),ref=snapshot.ui.elements.find(e=>e.tid==='Rows;btnItem').ref;
-  page.waitForTimeout=async()=>{row.remove();page.add('button','Rows;btnItem','New row',undefined,owner);};
+  page.waitForTimeout=async ms=>{page.clock.advance(ms);row.remove();page.add('button','Rows;btnItem','New row',undefined,owner);};
   const result=await page.act({verb:'scroll',ref,delta_y:200},snapshot);
   assert.equal(result.status,'SUCCEEDED');
   const next=result.output.ui.elements.find(e=>e.tid==='Rows;btnItem');
@@ -812,7 +804,7 @@ test('observation distinguishes rendered offscreen and covered targets from reac
 });
 
 test('set_checked reads back native state and does not toggle an already satisfied request',async()=>{
-  const page=new Page();page.waitForTimeout=async()=>{};
+  const page=new Page();page.waitForTimeout=async ms=>{page.clock.advance(ms);};
   const input=page.add('input','Wizard;Flag');input.attrs.type='checkbox';input.checked=false;
   const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);input.checked=!input.checked;};
   const before=await page.observe(),ref=before.ui.elements.find(e=>e.tid==='Wizard;Flag').ref;
@@ -828,7 +820,7 @@ test('set_checked reads back native state and does not toggle an already satisfi
 });
 
 test('unconfirmed checkbox change stays ambiguous instead of blindly retrying a toggle',async()=>{
-  const page=new Page();page.waitForTimeout=async()=>{};
+  const page=new Page();page.waitForTimeout=async ms=>{page.clock.advance(ms);};
   const input=page.add('input','Wizard;Flag');input.attrs.type='checkbox';input.checked=false;
   const s=await page.observe(),ref=s.ui.elements.find(e=>e.tid==='Wizard;Flag').ref;
   const r=await page.act({verb:'set_checked',ref,checked:true},s);
@@ -837,7 +829,7 @@ test('unconfirmed checkbox change stays ambiguous instead of blindly retrying a 
 });
 
 test('Loginom Ext DisplayEl state is read from its exact checked owner and radio cannot be unchecked',async()=>{
-  const page=new Page();page.waitForTimeout=async()=>{};
+  const page=new Page();page.waitForTimeout=async ms=>{page.clock.advance(ms);};
   const owner=page.add('div','Wizard;Option','',{x:20,y:90,width:150,height:50});
   const display=page.add('span','Wizard;Option;DisplayEl','',{x:30,y:100,width:20,height:20},owner);
   display.attrs.class='x-form-radio';display.classList.contains=name=>display.attrs.class.split(' ').includes(name);
@@ -927,7 +919,7 @@ test('storage filename code tokens are data, not editor identity: native-input-p
 
 for(const stage of ['controls','data_views'])for(const fault of ['transient','persistent','before','work','elements','traversal','other_stage','directory','owner','position','expired'])test('file-list scroll retries only its timed '+stage+' read without replay: '+fault,async()=>{
  const {page,table,cell}=scriptNamedStorageFixture('anchor.csv'),clock=fixtureClock();page.context.Date=clock.Date;
- page.context.innerWidth=1000;page.context.innerHeight=800;page.waitForTimeout=async()=>{};
+ page.context.innerWidth=1000;page.context.innerHeight=800;page.waitForTimeout=async ms=>{clock.advance(ms);};
  Object.assign(table,{scrollTop:0,scrollHeight:2400,clientHeight:400});table.style.overflowY='auto';
  const bar=page.add('div','MF;TF-1;NavigationBar;NavigationPanel');let folder;
  for(const [i,text] of ['Файлы','user'].entries()){
@@ -1474,7 +1466,7 @@ test('import settings preserve blank and whitespace values and exclude hidden or
 });
 
 function importFormatField(page) {
-  page.waitForTimeout=async()=>{};
+  page.waitForTimeout=async ms=>{page.clock.advance(ms);};
   page.context.innerWidth=1000;page.context.innerHeight=800;
   const base='MF;TF-1;WizrdMCF',form=page.add('div',base);
   page.add('div',base+';ImportTextFileParamsWizard;edtValueNull','',undefined,form);
@@ -1542,7 +1534,7 @@ function wizardStepFixture(page,direction='next') {
 test('wizard step clicks once and verifies only the requested stage in the same form',async()=>{
   for(const direction of ['next','previous']) {
     const page=new Page(),c=wizardStepFixture(page,direction),snapshot=await page.observe();
-    page.waitForTimeout=async()=>{};
+    page.waitForTimeout=async ms=>{page.clock.advance(ms);};
     const button=snapshot.ui.elements.find(e=>e.wizard_step);
     assert.equal(button.wizard_step.direction,direction);
     const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);c.advance();};
@@ -1558,7 +1550,7 @@ test('supported transforms accept only owned conditional destinations after one 
  for(const marker of [';CalcDataWizard;btnAddExpr',';GroupDataWizard;grdUsedFields;tbl',';SortingWizard;SortingColumnCollection;grdSorting;tbl',';ReplaceColumnsWizard;grdDataList;tbl',';ReformColumnsWizard;grdTargetColumns;tbl'])for(const destination of ['done','output_mapping','input_mapping']) {
   const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+marker;
   const snapshot=await page.observe(),button=snapshot.ui.elements.find(e=>e.wizard_step);
-  page.waitForTimeout=async()=>{};const click=page.mouse.click;
+  page.waitForTimeout=async ms=>{page.clock.advance(ms);};const click=page.mouse.click;
   page.mouse.click=async(...args)=>{await click(...args);c.marker.remove();page.add('div',c.base+(destination==='done'?';DoneWizard;edtDisplayName':destination==='output_mapping'?';DerivedDataSourceMappingEngineOutputPortWizard;btnAddMappingColumn':';TuneDataSourceInputPortWizard;btnAddMappingColumn'),'',undefined,c.form);};
   const result=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:['output_mapping','done']},snapshot);
   assert.equal(result.status,destination==='input_mapping'?'AMBIGUOUS':'SUCCEEDED',JSON.stringify(result.error));
@@ -1573,7 +1565,7 @@ test('wizard transition waits through a transient mask without repeating its cli
   const button=snapshot.ui.elements.find(e=>e.wizard_step);let mask,waits=0;
   const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);c.advance();
     mask=page.add('div',null,'Processing');mask.attrs.class='bg-mask-message';};
-  page.waitForTimeout=async()=>{waits++;mask.remove();};
+  page.waitForTimeout=async ms=>{page.clock.advance(ms);waits++;mask.remove();};
   const result=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:'input_mapping'},snapshot);
   assert.equal(result.status,'SUCCEEDED',JSON.stringify(result.error));assert.equal(waits,4);
   assert.equal(page.events.filter(e=>e==='click').length,1);
@@ -1584,7 +1576,7 @@ test('wizard step waits for delayed layout epochs and bounds a continuously chan
     const page=new Page(),c=wizardStepFixture(page),snapshot=await page.observe();
     const button=snapshot.ui.elements.find(e=>e.wizard_step);let waits=0;
     const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);c.advance();};
-    page.waitForTimeout=async()=>{
+    page.waitForTimeout=async ms=>{page.clock.advance(ms);
       waits++;
       if(mode==='continuous' || mode==='delayed' && waits<=2)page.mutationObserver.callback([{}]);
       if(mode==='replaced' && waits===1){c.form.remove();wizardStepFixture(page).advance();}
@@ -1610,7 +1602,7 @@ test('wizard step never confirms an unchanged stage, a closed form or its replac
       if(mode==='closed')c.form.remove();
       if(mode==='replacement'){c.form.remove();const replacement=wizardStepFixture(page);replacement.advance();}
     };
-    page.waitForTimeout=async()=>{waits++;};
+    page.waitForTimeout=async ms=>{page.clock.advance(ms);waits++;};
     const result=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:'input_mapping'},snapshot);
     assert.equal(result.status,'AMBIGUOUS',mode);assert.equal(result.error.code,'WIZARD_STEP_NOT_CONFIRMED');
     assert.equal(page.events.filter(e=>e==='click').length,1);assert.ok(waits<=24);
@@ -1663,7 +1655,7 @@ test('export header waits for delayed readback after one click and refuses a rep
   const snapshot=await page.observe(),option=snapshot.ui.elements.find(e=>e.wizard_combo?.kind==='option');
   assert.equal(snapshot.wizard.stage,'text_export_format');assert.equal(option.wizard_combo.field.name,'header');
   const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);list.remove();};
-  let waits=0;page.waitForTimeout=async()=>{if(++waits===1){
+  let waits=0;page.waitForTimeout=async ms=>{page.clock.advance(ms);if(++waits===1){
    if(fault==='replaced_input'){inputs.edtCaptionType.remove();page.add('input',null,'',undefined,headerOwner).value='Имена полей';}
    else if(fault==='none')inputs.edtCaptionType.value='Имена полей';
   }};
@@ -1942,7 +1934,7 @@ test('typed Calculator parameter editing binds dialog, selected row and exact dr
 
 test('Calculator Apply confirms Token metadata without exposing sensitive controls or table values',async()=>{
   const {page,base,records}=calculatorManifestFixture(),r=records[0];
-  page.waitForTimeout=async()=>{};
+  page.waitForTimeout=async ms=>{page.clock.advance(ms);};
   const dialog=page.add('div',base+'ExprDataEditForm');dialog.attrs.class='x-window';
   for(const [key,value] of [['edtName','Token'],['edtDisplayName','Token'],['cbxDataType','Строковый']]) {
     const owner=page.add('div',base+'ExprDataEditForm;'+key,'',undefined,dialog);
@@ -2023,7 +2015,7 @@ test('expression apply checks the resulting selected row after its separate dial
       name.attrs['data-tid']=base+'CalcDataWizard;colExpressionName_Amount';name.ownText=variation==='wrong_name'?'Other':'Amount';
       label.attrs['data-tid']=base+'CalcDataWizard;colExpressionDisplayName_Amount';label.ownText=variation==='wrong_label'?'Other':'Сумма';
       if(variation==='wrong_type')icon.attrs.class='bg-TBGDataType-dtInteger';
-      if(variation==='delayed_mask'){const mask=page.add('div',null,'Загрузка');mask.attrs.class='x-mask-msg';page.waitForTimeout=async()=>mask.remove();}
+      if(variation==='delayed_mask'){const mask=page.add('div',null,'Загрузка');mask.attrs.class='x-mask-msg';page.waitForTimeout=async ms=>{page.clock.advance(ms);mask.remove();};}
       if(variation==='lost_reply')throw new Error('reply lost');
     };
     const outcome=await page.act({verb,ref:target.ref},read.output);
@@ -2477,7 +2469,7 @@ for(const completion of ['done','execute'])test('wizard '+completion+' waits for
       return output;
     };
     let waits=0;
-    page.waitForTimeout=async()=>{
+    page.waitForTimeout=async ms=>{page.clock.advance(ms);
       waits++;
       if(mode==='late_body' && waits===2) {
         finishedNode.remove();finishedNode=page.add('g',base+'Graph;Сумма','',undefined,finishedGraph);
@@ -3018,7 +3010,7 @@ test('import input completion waits through delayed preview masks and never repe
       if(mode==='lost_tab_reply')throw new Error('lost completion reply');
       if(mode!=='late_refresh')block();
     }};
-    page.waitForTimeout=async()=>{
+    page.waitForTimeout=async ms=>{page.clock.advance(ms);
       waits++;
       if(mode==='late_refresh' && waits===1)block();
       if(mode==='replacement')c.form.attrs['data-tid']='MF;TF-1;OtherWizard';
@@ -3151,7 +3143,7 @@ test('import column choice closes editor and settles both type and kind without 
       if(mode==='editor_reopened')c.form.append(c.owner);
       if(mode==='lost_reply')throw new Error('lost reply');
     };
-    page.waitForTimeout=async()=>{
+    page.waitForTimeout=async ms=>{page.clock.advance(ms);
       waits++;
       if(mode==='late_kind' && waits===3)c.cells[3].ownText='Дискретный';
       if(['late_mask','stuck'].includes(mode) && waits===1){mask=page.add('div',null,'Loading');mask.attrs.class='x-mask-msg';}
@@ -3231,7 +3223,7 @@ test('source code page selection verifies the original field after one native ch
         c.inputs.encoding.remove();owner.append(new Element('input')).value=label;
       }
     };
-    page.waitForTimeout=async()=>{if(++waits===3 && mode==='delayed')c.inputs.encoding.value=label;};
+    page.waitForTimeout=async ms=>{page.clock.advance(ms);if(++waits===3 && mode==='delayed')c.inputs.encoding.value=label;};
     const result=await page.act({verb:'select_wizard_option',ref:option.ref},snapshot);
     const success=['applied','delayed'].includes(mode);
     assert.equal(result.status,success?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
@@ -4195,7 +4187,7 @@ test('Table parent formatting uses exact painted Ext InputEl for zero-size inlin
 
 
 // Private candidate fixture reconstructed from the root-owned live DOM probe.
-async function inputMappingLiveFixture(duplicateLabels=false,clock=Date) {
+async function inputMappingLiveFixture(duplicateLabels=false,clock) {
   const {mappingLiveLayout}=await import('./mapping-layout.fixture.mjs');
   const live=structuredClone(mappingLiveLayout),page=new Page({clock});
   if(duplicateLabels){const {duplicateTypeIcons}=await import('./mapping-duplicate-icons.fixture.mjs');
@@ -5432,7 +5424,7 @@ function outputPortFinishFixture(mode='valid') {
     page.add('span','MF;TF-1;Graph;'+key+';Label;Label',key,{x:110,y:220,width:120,height:30},node);
     if(mode==='mask')page.add('div',null,'Loading').attrs.class='x-mask-msg';
   };
-  page.waitForTimeout=async()=>{waits++;if(mode==='churn')page.mutationObserver.pending.push({type:'attributes',target:node,attributeName:'style'});};
+  page.waitForTimeout=async ms=>{page.clock.advance(ms);waits++;if(mode==='churn')page.mutationObserver.pending.push({type:'attributes',target:node,attributeName:'style'});};
   return {page,waits:()=>waits};
 }
 
@@ -6164,7 +6156,7 @@ for(const mode of ['owned','hidden','foreign','duplicate','transient']) {
    if(mode==='hidden')error.style.display='none';
    if(mode==='duplicate'){const second=page.add('div',null,'Other',undefined,owner);second.attrs.class='x-form-error-msg';}
   };
-  page.waitForTimeout=async()=>{waits++;if(mode==='transient' && waits===1){error.remove();c.advance();}};
+  page.waitForTimeout=async ms=>{page.clock.advance(ms);waits++;if(mode==='transient' && waits===1){error.remove();c.advance();}};
   const result=await page.act({verb:'wizard_step',ref:button.ref,expected_stage:'input_mapping'},snapshot);
   assert.equal(page.events.filter(e=>e==='click').length,1);
   if(mode==='owned'){
@@ -6187,7 +6179,7 @@ test('Table datetime selection exposes only its bound date formatting controls',
 });
 
 test('native process scroll uses only the observed console grid owner',async()=>{
- const page=new Page();page.waitForTimeout=async()=>{};page.context.innerWidth=1000;page.context.innerHeight=800;
+ const page=new Page();page.waitForTimeout=async ms=>{page.clock.advance(ms);};page.context.innerWidth=1000;page.context.innerHeight=800;
  const panel=page.add('div','ConsoleForm','',{x:0,y:400,width:900,height:300});
  const store={$className:'Ext.data.TreeStore',isLoading:()=>false},views={};
  const grids=['treepanel;tree','grd;tbl'].map((suffix,i)=>{
@@ -6863,6 +6855,7 @@ test('fractional geometry keeps ordinary and addressed output definitions comple
     for(const e of page.document.all())if(e.attrs['data-tid']?.startsWith(c.base))e.attrs['data-tid']=e.attrs['data-tid'].replace('ColumnsMappingEngineOutputPortWizard',family);
     fractionalRows(c.container,c.rows,scale);
     const read=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+    assert.equal(read.status,'SUCCEEDED',JSON.stringify(read.error));
     assert.equal(read.output.wizard.output_columns.definition_coverage.status,'complete_configured_rows',family+':'+scale);
     assert.equal(read.output.wizard.output_columns.page.status,'complete_definition_page',family+':'+scale);
   }

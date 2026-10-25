@@ -710,8 +710,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const settlementWait=preparedNodeContext&&['finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(action.verb)
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
       const code = processCode??makeWorkspaceUiCode({ mode: 'act', operation_id: id, action,
-        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}),
         ...(openingWait||settlementWait?{deadline:operation.deadline}:{}),
+        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}),
         ...(settlementWait?{settlement_timeout_ms:settlementWait}:{}),
         ...(openingWait?{opening_timeout_ms:openingWait}:{}),
         ...boundOptions,
