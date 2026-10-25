@@ -39,7 +39,7 @@ export function validateTextExportParameters(p,mode,r,directories=null){
  if('destination'in p)validateExportDestination(p.destination,directories);
  for(const [k,values]of Object.entries({encoding:['UTF-8'],delimiter:[';',',','\t'],header:['none','names','labels'],line_ending:['LF','CRLF'],
   decimal_separator:['.',','],text_qualifier:['"'],null_marker:['','?','null','NULL'],date_separator:['.','/','\\','-'],time_separator:[':', '.'],
-  date_format:['dd/mm/yyyy','mm/dd/yyyy','yyyy/mm/dd','dd/mm/yy','mm/dd/yy','yy/mm/dd'],time_format:['h:mm','hh:mm','h:mm:ss','hh:mm:ss'],
+  date_format:['dd/mm/yyyy','mm/dd/yyyy','yyyy/mm/dd','dd/mm/yy','mm/dd/yy','yy/mm/dd'],time_format:['h:mm','hh:mm','h:mm:ss','hh:mm:ss','hh:nn:ss.zzz'],
   true_value:['True','Истина','Да'],false_value:['False','Ложь','Нет'],overwrite:['reject','replace']}))
   if(k in p)need(values.includes(p[k]),'Unsupported export '+k);
  if('bom'in p)need(typeof p.bom==='boolean','BOM must be boolean');
@@ -64,6 +64,6 @@ export function validateNativeExportParams(values,directories=null){
   true_value:['True','Истина','Да'],false_value:['False','Ложь','Нет'],
   date_separator:['','.','/','\\','-'],time_separator:['',':','.'],
   date_format:['','dd/mm/yyyy','mm/dd/yyyy','yyyy/mm/dd','dd/mm/yy','mm/dd/yy','yy/mm/dd'],
-  time_format:['','h:mm','hh:mm','h:mm:ss','hh:mm:ss']};
+  time_format:['','h:mm','hh:mm','h:mm:ss','hh:mm:ss','hh:nn:ss.zzz']};
  for(const [key,options] of Object.entries(allowed))need(options.includes(values[key]?.value),'Unsupported retained export '+key+'; choose an explicit supported value');
 }
