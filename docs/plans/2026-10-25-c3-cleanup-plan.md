@@ -48,4 +48,6 @@ Controller остаётся enabled; после boot подтверждаетс�
 
 Checkpoint:
 - План v3 принят независимо; обязательных замечаний к плану нет. Code/live ACCEPT и исполнение не заявлены.
-- Следующий шаг — личная подготовка EvalOps свежего scope и точных артефактов, проверки и независимое ревью; live recovery и полный этап7 остаются открытыми.
+- Независимый pre-effect baseline21:06UTC: все29 Result hashes, manifest/pins, originals c3/partial A и фактический A archive сохранены; журнал/CAS/boot стабильны. Proof — `preparation-accounting/c3ea-pre-effect-independent-baseline.json`.
+- EvalOps подготовил unit/handoff; пять изолированных real-systemd cases (success/STOP/timeout/exec failure/HUP до acceptance) прошли. Report — `preparation-accounting/c3ea-lifecycle-result.json`; это не qualification полного cleanup. Передан проверенный CLI provenance/locality reference, не заменяющий fresh scope.
+- Следующий шаг — завершить лично EvalOps scope/script и оставшиеся проверки, получить независимое ревью точных артефактов; live recovery и полный этап7 открыты. Campaign source/units/leases не изменялись.
