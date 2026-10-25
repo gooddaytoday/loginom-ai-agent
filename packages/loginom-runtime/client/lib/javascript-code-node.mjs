@@ -384,7 +384,9 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
         const {output}=await channel.readOutputPort({port:0,execution:executionReceipt,
           sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
         need(output.port===0&&output.port_guid===outputMapping.node_context.output_port.port_guid,'JavaScript physical output port changed');
-        const aligned=alignReadSchema(output.schema,outputMapping.target_fields.filter(field=>!field.excluded));
+        const expected=outputMapping.target_fields.filter(field=>!field.excluded);
+        need(output.schema.every((field,index)=>field.name===expected[index]?.name),'JavaScript output field order differs from the configured output');
+        const aligned=alignReadSchema(output.schema,expected);
         const data={...output,schema:output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}))};
         if(read.coverage==='full')need(data.sample_complete===true&&data.sample_rows===data.row_count&&!data.limitations?.length,
           'Full JavaScript output exceeds bounded read coverage');

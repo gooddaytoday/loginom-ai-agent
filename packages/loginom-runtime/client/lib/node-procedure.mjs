@@ -197,6 +197,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   };
   const channel = {
     async readOutputPort(request) {
+      // Keep the latest attempt's proxy cleanup across phase resets and UI observations.
+      operation.portReadCleanupComplete=false;
       checkBudget();
       if(!preparedNodeContext)throw Error('Prepared node required for direct output read');
       const code=makeNodePortOutputCode(preparedNodeContext,request,{origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
@@ -212,7 +214,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         &&(result.verified?owner&&result.output?.port===request.port&&result.output.fresh===true
           &&result.output.execution_id===request.execution.execution_id&&result.output.freshness_basis==='completed_execution_port_source'
           :typeof result.reason==='string');
-      operation.cleanupConfirmed=valid&&result.cleanup_complete===true;
+      operation.portReadCleanupComplete=operation.cleanupConfirmed=valid&&result.cleanup_complete===true;
       checkBudget();
       if(!valid||!result.verified||!operation.cleanupConfirmed)throw Error('Direct output read refused'+(valid&&!result.verified?': '+result.reason:''));
       await entry('node_port_output_read',{outcome:structuredClone(result)});
