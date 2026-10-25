@@ -8,7 +8,7 @@ import {makePackageCleanupCode} from '../../../packages/loginom-runtime/client/l
 const source=await readFile(new URL('../cold-check.mjs',import.meta.url),'utf8');
 const body=source.slice(source.indexOf('} finally {\n  // Cold teardown:')+11,source.indexOf('\nasync function loadSaved'));
 const run=new (Object.getPrototypeOf(async function(){}).constructor)('f',
- `const {state,saved,session,config,makePackageCleanupCode,rawExecute,writeFile,join,args,context}=f;const signals=[],handlers=[];const process={off(){}};${body.slice(0,body.lastIndexOf('}'))}`);
+ `const {state,saved,session,config,makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode,rawExecute,record,page,writeFile,join,args,context}=f;const signals=[],handlers=[];const process={off(){}};${body.slice(0,body.lastIndexOf('}'))}`);
 const path='/own/saved.lgp';
 const prepared={status:'READY',document_id:'own-document',package_ref:{path},workflow_ref:{tab_tid:'own-tab',
  navigation_path:[{label:'Saved (только чтение)'}]}};
@@ -61,4 +61,57 @@ for(const scenario of ['clean','dirty','foreign','expired','already dispatched']
   assert.equal(result.cancellation.lock_may_remain,scenario!=='clean');
   if(scenario==='dirty')assert.equal(writes.get('cold/cleanup.json').reason,'UNSAVED_CHANGES');
  }
+});
+
+const refusalStart=source.indexOf('  if (\n    prepared.status !== "READY"');
+const refusalEnd=source.indexOf('\n\n  const origin',refusalStart);
+const classify=new Function('prepared','saved','state',source.slice(refusalStart,refusalEnd));
+for(const kind of ['rejected','foreign','readonly'])test('D56c cold Open keeps the exact refusal class: '+kind,()=>{
+ const p=kind==='rejected'?{status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED',effect_possible:true}:structuredClone(prepared);
+ if(kind==='foreign')p.package_ref.path='/foreign/other.lgp';
+ const state={};let error;
+ try{classify(p,{path},state);}catch(e){error=e;}
+ assert.equal(error?.message,{rejected:'COLD_PACKAGE_OPEN_NOT_READY',foreign:'COLD_PACKAGE_PATH_MISMATCH',readonly:'COLD_PACKAGE_NOT_WRITABLE'}[kind]);
+ assert.equal(state.openFailure?.reason,kind==='rejected'?'PACKAGE_OPEN_REJECTED':kind==='foreign'?'PACKAGE_PATH_MISMATCH':'PACKAGE_READ_ONLY');
+});
+
+for(const scenario of ['clean writer','dirty writer','no effect','transport lost','journal failure'])test('D56c saved rejected Open runs guarded cleanup before browser: '+scenario,async()=>{
+ const {makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode}=await import('../../../packages/loginom-runtime/client/lib/package-cleanup.mjs');
+ // Same refusal shape as LAB-138 q5-base cold-execution-events.jsonl:1.
+ const state={prepared:{status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED',effect_possible:scenario!=='no effect'},
+  openFailure:{status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED'},failure:'COLD_PACKAGE_OPEN_NOT_READY'};
+ const events=[],writes=new Map();
+ await run({state,saved:{path},session:'own-session',page:{},config:{loginom_url:'http://loginom.invalid/app/',workflow_profile:{loginom_user:'own'}},
+  makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode,
+  record:async()=>{events.push('diagnostic');if(scenario==='journal failure')throw Error('journal unavailable');},
+  rawExecute:async code=>{
+   assert.match(code,/bindFailedOpen/);assert.match(code,/diagnosticDiscard":false/);events.push('native');
+   if(scenario==='transport lost')throw Error('transport unavailable');
+   return {status:scenario==='dirty writer'?'BLOCKED':'SUCCEEDED',reason:scenario==='dirty writer'?'UNSAVED_CHANGES':null,
+    package_closed:scenario!=='dirty writer',logged_out:scenario!=='dirty writer',unsaved_changes_discarded:false};
+  },writeFile:async(name,body)=>writes.set(name,JSON.parse(body)),join:(...p)=>p.join('/'),args:{output:'cold'},
+  context:{close:async()=>events.push('browser')}});
+ assert.deepEqual(events,scenario==='no effect'?['diagnostic','browser']:['diagnostic','native','browser']);
+ const result=writes.get('cold/result.json');assert.equal(result.error,'COLD_PACKAGE_OPEN_NOT_READY');
+ assert.equal(result.reason,'PACKAGE_OPEN_REJECTED');assert.equal(result.status,'FAIL');
+ assert.equal(result.cleanup.package_closed,['clean writer','journal failure'].includes(scenario));
+ if(scenario==='dirty writer')assert.equal(result.cleanup.reason,'UNSAVED_CHANGES');
+ if(scenario==='transport lost')assert.equal(result.cleanup.status,'BLOCKED');
+});
+
+test('D56c slow Open diagnostics cannot hold cleanup beyond the remaining read budget',async()=>{
+ const {makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode}=await import('../../../packages/loginom-runtime/client/lib/package-cleanup.mjs');
+ const state={prepared:{status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED',effect_possible:true},
+  openFailure:{status:'NOT_READY',reason:'PACKAGE_OPEN_REJECTED'},openDeadline:Date.now()+20,failure:'COLD_PACKAGE_OPEN_NOT_READY'};
+ const events=[],writes=new Map();let snapshot;
+ await run({state,saved:{path},session:'own-session',page:{},config:{loginom_url:'http://loginom.invalid/app/',workflow_profile:{loginom_user:'own'}},
+  makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode,
+  record:async e=>{snapshot=e.snapshot;events.push('diagnostic');},rawExecute:async code=>{
+   if(code.includes('readColdOpenFailure'))return new Promise(()=>{});
+   events.push('native');return {status:'SUCCEEDED',reason:null,package_closed:true,logged_out:true};
+  },writeFile:async(name,body)=>writes.set(name,JSON.parse(body)),join:(...p)=>p.join('/'),args:{output:'cold'},
+  context:{close:async()=>events.push('browser')}});
+ assert.deepEqual(events,['diagnostic','native','browser']);
+ assert.equal(snapshot.status,'unavailable');assert.equal(snapshot.reason,'diagnostic_timeout');
+ assert.equal(writes.get('cold/result.json').cleanup.package_closed,true);
 });
