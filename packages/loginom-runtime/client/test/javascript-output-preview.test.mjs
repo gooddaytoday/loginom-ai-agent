@@ -165,6 +165,17 @@ test('managed preview journals each fixed gesture and keeps cleanup pending unti
  assert.equal(f.records.filter(r=>r.phase==='node_step_completed').length,2);
  assert.equal(new Set(steps.map(r=>r.internal_operation_id)).size,2);
 });
+test('shared preview settlement admits managed lease disposal only with its exact journal acknowledgement',async()=>{
+ for(const refused of [false,true]){
+  const f=channelFixture();f.operation.groupingPreview={managed:true};
+  const record=f.options.record;
+  f.options.record=async e=>refused&&e.phase==='node_preview_lease_disposed'?{}:record(e);
+  const opening=createNodeProcedure(f.options).openJavascriptPreview(f.task.output);
+  if(refused)await assert.rejects(opening,/disposal was not durably acknowledged/);else await opening;
+  assert.equal(f.operation.groupingPreview.lease_disposed,refused?undefined:true);
+  assert.deepEqual(f.events,['click','F3']);
+ }
+});
 
 function preflightFixture(type){
  const f=fixture(),port={...f.port,tid:f.binding.workflow_ref.prefix+';Graph;Сортировка_и_накопленная_доля_выручки;Output_Data-0'};
@@ -289,7 +300,7 @@ for(const type of ['transform.group_data','transform.sorting','transform.calcula
    if(code.includes('browserReceipt')){
     browser.events.push('close');return {status:'SUCCEEDED',action_key:receipt.action_key,operation_id:receipt.id,effect_possible:true,cleanup_complete:true};
    }
-   if(code.includes('readNodePreviewSchema'))return {verified:true,inventory_complete:true,fields:schema,root_tid:root,
+   if(code.includes('readNodePreviewSchema'))return {verified:true,inventory_complete:true,settings_changed:false,fields:schema,root_tid:root,
     port:0,port_guid:f.port.port_guid,node_id:f.binding.node.node_id,node_context:f.context};
    if(browser.events.includes('F3')&&!browser.events.includes('close')){
     const state=structuredClone(f.state);state.ui.elements=[{ref:'ui-preview',tid:root,allowed_actions:[]},
@@ -483,7 +494,7 @@ for(const inputPort of [0,1])test('Join input '+inputPort+' selects its JS produ
   if(code.includes('runManagedJavascriptSelectionRead')||code.includes('runManagedJavascriptSelectionBody')||code.includes('runJavascriptOutputPreview'))
    return runInNewContext('('+code+')',{Symbol,Map,Date})(browser.page);
   if(code.includes('browserReceipt')){browser.events.push('close');return {status:'SUCCEEDED',action_key:receipt.action_key,operation_id:receipt.id,effect_possible:true,cleanup_complete:true};}
-  if(code.includes('readNodePreviewSchema'))return {verified:true,inventory_complete:true,
+  if(code.includes('readNodePreviewSchema'))return {verified:true,inventory_complete:true,settings_changed:false,
    fields:f.history.outcome.output.configuration.readback.output_mapping.fields.map(({index,name,label,type})=>({index,name,label,type})),
    root_tid:root,port:0,port_guid:f.port.port_guid,node_id:f.binding.node.node_id,node_context:f.context};
   if(browser.events.includes('F3')&&!browser.events.includes('close')){
