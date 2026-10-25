@@ -3082,6 +3082,31 @@ test('narrow storage name reads retain sibling type without issuing sibling cont
   }
 });
 
+test('D74 bound Import field waits for its preview in the original deadline without retyping',async()=>{
+ for(const fault of [null,'delayed_value','wrong_value','expired','foreign','foreign_mask','dialog']) {
+  const page=new Page(),c=importFormatField(page);let waits=0;
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,settlement_timeout_ms:10000,
+    prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},
+   async()=>({verified:true,document_id:'doc',workflow_id:'flow',node_id:fault==='foreign'&&waits?'other':'node',surface:'wizard',tid:'MF;TF-1;WizrdMCF'})));
+  const snapshot=await page.observe(),field=snapshot.ui.elements.find(e=>e.wizard_field?.name==='null_marker');
+  page.waitForTimeout=async ms=>{page.clock.advance(ms);waits++;
+   // Preview recomputation changes its epoch after blur, even between masks.
+   if(waits<60||fault==='expired')page.mutationObserver.callback([{}]);
+   if(['delayed_value','wrong_value'].includes(fault))c.input.value=waits<60||fault==='wrong_value'?'old':'.';
+   if(waits===1&&fault==='foreign_mask')page.add('div','foreign-mask','Loading').attrs.class='x-mask-msg';
+   if(waits===1&&fault==='dialog')page.add('div','foreign-dialog','Other').attrs.class='x-window';
+  };
+  const result=await page.act({verb:'set_wizard_field',ref:field.ref,text:'.'},snapshot);
+  const succeeds=fault===null||fault==='delayed_value';
+  assert.equal(result.status,succeeds?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='keyboard_type').length,1);
+  assert.equal(page.events.filter(e=>e==='Tab').length,1);
+  if(succeeds){assert.ok(waits>=60);assert.ok(result.trace.some(e=>e.event==='import_format_input_settled'));}
+  if(['expired','wrong_value'].includes(fault))assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+ }
+});
+
 test('import input completion waits through delayed preview masks and never repeats typing',async()=>{
   for(const mode of ['refresh','late_refresh','stuck','replacement','reverted','lost_tab_reply']) {
     const page=new Page(),c=importFormatField(page),snapshot=await page.observe();

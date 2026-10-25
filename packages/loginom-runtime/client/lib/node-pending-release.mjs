@@ -30,14 +30,18 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
   if(operation.lastReceipt.operation_id)requireValue(response.receipt.operation_id===operation.lastReceipt.operation_id,
    'The last wizard receipt identity changed');
   const r=response.receipt,n=r.output?.prepared_node_context,w=r.output?.wizard;
-  if(r.action_key==='ui.act'&&r.operation_id===operation.lastReceipt.operation_id
-    &&r.status==='AMBIGUOUS'&&r.effect_possible===true&&sameNode(n,node)&&n.surface==='wizard'
-    &&w?.status==='observed'&&w.root_ref&&Number.isFinite(state.deadline)&&Number.isFinite(state.pending.deadline)
+  const gestures=r.trace?.filter(e=>e.event==='ui_gesture_applied')??[];
+  const graphReturn=n?.surface==='graph'&&w?.status==='absent'
+    &&['confirm_wizard_close','finish_wizard','execute_wizard'].includes(gestures[0]?.verb);
+  if(r.action_key==='ui.act'&&typeof operation.lastReceipt.operation_id==='string'&&r.operation_id===operation.lastReceipt.operation_id
+    &&r.status==='AMBIGUOUS'&&r.effect_possible===true&&n?.verified===true&&sameNode(n,node)
+    &&(n.surface==='wizard'&&w?.status==='observed'&&w.root_ref||graphReturn)
+    &&Number.isFinite(state.deadline)&&Number.isFinite(state.pending.deadline)
     &&Math.min(operation.deadline,state.deadline,state.pending.deadline)>Date.now()
-    &&['WIZARD_OPEN_NOT_CONFIRMED','WIZARD_STEP_NOT_CONFIRMED','WIZARD_CANCEL_NOT_CONFIRMED','WIZARD_FINISH_NOT_CONFIRMED'].includes(r.error?.code)
-    &&r.trace?.filter(e=>e.event==='ui_gesture_applied').length===1
-    &&r.trace.some(e=>e.event==='ui_gesture_applied'&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','finish_wizard','execute_wizard','confirm_wizard_close'].includes(e.verb))) {
-   settleWizard={root_ref:w.root_ref,node:n,deadline:Math.min(operation.deadline,state.deadline,state.pending.deadline)};
+    &&['WIZARD_OPEN_NOT_CONFIRMED','WIZARD_STEP_NOT_CONFIRMED','WIZARD_CANCEL_NOT_CONFIRMED','WIZARD_FINISH_NOT_CONFIRMED','WIZARD_FIELD_NOT_CONFIRMED'].includes(r.error?.code)
+    &&gestures.length===1
+    &&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','finish_wizard','execute_wizard','confirm_wizard_close','set_wizard_field'].includes(gestures[0].verb)) {
+   settleWizard={root_ref:w.root_ref,graph_only:graphReturn,node:n,deadline:Math.min(operation.deadline,state.deadline,state.pending.deadline)};
    beforeSettlement=await readReleaseGraph(operation,node);
   }
  }

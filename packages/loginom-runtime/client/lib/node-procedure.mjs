@@ -338,7 +338,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(wizardConfirmation && (!preparedNodeContext || !['close','deactivation'].includes(wizardConfirmation.kind)))throw Error('A prepared wizard confirmation binding is required');
       if(releaseWizard&&!preparedNodeContext)throw Error('Wizard release requires its prepared node');
       if(settleWizard&&(!releaseWizard||!Number.isFinite(settleWizard.deadline)||settleWizard.deadline>operation.deadline
-        ||!settleWizard.root_ref||!settleWizard.node))throw Error('Wizard settlement requires its original receipt and deadline');
+        ||!settleWizard.root_ref&&settleWizard.graph_only!==true||!settleWizard.node))throw Error('Wizard settlement requires its original receipt and deadline');
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
       if(tableDialog)makeNodeTableContextCode(preparedNodeContext,tableDialog.table,{row_offset:0,row_limit:0,column_offset:0,column_limit:1});
@@ -630,7 +630,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
               ||!['input_port','output_port'].every(k=>JSON.stringify(n[k])===JSON.stringify(expected.node[k])))
             ||!['document_id','workflow_id','node_id'].every(k=>n[k]===expected.node[k])
             ||ws.ui.dialogs.length||ws.ui.masks.length&&!ownWizardMask&&!returnedGraph
-            ||settleWizard&&(!returnedGraph&&w.root_ref!==settleWizard.root_ref
+            ||settleWizard&&(!returnedGraph&&(settleWizard.graph_only||w.root_ref!==settleWizard.root_ref)
               ||!['document_id','workflow_id','node_id'].every(k=>n[k]===settleWizard.node[k])))
             throw Error('Owned wizard loading context changed');
           if(ownWizardMask||returnedGraph&&ws.ui.masks.length){settlingWizard=expected;deadline=Math.min(operation.deadline,settleWizard?.deadline??Infinity);}

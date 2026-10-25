@@ -972,6 +972,28 @@ test('D74 ordinary readiness waits only for its own wizard mask under the origin
  }
 });
 
+test('D74 receipt returning to graph cannot authorize another wizard during settlement',async()=>{
+ for(const fault of [null,'wizard','foreign']) {
+  let time=1,mutations=0;
+  const ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]},node={document_id:'doc',workflow_id:'wf',node_id:'node'};
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:ref,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+   prepared_node_context:{...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Import'},wizard:{status:'absent'},
+   ui:{elements:[],dialogs:[],masks:[{kind:'busy',ref:'model',target_tid:'MF;TF-1;ModelForm',graph_loading_owner_ref:'model',dialog_ref:null}],truncated:{dialogs:false,masks:false}}};
+  const operation={id:'parent',deadline:30000,action:{action_key:'node.apply',revision:'1'}};
+  const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:ref,node},targetOrigin:state.origin,targetBuild:state.loginom_build,
+   now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms;
+    if(fault==='wizard'){state.prepared_node_context.surface='wizard';state.prepared_node_context.tid='MF;TF-1;WizrdMCF';
+     state.wizard={status:'observed',root_ref:'wizard',root_tid:'MF;TF-1;WizrdMCF'};
+     state.ui.masks=[{kind:'busy',ref:'wizard',target_tid:'MF;TF-1;WizrdMCF',dialog_ref:null}];}
+    if(fault==='foreign')state.ui.masks[0].target_tid='foreign';
+    if(!fault&&time>=25000)state.ui.masks=[];},record:async e=>structuredClone(e),
+   execute:async()=>({status:'SUCCEEDED',output:structuredClone(state)}),wrapMutation:()=>{mutations++;}});
+  const run=()=>channel.observe({condition:'cancelled graph ready',releaseWizard:true,settleWizard:{graph_only:true,node,deadline:30000},ready:()=>true,timeoutMs:1000});
+  if(fault)await assert.rejects(run());else{await run();assert.ok(time>=25000);}
+  assert.equal(operation.deadline,30000);assert.equal(mutations,0);
+ }
+});
+
 test('bound completion gives mask settlement only the remaining parent deadline',async()=>{
   for(const verb of ['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views','finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column','click']) {
     const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};

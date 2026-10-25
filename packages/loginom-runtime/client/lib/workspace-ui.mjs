@@ -4577,11 +4577,14 @@ function readRenderedInputMapping(observation) {
             // Observe only: never type again while that refresh is pending.
             const contextMatches=fresh=>fresh.authenticated && fresh.origin===current.origin && fresh.loginom_build===current.loginom_build
               && same(fresh.workflow_ref,current.workflow_ref) && same(fresh.package_identity,current.package_identity)
+              &&same(fresh.active_identity,current.active_identity)&&fresh.dom_epoch.document===current.dom_epoch.document
+              &&(!task.prepared_node_context||same(fresh.prepared_node_context,current.prepared_node_context))
+              &&(!task.settlement_timeout_ms||!fresh.ui.masks.length||ownedLoadingMask(fresh))
               && fresh.active_tab_ref===current.active_tab_ref && fresh.wizard.root_ref===current.wizard.root_ref
               && fresh.wizard.stage===current.wizard.stage && same(fresh.wizard.owner_context,current.wizard.owner_context)
               && same(fresh.ui.dialogs,current.ui.dialogs);
             let stable=0,previous=null;
-            for(let attempt=0;attempt<40 && contextMatches(observed);attempt++) {
+            for(let attempt=0;(task.settlement_timeout_ms||attempt<40) && contextMatches(observed);attempt++) {
               const field=observed.ui.elements.find(e=>e.ref===before.ref);
               const ready=observed.ui.masks.length===0 && field?.interaction?.state==='point_observed'
                 && field.enabled && field.value===task.action.text;
