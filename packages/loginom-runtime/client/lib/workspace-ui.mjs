@@ -86,14 +86,16 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       dialog_ref:mask.dialog_ref,...(mask.import_preview_owner_ref?{import_preview_owner_ref:mask.import_preview_owner_ref}:{})}))});
     while (observed.ui.masks.length && unchanged(observed)) {
       await page.waitForTimeout(Math.min(250,timeout()));
-      timeout();observed=await read();
+      timeout();observed=await read();timeout();
     }
     record('ui_mask_wait_finished',{elapsed_ms:Date.now()-maskStarted,mask_present:observed.ui.masks.length>0});
     return observed;
   };
   const boundNode = async () => {
+    timeout();
     if (!task.prepared_node_context) return null;
     let binding=await readNodeContext(page,task.prepared_node_context);
+    timeout();
     // Opening/finishing replaces the graph and wizard asynchronously. Observe
     // that one completed gesture; never reissue it. Foreign package/workflow
     // or GUID failures do not enter this wait.
@@ -102,13 +104,16 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         ||task.action?.verb==='click'&&task.snapshot?.node_navigation_read===true) && (task.opening_timeout_ms || sample<200);sample++) {
       record('node_surface_wait',{condition:'prepared_node_surface_ready',sample});
       await page.waitForTimeout(Math.min(50,timeout()));
+      timeout();
       binding=await readNodeContext(page,task.prepared_node_context);
+      timeout();
     }
     if(binding?.reason==='tab'&&processShowCompleted&&!processFocusAttempted&&processFocusTicket&&restoreProcessFocus){
       processFocusAttempted=true;timeout();mouseHeld=true;mouseButton='left';
       const restored=await restoreProcessFocus(page,processFocusTicket);
       mouseHeld=false;
-      if(restored.restored){record('process_node_focus_restored',restored.proof);timeout();binding=await readNodeContext(page,task.prepared_node_context);}
+      timeout();
+      if(restored.restored){record('process_node_focus_restored',restored.proof);binding=await readNodeContext(page,task.prepared_node_context);timeout();}
     }
     if(binding?.verified!==true)fail('PREPARED_NODE_CONTEXT_CHANGED','The prepared package, workflow or node changed: '+(binding?.reason??'surface_unavailable'));
     return binding;
@@ -3505,6 +3510,7 @@ function readRenderedInputMapping(observation) {
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
     preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
+    timeout();
     if (observed?.ui_read_failure) {
       const code=observed.ui_read_failure.code;
       if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown'});
@@ -3825,7 +3831,7 @@ function readRenderedInputMapping(observation) {
         });
         if (!same(current.dom_epoch,epochBeforeGesture)) fail('UI_EPOCH_CHANGED','The document changed while checking the target; observe again');
         record('ui_preconditions_verified', { verb: task.action.verb, refs });
-        phase = 'applying'; effectPossible = true;
+        timeout();phase = 'applying'; effectPossible = true;
         const first = targets[0].handle;
         const clickTarget = async (clickCount, button = 'left') => {
           timeout(); mouseHeld = true; mouseButton = button;
@@ -4432,7 +4438,7 @@ function readRenderedInputMapping(observation) {
           if (matches.length!==1 || matches[0].check_state.checked!==task.action.checked || matches[0].check_state.indeterminate) fail('UI_STATE_NOT_CONFIRMED','The requested checked state was not confirmed; inspect before any retry');
           record('ui_state_verified',{verb:task.action.verb,ref:matches[0].ref,checked:task.action.checked});
         }
-        phase = 'completed';
+        timeout();phase = 'completed';
         outcome = result('SUCCEEDED', { ...observed, gesture_applied: effectPossible, verification_required: true });
       }
     } catch (error) {

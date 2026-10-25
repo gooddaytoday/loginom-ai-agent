@@ -14,9 +14,11 @@ test('absolute node deadline rejects invalid or unbounded waits',()=>{
 });
 
 // LAB-148: the 10 s dispatch delay must consume the original 60 s budget.
-for(const [readyAt,transportDelay] of [[54000,10000],[64000,10000],[64000,59000]])
-test(`D50b dispatched views keep parent deadline: ready ${readyAt}, transport ${transportDelay}`,async()=>{
-  let elapsed=1000,clicked=false,receipt;
+for(const [readyAt,transportDelay,fault='none'] of [[54000,10000],[64000,10000],[64000,59000],
+  [64000,10000,'poll_wake'],[64000,10000,'pending_reader'],[54000,10000,'ready_reader'],
+  [54000,10000,'initial_reader'],[54000,10000,'gesture_reader'],[54000,10000,'preflight_epoch']])
+test(`D50b dispatched views keep parent deadline: ready ${readyAt}, transport ${transportDelay}, ${fault}`,async()=>{
+  let elapsed=1000,clicked=false,receipt,armed=false,reads=0;
   class Clock extends Date {static now(){return elapsed;}}
   const page=new Page({clock:Clock});
   page.add('g','MF;TF-1;Graph;Node');
@@ -25,14 +27,25 @@ test(`D50b dispatched views keep parent deadline: ready ${readyAt}, transport ${
   const node={document_id:'doc',workflow_id:'wf',node_id:'node-0'};
   const workflow_ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:page.tab.getAttribute('data-tid'),navigation_path:[{tid:'scenario',label:'Scenario'}]};
   const binding={document_id:'doc',workflow_ref,node};
-  const reader=async()=>clicked&&elapsed<readyAt?{verified:false,surface_pending:true}:
-    {verified:true,...node,surface:clicked?'views':'graph',tid:'MF;TF-1;'+(clicked?'ViewsForm':'Graph;Node'),...(!clicked?{locked:false}:{})};
+  const reader=async()=>{
+    if(armed)reads++;
+    if(armed&&(fault==='initial_reader'&&reads===1||fault==='gesture_reader'&&reads===3
+      ||fault==='pending_reader'&&clicked&&elapsed===59950||fault==='ready_reader'&&clicked&&elapsed===readyAt))elapsed=64000;
+    return clicked&&elapsed<readyAt?{verified:false,surface_pending:true}:
+      {verified:true,...node,surface:clicked?'views':'graph',tid:'MF;TF-1;'+(clicked?'ViewsForm':'Graph;Node'),...(!clicked?{locked:false}:{})};
+  };
   const observed=await runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
     {mode:'observe',expected_origin:origin,expected_build:build,prepared_node_context:binding},reader);
   const target=observed.output.ui.elements.find(e=>e.tid==='MF;TF-1;Graph;Node;Visualizers');
   const click=page.mouse.click;
   page.mouse.click=async(...args)=>{await click(...args);clicked=true;};
-  page.waitForTimeout=async ms=>{elapsed+=ms;};
+  page.waitForTimeout=async ms=>{elapsed+=ms;if(fault==='poll_wake'&&elapsed===60000)elapsed=64000;};
+  const evaluate=page.evaluate.bind(page);
+  page.evaluate=async(fn,...args)=>{
+    const result=await evaluate(fn,...args);
+    if(armed&&fault==='preflight_epoch'&&fn.toString().includes('return {document:state.epoch,revision:state.revision}'))elapsed=64000;
+    return result;
+  };
   page.context.readOwnedContext=reader;
   const operation={id:'parent',deadline:60000,action:{action_key:'node.apply',revision:'1'}};
   const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:origin,targetBuild:build,
@@ -46,17 +59,20 @@ test(`D50b dispatched views keep parent deadline: ready ${readyAt}, transport ${
       return receipt;
     }});
   await channel.observe({condition:'own graph',ready:()=>true});
+  armed=true;
   const act=()=>channel.act({verb:'open_node_views',ref:target.ref});
-  if(readyAt<operation.deadline){
+  const noGesture=transportDelay===59000||['initial_reader','gesture_reader','preflight_epoch'].includes(fault);
+  if(readyAt<operation.deadline&&fault==='none'){
     await act();assert.equal(receipt.status,'SUCCEEDED');assert.equal(elapsed,readyAt);
   }else{
     await assert.rejects(act());
     assert.equal(receipt.error.code,'UI_DEADLINE_EXCEEDED');
-    assert.equal(receipt.status,transportDelay===59000?'NOT_APPLIED':'AMBIGUOUS');
+    assert.equal(receipt.status,noGesture?'NOT_APPLIED':'AMBIGUOUS');
   }
-  assert.ok(elapsed<=60000,`parent deadline exceeded at ${elapsed}`);
+  if(fault==='none')assert.ok(elapsed<=60000,`parent deadline exceeded at ${elapsed}`);
+  else assert.equal(elapsed,64000,'The fixture must exercise a late asynchronous return');
   assert.equal(operation.deadline,60000);
-  assert.equal(page.clickedPoints.length,transportDelay===59000?0:1);
+  assert.equal(page.clickedPoints.length,noGesture?0:1);
 });
 
 // D50b: saved p17:128 and r4-base:82 contain one open_node_views
