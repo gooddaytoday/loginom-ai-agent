@@ -12,7 +12,7 @@ import {makeDateTimeContextCode} from './date-time-context.mjs';
 import {makeMissingValuesContextCode} from './missing-values-context.mjs';
 import {makeCollapseContextCode} from './collapse-context.mjs';
 import { createHash } from 'node:crypto';
-import { makeWorkspaceUiCode, validateUiAction } from './workspace-ui.mjs';
+import { makeWorkspaceUiCode, validateUiAction, makeBlockingWindowDiagnosticCode } from './workspace-ui.mjs';
 import {validatePreparedNodeContext} from './node-context.mjs';
 import {makeNodeMappingContextCode} from './node-mapping-context.mjs';
 import {makeNodePreviewSchemaCode} from './node-preview-schema.mjs';
@@ -528,6 +528,15 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           await entry('node_observation_context_refused', {step, sample, internal_operation_id:id,
             condition, reason:error.message, outcome:structuredClone(result)});
           const dialogs=result.output.ui?.dialogs;
+          if(error.message==='Node procedure is blocked by a mask or dialog'&&dialogs?.length
+              &&!signal?.aborted&&observationNow()+MIN_OBSERVATION_READ_MS<deadline) {
+            try {
+              const snapshot=await execute(makeBlockingWindowDiagnosticCode({refs:dialogs.map(d=>d.ref),origin:targetOrigin,build:targetBuild}),{timeout:readTimeout()});
+              await entry('node_blocking_window_native',{step,sample,internal_operation_id:id,condition,snapshot});
+            } catch {
+              await entry('node_blocking_window_native_unavailable',{step,sample,internal_operation_id:id,condition}).catch(()=>{});
+            }
+          }
           const blocker=dialogs?.length===1&&dialogs[0].text==='[outside selected root]'?dialogs[0]:null;
           // Inspect this already observed portal for diagnostics only. It is
           // never promoted to a usable node snapshot or dismissed as owned.

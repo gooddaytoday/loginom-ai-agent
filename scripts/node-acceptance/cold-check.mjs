@@ -365,6 +365,8 @@ page = context.pages()[0]
   )
   await writeFile(join(args.output, "cleanup.json"), JSON.stringify(cleanup, null, 2) + "\n")
   state.cleanup=cleanup
+  if(cleanup.native_close_readback)await record({phase:'cold_native_close_readback',readback:cleanup.native_close_readback,
+    modified_before_close:cleanup.modified_before_close,cleanup_status:cleanup.status,cleanup_reason:cleanup.reason}).catch(()=>undefined)
   if (cleanup.status !== "SUCCEEDED" || !cleanup.package_closed || !cleanup.logged_out)
     throw Error("COLD_CLEANUP_UNCONFIRMED")
   state.closed = true
@@ -424,7 +426,12 @@ page = context.pages()[0]
         diagnosticWaitForIdle: !readOnly && !state.cancelled,
       }),
     )
-      .then((result) => {state.cleanup=result;return writeFile(join(args.output, "cleanup.json"), JSON.stringify(result, null, 2) + "\n")})
+      .then(async (result) => {
+        state.cleanup=result
+        if(result.native_close_readback)await record({phase:'cold_native_close_readback',readback:result.native_close_readback,
+          modified_before_close:result.modified_before_close,cleanup_status:result.status,cleanup_reason:result.reason}).catch(()=>undefined)
+        return writeFile(join(args.output, "cleanup.json"), JSON.stringify(result, null, 2) + "\n")
+      })
       .catch(() => console.error("COLD_PACKAGE_CLEANUP_UNCONFIRMED"))
   }
   if(state.failure&&!state.cleanupExpired)await writeFile(join(args.output,'result.json'),JSON.stringify({status:'FAIL',
