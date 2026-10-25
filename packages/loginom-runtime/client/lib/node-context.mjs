@@ -124,9 +124,17 @@ export async function readPreparedNodeContext(page, binding) {
     // Done/Execute and Table reads keep the same cached native workflow even
     // when toolbar overflow hides its breadcrumb. This is context, not a ref
     // authorizing a gesture on the hidden component.
-    if(['graph','views'].includes(surface)) {
+    if(['graph','views','wizard'].includes(surface)) {
       const module=workflowNode.ParentNode,ancestors=[packageNode,module,workflowNode];
+      const branch=[];
+      if(surface==='wizard')for(let n=card.Controller.Node?.data?.node;n&&n!==workflowNode&&branch.length<5;n=n.ParentNode)branch.unshift(n);
+      const wizardAncestry=surface!=='wizard'||branch[0]===nodeTree
+        &&crumbs.length===b.workflow_ref.navigation_path.length+branch.length&&branch.every((n,i)=>{
+          const es=exact(crumbs[b.workflow_ref.navigation_path.length+i].tid),c=es.length===1&&globalThis.Ext?.getCmp(es[0].id);
+          return c?.el?.dom===es[0]&&c?._node?.data?.node===n;
+        });
       if(b.workflow_ref.navigation_path.length===5&&module?.ParentNode===packageNode
+        &&wizardAncestry
         &&crumbs.slice(2,5).every((crumb,i)=>{
           const es=exact(crumb.tid),c=es.length===1&&globalThis.Ext?.getCmp(es[0].id);
           return c?.el?.dom===es[0]&&c?._node?.data?.node===ancestors[i];
@@ -150,12 +158,20 @@ export async function readPreparedNodeContext(page, binding) {
         }
       }
     }
+    let overviewNode;
+    if(nodeTree&&(surface==='graph'&&crumbs.length===b.workflow_ref.navigation_path.length+1
+      ||surface==='wizard'&&inputNavigationWorkflow)) {
+      overviewNode=crumbs[b.workflow_ref.navigation_path.length];
+      const es=exact(overviewNode.tid),c=es.length===1&&globalThis.Ext?.getCmp(es[0].id);
+      if(inputNavigationWorkflow&&c?.el?.dom===es[0]&&c?._node?.data?.node===nodeTree)
+        overviewNode={...overviewNode,native_bound:true};
+    }
     return {verified:true,document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,surface,tid,
       ...(outputPort?{[outputPort.direction==='input'?'input_port':'output_port']:outputPort}:{}),
-      ...(inputNavigationNode?{navigation_node:inputNavigationNode}:{}),
+      ...(overviewNode?{navigation_node:overviewNode}:inputNavigationNode?{navigation_node:inputNavigationNode}:{}),
       ...(inputNavigationWorkflow?{navigation_workflow:inputNavigationWorkflow}:{}),
       ...(workflowOverflow?{workflow_overflow:workflowOverflow}:{}),
-      ...(surface==='graph'?{locked,...(nodeTree&&crumbs.length===b.workflow_ref.navigation_path.length+1?{navigation_node:crumbs.at(-1)}:{}),
+      ...(surface==='graph'?{locked,
         ...(pendingWizardNode?{pending_wizard_node:pendingWizardNode}:{})}:{} )};
   },binding);
 }

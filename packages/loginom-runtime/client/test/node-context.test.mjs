@@ -64,7 +64,14 @@ function fixture() {
       bar.layout.overflowHandler.menuTrigger=trigger;me.querySelectorAll=()=>[ie];activeElements.push(...elements);
       const old=context.Ext.getCmp;context.Ext.getCmp=id=>id.startsWith('overflow-')?[bar,trigger,menu,item][Number(id.slice(9))]:old(id);
       return {bar,trigger,menu,item};
-    },leaveInput:surface=>{crumbs=crumbs.slice(0,binding.workflow_ref.navigation_path.length);controller.Node.data.node=workflowNode;controller.FController=graph;activeElements=[tab,root,dom,...crumbs];if(surface==='views'){enterViews();activeElements.push(...crumbs);}},enterOverview:()=>{controller.Node.data.node=nodeTree;crumbs.push({...element(binding.workflow_ref.navigation_path[0].tid+'>Import-3'),textContent:'Import'});},enterViews,record,preparation,workflowNode,nodeTree,enterWizard,enterPortWizard,tab,graph,
+    },enterMainBreadcrumbs:()=>{
+      class WizardModelComponentForm{};
+      const w={ParentNode:nodeTree},model=Object.assign(new WizardModelComponentForm(),{FModelNode:nodeTree.FModelNode});
+      controller.FController=model;controller.Node.data.node=w;
+      const e={...element(crumbs[5].getAttribute()+'>Настройка'),id:'main-wizard',textContent:'Настройка'},c={el:{dom:e},_node:{data:{node:w}}};
+      crumbs=[...crumbs.slice(0,6),e];activeElements=[tab,wizard,...crumbs];const old=context.Ext.getCmp;context.Ext.getCmp=id=>id===e.id?c:old(id);
+      return {c,w,model};
+    },leaveInput:surface=>{crumbs=crumbs.slice(0,binding.workflow_ref.navigation_path.length);controller.Node.data.node=workflowNode;controller.FController=graph;activeElements=[tab,root,dom,...crumbs];if(surface==='views'){enterViews();activeElements.push(...crumbs);}},enterOverview:()=>{controller.Node.data.node=nodeTree;const e={...element(binding.workflow_ref.navigation_path.at(-1).tid+'>Import-3'),id:'overview',textContent:'Import'};crumbs.push(e);activeElements.push(e);const c={el:{dom:e},_node:{data:{node:nodeTree}}};if(context.Ext){const old=context.Ext.getCmp;context.Ext.getCmp=id=>id==='overview'?c:old(id);}return c;},enterViews,record,preparation,workflowNode,nodeTree,enterWizard,enterPortWizard,tab,graph,
     cloneNode:inside=>{const clone=element(dom.getAttribute());activeElements.push(clone);if(inside)root.contains=e=>e===dom||e===clone;},changeCrumb:()=>crumbs[0].textContent='Other',duplicateTab:()=>activeElements.push(tab)};
 }
 test('graph context ignores outline copies outside the native canvas but rejects duplicate nodes inside it',async()=>{
@@ -205,5 +212,26 @@ test('workflow overflow item belongs to the exact native toolbar, menu and cache
   if(fault==='item_dom')p.item.el.dom={};if(fault==='item_owner')p.item.ownerCt={};if(fault==='item_workflow')p.item._node.data.node={};
   const r=await readPreparedNodeContext(f.page,f.binding);
   assert.equal(!!r.workflow_overflow?.item_tid,fault==='valid',fault);
+ }
+});
+
+test('hidden overview node context additionally requires its exact native breadcrumb component',async()=>{
+ for(const fault of ['valid','node','dom','workflow']) {
+  const f=fixture(),p=f.enterInputBreadcrumbs(true);f.leaveInput('graph');const c=f.enterOverview();
+  if(fault==='node')c._node.data.node={};if(fault==='dom')c.el.dom={};if(fault==='workflow')p.ancestors[2]._node.data.node={};
+  const r=await readPreparedNodeContext(f.page,f.binding);
+  assert.equal(r.navigation_node?.native_bound===true,fault==='valid',fault);
+ }
+});
+
+test('deep main wizard context keeps its exact native node and Settings ancestry',async()=>{
+ for(const fault of ['valid','settings_node','settings_dom','parent','model','node_component']) {
+  const f=fixture(),input=f.enterInputBreadcrumbs(true),p=f.enterMainBreadcrumbs();
+  if(fault==='settings_node')p.c._node.data.node={};if(fault==='settings_dom')p.c.el.dom={};
+  if(fault==='parent')p.w.ParentNode={ParentNode:f.nodeTree};if(fault==='model')p.model.FModelNode={};
+  if(fault==='node_component')input.components[0]._node.data.node={};
+  const r=await readPreparedNodeContext(f.page,f.binding);
+  assert.equal(!!r.navigation_workflow,fault==='valid',fault);
+  if(fault==='valid')assert.equal(r.navigation_node.native_bound,true);
  }
 });

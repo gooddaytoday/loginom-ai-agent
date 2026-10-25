@@ -5047,7 +5047,7 @@ test('prepared node overview binds a multiline automatic key without trusting co
 });
 
 test('D52b graph and overview read hidden workflow context without issuing a hidden gesture',async()=>{
- for(const overview of [false,true])for(const fault of ['valid','missing','foreign','hidden','opacity','icon','path']) {
+ for(const overview of [false,true])for(const fault of ['valid','missing','foreign','hidden','opacity','icon','path',...(overview?['hidden_node','unbound_hidden_node','foreign_hidden_node']:[])]) {
   const {page,panel}=await nodeOverviewContextFixture(),crumbs=[...panel.children];
   const path=crumbs.slice(0,5).map(e=>({tid:e.attrs['data-tid'],label:e.textContent.trim()}));
   if(!overview)crumbs[5].remove();
@@ -5056,12 +5056,15 @@ test('D52b graph and overview read hidden workflow context without issuing a hid
   if(fault==='opacity')flow.style.opacity='0';
   if(fault==='icon')flow.children[0].attrs.class='maptree-icon-other';
   if(fault==='path')path[3].tid+='foreign';
+  if(fault.includes('hidden_node')){crumbs[5].style.display='none';crumbs[5].box={x:0,y:0,width:0,height:0};}
   const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}};
   const reader=async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'graph',tid:'MF;TF-5;Graph;Изменение',
-    ...(fault==='missing'?{}:{navigation_workflow:{tid:fault==='foreign'?'foreign':flow.attrs['data-tid'],label:flow.textContent.trim()}})});
+    ...(fault==='missing'?{}:{navigation_workflow:{tid:fault==='foreign'?'foreign':flow.attrs['data-tid'],label:flow.textContent.trim()}}),
+    ...(fault.includes('hidden_node')?{navigation_node:{tid:fault==='foreign_hidden_node'?'foreign':crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim(),native_bound:fault!=='unbound_hidden_node'}}:{})});
   const r=await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
    {mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:binding},reader);
-  assert.equal(r.output[overview?'node_context':'navigation_context'].status==='observed',fault==='valid',overview+':'+fault);
+  assert.equal(r.output[overview?'node_context':'navigation_context'].status==='observed',['valid','hidden_node'].includes(fault),overview+':'+fault);
+  if(fault.includes('hidden_node'))assert.equal(r.output.navigation_context.status,'unobserved');
   assert.equal(r.output.ui.elements.some(e=>e.tid===flow.attrs['data-tid']&&e.allowed_actions.length>0),false);
   assert.deepEqual(page.events,[]);
  }
@@ -5088,6 +5091,24 @@ test('D52b return uses the visible native workflow menu item and never its hidde
   if(fault==='valid')assert.ok(r.output.ui.elements.find(e=>e.ref===nav.control_ref).allowed_actions.includes('click'));
   assert.equal(r.output.ui.elements.some(e=>e.tid===flow.attrs['data-tid']&&e.allowed_actions.length>0),false);
   assert.deepEqual(page.events,[]);
+ }
+});
+
+test('D52b hidden main wizard owner requires complete native node and workflow metadata',async()=>{
+ for(const fault of ['valid','workflow','node','foreign_node']) {
+  const {page,panel}=await nodeOverviewContextFixture(),crumbs=[...panel.children],flow=crumbs[4],node=crumbs[5];
+  const path=crumbs.slice(0,5).map(e=>({tid:e.attrs['data-tid'],label:e.textContent.trim()}));
+  for(const e of [flow,node]){e.style.display='none';e.box={x:0,y:0,width:0,height:0};}
+  const settings=page.add('a',node.attrs['data-tid']+'>Настройка','Настройка',{x:0,y:0,width:0,height:0},panel);settings.style.display='none';
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},settings).attrs.class='maptree-icon-wizard';
+  const wizard=page.add('div','MF;TF-5;WizrdMCF','',{x:48,y:71,width:1000,height:700});
+  page.add('div','MF;TF-5;WizrdMCF;ReformColumnsWizard;grdTargetColumns;tbl','',{x:100,y:100,width:500,height:300},wizard);
+  const reader=async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:'MF;TF-5;WizrdMCF',
+    ...(fault==='workflow'?{}:{navigation_workflow:path[4]}),navigation_node:{tid:fault==='foreign_node'?'foreign':node.attrs['data-tid'],label:node.textContent.trim(),native_bound:fault!=='node'}});
+  const r=await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}}},reader);
+  assert.equal(r.output.wizard.owner_context.status==='observed',fault==='valid',fault);
+  assert.equal(r.output.ui.elements.some(e=>[flow,node,settings].some(n=>n.attrs['data-tid']===e.tid)&&e.allowed_actions.length>0),false);
  }
 });
 
