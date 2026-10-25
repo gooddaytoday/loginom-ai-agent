@@ -816,12 +816,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           const scanRefusal=timeScanRefusal(r,'ui.act');
           const graphRefusal=action.verb==='execute_graph_node'&&r.phase==='preconditions'
             &&r.error?.code==='GRAPH_EXECUTION_CONTEXT_CHANGED';
-          const nodeChanges=r.trace.filter(e=>e.event==='prepared_node_context_changed_before_gesture');
+          const nodeChanges=r.trace.filter(e=>['prepared_node_context_changed_before_gesture','prepared_node_surface_mismatch'].includes(e.event));
           const before=nodeChanges[0]?.before,after=nodeChanges[0]?.after;
           // The strict pre-gesture guard did not dispatch. Only a lock-only
           // change of this same native graph node permits a full fresh read;
           // neither the rejected snapshot nor its UI refs can be reused.
-          const nodeLockRefusal=!!preparedNodeContext&&r.phase==='preconditions'
+          const progressReadRefusal=r.phase==='observing'&&action.verb==='click'
+            &&observed.ui.elements.find(e=>e.ref===action.ref)?.tid==='MF;cntMain;tlbMainToolbar;btnProgress'
+            &&nodeChanges[0]?.event==='prepared_node_surface_mismatch';
+          const nodeLockRefusal=!!preparedNodeContext&&(progressReadRefusal
+            ||r.phase==='preconditions'&&nodeChanges[0]?.event==='prepared_node_context_changed_before_gesture')
             &&r.error?.code==='PREPARED_NODE_CONTEXT_CHANGED'&&nodeChanges.length===1
             &&before?.verified===true&&after?.verified===true&&before.surface==='graph'&&after.surface==='graph'
             &&typeof before.locked==='boolean'&&typeof after.locked==='boolean'&&before.locked!==after.locked
