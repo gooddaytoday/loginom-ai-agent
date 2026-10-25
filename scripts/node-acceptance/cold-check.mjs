@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url"
 import { randomUUID } from "node:crypto"
 import {observeStaticSources,verifyStaticSourceBytes,bindColdExecutions,observeExportDestinations} from './static-source-proof.mjs'
 import {makeColdSourceRevealCode} from './cold-source-viewport.mjs'
-import {coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews,coldProcessObservation} from './cold-reader-policy.mjs'
+import {coldNativeEligible,performColdNodeAction,runColdExecution,openColdOutputViews,openColdTableFilter,coldProcessObservation} from './cold-reader-policy.mjs'
 
 // Независимый oracle приёмки узла. Ожидания берутся из --expected, а не из
 // захардкоженных Alpha/Beta. Существующий cold-readback.mjs не меняется.
@@ -302,7 +302,7 @@ page = context.pages()[0]
       receipt_namespace:session,receipt_id:r.id,receipt_signature:r.signature,operation_id:r.id})})
    :openColdOutputViews(channel,args,{node,operation,readReceipt,record})})
   const precision = await configureTablePrecision(channel, opened.table)
-  const readSettings = await prepareTableRead(channel, opened.table)
+  const readSettings = await prepareTableRead(channel, opened.table, {openFilter:args=>openColdTableFilter(channel,args,{node,operation,readReceipt,record})})
   const raw = await readTableOutputPages(channel, opened.table, {
     sampleRows: Math.max(10, ...expectedOutputs.map(o=>o.rows.length)),
   })

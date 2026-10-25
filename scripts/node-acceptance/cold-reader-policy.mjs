@@ -91,6 +91,60 @@ export async function openColdOutputViews(channel,{state,output},{node,operation
  }
 }
 
+// D67: a completed late Filter click may already have opened its dialog.
+// Settle that exact owned effect by reads only, within the original parent
+// deadline. Neither the ambiguous receipt nor the click is retried/relabelled.
+export async function openColdTableFilter(channel,{state,table},{node,operation,readReceipt,record,now=Date.now}) {
+ const deadline=operation.deadline,condition='settle the dispatched cold Table Filter';
+ const owned=s=>s.prepared_node_context?.verified===true
+  &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k])
+  &&s.prepared_node_context.surface==='views'&&s.node_outputs?.verified===true
+  &&s.node_outputs.tables?.filter(t=>t.active&&['table_tid','view_guid','port_guid'].every(k=>t[k]===table[k])).length===1;
+ const controls=s=>s.ui.elements.filter(e=>e.tid===table.table_tid+';btnDataGridFilter'&&e.allowed_actions.includes('click'));
+ if(now()>=deadline||!owned(state)||controls(state).length!==1)throw Error('Owned cold Table Filter required before opening');
+ const ref=controls(state)[0].ref;
+ try {
+  await channel.perform({condition:'open bound Table filter',initialObservation:state,
+   ready:s=>owned(s)&&controls(s).length===1,resolve:s=>({verb:'click',ref:controls(s)[0].ref}),identity:()=>({table})});
+ } catch(error) {
+  const r=error.receipt,step=channel.lastPreparedStep;
+  if(now()>=deadline||operation.transportUncertain||step?.action?.verb!=='click'||step.action.ref!==ref
+   ||r?.operation_id!==step.internal_operation_id||r.action_key!=='ui.act'||r.status!=='AMBIGUOUS'
+   ||r.phase!=='observing'||r.effect_possible!==true||r.cleanup_complete!==true
+   ||r.error?.code!=='UI_DEADLINE_EXCEEDED'||!Array.isArray(r.trace)
+   ||r.trace.filter(e=>e.event==='ui_preconditions_verified').length!==1
+   ||r.trace.find(e=>e.event==='ui_preconditions_verified')?.verb!=='click'
+   ||JSON.stringify(r.trace.find(e=>e.event==='ui_preconditions_verified')?.refs)!==JSON.stringify([ref])
+   ||r.trace.filter(e=>e.event==='ui_gesture_applied').length!==1
+   ||r.trace.find(e=>e.event==='ui_gesture_applied')?.verb!=='click')throw error;
+  const inspected=await readReceipt({id:step.internal_operation_id,operation_id:step.internal_operation_id,
+   action_key:'ui.act',signature:step.signature});
+  if(now()>=deadline||operation.transportUncertain||inspected?.state!=='completed'
+   ||JSON.stringify(inspected.receipt)!==JSON.stringify(r))throw error;
+  const ready=s=>owned(s)&&s.ui.masks.length===0&&s.ui.dialogs.length===1
+   &&s.ui.dialogs[0].identity?.anchor_tid===table.table_tid+';ModalWindow_BrowseFilter'
+   &&s.table_settings?.status==='observed'&&s.table_settings.kind==='filter'
+   &&s.table_settings.view_key===table.table_tid&&s.table_settings.modal_ref===s.ui.dialogs[0].ref
+   &&s.table_settings.filter?.enabled?.status==='observed'&&typeof s.table_settings.filter.enabled.value==='boolean';
+  for(;;) {
+   if(now()>=deadline||operation.transportUncertain)throw error;
+   try {
+    const settled=await channel.observe({condition,readOutputs:true,tableDialog:{table,kind:'filter'},
+     timeoutMs:Math.min(15000,deadline-now()),ready});
+    if(now()>=deadline||operation.transportUncertain||!ready(settled))throw error;
+    break;
+   }catch(pending){
+    // Each ordinary read keeps its existing 15-second limit. Only its exact
+    // readiness timeout may continue read-only settlement of this one click.
+    if(pending.name!=='NodeReadinessTimeout'||pending.condition!==condition)throw pending;
+   }
+  }
+  await record({phase:'cold_table_filter_settled',operation_id:operation.id,
+   opening_operation_id:r.operation_id,node,table,effect_possible:true,deadline});
+  if(now()>=deadline||operation.transportUncertain)throw error;
+ }
+}
+
 export async function performColdNodeAction(channel,options,{node,operation,record,now=Date.now}) {
  let binding,intent,verb,document,workflow,fresh;
  const identity=s=>{
