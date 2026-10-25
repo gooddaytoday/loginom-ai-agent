@@ -132,6 +132,11 @@ PASS: независимые правильные значения/schema или
 до вывода; нет утверждений о невидимых строках; ordinary read без Table/format;
 cleanup и исходный контекст подтверждены. Native full/Table-эталоны отдельно.
 После Save открыть пакет в новой сессии и проверить сохранённые настройки.
+Cold audit сначала штатно активирует сохранённые аналитические узлы для получения
+входных схем (без повторного Export), затем собирает полные исходные наблюдения
+штатными native readers;
+оператор отдельно сверяет значения и смысл отображаемых подписей с настройками
+задачи и выполненных операций. Это сохраняет независимость от нового reader.
 Нормальное завершение: package_closed=true, logged_out=true, своих Chromium нет.
 Потеря транспорта/exit процесса не доказывают cleanup: профиль изолировать,
 чистить только установленные ресурсы своей попытки, без чужих пакетов/сеансов.
@@ -141,18 +146,18 @@ cleanup и исходный контекст подтверждены. Native fu
 
 ## Checkpoint
 
-- Оба полных payload собраны из точных исходных коммитов выше; sourceDirty=false, manifest verification PASS.
-- Private artifacts/evidence: /tmp/loginom-port-live-20261025-gxg7qus9/; обычный runtime не менялся.
-- user назначен владельцем; headless device OAuth завершён, models --refresh обновил cache; Luna/high и Sol/xhigh реально ответили OK.
-- Normal CLI main-path839b2bb7: точные3×4, Save, native close/logout без discard, ACK/exit0, guard released, видимое окно закрыто — PASS.
-- c8d50e99: старый checker ошибся в порядке Ratio, до Save; native close не подтверждён, профиль quarantined. Все user sessions не закрывать.
-- eafaa4c9: startup bridge отказал до prepare; отдельные catalog/startup probes PASS, причина единичного отказа не доказана.
-- Candidate Luna low-liquidity1d12ceba: все35×5 значений/порядок/schema/freshness совпали с CSV-derived oracle; независимое ревью подтвердило честность модели.
-- Четыре ordinary read прошли без UI gestures; partial previews2/200,12/35,5/35 не выданы за full; финальный35/35 реально доставлен.
-- Save/native close/logout/ACK/exit0/guard/window и отсутствие своих Chromium подтверждены.
-- Полная задача ещё не PASS: Export executed, но storage search исчерпал12 прокруток /user до download; исходный отказ сохранён.
-- Собственная export-папка создана и независимо проверена: только parent-entry `..`; operator logout/browser close подтверждены.
-- Начата новая Luna low-liquidity a3b9fc4e с отдельной папкой после исправления окружения; старый Export не повторялся.
-- Временный model controller проверяет native cleanup/ACK/свои процессы/visible до передачи auth; self-check и повторное независимое ревью PASS.
-- Независимый checker35×5 отклонил испорченную копию с0строками и ложным read_limit; полный CSV первой попытки не подтверждён.
-- Остальная модельная серия, точная матрица и fault artifact ещё не запускались; первый полный модельный gate остаётся открыт.
+- Оба чистых CLI payload собраны/проверены из закреплённых выше коммитов; обычный runtime не менялся.
+- Private artifacts/evidence: /tmp/loginom-port-live-20261025-gxg7qus9/; user назначен владельцем, credentials вне git.
+- Device OAuth завершён; models --refresh дал запрошенные Luna/Sol, обе реально ответили OK через candidate CLI.
+- Normal CLI main-path839b2bb7: точные3×4, Save/nativeclose/logout/discardfalse/ACK/exit0/guard/window/process — PASS.
+- c8d50e99: старый checker упал до Save; nativeclose Package1 не доказан, профиль quarantined; все user sessions не закрывать.
+- eafaa4c9: startup bridge отказал до prepare; следующие pinned catalog/startup probes PASS, первопричина не доказана.
+- Luna lowliq1d12ceba: все35×5 значений/схема/порядок/freshness и честность PASS; Export downloadFAIL на12scroll переполненного /user, отказ сохранён.
+- Собственная export-папка подтверждена nativeUI (только parent..), logout/browserclose; новая попытка после исправления окружения, старый Export не повторялся.
+- Luna lowliqa3b9fc4e: port35×5 + native CSV1508bytes + cleanup PASS; независимое ревью подтверждено.
+- Model controller gate проверяет nativeclose/logout/ACK/visible/свои процессы до authcopy; self-check/review PASS; checker отверг0rows с ложным read_limit.
+- Cold Import16cols+source/format/Filter<1/topology5nodes4links подтверждены; после nativeactivation сохранённые Sort/Reform выполнены без перенастройки/Save/ExportExecute, обеASCkeys/exclusions/ExportUTF8comma/path сохранены.
+- Cold definition order отличается от explicit mapping операции; physicalDataSourceeffect/причина не установлены. Functional PASS сохраняется; cold-settings PARTIAL, не общий PASS.
+- Cold0d3b21bd cleanupBLOCKED: адресно закрыта одна PendingDisconnect session с exact ownpath; отсутствие/nativeadminlogout/browserclose подтверждены. Старый Package1 не трогали.
+- Последний cold4a89dc2c завершён nativeclose/logout/discardfalse/browserclose; collection исходных наблюдений требует отдельной оценки orderразличия.
+- Запущена baseline Luna low-liquidity как A/B-диагностика первого gate. Прочая серия/точная матрица/fault artifact ещё не запускались.
