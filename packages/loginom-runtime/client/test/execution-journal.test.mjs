@@ -6,6 +6,26 @@ import { join } from 'node:path';
 import { createExecutionJournal } from '../lib/execution-journal.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 
+test('JSON business text retains its exact whitespace in durable evidence and ACK',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'dock-json-text-'));
+ t.after(()=>rm(directory,{recursive:true,force:true}));
+ const record=createExecutionJournal({directory,metadata:{}});
+ const value=' {\n  "args": {"Code": "CHK12", "Route": "west"},\n  "message": "quoted \\\" space ",\n  "method": "GET"\n}\n';
+ const saved=await record({phase:'node_phase_completed',receipt:{value}});
+ assert.equal(saved.receipt.value,value);
+ assert.equal(JSON.parse((await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim()).receipt.value,value);
+});
+
+for(const value of ['{ "password": "first-private", "password": "safe-value" }',
+ '{ "text": "first-private", "text": "safe-value" }',
+ '{ "nested": { "api_key": "first-private" } }',
+ '{ "escaped": "first\\u002dprivate" }'])
+test('JSON text preservation cannot retain discarded or sensitive input: '+value,()=>{
+ const cleaned=createRedactor(['first-private']).redact({value}).value;
+ assert.doesNotMatch(cleaned,/first-private|first\\u002dprivate/);
+ assert.notEqual(cleaned,value);
+});
+
 test('operation evidence is durable, ordered and redacted independently of transcripts', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'dock-execution-journal-'));
   t.after(() => rm(directory, { recursive: true, force: true }));

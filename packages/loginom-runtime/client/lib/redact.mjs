@@ -55,7 +55,13 @@ export function createRedactor(knownValues = []) {
     if (depth > 40) throw new Error('Redaction nesting limit');
     if (typeof value === 'string') {
       if (/^[\s]*[\[{]/.test(value)) {
-        try { return JSON.stringify(clean(JSON.parse(value), seen, depth + 1)); }
+        try {
+          const cleaned=JSON.stringify(clean(JSON.parse(value), seen, depth + 1));
+          // Keep lossless JSON text when only insignificant whitespace differs.
+          // Duplicate keys, noncanonical escapes or any redaction still use the
+          // cleaned serialization, so discarded input cannot escape redaction.
+          return value.replace(/"(?:\\.|[^"\\])*"|[ \t\r\n]+/g,part=>part[0]==='"'?part:'')===cleaned?value:cleaned;
+        }
         catch (error) { if (!(error instanceof SyntaxError)) throw error; }
       }
       return text(value);
