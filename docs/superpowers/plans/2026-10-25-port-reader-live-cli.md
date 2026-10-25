@@ -141,20 +141,18 @@ cleanup и исходный контекст подтверждены. Native fu
 
 ## Checkpoint
 
-- Оба полных payload собраны; sourceDirty=false, штатная проверка манифестов PASS.
-- Артефакты/приватные evidence: /tmp/loginom-port-live-20261025-gxg7qus9/.
-- Владелец назначил user с пустым паролем; admin доступен для собственных ресурсов. Секреты не хранить в git.
-- Штатный models --refresh обновил private cache: исходные модели плана доступны без изменения artifact.
-- Headless device OAuth завершён; Luna/high и Sol/xhigh реально ответили OK через candidate CLI, exit0; credentials 0600.
-- Setup подтвердил вход и сохранение origin/path logi-test-plan/app/.
-- Временный harness использует штатный --command loginom-automation, полный teardown и отдельный разбор XML skill.
-- c8d50e99: Import+Calculator вернули точные 3×4; native mapping подтверждает Ratio первым.
-- Исправлен только checker: native mapping + fixture по именам; Save перед assertions, без нового recovery-механизма.
-- c8d50e99 остановился до Save: CONFIRMED_SAVE_REQUIRED, guard retained, профиль quarantined.
-- Native закрытие его Package1 не подтверждено; runtime session ID не определяет manager row. Чужие/все user sessions не закрывались.
-- eafaa4c9: startup bridge отказал до dispatch prepare с LOGINOM_HOST_REQUEST_FAILED; ресурсы ACK/exit0, своих окон нет.
-- Read-only bundled SDK: полный remote catalog и exact pinned action catalog PASS.
-- Отдельный bundled-module startup probe дошёл до ready без prepare и подтвердил закрытие ресурсов; это не CLI acceptance.
-- Причина единичного startup-отказа не доказана; исходная неудачная попытка сохранена.
-- Normal CLI main-path 839b2bb7: PASS; точные3×4, native Save, package_closed/logged_out=true, discard=false, exit0, guard released, окон нет.
-- Запущена первая модельная задача: candidate low-liquidity, Luna/high. Остальная серия/матрица ещё не запускались.
+- Оба полных payload собраны из точных исходных коммитов выше; sourceDirty=false, manifest verification PASS.
+- Private artifacts/evidence: /tmp/loginom-port-live-20261025-gxg7qus9/; обычный runtime не менялся.
+- user назначен владельцем; headless device OAuth завершён, models --refresh обновил cache; Luna/high и Sol/xhigh реально ответили OK.
+- Normal CLI main-path839b2bb7: точные3×4, Save, native close/logout без discard, ACK/exit0, guard released, видимое окно закрыто — PASS.
+- c8d50e99: старый checker ошибся в порядке Ratio, до Save; native close не подтверждён, профиль quarantined. Все user sessions не закрывать.
+- eafaa4c9: startup bridge отказал до prepare; отдельные catalog/startup probes PASS, причина единичного отказа не доказана.
+- Candidate Luna low-liquidity1d12ceba: все35×5 значений/порядок/schema/freshness совпали с CSV-derived oracle; независимое ревью подтвердило честность модели.
+- Четыре ordinary read прошли без UI gestures; partial previews2/200,12/35,5/35 не выданы за full; финальный35/35 реально доставлен.
+- Save/native close/logout/ACK/exit0/guard/window и отсутствие своих Chromium подтверждены.
+- Полная задача ещё не PASS: Export executed, но storage search исчерпал12 прокруток /user до download; исходный отказ сохранён.
+- Собственная export-папка создана и независимо проверена: только parent-entry `..`; operator logout/browser close подтверждены.
+- Начата новая Luna low-liquidity a3b9fc4e с отдельной папкой после исправления окружения; старый Export не повторялся.
+- Временный model controller проверяет native cleanup/ACK/свои процессы/visible до передачи auth; self-check и повторное независимое ревью PASS.
+- Независимый checker35×5 отклонил испорченную копию с0строками и ложным read_limit; полный CSV первой попытки не подтверждён.
+- Остальная модельная серия, точная матрица и fault artifact ещё не запускались; первый полный модельный gate остаётся открыт.
