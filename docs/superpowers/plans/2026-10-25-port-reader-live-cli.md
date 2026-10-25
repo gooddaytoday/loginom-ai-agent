@@ -148,27 +148,37 @@ Cold audit сначала штатно активирует сохранённы
 короткий последовательный main path, затем новые изолированные попытки. Завершение Xorg
 подтверждено журналом ОС; его первопричина не установлена.
 
+Одноразовые контроллеры занимают 978 строк, включая 233 строки повторно
+использованных transport/cold tools. После проверки объёма оставлены прямые
+ветки в одном существующем контроллере; новый runner, зависимости и общая
+система телеметрии не добавляются. Ожидание контроллера не должно обрывать
+штатные 600 секунд настройки; оно продлено до 720 секунд, без изменения runtime deadline.
+
 Test-only scripted provider возвращает 405 для non-POST до разбора JSON. Это устраняет
 наблюдавшийся сбой вспомогательного контроллера при GET; POST/SSE сохранён и проверен.
 Обычные CLI payload не меняются; точный источник случайного GET не установлен.
 
+В диагностике 18 фиксированных сбоев выполняются на одном подготовленном Filter,
+с новой операцией чтения и доказанным освобождением после каждого случая. Это убирает
+около 48 минут повторной настройки. Отдельный payload `diagnostic-fixed` выбирает
+только заранее разрешённый случай по точному ID операции при приватном sentinel;
+публичный контракт и обычные payload не меняются. Изменение прошло независимое
+ревью; пропущенная стадия отмены/deadline означает NOT_EXERCISED, а не PASS.
+
 ## Checkpoint
 
-- Оба чистых CLI payload собраны/проверены из закреплённых выше коммитов; обычный runtime не менялся.
-- Private artifacts/evidence: /tmp/loginom-port-live-20261025-gxg7qus9/; user назначен владельцем, credentials вне git.
-- Device OAuth завершён; models --refresh дал запрошенные Luna/Sol, обе реально ответили OK через candidate CLI.
-- Normal CLI main-path839b2bb7: точные3×4, Save/nativeclose/logout/discardfalse/ACK/exit0/guard/window/process — PASS.
-- c8d50e99: старый checker упал до Save; nativeclose Package1 не доказан, профиль quarantined; все user sessions не закрывать.
-- После сбоя Xorg09:49:38Z: densebfbca8db доreader, seedSol92db50d8 послеImport10×2/доCalcнастройки, multifacts7ab6486c после30cells/доfinishSave, cartesian10242f6a доprepare; nativecleanup не доказан, attempts quarantined. Raw/audit сохранены. Повторы — новые профили/пакеты после устранения внешнего сбоя.
-- Luna lowliq1d12ceba: все35×5 значений/схема/порядок/freshness и честность PASS; Export downloadFAIL на12scroll переполненного /user, отказ сохранён.
-- Пострестарт: манифесты всех3payload/source identity PASS; новый mainpatheec4b9dc3×4/Save/nativeclose/logout/ACK/window/process PASS. Прогоны последовательно; модельный повтор после X-восстановления — новый attempt, старые операции не возобновляются.
-- Luna lowliqa3b9fc4e: port35×5 + native CSV1508bytes + cleanup PASS; независимое ревью подтверждено.
-- Model controller gate проверяет nativeclose/logout/ACK/visible/свои процессы до authcopy; self-check/review PASS; checker отверг0rows с ложным read_limit.
-- Cold Import16cols+source/format/Filter<1/topology5nodes4links подтверждены; после nativeactivation сохранённые Sort/Reform выполнены без перенастройки/Save/ExportExecute, обеASCkeys/exclusions/ExportUTF8comma/path сохранены.
-- Coldcb9743ce: независимый DataSource.Columns подтвердил физическую перестановку Reform после activation при autosync=true; nativeclose/logout/discardfalse/browserclose PASS. Baselinecolde4c53eda подтвердил ту же перестановку при том же запросе; это существовало до нового reader. Устойчивый explicit order исторически проверялся с autosync=false; непосредственная причина не доказана.
-- Cold0d3b21bd cleanupBLOCKED: адресно закрыта одна PendingDisconnect session с exact ownpath; отсутствие/nativeadminlogout/browserclose подтверждены. Старый Package1 не трогали.
-- Baseline Luna lowliqf888bd65: все35×5 + nativeCSV1508bytes с тем же hash + cleanup PASS; candidate647779ms/baseline993830ms, один функциональный прогон с одинаковым requested sample_rows=100/strict/port0, не статистическая оценка.
-- Первый functional gate принят независимым ревью; cold order PARTIAL не запрещает проверять остальные границы. Zscore setupf5f3dc5c отказал до модели; separate knowledge/browser probes READY/closeACK. Candidate91376509: независимый пересчёт500rows/доставленныеcells/CSV/cleanup PASS547408ms; безJoin/Filter — coveragegap. Baselinec62f14cc: все161доставленнаяcells/CSV/cleanup PASS867405ms, тоже безJoin/Filter. Candidate slidingbe052d9f: initial nativefull+ordinary/updatedordinary6cells/CSV24bytes/cleanup PASS. Baselinecfad0d4d: prepareFAIL/CALL_UNCERTAIN, собственный пакет не подтверждён, guard retained; runtime105s короче browser120/125s, исходная UI-причина скрыта, не повторяем без исправления.
-- Baselinecold31a98fe8: все5типов/16Importfields/source/format/Filter/Sort/Reform/Export независимо сверены; Cancel/nativeclose/logout без discard. Collector71553f13 ошибочно возвращал object в ready; Boolean-предикат исправлен, старый FAIL сохранён.
-- Fidelity00d5385a: raw45cells PASS, reread после Save безопасно отказал из-за старого breadcrumb (тот же код вbaseline). Fidelityfbe5b334 доSave: raw45cells/Int64/realbits/−0/JSONredaction/20kdoubleLF/0,1,100 и101доExecute PASS; publicImport0rows/read1001из9, максимумMCP НЕ проверен. ProductCLI0/cleanupPASS; outerproviderGET вызвалauxiliary1, минимальный POSTguard+GET/POSTtests3PASS; источникGET неизвестен.
-- Diagnosticpayload4file77linepatch verified; faultучётка/readback/admincleanup PASS. Cache0controller103linesreview/selfcheck5PASS; первый Save перенесён доImport для свежего breadcrumb. Fault/TZlive ещё нет. Boundary12casechecker selfchecks12+5PASS, dense6negativePASSoffline, live ещё нет; seedLunadcc1bccc WRONG10rows+Save/cleanup PASS.
+- Private artifacts/evidence: /tmp/loginom-port-live-20261025-gxg7qus9/; clean candidate4399/baseline9495 и отдельные diagnostic/diagnostic-fixed verified. Ordinary runtime не менялся; credentials вне git.
+- Device OAuth/models refresh и Luna/high, Sol/xhigh compiled smoke PASS. После Xorg09:49:38Z новый mainpatheec4b9dc exact3×4/Save/nativeclose/logout/ACK/window/PIDs PASS; первопричина X-сбоя неизвестна.
+- Interrupted densebfbca8db/seedSol92db50d8/multifacts7ab6486c/cartesian10242f6a quarantined с raw/audit; nativecleanup неизвестен. Старые Package1/user sessions не закрывать без точной принадлежности.
+- Luna lowliqa3b9fc4e и baselinef888bd65: все35×5/CSV1508bytes одногоhash/cleanup PASS. Candidate647779ms/baseline993830ms — один functional pair, не benchmark. Ранняя1d12ceba exportFAIL сохранена.
+- Cold lowliq обеих сборок: Import16fields/source/format/Filter/Sort/Reform/Export PASS; physical order переставляется после activation при autosync=true в обеих сборках, существующее отличие. OwnPendingDisconnect user:7514 адресно закрыта поexactpath; неизвестные сессии не трогали.
+- Zscore candidate91376509/baselinec62f14cc: независимые500rows/доставленныеcells/CSV45bytes/cleanup PASS; графы без Join/Filter, coveragegap. Candidate547408ms/baseline867405ms descriptive only. Initialcandidatef5f3setupFAIL сохранён.
+- Sliding candidatebe052d9f: initialnativefull+ordinary/updatedordinary6cells/CSV24bytes/cleanup PASS; updatednativefull/cold не проверены. Baselinecfad0d4d prepareFAIL/CALL_UNCERTAIN, guard retained:105s host короче120/125s browser, исходнаяUI-причина неизвестна.
+- Multifactscc1setupFAILgeneric; exactknowledgeprobe3bdaf2f9READY/ACK. Multifacts2a17108f MODELFAIL: выдуманныйskillpath/external_directory→permissionreject, nativeprepareсоздалdraft, Save/cleanupнеподтверждены. Не повторятьдоPASS.
+- Cartesianf8483eea: analytics/60ordinarycells/CSV50bytes/cleanup PASS; nativefull отказал на Sort ancestry, агент честно сообщил. Stringcounts40b0fed5:35ordinary+28nativefullcells/Int64bytes/CSV83bytes/cleanup PASS; blank отсутствует, cold не проверен.
+- CP1251 candidate84fceb3c CLI0/cleanupPASS; independent audit идёт. Multiline live идёт. JoinFiltera97945ca остановлен доExecute: Importdelimiter input UI_REFERENCE_OBSCURED, draft discarded/settings unchanged, nativepackagecleanup не доказан.
+- Fidelity00d5385a raw45cells PASS; reread послеSave отказал настаромbreadcrumb (код такойжеbaseline). Fidelityfbe5b334 raw45/Int64/realbits/−0/JSONredaction/20kdoubleLF/0,1,100/101доExecute PASS; public0/1из9, MCPmax отдельноdense. ProductCLI0/cleanupPASS; outerproviderGETaux1 исправлен минимальнымPOSTguard,3testsPASS.
+- Dense5b62053e raw100×10/public21/44292bytes,next46096/maxprefix21/6negative/cleanupPASS; independent review confirms serializer bytes4399. Actual Import+Calc validators coherent false-read_limit0rows отвергают именно requestedcoverage; Filternegative ещё не проверен.
+- Seeds Luna dcc1bccc и Sol fdf56b52 wrong10rows/Save/cleanupPASS; rendered prepared-task.json для отдельных modelcorrection попыток. Dates5ef5ffe4 two nativeOADate bytes доordinary PASS, cleanupPASS; auxposthocparser save-adviceFAIL исправляется без повторногоCLI.
+- Diagnostic4file77linepatch/151focused/actualserialized scope PASS; ownfaultaccount/admincleanupPASS. Earlyd1ef16f7SaveдоidentityFAILED/guard; correctedImport→Save→Filter c6b45eff cache0 expectedfault/restored/allsettled/all7dispose/recovery/normalcleanupPASS.
+- Diagnostic-fixed payload verified, operation selector/deadline scope testsPASS; fault-matrix133LOC selfcheck18+72negative+24temporalMissPASS, review доlive. Boundary12 offlinecases+5negativePASS; rows-0live идёт. Очередь: остальные модели/границы/18faults/датыTZ/dirty/freshness/Variant/cold.
