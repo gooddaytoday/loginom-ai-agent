@@ -434,7 +434,7 @@ for(const elapsed of [0,27500])test('D70 delayed diagnostic respects original de
  assert.equal(f.events.includes('discard'),false);assert.equal(f.events.includes('logout'),false);
 });
 
-for(const fault of ['none','dirty','foreign path','foreign account','connection','existing inventory','old tab','not submitted','wrong request','readonly','server session','foreign document','two packages','unknown mode','reserve account','expired','session changes during read'])test('D56c failed Open uses only the new owned package: '+fault,async()=>{
+for(const fault of ['none','dirty','foreign path','foreign account','connection','existing inventory','old tab','not submitted','wrong request','readonly','server session','foreign document','two packages','unknown mode','reserve account','expired','session changes during read','foreign window','own hidden picker','own active picker','foreign hidden picker'])test('D56c failed Open uses only the new owned package: '+fault,async()=>{
  const {makeFailedOpenCleanupCode}=await import('../lib/package-cleanup.mjs');
  const f=fixture({modified:fault==='dirty',readonly:fault==='readonly'}),c=f.context;
  const m=c.bg.app.Application.FInstance.FMainForm.FMapTree;
@@ -459,13 +459,20 @@ for(const fault of ['none','dirty','foreign path','foreign account','connection'
  if(fault==='existing inventory')receipt.packageInventoryBefore=1;
  if(fault==='old tab')receipt.before=[tab];
  if(fault==='not submitted')receipt.openSubmitted=false;
+ if(['foreign window','own hidden picker','own active picker','foreign hidden picker'].includes(fault)){
+  const window={id:'picker',getBoundingClientRect:()=>({x:283,y:-2327,width:730,height:500})};
+  const component={$className:'bg.filedialog.view.OpenDialogForm',el:{dom:window},hidden:fault!=='own active picker'};
+  c.Ext={getCmp:()=>component};
+  if(fault.startsWith('own ')){receipt.openDialogElement=window;receipt.openDialog=component;}
+  const find=c.document.querySelectorAll;c.document.querySelectorAll=q=>q.includes('.x-window')?[window]:find(q);
+ }
  if(fault==='wrong request')receipt.request=JSON.stringify({session:'foreign',intent:'open_package',packagePath:options.packagePath});
  const wait=f.page.waitForTimeout;f.page.waitForTimeout=ms=>ms>100?new Promise(()=>{}):wait(ms);
  const code=makeFailedOpenCleanupCode({...options,operationId:'prepare'});
  if(fault==='expired'){const deadline=Number(code.match(/deadline=(\d+)/)[1]);c.Date=class extends Date {static now(){return deadline;}};}
  if(fault==='session changes during read'){const read=m.FServerConnection.Session.IsPackageModified;m.FServerConnection.Session.IsPackageModified=async()=>{const result=await read();m.FServerConnection.Session={};return result;};}
  const result=await vm.runInContext('('+code+')',c)(f.page);
- const success=['none','readonly'].includes(fault);
+ const success=['none','readonly','own hidden picker'].includes(fault);
  assert.equal(result.status,success?'SUCCEEDED':'BLOCKED',JSON.stringify(result));
  assert.equal(result.package_closed,success);assert.equal(result.logged_out,success);
  assert.equal(f.events.includes('close'),success);assert.equal(f.events.includes('discard'),false);

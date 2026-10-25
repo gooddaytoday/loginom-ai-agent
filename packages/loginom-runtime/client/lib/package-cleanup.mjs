@@ -169,8 +169,16 @@ async function closeOwnedPackage(page, options, deadline) {
       });
       const tabBound = () => prepared?.packageNode === node && prepared.tab?.getAttribute('data-tid') === o.tabTid && document.contains(prepared.tab);
       if (!tabBound()) return {reason:'TAB_IDENTITY_CHANGED'};
-      const openOwnerBound=()=>prepared?.failedOpenCleanup!==true||(prepared.openConnection===m.FServerConnection
-        &&prepared.openServerSession===m.FServerConnection.Session);
+      const openOwnerBound=()=>{
+        if(prepared?.failedOpenCleanup!==true)return true;
+        if(prepared.openConnection!==m.FServerConnection||prepared.openServerSession!==m.FServerConnection.Session)return false;
+        return ![...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog,.x-message-box,.bg-mask-message,.x-mask-msg')].some(e=>{
+          const picker=e.closest?.('[data-tid="OpenDialogForm"]')??e,component=globalThis.Ext?.getCmp?.(picker.id);
+          const inactive=picker===prepared.openDialogElement&&component===prepared.openDialog
+            &&component?.$className==='bg.filedialog.view.OpenDialogForm'&&component.el?.dom===picker&&component.hidden===true;
+          return !inactive&&visible(e);
+        });
+      };
       if(!openOwnerBound())return {reason:'FAILED_OPEN_OWNER_CHANGED'};
       if (node.HasRunningNodes() !== false || m.HasRunningNodes() !== false) return {reason:'RUNNING_NODES'};
       const modified = await m.FServerConnection.Session.IsPackageModified(node.Package);
