@@ -145,7 +145,9 @@ export async function readNodePortOutput(page,binding,request,options,readNode=r
    const schema=[],types={1:'boolean',2:'datetime',3:'real',4:'integer',5:'string',6:'variant'};
    for(let index=0;index<total;index++){
     const column=await columns.getItem(index);items.push(column);live();stable();
-    const name=await column.get_Name(),label=await column.get_DisplayName(),type=types[await column.get_DataType()];
+    const name=await column.get_Name();live();stable();
+    const label=await column.get_DisplayName();live();stable();
+    const type=types[await column.get_DataType()];
     live();stable();need(typeof name==='string'&&typeof label==='string'&&name.length<=16384&&label.length<=16384&&type,'column_metadata');
     schema.push({index,name,label,type});
    }

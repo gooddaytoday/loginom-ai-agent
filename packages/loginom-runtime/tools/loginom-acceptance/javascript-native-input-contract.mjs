@@ -30,7 +30,8 @@ export function nativeInputRequest({prepared,storage,artifact,uploadOperationId,
 
 export function verifyNativeInputUi(table,fixtureId='real'){
   const fixture=javascriptNativeFixture(fixtureId),expectedValues=fixture.values;
-  need(table?.row_count===fixture.rows&&table.sample_rows===fixture.rows&&table.sample_complete===true&&table.filter_enabled!==true
+  need(table?.row_count===fixture.rows&&table.sample_rows===fixture.rows&&table.sample_complete===true
+    &&(table.freshness_basis==='completed_execution_port_source'?table.filter_enabled!==true:table.filter_enabled===false)
     &&table.precision?.numbers_verified===true&&table.precision.limitations?.length===0&&!table.limitations?.length
     &&table.schema?.length===1&&table.schema[0].name==='Value'&&table.schema[0].label==='Value'&&table.schema[0].type===fixture.type
     &&table.sample?.length===fixture.rows&&table.sample.every((row,i)=>row.length===1&&row[0].type===fixture.type

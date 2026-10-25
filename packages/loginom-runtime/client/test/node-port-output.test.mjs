@@ -5,7 +5,7 @@ import {decodePortCell,makeNodePortOutputCode,readNodePortOutput} from '../lib/n
 
 const portGuid='11111111-1111-1111-1111-111111111111';
 const execution={verified:true,cleanup_complete:true,status:'completed',owner_verified:true,execution_id:'doc:root:1',group_id:'1',process_id:'1.1',process_record_id:'child'};
-function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '9007199254740993'},1.2345678901234567,'']],types=[4,3,5]}={}) {
+function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '9007199254740993'},1.2345678901234567,'']],types=[4,3,5],clock=Date}={}) {
  const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Scenario',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
  const rpcCalls=[],uiCalls=[],disposed=[],elements=new Map();
  const el=tid=>{const e={id:tid,getAttribute:k=>k==='data-tid'?tid:null,classList:{contains:k=>k==='x-tab-active'},getBoundingClientRect:()=>({width:100,height:100}),contains:x=>e===x||e.children?.includes(x)};elements.set(tid,e);return e;};
@@ -32,7 +32,7 @@ function fixture({rows=[[{constructor:{name:'Int64'},toString:()=> '900719925474
  const prep={document:null,id:'doc',receipts:new Map([['prepared',{phase:'verified',workflowId:'flow',tab,packageNode,nodeTargetWorkflowNode:workflow}]])};
  const document={querySelectorAll:q=>{if(q.startsWith('[data-tid^='))return [crumb];const tid=JSON.parse(q.slice(10,-1));return elements.has(tid)?[elements.get(tid)]:[];}};prep.document=document;
  const app={Version:'7.4.2',PackageTreeNode,WorkFlowTreeNode,ModelForm,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{FController:model,Node:{data:{node:workflow}}}})}}}}}};
- const context=vm.createContext({document,bg:{app,IBGDataSource:{}},location:{origin:'http://example.test'},__loginomDockPreparationV1:prep,Ext:{getCmp:id=>id===tree.id?{getStore:()=>store}:null},TextEncoder,getComputedStyle:()=>({visibility:'visible'}),Date});
+ const context=vm.createContext({document,bg:{app,IBGDataSource:{}},location:{origin:'http://example.test'},__loginomDockPreparationV1:prep,Ext:{getCmp:id=>id===tree.id?{getStore:()=>store}:null},TextEncoder,getComputedStyle:()=>({visibility:'visible'}),Date:clock});
  const page={evaluate:async(fn,arg)=>structuredClone(await vm.runInContext('('+fn.toString()+')('+JSON.stringify(arg)+')',context))};
  return {page,binding,columnItems,columns,node,port,portDom,integerColumn,dataSource,helper,child,group,root,store,output,disposed,rpcCalls,uiCalls,run:request=>vm.runInNewContext('('+makeNodePortOutputCode(binding,request,{origin:'http://example.test',build:'7.4.2',deadline:Date.now()+10000})+')')(page)};
 }
@@ -119,6 +119,19 @@ test('an already initialized cache cannot be replaced while metadata is read',as
  const result=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:true});
  assert.equal(result.verified,false);assert.equal(result.output,undefined);assert.equal(result.reason,'cache_changed');
  assert.equal(result.cleanup_complete,true);
+});
+
+for(const fault of ['deadline','session'])for(const stage of ['name','label'])test('metadata stops after '+stage+' on '+fault,async()=>{
+ let expired=false;
+ const f=fixture({clock:class extends Date{static now(){return expired?Number.MAX_SAFE_INTEGER:Date.now();}}}),calls=[];
+ for(const [method,label,value] of [['get_Name','name','I'],['get_DisplayName','label','I'],['get_DataType','type',4]]){
+  f.integerColumn[method]=async()=>{calls.push(label);if(label===stage){if(fault==='deadline')expired=true;if(fault==='session')f.node.data.$S={};}return value;};
+ }
+ const result=await f.run({port:0,execution,sampleRows:1,requireExactNumbers:true});
+ assert.deepEqual(calls,stage==='name'?['name']:['name','label']);
+ assert.equal(result.verified,false);assert.equal(result.output,undefined);assert.deepEqual(f.rpcCalls,[]);
+ assert.equal(result.reason,fault==='deadline'?'deadline':'context_changed');assert.equal(result.cleanup_complete,fault==='deadline');
+ assert.deepEqual(f.disposed,['integerColumn','columns','dataSource','output']);
 });
 
 

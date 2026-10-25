@@ -372,6 +372,20 @@ test('immutable33-byte fixture and explicit marker/request',()=>{
   assert.equal(p.parameters.settings.format.null_marker,'__JS_NULL__');
 });
 test('complete typed UI evidence has no native precision claim',()=>assert.equal(verifyNativeInputUi(ui()).native_bytes_verified,false));
+for(const [source,value,accepted] of [
+  ...[undefined,'unknown'].flatMap(source=>[undefined,null,0,'false',true].map(value=>[source,value,false])),
+  ...[undefined,'unknown'].map(source=>[source,false,true]),
+  ...[undefined,null,0,'false',false].map(value=>['completed_execution_port_source',value,true]),
+  ['completed_execution_port_source',true,false]
+])
+  test('typed input filter contract '+String(source)+' / '+JSON.stringify(value),()=>{
+    const table=ui();
+    if(source)table.freshness_basis=source;
+    if(value===undefined)delete table.filter_enabled;
+    else table.filter_enabled=value;
+    if(accepted)assert.equal(verifyNativeInputUi(table).verified,true);
+    else assert.throws(()=>verifyNativeInputUi(table));
+  });
 for(const [name,change]of Object.entries({partial:x=>x.sample.pop(),filter:x=>x.filter_enabled=true,negativeZero:x=>x.sample[1][0].value=-0,stringNull:x=>x.sample[0][0].value='__JS_NULL__',wrongType:x=>x.schema[0].type='integer',rounded:x=>x.sample[3][0].value=10.13}))
   test('UI rejects '+name,()=>{const x=ui();change(x);assert.throws(()=>verifyNativeInputUi(x));});
 test('genuine owning read phases and upload lineage produce input provenance',()=>{const p=nativeInputProvenance(sourceEvidence());assert.equal(p.kind,'owned_import_read_phase');assert.equal(p.external_writers_excluded,false);});

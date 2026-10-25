@@ -45,7 +45,9 @@ class FullPortConsumerTests(unittest.TestCase):
     def test_ordinary_port_does_not_need_table_filter_state(self):
         from test_full_read_evidence import FullReadTests
         request, events = FullReadTests().fixture()
-        del events[0]['result']['output']['ports'][0]['filter_enabled']
+        port=events[0]['result']['output']['ports'][0]
+        del port['filter_enabled']
+        port['freshness_basis']='completed_execution_port_source'
         self.assertTrue(verify_full_read(events, request, 8)['passed'])
 
 
