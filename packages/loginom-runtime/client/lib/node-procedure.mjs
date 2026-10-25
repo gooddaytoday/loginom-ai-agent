@@ -405,7 +405,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           .map(tid=>(roots.output.ui?.elements??[]).filter(e=>e.tid===tid)).find(xs=>xs.length===1)?.[0].ref : undefined;
         const dialogRoot=tableDialog ? (roots.output.ui?.elements??[]).filter(e=>e.tid===tableDialog.table.table_tid+';ModalWindow_Browse'+(tableDialog.kind==='format'?'Format':'Filter')) : [];
         if(dialogRoot.length>1)throw new Error('Table dialog is ambiguous');
-        const navigationRoot=readNavigation&&preparedNodeContext?(roots.output.ui?.elements??[]).find(e=>e.tid===preparedNodeContext.workflow_ref.prefix+';NavigationBar;NavigationPanel')?.ref:undefined;
+        const navigationMenu=readNavigation&&preparedNodeContext?(roots.output.ui?.elements??[]).filter(e=>e.tid===preparedNodeContext.workflow_ref.prefix+';cnrNaviMode;b-2;mn'):[];
+        if(navigationMenu.length>1)throw Error('Prepared workflow overflow menu is ambiguous');
+        const navigationRoot=readNavigation&&preparedNodeContext?navigationMenu[0]?.ref??(roots.output.ui?.elements??[]).find(e=>e.tid===preparedNodeContext.workflow_ref.prefix+';NavigationBar;NavigationPanel')?.ref:undefined;
         const graphRoot=preparedNodeContext?(roots.output.ui?.elements??[]).find(e=>e.tid===preparedNodeContext.workflow_ref.prefix+';ModelForm;cmpDiagram')?.ref:undefined;
         if(readNavigation&&!navigationRoot)throw Error('Prepared workflow navigation region unavailable');
         const outputEditors=['output_mapping','input_mapping'].includes(wizard?.stage)?(roots.output.ui?.elements??[]).filter(e=>e.tid===(wizard.stage==='input_mapping'?'EditTuneColumnDefForm':'EditColumnDefForm')):[];

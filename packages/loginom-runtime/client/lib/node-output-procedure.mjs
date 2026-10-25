@@ -3,19 +3,41 @@ const requireValue=(v,m)=>{if(!v)throw Error(m);};
 const one=(xs,m)=>{requireValue(xs.length===1,m);return xs[0];};
 const tableRef=t=>({view_guid:t.view_guid,port_guid:t.port_guid,table_tid:t.table_tid});
 
+// Reveal the same native workflow through Loginom's visible overflow menu.
+// Hidden breadcrumb refs never authorize a gesture, and the enclosing node
+// operation retains its original deadline and one-flight action receipts.
+export async function revealWorkflowNavigation(channel,state,owned,readOutputs=false) {
+  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  const clickable=s=>s.workflow_navigation?.status==='observed'&&s.ui.elements.filter(e=>
+    e.ref===s.workflow_navigation.control_ref&&e.tid===s.workflow_navigation.control_tid&&e.allowed_actions.includes('click')).length===1;
+  if(clickable(state))return state;
+  const path=state.workflow_navigation?.path,overflow=state.workflow_navigation?.overflow;
+  const bound=s=>owned(s)&&s.workflow_navigation?.status==='observed'&&same(s.workflow_navigation.path,path)
+    &&same(s.workflow_navigation.overflow,overflow)&&s.ui.elements.filter(e=>e.ref===overflow?.trigger_ref
+      &&e.tid===overflow.trigger_tid&&e.allowed_actions.includes('click')).length===1;
+  requireValue(overflow&&bound(state),'Visible native workflow overflow control unavailable');
+  const node=state.prepared_node_context;
+  await channel.perform({condition:'reveal the native parent workflow in toolbar overflow',initialObservation:state,
+    ready:bound,identity:()=>({node:Object.fromEntries(['document_id','workflow_id','node_id'].map(k=>[k,node[k]])),path,overflow}),
+    resolve:s=>({verb:'click',ref:s.workflow_navigation.overflow.trigger_ref})});
+  return channel.observe({condition:'same native workflow visible in overflow menu',readNavigation:true,readOutputs,
+    ready:s=>owned(s)&&same(s.workflow_navigation?.path,path)&&clickable(s)});
+}
+
 export async function returnFromOutputTable(channel,table) {
   const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
   const bound=s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='views'
     &&s.node_outputs?.verified===true&&s.node_outputs.surface==='views'
     &&s.node_outputs.tables.filter(t=>t.active&&same(tableRef(t),tableRef(table))).length===1
-    &&s.workflow_navigation?.status==='observed'
-    &&s.ui.elements.filter(e=>e.ref===s.workflow_navigation.control_ref&&e.tid===s.workflow_navigation.control_tid
-      &&e.allowed_actions.includes('click')).length===1;
-  const before=await channel.observe({condition:'source Table and parent scenario observed',readOutputs:true,readNavigation:true,ready:bound});
+    &&s.workflow_navigation?.status==='observed';
+  let before=await channel.observe({condition:'source Table and parent scenario observed',readOutputs:true,readNavigation:true,ready:bound});
+  const source=before.prepared_node_context;
+  const owned=s=>bound(s)&&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===source[k]);
+  before=await revealWorkflowNavigation(channel,before,owned,true);
   const node=Object.fromEntries(['document_id','workflow_id','node_id'].map(k=>[k,before.prepared_node_context[k]]));
   const path=before.workflow_navigation.path;
   await channel.perform({condition:'return from the read Table to its scenario',initialObservation:before,
-    ready:s=>bound(s)&&same(s.workflow_navigation.path,path),identity:()=>({node,table:tableRef(table),path}),
+    ready:s=>owned(s)&&same(s.workflow_navigation.path,path),identity:()=>({node,table:tableRef(table),path}),
     resolve:s=>({verb:'click',ref:s.workflow_navigation.control_ref})});
   const after=await channel.observe({condition:'Table returned to the prepared scenario',readOutputs:true,readNavigation:true,
     ready:s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
@@ -64,12 +86,11 @@ async function cancelOwnTableDialog(channel,table) {
 export async function returnFromNodeViews(channel,node) {
   const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
   const owned=s=>s.prepared_node_context?.verified===true&&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k]);
-  const navigable=s=>owned(s)&&s.prepared_node_context.surface==='views'&&s.workflow_navigation?.status==='observed'
-    &&s.ui.elements.filter(e=>e.ref===s.workflow_navigation.control_ref&&e.tid===s.workflow_navigation.control_tid
-      &&e.allowed_actions.includes('click')).length===1;
-  const before=await channel.observe({condition:'node graph or its visualizers',readOutputs:true,readNavigation:true,
+  const navigable=s=>owned(s)&&s.prepared_node_context.surface==='views'&&s.workflow_navigation?.status==='observed';
+  let before=await channel.observe({condition:'node graph or its visualizers',readOutputs:true,readNavigation:true,
     ready:s=>owned(s)&&s.prepared_node_context.surface==='graph'||navigable(s)});
   if(before.prepared_node_context.surface==='graph')return {verified:true,returned:false};
+  before=await revealWorkflowNavigation(channel,before,navigable,true);
   const path=before.workflow_navigation.path;
   await channel.perform({condition:'return from node visualizers to its scenario',initialObservation:before,
     ready:s=>navigable(s)&&same(s.workflow_navigation.path,path),identity:()=>({node,path}),

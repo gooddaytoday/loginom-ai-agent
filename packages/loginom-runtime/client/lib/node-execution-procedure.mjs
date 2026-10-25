@@ -1,4 +1,5 @@
 import {NodeReadinessTimeout} from './node-procedure.mjs';
+import {revealWorkflowNavigation} from './node-output-procedure.mjs';
 import {captureExecutionBaseline,identifyNewExecution,verifyCompletedExecution,verifyFailedExecution,selectFailedExecutionChild,verifyFailedChildExecution,selectExecutionChild,expectedExecutionStopProof,verifyCancelledExecution,verifyExecutionReadWait} from './node-execution-evidence.mjs';
 
 const requireValue=(v,m)=>{if(!v)throw new Error(m);};
@@ -24,10 +25,14 @@ export async function returnToExecutedWorkflow(channel,node) {
   requireValue(context.kind==='node'&&path?.length&&(context.node?.tid===path.at(-1).tid+'>'
     +s.prepared_node_context.tid.split(';Graph;')[1]||boundNavigation?.tid===context.node?.tid&&boundNavigation?.label===context.node?.label),'Execution navigation does not belong to the prepared node');
   const workflow=path.at(-1),identity=()=>({node,path});
+  const controls=s=>s.ui.elements.filter(e=>e.allowed_actions.includes('click')&&(e.tid===workflow.tid&&e.label===workflow.label
+    ||s.workflow_navigation?.status==='observed'&&JSON.stringify(s.workflow_navigation.path)===JSON.stringify(path.map(({tid,label})=>({tid,label})))
+      &&e.ref===s.workflow_navigation.control_ref&&e.tid===s.workflow_navigation.control_tid));
+  if(controls(s).length===0)s=await revealWorkflowNavigation(channel,s,sameNode);
   await channel.perform({condition:'return from executed node to its scenario',initialObservation:s,
     ready:s=>sameNode(s)&&JSON.stringify(s.node_context?.path)===JSON.stringify(context.path)
-      &&s.ui.elements.filter(e=>e.tid===workflow.tid&&e.label===workflow.label&&e.allowed_actions.includes('click')).length===1,
-    identity,resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===workflow.tid&&e.label===workflow.label),'Scenario breadcrumb unavailable').ref})});
+      &&controls(s).length===1,
+    identity,resolve:s=>({verb:'click',ref:one(controls(s),'Scenario breadcrumb unavailable').ref})});
   await channel.observe({condition:'executed scenario navigation restored',readNavigation:true,ready:s=>sameNode(s)
     &&s.navigation_context?.status==='observed'&&JSON.stringify(s.navigation_context.path)===JSON.stringify(path.map(({tid,label})=>({tid,label})))});
 }

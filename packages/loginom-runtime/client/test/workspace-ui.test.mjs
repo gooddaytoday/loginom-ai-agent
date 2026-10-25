@@ -5046,6 +5046,51 @@ test('prepared node overview binds a multiline automatic key without trusting co
  }
 });
 
+test('D52b graph and overview read hidden workflow context without issuing a hidden gesture',async()=>{
+ for(const overview of [false,true])for(const fault of ['valid','missing','foreign','hidden','opacity','icon','path']) {
+  const {page,panel}=await nodeOverviewContextFixture(),crumbs=[...panel.children];
+  const path=crumbs.slice(0,5).map(e=>({tid:e.attrs['data-tid'],label:e.textContent.trim()}));
+  if(!overview)crumbs[5].remove();
+  const flow=crumbs[4];flow.style.display='none';flow.box={x:0,y:0,width:0,height:0};
+  if(fault==='hidden')flow.attrs.hidden='';
+  if(fault==='opacity')flow.style.opacity='0';
+  if(fault==='icon')flow.children[0].attrs.class='maptree-icon-other';
+  if(fault==='path')path[3].tid+='foreign';
+  const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}};
+  const reader=async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'graph',tid:'MF;TF-5;Graph;Изменение',
+    ...(fault==='missing'?{}:{navigation_workflow:{tid:fault==='foreign'?'foreign':flow.attrs['data-tid'],label:flow.textContent.trim()}})});
+  const r=await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:binding},reader);
+  assert.equal(r.output[overview?'node_context':'navigation_context'].status==='observed',fault==='valid',overview+':'+fault);
+  assert.equal(r.output.ui.elements.some(e=>e.tid===flow.attrs['data-tid']&&e.allowed_actions.length>0),false);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
+test('D52b return uses the visible native workflow menu item and never its hidden breadcrumb',async()=>{
+ for(const fault of ['valid','missing','foreign_item','hidden_item','wrong_label','foreign_menu']) {
+  const {page,panel}=await nodeOverviewContextFixture(),crumbs=[...panel.children],flow=crumbs[4];
+  const path=crumbs.slice(0,5).map(e=>({tid:e.attrs['data-tid'],label:e.textContent.trim()}));
+  flow.style.display='none';flow.box={x:0,y:0,width:0,height:0};
+  const tid='MF;TF-5;cnrNaviMode;b-2',menuTid=tid+';mn';
+  page.add('button',tid,'',{x:1300,y:41,width:24,height:24},panel);
+  const menu=page.add('div',menuTid,'',{x:1100,y:65,width:220,height:80});menu.attrs.class='x-menu';
+  const item=page.add('a',menuTid+';mn.i','Сценарий',{x:1100,y:66,width:218,height:24},menu);item.attrs.role='menuitem';
+  if(fault==='hidden_item')item.style.display='none';if(fault==='wrong_label')item.ownText='Other';
+  const binding={node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:path}};
+  const reader=async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'views',tid:'MF;TF-5;ViewsForm',
+    navigation_workflow:path[4],...(fault==='missing'?{}:{workflow_overflow:{trigger_tid:tid,menu_tid:fault==='foreign_menu'?'foreign':menuTid,item_tid:fault==='foreign_item'?'foreign':item.attrs['data-tid']}})});
+  const r=await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {mode:'observe',expected_build:build,expected_origin:origin,prepared_node_context:binding},reader);
+  const nav=r.output.workflow_navigation;
+  assert.equal(nav.status,'observed');
+  assert.equal(nav.control_tid===item.attrs['data-tid'],fault==='valid',fault);
+  if(fault==='valid')assert.ok(r.output.ui.elements.find(e=>e.ref===nav.control_ref).allowed_actions.includes('click'));
+  assert.equal(r.output.ui.elements.some(e=>e.tid===flow.attrs['data-tid']&&e.allowed_actions.length>0),false);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 function smallTableCoverageFixture() {
  const page=new Page(),key='MF;TF-1;ViewsForm;BrowseView';page.context.innerWidth=1000;page.context.innerHeight=800;
  const view=page.add('div',key,'',{x:10,y:50,width:950,height:700});

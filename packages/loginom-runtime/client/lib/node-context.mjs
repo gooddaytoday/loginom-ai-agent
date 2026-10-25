@@ -121,10 +121,40 @@ export async function readPreparedNodeContext(page, binding) {
     if(elements.length!==1)return reject('surface_ambiguous');
     if(elements[0].getBoundingClientRect().width<=0 || elements[0].getBoundingClientRect().height<=0
       || getComputedStyle(elements[0]).visibility==='hidden')return pending();
+    // Done/Execute and Table reads keep the same cached native workflow even
+    // when toolbar overflow hides its breadcrumb. This is context, not a ref
+    // authorizing a gesture on the hidden component.
+    if(['graph','views'].includes(surface)) {
+      const module=workflowNode.ParentNode,ancestors=[packageNode,module,workflowNode];
+      if(b.workflow_ref.navigation_path.length===5&&module?.ParentNode===packageNode
+        &&crumbs.slice(2,5).every((crumb,i)=>{
+          const es=exact(crumb.tid),c=es.length===1&&globalThis.Ext?.getCmp(es[0].id);
+          return c?.el?.dom===es[0]&&c?._node?.data?.node===ancestors[i];
+        }))inputNavigationWorkflow=crumbs[4];
+    }
+    let workflowOverflow;
+    if(inputNavigationWorkflow&&['graph','views'].includes(surface)) {
+      const barTid=b.workflow_ref.prefix+';cnrNaviMode',triggerTid=barTid+';b-2',menuTid=triggerTid+';mn';
+      const bars=exact(barTid),triggers=exact(triggerTid),menus=exact(menuTid);
+      const bar=bars.length===1&&globalThis.Ext?.getCmp(bars[0].id),trigger=triggers.length===1&&globalThis.Ext?.getCmp(triggers[0].id);
+      const overflow=bar?.layout?.overflowHandler,menu=menus.length===1&&globalThis.Ext?.getCmp(menus[0].id);
+      if(bar&&trigger&&bar.el?.dom===bars[0]&&trigger.el?.dom===triggers[0]&&trigger.ownerCt===bar&&overflow?.menuTrigger===trigger) {
+        workflowOverflow={trigger_tid:triggerTid,menu_tid:menuTid};
+        if(menu&&menu.el?.dom===menus[0]&&trigger.menu===menu&&overflow.menu===menu) {
+          const items=[...menus[0].querySelectorAll('[data-tid]')].filter(e=>{
+            const c=globalThis.Ext?.getCmp(e.id),t=e.getAttribute('data-tid');
+            return c?.el?.dom===e&&c.ownerCt===menu&&c._node?.data?.node===workflowNode
+              &&new RegExp('^'+menuTid+';mn\\.i(?:-[1-9][0-9]*)?$').test(t??'')&&exact(t).length===1;
+          });
+          if(items.length===1)workflowOverflow.item_tid=items[0].getAttribute('data-tid');
+        }
+      }
+    }
     return {verified:true,document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,surface,tid,
       ...(outputPort?{[outputPort.direction==='input'?'input_port':'output_port']:outputPort}:{}),
       ...(inputNavigationNode?{navigation_node:inputNavigationNode}:{}),
       ...(inputNavigationWorkflow?{navigation_workflow:inputNavigationWorkflow}:{}),
+      ...(workflowOverflow?{workflow_overflow:workflowOverflow}:{}),
       ...(surface==='graph'?{locked,...(nodeTree&&crumbs.length===b.workflow_ref.navigation_path.length+1?{navigation_node:crumbs.at(-1)}:{}),
         ...(pendingWizardNode?{pending_wizard_node:pendingWizardNode}:{})}:{} )};
   },binding);

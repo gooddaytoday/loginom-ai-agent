@@ -18,6 +18,24 @@ test('Table returns to its scenario in one click without execution or wizard reo
  assert.equal(r.verified,true);assert.equal(r.execution_started,false);assert.equal(r.reopen_performed,false);
  assert.deepEqual(f.mutations,[{verb:'click',ref:'parent'}]);
 });
+
+test('hidden scenario is revealed once, then its owned visible menu item returns from Table',async()=>{
+ for(const fault of ['valid','foreign_node','foreign_table','foreign_path','unbound_menu']) {
+  const f=fixture(),base=f.before;
+  base.ui.elements[0].allowed_actions=[];
+  base.workflow_navigation.overflow={trigger_ref:'overflow',trigger_tid:'toolbar-overflow',menu_tid:'menu'};
+  base.ui.elements.push({ref:'overflow',tid:'toolbar-overflow',allowed_actions:['click']});
+  const menu=structuredClone(base);menu.workflow_navigation.control_ref='menu-flow';menu.workflow_navigation.control_tid='menu-item';
+  menu.ui.elements.push({ref:'menu-flow',tid:'menu-item',allowed_actions:['click']});
+  if(fault==='foreign_node')menu.prepared_node_context.node_id='other';if(fault==='foreign_table')menu.node_outputs.tables[0].view_guid='other';
+  if(fault==='foreign_path')menu.workflow_navigation.path=[{tid:'other',label:'Сценарий'}];if(fault==='unbound_menu')menu.workflow_navigation.control_ref='missing';
+  let state=base,reads=0;
+  const channel={observe:async o=>{if(reads++)state=f.mutations.length===1?menu:f.after;assert.ok(o.ready(state));return state;},
+   perform:async o=>{assert.ok(o.ready(state));f.mutations.push(o.resolve(state));}};
+  if(fault==='valid'){await returnFromOutputTable(channel,f.table);assert.deepEqual(f.mutations,[{verb:'click',ref:'overflow'},{verb:'click',ref:'menu-flow'}]);}
+  else{await assert.rejects(returnFromOutputTable(channel,f.table));assert.deepEqual(f.mutations,[{verb:'click',ref:'overflow'}]);}
+ }
+});
 for(const [name,change] of Object.entries({
  wrong_table:f=>f.before.node_outputs.tables[0].view_guid='other',
  wrong_port:f=>f.before.node_outputs.tables[0].port_guid='other',

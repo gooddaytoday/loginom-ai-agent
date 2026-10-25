@@ -58,7 +58,13 @@ function fixture() {
       }
       context.Ext={getCmp:id=>id.startsWith('ancestor-')?ancestors[Number(id.slice(9))-2]:components[Number(id.slice('input-crumb-'.length))]};
       return {...port,components,ancestors};
-    },enterOverview:()=>{controller.Node.data.node=nodeTree;crumbs.push({...element(binding.workflow_ref.navigation_path[0].tid+'>Import-3'),textContent:'Import'});},enterViews,record,preparation,workflowNode,nodeTree,enterWizard,enterPortWizard,tab,graph,
+    },addOverflow:()=>{
+      const tid=binding.workflow_ref.prefix+';cnrNaviMode',elements=[tid,tid+';b-2',tid+';b-2;mn',tid+';b-2;mn;mn.i'].map((t,i)=>({...element(t),id:'overflow-'+i}));
+      const [be,te,me,ie]=elements,menu={el:{dom:me}},bar={el:{dom:be},layout:{overflowHandler:{menu}}},trigger={el:{dom:te},ownerCt:bar,menu},item={el:{dom:ie},ownerCt:menu,_node:{data:{node:workflowNode}}};
+      bar.layout.overflowHandler.menuTrigger=trigger;me.querySelectorAll=()=>[ie];activeElements.push(...elements);
+      const old=context.Ext.getCmp;context.Ext.getCmp=id=>id.startsWith('overflow-')?[bar,trigger,menu,item][Number(id.slice(9))]:old(id);
+      return {bar,trigger,menu,item};
+    },leaveInput:surface=>{crumbs=crumbs.slice(0,binding.workflow_ref.navigation_path.length);controller.Node.data.node=workflowNode;controller.FController=graph;activeElements=[tab,root,dom,...crumbs];if(surface==='views'){enterViews();activeElements.push(...crumbs);}},enterOverview:()=>{controller.Node.data.node=nodeTree;crumbs.push({...element(binding.workflow_ref.navigation_path[0].tid+'>Import-3'),textContent:'Import'});},enterViews,record,preparation,workflowNode,nodeTree,enterWizard,enterPortWizard,tab,graph,
     cloneNode:inside=>{const clone=element(dom.getAttribute());activeElements.push(clone);if(inside)root.contains=e=>e===dom||e===clone;},changeCrumb:()=>crumbs[0].textContent='Other',duplicateTab:()=>activeElements.push(tab)};
 }
 test('graph context ignores outline copies outside the native canvas but rejects duplicate nodes inside it',async()=>{
@@ -172,5 +178,32 @@ test('D52b workflow context requires all native ancestors of the same input0 ope
   const r=await readPreparedNodeContext(f.page,f.binding);
   assert.equal(!!r.navigation_workflow,fault==='valid',fault);
   if(fault==='valid')assert.equal(r.navigation_workflow.tid,f.binding.workflow_ref.navigation_path.at(-1).tid);
+ }
+});
+
+test('D52b Done/Execute and Views retain only the complete native workflow ancestry',async()=>{
+ for(const surface of ['graph','views'])for(const fault of ['valid','package','module','workflow','module_parent','component_dom','path','document','receipt']) {
+  const f=fixture(),p=f.enterInputBreadcrumbs(true);f.leaveInput(surface);
+  if(['package','module','workflow'].includes(fault))p.ancestors[['package','module','workflow'].indexOf(fault)]._node.data.node={};
+  if(fault==='module_parent')f.workflowNode.ParentNode.ParentNode={};
+  if(fault==='component_dom')p.ancestors[1].el.dom={};
+  if(fault==='path')f.changeCrumb();
+  if(fault==='document')f.preparation.document={};
+  if(fault==='receipt')f.record.phase='reserved';
+  const r=await readPreparedNodeContext(f.page,f.binding);
+  assert.equal(!!r.navigation_workflow,fault==='valid',surface+':'+fault);
+  if(fault==='valid'){assert.equal(r.surface,surface);assert.equal(r.navigation_workflow.tid,f.binding.workflow_ref.navigation_path.at(-1).tid);}
+ }
+});
+
+test('workflow overflow item belongs to the exact native toolbar, menu and cached workflow',async()=>{
+ for(const fault of ['valid','bar_dom','trigger_dom','trigger_owner','handler_trigger','menu_dom','trigger_menu','handler_menu','item_dom','item_owner','item_workflow']) {
+  const f=fixture();f.enterInputBreadcrumbs(true);f.leaveInput('views');const p=f.addOverflow();
+  if(fault==='bar_dom')p.bar.el.dom={};if(fault==='trigger_dom')p.trigger.el.dom={};
+  if(fault==='trigger_owner')p.trigger.ownerCt={};if(fault==='handler_trigger')p.bar.layout.overflowHandler.menuTrigger={};
+  if(fault==='menu_dom')p.menu.el.dom={};if(fault==='trigger_menu')p.trigger.menu={};if(fault==='handler_menu')p.bar.layout.overflowHandler.menu={};
+  if(fault==='item_dom')p.item.el.dom={};if(fault==='item_owner')p.item.ownerCt={};if(fault==='item_workflow')p.item._node.data.node={};
+  const r=await readPreparedNodeContext(f.page,f.binding);
+  assert.equal(!!r.workflow_overflow?.item_tid,fault==='valid',fault);
  }
 });

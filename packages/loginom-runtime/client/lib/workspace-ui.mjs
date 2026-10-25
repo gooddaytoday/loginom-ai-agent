@@ -117,7 +117,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   // The state is document-bound; navigation invalidates every previous reference.
   const readUi = async (rediscover = false, scanRetried = false) => {
     const nodeContext=await boundNode();
-    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedNavigationWorkflow,preparedOutputPort,preparedInputPort,preparedNodeWizard}) => {
+    const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedNavigationWorkflow,preparedWorkflowOverflow,preparedOutputPort,preparedInputPort,preparedNodeWizard}) => {
     try {
     const scanStarted = Date.now(), maxElements = 6000, maxWork = 250000;
     let maxMs = 500;
@@ -196,7 +196,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if (dom.length >= maxElements) { const error=new Error('Selected region or global guards exceed the scan budget');error.code='UI_SCAN_LIMIT';error.limit_kind='elements';throw error; }
       seenElements.add(element);dom.push(element);
     };
-    const regionSelector='[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
+    const regionSelector='[data-tid$=";cnrNaviMode;b-2;mn"],[data-tid$=";FileStorageForm;btnRefresh"],[data-tid$=";btnProduceType;mn"],[data-tid="mn"],[data-tid="mnContextData"],[data-tid="ConsoleForm"],[data-tid="MF;ConsoleForm"],[data-tid$=";FileStorageForm;pnlFileStorage;tbl"],[data-tid$=";PreviewForm;DataSetForm"],[data-tid$=";ViewsForm;BrowseView"],[data-tid$=";ViewsForm"],[data-tid="MF;cntMain;tlbMainToolbar"],[data-tid="MF;MainMenuForm"],[data-tid="MF;cntMain;cntWorkspace;Workspace;t.br"],[role="dialog"],.x-window,.bg-dialog,[role="grid"],table,[role="form"],[data-tid$=";WizrdMCF"],[data-tid$=";boundlist"],[data-tid$=";MapTreeForm;tree"],[data-tid$=";cmpDiagram"],[data-tid$=";pnlWorkarea"],[data-tid$="NavigationBar;NavigationPanel"]';
     // E2E utils/selectors.Format: whitespace -> underscore, comma removed.
     // This finds candidates, not filesystem identity or absence. CSS hex escapes
     // keep arbitrary filename characters data rather than selector syntax.
@@ -277,7 +277,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     const wizardButtons=['btnPrev','btnNext','btnDone','btnExecute','btnClose','btnError'];
     // Breadcrumb labels are fixed global context even for a narrow file row;
     // including buttons without their labels loses the observed directory.
-    const wizardSelectors=['[data-tid$=";WizrdMCF;ColumnsEditForm"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"] input','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType;trg_picker"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnApply"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnCancel"]',...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
+    const wizardSelectors=['[data-tid$=";cnrNaviMode;b-2"]','[data-tid$=";cnrNaviMode;b-2;mn"]','[data-tid*=";cnrNaviMode;b-2;mn;mn.i"]','[data-tid$=";WizrdMCF;ColumnsEditForm"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"]','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType"] input','[data-tid$=";WizrdMCF;ColumnsEditForm;cbxNormType;trg_picker"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnApply"]','[data-tid$=";WizrdMCF;ColumnsEditForm;btnCancel"]',...(definitionPrefix?['[data-tid='+JSON.stringify(definitionPrefix+';ModelForm;btnToggleActivateCurrent')+']']:[]),'[data-tid$=";WizrdMCF;ImportTextFilePreviewWizard;edtFileName"] .x-form-error-msg', '[data-tid$=";ModelForm;cmpDiagram"]','[data-tid$=";NavigationBar;NavigationPanel"]','[data-tid*=";cnrNaviMode;b.s_"]','[data-tid*=";cnrNaviMode;b.s"] .x-btn-inner-default-toolbar-small','[data-tid$=";WizrdMCF"]','[data-tid$=";WizrdMCF;cardWizardPanel;p.h;p.t"]',
       ...Object.values(wizardMarkers).flat().map(suffix=>'[data-tid$=";WizrdMCF'+suffix+'"]'),
       // Its grid identifies the stage; this separate guard identifies the
       // definition fields when the observed root is the native editor portal.
@@ -713,6 +713,17 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     let workflowNavigation={status:'unobserved'};
     let pendingWizardOwner={status:'unobserved'};
     let nodeContext={status:'unobserved',opening_verified:false};
+    const hiddenBoundWorkflow=e=>preparedNavigationWorkflow?.tid===getTid(e)
+      &&preparedNavigationWorkflow.label===e.textContent.trim()
+      &&preparedWorkflowPath?.length===5&&preparedWorkflowPath[4].tid===getTid(e)
+      &&preparedWorkflowPath[4].label===e.textContent.trim()
+      &&preparedWorkflowPath.every(c=>{const es=tids.get(c.tid)??[];return es.length===1
+        &&es[0].parentElement===e.parentElement&&es[0].textContent.trim()===c.label;})
+      &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'
+      &&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')&&!sensitive(e)
+      &&(tids.get(getTid(e))??[]).length===1
+      &&e.querySelectorAll('.maptree-icon-workflow').length===1
+      &&e.querySelectorAll('[class*="maptree-icon-"]').length===1;
     // Long export/package captions can overflow the node breadcrumb itself.
     // This is context text only: gestures still require visible controls and
     // the current native node wizard or exact input0/native input1 opening.
@@ -765,11 +776,11 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&(tids.get((getTid(e)??'').slice(0,-'>Настройка'.length))??[]).filter(parent=>panels[0].contains(parent)
             &&(visible(parent)||hiddenExportNode(parent))&&parent.querySelectorAll('[class*="bg-vendor-icon-"]').length===1).length===1;
         const crumbs=all.filter(e=>{charge();return (getTid(e)??'').startsWith(prefix) && panels[0].contains(e) && !sensitive(e)
-          && (visible(e)||hiddenExportNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
+          && (visible(e)||hiddenBoundWorkflow(e)||hiddenExportNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
             &&e.querySelectorAll('.maptree-icon-wizard').length===1);});
         if(crumbs.length>32)ownerContext.status='bounded';
         else if(crumbs.length) {
-          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
+          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenBoundWorkflow(e)||hiddenExportNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
             overflow_context:overflowSocket(e),
             wizard_icon:e.querySelectorAll('.maptree-icon-wizard').length===1,
             workflow_icon:e.querySelectorAll('.maptree-icon-workflow').length===1,
@@ -787,11 +798,25 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             workflowNavigation={status:'observed',control_ref:target.ref,control_tid:target.tid,
               path:items.slice(0,preparedWorkflowPath.length).map(({tid,label})=>({tid,label})),
               current_path:items.map(({tid,label})=>({tid,label}))};
+            if(hiddenBoundWorkflow(crumbs[preparedWorkflowPath.length-1])&&preparedWorkflowOverflow) {
+              const triggerTid=workflow.prefix+';cnrNaviMode;b-2',menuTid=triggerTid+';mn';
+              const triggers=tids.get(triggerTid)??[],menus=tids.get(menuTid)??[];
+              if(preparedWorkflowOverflow.trigger_tid===triggerTid&&preparedWorkflowOverflow.menu_tid===menuTid
+                &&triggers.length===1&&panels[0].contains(triggers[0])&&visible(triggers[0])&&!sensitive(triggers[0])) {
+                workflowNavigation.overflow={trigger_ref:refOf(triggers[0]),trigger_tid:triggerTid,menu_tid:menuTid};
+                const entries=tids.get(preparedWorkflowOverflow.item_tid)??[];
+                if(menus.length===1&&visible(menus[0])&&entries.length===1&&menus[0].contains(entries[0])
+                  &&visible(entries[0])&&!sensitive(entries[0])&&textOf(entries[0],true)===target.label) {
+                  workflowNavigation.control_ref=refOf(entries[0]);workflowNavigation.control_tid=getTid(entries[0]);
+                }
+              }
+            }
           }
           const last=items.at(-1),node=items.at(-2);
           if(items.reduce((size,item)=>size+item.tid.length+item.label.length,0)>4096)ownerContext.status='bounded';
           else if(!unique || !chain)ownerContext.status='ambiguous';
-          else if(last.workflow_icon) {
+          else if(last.workflow_icon&&(!hiddenBoundWorkflow(crumbs.at(-1))
+            ||all.filter(e=>panels[0].contains(e)&&(getTid(e)??'').startsWith(prefix)).length===items.length)) {
             navigationContext={status:'observed',kind:'workflow',path:items.map(({tid,label})=>({tid,label}))};
           }
           else if(last.wizard_icon && items.filter(i=>i.wizard_icon).length===1 && node?.output_data_icon && node.label
@@ -820,6 +845,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       const panelTid=workflow.prefix+';NavigationBar;NavigationPanel',panels=tids.get(panelTid)??[];
       const prefix=workflow.prefix+';cnrNaviMode;b.s_';
       const inside=(e,parent)=>{
+        if(hiddenBoundWorkflow(e)&&parent.contains(e))return true;
         const r=boxOf(e),p=boxOf(parent),vw=globalThis.innerWidth,vh=globalThis.innerHeight;
         return visible(e)&&!sensitive(e)&&[r.x,r.y,r.width,r.height,p.x,p.y,p.width,p.height,vw,vh].every(Number.isFinite)
           &&r.x>=0&&r.y>=0&&r.x+r.width<=vw&&r.y+r.height<=vh
@@ -830,7 +856,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const panel=panels[0],crumbs=all.filter(e=>{charge();return panel.contains(e)&&/;cnrNaviMode;b\.s_/.test(getTid(e)??'');});
         if(crumbs.length>32)nodeContext.status='bounded';
         else if(crumbs.length===6&&crumbs.every(e=>inside(e,panel)&&(getTid(e)??'').startsWith(prefix))) {
-          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:textOf(e,true)}));
+          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenBoundWorkflow(e)?short(e.textContent):textOf(e,true)}));
           const unique=new Set(items.map(i=>i.tid)).size===items.length;
           const bounded=items.every(i=>i.tid.length<=2048&&i.label.length<240)&&items.reduce((n,i)=>n+i.tid.length+i.label.length,0)<=4096;
           const chain=items.every((i,n)=>i.tid.slice(prefix.length).split('>').length===n+1&&(!n||i.tid.startsWith(items[n-1].tid+'>')));
@@ -841,7 +867,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const exact=items[0].tid===prefix+'Сервер'&&items[1].label==='Пакеты'&&items.slice(2).every(i=>i.label)
             &&(node.tid===items[4].tid+'>'+(nativeKey??format(node.label))
               ||preparedNodeId&&preparedNavigationNode?.tid===node.tid&&preparedNavigationNode.label===node.label);
-          const icon=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1&&inside(found[0],e);};
+          const icon=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1&&(hiddenBoundWorkflow(e)||inside(found[0],e));};
           const icons=icon(crumbs[4],'.maptree-icon-workflow')&&icon(crumbs[5],'[class*="bg-vendor-icon-"]');
           if(!bounded)nodeContext.status='bounded';
           else if(!unique||!chain)nodeContext.status='ambiguous';
@@ -3522,6 +3548,7 @@ function readRenderedInputMapping(observation) {
     preparedGraphTid:nodeContext?.surface==='graph'?nodeContext.tid:null,
     preparedNavigationNode:nodeContext?.surface==='graph'||nodeContext?.surface==='wizard'&&nodeContext.input_port
       &&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.navigation_node??null:null,
+    preparedWorkflowOverflow:nodeContext?.verified===true&&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.workflow_overflow??null:null,
     preparedNavigationWorkflow:nodeContext?.verified===true&&nodeContext.node_id===task.prepared_node_context?.node.node_id?nodeContext.navigation_workflow??null:null,
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
     preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,
