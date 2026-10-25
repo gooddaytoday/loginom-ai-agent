@@ -2,7 +2,7 @@
 
 **Результат:** отдельно подтвердить очистку неудачного двухслотового verify, освободить его настоящие reservations и продолжить прежнюю кампанию только по missing. Готовые измерения, исходные ошибки и история сохраняются. Полная автономность исходной LAB-170 этим ремонтом не подтверждается.
 
-**Статус:** база v3 EvalOps и точное уточнение порядка проверки ниже приняты независимо. C1–C4 закрыты статическим независимым ревью; спецификация C5 принята для реализации, сам observer ещё не проверен. Свежий scope, адресные проверки и итоговое ревью точных артефактов обязательны; live-допуска нет.
+**Статус:** база v3 и порядок проверки приняты независимо; C1–C4 закрыты статически. Acquisition C5, guard CP1 и metadata bridge с amended policy приняты в своих областях; C5C1–C5C3 закрыты, исправления и статическая интеграция приняты независимым native review. Actual runner3 unit-policy positive, capture CF1, quiet handoff/collector, свежие scopes и реальная once-операция остаются открыты; live-допуска нет.
 
 Основание — действующее техническое предварительное разрешение владельца, [основной план](2026-10-23-autonomous-evals-plan.md), [прежняя разовая процедура](2026-10-25-runner3-once-recovery-plan.md) и [принятый полный v3](https://mas.kartamyshev.dev/api/attachments/01a174d6-7ec8-78d2-ac51-2259213ff5f0/download). Exact plan/review и проверенные hashes сохранены private: `preparation-accounting/c3ea-once-recovery-plan-v3.md`, `epoch-v3-plan-review-result.json`. Актуальные source, счётчики и исходный no-progress предел — в [checkpoint runner3](2026-10-24-local-eval-runner-plan.md#7-этапы-и-состояние-проверок-открытые-пункты-переданы-в-канонический-чат).
 
@@ -51,8 +51,11 @@ Controller остаётся enabled; после boot подтверждаетс�
 Потерянный ответ или частичный start/release требует чтения того же unit/invocation/intent/receipt. Второй полный execute запрещён. Только однозначно завершённые действия учитываются; отдельный reviewed completion выполняет оставшийся хвост со свежими checks и тем же lifecycle. При неизвестном исходе — retained resources и STOP, без ослабления guards или продления срока.
 
 Checkpoint:
-- База v3 и поправка qualification gate приняты независимо; обязательных замечаний к плану нет. Full code/live ACCEPT и исполнение не заявлены.
-- Независимый pre-effect baseline21:06UTC: все29 Result hashes, manifest/pins, originals c3/partial A и фактический A archive сохранены; журнал/CAS/boot стабильны. Proof — `preparation-accounting/c3ea-pre-effect-independent-baseline.json`.
-- EvalOps подготовил unit/handoff; шесть изолированных real-systemd cases (success/STOP/timeout/exec failure/HUP до и после acceptance) прошли. Это не qualification полного cleanup. Проверенный CLI provenance/locality reference не заменяет fresh scope.
-- После [уточнения существующих будильников](2026-10-26-evalops-repair-wakeup-plan.md) EvalOps сам продолжил правки из periodic task; queued reply проверил уже созданное поручение и не сделал дубль. Verdict22:07UTC: C1–C4 закрыты статически, D1/D2 C5 приняты для реализации; full code/live ACCEPT не дан. Exact report private `preparation-accounting/private-c3ea-v3-review-result.json`. Draft scope не исполним; live effects не выполнялись.
-- Следующий шаг — лично реализовать и адресно проверить C5, получить итоговое ревью и immutable scope, затем выполнить once-операцию. Live recovery и полный этап7 открыты. Campaign source/units/leases не изменялись; внешняя помощь отдельно от автономности LAB-170.
+- База v3 и поправка qualification gate приняты; live-допуска нет. Прежний pre-effect baseline сохранён в `preparation-accounting/c3ea-pre-effect-independent-baseline.json` и не заменяет свежий scope.
+- Прежние шесть real-systemd lifecycle cases прошли в своей области; capture-specific CF1 ими не подтверждён. CLI provenance/locality reference также не заменяет fresh scope.
+- Acquisition принят отдельно; реальные process negatives — 3 PASS/10 assertions. Guard полноты `/proc` view CP1 принят после реальной проверки отказа при hidepid=4.
+- На runner3 UID1000 чтение `/proc/1/ns/pid` даёт EACCES (`preparation-accounting/c5-runner3-pid1-namespace-readability.json`). EvalOps лично реализовал отдельную host metadata preparation: root-owned receipt читает UID1000; bridge и amended policy приняты. Права cleanup и capabilities не расширены.
+- Native review23:21UTC: C5C1–C5C3 закрыты, исправления и статическая интеграция приняты, новых mandatory нет. Evidence — `preparation-accounting/turn17-native-progress.json`; actual-unit qualification и live этим не подтверждены.
+- Последний успешный campaign snapshot runner3 — 22:44UTC; последующий SSH timeout произошёл до dispatch. Свежая сохранность remote state не заявлена.
+- Следующий шаг — actual runner3 unit-policy positive, capture CF1 и quiet handoff/collector, затем свежие capture/final immutable scopes с принятыми exact артефактами и честным qualification receipt; после допуска — первая once-операция с настоящими receipts/read-back. Draft scope не исполним; live recovery и полный этап7 открыты.
+- Внешняя помощь учитывается отдельно от исходной автономности LAB-170.
