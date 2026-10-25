@@ -21,7 +21,7 @@ test('cold inspects saved export mapping after execution restores the complete d
    'createNodeProcedure','withBrowserReceipt','session','createNodeExecutionProcedure','performColdNodeAction',
    'runColdExecution','coldProcessObservation','staticSources','openNewOutputTable','configureTablePrecision','prepareTableRead',
    'readTableOutputPages','decodeTableOutput','returnFromOutputTable','writeFile','join','args','config',
-   'loginPassword','matchExpectedOutputs','resolveExportInput','selectColdOutputReads','observeExportDestinations','openColdOutputViews','exportCsv','state'].join(',')}}=f;\n${body}\nreturn correspondence;`);
+   'loginPassword','matchExpectedOutputs','resolveExportInput','selectColdOutputReads','observeExportDestinations','openColdOutputViews','openColdTableFilter','exportCsv','state'].join(',')}}=f;\n${body}\nreturn correspondence;`);
  const fields=[{name:'Code',source_name:'Code',type:'string'},{name:'Status',source_name:'Status',type:'integer'}];
  const data=actual('rename',1).data;
  data.schema.push({name:'Status',label:'Status',type:'integer'});
@@ -37,7 +37,7 @@ test('cold inspects saved export mapping after execution restores the complete d
    openNewOutputTable:async()=>({table:{}}),configureTablePrecision:async()=>({fields:data.schema.map(f=>({...f,key:f.name}))}),
    prepareTableRead:async()=>({}),readTableOutputPages:async()=>structuredClone(data),decodeTableOutput:raw=>raw,
    returnFromOutputTable:async()=>{},writeFile:async()=>{},join:()=>'',args:{output:''},config:{},loginPassword:'',
-   matchExpectedOutputs,resolveExportInput,selectColdOutputReads,coldProcessObservation,openColdOutputViews:async()=>{},
+   matchExpectedOutputs,resolveExportInput,selectColdOutputReads,coldProcessObservation,openColdOutputViews:async()=>{},openColdTableFilter:async()=>{},
    exportCsv:csvProvided?{columns:['Code','Status'],header:'names'}:undefined,state:{},
    observeExportDestinations:async()=>{calls.push('mapping');return [{node_id:'export',input_fields:restored?fields:fields.slice(1)}];}});
   if(!csvProvided)await assert.rejects(result,/COLD_EXPORT_CSV_REQUIRED/);
