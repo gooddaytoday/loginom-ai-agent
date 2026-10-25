@@ -6,7 +6,7 @@ import {Page} from './support/workspace-ui-fixture.mjs';
 // detail elements before three controls/time refusals. Rebuild that scale;
 // the journal is an observation, not a complete historical DOM recording.
 function storageFixture() {
-  let elapsed=0,queries=0,ranges=0,loading=false;
+  let elapsed=0,queries=0,ranges=0,loading=false,countChange=false;
   class Clock extends Date {static now(){return elapsed;}}
   const page=new Page({clock:Clock}),base='MF;TF-1;FileStorageForm;';
   const grid=page.add('div',base+'pnlFileStorage');grid.id='files-grid';
@@ -21,7 +21,7 @@ function storageFixture() {
     rows.push(row);cells.push(cell);
   }
   const store={$className:'bg.filedialog.FileStore',isBufferedStore:false,isLoading:()=>loading,
-    getCount:()=>records.length,getRange:()=>{ranges++;return [...records];}};
+    getCount:()=>records.length+(countChange&&ranges?1:0),getRange:()=>{ranges++;return [...records];}};
   const view={el:{dom:table},getRecord:row=>records[rows.indexOf(row)],getNode:record=>rows[records.indexOf(record)]};
   page.context.Ext={getCmp:id=>id===grid.id?{el:{dom:grid},getView:()=>view,getStore:()=>store}:null};
   const query=page.document.querySelectorAll.bind(page.document);
@@ -32,7 +32,7 @@ function storageFixture() {
     return query(selector);
   };
   return {page,table,cells,records,view,rows,
-    reset(){elapsed=queries=ranges=0;},loading(value){loading=value;},counts:()=>({queries,ranges})};
+    reset(){elapsed=queries=ranges=0;},loading(value){loading=value;},changeCount(){countChange=true;},counts:()=>({queries,ranges})};
 }
 
 test('q7 storage scan inventories its exact native grid once within the unchanged time budget',async()=>{
@@ -64,4 +64,11 @@ test('shared storage inventory still checks each row record and native view owne
   const files=result.output.ui.elements.filter(e=>e.storage_entry);
   assert.equal(files.find(e=>e.tid===f.cells[0].attrs['data-tid']).storage_entry.kind,'file');
   assert.equal(files.find(e=>e.tid===f.cells[1].attrs['data-tid']).storage_entry.kind,'unknown');
+});
+
+test('storage inventory refuses a count that changes while its records are read',async()=>{
+  const f=storageFixture();f.changeCount();
+  const result=await f.page.execute({mode:'observe'});
+  assert.equal(result.status,'SUCCEEDED');
+  assert.ok(result.output.ui.elements.filter(e=>e.storage_entry).every(e=>e.storage_entry.kind==='unknown'&&e.storage_entry.bytes===undefined));
 });

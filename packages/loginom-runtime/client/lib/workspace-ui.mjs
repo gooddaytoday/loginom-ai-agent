@@ -543,7 +543,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           const count=store.getCount?.();
           if(Number.isSafeInteger(count)&&count<=10000){
             const records=store.getRange?.();
-            if(Array.isArray(records)&&records.length===count)inventory={view,records:new Set(records)};
+            if(Array.isArray(records)&&records.length===count&&store.getCount()===count)inventory={view,store,count,records:new Set(records)};
           }
         }
         storageInventories.set(grid,inventory);
@@ -3044,7 +3044,7 @@ function readRenderedInputMapping(observation) {
         const gridTid=tid.split(';colName_')[0]+';pnlFileStorage';
         const grid=storageRow.closest('[data-tid='+JSON.stringify(gridTid)+']');
         const inventory=grid&&storageInventory(grid,gridTid),view=inventory?.view;
-        if(inventory&&view.el.dom.contains(storageRow)) {
+        if(inventory&&inventory.store.isLoading?.()===false&&inventory.store.getCount()===inventory.count&&view.el.dom.contains(storageRow)) {
           const record=view.getRecord?.(storageRow),data=record?.data;
           if(record?.isModel===true&&inventory.records.has(record)
             &&view.getNode?.(record)===storageRow&&data?.Type===0
