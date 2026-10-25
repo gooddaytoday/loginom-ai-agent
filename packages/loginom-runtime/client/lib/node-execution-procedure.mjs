@@ -89,13 +89,17 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
     resolve:s=>({verb,ref:one(control(s,tid,verb),'Unique execution control required').ref,...(key?{key}:{})}),identity});
   const consoleVisible=s=>s.ui.elements.filter(e=>consoleTid(e.tid,grid)).length===1;
   async function openConsole(condition='process console visible',ready=()=>true,extra={}) {
+    consoleControl??=channel.launchConsoleControl;
     let s=await observe('prepared node available for process console',s=>consoleVisible(s)||control(s,button).length===1,{readProcesses:false,readProcessControls:true,
       ...(launched()&&consoleControl?{settleProcessConsole:consoleControl}:{})});
     if(!launched()){
       const buttons=control(s,button);
       consoleControl=buttons.length===1&&buttons[0].signature?{ref:buttons[0].ref,signature:structuredClone(buttons[0].signature)}:undefined;
     }
-    if(!consoleVisible(s))await act(s,button);
+    if(!consoleVisible(s)){
+      requireValue(!launched()||consoleControl,'Confirmed launch requires its pre-launch console control');
+      await act(s,button);
+    }
     // The control-only read above has no native inventory, even when the
     // console was already open. Refresh inventory in the consumer's own
     // readiness read instead of discarding one full inventory immediately.
