@@ -148,10 +148,11 @@ Cold audit сначала штатно активирует сохранённы
 короткий последовательный main path, затем новые изолированные попытки. Завершение Xorg
 подтверждено журналом ОС; его первопричина не установлена.
 
-Одноразовые контроллеры занимают около 1025 строк, включая 233 строки повторно
-использованных transport/cold tools. После проверки объёма оставлены прямые
-ветки в одном существующем контроллере; новый runner, зависимости и общая
-система телеметрии не добавляются. Верхняя оценка объёма превышена вдвое:
+Активные одноразовые контроллеры/проверки:7 файлов,1302 строки по git diff --stat;
+историческая копия старого скрипта хранится отдельно с доказательствами.
+Transport/provider/window observer и native settings readers повторно используются;
+новый runner, зависимости и общий framework не добавляются. Оценка300–500 строк
+превышена более чем вдвое; конструкция пересмотрена независимым ревью:
 после пересмотра оставлены только две прямые ветки публичного продолжения
 (один resume до upload и один same-node Import после отмены черновика),
 проверяющий код выбирает ID фактически завершённой операции. Старые неудачные
@@ -191,12 +192,11 @@ Dirty проверяется существующим idempotent Save: повт�
 
 ## Checkpoint
 
-- Выполнение продолжается; проверенные результаты и ограничения: [живой отчёт](../../testing/loginom-ai-agent/port-output-live-2026-10-25.md).
-- Private artifacts/evidence: /tmp/loginom-port-live-20261025-gxg7qus9/; обычные payload/frozen worktrees не менялись, установка не заменялась, секреты вне Git.
-- Все21 назначенные model attempts и warm/deterministic/fault проверки независимо разобраны; это не21PASS. Неудачи и неподтверждённая очистка сохранены отдельно.
-- Обязательный остаток послеSave: cold19model+34актуальныхcontrolled packages; списокcontrolled основан на original Save/session в evidence/controlled-cold-selection.json. Model progress: evidence/cold-final-summary.json.
-- Только один live browser: владелец diagnose_boundary_interrupt запускает existing cold-settings. Два коллеги проверяют semantic raw observations без CLI/UI; root браузеры не запускает.
-- В private collector исправлены две observed формы mapping port; удалён лишний запрет native REST connection-arrow. Own package/GUID/tabular links/ancestry/no-side-effect Execute/Cancel/before-after проверки сохранены; оба изменения reviewed/self-check PASS.
-- Cold failures/retries сохраняются отдельно; допускается только новая попытка после конкретно доказанной коррекции. Unsupported native fields остаются gaps без нового API/framework.
-- Native cleanup шести dispose-сбоев остаётся BLOCKED. Финальная own-session очистка показала0 сеансов тестовой учётки, но helper admin logout UNKNOWN; старые guard-профили изолированы.
-- Далее: закончить53cold, обновить итог с gaps, проверить frozen артефакты, относительные ссылки/diff --check и commit. Без push/PR/install и изменения ordinary runtime.
+- Живые прогоны и независимые аудиты завершены со смешанным результатом; выводы и все ограничения: [итоговый отчёт](../../testing/loginom-ai-agent/port-output-live-2026-10-25.md).
+- Private artifacts/evidence перенесены в постоянный локальный каталог, путь и совместимая ссылка — в итоговом отчёте; секреты и исходные журналы вне Git.
+- Назначенные модельные попытки, ordinary/diagnostic проверки и все актуальные saved-package cold attempts разобраны; ошибки/NOT_VERIFIED/partial не заменены общим PASS.
+- Cold-настройки проверены штатными native readers независимо от нового reader; неподтверждённые source identity/excluded/file bytes/physical data сохранены как gaps.
+- Исходные cleanup BLOCKED и старые UNKNOWN остаются; последующая адресная очистка собственной учётки учтена отдельно. Неизвестные чужие пакеты/сеансы не закрывались, guard-профили изолированы.
+- Все live writers остановлены, принадлежащих кампании CLI/Node/Bun/Chromium не найдено; REST-ответчик штатно остановлен.
+- Candidate/baseline/diagnostic-fixed прошли штатную проверку соответствия исходникам; обычные frozen worktrees чистые, установка не заменялась, ordinary runtime не менялся.
+- Независимое финальное ревью отчёта без замечаний; относительные ссылки и diff проверены, штатный secret scan — clean. Без push/PR/install.
