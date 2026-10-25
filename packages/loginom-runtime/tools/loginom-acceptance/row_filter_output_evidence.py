@@ -29,11 +29,8 @@ def verify_filter_output(events, request, expected_columns, expected_ports):
         failures.extend(verify_port_output_receipts(events, request['operation_id'], ports))
         for port in ports:
             index = port['port']
-            failures.extend('port_'+str(index)+':'+error for error in verify_port_output(port, expected_columns, expected_ports[index], execution_id, index))
-            wanted = min(request['read']['sample_rows'], len(expected_ports[index]))
-            count = port.get('sample_rows')
-            if type(count) is not int or not 0 <= count <= wanted or count < wanted and port.get('read_limit') != 'preview_cell_or_byte_budget':
-                failures.append('port_'+str(index)+':port_output_requested_coverage')
+            failures.extend('port_'+str(index)+':'+error for error in verify_port_output(port, expected_columns,
+                expected_ports[index], execution_id, index, sample_rows=request['read']['sample_rows']))
     except (KeyError, IndexError, TypeError, AttributeError, ValueError) as error:
         failures.append(str(error) if isinstance(error, ValueError) else 'filter_output_malformed')
     return dict(passed=not failures, failures=sorted(set(failures)), execution_id=execution_id,

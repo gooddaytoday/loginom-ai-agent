@@ -103,7 +103,8 @@ def javascript_business_table(operation,request,expected_columns,expected_rows,o
     port = output['ports'][0]
     source_port = port.get('freshness_basis') == 'completed_execution_port_source'
     if source_port:
-        failures.extend(verify_port_output(port,columns,expected_rows,execution_id,0))
+        failures.extend(verify_port_output(port,columns,expected_rows,execution_id,0,
+            sample_rows=request['read'].get('sample_rows',100)))
         failures.extend(verify_port_output_receipts(operation['rows'],request['operation_id'],[port]))
         if port.get('port_guid') != phases['output_mapping']['value']['native_mapping']['node_context']['output_port']['port_guid']:
             failures.append('javascript_output_physical_port')

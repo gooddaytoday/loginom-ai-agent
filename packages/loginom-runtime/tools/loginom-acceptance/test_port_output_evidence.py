@@ -1,6 +1,44 @@
 import copy
+import json
 import unittest
 from full_read_evidence import verify_full_read
+
+
+class PortBudgetTests(unittest.TestCase):
+    def port(self, columns, rows, count):
+        return dict(port=0, port_guid='p', fresh=True, execution_id='e',
+            freshness_basis='completed_execution_port_source',
+            schema=[dict(c, index=i) for i,c in enumerate(columns)], row_count=len(rows),
+            sample_rows=count, sample_complete=count == len(rows), read_limit='preview_cell_or_byte_budget',
+            sample=[[dict(type=c['type'], is_null=v is None, value=float(v) if c['type']=='real' else v,
+                **(dict(decimal=v) if c['type']=='real' else {})) for c,v in zip(columns,row)] for row in rows[:count]])
+
+    def test_byte_limit_uses_independent_utf8_json_with_exact_real_number_lengths(self):
+        from import_output_evidence import verify_port_output
+        numbers=['-0', '1e-7', '1e-6', '1e20', '1e21', '5e-324', '1.7976931348623157e308']
+        native_json='0,1e-7,0.000001,100000000000000000000,1e+21,5e-324,1.7976931348623157e+308'
+        prefix='[['+native_json+','
+        escaped='"\\\r\n😀'
+        remaining=524288-len((prefix+json.dumps(escaped,ensure_ascii=False)+']]').encode())
+        text=escaped+'Ж'*(remaining//2)+'x'*(remaining%2)
+        self.assertEqual(len((prefix+json.dumps(text,ensure_ascii=False)+']]').encode()),524288)
+        columns=[dict(name='R'+str(i),label='R'+str(i),type='real') for i in range(len(numbers))]
+        columns.append(dict(name='Text',label='Text',type='string'))
+        for first,count in [(text,1),(text+'x',0)]:
+            rows=[[*numbers,first],[*numbers,'next']]
+            port=self.port(columns,rows,count)
+            self.assertEqual(verify_port_output(port,columns,rows,'e',0),[])
+            port.pop('read_limit')
+            self.assertIn('port_output_requested_coverage',verify_port_output(port,columns,rows,'e',0))
+
+    def test_cell_limit_accepts_only_the_independently_justified_whole_row_prefix(self):
+        from import_output_evidence import verify_port_output
+        columns=[dict(name='S'+str(i),label='S'+str(i),type='string') for i in range(101)]
+        rows=[[None]*101 for _ in range(100)]
+        for count in (98,99,100):
+            with self.subTest(count=count):
+                result=verify_port_output(self.port(columns,rows,count),columns,rows,'e',0)
+                self.assertEqual(result == [],count == 99)
 
 
 class FullPortConsumerTests(unittest.TestCase):
@@ -34,6 +72,12 @@ class ImportPortConsumerTests(unittest.TestCase):
     def test_import_compares_csv_with_port_without_table_actions(self):
         request, source, checkpoint = self.fixture()
         self.assertEqual(self.audit(request, source, checkpoint), [])
+
+    def test_import_rejects_an_unjustified_empty_budget_prefix(self):
+        request, source, checkpoint = self.fixture()
+        checkpoint['output']['ports'][0].update(sample=[], sample_rows=0, sample_complete=False,
+            read_limit='preview_cell_or_byte_budget')
+        self.assertIn('port_output_requested_coverage', self.audit(request, source, checkpoint))
 
     def test_import_refuses_stale_port_schema_and_insufficient_requested_rows(self):
         request, source, checkpoint = self.fixture()
@@ -117,7 +161,12 @@ class FilterPortConsumerTests(unittest.TestCase):
             self.assertFalse(verify_filter_output(changed,request,columns,rows)['passed'])
         changed=copy.deepcopy(events);port=changed[-1]['result']['output']['ports'][0]
         port.update(sample=port['sample'][:1],sample_rows=1,sample_complete=False,read_limit='preview_cell_or_byte_budget')
-        self.assertTrue(verify_filter_output(changed,request,columns,rows)['passed'])
+        self.assertFalse(verify_filter_output(changed,request,columns,rows)['passed'])
+        small=copy.deepcopy(request);small['read']['sample_rows']=1
+        for port in changed[-1]['result']['output']['ports']:
+            port.update(sample=port['sample'][:1],sample_rows=1,sample_complete=False)
+            port.pop('read_limit',None)
+        self.assertTrue(verify_filter_output(changed,small,columns,rows)['passed'])
         changed=copy.deepcopy(events);changed[0]['outcome']['status']='FAILED'
         self.assertFalse(verify_filter_output(changed,request,columns,rows)['passed'])
         changed=copy.deepcopy(events);changed[-1]['result']['execution']['execution_id']='old'

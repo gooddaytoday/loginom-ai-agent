@@ -3,9 +3,11 @@ from import_limits import import_operation_step_budget
 
 import csv
 import io
+import json
 import math
 import struct
 from datetime import datetime
+from decimal import Decimal
 from import_done_evidence import _verify_text_import
 from import_execution_evidence import verify_execution_observations
 from node_procedure_evidence import verify_internal_sequence
@@ -60,7 +62,49 @@ def equal_number(a, b):
         return False
 
 
-def verify_port_output(port, expected_columns, expected_rows, execution_id, port_index):
+def _port_expected_value(value, kind):
+    if value is None:
+        return None
+    if kind == 'integer':
+        return str(int(value))
+    if kind == 'real':
+        return float(value)
+    if kind == 'boolean':
+        boolean = value if type(value) is bool else {'true': True, 'истина': True, 'да': True,
+            'false': False, 'ложь': False, 'нет': False}.get(str(value).casefold())
+        if boolean is None:
+            raise ValueError('invalid_boolean_oracle')
+        return boolean
+    if kind == 'datetime':
+        for source_format in ['%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S',
+                '%d.%m.%Y %H:%M:%S.%f', '%d.%m.%Y %H:%M:%S', '%d.%m.%Y',
+                '%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+            try:
+                parsed = datetime.strptime(value, source_format)
+            except ValueError:
+                continue
+            if parsed.microsecond % 1000:
+                raise ValueError('submillisecond_oracle')
+            return parsed.isoformat(timespec='milliseconds')
+        raise ValueError('invalid_datetime_oracle')
+    return value
+
+
+def _port_json_size(value):
+    if type(value) is not float:
+        return len(json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode('utf-8', 'backslashreplace'))
+    if not math.isfinite(value):
+        raise ValueError('nonfinite_real_oracle')
+    if value == 0:
+        return 1  # JSON.stringify drops the sign of zero.
+    # Both runtimes use shortest round-trip digits, but JSON has different exponent thresholds.
+    if 1e-6 <= abs(value) < 1e21:
+        return len(format(Decimal(repr(value)), 'f').removesuffix('.0'))
+    mantissa, exponent = repr(value).split('e')
+    return len(mantissa.removesuffix('.0')) + 1 + len(str(int(exponent))) + (int(exponent) >= 0)
+
+
+def verify_port_output(port, expected_columns, expected_rows, execution_id, port_index, *, sample_rows=100):
     """Compare a source-port prefix with an independent complete fixture."""
     failures = []
     try:
@@ -72,12 +116,28 @@ def verify_port_output(port, expected_columns, expected_rows, execution_id, port
         if (not expected_columns or len({c['name'] for c in expected_columns}) != len(expected_columns)
                 or any(len(row) != len(expected_columns) for row in expected_rows)):
             return failures + ['port_output_oracle_shape']
+        if type(sample_rows) is not int or not 0 <= sample_rows <= 100:
+            return failures + ['port_output_requested_coverage']
         if (len(schema) != len(expected_columns) or any(c.get('index') != i
                 or any(c.get(k) != expected_columns[i][k] for k in ('name', 'label', 'type'))
                 or 'data_kind' in expected_columns[i] and c.get('data_kind') != expected_columns[i]['data_kind']
                 for i,c in enumerate(schema))):
             failures.append('port_output_schema')
         sample = port['sample']
+        wanted = min(sample_rows, len(expected_rows))
+        requested = min(wanted, 10000 // len(expected_columns))
+        values = [[_port_expected_value(v, c['type']) for v,c in zip(row, expected_columns)]
+            for row in expected_rows[:requested]]
+        size, count = 2, 0
+        for row in values:
+            next_size = size + (count > 0) + 2 + len(row) - 1 + sum(_port_json_size(v) for v in row)
+            if next_size > 512 * 1024:
+                break
+            size = next_size
+            count += 1
+        limit = 'preview_cell_or_byte_budget' if count < wanted else None
+        if port.get('sample_rows') != count or port.get('read_limit') != limit:
+            failures.append('port_output_requested_coverage')
         if (type(port.get('row_count')) is not int or port['row_count'] != len(expected_rows)
                 or type(port.get('sample_rows')) is not int or port['sample_rows'] != len(sample)
                 or not 0 <= len(sample) <= min(100, len(expected_rows))
@@ -88,7 +148,7 @@ def verify_port_output(port, expected_columns, expected_rows, execution_id, port
             failures.append('port_output_coverage')
         for i,row in enumerate(sample):
             for j,cell in enumerate(row):
-                expected = expected_rows[i][j]
+                expected = values[i][j]
                 kind = expected_columns[j]['type']
                 ok = cell.get('type') == kind and cell.get('is_null') is (expected is None)
                 if expected is None:
@@ -97,22 +157,10 @@ def verify_port_output(port, expected_columns, expected_rows, execution_id, port
                     ok &= equal_number(expected, cell.get('decimal')) and (equal_number(expected, cell.get('value'))
                         or float(expected) == 0 and type(cell.get('value')) in (int, float) and cell['value'] == 0)
                 elif kind == 'integer':
-                    ok &= isinstance(cell.get('value'), str) and str(int(expected)) == cell['value']
+                    ok &= isinstance(cell.get('value'), str) and expected == cell['value']
                 elif kind == 'boolean':
-                    boolean = expected if type(expected) is bool else {'true': True, 'истина': True, 'да': True,
-                        'false': False, 'ложь': False, 'нет': False}.get(str(expected).casefold())
-                    ok &= boolean is not None and cell.get('value') is boolean
-                elif kind == 'datetime':
-                    parsed = None
-                    for source_format in ['%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S',
-                            '%d.%m.%Y %H:%M:%S.%f', '%d.%m.%Y %H:%M:%S', '%d.%m.%Y',
-                            '%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
-                        try:
-                            parsed = datetime.strptime(expected, source_format); break
-                        except ValueError:
-                            pass
-                    ok &= parsed is not None and parsed.microsecond % 1000 == 0 and cell.get('value') == parsed.isoformat(timespec='milliseconds')
-                elif kind == 'string':
+                    ok &= cell.get('value') is expected
+                elif kind in ('string', 'datetime'):
                     ok &= cell.get('value') == expected
                 elif kind == 'variant':
                     ok &= cell.get('precision') == 'unverified' and cell.get('display_text') == expected
@@ -546,13 +594,9 @@ def verify_import_port_output(events, operation_id, request, source_bytes, check
             for c,index in zip(expected,indexes)] for row in records]
         ports = checkpoint['output']['ports']
         if len(ports) != 1 or request['read']['ports'] != [0]: raise ValueError('typed_port_missing')
-        failures = verify_port_output(ports[0], expected, rows, execution_id, 0)
+        failures = verify_port_output(ports[0], expected, rows, execution_id, 0, sample_rows=request['read']['sample_rows'])
         failures += verify_port_output_receipts(events, operation_id, ports)
         if checkpoint.get('execution', {}).get('execution_id') != execution_id: failures.append('output_checkpoint_execution_identity')
-        wanted = min(request['read']['sample_rows'], len(rows))
-        count = ports[0].get('sample_rows')
-        if type(count) is not int or not 0 <= count <= wanted or count < wanted and ports[0].get('read_limit') != 'preview_cell_or_byte_budget':
-            failures.append('port_output_requested_coverage')
         return failures
     except (KeyError, IndexError, TypeError, AttributeError, ValueError, UnicodeError):
         return ['source_port_output_malformed']

@@ -369,9 +369,9 @@ class PortOutputEvidenceTests(unittest.TestCase):
             for cell in row:
                 if cell['type']=='real':cell['value']=float(cell['value'])
 
-    def audit(self):
+    def audit(self, sample_rows=100):
         from import_output_evidence import verify_port_output
-        return verify_port_output(self.port, self.columns, self.rows, 'execution', 0)
+        return verify_port_output(self.port, self.columns, self.rows, 'execution', 0, sample_rows=sample_rows)
 
     def test_independent_fixture_accepts_port_values_without_table_evidence(self):
         self.assertEqual(self.audit(), [])
@@ -398,7 +398,11 @@ class PortOutputEvidenceTests(unittest.TestCase):
         for count in (0, 1):
             self.port['sample']=sample[:count]
             self.port.update(sample_rows=count, sample_complete=False)
-            self.assertEqual(self.audit(), [])
+            self.assertIn('port_output_requested_coverage', self.audit())
+            self.port['read_limit']='preview_cell_or_byte_budget'
+            self.assertIn('port_output_requested_coverage', self.audit())
+            self.port.pop('read_limit')
+            self.assertEqual(self.audit(sample_rows=count), [])
 
     def test_calculator_uses_port_fixture_and_retains_execution_and_sequence_audits(self):
         from calculator_output_evidence import verify_calculator_output
@@ -438,11 +442,11 @@ class PortOutputEvidenceTests(unittest.TestCase):
         events.append(dict(operation_id='calc',phase='node_checkpoint',result=checkpoint))
         audit=lambda:verify_calculator_output(events,request,self.columns,self.rows)
         self.assertTrue(audit()['passed'],audit())
-        # A valid smaller requested prefix and an explicit budget stop are allowed.
+        # Only the independently justified prefix is accepted, regardless of a budget claim.
         full=copy.deepcopy(self.port)
         self.port.update(sample=self.port['sample'][:1],sample_rows=1,sample_complete=False)
         self.assertIn('port_output_requested_coverage',audit()['failures'])
-        self.port['read_limit']='preview_cell_or_byte_budget';self.assertTrue(audit()['passed'],audit())
+        self.port['read_limit']='preview_cell_or_byte_budget';self.assertFalse(audit()['passed'],audit())
         self.port.pop('read_limit');request['read']['sample_rows']=1;self.assertTrue(audit()['passed'],audit())
         self.port.update(full);request['read']['sample_rows']=10
         events[-2]['outcome']['cleanup_complete']=False;self.assertFalse(audit()['passed'])

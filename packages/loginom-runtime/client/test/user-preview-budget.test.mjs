@@ -132,6 +132,24 @@ test('source-text MCP preview retains at least the legacy row count and removes 
  assert.deepEqual(original,before);
 });
 
+test('JSON transported negative zero compacts to decimal without reducing legacy preview capacity',()=>{
+ const legacy=raw(Array.from({length:100},()=>Array.from({length:10},()=>real(0))));
+ const source=structuredClone(legacy),port=source.outcome.output.output.ports[0];
+ port.freshness_basis='completed_execution_port_source';
+ port.sample.forEach(row=>row.forEach(cell=>{cell.value=-0;cell.decimal='-0';delete cell.display_text;}));
+ const transported=JSON.parse(JSON.stringify(source)),before=structuredClone(transported);
+ const reply=nodeResultReply(transported,{userProfile:true}),actual=reply.structuredContent.output.ports[0];
+ const previous=nodeResultReply(legacy,{userProfile:true}).structuredContent.output.ports[0];
+ assert.equal(reply.isError,undefined);
+ assert.ok(actual.sample_rows>=previous.sample_rows,actual.sample_rows+' < '+previous.sample_rows);
+ assert.ok(Buffer.byteLength(JSON.stringify(reply),'utf8')<=46000);
+ actual.sample.forEach(row=>row.forEach(cell=>{
+  assert.ok(Object.is(Number(cell.decimal),-0));
+  assert.equal(Object.hasOwn(cell,'value'),false);assert.equal(Object.hasOwn(cell,'representation'),false);
+ }));
+ assert.deepEqual(transported,before);
+});
+
 test('actual MCP delivery keeps the JavaScript full refusal separate from ordinary preview trimming',()=>{
  const source=raw([[{...string('x'.repeat(24000)),precision:'source_text',representation:'data_source_string'}]]);
  source.outcome.output.output.javascript_source={policy:'javascript-module-v1'};

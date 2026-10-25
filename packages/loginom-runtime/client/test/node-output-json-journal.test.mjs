@@ -28,6 +28,35 @@ test('output redaction failure cannot become accepted table evidence',()=>{
  assert.throws(()=>nodeOutputForJournal({}, {redact:()=>({type:'redaction_failure'})}),/could not be redacted/);
 });
 
+test('JSON source numbers survive secret redaction and repeated durable ACK without binary64 conversion',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'port-json-numbers-'));
+ try{
+  const body='{"id":9007199254740993,"amount":1e400,"zero":-0,"tiny":1e-400,"ratio":1.234567890123456789,"password":"private-json-secret"}';
+  const raw={ports:[{freshness_basis:'completed_execution_port_source',sample:[[{type:'string',precision:'source_text',value:body}]]}]};
+  const redactor=createRedactor(),value=nodeOutputForJournal(raw,redactor);
+  const expected=body.replace('private-json-secret','[redacted]');
+  assert.equal(value.ports[0].sample[0][0].value,expected);
+  const record=createExecutionJournal({directory,metadata:{sessionId:'test'},redactor});
+  const ack=await record({phase:'node_phase_completed',receipt:{phase:'read',value}});
+  assert.deepEqual(ack.receipt.value,value);
+  assert.equal(raw.ports[0].sample[0][0].value,body);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+
+test('source number tokens preserve descriptor and counter checks without exposing raw JSON strings',()=>{
+ const redactor=createRedactor(['known-private-value']);
+ assert.equal(redactor.redact('{"name":123,"element":0,"input_tokens":7,"ratio":1.00}'),
+  '{"name":123,"element":0,"input_tokens":7,"ratio":1.00}');
+ assert.equal(redactor.redact('{"element":0,"name":"password","value":"descriptor-private-value"}'),
+  '{"redacted":"credential input"}');
+ assert.equal(redactor.redact('{"input_tokens":9007199254740993,"output_tokens":1e400}'),
+  '{"input_tokens":"[redacted]","output_tokens":"[redacted]"}');
+ assert.equal(JSON.parse(redactor.redact(JSON.stringify({body:'{"id":9007199254740993,"token":"nested-private-value"}'}))).body,
+  '{"id":9007199254740993,"token":"[redacted]"}');
+ assert.doesNotMatch(JSON.stringify(redactor.redact(JSON.rawJSON('"known-private-value"'))),/known-private-value/);
+ assert.equal(redactor.redact('{invalid known-private-value'),'{invalid [redacted]');
+});
+
 test('JavaScript product read normalizes echo URL cells before the exact durable phase ACK',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'javascript-url-ack-'));
  try{

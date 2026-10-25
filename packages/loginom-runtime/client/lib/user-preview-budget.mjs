@@ -14,11 +14,12 @@ export function budgetUserPreview(reply,{wireSize=previewWireSize}={}) {
   // equivalent display/number duplicates, never infer numbers from UI text.
   if(cell.is_null===false&&cell.type==='real'&&cell.precision==='17_significant_digits'&&cell.representation==='binary64'
     &&typeof cell.decimal==='string'&&Number.isFinite(Number(cell.decimal))
-    &&typeof cell.value==='number'&&Object.is(Number(cell.decimal),cell.value)){
+    &&typeof cell.value==='number'&&(Object.is(Number(cell.decimal),cell.value)
+      ||cell.value===0&&Object.is(Number(cell.decimal),-0))){
    // A shorter decimal is safe only when it round-trips to the identical
    // binary64, including signed zero. This changes spelling, not precision.
-   const shortest=Object.is(cell.value,-0)?'-0':String(cell.value);
-   if(shortest.length<cell.decimal.length&&Object.is(Number(shortest),cell.value))cell.decimal=shortest;
+   const shortest=Object.is(Number(cell.decimal),-0)?'-0':String(cell.value);
+   if(shortest.length<cell.decimal.length&&Object.is(Number(shortest),Number(cell.decimal)))cell.decimal=shortest;
    delete cell.value;
    if(typeof cell.display_text==='string'&&Object.is(Number(cell.display_text.replace(',','.')),Number(cell.decimal)))delete cell.display_text;
    delete cell.representation;

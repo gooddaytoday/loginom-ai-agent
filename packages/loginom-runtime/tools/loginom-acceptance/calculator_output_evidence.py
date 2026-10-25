@@ -27,12 +27,8 @@ def verify_calculator_output(events,request,expected_columns,expected_rows, *, l
         if len(ports)!=1 or request['read']['ports']!=[0]:
             raise ValueError('calculator_output_port')
         port=ports[0]
-        failures.extend(verify_port_output(port,expected_columns,expected_rows,execution_id,0))
-        wanted=min(request['read'].get('sample_rows',10),len(expected_rows))
-        count=port.get('sample_rows')
-        if (type(count) is not int or not 0<=count<=wanted
-                or count<wanted and port.get('read_limit')!='preview_cell_or_byte_budget'):
-            failures.append('port_output_requested_coverage')
+        failures.extend(verify_port_output(port,expected_columns,expected_rows,execution_id,0,
+            sample_rows=request['read'].get('sample_rows',10)))
         failures.extend(verify_port_output_receipts(events, request['operation_id'], ports))
     except (KeyError,IndexError,TypeError,AttributeError,ValueError) as error:
         failures.append(str(error) if isinstance(error,ValueError) else 'calculator_output_malformed')
