@@ -14,7 +14,12 @@ async function prepareWorkspace(page, options) {
     phase = name;
     while (remaining()) {
       const value = await probe();
-      if (value) { trace.push({ condition: name, satisfied: true }); return value; }
+      if(value?.pending===true) {
+        const sample={condition:name,satisfied:false,blocking_windows:value.blocking_windows};
+        if(trace.at(-1)?.condition===name&&trace.at(-1)?.satisfied===false)trace[trace.length-1]=sample;
+        else trace.push(sample);
+      } else if (value) { trace.push({ condition: name, satisfied: true,
+        ...(value.blocking_windows?{blocking_windows:value.blocking_windows}:{}) }); return value; }
       await page.waitForTimeout(Math.min(100, remaining()));
     }
   };
@@ -34,8 +39,17 @@ async function prepareWorkspace(page, options) {
     if (!state || state.document !== document) state = globalThis[key] = {
       document, id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`, receipts: new Map(),
     };
+    // Match workspace-ui: only this preparation's exact native-hidden picker
+    // is inactive. Offscreen geometry alone never waives an active dialog.
+    const inactivePicker = e => {
+      if(e?.getAttribute('data-tid')!=='OpenDialogForm')return false;
+      const component=globalThis.Ext?.getCmp?.(e.id);
+      return state.document===document && component?.$className==='bg.filedialog.view.OpenDialogForm'
+        && component.el?.dom===e && [...state.receipts.values()].some(r=>r.openDialogElement===e&&r.openDialog===component)
+        && component.hidden===true;
+    };
     const visible = e => !!e && !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height
-      && getComputedStyle(e).visibility !== 'hidden';
+      && getComputedStyle(e).visibility !== 'hidden' && !inactivePicker(e.closest?.('[data-tid="OpenDialogForm"]')??e);
     const allTabs = [...document.querySelectorAll('[data-tid^="MF;cntMain;cntWorkspace;Workspace;t.br;tb"]')];
     const tabs = allTabs.filter(e => /^MF;cntMain;cntWorkspace;Workspace;t\.br;tb(?:-\d+)?$/.test(e.getAttribute('data-tid')));
     const active = tabs.filter(e => e.classList.contains('x-tab-active'));
@@ -49,7 +63,18 @@ async function prepareWorkspace(page, options) {
     const home = prefix && exact(prefix+';HomePage;btnCreateUnsavedPackage');
     const crumbs = prefix ? [...document.querySelectorAll('[data-tid^='+JSON.stringify(prefix+';cnrNaviMode;b.s_')+']')]
       .map(e=>({tid:e.getAttribute('data-tid'),label:(e.textContent??'').trim()})) : [];
-    const blockers = [...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg,.x-form-invalid-under')].filter(visible);
+    const blockers = [...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog,.x-message-box,.bg-mask-message,.x-mask-msg,.x-form-invalid-under')].filter(visible);
+    const blockingWindows=blockers.length?{
+      viewport:{width:innerWidth,height:innerHeight,scroll_x:globalThis.scrollX??null,scroll_y:globalThis.scrollY??null},
+      windows:blockers.slice(0,12).map(e=>{
+        const c=globalThis.Ext?.getCmp?.(e.id),style=getComputedStyle(e),box=e.getBoundingClientRect();
+        const short=v=>typeof v==='string'?v.slice(0,512):null;
+        return {tid:short(e.getAttribute('data-tid')),class_name:short(e.getAttribute('class')),
+          bounding_box:{x:box.x,y:box.y,width:box.width,height:box.height},
+          style:Object.fromEntries(['display','visibility','opacity','position','top','left','transform'].map(k=>[k,short(style[k])])),
+          native_owner:{class_name:short(c?.$className),exact_dom:c?.el?.dom===e,hidden:typeof c?.hidden==='boolean'?c.hidden:null,
+            prepared_picker:[...state.receipts.values()].some(r=>r.openDialogElement===e&&r.openDialog===c)}};
+      })}:null;
     const unsaved = blockers.some(e => /сохранить изменения в пакете/i.test(e.textContent??''));
     const hardBlocked = blockers.some(e=>!e.matches('.bg-mask-message,.x-mask-msg'));
     const openErrors = [...document.querySelectorAll('.bg-error-messages')].filter(visible);
@@ -80,6 +105,14 @@ async function prepareWorkspace(page, options) {
       state.receipts.set(options.operationId,{request,before:tabs,preserved,phase:'reserved'});
     }
     const current = state.receipts.get(options.operationId);
+    if(mode==='open_dialog') {
+      const roots=exact('OpenDialogForm'),element=roots.length===1?roots[0]:null;
+      const component=element&&globalThis.Ext?.getCmp?.(element.id);
+      if(!current || !element?.isConnected || component?.$className!=='bg.filedialog.view.OpenDialogForm'
+        || component.el?.dom!==element)return {error:'UI_BLOCKED'};
+      current.openDialogElement=element;current.openDialog=component;
+      return {bound:true};
+    }
     const map=app?.Application?.FInstance?.FMainForm?.FMapTree, connection=map?.FServerConnection;
     const absenceStillBound = proof => {
       const currentTabs=[...document.querySelectorAll('[data-tid^="MF;cntMain;cntWorkspace;Workspace;t.br;tb"]')]
@@ -90,7 +123,7 @@ async function prepareWorkspace(page, options) {
         && typeof proof.account==='string' && proof.account.length>0 && connection.UserName===proof.account
         && currentTabs.length===proof.tabs.length && currentTabs.every((t,i)=>t===proof.tabs[i])
         && currentTabs.filter(t=>t.classList.contains('x-tab-active'))[0]===proof.tab
-        && [...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg,.x-form-invalid-under')].every(e=>!visible(e))
+        && [...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog,.x-message-box,.bg-mask-message,.x-mask-msg,.x-form-invalid-under')].every(e=>!visible(e))
         && home?.length===1 && exact(prefix+';HomePage;btnCreateUnsavedPackage')[0]===home[0] && visible(home[0]) && Date.now()<deadline;
     };
     if (mode==='check_missing_package') {
@@ -124,7 +157,7 @@ async function prepareWorkspace(page, options) {
           || crumbs.length!==options.workflowRef.navigation_path.length
           || crumbs.some((crumb,i)=>crumb.tid!==options.workflowRef.navigation_path[i].tid || crumb.label!==options.workflowRef.navigation_path[i].label))) return {error:'WORKFLOW_CHANGED'};
       if (options.intent==='open_package' && openErrors.length) return {error:'PACKAGE_OPEN_REJECTED'};
-      if (!ready) return null;
+      if (!ready) return blockingWindows?{pending:true,blocking_windows:blockingWindows}:null;
       if (current?.tab && (tab!==current.tab || packageNode!==current.packageNode
           || JSON.stringify(crumbs)!==JSON.stringify(current.crumbs))) return {error:'WORKFLOW_CHANGED'};
       if (!current?.tab && options.intent==='new_draft') {
@@ -147,7 +180,8 @@ async function prepareWorkspace(page, options) {
         window:{width:innerWidth,height:innerHeight,outer_width:outerWidth,outer_height:outerHeight,
           available_width:screen.availWidth,available_height:screen.availHeight}};
     }
-    return {document_id:state.id,requested_tab_present:!!knownWorkflow && tabs.includes(knownWorkflow.tab) && knownWorkflow.tab.getAttribute('data-tid')===options.workflowRef?.tab_tid,blocked:blockers.length>0,hard_blocked:hardBlocked,unsaved,ready,home_ready:home?.length===1 && visible(home[0]),package_path:path,tab_tid:tabTid};
+    return {document_id:state.id,requested_tab_present:!!knownWorkflow && tabs.includes(knownWorkflow.tab) && knownWorkflow.tab.getAttribute('data-tid')===options.workflowRef?.tab_tid,blocked:blockers.length>0,hard_blocked:hardBlocked,unsaved,ready,home_ready:home?.length===1 && visible(home[0]),package_path:path,tab_tid:tabTid,
+      ...(blockingWindows?{blocking_windows:blockingWindows}:{})};
   }, {mode, options, deadline});
   try {
     const current = page.url() === 'about:blank' ? null : await page.evaluate(() => ({origin:location.origin,pathname:location.pathname}));
@@ -208,6 +242,8 @@ async function prepareWorkspace(page, options) {
       else {
         const field=tid('OpenDialogForm;edtFileName').locator('input');
         await wait('open_package_dialog',()=>field.isVisible());
+        const picker=await inspect('open_dialog');
+        if(picker.error)return result('NOT_READY',picker.error);
         await field.fill(options.packagePath,{timeout:remaining()});
         await tid('OpenDialogForm;btnOpen').click({timeout:remaining()});
       }

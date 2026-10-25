@@ -30,7 +30,7 @@ function fixture(overrides = {}) {
       return state.modified;
     }}}, async ClosePackage(target, suppressEvents, processAfterCall) {
       events.push('close'); assert.equal(target,node); assert.equal(suppressEvents,false); assert.equal(processAfterCall,true);
-      if (state.closePrompt || state.modified) { state.dialog=true; return new Promise(resolve => {
+      if ((state.closePrompt || state.modified)&&!state.closeWithoutPrompt) { state.dialog=true; return new Promise(resolve => {
         state.confirm=()=>{state.count=0;state.tab=false;state.dialog=false;resolve(true);};
       }); }
       if (state.closeThrows) throw Error('upstream private failure');
@@ -87,6 +87,7 @@ function fixture(overrides = {}) {
       if(state.changePreparation)context.__loginomDockPreparationV1.id='foreign-document';
     },
     async evaluate(fn,arg){
+      if(state.failDiagnostic&&fn.toString().includes("s?.document!==document"))throw Error('Diagnostic transport unavailable');
       if(fn.toString().includes('m.ClosePackage(node, false, true)'))fail('close_request');
       if(fn.toString().includes('remaining:globalThis'))fail('close_readback');
       if(fn.toString().includes('m?.PackageNodes?.Count === 0'))fail('logout_inventory_readback');
@@ -368,4 +369,34 @@ test('read-only mode cannot change during the server dirty-state check',async()=
   const f=fixture({readonly,raceReadOnly});const r=await f.run({diagnosticReadOnly:readonly});
   assert.equal(r.reason,'PACKAGE_CHANGED_DURING_CHECK');assert.equal(f.events.includes('close'),false);
  }
+});
+
+
+test('D70 diagnostic records native Close without changing missing-prompt refusal or discarding',async()=>{
+ const f=fixture({modified:true,closeWithoutPrompt:true}),r=await f.run({diagnosticDiscard:true});
+ assert.equal(r.reason,'DIAGNOSTIC_SAVE_PROMPT_MISSING');assert.equal(r.status,'BLOCKED');
+ assert.equal(r.package_closed,false);assert.equal(r.unsaved_changes_discarded,false);
+ assert.equal(r.modified_before_close,true);
+ assert.equal(r.native_close_readback.status,'observed');assert.equal(r.native_close_readback.done,true);
+ assert.equal(r.native_close_readback.closed,true);assert.equal(r.native_close_readback.result,'true');
+ assert.equal(r.native_close_readback.packages_after,0);assert.equal(r.native_close_readback.original_tab_attached,false);
+ assert.equal(f.events.filter(e=>e==='close').length,1);assert.equal(f.events.includes('discard'),false);assert.equal(f.events.includes('logout'),false);
+});
+
+test('D70 diagnostic keeps native Close false and rejected outcomes distinct without a retry',async()=>{
+ for(const overrides of [{closeResult:false},{closeThrows:true}]) {
+  const f=fixture(overrides),r=await f.run();
+  assert.equal(r.reason,'NATIVE_CLOSE_UNCONFIRMED');assert.equal(r.status,'BLOCKED');
+  assert.equal(r.native_close_readback.done,true);assert.equal(r.native_close_readback.closed,false);
+  assert.equal(r.native_close_readback.failed,!!overrides.closeThrows);
+  assert.equal(r.native_close_readback.packages_after,1);
+  assert.equal(f.events.filter(e=>e==='close').length,1);assert.equal(f.events.includes('discard'),false);assert.equal(f.events.includes('logout'),false);
+ }
+});
+
+test('D70 diagnostic transport failure cannot change cleanup refusal or repeat Close',async()=>{
+ const f=fixture({modified:true,closeWithoutPrompt:true,failDiagnostic:true}),r=await f.run({diagnosticDiscard:true});
+ assert.equal(r.status,'BLOCKED');assert.equal(r.reason,'DIAGNOSTIC_SAVE_PROMPT_MISSING');
+ assert.equal(r.native_close_readback.status,'unavailable');assert.equal(r.unsaved_changes_discarded,false);
+ assert.equal(f.events.filter(e=>e==='close').length,1);assert.equal(f.events.includes('logout'),false);
 });

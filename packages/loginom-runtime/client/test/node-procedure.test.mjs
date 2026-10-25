@@ -221,7 +221,7 @@ test('an unexpected dialog fails immediately without a mutation', async () => {
 
 test('a blocker outside the selected root is inspected for the journal without authorizing a gesture', async () => {
   for(const mode of ['detail','stale','transport','budget']) {
-    const records=[];let inspections=0,mutations=0,readinessCalls=0;
+    const records=[];let inspections=0,nativeInspections=0,mutations=0,readinessCalls=0;
     const operation={id:'blocked',action:{action_key:'node.apply',revision:'1'},deadline:10000,
       checkpoint:{workflow_ref:{prefix:'MF;TF-1',tab_tid:'tab'},document_id:'doc'}};
     if(mode==='budget')operation.deadline=5000;
@@ -233,6 +233,11 @@ test('a blocker outside the selected root is inspected for the journal without a
       record:async e=>{records.push(structuredClone(e));return e},wrapMutation:code=>({code}),
       execute:async code=>{
         if(typeof code!=='string'){mutations++;throw Error('Unexpected mutation')}
+        if(code.includes('function readBlockingWindows')) {
+          nativeInspections++;
+          if(mode==='transport')throw Error('Disconnected');
+          return {status:'observed',windows:[{ref:'ui-blocker',native_owner:{hidden:false},bounding_box:{y:-2327}}]};
+        }
         if(code.includes('"root_ref":"ui-blocker"')) {
           inspections++;
           if(mode==='transport')throw Error('Disconnected');
@@ -247,6 +252,8 @@ test('a blocker outside the selected root is inspected for the journal without a
       }});
     await assert.rejects(channel.observe({condition:'prepared port visualizer cards',ready:()=>{readinessCalls++;return true}}),/blocked by a mask or dialog/);
     assert.equal(inspections,mode==='budget'?0:1,mode);assert.equal(readinessCalls,0,mode);
+    assert.equal(nativeInspections,mode==='budget'?0:1,mode);
+    if(mode!=='budget')assert.ok(records.some(r=>r.phase===(mode==='transport'?'node_blocking_window_native_unavailable':'node_blocking_window_native')));
     assert.equal(records.find(r=>r.phase==='node_observation_context_refused').outcome.output.ui.dialogs[0].text,'[outside selected root]');
     if(mode==='detail') {
       const detail=records.find(r=>r.phase==='node_blocking_dialog_observed');
