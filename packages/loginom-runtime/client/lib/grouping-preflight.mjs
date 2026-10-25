@@ -1,6 +1,6 @@
 import {managedJavascriptPreviewAdmission} from './javascript-output-preview.mjs';
 import {alignReadSchema} from './node-read-contract.mjs';
-import {createNodeProcedure,NodeProcedureStepError} from './node-procedure.mjs';
+import {createNodeProcedure,NodeProcedureStepError,NodeReadinessTimeout} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {resolveGroupingParameters} from './grouping-parameters.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);};
@@ -27,9 +27,19 @@ export async function releaseGroupingPreview(options,ctx,config){
   const owned=s=>s.node_preview_schema?.verified===true&&s.node_preview_schema.node_id===p.binding.node.node_id
    &&s.node_preview_schema.port_guid===p.port.port_guid&&s.node_preview_schema.port===p.port.index
    &&s.node_preview_schema.settings_changed===false;
-  const s=await channel.observe({condition:'original grouping preview before release',readPreview:true,
-   ready:s=>graph(s)&&(owned(s)||s.ui.dialogs.length===0&&s.ui.masks.length===0),
-   timeoutMs:Math.max(1,ctx.deadline-now())});
+  const condition='original grouping preview before release';
+  let s;
+  for(;;){
+   try{
+    s=await channel.observe({condition,readPreview:true,
+     ready:s=>graph(s)&&(owned(s)||s.ui.dialogs.length===0&&s.ui.masks.length===0),
+     timeoutMs:Math.min(15000,Math.max(1,ctx.deadline-now()))});
+    break;
+   }catch(error){
+    // Continue only this read-only wait, never a gesture or another failure.
+    if(!(error instanceof NodeReadinessTimeout)||error.condition!==condition||now()>=ctx.deadline)throw error;
+   }
+  }
   if(owned(s))await channel.perform({condition:'close original grouping preview after failed F3',initialObservation:s,
    ready:owned,identity:()=>({node:p.binding.node,port_guid:p.port.port_guid,root:s.node_preview_schema.root_tid}),
    resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.node_preview_schema.root_tid+';p.h;close'&&e.allowed_actions.includes('click'));
