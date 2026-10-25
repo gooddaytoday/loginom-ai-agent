@@ -191,17 +191,18 @@ Dirty проверяется существующим idempotent Save: повт�
 
 ## Checkpoint
 
-- Выполнение продолжается. Подробные проверенные результаты и ограничения: [живой отчёт](../../testing/loginom-ai-agent/port-output-live-2026-10-25.md).
-- Private artifacts/evidence: /tmp/loginom-port-live-20261025-gxg7qus9/; frozen ordinary payload verified, runtime/установка не менялись, секреты вне Git.
-- После Xorg-сбоя mainpatheec4b9dc exact3×4/Save/nativeclose/logout/ACK/window/PIDs PASS; первопричина Xorg не установлена, interrupted profiles quarantined.
-- 18 назначенных model attempts завершены с раздельными PASS/FAIL/gaps; Sol preview d5a9b0af выполняется, две correction-задачи ещё не запускались. Seeds Luna dcc1bccc/Sol fdf56b52 prepared-task.json готовы.
-- Lowliq обе версии и zscore обе версии: значения/CSV/cleanup PASS; cold пока только lowliq. REST reread admission несовместим с собственными receipt IDs уже в baseline. Multi-facts model permission FAIL; остальные gaps см. отчёт.
-- Fidelity Luna/Sol/controlled PASS; dense5b62053e max whole-row MCP prefix21/44292bytes,next46096/cleanup PASS; Import+Calc+обаFilter actual validators отвергают coherent false-read_limit.
-- JoinFiltere4f3d067 [1,0]/Join/reread/Save/cleanup PASS; dirtyab2a5879 false до/после2reads и SaveReplay без новых Save PASS; rows1 0c4e80d1 PASS.
-- Rows0 header-only три сбоя доreader; VariantIS c6d3f889 deliveryDISCOVERY_FILE_NOT_FOUND. Каждая попытка сохранена; пустой результат проверяется отдельным Filter без совпадений, не повтором upload доPASS.
-- Default Date5ef5ffe4 two native serials→ordinary PASS/cleanupPASS (aux parser failure записан отдельно). Offline44/7TZ+extra9999 PASS; Date46 live controller reviewed/selfchecks PASS, зоны ещё не запущены.
-- Diagnostic-fixed c03bd34e12cache/AsString plain/cancel/deadline×ports PASS/allsettled/recovery/cleanup. Dispose0 5b565b1d expectedfault/heldgate, nativecleanupBLOCKED. Dispose1bb8cc22f prepareFAILED; новый eb3a4f66 после адресной own-idle очистки выполняется.
-- Own fault account: 9 PendingDisconnect sessions адресно закрыты stockhelper; первый admin helper завершил native close, но Node не поддержал Bun observer (aux failure). Повтор Bun15b2d553 подтвердил0оставшихся/adminlogout/windowclose; исходныеBLOCKED не менялись, shareduser не затронут.
-- Оставшаяся controlled очередь: dispose, emptyFilter/10boundaries, VariantRB/DS, Date7TZ/native admission, nonfinite witness, foreign receipt admission, cold settings. Nativeforeignbinding/inactive guard недостижимы детерминированно текущим public API; не засчитывать другие отказы вместо них.
-- Private controllers: main-path.ts временно у resume_fault_controller (nonfinite adapter), cold-settings.mjs у diagnose_boundary_interrupt (readonly persisted settings); root review доlive, обычный runtime не менять.
-- Завершение: независимые raw audits/21model attempts, раздельный final report и gaps, diff--check/relative links/clean frozen worktrees. Без push/PR/install.
+- Выполнение продолжается; проверенные результаты и ограничения: [живой отчёт](../../testing/loginom-ai-agent/port-output-live-2026-10-25.md).
+- Private artifacts/evidence: /tmp/loginom-port-live-20261025-gxg7qus9/; ordinary payload и frozen worktrees не менялись, установка не заменялась, секреты вне Git.
+- После сбоя Xorg короткий Import→Calculator→порт→Save→native close/logout прошёл; первопричина Xorg не установлена. Прерванные профили изолированы.
+- Все 21 назначенные model attempts завершены и независимо разобраны; это не 21 PASS. Из 19 сохранённых модельных пакетов cold разобрал 8, остальные 11 ждут продолжения.
+- Cold: low-liquidity обеих версий, CP1251 и наблюдаемые LR settings прошли с явными gaps; Sliding/Cartesian прошли. Kmeans/Zscore дали отличия порядка в output-definition UI до materialization; physical cold data не читались, причина не приписана reader.
+- Три исходные регрессии закрыты: числовой JSON-текст, максимальный dense −0 MCP prefix, настоящие Import/Calculator/Filter validators против ложного read_limit.
+- Управляемые Join/Filter [1,0]/reread, empty Filter и foreign receipt admission прошли; dirty=false на границах двух полных чтений подтверждён.
+- Независимо прошли строки 1/99/100/101, все семь длин текста, 100×100 ячеек и 512 KiB−1. Пустой результат проверен настоящим Filter; header-only Import исходно отказал до reader.
+- Следующие обычные границы: 101 колонка, ровно/+1 байт 512 KiB, первая слишком большая строка; затем Variant RB/DS/long. Original wide time-scan и setup cleanup failure сохранены отдельно.
+- Date: ordinary два native serial прошли, offline44/7TZ+extra9999 прошли; live Moscow подтвердил 8/9 исходных и extra9999. Berlin реально работал в Moscow из-за третьего env-фильтра; Berlin decoder NOT_VERIFIED, готовится отдельный diagnostic-tz payload с исправлением этой границы.
+- Все 18 fixed fault cases разобраны: 12 cache/AsString с нормальной очисткой, 6 dispose с ожидаемым held gate/native cleanup BLOCKED. Первоначальные квитанции не переписывались после адресной очистки собственных отключённых сессий.
+- Nonfinite остановился до Calculator Execute на Managed preview native port changed; witness/NaN/Infinity NOT_VERIFIED. Guard-модуль совпадает с baseline, живого baseline воспроизведения нет. Native foreign binding/inactive guards недостижимы детерминированно текущим public API.
+- Остальные live runs выполняются по одному браузеру: time-scan и Host shutdown failure при параллельных окнах требуют разделять продукт/среду. Причинность конкуренции ещё не доказана.
+- Private controllers: 7 файлов/1282 строки по git diff --stat; превышение оценки пересмотрено, оставлены прямые adapters существующих CLI/нативных readers без framework/dependencies. Новая диагностика только в отдельном worktree/artifact.
+- Завершение: оставшиеся live/cold проверки, независимый итог с gaps, diff --check/relative links/проверка frozen сборок. Без push/PR/install и изменения ordinary runtime.
