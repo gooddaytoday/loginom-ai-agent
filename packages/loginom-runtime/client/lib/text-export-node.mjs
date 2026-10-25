@@ -172,9 +172,10 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
     need(['input_mapping','open','configure','output_mapping','finish','execute'].includes(state.pending?.phase),
      'Only a stopped text export phase before file reading can be released here');
     releaseSignal?.throwIfAborted();
-    enter({signal:releaseSignal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
+    const deadline=now()+NODE_RELEASE_BUDGET_MS;
+    enter({signal:releaseSignal,deadline,document_id:state.request.document_id,
      workflow_ref:state.request.workflow_ref,node:state.node});
-    return releasePendingNode({operation,channel,readReceipt:options.readReceipt});
+    return releasePendingNode({operation,channel,deadline,now,readReceipt:options.readReceipt});
    },
    // Browser recovery T4: after the model cleared what blocked the download, the
    // runtime repeats only the idempotent file read of the same completed export.
