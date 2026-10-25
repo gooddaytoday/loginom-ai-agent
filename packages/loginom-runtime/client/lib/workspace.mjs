@@ -14,6 +14,7 @@ async function prepareWorkspace(page, options) {
     phase = name;
     while (remaining()) {
       const value = await probe();
+      remaining();
       if(value?.pending===true) {
         const sample={condition:name,satisfied:false,blocking_windows:value.blocking_windows};
         if(trace.at(-1)?.condition===name&&trace.at(-1)?.satisfied===false)trace[trace.length-1]=sample;

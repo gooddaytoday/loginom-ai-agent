@@ -102,6 +102,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     },
    }:{}),
    ...(!implementation||implementation.preflight?{beforeTarget:ctx=>(implementation?.preflight??preflightCalculatorSource)(options,ctx,{targetOrigin,targetBuild})}:{}),
+   ...(implementation?.releaseBeforeTarget?{releaseBeforeTarget:ctx=>implementation.releaseBeforeTarget(options,ctx,{targetOrigin,targetBuild})}:{}),
    verifySource:async()=>verified({not_applicable:true,source_kind:'upstream_table'}),
    ...(implementation?.openRecovery?{async verifyPendingOpen(state,{signal}={}){
     activeSignal=signal;signal?.throwIfAborted();

@@ -356,6 +356,25 @@ test('preparation deadline returns the last named phase with no mutation', async
   assert.equal(state.effect_possible,false);assert.equal(fixture.tabs.filter(t=>t.graph).length,0);
 });
 
+for (const [stage,elapsed] of [['ui_build',120000],['exact_workflow_ready',120000],['exact_workflow_ready',120001],['exact_workflow_ready',115000]]) {
+ test(`preparation rechecks its original deadline after ${stage} read at ${elapsed} ms`,async()=>{
+  const fixture=pageFixture({authenticated:true}),evaluate=fixture.page.evaluate;
+  let now=0;
+  fixture.page.evaluate=async(fn,args)=>{
+   const value=await evaluate(fn,args);
+   if(stage==='ui_build' && value===build || stage==='exact_workflow_ready' && args?.mode==='verify')now=elapsed;
+   return value;
+  };
+  const state=await execute(fixture,{timeoutMs:120000},{now:()=>now});
+  assert.equal(state.status,elapsed<120000?'READY':'NOT_READY');
+  if(elapsed>=120000){assert.equal(state.reason,'DEADLINE');assert.equal(state.phase,stage);}
+  const drafts=stage==='ui_build'?0:1;
+  assert.equal(fixture.events.filter(e=>e==='create_draft').length,drafts);
+  assert.equal(state.created_draft,drafts===1);
+  assert.equal(state.effect_possible,drafts===1);
+ });
+}
+
 test('durable attempt prevents duplicate creation after save or transport failure', async () => {
   const metadata={skillRevision:'skill'},request={operation_id:'op',intent:'new_draft',package_path:null};
   let calls=0;

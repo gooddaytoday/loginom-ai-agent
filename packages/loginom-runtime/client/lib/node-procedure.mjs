@@ -111,7 +111,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     const root=preparedNodeContext?.workflow_ref.prefix+';ModelForm;PreviewWindow';
     return !!preparedNodeContext&&state.prepared_node_context?.surface==='graph'
       &&state.node_preview_schema?.verified===false&&dialog.identity?.anchor_tid===root
-      &&state.ui.masks?.some(m=>m.kind==='busy'&&m.dialog_ref===dialog.ref&&m.target_tid===root+';PreviewForm');
+      &&state.ui.masks?.some(m=>m.kind==='busy'&&m.dialog_ref===dialog.ref
+        &&[root+';PreviewForm',root+';PreviewForm;DataSetForm'].includes(m.target_tid));
   };
   const allowedReformEditor=(dialog,state)=>state.wizard?.stage==='field_parameters'
     &&state.wizard.reform_parameters?.status==='observed'&&state.wizard.reform_parameters.portal_bound===true
