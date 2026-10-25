@@ -11,7 +11,7 @@
 - [x] Воспроизвести потерю evidence через публичный fake CLI: RED из-за отсутствующего outcome receipt. Сохранить исходный cleanup первым; получить GREEN без ослабления отказов.
 - [x] Проверить успешный ответ, ненулевой exit, неполный/невалидный JSON, trailing output, отсутствие секретов, timeout и interruption. EvalOps выполнил весь profile-файл: 93 PASS, два opt-in SKIP, typecheck PASS. В каноническом checkout отдельно подтверждены 18 целевых тестов / 101 assertions и typecheck на Bun1.3.14.
 - [x] Сверить отдельный чистый checkout, backup, source-пути config/обеих служб, сохранность результатов и terminal binding. Установку выполнил EvalOps под существующим controller lock, без reboot и restart/reset-failed batch; независимый read-back source и трёх файлов совпал.
-- [ ] Получить штатную fresh verification с новым каталогом: reconciliation должен подтвердить retained ресурсы по собственным management/admin/session/storage/archive receipts. Только после ready/released выполнить один native resume прежним EvalRunner; следующий batch запускает служба. Проверяемый результат — реальные новые admissions только missing при сохранённых шести Results и исходных receipts. При отказе изучить новый outcome, а не повторять команду вслепую.
+- [x] Получить штатную fresh verification с новым каталогом: reconciliation должен подтвердить retained ресурсы по собственным management/admin/session/storage/archive receipts. Только после ready/released выполнить один native resume прежним EvalRunner; следующий batch запускает служба. Проверяемый результат — реальные новые admissions только missing при сохранённых шести Results и исходных receipts. При отказе изучить новый outcome, а не повторять команду вслепую. Выполнено: две последовательные fresh verification 519b164a/7f2ced07 подтвердили Help ready обоих слотов и ready/released; native resume снял repair, служба запустила batch4. Независимый read-back 25.10 13:17:31 UTC подтвердил две реальные measurement admissions только missing, сохранность исходных результатов/receipts и срока. Новые результаты ещё не объявляются завершёнными.
 
 ## Ревью и ограничения
 
@@ -19,5 +19,6 @@
 
 Checkpoint:
 
-- Изменение лично подготовил и установил EvalOps; код импортирован в каноническую ветку с происхождением commit. Проверки и фактический порядок ревью указаны выше; private evidence — `/home/george/.codex/tmp/preparation-accounting/native-readiness-*`.
-- Старые результаты и срок сохранены. Одно штатное продолжение поручено EvalRunner встроенной delegation; Codex параллельное восстановление не запускал. Полный итог и этапы5–7 основного плана остаются открытыми.
+- Изменение лично подготовил и установил EvalOps; код импортирован в каноническую ветку с происхождением commit. Независимое ревью подтвердилось после установки, предварительное ревью этой поставки не доказано; правило отдельного рецензента до поставки уточнено в instructions EvalOps и проверено read-back.
+- Все четыре шага выполнены; штатные fresh verify/reconciliation/resume прежним EvalRunner и первые measurement admissions только missing независимо подтверждены. Proof — `/home/george/.codex/tmp/preparation-accounting/native-readiness-continuation-readback.json`; текущий срез — в checkpoint плана runner3.
+- Исходная точная причина прежнего Help отказа остаётся неизвестной; новые успешные проверки не восстанавливают утраченную диагностику. Готовые результаты и срок сохранены. Полный итог, завершение новых измерений и этапы5–7 основного плана остаются открытыми; Codex параллельное восстановление не запускал.
