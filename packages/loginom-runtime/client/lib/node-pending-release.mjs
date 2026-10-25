@@ -22,19 +22,35 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  const state=operation.nodeApply,node=state?.node;
  requireValue(state?.pending&&node&&!state.result,'Release requires an unresolved phase of a known node');
  requireValue(!operation.transportUncertain,'The last browser call has not confirmed completion; inspect the operation again later');
+ let settleWizard,beforeSettlement;
  if(operation.lastReceipt){
   const response=await readReceipt(operation.lastReceipt);
   requireValue(response?.state==='completed'&&response.receipt?.cleanup_complete===true,
    'The last browser gesture of this operation has no confirmed cleanup');
+  if(operation.lastReceipt.operation_id)requireValue(response.receipt.operation_id===operation.lastReceipt.operation_id,
+   'The last wizard receipt identity changed');
+  const r=response.receipt,n=r.output?.prepared_node_context,w=r.output?.wizard;
+  if(r.action_key==='ui.act'&&r.operation_id===operation.lastReceipt.operation_id
+    &&r.status==='AMBIGUOUS'&&r.effect_possible===true&&sameNode(n,node)&&n.surface==='wizard'
+    &&w?.status==='observed'&&w.root_ref&&Number.isFinite(state.deadline)&&Number.isFinite(state.pending.deadline)
+    &&Math.min(operation.deadline,state.deadline,state.pending.deadline)>Date.now()
+    &&['WIZARD_OPEN_NOT_CONFIRMED','WIZARD_STEP_NOT_CONFIRMED','WIZARD_CANCEL_NOT_CONFIRMED','WIZARD_FINISH_NOT_CONFIRMED'].includes(r.error?.code)
+    &&r.trace?.filter(e=>e.event==='ui_gesture_applied').length===1
+    &&r.trace.some(e=>e.event==='ui_gesture_applied'&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','finish_wizard','execute_wizard','confirm_wizard_close'].includes(e.verb))) {
+   settleWizard={root_ref:w.root_ref,node:n,deadline:Math.min(operation.deadline,state.deadline,state.pending.deadline)};
+   beforeSettlement=await readReleaseGraph(operation,node);
+  }
  }
  const cleanup={wizard_closed:false,read_view_restored:false,views_returned:false};
  if(restoreRead)cleanup.read_view_restored=await restoreRead();
  // A heavy wizard can exceed the observation budget; only the user can then
  // cancel it. Its unsaved settings are lost, which the agent must say first.
- const current=await channel.observe({condition:'stopped node release surface',releaseWizard:true,
+ const current=await channel.observe({condition:'stopped node release surface',releaseWizard:true,...(settleWizard?{settleWizard}:{}),
   ready:s=>['absent','observed'].includes(s.wizard?.status)}).catch(error=>{
    throw new NodeReleaseBlocked('The Loginom workspace could not be observed for release: '+String(error.message).slice(0,300),
     'Warn the user that unsaved settings of the open wizard will be lost, ask them to close any open Loginom wizard or dialog with its Cancel button and return to this scenario graph.'+retry);});
+ if(settleWizard)requireValue(same(beforeSettlement,await readReleaseGraph(operation,node)),
+  'The graph changed while the original wizard gesture settled; no cleanup was authorized');
  if(current.wizard.status==='observed'){
   if(current.prepared_node_context?.surface!=='wizard'||!sameNode(current.prepared_node_context,node))
    throw new NodeReleaseBlocked('A Loginom wizard of another node is open',

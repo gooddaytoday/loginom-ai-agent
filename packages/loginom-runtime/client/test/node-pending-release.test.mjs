@@ -42,6 +42,25 @@ test('release proves a quiet unchanged graph without a gesture',async()=>{
  assert.deepEqual(proof.cleanup,{wizard_closed:false,read_view_restored:false,views_returned:false});assert.deepEqual(s.gestures,[]);
  assert.equal(proof.node_context.node_id,'new');assert.equal(proof.graph.nodes.length,1);
 });
+test('D74 release settles only its exact ambiguous wizard receipt within the original deadline',async()=>{
+ for(const fault of [null,'receipt','graph','expired']) {
+  const s=surface({wizard:true}),operation=stopped();let reads=0,settled=false;
+  operation.nodeApply.deadline=Date.now()+(fault==='expired'?-1:5000);
+  operation.nodeApply.pending.deadline=operation.nodeApply.deadline;
+  operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7'};
+  operation.receipt={state:'completed',receipt:{action_key:'ui.act',operation_id:fault==='receipt'?'other':'apply:n7',
+   cleanup_complete:true,status:'AMBIGUOUS',effect_possible:true,error:{code:'WIZARD_STEP_NOT_CONFIRMED'},trace:[{event:'ui_gesture_applied',verb:'wizard_step'}],
+   output:{prepared_node_context:{...node,verified:true,surface:'wizard'},wizard:{status:'observed',root_ref:'ui-w'}}}};
+  operation.nodeTargetAdapter.observe=async()=>{const g=graphOf();if(fault==='graph'&&reads++)g.links.push({source:'foreign'});return g;};
+  const observe=s.channel.observe;s.channel.observe=async options=>{
+   if(!settled){assert.ok(options.settleWizard);assert.equal(options.settleWizard.deadline,operation.nodeApply.deadline);settled=true;}
+   return observe(options);
+  };
+  if(fault)await assert.rejects(release(operation,s.channel));
+  else assert.equal((await release(operation,s.channel)).verified,true);
+  if(fault)assert.equal(s.gestures.length,0);
+ }
+});
 test('release cancels only the stopped node\'s own wizard draft',async()=>{
  const s=surface({wizard:true}),proof=await release(stopped(),s.channel);
  assert.deepEqual(s.gestures,[{verb:'click',ref:'ui-close'}]);assert.equal(proof.cleanup.wizard_closed,true);assert.equal(proof.effect_possible,true);

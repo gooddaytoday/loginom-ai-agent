@@ -108,6 +108,26 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   const fail = (code, message) => { const error = new Error(message); error.code = code; throw error; };
   const timeout = () => { const left = deadline - Date.now(); if (left <= 0) fail('UI_DEADLINE_EXCEEDED', 'Observed UI action deadline exceeded'); return left; };
   const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+  const ownedLoadingMask = fresh => {
+    const before=task.snapshot,node=before?.prepared_node_context,after=fresh.prepared_node_context;
+    if(!task.prepared_node_context||!node?.verified||!after?.verified||!fresh.authenticated
+      ||fresh.origin!==before.origin||fresh.loginom_build!==before.loginom_build
+      ||!same(fresh.workflow_ref,before.workflow_ref)||!same(fresh.package_identity,before.package_identity)
+      ||fresh.active_tab_ref!==before.active_tab_ref||!before.dom_epoch?.document
+      ||fresh.dom_epoch?.document!==before.dom_epoch.document||fresh.ui.dialogs.length
+      ||!['document_id','workflow_id','node_id'].every(k=>typeof node[k]==='string'&&node[k]===after[k]))return false;
+    if(after.surface==='wizard'&&fresh.wizard?.status==='observed') {
+      if(before.wizard?.status==='observed'&&(fresh.wizard.root_ref!==before.wizard.root_ref
+        ||!['input_port','output_port'].every(k=>same(node[k],after[k]))))return false;
+      return fresh.ui.masks.every(m=>m.kind==='busy'&&!m.dialog_ref
+        &&(m.ref===fresh.wizard.root_ref&&m.target_tid===fresh.wizard.root_tid
+          ||m.import_preview_owner_ref===fresh.wizard.root_ref
+          ||m.wizard_loading_owner_ref===fresh.wizard.root_ref));
+    }
+    return effectPossible&&before.wizard?.status==='observed'&&after.surface==='graph'
+      &&fresh.wizard?.status==='absent'&&fresh.ui.masks.every(m=>m.kind==='busy'&&!m.dialog_ref
+        &&m.target_tid===fresh.workflow_ref.prefix+';ModelForm'&&typeof m.graph_loading_owner_ref==='string');
+  };
   const waitForMasks = async (observed, read, unchanged) => {
     if(!observed.ui.masks.length || !unchanged(observed))return observed;
     const maskStarted=Date.now();
@@ -131,7 +151,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // or GUID failures do not enter this wait.
     for(let sample=0;binding?.surface_pending===true && effectPossible
       && (['open_wizard','begin_wizard','confirm_wizard_deactivation','finish_wizard','execute_wizard','confirm_wizard_close','show_process_node','cancel_process','open_node_views','enter_table'].includes(task.action?.verb)
-        ||task.action?.verb==='click'&&task.snapshot?.node_navigation_read===true) && (task.opening_timeout_ms || sample<200);sample++) {
+        ||task.action?.verb==='click'&&task.snapshot?.node_navigation_read===true) && (task.opening_timeout_ms || task.settlement_timeout_ms || sample<200);sample++) {
       record('node_surface_wait',{condition:'prepared_node_surface_ready',sample});
       await page.waitForTimeout(Math.min(50,timeout()));
       timeout();
@@ -152,7 +172,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
   // A WeakMap records DOM incarnations, without adding attributes or mutating
   // Loginom. Re-rendering an identical-looking control invalidates its old ref.
   // The state is document-bound; navigation invalidates every previous reference.
-  const readUi = async (rediscover = false, scanRetried = false) => {
+  const readUi = async (rediscover = false, scanRetried = false, settleMasks = true) => {
     const nodeContext=await boundNode();
     const observed = await page.evaluate(({rootRef,discoverRoots,storageName,columnPage,mappingPage,tableFormatPage,cacheReadPredicates,definitionPrefix,preparedWorkflowPath,preparedNodeId,preparedGraphTid,preparedNavigationNode,preparedOutputPort,preparedInputPort,preparedNodeWizard}) => {
     try {
@@ -3208,9 +3228,19 @@ function readRenderedInputMapping(observation) {
         &&element.classList.contains('x-mask-msg')&&!owner
         &&(tids.get(wizard.root_tid+';TuneDataSourceInputPortWizard;grdTargetColumns')??[])
           .filter(grid=>visible(grid)&&wizardForms[0].contains(grid)).length===1;
+      const containedLoading=preparedNodeId&&wizard.status==='observed'&&wizard.stage_status==='observed'
+        &&wizardForms.length===1&&wizardForms[0].classList.contains('bg-mask-message')
+        &&wizardForms[0].contains(element)&&element!==wizardForms[0]&&!getTid(element)
+        &&element.classList.contains('x-mask-msg')&&!owner;
+      const graphs=tids.get(workflow?.prefix+';ModelForm;cmpDiagram')??[];
+      const graphLoading=preparedNodeId&&getTid(element)===workflow?.prefix+';ModelForm'
+        &&(tids.get(getTid(element))??[]).filter(visible).length===1
+        &&graphs.filter(g=>visible(g)&&element.contains(g)).length===1;
       return { ref: refOf(element), kind, target_tid:getTid(element), dialog_ref: owner, text: ownText === null ? textOf(element) : short(ownText), bounding_box: boxOf(element),
         ...(importPreview?{import_preview_owner_ref:wizard.root_ref}:{}),
-        ...(inputMapping?{input_mapping_owner_ref:wizard.root_ref}:{}) };
+        ...(inputMapping?{input_mapping_owner_ref:wizard.root_ref}:{}),
+        ...(containedLoading?{wizard_loading_owner_ref:wizard.root_ref}:{}),
+        ...(graphLoading?{graph_loading_owner_ref:refOf(graphs.find(g=>visible(g)&&element.contains(g)))}:{}) };
     });
     const messages = readTexts('[role="alert"],[role="status"],.bg-message,.x-message-box,.x-form-invalid-under');
     const definitionOnly=!!definitionPrefix && wizard.status==='observed';
@@ -3753,6 +3783,9 @@ function readRenderedInputMapping(observation) {
       }
       observed.prepared_node_context=after;
     }
+    if(!rediscover&&settleMasks&&task.mode==='act'
+      &&(task.snapshot?.wizard?.status==='observed'||['open_wizard','begin_wizard','confirm_wizard_deactivation'].includes(task.action?.verb)))
+      return waitForMasks(observed,()=>readUi(false,false,false),ownedLoadingMask);
     return observed;
   };
 
@@ -3854,7 +3887,15 @@ function readRenderedInputMapping(observation) {
       }
       return null;
     }, { point, viewport, isGraphLink });
-    if (!hit) fail('UI_REFERENCE_OBSCURED', 'The observed control has no verified visible interaction point');
+    if (!hit) {
+      if(!effectPossible&&task.snapshot?.wizard?.status==='observed') {
+        const waits=trace.filter(e=>e.event==='ui_mask_wait_started').length;
+        await readUi();
+        if(trace.filter(e=>e.event==='ui_mask_wait_started').length>waits)
+          fail('UI_EPOCH_CHANGED','The owned loading mask settled before the gesture; refresh the same target and intent');
+      }
+      fail('UI_REFERENCE_OBSCURED', 'The observed control has no verified visible interaction point');
+    }
     if (isGraphLink) record('ui_link_hit_point', { ref: current.ref, source: hit.source, candidates_checked: hit.candidates_checked, point: hit.point });
     return { handle, point: hit.point };
   };
@@ -3868,6 +3909,8 @@ function readRenderedInputMapping(observation) {
         outcome = result('SUCCEEDED', current);
       } else {
         phase = 'preconditions';
+        if(trace.some(e=>e.event==='ui_mask_wait_started'))
+          fail('UI_EPOCH_CHANGED','The owned loading mask settled before the gesture; refresh the same target and intent');
         if (!task.snapshot || !same(task.snapshot.origin, current.origin) || current.origin !== task.expected_origin
           || current.loginom_build !== task.expected_build || !same(task.snapshot.loginom_build, current.loginom_build)
           || !same(task.snapshot.workflow_ref, current.workflow_ref)) fail('UI_CONTEXT_CHANGED', 'Origin, build, or active workspace changed; observe the workspace again');
@@ -4629,7 +4672,7 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) 
     ||options.snapshot?.prepared_node_context?.input_port||options.snapshot?.prepared_node_context?.output_port))
     throw Error('Preserved Join mapping requires a bound input-to-Join node read');
   if(options.settlement_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
-    ||!['finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
+    ||options.snapshot?.wizard?.status!=='observed'&&!['finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
     ||options.opening_timeout_ms!==undefined||!Number.isInteger(options.settlement_timeout_ms)
     ||options.settlement_timeout_ms<1||options.settlement_timeout_ms>1800000))
     throw Error('Mask settlement requires a bound completion action and the remaining node deadline');

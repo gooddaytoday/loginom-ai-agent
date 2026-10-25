@@ -322,7 +322,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readLinRegression = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readLinRegression = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -337,6 +337,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       readOutputs ||= !!tablePage || !!tableDialog;
       if(wizardConfirmation && (!preparedNodeContext || !['close','deactivation'].includes(wizardConfirmation.kind)))throw Error('A prepared wizard confirmation binding is required');
       if(releaseWizard&&!preparedNodeContext)throw Error('Wizard release requires its prepared node');
+      if(settleWizard&&(!releaseWizard||!Number.isFinite(settleWizard.deadline)||settleWizard.deadline>operation.deadline
+        ||!settleWizard.root_ref||!settleWizard.node))throw Error('Wizard settlement requires its original receipt and deadline');
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
       if(tableDialog)makeNodeTableContextCode(preparedNodeContext,tableDialog.table,{row_offset:0,row_limit:0,column_offset:0,column_limit:1});
@@ -357,9 +359,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const observationNow = () => started + monotonicNow() - monotonicStarted;
       let deadline = settleOutputPort?operation.deadline:Math.min(operation.deadline, started + timeoutMs);
       const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, sampleStarted = observationNow();
+      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, settlingWizard, sampleStarted = observationNow();
       try {
-      for (let sample = 0; settleOutputPort || settleProcessConsole || sample < 80; sample++) {
+      for (let sample = 0; settleOutputPort || settleProcessConsole || settlingWizard || sample < 80; sample++) {
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
         // Pending reads already spend time polling. Keep a 200 ms start-to-start
@@ -614,6 +616,25 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             &&t.port_guid===tableDialog.table.port_guid&&t.table_tid===tableDialog.table.table_tid).length!==1)throw new Error('Table dialog owner changed');
           result.output.node_table_dialog=structuredClone(tableDialog);
         }
+        const ws=result.output,w=ws.wizard,n=ws.prepared_node_context;
+        const ownWizardMask=preparedNodeContext&&n?.verified===true&&n.surface==='wizard'&&w?.status==='observed'
+          &&n.tid===w.root_tid&&ws.ui.dialogs.length===0&&ws.ui.masks.length>0
+          &&ws.ui.masks.every(m=>m.kind==='busy'&&!m.dialog_ref&&(m.ref===w.root_ref&&m.target_tid===w.root_tid
+            ||m.import_preview_owner_ref===w.root_ref||m.wizard_loading_owner_ref===w.root_ref));
+        const returnedGraph=settleWizard&&n?.verified===true&&n.surface==='graph'&&w?.status==='absent'
+          &&['document_id','workflow_id','node_id'].every(k=>n[k]===settleWizard.node[k])&&ws.ui.dialogs.length===0
+          &&ws.ui.masks.every(m=>m.kind==='busy'&&!m.dialog_ref&&m.target_tid===ws.workflow_ref.prefix+';ModelForm'&&m.graph_loading_owner_ref);
+        if(settlingWizard||(ownWizardMask||returnedGraph&&ws.ui.masks.length)&&(!releaseWizard||settleWizard)) {
+          const expected=settlingWizard??{root_ref:w.root_ref,node:structuredClone(n)};
+          if(!returnedGraph&&(w?.status!=='observed'||w.root_ref!==expected.root_ref||n?.surface!=='wizard'
+              ||!['input_port','output_port'].every(k=>JSON.stringify(n[k])===JSON.stringify(expected.node[k])))
+            ||!['document_id','workflow_id','node_id'].every(k=>n[k]===expected.node[k])
+            ||ws.ui.dialogs.length||ws.ui.masks.length&&!ownWizardMask&&!returnedGraph
+            ||settleWizard&&(!returnedGraph&&w.root_ref!==settleWizard.root_ref
+              ||!['document_id','workflow_id','node_id'].every(k=>n[k]===settleWizard.node[k])))
+            throw Error('Owned wizard loading context changed');
+          if(ownWizardMask||returnedGraph&&ws.ui.masks.length){settlingWizard=expected;deadline=Math.min(operation.deadline,settleWizard?.deadline??Infinity);}
+        }
         if(settleProcessConsole&&(settlingConsole||result.output.ui.masks.length
           &&result.output.ui.elements.some(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress'))){
           const state=result.output,buttons=state.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress');
@@ -726,7 +747,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       // just like a wizard opening. Settle it once within the original budget.
       const openingWait=preparedNodeContext&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views'].includes(action.verb)
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
-      const settlementWait=preparedNodeContext&&['finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(action.verb)
+      const settlementWait=preparedNodeContext&&!openingWait&&(before.wizard?.status==='observed'
+        ||['finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(action.verb))
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
       const code = processCode??makeWorkspaceUiCode({ mode: 'act', operation_id: id, action,
         ...(openingWait||settlementWait?{deadline:operation.deadline}:{}),

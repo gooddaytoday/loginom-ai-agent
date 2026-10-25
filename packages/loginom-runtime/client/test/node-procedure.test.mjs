@@ -953,6 +953,25 @@ test('an incomplete observation preserves the original refusal in the journal',a
  assert.ok(!f.events.includes('mutated'));
 });
 
+test('D74 ordinary readiness waits only for its own wizard mask under the original deadline',async()=>{
+ for(const fault of [null,'foreign','node','expired']) {
+  let time=1,mutations=0;
+  const ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]},node={document_id:'doc',workflow_id:'wf',node_id:'node'};
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:ref,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+   prepared_node_context:{...node,verified:true,surface:'wizard',tid:'MF;TF-1;WizrdMCF'},
+   wizard:{status:'observed',root_ref:'wizard',root_tid:'MF;TF-1;WizrdMCF',stage:'output_mapping'},
+   ui:{elements:[],dialogs:[],masks:[{kind:'busy',ref:'wizard',target_tid:'MF;TF-1;WizrdMCF',dialog_ref:null}],truncated:{dialogs:false,masks:false}}};
+  const operation={id:'parent',deadline:30000,action:{action_key:'node.apply',revision:'1'}};
+  const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:ref,node},targetOrigin:state.origin,targetBuild:state.loginom_build,
+   now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms;if(!fault&&time>=25000)state.ui.masks=[];
+    if(fault==='foreign'&&time>=1000)state.ui.masks[0].target_tid='foreign';if(fault==='node'&&time>=1000)state.prepared_node_context.node_id='other';},
+   record:async e=>structuredClone(e),execute:async code=>{assert.equal(typeof code,'string');return {status:'SUCCEEDED',output:structuredClone(state)};},wrapMutation:()=>{mutations++;}});
+  const run=()=>channel.observe({condition:'owned wizard ready',ready:()=>true,timeoutMs:1000});
+  if(fault)await assert.rejects(run());else{await run();assert.ok(time>=25000);}
+  assert.equal(operation.deadline,30000);assert.equal(mutations,0);
+ }
+});
+
 test('bound completion gives mask settlement only the remaining parent deadline',async()=>{
   for(const verb of ['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views','finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column','click']) {
     const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};

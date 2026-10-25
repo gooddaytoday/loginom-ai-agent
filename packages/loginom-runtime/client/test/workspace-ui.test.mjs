@@ -1571,6 +1571,42 @@ test('wizard transition waits through a transient mask without repeating its cli
   assert.equal(page.events.filter(e=>e==='click').length,1);
 });
 
+test('D74 bound wizard step settles a loading mask beyond the short sample cap',async()=>{
+ for(const fault of [null,'foreign_mask','foreign_node','expired']) {
+  const page=new Page(),c=wizardStepFixture(page);let waits=0;
+  const reader=async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:fault==='foreign_node'&&waits?'other':'node',surface:'wizard',tid:c.base});
+  const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},reader);
+  const snapshot=(await execute({mode:'observe'})).output,button=snapshot.ui.elements.find(e=>e.wizard_step),click=page.mouse.click;
+  page.mouse.click=async(...a)=>{await click(...a);c.advance();c.form.attrs.class='bg-mask-message';};
+  page.waitForTimeout=async ms=>{page.clock.advance(ms);waits++;
+   if(!fault&&waits===240)c.form.attrs.class='';
+   if(fault==='foreign_mask'&&waits===1)page.add('div','foreign-mask','Loading').attrs.class='x-mask-msg';
+  };
+  const r=await execute({mode:'act',opening_timeout_ms:120000,action:{verb:'wizard_step',ref:button.ref,expected_stage:'input_mapping'},snapshot});
+  assert.equal(r.status,fault?'AMBIGUOUS':'SUCCEEDED',fault+JSON.stringify(r.error));
+  assert.equal(page.events.filter(e=>e==='click').length,1);
+  if(!fault)assert.ok(r.trace.some(e=>e.event==='ui_mask_wait_finished'&&e.elapsed_ms>=60000));
+  if(fault==='expired')assert.equal(r.error.code,'UI_DEADLINE_EXCEEDED');
+ }
+});
+
+test('D74 configure waits for a late owned mask then requires a fresh pre-gesture observation',async()=>{
+ const page=new Page(),c=wizardStepFixture(page);let waits=0,late=false;
+ const reader=async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base});
+ const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+  {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},reader);
+ const snapshot=(await execute({mode:'observe'})).output,button=snapshot.ui.elements.find(e=>e.wizard_step);
+ const hit=page.document.elementFromPoint.bind(page.document);
+ page.document.elementFromPoint=(x,y)=>{if(late){c.form.attrs.class='bg-mask-message';late=false;return c.form;}return hit(x,y);};
+ const evaluate=page.evaluate.bind(page);page.evaluate=async(fn,arg)=>{const out=await evaluate(fn,arg);if(arg?.discoverRoots===false&&!page.events.includes('click'))late=true;return out;};
+ page.waitForTimeout=async ms=>{page.clock.advance(ms);if(++waits===100)c.form.attrs.class='';};
+ const r=await execute({mode:'act',settlement_timeout_ms:120000,action:{verb:'click',ref:button.ref},snapshot});
+ assert.equal(r.status,'NOT_APPLIED');assert.equal(r.error.code,'UI_EPOCH_CHANGED',JSON.stringify(r.error));
+ assert.equal(r.effect_possible,false);assert.equal(page.events.filter(e=>e==='click').length,0);
+ assert.ok(r.trace.some(e=>e.event==='ui_mask_wait_finished'&&e.elapsed_ms>=25000));
+});
+
 test('wizard step waits for delayed layout epochs and bounds a continuously changing destination',async()=>{
   for(const mode of ['delayed','continuous','replaced']) {
     const page=new Page(),c=wizardStepFixture(page),snapshot=await page.observe();
@@ -2284,11 +2320,12 @@ test('prepared wizard opening retries one refused sample and preserves native ow
   const result=await page.act({verb:'begin_wizard',ref:button.ref},snapshot);
   assert.equal(result.status,!fault||fault==='loading'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify({error:result.error,trace:result.trace}));
   const retry=result.trace.filter(e=>e.event==='wizard_open_confirmation_read_retried');
-  assert.equal(retry.length,1,fault+JSON.stringify(result.error));assert.equal(retry[0].initial_observation.wizard.status,loading?'observed':'absent');
+  if(!loading){assert.equal(retry.length,1,fault+JSON.stringify(result.error));assert.equal(retry[0].initial_observation.wizard.status,'absent');}
+  else assert.ok(retry.length<=1,fault+JSON.stringify(result.error));
   assert.equal(page.events.filter(e=>e==='click').length,1);
   if(loading){
-   assert.equal(retry[0].initial_observation.ui.masks.length,2);
-   assert.equal(retry[0].initial_observation.ui.masks[1].target_tid,null);
+   const masks=result.trace.find(e=>e.event==='ui_mask_wait_started').masks;
+   assert.equal(masks.length,2);assert.equal(masks[1].target_tid,null);
   }
   if(fault&&fault!=='loading')assert.equal(result.error.code,
    fault==='node'?'PREPARED_NODE_CONTEXT_CHANGED':fault==='loading_expired'?'UI_DEADLINE_EXCEEDED':fault==='loading_dialog'?'WIZARD_CONTEXT_CHANGED':'WIZARD_OPEN_NOT_CONFIRMED',fault);
@@ -6766,7 +6803,7 @@ test('graph observation retains automatic-label links and excludes their child d
  const s=await page.observe();assert.deepEqual(s.links.map(e=>e.tid??e),[link]);
 });
 test('output-port Close returns through the port breadcrumb path after exactly one confirmation',async()=>{
- for(const mode of ['valid','duplicate','foreign_guid','foreign_document','foreign_workflow','wrong_workflow','wrong_node','still_open','missing_context','toast','foreign_toast','permanent_toast','toast_foreign_document','toast_foreign_workflow','toast_foreign_guid','toast_foreign_tab','toast_foreign_dialog','toast_deadline']) {
+ for(const mode of ['graph_busy','graph_busy_foreign','graph_busy_expired','valid','duplicate','foreign_guid','foreign_document','foreign_workflow','wrong_workflow','wrong_node','still_open','missing_context','toast','foreign_toast','permanent_toast','toast_foreign_document','toast_foreign_workflow','toast_foreign_guid','toast_foreign_tab','toast_foreign_dialog','toast_deadline']) {
   const {page}=outputPortFinishFixture(mode),clock=fixtureClock();page.context.Date=clock.Date;let toast,waits=0;
   const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
   page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
@@ -6785,13 +6822,18 @@ test('output-port Close returns through the port breadcrumb path after exactly o
   assert.ok(button,mode);
   const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);dialog.remove();if(mode==='duplicate')for(const e of page.document.all()){
    if(e.attrs['data-tid']?.startsWith('MF;TF-1;Graph;Calc'))e.attrs['data-tid']=e.attrs['data-tid'].replace('Graph;Calc','Graph;Calc@1');}
+   if(mode.startsWith('graph_busy')){
+    const graph=page.document.querySelectorAll('[data-tid="MF;TF-1;ModelForm;cmpDiagram"]')[0];
+    toast=page.add('div','MF;TF-1;ModelForm');graph.parentElement.children.splice(graph.parentElement.children.indexOf(graph),1);toast.append(graph);toast.attrs.class='bg-mask-message';
+   }
    if(mode.includes('toast')){toast=page.add('div',mode==='foreign_toast'?'foreign':'toast','Closed',{x:1000,y:800,width:300,height:75});toast.attrs.role='dialog';}};
   page.waitForTimeout=async ms=>{clock.advance(mode==='toast_deadline'?120001:ms);waits++;
    if(mode==='toast'&&waits===3)toast.remove();
    if(mode==='toast_foreign_tab'&&waits===2)page.tab.attrs['data-tid']='MF;cntMain;cntWorkspace;Workspace;t.br;tb-2';
    if(mode==='toast_foreign_dialog'&&waits===2)toast.attrs['data-tid']='foreign';};
-  const result=await execute({mode:'act',operation_id:'output-close',action:{verb:'confirm_wizard_close',ref:button.ref},snapshot});
-  assert.equal(result.status,['valid','duplicate','toast'].includes(mode)?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
+  const wait=page.waitForTimeout;page.waitForTimeout=async ms=>{await wait(ms);if(mode==='graph_busy'&&waits===100)toast.attrs.class='';if(mode==='graph_busy_foreign'&&waits===1)page.add('div','foreign-mask','Loading').attrs.class='x-mask-msg';};
+  const result=await execute({mode:'act',...(mode.startsWith('graph_busy')?{settlement_timeout_ms:120000}:{}),operation_id:'output-close',action:{verb:'confirm_wizard_close',ref:button.ref},snapshot});
+  assert.equal(result.status,['graph_busy','valid','duplicate','toast'].includes(mode)?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
   assert.equal(page.events.filter(e=>e==='click').length,1);
   if(mode==='toast'){assert.equal(waits,3);assert.equal(result.trace.filter(e=>e.event==='wizard_toast_wait').length,3);
    assert.equal(result.trace.some(e=>e.event==='wizard_cancel_graph_verified'),true);}
