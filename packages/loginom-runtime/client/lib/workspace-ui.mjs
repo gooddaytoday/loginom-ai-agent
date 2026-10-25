@@ -112,7 +112,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     if(!observed.ui.masks.length || !unchanged(observed))return observed;
     const maskStarted=Date.now();
     record('ui_mask_wait_started',{remaining_ms:timeout(),masks:observed.ui.masks.map(mask=>({ref:mask.ref,kind:mask.kind,target_tid:mask.target_tid,
-      dialog_ref:mask.dialog_ref,...(mask.import_preview_owner_ref?{import_preview_owner_ref:mask.import_preview_owner_ref}:{})}))});
+      dialog_ref:mask.dialog_ref,...(mask.import_preview_owner_ref?{import_preview_owner_ref:mask.import_preview_owner_ref}:{}),
+      ...(mask.input_mapping_owner_ref?{input_mapping_owner_ref:mask.input_mapping_owner_ref}:{})}))});
     while (observed.ui.masks.length && unchanged(observed)) {
       await page.waitForTimeout(Math.min(250,timeout()));
       timeout();observed=await read();timeout();
@@ -3198,8 +3199,18 @@ function readRenderedInputMapping(observation) {
         &&getTid(element)===wizard.root_tid+';ImportTextFilePreviewWizard;pnlPreview'
         &&wizardForms.length===1&&wizardForms[0].contains(element)
         &&(tids.get(getTid(element))??[]).filter(visible).length===1;
+      // Ext's input-mapping loading message has no data-tid and can flicker
+      // while the wizard's own mask remains. Bind only a contained message
+      // under that exact busy wizard; this permits waiting, never a gesture.
+      const inputMapping=preparedNodeId&&wizard.status==='observed'&&wizard.stage==='input_mapping'
+        &&wizardForms.length===1&&wizardForms[0].classList.contains('bg-mask-message')
+        &&wizardForms[0].contains(element)&&element!==wizardForms[0]&&!getTid(element)
+        &&element.classList.contains('x-mask-msg')&&!owner
+        &&(tids.get(wizard.root_tid+';TuneDataSourceInputPortWizard;grdTargetColumns')??[])
+          .filter(grid=>visible(grid)&&wizardForms[0].contains(grid)).length===1;
       return { ref: refOf(element), kind, target_tid:getTid(element), dialog_ref: owner, text: ownText === null ? textOf(element) : short(ownText), bounding_box: boxOf(element),
-        ...(importPreview?{import_preview_owner_ref:wizard.root_ref}:{}) };
+        ...(importPreview?{import_preview_owner_ref:wizard.root_ref}:{}),
+        ...(inputMapping?{input_mapping_owner_ref:wizard.root_ref}:{}) };
     });
     const messages = readTexts('[role="alert"],[role="status"],.bg-message,.x-message-box,.x-form-invalid-under');
     const definitionOnly=!!definitionPrefix && wizard.status==='observed';
@@ -4282,7 +4293,10 @@ function readRenderedInputMapping(observation) {
                 ||task.prepared_node_context&&fresh.prepared_node_context?.verified===true
                   &&fresh.prepared_node_context.surface==='wizard'&&fresh.wizard.stage==='text_import_file'
                   &&mask.target_tid===current.workflow_ref.prefix+';WizrdMCF;ImportTextFilePreviewWizard;pnlPreview'
-                  &&mask.import_preview_owner_ref===fresh.wizard.root_ref));
+                  &&mask.import_preview_owner_ref===fresh.wizard.root_ref
+                ||task.prepared_node_context&&fresh.prepared_node_context?.verified===true
+                  &&fresh.prepared_node_context.surface==='wizard'&&fresh.wizard.stage==='input_mapping'
+                  &&mask.input_mapping_owner_ref===fresh.wizard.root_ref));
           // The opening click is already sent. Observe its own loading mask
           // within the original node deadline; never reissue the click.
           observed=await waitForMasks(observed,readOpeningUi,ownedLoading);
