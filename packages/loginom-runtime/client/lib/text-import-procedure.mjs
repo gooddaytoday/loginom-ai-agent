@@ -467,9 +467,21 @@ async function configureImport(channel, parameters, owner,fieldsOnly,patch) {
       // reconcile below restores retained settings by name, not old position.
       // Loginom Help / import/txt and E2E sColumnDefsTuning.toolbar.RefreshAll.
       const suffix='ImportTextFileParamsWizard;ColumnDefsTuning;btnRefreshAll';
-      const before=await read('text_import_format','replacement source definitions refresh available',state=>
-        state.ui.elements.filter(e=>e.tid===state.wizard.root_tid+';'+suffix&&e.allowed_actions?.includes('click')).length===1);
-      await act(before,{verb:'click',ref:control(before,suffix,'click')});
+      const refreshReady=state=>{
+        const w=state.wizard;
+        if(w?.status==='observed'&&!same(identity(w.owner_context),identity(currentOwner)))throw Error('Text import wizard owner changed');
+        return w?.status==='observed'&&w.stage==='text_import_format'
+          &&state.ui.elements.filter(e=>e.tid===w.root_tid+';'+suffix&&e.allowed_actions?.includes('click')).length===1;
+      };
+      // Refresh can encounter the same late format repaint as Back. Reuse
+      // epoch confirmation and the bounded no-effect recovery, never replay a click.
+      const confirmIdentity=state=>state.dom_epoch;
+      const before=await read('text_import_format','replacement source definitions refresh available',refreshReady,{confirmIdentity});
+      await channel.perform({condition:'text_import_format: replacement source definitions refresh available',
+        initialObservation:before,ready:refreshReady,confirmIdentity,
+        identity:state=>({owner:identity(state.wizard.owner_context),root_tid:state.wizard.root_tid,stage:state.wizard.stage,
+          fields:Object.fromEntries(Object.entries(state.wizard.settings.fields).map(([name,f])=>[name,{status:f.status,truncated:f.truncated,value:f.value}]))}),
+        resolve:state=>({verb:'click',ref:control(state,suffix,'click')})});
       const refreshed=await read('text_import_format','replacement source definitions refreshed',state=>
         state.wizard.import_columns?.initial_layout?.status==='rendered_definition_layout');
       requireValue(Object.keys(before.wizard.settings.fields).every(k=>

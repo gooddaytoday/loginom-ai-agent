@@ -36,8 +36,10 @@ function fixture({samePath=false,emptyPatch=false,control='valid',drift=false,in
  return {parameters,owner,channel,retained,extra,gestures,state,get refreshes(){return refreshes;}};
 }
 
-function repaintingFormat(fault='delayed') {
+function repaintingFormat(fault='delayed',button='Back') {
  const f=fixture(),records=[],workflow_ref={prefix:'MF;TF-1',tab_tid:'tab'};
+ const ref=button==='Back'?'ui-prev':'ui-refresh';
+ const condition=button==='Back'?'Previous control available':'replacement source definitions refresh available';
  const operation={id:'replace',action:{action_key:'node.apply',revision:'1'},deadline:2000,
   checkpoint:{document_id:'doc',workflow_ref}};
  let elapsed=0,revision=1,armed=false,attempts=0,prepared,lastReadRevision;
@@ -47,34 +49,40 @@ function repaintingFormat(fault='delayed') {
    dom_epoch:{document:'doc',revision},scan:{complete:true}});
   Object.assign(s.ui,{masks:fault==='mask'&&elapsed<450?[{kind:'busy'}]:[],dialogs:[],truncated:{masks:false,dialogs:false}});
   s.wizard.root_ref='ui-wizard';
-  s.ui.elements.find(e=>e.ref==='prev').ref='ui-prev';
+  s.ui.elements.find(e=>e.ref===(button==='Back'?'prev':'refresh0')).ref=ref;
   if(fault==='foreign'&&attempts)s.wizard.owner_context.node.tid='foreign';
+  if(fault==='fields'&&attempts)s.wizard.settings.fields.decimal_separator.value=',';
+  if(fault==='root'&&attempts){
+   s.wizard.root_tid='foreign-wizard';
+   for(const e of s.ui.elements)e.tid=e.tid.replace(/^wizard;/,'foreign-wizard;');
+  }
+  if(fault==='document'&&attempts)s.dom_epoch.document='foreign-document';
   return s;
  };
  const tick=ms=>{elapsed+=ms;if(armed&&(fault==='delayed'||fault==='mask'))revision=elapsed<150?1:elapsed<450?3:5;
   if(fault==='deadline')revision++;};
- const act=f.channel.act,observe=f.channel.observe;
+ const act=f.channel.act,observe=f.channel.observe,perform=f.channel.perform;
  const channel=createNodeProcedure({operation,now:()=>elapsed,wait:async ms=>tick(ms),
   targetOrigin:'http://example.test',targetBuild:'7.4.2',
   record:async e=>{records.push(e);if(e.phase==='node_step_prepared')prepared=e.action;return structuredClone(e);},
   wrapMutation:(code,reference)=>({reference}),execute:async code=>{
    if(typeof code==='string'){tick(25);const output=state();lastReadRevision=revision;return {status:'SUCCEEDED',output};}
    attempts++;tick(125);
-   const late=['late','foreign','effect','unconfirmed'].includes(fault)&&attempts===1;
+   const late=['late','foreign','effect','unconfirmed','fields','root','document','possible'].includes(fault)&&attempts===1;
    if(late)revision+=2;
    const failed=revision!==lastReadRevision;
-   if(!failed||fault==='effect')await act(prepared);
+   if(!failed||fault==='effect')await act({...prepared,ref:button==='Back'?prepared.ref:'refresh0'});
    return {operation_id:code.reference.id,action_key:'ui.act',cleanup_complete:fault!=='unconfirmed',
-    effect_possible:fault==='effect'||!failed,status:failed?(fault==='effect'?'AMBIGUOUS':'NOT_APPLIED'):'SUCCEEDED',
+    effect_possible:['effect','possible'].includes(fault)||!failed,status:failed?(fault==='effect'?'AMBIGUOUS':'NOT_APPLIED'):'SUCCEEDED',
     phase:failed?(fault==='effect'?'applying':'preconditions'):'completed',output:state(),
     error:failed?{code:'UI_EPOCH_CHANGED'}:null,trace:[]};
   }});
  f.channel.observe=options=>{
-  if(options.condition!=='text_import_format: Previous control available')return observe(options);
+  if(options.condition!=='text_import_format: '+condition)return observe(options);
   armed=true;return channel.observe(options);
  };
- f.channel.act=action=>action.ref==='ui-prev'?channel.act(action):act(action);
- f.channel.perform=options=>channel.perform(options);
+ f.channel.act=action=>action.ref===ref?channel.act(action):act(action);
+ f.channel.perform=options=>options.condition==='text_import_format: '+condition?channel.perform(options):perform(options);
  return {...f,records,operation,get elapsed(){return elapsed;},get attempts(){return attempts;}};
 }
 
@@ -95,6 +103,28 @@ for(const fault of ['foreign','effect','unconfirmed','deadline'])test('existing 
  assert.ok(f.elapsed<=f.operation.deadline);
  assert.equal(f.gestures.filter(a=>a.ref==='ui-prev').length,fault==='effect'?1:0);
  assert.equal(f.attempts,fault==='deadline'?0:1);
+});
+
+for(const fault of ['delayed','mask','late'])test('existing Import waits for its format repaint before Refresh: '+fault,async()=>{
+ const f=repaintingFormat(fault,'Refresh');
+ const result=await configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv');
+ assert.equal(result.verified,true);
+ assert.equal(f.gestures.filter(a=>a.ref==='refresh0').length,1);
+ assert.ok(f.elapsed>=450);
+ assert.equal(f.attempts,fault==='late'?2:1);
+ assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,fault==='late'?1:0);
+ assert.ok(f.records.some(e=>e.readiness?.required_samples===2));
+ assert.equal(f.operation.deadline,2000);
+});
+
+for(const fault of ['foreign','fields','root','document','effect','possible','unconfirmed','deadline'])test('existing Import Refresh settlement refuses '+fault,async()=>{
+ const f=repaintingFormat(fault,'Refresh');
+ await assert.rejects(configureTextImportPatch(f.channel,f.parameters,f.owner,'/test/new.csv'));
+ assert.equal(f.operation.deadline,2000);
+ assert.ok(f.elapsed<=f.operation.deadline);
+ assert.equal(f.gestures.filter(a=>a.ref==='refresh0').length,fault==='effect'?1:0);
+ assert.equal(f.attempts,fault==='deadline'?0:1);
+ assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,['foreign','fields','root','document'].includes(fault)?1:0);
 });
 
 test('changed existing source refreshes stale native definitions and reconciles new order by name',async()=>{
