@@ -38,7 +38,29 @@ async function closeOwnedPackage(page, options, deadline) {
   const {sessionId, documentId, account, packagePath, tabTid, timeoutMs} = options;
   const receipt = {version:1, session_id:sessionId, document_id:documentId, account, package_path:packagePath,
     package_closed:false, logged_out:false, unsaved_changes_discarded:false, stage:'close_request', started_at:new Date().toISOString()};
-  const finish = (status, reason, extra = {}) => ({...receipt, ...extra, status, reason, completed_at:new Date().toISOString()});
+  let closeStarted=false;
+  const finish = async (status, reason, extra = {}) => {
+    // Private journal evidence, after the decision. Never retry Close, answer
+    // a prompt, or promote its outcome from this diagnostic readback.
+    if(closeStarted&&!receipt.native_close_readback) {
+      receipt.native_close_readback={status:'unavailable'};
+      const budget=deadline-Date.now();
+      if(budget>0) {
+        try {
+          // The decision is final; a slow read must not extend its original deadline.
+          receipt.native_close_readback=await Promise.race([
+            page.waitForTimeout(budget).then(()=>({status:'unavailable',reason:'deadline_exceeded'})),
+            page.evaluate(o=>{
+            const s=globalThis.__loginomDockCleanupV1,m=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree;
+            if(s?.document!==document||s.identity!==JSON.stringify(o))return {status:'identity_changed'};
+            return {status:'observed',done:s.done===true,closed:s.closed===true,failed:s.failed===true,result:s.result??'pending',
+              packages_after:m?.PackageNodes?.Count??null,original_tab_attached:document.contains(s.tab)};
+          },options)]);
+        } catch {}
+      } else receipt.native_close_readback.reason='deadline_exceeded';
+    }
+    return {...receipt,...extra,status,reason,completed_at:new Date().toISOString()};
+  };
   const at = tid => page.locator('[data-tid='+JSON.stringify(tid)+']');
   const remaining = () => {
     const ms = Math.min(timeoutMs, deadline-Date.now());
@@ -83,9 +105,10 @@ async function closeOwnedPackage(page, options, deadline) {
         if (Date.now() >= deadline) return {reason:'CLEANUP_DEADLINE_EXCEEDED'};
         if ([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)) return {reason:'DIALOG_OR_OPERATION_OPEN'};
       }
-      const state = globalThis.__loginomDockCleanupV1 = {identity, document, done:false, closed:false};
+      const state = globalThis.__loginomDockCleanupV1 = {identity, document, tab:prepared.tab, done:false, closed:false};
       Promise.resolve().then(() => m.ClosePackage(node, false, true)).then(value => {
         state.closed = value === true && m.PackageNodes.Count === 0;
+        state.result=value===true?'true':value===false?'false':'other';
         state.done = true;
       }, () => { state.done = true; state.failed = true; });
       return {started:true, packages_before:1, modified, display_name:node.DisplayName};
@@ -104,6 +127,7 @@ async function closeOwnedPackage(page, options, deadline) {
       before = await beginClose();
     }
     if (!before.started) return finish('BLOCKED', before.reason);
+    closeStarted=true;receipt.modified_before_close=before.modified;
     receipt.stage = 'close_wait';
     await page.waitForFunction(() => {
       const state = globalThis.__loginomDockCleanupV1;
@@ -134,11 +158,15 @@ async function closeOwnedPackage(page, options, deadline) {
       await page.waitForFunction(() => globalThis.__loginomDockCleanupV1?.done === true, undefined, {timeout:remaining()});
     }
     receipt.stage = 'close_readback';
-    const closed = await page.evaluate(() => {
+    const closed = await page.evaluate(o => {
       const state = globalThis.__loginomDockCleanupV1;
       return {done:state?.done === true, closed:state?.closed === true,
-        remaining:globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.PackageNodes?.Count};
-    });
+        remaining:globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree?.PackageNodes?.Count,
+        diagnostic:state?.document===document&&state.identity===JSON.stringify(o)?{status:'observed',
+          done:state?.done===true,closed:state?.closed===true,failed:state?.failed===true,result:state?.result??'pending',
+          original_tab_attached:document.contains(state?.tab)}:{status:'identity_changed'}};
+    },options);
+    receipt.native_close_readback={...closed.diagnostic,packages_after:closed.remaining??null};
     if (!closed.done || !closed.closed || closed.remaining !== 0) return finish('BLOCKED', 'NATIVE_CLOSE_UNCONFIRMED');
     receipt.stage = 'tab_detach';
     await at(tabTid).waitFor({state:'detached', timeout:remaining()});

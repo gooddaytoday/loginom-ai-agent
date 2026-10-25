@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { createObservationPages } from '../lib/observation-pages.mjs';
-import { makeWorkspaceUiCode, validateUiAction, workspaceUiCapability } from '../lib/workspace-ui.mjs';
+import { makeWorkspaceUiCode, validateUiAction, workspaceUiCapability, makeBlockingWindowDiagnosticCode } from '../lib/workspace-ui.mjs';
 import { assertActionOutcome } from '../lib/action-catalog.mjs';
 
 import {Page,Element,Document,build,origin,clone,fixtureClock} from './support/workspace-ui-fixture.mjs';
@@ -7083,4 +7083,43 @@ test('independent D47b foreign native navigation remains refused for hidden JS',
  assert.equal(r.output.wizard?.input_port_context?.status==='observed',mode==='d52_valid',mode);
  assert.deepEqual(page.events,[]);
  }
+});
+
+
+test('D70 only the prepared picker with its exact hidden native owner is inactive at mas2 geometry',async()=>{
+ for(const mode of ['owned_hidden','active','unknown','foreign_dom','foreign_component','foreign_document','no_receipt']) {
+  const page=new Page(),root=page.add('div','OpenDialogForm','Открыть файл',{x:283,y:-2327,width:730,height:500});
+  root.attrs.class='x-window';root.attrs.id='picker-owner';
+  const component={$className:'bg.filedialog.view.OpenDialogForm',hidden:mode!=='active',el:{dom:mode==='foreign_dom'?{}:root}};
+  page.context.Ext={getCmp:()=>mode==='unknown'?null:component};page.context.picker=root;page.context.pickerComponent=component;
+  vm.runInContext("globalThis.__loginomDockPreparationV1={document,id:'prepared',receipts:new Map([['open',{request:JSON.stringify({intent:'open_package'}),openDialogElement:picker,openDialog:pickerComponent}]])}",page.context);
+  if(mode==='foreign_component')vm.runInContext("__loginomDockPreparationV1.receipts.get('open').openDialog={}",page.context);
+  if(mode==='foreign_document')page.context.__loginomDockPreparationV1.document={};
+  if(mode==='no_receipt')page.context.__loginomDockPreparationV1.receipts.clear();
+  const snapshot=await page.observe();
+  assert.equal(snapshot.ui.dialogs.length,mode==='owned_hidden'?0:1,mode);
+  assert.equal(page.events.filter(e=>e==='click').length,0,mode);
+ }
+});
+
+
+test('D70 blocking window diagnostics retain native visibility and geometry without admitting actions',async()=>{
+ const page=new Page(),root=page.add('div','OpenDialogForm','PRIVATE FILE LIST',{x:283,y:-2327,width:730,height:500});
+ page.context.innerWidth=1280;page.context.innerHeight=800;
+ root.attrs.class='x-window';root.attrs.id='picker-owner';root.style.visibility='visible';root.style.top='-2327px';
+ page.context.Ext={getCmp:()=>({$className:'bg.filedialog.view.OpenDialogForm',hidden:false,el:{dom:root}})};
+ const snapshot=await page.observe(),ref=snapshot.ui.dialogs[0].ref;
+ const code=makeBlockingWindowDiagnosticCode({refs:[ref],origin,build});
+ const run=()=>vm.runInNewContext('('+code+')',{})({evaluate:async(fn,arg)=>{
+   page.context.diagnosticArg=arg;return vm.runInContext('('+fn.toString()+')(diagnosticArg)',page.context);
+ }});
+ const result=await run();
+ assert.equal(result.windows[0].native_owner.class_name,'bg.filedialog.view.OpenDialogForm');
+ assert.equal(result.windows[0].native_owner.exact_dom,true);assert.equal(result.windows[0].native_owner.hidden,false);
+ assert.equal(result.windows[0].style.visibility,'visible');assert.equal(result.windows[0].bounding_box.y,-2327);
+ assert.equal(result.windows[0].class_name,'x-window');assert.equal(result.viewport.height,800);
+ assert.ok(!JSON.stringify(result).includes('PRIVATE FILE LIST'));
+ root.remove();const replacement=page.add('div','OpenDialogForm','',root.box);replacement.attrs.class='x-window';
+ assert.equal((await run()).windows[0].status,'incarnation_changed');
+ assert.equal(page.events.filter(e=>e==='click').length,0);
 });

@@ -1,6 +1,35 @@
 import {readPreparedNodeContext, validatePreparedNodeContext} from './node-context.mjs';
 import {captureProcessNodeFocus,restoreProcessNodeFocus} from './process-node-focus.mjs';
 
+// Execution-journal diagnostics only. Never issue refs or classify a window as
+// safe from this read; require the already observed DOM incarnation.
+export function makeBlockingWindowDiagnosticCode({refs,origin,build}) {
+  if(!Array.isArray(refs)||refs.length>12||refs.some(r=>typeof r!=='string'||r.length>128))throw Error('Bound dialog refs required');
+  return `async page=>page.evaluate(${readBlockingWindows.toString()},${JSON.stringify({refs,origin,build})})`;
+}
+
+function readBlockingWindows({refs,origin,build}) {
+  if(location.origin!==origin||globalThis.bg?.app?.Version!==build)return {status:'context_changed'};
+  const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+  if(state?.document!==document)return {status:'document_changed'};
+  const roots=[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog')];
+  const short=v=>typeof v==='string'?v.slice(0,512):null;
+  return {status:'observed',viewport:{width:innerWidth,height:innerHeight,scroll_x:globalThis.scrollX??null,scroll_y:globalThis.scrollY??null,
+    visual_offset_top:globalThis.visualViewport?.offsetTop??null,visual_offset_left:globalThis.visualViewport?.offsetLeft??null},
+    windows:refs.map(ref=>{
+      const found=roots.filter(e=>state.ids.get(e)===ref);
+      if(found.length!==1)return {ref,status:'incarnation_changed'};
+      const root=found[0],box=root.getBoundingClientRect(),style=getComputedStyle(root);
+      const component=globalThis.Ext?.getCmp?.(root.id??root.getAttribute('id')),prep=globalThis.__loginomDockPreparationV1;
+      return {ref,status:'observed',tid:short(root.getAttribute('data-tid')),id:short(root.id??root.getAttribute('id')),
+        class_name:short(root.getAttribute('class')),bounding_box:{x:box.x,y:box.y,width:box.width,height:box.height},
+        style:Object.fromEntries(['display','visibility','opacity','position','top','left','width','height','transform','zIndex'].map(k=>[k,short(style[k])])),
+        native_owner:{class_name:short(component?.$className),xtype:short(component?.xtype),exact_dom:component?.el?.dom===root,
+          hidden:typeof component?.hidden==='boolean'?component.hidden:null,
+          prepared_picker:prep?.document===document&&prep.receipts instanceof Map&&[...prep.receipts.values()].some(r=>r.openDialogElement===root&&r.openDialog===component)}};
+    })};
+}
+
 // The model receives opaque observed references, never executable selectors or
 // browser code. All browser-side inspection and gestures below are client-pinned.
 export const uiActionSchema = {
@@ -418,10 +447,20 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     // Native 1000-column definitions share almost all ancestors. Cache each
     // ancestor's checks only within this synchronous observation, without
     // weakening visibility/redaction or retaining values across UI changes.
+    // Same rule as workspace preparation; retain native and DOM incarnations.
+    // An unknown/active picker remains a blocker even above the viewport.
+    const inactivePicker=e=>{
+      if(getTid(e)!=='OpenDialogForm')return false;
+      const prep=globalThis.__loginomDockPreparationV1,component=globalThis.Ext?.getCmp?.(e.id??e.getAttribute('id'));
+      return prep?.document===document && prep.receipts instanceof Map
+        && component?.$className==='bg.filedialog.view.OpenDialogForm' && component.el?.dom===e
+        && [...prep.receipts.values()].some(r=>r.openDialogElement===e&&r.openDialog===component)
+        && component.hidden===true;
+    };
     const visibleAncestors=ancestorCheck(parent=>{
       const style=getComputedStyle(parent);
       return style.display!=='none'&&style.visibility!=='hidden'&&style.visibility!=='collapse'
-        &&style.opacity!=='0'&&!parent.hasAttribute('hidden');
+        &&style.opacity!=='0'&&!parent.hasAttribute('hidden')&&!inactivePicker(parent);
     });
     const visible = memoRead(element => {
       if (!element?.isConnected) return false;
