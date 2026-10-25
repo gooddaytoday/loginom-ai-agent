@@ -36,4 +36,4 @@ Production: `evals/src/prepared-run.ts` и `evals/script/run-campaign.ts`. Пр�
 Checkpoint:
 
 - Локальные шаги1–3 завершены, plan/code review PASS. RED→GREEN и связанные проверки/typecheck прошли; evidence и кандидат сохраняются в `/home/george/.codex/tmp/preparation-accounting/`. Live source пока прежний принятый.
-- Native EvalRunner ещё диагностирует readiness/admission отказ текущего batch; параллельных live операций Codex не назначал.
+- Native EvalRunner завершил штатный repair и диагностику с STOP; EvalOps лично подтвердил сохранность исходных данных, active/parked controller и новый terminal batch. Поддержанного end-to-end пути в прежнем source нет. Готовый clean кандидат/bundle проверен независимым восстановлением полного Git tree; принятие SHA для live ещё требуется. Параллельных live операций Codex не назначал.
