@@ -216,7 +216,7 @@ page = context.pages()[0]
       }),
   })
   const channel={...procedure,observe:options=>processObservation.observe(procedure,options),get lastPreparedStep(){return procedure.lastPreparedStep;},
-    get steps(){return procedure.steps;},perform:options=>performColdNodeAction(procedure,options,{node,operation,record})};
+    get steps(){return procedure.steps;},perform:options=>performColdNodeAction(procedure,options,{node,operation,record,readReceipt})};
   const nativeSource=staticSources?.crossTables.find(c=>c.node_id===node.node_id);
   const nativeConfiguration=nativeSource?.configuration;
   if(nativeConfiguration){

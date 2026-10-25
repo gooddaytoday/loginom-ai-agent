@@ -102,10 +102,12 @@ export async function openColdTableFilter(channel,{state,table},{node,operation,
   &&s.node_outputs.tables?.filter(t=>t.active&&['table_tid','view_guid','port_guid'].every(k=>t[k]===table[k])).length===1;
  const controls=s=>s.ui.elements.filter(e=>e.tid===table.table_tid+';btnDataGridFilter'&&e.allowed_actions.includes('click'));
  if(now()>=deadline||!owned(state)||controls(state).length!==1)throw Error('Owned cold Table Filter required before opening');
- const ref=controls(state)[0].ref;
+ let ref;
  try {
   await channel.perform({condition:'open bound Table filter',initialObservation:state,
-   ready:s=>owned(s)&&controls(s).length===1,resolve:s=>({verb:'click',ref:controls(s)[0].ref}),identity:()=>({table})});
+   ready:s=>owned(s)&&controls(s).length===1,resolve:s=>{
+    ref=controls(s)[0].ref;return {verb:'click',ref};
+   },identity:()=>({table})});
  } catch(error) {
   const r=error.receipt,step=channel.lastPreparedStep;
   if(now()>=deadline||operation.transportUncertain||step?.action?.verb!=='click'||step.action.ref!==ref
@@ -145,8 +147,11 @@ export async function openColdTableFilter(channel,{state,table},{node,operation,
  }
 }
 
-export async function performColdNodeAction(channel,options,{node,operation,record,now=Date.now}) {
- let binding,intent,verb,document,workflow,fresh;
+export async function performColdNodeAction(channel,options,{node,operation,record,readReceipt,now=Date.now}) {
+ let binding,intent,verb,document,workflow,fresh,consoleControl;
+ const button='MF;cntMain;tlbMainToolbar;btnProgress';
+ const owned=s=>s.prepared_node_context?.verified===true&&s.prepared_node_context.surface==='graph'
+  &&['document_id','workflow_id','node_id'].every(k=>s.prepared_node_context[k]===node[k]);
  const identity=s=>{
   const value=coldGraphExecutionIdentity(options.identity(s),node),next=JSON.stringify(value);
   if(binding!==undefined&&(binding!==next||document!==s.dom_epoch?.document||workflow!==JSON.stringify(s.workflow_ref)))
@@ -157,12 +162,59 @@ export async function performColdNodeAction(channel,options,{node,operation,reco
  const resolve=s=>{
   const action=options.resolve(s),next=JSON.stringify(Object.fromEntries(Object.entries(action).filter(([k])=>!['ref','source_ref','target_ref'].includes(k))));
   if(intent!==undefined&&intent!==next)throw Error('Cold execution control intent changed');
+  if(options.condition==='execution control '+button){
+   const controls=s.ui.elements.filter(e=>e.tid===button&&e.allowed_actions.includes('click'));
+   if(!owned(s)||action.verb!=='click'||controls.length!==1||controls[0].ref!==action.ref||!controls[0].signature)
+    throw Error('Owned cold process console control required');
+   consoleControl={ref:action.ref,signature:structuredClone(controls[0].signature)};
+  }
   intent=next;verb=action.verb;return action;
  };
  for(let attempt=0;attempt<2;attempt++) {
   try{return await channel.perform({...options,identity,resolve,...(attempt?{initialObservation:fresh}:{})});}
   catch(error) {
    const r=error.receipt,s=r?.output;
+   // D67b: only this cold console opening may settle a completed late click.
+   // Keep its AMBIGUOUS receipt and the original deadline; never click again.
+   if(consoleControl&&r?.status==='AMBIGUOUS'){
+    const deadline=operation.deadline,step=channel.lastPreparedStep,condition='settle the dispatched cold process console';
+    if(now()>=deadline||operation.transportUncertain||typeof readReceipt!=='function'
+     ||step?.action?.verb!=='click'||step.action.ref!==consoleControl.ref
+     ||r.operation_id!==step.internal_operation_id||r.action_key!=='ui.act'||r.phase!=='observing'
+     ||r.effect_possible!==true||r.cleanup_complete!==true||r.error?.code!=='UI_DEADLINE_EXCEEDED'||!Array.isArray(r.trace)
+     ||r.trace.filter(e=>e.event==='ui_preconditions_verified').length!==1
+     ||r.trace.find(e=>e.event==='ui_preconditions_verified')?.verb!=='click'
+     ||JSON.stringify(r.trace.find(e=>e.event==='ui_preconditions_verified')?.refs)!==JSON.stringify([consoleControl.ref])
+     ||r.trace.filter(e=>e.event==='ui_gesture_applied').length!==1
+     ||r.trace.find(e=>e.event==='ui_gesture_applied')?.verb!=='click')throw error;
+    const inspected=await readReceipt({id:step.internal_operation_id,operation_id:step.internal_operation_id,
+     action_key:'ui.act',signature:step.signature});
+    if(now()>=deadline||operation.transportUncertain||inspected?.state!=='completed'
+     ||JSON.stringify(inspected.receipt)!==JSON.stringify(r))throw error;
+    const ready=s=>{
+     const root=s.observation_root?.identity?.anchor_tid;
+     return owned(s)&&s.dom_epoch?.document===document&&JSON.stringify(s.workflow_ref)===workflow
+      &&s.node_process_controls_read===true&&s.wizard?.status==='absent'&&s.ui.dialogs.length===0&&s.ui.masks.length===0
+      &&['ConsoleForm','MF;ConsoleForm'].includes(root)
+      &&['treepanel;tree','grd;tbl'].every(suffix=>s.ui.elements.filter(e=>
+       e.tid===root+';ProgressForm;trpProgress;'+suffix).length===1);
+    };
+    for(;;){
+     if(now()>=deadline||operation.transportUncertain)throw error;
+     try{
+      const settled=await channel.observe({condition,readProcesses:false,readProcessControls:true,
+       timeoutMs:Math.min(15000,deadline-now()),ready});
+      if(now()>=deadline||operation.transportUncertain||!ready(settled))throw error;
+      break;
+     }catch(pending){
+      if(pending.name!=='NodeReadinessTimeout'||pending.condition!==condition)throw pending;
+     }
+    }
+    await record({phase:'cold_process_console_settled',operation_id:operation.id,
+     opening_operation_id:r.operation_id,node,control:consoleControl,effect_possible:true,deadline});
+    if(now()>=deadline||operation.transportUncertain)throw error;
+    return;
+   }
    if(attempt||now()>=operation.deadline||operation.transportUncertain||r?.status!=='NOT_APPLIED'
     ||r.action_key!=='ui.act'||r.phase!=='preconditions'||r.error?.code!=='GRAPH_EXECUTION_CONTEXT_CHANGED'
     ||r.effect_possible!==false||r.cleanup_complete!==true||!Array.isArray(r.trace)

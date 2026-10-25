@@ -10,7 +10,7 @@ import * as cold from '../../../../scripts/node-acceptance/cold-reader-policy.mj
 
 // D67: real serialized dispatch and browser receipt, with the 27-second
 // response delay from p13-final1/cold :195-196. Only native reads are fixtures.
-for(const fault of ['none','busy_window','foreign_node','foreign_port','foreign_view','unknown_owner','foreign_dialog',
+for(const fault of ['refresh_before_click','none','busy_window','foreign_node','foreign_port','foreign_view','unknown_owner','foreign_dialog',
  'foreign_mask','no_dialog','unknown_setting','unknown_transport','lost_reply','pending_receipt','wrong_signature',
  'changed_receipt','no_gesture_proof','duplicate_gesture','late_inspect','late_observation','late_record','expired'])
 test('cold Filter settles only its single completed late click: '+fault,async()=>{
@@ -27,7 +27,15 @@ test('cold Filter settles only its single completed late click: '+fault,async()=
  const operation={id:'cold-filter',deadline:540000,action:{action_key:'acceptance.cold_read',revision:'1'}},records=[];
  const originalClick=page.mouse.click;
  page.mouse.click=async(...args)=>{await originalClick(...args);time=27002;opened=true;};
+ let refreshed=false;
  const execute=async code=>{
+  if(fault==='refresh_before_click'&&!refreshed&&code.includes('"mode":"act"')){
+   refreshed=true;
+   const old=page.document.all().find(e=>e.getAttribute('data-tid')===table.table_tid+';btnDataGridFilter');
+   const parent=old.parentElement,box=old.box;old.remove();
+   page.add('button',table.table_tid+';btnDataGridFilter','Фильтр',box,parent);
+   page.mutationObserver.pending.push({type:'attributes',target:page.tab,attributeName:'title'});
+  }
   const result=await runInContext('('+code.replaceAll(readPreparedNodeContext.toString(),'readOwnedContext')+')',page.context)(page);
   if(result.action_key==='ui.act'){
    if(fault==='unknown_transport')operation.transportUncertain=true;
@@ -93,15 +101,19 @@ test('cold Filter settles only its single completed late click: '+fault,async()=
    return inspected;
   }})});
  if(fault==='expired')time=operation.deadline;
- if(['none','busy_window'].includes(fault)){
+ if(['refresh_before_click','none','busy_window'].includes(fault)){
   const result=await run();assert.equal(result.filter_enabled,false);assert.equal(applied,true);
   assert.equal(records.filter(e=>e.phase==='cold_table_filter_settled').length,1);
   assert.equal(inspections,1);assert.equal(reads,fault==='busy_window'?2:1);
+  if(fault==='refresh_before_click'){
+   assert.equal(records.filter(e=>e.phase==='node_step_refresh_authorized').length,1);
+   assert.notEqual(procedure.lastPreparedStep.action.ref,initial.ui.elements.find(e=>e.tid.endsWith(';btnDataGridFilter')).ref);
+  }
  }else{await assert.rejects(run());assert.equal(applied,false);}
  assert.equal(page.clickedPoints.length,fault==='expired'?0:1);
  assert.equal(operation.deadline,540000);
  if(opened&&fault!=='lost_reply'){
-  const r=records.find(e=>e.phase==='node_step_completed').outcome;
+  const r=records.filter(e=>e.phase==='node_step_completed').at(-1).outcome;
   assert.equal(r.status,'AMBIGUOUS');assert.equal(r.effect_possible,true);
   assert.equal(r.error.code,'UI_DEADLINE_EXCEEDED');
  }
