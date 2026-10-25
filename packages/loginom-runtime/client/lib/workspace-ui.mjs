@@ -1964,7 +1964,7 @@ function readRenderedInputMapping(observation) {
         const input=inputs[0],value=String(input.value??''),limit=name==='destination'?512:256;
         if(value.length<=limit&&enabled(input)) {
           if(name!=='destination')wizardCombos.set(ownerTid,{name,owner_ref:refOf(owners[0]),input_ref:refOf(input),root_ref:wizard.root_ref,value});
-          if(name==='destination'&&!input.readOnly&&!/[\0\r\n]/.test(value))wizardFields.set(input,{name,scope:'export_format',max_length_utf16:512,stage:wizard.stage,root_ref:wizard.root_ref,owner_ref:refOf(owners[0])});
+          if(['destination','time_format'].includes(name)&&!input.readOnly&&!/[\0\r\n]/.test(value))wizardFields.set(input,{name,scope:'export_format',max_length_utf16:limit,stage:wizard.stage,root_ref:wizard.root_ref,owner_ref:refOf(owners[0])});
         }
         return [name,{status:'observed',value:value.slice(0,limit),value_length_utf16:value.length,truncated:value.length>limit,
           enabled:enabled(input),read_only:input.readOnly===true,source_tid:ownerTid,input_ref:refOf(input),owner_ref:refOf(owners[0]),value_kind:'displayed_input_text'}];
