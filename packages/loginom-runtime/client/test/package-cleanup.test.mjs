@@ -695,3 +695,26 @@ test('D78 OK receipt is retained and an ACK loss cannot repeat the gesture',asyn
  const second=await f.runFailed();assert.equal(second.status,'BLOCKED');assert.equal(f.state.dismissals,1);
  assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
 });
+
+for(const keepMask of [false,true])test('D78 own error disappearing before OK continues normal cleanup, mask='+keepMask,async()=>{
+ const f=failedOpenFixture(),evaluate=f.page.evaluate;let disappeared=false,okCallback=false;
+ const m=f.context.bg.app.Application.FInstance.FMainForm.FMapTree,close=m.ClosePackage;
+ m.ClosePackage=(...args)=>{assert.equal(okCallback,false,'OK callback must never start native Close');return close(...args);};
+ f.page.evaluate=async(fn,arg)=>{
+  okCallback=arg?.dismissOpenError===true;
+  const value=await evaluate(fn,arg);
+  if(okCallback)assert.notEqual(value?.started,true,'OK callback only dismisses its own error');
+  okCallback=false;
+  if(value?.reason==='OWNED_OPEN_ERROR'&&!disappeared){
+   disappeared=true;f.state.openError=false;f.state.mask=keepMask;
+  }
+  return value;
+ };
+ const result=await f.runFailed();
+ assert.equal(disappeared,true);assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(result.package_closed,true);assert.equal(result.logged_out,true);assert.equal(result.unsaved_changes_discarded,false);
+ assert.equal(f.state.dismissals,0);assert.equal(f.events.includes('error-ok'),false);
+ assert.equal(f.events.filter(x=>x==='close').length,1);assert.equal(f.events.filter(x=>x==='logout').length,1);
+ if(keepMask)assert.ok(f.events.indexOf('idle-wait')<f.events.indexOf('close'));
+ assert.ok(f.events.indexOf('close')<f.events.indexOf('logout'));assert.ok(f.state.clock<f.state.deadline);
+});

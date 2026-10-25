@@ -189,7 +189,7 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       });
       const tabBound = () => prepared?.packageNode === node && prepared.tab?.getAttribute('data-tid') === o.tabTid && document.contains(prepared.tab);
       if (!tabBound()) return {reason:'TAB_IDENTITY_CHANGED'};
-      if(o.failedOpenOperation&&([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)
+      if(o.failedOpenOperation&&(dismissOpenError||[...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)
         ||state.open_error_dismiss_started)) {
         if(prep.receipts.get(o.failedOpenOperation)!==prepared||prepared.failedOpenCleanup!==true
           ||prepared.phase!=='effect_possible'||prepared.openSubmitted!==true||prepared.packageInventoryBefore!==0
@@ -256,6 +256,9 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
         }
         if(state.open_error_dismiss_started&&(visible(error?.root)||visible(error?.element)))return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
         if(blockers.some(loading))return {reason:'OWNED_OPEN_LOADING'};
+        // This callback is only for OK. If its owned error vanished in transit,
+        // leave Close to the ordinary path and its fresh native guards.
+        if(dismissOpenError)return {reason:'OWNED_OPEN_ERROR_ABSENT'};
       }
       const openOwnerBound=()=>{
         if(prepared?.failedOpenCleanup!==true)return true;
@@ -303,13 +306,17 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
     if(before.reason==='OWNED_OPEN_ERROR') {
       if(!guardedDismiss)return finish('BLOCKED','FAILED_OPEN_ERROR_UNCONFIRMED');
       const ready=await guardedDismiss(()=>beginClose(true));
-      if(!ready.dismiss||Date.now()>=deadline)return finish('BLOCKED',ready.reason??'CLEANUP_DEADLINE_EXCEEDED');
-      receipt.stage='failed_open_error_dismiss';
-      if(ready.gesture_returned!==true)return finish('BLOCKED','FAILED_OPEN_ERROR_UNCONFIRMED');
-      receipt.open_error_cleanup={tid:ready.dismiss.tid,gesture_attempted:true,gesture_returned:true};
+      if(Date.now()>=deadline)return finish('BLOCKED','CLEANUP_DEADLINE_EXCEEDED');
+      if(ready.dismiss) {
+        receipt.stage='failed_open_error_dismiss';
+        if(ready.gesture_returned!==true)return finish('BLOCKED','FAILED_OPEN_ERROR_UNCONFIRMED');
+        receipt.open_error_cleanup={tid:ready.dismiss.tid,gesture_attempted:true,gesture_returned:true};
+      } else if(!['OWNED_OPEN_LOADING','OWNED_OPEN_ERROR_ABSENT'].includes(ready.reason)) {
+        return finish('BLOCKED',ready.reason??'FAILED_OPEN_ERROR_UNCONFIRMED');
+      }
       // A lost/late acknowledgement is never permission to click OK again.
       if(Date.now()>=deadline)return finish('BLOCKED','CLEANUP_DEADLINE_EXCEEDED');
-      before=await beginClose();
+      before=ready.reason==='OWNED_OPEN_LOADING'?ready:await beginClose();
     }
     const idleDeadline = Math.min(deadline, Date.now()+timeoutMs);
     // Cold owns an isolated diagnostic session. Wait only for a blocked gate;
