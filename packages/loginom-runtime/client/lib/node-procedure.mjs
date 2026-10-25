@@ -239,7 +239,16 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             do{checkBudget();expected=await read('inspect');if(!expected.selected)await wait(100);}while(!expected.selected);
           }
         }
-      }finally{if(!operation.transportUncertain)await read('dispose');}
+      }finally{if(!operation.transportUncertain){
+        const disposed=await read('dispose');
+        if(operation.groupingPreview?.managed===true&&disposed?.disposed===true){
+          const saved=await entry('node_preview_lease_disposed',{lease_operation_id:task.operation_id,
+            owner:task.owner,port_guid:port.port_guid,disposed:true});
+          if(saved?.lease_operation_id!==task.operation_id||saved.port_guid!==port.port_guid||saved.disposed!==true
+            ||JSON.stringify(saved.owner)!==JSON.stringify(task.owner))throw Error('Preview disposal was not durably acknowledged');
+          operation.groupingPreview.lease_disposed=true;
+        }
+      }}
       return {verified:true,port_guid:port.port_guid,execution_started:false};
     },
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
