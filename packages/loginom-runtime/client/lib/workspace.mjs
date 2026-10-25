@@ -21,8 +21,14 @@ async function prepareWorkspace(page, options) {
   const result = (status, reason, extra = {}) => ({ status, reason, phase, target,
     authenticated, created_draft: createdDraft, effect_possible: effectPossible,
     operation_id: options.operationId, session_id: options.sessionId, trace, ...extra });
-  // Only cached, read-only Loginom getters; never execute package or server methods.
-  const inspect = async mode => page.evaluate(({ mode, options }) => {
+  const missingPackage = proof => result('NOT_READY','PACKAGE_OPEN_REJECTED',{
+    ...proof, authenticated:true, effect_possible:false, package_absence_verified:true, package_path:options.packagePath,
+    message:'The saved package does not exist. For a new task call dock_prepare with intent new_draft, a NEW operation_id and no package_path. Keep this same package path/name as the final Save destination. Do not stop the task or retry Open for this future Save path.',
+    next_step:{tool:'dock_prepare',intent:'new_draft',new_operation_id_required:true,omit_package_path:true,save_path:options.packagePath},
+  });
+  // Cached Loginom getters, plus a read-only existence check before Open.
+  // Never execute or mutate a package through native methods here.
+  const inspect = async mode => page.evaluate(async ({ mode, options, deadline }) => {
     const key = '__loginomDockPreparationV1';
     let state = globalThis[key];
     if (!state || state.document !== document) state = globalThis[key] = {
@@ -74,9 +80,38 @@ async function prepareWorkspace(page, options) {
       state.receipts.set(options.operationId,{request,before:tabs,preserved,phase:'reserved'});
     }
     const current = state.receipts.get(options.operationId);
+    const map=app?.Application?.FInstance?.FMainForm?.FMapTree, connection=map?.FServerConnection;
+    const absenceStillBound = proof => {
+      const currentTabs=[...document.querySelectorAll('[data-tid^="MF;cntMain;cntWorkspace;Workspace;t.br;tb"]')]
+        .filter(e=>/^MF;cntMain;cntWorkspace;Workspace;t\.br;tb(?:-\d+)?$/.test(e.getAttribute('data-tid')));
+      return proof && state.document===document && globalThis.bg?.app===app
+        && app.Application.FInstance.FMainForm.FMapTree===map && map?.PackageNodes?.Count===0
+        && map.FServerConnection===proof.connection && connection?.Connected===true && connection.Session===proof.session
+        && typeof proof.account==='string' && proof.account.length>0 && connection.UserName===proof.account
+        && currentTabs.length===proof.tabs.length && currentTabs.every((t,i)=>t===proof.tabs[i])
+        && currentTabs.filter(t=>t.classList.contains('x-tab-active'))[0]===proof.tab
+        && [...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg,.x-form-invalid-under')].every(e=>!visible(e))
+        && home?.length===1 && exact(prefix+';HomePage;btnCreateUnsavedPackage')[0]===home[0] && visible(home[0]) && Date.now()<deadline;
+    };
+    if (mode==='check_missing_package') {
+      // A read-only server existence check is limited to an empty, authenticated
+      // home workspace. Never infer absence from a filtered/virtualized file list.
+      const proof={connection,session:connection?.Session,account:connection?.UserName,tab,tabs:[...tabs]};
+      if (absenceStillBound(proof) && typeof proof.session?.get_FileStorage==='function') {
+        const storage=await proof.session.get_FileStorage();
+        if (!absenceStillBound(proof)) return {error:'WORKSPACE_CHANGED'};
+        if (typeof storage?.FileExists==='function') {
+          const exists=await storage.FileExists(options.packagePath);
+          if (!absenceStillBound(proof)) return {error:'WORKSPACE_CHANGED'};
+          if (exists===false) {current.missing=proof;current.phase='missing_package';return {missing:true,document_id:state.id,loginom_account:proof.account};}
+        }
+      }
+    }
     if (mode==='effect') current.phase='effect_possible';
     if (mode==='lookup') {
       if (!receipt) return {exists:false,document_id:state.id};
+      if (receipt.phase==='missing_package') return absenceStillBound(receipt.missing)
+        ? {missing:true,document_id:state.id,loginom_account:receipt.missing.account} : {error:'WORKSPACE_CHANGED'};
       if (receipt.tab) {
         if (!tabs.includes(receipt.tab)) return {error:'WORKFLOW_LOST'};
         return {exists:true,tab_tid:receipt.tab.getAttribute('data-tid'),phase:receipt.phase};
@@ -113,7 +148,7 @@ async function prepareWorkspace(page, options) {
           available_width:screen.availWidth,available_height:screen.availHeight}};
     }
     return {document_id:state.id,requested_tab_present:!!knownWorkflow && tabs.includes(knownWorkflow.tab) && knownWorkflow.tab.getAttribute('data-tid')===options.workflowRef?.tab_tid,blocked:blockers.length>0,hard_blocked:hardBlocked,unsaved,ready,home_ready:home?.length===1 && visible(home[0]),package_path:path,tab_tid:tabTid};
-  }, {mode, options});
+  }, {mode, options, deadline});
   try {
     const current = page.url() === 'about:blank' ? null : await page.evaluate(() => ({origin:location.origin,pathname:location.pathname}));
     if (page.url() !== 'about:blank' && (current.origin !== options.origin || current.pathname !== options.pathname)) {
@@ -140,6 +175,7 @@ async function prepareWorkspace(page, options) {
     authenticated=true;
     const old=await inspect('lookup');
     if (old.error) return result('NOT_READY',old.error,{authenticated:true});
+    if (old.missing) return missingPackage(old);
     if (old.exists) {
       if (old.tab_tid) await tid(old.tab_tid).click({timeout:remaining()});
       else if (old.phase==='reserved') return result('NOT_READY','PREVIOUS_ATTEMPT_NOT_COMPLETED',{authenticated:true});
@@ -152,6 +188,12 @@ async function prepareWorkspace(page, options) {
       if(options.intent==='existing_workflow' && (before.document_id!==options.workflowRef.document_id || !before.requested_tab_present)) return result('NOT_READY','WORKFLOW_LOST',{authenticated:true});
       const reserved=await inspect('reserve');
       if (reserved.error) return result('NOT_READY',reserved.error,{authenticated:true});
+      if (options.intent==='open_package' && before.home_ready) {
+        const checked=await inspect('check_missing_package');
+        remaining();
+        if (checked.error) return result('NOT_READY',checked.error);
+        if (checked.missing) return missingPackage(checked);
+      }
       if (options.intent==='existing_workflow') {
         await inspect('effect');effectPossible=true;
         await tid(options.workflowRef.tab_tid).click({timeout:remaining()});
@@ -172,7 +214,8 @@ async function prepareWorkspace(page, options) {
       }
     }
     const verified=await wait('exact_workflow_ready',()=>inspect('verify'));
-    if (verified.error) return result('NOT_READY',verified.error,{authenticated:true});
+    if (verified.error) return result('NOT_READY',verified.error,{authenticated:true,
+      ...(verified.error==='PACKAGE_OPEN_REJECTED' ? {message:'Opening the existing saved package was rejected. A future Save path for a NEW task requires intent new_draft with no package_path; retain that name for Save. This opening has an unverified effect: reconcile the SAME operation_id before starting a different preparation.'} : {})});
     createdDraft=options.intent==='new_draft';
     return result('READY',null,{authenticated:true,...verified,replayed:old.exists===true});
   } catch (error) {
@@ -251,8 +294,12 @@ export async function prepareWorkspaceSession({ metadata, assertAllowed, prepare
   if (previous && previous.identity !== identity) {
     // An observed missing workflow did not create/open anything. A new explicit
     // request can replace that terminal refusal; uncertain attempts keep their ID.
+    const missingWithoutEffect = previous.state?.reason === 'PACKAGE_OPEN_REJECTED'
+      && previous.state.package_absence_verified === true
+      && JSON.parse(previous.identity).intent === 'open_package'
+      && previous.state.package_path === JSON.parse(previous.identity).package_path;
     const lostWithoutEffect = previous.effect_possible === false
-      && previous.state?.status === 'NOT_READY' && previous.state.reason === 'WORKFLOW_LOST'
+      && previous.state?.status === 'NOT_READY' && (previous.state.reason === 'WORKFLOW_LOST' || missingWithoutEffect)
       && previous.state.effect_possible === false && previous.state.created_draft === false
       && previous.state.authenticated === true;
     if (previous.operation_id === request?.operation_id
