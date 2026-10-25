@@ -72,3 +72,13 @@ test('storage inventory refuses a count that changes while its records are read'
   assert.equal(result.status,'SUCCEEDED');
   assert.ok(result.output.ui.elements.filter(e=>e.storage_entry).every(e=>e.storage_entry.kind==='unknown'&&e.storage_entry.bytes===undefined));
 });
+
+test('storage inventory rechecks count after obtaining each native row record',async()=>{
+  const f=storageFixture(),getRecord=f.view.getRecord;
+  f.view.getRecord=row=>{f.changeCount();return getRecord(row);};
+  const result=await f.page.execute({mode:'observe'});
+  assert.equal(result.status,'SUCCEEDED');
+  const files=result.output.ui.elements.filter(e=>e.storage_entry);
+  assert.equal(files.length,58);
+  assert.ok(files.every(e=>e.storage_entry.kind==='unknown'&&e.storage_entry.bytes===undefined));
+});

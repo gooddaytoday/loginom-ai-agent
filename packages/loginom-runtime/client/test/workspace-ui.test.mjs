@@ -6123,7 +6123,9 @@ test('file row gestures recheck the visible point when the center is covered',as
 async function cancelProcessFixture() {
   const {readFileSync}=await import('node:fs');
   const source=JSON.parse(readFileSync(new URL('./fixtures/process-console-run15.json',import.meta.url),'utf8'));
-    const page=new Page();page.context.innerWidth=1440;page.context.innerHeight=1000;
+    // This large synthetic console verifies ownership, not host scheduling.
+    // Scan time limits have separate tests with explicit clock advancement.
+    const page=new Page({clock:fixtureClock().Date});page.context.innerWidth=1440;page.context.innerHeight=1000;
     const panel=page.add('div','ConsoleForm','',{x:48,y:397,width:1392,height:603});
     const grids=[];
     for(const g of source.grids) {

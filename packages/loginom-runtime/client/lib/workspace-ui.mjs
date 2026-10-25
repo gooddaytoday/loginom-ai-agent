@@ -3046,7 +3046,7 @@ function readRenderedInputMapping(observation) {
         const inventory=grid&&storageInventory(grid,gridTid),view=inventory?.view;
         if(inventory&&inventory.store.isLoading?.()===false&&inventory.store.getCount()===inventory.count&&view.el.dom.contains(storageRow)) {
           const record=view.getRecord?.(storageRow),data=record?.data;
-          if(record?.isModel===true&&inventory.records.has(record)
+          if(record?.isModel===true&&inventory.store.getCount()===inventory.count&&inventory.records.has(record)
             &&view.getNode?.(record)===storageRow&&data?.Type===0
             &&data.FileName===textOf(element,true)&&typeof data.FilePath==='string'
             &&data.id===data.FilePath&&data.FilePath.startsWith('/')
