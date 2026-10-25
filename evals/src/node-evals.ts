@@ -28,15 +28,18 @@ export async function assessNodeAttempt(input: { runDir: string; taskId: string;
     if (result.task_id !== input.taskId || result.attempt !== 1) throw Error("attempt identity differs")
     if (!["completed", "failed", "timeout", "no_artifact"].includes(result.status) || result.harness_error || result.failure_kind === "provider" ||
       result.judge_status !== "skipped" || result.pass !== null || result.score !== null) throw Error(`technical node result: ${result.status}`)
-    if (result.cleanup_error || result.environment_cleanup?.status !== "confirmed") throw Error("cleanup unconfirmed")
+    if (result.cleanup_error) throw Error("cleanup unconfirmed")
     const cleanup = await Bun.file(path.join(directory, "cleanup.json")).json()
     if (cleanup.processes?.observation_mode === "unit_after_exit") throw Error("unit_after_exit cleanup evidence cannot confirm node attempt")
     if (input.slot) {
-      if (result.slot_id !== input.slot.id || cleanup.slotId !== input.slot.id || typeof cleanup.archive !== "string" ||
+      if (result.slot_id !== input.slot.id) throw Error("cleanup evidence unconfirmed")
+      if (result.environment_cleanup?.status === "failed") {
+        if (cleanup.processes?.status !== "failed") throw Error("cleanup evidence unconfirmed")
+      } else if (result.environment_cleanup?.status !== "confirmed" || cleanup.slotId !== input.slot.id || typeof cleanup.archive !== "string" ||
         !/^[a-f0-9]{64}$/.test(cleanup.serverEpoch ?? "") || cleanup.processes?.error !== null || cleanup.processes?.observation_mode !== "continuous")
         throw Error("cleanup evidence unconfirmed")
       await confirmedProfileArchive(directory, input.slot.profileDir, input.slot.historyDir)
-    } else if (cleanup.result?.status !== "confirmed" || cleanup.result?.error || cleanup.processes?.status !== "confirmed" ||
+    } else if (result.environment_cleanup?.status !== "confirmed" || cleanup.result?.status !== "confirmed" || cleanup.result?.error || cleanup.processes?.status !== "confirmed" ||
       !["processes", "diagnostics", "writer", "ready"].every(stage => cleanup.stages?.some((item: { stage: string; status: string }) => item.stage === stage && item.status === "confirmed")) ||
       !cleanup.stages?.some((item: { stage: string; status: string }) => ["pruning", "profile_history"].includes(item.stage) && item.status === "confirmed"))
       throw Error("cleanup evidence unconfirmed")
