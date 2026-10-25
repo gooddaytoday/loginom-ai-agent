@@ -41,15 +41,23 @@ function fixture() {
       const we={...element(binding.workflow_ref.navigation_path[0].tid+'>Import-3>Настройка'),id:'pending-wizard',textContent:'Настройка'};
       crumbs.push(ne,we);activeElements.push(ne,we);
       const nc={el:{dom:ne},_node:{data:{node:nt}}},wc={el:{dom:we},_node:{data:{node:wt}}};
-      context.Ext={getCmp:id=>id===ne.id?nc:id===we.id?wc:null};return {nt,wt,nc,wc};},enterInputBreadcrumbs:()=>{
-      const port=enterPortWizard(true),native=[nodeTree,port.group,port.portTree,port.w],components=[];
-      let tid=binding.workflow_ref.navigation_path[0].tid;
+      context.Ext={getCmp:id=>id===ne.id?nc:id===we.id?wc:null};return {nt,wt,nc,wc};},enterInputBreadcrumbs:(full=false)=>{
+      const port=enterPortWizard(true),native=[nodeTree,port.group,port.portTree,port.w],components=[],ancestors=[];
+      if(full){
+        const module={ParentNode:packageNode};workflowNode.ParentNode=module;
+        let prefix='MF;TF-1;cnrNaviMode;b.s_';
+        crumbs=['Server','Packages','Package','Module','Scenario'].map((label,i)=>{prefix+=(i?'>':'')+label;return {...element(prefix),id:'ancestor-'+i,textContent:label};});
+        binding.workflow_ref.navigation_path=crumbs.map(e=>({tid:e.getAttribute(),label:e.textContent}));
+        for(const [i,node]of [packageNode,module,workflowNode].entries())ancestors.push({el:{dom:crumbs[i+2]},_node:{data:{node}}});
+        activeElements.push(...crumbs);
+      }
+      let tid=binding.workflow_ref.navigation_path.at(-1).tid;
       for(const [i,label]of ['Import','Входные порты','Входной источник данных','Настройка'].entries()){
         tid+='>'+label.replaceAll(' ','_');const e={...element(tid),id:'input-crumb-'+i,textContent:label};
         crumbs.push(e);activeElements.push(e);components.push({el:{dom:e},_node:{data:{node:native[i]}}});
       }
-      context.Ext={getCmp:id=>components[Number(id.slice('input-crumb-'.length))]};
-      return {...port,components};
+      context.Ext={getCmp:id=>id.startsWith('ancestor-')?ancestors[Number(id.slice(9))-2]:components[Number(id.slice('input-crumb-'.length))]};
+      return {...port,components,ancestors};
     },enterOverview:()=>{controller.Node.data.node=nodeTree;crumbs.push({...element(binding.workflow_ref.navigation_path[0].tid+'>Import-3'),textContent:'Import'});},enterViews,record,preparation,workflowNode,nodeTree,enterWizard,enterPortWizard,tab,graph,
     cloneNode:inside=>{const clone=element(dom.getAttribute());activeElements.push(clone);if(inside)root.contains=e=>e===dom||e===clone;},changeCrumb:()=>crumbs[0].textContent='Other',duplicateTab:()=>activeElements.push(tab)};
 }
@@ -146,5 +154,23 @@ test('D52 input breadcrumb binding requires the exact native node, port and open
   if(fault==='component_dom')p.components[0].el.dom={};
   const r=await readPreparedNodeContext(f.page,f.binding);
   assert.equal(!!r.navigation_node,fault==='valid',fault);
+ }
+});
+
+
+test('D52b workflow context requires all native ancestors of the same input0 opening',async()=>{
+ for(const fault of ['valid','package','module','workflow','module_parent','component_dom','node','port','opening','path','duplicate']){
+  const f=fixture(),p=f.enterInputBreadcrumbs(true);
+  if(['package','module','workflow'].includes(fault))p.ancestors[['package','module','workflow'].indexOf(fault)]._node.data.node={};
+  if(fault==='module_parent')f.workflowNode.ParentNode.ParentNode={};
+  if(fault==='component_dom')p.ancestors[1].el.dom={};
+  if(fault==='node')p.components[0]._node.data.node={};
+  if(fault==='port')p.opening.portGuid='other';
+  if(fault==='opening')p.opening.phase='open_issued';
+  if(fault==='path')f.changeCrumb();
+  if(fault==='duplicate')f.preparation.inputPortOpenReceipts.set('duplicate',{...p.opening});
+  const r=await readPreparedNodeContext(f.page,f.binding);
+  assert.equal(!!r.navigation_workflow,fault==='valid',fault);
+  if(fault==='valid')assert.equal(r.navigation_workflow.tid,f.binding.workflow_ref.navigation_path.at(-1).tid);
  }
 });

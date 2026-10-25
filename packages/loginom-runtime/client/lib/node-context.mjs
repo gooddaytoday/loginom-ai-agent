@@ -43,7 +43,7 @@ export async function readPreparedNodeContext(page, binding) {
     }
     if(b.workflow_ref.navigation_path.some((c,i)=>c.tid!==crumbs[i].tid || c.label!==crumbs[i].label))return reject('navigation');
     const model=card?.Controller?.FController;
-    let surface, tid, locked, outputPort, graphRoot, pendingWizardNode, inputNavigationNode;
+    let surface, tid, locked, outputPort, graphRoot, pendingWizardNode, inputNavigationNode, inputNavigationWorkflow;
     if(app.ModelForm && model instanceof app.ModelForm) {
       const d=model.FDiagram, nodes=d?.FNodes?.FCollection, roots=exact(b.workflow_ref.prefix+';ModelForm;cmpDiagram');
       if(roots.length===0)return pending();
@@ -94,7 +94,17 @@ export async function readPreparedNodeContext(page, binding) {
           if(path.every((crumb,i)=>{
             const es=exact(crumb.tid),c=es.length===1&&globalThis.Ext?.getCmp(es[0].id);
             return c?.el?.dom===es[0]&&c?._node?.data?.node===ancestry[i];
-          }))inputNavigationNode=path[0];
+          })) {
+            inputNavigationNode=path[0];
+            // Deep toolbar overflow can hide the workflow too. Its context is
+            // usable only through this same opening's complete native ancestry.
+            const module=workflowNode.ParentNode,ancestors=[packageNode,module,workflowNode];
+            if(b.workflow_ref.navigation_path.length===5&&module?.ParentNode===packageNode
+              &&crumbs.slice(2,5).every((crumb,i)=>{
+                const es=exact(crumb.tid),c=es.length===1&&globalThis.Ext?.getCmp(es[0].id);
+                return c?.el?.dom===es[0]&&c?._node?.data?.node===ancestors[i];
+              }))inputNavigationWorkflow=crumbs[4];
+          }
         }
 
       }
@@ -114,6 +124,7 @@ export async function readPreparedNodeContext(page, binding) {
     return {verified:true,document_id:b.document_id,workflow_id:b.workflow_ref.workflow_id,node_id:b.node.node_id,surface,tid,
       ...(outputPort?{[outputPort.direction==='input'?'input_port':'output_port']:outputPort}:{}),
       ...(inputNavigationNode?{navigation_node:inputNavigationNode}:{}),
+      ...(inputNavigationWorkflow?{navigation_workflow:inputNavigationWorkflow}:{}),
       ...(surface==='graph'?{locked,...(nodeTree&&crumbs.length===b.workflow_ref.navigation_path.length+1?{navigation_node:crumbs.at(-1)}:{}),
         ...(pendingWizardNode?{pending_wizard_node:pendingWizardNode}:{})}:{} )};
   },binding);

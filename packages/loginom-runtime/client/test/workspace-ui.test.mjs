@@ -4337,10 +4337,11 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
   if(mode==='d52_other_index')binding.input_port.native_index=1;
   let reads=0;
   if(mode!=='unbound')page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
-    {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},async()=>{
+    {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:page.d52bWorkflow?page.document.querySelectorAll('[data-tid^=\"MF;TF-5;cnrNaviMode;b.s_\"]').slice(0,5).map(e=>({tid:e.attrs['data-tid'],label:e.textContent.trim()})):[]}},...options},async()=>{
       const next=structuredClone(binding);reads++;
       if(mode==='unverified_owner')return {verified:false,reason:'node'};
       if(mode==='missing_native_port')delete next.input_port;
+      if(page.d52bWorkflow&&mode!=='d52_no_workflow')next.navigation_workflow={...page.d52bWorkflow,...(mode==='d52_foreign_workflow'?{tid:'foreign'}:{})};
       if(reads>1&&mode.startsWith('changed_')) {
         const key=mode.slice(8);
         if(key in next.input_port)next.input_port[key]=key==='native_index'?1-port:'foreign';
@@ -6826,3 +6827,45 @@ for(const [card,family] of [['LAB-66','DerivedDataSourceOutputSocketWizard'],['L
    assert.equal(result.output.wizard.output_columns.page.status,['observed','half_pixel','one_pixel'].includes(fault)?'complete_definition_page':'unverified_definition_page',fault);
   }
  });
+
+test('D52b hidden workflow needs complete native opening ancestry',async()=>{
+ for(const vendor of ['group','clustering','linregression'])for(const mode of ['d52_valid','d52_no_workflow','d52_foreign_workflow','d52_missing_chain','d52_unknown_mode','d52_both_modes','d52_no_opening','d52_other_port','d52_other_index','d52_foreign_path','d52_workflow_hidden','d52_workflow_opacity','d52_workflow_icon']) {
+  const {page}=await joinInputPortOverflowFixture(mode,0,vendor);
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  crumbs[6].style.display='none';crumbs[6].box={x:0,y:0,width:0,height:0};
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  if(mode==='wrong_folder')crumbs[6].ownText='Выходные порты';
+  if(mode==='wrong_folder_icon')crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0];
+  const c=mappingCoverageFixture(page,4);page.context.innerWidth=1280;
+  for(const child of [...c.form.children]) {
+   if(child.attrs['data-tid']?.endsWith(';btnAddMappingColumn')){child.remove();continue;}
+   for(const e of [child,...child.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid']
+    .replace('MF;TF-1;','MF;TF-5;').replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard')
+    .replace('colDefaultUsageType_','colUsageType_');
+   wizard.append(child);
+  }
+  c.form.remove();page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1208,y:380,width:64,height:64},wizard);
+  crumbs[5].style.display='none';crumbs[5].box={x:0,y:0,width:0,height:0};
+  if(mode==='d52_unknown_mode')c.tableMode.attrs.class='';
+  if(mode==='d52_both_modes')c.linksMode.attrs.class='x-form-cb-checked';
+  if(mode==='d52_missing_chain')crumbs[6].remove();
+  crumbs[4].style.display='none';crumbs[4].box={x:0,y:0,width:0,height:0};
+  if(mode==='d52_workflow_hidden')crumbs[4].attrs.hidden='';
+  if(mode==='d52_workflow_opacity')crumbs[4].style.opacity='0';
+  if(mode==='d52_workflow_icon')crumbs[4].children[0].attrs.class='maptree-icon-other';
+  page.d52bWorkflow={tid:crumbs[4].attrs['data-tid'],label:crumbs[4].textContent.trim()};
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  assert.equal(r.output.ui?.elements?.some(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone'&&e.allowed_actions.includes('finish_wizard'))===true,mode==='d52_valid',mode);
+  if(r.status!=='SUCCEEDED')continue;
+  assert.equal(r.output.wizard.input_port_context.status==='observed',mode==='d52_valid',mode);
+  const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+  page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+  page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+  page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+  page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+  const close=await page.execute({mode:'observe'});
+  assert.equal(close.output.ui?.elements?.some(e=>e.allowed_actions.includes('confirm_wizard_close'))===true,mode==='d52_valid',mode);
+  assert.deepEqual(page.events,[]);
+ }
+});
