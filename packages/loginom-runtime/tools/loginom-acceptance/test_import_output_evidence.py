@@ -416,7 +416,8 @@ class PortOutputEvidenceTests(unittest.TestCase):
         def state(rows,elements):
             return dict(dom_epoch=dict(document='doc',revision=1),workflow_ref=dict(workflow_id='flow'),origin='https://test',loginom_build='7.4.2',
                 scan=dict(complete=True),ui=dict(dialogs=[],masks=[],elements=elements),wizard=dict(status='absent'),
-                prepared_node_context=node,node_outputs=dict(verified=True,node_selected=True,surface='graph',node_context=node),
+                prepared_node_context=node,node_outputs=dict(verified=True,node_selected=True,surface='graph',node_context=node,
+                    ports=[dict(index=0,port_guid='port',active=True)]),
                 node_processes=dict(verified=True,inventory_complete=True,show_completed=True,root_id='root',node_context=node,processes=rows))
         states=[state([],[dict(ref='launch',allowed_actions=['execute_graph_node'],graph_execution=dict(node_id='node',source='native_selected_graph_node'))]),
                 state([process('1'),process('1.1','1')],[dict(ref='go',allowed_actions=['show_process_node'],process_menu=dict(action='mniShowNodeToProcess',process=dict(record_id='r1.1')))]),
@@ -442,6 +443,14 @@ class PortOutputEvidenceTests(unittest.TestCase):
         events.append(dict(operation_id='calc',phase='node_checkpoint',result=checkpoint))
         audit=lambda:verify_calculator_output(events,request,self.columns,self.rows)
         self.assertTrue(audit()['passed'],audit())
+        self.port['port_guid']='foreign'
+        self.assertIn('unbound_port_read',audit()['failures'])
+        self.port['port_guid']='port'
+        read=events.pop(-2)
+        before=next(i for i,e in enumerate(events) if e.get('step')==3)
+        events.insert(before,read)
+        self.assertIn('unbound_port_read',audit()['failures'])
+        events.pop(before);events.insert(-1,read)
         # Only the independently justified prefix is accepted, regardless of a budget claim.
         full=copy.deepcopy(self.port)
         self.port.update(sample=self.port['sample'][:1],sample_rows=1,sample_complete=False)

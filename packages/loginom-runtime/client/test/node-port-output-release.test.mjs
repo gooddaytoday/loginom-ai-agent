@@ -36,6 +36,15 @@ function fixture(file,reply){
  return {operation,calls,channel,driver,read:port=>channel.readOutputPort({port,sampleRows:1,requireExactNumbers:true,execution}),
   release:()=>driver.releasePending(operation.nodeApply)};
 }
+for(const file of ['calculator-node.mjs','text-import-node.mjs'])test(file+' expired read before dispatch releases the unchanged graph without browser data calls',async()=>{
+ const f=fixture(file,()=>assert.fail('Expired reads must not dispatch'));
+ f.operation.deadline=1;
+ await assert.rejects(()=>f.read(0),/budget exhausted/);
+ f.operation.cleanupConfirmed=false;
+ const proof=await f.release();
+ assert.equal(proof.verified,true);assert.equal(proof.cleanup_complete,true);
+ assert.deepEqual(f.calls,['old-gesture','observe','observe','observe']);
+});
 for(const file of ['calculator-node.mjs','text-import-node.mjs'])test(file+' release retains failed port-proxy disposal despite a quiet graph and old gesture cleanup',async()=>{
  const f=fixture(file,()=>({verified:false,cleanup_complete:false,reason:'dispose_failed'}));
  await assert.rejects(()=>f.read(0),/dispose_failed/);
@@ -59,14 +68,13 @@ for(const file of ['calculator-node.mjs','text-import-node.mjs'])test(file+' rel
  assert.equal(result.pending_phase,null);assert.equal(f.operation.nodeApply.pending,null);
  assert.deepEqual(f.calls,['read','old-gesture','observe','observe','observe']);
 });
-for(const file of ['calculator-node.mjs','text-import-node.mjs'])test(file+' release requires the current port attempt cleanup proof',async()=>{
- for(const fault of ['unknown','transport','unstarted']){
+for(const file of ['calculator-node.mjs','text-import-node.mjs'])test(file+' release requires the current port dispatch cleanup proof',async()=>{
+ for(const fault of ['unknown','transport']){
   const f=fixture(file,()=>{if(fault==='transport')throw Error('lost transport');return {cleanup_complete:true};});
-  if(fault==='unstarted')f.operation.deadline=1;
-  await assert.rejects(()=>f.read(0),/refused|lost transport|budget exhausted/);
+  await assert.rejects(()=>f.read(0),/refused|lost transport/);
   f.operation.cleanupConfirmed=true;
   await assert.rejects(f.release,/no confirmed settled cleanup|has not confirmed completion/);
-  assert.deepEqual(f.calls,fault==='unstarted'?[]:['read']);
+  assert.deepEqual(f.calls,['read']);
  }
 });
 for(const file of ['calculator-node.mjs','text-import-node.mjs'])test(file+' release cannot reuse cleanup from the first Filter output',async()=>{
@@ -83,7 +91,21 @@ for(const file of ['calculator-node.mjs','text-import-node.mjs'])test(file+' rel
   await assert.rejects(()=>readFilterOutputs(channel,{ports:[0,1],sample_rows:1,require_exact_numbers:true},
    {execution,portExecution:execution}, {ports:[0,1].map(port=>({port,native_mapping:{target_fields:[field]}}))}),/dispose_failed|budget exhausted/);
   f.operation.cleanupConfirmed=true;
-  await assert.rejects(f.release,/output-port read has no confirmed settled cleanup/);
+  if(fault==='dispose')await assert.rejects(f.release,/output-port read has no confirmed settled cleanup/);
+  else {
+   const proof=await f.release();
+   assert.equal(proof.cleanup_complete,true);
+   assert.deepEqual(f.calls,['read','old-gesture','observe','observe','observe']);
+  }
   assert.equal(attempts,fault==='unstarted'?1:2);
  }
+});
+test('a refused attempt before dispatch never clears a previous failed disposal',async()=>{
+ const f=fixture('calculator-node.mjs',()=>({verified:false,cleanup_complete:false,reason:'dispose_failed'}));
+ await assert.rejects(()=>f.read(0),/dispose_failed/);
+ f.operation.deadline=1;
+ await assert.rejects(()=>f.read(0),/budget exhausted/);
+ f.operation.cleanupConfirmed=true;
+ await assert.rejects(f.release,/output-port read has no confirmed settled cleanup/);
+ assert.deepEqual(f.calls,['read']);
 });

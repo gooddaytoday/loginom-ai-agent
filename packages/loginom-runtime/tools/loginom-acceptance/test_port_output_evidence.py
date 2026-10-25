@@ -119,7 +119,8 @@ class FilterPortConsumerTests(unittest.TestCase):
         def state(rows,elements):
             return dict(dom_epoch=dict(document='doc',revision=1),workflow_ref=dict(workflow_id='flow'),origin='https://test',loginom_build='7.4.2',
                 scan=dict(complete=True),ui=dict(dialogs=[],masks=[],elements=elements),wizard=dict(status='absent'),
-                prepared_node_context=node,node_outputs=dict(verified=True,node_selected=True,surface='graph',node_context=node),
+                prepared_node_context=node,node_outputs=dict(verified=True,node_selected=True,surface='graph',node_context=node,
+                    ports=[dict(index=i,port_guid='port-'+str(i),active=True) for i in (0,1)]),
                 node_processes=dict(verified=True,inventory_complete=True,show_completed=True,root_id='root',node_context=node,processes=rows))
         def process(identity,parent=None):
             return dict(process_id=identity,record_id='r'+identity,parent_id=parent,state='completed',error=False,children_loaded=True,rendered=True,selected=parent is not None)
@@ -150,6 +151,70 @@ class FilterPortConsumerTests(unittest.TestCase):
         request,events,columns,rows=self.fixture()
         result=verify_filter_output(events,request,columns,rows)
         self.assertTrue(result['passed'],result)
+
+    def test_filter_refuses_reading_before_execution_owner_is_confirmed(self):
+        from row_filter_output_evidence import verify_filter_output
+        request,events,columns,rows=self.fixture()
+        reads=[e for e in events if e['phase']=='node_port_output_read']
+        events=[e for e in events if e['phase']!='node_port_output_read']
+        before=next(i for i,e in enumerate(events) if e['phase']=='node_observation_sample' and e.get('step')==3)
+        events[before:before]=reads
+        self.assertFalse(verify_filter_output(events,request,columns,rows)['passed'])
+
+    def test_filter_refuses_coordinated_receipt_and_checkpoint_port_substitution(self):
+        from row_filter_output_evidence import verify_filter_output
+        request,events,columns,rows=self.fixture()
+        # The checkpoint and read share their output; the earlier inventory is independent.
+        events[-1]['result']['output']['ports'][0]['port_guid']='foreign-port'
+        self.assertFalse(verify_filter_output(events,request,columns,rows)['passed'])
+
+    def test_port_read_requires_prior_completed_process_and_active_owned_inventory(self):
+        from node_procedure_evidence import verify_internal_sequence
+        request,events,_,_=self.fixture()
+        for fault in ('missing_owner','incomplete_owner','foreign_node','foreign_root','running','inactive','missing_port'):
+            with self.subTest(fault=fault):
+                changed=copy.deepcopy(events)
+                states=[e['outcome']['output'] for e in changed if e.get('phase') in ('node_observation_sample','node_observation_completed') and e.get('step')==5]
+                for state in states:
+                    if fault=='missing_owner':state.pop('prepared_node_context',None)
+                    if fault=='incomplete_owner':state['prepared_node_context'].pop('node_id',None)
+                    if fault=='foreign_node':state['node_outputs']['node_context']['node_id']='foreign'
+                    if fault=='foreign_root':state['node_processes']['root_id']='foreign'
+                    if fault=='running':state['node_processes']['processes'][0]['state']='running'
+                    if fault=='inactive':state['node_outputs']['ports'][1]['active']=False
+                    if fault=='missing_port':state['node_outputs']['ports']=[]
+                self.assertIn('unbound_port_read',verify_internal_sequence(changed,request['operation_id'])['failures'])
+
+    def test_latest_execution_uses_its_real_baseline_and_ignores_prior_launches(self):
+        from node_procedure_evidence import digest, verify_internal_sequence
+        request,events,_,_=self.fixture()
+        first=events[:next(i for i,e in enumerate(events) if e['phase']=='node_port_output_read')]
+        second=[copy.deepcopy(e) for e in first]
+        baseline=copy.deepcopy(first[-1]['outcome']['output']['node_processes']['processes'])
+        for process in baseline:process['selected']=False
+        current=None
+        for event in second:
+            event['step']+=5
+            event['internal_operation_id']='filter:n'+str(event['step'])
+            if event['phase'] in ('node_observation_sample','node_observation_completed'):
+                current=event['outcome']['output']
+                for process in current['node_processes']['processes']:
+                    for key in ('process_id','record_id','parent_id'):
+                        if process.get(key):process[key]=process[key].replace('1','2',1)
+                current['node_processes']['processes'][:0]=copy.deepcopy(baseline)
+                for control in current['ui']['elements']:
+                    if 'process_menu' in control:control['process_menu']['process']['record_id']='r2.1'
+            elif event['phase']=='node_step_prepared':
+                event['observation_sha256']=digest(current)
+                event['signature']=digest([event['internal_operation_id'],event['action'],current])
+            elif event['phase']=='node_step_completed':
+                event['outcome']['operation_id']=event['internal_operation_id']
+        reads=[copy.deepcopy(e) for e in events if e['phase']=='node_port_output_read']
+        for event in reads:event['outcome']['output']['execution_id']='doc:root:2'
+        result=verify_internal_sequence(first+second+reads,request['operation_id'])
+        self.assertTrue(result['passed'],result['failures'])
+        reads[-1]['outcome']['output']['execution_id']='doc:root:1'
+        self.assertIn('unbound_port_read',verify_internal_sequence(first+second+reads,request['operation_id'])['failures'])
 
     def test_filter_refuses_changed_port_execution_schema_and_short_unlimited_sample(self):
         from row_filter_output_evidence import verify_filter_output

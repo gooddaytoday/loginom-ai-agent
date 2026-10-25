@@ -197,12 +197,12 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   };
   const channel = {
     async readOutputPort(request) {
-      // Keep the latest attempt's proxy cleanup across phase resets and UI observations.
-      operation.portReadCleanupComplete=false;
       checkBudget();
       if(!preparedNodeContext)throw Error('Prepared node required for direct output read');
       const code=makeNodePortOutputCode(preparedNodeContext,request,{origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
       snapshot=null;evidenceSnapshot=null;
+      // Only an actual dispatch invalidates the previous read's cleanup proof.
+      operation.portReadCleanupComplete=false;
       operation.cleanupConfirmed=false;
       let result;
       try{result=await execute(code,{timeout:Math.max(5000,operation.deadline-now()+5000)});}

@@ -879,9 +879,13 @@ test('direct output read dispatches once and journals only confirmed bounded res
 
 test('direct output cancellation before dispatch publishes nothing and makes no call',async()=>{
  const controller=new AbortController();controller.abort(Error('cancelled'));
- const f=portReadFixture({signal:controller.signal});
- await assert.rejects(f.channel.readOutputPort(f.request),/cancelled/);
- assert.equal(f.calls.length,0);assert.equal(f.records.length,0);assert.equal(f.operation.cleanupConfirmed,true);
+ for(const previous of [undefined,true,false]){
+  const f=portReadFixture({signal:controller.signal});
+  if(previous!==undefined)f.operation.portReadCleanupComplete=previous;
+  await assert.rejects(f.channel.readOutputPort(f.request),/cancelled/);
+  assert.equal(f.calls.length,0);assert.equal(f.records.length,0);assert.equal(f.operation.cleanupConfirmed,true);
+  assert.equal(f.operation.portReadCleanupComplete,previous);
+ }
 });
 
 test('direct output cancellation after dispatch preserves confirmed cleanup without publishing',async()=>{

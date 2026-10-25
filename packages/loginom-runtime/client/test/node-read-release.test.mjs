@@ -33,10 +33,10 @@ async function fixture(fault,phase='finish'){
    const channel={async observe({ready}){calls.push('observe');const value=snapshot();if(!ready(value))throw Error('Readiness refused');return value;},
     async readOutputPort({port}){
      calls.push('read');
-     if(fault?.startsWith('second-')&&port===0){operation.cleanupConfirmed=true;return {output:{port,port_guid:'p0',
+     if(fault?.startsWith('second-')&&port===0){operation.portReadCleanupComplete=operation.cleanupConfirmed=true;return {output:{port,port_guid:'p0',
       fresh:true,execution_id:'fresh',freshness_basis:'completed_execution_port_source',schema,row_count:0,sample_rows:0,sample_complete:true,sample:[]}};}
      if(['unstarted','second-unstarted'].includes(fault))throw Error('Read refused before dispatch');
-     operation.cleanupConfirmed=!['port-cleanup','second-port-cleanup'].includes(fault);operation.transportUncertain=fault==='transport';
+     operation.portReadCleanupComplete=operation.cleanupConfirmed=!['port-cleanup','second-port-cleanup'].includes(fault);operation.transportUncertain=fault==='transport';
      throw Error('The owned port read was refused after cleanup');
     }};
    const create=vm.runInNewContext('('+createNodeReadDrivers.toString()+')',{
@@ -108,7 +108,16 @@ test('a settled refused read releases after its own cleanup and the same quiet g
  const repeatedExecuteCount=calls.filter(c=>c==='finish').length-before;
  assert.equal(repeatedExecuteCount,0);
 });
-for(const fault of ['transport','unsettled','cleanup','port-cleanup','unstarted','second-port-cleanup','second-unstarted','foreign-node','graph-drift'])test('read release retains unknown cleanup or context: '+fault,async()=>{
+for(const fault of ['unstarted','second-unstarted'])test('reread release accepts a stopped attempt before dispatch: '+fault,async()=>{
+ const {f,operation,calls}=await fixture(fault,'read');
+ const result=await f.recover('read-ru',{strategy:'abandon_operation',recoveryOperationId:'release-unstarted'});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(result.output.original_outcome.output.execution.status,'completed');
+ assert.equal(operation.nodeApply.pending,null);assert.equal(f.hasUnsettledWork(),false);
+ assert.equal(calls.filter(c=>c==='finish').length,1);
+ assert.equal(calls.filter(c=>c==='read').length,fault==='unstarted'?1:2);
+});
+for(const fault of ['transport','unsettled','cleanup','port-cleanup','second-port-cleanup','foreign-node','graph-drift'])test('read release retains unknown cleanup or context: '+fault,async()=>{
  const {f,operation,calls}=await fixture(fault,'read');
  if(fault==='transport')assert.equal(operation.transportUncertain,true);
  const unknownRelease=await f.recover('read-ru',{strategy:'abandon_operation',recoveryOperationId:'unknown-read'}).catch(error=>error);
@@ -120,7 +129,13 @@ test('browser recovery read release also requires the last actual port cleanup',
  const settled=await fixture(undefined,'read');
  const proof=await settled.operation.nodeApplyDrivers.recoveryReleasePending(settled.operation.nodeApply);
  assert.equal(proof.cleanup_complete,true);assert.equal(settled.calls.filter(c=>c==='finish').length,1);
- for(const fault of ['port-cleanup','unstarted','second-port-cleanup','second-unstarted']){
+ for(const fault of ['unstarted','second-unstarted']){
+  const unstarted=await fixture(fault,'read');
+  const proof=await unstarted.operation.nodeApplyDrivers.recoveryReleasePending(unstarted.operation.nodeApply);
+  assert.equal(proof.cleanup_complete,true);
+  assert.equal(unstarted.calls.filter(c=>c==='finish').length,1);
+ }
+ for(const fault of ['port-cleanup','second-port-cleanup']){
   const unknown=await fixture(fault,'read');
   await assert.rejects(()=>unknown.operation.nodeApplyDrivers.recoveryReleasePending(unknown.operation.nodeApply),/no confirmed settled cleanup/);
   assert.equal(unknown.calls.filter(c=>c==='finish').length,1);

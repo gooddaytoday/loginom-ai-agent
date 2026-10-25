@@ -15,7 +15,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
  const request=operation.parameters,javascript=request.target.type==='programming.javascript';
  const owner=javascript?{document_id:request.document_id,workflow_id:request.workflow_ref.workflow_id,
   node_id:request.target.ref.node_id,operation_id:operation.id,ui_epoch:Date.now()}:null;
- let channel,signal,driver,execution,sourceReceipt,readCleanupComplete=false;
+ let channel,signal,driver,execution,sourceReceipt;
  const enter=ctx=>{
   signal=ctx.signal;signal?.throwIfAborted();operation.deadline=ctx.deadline;
   if(javascript)need(['document_id','workflow_id','node_id'].every(key=>ctx.node?.[key]===owner[key]),
@@ -75,11 +75,7 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    for(const port of read.ports){
     const schema=operation.parameters.parameters.schemas.find(s=>s.port===port)?.schema;
     need(schema||schema===null&&operation.parameters.parameters.observed_schema===true,'Retained output schema missing');
-    readCleanupComplete=false;operation.cleanupConfirmed=false;
-    let result;
-    try{result=await channel.readOutputPort({port,execution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});}
-    // The enclosing failed phase later clears cleanupConfirmed; retain only this read's settlement.
-    finally{readCleanupComplete=operation.cleanupConfirmed===true&&!operation.transportUncertain;}
+    const result=await channel.readOutputPort({port,execution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
     const output=result.output;
     const policy=operation.parameters.parameters.cross_table_policy;
     let materialized;
@@ -106,7 +102,6 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    releasePendingPhases:['finish','read'],
    async releasePending(state,{signal}={}){
     need(['finish','read'].includes(state.pending?.phase),'Only a stopped output-read finish or read can be released here');
-    if(state.pending.phase==='read')need(readCleanupComplete,'The last output-port read has no confirmed settled cleanup');
     enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
      workflow_ref:state.request.workflow_ref,node:state.node});
     return releasePendingNode({operation,channel,readReceipt:options.readReceipt});
@@ -114,7 +109,6 @@ export function createNodeReadDrivers(options,{targetOrigin,targetBuild,redactor
    // Browser recovery runs the same proof for any stopped phase: the model, not
    // this driver, restored the page, and the proof rechecks the quiet graph.
    async recoveryReleasePending(state,{signal}={}){
-    if(state.pending?.phase==='read')need(readCleanupComplete,'The last output-port read has no confirmed settled cleanup');
     enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
      workflow_ref:state.request.workflow_ref,node:state.node});
     return releasePendingNode({operation,channel,readReceipt:options.readReceipt});

@@ -406,17 +406,34 @@ def verify_internal_sequence(events, operation_id, *, max_steps=96, cold_read_ce
             failures.append('journal_session_mismatch')
         phase, step = row.get('phase'), row.get('step')
         if phase == 'node_port_output_read':
+            from import_execution_evidence import verify_execution_observations
             result = row.get('outcome', {})
             owner = (observations[-1][1] if observations else {}).get('prepared_node_context', {})
             context = result.get('node_context', {})
             port = result.get('output', {})
+            launches = [m for m in mutations if m[1].get('verb') in ('execute_wizard', 'execute_graph_node')]
+            launch = launches[-1][0] if launches else 0
+            execution = dict(passed=False, execution_id=None)
+            if owner.get('verified') is True and all(owner.get(k) for k in ('document_id', 'workflow_id', 'node_id')):
+                execution = verify_execution_observations(observations,
+                    [m for m in mutations if m[0] >= launch], owner,
+                    launch_mode='graph' if launches and launches[-1][1]['verb'] == 'execute_graph_node' else 'wizard')
+            outputs = next((s['node_outputs'] for n, s in reversed(observations)
+                if n > launch and 'node_outputs' in s), {})
+            native_ports = [p for p in outputs.get('ports', []) if p.get('index') == port.get('port')]
             if (pending or rejected or refresh_authorized or samples or result.get('verified') is not True
                     or result.get('cleanup_complete') is not True or context.get('verified') is not True
                     or owner.get('verified') is not True
                     or any(not owner.get(k) or context.get(k) != owner[k] for k in ('document_id', 'workflow_id', 'node_id'))
                     or port.get('fresh') is not True or not port.get('execution_id') or not port.get('port_guid')
                     or type(port.get('port')) is not int or port['port'] < 0
-                    or port.get('freshness_basis') != 'completed_execution_port_source'):
+                    or port.get('freshness_basis') != 'completed_execution_port_source'
+                    or not execution['passed'] or execution['execution_id'] != port.get('execution_id')
+                    or outputs.get('verified') is not True or outputs.get('surface') != 'graph'
+                    or outputs.get('node_selected') is not True or outputs.get('node_context', {}).get('verified') is not True
+                    or any(outputs.get('node_context', {}).get(k) != owner.get(k) for k in ('document_id', 'workflow_id', 'node_id'))
+                    or len(native_ports) != 1 or native_ports[0].get('active') is not True
+                    or native_ports[0].get('port_guid') != port.get('port_guid')):
                 failures.append('unbound_port_read')
             current = None
             continue

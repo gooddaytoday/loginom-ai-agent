@@ -262,6 +262,14 @@ class PreparedSelectionRefreshTests(unittest.TestCase):
 
 class PortReadSequenceTests(unittest.TestCase):
     def setUp(self):
+        from test_port_output_evidence import FilterPortConsumerTests
+        request, events, _, _ = FilterPortConsumerTests().fixture()
+        self.fixture = dict(operation_id=request['operation_id'])
+        self.node = copy.deepcopy(events[-1]['result']['node'])
+        self.events = events[:-1]
+        self.read = self.events[-1]
+
+    def table_fixture(self):
         self.fixture=json.loads(FIXTURE.read_text())
         self.events=self.fixture['events']
         last=next(r for r in reversed(self.events) if r['phase']=='node_observation_completed')
@@ -282,7 +290,7 @@ class PortReadSequenceTests(unittest.TestCase):
 
     def test_read_only_port_event_needs_no_ui_step_and_two_consecutive_reads_are_valid(self):
         self.assertTrue(self.audit()['passed'],self.audit()['failures'])
-        self.events.append(copy.deepcopy(self.read));self.events[-1]['outcome']['output']['port']=1
+        self.events.append(copy.deepcopy(self.read));self.events[-1]['outcome']['output'].update(port=1,port_guid='port-1')
         self.assertTrue(self.audit()['passed'],self.audit()['failures'])
 
     def test_read_event_refuses_changed_owner_or_missing_cleanup(self):
@@ -293,7 +301,7 @@ class PortReadSequenceTests(unittest.TestCase):
 
     def test_read_cannot_hide_pending_ui_mutation_or_allow_a_stale_gesture(self):
         prepared=next(copy.deepcopy(r) for r in reversed(self.events) if r['phase']=='node_step_prepared')
-        prepared.update(step=66,internal_operation_id=self.fixture['operation_id']+':n66')
+        prepared.update(step=6,internal_operation_id=self.fixture['operation_id']+':n6')
         self.events.insert(-1,prepared)
         self.assertIn('unbound_port_read',self.audit()['failures'])
         self.events.pop(-2);self.events.append(prepared)
@@ -301,6 +309,7 @@ class PortReadSequenceTests(unittest.TestCase):
 
     def console_fixture(self):
         from node_procedure_evidence import digest
+        self.table_fixture()
         self.events.pop()  # Replace the port read with the existing console wait path.
         button=dict(tid='MF;cntMain;tlbMainToolbar;btnProgress',ref='console-button',
                     signature=dict(tid='MF;cntMain;tlbMainToolbar;btnProgress',tag='a'),enabled=True,allowed_actions=['click'])
