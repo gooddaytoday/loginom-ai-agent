@@ -331,7 +331,7 @@ def bound_output_settlement(rows, row, samples, observations, mutations, *, cold
 
 
 def bound_console_settlement(rows, row, samples, observations, mutations):
-    """The launched node's own loading mask may outlive local readiness."""
+    """The launched node's own busy mask or lock may outlive local readiness."""
     readiness = row.get('readiness', {})
     admissions = [r for r in rows if r.get('phase') == 'node_apply_prepared']
     phases = [r['receipt'] for r in rows[:rows.index(row)] if r.get('phase') == 'node_phase_prepared']
@@ -362,7 +362,9 @@ def bound_console_settlement(rows, row, samples, observations, mutations):
     controls = [e for e in prior.get('ui', {}).get('elements', []) if e.get('tid') == tid]
     if len(controls) != 1 or not controls[0].get('ref') or not controls[0].get('signature'):
         return False
-    if not any(sample.get('outcome', {}).get('output', {}).get('ui', {}).get('masks') for sample in samples):
+    if not any(sample.get('outcome', {}).get('output', {}).get('ui', {}).get('masks')
+               or sample.get('outcome', {}).get('output', {}).get('prepared_node_context', {}).get('locked') is True
+               for sample in samples):
         return False
     for sample in samples:
         r = sample.get('readiness', {})
@@ -373,15 +375,17 @@ def bound_console_settlement(rows, row, samples, observations, mutations):
         if (any(r.get(k) != readiness.get(k) for k in ('policy', 'required_samples', 'condition', 'timeout_ms'))
                 or type(r.get('elapsed_ms')) not in (int, float) or not 0 <= r['elapsed_ms'] < timeout
                 or context.get('verified') is not True or context.get('surface') != 'graph'
+                or type(context.get('locked')) is not bool or not isinstance(ui.get('masks'), list)
                 or any(not owner.get(k) or context.get(k) != owner[k] for k in ('document_id', 'workflow_id', 'node_id'))
                 or state.get('scan', {}).get('complete') is not True or state.get('wizard', {}).get('status') != 'absent'
                 or ui.get('dialogs') != [] or len(buttons) != 1 or buttons[0].get('enabled') is not True
                 or 'click' not in buttons[0].get('allowed_actions', [])
                 or any(buttons[0].get(k) != controls[0].get(k) for k in ('ref', 'signature'))
-                or any(m.get('kind') != 'busy' or m.get('dialog_ref') or m.get('target_tid') != prefix+';ModelForm'
-                       for m in ui.get('masks', []))):
+                or any(not isinstance(m, dict) or m.get('kind') != 'busy' or m.get('dialog_ref') or m.get('target_tid') != prefix+';ModelForm'
+                       for m in ui['masks'])):
             return False
-    return samples[-1]['outcome']['output']['ui'].get('masks') == []
+    final = samples[-1]['outcome']['output']
+    return final['ui']['masks'] == [] and final['prepared_node_context']['locked'] is False
 
 
 def verify_internal_sequence(events, operation_id, *, max_steps=96, cold_read_ceiling=None):
