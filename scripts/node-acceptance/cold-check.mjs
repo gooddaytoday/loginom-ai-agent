@@ -43,7 +43,7 @@ const { createNodeProcedure } = await load("client/lib/node-procedure.mjs")
 const { createNodeExecutionProcedure } = await load("client/lib/node-execution-procedure.mjs")
 const { createExecutionJournal } = await load("client/lib/execution-journal.mjs")
 const { withBrowserReceipt } = await load("client/lib/executor.mjs")
-const { makePackageCleanupCode } = await load("client/lib/package-cleanup.mjs")
+const { makePackageCleanupCode,makeFailedOpenCleanupCode,makeColdOpenDiagnosticCode } = await load("client/lib/package-cleanup.mjs")
 const { openNewOutputTable, configureTablePrecision, prepareTableRead, returnFromOutputTable } =
   await load("client/lib/node-output-procedure.mjs")
 const { readTableOutputPages } = await load("client/lib/table-output-pages.mjs")
@@ -115,6 +115,8 @@ const authenticated = await loginBrowser({
 })
 context = authenticated.context
 page = context.pages()[0]
+  state.openAttempted=true
+  state.openDeadline=Date.now()+120000
   let prepared = await execute(
     makeWorkspacePrepareCode({
       loginomUrl: page.url(),
@@ -129,11 +131,19 @@ page = context.pages()[0]
   await record({phase:"cold_package_opened",prepared,settings_applied:false})
   if (state.cancelled) throw Error("COLD_CANCELLED")
   if (
-    prepared.status !== "READY" ||
-    prepared.package_ref.path !== saved.path ||
-    prepared.workflow_ref.navigation_path.some((item) => item.label.endsWith("(только чтение)"))
-  )
+    prepared.status !== "READY"
+  ) {
+    state.openFailure={status:prepared.status,reason:prepared.reason??'OPEN_NOT_READY'}
+    throw Error("COLD_PACKAGE_OPEN_NOT_READY")
+  }
+  if(prepared.package_ref?.path!==saved.path) {
+    state.openFailure={status:prepared.status,reason:'PACKAGE_PATH_MISMATCH'}
+    throw Error("COLD_PACKAGE_PATH_MISMATCH")
+  }
+  if(prepared.workflow_ref.navigation_path.some(item=>item.label.endsWith("(только чтение)"))) {
+    state.openFailure={status:prepared.status,reason:'PACKAGE_READ_ONLY'}
     throw Error("COLD_PACKAGE_NOT_WRITABLE")
+  }
 
   const origin = new URL(config.loginom_url).origin
   const adapter = createNodeTargetBrowserAdapter({ execute, origin, build: "7.4.2" })
@@ -399,18 +409,38 @@ page = context.pages()[0]
   )
 } catch(error) {
   state.failure=state.cancelled?"COLD_CANCELLED":String(error?.message??error)
-  for(const secret of [config.api_key,loginPassword].filter(Boolean))state.failure=state.failure.split(secret).join('[REDACTED]')
+  if(state.openAttempted&&state.prepared?.status!=='READY'&&!state.openFailure)
+    state.openFailure={status:state.prepared?.status??'UNCONFIRMED',reason:state.prepared?.reason??state.failure}
+  for(const secret of [config.api_key,loginPassword].filter(Boolean)){
+    state.failure=state.failure.split(secret).join('[REDACTED]')
+    if(state.openFailure)state.openFailure.reason=String(state.openFailure.reason).split(secret).join('[REDACTED]')
+  }
   if (!state.cancelled) throw error
 } finally {
   // Cold teardown: one native cleanup, then browser, including cancellation.
   try {
-  if (!state.cleanupExpired && !state.closed && !state.cleanupAttempted && state.prepared?.status === "READY" && state.prepared.package_ref?.path === saved.path) {
+  if(state.openFailure&&page&&!state.cleanupExpired) {
+    let timer
+    const budget=Math.max(0,Math.min(1000,(state.openDeadline??Date.now())-Date.now()))
+    let snapshot={status:'unavailable',reason:'open_deadline_exceeded'}
+    if(budget>0)try {
+      const timeout=new Promise(resolve=>{timer=setTimeout(()=>resolve({status:'unavailable',reason:'diagnostic_timeout'}),budget)})
+      snapshot=await Promise.race([timeout,rawExecute(makeColdOpenDiagnosticCode({loginomUrl:config.loginom_url,
+        loginomBuild:'7.4.2',account:config.workflow_profile.loginom_user}))])
+    } catch {snapshot={status:'unavailable',reason:'diagnostic_read_failed'}} finally {clearTimeout(timer)}
+    await record({phase:'cold_open_refused_native',open_failure:state.openFailure,snapshot})
+      .catch(()=>{state.openDiagnosticUnconfirmed=true})
+  }
+  const failedOpen=state.openFailure&&state.prepared?.status!=='READY'
+    &&(state.prepared?.effect_possible===true||!state.prepared&&state.openAttempted)
+  if (!state.cleanupExpired && !state.closed && !state.cleanupAttempted && (failedOpen || state.prepared?.status === "READY" && state.prepared.package_ref?.path === saved.path)) {
     // A rejected readonly opening owns only this diagnostic copy, never the
     // writer's lock. Native cleanup rechecks its mode and refuses dirty copies.
-    const readOnly = state.prepared.workflow_ref.navigation_path.some(item => item.label.endsWith("(только чтение)"))
+    const readOnly = state.prepared?.workflow_ref?.navigation_path.some(item => item.label.endsWith("(только чтение)"))
     state.cleanupAttempted=true
     await rawExecute(
-      makePackageCleanupCode({
+      failedOpen?makeFailedOpenCleanupCode({sessionId:session,operationId:'cold-open',account:config.workflow_profile.loginom_user,
+        packagePath:saved.path,loginomUrl:config.loginom_url,loginomBuild:'7.4.2'}):makePackageCleanupCode({
         sessionId: session,
         documentId: state.prepared.document_id,
         account: config.workflow_profile.loginom_user,
@@ -432,14 +462,20 @@ page = context.pages()[0]
           modified_before_close:result.modified_before_close,cleanup_status:result.status,cleanup_reason:result.reason}).catch(()=>undefined)
         return writeFile(join(args.output, "cleanup.json"), JSON.stringify(result, null, 2) + "\n")
       })
-      .catch(() => console.error("COLD_PACKAGE_CLEANUP_UNCONFIRMED"))
+      .catch(async () => {
+        state.cleanup={status:'BLOCKED',reason:'COLD_PACKAGE_CLEANUP_UNCONFIRMED',package_closed:false,logged_out:false}
+        await writeFile(join(args.output,'cleanup.json'),JSON.stringify(state.cleanup,null,2)+'\n')
+      })
   }
   if(state.failure&&!state.cleanupExpired)await writeFile(join(args.output,'result.json'),JSON.stringify({status:'FAIL',
    phase:'independent_cold_reopen_readback',path:saved.path,settingsReapplied:false,error:state.failure,
+   ...(state.openFailure?{reason:state.openFailure.reason,open_failure:state.openFailure}:{}),
+   ...(state.openDiagnosticUnconfirmed?{open_diagnostic_recorded:false}:{}),
    ...(state.exportObservation?{export_observation:state.exportObservation}:{}),
    ...(state.cancelled?{cancellation:{signal:state.cancelled,cleanup_budget_exhausted:false,
     lock_may_remain:state.cleanup?.package_closed!==true}}:{}),
-   cleanup:{package_closed:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.package_closed===true,
+   cleanup:{status:state.cleanup?.status??'BLOCKED',reason:state.cleanup?.reason??(state.cleanup?'CLEANUP_UNCONFIRMED':'CLEANUP_NOT_ADMITTED'),
+    package_closed:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.package_closed===true,
     logged_out:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.logged_out===true}},null,2)+'\n')
   } finally {
     await context?.close()

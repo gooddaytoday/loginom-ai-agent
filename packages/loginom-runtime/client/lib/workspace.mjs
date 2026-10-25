@@ -103,7 +103,11 @@ async function prepareWorkspace(page, options) {
         const diagrams=exact('MF;TF'+ending+';ModelForm;cmpDiagram');
         return diagrams.length===1 ? {tab:t,graph:diagrams[0],html:diagrams[0].innerHTML} : null;
       }).filter(Boolean);
-      state.receipts.set(options.operationId,{request,before:tabs,preserved,phase:'reserved'});
+      state.receipts.set(options.operationId,{request,before:tabs,preserved,phase:'reserved',
+        packageInventoryBefore:app?.Application?.FInstance?.FMainForm?.FMapTree?.PackageNodes?.Count,
+        openConnection:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection,
+        openServerSession:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.Session,
+        openAccount:app?.Application?.FInstance?.FMainForm?.FMapTree?.FServerConnection?.UserName});
     }
     const current = state.receipts.get(options.operationId);
     if(mode==='open_dialog') {
@@ -112,6 +116,13 @@ async function prepareWorkspace(page, options) {
       if(!current || !element?.isConnected || component?.$className!=='bg.filedialog.view.OpenDialogForm'
         || component.el?.dom!==element)return {error:'UI_BLOCKED'};
       current.openDialogElement=element;current.openDialog=component;
+      return {bound:true};
+    }
+    if(mode==='open_submit') {
+      const element=current?.openDialogElement,component=element&&globalThis.Ext?.getCmp?.(element.id);
+      if(!element?.isConnected||component!==current.openDialog||component.$className!=='bg.filedialog.view.OpenDialogForm'||component.el?.dom!==element
+        ||component.hidden!==false||Date.now()>=deadline)return {error:'UI_BLOCKED'};
+      current.openSubmitted=true;
       return {bound:true};
     }
     const map=app?.Application?.FInstance?.FMainForm?.FMapTree, connection=map?.FServerConnection;
@@ -246,6 +257,8 @@ async function prepareWorkspace(page, options) {
         const picker=await inspect('open_dialog');
         if(picker.error)return result('NOT_READY',picker.error);
         await field.fill(options.packagePath,{timeout:remaining()});
+        const submitted=await inspect('open_submit');
+        if(submitted.error)return result('NOT_READY',submitted.error);
         await tid('OpenDialogForm;btnOpen').click({timeout:remaining()});
       }
       }

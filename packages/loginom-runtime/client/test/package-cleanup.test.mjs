@@ -114,7 +114,7 @@ function fixture(overrides = {}) {
     },
   };
   const Clock = class extends Date {static now(){return state.clock;}};
-  return {state,events,context, run:changed => {
+  return {state,events,context,page, run:changed => {
     const code=makePackageCleanupCode({...options,timeoutMs:state.timeoutMs??options.timeoutMs,...changed});
     state.deadline=Number(code.match(/,(\d+)\)$/)[1]);
     state.clock=state.deadline-30000;
@@ -130,6 +130,28 @@ test('saved owned package closes with native guards, tabs disappear, then logout
   assert.equal(result.unsaved_changes_discarded,false);
   assert.deepEqual(f.events,['modified-read','close','tab-detached','avatar','logout','login-visible']);
   const again=await f.run();assert.equal(again.reason,'CLEANUP_ALREADY_ATTEMPTED');assert.equal(f.events.filter(e=>e==='close').length,1);
+});
+
+for(const mode of ['saved','readonly','diagnostic discard'])for(const changedAt of ['native Close','logout account readback'])
+test('cleanup refuses a replacement server session after '+changedAt+' for '+mode,async()=>{
+ const f=fixture({readonly:mode==='readonly',modified:mode==='diagnostic discard'});
+ const m=f.context.bg.app.Application.FInstance.FMainForm.FMapTree;
+ const foreignSession={marker:'foreign-session'};
+ if(changedAt==='native Close'){
+  const close=m.ClosePackage;
+  m.ClosePackage=async(...args)=>{const result=await close(...args);m.FServerConnection.Session=foreignSession;return result;};
+ }else{
+  const locator=f.page.locator;
+  f.page.locator=query=>{
+   const target=locator(query),read=target.innerText;
+   target.innerText=async(...args)=>{const text=await read(...args);if(query.includes('MF;AppMenuForm;p.h;p.t'))m.FServerConnection.Session=foreignSession;return text;};
+   return target;
+  };
+ }
+ const result=await f.run({diagnosticReadOnly:mode==='readonly',diagnosticDiscard:mode==='diagnostic discard'});
+ assert.equal(result.status,'BLOCKED');assert.equal(result.reason,'LOGOUT_SESSION_CHANGED');
+ assert.equal(result.package_closed,true);assert.equal(result.logged_out,false);
+ assert.equal(f.events.filter(e=>e==='close').length,1);assert.equal(f.events.includes('logout'),false);
 });
 
 for(const blocker of ['mask','dialog'])test('cold cleanup waits read-only for a transient '+blocker+' before one native close/logout',async()=>{
@@ -432,4 +454,67 @@ for(const elapsed of [0,27500])test('D70 delayed diagnostic respects original de
  assert.equal(result.unsaved_changes_discarded,false);
  assert.equal(f.events.filter(e=>e==='close').length,1);
  assert.equal(f.events.includes('discard'),false);assert.equal(f.events.includes('logout'),false);
+});
+
+for(const fault of ['none','dirty','foreign path','foreign account','connection','existing inventory','old tab','not submitted','wrong request','readonly','server session','foreign document','two packages','unknown mode','reserve account','expired','session changes during read','session changes after close','foreign window','own hidden picker','own active picker','foreign hidden picker'])test('D56c failed Open uses only the new owned package: '+fault,async()=>{
+ const {makeFailedOpenCleanupCode}=await import('../lib/package-cleanup.mjs');
+ const f=fixture({modified:fault==='dirty',readonly:fault==='readonly'}),c=f.context;
+ const m=c.bg.app.Application.FInstance.FMainForm.FMapTree;
+ const node=m.PackageNodes.Items(0),tab=c.ownedTab;
+ f.state.tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';tab.classList={contains:()=>true};
+ c.bg.app.Application.FInstance.FMainForm.Items={Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node}}}})}};
+ const query=c.document.querySelectorAll;
+ c.document.querySelectorAll=q=>q.startsWith('[data-tid^="MF;cntMain;cntWorkspace')?[tab]:query(q);
+ const receipt=c.__loginomDockPreparationV1.receipts.get('prepare');
+ receipt.request=JSON.stringify({session:options.sessionId,intent:'open_package',packagePath:options.packagePath});
+ receipt.phase='effect_possible';receipt.before=[];receipt.openSubmitted=true;
+ receipt.openAccount=options.account;receipt.openConnection=m.FServerConnection;receipt.openServerSession=m.FServerConnection.Session;receipt.packageInventoryBefore=0;
+ delete receipt.tab;delete receipt.packageNode;
+ if(fault==='foreign path')f.state.path='/foreign/other.lgp';
+ if(fault==='foreign account')f.state.account='foreign';
+ if(fault==='connection')receipt.openConnection={};
+ if(fault==='server session')receipt.openServerSession={};
+ if(fault==='foreign document')c.__loginomDockPreparationV1.document={};
+ if(fault==='two packages')f.state.count=2;
+ if(fault==='unknown mode')f.state.readonly=undefined;
+ if(fault==='reserve account')receipt.openAccount='foreign';
+ if(fault==='existing inventory')receipt.packageInventoryBefore=1;
+ if(fault==='old tab')receipt.before=[tab];
+ if(fault==='not submitted')receipt.openSubmitted=false;
+ if(['foreign window','own hidden picker','own active picker','foreign hidden picker'].includes(fault)){
+  const window={id:'picker',getBoundingClientRect:()=>({x:283,y:-2327,width:730,height:500})};
+  const component={$className:'bg.filedialog.view.OpenDialogForm',el:{dom:window},hidden:fault!=='own active picker'};
+  c.Ext={getCmp:()=>component};
+  if(fault.startsWith('own ')){receipt.openDialogElement=window;receipt.openDialog=component;}
+  const find=c.document.querySelectorAll;c.document.querySelectorAll=q=>q.includes('.x-window')?[window]:find(q);
+ }
+ if(fault==='wrong request')receipt.request=JSON.stringify({session:'foreign',intent:'open_package',packagePath:options.packagePath});
+ const wait=f.page.waitForTimeout;f.page.waitForTimeout=ms=>ms>100?new Promise(()=>{}):wait(ms);
+ const code=makeFailedOpenCleanupCode({...options,operationId:'prepare'});
+ if(fault==='expired'){const deadline=Number(code.match(/deadline=(\d+)/)[1]);c.Date=class extends Date {static now(){return deadline;}};}
+ if(fault==='session changes during read'){const read=m.FServerConnection.Session.IsPackageModified;m.FServerConnection.Session.IsPackageModified=async()=>{const result=await read();m.FServerConnection.Session={};return result;};}
+ if(fault==='session changes after close'){const close=m.ClosePackage;m.ClosePackage=async(...args)=>{const result=await close(...args);m.FServerConnection.Session={};return result;};}
+ const result=await vm.runInContext('('+code+')',c)(f.page);
+ const success=['none','readonly','own hidden picker'].includes(fault);
+ assert.equal(result.status,success?'SUCCEEDED':'BLOCKED',JSON.stringify(result));
+ const closed=success||fault==='session changes after close';
+ assert.equal(result.package_closed,closed);assert.equal(result.logged_out,success);
+ assert.equal(f.events.includes('close'),closed);assert.equal(f.events.includes('discard'),false);
+ if(fault==='session changes after close'){assert.equal(result.reason,'LOGOUT_SESSION_CHANGED');assert.equal(f.events.includes('logout'),false);}
+ if(fault==='dirty')assert.equal(result.reason,'UNSAVED_CHANGES');
+});
+
+test('D56c Open diagnostics read native inventory/errors without binding or RPC guesses',async()=>{
+ const {makeColdOpenDiagnosticCode}=await import('../lib/package-cleanup.mjs');
+ const f=fixture(),m=f.context.bg.app.Application.FInstance.FMainForm.FMapTree;
+ m.FServerConnection.Session.SessionID='server-session';
+ Object.defineProperty(m.FServerConnection.Session,'ID',{get(){throw Error('never invoke guessed RPC getter');}});
+ const query=f.context.document.querySelectorAll;
+ f.context.document.querySelectorAll=q=>q==='.bg-error-messages'?[{textContent:'Open rejected',getBoundingClientRect:()=>({width:20,height:10})}]:query(q);
+ const receipt=f.context.__loginomDockPreparationV1.receipts.get('prepare');
+ const result=await vm.runInContext('('+makeColdOpenDiagnosticCode(options)+')',f.context)(f.page);
+ assert.equal(result.packages[0].path,options.packagePath);assert.equal(result.packages[0].read_only,false);
+ assert.equal(result.inventory_complete,true);assert.equal(result.server_session,'server-session');
+ assert.equal(result.errors[0].text,'Open rejected');assert.equal(receipt.failedOpenCleanup,undefined);
+ assert.deepEqual(f.events,[]);
 });
