@@ -61,7 +61,9 @@ export function validateUiAction(action, snapshot) {
 }
 
 export function workspaceUiCapability(page, task, readNodeContext, captureProcessFocus, restoreProcessFocus) {
-  const started = Date.now(), deadline = started + (task.settlement_timeout_ms??task.opening_timeout_ms??15000);
+  // Dispatch time consumes the bound node budget; it cannot restart in the browser.
+  const started = Date.now(), deadline = Math.min(task.deadline??Infinity,
+    started + (task.settlement_timeout_ms??task.opening_timeout_ms??15000));
   const trace = [], handles = [];
   let postActionRoot;
   let cancellationSurfaceReads=0;
@@ -84,14 +86,16 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       dialog_ref:mask.dialog_ref,...(mask.import_preview_owner_ref?{import_preview_owner_ref:mask.import_preview_owner_ref}:{})}))});
     while (observed.ui.masks.length && unchanged(observed)) {
       await page.waitForTimeout(Math.min(250,timeout()));
-      timeout();observed=await read();
+      timeout();observed=await read();timeout();
     }
     record('ui_mask_wait_finished',{elapsed_ms:Date.now()-maskStarted,mask_present:observed.ui.masks.length>0});
     return observed;
   };
   const boundNode = async () => {
+    timeout();
     if (!task.prepared_node_context) return null;
     let binding=await readNodeContext(page,task.prepared_node_context);
+    timeout();
     // Opening/finishing replaces the graph and wizard asynchronously. Observe
     // that one completed gesture; never reissue it. Foreign package/workflow
     // or GUID failures do not enter this wait.
@@ -100,13 +104,16 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         ||task.action?.verb==='click'&&task.snapshot?.node_navigation_read===true) && (task.opening_timeout_ms || sample<200);sample++) {
       record('node_surface_wait',{condition:'prepared_node_surface_ready',sample});
       await page.waitForTimeout(Math.min(50,timeout()));
+      timeout();
       binding=await readNodeContext(page,task.prepared_node_context);
+      timeout();
     }
     if(binding?.reason==='tab'&&processShowCompleted&&!processFocusAttempted&&processFocusTicket&&restoreProcessFocus){
       processFocusAttempted=true;timeout();mouseHeld=true;mouseButton='left';
       const restored=await restoreProcessFocus(page,processFocusTicket);
       mouseHeld=false;
-      if(restored.restored){record('process_node_focus_restored',restored.proof);timeout();binding=await readNodeContext(page,task.prepared_node_context);}
+      timeout();
+      if(restored.restored){record('process_node_focus_restored',restored.proof);binding=await readNodeContext(page,task.prepared_node_context);timeout();}
     }
     if(binding?.verified!==true)fail('PREPARED_NODE_CONTEXT_CHANGED','The prepared package, workflow or node changed: '+(binding?.reason??'surface_unavailable'));
     return binding;
@@ -3559,6 +3566,7 @@ function readRenderedInputMapping(observation) {
     preparedOutputPort:nodeContext?.output_port??null,preparedInputPort:nodeContext?.input_port??null,
     preparedNodeWizard:nodeContext?.surface==='wizard'&&!nodeContext.input_port&&!nodeContext.output_port,
     cacheReadPredicates:!!task.prepared_node_context,definitionPrefix:task.prepared_node_context?.workflow_ref.prefix??null});
+    timeout();
     if (observed?.ui_read_failure) {
       const code=observed.ui_read_failure.code;
       if(code==='UI_SCAN_LIMIT')record('ui_scan_limit',{limit_kind:observed.ui_read_failure.limit_kind??'unknown',scan_stage:observed.ui_read_failure.scan_stage??'unknown'});
@@ -3879,7 +3887,7 @@ function readRenderedInputMapping(observation) {
         });
         if (!same(current.dom_epoch,epochBeforeGesture)) fail('UI_EPOCH_CHANGED','The document changed while checking the target; observe again');
         record('ui_preconditions_verified', { verb: task.action.verb, refs });
-        phase = 'applying'; effectPossible = true;
+        timeout();phase = 'applying'; effectPossible = true;
         const first = targets[0].handle;
         const clickTarget = async (clickCount, button = 'left') => {
           timeout(); mouseHeld = true; mouseButton = button;
@@ -4531,7 +4539,7 @@ function readRenderedInputMapping(observation) {
           if (matches.length!==1 || matches[0].check_state.checked!==task.action.checked || matches[0].check_state.indeterminate) fail('UI_STATE_NOT_CONFIRMED','The requested checked state was not confirmed; inspect before any retry');
           record('ui_state_verified',{verb:task.action.verb,ref:matches[0].ref,checked:task.action.checked});
         }
-        phase = 'completed';
+        timeout();phase = 'completed';
         outcome = result('SUCCEEDED', { ...observed, gesture_applied: effectPossible, verification_required: true });
       }
     } catch (error) {
@@ -4563,15 +4571,18 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) 
     ||options.snapshot?.wizard?.stage!=='input_mapping'||options.snapshot?.wizard?.owner_context?.status!=='observed'
     ||options.snapshot?.prepared_node_context?.input_port||options.snapshot?.prepared_node_context?.output_port))
     throw Error('Preserved Join mapping requires a bound input-to-Join node read');
+  if(options.deadline!==undefined&&(!Number.isFinite(options.deadline)||options.deadline<=0
+    ||options.opening_timeout_ms===undefined&&options.settlement_timeout_ms===undefined))
+    throw Error('Absolute node deadline requires a bounded opening or settlement wait');
   if(options.settlement_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
     ||!['finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
     ||options.opening_timeout_ms!==undefined||!Number.isInteger(options.settlement_timeout_ms)
     ||options.settlement_timeout_ms<1||options.settlement_timeout_ms>1800000))
     throw Error('Mask settlement requires a bound completion action and the remaining node deadline');
   if(options.opening_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
-    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(options.action?.verb)
+    ||!['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views'].includes(options.action?.verb)
     ||!Number.isInteger(options.opening_timeout_ms)||options.opening_timeout_ms<1||options.opening_timeout_ms>1800000))
-    throw Error('Extended opening wait requires a bound node wizard and the remaining node deadline');
+    throw Error('Extended opening wait requires a bound node opening and the remaining node deadline');
   if(options.mode==='act'&&['begin_wizard','confirm_wizard_deactivation','cancel_process'].includes(options.action?.verb)
     &&!options.prepared_node_context)throw Error('Node wizard deactivation requires a prepared native node binding');
   if(options.prepared_node_context!==undefined)validatePreparedNodeContext(options.prepared_node_context);
