@@ -14,6 +14,7 @@ async function prepareWorkspace(page, options) {
     phase = name;
     while (remaining()) {
       const value = await probe();
+      remaining();
       if (value) { trace.push({ condition: name, satisfied: true }); return value; }
       await page.waitForTimeout(Math.min(100, remaining()));
     }
