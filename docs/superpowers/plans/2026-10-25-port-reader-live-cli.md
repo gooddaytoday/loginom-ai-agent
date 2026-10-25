@@ -192,17 +192,11 @@ Dirty проверяется существующим idempotent Save: повт�
 ## Checkpoint
 
 - Выполнение продолжается; проверенные результаты и ограничения: [живой отчёт](../../testing/loginom-ai-agent/port-output-live-2026-10-25.md).
-- Private artifacts/evidence: /tmp/loginom-port-live-20261025-gxg7qus9/; ordinary payload и frozen worktrees не менялись, установка не заменялась, секреты вне Git.
-- После сбоя Xorg короткий Import→Calculator→порт→Save→native close/logout прошёл; первопричина Xorg не установлена. Прерванные профили изолированы.
-- Все 21 назначенные model attempts завершены и независимо разобраны; это не 21 PASS. Из 19 сохранённых модельных пакетов cold разобрал 8, остальные 11 ждут продолжения.
-- Cold: low-liquidity обеих версий, CP1251 и наблюдаемые LR settings прошли с явными gaps; Sliding/Cartesian прошли. Kmeans/Zscore дали отличия порядка в output-definition UI до materialization; physical cold data не читались, причина не приписана reader.
-- Три исходные регрессии закрыты: числовой JSON-текст, максимальный dense −0 MCP prefix, настоящие Import/Calculator/Filter validators против ложного read_limit.
-- Управляемые Join/Filter [1,0]/reread, empty Filter и foreign receipt admission прошли; dirty=false на границах двух полных чтений подтверждён.
-- Независимо прошли строки 1/99/100/101, все семь длин текста, 100×100 ячеек и 512 KiB−1. Пустой результат проверен настоящим Filter; header-only Import исходно отказал до reader.
-- Все байтовые границы и запрет пропуска первой большой строки прошли. Превышение10000cells NOT_VERIFIED: Import101 и дополнительный Import100(sample0)→CalculatorExtra оба остановились на configure доExecute/read; иной UI-путь не добавляется. Variant RB/DS прошли с честным unverified/strict refusal; long ждёт независимого аудита. RB auxJSONparse исправлен без live replay, исходный FAIL сохранён.
-- Date: ordinary два native serial и offline44/7TZ+extra9999 прошли; live35/44+extra2/2,9 ранних дат сервер создал иначе. Actual TZ6/7 (Bissau native serial не создан, ordinary не запускался). Все7 итоговых прогонов Save/nativecleanup PASS; старые wrong-zone/setup failures сохранены. TZ передаётся при запуске Bun с early guard, лишние source-правки удалены.
-- Все 18 fixed fault cases разобраны: 12 cache/AsString с нормальной очисткой, 6 dispose с ожидаемым held gate/native cleanup BLOCKED. Первоначальные квитанции не переписывались после адресной очистки собственных отключённых сессий.
-- Nonfinite остановился до Calculator Execute на Managed preview native port changed; witness/NaN/Infinity NOT_VERIFIED. Guard-модуль совпадает с baseline, живого baseline воспроизведения нет. Native foreign binding/inactive guards недостижимы детерминированно текущим public API.
-- Остальные live runs выполняются по одному браузеру: time-scan и Host shutdown failure при параллельных окнах требуют разделять продукт/среду. Причинность конкуренции ещё не доказана.
-- Private controllers: 7 файлов/1282 строки по git diff --stat; превышение оценки пересмотрено, оставлены прямые adapters существующих CLI/нативных readers без framework/dependencies. Новая диагностика только в отдельном worktree/artifact.
-- Завершение: оставшиеся live/cold проверки, независимый итог с gaps, diff --check/relative links/проверка frozen сборок. Без push/PR/install и изменения ordinary runtime.
+- Private artifacts/evidence: /tmp/loginom-port-live-20261025-gxg7qus9/; обычные payload/frozen worktrees не менялись, установка не заменялась, секреты вне Git.
+- Все21 назначенные model attempts и warm/deterministic/fault проверки независимо разобраны; это не21PASS. Неудачи и неподтверждённая очистка сохранены отдельно.
+- Обязательный остаток послеSave: cold19model+34актуальныхcontrolled packages; списокcontrolled основан на original Save/session в evidence/controlled-cold-selection.json. Model progress: evidence/cold-final-summary.json.
+- Только один live browser: владелец diagnose_boundary_interrupt запускает existing cold-settings. Два коллеги проверяют semantic raw observations без CLI/UI; root браузеры не запускает.
+- В private collector исправлены две observed формы mapping port; удалён лишний запрет native REST connection-arrow. Own package/GUID/tabular links/ancestry/no-side-effect Execute/Cancel/before-after проверки сохранены; оба изменения reviewed/self-check PASS.
+- Cold failures/retries сохраняются отдельно; допускается только новая попытка после конкретно доказанной коррекции. Unsupported native fields остаются gaps без нового API/framework.
+- Native cleanup шести dispose-сбоев остаётся BLOCKED. Финальная own-session очистка показала0 сеансов тестовой учётки, но helper admin logout UNKNOWN; старые guard-профили изолированы.
+- Далее: закончить53cold, обновить итог с gaps, проверить frozen артефакты, относительные ссылки/diff --check и commit. Без push/PR/install и изменения ordinary runtime.
