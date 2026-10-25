@@ -2411,8 +2411,8 @@
   },
   "packages/loginom-runtime/client/lib/package-cleanup.mjs": {
     "baseHash": "5554249e30dd7b8891a0bc9d0e4e58d91438de993603fcd7e722753dd7c1968c",
-    "reason": " D78: bind only the submitted Open native renderer error, dismiss its sole owned OK once and wait its own TabForm mask within the original cleanup deadline; retain all other refusals and test no replay.",
-    "hash": "2bbecc1372f40c0f661a2aee91c7a9d9aa65c3cbf589a9b54a014461e8998e14"
+    "reason": " D78: bind only the submitted Open native renderer error, dismiss its sole owned OK once and wait its own TabForm mask within the original cleanup deadline; retain all other refusals and test no replay. D78 P2: atomic owned OK DOM gesture with retained exact native/DOM signature, original deadline and existing browser receipt; transport races refuse before any gesture.",
+    "hash": "45c8f228bbba3f2622d0c6dc9576c73f4a6ee52aeedd6471bab899e6409fc14b"
   },
   "packages/loginom-runtime/client/lib/workspace.mjs": {
     "baseHash": "1dd8c3bdf0b5045d3cba24dadce0cf910e9ca1ffd61b87d858c5fcd2515fb482",
@@ -2421,7 +2421,7 @@
   },
   "packages/loginom-runtime/client/test/package-cleanup.test.mjs": {
     "baseHash": "279ccf1f2270864aba986bf6e002b76d01d0b0a23b03b3232ce6a81daaa6f8b3",
-    "reason": " D78: bind only the submitted Open native renderer error, dismiss its sole owned OK once and wait its own TabForm mask within the original cleanup deadline; retain all other refusals and test no replay.",
-    "hash": "281e5f304035a59d75411846fe3a20c35701a4d516d83f4f407d7e2ac86815ab"
+    "reason": " D78: bind only the submitted Open native renderer error, dismiss its sole owned OK once and wait its own TabForm mask within the original cleanup deadline; retain all other refusals and test no replay. D78 P2: atomic owned OK DOM gesture with retained exact native/DOM signature, original deadline and existing browser receipt; transport races refuse before any gesture.",
+    "hash": "547cc54b5f14712c8a645fde14f22b37e90044a44cdae0564769fa53f3f6c777"
   }
 }
