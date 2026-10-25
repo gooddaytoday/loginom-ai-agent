@@ -1,0 +1,51 @@
+# Разовая очистка c3 и продолжение LAB-170
+
+**Результат:** отдельно подтвердить очистку неудачного двухслотового verify, освободить его настоящие reservations и продолжить прежнюю кампанию только по missing. Готовые измерения, исходные ошибки и история сохраняются. Полная автономность исходной LAB-170 этим ремонтом не подтверждается.
+
+**Статус:** адресный план v3 EvalOps принят независимым ревью EvalBaseline; обязательное замечание о возврате controller закрыто. Реализация, свежий scope, проверки и независимое ревью точных исполняемых артефактов ещё необходимы. Принятие плана не означает подтверждения очистки или допуска к live-операции.
+
+Основание — действующее техническое предварительное разрешение владельца, [основной план](2026-10-23-autonomous-evals-plan.md), [прежняя разовая процедура](2026-10-25-runner3-once-recovery-plan.md) и [принятый полный v3](https://mas.kartamyshev.dev/api/attachments/01a174d6-7ec8-78d2-ac51-2259213ff5f0/download). Exact plan/review и проверенные hashes сохранены private: `preparation-accounting/c3ea-once-recovery-plan-v3.md`, `epoch-v3-plan-review-result.json`. Актуальные source, счётчики и исходный no-progress предел — в [checkpoint runner3](2026-10-24-local-eval-runner-plan.md#7-этапы-и-состояние-проверок-открытые-пункты-переданы-в-канонический-чат).
+
+## Причина и минимальный способ
+
+Verify заранее приобрёл оба slot lease, но завершился с ошибкой проверки профиля. У B осталась историческая запись пользователя, собственного допустимого process-scope proof нет. Отсутствие PID или management directory не заменяет этого доказательства. Существующие cancellation и generation не принимают такой двухслотовый unbound command.
+
+Исполнитель — лично EvalOps. Он адаптирует private one-off из прежней процедуры, используя существующие lease, pair, archive и release APIs. Новый production API, scheduler, ledger или retry framework не нужен. Прежний скрипт повторять нельзя: он закреплён за другим command и считает B отсутствующим; первоначальная операция также потребовала отдельного хвоста после отказа по сессии.
+
+В Git ожидаются этот план и ссылка/checkpoint runner3: **2 файла, около 60–90 изменённых строк**. Production harness не меняется. Private комплект: один адресный скрипт, immutable scope, небольшой guard self-check, временный unit/handoff и evidence; ориентир скрипта — **250–350 строк**, плюс необходимые проверки. Готовые primitives и lifecycle прежней процедуры переиспользуются. Новые scope/start intent нужны только для привязки этой операции и запрета слепого повтора при потерянном ответе.
+
+## Обязательные границы
+
+- Только прежняя выделенная VM и owned pair LAB-170. До reboot сверить активные units, процессы, контейнеры и reservations, включая retained lost-binding fixture; чужая затрагиваемая работа запрещает операцию. Старую fixture не объявлять очищенной этой процедурой.
+- Сохранить manifest/pins, числовые бюджеты/таймауты, Results и исходные receipts. Ремонт и reboot не меняют lastProgressAt. После истечения исходного предела допустима очистка, но новые измерения и generation для продолжения запрещены; controller публикует partial штатно.
+- Полная цепочка pinned CLI → management/sandbox/browser должна доказывать локальность OS workers на том же kernel; удалённые Loginom/LLM API сами по себе не означают удалённое выполнение OS workers. Связать прежний boot с той же VM, доверенным host fingerprint и Docker daemon/endpoint. При внешнем execution/restore или недоказанной привязке boot-fence недостаточен: STOP.
+- Исходные real leases удерживаются с прежними identity, token, revision и serverEpoch. Новая identity применяется только к текущим observations. Cast lease, переписывание CAS и подмена исторической ошибки успешным cleanup запрещены.
+- A сохраняет original startup proof и прежний embedded archive inventory; revalidation записывается отдельно со ссылками/hashes. Изменённые device/inode/link/socket означают STOP, а не принятие нового baseline. B получает собственные ownership, storage, process и archive evidence; proof A ему не подходит.
+
+## Шаги и проверяемый результат
+
+1. [x] **Принять адресный план.** Независимый plan review v3 — ACCEPT, CF1 закрыт. Это подтверждает применимость конструкции, а не её исполнение.
+2. [ ] **Закрепить свежий scope.** Под controller lock сверить owner/repairer, inactive batch, срок/final, source, CLI provenance, pair/daemon/config, три reservations, composites, оба preparation/user/storage records, partial A, Results и остальные защищённые originals. Credentials не копировать, только проверять hashes из закрытых источников. Результат — immutable адресный scope с отделением изменяемых lease states от исходных evidence.
+3. [ ] **Подготовить и проверить точные артефакты.** Лично EvalOps пишет script/scope/unit/handoff; независимый reviewer проверяет именно их. Реальные file/native guard-проверки охватывают отказ при ином host или прежнем boot, изменённых source/token/revision/daemon/IDs/config, чужой работе, pending/recovery, прерванном start, изменении A inventory во время observations, непустом B storage и частичном release. Lifecycle проверяется при success, STOP, timeout с child, exec/start failure и потере handoff до/после acceptance. Fake lease, чужой proof и synthetic boot не доказывают положительный результат.
+4. [ ] **Выполнить проверенную адресную процедуру.** Сохранить состояние восстановления; использовать реальную boot boundary той же VM после принятия точных артефактов и плана исполнения. Положительный путь двух prepared slots с partial A, собственным B storage/archive и matching old releases квалифицировать на изолированном real-kernel пути до campaign release. Результат — реальные наблюдения и проверяемая цепочка очистки; исходные неуспешные receipts остаются неуспешными.
+5. [ ] **Освободить и продолжить штатно.** После всех проверок native release A → B → server, затем read-back tokens/revisions/cleanup hashes и composite states. При ещё открытом допуске EvalRunner выполняет существующие prepare-generation, чтение config, restart controller и один resume только missing. Если срок истёк, controller завершает partial. Результат — освобождённые прежние ресурсы и подтверждённое продолжение либо штатный частичный итог, без дублей готовых измерений.
+
+## Порядок операции
+
+После нового boot удерживать reopened old guards. До каждого start проверить прежние daemon, exact container/network IDs, owner labels/nonce, images, HostConfig, networks/mount policy и stable configuration. Отдельный durable intent сохраняется до адресного `docker start` только прежних stopped server/studio IDs; `createPair`, пересоздание и изменение restart policy не применяются. Running read-back предшествует current observation и `verifyParallelPair` с текущей identity.
+
+Для обоих слотов прочитать preparation/ownership в old authority и сверить опубликованные storage markers. С current identity проверить пустой owned storage и прежние nonce/userKey/owner-source/device/inode/uid/gid; B не считать отсутствующим. Current admin в отдельном evidence stateDir получает аутентифицированный pair context и используется только для inspect/dispose. Проверить sessions/pool, пустой SessionBackup, закрытые server files, settled/idle profiles, writer/marker и полный читаемый process scan. Неизвестные foreign rows или null telemetry не превращать в подтверждение чистоты. После awaited observations перепроверять guards, текущую identity и неизменность A archive.
+
+A не архивировать и не настраивать заново. Для B использовать существующий durable `archiveProfileEvidence` только после проверки пригодности exact wrapper/paths; journal привязан к B token, archive reference сохраняется до последующего inventory. Даже пустой профиль получает собственное проверяемое empty inventory. При частичном move сохранить journal и остановиться; новый пустой архив не заменяет прежний. `setupProfile`, удаление storage, принудительное закрытие sessions и старые marker/pending-session исключения сюда не переносятся.
+
+После confirmed admin disposal повторить scope/originals/guards/current identity/archive checks. Новые отдельные cleanup proofs явно связывают old authority и current observations, реальные old/current host/boot, command/source и hashes; A дополнительно ссылается на original startup/archive, B — на свой архив. Поля confirmed заполняются только после фактического подтверждения. Затем применяются существующие native release APIs.
+
+## Возврат управления и остановка
+
+Controller остаётся enabled; после boot подтверждается прежний parked state. Проверенный temporary Type=exec unit использует прежние UID, controller environment/flock, RuntimeMaxSec15min, TimeoutStopSec30s, KillMode=control-group и Restart=no. До подтверждённого systemd acceptance действует EXIT/HUP fallback, после — ExecStopPost возвращает controller при success/STOP/error/timeout/partial release после освобождения job locks. Отказ запуска controller остаётся отказом. Этот возврат сохраняет repairing/repairer/deadline и сам не вызывает resume/admission.
+
+Потерянный ответ или частичный start/release требует чтения того же unit/invocation/intent/receipt. Второй полный execute запрещён. Только однозначно завершённые действия учитываются; отдельный reviewed completion выполняет оставшийся хвост со свежими checks и тем же lifecycle. При неизвестном исходе — retained resources и STOP, без ослабления guards или продления срока.
+
+Checkpoint:
+- План v3 принят независимо; обязательных замечаний к плану нет. Code/live ACCEPT и исполнение не заявлены.
+- Следующий шаг — личная подготовка EvalOps свежего scope и точных артефактов, проверки и независимое ревью; live recovery и полный этап7 остаются открытыми.
