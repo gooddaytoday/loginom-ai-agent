@@ -593,10 +593,11 @@ function failedOpenFixture(fault='none') {
   if(fault==='session after wait')m.FServerConnection.Session={};
   if(fault==='late wait')f.state.clock+=30000;
  };
- f.page.mouse={async click(){f.state.dismissals++;f.events.push('error-ok');if(fault!=='late modal')f.state.openError=false;
+ ok.click=()=>{f.state.dismissals++;f.events.push('error-ok');if(fault!=='late modal')f.state.openError=false;
   if(fault==='lost click')throw Error('lost OK reply');
   if(fault==='late click')f.state.clock+=30000;
- }};
+ };
+ f.page.mouse={async click(){return ok.click();}};
  return {...f,runFailed:async()=>{
   const {makeFailedOpenCleanupCode}=await import(process.env.D78_CLEANUP_MODULE??'../lib/package-cleanup.mjs');
   const code=makeFailedOpenCleanupCode({...options,operationId:'prepare'});
@@ -636,4 +637,61 @@ for(const fault of ['foreign dialog','covered','confirmation','unknown error','u
  assert.ok(f.state.dismissals<=1);assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
  if(['foreign dialog','covered','confirmation','unknown error','unbound error','changed native','foreign account'].includes(fault))assert.equal(f.state.dismissals,0);
  assert.equal(result.unsaved_changes_discarded,false);
+});
+
+for(const race of ['foreign error','replacement session','moved button'])test('D78 OK transport race has zero gestures: '+race,async()=>{
+ const f=failedOpenFixture(),evaluate=f.page.evaluate;let changed=false;
+ f.page.evaluate=async(fn,arg)=>{
+  const value=await evaluate(fn,arg);
+  if(value?.dismiss&&!changed){
+   changed=true;
+   if(race==='foreign error')f.context.bg.ext.errormessage.ErrorMsg.FInstance.FErrorMessageInfo={foreign:true};
+   if(race==='replacement session')f.context.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Session={foreign:true};
+   if(race==='moved button')f.context.document.elementFromPoint=()=>({id:'foreign-destructive-control'});
+  }
+  return value;
+ };
+ const result=await f.runFailed();
+ assert.equal(changed,true);assert.equal(result.status,'BLOCKED');
+ assert.equal(f.state.dismissals,0);assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+});
+
+for(const race of ['button reference','native control','geometry','label','deadline'])test('D78 pins exact OK reference/signature and original deadline: '+race,async()=>{
+ const f=failedOpenFixture(),c=f.context,evaluate=f.page.evaluate;
+ f.page.evaluate=async(fn,arg)=>{
+  const value=await evaluate(fn,arg);
+  if(value?.reason==='OWNED_OPEN_ERROR'){
+   const ok=c.document.querySelectorAll('[data-tid="msgbox;tlb;ok"]')[0];
+   if(race==='button reference'){
+    const replacement={...ok};
+    const query=c.document.querySelectorAll;
+    c.document.querySelectorAll=q=>query(q).map(e=>e===ok?replacement:e);
+   }
+   if(race==='native control'){
+    const get=c.Ext.getCmp,control=get(ok.id);c.Ext.getCmp=id=>id===ok.id?{...control}:get(id);
+   }
+   if(race==='geometry')ok.getBoundingClientRect=()=>({x:110,y:100,width:200,height:100});
+   if(race==='label')ok.innerText='Different';
+   if(race==='deadline')f.state.clock+=30000;
+  }
+  return value;
+ };
+ const result=await f.runFailed();
+ assert.equal(result.status,'BLOCKED');assert.equal(f.state.dismissals,0);
+ assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+});
+
+test('D78 OK receipt is retained and an ACK loss cannot repeat the gesture',async()=>{
+ const f=failedOpenFixture(),evaluate=f.page.evaluate;
+ f.page.evaluate=async(fn,arg)=>{
+  const result=await evaluate(fn,arg);
+  if(result?.gesture_returned===true)throw Error('lost guarded gesture ACK');
+  return result;
+ };
+ const first=await f.runFailed();assert.equal(first.status,'BLOCKED');assert.equal(f.state.dismissals,1);
+ const ledger=f.page[Symbol.for('loginom-dock.operation-receipts.v1')];
+ assert.equal(ledger.size,1);assert.equal([...ledger.values()][0].state,'unknown');
+ f.state.openError=true; // No acknowledgement and the same modal is still visible.
+ const second=await f.runFailed();assert.equal(second.status,'BLOCKED');assert.equal(f.state.dismissals,1);
+ assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
 });

@@ -1,3 +1,5 @@
+import {withBrowserReceipt} from './executor.mjs';
+
 // Explicit isolated-run teardown. Never save, stop nodes, or close a package
 // in another Loginom session. The CLI never opts into diagnostic discard.
 // Loginom's own close guard remains
@@ -24,6 +26,9 @@ export function makeFailedOpenCleanupCode(options) {
   const o={sessionId:options.sessionId,account:options.account,packagePath:options.packagePath,
     origin:new URL(options.loginomUrl).origin,loginomBuild:options.loginomBuild,operationId:options.operationId,
     timeoutMs:options.timeoutMs??8000,diagnosticDiscard:false,diagnosticWaitForIdle:false};
+  const gesture=withBrowserReceipt('perform()',{
+    receipt_namespace:'failed-open-cleanup:'+o.sessionId,operation_id:o.operationId+':cleanup-error-ok',
+    receipt_signature:JSON.stringify(o)});
   return `async page=>{
     const o=${JSON.stringify(o)},deadline=${Date.now()+30000};
     const blocked=reason=>({version:1,session_id:o.sessionId,package_path:o.packagePath,status:'BLOCKED',reason,
@@ -36,7 +41,8 @@ export function makeFailedOpenCleanupCode(options) {
         if(Date.now()>=deadline)return blocked('CLEANUP_DEADLINE_EXCEEDED');
         if(!bound)return blocked('FAILED_OPEN_OWNER_UNCONFIRMED');
         return (${closeOwnedPackage.toString()})(page,{...o,documentId:bound.document_id,tabTid:bound.tab_tid,
-          diagnosticReadOnly:bound.read_only,failedOpenOperation:o.operationId},Math.min(deadline,bound.cleanup_deadline));
+          diagnosticReadOnly:bound.read_only,failedOpenOperation:o.operationId},Math.min(deadline,bound.cleanup_deadline),
+          perform=>(${gesture})(page));
       } catch {return blocked('FAILED_OPEN_CLEANUP_UNCONFIRMED');}
     })()]);
   }`;
@@ -117,7 +123,7 @@ export function parsePackageCleanupResult(response, expected) {
   throw Error('Bound package cleanup receipt missing');
 }
 
-async function closeOwnedPackage(page, options, deadline) {
+async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
   const {sessionId, documentId, account, packagePath, tabTid, timeoutMs} = options;
   const receipt = {version:1, session_id:sessionId, document_id:documentId, account, package_path:packagePath,
     package_closed:false, logged_out:false, unsaved_changes_discarded:false, stage:'close_request', started_at:new Date().toISOString()};
@@ -221,17 +227,32 @@ async function closeOwnedPackage(page, options, deadline) {
           const button=buttons.length===1&&buttons[0],control=button&&globalThis.Ext?.getCmp?.(button.id);
           const choices=[...document.querySelectorAll('[data-tid^='+JSON.stringify(tid+';tlb;')+']')]
             .filter(e=>visible(e)&&/;(ok|yes|no|cancel)$/.test(e.getAttribute('data-tid')??''));
-          if(!button||!error.root.contains(button)||!visible(button)||button.innerText?.trim()!=='OK'
+          if(!button||button.isConnected!==true||button.getAttribute('data-tid')!==tid+';tlb;ok'
+            ||!error.root.contains(button)||!visible(button)||button.innerText?.trim()!=='OK'
             ||choices.length!==1||choices[0]!==button||control?.el?.dom!==button||control.disabled!==false)return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
           let parent=control;const seen=new Set();
           for(let i=0;parent&&parent!==error.message&&i<16&&!seen.has(parent);i++){seen.add(parent);parent=parent.ownerCt;}
           if(parent!==error.message)return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
-          if(!dismissOpenError)return {reason:'OWNED_OPEN_ERROR'};
           const b=button.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,hit=document.elementFromPoint(x,y);
           if(!Number.isFinite(x)||!Number.isFinite(y)||x<0||y<0||x>=innerWidth||y>=innerHeight
             ||!(hit===button||button.contains(hit))||Date.now()>=deadline)return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+          const signature=JSON.stringify([tid,button.tagName,button.getAttribute('type'),button.innerText,
+            control.disabled,b.x,b.y,b.width,b.height]);
+          const target=state.open_error_target;
+          if(!dismissOpenError) {
+            if(!target)state.open_error_target={button,control,signature};
+            else if(target.button!==button||target.control!==control||target.signature!==signature)
+              return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+            return {reason:'OWNED_OPEN_ERROR',dismiss:{tid:tid+';tlb;ok'}};
+          }
+          if(!target||target.button!==button||target.control!==control||target.signature!==signature)
+            return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+          // No await/RPC between the complete native owner/ref/hit-test proof
+          // and this sole DOM gesture. Never dispatch to retained coordinates.
+          if(Date.now()>=deadline)return {reason:'CLEANUP_DEADLINE_EXCEEDED'};
           state.open_error_dismiss_started=true;
-          return {dismiss:{x,y,tid:tid+';tlb;ok'}};
+          button.click();
+          return {dismiss:{tid:tid+';tlb;ok'},gesture_returned:true};
         }
         if(state.open_error_dismiss_started&&(visible(error?.root)||visible(error?.element)))return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
         if(blockers.some(loading))return {reason:'OWNED_OPEN_LOADING'};
@@ -280,12 +301,13 @@ async function closeOwnedPackage(page, options, deadline) {
     }, {options, deadline,dismissOpenError});
     let before = await beginClose();
     if(before.reason==='OWNED_OPEN_ERROR') {
-      const ready=await beginClose(true);
+      if(!guardedDismiss)return finish('BLOCKED','FAILED_OPEN_ERROR_UNCONFIRMED');
+      const ready=await guardedDismiss(()=>beginClose(true));
       if(!ready.dismiss||Date.now()>=deadline)return finish('BLOCKED',ready.reason??'CLEANUP_DEADLINE_EXCEEDED');
       receipt.stage='failed_open_error_dismiss';
-      receipt.open_error_cleanup={tid:ready.dismiss.tid,gesture_attempted:true};
+      if(ready.gesture_returned!==true)return finish('BLOCKED','FAILED_OPEN_ERROR_UNCONFIRMED');
+      receipt.open_error_cleanup={tid:ready.dismiss.tid,gesture_attempted:true,gesture_returned:true};
       // A lost/late acknowledgement is never permission to click OK again.
-      await page.mouse.click(ready.dismiss.x,ready.dismiss.y);
       if(Date.now()>=deadline)return finish('BLOCKED','CLEANUP_DEADLINE_EXCEEDED');
       before=await beginClose();
     }
