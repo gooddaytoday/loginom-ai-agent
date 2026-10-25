@@ -148,22 +148,43 @@ Cold audit сначала штатно активирует сохранённы
 короткий последовательный main path, затем новые изолированные попытки. Завершение Xorg
 подтверждено журналом ОС; его первопричина не установлена.
 
-Одноразовые контроллеры занимают 978 строк, включая 233 строки повторно
+Одноразовые контроллеры занимают около 1025 строк, включая 233 строки повторно
 использованных transport/cold tools. После проверки объёма оставлены прямые
 ветки в одном существующем контроллере; новый runner, зависимости и общая
-система телеметрии не добавляются. Ожидание контроллера не должно обрывать
+система телеметрии не добавляются. Верхняя оценка объёма превышена вдвое:
+после пересмотра оставлены только две прямые ветки публичного продолжения
+(один resume до upload и один same-node Import после отмены черновика),
+проверяющий код выбирает ID фактически завершённой операции. Старые неудачные
+попытки не заменяются. Отдельный механизм повторов не вводится. Ожидание контроллера не должно обрывать
 штатные 600 секунд настройки; оно продлено до 720 секунд, без изменения runtime deadline.
 
 Test-only scripted provider возвращает 405 для non-POST до разбора JSON. Это устраняет
 наблюдавшийся сбой вспомогательного контроллера при GET; POST/SSE сохранён и проверен.
 Обычные CLI payload не меняются; точный источник случайного GET не установлен.
 
-В диагностике 18 фиксированных сбоев выполняются на одном подготовленном Filter,
+В диагностике 12 восстанавливаемых сбоев выполняются на одном подготовленном Filter,
 с новой операцией чтения и доказанным освобождением после каждого случая. Это убирает
 около 48 минут повторной настройки. Отдельный payload `diagnostic-fixed` выбирает
 только заранее разрешённый случай по точному ID операции при приватном sentinel;
-публичный контракт и обычные payload не меняются. Изменение прошло независимое
+публичный контракт и обычные payload не меняются. Шесть dispose-сбоев требуют
+отдельных CLI-сессий: ожидается подтверждённый отказ release и удержание gate;
+успешное освобождение считается ошибкой, native cleanup не объявляется. Изменение прошло независимое
 ревью; пропущенная стадия отмены/deadline означает NOT_EXERCISED, а не PASS.
+
+Dirty проверяется существующим idempotent Save: повтор точного ID и параметров
+возвращает исходную квитанцию без Save-жеста, а bridge отдельно читает свежий
+`IsPackageModified`. Вокруг двух чтений сохраняются три таких снимка и проверяется
+отсутствие новых Save. Это доказывает false до и после полного публичного чтения,
+а не непрерывную неизменность внутри RPC. Путь и контроллер прошли независимое ревью.
+
+В `/user` наблюдалось 685 файлов: проверка новой загрузки после 27 прокруток
+отказала с `DOWNLOAD_CONTEXT_CHANGED` до скачивания. Закрытые jobs не возобновляются.
+Для оставшихся управляемых обычных проверок используется существующая собственная
+тестовая учётная запись и новый профиль; подключение выбирается только контроллером.
+Обычные/диагностические результаты различаются по payload, не по имени учётки.
+Модельные и парные сравнения сохраняют исходного пользователя. Новый account, ACL
+или глобальная настройка не добавляются; проверка секретов учитывает ключ и пароль.
+Переиспользование учётки прошло независимое ревью.
 
 ## Checkpoint
 
@@ -176,9 +197,9 @@ Test-only scripted provider возвращает 405 для non-POST до раз
 - Sliding candidatebe052d9f: initialnativefull+ordinary/updatedordinary6cells/CSV24bytes/cleanup PASS; updatednativefull/cold не проверены. Baselinecfad0d4d prepareFAIL/CALL_UNCERTAIN, guard retained:105s host короче120/125s browser, исходнаяUI-причина неизвестна.
 - Multifactscc1setupFAILgeneric; exactknowledgeprobe3bdaf2f9READY/ACK. Multifacts2a17108f MODELFAIL: выдуманныйskillpath/external_directory→permissionreject, nativeprepareсоздалdraft, Save/cleanupнеподтверждены. Не повторятьдоPASS.
 - Cartesianf8483eea: analytics/60ordinarycells/CSV50bytes/cleanup PASS; nativefull отказал на Sort ancestry, агент честно сообщил. Stringcounts40b0fed5:35ordinary+28nativefullcells/Int64bytes/CSV83bytes/cleanup PASS; blank отсутствует, cold не проверен.
-- CP1251 candidate84fceb3c CLI0/cleanupPASS; independent audit идёт. Multiline live идёт. JoinFiltera97945ca остановлен доExecute: Importdelimiter input UI_REFERENCE_OBSCURED, draft discarded/settings unchanged, nativepackagecleanup не доказан.
+- CP1251 candidate84fceb3c values15/15/cleanupPASS; metadataDateНепрерывный vsdraftSPECДискретныйFAIL, readerточен. Multiline2618bc62 values15/15/cleanupPASS, такоежеdraftDatekindFAIL. JoinFiltera97945ca остановлен доExecute: Importdelimiter input UI_REFERENCE_OBSCURED, draft discarded/settings unchanged, nativepackagecleanup не доказан.
 - Fidelity00d5385a raw45cells PASS; reread послеSave отказал настаромbreadcrumb (код такойжеbaseline). Fidelityfbe5b334 raw45/Int64/realbits/−0/JSONredaction/20kdoubleLF/0,1,100/101доExecute PASS; public0/1из9, MCPmax отдельноdense. ProductCLI0/cleanupPASS; outerproviderGETaux1 исправлен минимальнымPOSTguard,3testsPASS.
-- Dense5b62053e raw100×10/public21/44292bytes,next46096/maxprefix21/6negative/cleanupPASS; independent review confirms serializer bytes4399. Actual Import+Calc validators coherent false-read_limit0rows отвергают именно requestedcoverage; Filternegative ещё не проверен.
+- Dense5b62053e raw100×10/public21/44292bytes,next46096/maxprefix21/6negative/cleanupPASS; independent review confirms serializer bytes4399. Actual Import+Calc validators coherent false-read_limit0rows отвергают именно requestedcoverage; Filteractuale4f3d067 позитив+обаcoherent4copyzero-rowfalse-limit отклоненыименноrequestedcoverage;rawunchanged.
 - Seeds Luna dcc1bccc и Sol fdf56b52 wrong10rows/Save/cleanupPASS; rendered prepared-task.json для отдельных modelcorrection попыток. Dates5ef5ffe4 two nativeOADate bytes доordinary PASS, cleanupPASS; auxposthocparser save-adviceFAIL исправляется без повторногоCLI.
 - Diagnostic4file77linepatch/151focused/actualserialized scope PASS; ownfaultaccount/admincleanupPASS. Earlyd1ef16f7SaveдоidentityFAILED/guard; correctedImport→Save→Filter c6b45eff cache0 expectedfault/restored/allsettled/all7dispose/recovery/normalcleanupPASS.
-- Diagnostic-fixed payload verified, operation selector/deadline scope testsPASS; fault-matrix133LOC selfcheck18+72negative+24temporalMissPASS, review доlive. Boundary12 offlinecases+5negativePASS; rows-0live идёт. Очередь: остальные модели/границы/18faults/датыTZ/dirty/freshness/Variant/cold.
+- Diagnostic-fixed payload verified, operation selector/deadline scope testsPASS; fault-matrix141LOC selfcheck18+72negative+4held+24temporalMissPASS/reviewPASS. c03bd34e12cache/AsString plain/cancel/deadline×ports PASS/allsettled/released_after_proof/normalcleanup/PIDs[]. Disposeотдельнонепроверен. Boundary12 offlinecases+5negativePASS; rows-0ccab6eb0 preuploadWorkspaceChanged; rows-042262697 uploadAMBIGUOUS/downloadEpochChanged(685files/27scroll), обеquarantined; normaldirtyвisolatedаккаунтеlive. ReviewboundedcontinuationPASS; JoinFiltere4f3d067 Import/Filter[1,0]/Join/reread/Save/nativecleanup/PIDs[] PASS. Offline44/7TZ currentdecoderPASS/maxloopbody1. LinearRegression5f1e8a9b иKmeans8a92c705 CLI0/cleanupPASS, independent audit ожидает; RESTf1da5af8 initial200/503/2GET/cleanupPASS;repeatread[1,0]admissionFAIL(RESTreceiptIDsнесовместимыgenericretainedMappingSchemas,sourcebugестьbaseline),independentauditидёт. JSdae2ae05 CLI0/cleanupPASS,auditожидает. FidelityLunalive. Очередь: остальные модели/границы/18faults/датыTZ/dirty/freshness/Variant/cold.
