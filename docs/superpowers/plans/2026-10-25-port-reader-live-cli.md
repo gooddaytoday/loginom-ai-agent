@@ -144,6 +144,10 @@ Cold audit сначала штатно активирует сохранённы
 Итог: модельные результаты, normal deterministic, diagnostic faults и ограничения
 раздельно. Сохранять каждую попытку и не заменять неудачи успешным повтором.
 
+Test-only scripted provider возвращает 405 для non-POST до разбора JSON. Это устраняет
+наблюдавшийся сбой вспомогательного контроллера при GET; POST/SSE сохранён и проверен.
+Обычные CLI payload не меняются; точный источник случайного GET не установлен.
+
 ## Checkpoint
 
 - Оба чистых CLI payload собраны/проверены из закреплённых выше коммитов; обычный runtime не менялся.
@@ -160,7 +164,7 @@ Cold audit сначала штатно активирует сохранённы
 - Coldcb9743ce: независимый DataSource.Columns подтвердил физическую перестановку Reform после activation при autosync=true; nativeclose/logout/discardfalse/browserclose PASS. Baselinecolde4c53eda подтвердил ту же перестановку при том же запросе; это существовало до нового reader. Устойчивый explicit order исторически проверялся с autosync=false; непосредственная причина не доказана.
 - Cold0d3b21bd cleanupBLOCKED: адресно закрыта одна PendingDisconnect session с exact ownpath; отсутствие/nativeadminlogout/browserclose подтверждены. Старый Package1 не трогали.
 - Baseline Luna lowliqf888bd65: все35×5 + nativeCSV1508bytes с тем же hash + cleanup PASS; candidate647779ms/baseline993830ms, один функциональный прогон с одинаковым requested sample_rows=100/strict/port0, не статистическая оценка.
-- Первый functional gate принят независимым ревью; cold order PARTIAL не запрещает проверять остальные границы. Zscore setupf5f3dc5c отказал до модели; separate knowledge/browser probes READY/closeACK. Candidate91376509: независимый пересчёт500rows/доставленныеcells/CSV/cleanup PASS547408ms; безJoin/Filter — coveragegap. Baselinec62f14cc завершён867405ms/cleanuptrue, независимая проверка идёт. Запущен candidate sliding-source-refresh.
+- Первый functional gate принят независимым ревью; cold order PARTIAL не запрещает проверять остальные границы. Zscore setupf5f3dc5c отказал до модели; separate knowledge/browser probes READY/closeACK. Candidate91376509: независимый пересчёт500rows/доставленныеcells/CSV/cleanup PASS547408ms; безJoin/Filter — coveragegap. Baselinec62f14cc: все161доставленнаяcells/CSV/cleanup PASS867405ms, тоже безJoin/Filter. Candidate slidingbe052d9f завершён/cleanuptrue; independentcheck идёт, baselinecfad0d4d запущен.
 - Baselinecold31a98fe8: все5типов/16Importfields/source/format/Filter/Sort/Reform/Export независимо сверены; Cancel/nativeclose/logout без discard. Collector71553f13 ошибочно возвращал object в ready; Boolean-предикат исправлен, старый FAIL сохранён.
-- Fidelity00d5385a: raw Import45cells/Int64/realbits/−0/JSONredaction/20kdoubleLF PASS. Public0rows обоснованы MCP46000; первая46590bytes. Save изменил breadcrumb, reread0 безопасно отказал до Execute (тот же путь вbaseline); повторы0/1/100 пока не проверены.
-- Отдельный diagnosticpayload собран с4file77linepatch; manifest/stagedhooks/environment/selfchecks подтверждены. Faultlive/TZlive ещё не запускались, отдельная учётка не подготовлена.
+- Fidelity00d5385a: raw45cells PASS, reread после Save безопасно отказал из-за старого breadcrumb (тот же код вbaseline). Fidelityfbe5b334 доSave: raw45cells/Int64/realbits/−0/JSONredaction/20kdoubleLF/0,1,100 и101доExecute PASS; publicImport0rows/read1001из9, максимумMCP НЕ проверен. ProductCLI0/cleanupPASS; outerproviderGET вызвалauxiliary1, минимальный POSTguard+GET/POSTtests3PASS; источникGET неизвестен.
+- Отдельный diagnosticpayload собран с4file77linepatch; manifest/stagedhooks/environment/selfchecks подтверждены. Изолированная faultучётка создана/readbackPASS, adminlogout/refs/window/processPASS; Faultlive/TZlive ещё не запускались.
