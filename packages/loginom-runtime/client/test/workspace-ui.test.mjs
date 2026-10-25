@@ -4837,7 +4837,7 @@ function lostLinksPrompt(page,mode='lost_links') {
 }
 
 test('saved Join Next preserves links only for its exact owned question, with no repeated gesture',async()=>{
- for(const fault of ['none','no-private-read','other-question','foreign-node','foreign-owner','busy','lost-reply','repeat','epoch']){
+ for(const fault of ['none','delayed','no-private-read','other-question','foreign-node','foreign-owner','busy','lost-reply','repeat','epoch']){
   const clock=fixtureClock(),page=new Page({clock:clock.Date}),c=wizardStepFixture(page);
   c.form.box={x:48,y:71,width:1232,height:729};c.button.box={x:1208,y:380,width:64,height:64};
   page.app.Version='7.4.2';
@@ -4848,21 +4848,23 @@ test('saved Join Next preserves links only for its exact owned question, with no
    path+=(path?'>':'')+label;const crumb=page.add('a','MF;TF-1;cnrNaviMode;b.s_'+path,label,{x:50+panel.children.length*100,y:40,width:90,height:22},panel);
    if(icon)page.add('span',null,'',undefined,crumb).attrs.class=icon;
   }
-  let prompt,clicks=0;
+  let prompt,clicks=0,pendingPrompt=false;
   const native=async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:fault==='foreign-node'&&prompt?'other':'node',surface:'wizard',tid:c.base});
   const execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
    {expected_build:'7.4.2',expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}},...options},native));
   const snapshot=(await execute({mode:'observe'})).output;
   assert.equal(snapshot.wizard.owner_context.status,'observed');
   const next=snapshot.ui.elements.find(e=>e.wizard_step);
-  const click=page.mouse.click;page.mouse.click=async(...args)=>{
-   await click(...args);clicks++;
-   if(clicks===1){prompt=lostLinksPrompt(page,fault==='other-question'?'lost_links_text':'lost_links');
+  const showPrompt=()=>{prompt=lostLinksPrompt(page,fault==='other-question'?'lost_links_text':'lost_links');
     prompt.children[0].ownText='Loginom 7.4.2';
     c.form.attrs.class='bg-mask-message';
     if(fault==='foreign-owner')panel.children.at(-2).ownText='Other';
     if(fault==='busy')page.add('div',null,'Loading').attrs.class='x-mask-msg';
-   }else{
+  };
+  const click=page.mouse.click;page.mouse.click=async(...args)=>{
+   await click(...args);clicks++;
+   if(clicks===1){if(fault==='delayed')pendingPrompt=true;else showPrompt();}
+   else{
     const no=page.document.querySelectorAll('[data-tid="msgbox;tlb;no"]')[0];
     assert.ok(args[0]>=no.box.x&&args[0]<=no.box.x+no.box.width,'must answer No, never delete links');
     if(fault==='lost-reply')throw Error('Lost No reply');
@@ -4870,7 +4872,7 @@ test('saved Join Next preserves links only for its exact owned question, with no
     prompt.remove();c.form.attrs.class='';c.marker.remove();page.add('div',c.base+';JoinDataWizard;grdSourceColumns;tbl','',undefined,c.form);
    }
   };
-  page.waitForTimeout=async ms=>clock.advance(ms);
+  page.waitForTimeout=async ms=>{clock.advance(ms);if(pendingPrompt){pendingPrompt=false;showPrompt();}};
   if(fault==='epoch'){
    const evaluate=page.evaluate.bind(page);page.evaluate=(fn,arg)=>{
     if(prompt&&fn.toString().includes('state.captureMutations(state.observer.takeRecords());')&&fn.toString().includes('return {document:state.epoch'))
@@ -4880,10 +4882,10 @@ test('saved Join Next preserves links only for its exact owned question, with no
   }
   const result=await execute({mode:'act',operation_id:'saved-next',snapshot,action:{verb:'wizard_step',ref:next.ref,expected_stage:'join'},
    ...(fault==='no-private-read'?{}:{preserve_join_mapping:true})});
-  assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify({error:result.error,output:result.output,trace:result.trace}));
-  assert.equal(clicks,['none','lost-reply','repeat'].includes(fault)?2:1,fault);
-  if(fault==='none')assert.equal(result.output.wizard.stage,'join');
-  assert.equal(result.trace.filter(e=>e.event==='saved_join_mapping_preserved').length,['none','repeat'].includes(fault)?1:0,fault);
+  assert.equal(result.status,['none','delayed'].includes(fault)?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
+  assert.equal(clicks,['none','delayed','lost-reply','repeat'].includes(fault)?2:1,fault);
+  if(['none','delayed'].includes(fault))assert.equal(result.output.wizard.stage,'join');
+  assert.equal(result.trace.filter(e=>e.event==='saved_join_mapping_preserved').length,['none','delayed','repeat'].includes(fault)?1:0,fault);
  }
 });
 async function inputPortFinishFixture(mode='valid') {

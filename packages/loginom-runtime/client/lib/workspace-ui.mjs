@@ -4339,7 +4339,9 @@ function readRenderedInputMapping(observation) {
           // An unchanged saved Join may first open its input page while an
           // upstream output is inactive. Keep every link in this disposable
           // draft; this private read path never approves deleting lost links.
-          if(task.preserve_join_mapping===true&&observed.ui.dialogs.length===1){
+          let savedJoinQuestionAnswered=false;
+          const continueSavedJoin=async observed=>{
+          if(task.preserve_join_mapping===true&&!savedJoinQuestionAnswered&&observed.ui.dialogs.length===1){
             const dialog=observed.ui.dialogs[0],wizardRoot=postActionRoot;
             const owned=s=>s.authenticated&&s.origin===current.origin&&s.loginom_build==='7.4.2'
               &&same(s.workflow_ref,current.workflow_ref)&&same(s.package_identity,current.package_identity)
@@ -4366,13 +4368,16 @@ function readRenderedInputMapping(observation) {
                   const epoch=await page.evaluate(()=>{const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
                     if(!state?.observer)return null;state.captureMutations(state.observer.takeRecords());return {document:state.epoch,revision:state.revision};});
                   if(!same(checked.dom_epoch,epoch))fail('UI_EPOCH_CHANGED','The saved Join question changed before continuing');
-                  timeout();mouseHeld=true;await page.mouse.click(target.point.x,target.point.y,{clickCount:1,button:'left'});mouseHeld=false;
+                  savedJoinQuestionAnswered=true;timeout();mouseHeld=true;await page.mouse.click(target.point.x,target.point.y,{clickCount:1,button:'left'});mouseHeld=false;
                   record('saved_join_mapping_preserved',{dialog_ref:dialog.ref,button:'msgbox;tlb;no',settings_applied:false});
                 }
               }finally{postActionRoot=wizardRoot;}
               observed=await readUi();
             }
           }
+          return observed;
+          };
+          observed=await continueSavedJoin(observed);
           const unchangedContext=fresh=>fresh.authenticated && fresh.origin===current.origin && fresh.loginom_build===current.loginom_build
             && same(fresh.workflow_ref,current.workflow_ref) && same(fresh.package_identity,current.package_identity)
             && same(fresh.active_identity,current.active_identity) && fresh.wizard.status==='observed'
@@ -4386,14 +4391,14 @@ function readRenderedInputMapping(observation) {
             if(!observed.ui.masks.length && observed.wizard.stage===current.wizard.stage
               && validation?.status==='observed' && validation.root_ref===current.wizard.root_ref) {
               // Confirm the owned error once more without issuing another gesture.
-              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await readUi();
+              timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await continueSavedJoin(await readUi());
               if(unchangedContext(fresh) && !fresh.ui.masks.length && fresh.wizard.stage===current.wizard.stage
                 && same(calculatorValidation?fresh.wizard.calculator_validation:fresh.wizard.source_validation,validation)) {
                 observed=fresh;record(calculatorValidation?'wizard_calculator_validation_failed':'wizard_source_validation_failed',validation);
                 fail(calculatorValidation?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_SOURCE_VALIDATION_FAILED',validation.message);
               }
               observed=fresh;
-            } else { timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await readUi(); }
+            } else { timeout();await page.waitForTimeout(Math.min(200,timeout()));observed=await continueSavedJoin(await readUi()); }
           }
           if(!unchangedContext(observed) || observed.ui.masks.length || !destination(observed.wizard.stage))
             fail('WIZARD_STEP_NOT_CONFIRMED','The requested destination stage was not confirmed after one click; inspect before retry');
