@@ -31,6 +31,7 @@ import {makeNodeOutputContextCode} from './node-output-context.mjs';
 import {makeNodeTableContextCode} from './node-table-context.mjs';
 import {boundWizardCloseConfirmation,wizardCloseDialogOwner,wizardCloseBinding,boundInputMappingConflict} from './node-wizard-close.mjs';
 import {boundWizardDeactivationConfirmation,wizardDeactivationDialogOwner} from './node-wizard-open.mjs';
+import {isUnchangedTransformExecution} from './node-read-contract.mjs';
 const boundWizardConfirmation=(...args)=>boundWizardCloseConfirmation(...args)||boundWizardDeactivationConfirmation(...args)||boundInputMappingConflict(...args);
 const wizardConfirmationOwner=(...args)=>wizardCloseDialogOwner(...args)||wizardDeactivationDialogOwner(...args);
 
@@ -669,9 +670,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw error;
       }
     },
-    async act(action,processControl) {
+    async act(action,processControl,{preserveJoinMapping=false}={}) {
       checkBudget();
       if (!snapshot) throw new Error('A fresh internal observation is required');
+      if(preserveJoinMapping&&(!isUnchangedTransformExecution(operation.parameters)
+        ||operation.parameters.target.type!=='transform.join_data'||action.verb!=='wizard_step'||action.expected_stage!=='join'
+        ||snapshot.wizard?.stage!=='input_mapping'||snapshot.prepared_node_context?.input_port||snapshot.prepared_node_context?.output_port))
+        throw Error('Preserved Join navigation requires its unchanged node read');
       validateUiAction(action, snapshot);
       assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);
       const mappingConflict=snapshotWizardConfirmation&&boundInputMappingConflict(snapshot,snapshotWizardConfirmation);
@@ -680,16 +685,19 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const step = nextStep(), id = operation.id + ':n' + step;
       const before = snapshot;
       snapshot = null;
-      const signature = digest([id, action, evidenceSnapshot,...(processControl?[processControl]:[])]);
+      const signature = digest([id, action, evidenceSnapshot,...(processControl?[processControl]:[]),
+        ...(preserveJoinMapping?[{preserve_join_mapping:true}]:[])]);
       const processCode=processControl?makeNodeProcessControlCode(preparedNodeContext,before,action,processControl,
         {operation_id:id,deadline:operation.deadline,origin:targetOrigin,build:targetBuild}):null;
       // This write must be durable before the browser receives the mutation.
       const persisted = await entry('node_step_prepared', { step, internal_operation_id: id,
         action: structuredClone(action), observation_sha256: digest(evidenceSnapshot), signature,
-        ...(processControl?{process_control:structuredClone(processControl)}:{}) });
+        ...(processControl?{process_control:structuredClone(processControl)}:{}),
+        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}) });
       evidenceSnapshot = null;
       if (!persisted || JSON.stringify(persisted.action) !== JSON.stringify(action)
-        || persisted.signature !== signature||processControl&&JSON.stringify(persisted.process_control)!==JSON.stringify(processControl)) throw new Error('Prepared step was not durably preserved after redaction');
+        || persisted.signature !== signature||processControl&&JSON.stringify(persisted.process_control)!==JSON.stringify(processControl)
+        ||preserveJoinMapping&&persisted.preserve_join_mapping!==true) throw new Error('Prepared step was not durably preserved after redaction');
       lastPreparedStep = structuredClone(persisted);
       preparedSteps.push({ step: persisted.step, internal_operation_id: persisted.internal_operation_id, signature: persisted.signature, verb: action.verb });
       if (preparedSteps.length > 512) { preparedSteps.shift(); preparedStepsTrimmed = true; }
@@ -703,6 +711,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
       const code = processCode??makeWorkspaceUiCode({ mode: 'act', operation_id: id, action,
         ...(openingWait||settlementWait?{deadline:operation.deadline}:{}),
+        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}),
         ...(settlementWait?{settlement_timeout_ms:settlementWait}:{}),
         ...(openingWait?{opening_timeout_ms:openingWait}:{}),
         ...boundOptions,
@@ -742,7 +751,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     // input never contains a resolver or a recipe. Only a durably recorded,
     // strictly pre-gesture epoch/scan refusal, owned busy mask or proved body replacement
     // permits a new local attempt with unchanged identity and intent.
-    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, processControl }) {
+    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, processControl, preserveJoinMapping=false }) {
       if (typeof resolve !== 'function' || typeof identity !== 'function') {
         throw new Error('A bound action resolver and domain identity are required');
       }
@@ -798,7 +807,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw new Error('Node procedure recovery target or intent changed');
         }
         binding = nextBinding; intent = nextIntent;
-        try { return await channel.act(action,processControl); }
+        try { return await channel.act(action,processControl,{preserveJoinMapping}); }
         catch (error) {
           const r = error instanceof NodeProcedureStepError ? error.receipt : null;
           if (attempt === 2 || r?.status !== 'NOT_APPLIED'

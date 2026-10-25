@@ -7,7 +7,7 @@ import vm from 'node:vm';
 import {createRedactor} from '../lib/redact.mjs';
 import {createExecutionJournal} from '../lib/execution-journal.mjs';
 import {nodeOutputForJournal,createCandidateNodeSupport} from '../lib/node-support.mjs';
-import {isUnchangedTextImportExecution} from '../lib/node-read-contract.mjs';
+import {isUnchangedTextImportExecution,isUnchangedTransformExecution} from '../lib/node-read-contract.mjs';
 
 test('REST/Join JSON cells retain the exact phase ACK through the real journal redactor',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'node-json-ack-'));
@@ -37,7 +37,7 @@ test('JavaScript product read normalizes echo URL cells before the exact durable
     {type:'string',value:'a b&я'}]]}]};
   const before=structuredClone(raw),redactor=createRedactor(),calls=[];
   // Replace browser driver dependencies only; execute the actual product dispatch.
-  const context={createRedactor,nodeOutputForJournal,isUnchangedTextImportExecution,NODE_READ_MODE:'read',createNodeReadDrivers:()=>assert.fail('Wrong driver')};
+  const context={createRedactor,nodeOutputForJournal,isUnchangedTextImportExecution,isUnchangedTransformExecution,NODE_READ_MODE:'read',createNodeReadDrivers:()=>assert.fail('Wrong driver')};
   for(const name of ['ExcelImport','RestRequest','LinRegression','Clustering','CrossTable','Replacement','Duplicates',
    'DateTime','MissingValues','Collapse','Union','TextExport','Join','Filter','TextImport','Sorting','Grouping','Reform','Calculator'])
    context['create'+name+'NodeSupport']=()=>({nodeApplyHandlers:new Map(),nodeApplyDriverFactory:()=>assert.fail('Wrong driver')});
