@@ -154,6 +154,31 @@ test('cleanup refuses a replacement server session after '+changedAt+' for '+mod
  assert.equal(f.events.filter(e=>e==='close').length,1);assert.equal(f.events.includes('logout'),false);
 });
 
+test('D75 idle wait pins original connection/session through dirty read and Close',async()=>{
+ for(const phase of ['idle_session','idle_connection','dirty_session','dirty_connection']) {
+  const f=fixture({running:phase.startsWith('idle'),timeoutMs:8000,idleChange:{running:false}});
+  const m=f.context.bg.app.Application.FInstance.FMainForm.FMapTree,connection=m.FServerConnection,session=connection.Session;
+  const replace=()=>{if(phase.endsWith('connection'))m.FServerConnection={...connection};
+   else connection.Session={IsPackageModified:async()=>false};};
+  if(phase.startsWith('idle')){const wait=f.page.waitForTimeout.bind(f.page);f.page.waitForTimeout=async ms=>{await wait(ms);replace();};}
+  else session.IsPackageModified=async()=>{replace();return false;};
+  const result=await f.run();
+  assert.equal(result.status,'BLOCKED',phase);assert.equal(result.reason,'CLEANUP_SESSION_CHANGED',phase);
+  assert.equal(f.events.includes('close'),false,phase);assert.equal(f.events.includes('logout'),false,phase);
+ }
+});
+
+test('D75 cleanup waits for confirmed own running package and rechecks identity before Close',async()=>{
+ for(const fault of [null,'foreign','unknown','expired']) {
+  const f=fixture({running:fault==='unknown'?undefined:true,timeoutMs:8000,
+   idleChange:fault==='expired'?{}:fault==='foreign'?{path:'/test-2/other.lgp'}:{running:false}});
+  const r=await f.run();
+  assert.equal(r.status,fault?'BLOCKED':'SUCCEEDED',fault);
+  assert.equal(f.events.filter(e=>e==='close').length,fault?0:1);
+  if(!fault){assert.ok(f.events.includes('idle-wait'));assert.equal(r.logged_out,true);}
+ }
+});
+
 for(const blocker of ['mask','dialog'])test('cold cleanup waits read-only for a transient '+blocker+' before one native close/logout',async()=>{
  const f=fixture({[blocker]:true,clearBlocker:true,timeoutMs:8000}),r=await f.run({diagnosticDiscard:true,diagnosticWaitForIdle:true});
  assert.equal(r.status,'SUCCEEDED');assert.equal(r.package_closed,true);assert.equal(r.logged_out,true);

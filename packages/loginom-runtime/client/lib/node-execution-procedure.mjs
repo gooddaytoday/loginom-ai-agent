@@ -83,6 +83,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
     return typeof current==='string'&&current.length?s.ui.elements.filter(e=>consoleTid(e.tid,current)&&e.allowed_actions.includes(verb)):[];};
   const act=async(s,tid,verb='click',identity=()=>node,key)=>channel.perform({condition:'execution control '+tid,
     initialObservation:s,ready:s=>control(s,tid,verb).length===1,
+    ...(launchSucceeded&&consoleControl&&tid===button&&verb==='click'?{settleProcessConsole:consoleControl}:{}),
     ...(tid===grid?{confirmIdentity:consoleMenuIdentity}:{}),
     resolve:s=>({verb,ref:one(control(s,tid,verb),'Unique execution control required').ref,...(key?{key}:{})}),identity});
   const consoleVisible=s=>s.ui.elements.filter(e=>consoleTid(e.tid,grid)).length===1;

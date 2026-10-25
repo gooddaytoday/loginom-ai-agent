@@ -149,3 +149,14 @@ for(const launched of [false,true])test('console settlement requires a succeeded
  };
  await assert.rejects(f.driver.identify(),/admission checked/);
 });
+
+for(const launched of [false,true])test('D75 console gesture forwards running settlement only after succeeded launch: '+launched,async()=>{
+ const f=await execution({offscreen:false,selectedInitially:true});
+ if(launched)await f.driver.launchGraph();
+ f.channel.perform=async o=>{
+  assert.equal(o.condition,'execution control MF;cntMain;tlbMainToolbar;btnProgress');
+  assert.equal(!!o.settleProcessConsole,launched);
+  throw Error('gesture admission checked');
+ };
+ await assert.rejects(f.driver.identify(),/gesture admission checked/);
+});
