@@ -1023,3 +1023,42 @@ export async function superviseProcess(input: {
   if (root && cleanup.status === "confirmed") liveSupervisors.delete(key(root))
   return result
 }
+
+/** Current closure of a native nondelegated preparation unit; no continuous trace is invented. */
+export async function observeTerminalPreparationUnit(binding: UnitBinding, owner: UnitBinding["producer"] & { bootId: string }) {
+  if (!binding || !owner || binding.producer.pid !== owner.pid || binding.producer.starttime !== owner.starttime ||
+    binding.producer.uid !== owner.uid || owner.uid !== process.getuid?.() || !Number.isSafeInteger(owner.pid) || owner.pid < 1 ||
+    !/^\d+$/.test(owner.starttime) || !/^[a-f0-9]{32}$/.test(binding.invocation) || binding.bootId !== owner.bootId ||
+    binding.bootId !== (await readFile("/proc/sys/kernel/random/boot_id", "utf8")).trim() ||
+    !path.posix.isAbsolute(binding.cgroup) || path.posix.normalize(binding.cgroup) !== binding.cgroup ||
+    path.posix.basename(binding.cgroup) !== binding.unit || await realpath("/sys/fs/cgroup") !== "/sys/fs/cgroup")
+    throw Error("TERMINAL_PREPARATION_BINDING")
+  const passes: { observedAt: string; inspected: number; cgroupRemaining: number; producerRemaining: number }[] = []
+  for (let pass = 0; pass < 2; pass++) {
+    const unit = await unitProperties(binding)
+    if (unit.Id !== binding.unit || unit.InvocationID !== binding.invocation || unit.Delegate !== "no" ||
+      unit.MainPID !== "0" || unit.ControlGroup !== "" || !["inactive", "failed"].includes(unit.ActiveState ?? ""))
+      throw Error("TERMINAL_PREPARATION_UNIT_BUSY")
+    if (await lstat(path.join("/sys/fs/cgroup", binding.cgroup)).catch(error => { if (gone(error)) return; throw error }))
+      throw Error("TERMINAL_PREPARATION_CGROUP_BUSY")
+    let inspected = 0
+    for (const pid of (await readdir("/proc")).filter(name => /^\d+$/.test(name))) {
+      const groups = await readFile(`/proc/${pid}/cgroup`, "utf8").catch(error => { if (gone(error)) return null; throw error })
+      if (groups === null) continue
+      if (!groups.trim() || groups.trim().split("\n").some(row => !/^\d+:[^:]*:\//.test(row))) throw Error("TERMINAL_PREPARATION_SCAN_INCOMPLETE")
+      inspected++
+      if (groups.trim().split("\n").some(row => {
+        const group = row.split(":").slice(2).join(":")
+        return group === binding.cgroup || group.startsWith(binding.cgroup + "/")
+      })) throw Error("TERMINAL_PREPARATION_CGROUP_BUSY")
+    }
+    const raw = await readFile(`/proc/${owner.pid}/stat`, "utf8").catch(error => { if (gone(error)) return null; throw error })
+    if (raw !== null) {
+      const starttime = raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19]
+      if (!starttime || !/^\d+$/.test(starttime) || starttime === owner.starttime) throw Error("TERMINAL_PREPARATION_PRODUCER_BUSY")
+    }
+    passes.push({ observedAt: new Date().toISOString(), inspected, cgroupRemaining: 0, producerRemaining: 0 })
+    if (!pass) await Bun.sleep(150)
+  }
+  return passes
+}

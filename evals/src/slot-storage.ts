@@ -5,8 +5,11 @@ import { childEnvironment } from "./child-environment"
 import { readLeaseReceipt, type acquireResourceLease } from "./lease"
 import { closeUserSessions, type AdminConnection } from "./loginom-admin"
 import { inspectUserStorage, verifyParallelPair } from "./parallel-pair"
-import { archiveProfileHistory, releaseStaleWriter } from "./profile"
+import { archiveProfileHistory, assertProfileSettled, releaseStaleWriter } from "./profile"
+import { archiveProfileEvidence } from "./profile-archive"
 import type { ProcessCleanup } from "./process-supervisor"
+import { validateTerminalPreparation, type TerminalPreparationProof } from "./terminal-preparation"
+import { startupArchiveInventory, validateStartupArchive, type StartupArchive } from "./startup-archive"
 import { serverFileObservation } from "./server-files"
 import type { ServerIdentity, SlotFile, SlotLease } from "./slots"
 import { readUserOwnership, readUserPreparation } from "./user-environment"
@@ -18,9 +21,18 @@ export async function assertSessionBackupEmpty(file: SlotFile, identity: ServerI
 }
 
 export async function cleanupSlotStorage(file: SlotFile, server: Awaited<ReturnType<typeof acquireResourceLease>>, lease: SlotLease,
-  admin: Pick<AdminConnection, "identity" | "inspectSessionInventory" | "closeUserSession">, processes: ProcessCleanup, prefixes: string[], attemptDirs: string[] = []) {
-  if (processes.status !== "confirmed" || !processes.capture_complete || processes.unknownProcesses?.length)
+  admin: Pick<AdminConnection, "identity" | "inspectSessionInventory" | "closeUserSession">, processes: ProcessCleanup | TerminalPreparationProof, prefixes: string[], attemptDirs: string[] = [], reuse?: StartupArchive, startup = false) {
+  if (startup && (prefixes.length || attemptDirs.length)) throw new EvalFailure("STARTUP_ARCHIVE_SCOPE", 2)
+  const terminal = "kind" in processes && processes.kind === "terminal-preparation" ? processes : undefined
+  const continuous = "status" in processes ? processes : undefined
+  if (terminal && (prefixes.length || attemptDirs.length)) throw new EvalFailure("TERMINAL_PREPARATION_SCOPE", 2)
+  if (terminal) await validateTerminalPreparation(terminal, server, lease)
+  else if (!continuous || continuous.status !== "confirmed" || !continuous.capture_complete || continuous.unknownProcesses?.length)
     throw new EvalFailure("SLOT_PROCESS_CLEANUP_UNCONFIRMED", 2)
+  if (reuse) {
+    if (attemptDirs.length || prefixes.length) throw new EvalFailure("STARTUP_ARCHIVE_UNCONFIRMED", 2)
+    await validateStartupArchive(reuse, server, lease)
+  }
   await server.assertHeld()
   await lease.assertHeld()
   if (server.reservation.key !== `server:${lease.identity.containerId}` || JSON.stringify(admin.identity) !== JSON.stringify(lease.identity) ||
@@ -36,14 +48,24 @@ export async function cleanupSlotStorage(file: SlotFile, server: Awaited<ReturnT
     Object.entries(expected).some(([key, value]) => JSON.stringify(published[key]) !== JSON.stringify(value)) ||
     ["device", "inode", "uid", "gid"].some(key => published[key] !== storage[key as keyof typeof storage]))
     throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
-  await releaseStaleWriter(lease.slot.profileDir, processes.writerRefusal ? undefined : processes.writer)
-  const archive = await archiveProfileHistory(lease.slot.profileDir, prefixes.at(-1) ?? `startup-${crypto.randomUUID()}`, lease.slot.historyDir)
+  if (terminal) await validateTerminalPreparation(terminal, server, lease)
+  if (reuse) await validateStartupArchive(reuse, server, lease)
+  if (continuous) await releaseStaleWriter(lease.slot.profileDir, continuous.writerRefusal ? undefined : continuous.writer)
+  // Zero-attempt startup uses the existing durable mover. Its stable journal retains
+  // the archive reference even if a later observation or cleanup fails.
+  let archive = reuse?.archive
+  if (!archive && startup) {
+    archive = (await archiveStartupHistory(file, lease)).archive
+  }
+  archive ??= await archiveProfileHistory(lease.slot.profileDir, prefixes.at(-1) ?? `startup-${crypto.randomUUID()}`, lease.slot.historyDir)
+  if (reuse) await validateStartupArchive(reuse, server, lease)
   const closed = await closeUserSessions(admin, lease.slot.username)
   await assertSessionBackupEmpty(file, lease.identity)
   requireServerFilesClosed(await serverFileObservation(lease.identity.containerId), storage.root)
   await server.assertHeld()
   await lease.assertHeld()
   const delivered = await readDeliveredStorage(attemptDirs, lease.slot.username)
+  if (reuse) await validateStartupArchive(reuse, server, lease)
   if (await storageCommand(lease.identity.containerId, "cleanup-slot-storage.sh", [storage.root,
     `${storage.device} ${storage.inode} ${storage.uid} ${storage.gid}`, String(prefixes.length), ...prefixes,
     ...delivered.flatMap(entry => [entry.sha256, String(entry.bytes), entry.name])]) !== 0)
@@ -52,8 +74,24 @@ export async function cleanupSlotStorage(file: SlotFile, server: Awaited<ReturnT
   if (after.entries.length) throw new EvalFailure("SLOT_STORAGE_NOT_EMPTY", 2)
   await server.assertHeld()
   await lease.assertHeld()
-  await archiveSlotWorkspaces(lease.slot, archive, prefixes, attemptDirs)
-  return { archive, closed, removed: storage.entries.map(entry => entry.name) }
+  if (reuse) {
+    if (attemptDirs.length || prefixes.length) throw new EvalFailure("STARTUP_ARCHIVE_UNCONFIRMED", 2)
+    await validateStartupArchive(reuse, server, lease)
+  } else await archiveSlotWorkspaces(lease.slot, archive, prefixes, attemptDirs)
+  return { archive, closed, removed: storage.entries.map(entry => entry.name),
+    ...(startup ? { archiveInventory: await startupArchiveInventory(lease.slot.historyDir, archive) } : {}) }
+}
+
+/** Narrow zero-attempt startup archive, bound to the held composite token. */
+export async function archiveStartupHistory(file: SlotFile, lease: SlotLease) {
+  await lease.assertHeld()
+  await assertProfileSettled(lease.slot.profileDir)
+  const archive = path.join(lease.slot.historyDir, `startup-${lease.token}`)
+  const journal = path.join(file.controller.stateDir, `startup-${lease.token}.archive.json`)
+  await mkdir(archive, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => { if (error.code !== "EEXIST") throw error })
+  await archiveProfileEvidence(lease.slot.profileDir, archive, journal)
+  await lease.assertHeld()
+  return { archive, journal, inventory: await startupArchiveInventory(lease.slot.historyDir, archive) }
 }
 
 export async function archiveSlotWorkspaces(slot: SlotLease["slot"], archive: string, prefixes: string[], attemptDirs: string[]) {

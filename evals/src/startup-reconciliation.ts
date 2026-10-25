@@ -1,3 +1,5 @@
+import { observeTerminalPreparation, type TerminalPreparationProof } from "./terminal-preparation"
+import { readStartupArchive } from "./startup-archive"
 import { EvalFailure } from "./fail"
 import path from "node:path"
 import { lstat, readdir, unlink } from "node:fs/promises"
@@ -64,7 +66,7 @@ export async function reconcileEnvironment(file: SlotFile, identity: ServerIdent
     const reconciled = []
     for (const lease of environment.slots) {
       const recovery = command.unitBinding ? { unitBinding: command.unitBinding, owner: reservation.owner, server: environment.server, lease } : undefined
-      let processes = await readStartupManagement({ stateDir: file.controller.stateDir, commandId: reservation.commandId,
+      let processes: ProcessCleanup | TerminalPreparationProof | undefined = await readStartupManagement({ stateDir: file.controller.stateDir, commandId: reservation.commandId,
         slotId: lease.slot.id, producerPid: reservation.owner.pid, runDir: command.runDir, recovery })
       const prefixes: string[] = [], attemptDirs: string[] = []
       for (const attempt of command.attempts?.filter(attempt => attempt.slotId === lease.slot.id) ?? []) {
@@ -74,6 +76,10 @@ export async function reconcileEnvironment(file: SlotFile, identity: ServerIdent
         processes = await reconcileStartupCleanup(path.join(directory, "cleanup.json"), reservation.owner.pid, recovery)
         prefixes.push(`eval-${path.basename(command.runDir)}-${attempt.taskId}-${attempt.attempt}`)
         attemptDirs.push(directory)
+      }
+      if (!processes && command.unitBinding) {
+        processes = await observeTerminalPreparation(environment.server, lease)
+        await writeLeaseReceipt(path.join(file.controller.stateDir, `terminal-preparation-${lease.token}-${crypto.randomUUID()}.json`), processes)
       }
       if (!await waitProfileIdle(lease.slot.profileDir, 1000)) throw new EvalFailure("STARTUP_PROCESS_CLEANUP_UNCONFIRMED", 2)
       reconciled.push({ lease, processes, prefixes, attemptDirs })
@@ -89,16 +95,25 @@ export async function reconcileEnvironment(file: SlotFile, identity: ServerIdent
         const prepared = await lstat(path.join(file.controller.stateDir, `user-${lease.slot.id}.json`)).catch((error: NodeJS.ErrnoException) => {
           if (error.code === "ENOENT") return undefined; throw error
         })
-        const cleanup = prepared ? entry.processes && await cleanupSlotStorage(file, environment.server, lease, admin, entry.processes, entry.prefixes, entry.attemptDirs) : undefined
+        const originalProof = path.join(file.controller.stateDir, `startup-${lease.token}.json`)
+        const zeroAttempt = entry.attemptDirs.length === 0
+        // The new reader proves only zero-attempt archives. Admitted attempts keep
+        // their existing process/storage recovery contract and original receipts.
+        const prior = prepared && zeroAttempt ? await readStartupArchive(originalProof, environment.server, lease) : undefined
+        const originalBytes = await Bun.file(originalProof).text().catch((error: NodeJS.ErrnoException) => { if (error.code === "ENOENT") return undefined; throw error })
+        const cleanup = prepared ? entry.processes && await cleanupSlotStorage(file, environment.server, lease, admin, entry.processes, entry.prefixes, entry.attemptDirs, prior, zeroAttempt) : undefined
         if (prepared && !cleanup) throw new EvalFailure("STARTUP_PROCESS_CLEANUP_UNCONFIRMED", 2)
         if (!prepared) {
           await assertProfileClean(lease.slot.profileDir)
           await closeUserSessions(admin, lease.slot.username)
           await inspectAbsentUserStorage(file, identity, lease.slot)
         }
-        const proof = path.join(file.controller.stateDir, `startup-${lease.token}.json`)
+        const proof = originalBytes !== undefined ? path.join(file.controller.stateDir, `startup-${lease.token}-revalidated-${crypto.randomUUID()}.json`) : originalProof
         await writeLeaseReceipt(proof, { version: 2, status: "confirmed", slotId: lease.slot.id, leaseToken: lease.token, serverEpoch: identity.serverEpoch,
           processes: "confirmed", serverSessions: "confirmed", archive: "committed", profileArchive: cleanup?.archive ?? null,
+          ...(cleanup?.archiveInventory ? { archiveInventory: cleanup.archiveInventory } : {}),
+          ...(originalBytes !== undefined ? { priorStartup: { file: originalProof, sha256: new Bun.CryptoHasher("sha256").update(originalBytes).digest("hex") } } : {}),
+          ...(prior ? { priorArchive: prior } : {}),
           closed: cleanup?.closed ?? [], removed: cleanup?.removed ?? [], attemptDirs: entry.attemptDirs, unused: !prepared, storageDeletionAllowed: true, nextAdmissionAllowed: true })
         cleanups.push({ lease, proof })
       }

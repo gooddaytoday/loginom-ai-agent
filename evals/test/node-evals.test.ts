@@ -11,7 +11,8 @@ import { writeLeaseReceipt } from "../src/lease"
 import { campaignTick, type CampaignJournal } from "../script/run-campaign"
 import { agentInputsHash, loadTasks, rubricHash } from "../src/task"
 
-test.each([false, true])("saved node without summary collects native evidence after late cleanup=%s", async late => {
+test.each(["normal", "late", "revalidated"])("saved node without summary collects native evidence after cleanup=%s", async mode => {
+  const late = mode !== "normal"
   const batchRoot = await mkdtemp(path.join(os.tmpdir(), "node-attempt-recovery-")), root = path.join(batchRoot, "run")
   const taskId = "crosstable-min-max", attempt = path.join(root, taskId, "1")
   const fixture = await parallelFixture(root), slot = fixture.slots.slots[0]!
@@ -68,7 +69,16 @@ test.each([false, true])("saved node without summary collects native evidence af
         await writeLeaseReceipt(cleanup, { version: 2, status: "confirmed", slotId: slot.id, leaseToken: lease.token, serverEpoch: identity.serverEpoch,
           processes: "confirmed", serverSessions: "confirmed", archive: "committed", profileArchive: archive, attemptDirs: [attempt],
           unused: false, storageDeletionAllowed: true, nextAdmissionAllowed: true })
-        await lease.release(cleanup)
+        if (mode === "revalidated") {
+          const originalBytes = await Bun.file(cleanup).text()
+          const latest = path.join(fixture.slots.controller.stateDir, `startup-${lease.token}-revalidated-${crypto.randomUUID()}.json`)
+          const emptyArchive = path.join(slot.historyDir, "second-cleanup")
+          await mkdir(emptyArchive, { mode: 0o700 })
+          await writeLeaseReceipt(latest, { ...JSON.parse(originalBytes), profileArchive: emptyArchive,
+            priorStartup: { file: cleanup, sha256: new Bun.CryptoHasher("sha256").update(originalBytes).digest("hex") } })
+          await lease.release(latest)
+          expect(await Bun.file(cleanup).text()).toBe(originalBytes)
+        } else await lease.release(cleanup)
       } finally { await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())]) }
     }
     const originalCleanup = await Bun.file(path.join(attempt, "cleanup.json")).text()
@@ -104,6 +114,30 @@ test.each([false, true])("saved node without summary collects native evidence af
       await writeLeaseReceipt(receipt, lease)
       const releaseFile = `${receipt}.${new Bun.CryptoHasher("sha256").update(`profile:${slot.profileDir}`).digest("hex")}.released.json`
       const release = await Bun.file(releaseFile).json(), cleanup = await Bun.file(lease.cleanupReceipt).json()
+      if (mode === "revalidated") {
+        const originalFile = cleanup.priorStartup.file, originalBytes = await Bun.file(originalFile).text()
+        const original = JSON.parse(originalBytes)
+        const publish = async (value: typeof cleanup) => {
+          await writeLeaseReceipt(lease.cleanupReceipt, value)
+          await writeLeaseReceipt(releaseFile, { ...release, cleanupReceiptHash: new Bun.CryptoHasher("sha256").update(JSON.stringify(value)).digest("hex") })
+        }
+        for (const priorStartup of [undefined, { ...cleanup.priorStartup, file: path.join(root, "foreign.json") },
+          { ...cleanup.priorStartup, sha256: "0".repeat(64) }]) {
+          await publish({ ...cleanup, priorStartup }); await reject()
+        }
+        for (const changed of [{ ...original, leaseToken: "foreign" }, { ...original, slotId: "b" },
+          { ...original, attemptDirs: [] }, { ...original, serverEpoch: "0".repeat(64) },
+          { ...original, profileArchive: root }, { ...original, priorStartup: cleanup.priorStartup }]) {
+          await writeLeaseReceipt(originalFile, changed)
+          await publish(cleanup); await reject() // original bytes no longer match
+          await publish({ ...cleanup, priorStartup: { file: originalFile,
+            sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(originalFile).arrayBuffer()).digest("hex") } })
+          await reject() // even a self-consistent link cannot change owner/scope or form a chain
+        }
+        await Bun.write(originalFile, originalBytes)
+        await publish(cleanup)
+        expect(await Bun.file(originalFile).text()).toBe(originalBytes)
+      }
       await writeLeaseReceipt(releaseFile, { ...release, token: "foreign-token" })
       await reject()
       await writeLeaseReceipt(releaseFile, release)

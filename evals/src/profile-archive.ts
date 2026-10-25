@@ -139,16 +139,21 @@ async function confirmedRecoveredArchive(attemptDir: string, profileDir: string,
   }
   if (matches.length !== 1) return refuse()
   const { receipt, lease } = matches[0]!
+  const originalCleanupPath = path.join(file.controller.stateDir, `startup-${lease.token}.json`)
+  const revalidatedName = path.basename(lease.cleanupReceipt ?? "")
+  const linked = lease.cleanupReceipt !== originalCleanupPath
   const resource = lease.resources?.[0], key = `profile:${profileDir}`
   if (lease.version !== 2 || lease.state !== "released" || !lease.token || lease.resources?.length !== 1 || resource?.key !== key ||
     !resource.token || !Number.isSafeInteger(resource.revision) || resource.revision < 1 ||
-    lease.cleanupReceipt !== path.join(file.controller.stateDir, `startup-${lease.token}.json`)) return refuse()
+    linked && (path.dirname(lease.cleanupReceipt) !== file.controller.stateDir ||
+      !revalidatedName.startsWith(`startup-${lease.token}-revalidated-`) ||
+      !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.json$/.test(revalidatedName.slice(`startup-${lease.token}-revalidated-`.length)))) return refuse()
   const release = await readLeaseReceipt(`${receipt}.${new Bun.CryptoHasher("sha256").update(key).digest("hex")}.released.json`) as {
     version: number; kind: string; status: string; key: string; token: string; revision: number; slotReceipt: string;
     cleanupReceipt: string; cleanupReceiptHash: string; serverEpoch: string }
   const cleanup = await readLeaseReceipt(lease.cleanupReceipt) as { version: number; status: string; slotId: string; leaseToken: string;
     serverEpoch: string; processes: string; serverSessions: string; archive: string; profileArchive: string; attemptDirs: string[];
-    unused: boolean; storageDeletionAllowed: boolean; nextAdmissionAllowed: boolean }
+    unused: boolean; storageDeletionAllowed: boolean; nextAdmissionAllowed: boolean; priorStartup?: { file: string; sha256: string } }
   if (release.version !== 2 || release.kind !== "slot-resource-release" || release.status !== "confirmed" || release.key !== key ||
     release.token !== resource.token || release.revision !== resource.revision || release.slotReceipt !== receipt ||
     release.cleanupReceipt !== lease.cleanupReceipt || release.serverEpoch !== command.identity.serverEpoch ||
@@ -158,6 +163,22 @@ async function confirmedRecoveredArchive(attemptDir: string, profileDir: string,
     cleanup.archive !== "committed" || cleanup.unused !== false || cleanup.storageDeletionAllowed !== true || cleanup.nextAdmissionAllowed !== true ||
     !Array.isArray(cleanup.attemptDirs) || !cleanup.attemptDirs.includes(attemptDir) || typeof cleanup.profileArchive !== "string" ||
     !cleanup.profileArchive.startsWith(path.resolve(historyDir) + path.sep) || await realpath(cleanup.profileArchive) !== cleanup.profileArchive) return refuse()
+  if (linked) {
+    // Native release authenticates the current closure. Only the immutable original
+    // startup proof identifies the archive containing this saved measurement.
+    if (cleanup.priorStartup?.file !== originalCleanupPath || !/^[a-f0-9]{64}$/.test(cleanup.priorStartup.sha256)) return refuse()
+    const originalBytes = await Bun.file(originalCleanupPath).arrayBuffer()
+    if (new Bun.CryptoHasher("sha256").update(originalBytes).digest("hex") !== cleanup.priorStartup.sha256) return refuse()
+    const originalCleanup = JSON.parse(Buffer.from(originalBytes).toString()) as typeof cleanup
+    if (originalCleanup.priorStartup !== undefined ||
+      ["version", "status", "slotId", "leaseToken", "serverEpoch", "processes", "serverSessions", "archive", "unused",
+        "storageDeletionAllowed", "nextAdmissionAllowed", "attemptDirs"].some(field =>
+          JSON.stringify(originalCleanup[field as keyof typeof cleanup]) !== JSON.stringify(cleanup[field as keyof typeof cleanup])) ||
+      typeof originalCleanup.profileArchive !== "string" || !originalCleanup.profileArchive.startsWith(path.resolve(historyDir) + path.sep) ||
+      await realpath(originalCleanup.profileArchive) !== originalCleanup.profileArchive) return refuse()
+    return originalCleanup.profileArchive
+  }
+  if (cleanup.priorStartup !== undefined) return refuse()
   // Historical native release remains valid after a later command replaces the current reservation.
   return cleanup.profileArchive
 }
