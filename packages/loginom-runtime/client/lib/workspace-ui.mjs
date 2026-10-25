@@ -725,7 +725,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // already verified. Read their context without making hidden controls actionable.
       ||preparedNodeWizard&&['text_import_file','text_import_format','output_mapping','done'].includes(wizard.stage)
         &&e.querySelectorAll('.bg-vendor-icon-importtextfile').length===1
-      ||(preparedInputPort?.direction==='input'&&!preparedOutputPort||preparedOutputPort?.direction==='output'&&!preparedInputPort)
+      // JS input0 uses hiddenInputNode's exact native path and known-mode guard below.
+      ||preparedOutputPort?.direction==='output'&&!preparedInputPort
         &&javascriptPort.port===0&&javascriptPort.native_index===0
         &&javascriptPort.node_icon_class==='bg-vendor-icon-javascript'
         &&typeof javascriptPort.port_guid==='string'&&javascriptPort.port_guid.length>0

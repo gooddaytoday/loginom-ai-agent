@@ -4330,9 +4330,11 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
   if(mode==='missing_guid')delete binding.input_port.port_guid;
   if(mode==='missing_opening')delete binding.input_port.opening_operation_id;
   if(mode==='wrong_native_icon')binding.input_port.node_icon_class='bg-vendor-icon-unknown';
-  if(mode.startsWith('d52_'))binding.navigation_node={tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()};
+  if(mode.startsWith('d52_')||vendor==='javascript')binding.navigation_node={tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()};
   if(mode==='d52_foreign_node')binding.node_id='foreign';
   if(mode==='d52_foreign_path')binding.navigation_node.tid+='-foreign';
+  if(mode==='d52_foreign_label')binding.navigation_node.label+=' foreign';
+  if(mode==='d52_no_navigation')delete binding.navigation_node;
   if(mode==='d52_no_opening')delete binding.input_port.opening_operation_id;
   if(mode==='d52_no_guid')delete binding.input_port.port_guid;
   if(mode==='d52_other_port')binding.input_port.port=1;
@@ -4379,6 +4381,9 @@ test('JavaScript input0 overflow preserves the owned typed close confirmation',a
 test('D47b owned JS input0 keeps context when the node caption itself overflows',async()=>{
  for(const mode of ['valid','wrong_port','wrong_native_index','missing_native_icon','wrong_native_icon','missing_native_port','unverified_owner','unbound','foreign_path','hidden_ancestor','missing_guid','missing_opening','hidden_visibility','hidden_attribute','zero_opacity','duplicate_icon','secret_node']) {
   const {page}=await joinInputPortOverflowFixture(mode,0,'javascript');
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0];
+  page.add('div','MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;rbTable','',undefined,wizard).attrs.class='x-form-cb-checked';
+  page.add('div','MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;rbLinks','',undefined,wizard);
   const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
   for(const i of [5,6]){crumbs[i].style.display='none';crumbs[i].box={x:0,y:0,width:0,height:0};for(const icon of crumbs[i].children)icon.box={x:0,y:0,width:0,height:0};}
   page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
@@ -6944,3 +6949,34 @@ for(const [card,family] of [['LAB-66','DerivedDataSourceOutputSocketWizard'],['L
    assert.equal(result.output.wizard.output_columns.page.status,['observed','half_pixel','one_pixel'].includes(fault)?'complete_definition_page':'unverified_definition_page',fault);
   }
  });
+
+test('independent D47b foreign native navigation remains refused for hidden JS',async()=>{
+ for(const mode of ['d52_valid','d52_foreign_path','d52_foreign_label','d52_no_navigation','d52_unknown_mode','d52_both_modes','d52_disabled_mode']){
+ const {page}=await joinInputPortOverflowFixture(mode,0,'javascript');
+ const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+ for(const i of [5,6]){crumbs[i].style.display='none';crumbs[i].box={x:0,y:0,width:0,height:0};for(const icon of crumbs[i].children)icon.box={x:0,y:0,width:0,height:0};}
+ page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+ const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0];
+ const c=mappingCoverageFixture(page,4);page.context.innerWidth=1280;
+ for(const child of [...c.form.children]){
+  if(child.attrs['data-tid']?.endsWith(';btnAddMappingColumn')){child.remove();continue;}
+  for(const e of [child,...child.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('MF;TF-1;','MF;TF-5;').replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard').replace('colDefaultUsageType_','colUsageType_');
+  wizard.append(child);
+ }
+ c.form.remove();
+ if(mode==='d52_unknown_mode')c.tableMode.attrs.class='';
+ if(mode==='d52_both_modes')c.linksMode.attrs.class='x-form-cb-checked';
+ if(mode==='d52_disabled_mode')c.tableMode.attrs['aria-disabled']='true';
+ const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
+ page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
+ page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
+ page.add('button','msgbox;tlb;yes','Да',{x:600,y:300,width:50,height:30},dialog);
+ page.add('button','msgbox;tlb;no','Нет',{x:670,y:300,width:50,height:30},dialog);
+ const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+ const permitted=r.output.ui?.elements?.some(e=>e.tid==='msgbox;tlb;yes'&&e.allowed_actions.includes('confirm_wizard_close'))===true;
+ console.log(JSON.stringify({mode,status:r.status,owner_status:r.output.wizard?.input_port_context?.status,confirm_wizard_close:permitted}));
+ assert.equal(permitted,mode==='d52_valid','Native breadcrumb binding must match before Close: '+mode);
+ assert.equal(r.output.wizard?.input_port_context?.status==='observed',mode==='d52_valid',mode);
+ assert.deepEqual(page.events,[]);
+ }
+});
