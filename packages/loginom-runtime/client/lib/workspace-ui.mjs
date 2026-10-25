@@ -524,6 +524,32 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       return null;
     };
     const enabled = element => !element.matches(':disabled') && !element.closest('[aria-disabled="true"],.x-item-disabled,.x-btn-disabled,.x-menu-item-disabled');
+    // File rows share the same native container. These queries and the bounded
+    // FileStore inventory belong to this synchronous observation only; no DOM
+    // gesture or event-loop yield can intervene before the next row is checked.
+    const storageGridPeers=new Map(),storageInventories=new WeakMap();
+    const storagePeers=tid=>{
+      charge();
+      if(!storageGridPeers.has(tid))storageGridPeers.set(tid,[...document.querySelectorAll('[data-tid='+JSON.stringify(tid)+']')]);
+      return storageGridPeers.get(tid);
+    };
+    const storageInventory=(grid,gridTid)=>{
+      charge();
+      if(!storageInventories.has(grid)){
+        const component=globalThis.Ext?.getCmp?.(grid.id),view=component?.getView?.(),store=component?.getStore?.();
+        let inventory=null;
+        if(storagePeers(gridTid).length===1&&component?.el?.dom===grid&&grid.contains(view?.el?.dom)
+          &&store?.$className==='bg.filedialog.FileStore'&&!store.isBufferedStore&&store.isLoading?.()===false){
+          const count=store.getCount?.();
+          if(Number.isSafeInteger(count)&&count<=10000){
+            const records=store.getRange?.();
+            if(Array.isArray(records)&&records.length===count)inventory={view,records:new Set(records)};
+          }
+        }
+        storageInventories.set(grid,inventory);
+      }
+      return storageInventories.get(grid);
+    };
     const controlCodeIdentity = element => {
       const tid=getTid(element),stem=workflow?.prefix+';FileStorageForm;colName_';
       let controlTid=tid??'';
@@ -531,7 +557,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // identity. Keep name/id and all other dangerous-control guards intact.
       if(workflow&&element.tagName==='TD'&&!element.isContentEditable&&!element.closest('[contenteditable="true"]')&&tid?.startsWith(stem)){
         const gridTid=workflow.prefix+';FileStorageForm;pnlFileStorage;tbl';
-        const grids=[...document.querySelectorAll('[data-tid='+JSON.stringify(gridTid)+']')];charge();
+        const grids=storagePeers(gridTid);
         const row=element.closest('.x-grid-item'),label=element.textContent?.trim();
         if(grids.length===1&&row&&grids[0].contains(row)&&row.contains(element)
           &&typeof label==='string'&&label.length>0&&label.length<=240
@@ -3017,16 +3043,10 @@ function readRenderedInputMapping(observation) {
         // byte identity: use the cached file record bound to this exact row.
         const gridTid=tid.split(';colName_')[0]+';pnlFileStorage';
         const grid=storageRow.closest('[data-tid='+JSON.stringify(gridTid)+']');
-        const component=grid&&globalThis.Ext?.getCmp?.(grid.id);
-        const view=component?.getView?.(),store=component?.getStore?.();
-        if(grid&&document.querySelectorAll('[data-tid='+JSON.stringify(gridTid)+']').length===1
-          &&component?.el?.dom===grid&&grid.contains(view?.el?.dom)
-          &&view.el.dom.contains(storageRow)&&store?.$className==='bg.filedialog.FileStore'
-          &&!store.isBufferedStore&&store.isLoading?.()===false
-          &&Number.isSafeInteger(store.getCount?.())&&store.getCount()<=10000) {
+        const inventory=grid&&storageInventory(grid,gridTid),view=inventory?.view;
+        if(inventory&&view.el.dom.contains(storageRow)) {
           const record=view.getRecord?.(storageRow),data=record?.data;
-          const records=store.getRange?.();
-          if(record?.isModel===true&&Array.isArray(records)&&records.length===store.getCount()&&records.includes(record)
+          if(record?.isModel===true&&inventory.records.has(record)
             &&view.getNode?.(record)===storageRow&&data?.Type===0
             &&data.FileName===textOf(element,true)&&typeof data.FilePath==='string'
             &&data.id===data.FilePath&&data.FilePath.startsWith('/')
