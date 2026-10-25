@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, stat } from "node:fs/promises"
 import { campaignTick, controlCampaign, prepareCampaignBatch, runCampaign, type CampaignManifest } from "../script/run-campaign"
 import { readLeaseReceipt, writeLeaseReceipt } from "../src/lease"
 import { tryCampaignLock } from "../src/campaign-lock"
@@ -346,6 +346,52 @@ test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("repair assigns one repairer
     await expect(controlCampaign(fixture.manifestFile, fixture.serverFile, "repair", "EvalBaseline")).rejects.toThrow("CAMPAIGN_REPAIRER_MISMATCH")
     expect(await readLeaseReceipt(fixture.manifestFile)).toEqual(fixture.manifest)
     expect(await Bun.file(path.join(fixture.root, "preflights.json")).json()).toBe(1)
+    expect(await Bun.file(fixture.config.batchEnvFile).exists()).toBe(false)
+  } finally { await fixture.close() }
+})
+
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1").each(["ADMISSION_STATE_UNCONFIRMED", "CLEANUP_UNCONFIRMED"])("resume rechecks old accounted admissions after %s", async blocker => {
+  const fixture = await controlFixture()
+  try {
+    const reserved = await controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")
+    const resultsDir = path.join(fixture.root, "control/batches/1"), runDir = path.join(resultsDir, "run")
+    const commandJournal = path.join(runDir, "native-command.json"), journalFile = path.join(fixture.root, "control/journal.json")
+    await mkdir(runDir, { recursive: true })
+    await writeLeaseReceipt(commandJournal, { version: 2, kind: "unactivated-preparation", runDir, attempts: null })
+    await writeLeaseReceipt(path.join(runDir, "config.json"), { commandJournal })
+    const original = await Bun.file(commandJournal).text()
+    await writeLeaseReceipt(journalFile, { ...reserved, repairing: true, repairer: "EvalRunner", blocker,
+      batches: [{ id: "batch", keys: fixture.manifest.keys, resultsDir, invocationBefore: "", started: true, accounted: true }], startedAttempts: 0 })
+    await Bun.write(path.join(fixture.root, "verify.ts"), 'import { mkdir } from "node:fs/promises"; await mkdir(process.argv[2]!)')
+    await expect(controlCampaign(fixture.manifestFile, fixture.serverFile, "resume", "EvalRunner")).rejects.toThrow("ADMISSION_STATE_UNCONFIRMED")
+    expect(await readLeaseReceipt(journalFile)).toMatchObject({ repairing: true, blocker: "ADMISSION_STATE_UNCONFIRMED",
+      startedAttempts: 0, lastProgressAt: reserved.lastProgressAt, batches: [{ accounted: false }] })
+    expect(await Bun.file(path.join(fixture.root, "control/verification")).exists()).toBe(false)
+    expect(await Bun.file(commandJournal).text()).toBe(original)
+    expect(await Bun.file(path.join(fixture.root, "preflights.json")).json()).toBe(1)
+  } finally { await fixture.close() }
+})
+
+test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("resume reconciles an empty initial admission ledger before fresh verification", async () => {
+  const fixture = await controlFixture()
+  try {
+    const reserved = await controlCampaign(fixture.manifestFile, fixture.serverFile, "reserve")
+    const resultsDir = path.join(fixture.root, "control/batches/1"), runDir = path.join(resultsDir, "run")
+    const commandJournal = path.join(runDir, "native-command.json"), journalFile = path.join(fixture.root, "control/journal.json")
+    await mkdir(runDir, { recursive: true })
+    await writeLeaseReceipt(commandJournal, { version: 2, kind: "unactivated-preparation", runDir, attempts: [] })
+    await writeLeaseReceipt(path.join(runDir, "config.json"), { commandJournal })
+    const original = await Bun.file(commandJournal).text()
+    await writeLeaseReceipt(journalFile, { ...reserved, repairing: true, repairer: "EvalRunner", blocker: "ADMISSION_STATE_UNCONFIRMED",
+      batches: [{ id: "batch", keys: fixture.manifest.keys, resultsDir, invocationBefore: "", started: true, accounted: true }], startedAttempts: 0 })
+    await Bun.write(path.join(fixture.root, "verify.ts"), 'import { mkdir } from "node:fs/promises"; await mkdir(process.argv[2]!)')
+    const resumed = await controlCampaign(fixture.manifestFile, fixture.serverFile, "resume", "EvalRunner")
+    expect(resumed).toMatchObject({ repairing: false, repairer: null, cleanupVerified: true, startedAttempts: 0,
+      lastProgressAt: reserved.lastProgressAt, attempts: [], batches: [{ accounted: true, startedAttempts: 0 }] })
+    expect(resumed.blocker).toBeUndefined()
+    expect((await stat(resumed.verificationDir!)).isDirectory()).toBe(true)
+    expect(await Bun.file(commandJournal).text()).toBe(original)
+    expect(await Bun.file(path.join(fixture.root, "preflights.json")).json()).toBe(2)
     expect(await Bun.file(fixture.config.batchEnvFile).exists()).toBe(false)
   } finally { await fixture.close() }
 })

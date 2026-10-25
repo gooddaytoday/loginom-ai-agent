@@ -337,22 +337,30 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
           const saved = await Bun.file(path.join(runDir, "config.json")).json() as { commandJournal?: string }
           if (typeof saved.commandJournal !== "string" || !path.isAbsolute(saved.commandJournal)) throw Error("ADMISSION_STATE_UNCONFIRMED")
           const native = await readLeaseReceipt(saved.commandJournal) as { version: number; kind: string; runDir: string;
+            commandId?: string; phase?: string; slotIds?: unknown[]; unitBinding?: { invocation?: string };
             attempts?: { taskId: string; attempt: number; purpose: string; completedAt?: number; completionOrder?: number; quality?: boolean }[]; admissionBlocker?: string }
-          if (native.version !== 2 || native.kind !== "unactivated-preparation" || native.runDir !== runDir || !Array.isArray(native.attempts) ||
-            native.attempts.some(attempt => !["preflight", "measurement"].includes(attempt.purpose) || attempt.attempt !== 1 ||
+          // The old initial receipt precedes every write-ahead admission; its writer must have exited.
+          const admissions = native.attempts === undefined && native.phase === "cli_admitted" &&
+            /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(native.commandId ?? "") &&
+            path.basename(saved.commandJournal) === `run-command-${native.commandId}.json` &&
+            Array.isArray(native.slotIds) && native.slotIds.length === manifest.parallel && new Set(native.slotIds).size === native.slotIds.length &&
+            native.slotIds.every(id => typeof id === "string" && /^[a-z0-9][a-z0-9_-]{0,63}$/.test(id)) &&
+            /^[a-f0-9]{32}$/.test(unit.invocation) && native.unitBinding?.invocation === unit.invocation ? [] : native.attempts
+          if (native.version !== 2 || native.kind !== "unactivated-preparation" || native.runDir !== runDir || !Array.isArray(admissions) ||
+            admissions.some(attempt => !["preflight", "measurement"].includes(attempt.purpose) || attempt.attempt !== 1 ||
               attempt.purpose === "measurement" && !batch.keys.some(key => key.taskId === attempt.taskId))) throw Error("ADMISSION_STATE_UNCONFIRMED")
-          startedAttempts += native.attempts.filter(attempt => attempt.purpose === "measurement").length
-          for (const attempt of native.attempts.filter(attempt => attempt.purpose === "measurement"))
+          startedAttempts += admissions.filter(attempt => attempt.purpose === "measurement").length
+          for (const attempt of admissions.filter(attempt => attempt.purpose === "measurement"))
             completions.set(path.join(runDir, attempt.taskId, "1/result.json"), attempt)
           if (native.admissionBlocker) journal.blocker ??= native.admissionBlocker
         } catch { admissionConfirmed = false; journal.blocker ??= "ADMISSION_STATE_UNCONFIRMED" }
       }
       if (admissionConfirmed) {
-        if (startedAttempts < (batch.startedAttempts ?? 0)) journal.blocker ??= "ADMISSION_STATE_UNCONFIRMED"
+        if (startedAttempts < (batch.startedAttempts ?? 0)) { admissionConfirmed = false; journal.blocker ??= "ADMISSION_STATE_UNCONFIRMED" }
         else batch.startedAttempts = startedAttempts
       }
       const totalStarted = journal.batches.reduce((total, item) => total + (item.startedAttempts ?? 0), 0)
-      if (totalStarted < (journal.startedAttempts ?? 0)) journal.blocker ??= "ADMISSION_STATE_UNCONFIRMED"
+      if (totalStarted < (journal.startedAttempts ?? 0)) { admissionConfirmed = false; journal.blocker ??= "ADMISSION_STATE_UNCONFIRMED" }
       else journal.startedAttempts = totalStarted
       const probes = await Promise.all(runs.map(async run => {
         const file = Bun.file(path.join(batch.resultsDir, run, "request-preflight.json"))
@@ -413,7 +421,7 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
       if (!batch.started && unit.invocation === batch.invocationBefore && !probes.some(probe => probe) &&
         !journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep)))
         pending = batch.keys
-      if (!pending) batch.accounted = !assessmentPending
+      if (!pending) batch.accounted = admissionConfirmed && !assessmentPending
       if (probes.some(probe => probe?.code === null)) journal.emptyPreflights = 0
       if (!pending && !batch.keys.every(key => journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep) && keyId(attempt.key) === keyId(key)))) {
         const failure = probes.find(probe => probe && ["REQUEST_PREFLIGHT_EMPTY", "REQUEST_PREFLIGHT_FAILED"].includes(probe.code ?? ""))
@@ -780,6 +788,7 @@ export async function runCampaign(manifestFile: string, serverFile: string, once
         if (!previous.repairing || previous.repairer !== repairer) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
         const unit = await observeUnit(unitName, config.harnessRoot)
         if (unit.active) throw Error("CAMPAIGN_BATCH_ACTIVE")
+        if (previous.batches.length) previous.batches.at(-1)!.accounted = false
         const checked = await campaignTick(manifest, { ...previous, repairing: false, blocker: undefined, blockerKind: undefined }, unit, Date.now(), config)
         previous = { ...checked.journal, repairing: true, repairer: repairer! }
         if (["CAMPAIGN_RECONCILIATION_FAILED", "ADMISSION_STATE_UNCONFIRMED"].includes(previous.blocker ?? "")) {

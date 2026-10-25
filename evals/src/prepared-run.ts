@@ -134,8 +134,9 @@ export async function runPreparedSlots(config: EvalConfig, nodeEvaluation = fals
   const runDir = await reserveRunDirectory(config.resultsDir, `${stamp(started)}-${git?.sha ?? "nogit"}${git?.dirty ? "-dirty" : ""}`)
   const runId = path.basename(runDir), commandId = crypto.randomUUID()
   const journal = path.join(file.controller.stateDir, `run-command-${commandId}.json`)
+  const admissions: CommandAdmission[] = []
   const commandJournal = { version: 2, kind: "unactivated-preparation", commandId, identity, phase: "cli_admitted", runDir,
-    unitBinding: await captureUnitBinding(), slotIds: file.slots.slice(0, config.parallel).map(slot => slot.id) }
+    unitBinding: await captureUnitBinding(), slotIds: file.slots.slice(0, config.parallel).map(slot => slot.id), attempts: admissions }
   await writeLeaseReceipt(journal, commandJournal)
   const budgetFile = path.join(runDir, "resource-budget.json")
   const budget = await freezeResourceBudget({ out: budgetFile, runId, bounds })
@@ -149,7 +150,6 @@ export async function runPreparedSlots(config: EvalConfig, nodeEvaluation = fals
   let metadata: Environment = { git, agent: null, codex: null, dock: null, loginom: null }
   let judge: Awaited<ReturnType<typeof judgeInfo>> | null = null, stopped: string | null = null
   let judgeConfirmed = true, dispatchStarted = "", executionFinished = ""
-  const admissions: CommandAdmission[] = []
   let admissionWrite = Promise.resolve()
   let admissionBlocker: string | undefined
   const saveAdmissions = () => {

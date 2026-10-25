@@ -16,6 +16,86 @@ async function admitRun(runDir: string, taskIds: string[]) {
   await writeLeaseReceipt(path.join(runDir, "config.json"), { commandJournal })
 }
 
+async function initialCommandFixture() {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-initial-command-"))
+  const key = { corpus: "ordinary", taskId: "first", round: 1 }
+  const manifest: CampaignManifest = { id: "initial", server: "runner3", executor: "EvalRunner", parallel: 1, batchSize: 1, keys: [key], pins: {} }
+  const resultsDir = path.join(root, "batches"), runDir = path.join(resultsDir, "run")
+  const commandId = crypto.randomUUID(), invocation = crypto.randomUUID().replaceAll("-", "")
+  const commandJournal = path.join(root, `run-command-${commandId}.json`)
+  const command = { version: 2, kind: "unactivated-preparation", commandId, phase: "cli_admitted", runDir, slotIds: ["a"],
+    unitBinding: { invocation } }
+  await mkdir(runDir, { recursive: true })
+  await writeLeaseReceipt(commandJournal, command)
+  await writeLeaseReceipt(path.join(runDir, "config.json"), { commandJournal })
+  const state: CampaignJournal = { manifestHash: "initial", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
+    repairing: false, repairer: null, batches: [{ id: "batch", keys: [key], resultsDir, invocationBefore: "", started: true }],
+    attempts: [], lastProgressAt: 1000, consecutiveErrors: 0 }
+  return { manifest, command, commandJournal, state, unit: { active: false, invocation, exitCode: 2 },
+    async close() { await rm(root, { recursive: true, force: true }) } }
+}
+
+test("campaign recognizes its terminal initial command before any request admission", async () => {
+  const fixture = await initialCommandFixture()
+  try {
+    const saved = await Bun.file(fixture.commandJournal).text()
+    const tick = await campaignTick(fixture.manifest, fixture.state, fixture.unit, 2000)
+    expect(tick.action).toBe("blocked")
+    expect(tick.journal.blocker).toBe("BATCH_RESULT_MISSING")
+    expect(tick.journal.startedAttempts).toBe(0)
+    expect(tick.journal.attempts).toEqual([])
+    expect(tick.journal.lastProgressAt).toBe(1000)
+    expect(await Bun.file(fixture.commandJournal).text()).toBe(saved)
+  } finally { await fixture.close() }
+})
+
+test("campaign leaves an invalid admission receipt unaccounted", async () => {
+  const fixture = await initialCommandFixture()
+  try {
+    await writeLeaseReceipt(fixture.commandJournal, { ...fixture.command, attempts: null })
+    const tick = await campaignTick(fixture.manifest, fixture.state, fixture.unit, 2000)
+    expect(tick.action).toBe("blocked")
+    expect(tick.journal.blocker).toBe("ADMISSION_STATE_UNCONFIRMED")
+    expect(tick.journal.batches[0]!.accounted).toBe(false)
+    expect(tick.journal.attempts).toEqual([])
+    expect(tick.journal.lastProgressAt).toBe(1000)
+  } finally { await fixture.close() }
+})
+
+test.each([
+  { name: "missing binding", patch: { unitBinding: undefined } },
+  { name: "different invocation", patch: { unitBinding: { invocation: "f".repeat(32) } } },
+  { name: "different phase", patch: { phase: "unactivated" } },
+  { name: "different run", patch: { runDir: "/other/run" } },
+  { name: "different command", patch: { commandId: "00000000-0000-0000-0000-000000000000" } },
+  { name: "unknown slot", patch: { slotIds: [null] } },
+])("campaign refuses to infer no admissions from $name", async value => {
+  const fixture = await initialCommandFixture()
+  try {
+    await writeLeaseReceipt(fixture.commandJournal, { ...fixture.command, ...value.patch })
+    const tick = await campaignTick(fixture.manifest, fixture.state, fixture.unit, 2000)
+    expect(tick.action).toBe("blocked")
+    expect(tick.journal.blocker).toBe("ADMISSION_STATE_UNCONFIRMED")
+    expect(tick.journal.batches[0]!.accounted).toBe(false)
+    expect(tick.journal.attempts).toEqual([])
+    expect(tick.journal.lastProgressAt).toBe(1000)
+  } finally { await fixture.close() }
+})
+
+test("campaign does not replace already known admissions with an initial zero", async () => {
+  const fixture = await initialCommandFixture()
+  try {
+    fixture.state.batches[0]!.startedAttempts = 1
+    fixture.state.startedAttempts = 1
+    const tick = await campaignTick(fixture.manifest, fixture.state, fixture.unit, 2000)
+    expect(tick.action).toBe("blocked")
+    expect(tick.journal.blocker).toBe("ADMISSION_STATE_UNCONFIRMED")
+    expect(tick.journal.batches[0]!.accounted).toBe(false)
+    expect(tick.journal.startedAttempts).toBe(1)
+    expect(tick.journal.lastProgressAt).toBe(1000)
+  } finally { await fixture.close() }
+})
+
 test("campaign finishes only the pending judge then selects the next missing key once", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-pending-offline-"))
   try {
