@@ -18,6 +18,7 @@ import {NODE_READ_MODE,alignReadSchema} from './node-read-contract.mjs';
 import {createNodeReadDrivers} from './node-read-driver.mjs';
 import {withJavascriptSourcePolicyBoundary} from './javascript-source-policy-refusal.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
+import {refuseJavascriptPortFullRead} from './native-read-refusal.mjs';
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const same=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
@@ -383,13 +384,16 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           &&executionReceipt.execution_id===ctx.execution.execution_id&&outputMapping,
         'JavaScript final owned execution and output mapping required');
         if(!read.ports.length)return verified({status:'complete',ports:[],execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id});
-        const {output}=await channel.readOutputPort({port:0,execution:executionReceipt,
+        const portRead=await channel.readOutputPort({port:0,execution:executionReceipt,
           sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
+        const {output}=portRead;
         need(output.port===0&&output.port_guid===outputMapping.node_context.output_port.port_guid,'JavaScript physical output port changed');
         const expected=outputMapping.target_fields.filter(field=>!field.excluded);
         need(output.schema.every((field,index)=>field.name===expected[index]?.name),'JavaScript output field order differs from the configured output');
         const aligned=alignReadSchema(output.schema,expected);
         const data={...output,schema:output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}))};
+        if(read.coverage==='full'&&(data.row_count>100||data.read_limit==='preview_cell_or_byte_budget'))
+          refuseJavascriptPortFullRead(read,portRead,ctx,outputMapping.node_context.output_port.port_guid);
         if(read.coverage==='full')need(data.sample_complete===true&&data.sample_rows===data.row_count&&!data.limitations?.length,
           'Full JavaScript output exceeds bounded read coverage');
         return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,
