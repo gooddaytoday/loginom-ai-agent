@@ -518,7 +518,7 @@ test("parallel observation evidence records delayed starts separately from scan 
   } finally { await Promise.all(runs); await rm(root, { recursive: true }) }
 }, 10_000)
 
-processDenial("parallel registry does not publish a fresh peer claim for an unreadable live process", async () => {
+processDenial("parallel registry keeps healthy cleanup when a live peer becomes unreadable", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-peer-unreadable-"))
   const a = path.join(root, "a"), b = path.join(root, "b")
   await Promise.all([mkdir(a), mkdir(b)])
@@ -542,8 +542,8 @@ processDenial("parallel registry does not publish a fresh peer claim for an unre
     const pid = await Promise.race([ready.promise, pendingB.then(() => { throw Error("Protected peer ended before readiness") })])
     const before = await Bun.file(heartbeat).text()
     const run = await pendingA
-    expect(run.processCleanup.status).toBe("failed")
-    expect(run.processCleanup.error).toContain("Cannot inspect process identity")
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.exitCode).toBe(0)
     expect(run.processCleanup.peerProcesses?.some(entry => entry.process.pid === pid)).toBe(false)
     expect(run.processCleanup.processes.some(entry => entry.pid === pid)).toBe(false)
     expect(await Bun.file(heartbeat).text()).not.toBe(before)

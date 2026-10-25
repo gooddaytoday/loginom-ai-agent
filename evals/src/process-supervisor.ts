@@ -656,8 +656,8 @@ export async function superviseProcess(input: {
   let scanning = Promise.resolve(), stopped = false, timedOut = false, interrupted = false
   const scan = async () => {
     const registered = [...liveSupervisors.values()]
-    const live = await snapshot(registered.flatMap(supervisor => [...supervisor.entries.values()]
-      .filter(entry => entry.origin).map(entry => entry.process)))
+    // Only this owner's ancestry can turn an unreadable process into a refusal.
+    const live = await snapshot([...ledger.values()].filter(entry => entry.origin).map(entry => entry.process))
     const peers = registered.filter(supervisor => supervisor.entries !== ledger && supervisor.cleanup.launcher?.ready &&
       live.some(current => sameIdentity(current, supervisor.launcher)))
     cleanup.peerProcesses = peers.flatMap(supervisor => [...supervisor.entries.values()]
