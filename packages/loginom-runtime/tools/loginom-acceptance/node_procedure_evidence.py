@@ -331,7 +331,7 @@ def bound_output_settlement(rows, row, samples, observations, mutations, *, cold
 
 
 def bound_console_settlement(rows, row, samples, observations, mutations):
-    """Only a confirmed launch's owned console may settle under its deadline."""
+    """Bind owned busy/lock or post-launch epoch settlement to its deadline."""
     readiness = row.get('readiness', {})
     quiet = readiness.get('console_epoch_settlement') is True
     admissions = [r for r in rows if r.get('phase') == 'node_apply_prepared']
@@ -365,7 +365,9 @@ def bound_console_settlement(rows, row, samples, observations, mutations):
         return False
     if quiet and (readiness.get('deadline') != deadline or len(samples) < 2):
         return False
-    if not quiet and not any(sample.get('outcome', {}).get('output', {}).get('ui', {}).get('masks') for sample in samples):
+    if not quiet and not any(sample.get('outcome', {}).get('output', {}).get('ui', {}).get('masks')
+               or sample.get('outcome', {}).get('output', {}).get('prepared_node_context', {}).get('locked') is True
+               for sample in samples):
         return False
     for sample in samples:
         r = sample.get('readiness', {})
@@ -382,13 +384,14 @@ def bound_console_settlement(rows, row, samples, observations, mutations):
         if (any(r.get(k) != readiness.get(k) for k in ('policy', 'required_samples', 'condition', 'timeout_ms'))
                 or type(r.get('elapsed_ms')) not in (int, float) or not 0 <= r['elapsed_ms'] < timeout
                 or context.get('verified') is not True or context.get('surface') != 'graph'
+                or type(context.get('locked')) is not bool or not isinstance(ui.get('masks'), list)
                 or any(not owner.get(k) or context.get(k) != owner[k] for k in ('document_id', 'workflow_id', 'node_id'))
                 or state.get('scan', {}).get('complete') is not True or state.get('wizard', {}).get('status') != 'absent'
                 or ui.get('dialogs') != [] or len(buttons) != 1 or buttons[0].get('enabled') is not True
                 or 'click' not in buttons[0].get('allowed_actions', [])
                 or any(buttons[0].get(k) != controls[0].get(k) for k in ('ref', 'signature'))
-                or any(m.get('kind') != 'busy' or m.get('dialog_ref') or m.get('target_tid') != prefix+';ModelForm'
-                       for m in ui.get('masks', []))):
+                or any(not isinstance(m, dict) or m.get('kind') != 'busy' or m.get('dialog_ref') or m.get('target_tid') != prefix+';ModelForm'
+                       for m in ui['masks'])):
             return False
     if quiet:
         final = [s['outcome']['output'] for s in samples[-2:]]
@@ -396,7 +399,8 @@ def bound_console_settlement(rows, row, samples, observations, mutations):
                 or any(s['prepared_node_context']['locked'] or s['ui'].get('masks') != [] for s in final)
                 or samples[-1]['readiness']['elapsed_ms'] - samples[-2]['readiness']['elapsed_ms'] < 200):
             return False
-    return samples[-1]['outcome']['output']['ui'].get('masks') == []
+    final = samples[-1]['outcome']['output']
+    return final['ui']['masks'] == [] and final['prepared_node_context']['locked'] is False
 
 
 def bound_console_epoch_refresh(rows, row, rejected, observations, mutations):

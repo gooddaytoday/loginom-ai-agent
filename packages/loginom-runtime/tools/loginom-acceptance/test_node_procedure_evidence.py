@@ -307,7 +307,7 @@ class PortReadSequenceTests(unittest.TestCase):
         self.events.pop(-2);self.events.append(prepared)
         self.assertIn('mutation_without_fresh_observation',self.audit()['failures'])
 
-    def console_fixture(self):
+    def console_fixture(self,wait='mask'):
         from node_procedure_evidence import digest
         self.table_fixture()
         self.events.pop()  # Replace the port read with the existing console wait path.
@@ -317,7 +317,7 @@ class PortReadSequenceTests(unittest.TestCase):
         for row in self.events:
             if row.get('step')==65:
                 state=row['outcome']['output']
-                state.update(prepared_node_context=dict(self.node,surface='graph'),wizard=dict(status='absent'))
+                state.update(prepared_node_context=dict(self.node,surface='graph',locked=False),wizard=dict(status='absent'))
                 state['ui'].update(elements=[button,launch],masks=[],dialogs=[])
         state=copy.deepcopy(self.events[-1]['outcome']['output'])
         common={k:copy.deepcopy(self.read[k]) for k in ('session_id','runtime_revision','target','operation_id','internal_provenance')}
@@ -330,7 +330,8 @@ class PortReadSequenceTests(unittest.TestCase):
                                 outcome=dict(operation_id=identity,action_key='ui.act',status='SUCCEEDED',cleanup_complete=True)))
         for index in range(101):
             current=copy.deepcopy(state);current['ui']['elements']=[copy.deepcopy(button)]
-            current['ui']['masks']=[dict(kind='busy',target_tid=current['workflow_ref']['prefix']+';ModelForm',dialog_ref=None)] if index<100 else []
+            current['prepared_node_context']['locked']=index<100 and (wait=='lock' or wait=='mixed' and index<50)
+            current['ui']['masks']=[dict(kind='busy',target_tid=current['workflow_ref']['prefix']+';ModelForm',dialog_ref=None)] if index<100 and (wait=='mask' or wait=='mixed' and index>=50) else []
             ready=dict(policy='semantic_condition_v2',required_samples=1,condition='prepared node available for process console',
                        satisfied=index==100,timeout_ms=30000,elapsed_ms=index*200)
             self.events.append(dict(common,phase='node_observation_sample',step=67,internal_operation_id=operation+':n67',
@@ -404,6 +405,66 @@ class PortReadSequenceTests(unittest.TestCase):
                 if fault=='reason':auth['reason']='ordinary'
                 if fault=='launch':completed['outcome']['status']='FAILED'
                 self.assertFalse(check(bad,auth),fault)
+
+    def test_owned_console_lock_only_and_mixed_settlement_keep_parent_budget(self):
+        for wait in ('lock','mixed'):
+            with self.subTest(wait=wait):
+                self.console_fixture(wait)
+                self.assertTrue(self.audit()['passed'],self.audit()['failures'])
+
+    def test_epoch_settlement_after_owned_lock_or_mask_still_requires_quiet_unlocked_final_pair(self):
+        for wait in ('lock','mixed'):
+            with self.subTest(wait=wait):
+                self.console_epoch_fixture()
+                samples=[r for r in self.events if r.get('phase')=='node_observation_sample' and r.get('step')==67]
+                for index,row in enumerate(samples[:-2]):
+                    state=row['outcome']['output']
+                    state['prepared_node_context']['locked']=wait=='lock' or index<50
+                    state['ui']['masks']=[] if state['prepared_node_context']['locked'] else [dict(
+                        kind='busy',target_tid=state['workflow_ref']['prefix']+';ModelForm',dialog_ref=None)]
+                    row['readiness']['satisfied']=False
+                    row['readiness'].pop('identity_sha256',None)
+                self.assertEqual(len(samples),101)
+                self.assertTrue(self.audit()['passed'],self.audit()['failures'])
+                original=copy.deepcopy(self.events)
+                for fault in ('final_lock','final_mask','epoch','spacing'):
+                    with self.subTest(fault=fault):
+                        self.events=copy.deepcopy(original)
+                        penultimate=[r for r in self.events if r.get('phase')=='node_observation_sample' and r.get('step')==67][-2]
+                        state=penultimate['outcome']['output']
+                        if fault=='final_lock':state['prepared_node_context']['locked']=True
+                        if fault=='final_mask':state['ui']['masks']=[dict(kind='busy',target_tid=state['workflow_ref']['prefix']+';ModelForm',dialog_ref=None)]
+                        if fault=='epoch':
+                            state['dom_epoch']['revision']+=1
+                            from node_procedure_evidence import digest
+                            penultimate['readiness']['identity_sha256']=digest(state['dom_epoch'])
+                        if fault=='spacing':penultimate['readiness']['elapsed_ms']+=1
+                        self.assertFalse(self.audit()['passed'],fault)
+
+    def test_lock_only_console_refuses_foreign_or_unknown_owner_mask_controls_and_unsettled_end(self):
+        self.console_fixture('lock');original=copy.deepcopy(self.events)
+        for fault in ('foreign_lock','foreign_mask','unknown_lock','missing_masks','signature','disabled','action','dialog','scan','elapsed','final_lock','final_mask','no_wait'):
+            with self.subTest(fault=fault):
+                self.events=copy.deepcopy(original)
+                samples=[r for r in self.events if r.get('phase')=='node_observation_sample' and r.get('step')==67]
+                state=samples[0]['outcome']['output']
+                if fault=='foreign_lock':state['prepared_node_context']['node_id']='foreign'
+                if fault=='foreign_mask':state['ui']['masks']=[dict(kind='busy',target_tid='Other;ModelForm',dialog_ref=None)]
+                if fault=='unknown_lock':state['prepared_node_context']['locked']=None
+                if fault=='missing_masks':del state['ui']['masks']
+                if fault=='signature':state['ui']['elements'][0]['signature']['tid']='foreign'
+                if fault=='disabled':state['ui']['elements'][0]['enabled']=False
+                if fault=='action':state['ui']['elements'][0]['allowed_actions']=[]
+                if fault=='dialog':state['ui']['dialogs']=[dict(ref='foreign')]
+                if fault=='scan':state['scan']['complete']=False
+                if fault=='elapsed':samples[0]['readiness']['elapsed_ms']=30000
+                if fault=='final_lock':
+                    for row in [samples[-1],self.events[-1]]:row['outcome']['output']['prepared_node_context']['locked']=True
+                if fault=='final_mask':
+                    for row in [samples[-1],self.events[-1]]:row['outcome']['output']['ui']['masks']=[dict(kind='busy',target_tid=state['workflow_ref']['prefix']+';ModelForm',dialog_ref=None)]
+                if fault=='no_wait':
+                    for row in samples+[self.events[-1]]:row['outcome']['output']['prepared_node_context']['locked']=False
+                self.assertFalse(self.audit()['passed'],fault)
 
     def test_console_settlement_rejects_changed_launch_owner_control_mask_and_budget(self):
         self.console_fixture();original=copy.deepcopy(self.events)
