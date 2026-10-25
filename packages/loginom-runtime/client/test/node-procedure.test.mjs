@@ -959,6 +959,8 @@ test('bound completion gives mask settlement only the remaining parent deadline'
       execute:async(code,options)=>{
         if(typeof code==='string')return {status:'SUCCEEDED',output:structuredClone(state)};
         assert.equal(options.timeout,verb==='click'?35000:69000);
+        if(verb==='click')assert.doesNotMatch(code.code,/"deadline":/);
+        else assert.match(code.code,/"deadline":65000/);
         if(verb==='click')assert.doesNotMatch(code.code,/"settlement_timeout_ms":/);
         else assert.match(code.code,['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views'].includes(verb)?/"opening_timeout_ms":64000/:/"settlement_timeout_ms":64000/);
         return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state};

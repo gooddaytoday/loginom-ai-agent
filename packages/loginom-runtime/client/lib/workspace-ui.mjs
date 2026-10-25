@@ -61,7 +61,9 @@ export function validateUiAction(action, snapshot) {
 }
 
 export function workspaceUiCapability(page, task, readNodeContext, captureProcessFocus, restoreProcessFocus) {
-  const started = Date.now(), deadline = started + (task.settlement_timeout_ms??task.opening_timeout_ms??15000);
+  // Dispatch time consumes the bound node budget; it cannot restart in the browser.
+  const started = Date.now(), deadline = Math.min(task.deadline??Infinity,
+    started + (task.settlement_timeout_ms??task.opening_timeout_ms??15000));
   const trace = [], handles = [];
   let postActionRoot;
   let cancellationSurfaceReads=0;
@@ -4457,6 +4459,9 @@ function readRenderedInputMapping(observation) {
 
 export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
+  if(options.deadline!==undefined&&(!Number.isFinite(options.deadline)||options.deadline<=0
+    ||options.opening_timeout_ms===undefined&&options.settlement_timeout_ms===undefined))
+    throw Error('Absolute node deadline requires a bounded opening or settlement wait');
   if(options.settlement_timeout_ms!==undefined&&(!options.prepared_node_context||options.mode!=='act'
     ||!['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(options.action?.verb)
     ||options.opening_timeout_ms!==undefined||!Number.isInteger(options.settlement_timeout_ms)
