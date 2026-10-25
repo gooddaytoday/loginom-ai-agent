@@ -90,7 +90,7 @@ export function createUserWorkflowBindings() {
         if(!ref)throw Error('UNKNOWN_PREPARED_WORKFLOW: read source using document_id and workflow_id issued together by successful dock_prepare.');
         return {...request,workflow_ref:structuredClone(ref),budget_ms:request.kind==='context'?600000:300000};
       }
-      return {budget_ms:300000,...request};
+      return {budget_ms:600000,...request};
     },
     expandNode(request) {
       const ref = references.get(key(request.document_id, request.workflow_ref?.workflow_id));

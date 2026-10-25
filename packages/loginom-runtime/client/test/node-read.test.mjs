@@ -87,7 +87,7 @@ test('JavaScript output reread refuses until it can verify the effective source'
 test('host reread allowance reaches every phase while full diagnostic defaults and explicit budgets remain unchanged',()=>{
  const s=source(),before=structuredClone(s),expanded=createUserWorkflowBindings().expandNodeRead(args);
  const request=buildNodeReadRequest(expanded,s);validateNodeApplyRequest(request,handlers);
- assert.deepEqual(request.budgets,{configure_ms:300000,execute_ms:300000,total_ms:300000});
+ assert.deepEqual(request.budgets,{configure_ms:600000,execute_ms:600000,total_ms:600000});
  assert.deepEqual(request.read,{ports:[0],sample_rows:100,require_exact_numbers:true});
  assert.deepEqual(s,before);
  for(const budget of [undefined,60000]){
@@ -102,13 +102,13 @@ for(const expired of [false,true])test('read lifecycle skips configuration and n
  const drivers={verifySource:result('source'),prepareTarget:result('target',{node}),openWizard:forbidden,mapPorts:forbidden,finish:forbidden,
   finishGraph:result('finish',{mode:'execute',execution_id:'exec',settings_applied:false}),
   waitExecution:result('execute',{execution_id:'exec',status:'completed'}),
-  readOutput:async(...params)=>{if(expired)time=300002;return result('read',{execution_id:'exec',status:'complete',evidence_ref:'read:output',ports:[{port:0,fresh:true}]})(...params);},verifyContinuation:async()=>false};
+  readOutput:async(...params)=>{if(expired)time=600002;return result('read',{execution_id:'exec',status:'complete',evidence_ref:'read:output',ports:[{port:0,fresh:true}]})(...params);},verifyContinuation:async()=>false};
  const run=()=>applyNode({request,operation,handlers,drivers,record:async e=>structuredClone(e),now:()=>time});
  const out=await run();
  if(expired){
   assert.equal(out.status,'AMBIGUOUS');assert.match(out.error.message,/deadline/);
   await assert.rejects(run,/Explicit inspected resume is required/);
-  assert.equal(operation.nodeApply.deadline,300001);assert.deepEqual(calls,['source','target','finish','execute','read']);return;
+  assert.equal(operation.nodeApply.deadline,600001);assert.deepEqual(calls,['source','target','finish','execute','read']);return;
  }
  assert.equal(out.status,'SUCCEEDED',JSON.stringify(out));assert.equal(out.configuration.status,'not_requested');
  assert.deepEqual(calls,['source','target','finish','execute','read']);assert.deepEqual(await run(),out);assert.equal(calls.length,5);
