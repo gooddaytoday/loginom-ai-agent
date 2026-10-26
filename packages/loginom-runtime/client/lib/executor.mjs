@@ -1028,7 +1028,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       seen.add(node);
       if (app.PackageTreeNode && node instanceof app.PackageTreeNode) {
         const path = node.PackageFileName;
-        return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null };
+        return { path: typeof path === 'string' ? path : null, name: node.PackageName ?? null, read_only: node.ReadOnly === true };
       }
       node = node.ParentNode;
     }
@@ -1058,7 +1058,15 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     if(crumbs.length<3||crumbs.length>32)throw Error('Saved continuation navigation unavailable');
     const result=new Map();
     for(const record of preparation.receipts.values()) {
-      if(record.phase!=='verified'||record.tab!==tabs[0]||!record.nodeTargetWorkflowNode)continue;
+      if(record.phase!=='verified'||record.tab!==tabs[0]||typeof record.workflowId!=='string')continue;
+      // An opened package may be copied before any node read populates this
+      // cache. Bind it against the original prepared path before Save, so the
+      // existing navigation refresh is not skipped for that workflow.
+      if(!record.nodeTargetWorkflowNode) {
+        if(record.packageNode!==packageNode||!workflowNode||JSON.stringify(record.crumbs)!==JSON.stringify(crumbs))
+          throw Error('Saved continuation initial native identity changed');
+        record.nodeTargetWorkflowNode=workflowNode;
+      }
       if(record.packageNode!==packageNode||record.nodeTargetWorkflowNode!==workflowNode)throw Error('Saved continuation native identity changed');
       result.set(record.workflowId,{document_id:preparation.id,workflow_ref:{...binding,workflow_id:record.workflowId,navigation_path:crumbs}});
       if(result.size>32)throw Error('Saved continuation bound exceeded');
@@ -1131,6 +1139,8 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
   const runPackageSaveAs = async ({ keepOpen = false } = {}) => {
     const before = await packageCheckpoint();
     if (task.checkpoint && !same(before, task.checkpoint)) throw new Error('Package changed after save preflight');
+    if (before.package_identity.read_only && normalizeStoredPath(before.package_identity.path) === before.path)
+      throw new Error('The active package is read-only. Save a copy to an explicitly different package path.');
     let arrangement = { status: 'skipped', reason: 'ownership_unconfirmed' };
     try {
       const admission = await page.evaluate(binding => {
@@ -1181,7 +1191,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const continuationsBefore = keepOpen ? await packageContinuations(before.workflow_ref) : [];
     const click = async (symbol, effect = false) => interact(timeout => resolve(symbol).then(item => item.click({ timeout })), effect);
     transientDialog = true;
-    await click('packages.menu');
+    if (!(await resolve('packages.save_as', {}, { cardinality: 'zeroOrOne' }))) await click('packages.menu');
     await click('packages.save_as');
     const input = await poll(() => resolve('file_dialog.file_name', {}, { cardinality: 'zeroOrOne', stable: false }));
     await writeFileName(input, before.path);
@@ -1365,7 +1375,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
       } else if (!task.mode || task.mode === 'apply') outcome = await handler.apply();
       else throw new Error('Unknown capability execution mode');
     } catch (error) {
-      record('action_failed', { phase, effect_possible: effectPossible });
+      record('action_failed', { phase, effect_possible: effectPossible, message: safeMessage(error) });
       outcome = result(effectPossible || task.mode === 'reconcile' ? 'AMBIGUOUS' : 'FAILED', {}, { code: 'CAPABILITY_ERROR', message: safeMessage(error) });
     } finally {
       const cleanup = async (name, operation) => {
@@ -1625,7 +1635,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     }
     attempt.byteOutcome=structuredClone(outcome);
     if(!attempt.byteRecorded) {await remember(attempt,'download_verified',outcome);attempt.byteRecorded=true;}
-    if(outcome.output.bytes_verified===true && operation.outcome.output.upload_submitted===true
+    if(outcome.output.bytes_verified===true && (operation.outcome.output.upload_submitted===true||attempt.checkpoint.existing_file_check===true)
       && operation.outcome.cleanup_complete===true && raw.cleanup_complete===true) {
       // The transfer contract's postcondition is exact destination bytes/size/
       // digest, not a visible filename or a network-idle heuristic. Both native
@@ -1642,6 +1652,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         destination:artifact.upload.destination,bytes:artifact.bytes,sha256:artifact.sha256};
       const completedUpload={...structuredClone(operation.outcome),status:'SUCCEEDED',phase:'verified',error:null,
         cleanup_complete:true,output:{...structuredClone(operation.outcome.output),verification_required:false,
+          ...(attempt.checkpoint.existing_file_check?{existing_file_reused:true,artifact_id:artifact.artifact_id,bytes:artifact.bytes,sha256:artifact.sha256}:{}),
           transfer_postcondition:'destination_bytes_digest_and_size',server_copy_verification:summary}};
       const completedVerification={...structuredClone(outcome),output:{...outcome.output,upload_completion_verified:true}};
       if(!attempt.transferRecorded) {await remember(operation,'transfer_completed',completedUpload);attempt.transferRecorded=true;}
@@ -1652,13 +1663,23 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(pending===operation)pending=null;
       return completedVerification;
     }
+    if(attempt.checkpoint.existing_file_check&&raw.cleanup_complete===true){
+      try{await attempt.lease.release();}
+      catch{
+        operation.cleanupConfirmed=false;
+        attempt.outcome={...structuredClone(outcome),status:'AMBIGUOUS',phase:'cleanup',cleanup_complete:false,
+          error:{code:'TRANSFER_CLEANUP_FAILED',message:'Existing file was not accepted; temporary file cleanup is unconfirmed'}};
+        return attempt.outcome;
+      }
+      if(pending===operation)pending=null;
+    }
     attempt.outcome=outcome;attempt.settled=true;
     auxiliary.set(attempt.id,{signature:attempt.signature,outcome:structuredClone(outcome)});
     operation.transportUncertain=false;operation.cleanupConfirmed=raw.cleanup_complete===true;
     operation.outcome.output.server_copy_verification={verification_id:attempt.id,status:outcome.status,
       bytes_verified:outcome.output.bytes_verified===true,upload_completion_verified:false,
       ...(outcome.output.bytes_verified ? {destination:artifact.upload.destination,bytes:artifact.bytes,sha256:artifact.sha256} : {})};
-    if(raw.status==='NOT_APPLIED' && raw.cleanup_complete===true)await attempt.lease.release();
+    if(!attempt.checkpoint.existing_file_check&&raw.status==='NOT_APPLIED' && raw.cleanup_complete===true)await attempt.lease.release();
     return outcome;
   };
   const nodeTargetOutcome=(operation,result)=>({status:result.status,action_key:operation.action.action_key,action_revision:'1',operation_id:operation.id,
@@ -1818,8 +1839,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
   const earlyNodePhase=operation=>!operation?.nodeApply?.node&&!operation?.nodeApply?.result
     &&(['source','workflow','target'].includes(operation?.nodeApply?.pending?.phase)
       ||operation?.nodeApply?.target_reconciled===true);
-  const earlyRelease=(operation,signal)=>earlyNodePhase(operation)?()=>releaseNodeTarget({operation,adapter:operation.nodeTargetAdapter,
-    record:nodeTargetRecord,readReceipt:ref=>readReceipt(operation,ref),deadline:now()+NODE_RELEASE_BUDGET_MS,signal,now}):undefined;
+  const earlyRelease=(operation,signal)=>earlyNodePhase(operation)?async()=>{
+    const deadline=now()+NODE_RELEASE_BUDGET_MS;
+    await operation.nodeApplyDrivers?.releaseBeforeTarget?.({signal,deadline});
+    return releaseNodeTarget({operation,adapter:operation.nodeTargetAdapter,
+      record:nodeTargetRecord,readReceipt:ref=>readReceipt(operation,ref),deadline,signal,now});
+  }:undefined;
   const nodeReleaseStep=operation=>!operation.transportUncertain&&!nodeJobs.busy&&(earlyNodePhase(operation)
     ||operation.nodeApply?.pending&&(!operation.nodeApplyDrivers?.releasePendingPhases||operation.nodeApplyDrivers.releasePendingPhases.includes(operation.nodeApply.pending.phase))
     &&operation.nodeApply.node&&typeof operation.nodeApplyDrivers?.releasePending==='function')?{tool:'dock_operation_recover',
@@ -2268,6 +2293,9 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     };
     const graphRequest={document_id:request.document_id,workflow_ref:request.workflow_ref,
       target:{kind:'existing',type:'programming.javascript',ref:request.node},inputs:[]};
+    // Source-only requests need the same initial native graph binding as context
+    // reads. Observing never activates, executes or changes the requested node.
+    if(request.kind==='source')await targetAdapter(operation).observe(graphRequest,deadline);
     const session=request.kind==='context'?createJavascriptContextReadSession({request,uiEpoch,deadline,adapter,redactor,record:onRecord,
       channel:contextChannel,observeGraph:()=>targetAdapter(operation).observe(graphRequest,deadline)}):
       createJavascriptSourceReadSession({request,uiEpoch,deadline,adapter,redactor,record:onRecord});
@@ -2611,11 +2639,18 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         return structuredClone(outcome);
       } finally {running=false;}
     },
-    async verifyArtifact({operationId,verificationId,observationId,fileRef,signal,discover=false,onDispatched}={}) {
+    async verifyArtifact({operationId,verificationId,observationId,fileRef,signal,discover=false,compareExisting=false,onDispatched}={}) {
       signal?.throwIfAborted();checkId(operationId);checkId(verificationId);
       if(!allowCandidate || !artifactStore)throw new Error('Artifact verification is available only in a candidate session');
-      const signature=fingerprint(discover?'artifact.verify.discovery':'artifact.verify',[operationId,observationId,fileRef]);
+      const signature=fingerprint(discover?'artifact.verify.discovery':'artifact.verify',[operationId,observationId,fileRef,compareExisting]);
       const operation=operations.get(operationId);
+      // Only the private delivery's confirmed Skip can compare a pre-existing
+      // file. The admitted current-session artifact still owns the exact path
+      // and byte identity; uncertain submission never enters this branch.
+      const existingFile=compareExisting&&operation?.deliveryOperationId&&operation.parameters.overwrite==='reject'
+        &&operation.outcome?.status==='FAILED'&&operation.outcome.error?.code==='UPLOAD_PATH_CONFLICT'
+        &&operation.outcome.output?.conflict_rejected===true&&operation.outcome.output.upload_submitted===false
+        &&operation.outcome.output.destination===operation.parameters.destination;
       if(operations.has(verificationId))throw new Error('Verification ID conflicts with an existing operation');
       if(auxiliary.has(verificationId)) {
         const previous=auxiliary.get(verificationId);
@@ -2626,7 +2661,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         if(operation.verification.signature!==signature)throw new Error('Verification ID was already used with different parameters');
         return structuredClone(operation.verification.outcome ?? failed(operation.verification,'OPERATION_STILL_PENDING','Inspect the original upload to reconcile its download'));
       }
-      if(running || !operation || pending!==operation || operation.action.capability!=='artifact.upload'
+      if(running || !operation || (pending!==operation&&!(existingFile&&!pending)) || operation.action.capability!=='artifact.upload'
         || operation.transportUncertain || !operation.cleanupConfirmed || (operation.verification && !operation.verification.settled))
         throw new Error('Inspect and confirm the pending upload browser receipt before verifying its file');
       const snapshot=observations.get(observationId);
@@ -2643,13 +2678,14 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         const lease=await artifactStore.stageDownload(operation.parameters.artifact_id);
         const attempt={id:verificationId,signature,lease,action:{action_key:'artifact.verify',revision:'1',capability:'artifact.verify'},
           parameters:{upload_operation_id:operationId,observation_id:observationId,file_ref:fileRef},checkpoint:{artifact:options.artifact,
+            ...(existingFile?{existing_file_check:true}:{}),
             ...(discover?{discovery:{workflow_ref:snapshot.workflow_ref,document:snapshot.dom_epoch.document,active_tab_ref:snapshot.active_tab_ref}}:{})},deadline:now()+60000};
         try {signal?.throwIfAborted();await remember(attempt,'download_prepared');signal?.throwIfAborted();}
         catch(error){await lease.release();throw error;}
         let code;
         try {signal?.throwIfAborted();code=buildDownload({...options,download_path:lease.path});}
         catch(error){await lease.release();throw error;}
-        operation.verification=attempt;observations.clear();
+        operation.verification=attempt;pending=operation;observations.clear();
         const receipt=receiptOptions(operation,verificationId,'artifact.download',signature);
         let raw;
         try {
@@ -2670,7 +2706,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
       if(snapshot)makeArtifactDiscoveryDownloadCode({artifact,snapshot},{download:browserArtifactDownload,reveal:browserArtifactReveal});
     },
     uploadDeliveredArtifact:options=>runtime.upload({...options,decideConflicts:true}),
-    verifyDeliveredArtifact:options=>runtime.verifyArtifact({...options,discover:true}),
+    verifyDeliveredArtifact:options=>runtime.verifyArtifact({...options,discover:true,compareExisting:true}),
     // Private entry point for the node.apply shell (03). No new public MCP
     // action: the graph phase shares this runtime's gate, IDs and journal.
     async runNodeTarget(request,{operationId,signal,resume=false}={}) {
@@ -2813,7 +2849,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
               {document_id:request.document_id,workflow_ref:request.workflow_ref},ctx)}:{}),prepareTarget:async(graph,ctx)=>{
             const overallDeadline=operation.deadline;operation.deadline=ctx.deadline;
             let result,preflight;
-            try{
+            const sourcePreflight=async()=>{
               if(operation.nodeApplyDrivers.beforeTarget){
                 const current=await operation.nodeTargetAdapter.verifyWorkflow({document_id:graph.document_id,workflow_ref:graph.workflow_ref},ctx);
                 if(current?.status!=='SUCCEEDED'||current.verified!==true||current.cleanup_complete!==true
@@ -2828,9 +2864,17 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
                   throw Error('Complete owned graph required before node preflight');
                 preflight=await operation.nodeApplyDrivers.beforeTarget(ctx);
               }
+            };
+            try{
+              const checkpointPreflight=graph.target.kind==='new'&&['transform.cross_table','transform.calculator','preprocessing.data_recovery'].includes(graph.target.type)
+                &&!operation.targetPhase?.baseline&&typeof operation.nodeApplyDrivers.beforeTarget==='function';
+              if(!checkpointPreflight)await sourcePreflight();
               const targetRequest=preflight?.target_inputs?{...graph,inputs:preflight.target_inputs}:graph;
               result=await prepareNodeTarget({request:targetRequest,operation,adapter:operation.nodeTargetAdapter,
-                record:onRecord,signal:ctx.signal,now});
+                record:onRecord,signal:ctx.signal,now,...(checkpointPreflight?{beforeTarget:async()=>{
+                  await sourcePreflight();
+                  if(preflight?.target_inputs)throw Error('Checkpointed source preflight cannot replace target inputs');
+                }}:{})});
             }finally{operation.deadline=overallDeadline;}
             if(result.status!=='SUCCEEDED'){
               const error=new Error(result.error??'Node target is not verified');

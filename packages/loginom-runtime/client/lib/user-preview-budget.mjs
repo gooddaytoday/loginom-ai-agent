@@ -14,17 +14,19 @@ export function budgetUserPreview(reply,{wireSize=previewWireSize}={}) {
   // equivalent display/number duplicates, never infer numbers from UI text.
   if(cell.is_null===false&&cell.type==='real'&&cell.precision==='17_significant_digits'&&cell.representation==='binary64'
     &&typeof cell.decimal==='string'&&Number.isFinite(Number(cell.decimal))
-    &&typeof cell.value==='number'&&Object.is(Number(cell.decimal),cell.value)){
+    &&typeof cell.value==='number'&&(Object.is(Number(cell.decimal),cell.value)
+      ||cell.value===0&&Object.is(Number(cell.decimal),-0))){
    // A shorter decimal is safe only when it round-trips to the identical
    // binary64, including signed zero. This changes spelling, not precision.
-   const shortest=Object.is(cell.value,-0)?'-0':String(cell.value);
-   if(shortest.length<cell.decimal.length&&Object.is(Number(shortest),cell.value))cell.decimal=shortest;
+   const shortest=Object.is(Number(cell.decimal),-0)?'-0':String(cell.value);
+   if(shortest.length<cell.decimal.length&&Object.is(Number(shortest),Number(cell.decimal)))cell.decimal=shortest;
    delete cell.value;
    if(typeof cell.display_text==='string'&&Object.is(Number(cell.display_text.replace(',','.')),Number(cell.decimal)))delete cell.display_text;
    delete cell.representation;
   }else if(cell.is_null===false&&cell.type==='integer'&&cell.precision==='exact_integer'&&cell.representation==='decimal_integer'
     &&typeof cell.value==='string'&&/^-?\d+$/.test(cell.value))delete cell.representation;
-  else if(cell.is_null===false&&cell.type==='string'&&cell.precision==='display_text'&&cell.representation==='cached_display_text'
+  else if(cell.is_null===false&&cell.type==='string'&&((cell.precision==='display_text'&&cell.representation==='cached_display_text')
+    ||(cell.precision==='source_text'&&cell.representation==='data_source_string'))
     &&typeof cell.value==='string')delete cell.representation;
  }
  if(wireSize(reply)>USER_PREVIEW_WIRE_BUDGET&&reply.configuration){
@@ -39,6 +41,6 @@ export function budgetUserPreview(reply,{wireSize=previewWireSize}={}) {
   if(!candidates.length)break;
   const port=candidates.reduce((a,b)=>JSON.stringify(a.sample).length>=JSON.stringify(b.sample).length?a:b);
   port.sample.pop();port.sample_rows=port.sample.length;port.sample_complete=false;omitted++;
-  reply.limitations[limitationIndex]='Preview response budget omitted '+omitted+' already-read rows. Full local receipts are retained. Returned samples are incomplete; use smaller analytical outputs, not an unavailable filesystem tool.';
+  reply.limitations[limitationIndex]='Preview response budget omitted '+omitted+' already-read rows. Full local receipts are retained. Returned samples are incomplete. For full text, connect the original output to an exports.text node and download its UTF-8 file; for analysis, compute smaller analytical outputs in nodes.';
  }
 }

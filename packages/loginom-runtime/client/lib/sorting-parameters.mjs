@@ -36,6 +36,13 @@ export function resolveSortingParameters(p,fields){
  });
 }
 export function validateSortingInputParameters(p,resolved,native){
+ // A retained field can outlive its upstream source after projection. The
+ // sorting wizard still lists it, but final readback cannot prove its origin.
+ // Refuse while the owned input wizard can still be cancelled, before Done.
+ for(const f of native.target_fields){
+  need(f.source&&native.source_fields.some(s=>JSON.stringify(s)===JSON.stringify(f.source)),
+   'Sorting input source is missing or changed: '+f.name+'. Restore the upstream field before retrying Sorting');
+ }
  if(p.keys===undefined)return;
  // The mapping resolver preserves a retained name when a patch omits it.
  // Source names alone cannot describe the fields the sorting wizard will see.

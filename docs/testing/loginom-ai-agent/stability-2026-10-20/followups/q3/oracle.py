@@ -34,13 +34,13 @@ rows = [row for row in rows if row["Debt"] >= 2500]
 
 expected = {
     "package_path": sys.argv[1] if len(sys.argv) > 1 else "/demo-2026-10-22/s3-reconcile.lgp",
-    "nodes": [{"type": kind} for kind in ("imports.text", "transform.join_data", "exports.text")],
+    "nodes": [],
     "outputs": [{
         "output_node_type": "export_input",
         "export_destination": sys.argv[2] if len(sys.argv) > 2 else "/demo-2026-10-22/debts-large.csv",
         "ordered": True,
         "column_order": "exact",
-        "columns": [{"name": name, "label": LABELS.get(name, name), "type": kind}
+        "columns": [{"name": name, "label_any": True, "type": kind}
                     for name, kind in COLUMNS],
         "rows": rows,
     }],

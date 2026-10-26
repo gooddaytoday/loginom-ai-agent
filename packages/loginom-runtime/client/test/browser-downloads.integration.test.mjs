@@ -12,32 +12,33 @@ import {createSession} from '../lib/session.mjs';
 import {loginBrowser} from '../../src/connection-check.mjs';
 import {browserProcessEnvironment} from '../lib/bridge.mjs';
 
-// No synthetic download event: the fixture uses a native Blob/anchor download
-// and real file inputs inside the same Page that MCP owns.
+// No synthetic download event: a trusted click follows the native Blob link
+// selected by the first page script, inside the same Page that MCP owns.
 const html = `<!doctype html><html><body>
 <div data-tid="MF;cntMain;tlbMainToolbar;btnAvatar">user</div>
 <input id="upload" type="file" hidden><input id="chooser" type="file">
-<button id="save">Download</button>
+<a id="save" download="sales.csv">Download</a>
 <script>
 window.initialPicker = typeof showSaveFilePicker;
 window.bg = {app:{Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:'user'}}}}}}};
-document.querySelector('#save').onclick = async () => {
-  if (window.initialPicker !== 'undefined') {
+window.downloadClicks = 0;
+document.querySelector('#save').addEventListener('click', () => window.downloadClicks++);
+window.downloadMode = window.initialPicker === 'undefined' ? 'blob' : 'picker';
+if (window.downloadMode === 'blob') {
+  document.querySelector('#save').href = URL.createObjectURL(new Blob(['group;qty\\nA;1\\n']));
+} else {
+  document.querySelector('#save').onclick = async event => {
+    event.preventDefault();
     await showSaveFilePicker({suggestedName:'sales.csv'});
-    return;
-  }
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(new Blob(['group;qty\\nA;1\\n']));
-  link.download = 'sales.csv';
-  link.click();
-};
+  };
+}
 </script></body></html>`;
 
 for (const owner of ['mcp', 'managed']) {
   test(`${owner} browser selects downloads before the first page script and retains uploads`, {
     skip: !process.env.LOGINOM_DOCK_TEST_BROWSER && 'Set LOGINOM_DOCK_TEST_BROWSER to pinned Chromium',
     timeout: 90000,
-  }, async () => {
+  }, async t => {
     const directory = await mkdtemp(join(tmpdir(), 'dock-browser-downloads-'));
     const http = createServer((request, response) => {
       response.writeHead(200, {'Content-Type':'text/html; charset=utf-8'});
@@ -61,6 +62,7 @@ for (const owner of ['mcp', 'managed']) {
         // This assertion intentionally precedes MCP: its init script cannot fix
         // a capability decision already made by an authenticated application.
         assert.equal(await handles.context.pages()[0].evaluate(() => window.initialPicker), 'undefined');
+        assert.equal(await handles.context.pages()[0].evaluate(() => window.downloadMode), 'blob');
       }
       if (owner === 'managed') {
         handles.server = await createConnection(config, async () => handles.context);
@@ -86,10 +88,10 @@ for (const owner of ['mcp', 'managed']) {
         assert.ok(result, text);
         return JSON.parse(result[1]);
       };
-      assert.equal(await code(`async page => {
+      assert.deepEqual(await code(`async page => {
         ${owner === 'mcp' ? `await page.goto(${JSON.stringify(url)});` : ''}
-        return await page.evaluate(() => window.initialPicker);
-      }`), 'undefined');
+        return await page.evaluate(() => ({picker:window.initialPicker, mode:window.downloadMode}));
+      }`), {picker:'undefined', mode:'blob'});
       const geometry=await code('async page => ({viewport:page.viewportSize(),dpr:await page.evaluate(()=>devicePixelRatio)})');
       assert.equal(geometry.dpr,1,'agent browser normalizes OS scale at default page zoom');
       assert.deepEqual(geometry.viewport,headless?{width:1280,height:800}:null);
@@ -101,25 +103,33 @@ for (const owner of ['mcp', 'managed']) {
         const onCrash = () => mark('crash');
         page.on('pageerror', onPageError);
         page.on('crash', onCrash);
-        const event = page.waitForEvent('download', {timeout:5000});
+        // Register before the action; retain the cold Chromium budget.
+        const event = page.waitForEvent('download', {timeout:20000});
         event.then(() => mark('download'), () => mark('download_failed'));
         try {
           mark('click_start');
-          await page.locator('#save').click();
+          const [file] = await Promise.all([event, page.locator('#save').click({timeout:20000})]);
           mark('click_done');
-          const file = await event;
+          const download_ms = Date.now() - started;
           await file.saveAs(${JSON.stringify(join(session.metadata.artifacts, 'sales.csv'))});
           await page.locator('#upload').setInputFiles(${JSON.stringify(join(session.metadata.artifacts, 'input.csv'))});
-          return {name:file.suggestedFilename(), failure:await file.failure(), listeners:page.listenerCount('filechooser'),
+          return {download_ms, clicks:await page.evaluate(() => window.downloadClicks), url:file.url(),
+            name:file.suggestedFilename(), failure:await file.failure(), listeners:page.listenerCount('filechooser'),
             uploaded:await page.locator('#upload').evaluate(async input => await input.files[0].text())};
         } catch (error) {
-          throw new Error(String(error) + '\\nDownload diagnostics: ' + JSON.stringify({closed:page.isClosed(), events}), {cause:error});
+          const state = await page.locator('#save').evaluate(link => ({picker:window.initialPicker,
+            mode:window.downloadMode, clicks:window.downloadClicks, href:link.href,
+            ready:document.readyState, visibility:document.visibilityState})).catch(() => ({unavailable:true}));
+          throw new Error(String(error) + '\\nDownload diagnostics: ' + JSON.stringify({closed:page.isClosed(), events, fixture:state}), {cause:error});
         } finally {
           page.off('pageerror', onPageError);
           page.off('crash', onCrash);
         }
       }`);
       assert.equal(downloaded.name, 'sales.csv');
+      assert.equal(downloaded.clicks, 1, 'one trusted click without replay');
+      assert.ok(downloaded.url.startsWith('blob:' + new URL(url).origin + '/'));
+      t.diagnostic(`${owner} native Blob download ${downloaded.download_ms.toFixed(1)}ms`);
       assert.equal(downloaded.failure, null);
       assert.ok(downloaded.listeners > 0);
       assert.equal(downloaded.uploaded, 'value\n42\n');

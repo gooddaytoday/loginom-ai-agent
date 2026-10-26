@@ -93,9 +93,18 @@ export async function configureTextExport(channel,p,ctx,options){
    }else if(key==='destination'){
     const control=one(s.ui.elements.filter(e=>e.wizard_field?.scope==='export_format'&&e.wizard_field.name===key&&e.allowed_actions.includes('set_wizard_field')));
     await channel.perform({condition:'export destination',initialObservation:s,ready:s=>s.wizard?.stage===stage,identity:()=>({node:ctx.node,key,value}),resolve:()=>({verb:'set_wizard_field',ref:control.ref,text:value})});
+   }else if(key==='time_format'&&value==='hh:nn:ss.zzz'){
+    // Native 7.4.2 accepts this mask in its editable combo, but has no preset.
+    const field=s=>one(s.ui.elements.filter(e=>e.wizard_field?.scope==='export_format'&&e.wizard_field.name===key&&e.allowed_actions.includes('set_wizard_field')));
+    await channel.perform({condition:'export time_format',initialObservation:s,ready:s=>s.wizard?.stage===stage,
+     identity:s=>({node:ctx.node,key,tid:field(s).tid,field:field(s).wizard_field,value:field(s).value}),
+     resolve:s=>({verb:'set_wizard_field',ref:field(s).ref,text:value})});
    }else{
-    const picker=one(s.ui.elements.filter(e=>e.tid===tid+';trg_picker'&&e.allowed_actions.includes('click')));
-    await channel.perform({condition:'export options '+key,initialObservation:s,ready:s=>s.wizard?.stage===stage,identity:()=>({node:ctx.node,key}),resolve:()=>({verb:'click',ref:picker.ref})});
+    const picker=s=>one(s.ui.elements.filter(e=>e.tid===tid+';trg_picker'&&e.allowed_actions.includes('click')));
+    await channel.perform({condition:'export options '+key,initialObservation:s,refreshWizardBusy:key==='header',
+     ready:s=>s.wizard?.stage===stage&&s.ui.elements.some(e=>e.tid===tid+';trg_picker'&&e.allowed_actions.includes('click')&&e.interaction?.state==='point_observed'),
+     identity:s=>({node:ctx.node,key,field:tid,name:picker(s).wizard_combo?.field?.name,wizard:s.wizard.root_ref,root:s.wizard.root_tid,value:picker(s).wizard_combo?.field?.value}),
+     resolve:s=>({verb:'click',ref:picker(s).ref})});
     s=await channel.observe({condition:'export option '+key,ready:s=>s.wizard?.stage===stage&&s.ui.elements.some(e=>e.allowed_actions.includes('select_wizard_option'))});
     const labels={encoding:'UTF-8 (65001)',delimiter:{';':'Точка с запятой',',':'Запятая','\t':'Символ табуляции'}[value],header:{none:'Нет строки заголовков',names:'Имена полей',labels:'Метки полей'}[value],line_ending:{LF:'Unix (LF)',CRLF:'Windows (CRLF)'}[value],text_qualifier:'Двойная кавычка (")',decimal_separator:{'.':'Точка (.)',',':'Запятая (,)'}[value],date_separator:{'.':'Точка (.)','/':'Слэш (/)','\\':'Обратный слэш (\\)','-':'Дефис (-)'}[value],time_separator:{':':'Двоеточие (:)','.':'Точка (.)'}[value],null_marker:value===''?'Пустая строка':value};
     const label=labels[key]??value,choice=one(s.ui.elements.filter(e=>e.allowed_actions.includes('select_wizard_option')&&e.label===label&&e.tid.startsWith(tid+';boundlist;')));

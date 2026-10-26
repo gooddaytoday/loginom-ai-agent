@@ -115,17 +115,32 @@ test('stale button before Next does not authorize a diagnostic gesture',async()=
   assert.deepEqual(f.calls,[]);
 });
 
-test('unclosed dialog retains uncertainty under the original deadline after one OK',async()=>{
+test('unclosed dialog retains uncertainty under the original deadline after one OK',async t=>{
+  t.mock.timers.enable({apis:['Date','setTimeout']});
   const f=managedJavascriptErrorFixture({close:false});f.task.deadline=Date.now()+80;
+  // The generated browser bodies and host must observe the same original clock.
+  f.context.Date=Date;
+  const deadline=f.task.deadline;
   f.lease.identity=JSON.stringify([f.task.owner,f.task.workflow_ref,f.task.targetOrigin,f.task.targetBuild,f.task.deadline]);
-  await assert.rejects(captureManagedJavascriptWizardError({...f.options,wait:async()=>new Promise(resolve=>setTimeout(resolve,5))}),/closure original deadline expired|lease unavailable/);
+  let waits=0;
+  await assert.rejects(captureManagedJavascriptWizardError({...f.options,wait:async ms=>{
+    assert.deepEqual(f.calls,['button','ok']);assert.equal(f.dialogs.length,1);
+    assert.equal(f.task.deadline,deadline);assert.ok(ms>0&&ms<=deadline-Date.now());
+    waits++;t.mock.timers.tick(ms);
+  }}),/closure original deadline expired/);
+  assert.equal(waits,1);assert.equal(Date.now(),deadline);
+  assert.ok(f.events.every(event=>event.deadline===deadline));
   assert.deepEqual(f.calls,['button','ok']);assert.equal(f.dialogs.length,1);
   assert.ok(!f.events.some(event=>event.phase==='javascript_managed_error_observed'));
 });
 
-test('hung journal is bounded by the original deadline',async()=>{
-  await assert.rejects(journalManagedJavascriptError({record:()=>new Promise(()=>{}),deadline:Date.now()+25},
+test('hung journal is bounded by the original deadline',async t=>{
+  t.mock.timers.enable({apis:['Date','setTimeout']});
+  let recorded=false;
+  const rejected=assert.rejects(journalManagedJavascriptError({record:()=>{recorded=true;return new Promise(()=>{});},deadline:Date.now()+25},
     {phase:'error-test'}),/journal deadline/);
+  await Promise.resolve();assert.equal(recorded,true);
+  t.mock.timers.tick(25);await rejected;
 });
 
 test('bounded native dialog preserves exact prefix and reports truncation',async()=>{

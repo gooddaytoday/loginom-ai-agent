@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {parseExpectedOutputs,resolveExportInput,matchExpectedOutputs} from '../expected-outputs.mjs';
+import {parseExpectedOutputs,resolveExportInput,matchExpectedOutputs,parseExportCsvHeader,selectColdOutputReads} from '../expected-outputs.mjs';
 import {coldProcessObservation} from '../cold-reader-policy.mjs';
 
 const output={output_node_type:'export_input',columns:[{name:'Code',type:'string'}],rows:[{Code:'A'}],ordered:true};
@@ -21,13 +21,13 @@ test('cold inspects saved export mapping after execution restores the complete d
    'createNodeProcedure','withBrowserReceipt','session','createNodeExecutionProcedure','performColdNodeAction',
    'runColdExecution','coldProcessObservation','staticSources','openNewOutputTable','configureTablePrecision','prepareTableRead',
    'readTableOutputPages','decodeTableOutput','returnFromOutputTable','writeFile','join','args','config',
-   'loginPassword','matchExpectedOutputs','resolveExportInput','observeExportDestinations','openColdOutputViews'].join(',')}}=f;\n${body}\nreturn correspondence;`);
+   'loginPassword','matchExpectedOutputs','resolveExportInput','selectColdOutputReads','observeExportDestinations','openColdOutputViews','openColdTableFilter','exportCsv','state'].join(',')}}=f;\n${body}\nreturn correspondence;`);
  const fields=[{name:'Code',source_name:'Code',type:'string'},{name:'Status',source_name:'Status',type:'integer'}];
  const data=actual('rename',1).data;
  data.schema.push({name:'Status',label:'Status',type:'integer'});
  data.sample[0].push({type:'integer',is_null:false,value:'200'});
  const want={...output,column_order:'exact',columns:fields.map(({name,type})=>({name,type})),rows:[{Code:'A',Status:200}]};
- for(const completeAfterExecution of [true,false]){
+ for(const completeAfterExecution of [true,false])for(const csvProvided of [true,false]){
   let restored=false;const calls=[];
   const result=run({expectedOutputs:[want],expected:{nodes:[]},graph:graph(),load:async()=>({}),
    channelFor:()=>({}),execute:async()=>({}),record:async()=>{},saved:{path:'/own/export.lgp'},
@@ -37,12 +37,71 @@ test('cold inspects saved export mapping after execution restores the complete d
    openNewOutputTable:async()=>({table:{}}),configureTablePrecision:async()=>({fields:data.schema.map(f=>({...f,key:f.name}))}),
    prepareTableRead:async()=>({}),readTableOutputPages:async()=>structuredClone(data),decodeTableOutput:raw=>raw,
    returnFromOutputTable:async()=>{},writeFile:async()=>{},join:()=>'',args:{output:''},config:{},loginPassword:'',
-   matchExpectedOutputs,resolveExportInput,coldProcessObservation,openColdOutputViews:async()=>{},
+   matchExpectedOutputs,resolveExportInput,selectColdOutputReads,coldProcessObservation,openColdOutputViews:async()=>{},openColdTableFilter:async()=>{},
+   exportCsv:csvProvided?{columns:['Code','Status'],header:'names'}:undefined,state:{},
    observeExportDestinations:async()=>{calls.push('mapping');return [{node_id:'export',input_fields:restored?fields:fields.slice(1)}];}});
-  if(completeAfterExecution)assert.equal((await result).length,1);
+  if(!csvProvided)await assert.rejects(result,/COLD_EXPORT_CSV_REQUIRED/);
+  else if(completeAfterExecution)assert.equal((await result).length,1);
   else await assert.rejects(result,/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
   assert.deepEqual(calls,['execute','mapping']);
  }
+});
+
+test('recorded s5/q7 cold permutations use downloaded CSV order while retaining all data checks',()=>{
+ const allColumns=[['Region','string'],['Office','real'],['Warehouse','real'],['Tech','real'],['Total','real']];
+ const rows=[['Север',5257.5,1976,44970,52203.5],['Центр',7530,1365,77490,86385],['Юг',4334,2505,35420,42259]];
+ for(const order of [[1,2,3,0],[4,1,2,3,0],[1,2,3,4,0]]){
+  const columns=allColumns.slice(0,order.length).map(([name,type])=>({name,label:name,type}));
+  const a={node:{node_id:'report'},type:'transform.reform_columns',output_port:0,data:{
+   schema:order.map(i=>columns[i]),row_count:3,sample_complete:true,precision:{numbers_verified:true},
+   sample:rows.map(row=>order.map(i=>({type:columns[i].type,is_null:false,value:row[i]})))}};
+  const want={output_node_type:'export_input',column_order:'exact',columns,
+   rows:rows.map(row=>Object.fromEntries(columns.map((c,i)=>[c.name,row[i]])))};
+  const exportInput={node:{ref:a.node},output_port:0,input_fields:a.data.schema.map(c=>({name:c.name,source_name:c.name,type:c.type}))};
+  const csv=columns.map(c=>c.name).join(',')+'\r\n'+rows.map(r=>r.slice(0,columns.length).join(',')).join('\r\n');
+  const exportCsv={columns:parseExportCsvHeader(csv),header:'names'};
+  const options={exportInput,exportCsv};
+  assert.throws(()=>matchExpectedOutputs([a],[want],{exportInput}),/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
+  assert.equal(matchExpectedOutputs([a],[want],options).length,1);
+  for(const csvColumns of [exportCsv.columns.toReversed(),exportCsv.columns.slice(1),[...exportCsv.columns,'Extra']])
+   assert.throws(()=>matchExpectedOutputs([a],[want],{...options,exportCsv:{...exportCsv,columns:csvColumns}}));
+  const aligned=structuredClone(a);aligned.data.schema=columns;
+  aligned.data.sample=rows.map(row=>columns.map((c,i)=>({type:c.type,is_null:false,value:row[i]})));
+  assert.throws(()=>matchExpectedOutputs([aligned],[want],{exportInput:{...exportInput,input_fields:columns.map(c=>({name:c.name,source_name:c.name,type:c.type}))},
+   exportCsv:{columns:exportCsv.columns.toReversed(),header:'names'}}));
+  for(const change of [d=>d.schema.pop(),d=>d.schema.push({name:'Extra',label:'Extra',type:'real'}),
+   d=>d.schema[0]={...d.schema[1]},d=>d.schema[0]={...d.schema[0],type:'integer'},
+   d=>d.sample[0][0].value+=1,d=>d.sample_complete=false,d=>d.precision.numbers_verified=false]){
+   const bad=structuredClone(a);change(bad.data);
+   assert.throws(()=>matchExpectedOutputs([bad],[want],options));
+  }
+  if(columns.length===5){
+   const bad=structuredClone(a),index=bad.data.schema.findIndex(c=>c.name==='Total');
+   for(const row of bad.data.sample)row[index].value+=1;
+   assert.throws(()=>matchExpectedOutputs([bad],[want],options));
+  }
+  // A CSV never relaxes a table without Export, or an invalid native mapping.
+  assert.throws(()=>matchExpectedOutputs([a],[{...want,output_node_type:a.type}],options));
+  assert.throws(()=>matchExpectedOutputs([a],[want],{...options,exportInput:{...exportInput,input_fields:exportInput.input_fields.slice(1)}}));
+ }
+});
+
+test('CSV header reader respects BOM, quoting, escaped quotes, separators and embedded newlines',()=>{
+ assert.deepEqual(parseExportCsvHeader('\uFEFF"Region","A, B","say ""yes""","line\nbreak"\r\nignored'),['Region','A, B','say "yes"','line\nbreak']);
+ assert.deepEqual(parseExportCsvHeader('Region;Total\r\nNorth;1',';'),['Region','Total']);
+ assert.deepEqual(parseExportCsvHeader('Region\tTotal','\t'),['Region','Total']);
+ for(const text of ['', '"unterminated', '"closed"extra,Total', 'bad"quote,Total'])
+  assert.throws(()=>parseExportCsvHeader(text),/COLD_EXPORT_CSV_INVALID/);
+ assert.throws(()=>parseExportCsvHeader('a'.repeat(65537)),/COLD_EXPORT_CSV_HEADER_BOUND/);
+ assert.throws(()=>parseExportCsvHeader('a|b','|'),/COLD_EXPORT_CSV_INVALID/);
+});
+
+test('label headers require an explicit mode and unambiguous observed labels',()=>{
+ const a=actual('rename',1);a.data.schema[0].label='Код';
+ const want={...output,column_order:'exact',columns:[{name:'Code',label:'Код',type:'string'}]};
+ const exportInput=resolveExportInput(graph());
+ assert.equal(matchExpectedOutputs([a],[want],{exportInput,exportCsv:{columns:['Код'],header:'labels'}}).length,1);
+ for(const header of ['names','none',undefined])assert.throws(()=>matchExpectedOutputs([a],[want],{exportInput,exportCsv:{columns:['Код'],header}}));
 });
 
 test('export_input parses in both forms and forbids explicit output ports or labels',()=>{
@@ -137,6 +196,28 @@ test('exact destination selects renamed report while the earlier s1 export remai
  for(const mutate of [d=>{d.schema[0].name='Wrong'},d=>{d.schema[0].label='Wrong'},d=>{d.schema[0].type='real'},d=>{d.sample[0][0].value='Wrong'},d=>{d.schema.push({...d.schema[0]})}]){
   const a=actual('rename',1);mutate(a.data);
   assert.throws(()=>matchExpectedOutputs([a],[{...output,export_destination:destination}],{exportInput:binding}),/COLD_OUTPUT_NOT_UNIQUELY_MATCHED/);
+ }
+});
+
+test('s8 cold selects an observed owned body despite a clipped label; hidden points still require reveal',async()=>{
+ const {observeExportDestinations}=await import('../static-source-proof.mjs');
+ const {preparedGraphSelection}=await import('../../../packages/loginom-runtime/client/lib/node-graph-selection.mjs');
+ for(const mode of ['body','label','hidden','foreign']){
+  const ref={document_id:'doc',workflow_id:'wf',node_id:'export'},tid='MF;TF-1;Graph;Экспорт_выручки_с_русскими_заголовками';
+  // head69/s8 cold journal: body (1188,140)56x104, label (1161,90)111x48;
+  // canvas starts y=100, scrollTop=0. Both gesture centers were observed.
+  const state={prepared_node_context:{...ref,verified:true,surface:'graph',locked:false,tid},wizard:{status:'absent'},ui:{elements:[
+   {tid,ref:'body',graph_node:{part:'body'},bounding_box:{x:1188,y:140,width:56,height:104},allowed_actions:['click'],interaction:{state:'point_observed'}},
+   {tid:tid+';Label;Label',ref:'label',graph_node:{part:'label'},bounding_box:{x:1161,y:90,width:111,height:48},allowed_actions:['click'],interaction:{state:'point_observed'}}]}};
+  if(mode!=='body')state.ui.elements[0].interaction.state='outside_viewport';
+  if(mode==='hidden')state.ui.elements[1].interaction.state='outside_viewport';
+  if(mode==='foreign')state.prepared_node_context.node_id='foreign';
+  let reveals=0,selected=0;
+  const channel={observe:async()=>structuredClone(state),revealGraphNode:async()=>{reveals++;if(mode!=='hidden')throw Error('unnecessary full bbox reveal');state.ui.elements[0].interaction.state='point_observed';}};
+  const helpers={selectPreparedGraphNode:async(c,s)=>{assert.equal(preparedGraphSelection(s).ref,mode==='label'?'label':'body');selected++;throw Error('SELECTION_REACHED');}};
+  const result=observeExportDestinations({load:async()=>helpers,graph:{nodes:[{type:'exports.text',ref}]},channelFor:()=>channel});
+  await assert.rejects(result,mode==='foreign'?/export selection owner/:/SELECTION_REACHED/);
+  assert.equal(reveals,mode==='hidden'?1:0);assert.equal(selected,mode==='foreign'?0:1);
  }
 });
 

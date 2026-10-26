@@ -9,11 +9,14 @@ export function validateSortingInlineSources(configuration,native){
   &&new Set(sources.map(s=>s.name)).size===fields.length
   &&sources.every(s=>fields.some(f=>f.name===s.name&&f.label===s.label&&f.type===s.type)),
   'Sorting conditional output differs from the configured input');
- need(native.target_fields.every(f=>!f.excluded&&!f.inherited&&f.required===false),'Unsupported retained sorting output');
- const obsolete=native.target_fields.filter(f=>f.source===null);
+ need(native.target_fields.every(f=>!f.inherited&&f.required===false
+  &&(!f.excluded||f.source===null&&f.exclusion_source
+   &&sources.some(s=>JSON.stringify(s)===JSON.stringify(f.exclusion_source)))), 'Unsupported retained sorting output');
+ const obsolete=native.target_fields.filter(f=>f.source===null&&!f.excluded&&!f.exclusion_source);
  need(obsolete.every(f=>!fields.some(s=>s.name===f.name)), 'Current sorting output cannot be pruned as obsolete');
  return obsolete;
 }
 export function configureSortingInlineMapping(channel,configuration){
- return configureDerivedInlineMapping(channel,configuration,validateSortingInlineSources);
+ return configureDerivedInlineMapping(channel,configuration,validateSortingInlineSources,undefined,
+  {sourceOf:f=>f.source??f.exclusion_source});
 }

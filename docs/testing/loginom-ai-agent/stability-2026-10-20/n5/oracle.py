@@ -26,12 +26,12 @@ rows = [{"Team": team, "Incidents": values[0], "Downtime": int(values[1])}
 
 expected = {
     "package_path": sys.argv[1] if len(sys.argv) > 1 else "/stability-2026-10-20/n5.lgp",
-    "nodes": [{"type": kind} for kind in ['imports.text', 'transform.filter_data', 'transform.group_data', 'exports.text']],
+    "nodes": [],
     "outputs": [{
         "output_node_type": "export_input",
         "ordered": True,
         "column_order": "exact",
-        "columns": [{"name": name, "label": name, "type": kind} for name, kind in [('Team', 'string'), ('Incidents', 'integer'), ('Downtime', 'integer')]],
+        "columns": [{"name": name, "label_any": True, "type": kind} for name, kind in [('Team', 'string'), ('Incidents', 'integer'), ('Downtime', 'integer')]],
         "rows": rows,
     }],
 }

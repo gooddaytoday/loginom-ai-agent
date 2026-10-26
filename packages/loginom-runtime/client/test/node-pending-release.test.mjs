@@ -4,7 +4,8 @@ import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 import {createActionRuntime} from '../lib/executor.mjs';
 import {releasePendingNode,proveFinishLaunchRefused,NodeReleaseBlocked} from '../lib/node-pending-release.mjs';
 import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
-import {releaseNodeApply} from '../lib/node-apply.mjs';
+import {applyNode,releaseNodeApply} from '../lib/node-apply.mjs';
+import {validateSortingInputParameters,validateSortingParameters} from '../lib/sorting-parameters.mjs';
 import {nodeJobResultSchema} from '../lib/node-result-schema.mjs';
 import {actions} from './support/executor-fixture.mjs';
 
@@ -40,6 +41,58 @@ test('release proves a quiet unchanged graph without a gesture',async()=>{
  assert.equal(proof.verified,true);assert.equal(proof.cleanup_complete,true);assert.equal(proof.effect_possible,false);
  assert.deepEqual(proof.cleanup,{wizard_closed:false,read_view_restored:false,views_returned:false});assert.deepEqual(s.gestures,[]);
  assert.equal(proof.node_context.node_id,'new');assert.equal(proof.graph.nodes.length,1);
+});
+test('release graph reads retain the explicitly supplied deadline and clock',async()=>{
+ for(const fault of [null,'before_first','after_first','before_second','after_second']) {
+  let clock=1,observations=0,reads=0;const deadline=100;
+  const operation=stopped(),s=surface(),observe=s.channel.observe;
+  delete operation.deadline; // The driver supplies this release's budget explicitly.
+  s.channel.observe=async options=>{
+   observations++;operation.deadline=90000; // Later mutation cannot replace the captured bound.
+   if(fault==='before_first'&&observations===2||fault==='before_second'&&observations===3)clock=deadline;
+   return observe(options);
+  };
+  operation.nodeTargetAdapter.observe=async(_context,bound)=>{
+   reads++;assert.equal(bound,deadline);
+   if(fault==='after_first'&&reads===1||fault==='after_second'&&reads===2)clock=deadline;
+   return graphOf();
+  };
+  const run=()=>releasePendingNode({operation,channel:s.channel,readReceipt:async()=>operation.receipt,deadline,now:()=>clock});
+  if(fault)await assert.rejects(run(),/Original release graph deadline elapsed/);
+  else assert.equal((await run()).verified,true);
+  assert.equal(reads,fault==='before_first'?0:['after_first','before_second'].includes(fault)?1:2);
+  assert.deepEqual(s.gestures,[]);
+ }
+});
+test('D74 release settles only its exact ambiguous wizard receipt within the original deadline',async t=>{
+ let clock=1;t.mock.method(Date,'now',()=>clock);
+ for(const fault of [null,'field','cancel_graph','missing_identity','receipt','graph','expired','late_graph_before','late_graph_after']) {
+  clock=1;
+  const s=surface({wizard:fault!=='cancel_graph'}),operation=stopped();let reads=0,settled=false;
+  operation.nodeApply.deadline=Date.now()+(fault==='expired'?-1:5000);
+  operation.nodeApply.pending.deadline=operation.nodeApply.deadline;
+  operation.lastReceipt={id:'apply:n7',operation_id:'apply:n7'};
+  operation.receipt={state:'completed',receipt:{action_key:'ui.act',operation_id:fault==='receipt'?'other':'apply:n7',
+   cleanup_complete:true,status:'AMBIGUOUS',effect_possible:true,
+   error:{code:fault==='field'?'WIZARD_FIELD_NOT_CONFIRMED':fault==='cancel_graph'?'WIZARD_CANCEL_NOT_CONFIRMED':'WIZARD_STEP_NOT_CONFIRMED'},
+   trace:[{event:'ui_gesture_applied',verb:fault==='field'?'set_wizard_field':fault==='cancel_graph'?'confirm_wizard_close':'wizard_step'}],
+   output:{prepared_node_context:{...node,verified:true,surface:fault==='cancel_graph'?'graph':'wizard'},wizard:fault==='cancel_graph'?{status:'absent'}:{status:'observed',root_ref:'ui-w'}}}};
+  if(fault==='missing_identity'){delete operation.lastReceipt.operation_id;delete operation.receipt.receipt.operation_id;}
+  operation.nodeTargetAdapter.observe=async(_context,deadline)=>{
+   reads++;if(fault!=='missing_identity'&&reads<=2)assert.equal(deadline,operation.nodeApply.deadline);
+   const g=graphOf();if(fault==='graph'&&reads>1)g.links.push({source:'foreign'});
+   if(fault==='late_graph_before'&&reads===1||fault==='late_graph_after'&&reads===2)clock=operation.nodeApply.deadline;
+   return g;};
+  const observe=s.channel.observe;s.channel.observe=async options=>{
+   if(!settled){if(fault==='missing_identity')assert.equal(options.settleWizard,undefined);
+    else{assert.ok(options.settleWizard);assert.equal(options.settleWizard.deadline,operation.nodeApply.deadline);}settled=true;}
+   return observe(options);
+  };
+  if(fault&&!['field','cancel_graph','missing_identity'].includes(fault))await assert.rejects(release(operation,s.channel));
+  else assert.equal((await release(operation,s.channel)).verified,true);
+  if(fault&&!['field','missing_identity'].includes(fault))assert.equal(s.gestures.length,0);
+  if(fault==='expired')assert.equal(reads,0);
+ }
 });
 test('release cancels only the stopped node\'s own wizard draft',async()=>{
  const s=surface({wizard:true}),proof=await release(stopped(),s.channel);
@@ -246,4 +299,32 @@ test('a refused finish proof keeps the operation and leaves only release',async(
  assert.equal(f.calls.filter(c=>c==='finish').length,1);
  const released=await f.runtime.recover('apply',{strategy:'abandon_operation',recoveryOperationId:'release-1'});
  assert.equal(released.status,'SUCCEEDED');
+});
+
+// #281 reached final readback with no pending phase and could not release.
+// The retained input must instead stop before input Done, using normal release.
+test('Sorting with the retained unbound OrderPosition stops in input_mapping and can release its own draft',async()=>{
+ const ui=surface({wizard:true}),op={...stopped(),id:'sort-retained'};delete op.nodeApply;
+ const native={source_fields:[{record_id:'s',name:'Debt',type:'real'}],
+  target_fields:[{name:'OrderPosition',type:'integer',source:null},{name:'Debt',type:'real',source:{record_id:'s',name:'Debt',type:'real'}}]};
+ const handlers=new Map([['transform.sorting',{revision:'1',modes:['keys'],validate:validateSortingParameters,configure(){assert.fail('Sorting must not configure');},
+  configurationReadback(){assert.fail('Unbound input must never reach final readback');}}]]);
+ const calls=[],verified=async()=>({verified:true,cleanup_complete:true,effect_possible:false});
+ const drivers={verifySource:verified,prepareTarget:async()=>({...await verified(),node}),
+  async mapPorts(){calls.push('input_mapping');validateSortingInputParameters({}, {fields:null},native);assert.fail('Invalid input must not be committed');},
+  async openWizard(){assert.fail('Sorting configuration must not open');},
+  finish:verified,waitExecution:verified,readOutput:verified,
+  releasePending:()=>releasePendingNode({operation:op,channel:ui.channel,readReceipt:async()=>op.receipt})};
+ const request={operation_id:op.id,contract_revision:'1.0.0',document_id:'doc',workflow_ref:workflow,
+  target:{kind:'existing',type:'transform.sorting',ref:node},inputs:[],mode:'keys',parameters:{},mappings:[],finish:'execute',
+  read:{ports:[0],sample_rows:10,require_exact_numbers:true},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}};
+ const record=async e=>structuredClone(e);
+ const stoppedResult=await applyNode({request,operation:op,handlers,drivers,record});
+ assert.equal(stoppedResult.pending_phase,'input_mapping');assert.match(stoppedResult.error.message,/Sorting input source is missing or changed: OrderPosition/);
+ assert.deepEqual(calls,['input_mapping']);assert.ok(!op.nodeApply.phases.some(p=>['configure','finish','read'].includes(p.phase)));
+ const released=await releaseNodeApply({operation:op,handlers,drivers,record});
+ assert.equal(released.released_phase,'input_mapping');assert.equal(released.pending_phase,null);
+ assert.equal(released.cleanup_complete,true);assert.equal(released.execution.status,'not_requested');
+ assert.equal(released.configuration.status,'discarded');assert.deepEqual(ui.gestures,[{verb:'click',ref:'ui-close'}]);
+ assert.equal(op.nodeApply.pending,null);assert.deepEqual(calls,['input_mapping']);
 });

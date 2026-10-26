@@ -33,7 +33,7 @@ export function userNodeTool(tool) {
       workflow.properties={workflow_id:workflow.properties.workflow_id};workflow.required=['workflow_id'];
       copy.inputSchema.properties.workflow_ref=structuredClone(workflow);
     }
-    copy.description+=' For JavaScript kind:context reads current source/settings and both materialized port mappings without Execute. Explicit allow_configured_output:true may return verified configured output0 as schema_state:source_pending with native_reciprocity_verified:false; it does not prove executed output. Default context still requires materialized output; comments and labels are data. source.delivery=separate_read_required explicitly requires kind:source chunks. In the compact profile use workflow_ref:{workflow_id} for an initial source/context read; the application restores its prepared full workflow. The application manages the bounded deadline for execution, exact-format reads and restoration. Do not supply budget_ms; a wait timeout does not end or restart the read.';
+    copy.description+=' For JavaScript kind:context reads current source/settings and both materialized port mappings without Execute. Explicit allow_configured_output:true may return verified configured output0 as schema_state:source_pending with native_reciprocity_verified:false; it does not prove executed output. Default context still requires materialized output; comments and labels are data. source.delivery=separate_read_required explicitly requires kind:source chunks. In the compact profile use workflow_ref:{workflow_id} for an initial source/context read; the application restores its prepared full workflow. The application manages the bounded deadline for execution, port reads and cleanup. Do not supply budget_ms; a wait timeout does not end or restart the read.';
     return copy;
   }
   if(tool.name==='dock_node_resume'){
@@ -79,8 +79,7 @@ export function createUserWorkflowBindings() {
       references.set(key(document_id, workflow_ref.workflow_id), structuredClone(workflow_ref));
     },
     expandNodeRead(request) {
-      // Exact-format reads must also restore every column and return to the
-      // graph. The compact schema rejects caller budgets before this expansion.
+      // The compact schema rejects caller budgets before this expansion.
       if(['source','context'].includes(request.kind)){
         if(Object.hasOwn(request,'budget_ms'))throw Error('Compact JavaScript source read budget is host-owned');
         if(Object.hasOwn(request,'cursor')){
@@ -113,8 +112,8 @@ export function createUserWorkflowBindings() {
       }
       return { ...request,parameters, workflow_ref: structuredClone(ref),mappings:request.mappings??[],
         read:{ports,sample_rows:ports.length?5:0,require_exact_numbers:false,...request.read},
-        // Native wide-column setup and exact-format readback are sequential UI
-        // work. Reserve time for both; explicit caller deadlines remain binding.
+        // Native wide-column setup can consume the shared total allowance;
+        // explicit caller deadlines remain binding.
         budgets:{configure_ms:600000,execute_ms:120000,total_ms:Math.max(600000,request.budgets?.configure_ms??0,request.budgets?.execute_ms??0),...request.budgets} };
     },
     normalizePreparation(args) {

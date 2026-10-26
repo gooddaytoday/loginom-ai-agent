@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {restoreStoppedTableRead} from '../lib/node-output-procedure.mjs';
+import {NodeProcedureStepError} from '../lib/node-procedure.mjs';
 
 const node={document_id:'doc',workflow_id:'wf',node_id:'calc'};
 const table={view_guid:'view-1',port_guid:'port-1',table_tid:'MF;TF-1;Views;Table1'};
@@ -44,4 +45,24 @@ test('a foreign dialog refuses the stopped read cleanup without a gesture',async
  const s=surface('foreign');
  await assert.rejects(restoreStoppedTableRead(s.channel,{table,formatProof:null,restored:false,formatting:{}}),/other than this Table read/);
  assert.deepEqual(s.gestures,[]);
+});
+
+for(const fault of ['foreign_dialog','cancel_failed'])test('D14 preserves the ambiguous Filter click when cleanup fails: '+fault,async()=>{
+ const primary=new NodeProcedureStepError({status:'AMBIGUOUS',action_key:'ui.act',phase:'observing',effect_possible:true,
+  cleanup_complete:true,error:{code:'UI_DEADLINE_EXCEEDED',message:'Observed UI action deadline exceeded'}});
+ const s=surface(fault==='foreign_dialog'?'foreign':'filter');
+ if(fault==='cancel_failed')s.channel.perform=async()=>{throw Error('Cancel reply was not confirmed');};
+ await assert.rejects(restoreStoppedTableRead(s.channel,{table,formatProof:null,restored:false,formatting:{}},primary),error=>error===primary);
+ assert.equal(primary.receipt.status,'AMBIGUOUS');assert.equal(primary.receipt.error.code,'UI_DEADLINE_EXCEEDED');
+ assert.deepEqual(s.gestures,[]);
+});
+
+test('D14 cleans only the owned Filter draft while the original failed read still rejects',async()=>{
+ const primary=new NodeProcedureStepError({status:'AMBIGUOUS',effect_possible:true,cleanup_complete:true,
+  error:{code:'UI_DEADLINE_EXCEEDED',message:'Observed UI action deadline exceeded'}});
+ const s=surface('filter');
+ await assert.rejects((async()=>{
+  try{throw primary;}finally{await restoreStoppedTableRead(s.channel,{table,formatProof:null,restored:false,formatting:{}},primary);}
+ })(),error=>error===primary);
+ assert.deepEqual(s.gestures.map(g=>g.ref),['ui-cancel','ui-nav']);
 });

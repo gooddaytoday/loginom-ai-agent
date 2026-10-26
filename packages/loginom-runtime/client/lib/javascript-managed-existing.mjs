@@ -22,7 +22,33 @@ export async function openManagedJavascriptExistingWizard({prepared, node, deadl
     ||!['document_id','workflow_id','node_id'].every(key=>context[key]===task.owner[key])
     ||typeof context.tid!=='string'||!context.tid.startsWith(task.workflow_ref.prefix+';Graph;'))
     throw Error('Managed JavaScript existing graph owner unavailable');
-  const before = await execute(makeJavascriptManagedSelectionReadCode({...task, mode: 'capture'}));
+  const body=graph.ui?.elements?.filter(element=>element.tid===context.tid&&element.graph_node?.part==='body')??[];
+  if(body.length===1&&body[0].interaction?.state==='outside_viewport') {
+    await channel.revealGraphNode();
+    if(Date.now()>=deadline)throw Error('Managed JavaScript existing opening deadline expired');
+    const revealed=await channel.observe({condition:'owned existing JavaScript graph revealed before capture',
+      ready:state=>state.prepared_node_context?.surface==='graph'&&state.prepared_node_context.locked===false
+        &&state.wizard?.status==='absent'
+        &&state.ui?.elements?.some(element=>element.tid===context.tid&&element.graph_node?.part==='body'
+          &&element.interaction?.state==='point_observed')});
+    const current=revealed.prepared_node_context;
+    if(current?.verified!==true||current.surface!=='graph'||current.locked!==false
+      ||revealed.wizard?.status!=='absent'||current.tid!==context.tid
+      ||!['document_id','workflow_id','node_id'].every(key=>current[key]===task.owner[key]))
+      throw Error('Managed JavaScript existing graph owner unavailable');
+    const visible=revealed.ui?.elements?.filter(element=>element.tid===current.tid&&element.graph_node?.part==='body')??[];
+    if(visible.length!==1||visible[0].interaction?.state!=='point_observed'
+      ||!Number.isFinite(visible[0].interaction.point?.x)||!Number.isFinite(visible[0].interaction.point?.y)
+      ||Date.now()>=deadline)
+      throw Error('Managed JavaScript existing node not revealed before original deadline');
+  }
+  let before;
+  try { before = await execute(makeJavascriptManagedSelectionReadCode({...task, mode: 'capture'})); }
+  catch(error) {
+    // The capture only reads. No body or Setting gesture has been prepared.
+    error.nodePhaseRefusal={phase:'open',status:'NOT_APPLIED',effect_possible:false,cleanup_complete:true};
+    throw error;
+  }
   const selected = before.ready === true ? before
     : (await dispatchManagedJavascriptBody({task, before, execute, record, receiptOptions})).output?.selection;
   if (selected?.ready !== true || selected.node_tid!==context.tid || Date.now() >= deadline)

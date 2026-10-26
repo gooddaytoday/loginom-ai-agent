@@ -120,6 +120,39 @@ test('ready condition completes without redundant identical snapshots', async ()
   const f = fixture(); await f.channel.observe({ condition: 'button usable', ready: () => true });
   assert.equal(f.records.filter(r => r.phase === 'node_observation_sample').length, 1);
 });
+for(const readMs of [20,350])test('pending polling includes the read time in its 200 ms interval: '+readMs,async()=>{
+  let clock=1,checks=0,reads=0;const starts=[],waits=[];
+  const f=fixture({now:()=>clock,monotonicNow:()=>clock,
+    onRead:()=>{if(++reads%2)starts.push(clock);clock+=readMs;},
+    wait:async ms=>{waits.push(ms);clock+=ms;}});
+  await f.channel.observe({condition:'prepared node available for process console',ready:()=>++checks===3});
+  assert.deepEqual(starts,readMs===350?[1,701,1401]:[1,201,401]);
+  assert.deepEqual(waits,readMs===350?[]:[160,160]);
+  assert.equal(f.records.at(-1).readiness.elapsed_ms,readMs===350?2100:440);
+  assert.equal(f.records.filter(r=>r.phase==='node_observation_sample').length,3);
+  assert.ok(!f.events.includes('mutated'));
+});
+test('pending polls accelerate without shortening the two ready identity confirmations',async()=>{
+  let clock=1,checks=0;const waits=[];
+  const f=fixture({now:()=>clock,monotonicNow:()=>clock,onRead:()=>{clock+=350;},
+    wait:async ms=>{waits.push(ms);clock+=ms;}});
+  await f.channel.observe({condition:'new Table card bound to output',ready:()=>++checks>1,
+    confirmIdentity:()=>({view:'same-owned-table'})});
+  assert.deepEqual(waits,[200]);
+  assert.deepEqual(f.records.filter(r=>r.phase==='node_observation_sample').map(r=>r.readiness.satisfied),[false,true,true]);
+  assert.equal(f.records.at(-1).readiness.required_samples,2);
+  assert.equal(f.records.at(-1).readiness.elapsed_ms,2300);
+});
+test('pending polling retains the original deadline and leaves no refs after expiry',async()=>{
+  let clock=1;const f=fixture({now:()=>clock,monotonicNow:()=>clock,onRead:()=>{clock+=350;},
+    wait:async ms=>{clock+=ms;}});
+  const deadline=f.operation.deadline;
+  await assert.rejects(f.channel.observe({condition:'pending table',timeoutMs:1500,ready:()=>false}),/readiness timeout/);
+  assert.equal(f.operation.deadline,deadline);
+  assert.equal(f.records.find(r=>r.phase==='node_observation_timeout').effect_possible,false);
+  await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
+  assert.ok(!f.events.includes('mutated'));
+});
 test('foreign receipt cannot confirm original cleanup', async () => {
   const f = fixture({ foreignReceipt: true }); await f.channel.observe({ condition: 'button usable', ready: s => s.ui.elements.some(e => e.ref === 'ui-button') });
   await assert.rejects(f.channel.act({ verb: 'click', ref: 'ui-button' }), /receipt identity differs/);
@@ -188,7 +221,7 @@ test('an unexpected dialog fails immediately without a mutation', async () => {
 
 test('a blocker outside the selected root is inspected for the journal without authorizing a gesture', async () => {
   for(const mode of ['detail','stale','transport','budget']) {
-    const records=[];let inspections=0,mutations=0,readinessCalls=0;
+    const records=[];let inspections=0,nativeInspections=0,mutations=0,readinessCalls=0;
     const operation={id:'blocked',action:{action_key:'node.apply',revision:'1'},deadline:10000,
       checkpoint:{workflow_ref:{prefix:'MF;TF-1',tab_tid:'tab'},document_id:'doc'}};
     if(mode==='budget')operation.deadline=5000;
@@ -200,6 +233,11 @@ test('a blocker outside the selected root is inspected for the journal without a
       record:async e=>{records.push(structuredClone(e));return e},wrapMutation:code=>({code}),
       execute:async code=>{
         if(typeof code!=='string'){mutations++;throw Error('Unexpected mutation')}
+        if(code.includes('function readBlockingWindows')) {
+          nativeInspections++;
+          if(mode==='transport')throw Error('Disconnected');
+          return {status:'observed',windows:[{ref:'ui-blocker',native_owner:{hidden:false},bounding_box:{y:-2327}}]};
+        }
         if(code.includes('"root_ref":"ui-blocker"')) {
           inspections++;
           if(mode==='transport')throw Error('Disconnected');
@@ -214,6 +252,8 @@ test('a blocker outside the selected root is inspected for the journal without a
       }});
     await assert.rejects(channel.observe({condition:'prepared port visualizer cards',ready:()=>{readinessCalls++;return true}}),/blocked by a mask or dialog/);
     assert.equal(inspections,mode==='budget'?0:1,mode);assert.equal(readinessCalls,0,mode);
+    assert.equal(nativeInspections,mode==='budget'?0:1,mode);
+    if(mode!=='budget')assert.ok(records.some(r=>r.phase===(mode==='transport'?'node_blocking_window_native_unavailable':'node_blocking_window_native')));
     assert.equal(records.find(r=>r.phase==='node_observation_context_refused').outcome.output.ui.dialogs[0].text,'[outside selected root]');
     if(mode==='detail') {
       const detail=records.find(r=>r.phase==='node_blocking_dialog_observed');
@@ -331,6 +371,116 @@ test('native process, port and mapping reads share the prepared node and durable
  assert.equal(controls.node_processes,undefined);
  assert.equal(records.at(-1).outcome.output.node_process_controls_read,true);
  await assert.rejects(fixture().channel.observe({condition:'unbound controls',readProcessControls:true,ready:()=>true}),/prepared node/);
+});
+
+function preparedLockStepFixture({locked=true,change={},fault,continuous=false}={}) {
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'crumb',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,dom_epoch:{document:'dom',revision:1},scan:{complete:true},wizard:{status:'absent'},
+  prepared_node_context:{verified:true,...binding.node,surface:'graph',tid:'MF;TF-1;Graph;Reform',locked:!locked},
+  ui:{elements:[{ref:'ui-old',tid:'progress',allowed_actions:['click']}],dialogs:[],masks:[],truncated:{dialogs:false,masks:false}}};
+ const records=[],actions=[],ready=[];let reads=0,clock=1,gestures=0;const controller=new AbortController();
+ const operation={id:'cold',deadline:10000,action:{action_key:'acceptance.cold_read',revision:'1'}};
+ const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>clock,signal:controller.signal,
+  record:async e=>{records.push(structuredClone(e));if(e.phase==='node_step_refresh_authorized'){if(fault==='cancel')controller.abort();if(fault==='deadline')clock=operation.deadline;}return structuredClone(e)},
+  wrapMutation:(code,r)=>({code,r}),execute:async code=>{
+   if(typeof code==='string'){reads++;return {status:'SUCCEEDED',output:structuredClone(state)}}
+   actions.push(code.r);
+   if(actions.length===1||continuous){
+    if(fault==='transport')throw Error('unknown reply');
+    const before=structuredClone(state.prepared_node_context),after={...before,locked:!before.locked,...change};
+    const trace=[{event:'prepared_node_context_changed_before_gesture',before,after}];
+    if(fault==='missing_pair')delete trace[0].after;
+    if(fault==='duplicate_pair')trace.push(structuredClone(trace[0]));
+    if(fault==='gesture')trace.push({event:'ui_gesture_applied'});
+    state.prepared_node_context=after;state.ui.elements[0].ref='ui-fresh';
+    return {status:'NOT_APPLIED',action_key:'ui.act',operation_id:code.r.id,phase:fault==='phase'?'observing':'preconditions',effect_possible:fault==='effect',cleanup_complete:fault!=='cleanup',
+     error:{code:'PREPARED_NODE_CONTEXT_CHANGED'},trace,output:structuredClone(state)};
+   }
+   assert.ok(code.code.includes('"ref":"ui-fresh"'),'freshly resolved UI ref replaces the rejected ref');gestures++;
+   return {status:'SUCCEEDED',action_key:'ui.act',operation_id:code.r.id,effect_possible:true,cleanup_complete:true,output:structuredClone(state),trace:[]};
+  }});
+ return {channel,records,actions,ready,operation,get reads(){return reads},get gestures(){return gestures},
+  run:()=>channel.perform({condition:'cold process console',ready:s=>{ready.push(structuredClone(s));return true},
+   resolve:s=>({verb:'click',ref:s.ui.elements[0].ref}),identity:s=>({tid:s.ui.elements[0].tid})})};
+}
+
+for(const locked of [false,true])test('D50 lock-only precondition refusal obtains a full fresh observation before one gesture: '+locked,async()=>{
+ const f=preparedLockStepFixture({locked});await f.run();
+ assert.equal(f.actions.length,2);assert.equal(f.gestures,1);assert.equal(f.reads,4);assert.equal(f.ready.length,2);
+ assert.equal(f.ready[0].prepared_node_context.locked,!locked);assert.equal(f.ready[1].prepared_node_context.locked,locked);
+ assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized'&&e.reason==='prepared_node_lock_changed').length,1);
+});
+
+for(const change of [{document_id:'foreign'},{workflow_id:'foreign'},{node_id:'foreign'},{tid:'other'},{surface:'wizard'},{verified:false},{locked:undefined},{navigation_node:{tid:'foreign'}}])
+test('D50 retry refuses another native context difference '+JSON.stringify(change),async()=>{
+ const f=preparedLockStepFixture({change});await assert.rejects(f.run());assert.equal(f.actions.length,1);assert.equal(f.gestures,0);
+ assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,0);
+});
+
+for(const fault of ['missing_pair','duplicate_pair','phase','effect','cleanup','gesture','transport','cancel','deadline'])test('D50 retry retains '+fault+' guard',async()=>{
+ const f=preparedLockStepFixture({fault});await assert.rejects(f.run());assert.equal(f.actions.length,1);assert.equal(f.gestures,0);
+ if(!['cancel','deadline'].includes(fault))assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,0);
+ assert.equal(f.operation.deadline,10000);
+});
+
+test('D50 continuous pre-gesture lock churn stays bounded without a gesture',async()=>{
+ const f=preparedLockStepFixture({continuous:true});await assert.rejects(f.run());assert.equal(f.actions.length,3);assert.equal(f.gestures,0);
+ assert.equal(f.operation.deadline,10000);assert.equal(f.records.filter(e=>e.phase==='node_step_refresh_authorized').length,2);
+});
+
+function processLockFixture(onProcessRead,{deadline=10000}={}) {
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'crumb',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const node={verified:true,...binding.node,surface:'graph',tid:'MF;TF-1;Graph;JS',locked:true};
+ const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:binding.workflow_ref,dom_epoch:{document:'dom',revision:1},
+  prepared_node_context:node,scan:{complete:true},wizard:{status:'absent'},ui:{elements:[{tid:'MF;ConsoleForm',ref:'ui-console'}],masks:[],dialogs:[],truncated:{dialogs:false,masks:false}}};
+ const records=[],timeouts=[];let clock=1,reads=0,gestures=0;
+ const channel=createNodeProcedure({operation:{id:'replace',deadline,action:{action_key:'node.apply',revision:'1'}},preparedNodeContext:binding,
+  targetOrigin:state.origin,targetBuild:state.loginom_build,now:()=>clock,wait:async ms=>{clock+=ms},
+  record:async r=>{records.push(structuredClone(r));return structuredClone(r)},wrapMutation:()=>{gestures++;throw Error('unexpected gesture')},
+  execute:async(code,options)=>{
+   timeouts.push(options?.timeout);
+   if(code.includes('function workspaceUiCapability'))return {status:'SUCCEEDED',output:structuredClone(state)};
+   if(code.includes('async function readNodeProcesses')){
+    const context=structuredClone(node);onProcessRead(reads++,node,context);
+    return {verified:true,node_context:context,processes:[]};
+   }
+   throw Error('unexpected native read');
+  }});
+ return {channel,records,timeouts,state,get reads(){return reads},get gestures(){return gestures},get clock(){return clock}};
+}
+
+for(const locked of [false,true])test('process observation discards a lock-only transition to '+locked+' and rereads',async()=>{
+ const f=processLockFixture((n,node)=>{if(!n){node.locked=locked;node.tid='MF;TF-1;Graph;JS'};});
+ f.state.prepared_node_context.locked=!locked;
+ const ready=[];
+ const result=await f.channel.observe({condition:'execution after JS Done',readProcesses:true,ready:s=>{ready.push(s);return s.node_processes.verified}});
+ assert.equal(f.reads,2);assert.equal(ready.length,1,'mixed read is never passed to readiness');assert.equal(f.gestures,0);
+ assert.equal(result.prepared_node_context.locked,locked);assert.deepEqual(result.node_processes.node_context,result.prepared_node_context);
+ const retried=f.records.filter(e=>e.phase==='node_observation_lock_retried');assert.equal(retried.length,1);
+ assert.equal(retried[0].native_node_context.locked,!locked);assert.equal(retried[0].ui_node_context.locked,locked);
+});
+
+test('lock-only retry resets consecutive execution identity confirmation',async()=>{
+ const f=processLockFixture((n,node)=>{if(n===1)node.locked=false});
+ await f.channel.observe({condition:'stable execution',readProcesses:true,ready:()=>true,confirmIdentity:()=>({execution:'same'})});
+ assert.equal(f.reads,4);assert.deepEqual(f.records.filter(e=>e.phase==='node_observation_sample').map(e=>e.sample),[0,2,3]);
+ assert.equal(f.records.filter(e=>e.phase==='node_observation_completed').length,1);
+});
+
+for(const change of [{node_id:'foreign'},{document_id:'foreign'},{workflow_id:'foreign'},{surface:'wizard'},
+ {tid:'MF;TF-1;Graph;Other'},{verified:false},{locked:undefined},{navigation_node:{tid:'other',label:'Other'}}])
+test('process lock change cannot hide another context change '+JSON.stringify(change),async()=>{
+ const f=processLockFixture((n,node,native)=>{node.locked=false;Object.assign(native,change)});
+ await assert.rejects(f.channel.observe({condition:'execution',readProcesses:true,ready:()=>true}),/context changed/);
+ assert.equal(f.reads,1);assert.equal(f.records.filter(e=>e.phase==='node_observation_lock_retried').length,0);assert.equal(f.gestures,0);
+});
+
+test('continuous process lock changes exhaust the original observation deadline without a usable snapshot',async()=>{
+ const f=processLockFixture((n,node)=>{node.locked=!node.locked},{deadline:451});
+ await assert.rejects(f.channel.observe({condition:'execution',readProcesses:true,timeoutMs:1000,ready:()=>true}),/readiness timeout/);
+ assert.equal(f.clock,451);assert.equal(f.reads,3);assert.equal(f.gestures,0);
+ assert.equal(f.records.filter(e=>e.phase==='node_observation_completed').length,0);
+ await assert.rejects(f.channel.act({verb:'click',ref:'ui-console'}),/budget exhausted|observation/i);
 });
 
 for(const fault of ['other field','source connection','port owner','incomplete mapping'])
@@ -803,8 +953,110 @@ test('an incomplete observation preserves the original refusal in the journal',a
  assert.ok(!f.events.includes('mutated'));
 });
 
+test('D74 receipt guards every unmasked read and the first transport deadline',async()=>{
+ for(const fault of [null,'graph_return','replacement','late_replacement','graph_only','port','expired','slow_roots','slow_detail','slow_ack']) {
+  let clock=fault==='expired'?1000:1,reads=0;
+  const ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]},node={document_id:'doc',workflow_id:'wf',node_id:'node'};
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:ref,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+   prepared_node_context:{...node,verified:true,surface:fault==='graph_return'?'graph':'wizard',tid:'MF;TF-1;WizrdMCF'},
+   wizard:fault==='graph_return'?{status:'absent'}:{status:'observed',root_ref:fault==='replacement'?'ui-replacement':'ui-original',root_tid:'MF;TF-1;WizrdMCF',stage:'sorting',owner_context:{status:'observed'}},
+   ui:{elements:[],dialogs:[],masks:[],truncated:{dialogs:false,masks:false}}};
+  const operation={id:'release',deadline:90000,action:{action_key:'node.apply',revision:'1'}};
+  const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:ref,node},targetOrigin:state.origin,targetBuild:state.loginom_build,
+   now:()=>clock,monotonicNow:()=>clock,record:async e=>{if(fault==='slow_ack'&&e.phase==='node_observation_completed')clock=1000;return structuredClone(e);},
+   execute:async(_code,options)=>{
+    assert.ok(options.timeout>0&&options.timeout<=1000-clock);reads++;
+    if(fault==='slow_roots')clock+=1200;
+    if(fault==='slow_detail')clock+=600;
+    if(fault==='late_replacement'&&reads===2)state.wizard.root_ref='ui-replacement';
+    return {status:'SUCCEEDED',output:structuredClone(state)};
+   },wrapMutation:()=>{throw Error('No gesture permitted');}});
+  const run=()=>channel.observe({condition:'receipt-bound release',releaseWizard:true,
+   settleWizard:{root_ref:'ui-original',graph_only:['graph_only','graph_return'].includes(fault),deadline:1000,
+    node:{...node,...(fault==='port'?{input_port:{port_guid:'original'}}:{})}},ready:()=>true});
+  if(!fault||fault==='graph_return')await run();else await assert.rejects(run(),/context|deadline|timeout/i);
+  if(fault==='expired')assert.equal(reads,0);
+  if(fault==='slow_roots')assert.equal(reads,1);
+  if(fault==='slow_detail')assert.equal(reads,2);
+  assert.equal(operation.deadline,90000);
+ }
+});
+
+test('D74 ordinary readiness waits only for its own wizard mask under the original deadline',async()=>{
+ for(const fault of [null,'foreign','node','expired']) {
+  let time=1,mutations=0;
+  const ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]},node={document_id:'doc',workflow_id:'wf',node_id:'node'};
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:ref,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+   prepared_node_context:{...node,verified:true,surface:'wizard',tid:'MF;TF-1;WizrdMCF'},
+   wizard:{status:'observed',root_ref:'wizard',root_tid:'MF;TF-1;WizrdMCF',stage:'output_mapping'},
+   ui:{elements:[],dialogs:[],masks:[{kind:'busy',ref:'wizard',target_tid:'MF;TF-1;WizrdMCF',dialog_ref:null}],truncated:{dialogs:false,masks:false}}};
+  const operation={id:'parent',deadline:30000,action:{action_key:'node.apply',revision:'1'}};
+  const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:ref,node},targetOrigin:state.origin,targetBuild:state.loginom_build,
+   now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms;if(!fault&&time>=25000)state.ui.masks=[];
+    if(fault==='foreign'&&time>=1000)state.ui.masks[0].target_tid='foreign';if(fault==='node'&&time>=1000)state.prepared_node_context.node_id='other';},
+   record:async e=>structuredClone(e),execute:async code=>{assert.equal(typeof code,'string');return {status:'SUCCEEDED',output:structuredClone(state)};},wrapMutation:()=>{mutations++;}});
+  const run=()=>channel.observe({condition:'owned wizard ready',ready:()=>true,timeoutMs:1000});
+  if(fault)await assert.rejects(run());else{await run();assert.ok(time>=25000);}
+  assert.equal(operation.deadline,30000);assert.equal(mutations,0);
+ }
+});
+
+test('D74 receipt returning to graph cannot authorize another wizard during settlement',async()=>{
+ for(const fault of [null,'wizard','foreign']) {
+  let time=1,mutations=0;
+  const ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]},node={document_id:'doc',workflow_id:'wf',node_id:'node'};
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:ref,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+   prepared_node_context:{...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Import'},wizard:{status:'absent'},
+   ui:{elements:[],dialogs:[],masks:[{kind:'busy',ref:'model',target_tid:'MF;TF-1;ModelForm',graph_loading_owner_ref:'model',dialog_ref:null}],truncated:{dialogs:false,masks:false}}};
+  const operation={id:'parent',deadline:30000,action:{action_key:'node.apply',revision:'1'}};
+  const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:ref,node},targetOrigin:state.origin,targetBuild:state.loginom_build,
+   now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms;
+    if(fault==='wizard'){state.prepared_node_context.surface='wizard';state.prepared_node_context.tid='MF;TF-1;WizrdMCF';
+     state.wizard={status:'observed',root_ref:'wizard',root_tid:'MF;TF-1;WizrdMCF'};
+     state.ui.masks=[{kind:'busy',ref:'wizard',target_tid:'MF;TF-1;WizrdMCF',dialog_ref:null}];}
+    if(fault==='foreign')state.ui.masks[0].target_tid='foreign';
+    if(!fault&&time>=25000)state.ui.masks=[];},record:async e=>structuredClone(e),
+   execute:async()=>({status:'SUCCEEDED',output:structuredClone(state)}),wrapMutation:()=>{mutations++;}});
+  const run=()=>channel.observe({condition:'cancelled graph ready',releaseWizard:true,settleWizard:{graph_only:true,node,deadline:30000},ready:()=>true,timeoutMs:1000});
+  if(fault)await assert.rejects(run());else{await run();assert.ok(time>=25000);}
+  assert.equal(operation.deadline,30000);assert.equal(mutations,0);
+ }
+});
+
+test('D75 launched own graph waits read-only through running epochs before console gesture',async()=>{
+ for(const fault of [null,'epoch','foreign','unknown','expired']) {
+  let time=1,mutatedAt,attempts=0,gestures=0;
+  const ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]},node={document_id:'doc',workflow_id:'wf',node_id:'node'};
+  const button={tid:'MF;cntMain;tlbMainToolbar;btnProgress',ref:'ui-progress',signature:{tag:'button'},allowed_actions:['click'],enabled:true};
+  const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:ref,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+   prepared_node_context:{...node,verified:true,surface:'graph',tid:'MF;TF-1;Graph;Import',locked:fault!=='epoch'},wizard:{status:'absent'},
+   ui:{elements:[{tid:'MF;cntMain;tlbMainToolbar',ref:'toolbar'},button],dialogs:[],masks:[],truncated:{dialogs:false,masks:false}}};
+  const operation={id:'parent',deadline:30000,action:{action_key:'node.apply',revision:'1'}};
+  const channel=createNodeProcedure({operation,preparedNodeContext:{document_id:'doc',workflow_ref:ref,node},targetOrigin:state.origin,targetBuild:state.loginom_build,
+   now:()=>time,monotonicNow:()=>time,wait:async ms=>{time+=ms;state.dom_epoch.revision++;
+    if((!fault||fault==='epoch')&&time>=25000)state.prepared_node_context.locked=false;
+    if(fault==='foreign')state.prepared_node_context.node_id='other';
+    if(fault==='unknown')delete state.prepared_node_context.locked;},record:async e=>structuredClone(e),
+   execute:async code=>{
+    if(typeof code==='string')return {status:'SUCCEEDED',output:structuredClone(state)};
+    attempts++;
+    if(fault==='epoch'&&attempts===1){state.prepared_node_context.locked=true;
+     return {status:'NOT_APPLIED',operation_id:code.reference.id,action_key:'ui.act',phase:'preconditions',cleanup_complete:true,effect_possible:false,
+      error:{code:'UI_EPOCH_CHANGED'},trace:[],output:structuredClone(state)};}
+    gestures++;return {status:'SUCCEEDED',operation_id:code.reference.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state};},
+   wrapMutation:(code,reference)=>{mutatedAt=time;return {code,reference}}});
+  const initial=await channel.observe({condition:'console button',readProcessControls:true,ready:()=>true});
+  const run=()=>channel.perform({condition:'execution control '+button.tid,initialObservation:initial,ready:()=>true,
+   settleProcessConsole:{ref:button.ref,signature:button.signature},identity:()=>node,resolve:()=>({verb:'click',ref:button.ref})});
+  if(fault&&!['epoch'].includes(fault))await assert.rejects(run());else{await run();assert.ok(mutatedAt>=25000);assert.equal(gestures,1);}
+  if(fault&&fault!=='epoch')assert.equal(mutatedAt,undefined);
+  assert.equal(attempts,fault==='epoch'?2:fault?0:1);
+  assert.equal(operation.deadline,30000);
+ }
+});
+
 test('bound completion gives mask settlement only the remaining parent deadline',async()=>{
-  for(const verb of ['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column','click']) {
+  for(const verb of ['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views','finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column','click']) {
     const workflow_ref={workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
     const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
     const state={origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,dom_epoch:{document:'dom',revision:1},
@@ -816,8 +1068,10 @@ test('bound completion gives mask settlement only the remaining parent deadline'
       execute:async(code,options)=>{
         if(typeof code==='string')return {status:'SUCCEEDED',output:structuredClone(state)};
         assert.equal(options.timeout,verb==='click'?35000:69000);
+        if(verb==='click')assert.doesNotMatch(code.code,/"deadline":/);
+        else assert.match(code.code,/"deadline":65000/);
         if(verb==='click')assert.doesNotMatch(code.code,/"settlement_timeout_ms":/);
-        else assert.match(code.code,['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(verb)?/"opening_timeout_ms":64000/:/"settlement_timeout_ms":64000/);
+        else assert.match(code.code,['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views'].includes(verb)?/"opening_timeout_ms":64000/:/"settlement_timeout_ms":64000/);
         return {status:'SUCCEEDED',operation_id:code.receipt.id,action_key:'ui.act',cleanup_complete:true,effect_possible:true,output:state};
       }});
     if(verb==='wizard_step')state.wizard={status:'observed',stage:'text_import_file'};
@@ -859,4 +1113,69 @@ test('root refusal retains bounded code and trace without payloads, retries or u
  assert.equal(event.stage,'roots');assert.equal(JSON.stringify(event).includes('secret payload'),false);
  await assert.rejects(f.channel.act({verb:'click',ref:'ui-button'}),/fresh internal observation/);
  assert.ok(!f.events.includes('mutated'));
+});
+
+function portReadFixture({signal,afterDispatch,executeFailure,envelope,now=()=>1,onRecord}={}) {
+ const binding={document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Scenario',label:'Scenario'}]},node:{document_id:'doc',workflow_id:'flow',node_id:'node'}};
+ const request={port:0,sampleRows:1,requireExactNumbers:true,execution:{verified:true,owner_verified:true,status:'completed',execution_id:'doc:root:1',process_id:'1.1',process_record_id:'child'}};
+ const records=[],calls=[],operation={id:'read-port',deadline:10000,cleanupConfirmed:true,action:{action_key:'node.apply',revision:'1'}};
+ const result={verified:true,cleanup_complete:true,node_context:{verified:true,document_id:'doc',workflow_id:'flow',node_id:'node'},output:{port:0,port_guid:'11111111-1111-1111-1111-111111111111',fresh:true,execution_id:'doc:root:1',freshness_basis:'completed_execution_port_source',schema:[],sample:[],row_count:0,sample_rows:0,sample_complete:true,precision:{numbers_verified:true,limitations:[]}}};
+ const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:'http://example.test',targetBuild:'7.4.2',signal,now,
+  record:async r=>{await onRecord?.(r);records.push(r);return structuredClone(r)},wrapMutation:()=>{throw Error('Unexpected mutation')},execute:async(code,options)=>{calls.push({code,options});if(executeFailure)throw Error('transport');afterDispatch?.();return envelope??result;}});
+ return {channel,operation,request,records,calls,result};
+}
+test('direct output read dispatches once and journals only confirmed bounded result',async()=>{
+ const f=portReadFixture(),result=await f.channel.readOutputPort(f.request);
+ assert.deepEqual(result,f.result);assert.equal(f.calls.length,1);assert.equal(f.calls[0].options.timeout,14999);
+ assert.match(f.calls[0].code,/readNodePortOutput/);assert.equal(f.operation.cleanupConfirmed,true);
+ assert.equal(f.records.at(-1).phase,'node_port_output_read');
+});
+
+test('direct output cancellation before dispatch publishes nothing and makes no call',async()=>{
+ const controller=new AbortController();controller.abort(Error('cancelled'));
+ for(const previous of [undefined,true,false]){
+  const f=portReadFixture({signal:controller.signal});
+  if(previous!==undefined)f.operation.portReadCleanupComplete=previous;
+  await assert.rejects(f.channel.readOutputPort(f.request),/cancelled/);
+  assert.equal(f.calls.length,0);assert.equal(f.records.length,0);assert.equal(f.operation.cleanupConfirmed,true);
+  assert.equal(f.operation.portReadCleanupComplete,previous);
+ }
+});
+
+test('direct output cancellation after dispatch preserves confirmed cleanup without publishing',async()=>{
+ const controller=new AbortController(),f=portReadFixture({signal:controller.signal,afterDispatch:()=>controller.abort(Error('cancelled'))});
+ await assert.rejects(f.channel.readOutputPort(f.request),/cancelled/);
+ assert.equal(f.calls.length,1);assert.equal(f.records.length,0);assert.equal(f.operation.cleanupConfirmed,true);
+ assert.notEqual(f.operation.transportUncertain,true);
+});
+
+test('direct output lost reply retains uncertainty and never retries or journals values',async()=>{
+ const f=portReadFixture({executeFailure:true});
+ await assert.rejects(f.channel.readOutputPort(f.request),/transport/);
+ assert.equal(f.calls.length,1);assert.equal(f.records.length,0);assert.equal(f.operation.cleanupConfirmed,false);assert.equal(f.operation.transportUncertain,true);
+});
+
+test('direct output unknown reply cannot confirm cleanup or publish values',async()=>{
+ const f=portReadFixture({envelope:{cleanup_complete:true}});
+ await assert.rejects(f.channel.readOutputPort(f.request),/refused/);
+ assert.equal(f.calls.length,1);assert.equal(f.records.length,0);assert.equal(f.operation.cleanupConfirmed,false);
+ assert.notEqual(f.operation.transportUncertain,true);
+});
+
+
+test('direct output abort during journal ACK prevents late return and preserves cleanup',async()=>{
+ const controller=new AbortController(),f=portReadFixture({signal:controller.signal,onRecord:async()=>{await Promise.resolve();controller.abort(Error('cancelled during journal'));}});
+ let published=false;
+ await assert.rejects(f.channel.readOutputPort(f.request).then(()=>{published=true;}),/cancelled during journal/);
+ assert.equal(published,false);assert.equal(f.calls.length,1);assert.equal(f.records.length,1);assert.equal(f.operation.cleanupConfirmed,true);
+ assert.notEqual(f.operation.transportUncertain,true);
+});
+
+test('direct output deadline during journal ACK prevents late return and preserves cleanup',async()=>{
+ let time=1;
+ const f=portReadFixture({now:()=>time,onRecord:async()=>{await Promise.resolve();time=10000;}});
+ let published=false;
+ await assert.rejects(f.channel.readOutputPort(f.request).then(()=>{published=true;}),/budget exhausted/);
+ assert.equal(published,false);assert.equal(f.calls.length,1);assert.equal(f.records.length,1);assert.equal(f.operation.cleanupConfirmed,true);
+ assert.notEqual(f.operation.transportUncertain,true);
 });

@@ -1,8 +1,6 @@
 import {configureSortingOutput} from './sorting-output.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
-import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
-import {readTableOutputPages} from './table-output-pages.mjs';
-import {decodeTableOutput} from './table-output-values.mjs';
+import {alignReadSchema} from './node-read-contract.mjs';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 export async function configureFilterOutputs(channel,configuration,parameters,mappings,finishWizard){
  const ports=[];
@@ -18,20 +16,16 @@ export async function configureFilterOutputs(channel,configuration,parameters,ma
  return {verified:true,cleanup_complete:true,effect_possible:true,ports};
 }
 export async function readFilterOutputs(channel,read,ctx,mapped){
- const ports=[],evidence=[];
+ const ports=[];
  for(const port of read.ports){
   const mapping=mapped.ports.find(p=>p.port===port);need(mapping,'Missing filter output schema');
-  const table=await openNewOutputTable(channel,port),formatProof=read.require_exact_numbers?await configureTablePrecision(channel,table.table):null;
-  let readSettings,data,formatRestoration;
-  try{
-   readSettings=await prepareTableRead(channel,table.table);
-   const raw=await readTableOutputPages(channel,table.table,{sampleRows:read.sample_rows});
-   data=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:mapping.native_mapping.target_fields.filter(f=>!f.excluded),requireExactNumbers:read.require_exact_numbers});
-  }finally{if(formatProof)formatRestoration=await restoreTablePrecision(channel,formatProof);}
-  const returned=await returnFromOutputTable(channel,table.table);
-  ports.push({port,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data});
-  evidence.push({port,table_creation:table,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:returned});
+  const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
+  const expected=mapping.native_mapping.target_fields.filter(f=>!f.excluded);
+  need(output.schema.every((field,index)=>field.name===expected[index]?.name),'Filter output field order differs from the configured output');
+  const aligned=alignReadSchema(output.schema,expected);
+  output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
+  ports.push(output);
  }
  need(new Set(ports.map(p=>p.port_guid)).size===ports.length,'Filter outputs share an unexpected identity');
- return {verified:true,cleanup_complete:true,effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports,port_evidence:evidence};
+ return {verified:true,cleanup_complete:true,effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports};
 }

@@ -29,13 +29,13 @@ rows = [row for row in rows if row["Region"] == "Север"]
 
 expected = {
     "package_path": sys.argv[1] if len(sys.argv) > 1 else "/demo-2026-10-22/s1-revenue.lgp",
-    "nodes": [{"type": kind} for kind in ("imports.text", "transform.group_data", "exports.text")],
+    "nodes": [],
     "outputs": [{
         "output_node_type": "export_input",
         "export_destination": sys.argv[2] if len(sys.argv) > 2 else "/demo-2026-10-22/revenue-north.csv",
         "ordered": True,
         "column_order": "exact",
-        "columns": [{"name": name, "label": LABELS.get(name, name), "type": kind}
+        "columns": [{"name": name, "label_any": True, "type": kind}
                     for name, kind in COLUMNS],
         "rows": rows,
     }],

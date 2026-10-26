@@ -5,7 +5,7 @@ import {releasePendingNode} from '../lib/node-pending-release.mjs';
 
 const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
 const workflow={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]};
-function fixture(kind,fault){
+function fixture(kind,fault,nodeWizard=false){
  let mode=kind,lastAction;const gestures=[],events=[];
  const operation={id:'apply',action:{action_key:'node.apply',revision:'1'},deadline:10000,lastReceipt:{id:'apply:opening'},
   nodeApply:{node,pending:{phase:'input_mapping'},request:{document_id:'doc',workflow_ref:workflow}},
@@ -16,8 +16,8 @@ function fixture(kind,fault){
    :'Подтвердить Вы действительно хотите закрыть мастер настройки? Да Нет';
   return {origin:'http://example.test',loginom_build:'7.4.2',workflow_ref:workflow,dom_epoch:{document:'browser',revision:1},scan:{complete:true},
    prepared_node_context:{...node,node_id:fault==='foreign-node'?'other':'node',verified:true,surface:graph?'graph':'wizard',locked:false,
-    ...(!graph?{input_port:{direction:'input',port:2,native_index:2,port_guid:'input2',opening_operation_id:fault==='foreign-opening'?'other:n45':'apply:n45'}}:{})},
-   wizard:graph?{status:'absent'}:{status:'observed',root_ref:'ui-wizard',root_tid:'W',stage:'input_mapping',owner_context:{status:'unobserved'}},
+    ...(!graph&&!nodeWizard?{input_port:{direction:'input',port:2,native_index:2,port_guid:'input2',opening_operation_id:fault==='foreign-opening'?'other:n45':'apply:n45'}}:{})},
+   wizard:graph?{status:'absent'}:{status:'observed',root_ref:'ui-wizard',root_tid:'W',stage:'input_mapping',owner_context:nodeWizard?{status:'observed',node:{tid:fault==='foreign-owner'&&dialog?'other':'saved-node'},path:['package','workflow','node','settings']}:{status:'unobserved'}},
    ui:{truncated:{elements:false,dialogs:false,masks:false},
     dialogs:dialog?[{ref:'ui-dialog',title:portal?(conflict?'Loginom 7.4.2':'Подтвердить'):'',text:portal?(fault==='other-question'?'Удалить пакет?':text):'[outside selected root]'}]:[],
     masks:dialog?[{kind:fault==='busy'?'busy':'modal_background',ref:'ui-wizard'}]:[],
@@ -57,4 +57,11 @@ test('a lost Cancel reply never replays Cancel, Close or confirmation',async()=>
  const f=fixture('conflict','lost-reply');await assert.rejects(f.run(),/Transport response lost/);
  assert.equal(f.operation.transportUncertain,true);assert.equal(f.operation.cleanupConfirmed,false);
  assert.deepEqual(f.gestures,[{verb:'click',ref:'ui-cancel'}]);
+});
+test('release cancels the same exact question of its owned node input page without continuing',async()=>{
+ const f=fixture('conflict',null,true),proof=await f.run();
+ assert.equal(proof.verified,true);assert.deepEqual(f.gestures,[{verb:'click',ref:'ui-cancel'},{verb:'click',ref:'ui-close'},{verb:'confirm_wizard_close',ref:'ui-yes'}]);
+});
+for(const fault of ['foreign-node','other-question','foreign-control','busy'])test('node input release keeps foreign or uncertain dialog refusal: '+fault,async()=>{
+ const f=fixture('conflict',fault,true);await assert.rejects(f.run());assert.deepEqual(f.gestures,[]);
 });

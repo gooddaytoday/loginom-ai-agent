@@ -78,25 +78,32 @@ export async function revealExecutionControl(channel,node,initial,process,tid,ve
 
 export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false,verifyFailedChild=false,retainReadWait=false}={}) {
   let baseline,execution,stopPromise,readWaitBinding,consoleControl,launchSucceeded=false,launchAttempted=false,deactivationAttempted=false,failedChildAttempted=false;
+  const launched=()=>launchSucceeded||channel.launchConfirmed===true;
   const observe=(condition,ready=()=>true,extra={})=>channel.observe({condition,readProcesses:true,ready,...extra});
   const control=(s,tid,verb='click')=>{const current=typeof tid==='function'?tid(s):tid;
     return typeof current==='string'&&current.length?s.ui.elements.filter(e=>consoleTid(e.tid,current)&&e.allowed_actions.includes(verb)):[];};
   const act=async(s,tid,verb='click',identity=()=>node,key)=>channel.perform({condition:'execution control '+tid,
     initialObservation:s,ready:s=>control(s,tid,verb).length===1,
+    ...(launched()&&consoleControl&&tid===button&&verb==='click'?{settleProcessConsole:consoleControl}:{}),
     ...(tid===grid?{confirmIdentity:consoleMenuIdentity}:{}),
     resolve:s=>({verb,ref:one(control(s,tid,verb),'Unique execution control required').ref,...(key?{key}:{})}),identity});
   const consoleVisible=s=>s.ui.elements.filter(e=>consoleTid(e.tid,grid)).length===1;
-  async function openConsole() {
+  async function openConsole(condition='process console visible',ready=()=>true,extra={}) {
+    consoleControl??=channel.launchConsoleControl;
     let s=await observe('prepared node available for process console',s=>consoleVisible(s)||control(s,button).length===1,{readProcesses:false,readProcessControls:true,
-      ...(launchSucceeded&&consoleControl?{settleProcessConsole:consoleControl}:{})});
-    if(!launchSucceeded){
+      ...(launched()&&consoleControl?{settleProcessConsole:consoleControl}:{})});
+    if(!launched()){
       const buttons=control(s,button);
       consoleControl=buttons.length===1&&buttons[0].signature?{ref:buttons[0].ref,signature:structuredClone(buttons[0].signature)}:undefined;
     }
-    if(!consoleVisible(s))await act(s,button);
+    if(!consoleVisible(s)){
+      requireValue(!launched()||consoleControl,'Confirmed launch requires its pre-launch console control');
+      await act(s,button);
+    }
     // The control-only read above has no native inventory, even when the
-    // console was already open. Stop must refresh its root/process proof.
-    return observe('process console visible',consoleVisible);
+    // console was already open. Refresh inventory in the consumer's own
+    // readiness read instead of discarding one full inventory immediately.
+    return observe(condition,s=>consoleVisible(s)&&ready(s),extra);
   }
   async function closeConsole(s) {
     if(consoleVisible(s))await act(s,'ConsoleForm;btnClose');
@@ -105,8 +112,10 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
   const processes=s=>s.node_processes?.verified===true&&s.node_processes.show_completed===true;
   async function revealChildren(s,group) {
     // A cached process can be complete while its virtualized row is offscreen.
+    // Buffered split grids can retain matching DOM cells (rendered=true)
+    // below the viewport, before the snapshot annotates their expander tid.
     // Reveal the exact record before requiring its painted expander identity.
-    if(group.rendered!==true){
+    if(group.rendered!==true||group.expanded!==true&&!group.expander_tid){
       const current=state=>state.node_processes?.processes.find(p=>p.process_id===group.process_id&&p.record_id===group.record_id);
       s=await revealExecutionControl(channel,node,s,group,state=>current(state)?.process_tid);
       group=current(s);requireValue(group?.rendered===true,'Execution group did not become visible');
@@ -128,7 +137,9 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
     async prepare({keepConsoleOpen=false}={}) {
       requireValue(typeof keepConsoleOpen==='boolean','Owned process console mode must be boolean');
       requireValue(!baseline,'Execution baseline has already been captured');
-      let s=await openConsole();
+      const menuReady=s=>consoleVisible(s)&&control(s,grid,'right_click').length===1;
+      let s=await (keepConsoleOpen?openConsole():openConsole('process console menu settled',menuReady,
+        {confirmIdentity:consoleMenuIdentity}));
       if(keepConsoleOpen) {
         const pinned=s=>consoleVisible(s)&&control(s,'ConsoleForm;btnPin').length===1
           &&control(s,'ConsoleForm;btnUnpin').length===0;
@@ -142,8 +153,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       // A long buffered process list can repaint after the panel becomes
       // visible. Require two matching epochs before its menu gesture, and
       // retain this readiness check on strictly pre-gesture recovery.
-      s=await observe('process console menu settled',s=>consoleVisible(s)&&control(s,grid,'right_click').length===1,
-        {confirmIdentity:consoleMenuIdentity});
+      if(keepConsoleOpen)s=await observe('process console menu settled',menuReady,{confirmIdentity:consoleMenuIdentity});
       // Opening the native menu establishes the filter's actual cached state,
       // including an empty history. Never clear or delete earlier processes.
       await act(s,grid,'right_click');
@@ -228,8 +238,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
     },
     async identify() {
       requireValue(baseline&&!execution,'A pre-launch baseline without an identified execution is required');
-      await openConsole();
-      const s=await observe('one new node execution group',s=>{
+      const s=await openConsole('one new node execution group',s=>{
         if(!processes(s))return false;
         const old=new Set(baseline.roots.map(p=>p.process_id));
         return s.node_processes.processes.some(p=>p.parent_id===null&&!old.has(p.process_id));
@@ -371,8 +380,7 @@ export function createNodeExecutionProcedure(channel,node,{allowDeactivate=false
       });
       // Switching back from Files can hide the process panel. Reopen it for
       // a fresh check of the same execution; this never launches the node.
-      await openConsole();
-      s=await observe('new process selects the prepared graph node',s=>processes(s)&&s.node_outputs?.verified===true
+      s=await openConsole('new process selects the prepared graph node',s=>processes(s)&&s.node_outputs?.verified===true
         &&s.node_outputs.node_selected===true&&s.prepared_node_context.surface==='graph',{readOutputs:true});
       const owner={verified:true,process_id:child.process_id,record_id:child.record_id,
         node_selected:s.node_outputs.node_selected,node:s.prepared_node_context};

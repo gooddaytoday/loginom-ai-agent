@@ -1,11 +1,13 @@
-"""Independent CSV/source, execution and Table audit; no persistence/Hermes proof."""
+"""Independent CSV/source and execution audits with port and retained Table readers."""
 from import_limits import import_operation_step_budget
 
 import csv
 import io
+import json
 import math
 import struct
 from datetime import datetime
+from decimal import Decimal
 from import_done_evidence import _verify_text_import
 from import_execution_evidence import verify_execution_observations
 from node_procedure_evidence import verify_internal_sequence
@@ -58,6 +60,129 @@ def equal_number(a, b):
         return math.isfinite(a) and math.isfinite(b) and struct.pack('>d', a) == struct.pack('>d', b)
     except (ValueError, TypeError, OverflowError):
         return False
+
+
+def _port_expected_value(value, kind):
+    if value is None:
+        return None
+    if kind == 'integer':
+        return str(int(value))
+    if kind == 'real':
+        return float(value)
+    if kind == 'boolean':
+        boolean = value if type(value) is bool else {'true': True, 'истина': True, 'да': True,
+            'false': False, 'ложь': False, 'нет': False}.get(str(value).casefold())
+        if boolean is None:
+            raise ValueError('invalid_boolean_oracle')
+        return boolean
+    if kind == 'datetime':
+        for source_format in ['%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S',
+                '%d.%m.%Y %H:%M:%S.%f', '%d.%m.%Y %H:%M:%S', '%d.%m.%Y',
+                '%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+            try:
+                parsed = datetime.strptime(value, source_format)
+            except ValueError:
+                continue
+            if parsed.microsecond % 1000:
+                raise ValueError('submillisecond_oracle')
+            return parsed.isoformat(timespec='milliseconds')
+        raise ValueError('invalid_datetime_oracle')
+    return value
+
+
+def _port_json_size(value):
+    if type(value) is not float:
+        return len(json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode('utf-8', 'backslashreplace'))
+    if not math.isfinite(value):
+        raise ValueError('nonfinite_real_oracle')
+    if value == 0:
+        return 1  # JSON.stringify drops the sign of zero.
+    # Both runtimes use shortest round-trip digits, but JSON has different exponent thresholds.
+    if 1e-6 <= abs(value) < 1e21:
+        return len(format(Decimal(repr(value)), 'f').removesuffix('.0'))
+    mantissa, exponent = repr(value).split('e')
+    return len(mantissa.removesuffix('.0')) + 1 + len(str(int(exponent))) + (int(exponent) >= 0)
+
+
+def verify_port_output(port, expected_columns, expected_rows, execution_id, port_index, *, sample_rows=100):
+    """Compare a source-port prefix with an independent complete fixture."""
+    failures = []
+    try:
+        if (port.get('port') != port_index or not port.get('port_guid') or port.get('fresh') is not True
+                or not execution_id or port.get('execution_id') != execution_id
+                or port.get('freshness_basis') != 'completed_execution_port_source'):
+            failures.append('port_output_identity')
+        schema = port['schema']
+        if (not expected_columns or len({c['name'] for c in expected_columns}) != len(expected_columns)
+                or any(len(row) != len(expected_columns) for row in expected_rows)):
+            return failures + ['port_output_oracle_shape']
+        if type(sample_rows) is not int or not 0 <= sample_rows <= 100:
+            return failures + ['port_output_requested_coverage']
+        if (len(schema) != len(expected_columns) or any(c.get('index') != i
+                or any(c.get(k) != expected_columns[i][k] for k in ('name', 'label', 'type'))
+                or 'data_kind' in expected_columns[i] and c.get('data_kind') != expected_columns[i]['data_kind']
+                for i,c in enumerate(schema))):
+            failures.append('port_output_schema')
+        sample = port['sample']
+        wanted = min(sample_rows, len(expected_rows))
+        requested = min(wanted, 10000 // len(expected_columns))
+        values = [[_port_expected_value(v, c['type']) for v,c in zip(row, expected_columns)]
+            for row in expected_rows[:requested]]
+        size, count = 2, 0
+        for row in values:
+            next_size = size + (count > 0) + 2 + len(row) - 1 + sum(_port_json_size(v) for v in row)
+            if next_size > 512 * 1024:
+                break
+            size = next_size
+            count += 1
+        limit = 'preview_cell_or_byte_budget' if count < wanted else None
+        if port.get('sample_rows') != count or port.get('read_limit') != limit:
+            failures.append('port_output_requested_coverage')
+        if (type(port.get('row_count')) is not int or port['row_count'] != len(expected_rows)
+                or type(port.get('sample_rows')) is not int or port['sample_rows'] != len(sample)
+                or not 0 <= len(sample) <= min(100, len(expected_rows))
+                or port.get('sample_complete') is not (len(sample) == len(expected_rows))
+                or any(len(row) != len(expected_columns) for row in sample)
+                or port.get('read_limit') not in (None, 'preview_cell_or_byte_budget')
+                or port.get('read_limit') and port.get('sample_complete') is True):
+            failures.append('port_output_coverage')
+        for i,row in enumerate(sample):
+            for j,cell in enumerate(row):
+                expected = values[i][j]
+                kind = expected_columns[j]['type']
+                ok = cell.get('type') == kind and cell.get('is_null') is (expected is None)
+                if expected is None:
+                    ok &= cell.get('value') is None
+                elif kind == 'real':
+                    ok &= equal_number(expected, cell.get('decimal')) and (equal_number(expected, cell.get('value'))
+                        or float(expected) == 0 and type(cell.get('value')) in (int, float) and cell['value'] == 0)
+                elif kind == 'integer':
+                    ok &= isinstance(cell.get('value'), str) and expected == cell['value']
+                elif kind == 'boolean':
+                    ok &= cell.get('value') is expected
+                elif kind in ('string', 'datetime'):
+                    ok &= cell.get('value') == expected
+                elif kind == 'variant':
+                    ok &= cell.get('precision') == 'unverified' and cell.get('display_text') == expected
+                else:
+                    ok = False
+                if not ok:
+                    failures.append('port_output_value_'+str(i)+'_'+str(j))
+    except (KeyError, IndexError, TypeError, AttributeError, ValueError, OverflowError):
+        failures.append('port_output_malformed')
+    return sorted(set(failures))
+
+
+def verify_port_output_receipts(events, operation_id, ports):
+    """Bind public samples to the actual reader receipts in requested order."""
+    reads = [e.get('outcome', {}).get('output', {}) for e in events
+        if e.get('operation_id') == operation_id and e.get('phase') == 'node_port_output_read']
+    keys = ('port', 'port_guid', 'execution_id', 'sample', 'row_count', 'sample_rows', 'sample_complete', 'read_limit')
+    schema = lambda port: [{k:c.get(k) for k in ('index', 'name', 'label', 'type')} for c in port.get('schema', [])]
+    if len(reads) != len(ports) or any(any(read.get(k) != port.get(k) for k in keys)
+            or schema(read) != schema(port) for read,port in zip(reads,ports)):
+        return ['port_output_read_receipt']
+    return []
 
 
 def verify_table_format_restoration(observations, mutations, table, expected, first_apply, last_page, restore_apply, proof):
@@ -439,6 +564,44 @@ def verify_table_output_observations(observations, mutations, request, source_by
     return sorted(set(failures))
 
 
+def verify_import_port_output(events, operation_id, request, source_bytes, checkpoint, execution_id):
+    """Compare imported output with independently decoded original CSV bytes."""
+    try:
+        settings = request['parameters']['settings']
+        if request.get('target', {}).get('kind') == 'new':
+            settings = source_ordered_settings(settings, source_bytes)
+        expected = [c for c in settings['columns'] if c['used']]
+        if request.get('mappings'):
+            from port_mapping_evidence import configured_mapping_goal
+            if len(request['mappings']) != 1: raise ValueError('one_output_mapping_required')
+            expected = configured_mapping_goal(request['mappings'][0], settings['columns'])
+        groups = [('utf-8-sig', ['UTF-8', '65001', 'UTF-8 (65001)']),
+            ('cp1251', ['Windows-1251', 'CP1251', '1251', 'Кириллическая (1251)']),
+            ('cp1252', ['Windows-1252', 'CP1252', '1252', 'Западноевропейская (1252)']),
+            ('utf-16-le', ['UTF-16 LE', 'UTF-16LE', '1200', 'UTF-16 LE (1200)']),
+            ('utf-16-be', ['UTF-16 BE', 'UTF-16BE', '1201', 'UTF-16 BE (1201)'])]
+        codec = next((codec for codec, aliases in groups if settings['source'].get('encoding', 'UTF-8') in aliases), None)
+        if codec is None: raise ValueError('unsupported_source_encoding')
+        fmt = settings['format']; qualifier = fmt['text_qualifier']
+        records = list(csv.reader(io.StringIO(source_bytes.decode(codec).removeprefix('\ufeff'), newline=''),
+            delimiter=fmt['delimiter'], quotechar=qualifier or None, quoting=csv.QUOTE_MINIMAL if qualifier else csv.QUOTE_NONE))
+        records = records[settings['source']['rows_to_skip']:]
+        names = records.pop(0) if settings['source']['first_line_as_title'] else [c.get('source_name', c['name']) for c in settings['columns']]
+        if len(set(names)) != len(names) or any(len(row) != len(names) for row in records): raise ValueError('source_fixture_shape')
+        indexes = [names.index(c.get('source_name', c['name'])) for c in expected]
+        rows = [[None if row[index] == fmt['null_marker'] or row[index] == '' and c['type'] in ('integer', 'real')
+            else row[index].replace(fmt['decimal_separator'], '.') if c['type'] == 'real' else row[index]
+            for c,index in zip(expected,indexes)] for row in records]
+        ports = checkpoint['output']['ports']
+        if len(ports) != 1 or request['read']['ports'] != [0]: raise ValueError('typed_port_missing')
+        failures = verify_port_output(ports[0], expected, rows, execution_id, 0, sample_rows=request['read']['sample_rows'])
+        failures += verify_port_output_receipts(events, operation_id, ports)
+        if checkpoint.get('execution', {}).get('execution_id') != execution_id: failures.append('output_checkpoint_execution_identity')
+        return failures
+    except (KeyError, IndexError, TypeError, AttributeError, ValueError, UnicodeError):
+        return ['source_port_output_malformed']
+
+
 def _verify_text_import_output(events, request, source_bytes, *, settings_override=None, output_columns_override=None, target_label_override=None):
     base = _verify_text_import(events, request, source_bytes, 'execute', settings_override=settings_override, output_columns_override=output_columns_override, target_label_override=target_label_override)
     seq = verify_internal_sequence(events, request['operation_id'], max_steps=import_operation_step_budget(events, request['operation_id']))
@@ -452,10 +615,10 @@ def _verify_text_import_output(events, request, source_bytes, *, settings_overri
     if len(checkpoints) != 1:
         failures.append('output_checkpoint_missing')
     else:
-        table_request = request if settings_override is None else {**request, 'parameters': {**request['parameters'], 'settings': settings_override}}
+        output_request = request if settings_override is None else {**request, 'parameters': {**request['parameters'], 'settings': settings_override}}
         if output_columns_override is not None:
-            table_request = {**table_request, 'parameters': {**table_request['parameters'], 'settings': {**table_request['parameters']['settings'], 'columns': output_columns_override}}}
-        failures += verify_table_output_observations(seq['observations'], seq['mutations'], table_request, source_bytes, checkpoints[0], execution['execution_id'])
+            output_request = {**output_request, 'parameters': {**output_request['parameters'], 'settings': {**output_request['parameters']['settings'], 'columns': output_columns_override}}}
+        failures += verify_import_port_output(events, request['operation_id'], output_request, source_bytes, checkpoints[0], execution['execution_id'])
     return dict(base, scope='verified_upload_execution_and_output', passed=not failures, failures=sorted(set(failures)), execution_id=execution['execution_id'], execution_verified=not execution['failures'],
                 output_data_verified=not failures, package_persistence_verified=False)
 

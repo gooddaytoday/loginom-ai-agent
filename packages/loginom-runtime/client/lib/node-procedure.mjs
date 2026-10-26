@@ -12,7 +12,7 @@ import {makeDateTimeContextCode} from './date-time-context.mjs';
 import {makeMissingValuesContextCode} from './missing-values-context.mjs';
 import {makeCollapseContextCode} from './collapse-context.mjs';
 import { createHash } from 'node:crypto';
-import { makeWorkspaceUiCode, validateUiAction } from './workspace-ui.mjs';
+import { makeWorkspaceUiCode, validateUiAction, makeBlockingWindowDiagnosticCode } from './workspace-ui.mjs';
 import {validatePreparedNodeContext} from './node-context.mjs';
 import {makeNodeMappingContextCode} from './node-mapping-context.mjs';
 import {makeNodePreviewSchemaCode} from './node-preview-schema.mjs';
@@ -28,9 +28,11 @@ import {makeJavascriptSchemaContextCode} from './javascript-schema-context.mjs';
 import {makePreparedOutputPortOpenCode,makePreparedInputPortOpenCode} from './node-port-open.mjs';
 import {makeNodeProcessContextCode} from './node-process-context.mjs';
 import {makeNodeOutputContextCode} from './node-output-context.mjs';
+import {makeNodePortOutputCode} from './node-port-output.mjs';
 import {makeNodeTableContextCode} from './node-table-context.mjs';
 import {boundWizardCloseConfirmation,wizardCloseDialogOwner,wizardCloseBinding,boundInputMappingConflict} from './node-wizard-close.mjs';
 import {boundWizardDeactivationConfirmation,wizardDeactivationDialogOwner} from './node-wizard-open.mjs';
+import {isUnchangedTransformExecution} from './node-read-contract.mjs';
 const boundWizardConfirmation=(...args)=>boundWizardCloseConfirmation(...args)||boundWizardDeactivationConfirmation(...args)||boundInputMappingConflict(...args);
 const wizardConfirmationOwner=(...args)=>wizardCloseDialogOwner(...args)||wizardDeactivationDialogOwner(...args);
 
@@ -53,6 +55,7 @@ export class NodeProcedureStepError extends Error {
 // Остаток бюджета наблюдения бывает короче самого чтения; обрезанный до него
 // таймаут выдаёт исчерпание ожидания за потерю транспорта.
 const MIN_OBSERVATION_READ_MS = 5000;
+const OUTPUT_SETTLEMENT_READ_MS = 35000;
 
 const canonical = value => Array.isArray(value) ? value.map(canonical)
   : value && typeof value === 'object'
@@ -75,6 +78,15 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
   let evidenceSnapshot = null;
   let snapshotTableDialog = null;
   let snapshotWizardConfirmation = null;
+  let launchConfirmed = false;
+  let launchConsoleControl;
+  const rememberConsoleControl = state => {
+    if(launchConfirmed||!preparedNodeContext||state.prepared_node_context?.surface!=='graph')return;
+    const buttons=state.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress');
+    if(buttons.length===1&&buttons[0].ref&&buttons[0].signature&&buttons[0].enabled===true
+      &&buttons[0].allowed_actions.includes('click'))
+      launchConsoleControl={ref:buttons[0].ref,signature:structuredClone(buttons[0].signature)};
+  };
   if(preparedNodeContext)validatePreparedNodeContext(preparedNodeContext);
   const boundOptions=preparedNodeContext?{prepared_node_context:structuredClone(preparedNodeContext)}:{};
   let uiContext=preparedNodeContext?null:operation.checkpoint;
@@ -110,7 +122,8 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     const root=preparedNodeContext?.workflow_ref.prefix+';ModelForm;PreviewWindow';
     return !!preparedNodeContext&&state.prepared_node_context?.surface==='graph'
       &&state.node_preview_schema?.verified===false&&dialog.identity?.anchor_tid===root
-      &&state.ui.masks?.some(m=>m.kind==='busy'&&m.dialog_ref===dialog.ref&&m.target_tid===root+';PreviewForm');
+      &&state.ui.masks?.some(m=>m.kind==='busy'&&m.dialog_ref===dialog.ref
+        &&[root+';PreviewForm',root+';PreviewForm;DataSetForm'].includes(m.target_tid));
   };
   const allowedReformEditor=(dialog,state)=>state.wizard?.stage==='field_parameters'
     &&state.wizard.reform_parameters?.status==='observed'&&state.wizard.reform_parameters.portal_bound===true
@@ -195,10 +208,37 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
     return structuredClone(result.output);
   };
   const channel = {
+    // Private cleanup proofs must use the same clock as this procedure's deadline.
+    now,
+    async readOutputPort(request) {
+      checkBudget();
+      if(!preparedNodeContext)throw Error('Prepared node required for direct output read');
+      const code=makeNodePortOutputCode(preparedNodeContext,request,{origin:targetOrigin,build:targetBuild,deadline:operation.deadline});
+      snapshot=null;evidenceSnapshot=null;
+      // Only an actual dispatch invalidates the previous read's cleanup proof.
+      operation.portReadCleanupComplete=false;
+      operation.cleanupConfirmed=false;
+      let result;
+      try{result=await execute(code,{timeout:Math.max(5000,operation.deadline-now()+5000)});}
+      catch(error){operation.transportUncertain=true;throw error;}
+      const context=result?.node_context;
+      const owner=context?.verified===true&&context.document_id===preparedNodeContext.document_id
+        &&context.workflow_id===preparedNodeContext.workflow_ref.workflow_id&&context.node_id===preparedNodeContext.node.node_id;
+      const valid=!!result&&typeof result.verified==='boolean'&&typeof result.cleanup_complete==='boolean'
+        &&(result.verified?owner&&result.output?.port===request.port&&result.output.fresh===true
+          &&result.output.execution_id===request.execution.execution_id&&result.output.freshness_basis==='completed_execution_port_source'
+          :typeof result.reason==='string');
+      operation.portReadCleanupComplete=operation.cleanupConfirmed=valid&&result.cleanup_complete===true;
+      checkBudget();
+      if(!valid||!result.verified||!operation.cleanupConfirmed)throw Error('Direct output read refused'+(valid&&!result.verified?': '+result.reason:''));
+      await entry('node_port_output_read',{outcome:structuredClone(result)});
+      checkBudget();
+      return structuredClone(result);
+    },
     async openJavascriptPreview(port){
       checkBudget();
-      if(!preparedNodeContext||!['transform.group_data','transform.sorting','transform.calculator','transform.join_data'].includes(operation.parameters?.target?.type))
-        throw Error('Managed preview is restricted to native Group, Sort, Calculator and Join preflight');
+      if(!preparedNodeContext||!['transform.group_data','transform.sorting','transform.calculator','transform.filter_data','transform.join_data'].includes(operation.parameters?.target?.type))
+        throw Error('Managed preview is restricted to native Group, Sort, Calculator, Filter and Join preflight');
       const task={operation_id:operation.id+':preview'+nextStep(),owner:preparedNodeContext.node,
         workflow_ref:{prefix:preparedNodeContext.workflow_ref.prefix,tab_tid:preparedNodeContext.workflow_ref.tab_tid},
         output:{index:port.index,native_index:port.native_index,active:port.active,port_guid:port.port_guid},
@@ -237,25 +277,35 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             do{checkBudget();expected=await read('inspect');if(!expected.selected)await wait(100);}while(!expected.selected);
           }
         }
-      }finally{if(!operation.transportUncertain)await read('dispose');}
+      }finally{if(!operation.transportUncertain){
+        const disposed=await read('dispose');
+        if(operation.groupingPreview?.managed===true&&disposed?.disposed===true){
+          const saved=await entry('node_preview_lease_disposed',{lease_operation_id:task.operation_id,
+            owner:task.owner,port_guid:port.port_guid,disposed:true});
+          if(saved?.lease_operation_id!==task.operation_id||saved.port_guid!==port.port_guid||saved.disposed!==true
+            ||JSON.stringify(saved.owner)!==JSON.stringify(task.owner))throw Error('Preview disposal was not durably acknowledged');
+          operation.groupingPreview.lease_disposed=true;
+        }
+      }}
       return {verified:true,port_guid:port.port_guid,execution_started:false};
     },
     async configureCrossTableVariables(variables) {return crossTableOwnedStep('local_variables',{variables},makeCrossTableVariablesCode);},
     async bindCrossTableVariables(bindings) {return crossTableOwnedStep('bindings',{bindings},makeCrossTableBindingsCode);},
-    async revealGraphNode() {
+    async revealGraphNode({target='drawing'}={}) {
+      if(!['drawing','body'].includes(target))throw Error('Unknown node viewport target');
       checkBudget();
       if(!preparedNodeContext)throw Error('Viewport navigation requires a prepared node');
       const before=await channel.observe({condition:'prepared graph before node viewport navigation',
         ready:s=>s.prepared_node_context?.surface==='graph'&&s.prepared_node_context.locked===false&&s.wizard?.status==='absent'});
       assertContext(before);checkBudget();
-      const step=nextStep(),id=operation.id+':n'+step,action={verb:'reveal_prepared_node'},actionKey='node.viewport.reveal.internal';
+      const step=nextStep(),id=operation.id+':n'+step,action={verb:'reveal_prepared_node',target},actionKey='node.viewport.reveal.internal';
       const signature=digest([id,action,evidenceSnapshot]),observationHash=digest(evidenceSnapshot);
       snapshot=null;evidenceSnapshot=null;
       const prepared=await entry('node_step_prepared',{step,internal_operation_id:id,action,observation_sha256:observationHash,signature});
       if(prepared?.signature!==signature||JSON.stringify(prepared.action)!==JSON.stringify(action))throw Error('Node viewport navigation was not durably prepared');
       signal?.throwIfAborted();checkBudget();
-      const code=`async page=>(${revealPreparedGraphNode.toString()})(page,${JSON.stringify({binding:preparedNodeContext,origin:targetOrigin,build:targetBuild,deadline:operation.deadline,types:NODE_TYPES})},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${samePlacementGraph.toString()})`;
-      const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'node_viewport',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:null,trace:[]}}`;
+      const code=`async page=>(${revealPreparedGraphNode.toString()})(page,${JSON.stringify({binding:preparedNodeContext,origin:targetOrigin,build:targetBuild,deadline:operation.deadline,types:NODE_TYPES,target})},${readGraph.toString()},${revealNodePlacement.toString()},${nodePlacementViewport.toString()},${nodePlacementPoint.toString()},${samePlacementGraph.toString()})`;
+      const envelope=`async page=>{const r=await (${code})(page);return {status:r.status,action_key:${JSON.stringify(actionKey)},action_revision:'1',operation_id:${JSON.stringify(id)},phase:'node_viewport',effect_possible:r.effect_possible,cleanup_complete:r.cleanup_complete,output:r,error:r.status==='SUCCEEDED'?null:{code:'NODE_VIEWPORT_NOT_REVEALED',message:'Prepared node viewport: node not revealed'},trace:[]}}`;
       let result;
       try{result=await execute(wrapMutation(envelope,{id,signature,action_key:actionKey}),{timeout:Math.max(1,operation.deadline-now())});}
       catch(error){operation.transportUncertain=true;operation.cleanupConfirmed=false;throw error;}
@@ -310,7 +360,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeProcedureStepError(result);
       return structuredClone(result);
     },
-    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readLinRegression = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false } = {}) {
+    async observe({ condition, ready, confirmIdentity, timeoutMs = 15000, importColumnPage, outputColumnPage, readLinRegression = false, readClustering = false, readTraining = false, readProcesses = false, readProcessControls = false, readOutputs = false, readMappings = false, mappingEditor, readCalculator = false, readJavascript = false, readGrouping = false, readCrossTable = false, readDateTime = false, readCollapse = false, readMissingValues = false, readSorting = false, readReplacement = false, readDuplicates = false, readReform = false, readFilter = false, readJoin = false, readUnion = false, readPreview = false, readNavigation = false, tablePage, tableDialog, tableFormatPage, wizardConfirmation, settleOutputPort, settleProcessConsole, releaseWizard = false, settleWizard } = {}) {
       checkBudget();
       if (typeof condition !== 'string' || !condition.trim() || typeof ready !== 'function'
         || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 15000) {
@@ -322,9 +372,12 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if(settleProcessConsole!==undefined&&(!readProcessControls||readProcesses||!preparedNodeContext
         ||typeof settleProcessConsole.ref!=='string'||!settleProcessConsole.signature))
         throw Error('Process console settlement requires its prepared control');
+      if(settleProcessConsole?.quiet&&!launchConfirmed)throw Error('Console epoch settlement requires a confirmed launch');
       readOutputs ||= !!tablePage || !!tableDialog;
       if(wizardConfirmation && (!preparedNodeContext || !['close','deactivation'].includes(wizardConfirmation.kind)))throw Error('A prepared wizard confirmation binding is required');
       if(releaseWizard&&!preparedNodeContext)throw Error('Wizard release requires its prepared node');
+      if(settleWizard&&(!releaseWizard||!Number.isFinite(settleWizard.deadline)||settleWizard.deadline>operation.deadline
+        ||!settleWizard.root_ref&&settleWizard.graph_only!==true||!settleWizard.node))throw Error('Wizard settlement requires its original receipt and deadline');
       if(tableDialog && (!['format','filter'].includes(tableDialog.kind)||!tableDialog.table))throw new Error('A typed Table dialog binding is required');
       if(tablePage)makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page);
       if(tableDialog)makeNodeTableContextCode(preparedNodeContext,tableDialog.table,{row_offset:0,row_limit:0,column_offset:0,column_limit:1});
@@ -340,24 +393,54 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       snapshotTableDialog=null;
       snapshotWizardConfirmation=null;
       const step = nextStep(), id = operation.id + ':n' + step;
-      // Wall time binds the parent deadline once; elapsed waits must survive clock corrections.
-      const started = now(), monotonicStarted = monotonicNow();
-      const observationNow = () => started + monotonicNow() - monotonicStarted;
-      let deadline = settleOutputPort?operation.deadline:Math.min(operation.deadline, started + timeoutMs);
-      const readTimeout = () => Math.min(35000, Math.max(MIN_OBSERVATION_READ_MS, deadline - observationNow()));
-      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false;
+      // Bound Table and post-launch console settling share the parent's clock and deadline.
+      // Other observation windows retain their monotonic elapsed-time policy.
+      const started = now(), monotonicStarted = settleOutputPort||settleProcessConsole?.quiet?undefined:monotonicNow();
+      const observationNow = settleOutputPort||settleProcessConsole?.quiet ? now : () => started + monotonicNow() - monotonicStarted;
+      let deadline = Math.min(settleWizard?.deadline??Infinity,settleOutputPort||settleProcessConsole?.quiet?operation.deadline:Math.min(operation.deadline, started + timeoutMs));
+      const readTimeout = () => Math.min(35000, Math.max(settleWizard||settleProcessConsole?.quiet?0:MIN_OBSERVATION_READ_MS, Math.min(deadline,settleWizard?.deadline??Infinity) - observationNow()));
+      const read = async (code,options,readDeadline=deadline) => {
+        const limit=settleOutputPort?Math.min(readDeadline,deadline,now()+OUTPUT_SETTLEMENT_READ_MS):deadline;
+        if((settleOutputPort||settleWizard||settleProcessConsole?.quiet)&&observationNow()>=limit)throw new NodeReadinessTimeout(condition);
+        if(settleOutputPort)options={...options,timeout:Math.max(1,limit-now())};
+        const value=await execute(code,options);
+        if((settleOutputPort||settleWizard||settleProcessConsole?.quiet)&&observationNow()>=limit)throw new NodeReadinessTimeout(condition);
+        return value;
+      };
+      const readUi = options => {
+        if(!settleOutputPort)return read(makeWorkspaceUiCode(options),{timeout:readTimeout()});
+        // Capture before transport: dispatch and browser reads consume one allowance.
+        const readDeadline=Math.min(deadline,now()+OUTPUT_SETTLEMENT_READ_MS);
+        return read(makeWorkspaceUiCode({...options,deadline:readDeadline,
+          output_settlement_read:{port_guid:settleOutputPort,timeout_ms:OUTPUT_SETTLEMENT_READ_MS}}),
+        {timeout:Math.max(1,readDeadline-now())},readDeadline);
+      };
+      const assertSettlement = state => {
+        if(!settleWizard)return;
+        const n=state.prepared_node_context,w=state.wizard;
+        if(n?.verified!==true||!['document_id','workflow_id','node_id','input_port','output_port'].every(k=>
+          JSON.stringify(n[k])===JSON.stringify(settleWizard.node[k]))
+          ||!(n.surface==='graph'&&w?.status==='absent'
+            ||!settleWizard.graph_only&&n.surface==='wizard'&&w?.status==='observed'&&w.root_ref===settleWizard.root_ref))
+          throw Error('Original wizard receipt context changed');
+      };
+      let result, lastGeometry, satisfied = false, previousIdentity, confirmations = 0, rootRefreshes = 0, settlingConsole = false, settlingWizard, sampleStarted = observationNow();
       try {
-      for (let sample = 0; settleOutputPort || settleProcessConsole || sample < 80; sample++) {
+      for (let sample = 0; settleOutputPort || settleProcessConsole || settlingWizard || sample < 80; sample++) {
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
-        if (sample) await wait(Math.min(200, Math.max(0, deadline - observationNow())));
+        // Pending reads already spend time polling. Keep a 200 ms start-to-start
+        // interval instead of adding that delay to a slow read. A ready identity
+        // still gets the full existing pause before its second confirmation.
+        const pause = satisfied ? 200 : Math.max(0, 200 - (observationNow() - sampleStarted));
+        if (sample && pause > 0) await wait(Math.min(pause, Math.max(0, deadline - observationNow())));
         signal?.throwIfAborted();
         if (observationNow() >= deadline) break;
+        sampleStarted = observationNow();
         // Rediscover the root: wizard transitions and combo portals can replace it.
-        const roots = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
+        const roots = await readUi({ mode: 'observe', operation_id: id,
           ...boundOptions,
-          discover_roots: true, expected_origin: targetOrigin, expected_build: targetBuild }),
-        { timeout: readTimeout() });
+          discover_roots: true, expected_origin: targetOrigin, expected_build: targetBuild });
         if (roots.status !== 'SUCCEEDED') {
           if (timeScanRefusal(roots,'workspace.observe')) {
             await entry('node_observation_scan_retried',{step,sample,internal_operation_id:id,
@@ -380,6 +463,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           error.nodeObservationRefusal=outcome;
           throw error;
         }
+        assertSettlement(roots.output);
         const wizard = roots.output.wizard;
         if(releaseWizard&&wizard?.status==='observed') {
           assertContext(roots.output,true,null,true);
@@ -431,27 +515,26 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         // Polling repaints the native process console. Read its cache before
         // issuing final UI refs/epoch, so those refs do not age across the
         // separate native transport. The exact node context must still match.
-        const nativeProcesses=readProcesses?await execute(makeNodeProcessContextCode(preparedNodeContext),
+        const nativeProcesses=readProcesses?await read(makeNodeProcessContextCode(preparedNodeContext),
           {timeout:readTimeout()}):null;
         if (observationNow() >= deadline) break;
-        result = await execute(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
+        result = await readUi({ mode: 'observe', operation_id: id,
           ...boundOptions,
           root_ref: root, expected_origin: targetOrigin, expected_build: targetBuild,
           ...(importColumnPage===undefined?{}:{import_column_page:importColumnPage}),
           ...(outputColumnPage===undefined?{}:{output_column_page:outputColumnPage}),
-          ...(tableFormatPage===undefined?{}:{table_format_page:tableFormatPage}) }),
-        { timeout: readTimeout() });
+          ...(tableFormatPage===undefined?{}:{table_format_page:tableFormatPage}) });
         if(result.status==='SUCCEEDED'&&readMissingValues&&result.output.wizard?.stage==='missing_values'&&result.output.ui.dialogs.length===1){
           // Ext's message box has no root data-tid. Re-read its observed portal;
           // native field ownership and exact prompt controls are checked below.
-          result=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
+          result=await read(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
             root_ref:result.output.ui.dialogs[0].ref,expected_origin:targetOrigin,expected_build:targetBuild}),
           {timeout:readTimeout()});
         }
         if(result.status==='SUCCEEDED' && wizardConfirmationOwner(result.output,wizardConfirmation)) {
           // The native message box is a portal outside the wizard subtree.
           const dialog=result.output.ui.dialogs[0];
-          result=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
+          result=await read(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
             root_ref:dialog.ref,expected_origin:targetOrigin,expected_build:targetBuild}),
           {timeout:readTimeout()});
         }
@@ -485,31 +568,32 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           error.nodeObservationRefusal = structuredClone(result);
           throw error;
         }
+        assertSettlement(result.output);
         if(readPreview){
-          result.output.node_preview_schema=await execute(makeNodePreviewSchemaCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_preview_schema=await read(makeNodePreviewSchemaCode(preparedNodeContext),{timeout:readTimeout()});
         }
         if(readFilter){
-          result.output.node_filter=await execute(makeFilterContextCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_filter=await read(makeFilterContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_filter.node_context&&JSON.stringify(canonical(result.output.node_filter.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Native filter context changed during observation');
         }
         if(readMissingValues){
-          result.output.node_missing_values=await execute(makeMissingValuesContextCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_missing_values=await read(makeMissingValuesContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_missing_values.node_context&&JSON.stringify(canonical(result.output.node_missing_values.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Native missing values context changed during observation');
         }
         // CrossTable modal ownership is attested by its native cached record,
         // before a modal can pass the context gate or authorize any action.
         if(readCrossTable&&result.output.wizard?.stage==='crosstable'){
-          result.output.node_crosstable=await execute(makeCrossTableContextCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_crosstable=await read(makeCrossTableContextCode(preparedNodeContext),{timeout:readTimeout()});
           const native=result.output.node_crosstable;
           if(native.node_context&&JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
             throw Error('CrossTable native owner changed during observation');
         }
         if(readLinRegression){
-          result.output.node_linregression=await execute(makeLinRegressionContextCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_linregression=await read(makeLinRegressionContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_linregression.node_context&&JSON.stringify(canonical(result.output.node_linregression.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Linear regression native owner changed during observation');
         }
         if(readClustering){
-          result.output.node_clustering=await execute(makeClusteringContextCode(preparedNodeContext),{timeout:readTimeout()});
+          result.output.node_clustering=await read(makeClusteringContextCode(preparedNodeContext),{timeout:readTimeout()});
           if(result.output.node_clustering.node_context&&JSON.stringify(canonical(result.output.node_clustering.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))throw Error('Clustering native owner changed during observation');
         }
         try {
@@ -520,13 +604,22 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           await entry('node_observation_context_refused', {step, sample, internal_operation_id:id,
             condition, reason:error.message, outcome:structuredClone(result)});
           const dialogs=result.output.ui?.dialogs;
+          if(error.message==='Node procedure is blocked by a mask or dialog'&&dialogs?.length
+              &&!signal?.aborted&&observationNow()+MIN_OBSERVATION_READ_MS<deadline) {
+            try {
+              const snapshot=await read(makeBlockingWindowDiagnosticCode({refs:dialogs.map(d=>d.ref),origin:targetOrigin,build:targetBuild}),{timeout:readTimeout()});
+              await entry('node_blocking_window_native',{step,sample,internal_operation_id:id,condition,snapshot});
+            } catch {
+              await entry('node_blocking_window_native_unavailable',{step,sample,internal_operation_id:id,condition}).catch(()=>{});
+            }
+          }
           const blocker=dialogs?.length===1&&dialogs[0].text==='[outside selected root]'?dialogs[0]:null;
           // Inspect this already observed portal for diagnostics only. It is
           // never promoted to a usable node snapshot or dismissed as owned.
           if(error.message==='Node procedure is blocked by a mask or dialog'&&typeof blocker?.ref==='string'
               &&!signal?.aborted&&observationNow()+MIN_OBSERVATION_READ_MS<deadline) {
             try {
-              const detail=await execute(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
+              const detail=await read(makeWorkspaceUiCode({mode:'observe',operation_id:id,...boundOptions,
                 root_ref:blocker.ref,expected_origin:targetOrigin,expected_build:targetBuild}),{timeout:readTimeout()});
               await entry('node_blocking_dialog_observed',{step,sample,internal_operation_id:id,
                 condition,dialog_ref:blocker.ref,outcome:structuredClone(detail)});
@@ -543,8 +636,22 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(readProcesses) {
           result.output.node_processes=nativeProcesses;
           if(nativeProcesses.node_context&&JSON.stringify(canonical(nativeProcesses.node_context))
-            !==JSON.stringify(canonical(result.output.prepared_node_context)))
+            !==JSON.stringify(canonical(result.output.prepared_node_context))) {
+            const {locked:nativeLocked,...nativeOwner}=nativeProcesses.node_context;
+            const {locked:uiLocked,...uiOwner}=result.output.prepared_node_context;
+            // Execute/completion can change FLocked between these two reads.
+            // Discard the mixed snapshot; never use it to authorize a gesture.
+            if(nativeOwner.verified===true&&nativeOwner.surface==='graph'
+              &&typeof nativeLocked==='boolean'&&typeof uiLocked==='boolean'&&nativeLocked!==uiLocked
+              &&JSON.stringify(canonical(nativeOwner))===JSON.stringify(canonical(uiOwner))) {
+              await entry('node_observation_lock_retried',{step,sample,internal_operation_id:id,condition,
+                native_node_context:structuredClone(nativeProcesses.node_context),
+                ui_node_context:structuredClone(result.output.prepared_node_context)});
+              satisfied=false;confirmations=0;previousIdentity=undefined;
+              continue;
+            }
             throw new Error('Native process/output context changed during observation');
+          }
         }
         if(readTraining)result.output.node_training_read=true;
         if(boundWizardConfirmation(result.output,wizardConfirmation))result.output.node_wizard_confirmation=structuredClone(wizardConfirmation);
@@ -555,7 +662,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           [readCollapse,'node_collapse',makeCollapseContextCode], [readDateTime,'node_date_time',makeDateTimeContextCode], [readDuplicates,'node_duplicates',makeDuplicatesContextCode], [readUnion,'node_union',makeUnionContextCode], [readJoin,'node_join',makeJoinContextCode], [readCalculator,'node_calculator',makeCalculatorContextCode], [readJavascript,'node_javascript_schema',makeJavascriptSchemaContextCode], [readGrouping,'node_grouping',makeGroupingContextCode], [readReplacement,'node_replacement',makeReplacementContextCode], [readSorting,'node_sorting',makeSortingContextCode], [readReform,'node_reform',makeReformContextCode]]) {
           if (!requested) continue;
           if (observationNow() >= deadline) break;
-          const native=await execute(key==='node_mapping'?makeCode(preparedNodeContext,mappingEditorBinding):makeCode(preparedNodeContext),{timeout:readTimeout()});
+          const native=await read(key==='node_mapping'?makeCode(preparedNodeContext,mappingEditorBinding):makeCode(preparedNodeContext),{timeout:readTimeout()});
           result.output[key]=native;
           if(key==='node_mapping'&&mappingEditorBinding)result.output.node_mapping_editor=structuredClone(mappingEditorBinding);
           if(native.node_context && JSON.stringify(canonical(native.node_context))!==JSON.stringify(canonical(result.output.prepared_node_context)))
@@ -564,7 +671,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if(tablePage) {
           if(observationNow()>=deadline)break;
           result.output.node_table_request=structuredClone(tablePage);
-          result.output.node_table=await execute(makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page),
+          result.output.node_table=await read(makeNodeTableContextCode(preparedNodeContext,tablePage.table,tablePage.page),
             {timeout:readTimeout()});
         }
         if(observationNow()>=deadline)break;
@@ -574,10 +681,29 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
             &&t.port_guid===tableDialog.table.port_guid&&t.table_tid===tableDialog.table.table_tid).length!==1)throw new Error('Table dialog owner changed');
           result.output.node_table_dialog=structuredClone(tableDialog);
         }
-        if(settleProcessConsole&&(settlingConsole||result.output.ui.masks.length
+        const ws=result.output,w=ws.wizard,n=ws.prepared_node_context;
+        const ownWizardMask=preparedNodeContext&&n?.verified===true&&n.surface==='wizard'&&w?.status==='observed'
+          &&n.tid===w.root_tid&&ws.ui.dialogs.length===0&&ws.ui.masks.length>0
+          &&ws.ui.masks.every(m=>m.kind==='busy'&&!m.dialog_ref&&(m.ref===w.root_ref&&m.target_tid===w.root_tid
+            ||m.import_preview_owner_ref===w.root_ref||m.wizard_loading_owner_ref===w.root_ref));
+        const returnedGraph=settleWizard&&n?.verified===true&&n.surface==='graph'&&w?.status==='absent'
+          &&['document_id','workflow_id','node_id'].every(k=>n[k]===settleWizard.node[k])&&ws.ui.dialogs.length===0
+          &&ws.ui.masks.every(m=>m.kind==='busy'&&!m.dialog_ref&&m.target_tid===ws.workflow_ref.prefix+';ModelForm'&&m.graph_loading_owner_ref);
+        if(settlingWizard||(ownWizardMask||returnedGraph&&ws.ui.masks.length)&&(!releaseWizard||settleWizard)) {
+          const expected=settlingWizard??{root_ref:w.root_ref,node:structuredClone(n)};
+          if(!returnedGraph&&(w?.status!=='observed'||w.root_ref!==expected.root_ref||n?.surface!=='wizard'
+              ||!['input_port','output_port'].every(k=>JSON.stringify(n[k])===JSON.stringify(expected.node[k])))
+            ||!['document_id','workflow_id','node_id'].every(k=>n[k]===expected.node[k])
+            ||ws.ui.dialogs.length||ws.ui.masks.length&&!ownWizardMask&&!returnedGraph
+            ||settleWizard&&(!returnedGraph&&(settleWizard.graph_only||w.root_ref!==settleWizard.root_ref)
+              ||!['document_id','workflow_id','node_id'].every(k=>n[k]===settleWizard.node[k])))
+            throw Error('Owned wizard loading context changed');
+          if(ownWizardMask||returnedGraph&&ws.ui.masks.length){settlingWizard=expected;deadline=Math.min(operation.deadline,settleWizard?.deadline??Infinity);}
+        }
+        if(settleProcessConsole&&(settleProcessConsole.quiet||settlingConsole||result.output.prepared_node_context?.locked===true||result.output.ui.masks.length
           &&result.output.ui.elements.some(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress'))){
           const state=result.output,buttons=state.ui.elements.filter(e=>e.tid==='MF;cntMain;tlbMainToolbar;btnProgress');
-          const owned=state.prepared_node_context?.surface==='graph'&&state.ui.dialogs.length===0
+          const owned=state.prepared_node_context?.surface==='graph'&&typeof state.prepared_node_context.locked==='boolean'&&state.ui.dialogs.length===0
             &&state.wizard?.status==='absent'&&buttons.length===1&&buttons[0].ref===settleProcessConsole.ref
             &&buttons[0].enabled===true&&buttons[0].allowed_actions.includes('click')
             &&JSON.stringify(canonical(buttons[0].signature))===JSON.stringify(canonical(settleProcessConsole.signature))
@@ -586,7 +712,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           if(!owned)throw Error('Owned process console settlement context changed');
           // Only the confirmed launch's own loading mask may outlive the local
           // readiness window. Keep the parent deadline and authorize no action.
-          if(state.ui.masks.length){settlingConsole=true;deadline=operation.deadline;}
+          if(state.ui.masks.length||state.prepared_node_context.locked){settlingConsole=true;deadline=operation.deadline;}
         }
         if(settleOutputPort){
           const state=result.output,context=state.prepared_node_context;
@@ -616,7 +742,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         confirmations = satisfied ? (confirmIdentity ? (identity === previousIdentity ? confirmations + 1 : 1) : 1) : 0;
         previousIdentity = identity;
         await entry('node_observation_sample', { step, sample, internal_operation_id: id,
-          readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), elapsed_ms: observationNow() - started },
+          readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: identity, condition, satisfied, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observationNow() - started },
           outcome: structuredClone(result) });
         // The action transport checks the exact document epoch again before
         // the gesture. Repeating already satisfied observations adds latency
@@ -631,12 +757,14 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw new NodeReadinessTimeout(condition);
       }
       const persisted = await entry('node_observation_completed', { step, internal_operation_id: id,
-        readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), elapsed_ms: observationNow() - started }, outcome: structuredClone(result) });
+        readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observationNow() - started }, outcome: structuredClone(result) });
       if (!persisted?.outcome?.output) throw new Error('Node observation requires a durable journal acknowledgement');
+      if((settleOutputPort||settleWizard)&&observationNow()>=Math.min(deadline,settleWizard?.deadline??Infinity))throw new NodeReadinessTimeout(condition);
       evidenceSnapshot = structuredClone(persisted.outcome.output);
       snapshot = structuredClone(result.output);
       snapshotTableDialog=tableDialog?structuredClone(tableDialog):null;
       snapshotWizardConfirmation=snapshot.node_wizard_confirmation??null;
+      if(readProcessControls)rememberConsoleControl(snapshot);
       return structuredClone(snapshot);
       } catch(error) {
         if(signal?.aborted&&error===signal.reason) {
@@ -649,9 +777,13 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         throw error;
       }
     },
-    async act(action,processControl) {
+    async act(action,processControl,{preserveJoinMapping=false}={}) {
       checkBudget();
       if (!snapshot) throw new Error('A fresh internal observation is required');
+      if(preserveJoinMapping&&(!isUnchangedTransformExecution(operation.parameters)
+        ||operation.parameters.target.type!=='transform.join_data'||action.verb!=='wizard_step'||action.expected_stage!=='join'
+        ||snapshot.wizard?.stage!=='input_mapping'||snapshot.prepared_node_context?.input_port||snapshot.prepared_node_context?.output_port))
+        throw Error('Preserved Join navigation requires its unchanged node read');
       validateUiAction(action, snapshot);
       assertContext(snapshot,false,snapshotTableDialog,false,snapshotWizardConfirmation);
       const mappingConflict=snapshotWizardConfirmation&&boundInputMappingConflict(snapshot,snapshotWizardConfirmation);
@@ -660,26 +792,34 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const step = nextStep(), id = operation.id + ':n' + step;
       const before = snapshot;
       snapshot = null;
-      const signature = digest([id, action, evidenceSnapshot,...(processControl?[processControl]:[])]);
+      const signature = digest([id, action, evidenceSnapshot,...(processControl?[processControl]:[]),
+        ...(preserveJoinMapping?[{preserve_join_mapping:true}]:[])]);
       const processCode=processControl?makeNodeProcessControlCode(preparedNodeContext,before,action,processControl,
         {operation_id:id,deadline:operation.deadline,origin:targetOrigin,build:targetBuild}):null;
       // This write must be durable before the browser receives the mutation.
       const persisted = await entry('node_step_prepared', { step, internal_operation_id: id,
         action: structuredClone(action), observation_sha256: digest(evidenceSnapshot), signature,
-        ...(processControl?{process_control:structuredClone(processControl)}:{}) });
+        ...(processControl?{process_control:structuredClone(processControl)}:{}),
+        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}) });
       evidenceSnapshot = null;
       if (!persisted || JSON.stringify(persisted.action) !== JSON.stringify(action)
-        || persisted.signature !== signature||processControl&&JSON.stringify(persisted.process_control)!==JSON.stringify(processControl)) throw new Error('Prepared step was not durably preserved after redaction');
+        || persisted.signature !== signature||processControl&&JSON.stringify(persisted.process_control)!==JSON.stringify(processControl)
+        ||preserveJoinMapping&&persisted.preserve_join_mapping!==true) throw new Error('Prepared step was not durably preserved after redaction');
       lastPreparedStep = structuredClone(persisted);
       preparedSteps.push({ step: persisted.step, internal_operation_id: persisted.internal_operation_id, signature: persisted.signature, verb: action.verb });
       if (preparedSteps.length > 512) { preparedSteps.shift(); preparedStepsTrimmed = true; }
       signal?.throwIfAborted();
       if (now() >= operation.deadline) throw new Error('Node procedure deadline elapsed before mutation');
-      const openingWait=preparedNodeContext&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step'].includes(action.verb)
+      // A dispatched visualizers opening replaces the graph asynchronously,
+      // just like a wizard opening. Settle it once within the original budget.
+      const openingWait=preparedNodeContext&&['open_wizard','begin_wizard','confirm_wizard_deactivation','wizard_step','open_node_views'].includes(action.verb)
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
-      const settlementWait=preparedNodeContext&&['finish_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(action.verb)
+      const settlementWait=preparedNodeContext&&!openingWait&&(before.wizard?.status==='observed'
+        ||['finish_wizard','execute_wizard','apply_output_column','cancel_output_column','apply_reform_column','cancel_reform_column'].includes(action.verb))
         ?Math.max(1,Math.floor(operation.deadline-now())):null;
       const code = processCode??makeWorkspaceUiCode({ mode: 'act', operation_id: id, action,
+        ...(openingWait||settlementWait?{deadline:operation.deadline}:{}),
+        ...(preserveJoinMapping?{preserve_join_mapping:true}:{}),
         ...(settlementWait?{settlement_timeout_ms:settlementWait}:{}),
         ...(openingWait?{opening_timeout_ms:openingWait}:{}),
         ...boundOptions,
@@ -712,21 +852,29 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       if (result.status !== 'SUCCEEDED' || !operation.cleanupConfirmed) {
         throw new NodeProcedureStepError(result);
       }
+      const trainCommands=before.node_training_read===true?before.ui.elements.filter(e=>
+        e.label==='Обучить узел'&&e.tid?.startsWith('mn;')&&e.allowed_actions.includes('click')):[];
+      const trainingLaunch=action.verb==='click'&&trainCommands.length===1&&trainCommands[0].ref===action.ref;
+      if(preparedNodeContext&&(['execute_graph_node','execute_wizard'].includes(action.verb)||trainingLaunch)){
+        rememberConsoleControl(before);
+        launchConfirmed=true;
+      }
       // Even a successful gesture does not authorize the next one with old refs.
       return structuredClone(result);
     },
     // Fixed handlers supply the readiness condition and domain identity. Caller
     // input never contains a resolver or a recipe. Only a durably recorded,
-    // strictly pre-gesture epoch/scan refusal or proved body replacement
+    // strictly pre-gesture epoch/scan refusal, owned busy mask or proved body replacement
     // permits a new local attempt with unchanged identity and intent.
-    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, processControl }) {
+    async perform({ condition, ready, resolve, identity, confirmIdentity, timeoutMs = 15000, initialObservation, refreshReplacedBody, refreshWizardBusy, processControl, settleProcessConsole, preserveJoinMapping=false }) {
       if (typeof resolve !== 'function' || typeof identity !== 'function') {
         throw new Error('A bound action resolver and domain identity are required');
       }
       let binding, intent, bodyRefreshes = 0;
+      const quietConsole=settleProcessConsole&&launchConfirmed;
       const initialPage=initialObservation?.wizard?.import_columns?.page;
       const initialOutputPage=initialObservation?.wizard?.output_columns?.page;
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; quietConsole || attempt < 3; attempt++) {
         let observed;
         if (!attempt && initialObservation !== undefined) {
           checkBudget();
@@ -763,6 +911,27 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           readProcessControls:initialObservation?.node_process_controls_read===true,
           readProcesses:initialObservation?.node_processes!==undefined,readOutputs:initialObservation?.node_outputs!==undefined,tableDialog:initialObservation?.node_table_dialog,
           tableFormatPage:initialObservation?.table_settings?.format?.page?{offset:initialObservation.table_settings.format.page.offset,limit:initialObservation.table_settings.format.page.limit}:undefined });
+        if(settleProcessConsole&&(observed.prepared_node_context?.surface!=='graph'
+          ||observed.prepared_node_context?.verified!==true||typeof observed.prepared_node_context.locked!=='boolean'))
+          throw Error('Running node console owner is unknown');
+        // Only the driver's succeeded launch opts in. Poll before a console
+        // gesture; keep the original deadline and every later epoch guard.
+        if(settleProcessConsole&&(quietConsole||observed.prepared_node_context.locked===true)){
+          const originalIdentity=digest(canonical(identity(observed)));
+          const originalAction=resolve(observed),button=observed.ui.elements.find(e=>e.ref===originalAction.ref);
+          if(originalAction.verb!=='click'||button?.tid!=='MF;cntMain;tlbMainToolbar;btnProgress'
+            ||button.ref!==settleProcessConsole.ref||digest(canonical(button.signature))!==digest(canonical(settleProcessConsole.signature)))
+            throw Error('Running node settlement requires its original console control');
+          observed=await channel.observe({condition:'launched own node stops repainting its console control',readProcessControls:true,
+            settleProcessConsole:{...settleProcessConsole,...(quietConsole?{quiet:true}:{})},
+            ...(quietConsole?{confirmIdentity:s=>s.dom_epoch}:{}),
+            ready:s=>s.prepared_node_context?.locked===false&&(!quietConsole||typeof s.dom_epoch?.document==='string'
+              &&Number.isFinite(s.dom_epoch.revision))&&ready(s)});
+          const freshAction=resolve(observed);
+          if(digest(canonical(identity(observed)))!==originalIdentity||freshAction.verb!==originalAction.verb
+            ||freshAction.ref!==settleProcessConsole.ref)
+            throw Error('Running node console identity or intent changed');
+        }
         const action = resolve(observed), object = identity(observed);
         if (!object || typeof object !== 'object' || !Object.keys(object).length) {
           throw new Error('A nonempty domain identity is required');
@@ -775,33 +944,73 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
           throw new Error('Node procedure recovery target or intent changed');
         }
         binding = nextBinding; intent = nextIntent;
-        try { return await channel.act(action,processControl); }
+        try { return await channel.act(action,processControl,{preserveJoinMapping}); }
         catch (error) {
           const r = error instanceof NodeProcedureStepError ? error.receipt : null;
-          if (attempt === 2 || r?.status !== 'NOT_APPLIED'
+          if (r?.status !== 'NOT_APPLIED'
             || r.effect_possible !== false || r.cleanup_complete !== true
             || r.trace?.some(e => ['ui_preconditions_verified','ui_gesture_applied'].includes(e.event))
             || !Array.isArray(r.trace)) throw error;
           const epochRefusal=r.phase==='preconditions'&&r.error?.code==='UI_EPOCH_CHANGED'
             ||r.phase==='observing'&&r.error?.code==='UI_ROOT_STALE';
+          const consoleEpochRefusal=quietConsole&&epochRefusal&&r.error?.code==='UI_EPOCH_CHANGED';
+          if(attempt>=2&&!consoleEpochRefusal)throw error;
           const scanRefusal=timeScanRefusal(r,'ui.act');
           const graphRefusal=action.verb==='execute_graph_node'&&r.phase==='preconditions'
             &&r.error?.code==='GRAPH_EXECUTION_CONTEXT_CHANGED';
+          const nodeChanges=r.trace.filter(e=>['prepared_node_context_changed_before_gesture','prepared_node_surface_mismatch'].includes(e.event));
+          const before=nodeChanges[0]?.before,after=nodeChanges[0]?.after;
+          // The strict pre-gesture guard did not dispatch. Only a lock-only
+          // change of this same native graph node permits a full fresh read;
+          // neither the rejected snapshot nor its UI refs can be reused.
+          const progressReadRefusal=r.phase==='observing'&&action.verb==='click'
+            &&observed.ui.elements.find(e=>e.ref===action.ref)?.tid==='MF;cntMain;tlbMainToolbar;btnProgress'
+            &&nodeChanges[0]?.event==='prepared_node_surface_mismatch';
+          const nodeLockRefusal=!!preparedNodeContext&&(progressReadRefusal
+            ||r.phase==='preconditions'&&nodeChanges[0]?.event==='prepared_node_context_changed_before_gesture')
+            &&r.error?.code==='PREPARED_NODE_CONTEXT_CHANGED'&&nodeChanges.length===1
+            &&before?.verified===true&&after?.verified===true&&before.surface==='graph'&&after.surface==='graph'
+            &&typeof before.locked==='boolean'&&typeof after.locked==='boolean'&&before.locked!==after.locked
+            &&JSON.stringify(canonical({...before,locked:false}))===JSON.stringify(canonical({...after,locked:false}))
+            &&JSON.stringify(canonical({...before,locked:false}))===JSON.stringify(canonical({...observed.prepared_node_context,locked:false}));
           // Only an opting-in source selector can prove a replaced native body.
           // This remains a new observation and bound attempt, never a raw retry.
           const bodyRefusal=r.phase==='preconditions'&&['UI_REFERENCE_STALE','UI_REFERENCE_OBSCURED'].includes(r.error?.code)
             &&bodyRefreshes===0&&typeof refreshReplacedBody==='function'
             &&refreshReplacedBody({receipt:r,observation:observed,action})===true;
-          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal)throw error;
+          const wizard=observed.wizard,masked=r.output,control=observed.ui.elements.find(e=>e.ref===action.ref);
+          const covered=masked?.ui?.elements?.filter(e=>e.tid===control?.tid);
+          // An opting-in picker may wait for its own late loading mask only
+          // after a matched no-effect refusal. A new read must clear every
+          // blocker and rebind the same owner/field before another guarded act.
+          const busyRefusal=refreshWizardBusy===true&&!!preparedNodeContext&&action.verb==='click'
+            &&r.phase==='preconditions'&&r.error?.code==='UI_REFERENCE_OBSCURED'
+            &&wizard?.status==='observed'&&masked?.wizard?.status==='observed'
+            &&['root_ref','root_tid','stage'].every(k=>wizard[k]&&wizard[k]===masked.wizard[k])
+            &&[observed,masked].every(s=>s.prepared_node_context?.surface==='wizard'&&s.prepared_node_context.tid===wizard.root_tid)
+            &&control?.wizard_combo?.kind==='picker'&&control.wizard_combo.field?.root_ref===wizard.root_ref
+            &&covered?.length===1&&covered[0].wizard_combo?.kind==='picker'
+            &&covered[0].wizard_combo.field?.root_ref===wizard.root_ref
+            &&covered[0].wizard_combo.field.name===control.wizard_combo.field.name
+            &&covered[0].interaction?.state==='point_not_observed'
+            &&covered[0].interaction.covering?.length===1&&covered[0].interaction.covering[0].tid===wizard.root_tid
+            &&masked.ui.dialogs?.length===0&&masked.ui.masks?.length===1
+            &&masked.ui.masks[0].kind==='busy'&&masked.ui.masks[0].ref===wizard.root_ref
+            &&masked.ui.masks[0].target_tid===wizard.root_tid&&masked.ui.masks[0].dialog_ref===null;
+          if(busyRefusal)assertContext(masked,true);
+          if(!epochRefusal&&!bodyRefusal&&!scanRefusal&&!graphRefusal&&!nodeLockRefusal&&!busyRefusal)throw error;
           if(bodyRefusal)bodyRefreshes++;
           const event = await entry('node_step_refresh_authorized', {
             step:operation.nodeStepSequence,internal_operation_id:r.operation_id,
             rejected_operation_id: r.operation_id, retry: attempt + 1,
             condition, binding_sha256: binding, intent_sha256: intent,
             effect_possible: false,
+            ...(consoleEpochRefusal?{reason:'launched_console_epoch_changed'}:{}),
             ...(bodyRefusal?{reason:'prepared_graph_body_replaced'}:{}),
             ...(scanRefusal?{reason:'read_scan_time_limit'}:{}),
             ...(graphRefusal?{reason:'graph_execution_context_changed'}:{}),
+            ...(nodeLockRefusal?{reason:'prepared_node_lock_changed',before:structuredClone(before),after:structuredClone(after)}:{}),
+            ...(busyRefusal?{reason:'owned_wizard_busy_mask'}:{}),
           });
           if (event?.rejected_operation_id !== r.operation_id || event.retry !== attempt + 1
             || event.binding_sha256 !== binding || event.intent_sha256 !== intent) {
@@ -811,6 +1020,10 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       }
     },
     get steps() { return sequence; },
+    get launchConfirmed() { return launchConfirmed; },
+    // Execution drivers can be recreated between JS materialization/finish.
+    // Retain the pre-launch control; never recapture its replacement afterwards.
+    get launchConsoleControl() { return launchConsoleControl&&structuredClone(launchConsoleControl); },
     get lastPreparedStep() { return structuredClone(lastPreparedStep); },
     stepsSince(step) {
       if (preparedStepsTrimmed && !(preparedSteps[0]?.step <= step + 1)) throw new Error('Prepared step log no longer covers this boundary');

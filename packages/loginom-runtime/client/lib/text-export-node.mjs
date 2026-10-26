@@ -5,6 +5,7 @@ import {openPreparedWizard} from './node-wizard-open.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {createNodeExecutionProcedure} from './node-execution-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
+import {configureOutputAutosync,reorderOutputFields} from './port-mapping-procedure.mjs';
 import {validateTextExportParameters} from './text-export-parameters.mjs';
 import {configureTextExport} from './text-export-procedure.mjs';
 import {textExportParametersSchema} from './node-api.mjs';
@@ -13,6 +14,50 @@ import {exportContinuationSurface,verifyExportContinuation} from './text-export-
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
 const need=(v,m)=>{if(!v)throw Error(m);},one=xs=>{need(xs.length===1,'Unique export control required');return xs[0];};
 const verified=v=>({verified:true,cleanup_complete:true,effect_possible:false,...v});
+export async function synchronizeTextExportInput(channel,state){
+ const before=state.node_mapping,same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+ // Sync only a complete, uncustomized automatic mapping. Manual layouts and
+ // renamed/excluded/unlinked fields retain their existing semantics.
+ if(before.autosync!==true||before.source_fields.length!==before.target_fields.length
+  ||!before.source_fields.length||before.target_fields.some(f=>!f.source||f.excluded||f.origin_type!==0
+   ||!['name','label','type','required'].every(k=>f[k]===f.source[k]))
+  ||new Set(before.target_fields.map(f=>f.source.record_id)).size!==before.source_fields.length
+  ||before.target_fields.some(f=>!before.source_fields.some(s=>same(s,f.source)))
+  ||before.target_fields.every((f,i)=>f.source.record_id===before.source_fields[i].record_id))return before;
+ const bound=s=>s.wizard?.stage==='input_mapping'&&s.wizard.root_ref===state.wizard.root_ref
+  &&s.wizard.root_tid===state.wizard.root_tid&&s.node_mapping?.verified===true
+  &&s.node_mapping.inventory_complete===true&&s.node_mapping.source_identity_verified===true
+  &&s.node_mapping.mapping_wizard==='TuneDataSourceMappingWizard'
+  &&same(s.node_mapping.node_context,before.node_context);
+ need(bound(state),'Export input synchronization owner is unverified');
+ await channel.perform({condition:'synchronize automatic export input order',initialObservation:state,
+  ready:s=>bound(s)&&same(s.node_mapping,before),identity:s=>({wizard:s.wizard.root_ref,mapping:s.node_mapping}),
+  resolve:s=>({verb:'click',ref:one(s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';TuneDataSourceMappingWizard;btnSyncThroughColumns'
+   &&e.allowed_actions.includes('click'))).ref})});
+ const retained=({record_id,index,...field})=>field;
+ const unchanged=(mapping,autosync)=>same(mapping.source_fields,before.source_fields)&&mapping.autosync===autosync
+  &&mapping.target_fields.length===before.target_fields.length
+  &&new Set(mapping.target_fields.map(f=>f.source?.record_id)).size===before.source_fields.length
+  &&mapping.target_fields.every((f,i)=>{
+   const original=before.target_fields.find(t=>t.source.record_id===f.source?.record_id);
+   return f.index===i&&original&&same(retained(f),retained(original));
+  });
+ const ordered=mapping=>mapping.target_fields.every((f,i)=>f.source.record_id===before.source_fields[i].record_id);
+ let after=(await channel.observe({condition:'automatic export input after synchronization',readMappings:true,ready:bound})).node_mapping;
+ need(unchanged(after,true),'Export input synchronization changed source or field properties');
+ if(!ordered(after)){
+  // Loginom 7.4.2 Sync recreates cached target records but retains their order.
+  // Use the existing guarded field moves; restore the automatic option before Done.
+  await configureOutputAutosync(channel,false);
+  const manual=(await channel.observe({condition:'export input before order repair',readMappings:true,ready:bound})).node_mapping;
+  need(unchanged(manual,false),'Export input autosync toggle changed field properties');
+  await reorderOutputFields(channel,before.source_fields.map(source=>manual.target_fields.find(f=>f.source.record_id===source.record_id).record_id));
+  await configureOutputAutosync(channel,true);
+  after=(await channel.observe({condition:'automatic export input after order repair',readMappings:true,ready:bound})).node_mapping;
+ }
+ need(unchanged(after,true)&&ordered(after),'Export input synchronization did not preserve fields in source order');
+ return after;
+}
 export function textExportReadback({node,phases}){
  const configured=phases.find(p=>p.phase==='configure'),input=phases.find(p=>p.phase==='input_mapping'),finish=phases.find(p=>p.phase==='finish');
  need(configured?.value?.configuration&&input?.value?.source_identity_verified&&finish?.status==='verified','Export readback chain incomplete');
@@ -91,7 +136,7 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
     }
     await channel.openInputPort(0);
     const s=await channel.observe({condition:'complete native export input mapping',readMappings:true,ready:s=>s.wizard?.stage==='input_mapping'&&s.node_mapping?.verified===true});
-    inputMapping=s.node_mapping;
+    inputMapping=operation.nodeApply.request.target?.kind==='existing'?await synchronizeTextExportInput(channel,s):s.node_mapping;
     need(inputMapping.target_fields.length>0&&inputMapping.target_fields.length<=1000&&inputMapping.target_fields.every(f=>f.source&&!f.excluded),'Export input has missing fields');
     const definition=await readOutputDefinitionPages(channel,{expectedCount:inputMapping.target_fields.length});
     need(definition.fields.every((f,i)=>['name','label','type','data_kind'].every(k=>f[k]===inputMapping.target_fields[i][k])),'Export input definition differs');
@@ -99,6 +144,7 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
     return verified({effect_possible:true,source_identity_verified:true,native_mapping:inputMapping,definition,finish:completed});
    },
    async openWizard(ctx){enter(ctx);if(operation.nodeApply.request.finish==='execute'){driver=createNodeExecutionProcedure(channel,ctx.node);await driver.prepare();}
+    await channel.revealGraphNode({target:operation.nodeApply.request.target?.kind==='existing'?'body':'drawing'});
     const s=await channel.observe({condition:'export graph ready',ready:s=>s.prepared_node_context?.surface==='graph'});await selectPreparedGraphNode(channel,s,'select export node');await openPreparedWizard(channel);
     const opened=await channel.observe({condition:'export configuration opened',ready:s=>s.wizard?.stage==='text_export_params'||s.wizard?.stage==='input_mapping'});
     if(opened.wizard.stage==='input_mapping')await channel.perform({condition:'export inline input complete',initialObservation:opened,ready:s=>s.wizard?.stage==='input_mapping',identity:()=>ctx.node,
@@ -126,9 +172,10 @@ export function createTextExportNodeSupport({targetOrigin,targetBuild,storageDir
     need(['input_mapping','open','configure','output_mapping','finish','execute'].includes(state.pending?.phase),
      'Only a stopped text export phase before file reading can be released here');
     releaseSignal?.throwIfAborted();
-    enter({signal:releaseSignal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
+    const deadline=now()+NODE_RELEASE_BUDGET_MS;
+    enter({signal:releaseSignal,deadline,document_id:state.request.document_id,
      workflow_ref:state.request.workflow_ref,node:state.node});
-    return releasePendingNode({operation,channel,readReceipt:options.readReceipt});
+    return releasePendingNode({operation,channel,deadline,now,readReceipt:options.readReceipt});
    },
    // Browser recovery T4: after the model cleared what blocked the download, the
    // runtime repeats only the idempotent file read of the same completed export.

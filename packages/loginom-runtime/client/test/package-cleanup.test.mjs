@@ -30,7 +30,7 @@ function fixture(overrides = {}) {
       return state.modified;
     }}}, async ClosePackage(target, suppressEvents, processAfterCall) {
       events.push('close'); assert.equal(target,node); assert.equal(suppressEvents,false); assert.equal(processAfterCall,true);
-      if (state.closePrompt || state.modified) { state.dialog=true; return new Promise(resolve => {
+      if ((state.closePrompt || state.modified)&&!state.closeWithoutPrompt) { state.dialog=true; return new Promise(resolve => {
         state.confirm=()=>{state.count=0;state.tab=false;state.dialog=false;resolve(true);};
       }); }
       if (state.closeThrows) throw Error('upstream private failure');
@@ -81,12 +81,18 @@ function fixture(overrides = {}) {
   });
   const page = {locator,
     async waitForTimeout(ms){
+      if(events.includes('close')){
+        (state.diagnosticWaitBudgets??=[]).push(ms);
+        return new Promise(resolve=>{const timer=setTimeout(resolve,ms);timer.unref?.();});
+      }
       assert.ok(ms>0&&ms<=100);events.push('idle-wait');state.clock+=state.idleElapsed??ms;
       if(state.clearBlocker){state.mask=false;state.dialog=false;}
       Object.assign(state,state.idleChange??{});
       if(state.changePreparation)context.__loginomDockPreparationV1.id='foreign-document';
     },
     async evaluate(fn,arg){
+      if(state.failDiagnostic&&fn.toString().includes("s?.document!==document"))throw Error('Diagnostic transport unavailable');
+      if(state.diagnosticDelay&&fn.toString().includes("s?.document!==document"))await new Promise(resolve=>setTimeout(resolve,state.diagnosticDelay));
       if(fn.toString().includes('m.ClosePackage(node, false, true)'))fail('close_request');
       if(fn.toString().includes('remaining:globalThis'))fail('close_readback');
       if(fn.toString().includes('m?.PackageNodes?.Count === 0'))fail('logout_inventory_readback');
@@ -108,7 +114,7 @@ function fixture(overrides = {}) {
     },
   };
   const Clock = class extends Date {static now(){return state.clock;}};
-  return {state,events,context, run:changed => {
+  return {state,events,context,page, run:changed => {
     const code=makePackageCleanupCode({...options,timeoutMs:state.timeoutMs??options.timeoutMs,...changed});
     state.deadline=Number(code.match(/,(\d+)\)$/)[1]);
     state.clock=state.deadline-30000;
@@ -124,6 +130,53 @@ test('saved owned package closes with native guards, tabs disappear, then logout
   assert.equal(result.unsaved_changes_discarded,false);
   assert.deepEqual(f.events,['modified-read','close','tab-detached','avatar','logout','login-visible']);
   const again=await f.run();assert.equal(again.reason,'CLEANUP_ALREADY_ATTEMPTED');assert.equal(f.events.filter(e=>e==='close').length,1);
+});
+
+for(const mode of ['saved','readonly','diagnostic discard'])for(const changedAt of ['native Close','logout account readback'])
+test('cleanup refuses a replacement server session after '+changedAt+' for '+mode,async()=>{
+ const f=fixture({readonly:mode==='readonly',modified:mode==='diagnostic discard'});
+ const m=f.context.bg.app.Application.FInstance.FMainForm.FMapTree;
+ const foreignSession={marker:'foreign-session'};
+ if(changedAt==='native Close'){
+  const close=m.ClosePackage;
+  m.ClosePackage=async(...args)=>{const result=await close(...args);m.FServerConnection.Session=foreignSession;return result;};
+ }else{
+  const locator=f.page.locator;
+  f.page.locator=query=>{
+   const target=locator(query),read=target.innerText;
+   target.innerText=async(...args)=>{const text=await read(...args);if(query.includes('MF;AppMenuForm;p.h;p.t'))m.FServerConnection.Session=foreignSession;return text;};
+   return target;
+  };
+ }
+ const result=await f.run({diagnosticReadOnly:mode==='readonly',diagnosticDiscard:mode==='diagnostic discard'});
+ assert.equal(result.status,'BLOCKED');assert.equal(result.reason,'LOGOUT_SESSION_CHANGED');
+ assert.equal(result.package_closed,true);assert.equal(result.logged_out,false);
+ assert.equal(f.events.filter(e=>e==='close').length,1);assert.equal(f.events.includes('logout'),false);
+});
+
+test('D75 idle wait pins original connection/session through dirty read and Close',async()=>{
+ for(const phase of ['idle_session','idle_connection','dirty_session','dirty_connection']) {
+  const f=fixture({running:phase.startsWith('idle'),timeoutMs:8000,idleChange:{running:false}});
+  const m=f.context.bg.app.Application.FInstance.FMainForm.FMapTree,connection=m.FServerConnection,session=connection.Session;
+  const replace=()=>{if(phase.endsWith('connection'))m.FServerConnection={...connection};
+   else connection.Session={IsPackageModified:async()=>false};};
+  if(phase.startsWith('idle')){const wait=f.page.waitForTimeout.bind(f.page);f.page.waitForTimeout=async ms=>{await wait(ms);replace();};}
+  else session.IsPackageModified=async()=>{replace();return false;};
+  const result=await f.run();
+  assert.equal(result.status,'BLOCKED',phase);assert.equal(result.reason,'CLEANUP_SESSION_CHANGED',phase);
+  assert.equal(f.events.includes('close'),false,phase);assert.equal(f.events.includes('logout'),false,phase);
+ }
+});
+
+test('D75 cleanup waits for confirmed own running package and rechecks identity before Close',async()=>{
+ for(const fault of [null,'foreign','unknown','expired']) {
+  const f=fixture({running:fault==='unknown'?undefined:true,timeoutMs:8000,
+   idleChange:fault==='expired'?{}:fault==='foreign'?{path:'/test-2/other.lgp'}:{running:false}});
+  const r=await f.run();
+  assert.equal(r.status,fault?'BLOCKED':'SUCCEEDED',fault);
+  assert.equal(f.events.filter(e=>e==='close').length,fault?0:1);
+  if(!fault){assert.ok(f.events.includes('idle-wait'));assert.equal(r.logged_out,true);}
+ }
 });
 
 for(const blocker of ['mask','dialog'])test('cold cleanup waits read-only for a transient '+blocker+' before one native close/logout',async()=>{
@@ -368,4 +421,300 @@ test('read-only mode cannot change during the server dirty-state check',async()=
   const f=fixture({readonly,raceReadOnly});const r=await f.run({diagnosticReadOnly:readonly});
   assert.equal(r.reason,'PACKAGE_CHANGED_DURING_CHECK');assert.equal(f.events.includes('close'),false);
  }
+});
+
+
+test('D70 diagnostic records native Close without changing missing-prompt refusal or discarding',async()=>{
+ const f=fixture({modified:true,closeWithoutPrompt:true}),r=await f.run({diagnosticDiscard:true});
+ assert.equal(r.reason,'DIAGNOSTIC_SAVE_PROMPT_MISSING');assert.equal(r.status,'BLOCKED');
+ assert.equal(r.package_closed,false);assert.equal(r.unsaved_changes_discarded,false);
+ assert.equal(r.modified_before_close,true);
+ assert.equal(r.native_close_readback.status,'observed');assert.equal(r.native_close_readback.done,true);
+ assert.equal(r.native_close_readback.closed,true);assert.equal(r.native_close_readback.result,'true');
+ assert.equal(r.native_close_readback.packages_after,0);assert.equal(r.native_close_readback.original_tab_attached,false);
+ assert.equal(f.events.filter(e=>e==='close').length,1);assert.equal(f.events.includes('discard'),false);assert.equal(f.events.includes('logout'),false);
+});
+
+test('D70 diagnostic keeps native Close false and rejected outcomes distinct without a retry',async()=>{
+ for(const overrides of [{closeResult:false},{closeThrows:true}]) {
+  const f=fixture(overrides),r=await f.run();
+  assert.equal(r.reason,'NATIVE_CLOSE_UNCONFIRMED');assert.equal(r.status,'BLOCKED');
+  assert.equal(r.native_close_readback.done,true);assert.equal(r.native_close_readback.closed,false);
+  assert.equal(r.native_close_readback.failed,!!overrides.closeThrows);
+  assert.equal(r.native_close_readback.packages_after,1);
+  assert.equal(f.events.filter(e=>e==='close').length,1);assert.equal(f.events.includes('discard'),false);assert.equal(f.events.includes('logout'),false);
+ }
+});
+
+test('D70 diagnostic transport failure cannot change cleanup refusal or repeat Close',async()=>{
+ const f=fixture({modified:true,closeWithoutPrompt:true,failDiagnostic:true}),r=await f.run({diagnosticDiscard:true});
+ assert.equal(r.status,'BLOCKED');assert.equal(r.reason,'DIAGNOSTIC_SAVE_PROMPT_MISSING');
+ assert.equal(r.native_close_readback.status,'unavailable');assert.equal(r.unsaved_changes_discarded,false);
+ assert.equal(f.events.filter(e=>e==='close').length,1);assert.equal(f.events.includes('logout'),false);
+});
+
+for(const elapsed of [0,27500])test('D70 delayed diagnostic respects original deadline after '+elapsed+' ms',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});
+ const f=fixture({modified:true,closeWithoutPrompt:true,modifiedReadElapsed:elapsed,diagnosticDelay:31000});
+ let result,settledAt;
+ const pending=f.run({diagnosticDiscard:true}).then(value=>{result=value;settledAt=f.state.clock;});
+ const flush=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
+ await flush();
+ const remaining=f.state.deadline-f.state.clock;
+ assert.equal(remaining,30000-elapsed);
+ f.state.clock+=remaining;t.mock.timers.tick(remaining);await flush();
+ const resultAtDeadline=result;
+ // Also settle the late read, proving it cannot replace the published refusal.
+ const late=31000-remaining;
+ f.state.clock+=late;t.mock.timers.tick(late);await pending;
+ t.diagnostic(JSON.stringify({diagnostic_delay_ms:31000,remaining_ms:remaining,receipt_elapsed_ms:settledAt-(f.state.deadline-30000)}));
+ assert.ok(resultAtDeadline,'diagnostic must not delay an accepted refusal beyond its original deadline');
+ assert.ok(settledAt<=f.state.deadline);
+ assert.deepEqual(f.state.diagnosticWaitBudgets,[remaining]);
+ assert.equal(result,resultAtDeadline);
+ assert.equal(result.status,'BLOCKED');assert.equal(result.reason,'DIAGNOSTIC_SAVE_PROMPT_MISSING');
+ assert.equal(result.native_close_readback.status,'unavailable');
+ assert.equal(result.native_close_readback.reason,'deadline_exceeded');
+ assert.equal(result.package_closed,false);assert.equal(result.logged_out,false);
+ assert.equal(result.unsaved_changes_discarded,false);
+ assert.equal(f.events.filter(e=>e==='close').length,1);
+ assert.equal(f.events.includes('discard'),false);assert.equal(f.events.includes('logout'),false);
+});
+
+for(const fault of ['none','dirty','foreign path','foreign account','connection','existing inventory','old tab','not submitted','wrong request','readonly','server session','foreign document','two packages','unknown mode','reserve account','expired','session changes during read','session changes after close','foreign window','own hidden picker','own active picker','foreign hidden picker'])test('D56c failed Open uses only the new owned package: '+fault,async()=>{
+ const {makeFailedOpenCleanupCode}=await import('../lib/package-cleanup.mjs');
+ const f=fixture({modified:fault==='dirty',readonly:fault==='readonly'}),c=f.context;
+ const m=c.bg.app.Application.FInstance.FMainForm.FMapTree;
+ const node=m.PackageNodes.Items(0),tab=c.ownedTab;
+ f.state.tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';tab.classList={contains:()=>true};
+ c.bg.app.Application.FInstance.FMainForm.Items={Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node}}}})}};
+ const query=c.document.querySelectorAll;
+ c.document.querySelectorAll=q=>q.startsWith('[data-tid^="MF;cntMain;cntWorkspace')?[tab]:query(q);
+ const receipt=c.__loginomDockPreparationV1.receipts.get('prepare');
+ receipt.request=JSON.stringify({session:options.sessionId,intent:'open_package',packagePath:options.packagePath});
+ receipt.phase='effect_possible';receipt.before=[];receipt.openSubmitted=true;
+ receipt.openAccount=options.account;receipt.openConnection=m.FServerConnection;receipt.openServerSession=m.FServerConnection.Session;receipt.packageInventoryBefore=0;
+ delete receipt.tab;delete receipt.packageNode;
+ if(fault==='foreign path')f.state.path='/foreign/other.lgp';
+ if(fault==='foreign account')f.state.account='foreign';
+ if(fault==='connection')receipt.openConnection={};
+ if(fault==='server session')receipt.openServerSession={};
+ if(fault==='foreign document')c.__loginomDockPreparationV1.document={};
+ if(fault==='two packages')f.state.count=2;
+ if(fault==='unknown mode')f.state.readonly=undefined;
+ if(fault==='reserve account')receipt.openAccount='foreign';
+ if(fault==='existing inventory')receipt.packageInventoryBefore=1;
+ if(fault==='old tab')receipt.before=[tab];
+ if(fault==='not submitted')receipt.openSubmitted=false;
+ if(['foreign window','own hidden picker','own active picker','foreign hidden picker'].includes(fault)){
+  const window={id:'picker',getBoundingClientRect:()=>({x:283,y:-2327,width:730,height:500})};
+  const component={$className:'bg.filedialog.view.OpenDialogForm',el:{dom:window},hidden:fault!=='own active picker'};
+  c.Ext={getCmp:()=>component};
+  if(fault.startsWith('own ')){receipt.openDialogElement=window;receipt.openDialog=component;}
+  const find=c.document.querySelectorAll;c.document.querySelectorAll=q=>q.includes('.x-window')?[window]:find(q);
+ }
+ if(fault==='wrong request')receipt.request=JSON.stringify({session:'foreign',intent:'open_package',packagePath:options.packagePath});
+ const wait=f.page.waitForTimeout;f.page.waitForTimeout=ms=>ms>100?new Promise(()=>{}):wait(ms);
+ const code=makeFailedOpenCleanupCode({...options,operationId:'prepare'});
+ if(fault==='expired'){const deadline=Number(code.match(/deadline=(\d+)/)[1]);c.Date=class extends Date {static now(){return deadline;}};}
+ if(fault==='session changes during read'){const read=m.FServerConnection.Session.IsPackageModified;m.FServerConnection.Session.IsPackageModified=async()=>{const result=await read();m.FServerConnection.Session={};return result;};}
+ if(fault==='session changes after close'){const close=m.ClosePackage;m.ClosePackage=async(...args)=>{const result=await close(...args);m.FServerConnection.Session={};return result;};}
+ const result=await vm.runInContext('('+code+')',c)(f.page);
+ const success=['none','readonly','own hidden picker'].includes(fault);
+ assert.equal(result.status,success?'SUCCEEDED':'BLOCKED',JSON.stringify(result));
+ const closed=success||fault==='session changes after close';
+ assert.equal(result.package_closed,closed);assert.equal(result.logged_out,success);
+ assert.equal(f.events.includes('close'),closed);assert.equal(f.events.includes('discard'),false);
+ if(fault==='session changes after close'){assert.equal(result.reason,'LOGOUT_SESSION_CHANGED');assert.equal(f.events.includes('logout'),false);}
+ if(fault==='dirty')assert.equal(result.reason,'UNSAVED_CHANGES');
+});
+
+test('D56c Open diagnostics read native inventory/errors without binding or RPC guesses',async()=>{
+ const {makeColdOpenDiagnosticCode}=await import('../lib/package-cleanup.mjs');
+ const f=fixture(),m=f.context.bg.app.Application.FInstance.FMainForm.FMapTree;
+ m.FServerConnection.Session.SessionID='server-session';
+ Object.defineProperty(m.FServerConnection.Session,'ID',{get(){throw Error('never invoke guessed RPC getter');}});
+ const query=f.context.document.querySelectorAll;
+ f.context.document.querySelectorAll=q=>q==='.bg-error-messages'?[{textContent:'Open rejected',getBoundingClientRect:()=>({width:20,height:10})}]:query(q);
+ const receipt=f.context.__loginomDockPreparationV1.receipts.get('prepare');
+ const result=await vm.runInContext('('+makeColdOpenDiagnosticCode(options)+')',f.context)(f.page);
+ assert.equal(result.packages[0].path,options.packagePath);assert.equal(result.packages[0].read_only,false);
+ assert.equal(result.inventory_complete,true);assert.equal(result.server_session,'server-session');
+ assert.equal(result.errors[0].text,'Open rejected');assert.equal(receipt.failedOpenCleanup,undefined);
+ assert.deepEqual(f.events,[]);
+});
+
+// Both retained cold journals show an exact new package, writable mode,
+// PACKAGE_OPEN_REJECTED and the same renderer text under the TabForm mask.
+// Modal ownership below models the native ErrorMsg/FMessages contract; the
+// historical journals did not capture its data-tid or DOM (not a live proof).
+function failedOpenFixture(fault='none') {
+ const f=fixture(),c=f.context,m=c.bg.app.Application.FInstance.FMainForm.FMapTree;
+ const node=m.PackageNodes.Items(0),tab=c.ownedTab,r=c.__loginomDockPreparationV1.receipts.get('prepare');
+ f.state.tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';tab.classList={contains:()=>true};
+ const element=(tid,text='')=>({id:tid,isConnected:true,textContent:text,innerText:text,getAttribute:()=>tid,
+  contains(e){return e===this;},closest(){return null;},matches:()=>false,
+  getBoundingClientRect:()=>({x:100,y:100,width:200,height:100})});
+ const root=element('MF;TF-1'),error=element('msgbox'),body=element('messages',"Cannot read properties of undefined (reading 'TestableCellRenderer')"),ok=element('msgbox;tlb;ok','OK');
+ f.state.mask=true;f.state.openError=true;f.state.dismissals=0;
+ root.matches=()=>f.state.mask;root.contains=e=>e===root;
+ error.contains=e=>[error,body,ok].includes(e);
+ for(const e of [error,body,ok])e.getBoundingClientRect=()=>({x:100,y:100,width:f.state.openError?200:0,height:f.state.openError?100:0});
+ const native={$className:'bg.app.view.TabForm',el:{dom:root},hidden:false,Controller:{Node:{data:{node}}}};
+ const message={el:{dom:error}},messages={el:{dom:body}},info={};
+ const instance={FMessageBox:message,FMessages:messages,FErrorMessageInfo:info};
+ const button={el:{dom:ok},disabled:false,ownerCt:message};
+ c.bg.ext={errormessage:{ErrorMsg:{FInstance:instance}}};
+ c.Ext={getCmp:id=>id===root.id?native:id===error.id?message:id===ok.id?button:null};
+ c.innerWidth=1280;c.innerHeight=800;
+ c.bg.app.Application.FInstance.FMainForm.Items={Workspace:{getActiveTab:()=>native}};
+ const query=c.document.querySelectorAll;
+ c.document.querySelectorAll=q=>q.startsWith('[data-tid^="MF;cntMain;cntWorkspace')?[tab]:
+  q==='[data-tid="MF;TF-1"]'?[root]:q==='.bg-error-messages'?[body]:q==='[data-tid="msgbox;tlb;ok"]'?[ok]:
+  q==='[data-tid^="msgbox;tlb;"]'?(fault==='confirmation'?[ok,element('msgbox;tlb;yes')]:[ok]):
+  q.startsWith('[role="dialog"]')?[...(f.state.mask?[root]:[]),...(f.state.openError?[error]:[]),...(fault==='foreign dialog'?[element('foreign')]:[])]:query(q);
+ c.document.elementFromPoint=()=>fault==='covered'?element('cover'):ok;
+ Object.assign(r,{request:JSON.stringify({session:options.sessionId,intent:'open_package',packagePath:options.packagePath}),phase:'effect_possible',before:[],openSubmitted:true,
+  openAccount:options.account,openConnection:m.FServerConnection,openServerSession:m.FServerConnection.Session,packageInventoryBefore:0,
+  openError:{instance,message,root:error,messages,info,element:body}});
+ delete r.tab;delete r.packageNode;
+ if(fault==='unknown error')body.textContent='Unknown error';
+ if(fault==='unbound error')delete r.openError;
+ if(fault==='changed native')instance.FErrorMessageInfo={};
+ if(fault==='foreign account')f.state.account='foreign';
+ if(fault==='dirty')f.state.modified=true;
+ if(fault==='running')f.state.running=true;
+ const wait=f.page.waitForTimeout;
+ f.page.waitForTimeout=async ms=>{
+  if(ms>100)return new Promise(()=>{});
+  await wait(ms);
+  if(!['permanent mask','late modal'].includes(fault))f.state.mask=false;
+  if(fault==='late modal'){f.state.openError=false;f.state.mask=false;}
+  if(fault==='session after wait')m.FServerConnection.Session={};
+  if(fault==='late wait')f.state.clock+=30000;
+ };
+ ok.click=()=>{f.state.dismissals++;f.events.push('error-ok');if(fault!=='late modal')f.state.openError=false;
+  if(fault==='lost click')throw Error('lost OK reply');
+  if(fault==='late click')f.state.clock+=30000;
+ };
+ f.page.mouse={async click(){return ok.click();}};
+ return {...f,runFailed:async()=>{
+  const {makeFailedOpenCleanupCode}=await import(process.env.D78_CLEANUP_MODULE??'../lib/package-cleanup.mjs');
+  const code=makeFailedOpenCleanupCode({...options,operationId:'prepare'});
+  f.state.deadline=Number(code.match(/deadline=(\d+)/)[1]);f.state.clock=f.state.deadline-30000;
+  c.Date=class extends Date {static now(){return f.state.clock;}};
+  return vm.runInContext('('+code+')',c)(f.page);
+ }};
+}
+
+for(const sample of ['p15 cold:1–2','LAB-173 p24 cold1:1–2'])test('D78 replay '+sample+' dismisses only owned error, waits mask and closes/logs out',async()=>{
+ const f=failedOpenFixture(),result=await f.runFailed();
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(result.package_closed,true);assert.equal(result.logged_out,true);assert.equal(result.unsaved_changes_discarded,false);
+ assert.equal(f.state.dismissals,1);assert.equal(f.events.filter(x=>x==='close').length,1);
+ assert.ok(f.events.indexOf('error-ok')<f.events.indexOf('idle-wait'));
+ assert.ok(f.events.indexOf('idle-wait')<f.events.indexOf('close'));
+ assert.ok(f.events.indexOf('close')<f.events.indexOf('logout'));
+});
+
+test('D78 late own modal disappearance is read-only settlement, never another OK',async()=>{
+ const f=failedOpenFixture('late modal'),r=await f.runFailed();
+ assert.equal(r.status,'SUCCEEDED');assert.equal(f.state.dismissals,1);assert.equal(r.package_closed,true);assert.equal(r.logged_out,true);
+});
+
+test('D78 a later cleanup call cannot renew the failed Open cleanup deadline',async()=>{
+ const f=failedOpenFixture();
+ const r=f.context.__loginomDockPreparationV1.receipts.get('prepare');
+ r.failedOpenCleanupDeadline=Date.now()-1;
+ const result=await f.runFailed();
+ assert.equal(result.status,'BLOCKED');assert.equal(f.state.dismissals,0);assert.equal(f.events.includes('close'),false);
+});
+
+for(const fault of ['foreign dialog','covered','confirmation','unknown error','unbound error','changed native','foreign account','dirty','running',
+ 'session after wait','permanent mask','lost click','late click','late wait'])test('D78 keeps refusal/one-flight/deadline: '+fault,async()=>{
+ const f=failedOpenFixture(fault),result=await f.runFailed();
+ assert.equal(result.status,'BLOCKED',JSON.stringify(result));assert.equal(result.package_closed,false);assert.equal(result.logged_out,false);
+ assert.ok(f.state.dismissals<=1);assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+ if(['foreign dialog','covered','confirmation','unknown error','unbound error','changed native','foreign account'].includes(fault))assert.equal(f.state.dismissals,0);
+ assert.equal(result.unsaved_changes_discarded,false);
+});
+
+for(const race of ['foreign error','replacement session','moved button'])test('D78 OK transport race has zero gestures: '+race,async()=>{
+ const f=failedOpenFixture(),evaluate=f.page.evaluate;let changed=false;
+ f.page.evaluate=async(fn,arg)=>{
+  const value=await evaluate(fn,arg);
+  if(value?.dismiss&&!changed){
+   changed=true;
+   if(race==='foreign error')f.context.bg.ext.errormessage.ErrorMsg.FInstance.FErrorMessageInfo={foreign:true};
+   if(race==='replacement session')f.context.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Session={foreign:true};
+   if(race==='moved button')f.context.document.elementFromPoint=()=>({id:'foreign-destructive-control'});
+  }
+  return value;
+ };
+ const result=await f.runFailed();
+ assert.equal(changed,true);assert.equal(result.status,'BLOCKED');
+ assert.equal(f.state.dismissals,0);assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+});
+
+for(const race of ['button reference','native control','geometry','label','deadline'])test('D78 pins exact OK reference/signature and original deadline: '+race,async()=>{
+ const f=failedOpenFixture(),c=f.context,evaluate=f.page.evaluate;
+ f.page.evaluate=async(fn,arg)=>{
+  const value=await evaluate(fn,arg);
+  if(value?.reason==='OWNED_OPEN_ERROR'){
+   const ok=c.document.querySelectorAll('[data-tid="msgbox;tlb;ok"]')[0];
+   if(race==='button reference'){
+    const replacement={...ok};
+    const query=c.document.querySelectorAll;
+    c.document.querySelectorAll=q=>query(q).map(e=>e===ok?replacement:e);
+   }
+   if(race==='native control'){
+    const get=c.Ext.getCmp,control=get(ok.id);c.Ext.getCmp=id=>id===ok.id?{...control}:get(id);
+   }
+   if(race==='geometry')ok.getBoundingClientRect=()=>({x:110,y:100,width:200,height:100});
+   if(race==='label')ok.innerText='Different';
+   if(race==='deadline')f.state.clock+=30000;
+  }
+  return value;
+ };
+ const result=await f.runFailed();
+ assert.equal(result.status,'BLOCKED');assert.equal(f.state.dismissals,0);
+ assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+});
+
+test('D78 OK receipt is retained and an ACK loss cannot repeat the gesture',async()=>{
+ const f=failedOpenFixture(),evaluate=f.page.evaluate;
+ f.page.evaluate=async(fn,arg)=>{
+  const result=await evaluate(fn,arg);
+  if(result?.gesture_returned===true)throw Error('lost guarded gesture ACK');
+  return result;
+ };
+ const first=await f.runFailed();assert.equal(first.status,'BLOCKED');assert.equal(f.state.dismissals,1);
+ const ledger=f.page[Symbol.for('loginom-dock.operation-receipts.v1')];
+ assert.equal(ledger.size,1);assert.equal([...ledger.values()][0].state,'unknown');
+ f.state.openError=true; // No acknowledgement and the same modal is still visible.
+ const second=await f.runFailed();assert.equal(second.status,'BLOCKED');assert.equal(f.state.dismissals,1);
+ assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+});
+
+for(const keepMask of [false,true])test('D78 own error disappearing before OK continues normal cleanup, mask='+keepMask,async()=>{
+ const f=failedOpenFixture(),evaluate=f.page.evaluate;let disappeared=false,okCallback=false;
+ const m=f.context.bg.app.Application.FInstance.FMainForm.FMapTree,close=m.ClosePackage;
+ m.ClosePackage=(...args)=>{assert.equal(okCallback,false,'OK callback must never start native Close');return close(...args);};
+ f.page.evaluate=async(fn,arg)=>{
+  okCallback=arg?.dismissOpenError===true;
+  const value=await evaluate(fn,arg);
+  if(okCallback)assert.notEqual(value?.started,true,'OK callback only dismisses its own error');
+  okCallback=false;
+  if(value?.reason==='OWNED_OPEN_ERROR'&&!disappeared){
+   disappeared=true;f.state.openError=false;f.state.mask=keepMask;
+  }
+  return value;
+ };
+ const result=await f.runFailed();
+ assert.equal(disappeared,true);assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(result.package_closed,true);assert.equal(result.logged_out,true);assert.equal(result.unsaved_changes_discarded,false);
+ assert.equal(f.state.dismissals,0);assert.equal(f.events.includes('error-ok'),false);
+ assert.equal(f.events.filter(x=>x==='close').length,1);assert.equal(f.events.filter(x=>x==='logout').length,1);
+ if(keepMask)assert.ok(f.events.indexOf('idle-wait')<f.events.indexOf('close'));
+ assert.ok(f.events.indexOf('close')<f.events.indexOf('logout'));assert.ok(f.state.clock<f.state.deadline);
 });

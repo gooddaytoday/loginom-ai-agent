@@ -1,22 +1,6 @@
 {
   "package_path": "/stability-2026-10-20/n1.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.group_data"
-    },
-    {
-      "type": "transform.join_data"
-    },
-    {
-      "type": "transform.filter_data"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -25,22 +9,22 @@
       "columns": [
         {
           "name": "SKU",
-          "label": "SKU",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Requested",
-          "label": "Requested",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Available",
-          "label": "Available",
+          "label_any": true,
           "type": "integer"
         },
         {
           "name": "Shortage",
-          "label": "Shortage",
+          "label_any": true,
           "type": "integer"
         }
       ],

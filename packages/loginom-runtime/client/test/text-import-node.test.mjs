@@ -1,9 +1,101 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createTextImportNodeSupport,validateTextImportNodeParameters,verifyTextImportSource} from '../lib/text-import-node.mjs';
+import {createCandidateNodeSupport} from '../lib/node-support.mjs';
+import {applyNode,validateNodeApplyRequest} from '../lib/node-apply.mjs';
+import {dispatchNodeApi,nodeApiTools,textImportParametersSchema} from '../lib/node-api.mjs';
 const params=()=>({settings:{source:{source_path:'/test/data.csv',encoding:'UTF-8',rows_to_skip:0,first_line_as_title:true},format:{delimiter:';',decimal_separator:'.',null_marker:'NULL',text_qualifier:'"'},columns:[{name:'A',label:'A',type:'integer',data_kind:'Дискретный',used:true}]},source:{artifact_id:'artifact',upload_operation_id:'upload',bytes:15,sha256:'a'.repeat(64)}});
 const request=()=>({finish:'done',read:{ports:[]},mappings:[],inputs:[]});
 const uploaded=()=>({operation_id:'upload',artifact:{artifact_id:'artifact',bytes:15,sha256:'a'.repeat(64)},outcome:{operation_id:'upload',action_key:'artifact.upload',status:'SUCCEEDED',cleanup_complete:true,output:{artifact_id:'artifact',destination:'/test/data.csv',bytes:15,sha256:'a'.repeat(64),server_copy_verification:{verification_id:'verification',status:'SUCCEEDED',bytes_verified:true,upload_completion_verified:true,destination:'/test/data.csv',bytes:15,sha256:'a'.repeat(64)}}}});
+
+function coveredImport({existing=false,foreign=false,unknown=false}={}) {
+ const node={document_id:'doc',workflow_id:'flow',node_id:'node'},workflow={prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',workflow_id:'flow',navigation_path:[{tid:'flow',label:'Scenario'}]};
+ const actions=[];let covered=true,opened=false,pending;
+ const graphTid='MF;TF-1;Graph;Import';
+ const state=()=>({origin:'http://test',loginom_build:'7.4.2',workflow_ref:workflow,dom_epoch:{document:'dom',revision:1},scan:{complete:true},
+  prepared_node_context:{...node,node_id:foreign&&!covered?'foreign':node.node_id,verified:true,surface:opened?'wizard':'graph',tid:graphTid,locked:false},
+  wizard:opened?{status:'observed',stage:'text_import_file',root_tid:'wizard',root_ref:'wizard',
+   owner_context:{status:'observed',node:{tid:'flow>Import',label:'Import'},path:[...workflow.navigation_path,{tid:'node',label:'Import'},{tid:'wizard',label:'Wizard'}]},
+   import_source:{fields:Object.fromEntries(Object.entries({source_path:'',connection:'file',encoding:'UTF-8',rows_to_skip:'0',first_line_as_title:true}).map(([k,value])=>[k,{status:'observed',value}]))}}:{status:'absent'},
+  ui:{masks:[],dialogs:[],truncated:{masks:false,dialogs:false},elements:[
+   {ref:'ui-body',tid:graphTid,graph_node:{part:'body'},allowed_actions:['click'],interaction:{state:covered?'point_not_observed':'point_observed',...(covered?{covering:[{anchor_tid:graphTid+';NodesControls'}]}:{})}},
+   {ref:'ui-label',tid:graphTid+';Label;Label',label:'Import',graph_node:{part:'label'},allowed_actions:['click'],interaction:{state:'point_observed'}},
+   {ref:'ui-settings',tid:graphTid+';Setting',allowed_actions:['open_wizard','begin_wizard'],wizard_open:{node:{node_label:'Import'},workflow_path:workflow.navigation_path},interaction:{state:'point_observed'}}]}});
+ const support=createTextImportNodeSupport({targetOrigin:'http://test',targetBuild:'7.4.2'});
+ const driver=support.nodeApplyDriverFactory({operation:{id:'import',action:{action_key:'node.apply',revision:'1'},nodeApply:{request:{...request(),target:{kind:existing?'existing':'new'},parameters:params()}}},
+  now:Date.now,receiptOptions:()=>({}),onRecord:async e=>{if(e.phase==='node_step_prepared')pending=e;return e;},execute:async()=>{
+   if(!pending)return {status:'SUCCEEDED',output:state()};
+   const step=pending;pending=null;const a=step.action;actions.push(a);
+   const refused=a.ref==='ui-body'&&covered;
+   if(a.ref==='ui-label')covered=false;
+   if(a.ref==='ui-settings')opened=true;
+   return {operation_id:step.internal_operation_id,action_key:'ui.act',status:unknown&&a.ref==='ui-label'?'AMBIGUOUS':refused?'NOT_APPLIED':'SUCCEEDED',
+    phase:refused?'preconditions':'completed',effect_possible:!refused,cleanup_complete:!unknown,
+    error:refused?{code:'UI_REFERENCE_OBSCURED',message:'The observed control has no verified visible interaction point'}:null,trace:[]};
+  }});
+ return {actions,run:()=>driver.openWizard({document_id:'doc',workflow_ref:workflow,node,deadline:Date.now()+60000})};
+}
+for(const existing of [false,true])test('import opens through its label when hover controls cover the body, existing: '+existing,async()=>{
+ const f=coveredImport({existing});assert.equal((await f.run()).verified,true);
+ assert.deepEqual(f.actions.map(a=>a.ref),['ui-label','ui-body','ui-settings']);
+});
+test('import selection stops after an unknown label gesture or changed native owner',async()=>{
+ for(const options of [{unknown:true},{foreign:true}]){
+  const f=coveredImport(options);await assert.rejects(f.run());assert.deepEqual(f.actions.map(a=>a.ref),['ui-label']);
+ }
+});
+const persistedImport=()=>({operation_id:'activate-import',contract_revision:'1.0.0',document_id:'doc',
+ workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'path',label:'Scenario'}]},
+ target:{kind:'existing',type:'imports.text',ref:{document_id:'doc',workflow_id:'wf',node_id:'import'}},
+ inputs:[],mappings:[],mode:'delimited',parameters:{settings:{}},finish:'execute',
+ read:{ports:[0],sample_rows:100,require_exact_numbers:true},budgets:{configure_ms:10000,execute_ms:10000,total_ms:30000}});
+test('unchanged persisted Import executes without a new upload or configuration phases',async()=>{
+ const support=createCandidateNodeSupport({targetOrigin:'https://loginom.invalid',targetBuild:'7.4.2'}),r=persistedImport();
+ const operation={id:r.operation_id,parameters:r},calls=[];
+ const drivers=support.nodeApplyDriverFactory({operation,
+  execute:async()=>assert.fail('No wizard or configuration transport expected'),
+  verifiedUploads:()=>assert.fail('Saved configuration does not require a new upload'),
+  onRecord:async e=>structuredClone(e),now:Date.now});
+ const ok=value=>({verified:true,cleanup_complete:true,effect_possible:false,...value});
+ const result=await applyNode({request:r,operation,handlers:support.nodeApplyHandlers,record:async e=>structuredClone(e),drivers:{...drivers,
+  prepareTarget:async()=>{calls.push('target');return ok({node:r.target.ref});},
+  finishGraph:async()=>{calls.push('execute');return ok({mode:'execute',execution_id:'fresh',settings_applied:false});},
+  waitExecution:async()=>ok({execution_id:'fresh',status:'completed'}),
+  readOutput:async()=>ok({execution_id:'fresh',status:'complete',ports:[{port:0,fresh:true}],evidence_ref:'fresh-output'})}});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.deepEqual(result.configuration,{status:'not_requested'});assert.deepEqual(calls,['target','execute']);
+ assert.deepEqual(result.phases.map(p=>p.phase),['source','target','finish','execute','read']);
+ assert.equal(result.execution.status,'completed');
+});
+for(const [name,change] of Object.entries({
+ newImport:r=>{r.target={kind:'new',type:'imports.text',label:'Source',position:{x:320,y:280}};},
+ sourcePath:r=>{r.parameters.settings={source:{source_path:'/other/source.csv'}};},
+ columns:r=>{r.parameters.settings={columns:[{name:'Ticket',label:'Changed'}]};},
+ format:r=>{r.parameters.settings={format:{delimiter:';'}};},
+ mapping:r=>{r.mappings=[{direction:'output',port:0,changes:[{source:{kind:'configured_field',name:'Ticket'},label:'Changed'}]}];},
+ done:r=>{r.finish='done';r.read.ports=[];},
+ close:r=>{r.finish='close';r.read.ports=[];},
+ otherPort:r=>{r.read.ports=[1];},
+ arraySettings:r=>{r.parameters.settings=[];},
+}))test('source omission cannot admit Import configuration: '+name,()=>{
+ const r=persistedImport();change(r);
+ const handlers=createTextImportNodeSupport({}).nodeApplyHandlers;
+ assert.throws(()=>validateNodeApplyRequest(r,handlers),/Exact import source and settings required/);
+});
+test('an explicit old upload ID still requires current-session verified upload evidence',async()=>{
+ const r=persistedImport();r.parameters.source={artifact_id:'old-artifact',upload_operation_id:'previous:upload'};
+ const support=createCandidateNodeSupport({targetOrigin:'https://loginom.invalid',targetBuild:'7.4.2'});
+ validateNodeApplyRequest(r,support.nodeApplyHandlers);
+ const drivers=support.nodeApplyDriverFactory({operation:{id:r.operation_id,parameters:r},verifiedUploads:()=>[],
+  execute:async()=>assert.fail('No browser call before source verification')});
+ await assert.rejects(drivers.verifySource(r.parameters),/Verified upload operation is missing/);
+});
+test('public Import discovery and dispatch admit the unchanged existing execution request',async()=>{
+ const handlers=createTextImportNodeSupport({}).nodeApplyHandlers,r=persistedImport();let received;
+ assert.deepEqual(textImportParametersSchema.required,['settings']);
+ await dispatchNodeApi({tools:nodeApiTools,startNodeApply:args=>{validateNodeApplyRequest(args,handlers);received=args;}},'dock_node_apply',r);
+ assert.deepEqual(received,r);
+});
 test('new import missing columns identifies the corrective parameter; existing patches remain allowed',()=>{
  const p=params();delete p.settings.columns;
  assert.throws(()=>validateTextImportNodeParameters(p,'delimited',request()),/Invalid parameters.parameters.settings.columns:/);

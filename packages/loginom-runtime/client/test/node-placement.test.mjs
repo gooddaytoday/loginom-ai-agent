@@ -1,9 +1,103 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
+import {readFile} from 'node:fs/promises';
 import {createNodeTargetBrowserAdapter,mutateGraph} from '../lib/node-target-browser.mjs';
 import {validateNodeTargetRequest} from '../lib/node-contracts.mjs';
-import {nodePlacementPoint,nodePlacementPosition,nodePlacementOverflow,revealNodePlacement,samePlacementGraph} from '../lib/node-placement.mjs';
+import {nodePlacementViewport,nodePlacementPoint,nodePlacementPosition,nodePlacementGap,nodePlacementOverflow,revealNodePlacement,revealPreparedGraphNode,samePlacementGraph} from '../lib/node-placement.mjs';
+
+function gapFixture(occupied=[]){
+ const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type:'integration.rest_request'},inputs:[]};
+ const graph={complete:true,interaction_ready:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
+ const box={x:0,y:0,left:0,right:800,top:0,bottom:600,width:800,height:600};
+ const canvas={getBoundingClientRect:()=>box,querySelectorAll:()=>occupied.map(r=>({getBoundingClientRect:()=>({...r,width:r.right-r.left,height:r.bottom-r.top})})),scrollLeft:0,scrollTop:0};
+ const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:1,translate:{x:0,y:0}}}}}};
+ const context={innerWidth:800,innerHeight:600,document:{elementFromPoint:()=>canvas},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
+ const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>{
+  if(code.includes('async function readGraph'))return graph;
+  if(code.includes('evaluateAll')||code.includes('const row=page.locator'))return true;
+  return runInNewContext('('+code+')',context)({locator:()=>({evaluate:async(fn,arg)=>fn(canvas,arg)})});
+ }});
+ return {adapter,request,graph};
+}
+test('D32 automatic placement reserves the whole REST footprint above an observed encoder port',async()=>{
+ const f=gapFixture([{left:80,right:136,top:160,bottom:244},{left:140,right:149,top:192,bottom:204}]);
+ const p=await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000);
+ // Observed native REST body is 56x104; the old point-only choice (80,80)
+ // intersected the encoder body below it even though the drop point was free.
+ assert.equal(p.x<149&&p.x+72>80&&p.y<244&&p.y+104>160,false);
+});
+test('D32 an implicit encoder reserves its parent REST requested location without changing it',async()=>{
+ const f=gapFixture(),reserved={x:80,y:80};
+ const p=await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000,undefined,[reserved]);
+ assert.ok(Math.abs(p.x-reserved.x)>=128||Math.abs(p.y-reserved.y)>=160);
+ assert.deepEqual(reserved,{x:80,y:80});
+});
+test('D32 explicit REST coordinates retain their prior preflight without a new clearance refusal',async()=>{
+ const f=gapFixture([{left:400,right:456,top:336,bottom:420},{left:460,right:469,top:368,bottom:380}]);
+ f.request.target.position={x:400,y:300};
+ await f.adapter.preflight(f.request,f.graph,Date.now()+10000);
+ assert.deepEqual(f.request.target.position,{x:400,y:300});
+});
+test('D32 explicit Import beside the observed scenario variables retains its prior preflight',async()=>{
+ const occupied=[{left:17,right:73,top:193,bottom:249},...Array.from({length:5},(_,i)=>({left:17,right:32,top:53+i*28,bottom:77+i*28}))];
+ for(const position of [{x:100,y:300},{x:80,y:280},{x:80,y:320}]){
+  const f=gapFixture(occupied);f.request.target={kind:'new',type:'imports.text',position};
+  await f.adapter.preflight(f.request,f.graph,Date.now()+10000);
+  assert.deepEqual(f.request.target.position,position);
+ }
+});
+test('D32 automatic placement of unrelated node types keeps the old point clearance',async()=>{
+ const f=gapFixture([{left:80,right:136,top:160,bottom:244}]);
+ f.request.target.type='imports.text';
+ assert.deepEqual(structuredClone(await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000)),{x:80,y:80});
+ f.request.target.type='programming.javascript';
+ assert.deepEqual(structuredClone(await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000)),{x:80,y:80});
+});
+test('D32 implicit encoder alone opts into REST clearance even without a reserved explicit REST',async()=>{
+ const f=gapFixture([{left:80,right:136,top:160,bottom:244}]);f.request.target.type='programming.javascript';
+ const p=await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000,undefined,[]);
+ assert.notDeepEqual(structuredClone(p),{x:80,y:80});
+});
+test('D28/D32 search the visible gap missed by the coarse grid before choosing unreachable overflow',async()=>{
+ for(const implicit of [false,true]){
+  const occupied=[{left:0,right:180,top:0,bottom:600},{left:500,right:800,top:0,bottom:600}],f=gapFixture(occupied);
+  if(implicit)f.request.target.type='programming.javascript';
+  const p=await f.adapter.choosePosition(f.request,f.graph,Date.now()+10000,undefined,implicit?[]:undefined);
+  assert.ok(p.x>=276&&p.x<=340&&p.y>=64&&p.y<520,JSON.stringify(p));
+  assert.equal(nodePlacementGap({scale:1},p,occupied),true);
+ }
+});
+test('D32 clearance keeps the observed 120-unit native auto-link case apart at every scale',()=>{
+ for(const scale of [.5,1,2]){
+  const v={x:324,y:100,scale,translate:{x:32,y:-16},scroll:{x:40,y:24}};
+  const source=nodePlacementPoint(v,{x:184,y:144});
+  const occupied=[{left:source.x,right:source.x+72*scale,top:source.y,bottom:source.y+80*scale}];
+  assert.equal(nodePlacementGap(v,nodePlacementPoint(v,{x:304,y:144}),occupied),false);
+  assert.equal(nodePlacementGap(v,nodePlacementPoint(v,{x:600,y:144}),occupied),true);
+ }
+ assert.throws(()=>nodePlacementGap({scale:1},{x:0,y:0},[{left:0,right:1,top:NaN,bottom:2}]),/clearance bounds/);
+});
+
+test('D28 late automatic JS uses a visible gap missed by the coarse grid, retaining the same clearance',async()=>{
+ const recorded=JSON.parse(await readFile(new URL('./fixtures/d28-js-placement.json',import.meta.url),'utf8'));
+ const v=recorded.view,box={...v,right:v.x+v.width,bottom:v.y+v.height};
+ const occupied=recorded.rects.map(([x,y,width,height])=>({x,y,width,height,left:x,top:y,right:x+width,bottom:y+height}));
+ const canvas={getBoundingClientRect:()=>box,querySelectorAll:()=>occupied.map(b=>({getBoundingClientRect:()=>b})),scrollLeft:0,scrollTop:0,contains:()=>false};
+ const controller={FController:{FDiagram:{FmxGraph:{container:canvas,view:{scale:v.scale,translate:v.translate}}}}};
+ const context={innerWidth:1280,innerHeight:800,document:{elementFromPoint:()=>canvas},bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:controller})}}}}}}}};
+ for(const type of ['programming.javascript','imports.text']){
+  const request={document_id:'doc',workflow_ref:{workflow_id:'wf',prefix:'MF;TF'},target:{kind:'new',type},inputs:[]};
+  const graph={complete:true,document_id:'doc',workflow_ref:request.workflow_ref,nodes:[],links:[]};
+  let calls=0;const adapter=createNodeTargetBrowserAdapter({build:'7.4.2',execute:async code=>++calls===1?graph:runInNewContext('('+code+')',context)({locator:()=>({evaluate:async fn=>fn(canvas)})})});
+  const position=structuredClone(await adapter.choosePosition(request,graph,Date.now()+10000));
+  // JS retains its earlier 40px result; other types now exhaust the added
+  // 32px pass before overflow, with the same point clearance in both cases.
+  assert.deepEqual(position,type==='imports.text'?{x:2200,y:208}:{x:2176,y:520});
+  const point=nodePlacementPoint(v,position);assert.ok(point.y<=v.y+v.height-8&&point.x<=v.x+v.width-8);
+  assert.equal(occupied.some(r=>point.x>r.left-72&&point.x<r.right+96&&point.y>r.top-56&&point.y<r.bottom+72),false);
+ }
+});
 
 for(const {scale,translate,expected} of [
  {scale:1.5,translate:{x:0,y:0},expected:{x:160,y:136}},
@@ -129,6 +223,26 @@ test('created node without verified rendered bounds cannot silently use a point'
  await assert.rejects(revealNodePlacement(f.args),/footprint unavailable/);assert.equal(f.state().clicks,0);
 });
 
+for(const edge of ['canvas','browser'])for(const axis of ['right','bottom'])test('rendered node exactly eight pixels inside '+edge+' '+axis+' boundary needs no navigation',async()=>{
+ const f=fixture();f.args.nodeId='edge';
+ const v={...structuredClone(f.state().v),y:80,...(edge==='browser'?{viewportWidth:1280,viewportHeight:800}:{})};
+ f.args.root.evaluate=async()=>({...v,node_bounds:{
+  x:axis==='right'?Math.min(v.x+v.width,v.viewportWidth)-8-111:500,
+  y:axis==='bottom'?Math.min(v.y+v.height,v.viewportHeight)-8-154:106,width:111,height:154}});
+ const r=await revealNodePlacement(f.args);
+ assert.equal(r.fully_visible,true);assert.equal(r.zoom_steps,0);
+ assert.equal(f.state().clicks,0);assert.equal(f.state().open,false);
+});
+test('navigation accepts an eight pixel inset after zoom and outline cleanup, but never a smaller inset',async()=>{
+ const f=fixture();f.args.nodeId='edge';
+ f.args.root.evaluate=async()=>({...structuredClone(f.state().v),y:80,viewportWidth:1280,viewportHeight:800,node_bounds:{
+  x:f.state().clicks?1161:1161.01,y:106,width:111,height:154}});
+ const r=await revealNodePlacement(f.args);
+ assert.equal(r.fully_visible,true);assert.equal(r.zoom_steps,1);
+ assert.equal(f.state().clicks,1);assert.equal(f.state().open,false);
+ assert.equal(r.view.node_bounds.x+r.view.node_bounds.width,1272);
+});
+
 for(const fault of [null,'foreign','lost'])test('existing target scroll preserves native scale and refuses '+(fault??'no owner change'),async()=>{
  const f=fixture();f.args.nodeId='existing';f.args.scrollNode=true;let scrolled=false;
  const canvas={scrollLeft:0,scrollTop:0};
@@ -145,6 +259,38 @@ for(const fault of [null,'foreign','lost'])test('existing target scroll preserve
  if(fault){await assert.rejects(revealNodePlacement(f.args),e=>fault==='lost'?e.placement_navigation_unverified===true:e.message==='Graph changed');}
  else {const r=await revealNodePlacement(f.args);assert.equal(r.fully_visible,true);assert.equal(r.view.scale,1);assert.equal(r.zoom_steps,0);}
  assert.equal(f.state().clicks,0);assert.ok(canvas.scrollLeft>0);
+});
+
+function insetFixture({lost=false}={}){
+ const f=fixture();Object.assign(f.state().v,{width:950,height:694,viewportWidth:1280,viewportHeight:800});
+ f.args.nodeId='long-label';f.args.position={x:864,y:56};let left=0,increases=0;
+ const canvas={get scrollLeft(){return left;},set scrollLeft(x){left=Math.max(0,Math.min(x,975*f.state().v.scale-950));},scrollTop:0};
+ f.args.root.evaluate=async(fn,arg)=>{
+  if(typeof arg==='object'){fn(canvas,arg);canvas.scrollTop=0;if(lost)throw Error('Lost scroll reply');return;}
+  const v=structuredClone(f.state().v),s=v.scale;
+  return {...v,scroll:{x:left,y:0},node_bounds:{x:v.x+836*s-left,y:v.y+Math.round(6*s),width:112*s,height:158*s}};
+ };
+ const locate=f.args.page.locator;
+ f.args.page.locator=s=>{
+  const owner=locate(s);if(!s.endsWith(';cntDiagram"]'))return owner;
+  return {...owner,locator:s=>s.endsWith(';tlb;b-1"]')?{count:async()=>1,isVisible:async()=>f.state().open,
+   getAttribute:async()=> 'Увеличить масштаб',click:async()=>{increases++;f.state().v.scale*=1.1;},
+   waitFor:async({state})=>assert.equal(f.state().open,state==='visible')}:owner.locator(s)};
+ };
+ return {...f,increases:()=>increases};
+}
+test('D15 top inset grows through native zoom-in and scroll without moving the model node',async()=>{
+ const f=insetFixture(),position=structuredClone(f.args.position),r=await revealNodePlacement(f.args);
+ assert.equal(r.fully_visible,true);assert.equal(f.increases(),3);assert.equal(f.state().clicks,0);
+ assert.ok(r.view.node_bounds.y>=108);assert.ok(r.view.scroll.x>0);assert.equal(f.state().open,false);
+ assert.deepEqual(f.args.position,position);
+ assert.ok(r.navigation_steps.some(s=>s.action==='zoom_in'&&s.before.scale<s.after.scale));
+ assert.ok(r.navigation_steps.some(s=>s.action==='scroll'&&s.after.scroll.x>s.before.scroll.x));
+});
+test('D15 lost native scroll reply stops navigation and retains uncertainty',async()=>{
+ const f=insetFixture({lost:true});
+ await assert.rejects(revealNodePlacement(f.args),e=>e.placement_navigation_unverified===true&&/Lost scroll reply/.test(e.message));
+ assert.equal(f.increases(),1);assert.equal(f.state().clicks,0);assert.equal(f.state().open,false);
 });
 
 function overflowFixture({foreign=false,missing=false,wrongIcon=false,ambiguous=false,changed=false,buffered=false}={}){
@@ -244,4 +390,112 @@ for(const fault of ['visible-toggle','overflow-open','overflow-toggle','zoom','o
  // the known-open outline. That cleanup must not erase the original fault.
  if(fault==='menu-cleanup'){assert.equal(triggers,4);assert.equal(items,2);assert.equal(f.state().open,false);}
  assert.equal(f.state().clicks,fault==='zoom'?1:fault==='overflow-close'?2:0);
+});
+
+// LAB-151 line 3905: pinning the process console clips a minimum-scale node.
+for(const maxScroll of [151,148])test('D28 minimum zoom scroll range '+maxScroll+' preserves full drawing inset',async()=>{
+ const f=fixture({stuck:true});Object.assign(f.state().v,{x:324,y:100,width:950,height:494,viewportWidth:1280,viewportHeight:800,scale:0.3855432894295314});
+ f.args.nodeId='rest-country-de';f.args.position={x:208,y:1536};let top=0;
+ const canvas={scrollLeft:0,get scrollTop(){return top;},set scrollTop(value){top=Math.max(0,Math.min(maxScroll,value));}};
+ f.args.root.evaluate=async(fn,arg)=>{
+  if(typeof arg==='object'){fn(canvas,arg);canvas.scrollLeft=0;return;}
+  return {...structuredClone(f.state().v),scroll:{x:0,y:top},node_bounds:{x:398,y:673-top,width:34.5,height:61.5}};
+ };
+ const run=runInNewContext('('+revealNodePlacement.toString()+')');
+ const r=await run(f.args);
+ assert.equal(r.fully_visible,maxScroll===151);assert.equal(top,maxScroll);
+ assert.equal(r.view.scale,0.3855432894295314);assert.equal(r.zoom_steps,1);assert.equal(f.state().open,false);
+ assert.equal(r.navigation_steps.filter(s=>s.action==='scroll').length,1);
+ assert.equal(r.view.node_bounds.y+r.view.node_bounds.height<=586,maxScroll===151);
+});
+
+// Connection placement has no nodeId: its projected point still needs the inset.
+for(const maxScroll of [8,7])test('D28 connection point 398.024/793.978 native scroll range '+maxScroll,async()=>{
+ const f=fixture({stuck:true});Object.assign(f.state().v,{x:324,y:100,width:950,height:694,viewportWidth:1280,viewportHeight:800,scale:0.3855432894295314});
+ f.args.position={x:192,y:1800};let top=0;
+ const canvas={scrollLeft:0,get scrollTop(){return top;},set scrollTop(value){top=Math.max(0,Math.min(maxScroll,value));}};
+ f.args.root.evaluate=async(fn,arg)=>{
+  if(typeof arg==='object'){fn(canvas,arg);canvas.scrollLeft=0;return;}
+  return {...structuredClone(f.state().v),scroll:{x:0,y:top}};
+ };
+ const before=nodePlacementPoint(f.state().v,f.args.position);
+ assert.ok(Math.abs(before.x-398.024)<.001);assert.ok(Math.abs(before.y-793.978)<.001);
+ const run=runInNewContext('('+revealNodePlacement.toString()+')'),r=await run(f.args);
+ assert.equal(r.fully_visible,maxScroll===8);assert.equal(top,maxScroll);assert.equal(r.zoom_steps,1);
+ assert.equal(r.point.y<=786,maxScroll===8);assert.equal(f.state().open,false);
+ assert.equal(r.navigation_steps.filter(s=>s.action==='scroll').length,1);
+});
+
+// The cold prepared-node path serializes these same viewport helpers.
+for(const available of [12,11,0])test('D28 prepared cold top96 requires12px upward scroll; available '+available,async()=>{
+ const f=fixture({stuck:true});Object.assign(f.state().v,{x:324,y:100,width:950,height:694,viewportWidth:1280,viewportHeight:800});
+ f.args.nodeId='cold-node';f.args.position={x:192,y:80};let top=available;
+ const canvas={scrollLeft:0,get scrollTop(){return top;},set scrollTop(value){top=Math.max(0,Math.min(available,value));}};
+ f.args.root.evaluate=async(fn,arg)=>{
+  if(typeof arg==='object'){fn(canvas,arg);canvas.scrollLeft=0;return;}
+  return {...structuredClone(f.state().v),scroll:{x:0,y:top},node_bounds:{x:646.5,y:96+available-top,width:43.2952880859375,height:61.5}};
+ };
+ const locate=f.args.page.locator;
+ f.args.page.locator=selector=>{
+  if(selector.endsWith(';cmpDiagram"]'))return {...f.args.root,count:async()=>1,isVisible:async()=>true};
+  const owner=locate(selector);if(!selector.endsWith(';cntDiagram"]'))return owner;
+  return {...owner,locator:child=>{const zoom=owner.locator(child);return {...zoom,click:async()=>{await zoom.click();if(f.state().clicks<=10)f.state().v.scale/=1.1;}};}};
+ };
+ const ref={document_id:'doc',workflow_id:'flow',node_id:'cold-node'};
+ const graph={complete:true,interaction_ready:true,nodes:[{ref,locked:false,position:f.args.position}],links:[]};
+ const args={binding:{document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF'},node:ref},deadline:Date.now()+10000};
+ const r=await revealPreparedGraphNode(f.args.page,args,async()=>structuredClone(graph),revealNodePlacement,f.args.readViewport,nodePlacementPoint,samePlacementGraph);
+ assert.equal(r.fully_visible,available===12);assert.equal(r.status,available===12?'SUCCEEDED':'FAILED');
+ assert.equal(r.zoom_steps,11);assert.equal(top,0);assert.equal(r.graph_unchanged,true);assert.equal(r.settings_applied,false);
+ const scroll=r.navigation_steps.find(s=>s.action==='scroll');assert.ok(scroll);assert.equal(scroll.before.node_bounds.y,96);
+ assert.equal(scroll.after.node_bounds.y,96+available);assert.equal(scroll.after.scroll.y,0);assert.equal(f.state().open,false);
+});
+
+// LAB-82 main-0-execution-events.jsonl:443: full body (1163,140,56,104),
+// label (1136,90,111,48). The body is inside the eight-pixel canvas inset.
+for(const target of ['body','drawing'])test('D28 Export open uses the full selected footprint: '+target,async()=>{
+ const bodyBox={x:1163,y:140,width:56,height:104},labelBox={x:1136,y:90,width:111,height:48};
+ const body={getAttribute:()=> 'owned',getBoundingClientRect:()=>bodyBox};
+ const label={getAttribute:()=> 'owned;Label;Label',getBoundingClientRect:()=>labelBox};
+ const canvas={getBoundingClientRect:()=>({x:324,y:100,width:950,height:694}),contains:e=>e===body,
+  querySelectorAll:()=>[body,label],scrollLeft:0,scrollTop:0};
+ const diagram={FNodes:{FCollection:[{FGuid:'export',FCell:{}}]},FmxGraph:{container:canvas,
+  view:{scale:1,translate:{x:0,y:0},getState:()=>({shape:{node:body}})}}};
+ const context={innerWidth:1280,innerHeight:800,bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{
+  getActiveTab:()=>({Controller:{FController:{FDiagram:diagram}}})
+ }}}}}}}};
+ const read=runInNewContext('('+nodePlacementViewport.toString()+')',context);
+ const id=target==='body'?{node_id:'export',body_only:true}:'export';
+ const v=structuredClone(read(canvas,id));
+ assert.deepEqual(v.node_bounds,target==='body'?bodyBox:{x:1136,y:90,width:111,height:154});
+ if(target==='drawing')return;
+ const f=fixture();f.args.nodeId=id;f.args.root.evaluate=async()=>structuredClone(read(canvas,id));
+ assert.equal((await revealNodePlacement(f.args)).fully_visible,true);assert.equal(f.state().clicks,0);
+ const ref={document_id:'doc',workflow_id:'flow',node_id:'export'};
+ const graph={complete:true,interaction_ready:true,nodes:[{ref,locked:false,position:{x:864,y:40}}],links:[]};
+ const args={target:'body',binding:{document_id:'doc',workflow_ref:{workflow_id:'flow',prefix:'MF;TF'},node:ref},deadline:Date.now()+10000};
+ const root={count:async()=>1,isVisible:async()=>true,evaluate:async(fn,arg)=>fn(canvas,arg)};
+ const page={locator:()=>root};
+ const result=await revealPreparedGraphNode(page,args,async()=>structuredClone(graph),revealNodePlacement,read,nodePlacementPoint,samePlacementGraph);
+ assert.equal(result.status,'SUCCEEDED');assert.equal(result.zoom_steps,0);assert.equal(result.graph_unchanged,true);
+ assert.deepEqual(structuredClone(result.viewport.node_bounds),bodyBox);
+ await assert.rejects(revealPreparedGraphNode(page,{...args,deadline:0},async()=>graph,revealNodePlacement,read,nodePlacementPoint,samePlacementGraph),/deadline/);
+ let calls=0;
+ await assert.rejects(revealPreparedGraphNode(page,args,async()=>{const g=structuredClone(graph);if(++calls>1)g.nodes[0].position.x++;return g;},
+  revealNodePlacement,read,nodePlacementPoint,samePlacementGraph),/graph changed/);
+ // A visible centre still cannot authorize a clipped body, on any edge.
+ for(const box of [{x:331,y:140},{x:1211,y:140},{x:1163,y:107},{x:1163,y:683}]){
+  Object.assign(bodyBox,box);const clipped=fixture({stuck:true});clipped.args.nodeId=id;
+  clipped.args.root.evaluate=async(fn,arg)=>typeof arg==='object'&&arg.node_id===undefined?undefined:structuredClone(read(canvas,id));
+  const locate=clipped.args.page.locator;clipped.args.page.locator=selector=>{
+   const owner=locate(selector);if(!selector.endsWith(';cntDiagram\"]'))return owner;
+   return {...owner,locator:child=>{const z=owner.locator(child.replace(';tlb;b-1',';tlb;b'));
+    return {...z,getAttribute:async()=>child.includes(';tlb;b-1')?'Увеличить масштаб':'Уменьшить масштаб'};}};
+  };
+  const r=await revealNodePlacement(clipped.args);
+  assert.equal(r.fully_visible,false);assert.ok(clipped.state().clicks>0);
+ }
+ // The native node GUID and canvas body membership remain authoritative.
+ assert.throws(()=>read(canvas,{node_id:'foreign',body_only:true}),/identity unavailable/);
+ canvas.contains=()=>false;assert.throws(()=>read(canvas,id),/drawing unavailable/);
 });

@@ -28,7 +28,7 @@ function fixture(count){
   bg:{app:{Version:task.targetBuild,ModelForm,Application:{FInstance:{FMainForm:{FMapTree:{FServerConnection:{UserName:'user'}},
    Items:{Workspace:{getActiveTab:()=>tab}}}}}}},__loginomDockPreparationV1:preparation};
  const capture=()=>runInNewContext('('+captureManagedJavascriptSelection.toString()+')(task,('+captureJavascriptSelection.toString()+'))',context);
- return {context,capture,nodes,native};
+ return {context,capture,nodes,native,graph,shape,container};
 }
 for(const count of [20,21,200])test('actual serialized JS selection and output observers accept bounded graph '+count,()=>{
  const f=fixture(count),held=f.capture();
@@ -54,3 +54,37 @@ for(const fault of ['201','duplicate','foreign'])test('actual JS captures retain
   targetOrigin:'http://test',targetBuild:'7.4.2'};
  assert.throws(()=>runInNewContext('('+inspectJavascriptVisualizers.toString()+')(args)',f.context),/native owner changed/);
 });
+
+// D17: after Done, the first source-read selection capture retained a shape
+// that Loginom detached before its first managed observation (no body gesture).
+test('D17 committed encoder source read accepts one selected redraw before its first observation',()=>{
+ const f=fixture(3),held=f.capture(),old=f.shape;
+ const current={...old};old.isConnected=false;
+ f.graph.view.getState=()=>({shape:{node:current}});
+ f.container.querySelectorAll=()=>[current];f.container.contains=value=>value===current;
+ f.context.document.elementFromPoint=()=>current;
+ f.context.args={binding:held.binding,node:held.node,icon:held.icon,retained:held.retained,
+  inspectPhase:'managed_observe',targetOrigin:'http://test',targetBuild:'7.4.2'};
+ const inspect=()=>runInNewContext('('+inspectJavascriptSelection.toString()+')(args)',f.context);
+ const result=inspect();assert.equal(result.ready,true);assert.equal(result.dom_replacements,1);
+ assert.equal(held.retained.native,f.native);assert.equal(held.retained.shape,current);
+ const next={...current};current.isConnected=false;
+ f.graph.view.getState=()=>({shape:{node:next}});
+ f.container.querySelectorAll=()=>[next];f.container.contains=value=>value===next;
+ assert.throws(inspect,/DOM changed/);
+});
+for(const fault of ['not-initially-selected','selection-changed','connected-old','foreign-native','duplicate-shape'])
+ test('D17 initial observation still refuses '+fault,()=>{
+  const f=fixture(3);
+  if(fault==='not-initially-selected')f.graph.getSelectionCells=()=>[];
+  const held=f.capture(),old=f.shape,current={...old};
+  if(fault!=='connected-old')old.isConnected=false;
+  f.graph.view.getState=()=>({shape:{node:current}});
+  f.container.querySelectorAll=()=>fault==='duplicate-shape'?[current,{...current}]:[current];
+  f.container.contains=value=>value===current;f.context.document.elementFromPoint=()=>current;
+  if(fault==='selection-changed')f.graph.getSelectionCells=()=>[];
+  if(fault==='foreign-native')f.native.data={};
+  f.context.args={binding:held.binding,node:held.node,icon:held.icon,retained:held.retained,
+   inspectPhase:'managed_observe',targetOrigin:'http://test',targetBuild:'7.4.2'};
+  assert.throws(()=>runInNewContext('('+inspectJavascriptSelection.toString()+')(args)',f.context),/DOM changed|owner changed/);
+ });

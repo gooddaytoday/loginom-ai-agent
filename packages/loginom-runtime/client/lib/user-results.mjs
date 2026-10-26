@@ -42,7 +42,7 @@ export function compactNodeRequestFailure(outcome,request={}) {
   const mappingConflict=!pending&&message==='Output changes and full fields are mutually exclusive';
   const mappingHint='For each output mapping choose changes (a patch) OR fields (the complete ordered layout), never both. For ordering plus exclusions, keep fields, account for every configured source field and express exclusions as excluded:true in those entries; remove changes from that mapping. Keep ALL other original request fields, including top-level finish, parameters and inputs. Submit the COMPLETE corrected request with a NEW operation_id, not just a mappings patch.';
   const exportMappings=!pending&&message==='Invalid parameters.mappings: use an empty list; text export does not support requested port mappings';
-  const exportMappingHint='For exports.text omit top-level mappings or set mappings:[], and use read:{ports:[]}. To select, rename or reorder columns, configure the upstream node output mapping or a transform.reform_columns node, execute it and connect that output to the export. Keep the remaining export settings and submit the COMPLETE request with a NEW operation_id.';
+  const exportMappingHint='For exports.text omit top-level mappings or set mappings:[], and use read:{ports:[]}. To select, rename or reorder columns, configure the upstream node output mapping or a transform.reform_columns node, execute it and connect that output to the export. Keep the remaining export settings and submit the COMPLETE request with a NEW operation_id.'+(request.target?.kind==='existing'?' Reuse the SAME existing export: keep target.kind:"existing" and its exact target.ref; use inputs:[] to retain the same source. A NEW operation_id retries the request; it does not require a new node. Do not create a second export for the same destination. If the existing export cannot produce the requested layout, report that limitation instead of duplicating it.':'');
   const repairHint=missingFinish?finishHint:mappingConflict?mappingHint:exportMappings?exportMappingHint:null;
   if(missingFinish)path='finish';
   if(mappingConflict)path='mappings';
@@ -65,7 +65,7 @@ export function compactNodeResult(result,{wireSize=previewWireSize}={}) {
   const outcome = result.outcome, node = outcome?.output, data = node?.output;
   const output = data ? pick(data, ['status', 'evidence_ref', 'execution_id', 'no_output_requested', 'javascript_source']) : {};
   if (data?.ports) output.ports = data.ports.map(port => {
-    const value = pick(port, ['port', 'port_guid', 'fresh', 'execution_id', 'category_fields', 'schema', 'row_count', 'sample', 'sample_rows', 'sample_complete', 'precision', 'table', 'exact_table', 'read_coverage', 'read_consistency', 'cell_precision', 'binding', 'limitations']);
+    const value = pick(port, ['port', 'port_guid', 'fresh', 'execution_id', 'freshness_basis', 'read_limit', 'category_fields', 'schema', 'row_count', 'sample', 'sample_rows', 'sample_complete', 'precision', 'table', 'exact_table', 'read_coverage', 'read_consistency', 'cell_precision', 'binding', 'limitations']);
     value.schema = value.schema.map(column => pick(column, ['index', 'name', 'label', 'type', 'data_kind']));
     value.sample = value.sample.map(row => row.map(cell => {
       const compact = pick(cell, ['type', 'value', 'decimal', 'representation', 'display_text', 'precision', 'is_null', 'timezone', 'cell_type', 'native']);

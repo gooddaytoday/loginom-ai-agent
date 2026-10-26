@@ -5,6 +5,10 @@ import {createTabularTransformNodeSupport} from '../lib/calculator-node.mjs';
 import {NodeProcedureStepError} from '../lib/node-procedure.mjs';
 import {javascriptSourceSettingsDigest} from '../lib/javascript-source-admission.mjs';
 import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createExecutionJournal} from '../lib/execution-journal.mjs';
 const request=()=>({operation_id:'apply1',contract_revision:'1.0.0',document_id:'doc',
   workflow_ref:{workflow_id:'workflow',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;cnrNaviMode;b.s_Сервер',label:''}]},
   target:{kind:'new',type:'imports.text',label:'Import',position:{x:96,y:80}},inputs:[],mode:'delimited',parameters:{},mappings:[],finish:'execute',
@@ -21,6 +25,35 @@ function fixture({badPhase,badResult,failJournal,failAfter,signal}={}){
  const run=(r=request(),extra={})=>applyNode({request:r,operation,handlers,drivers,record,signal,now:()=>time,...extra});
  return {run,calls,records,operation,handlers,drivers,setTime:v=>{time=v}};
 }
+for(const corruptAck of [false,true])test('Calculator JSON Response read uses exact durable phase ACK: '+corruptAck,async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'node-json-ack-'));t.after(()=>rm(directory,{recursive:true,force:true}));
+ const journal=createExecutionJournal({directory,metadata:{}}),f=fixture();
+ const value='{\n  "args": {\n    "Code": "CHK12",\n    "Route": "west"\n  },\n  "method": "GET"\n}';
+ f.drivers.readOutput=async()=>({verified:true,cleanup_complete:true,effect_possible:false,status:'complete',execution_id:'execution1',evidence_ref:'evidence1',
+  ports:[{port:0,fresh:true,row_count:1,schema:[{name:'Response',type:'string'}],sample:[[{type:'string',is_null:false,value}]]}]});
+ const result=await f.run(request(),{record:async event=>{
+  const saved=await journal(event);
+  if(corruptAck&&event.phase==='node_phase_completed'&&event.receipt.phase==='read')saved.receipt.value.ports[0].sample[0][0].value='changed';
+  return saved;
+ }});
+ const records=(await readFile(join(directory,'execution-events.jsonl'),'utf8')).trim().split('\n').map(JSON.parse);
+ const read=records.find(e=>e.phase==='node_phase_completed'&&e.receipt.phase==='read');
+ assert.equal(read.receipt.value.ports[0].sample[0][0].value,value);
+ if(corruptAck){assert.equal(result.status,'AMBIGUOUS');assert.match(result.error.message,/journal acknowledgement differs/);assert.equal(result.pending_phase,'read');assert.ok(!records.some(e=>e.phase==='node_checkpoint'));}
+ else {assert.equal(result.status,'SUCCEEDED');assert.equal(result.output.ports[0].sample[0][0].value,value);assert.ok(records.some(e=>e.phase==='node_checkpoint'));}
+});
+for(const mode of ['done','execute'])test('Import reports its observed Finish caption and an existing-node correction: '+mode,async()=>{
+ const f=fixture(),p=request();p.finish=mode;if(mode==='done')p.read.ports=[];
+ const finish=f.drivers.finish;
+ f.drivers.finish=async mode=>({...await finish(mode),node_label:'data.csv'});
+ const result=await f.run(p);
+ assert.equal(result.status,'SUCCEEDED');
+ assert.match(result.warnings.join(' '),/data\.csv/);
+ assert.match(result.warnings.join(' '),/target.label/);
+ assert.match(result.warnings.join(' '),/settings:\{\}/);
+ assert.match(result.warnings.join(' '),/node1/);
+ assert.deepEqual(await f.run(p),result);
+});
 test('full shell orders configuration before execution and binds empty fresh output',async()=>{
  const f=fixture(),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.equal(r.execution.status,'completed');assert.equal(r.output.ports[0].row_count,0);
  assert.deepEqual(f.calls,['source','target','mapping','open','configure','mapping','finish','execute','read']);

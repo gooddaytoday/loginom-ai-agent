@@ -10,18 +10,15 @@ import {createNodeProcedure} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 import {closeJavascriptPortMapping} from './javascript-port-mapping-close.mjs';
-import {openManagedJavascriptOutputViews} from './javascript-managed-views.mjs';
-import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
-import {readTableOutputPages} from './table-output-pages.mjs';
-import {decodeTableOutput} from './table-output-values.mjs';
 import {validateJavascriptDeclaredPrimitiveColumns} from './javascript-managed-declared.mjs';
 import {javascriptExistingLifecycleBaseline} from './javascript-existing-lifecycle.mjs';
 import {admitJavascriptExistingSchema} from './javascript-existing-schema-refusal.mjs';
 import {javascriptExecutionWaitContext} from './javascript-execution-continuation.mjs';
-import {NODE_READ_MODE} from './node-read-contract.mjs';
+import {NODE_READ_MODE,alignReadSchema} from './node-read-contract.mjs';
 import {createNodeReadDrivers} from './node-read-driver.mjs';
 import {withJavascriptSourcePolicyBoundary} from './javascript-source-policy-refusal.mjs';
 import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
+import {refuseJavascriptPortFullRead} from './native-read-refusal.mjs';
 
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const same=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
@@ -104,7 +101,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       node_id:request.target.kind==='existing'?request.target.ref.node_id:null,operation_id:operation.id,ui_epoch:Date.now()};
     let expected=request.parameters.source_text===undefined?null:javascriptSourceIdentity(request.parameters.source_text);
     let owner,channel,signal,adapter,handle,admission,admitted,configured,committed,
-      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline,doneReceipt;
+      executionDriver,executionReceipt,inputMapping,outputMapping,sourceSnapshot,existingBaseline,existingGraphBaseline,doneReceipt,lastSourceAdapter,materializationSettled=false;
     const enter=ctx=>{
       signal=ctx.signal;signal?.throwIfAborted();operation.deadline=ctx.deadline;
       if(ctx.node){
@@ -132,7 +129,7 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           schema:structuredClone(opened.schema)};
         return opened;
       };
-      return selected;
+      lastSourceAdapter=selected;return selected;
     };
     const policyAdmission=(kind,boundOwner,deadline,expectedSource,expectedSettings)=>createJavascriptSourceAdmission({kind,owner:boundOwner,
       deadline,sourceAdapter:current=>sourceAdapter(current,deadline),redactor,record:onRecord,expectedSource,expectedSettings});
@@ -340,7 +337,9 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
       },
       async materializeOutput(ctx){
         enter(ctx);return withJavascriptSourcePolicyBoundary({phase:'materialization_start',owner,deadline:ctx.deadline,record:onRecord},
-          ()=>admission.withEffect({receipt:configured,owner},()=>launch(ctx)));
+          ()=>admission.withEffect({receipt:configured,owner},async()=>{
+            try{return await launch(ctx);}finally{materializationSettled=true;}
+          }));
       },
       async finishGraph(mode,ctx){
         enter(ctx);
@@ -385,34 +384,36 @@ export function createJavascriptCodeNodeSupport({targetOrigin,targetBuild,redact
           &&executionReceipt.execution_id===ctx.execution.execution_id&&outputMapping,
         'JavaScript final owned execution and output mapping required');
         if(!read.ports.length)return verified({status:'complete',ports:[],execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id});
-        const table=await openNewOutputTable(channel,0,{openViews:({output})=>openManagedJavascriptOutputViews({
-          prepared:{document_id:ctx.document_id,workflow_ref:ctx.workflow_ref},node:ctx.node,output,
-          deadline:ctx.deadline,targetOrigin,execute,record:onRecord,receiptOptions,
-          wrapMutation:(code,reference)=>withBrowserReceipt('('+code+')(page)',{
-            ...receiptOptions(reference.id,reference.action_key,reference.signature),operation_id:reference.id})})});
-        need(table.port_guid===outputMapping.node_context.output_port.port_guid,'JavaScript physical output port changed');
-        const format=read.require_exact_numbers?await configureTablePrecision(channel,table.table):null;
-        let data,restoration;
-        try{
-          const settings=await prepareTableRead(channel,table.table);
-          const raw=await readTableOutputPages(channel,table.table,{sampleRows:read.sample_rows});
-          data=decodeTableOutput(raw,{formatProof:format,readSettings:settings,
-            expectedColumns:outputMapping.target_fields.filter(field=>!field.excluded),requireExactNumbers:read.require_exact_numbers});
-        }finally{if(format)restoration=await restoreTablePrecision(channel,format);}
-        const returned=await returnFromOutputTable(channel,table.table);
+        const portRead=await channel.readOutputPort({port:0,execution:executionReceipt,
+          sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
+        const {output}=portRead;
+        need(output.port===0&&output.port_guid===outputMapping.node_context.output_port.port_guid,'JavaScript physical output port changed');
+        const expected=outputMapping.target_fields.filter(field=>!field.excluded);
+        need(output.schema.every((field,index)=>field.name===expected[index]?.name),'JavaScript output field order differs from the configured output');
+        const aligned=alignReadSchema(output.schema,expected);
+        const data={...output,schema:output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}))};
+        if(read.coverage==='full'&&(data.row_count>100||data.read_limit==='preview_cell_or_byte_budget'))
+          refuseJavascriptPortFullRead(read,portRead,ctx,outputMapping.node_context.output_port.port_guid);
         if(read.coverage==='full')need(data.sample_complete===true&&data.sample_rows===data.row_count&&!data.limitations?.length,
-          'Full JavaScript UI output exceeds bounded read coverage');
+          'Full JavaScript output exceeds bounded read coverage');
         return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,
-          evidence_ref:ctx.receipt_id,ports:[{port:0,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data}],
-          table_creation:table,format_restoration:restoration,workflow_return:returned});
+          evidence_ref:ctx.receipt_id,ports:[data]});
       },
-      releasePendingPhases:['input_mapping','open','configure'],
+      // A materialization launch may settle before its process identity can
+      // be read. Release proves cleanup only, never completion or a replay.
+      // The retained REST child also uses the independently settled Done.
+      releasePendingPhases:['input_mapping','open','configure','materialization_start'],
       async releasePending(state,{signal:releaseSignal}={}) {
-        need(['input_mapping','open','configure'].includes(state.pending?.phase),
-          'Only a stopped JavaScript draft can be released here');
-        enter({signal:releaseSignal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,
+        const afterDone=['node_finish','materialization_start'].includes(state.pending?.phase)&&committed?.owned_done_settled===true
+          &&(state.pending.phase==='node_finish'||materializationSettled)
+          &&adapter?.active===false&&adapter.uncertain===false
+          &&lastSourceAdapter?.active===false&&lastSourceAdapter.uncertain===false;
+        need(['input_mapping','open','configure'].includes(state.pending?.phase)||afterDone,
+          'Only a stopped JavaScript draft or settled Done with no unresolved source opening can be released here');
+        const deadline=now()+NODE_RELEASE_BUDGET_MS;
+        enter({signal:releaseSignal,deadline,document_id:state.request.document_id,
           workflow_ref:state.request.workflow_ref,node:state.node});
-        return releasePendingNode({operation,channel,readReceipt});
+        return releasePendingNode({operation,channel,deadline,now,readReceipt});
       },
       async verifyContinuation(state,{signal:nextSignal}) {
         const ctx=javascriptExecutionWaitContext(state,{operation,owner,expected,configured,committed,inputMapping,outputMapping,now:now()});

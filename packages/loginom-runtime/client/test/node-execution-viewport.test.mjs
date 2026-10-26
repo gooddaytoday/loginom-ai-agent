@@ -109,7 +109,8 @@ test('prepared viewport preserves node GUID, settings and complete graph while u
    if(fault==='locked')g.interaction_ready=false;if(fault==='changed'&&reads>1)g.nodes[0].position.x++;
    return g;};
   const navigate=async o=>{calls++;await o.guard();return {fully_visible:fault!=='not_visible',zoom_steps:1};};
-  await assert.rejects(revealPreparedGraphNode(page,{...args,deadline:fault==='deadline'?0:args.deadline},read,navigate,()=>{},()=>{},samePlacementGraph),/Prepared node viewport/);
+  if(fault==='not_visible'){const r=await revealPreparedGraphNode(page,args,read,navigate,()=>{},()=>{},samePlacementGraph);assert.equal(r.status,'FAILED');assert.equal(r.verified,false);assert.equal(r.fully_visible,false);}
+  else await assert.rejects(revealPreparedGraphNode(page,{...args,deadline:fault==='deadline'?0:args.deadline},read,navigate,()=>{},()=>{},samePlacementGraph),/Prepared node viewport/);
   if(['foreign','missing','locked','deadline'].includes(fault))assert.equal(calls,0);
  }
 });
@@ -133,6 +134,7 @@ test('actual serialized viewport step returns a valid durable capability receipt
   }});
  const result=await channel.revealGraphNode();assert.equal(result.action_key,'node.viewport.reveal.internal');
  assert.equal(result.output.fully_visible,true);assert.equal(operation.cleanupConfirmed,true);
+ assert.deepEqual(result.output.viewport.node_bounds,{x:200,y:200,width:70,height:80});
  assert.equal(events.at(-1).phase,'node_step_completed');assert.deepEqual(events.at(-1).outcome,result);
  await assert.rejects(channel.act({verb:'click',ref:'old'}),/fresh internal observation/);
 });
@@ -146,4 +148,15 @@ for(const launched of [false,true])test('console settlement requires a succeeded
   throw Error('admission checked');
  };
  await assert.rejects(f.driver.identify(),/admission checked/);
+});
+
+for(const launched of [false,true])test('D75 console gesture forwards running settlement only after succeeded launch: '+launched,async()=>{
+ const f=await execution({offscreen:false,selectedInitially:true});
+ if(launched)await f.driver.launchGraph();
+ f.channel.perform=async o=>{
+  assert.equal(o.condition,'execution control MF;cntMain;tlbMainToolbar;btnProgress');
+  assert.equal(!!o.settleProcessConsole,launched);
+  throw Error('gesture admission checked');
+ };
+ await assert.rejects(f.driver.identify(),/gesture admission checked/);
 });

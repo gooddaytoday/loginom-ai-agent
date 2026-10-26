@@ -116,3 +116,11 @@ for(const prefix of ['ConsoleForm','MF;ConsoleForm'])test('native inventory reta
  f.el(prefix==='ConsoleForm'?'MF;ConsoleForm':'ConsoleForm');
  assert.equal((await readNodeProcesses(f.page,{},f.readNode)).reason,'console_panel');
 });
+
+test('buffered split-grid cells may be rendered before their expander is annotated',async()=>{
+ const f=fixture();f.rows[0].process.children=[];
+ const r=await readNodeProcesses(f.page,{},f.readNode),group=r.processes[0];
+ assert.equal(r.verified,true);assert.equal(group.rendered,true);assert.equal(group.children_loaded,true);
+ assert.equal(group.process_tid,'ConsoleForm;ProgressForm;colProcess_1');
+ assert.equal(group.expander_tid,null);assert.equal(group.expanded,null);
+});

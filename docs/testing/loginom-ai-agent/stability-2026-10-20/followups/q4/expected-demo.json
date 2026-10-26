@@ -1,16 +1,6 @@
 {
   "package_path": "/demo-2026-10-22/s3-reconcile.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.join_data"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -20,27 +10,27 @@
       "columns": [
         {
           "name": "OrderID",
-          "label": "OrderID",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Customer",
-          "label": "Customer",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "OrderAmount",
-          "label": "OrderAmount",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "PaidAmount",
-          "label": "PaidAmount",
+          "label_any": true,
           "type": "real"
         },
         {
           "name": "Debt",
-          "label": "Debt",
+          "label_any": true,
           "type": "real"
         }
       ],

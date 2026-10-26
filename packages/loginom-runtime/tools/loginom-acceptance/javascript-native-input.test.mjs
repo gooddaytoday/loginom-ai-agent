@@ -372,6 +372,13 @@ test('immutable33-byte fixture and explicit marker/request',()=>{
   assert.equal(p.parameters.settings.format.null_marker,'__JS_NULL__');
 });
 test('complete typed UI evidence has no native precision claim',()=>assert.equal(verifyNativeInputUi(ui()).native_bytes_verified,false));
+for(const basis of [undefined,'table','completed_execution_port_source'])for(const flag of ['missing',null,false,true])
+ test('native input filter evidence '+basis+' / '+flag,()=>{
+  const table=ui();table.freshness_basis=basis;
+  if(flag==='missing')delete table.filter_enabled;else table.filter_enabled=flag;
+  if(flag===false||flag==='missing'&&basis==='completed_execution_port_source')assert.equal(verifyNativeInputUi(table).verified,true);
+  else assert.throws(()=>verifyNativeInputUi(table),/complete typed UI oracle differs/);
+ });
 for(const [name,change]of Object.entries({partial:x=>x.sample.pop(),filter:x=>x.filter_enabled=true,negativeZero:x=>x.sample[1][0].value=-0,stringNull:x=>x.sample[0][0].value='__JS_NULL__',wrongType:x=>x.schema[0].type='integer',rounded:x=>x.sample[3][0].value=10.13}))
   test('UI rejects '+name,()=>{const x=ui();change(x);assert.throws(()=>verifyNativeInputUi(x));});
 test('genuine owning read phases and upload lineage produce input provenance',()=>{const p=nativeInputProvenance(sourceEvidence());assert.equal(p.kind,'owned_import_read_phase');assert.equal(p.external_writers_excluded,false);});

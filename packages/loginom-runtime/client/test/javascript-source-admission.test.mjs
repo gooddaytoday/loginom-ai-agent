@@ -103,7 +103,20 @@ for(const phase of ['source_discard_settled','source_delivery_verified','javascr
 });
 test('admission never trusts a receipt from another producer or a modified policy',async()=>{for(const forged of ['foreign','policy','deadline']){const f=fixture(),receipt=await f.admission.admit({}),other=fixture(),foreign=await other.admission.admit({});const bad=structuredClone(forged==='foreign'?foreign:receipt);if(forged==='policy')bad.effective_source.parser.ecma_version=2026;if(forged==='deadline')bad.deadline++;await assert.rejects(()=>f.admission.withEffect(input(f,bad),f.effect),{code:'receipt'});assert.ok(!f.calls.includes('effect'));}});
 for(const stage of ['mutate','effect'])test('admission lost callback reply once without replay '+stage,async()=>{const f=fixture(),receipt=await f.admission.admit({});let calls=0;const lost=async()=>{calls++;throw Error('PRIVATE_SENTINEL');};await assert.rejects(()=>stage==='mutate'?f.admission.withMutation(input(f,receipt),lost):f.admission.withEffect(input(f,receipt),lost),e=>e.code==='boundary'&&!e.message.includes('PRIVATE_SENTINEL'));await assert.rejects(()=>f.admission.withMutation(input(f,receipt),f.mutate),{code:'state'});assert.equal(calls,1);});
-test('admission original deadline after admission prohibits callback',async()=>{const f=fixture({kind:'new',deadline:Date.now()+30}),receipt=await f.admission.admit({source_text:''});await new Promise(resolve=>setTimeout(resolve,35));await assert.rejects(()=>f.admission.withMutation(input(f,receipt),f.mutate),{code:'deadline'});assert.deepEqual(f.calls,[]);});
+test('admission original deadline after admission prohibits callback',async t=>{
+ // Admission must finish before the tested expiry, regardless of CPU scheduling.
+ // Drive the original deadline explicitly instead of racing 30/35ms wall timers.
+ t.mock.timers.enable({apis:['Date','setTimeout'],now:10000});
+ const f=fixture({kind:'new',deadline:10030}),receipt=await f.admission.admit({source_text:''});
+ assert.equal(f.admission.state,'admitted');
+ assert.equal(receipt.deadline,10030);
+ assert.equal(Date.now(),10000);
+ t.mock.timers.tick(30);
+ assert.equal(Date.now(),receipt.deadline);
+ await assert.rejects(()=>f.admission.withMutation(input(f,receipt),f.mutate),{code:'deadline'});
+ assert.equal(f.admission.state,'retired');
+ assert.deepEqual(f.calls,[]);
+});
 test('admission callback late reply retires and does not continue to readback',async()=>{const f=fixture({kind:'new',deadline:Date.now()+40}),receipt=await f.admission.admit({source_text:''});let finish;await assert.rejects(()=>f.admission.withMutation(input(f,receipt),()=>new Promise(resolve=>{finish=resolve;})),e=>['timeout','deadline'].includes(e.code));finish({owner});await new Promise(resolve=>setTimeout(resolve,1));assert.equal(f.admission.state,'retired');assert.deepEqual(f.calls,[]);});
 test('admission replacement snapshots caller parameters before asynchronous read',async()=>{const params={source_text:'',expected_source_sha256:digest(original)};const f=fixture({record:event=>{params.source_text='require("changed")';return event;}});const receipt=await f.admission.admit(params);assert.equal(receipt.effective_source.source_sha256,digest(''));});
 for(const fault of ['owner','source','settings'])test('admission mutation output must match independently read source/settings '+fault,async()=>{const f=fixture(),receipt=await f.admission.admit({source_text:'',expected_source_sha256:digest(original)});await assert.rejects(()=>f.admission.withMutation(input(f,receipt),async args=>{const value=await f.mutate(args);if(fault==='owner')return {owner:{...owner,node_id:'foreign'}};if(fault==='source')f.browser.setSource('let x=1;');if(fault==='settings')f.settings.generation=false;return value;}));assert.ok(!f.calls.includes('effect'));});

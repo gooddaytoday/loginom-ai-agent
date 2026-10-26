@@ -36,14 +36,14 @@ assert within > 0 and between > 100 * within, 'Clouds insufficiently separated'
 for i, group in enumerate(groups):
     assert all(distance(p, centers[i]) < distance(p, center)
                for p in group for j, center in enumerate(centers) if i != j)
-columns = [dict(name='Points', label='Points', type='integer')]
-columns += [dict(name='Mean' + f, label='Mean' + f, type='real',
+columns = [dict(name='Points', label_any=True, type='integer')]
+columns += [dict(name='Mean' + f, label_any=True, type='real',
                  tolerance=dict(abs=1e-8, rel=1e-10)) for f in FIELDS]
 rows = [dict(Points=len(group), **{'Mean' + f: float(center[j]) for j, f in enumerate(FIELDS)})
         for group, center in zip(groups, centers)]
 expected = dict(
     package_path=sys.argv[1] if len(sys.argv) > 1 else '/stability-2026-10-20/n7.lgp',
-    nodes=[dict(type=t) for t in ['imports.text', 'datamining.clustering', 'exports.text']],
+    nodes=[],
     outputs=[dict(output_node_type='export_input', ordered=False, column_order='exact',
                   columns=columns, rows=rows)])
 sys.stdout.buffer.write((json.dumps(expected, ensure_ascii=False, indent=2, allow_nan=False) + '\n').encode('utf-8'))

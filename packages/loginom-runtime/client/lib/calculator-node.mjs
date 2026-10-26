@@ -3,6 +3,7 @@ import {readCalculatorOutputMapping} from './calculator-output-source.mjs';
 import {selectPreparedGraphNode} from './node-graph-selection.mjs';
 import {inputMappingOrigin,inputMappingState,inputMappingGraph,verifyInputMappingFinish,inputRecoveryBoundary,sameInputRecovery} from './node-input-mapping-recovery.mjs';
 import {verifyCalculatorInlineSync} from './calculator-inline-mapping.mjs';
+import {releaseNodeSchemaPreview} from './grouping-preflight.mjs';
 import {createNodeProcedure} from './node-procedure.mjs';
 import {withBrowserReceipt} from './executor.mjs';
 import {validateCalculatorParameters} from './calculator-parameters.mjs';
@@ -16,9 +17,7 @@ import {closePreparedWizard} from './node-wizard-close.mjs';
 import {createNodeExecutionProcedure,finishConfiguredGraph} from './node-execution-procedure.mjs';
 import {configureOutputFields,configureOutputAutosync,reorderOutputFields,resolveConfiguredOutputMapping} from './port-mapping-procedure.mjs';
 import {readOutputDefinitionPages} from './import-definition-pages.mjs';
-import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable,restoreStoppedTableRead} from './node-output-procedure.mjs';
-import {readTableOutputPages} from './table-output-pages.mjs';
-import {decodeTableOutput} from './table-output-values.mjs';
+import {alignReadSchema} from './node-read-contract.mjs';
 import {readCollapseNativeOutput} from './collapse-native-output.mjs';
 import {finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from './node-import-continuation.mjs';
 import {releasePendingNode,proveFinishLaunchRefused,NODE_RELEASE_BUDGET_MS} from './node-pending-release.mjs';
@@ -37,7 +36,7 @@ export function createCalculatorNodeSupport(config) {return createTabularTransfo
 // Shared lifecycle for a tabular transformation with a separate output
 // wizard. Type-specific code supplies configuration and derived-output hooks;
 // graph ownership, execution, continuation and data reading remain shared.
-export function createTabularTransformNodeSupport({targetOrigin,targetBuild},implementation=null) {
+export function createTabularTransformNodeSupport({targetOrigin,targetBuild,wait},implementation=null) {
  const nodeApplyHandlers=new Map([['transform.calculator',{revision:'calculator-v3-internal-2',modes:['expression'],output_wizard:'separate',
   configurationReadback:calculatorConfigurationReadback,parameter_schema:calculatorParametersSchema,
   validate:(p,m,r)=>{validateCalculatorParameters(p,m,r);
@@ -51,7 +50,7 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
   validate:implementation.validate,configure:(ctx,p,drivers)=>drivers.configureCalculator(ctx,p)});}
  const nodeApplyDriverFactory=options=>{
   const {operation,execute,onRecord,now,receiptOptions}=options;
-  let channel,activeSignal,configured,mapping,columns,executionDriver,executionReceipt,multipleOutputs,preconfiguration,inputCheckpoint,outputCheckpoint,configurationGraph,openCheckpoint,readView,finishStart;
+  let channel,activeSignal,configured,mapping,columns,executionDriver,executionReceipt,multipleOutputs,preconfiguration,inputCheckpoint,outputCheckpoint,configurationGraph,openCheckpoint,finishStart;
   const graphForRejection=async()=>{
    const g=await operation.nodeTargetAdapter.observe({document_id:operation.nodeApply.request.document_id,workflow_ref:operation.nodeApply.request.workflow_ref},operation.deadline);
    requireValue(g.complete===true&&g.document_id===operation.nodeApply.node.document_id&&g.workflow_ref.workflow_id===operation.nodeApply.node.workflow_id,'Complete calculator rollback graph required');
@@ -101,7 +100,8 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
      return true;
     },
    }:{}),
-   ...(!implementation||implementation.preflight?{beforeTarget:ctx=>(implementation?.preflight??preflightCalculatorSource)(options,ctx,{targetOrigin,targetBuild})}:{}),
+   ...(!implementation||implementation.preflight?{beforeTarget:ctx=>(implementation?.preflight??preflightCalculatorSource)(options,ctx,{targetOrigin,targetBuild,wait})}:{}),
+   releaseBeforeTarget:ctx=>releaseNodeSchemaPreview(options,ctx,{targetOrigin,targetBuild,wait}),
    verifySource:async()=>verified({not_applicable:true,source_kind:'upstream_table'}),
    ...(implementation?.openRecovery?{async verifyPendingOpen(state,{signal}={}){
     activeSignal=signal;signal?.throwIfAborted();
@@ -340,23 +340,18 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     }
     if(read.coverage==='full')requireValue(implementation?.fullUiOutput===true&&read.sample_rows===100,
      'Full bounded UI output is unavailable for this handler');
-    if(implementation?.readOutputs){requireValue(multipleOutputs?.verified,'Verified output schemas missing');return implementation.readOutputs(channel,read,ctx,multipleOutputs);}
-    const table=await openNewOutputTable(channel,0);readView={table:table.table,formatProof:null,restored:false,formatting:{}};
-    const formatProof=read.require_exact_numbers?await configureTablePrecision(channel,table.table,{progress:readView.formatting}):null;readView.formatProof=formatProof;
-    let readSettings,data,formatRestoration;
-    try {
-      readSettings=await prepareTableRead(channel,table.table);
-      const raw=await readTableOutputPages(channel,table.table,{sampleRows:read.sample_rows});
-      const materialized=implementation?.type==='transform.cross_table'&&implementation.materializedSchema
-       ?implementation.materializedSchema(raw.columns,configured,{node:ctx.node,execution:ctx.execution}):null;
-      data=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:materialized?.columns??columns,requireExactNumbers:read.require_exact_numbers});
-      if(materialized)data.category_fields=materialized.category_fields;
-    } finally { if(formatProof){formatRestoration=await restoreTablePrecision(channel,formatProof);readView.restored=true;} }
-    const returned=await returnFromOutputTable(channel,table.table);readView=null;
-    if(read.coverage==='full')requireValue(data.sample_complete===true&&data.sample_rows===data.row_count
-     &&!data.limitations?.length,'Full bounded UI output exceeds the readable row/cell/byte window');
-    return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,
-     ports:[{port:0,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data}],table_creation:table,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:returned});
+    if(implementation?.readOutputs){requireValue(multipleOutputs?.verified,'Verified output schemas missing');return implementation.readOutputs(channel,read,{...ctx,portExecution:executionReceipt},multipleOutputs);}
+    const {output}=await channel.readOutputPort({port:0,execution:executionReceipt,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
+    const materialized=implementation?.type==='transform.cross_table'&&implementation.materializedSchema
+     ?implementation.materializedSchema(output.schema,configured,{node:ctx.node,execution:ctx.execution}):null;
+    const expected=materialized?(configured.output_mapping?.target_fields??materialized.columns):columns;
+    requireValue(output.schema.every((field,index)=>field.name===expected[index]?.name),'Output field order differs from the configured output');
+    const aligned=alignReadSchema(output.schema,expected);
+    output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
+    if(materialized)output.category_fields=materialized.category_fields;
+    if(read.coverage==='full')requireValue(output.sample_complete===true&&output.sample_rows===output.row_count
+     &&!output.limitations?.length,'Full bounded UI output exceeds the readable row/cell/byte window');
+    return verified({effect_possible:true,status:output.sample_complete?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports:[output]});
    },
    ...((!implementation||implementation.inputMappingRecovery)?{
     async inspectInputMapping({readReceipt,signal}){
@@ -440,14 +435,10 @@ export function createTabularTransformNodeSupport({targetOrigin,targetBuild},imp
     return proof;
    }}:{}),
    async releasePending(state,{signal}={}){
-    enter({signal,deadline:now()+NODE_RELEASE_BUDGET_MS,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
+    const deadline=now()+NODE_RELEASE_BUDGET_MS;
+    enter({signal,deadline,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
     signal?.throwIfAborted();
-    // A stopped read may leave its own output Table open with exact-number
-    // formatting or a settings dialog. Restore that before leaving the view.
-    const view=state.pending.phase==='read'?readView:null;
-    return releasePendingNode({operation,channel,readReceipt:options.readReceipt,restoreRead:view?async()=>{
-     await restoreStoppedTableRead(channel,view);readView=null;return true;
-    }:undefined});
+    return releasePendingNode({operation,channel,deadline,now,readReceipt:options.readReceipt});
    },
    async verifyContinuation(state,{signal}={}){
     if(state.output_mapping_recovered&&state.phases.at(-1)?.phase==='output_mapping'){

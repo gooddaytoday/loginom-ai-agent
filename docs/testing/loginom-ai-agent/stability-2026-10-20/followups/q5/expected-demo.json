@@ -1,16 +1,6 @@
 {
   "package_path": "/demo-2026-10-22/s4-branches.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.union_data"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -20,12 +10,12 @@
       "columns": [
         {
           "name": "Category",
-          "label": "Category",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Revenue",
-          "label": "Revenue",
+          "label_any": true,
           "type": "real"
         }
       ],

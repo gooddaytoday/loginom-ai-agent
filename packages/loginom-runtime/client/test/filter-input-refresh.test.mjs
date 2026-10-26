@@ -4,7 +4,7 @@ import {prepareFilterInput} from '../lib/filter-node.mjs';
 const node={document_id:'doc',workflow_id:'flow',node_id:'filter'};
 function fixture({active=false,lost=false,foreign=false,incomplete=false}={}){
  let opened=false,launched=false,menu=false,selected=false;
- const actions=[],el=(tid,allowed_actions=['click'])=>({tid,ref:tid,allowed_actions});
+ const actions=[],el=(tid,allowed_actions=['click'])=>({tid,ref:tid,signature:{tid},enabled:true,allowed_actions});
  const state=()=>({prepared_node_context:{...node,...(foreign?{node_id:'other'}:{}),verified:true,surface:'graph',tid:'graph-node',locked:false},wizard:{status:'absent'},navigation_context:{status:'observed'},
   node_outputs:{verified:true,node_selected:true,ports:(incomplete?[0]:[0,1]).map(index=>({index,active:active||launched}))},
   node_processes:{verified:true,inventory_complete:true,show_completed:true,root_id:'root',node_context:{...node,verified:true,surface:'graph'},processes:launched?[

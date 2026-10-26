@@ -1,19 +1,6 @@
 {
   "package_path": "/stability-2026-10-20/n2.lgp",
-  "nodes": [
-    {
-      "type": "imports.text"
-    },
-    {
-      "type": "transform.union_data"
-    },
-    {
-      "type": "transform.group_data"
-    },
-    {
-      "type": "exports.text"
-    }
-  ],
+  "nodes": [],
   "outputs": [
     {
       "output_node_type": "export_input",
@@ -22,12 +9,12 @@
       "columns": [
         {
           "name": "Courier",
-          "label": "Courier",
+          "label_any": true,
           "type": "string"
         },
         {
           "name": "Payout",
-          "label": "Payout",
+          "label_any": true,
           "type": "real"
         }
       ],
