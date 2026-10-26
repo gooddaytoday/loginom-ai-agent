@@ -26,8 +26,11 @@ test.each([
 test("both adapters stage the selected external package and preserve the old default bytes", async () => {
   const { acceptanceTurns, prepareAcceptanceInputs } = await import("../script/skills-acceptance/turns.mjs")
   const corpus = await Bun.file(new URL("../../agent/test/cli/package-docs-routing/cases.json", import.meta.url)).json()
-  const fixtures: Record<string, string> = { ...Object.fromEntries(Object.entries(corpus.fixtures).map(([key, file]) => [key, resolve(import.meta.dir, "../../..", file as string)])),
-    edit_lgp: resolve(import.meta.dir, "fixtures/skills-cold/sales.lgp") }
+  const fixtures: Record<string, string> = Object.fromEntries(Object.entries(corpus.fixtures).map(([key, file]) => [key, resolve(import.meta.dir, "../../..", file as string)]))
+  expect(fixtures.edit_lgp, "confirmed edit fixture must be registered in cases.json").toBeDefined()
+  expect(new Bun.CryptoHasher("sha256").update(await Bun.file(fixtures.edit_lgp!).bytes()).digest("hex")).toBe(
+    (await Bun.file(new URL("../../agent/test/cli/package-docs-routing/fixtures/edit-source.provenance.json", import.meta.url)).json()).sha256,
+  )
   const root = await mkdtemp(join(tmpdir(), "loginom-routing-input-"))
   try {
     await mkdir(join(root, "input"))

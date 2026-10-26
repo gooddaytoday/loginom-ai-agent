@@ -2,6 +2,7 @@
   "schema_version": "loginom-skills-routing.v1",
   "scope": "product-routing",
   "fixtures": {
+    "edit_lgp": "packages/agent/test/cli/package-docs-routing/fixtures/edit-source.lgp",
     "lgp": "packages/loginom-host/test/fixtures/package-docs/nested.lgp",
     "png": "packages/agent/test/tool/fixtures/large-image.png",
     "csv": "packages/desktop/test/loginom/fixtures/standalone-cli/A/sales.csv",
