@@ -18,9 +18,9 @@ B4 закрыт на9f723: UTF8 test image+native overflow guard; natural own-co
 B1–B4 и Task7 закрыты: оба reference/CLI/cold/oracle/collection validator и pair calibration100/0+100/0 PASS. Local edit CLI1/handledRead сохранён честно.
 Task8 benchmark: scores100/100/oracle2/2, execution1/2(edit CLI1/recoveredRead), native/process/storage cleanup0, fresh review Approved; own32795 остановлен с данными.
 Docs fix93f52: native Calc Expressions/v1 string map и отрицательный Markdown tripwire; TDD60+35/typecheck/actual package/report PASS. Runtime/automation/reference/benchmark evidence остаётся применимым.
-Source-frozen93f52 CLI2 transitions идут на свежих stand02/03, затем Desktop3 на отдельных stands; unchanged legacy docs/TXT reuse подтверждён hashes. Полной Task8 acceptance ещё нет.
+Source-frozen93f52: DesktopCSV factual/native PASS; CLI2 edit transitions обязательный FAIL/SAVE_RECEIPT_MISSING/noACK/guards, Desktop2 HOLD. B5 source probe трёх navigation waits перед fix/TDD/newcandidate; legacy docs/TXT reuse подтверждён. Task8 открыт.
 Bun1.3.14/Node24.19.0/Chromium1246; packaging13PASS/2skip, shortTMPDIR crash6PASS/exit0/process0; исходный SIGILL на longTMPDIR сохранён, exact native cause не установлен.
-Own completed stands остановлены/snapshots, failed guards сохранены; общие сервисы/профили не менялись. Windows native NOT_RUN; full attribution README baseline mismatch не объявлен PASS. Merge/release не разрешены.
+Own stand02/03/04 остановлены/snapshots, empty qualified05/06 без model calls; failed guards сохранены; общие сервисы/профили не менялись. Windows native NOT_RUN; full attribution README baseline mismatch не объявлен PASS. Merge/release не разрешены.
 [Отчёт](../testing/loginom-ai-agent/local-file-paths.md#task8-candidate93f52-qualification-2026-10-26) · [блокеры](../testing/loginom-ai-agent/local-file-paths-blockers.md).
 
 ## 2026-10-20 — v0.3.2 опубликован
