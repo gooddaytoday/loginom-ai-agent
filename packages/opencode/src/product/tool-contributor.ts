@@ -93,8 +93,7 @@ const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
           execute(args, options) {
             return run.promise(
               Effect.gen(function* () {
-                if (!toolPolicy.permitsLoginom(profile, definition.name))
-                  return yield* Effect.die(toolPolicy.denied())
+                if (!toolPolicy.permitsLoginom(profile, definition.name)) return yield* Effect.die(toolPolicy.denied())
                 const ctx = context(args, options)
                 yield* plugin.trigger(
                   "tool.execute.before",

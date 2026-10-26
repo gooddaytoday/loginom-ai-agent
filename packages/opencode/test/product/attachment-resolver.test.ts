@@ -39,24 +39,30 @@ describe("ProductHooks.attachmentResolver", () => {
       { ...owner, type: "text", synthetic: true, text: "Attached Loginom package path: /work/Demo.LGP" },
       { ...part, ...owner, mime: "application/x-loginom-package", filename: "Demo.LGP" },
     ])
-    expect(resolver.packageParts({ ...part, mime: "application/x-loginom-package", filename: "x" }, "/work/x.bin", owner)).toBeDefined()
+    expect(
+      resolver.packageParts({ ...part, mime: "application/x-loginom-package", filename: "x" }, "/work/x.bin", owner),
+    ).toBeDefined()
     expect(resolver.packageParts({ ...part, mime: "text/csv" }, "/work/sales.csv", owner)).toBeUndefined()
   })
 
   test("a subtask receives user text and package paths but not ignored text or other files", () => {
     expect(resolver.subtaskText({ type: "text", text: "build it" })).toEqual(["build it"])
     expect(resolver.subtaskText({ type: "text", text: "hidden", ignored: true })).toEqual([])
-    expect(resolver.subtaskText({ type: "file", mime: "application/x-loginom-package", url: "file:///work/demo.lgp" })).toEqual([
-      "Attached Loginom package path: /work/demo.lgp",
-    ])
+    expect(
+      resolver.subtaskText({ type: "file", mime: "application/x-loginom-package", url: "file:///work/demo.lgp" }),
+    ).toEqual(["Attached Loginom package path: /work/demo.lgp"])
     expect(resolver.subtaskText({ type: "file", mime: "text/csv", url: "file:///work/sales.csv" })).toEqual([])
-    expect(resolver.subtaskText({ type: "file", mime: "application/x-loginom-package", url: "data:;base64,AA==" })).toEqual([])
+    expect(
+      resolver.subtaskText({ type: "file", mime: "application/x-loginom-package", url: "data:;base64,AA==" }),
+    ).toEqual([])
   })
 
   test("the original bytes of a CLI attachment are the only source of the preview and the data URL", async () => {
     process.env.LOGINOM_AI_AGENT_CLI_ROOT = "/cli"
     const { filepath, url } = await attached("sales.csv", "A;1\nB;2\n")
-    const snapshot = await Effect.runPromise(resolver.snapshot({ filepath, url, filename: "sales.csv", hasAttachments: false }))
+    const snapshot = await Effect.runPromise(
+      resolver.snapshot({ filepath, url, filename: "sales.csv", hasAttachments: false }),
+    )
     expect(snapshot?.text).toBe("A;1\nB;2\n")
     expect(snapshot?.dataUrl("text/csv")).toBe(`data:text/csv;base64,${Buffer.from("A;1\nB;2\n").toString("base64")}`)
   })

@@ -2,7 +2,18 @@ import { describe, expect, test } from "bun:test"
 import { ProductHooks } from "../../src/product-hooks"
 
 const policy = ProductHooks.toolPolicy
-const docsBuiltins = ["read", "glob", "grep", "edit", "write", "apply_patch", "todowrite", "question", "skill", "package_docs_run"]
+const docsBuiltins = [
+  "read",
+  "glob",
+  "grep",
+  "edit",
+  "write",
+  "apply_patch",
+  "todowrite",
+  "question",
+  "skill",
+  "package_docs_run",
+]
 
 describe("ProductHooks.toolPolicy", () => {
   test("package-docs exposes only its built-in tools", () => {

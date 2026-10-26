@@ -35,7 +35,11 @@ function setup(options: { profile: TaskScope.Profile; task?: boolean; image?: bo
       },
     },
     loginomStatus: status,
-    model: { api: { id: "m" }, providerID: "test", capabilities: { input: { image: !!options.image } } } as Provider.Model,
+    model: {
+      api: { id: "m" },
+      providerID: "test",
+      capabilities: { input: { image: !!options.image } },
+    } as Provider.Model,
     history: [],
     task,
     profile: options.profile,
@@ -43,7 +47,8 @@ function setup(options: { profile: TaskScope.Profile; task?: boolean; image?: bo
   return { tools, status, requested, run: () => Effect.runPromise(ProductHooks.toolContributor.contribute(input)) }
 }
 
-const schemaOf = (tool: AITool) => (tool.inputSchema as { jsonSchema: { properties: object; required?: string[] } }).jsonSchema
+const schemaOf = (tool: AITool) =>
+  (tool.inputSchema as { jsonSchema: { properties: object; required?: string[] } }).jsonSchema
 
 describe("ProductHooks.toolContributor", () => {
   test("automation receives the whole catalog under the loginom_ prefix without the host token", async () => {

@@ -37,8 +37,19 @@ export const attachmentResolver = {
   // A CLI attachment is read once from disk; the preview shown to the model and
   // the bytes kept for the Dock transfer come from that same snapshot.
   // Line references never authorize transferring the rest of the file.
-  snapshot: Effect.fnUntraced(function* (input: { filepath: string; url: URL; filename?: string; hasAttachments: boolean }) {
-    if (!process.env.LOGINOM_AI_AGENT_CLI_ROOT || input.url.search || input.url.hash || !input.filename || input.hasAttachments)
+  snapshot: Effect.fnUntraced(function* (input: {
+    filepath: string
+    url: URL
+    filename?: string
+    hasAttachments: boolean
+  }) {
+    if (
+      !process.env.LOGINOM_AI_AGENT_CLI_ROOT ||
+      input.url.search ||
+      input.url.hash ||
+      !input.filename ||
+      input.hasAttachments
+    )
       return undefined
     const bytes = yield* Effect.promise(() => fileSnapshot(input.filepath))
     return {
@@ -48,7 +59,11 @@ export const attachmentResolver = {
   }),
 
   // Compacted messages still own the canonical data URLs used by saved snapshot links.
-  retainCompacted: Effect.fnUntraced(function* (db: Database.Service["Service"]["db"], fsys: FSUtil.Interface, sessionID: SessionID) {
+  retainCompacted: Effect.fnUntraced(function* (
+    db: Database.Service["Service"]["db"],
+    fsys: FSUtil.Interface,
+    sessionID: SessionID,
+  ) {
     const attachments = yield* db
       .select({ url: sql<string>`json_extract(${PartTable.data}, '$.url')` })
       .from(MessageTable)
@@ -64,7 +79,9 @@ export const attachmentResolver = {
       .all()
       .pipe(Effect.orDie)
     yield* Effect.forEach(
-      new Set(attachments.map((part) => part.url).filter((url) => URL.canParse(url) && new URL(url).protocol === "data:")),
+      new Set(
+        attachments.map((part) => part.url).filter((url) => URL.canParse(url) && new URL(url).protocol === "data:"),
+      ),
       (url) => attachmentContext(decodeDataUrl(url)),
       { discard: true },
     ).pipe(Effect.provideService(FSUtil.Service, fsys))
@@ -73,7 +90,8 @@ export const attachmentResolver = {
   // Subtasks receive text, so retain attachment context after template and shell expansion.
   subtaskText: (part: { type: string; text?: string; ignored?: boolean; mime?: string; url?: string }): string[] => {
     if (part.type === "text") return part.ignored ? [] : [part.text ?? ""]
-    if (part.mime === PACKAGE_MIME && part.url?.startsWith("file:")) return [`Attached Loginom package path: ${fileURLToPath(part.url)}`]
+    if (part.mime === PACKAGE_MIME && part.url?.startsWith("file:"))
+      return [`Attached Loginom package path: ${fileURLToPath(part.url)}`]
     return []
   },
 }

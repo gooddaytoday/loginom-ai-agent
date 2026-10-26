@@ -1,5 +1,6 @@
 import { installationNode } from "./product/installation"
 import { attachmentResolver } from "./product/attachment-resolver"
+import { turnLifecycle } from "./product/turn-lifecycle"
 import { toolContributor } from "./product/tool-contributor"
 import { toolPolicy } from "./product/tool-policy"
 import { skillSource } from "./product/skill-source"
@@ -14,4 +15,5 @@ export const ProductHooks = {
   toolPolicy,
   toolContributor,
   attachmentResolver,
+  turnLifecycle,
 } as const
