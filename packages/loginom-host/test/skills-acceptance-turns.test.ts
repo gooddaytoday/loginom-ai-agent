@@ -77,6 +77,8 @@ test("new path answers require the exact Read value and facts from the modified 
   ]
   expect(() => verifyLocalFileAnswer("docs-after-edit", docs, path, "Готово", "amount_double = amount * 3")).not.toThrow()
   expect(() => verifyLocalFileAnswer("docs-after-edit", docs, path, "Готово",
+    "Бизнес-назначение пакета не указано. В изменённом пакете сохранена формула `amount_double = amount*3`: несмотря на название поля, она утраивает исходное значение.")).not.toThrow()
+  expect(() => verifyLocalFileAnswer("docs-after-edit", docs, path, "Готово",
     "amount_double\n\nФормула и параметры выражений в извлечённых настройках отсутствуют; в частности, сохранение формулы `amount*3` по извлечённой структуре проверить нельзя.")).toThrow("MODIFIED_DOC_FACTS_NOT_VERIFIED")
   expect(() => verifyLocalFileAnswer("docs-after-edit", docs, path, "Готово", "amount_double = amount * 2")).toThrow()
   expect(() => verifyLocalFileAnswer("docs-after-edit", docs, path, "Готово", "amount_double = amount * 30")).toThrow("MODIFIED_DOC_FACTS_NOT_VERIFIED")
