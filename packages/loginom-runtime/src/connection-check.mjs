@@ -27,7 +27,7 @@ export function loginomAddress(value) {
 
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
-export async function loginPage(page, candidate, { deadline = Infinity } = {}) {
+export async function loginPage(page, candidate, { deadline = Infinity, themeState = { reloaded: false }, onThemeReload } = {}) {
   const started = performance.now()
   let phase = "goto", phaseStarted = started, original
   const remaining = limit => {
@@ -37,10 +37,40 @@ export async function loginPage(page, candidate, { deadline = Infinity } = {}) {
   }
   try {
     await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: remaining(60_000) })
-    phase = "form"; phaseStarted = performance.now()
     const field = (name) => page.locator(`[data-tid="LoginForm;Login;${name}"]`)
     const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
-    await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: remaining(60_000) })
+    for (;;) {
+      phase = "form"; phaseStarted = performance.now()
+      await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: remaining(60_000) })
+      phase = "theme"; phaseStarted = performance.now()
+      const missing = await page.evaluate(function themeStylesheetMissing() {
+        const missing = [...document.querySelectorAll('link[rel~="stylesheet"][href]')].some(link => {
+          const url = new URL(link.href, location.href)
+          if (url.origin !== location.origin || !/\/packages\/deductor-theme\/build\/resources\/deductor-theme-all(?:-debug)?\.css$/.test(url.pathname)) return false
+          try { return !link.sheet || link.sheet.cssRules.length === 0 }
+          catch { return true }
+        })
+        return missing && globalThis.__loginomThemeStartupInteracted === true ? "interacted" : missing
+      })
+      if (missing !== true && missing !== "interacted") break
+      themeState.failed = true
+      if (themeState.reloaded || missing === "interacted" || await avatar.isVisible()) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
+      // No credential or workspace gesture has happened. Never reload a page
+      // handed to MCP, and never give this recovery a fresh time allowance.
+      remaining(60_000)
+      themeState.reloaded = true
+      await onThemeReload?.({ phase: "theme_reload", reason: "theme_stylesheet_rules_missing" })
+      await Promise.all([
+        page.waitForEvent("domcontentloaded", { timeout: remaining(60_000) }),
+        page.evaluate(() => {
+          // Keep the final human-input check and navigation in one browser task:
+          // a journal write must not open a window for discarding new input.
+          if (globalThis.__loginomThemeStartupInteracted === true) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
+          location.reload()
+        }),
+      ])
+    }
+    phase = "form"; phaseStarted = performance.now()
     if (!(await avatar.isVisible())) {
       phase = "submit"; phaseStarted = performance.now()
       await field("edtUsername").locator("input").fill(candidate.username, { timeout: remaining(30_000) })
@@ -138,6 +168,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
   signal?.throwIfAborted()
   // Both attempts share the original admission deadline and the same profile.
   const record = onRetry ?? createExecutionJournal({ directory: profile, metadata: { sessionId: null } })
+  const themeState = { reloaded: false }
   for (let attempt = 0; attempt < 2; attempt++) {
   signal?.throwIfAborted()
   if (Date.now() >= deadline) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
@@ -186,8 +217,16 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     // This authenticated page predates MCP; its capability choice must already
     // match the executor's download/byte-verification path on the first load.
     await context.addInitScript({ content: browserDownloadScript(candidate.url) })
+    await context.addInitScript(() => {
+      // A human can interact with the headed startup page before host login.
+      // Once that happens, failing startup is safer than reloading their state.
+      for (const type of ["pointerdown", "keydown", "input", "change"])
+        addEventListener(type, event => {
+          if (event.isTrusted) globalThis.__loginomThemeStartupInteracted = true
+        }, { capture: true })
+    })
     if (onContextCreated) await onContextCreated(context)
-    const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate, { deadline })
+    const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate, { deadline, themeState, onThemeReload: record })
     signal?.throwIfAborted()
     if (!keepOpen) {
       await close()
@@ -199,7 +238,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     await close().catch(() => { throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED", error?.cause?.login ? { cause: error.cause } : undefined) })
     signal?.throwIfAborted()
     // Only a classified transient login failure may retry, after confirmed close.
-    if (attempt === 0 && error?.message === "LOGINOM_LOGIN_UNAVAILABLE" && Date.now() < deadline) {
+    if (attempt === 0 && !themeState.failed && error?.message === "LOGINOM_LOGIN_UNAVAILABLE" && Date.now() < deadline) {
       await record({ phase: "login_retry", attempt: 2, reason: error.message, login: error.cause?.login ?? null })
       continue
     }
