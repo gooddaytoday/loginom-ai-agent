@@ -1,13 +1,13 @@
 # Расхождения форка с upstream: файлы, изменённые форком
 
 - форк `2e6f66a92d961d3e517fb9cc63dc4b4c77039389`, база `501ff62cbf40d4ff260b48c9f1fc113e9b9a83e1`
-- парных файлов (изменение или переименование): **2630**; добавлено форком: 9145; удалено: 24
+- парных файлов (изменение или переименование): **2650**; добавлено форком: 9125; удалено: 4
 
 | класс | файлов |
 |---|---|
-| mech:internal-only | 1125 |
+| mech:internal-only | 1136 |
 | mech:needs-external | 669 |
-| substantive | 437 |
+| substantive | 446 |
 | move-only | 345 |
 | binary | 54 |
 
@@ -15,7 +15,7 @@
 
 | набор | файлов |
 |---|---|
-| scope | 982 |
+| scope | 993 |
 | userfiles | 243 |
 | env,userfiles | 131 |
 | env | 124 |
@@ -39,21 +39,21 @@
 
 | кластер | файлов | + строк | − строк | затронуто upstream (1000 коммитов) | в реальной дельте |
 |---|---|---|---|---|---|
-| K1 session/tools/server | 16 | 769 | 99 | 12 | 2 |
-| K1 session/tools/server (tests) | 16 | 2214 | 90 | 12 | 3 |
+| K1 session/tools/server | 19 | 791 | 100 | 13 | 2 |
+| K1 session/tools/server (tests) | 17 | 2453 | 94 | 13 | 3 |
 | K10 manifests+lock | 11 | 1131 | 1311 | 10 | 10 |
-| K11 brand assets/strings | 218 | 4141 | 2759 | 132 | 1 |
+| K11 brand assets/strings | 219 | 4218 | 2759 | 132 | 1 |
 | K12 core identity/paths | 8 | 27 | 22 | 4 | 0 |
 | K12 core identity/paths (tests) | 2 | 7 | 7 | 0 | 0 |
 | K13 other | 9 | 32 | 23 | 3 | 3 |
 | K13 other (tests) | 1 | 10 | 13 | 0 | 0 |
-| K2 CLI/worker/config | 22 | 373 | 179 | 3 | 3 |
+| K2 CLI/worker/config | 24 | 394 | 179 | 3 | 3 |
 | K2 CLI/worker/config (tests) | 6 | 263 | 126 | 3 | 2 |
 | K3 skills/commands | 2 | 101 | 30 | 2 | 0 |
 | K4 provider/plugin/proxy | 6 | 92 | 25 | 4 | 3 |
 | K4 provider/plugin/proxy (tests) | 4 | 265 | 9 | 3 | 3 |
-| K5 install/update | 1 | 16 | 6 | 1 | 0 |
-| K5 install/update (tests) | 1 | 10 | 2 | 0 | 0 |
+| K5 install/update | 2 | 33 | 269 | 2 | 1 |
+| K5 install/update (tests) | 2 | 25 | 234 | 1 | 1 |
 | K6 desktop main/renderer | 23 | 429 | 199 | 16 | 0 |
 | K6 desktop main/renderer (tests) | 3 | 26 | 26 | 3 | 0 |
 | K7 app/ui | 50 | 381 | 224 | 35 | 0 |
@@ -76,8 +76,8 @@
 | evals/calibration | 149 |
 | packages/desktop | 149 |
 | evals/test | 130 |
-| packages/agent | 77 |
 | evals/src | 69 |
 | docs/superpowers | 68 |
+| packages/agent | 57 |
 | evals/fixtures | 56 |
 | evals/docs | 52 |

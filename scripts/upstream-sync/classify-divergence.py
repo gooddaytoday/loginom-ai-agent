@@ -99,8 +99,22 @@ def main():
 
     ns = name_status(a.base, a.fork)
     pairs = [(s, o, n) for s, o, n in ns if s in "MR"]
-    added = [n for s, o, n in ns if s == "A"]
-    deleted = [o for s, o, n in ns if s == "D"]
+    added = {n for s, o, n in ns if s == "A"}
+    deleted = []
+    # Сильно переписанный файл git показывает как удаление + добавление (сходство < 50 %): сопоставляем по пути
+    # с учётом переименованных каталогов, иначе самые содержательные правки выпадут из выборки.
+    moves = [(base_prefix, fork_prefix) for c in ("pkgdir", "userfiles")
+             for fork_prefix, base_prefix in cfn.CLASSES[c][2]]
+    for s, o, n in ns:
+        if s != "D":
+            continue
+        mapped = next((fork_prefix + o[len(base_prefix):] for base_prefix, fork_prefix in moves
+                       if o.startswith(base_prefix)), o)
+        if mapped in added:
+            pairs.append(("M", o, mapped)); added.discard(mapped)
+        else:
+            deleted.append(o)
+    added = sorted(added)
 
     spec_in = b"".join(f"{a.base}:{o}\n{a.fork}:{n}\n".encode() for _, o, n in pairs)
     data = git("cat-file", "--batch", inp=spec_in)

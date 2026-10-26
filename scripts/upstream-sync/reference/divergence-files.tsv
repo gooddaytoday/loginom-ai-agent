@@ -1038,6 +1038,7 @@ packages/llm/test/recorded-golden.ts	packages/llm/test/recorded-golden.ts	mech	s
 packages/llm/test/recorded-test.ts	packages/llm/test/recorded-test.ts	mech	scope		0	0	0	0
 packages/llm/test/recorded-websocket.ts	packages/llm/test/recorded-websocket.ts	mech	scope		0	0	0	0
 packages/opencode/.gitignore	packages/agent/.gitignore	substantive		K2 CLI/worker/config	1	0	0	0
+packages/opencode/AGENTS.md	packages/agent/AGENTS.md	substantive		K11 brand assets/strings	77	0	0	0
 packages/opencode/Dockerfile	packages/agent/Dockerfile	move-only			0	0	0	0
 packages/opencode/README.md	packages/agent/README.md	move-only			0	0	0	0
 packages/opencode/bin/opencode	packages/agent/bin/loginom-ai-agent	substantive		K9 CI/build/release	3	3	0	0
@@ -1046,6 +1047,7 @@ packages/opencode/git	packages/agent/git	move-only			0	0	0	0
 packages/opencode/migration/20260511173437_session-metadata/migration.sql	packages/agent/migration/20260511173437_session-metadata/migration.sql	move-only			0	0	0	0
 packages/opencode/migration/20260511173437_session-metadata/snapshot.json	packages/agent/migration/20260511173437_session-metadata/snapshot.json	move-only			0	0	0	0
 packages/opencode/package.json	packages/agent/package.json	substantive		K10 manifests+lock	12	8	69	1
+packages/opencode/parsers-config.ts	packages/agent/parsers-config.ts	mech	scope		0	0	0	0
 packages/opencode/script/bench-search.ts	packages/agent/script/bench-search.ts	mech	scope		0	0	0	0
 packages/opencode/script/bench-test-suite.ts	packages/agent/script/bench-test-suite.ts	move-only			0	0	0	0
 packages/opencode/script/build-node.ts	packages/agent/script/build-node.ts	mech	scope,env		0	0	1	0
@@ -1133,6 +1135,7 @@ packages/opencode/src/cli/cmd/mcp.ts	packages/agent/src/cli/cmd/mcp.ts	mech	scop
 packages/opencode/src/cli/cmd/models.ts	packages/agent/src/cli/cmd/models.ts	substantive		K2 CLI/worker/config	2	0	0	0
 packages/opencode/src/cli/cmd/plug.ts	packages/agent/src/cli/cmd/plug.ts	substantive		K2 CLI/worker/config	1	1	0	0
 packages/opencode/src/cli/cmd/pr.ts	packages/agent/src/cli/cmd/pr.ts	move-only			0	0	0	1
+packages/opencode/src/cli/cmd/prompt-display.ts	packages/agent/src/cli/cmd/prompt-display.ts	mech	scope		0	0	0	0
 packages/opencode/src/cli/cmd/providers.ts	packages/agent/src/cli/cmd/providers.ts	substantive		K2 CLI/worker/config	15	4	0	0
 packages/opencode/src/cli/cmd/run.ts	packages/agent/src/cli/cmd/run.ts	substantive		K2 CLI/worker/config	192	74	3	1
 packages/opencode/src/cli/cmd/run/demo.ts	packages/agent/src/cli/cmd/run/demo.ts	mech	scope,pkgdir		0	0	0	0
@@ -1154,6 +1157,7 @@ packages/opencode/src/cli/cmd/run/runtime.boot.ts	packages/agent/src/cli/cmd/run
 packages/opencode/src/cli/cmd/run/runtime.lifecycle.ts	packages/agent/src/cli/cmd/run/runtime.lifecycle.ts	mech	scope		0	0	0	0
 packages/opencode/src/cli/cmd/run/runtime.queue.ts	packages/agent/src/cli/cmd/run/runtime.queue.ts	move-only			0	0	0	0
 packages/opencode/src/cli/cmd/run/runtime.shared.ts	packages/agent/src/cli/cmd/run/runtime.shared.ts	move-only			0	0	0	0
+packages/opencode/src/cli/cmd/run/runtime.stdin.ts	packages/agent/src/cli/cmd/run/runtime.stdin.ts	substantive		K2 CLI/worker/config	20	0	0	0
 packages/opencode/src/cli/cmd/run/runtime.ts	packages/agent/src/cli/cmd/run/runtime.ts	mech	scope,env		0	0	0	0
 packages/opencode/src/cli/cmd/run/scrollback.shared.ts	packages/agent/src/cli/cmd/run/scrollback.shared.ts	move-only			0	0	0	0
 packages/opencode/src/cli/cmd/run/scrollback.surface.ts	packages/agent/src/cli/cmd/run/scrollback.surface.ts	move-only			0	0	0	0
@@ -1182,7 +1186,9 @@ packages/opencode/src/cli/effect-cmd.ts	packages/agent/src/cli/effect-cmd.ts	sub
 packages/opencode/src/cli/effect/prompt.ts	packages/agent/src/cli/effect/prompt.ts	move-only			0	0	0	0
 packages/opencode/src/cli/error.ts	packages/agent/src/cli/error.ts	mech	scope,userfiles		0	0	0	0
 packages/opencode/src/cli/heap.ts	packages/agent/src/cli/heap.ts	mech	scope,env		0	0	0	0
+packages/opencode/src/cli/logo.ts	packages/agent/src/cli/logo.ts	mech	scope		0	0	0	0
 packages/opencode/src/cli/network.ts	packages/agent/src/cli/network.ts	mech	scope		0	0	0	0
+packages/opencode/src/cli/tui/layer.ts	packages/agent/src/cli/tui/layer.ts	mech	scope		0	0	1	0
 packages/opencode/src/cli/tui/validate-session.ts	packages/agent/src/cli/tui/validate-session.ts	substantive		K2 CLI/worker/config	5	1	0	0
 packages/opencode/src/cli/tui/worker.ts	packages/agent/src/cli/tui/worker.ts	substantive		K2 CLI/worker/config	21	4	0	1
 packages/opencode/src/cli/ui.ts	packages/agent/src/cli/ui.ts	substantive		K2 CLI/worker/config	4	16	0	0
@@ -1225,7 +1231,9 @@ packages/opencode/src/effect/instance-state.ts	packages/agent/src/effect/instanc
 packages/opencode/src/effect/promise.ts	packages/agent/src/effect/promise.ts	move-only			0	0	0	0
 packages/opencode/src/effect/run-service.ts	packages/agent/src/effect/run-service.ts	mech	scope		0	0	0	0
 packages/opencode/src/effect/runner.ts	packages/agent/src/effect/runner.ts	substantive		K1 session/tools/server	14	5	0	0
+packages/opencode/src/effect/runtime-flags.ts	packages/agent/src/effect/runtime-flags.ts	substantive		K1 session/tools/server	1	0	5	0
 packages/opencode/src/env/index.ts	packages/agent/src/env/index.ts	mech	svckey,scope		0	0	1	0
+packages/opencode/src/event-manifest.ts	packages/agent/src/event-manifest.ts	mech	scope		0	0	0	0
 packages/opencode/src/event-v2-bridge.ts	packages/agent/src/event-v2-bridge.ts	mech	svckey,scope		0	0	1	0
 packages/opencode/src/format/formatter.ts	packages/agent/src/format/formatter.ts	mech	scope		0	0	0	0
 packages/opencode/src/format/index.ts	packages/agent/src/format/index.ts	mech	svckey,scope		0	0	1	0
@@ -1234,6 +1242,7 @@ packages/opencode/src/id/id.ts	packages/agent/src/id/id.ts	move-only			0	0	0	0
 packages/opencode/src/ide/index.ts	packages/agent/src/ide/index.ts	mech	scope,env		0	0	0	0
 packages/opencode/src/image/image.ts	packages/agent/src/image/image.ts	mech	svckey,scope		0	0	1	0
 packages/opencode/src/index.ts	packages/agent/src/index.ts	substantive		K2 CLI/worker/config	2	2	0	0
+packages/opencode/src/installation/index.ts	packages/agent/src/installation/index.ts	substantive		K5 install/update	17	263	1	1
 packages/opencode/src/lsp/client.ts	packages/agent/src/lsp/client.ts	move-only			0	0	0	0
 packages/opencode/src/lsp/diagnostic.ts	packages/agent/src/lsp/diagnostic.ts	move-only			0	0	0	0
 packages/opencode/src/lsp/language.ts	packages/agent/src/lsp/language.ts	move-only			0	0	0	0
@@ -1247,6 +1256,7 @@ packages/opencode/src/mcp/catalog.ts	packages/agent/src/mcp/catalog.ts	move-only
 packages/opencode/src/mcp/index.ts	packages/agent/src/mcp/index.ts	mech	svckey,scope		0	0	8	0
 packages/opencode/src/mcp/oauth-callback.ts	packages/agent/src/mcp/oauth-callback.ts	substantive		K1 session/tools/server	11	2	2	0
 packages/opencode/src/mcp/oauth-provider.ts	packages/agent/src/mcp/oauth-provider.ts	move-only			0	0	2	1
+packages/opencode/src/node.ts	packages/agent/src/node.ts	substantive		K2 CLI/worker/config	1	0	0	0
 packages/opencode/src/patch/index.ts	packages/agent/src/patch/index.ts	mech	scope		0	0	0	0
 packages/opencode/src/permission/arity.ts	packages/agent/src/permission/arity.ts	move-only			0	0	0	0
 packages/opencode/src/permission/evaluate.ts	packages/agent/src/permission/evaluate.ts	move-only			0	0	0	0
@@ -1333,6 +1343,7 @@ packages/opencode/src/server/routes/instance/httpapi/handlers/project.ts	package
 packages/opencode/src/server/routes/instance/httpapi/handlers/provider.ts	packages/agent/src/server/routes/instance/httpapi/handlers/provider.ts	mech	scope		0	0	1	0
 packages/opencode/src/server/routes/instance/httpapi/handlers/pty.ts	packages/agent/src/server/routes/instance/httpapi/handlers/pty.ts	mech	scope		0	0	0	1
 packages/opencode/src/server/routes/instance/httpapi/handlers/question.ts	packages/agent/src/server/routes/instance/httpapi/handlers/question.ts	move-only			0	0	0	0
+packages/opencode/src/server/routes/instance/httpapi/handlers/session-errors.ts	packages/agent/src/server/routes/instance/httpapi/handlers/session-errors.ts	substantive		K1 session/tools/server	17	1	0	0
 packages/opencode/src/server/routes/instance/httpapi/handlers/session.ts	packages/agent/src/server/routes/instance/httpapi/handlers/session.ts	substantive		K1 session/tools/server	16	8	1	0
 packages/opencode/src/server/routes/instance/httpapi/handlers/sync.ts	packages/agent/src/server/routes/instance/httpapi/handlers/sync.ts	mech	scope		0	0	0	0
 packages/opencode/src/server/routes/instance/httpapi/handlers/tui.ts	packages/agent/src/server/routes/instance/httpapi/handlers/tui.ts	move-only			0	0	0	0
@@ -1357,6 +1368,7 @@ packages/opencode/src/server/shared/public-ui.ts	packages/agent/src/server/share
 packages/opencode/src/server/shared/tui-control.ts	packages/agent/src/server/shared/tui-control.ts	move-only			0	0	0	0
 packages/opencode/src/server/shared/ui.ts	packages/agent/src/server/shared/ui.ts	mech	scope		0	0	1	0
 packages/opencode/src/server/shared/workspace-routing.ts	packages/agent/src/server/shared/workspace-routing.ts	move-only			0	0	1	0
+packages/opencode/src/server/tui-event.ts	packages/agent/src/server/tui-event.ts	mech	scope		0	0	0	0
 packages/opencode/src/session/compaction.ts	packages/agent/src/session/compaction.ts	substantive		K1 session/tools/server	39	8	3	0
 packages/opencode/src/session/instruction.ts	packages/agent/src/session/instruction.ts	mech	svckey,scope,env		0	0	1	0
 packages/opencode/src/session/llm.ts	packages/agent/src/session/llm.ts	mech	svckey,scope		0	0	1	0
@@ -1403,6 +1415,7 @@ packages/opencode/src/skill/discovery.ts	packages/agent/src/skill/discovery.ts	m
 packages/opencode/src/skill/index.ts	packages/agent/src/skill/index.ts	substantive		K3 skills/commands	73	29	1	0
 packages/opencode/src/snapshot/index.ts	packages/agent/src/snapshot/index.ts	mech	svckey,scope		0	0	1	0
 packages/opencode/src/sql.d.ts	packages/agent/src/sql.d.ts	move-only			0	0	0	0
+packages/opencode/src/storage/schema.ts	packages/agent/src/storage/schema.ts	mech	scope		0	0	0	0
 packages/opencode/src/storage/storage.ts	packages/agent/src/storage/storage.ts	mech	svckey,scope		0	0	1	0
 packages/opencode/src/sync/README.md	packages/agent/src/sync/README.md	move-only			0	0	0	0
 packages/opencode/src/sync/schema.ts	packages/agent/src/sync/schema.ts	mech	scope		0	0	0	0
@@ -1443,6 +1456,7 @@ packages/opencode/src/tool/todo.ts	packages/agent/src/tool/todo.ts	move-only			0
 packages/opencode/src/tool/todowrite.txt	packages/agent/src/tool/todowrite.txt	move-only			0	0	0	0
 packages/opencode/src/tool/tool.ts	packages/agent/src/tool/tool.ts	substantive		K1 session/tools/server	5	0	0	0
 packages/opencode/src/tool/truncate.ts	packages/agent/src/tool/truncate.ts	substantive		K1 session/tools/server	9	5	2	0
+packages/opencode/src/tool/truncation-dir.ts	packages/agent/src/tool/truncation-dir.ts	substantive		K1 session/tools/server	4	0	0	0
 packages/opencode/src/tool/webfetch.ts	packages/agent/src/tool/webfetch.ts	move-only			0	0	0	0
 packages/opencode/src/tool/webfetch.txt	packages/agent/src/tool/webfetch.txt	move-only			0	0	0	0
 packages/opencode/src/tool/websearch.ts	packages/agent/src/tool/websearch.ts	mech	scope,env		0	0	0	0
@@ -1454,19 +1468,23 @@ packages/opencode/src/util/bom.ts	packages/agent/src/util/bom.ts	mech	scope		0	0
 packages/opencode/src/util/data-url.ts	packages/agent/src/util/data-url.ts	move-only			0	0	0	0
 packages/opencode/src/util/defer.ts	packages/agent/src/util/defer.ts	move-only			0	0	0	0
 packages/opencode/src/util/effect-http-client.ts	packages/agent/src/util/effect-http-client.ts	move-only			0	0	0	0
+packages/opencode/src/util/error.ts	packages/agent/src/util/error.ts	mech	scope		0	0	0	0
 packages/opencode/src/util/filesystem.ts	packages/agent/src/util/filesystem.ts	mech	scope		0	0	0	0
 packages/opencode/src/util/html.ts	packages/agent/src/util/html.ts	move-only			0	0	0	0
 packages/opencode/src/util/iife.ts	packages/agent/src/util/iife.ts	move-only			0	0	0	0
 packages/opencode/src/util/lazy.ts	packages/agent/src/util/lazy.ts	move-only			0	0	0	0
 packages/opencode/src/util/local-context.ts	packages/agent/src/util/local-context.ts	move-only			0	0	0	0
+packages/opencode/src/util/locale.ts	packages/agent/src/util/locale.ts	mech	scope		0	0	0	0
 packages/opencode/src/util/media.ts	packages/agent/src/util/media.ts	move-only			0	0	0	0
 packages/opencode/src/util/process.ts	packages/agent/src/util/process.ts	move-only			0	0	0	0
 packages/opencode/src/util/proxy-env.ts	packages/agent/src/util/proxy-env.ts	substantive		K4 provider/plugin/proxy	16	3	0	0
 packages/opencode/src/util/queue.ts	packages/agent/src/util/queue.ts	move-only			0	0	0	0
+packages/opencode/src/util/record.ts	packages/agent/src/util/record.ts	mech	scope		0	0	0	0
 packages/opencode/src/util/repository.ts	packages/agent/src/util/repository.ts	mech	scope,env		0	0	0	0
 packages/opencode/src/util/rpc.ts	packages/agent/src/util/rpc.ts	substantive		K2 CLI/worker/config	27	10	0	0
 packages/opencode/src/util/signal.ts	packages/agent/src/util/signal.ts	move-only			0	0	0	0
 packages/opencode/src/util/timeout.ts	packages/agent/src/util/timeout.ts	move-only			0	0	0	0
+packages/opencode/src/util/token.ts	packages/agent/src/util/token.ts	mech	scope		0	0	0	0
 packages/opencode/src/util/wildcard.ts	packages/agent/src/util/wildcard.ts	move-only			0	0	0	0
 packages/opencode/src/worktree/index.ts	packages/agent/src/worktree/index.ts	mech	svckey,scope		0	0	2	0
 packages/opencode/sst-env.d.ts	packages/agent/sst-env.d.ts	move-only			0	0	0	0
@@ -1663,6 +1681,7 @@ packages/opencode/test/git/git.test.ts	packages/agent/test/git/git.test.ts	mech	
 packages/opencode/test/ide/ide.test.ts	packages/agent/test/ide/ide.test.ts	mech	env		0	0	0	0
 packages/opencode/test/image/fixtures/picture-5mb-base64.png	packages/agent/test/image/fixtures/picture-5mb-base64.png	move-only			0	0	0	0
 packages/opencode/test/image/image.test.ts	packages/agent/test/image/image.test.ts	mech	scope		0	0	1	0
+packages/opencode/test/installation/installation.test.ts	packages/agent/test/installation/installation.test.ts	substantive		K5 install/update (tests)	15	232	3	1
 packages/opencode/test/lib/cli-process.ts	packages/agent/test/lib/cli-process.ts	mech	scope,env,userfiles		0	0	3	0
 packages/opencode/test/lib/effect.ts	packages/agent/test/lib/effect.ts	mech	scope		0	0	0	0
 packages/opencode/test/lib/filesystem.ts	packages/agent/test/lib/filesystem.ts	move-only			0	0	0	0
@@ -1808,6 +1827,7 @@ packages/opencode/test/session/snapshot-tool-race.test.ts	packages/agent/test/se
 packages/opencode/test/session/structured-output-integration.test.ts	packages/agent/test/session/structured-output-integration.test.ts	mech	scope		0	0	2	0
 packages/opencode/test/session/structured-output.test.ts	packages/agent/test/session/structured-output.test.ts	mech	scope		0	0	0	0
 packages/opencode/test/session/system.test.ts	packages/agent/test/session/system.test.ts	mech	scope		0	0	4	0
+packages/opencode/test/session/tools.test.ts	packages/agent/test/session/tools.test.ts	substantive		K1 session/tools/server (tests)	239	4	5	0
 packages/opencode/test/share/share-next.test.ts	packages/agent/test/share/share-next.test.ts	mech	scope		0	0	0	1
 packages/opencode/test/skill/discovery.test.ts	packages/agent/test/skill/discovery.test.ts	mech	scope		0	0	1	0
 packages/opencode/test/skill/skill.test.ts	packages/agent/test/skill/skill.test.ts	mech	scope,env,userfiles		0	0	1	0
