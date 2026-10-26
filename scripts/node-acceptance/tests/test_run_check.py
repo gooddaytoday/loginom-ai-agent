@@ -76,6 +76,15 @@ class RunCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, 'CSV_COLUMN_ORDER'):
                 runner.check_csv(actual, expected)
 
+    def test_csv_flexible_order_still_rejects_duplicate_header(self):
+        expected = {'columns': [{'name': 'Id', 'type': 'integer'}, {'name': 'Count', 'type': 'integer'}],
+                    'column_order': 'any', 'rows': [{'Id': 1, 'Count': 2}]}
+        with tempfile.TemporaryDirectory() as folder:
+            actual = Path(folder) / 'actual.csv'
+            actual.write_text('Count,Id,Id\n2,1,1\n')
+            with self.assertRaisesRegex(AssertionError, 'CSV_COLUMN_ORDER'):
+                runner.check_csv(actual, expected)
+
     def test_deadline_is_unknown_with_a_real_failure_journal(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder)

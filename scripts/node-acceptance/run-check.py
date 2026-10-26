@@ -128,7 +128,7 @@ def check_csv(path, expected, header='names'):
     rows = list(csv.reader(io.StringIO(text), delimiter=delimiter))
     columns = expected['columns']
     names = [c.get('label', c['name']) if header == 'labels' else c['name'] for c in columns]
-    assert rows and len(set(rows[0])) == len(columns), 'CSV_COLUMN_ORDER'
+    assert rows and len(rows[0]) == len(set(rows[0])) == len(columns), 'CSV_COLUMN_ORDER'
     if expected.get('column_order') == 'any':
         assert set(rows[0]) == set(names), 'CSV_COLUMN_ORDER'
         columns = [columns[names.index(name)] for name in rows[0]]
