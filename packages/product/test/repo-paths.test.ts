@@ -155,7 +155,40 @@ describe("path literals in build and CI code", () => {
   }, 60_000)
 
   test("the legacy packages/agent directory is not referenced outside historical material", () => {
-    const stale = checked.filter((path) => /packages\/agent(?![\w-])/.test(read(path)))
+    // This file names the legacy directory on purpose.
+    const stale = checked.filter((path) => path !== "packages/product/test/repo-paths.test.ts" && /packages\/agent(?![\w-])/.test(read(path)))
     expect(stale).toEqual([])
   }, 60_000)
+})
+
+describe("upstream-sync documentation", () => {
+  // The catalog compares against the upstream revision recorded in catalog.json; a shallow CI checkout does not have it.
+  const against: string = JSON.parse(read("docs/upstream-sync/catalog.json")).against
+  const hasBase = (() => {
+    try {
+      execFileSync("git", ["cat-file", "-e", `${against}^{commit}`], { cwd: root, stdio: "ignore" })
+      return true
+    } catch {
+      return false
+    }
+  })()
+
+  test.skipIf(!hasBase)("catalog.json describes every file in which the fork differs from upstream", () => {
+    execFileSync("python3", ["-I", "scripts/upstream-sync/catalog-check.py"], { cwd: root, stdio: "pipe" })
+  }, 60_000)
+
+  const expand = (token: string): string[] => {
+    const match = token.match(/\{([^{}]+)\}/)
+    if (!match) return [token]
+    return match[1]!.split(",").flatMap((alternative) => expand(token.replace(match[0], alternative)))
+  }
+
+  test("files named in guarantees.md and the scripts it relies on exist", () => {
+    const missing: string[] = []
+    for (const match of read("docs/upstream-sync/guarantees.md").matchAll(/`((?:packages|scripts)\/[^`\s]+)`/g)) {
+      if (/[*<>]/.test(match[1]!)) continue
+      for (const path of expand(match[1]!)) if (!existsSync(join(root, path))) missing.push(path)
+    }
+    expect(missing).toEqual([])
+  })
 })

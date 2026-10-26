@@ -1,0 +1,56 @@
+{
+  "comment": "Source of truth for which fork changes inside upstream files are described in catalog.md. First matching entry wins. Checked by scripts/upstream-sync/catalog-check.py.",
+  "against": "501ff62cbf40d4ff260b48c9f1fc113e9b9a83e1",
+  "entries": [
+    { "id": "CAT-01", "title": "Manifests and lockfile", "paths": ["bun.lock", "**/package.json"] },
+    {
+      "id": "CAT-02",
+      "title": "CI, build, release and repository hygiene",
+      "paths": [
+        ".github/**", "github/**", ".husky/**", "script/**", "nix/**", "infra/**", "patches/**", "perf/**",
+        "turbo.json", ".gitignore", ".gitattributes", ".dockerignore", "install",
+        "packages/*/script/**", "packages/*/scripts/**", "packages/desktop/electron*.ts",
+        "packages/opencode/bin/**", "packages/cli/bin/**"
+      ]
+    },
+    {
+      "id": "CAT-03",
+      "title": "Brand: documentation, translations, icons, dictionaries, repository dotdirs",
+      "paths": [
+        "packages/web/**", "packages/desktop/icons/**", "packages/desktop/resources/**", "packages/app/src/i18n/**",
+        "packages/app/public/**", "docs/upstream/**", ".loginom-ai-agent/**", ".opencode/**", "specs/**", "sdks/**",
+        "packages/opencode/specs/**", "*.md", "packages/*/*.md", "packages/*/README*"
+      ]
+    },
+    {
+      "id": "CAT-04",
+      "title": "Upstream endpoints: updates, installer, sharing",
+      "paths": [
+        "packages/opencode/src/installation/**", "packages/opencode/src/cli/upgrade.ts", "packages/opencode/test/installation/**",
+        "packages/opencode/src/share/**", "packages/opencode/test/share/**", "packages/desktop/src/main/updater*"
+      ]
+    },
+    {
+      "id": "CAT-05",
+      "title": "Session, tools, attachments, permissions, server",
+      "paths": [
+        "packages/opencode/src/session/**", "packages/opencode/src/tool/**", "packages/opencode/src/effect/**",
+        "packages/opencode/src/server/**", "packages/opencode/src/permission/**", "packages/opencode/src/mcp/**",
+        "packages/opencode/src/util/**", "packages/opencode/test/session/**", "packages/opencode/test/tool/**",
+        "packages/opencode/test/effect/**", "packages/opencode/test/server/**", "packages/opencode/test/permission/**",
+        "packages/opencode/test/mcp/**", "packages/opencode/test/util/**"
+      ]
+    },
+    { "id": "CAT-06", "title": "Skills and commands", "paths": ["packages/opencode/src/skill/**", "packages/opencode/src/command/**", "packages/opencode/test/skill/**", "packages/opencode/test/command/**"] },
+    {
+      "id": "CAT-07",
+      "title": "Providers, plugins, proxy",
+      "paths": ["packages/opencode/src/provider/**", "packages/opencode/src/plugin/**", "packages/opencode/test/provider/**", "packages/opencode/test/plugin/**"]
+    },
+    { "id": "CAT-08", "title": "CLI, worker, configuration of the agent package", "paths": ["packages/opencode/**"] },
+    { "id": "CAT-09", "title": "Desktop main process, preload, renderer", "paths": ["packages/desktop/**"] },
+    { "id": "CAT-10", "title": "Web app, UI kit, session UI", "paths": ["packages/app/**", "packages/ui/**", "packages/session-ui/**"] },
+    { "id": "CAT-11", "title": "Terminal UI", "paths": ["packages/tui/**"] },
+    { "id": "CAT-12", "title": "Core identity and shared packages", "paths": ["packages/**", "AGENTS.md", "CONTEXT.md"] }
+  ]
+}
