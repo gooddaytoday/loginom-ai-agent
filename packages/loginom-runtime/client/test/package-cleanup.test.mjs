@@ -37,14 +37,14 @@ function fixture(overrides = {}) {
       if (state.closeResult) { state.count=0; state.tab=false; }
       return state.closeResult;
     }};
-  const dialog = {getBoundingClientRect:() => ({width:10,height:10})};
+  const dialog = {getBoundingClientRect:() => ({x:0,y:0,width:10,height:10}),getAttribute:()=>'fixture-mask',closest:()=>dialog};
   const tab = {getAttribute:() => state.tabTid ?? options.tabTid};
   const doc = {querySelectorAll:query => {
     if(query.includes('MF;AppMenuForm'))return state.menu ? Array(state.menuCount??1).fill(dialog) : [];
     if(query.includes('btnAvatar'))return state.avatarAbsent ? [] : [dialog];
     // Timeout adds a plain backdrop; initial masks also expose busy markers.
     return state.dialog || state.mask && (query.split(',').includes('.x-mask') || !state.maskAfterTimeout) ? [dialog] : [];
-  }, contains:value => value === tab && state.tab};
+  }, contains:value => value === tab && state.tab,elementFromPoint:()=>dialog};
   const context = vm.createContext({document:doc, location:{origin:'http://loginom.invalid'},
     ownedPackage:state.foreignPreparedPackage ? {} : node, ownedTab:tab,
     getComputedStyle:() => ({visibility:'visible'}), bg:{app:{Version:'7.4.2', Application:{FInstance:{FMainForm:{FMapTree:m}}}}}});
@@ -276,6 +276,62 @@ test('second avatar timeout keeps the original unconfirmed cleanup refusal',asyn
   assert.equal(r.status,'BLOCKED');assert.equal(r.reason,'CLEANUP_UNCONFIRMED');assert.equal(r.stage,'logout_menu_open');
   assert.equal(r.package_closed,true);assert.equal(r.logged_out,false);assert.equal(f.state.avatarClicks,2);
   assert.equal(f.events.includes('logout'),false);assert.doesNotMatch(JSON.stringify(r),/private click timeout/);
+});
+
+test('D81 success adds no diagnostic browser reads or waits',async()=>{
+  const f=fixture();let reads=0;
+  const evaluate=f.page.evaluate.bind(f.page);
+  f.page.evaluate=(fn,arg)=>{if(fn.toString().includes('const groups='))reads++;return evaluate(fn,arg);};
+  const r=await f.run();
+  assert.equal(r.status,'SUCCEEDED');assert.equal(r.logout_menu_step,'first_click');
+  assert.equal(Date.parse(r.deadline_at),f.state.deadline);
+  assert.equal(reads,0);assert.equal(r.logout_menu_readback,undefined);
+  assert.equal(r.logout_menu_failed_at,undefined);assert.equal(f.state.diagnosticWaitBudgets,undefined);
+  assert.deepEqual(f.events,['modified-read','close','tab-detached','avatar','logout','login-visible']);
+});
+
+test('D81 refused avatar records the covering mask without retrying Close or logout',async()=>{
+  const f=fixture({avatarTimeouts:1,maskAfterTimeout:true}),r=await f.run();
+  assert.equal(r.status,'BLOCKED');assert.equal(r.reason,'CLEANUP_UNCONFIRMED');
+  assert.equal(r.logout_menu_step,'observe_after_timeout');
+  assert.ok(Number.isFinite(Date.parse(r.logout_menu_failed_at)));
+  assert.equal(Date.parse(r.deadline_at),f.state.deadline);
+  assert.equal(r.logout_menu_readback.status,'observed');
+  assert.equal(r.logout_menu_readback.masks[0].tid,'fixture-mask');
+  assert.equal(r.logout_menu_readback.avatar[0].hit_tid,'fixture-mask');
+  assert.equal(r.package_closed,true);assert.equal(r.logged_out,false);
+  assert.equal(f.events.filter(e=>e==='close').length,1);assert.equal(f.state.avatarClicks,1);
+  assert.equal(f.events.includes('logout'),false);assert.equal(r.unsaved_changes_discarded,false);
+});
+
+test('D81 expired deadline records the refusal without starting a diagnostic read',async()=>{
+  const f=fixture({avatarTimeouts:1,avatarElapsed:30001,timeoutMs:8000}),r=await f.run();
+  assert.equal(r.status,'BLOCKED');assert.equal(r.logout_menu_step,'observe_after_timeout');
+  assert.ok(Number.isFinite(Date.parse(r.logout_menu_failed_at)));
+  assert.equal(r.logout_menu_readback,undefined);assert.equal(f.state.diagnosticWaitBudgets,undefined);
+  assert.equal(f.state.avatarClicks,1);assert.equal(r.logged_out,false);
+});
+
+test('D81 unavailable diagnostic cannot alter the refusal or extend its original deadline',async t=>{
+  t.mock.timers.enable({apis:['setTimeout']});
+  const f=fixture({avatarTimeouts:1,maskAfterTimeout:true,avatarElapsed:27500});
+  const evaluate=f.page.evaluate.bind(f.page);
+  f.page.evaluate=(fn,arg)=>fn.toString().includes('const groups=')
+    ?new Promise(resolve=>setTimeout(()=>resolve({status:'observed'}),31000)):evaluate(fn,arg);
+  let result,settledAt;
+  const pending=f.run().then(r=>{result=r;settledAt=f.state.clock;});
+  const flush=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
+  await flush();const left=f.state.deadline-f.state.clock;
+  assert.equal(left,2500);
+  f.state.clock+=left;t.mock.timers.tick(left);await flush();
+  assert.ok(result);assert.ok(settledAt<=f.state.deadline);
+  const refusal=result;
+  f.state.clock+=31000-left;t.mock.timers.tick(31000-left);await pending;
+  assert.equal(result,refusal);assert.equal(result.status,'BLOCKED');
+  assert.equal(result.reason,'CLEANUP_UNCONFIRMED');assert.equal(result.logged_out,false);
+  assert.equal(result.logout_menu_readback.status,'unavailable');
+  assert.deepEqual(f.state.diagnosticWaitBudgets,[2500]);
+  assert.equal(f.state.avatarClicks,1);assert.equal(f.events.filter(e=>e==='close').length,1);
 });
 
 test('a menu opened by a timed-out avatar click is not toggled again',async()=>{
