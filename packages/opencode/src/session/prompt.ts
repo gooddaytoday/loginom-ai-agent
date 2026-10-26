@@ -1,4 +1,4 @@
-import { attachmentContext, attachmentPreview } from "@/util/attachment-preview"
+import { ProductHooks } from "@/product-hooks"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
@@ -47,8 +47,6 @@ import { FSUtil } from "@opencode-ai/core/fs-util"
 import { AppProcess } from "@opencode-ai/core/process"
 import { Truncate } from "@/tool/truncate"
 import { Image } from "@/image/image"
-import { decodeDataUrl } from "@/util/data-url"
-import { fileSnapshot } from "@/util/file-snapshot"
 import { Process } from "@/util/process"
 import { Cause, Effect, Exit, Latch, Layer, Option, Scope, Context, Schema, Types } from "effect"
 import { InstanceState } from "@/effect/instance-state"
@@ -59,8 +57,8 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { Database } from "@opencode-ai/core/database/database"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { ProviderV2 } from "@opencode-ai/core/provider"
-import { and, eq, sql } from "drizzle-orm"
-import { MessageTable, PartTable, SessionTable } from "@opencode-ai/core/session/sql"
+import { eq } from "drizzle-orm"
+import { SessionTable } from "@opencode-ai/core/session/sql"
 import { SessionReminders } from "./reminders"
 import { SessionTools } from "./tools"
 import { LLMEvent } from "@opencode-ai/llm"
@@ -192,12 +190,7 @@ const layer = Layer.effect(
             type: "file",
             url: pathToFileURL(filepath).href,
             filename: name,
-            mime:
-              stat.type === "Directory"
-                ? "application/x-directory"
-                : FSUtil.mimeType(filepath) === "application/x-loginom-package"
-                  ? "application/x-loginom-package"
-                  : "text/plain",
+            mime: stat.type === "Directory" ? "application/x-directory" : ProductHooks.attachmentResolver.mentionMime(filepath),
           })
         }),
         { concurrency: "unbounded", discard: true },
@@ -819,9 +812,7 @@ const layer = Layer.effect(
                     sessionID: input.sessionID,
                     type: "text",
                     synthetic: true,
-                    text: yield* attachmentContext(decodeDataUrl(part.url)).pipe(
-                      Effect.provideService(FSUtil.Service, fsys),
-                    ),
+                    text: yield* ProductHooks.attachmentResolver.dataContext(part.url, fsys),
                   },
                   { ...part, messageID: info.id, sessionID: input.sessionID },
                 ]
@@ -830,24 +821,11 @@ const layer = Layer.effect(
             case "file:": {
               yield* Effect.logInfo("file", { mime: part.mime })
               const filepath = fileURLToPath(part.url)
-              if (part.mime === "application/x-loginom-package" || filepath.toLowerCase().endsWith(".lgp")) {
-                return [
-                  {
-                    messageID: info.id,
-                    sessionID: input.sessionID,
-                    type: "text",
-                    synthetic: true,
-                    text: `Attached Loginom package path: ${filepath}`,
-                  },
-                  {
-                    ...part,
-                    mime: "application/x-loginom-package",
-                    filename: part.filename ?? path.basename(filepath),
-                    messageID: info.id,
-                    sessionID: input.sessionID,
-                  },
-                ]
-              }
+              const loginomPackage = ProductHooks.attachmentResolver.packageParts(part, filepath, {
+                messageID: info.id,
+                sessionID: input.sessionID,
+              })
+              if (loginomPackage) return loginomPackage
               const mime = (yield* fsys.isDir(filepath)) ? "application/x-directory" : part.mime
 
               const { read } = yield* registry.named()
@@ -907,22 +885,18 @@ const layer = Layer.effect(
                 )
                 if (Exit.isSuccess(exit)) {
                   const result = exit.value
-                  // Use the same original-user snapshot for model context and admission.
-                  // Line references never authorize transferring the rest of the file.
-                  const bytes =
-                    process.env.LOGINOM_AI_AGENT_CLI_ROOT &&
-                    !url.search &&
-                    !url.hash &&
-                    part.filename &&
-                    !result.attachments?.length
-                      ? yield* Effect.promise(() => fileSnapshot(filepath))
-                      : undefined
+                  const snapshot = yield* ProductHooks.attachmentResolver.snapshot({
+                    filepath,
+                    url,
+                    filename: part.filename,
+                    hasAttachments: !!result.attachments?.length,
+                  })
                   pieces.push({
                     messageID: info.id,
                     sessionID: input.sessionID,
                     type: "text",
                     synthetic: true,
-                    text: bytes ? attachmentPreview(bytes.toString("utf8")) : result.output,
+                    text: snapshot?.text ?? result.output,
                   })
                   if (result.attachments?.length) {
                     pieces.push(
@@ -938,7 +912,7 @@ const layer = Layer.effect(
                     pieces.push({
                       ...part,
                       mime,
-                      url: bytes ? `data:${mime};base64,${bytes.toString("base64")}` : part.url,
+                      url: snapshot?.dataUrl(mime) ?? part.url,
                       messageID: info.id,
                       sessionID: input.sessionID,
                     })
@@ -1153,28 +1127,7 @@ const layer = Layer.effect(
 
     const runLoop: (sessionID: SessionID) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID) {
-        // Compacted messages still own the canonical data URLs used by saved snapshot links.
-        const attachments = yield* db
-          .select({ url: sql<string>`json_extract(${PartTable.data}, '$.url')` })
-          .from(MessageTable)
-          .innerJoin(PartTable, eq(PartTable.message_id, MessageTable.id))
-          .where(
-            and(
-              eq(MessageTable.session_id, sessionID),
-              sql`json_extract(${MessageTable.data}, '$.role') = 'user'`,
-              sql`json_extract(${PartTable.data}, '$.type') = 'file'`,
-              sql`json_extract(${PartTable.data}, '$.mime') = 'text/plain'`,
-            ),
-          )
-          .all()
-          .pipe(Effect.orDie)
-        yield* Effect.forEach(
-          new Set(
-            attachments.map((part) => part.url).filter((url) => URL.canParse(url) && new URL(url).protocol === "data:"),
-          ),
-          (url) => attachmentContext(decodeDataUrl(url)),
-          { discard: true },
-        ).pipe(Effect.provideService(FSUtil.Service, fsys))
+        yield* ProductHooks.attachmentResolver.retainCompacted(db, fsys, sessionID)
 
         const loginomStatus: { failure?: string } = {}
         const loginom = yield* Effect.acquireRelease(
@@ -1769,13 +1722,7 @@ const layer = Layer.effect(
               // Subtasks receive text, so retain attachment context after template and shell expansion.
               prompt: [
                 templateParts.find((y) => y.type === "text")?.text ?? "",
-                ...(input.parts?.flatMap((part) => {
-                  if (part.type === "text") return part.ignored ? [] : [part.text]
-                  if (part.mime === "application/x-loginom-package" && part.url.startsWith("file:")) {
-                    return [`Attached Loginom package path: ${fileURLToPath(part.url)}`]
-                  }
-                  return []
-                }) ?? []),
+                ...(input.parts?.flatMap((part) => ProductHooks.attachmentResolver.subtaskText(part)) ?? []),
               ].join("\n\n"),
             },
           ]
