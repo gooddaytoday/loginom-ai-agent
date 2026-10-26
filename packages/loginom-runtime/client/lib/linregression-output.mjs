@@ -14,12 +14,12 @@ export async function configureLinRegressionOutputs(channel,configuration,p,mapp
  const observe=condition=>channel.observe({condition,readMappings:true,ready});
  let state=await observe('complete native regression coefficients');
  const initial=state.node_mapping,expected=linRegressionOutputColumns(configuration,1),keep=expected.map(f=>f.name);
- // Reopening an already configured coefficient output materializes its native
- // source inventory. Admit that readback only when the intended selection and
- // every retained/excluded source binding are unchanged; no gesture is needed.
+ // After release, native sources can be materialized before the coefficient
+ // selection was reduced. Admit that unfinished selection only with complete,
+ // unique source bindings and the exact intended retained columns.
  const bindings=initial.target_fields.map(f=>f.excluded?f.exclusion_source:f.source);
  const configured=initial.source_fields.length===initial.target_fields.length
-  &&same(initial.target_fields.filter(f=>!f.excluded).map(({name,label,type})=>({name,label,type})),expected)
+  &&same(initial.target_fields.filter(f=>!f.excluded&&keep.includes(f.name)).map(({name,label,type})=>({name,label,type})),expected)
   &&new Set(bindings.map(s=>s?.record_id)).size===bindings.length
   &&initial.target_fields.every((f,i)=>bindings[i]?.name===f.name&&bindings[i]?.type===f.type
    &&initial.source_fields.some(s=>same(s,bindings[i])));
@@ -39,9 +39,11 @@ export async function configureLinRegressionOutputs(channel,configuration,p,mapp
   await channel.perform({condition:'exclude optional intrinsic coefficient field',initialObservation:state,ready:s=>ready(s)&&s.wizard.root_ref===root&&row(s)?.selected===true,identity:()=>field,
    resolve:s=>{const es=s.ui.elements.filter(e=>e.tid===s.wizard.root_tid+';DerivedDataSourceOutputSocketWizard;btnAddMappingToExcluded'&&e.allowed_actions.includes('click'));need(es.length===1,'native coefficient exclusion unavailable');return {verb:'click',ref:es[0].ref};}});
   state=await observe('native coefficient exclusion readback');const after=state.node_mapping;
-  need(after.source_fields.length===0&&after.autosync===baseline.autosync&&after.target_fields.length===baseline.target_fields.length,'exclusion changed the coefficient inventory');
+  need(same(after.source_fields,baseline.source_fields)&&after.autosync===baseline.autosync&&after.target_fields.length===baseline.target_fields.length,'exclusion changed the coefficient inventory');
   const excluded=after.target_fields.filter(f=>f.name===name&&f.excluded===true);
-  need(excluded.length===1&&same(semantic(after.target_fields.filter(f=>f.name!==name)),semantic(baseline.target_fields.filter(f=>f.name!==name))),'exclusion changed unrelated coefficients');
+  need(excluded.length===1&&excluded[0].source===null&&same(excluded[0].exclusion_source,field.source)
+   &&excluded[0].type===field.type&&excluded[0].label===name
+   &&same(semantic(after.target_fields.filter(f=>f.name!==name)),semantic(baseline.target_fields.filter(f=>f.name!==name))),'exclusion changed unrelated coefficients');
  }
  const mapping=(await observe('selected coefficient table readback')).node_mapping;
  need(same(mapping.target_fields.filter(f=>!f.excluded).map(f=>f.name),keep),'only names and coefficients must remain');
