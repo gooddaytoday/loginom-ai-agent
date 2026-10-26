@@ -208,8 +208,11 @@ JUDGE_MODEL=gpt-6-sol JUDGE_REASONING=xhigh bun --no-env-file run src/run.ts --c
 - [ ] Один live scenario проход двух IDs через штатный isolated harness. Проверить installed EVAL_CLI_BIN, dedicated endpoint, модель/variant, private profiles/results; из `evals`:
 
 ```bash
-EVAL_REPEAT=1 bun run src/run.ts --tasks tasks/local-path-scenarios --only csv-two-paths,local-lgp-edit
+env -u EVAL_SLOTS_FILE EVAL_REPEAT=1 bun --no-env-file run src/run.ts --tasks tasks/local-path-scenarios --only csv-two-paths,local-lgp-edit --repeat 1 --skip-judge
+bun --no-env-file run src/run.ts --judge-only "$LOCAL_PATHS_RUN_ID"
 ```
+
+Перед обеими командами задать private `EVAL_SLOTS_FILE` и VPN `EVAL_JUDGE_COMMAND` по runbook задачи7; первая команда исключает slots только из своего env. Для второй `LOCAL_PATHS_RUN_ID` — ID того же завершённого прогона, `EVAL_RESULTS_DIR` прежний. Штатный `--judge-only` оценивает сохранённые артефакты через offline judge lease/private home/named systemd без повторного агента; исходный execution status сохраняется. Проверять actual score/oracle и cleanup, а не один exit0 судьи. Новые parallel users/config API не нужны.
 
 - [ ] Existing `skills-acceptance` запустить на **CLI и Desktop** с явными `--repeat 1` и `--cases docs-local-path,docs-external-unicode-path,scenario-create-path,text-read,edit-after-docs,docs-after-edit`. Остальные аргументы artifact/output/model/variant/installed CLI image брать из проверенного candidate/runbook. Никакого `--corpus` или специального default. CSV-path case обязан пройти в обоих интерфейсах, а не только в scenario benchmark.
 - [ ] Проверить actual outputs, activations, source hashes, absence attachments, две transition Session IDs, факт изменения и документ после изменения. Сохранить различающиеся outcomes существующего external docs case. Harness выдаёт modified copy во второй user prompt; продукт не начинает автоматически скачивать серверные пакеты ради docs.
