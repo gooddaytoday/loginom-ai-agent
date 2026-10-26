@@ -11,7 +11,8 @@ Tools of the OpenCode update procedure. Read [docs/upstream-sync/procedure.md](.
 | `apply-identity.py` | Gives new upstream code the fork's external names (`LOGINOM_AI_AGENT_*`, `.loginom-ai-agent`, `loginom-ai-agent.json`) |
 | `compat-snapshot.ts`, `compat-compare.ts` | External-compatibility snapshot of a checkout and its comparison (identity, packaging, env names, CI triggers, resources) |
 | `catalog-check.py` | Every file that differs from upstream belongs to an entry of `docs/upstream-sync/catalog.json` |
-| `selftest.sh` | Offline test of the procedure on a synthetic upstream and fork |
+| `selftest.sh` | Offline test of the procedure on a synthetic upstream and fork; also runs `test_tools.py` |
+| `test_tools.py` | Behavior tests of `apply-identity.py` and `verify-accepted.py` on synthetic merges (stdlib `unittest`, `python3 -I scripts/upstream-sync/test_tools.py`) |
 | `revert-names.py`, `rename-lock.py` | One-time tools that returned the internal names to upstream (history, not for reuse) |
 | `reference/` | Baseline of LAB-198: 69 conflicting paths of `2e6f66a9` + `v1.19.4`, their types, the 21 that remain when only internal names are restored |
 

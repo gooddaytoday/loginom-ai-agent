@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Offline self-test of the sync procedure on a synthetic upstream and fork (no network, no bun).
 # Covers: pin refuses pre-releases, prepare reports the expected conflicts and refuses a reused directory,
-# accepted rejects "keep the fork's whole file" and accepts a real merge with a recorded decision.
+# accepted rejects "keep the fork's whole file" and accepts a real merge with a recorded decision; test_tools.py covers the
+# edge cases of accepted and apply-identity.
 # Usage: scripts/upstream-sync/selftest.sh   (exit 0 = all assertions held)
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -76,4 +77,6 @@ grep -q 'process.env.OPENCODE_API_KEY' "$IDREPO/packages/core/src/x.ts" || fail 
 grep -q '".loginom-ai-agent/agent"' "$IDREPO/packages/core/src/x.ts" || fail "directory was not renamed"
 grep -q '"loginom-ai-agent.json"' "$IDREPO/packages/core/src/x.ts" || fail "config file was not renamed"
 python3 -I "$HERE/apply-identity.py" --repo "$IDREPO" --check >/dev/null 2>&1 || fail "apply-identity is not idempotent"
+# --- behavior tests of apply-identity.py and verify-accepted.py on synthetic merges (one test per counterexample)
+python3 -I "$HERE/test_tools.py" >"$W/test_tools.log" 2>&1 || { cat "$W/test_tools.log" >&2; fail "test_tools.py failed"; }
 echo "SELFTEST PASS"

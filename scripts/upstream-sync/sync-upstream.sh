@@ -150,7 +150,8 @@ check)
   step catalog . python3 -I "$HERE/catalog-check.py" --repo "$WT" --against "$UPSTREAM_SHA"
   step guards packages/product "$BUN" test
   # 3. Builds.
-  step "build-desktop" packages/desktop "$BUN" run build
+  # electron-vite bundles the whole backend into the main process: .github/workflows/release.yml:221–223 gives it 6144 MB of V8 heap.
+  step "build-desktop" packages/desktop env "NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=6144}" "$BUN" run build
   # 4. External compatibility: identical modulo documented renames, compared with the pre-merge fork.
   if skipped compat; then printf 'compat\tNOT_RUN\tskipped by --skip\n' >>"$CHK/summary.tsv"
   else
