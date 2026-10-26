@@ -129,6 +129,28 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
     package_closed:false, logged_out:false, unsaved_changes_discarded:false, stage:'close_request', started_at:new Date().toISOString()};
   let closeStarted=false;
   const finish = async (status, reason, extra = {}) => {
+    if(status==='BLOCKED'&&receipt.stage==='logout_menu_open'&&deadline>Date.now()) {
+      receipt.logout_menu_readback={status:'unavailable'};
+      try {
+        receipt.logout_menu_readback=await Promise.race([
+          page.waitForTimeout(deadline-Date.now()).then(()=>({status:'unavailable'})),
+          page.evaluate(o=>{
+            const prep=globalThis.__loginomDockPreparationV1,m=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree;
+            if(location.origin!==o.origin||prep?.document!==document||prep.id!==o.documentId
+              ||m?.FServerConnection?.UserName!==o.account)return {status:'identity_changed'};
+            const groups={avatar:'[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]',menu:'[data-tid="MF;AppMenuForm"]',
+              dialogs:'[role="dialog"],.x-message-box',masks:'.x-mask,.bg-mask-message,.x-mask-msg'};
+            const result={status:'observed'};
+            for(const [key,selector] of Object.entries(groups))result[key]=[...document.querySelectorAll(selector)]
+              .filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height&&getComputedStyle(e).visibility!=='hidden';})
+              .slice(0,8).map(e=>{const r=e.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+                return {tid:e.getAttribute('data-tid'),rect:{x:r.x,y:r.y,width:r.width,height:r.height},
+                  hit_tid:hit?.closest('[data-tid]')?.getAttribute('data-tid')??null};});
+            return result;
+          },options),
+        ]);
+      } catch {}
+    }
     // Private journal evidence, after the decision. Never retry Close, answer
     // a prompt, or promote its outcome from this diagnostic readback.
     if(closeStarted&&!receipt.native_close_readback) {
@@ -382,11 +404,13 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
     receipt.package_closed = true;
     receipt.stage = 'logout_menu_open';
     try {
+      receipt.logout_menu_step='first_click';
       await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:remaining()});
     } catch (error) {
       if (error?.name !== 'TimeoutError') throw error;
       // A timed-out click may already have opened the menu. Observe before
       // retrying once; never toggle it closed or extend the cleanup call.
+      receipt.logout_menu_step='observe_after_timeout';
       const observed = await page.waitForFunction(o => {
         const prep = globalThis.__loginomDockPreparationV1, app = globalThis.bg?.app;
         const m = app?.Application?.FInstance?.FMainForm?.FMapTree;
@@ -406,7 +430,10 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       const state = await observed.jsonValue();
       await observed.dispose();
       if (!state?.safe) return finish('BLOCKED', 'CLEANUP_UNCONFIRMED');
-      if (!state.menu) await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:remaining()});
+      if (!state.menu) {
+        receipt.logout_menu_step='retry_click';
+        await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:remaining()});
+      }
     }
     receipt.stage = 'logout_account_readback';
     if ((await at('MF;AppMenuForm;p.h;p.t').innerText({timeout:remaining()})).trim() !== account) return finish('BLOCKED', 'LOGOUT_ACCOUNT_CHANGED');
