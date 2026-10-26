@@ -154,6 +154,11 @@ def main():
         "все изменённые форком": {r[0] for r in rows},
         "после возврата внутренних имён": {r[0] for r in rows if not (r[2] == "move-only" or (r[2] == "mech" and set(r[3].split(",")) <= INTERNAL))},
         "после возврата всех имён": {r[0] for r in rows if r[2] in ("substantive", "binary")},
+        # K10 (кроме bun.lock), K11 и K9 уходят из расхождения политикой владения файлами: манифесты без правок name/version,
+        # оверлей строк и ресурсов бренда, отдельные файлы CI форка (см. отчёт S1)
+        "после политики владения (без K9, K10 кроме bun.lock, K11)": {
+            r[0] for r in rows
+            if r[2] in ("substantive", "binary") and (r[0] == "bun.lock" or r[4].split(" ")[0] not in ("K9", "K10", "K11"))},
     }
 
     def window(x, y):
