@@ -1,0 +1,71 @@
+CONFLICT (content): Merge conflict in .github/workflows/test.yml
+CONFLICT (content): Merge conflict in .github/workflows/typecheck.yml
+CONFLICT (content): Merge conflict in .gitignore
+CONFLICT (content): Merge conflict in bun.lock
+CONFLICT (content): Merge conflict in install
+CONFLICT (content): Merge conflict in package.json
+CONFLICT (content): Merge conflict in packages/agent/package.json
+CONFLICT (content): Merge conflict in packages/agent/script/build.ts
+CONFLICT (content): Merge conflict in packages/agent/src/cli/cmd/import.ts
+CONFLICT (content): Merge conflict in packages/agent/src/cli/cmd/tui.ts
+CONFLICT (content): Merge conflict in packages/agent/src/cli/cmd/web.ts
+CONFLICT (content): Merge conflict in packages/agent/src/cli/upgrade.ts
+CONFLICT (content): Merge conflict in packages/agent/src/mcp/browser.ts
+CONFLICT (content): Merge conflict in packages/agent/src/provider/provider.ts
+CONFLICT (content): Merge conflict in packages/agent/test/cli/import.test.ts
+CONFLICT (content): Merge conflict in packages/agent/test/cli/run/run-process.test.ts
+CONFLICT (content): Merge conflict in packages/agent/test/session/llm.test.ts
+CONFLICT (content): Merge conflict in packages/agent/test/session/message-v2.test.ts
+CONFLICT (content): Merge conflict in packages/app/package.json
+CONFLICT (content): Merge conflict in packages/cli/package.json
+CONFLICT (content): Merge conflict in packages/codemode/package.json
+CONFLICT (content): Merge conflict in packages/console/app/package.json
+CONFLICT (content): Merge conflict in packages/console/app/src/context/auth.ts
+CONFLICT (content): Merge conflict in packages/console/app/src/lib/stats-proxy.ts
+CONFLICT (content): Merge conflict in packages/console/app/src/routes/download/[channel]/[platform].ts
+CONFLICT (content): Merge conflict in packages/console/core/package.json
+CONFLICT (content): Merge conflict in packages/console/function/package.json
+CONFLICT (content): Merge conflict in packages/console/function/src/auth.ts
+CONFLICT (content): Merge conflict in packages/console/mail/package.json
+CONFLICT (content): Merge conflict in packages/console/support/package.json
+CONFLICT (content): Merge conflict in packages/core/package.json
+CONFLICT (content): Merge conflict in packages/core/test/npm.test.ts
+CONFLICT (content): Merge conflict in packages/desktop/package.json
+CONFLICT (content): Merge conflict in packages/effect-drizzle-sqlite/package.json
+CONFLICT (content): Merge conflict in packages/effect-sqlite-node/package.json
+CONFLICT (content): Merge conflict in packages/enterprise/package.json
+CONFLICT (content): Merge conflict in packages/function/package.json
+CONFLICT (content): Merge conflict in packages/http-recorder/package.json
+CONFLICT (content): Merge conflict in packages/llm/package.json
+CONFLICT (content): Merge conflict in packages/plugin/package.json
+CONFLICT (content): Merge conflict in packages/sdk/js/package.json
+CONFLICT (content): Merge conflict in packages/server/package.json
+CONFLICT (content): Merge conflict in packages/session-ui/package.json
+CONFLICT (content): Merge conflict in packages/slack/package.json
+CONFLICT (content): Merge conflict in packages/stats/app/package.json
+CONFLICT (content): Merge conflict in packages/stats/app/src/context/i18n.tsx
+CONFLICT (content): Merge conflict in packages/stats/app/src/routes/[lab]/[model].tsx
+CONFLICT (content): Merge conflict in packages/stats/app/src/routes/model-catalog.ts
+CONFLICT (content): Merge conflict in packages/stats/core/package.json
+CONFLICT (content): Merge conflict in packages/stats/server/Dockerfile
+CONFLICT (content): Merge conflict in packages/stats/server/package.json
+CONFLICT (content): Merge conflict in packages/tui/package.json
+CONFLICT (content): Merge conflict in packages/tui/src/app.tsx
+CONFLICT (content): Merge conflict in packages/tui/src/routes/home.tsx
+CONFLICT (content): Merge conflict in packages/ui/package.json
+CONFLICT (content): Merge conflict in packages/web/src/content/docs/cli.mdx
+CONFLICT (content): Merge conflict in packages/web/src/content/docs/ecosystem.mdx
+CONFLICT (file location): packages/opencode/script/entitlements.plist added in 148842ef7cb1bc34192b3fff57d0f9721ab9c801 inside a directory that was renamed in HEAD, suggesting it should perhaps be moved to packages/agent/script/entitlements.plist.
+CONFLICT (file location): packages/opencode/src/cli/cmd/debug/redact.ts added in 148842ef7cb1bc34192b3fff57d0f9721ab9c801 inside a directory that was renamed in HEAD, suggesting it should perhaps be moved to packages/agent/src/cli/cmd/debug/redact.ts.
+CONFLICT (file location): packages/opencode/test/cli/debug-config.test.ts added in 148842ef7cb1bc34192b3fff57d0f9721ab9c801 inside a directory that was renamed in HEAD, suggesting it should perhaps be moved to packages/agent/test/cli/debug-config.test.ts.
+CONFLICT (file location): packages/opencode/test/cli/upgrade.test.ts added in 148842ef7cb1bc34192b3fff57d0f9721ab9c801 inside a directory that was renamed in HEAD, suggesting it should perhaps be moved to packages/agent/test/cli/upgrade.test.ts.
+CONFLICT (file location): packages/opencode/test/mcp/browser.test.ts added in 148842ef7cb1bc34192b3fff57d0f9721ab9c801 inside a directory that was renamed in HEAD, suggesting it should perhaps be moved to packages/agent/test/mcp/browser.test.ts.
+CONFLICT (file location): packages/opencode/test/provider/openai.test.ts added in 148842ef7cb1bc34192b3fff57d0f9721ab9c801 inside a directory that was renamed in HEAD, suggesting it should perhaps be moved to packages/agent/test/provider/openai.test.ts.
+CONFLICT (modify/delete): packages/agent/src/share/share-next.ts deleted in 148842ef7cb1bc34192b3fff57d0f9721ab9c801 and modified in HEAD.  Version HEAD of packages/agent/src/share/share-next.ts left in tree.
+CONFLICT (modify/delete): packages/agent/test/share/share-next.test.ts deleted in 148842ef7cb1bc34192b3fff57d0f9721ab9c801 and modified in HEAD.  Version HEAD of packages/agent/test/share/share-next.test.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/src/installation/index.ts deleted in HEAD and modified in 148842ef7cb1bc34192b3fff57d0f9721ab9c801.  Version 148842ef7cb1bc34192b3fff57d0f9721ab9c801 of packages/opencode/src/installation/index.ts left in tree.
+CONFLICT (modify/delete): packages/opencode/test/installation/installation.test.ts deleted in HEAD and modified in 148842ef7cb1bc34192b3fff57d0f9721ab9c801.  Version 148842ef7cb1bc34192b3fff57d0f9721ab9c801 of packages/opencode/test/installation/installation.test.ts left in tree.
+CONFLICT (modify/delete): packages/stats/core/src/athena.ts deleted in 148842ef7cb1bc34192b3fff57d0f9721ab9c801 and modified in HEAD.  Version HEAD of packages/stats/core/src/athena.ts left in tree.
+CONFLICT (modify/delete): packages/stats/server/src/ingest.ts deleted in 148842ef7cb1bc34192b3fff57d0f9721ab9c801 and modified in HEAD.  Version HEAD of packages/stats/server/src/ingest.ts left in tree.
+CONFLICT (rename/delete): packages/opencode/src/share/share-next.ts renamed to packages/agent/src/share/share-next.ts in HEAD, but deleted in 148842ef7cb1bc34192b3fff57d0f9721ab9c801.
+CONFLICT (rename/delete): packages/opencode/test/share/share-next.test.ts renamed to packages/agent/test/share/share-next.test.ts in HEAD, but deleted in 148842ef7cb1bc34192b3fff57d0f9721ab9c801.

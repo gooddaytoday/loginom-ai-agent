@@ -1,0 +1,11 @@
+combo	classes	fork_commit	unmerged	content_rewritten	exact_base_restored	roundtrip_failures
+baseline	-	2e6f66a92d961d3e517fb9cc63dc4b4c77039389	69	0	0	
+svckey	svckey	cae245e66df891690cf84ed7f096fa3654a2d089	67	12	6	
+scope	scope	a82e75a5454fb491778820681de8c3566a399cdc	30	134	86	bun.lock;package.json;packages/cli/script/build.ts
+pkgdir	pkgdir	057e83332f63013ad6c532fa5235e163497b77e8	63	7	1	
+tier1	svckey,scope,pkgdir	51b3335fcf9566c39db7458e1bd131b38ebc2382	21	137	99	bun.lock;package.json;packages/cli/script/build.ts
+env	env	a5b6f2243e85ef143fc0f8777f7c26c0af04a8f9	68	22	3	.github/workflows/duplicate-issues.yml
+userfiles	userfiles	744ce9ba0fa3a5888ea07308941ff70b0c417e09	68	12	3	packages/agent/test/provider/transform.test.ts
+tier1+env	svckey,scope,pkgdir,env	eacbe0605b61f37c6bc20e405212354c569feaca	18	145	109	.github/workflows/duplicate-issues.yml;bun.lock;package.json;packages/agent/test/provider/provider.test.ts;packages/cli/script/build.ts
+tier1+userfiles	svckey,scope,pkgdir,userfiles	3d75ee39fb187002843b8f6caff7e70a16b0fb9f	20	145	104	bun.lock;package.json;packages/agent/test/provider/transform.test.ts;packages/cli/script/build.ts
+tier2	svckey,scope,pkgdir,env,userfiles	1672bcbd2f813632e51a3315b62e108beb9d1435	17	149	117	.github/workflows/duplicate-issues.yml;bun.lock;package.json;packages/agent/test/provider/provider.test.ts;packages/agent/test/provider/transform.test.ts;packages/cli/script/build.ts

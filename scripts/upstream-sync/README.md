@@ -8,6 +8,7 @@ upstream (OpenCode) в форк. Они ничего не меняют в раб
 |---|---|
 | `measure-conflicts.sh` | Базовое измерение: пробное слияние, список путей, типы конфликтов, сводка. |
 | `counterfactual-names.py` | Строит синтетический дочерний коммит форка с возвращёнными именами upstream (для прогноза). |
+| `classify-divergence.py` | Классификация изменённых форком файлов (только перенос / механика по классам имён / бинарные / содержательные), кластеры, окна изменчивости upstream. |
 | `forecast-conflicts.sh` | Для набора комбинаций классов переименований строит контрфактический коммит и измеряет на нём то же слияние. |
 | `reference/` | Эталонный вывод для исходной точки (форк `2e6f66a9`, upstream `v1.19.4` = `148842ef`). |
 
@@ -20,6 +21,11 @@ scripts/upstream-sync/measure-conflicts.sh --out /tmp/sync-out \
 
 # прогноз по классам переименований (нужен клон, где есть оба коммита; его создаёт предыдущая команда)
 scripts/upstream-sync/forecast-conflicts.sh --repo /tmp/sync-out/clone --out /tmp/sync-forecast
+
+# классификация расхождений (быстро, ~30 с)
+python3 -I scripts/upstream-sync/classify-divergence.py --repo /tmp/sync-out/clone --out /tmp/sync-classify \
+  --base 501ff62cbf40d4ff260b48c9f1fc113e9b9a83e1 --fork 2e6f66a92d961d3e517fb9cc63dc4b4c77039389 \
+  --upstream 148842ef7cb1bc34192b3fff57d0f9721ab9c801
 ```
 
 Нужны `git` ≥ 2.43, `bash`, `awk`, `sort`, `sha256sum`; для прогноза — `python3` (стандартная библиотека).
