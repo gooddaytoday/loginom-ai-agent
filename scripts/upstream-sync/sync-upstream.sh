@@ -145,6 +145,9 @@ check)
   step tests-desktop packages/desktop "$BUN" test --path-ignore-patterns=src/main/draft-store.test.ts
   step check-generated packages/client "$BUN" run check:generated
   step httpapi packages/opencode "$BUN" run test:httpapi
+  # The catalog is compared with the merged upstream commit; catalog.json "against" must have been moved to it (procedure, step 2),
+  # otherwise the product guard test below, which reads "against", fails on purpose.
+  step catalog . python3 -I "$HERE/catalog-check.py" --repo "$WT" --against "$UPSTREAM_SHA"
   step guards packages/product "$BUN" test
   # 3. Builds.
   step "build-desktop" packages/desktop "$BUN" run build

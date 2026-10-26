@@ -58,7 +58,8 @@ scripts/upstream-sync/sync-upstream.sh prepare \
 3. **Внешние имена нового кода.** Новые флаги, каталоги и файлы конфигурации в коде upstream приходят в написании OpenCode (`OPENCODE_*`, `.opencode`, `opencode.json`). Приведите их к именам продукта: `python3 scripts/upstream-sync/apply-identity.py --repo rehearsal --since <FORK_SHA>`. Ключи сторонних провайдеров `OPENCODE_API_KEY` и `OPENCODE_GO_API_KEY` остаются. Видимые строки бренда в интерфейсе и документах (запись CAT-03) инструмент не трогает: это решение по каждой строке.
 4. **Манифесты и `bun.lock`.** Объедините `package.json`; затем `bun install` (версия bun строго по `packageManager`) и `bun install --frozen-lockfile` для проверки. Сравните набор разрешённых `name@version` с блокировкой upstream для зависимостей, которые форк не менял: расхождение без причины в манифестах — повод остановиться.
 5. **Исправить устаревшие пути.** После слияния upstream мог переименовать каталог или пакет: `bun test` в `packages/product` (охранные тесты `repo-paths`, `names`) укажет, куда ещё ведут turbo, `--filter`, фильтры путей workflows и скрипты сборки.
-6. Закоммитить слияние в `rehearsal/` (хук проекта запускает сканер секретов). Рабочая ветка форка не затрагивается.
+6. **Каталог.** Переведите `against` в `docs/upstream-sync/catalog.json` на SHA принятого тега и запустите `python3 scripts/upstream-sync/catalog-check.py --against <UPSTREAM_SHA>`: он перечисляет файлы, где форк отличается от нового upstream и которые не описаны ни одной записью, и записи без расхождений. Опишите новое расхождение в `catalog.md` или устраните его.
+7. Закоммитить слияние в `rehearsal/` (хук проекта запускает сканер секретов). Рабочая ветка форка не затрагивается.
 
 ### 3. Собрать и проверить
 
@@ -74,6 +75,7 @@ scripts/upstream-sync/sync-upstream.sh check --out /abs/path/new-empty-dir [--sk
 | `typecheck` | `bun turbo typecheck --continue --concurrency=1` |
 | `tests-turbo` | `bun turbo test --continue` (включает `product#test`: охранные тесты) |
 | `tests-desktop` | `bun test --path-ignore-patterns=src/main/draft-store.test.ts` в `packages/desktop` |
+| `catalog` | `catalog-check.py --against <UPSTREAM_SHA>`: каждое расхождение с принятым тегом описано в каталоге |
 | `check-generated` | `bun run check:generated` в `packages/client` |
 | `httpapi` | `bun run test:httpapi` в `packages/opencode` |
 | `build-desktop` | `bun run build` в `packages/desktop` (electron-vite, без упаковки) |
@@ -98,7 +100,7 @@ scripts/upstream-sync/sync-upstream.sh accepted --out /abs/path/new-empty-dir \
 
 ### 5. Отчёт и передача
 
-Приложите к отчёту: `pins.env`, `report.md`, `check/summary.md`, `compat.log`, вывод `accepted`, список решений владельца с причинами, список `NOT_RUN` с причиной. Ветку `rehearsal` при необходимости публикует человек по отдельному решению; процедура её не публикует. Если слияние принято, в `catalog.json` поле `against` переводится на коммит принятого тега, а каталог пересматривается (`catalog-check.py` показывает записи без расхождений и расхождения без записей).
+Приложите к отчёту: `pins.env`, `report.md`, `check/summary.md`, `compat.log`, вывод `accepted`, список решений владельца с причинами, список `NOT_RUN` с причиной. Ветку `rehearsal` при необходимости публикует человек по отдельному решению; процедура её не публикует. Поле `against` каталога переводится на коммит принятого тега в шаге 2; отчёт содержит вывод `catalog-check.py`.
 
 ## Самопроверка процедуры
 
