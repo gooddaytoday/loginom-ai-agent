@@ -2,8 +2,9 @@
 """Keeps docs/upstream-sync/catalog.md honest: every file in which the fork differs from upstream belongs to a catalog entry.
 
 catalog.json lists entries with path globs (first match wins; `**` crosses directories, `*` does not). The tool takes
-the files that exist in the upstream revision (--against) and differ in HEAD (modified, deleted or renamed; files the fork
-added are fork-owned and out of scope), assigns each to an entry and fails when:
+the files that exist in the upstream revision (--against) and differ in the working tree (modified, deleted or renamed; files
+the fork added are fork-owned and out of scope). The working tree, not HEAD, so that the check also covers a resolved merge
+before its commit, staged or not, new files included; the repository's own index is not touched, assigns each to an entry and fails when:
   * a divergent file matches no entry          (new divergence nobody has described: add or extend an entry);
   * an entry matches no divergent file          (stale entry: remove or narrow it);
   * an entry id is missing from catalog.md, or catalog.md describes an id that catalog.json does not have.
@@ -17,8 +18,10 @@ import collections
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 
 
 def glob_regex(pattern):
@@ -48,8 +51,14 @@ def main():
     spec = json.load(open(os.path.join(repo, a.catalog), encoding="utf-8"))
     against = a.against or spec["against"]
     env = dict(os.environ, GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1", LC_ALL="C")
-    raw = subprocess.run(["git", "-C", repo, "diff", "-l30000", "-M", "--name-status", "-z", against, "HEAD"],
-                         capture_output=True, check=True, env=env).stdout.split(b"\0")
+    with tempfile.TemporaryDirectory() as tmp:
+        index = os.path.join(tmp, "index")
+        shutil.copyfile(subprocess.run(["git", "-C", repo, "rev-parse", "--path-format=absolute", "--git-path", "index"],
+                                       capture_output=True, check=True, env=env).stdout.decode().strip(), index)
+        tree_env = dict(env, GIT_INDEX_FILE=index)
+        subprocess.run(["git", "-C", repo, "add", "-A"], capture_output=True, check=True, env=tree_env)
+        raw = subprocess.run(["git", "-C", repo, "diff", "--cached", "-l30000", "-M", "--name-status", "-z", against],
+                             capture_output=True, check=True, env=tree_env).stdout.split(b"\0")
     divergent, i = [], 0
     while i < len(raw) - 1:
         st = raw[i].decode(); i += 1
