@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import {Client} from '@modelcontextprotocol/sdk/client/index.js';
+import {Server} from '@modelcontextprotocol/sdk/server/index.js';
+import {InMemoryTransport} from '@modelcontextprotocol/sdk/inMemory.js';
+import {CallToolRequestSchema} from '@modelcontextprotocol/sdk/types.js';
 import {makePackageCleanupCode,parsePackageCleanupResult} from '../lib/package-cleanup.mjs';
 
 const options = {sessionId:'owned-session', documentId:'owned-document', account:'test-2',
@@ -297,8 +301,8 @@ test('D81 refused avatar records the covering mask without retrying Close or log
   assert.ok(Number.isFinite(Date.parse(r.logout_menu_failed_at)));
   assert.equal(Date.parse(r.deadline_at),f.state.deadline);
   assert.equal(r.logout_menu_readback.status,'observed');
-  assert.equal(r.logout_menu_readback.masks[0].tid,'fixture-mask');
-  assert.equal(r.logout_menu_readback.avatar[0].hit_tid,'fixture-mask');
+  assert.equal(r.logout_menu_readback.masks[0].tid,null);
+  assert.equal(r.logout_menu_readback.avatar[0].hit_tid,null);
   assert.equal(r.package_closed,true);assert.equal(r.logged_out,false);
   assert.equal(f.events.filter(e=>e==='close').length,1);assert.equal(f.state.avatarClicks,1);
   assert.equal(f.events.includes('logout'),false);assert.equal(r.unsaved_changes_discarded,false);
@@ -323,14 +327,14 @@ test('D81 unavailable diagnostic cannot alter the refusal or extend its original
   const flush=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
   await flush();const left=f.state.deadline-f.state.clock;
   assert.equal(left,2500);
-  f.state.clock+=left;t.mock.timers.tick(left);await flush();
-  assert.ok(result);assert.ok(settledAt<=f.state.deadline);
+  f.state.clock+=500;t.mock.timers.tick(500);await flush();
+  assert.ok(result);assert.equal(settledAt,f.state.deadline-2000);
   const refusal=result;
   f.state.clock+=31000-left;t.mock.timers.tick(31000-left);await pending;
   assert.equal(result,refusal);assert.equal(result.status,'BLOCKED');
   assert.equal(result.reason,'CLEANUP_UNCONFIRMED');assert.equal(result.logged_out,false);
   assert.equal(result.logout_menu_readback.status,'unavailable');
-  assert.deepEqual(f.state.diagnosticWaitBudgets,[2500]);
+  assert.deepEqual(f.state.diagnosticWaitBudgets,[500]);
   assert.equal(f.state.avatarClicks,1);assert.equal(f.events.filter(e=>e==='close').length,1);
 });
 
@@ -773,4 +777,84 @@ for(const keepMask of [false,true])test('D78 own error disappearing before OK co
  assert.equal(f.events.filter(x=>x==='close').length,1);assert.equal(f.events.filter(x=>x==='logout').length,1);
  if(keepMask)assert.ok(f.events.indexOf('idle-wait')<f.events.indexOf('close'));
  assert.ok(f.events.indexOf('close')<f.events.indexOf('logout'));assert.ok(f.state.clock<f.state.deadline);
+});
+
+test('review privacy: diagnostic does not persist a file-name canary from a hit target',async()=>{
+  const f=fixture({avatarTimeouts:1,maskAfterTimeout:true});
+  const canary='alice.smith@example.invalid.csv';
+  const tid='MF;TF-1;FileStorageForm;colName_'+canary;
+  f.context.document.elementFromPoint=()=>({closest:()=>({getAttribute:()=>tid})});
+  const r=await f.run();
+  assert.equal(JSON.stringify(r).includes(canary),false);
+});
+test('review deadline: outer 30000ms call retains the original refusal and package facts',async t=>{
+  const f=fixture({avatarTimeouts:1,maskAfterTimeout:true,avatarElapsed:27500});
+  const evaluate=f.page.evaluate.bind(f.page);
+  f.page.evaluate=(fn,arg)=>fn.toString().includes('const groups=')?new Promise(()=>{}):evaluate(fn,arg);
+  const locator=f.page.locator;
+  f.page.locator=query=>{
+    const l=locator(query);
+    if(query.includes('btnAvatar')){
+      const click=l.click;
+      l.click=async settings=>{try{return await click(settings);}finally{t.mock.timers.tick(27500);}};
+    }
+    return l;
+  };
+  const server=new Server({name:'review-browser',version:'1'},{capabilities:{tools:{}}});
+  const client=new Client({name:'review-bridge',version:'1'});
+  server.setRequestHandler(CallToolRequestSchema,async()=>({content:[{type:'text',text:JSON.stringify(await f.run())}]}));
+  const [a,b]=InMemoryTransport.createLinkedPair();
+  await server.connect(b);await client.connect(a);
+  t.mock.timers.enable({apis:['setTimeout']});
+  let result;
+  const pending=client.callTool({name:'browser_run_code_unsafe',arguments:{}},undefined,{timeout:30000})
+    .then(r=>{result=JSON.parse(r.content[0].text);},error=>{result={status:'BLOCKED',reason:'CLEANUP_OR_OPERATION_UNCONFIRMED',transport_error:error.message};});
+  const flush=async()=>{for(let i=0;i<60;i++)await Promise.resolve();};
+  await flush();
+  f.state.clock+=500;t.mock.timers.tick(500);await flush();
+  assert.ok(result,'receipt arrives before the outer deadline');
+  f.state.clock+=2000;t.mock.timers.tick(2000);await flush();await pending;
+  await client.close();await server.close();
+  assert.equal(result.reason,'CLEANUP_UNCONFIRMED');
+  assert.equal(result.package_closed,true);
+});
+
+for(const elapsed of [28900,29000,29500])test('D81 diagnostic leaves delivery reserve after '+elapsed+' ms',async t=>{
+  t.mock.timers.enable({apis:['setTimeout']});
+  const f=fixture({avatarTimeouts:1,maskAfterTimeout:true,avatarElapsed:elapsed});
+  const evaluate=f.page.evaluate.bind(f.page);let reads=0;
+  f.page.evaluate=(fn,arg)=>{
+    if(fn.toString().includes('const groups=')){reads++;return new Promise(()=>{});}
+    return evaluate(fn,arg);
+  };
+  let result;
+  const pending=f.run().then(r=>{result=r;});
+  const flush=async()=>{for(let i=0;i<60;i++)await Promise.resolve();};
+  await flush();
+  if(elapsed<29000){f.state.clock+=100;t.mock.timers.tick(100);await flush();}
+  assert.ok(result);await pending;
+  assert.equal(reads,elapsed<29000?1:0);
+  assert.equal(result.reason,'CLEANUP_UNCONFIRMED');assert.equal(result.package_closed,true);
+  assert.equal(result.logged_out,false);assert.equal(result.unsaved_changes_discarded,false);
+  assert.equal(f.events.filter(e=>e==='close').length,1);
+});
+
+test('D81 diagnostic redacts dynamic IDs on both observed elements and hit targets',async()=>{
+  const f=fixture({avatarTimeouts:1,maskAfterTimeout:true});
+  const canary='private-name@example.invalid';
+  for(const element of f.context.document.querySelectorAll('[data-tid*="btnAvatar"]'))
+    element.getAttribute=()=> 'MF;TF-1;FileStorageForm;colName_'+canary;
+  const r=await f.run();
+  assert.equal(JSON.stringify(r).includes(canary),false);
+  assert.equal(r.logout_menu_readback.avatar[0].tid,null);
+  assert.equal(r.logout_menu_readback.avatar[0].hit_tid,null);
+});
+
+test('D81 diagnostic retains fixed safe control IDs',async()=>{
+  const f=fixture({avatarTimeouts:1,maskAfterTimeout:true});
+  const tid='MF;cntMain;tlbMainToolbar;btnAvatar';
+  for(const element of f.context.document.querySelectorAll('[data-tid*="btnAvatar"]'))element.getAttribute=()=>tid;
+  const r=await f.run();
+  assert.equal(r.logout_menu_readback.avatar[0].tid,tid);
+  assert.equal(r.logout_menu_readback.avatar[0].hit_tid,tid);
 });
