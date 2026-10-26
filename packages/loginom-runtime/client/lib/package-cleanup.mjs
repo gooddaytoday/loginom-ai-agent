@@ -126,9 +126,40 @@ export function parsePackageCleanupResult(response, expected) {
 async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
   const {sessionId, documentId, account, packagePath, tabTid, timeoutMs} = options;
   const receipt = {version:1, session_id:sessionId, document_id:documentId, account, package_path:packagePath,
-    package_closed:false, logged_out:false, unsaved_changes_discarded:false, stage:'close_request', started_at:new Date().toISOString()};
+    package_closed:false, logged_out:false, unsaved_changes_discarded:false, stage:'close_request', started_at:new Date().toISOString(),
+    deadline_at:new Date(deadline).toISOString()};
   let closeStarted=false;
   const finish = async (status, reason, extra = {}) => {
+    if(status==='BLOCKED'&&receipt.stage==='logout_menu_open')receipt.logout_menu_failed_at=new Date().toISOString();
+    // Diagnostics must leave time for the existing 30 s MCP reply to arrive.
+    const diagnosticBudget=Math.min(500,deadline-Date.now()-1000);
+    if(status==='BLOCKED'&&receipt.stage==='logout_menu_open'&&diagnosticBudget>0) {
+      receipt.logout_menu_readback={status:'unavailable'};
+      try {
+        receipt.logout_menu_readback=await Promise.race([
+          page.waitForTimeout(diagnosticBudget).then(()=>({status:'unavailable'})),
+          page.evaluate(o=>{
+            const prep=globalThis.__loginomDockPreparationV1,m=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.FMapTree;
+            if(location.origin!==o.origin||prep?.document!==document||prep.id!==o.documentId
+              ||m?.FServerConnection?.UserName!==o.account)return {status:'identity_changed'};
+            const groups={avatar:'[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]',menu:'[data-tid="MF;AppMenuForm"]',
+              dialogs:'[role="dialog"],.x-message-box',masks:'.x-mask,.bg-mask-message,.x-mask-msg'};
+            // Other data-tid values can contain user file names or captions.
+            const safeTid=e=>{
+              const tid=e?.getAttribute('data-tid');
+              return ['MF;cntMain;tlbMainToolbar;btnAvatar','MF;AppMenuForm','MF;AppMenuForm;btnLogOut'].includes(tid)?tid:null;
+            };
+            const result={status:'observed'};
+            for(const [key,selector] of Object.entries(groups))result[key]=[...document.querySelectorAll(selector)]
+              .filter(e=>{const r=e.getBoundingClientRect();return r.width&&r.height&&getComputedStyle(e).visibility!=='hidden';})
+              .slice(0,8).map(e=>{const r=e.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+                return {tid:safeTid(e),rect:{x:r.x,y:r.y,width:r.width,height:r.height},
+                  hit_tid:safeTid(hit?.closest('[data-tid]'))};});
+            return result;
+          },options),
+        ]);
+      } catch {}
+    }
     // Private journal evidence, after the decision. Never retry Close, answer
     // a prompt, or promote its outcome from this diagnostic readback.
     if(closeStarted&&!receipt.native_close_readback) {
@@ -382,11 +413,13 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
     receipt.package_closed = true;
     receipt.stage = 'logout_menu_open';
     try {
+      receipt.logout_menu_step='first_click';
       await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:remaining()});
     } catch (error) {
       if (error?.name !== 'TimeoutError') throw error;
       // A timed-out click may already have opened the menu. Observe before
       // retrying once; never toggle it closed or extend the cleanup call.
+      receipt.logout_menu_step='observe_after_timeout';
       const observed = await page.waitForFunction(o => {
         const prep = globalThis.__loginomDockPreparationV1, app = globalThis.bg?.app;
         const m = app?.Application?.FInstance?.FMainForm?.FMapTree;
@@ -406,7 +439,10 @@ async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
       const state = await observed.jsonValue();
       await observed.dispose();
       if (!state?.safe) return finish('BLOCKED', 'CLEANUP_UNCONFIRMED');
-      if (!state.menu) await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:remaining()});
+      if (!state.menu) {
+        receipt.logout_menu_step='retry_click';
+        await at('MF;cntMain;tlbMainToolbar;btnAvatar').click({timeout:remaining()});
+      }
     }
     receipt.stage = 'logout_account_readback';
     if ((await at('MF;AppMenuForm;p.h;p.t').innerText({timeout:remaining()})).trim() !== account) return finish('BLOCKED', 'LOGOUT_ACCOUNT_CHANGED');
