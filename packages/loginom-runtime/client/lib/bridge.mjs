@@ -400,7 +400,7 @@ export async function createBridge(config, session, { browserTransport: managedB
               const result=await dispatchNodeApi(actionRuntime,request.params.name,args,{signal:extra.signal});
               if(userProfile)userWorkflows.rememberDelivery(result,args);
               await logResult(request.params.name,result);
-              return nodeResultReply(result,{userProfile});
+              return nodeResultReply(result,{userProfile,tool:request.params.name});
             };
             // Local lifecycle calls must remain available while another request is
             // awaiting browser work. The runtime owns exclusion through cleanup.
