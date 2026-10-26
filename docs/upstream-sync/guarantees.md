@@ -20,7 +20,7 @@
 | Тест | Что ловит | Красный на |
 |---|---|---|
 | `packages/product/test/repo-paths.test.ts` | ключи задач turbo, `--filter`, фильтры путей workflows, `working-directory`, пути к соседним пакетам и `packages/<имя>` в скриптах сборки/CI указывают на несуществующее | `c201f28a` (7 устаревших ссылок: в том числе `packages/desktop/scripts/prebuild.ts`, из-за которого первый CI-прогон ветки упал в macOS и Windows) |
-| `packages/product/test/names.test.ts` | пакет форка/upstream носит чужое имя; `@loginom-ai-agent/<пакет upstream>` в импортах; ключи сервисов с чужим префиксом; чтение `OPENCODE_*` | `2e6f66a9` (4 падения) |
+| `packages/product/test/names.test.ts` | пакет форка/upstream носит чужое имя; `@loginom-ai-agent/<пакет upstream>` в импортах; ключи сервисов с чужим префиксом; чтение `OPENCODE_*` | `2e6f66a9` (5 падений из 6; зелёным остаётся лишь проверка чтений `OPENCODE_*`) |
 | `packages/core/test/flag-identity.test.ts` | унаследованное окружение OpenCode влияет на конфигурацию, БД или пути | мутация выше |
 | `scripts/upstream-sync/selftest.sh` | процедура принимает «разрешение» с файлом форка целиком | мутация проверки `kept-fork` |
 

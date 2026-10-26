@@ -42,6 +42,17 @@ describe("package names", () => {
     expect(offenders).toEqual([])
   })
 
+  test("the fork scope is not spelled as a separate path segment or string", () => {
+    // path.join(dir, "node_modules", "@loginom-ai-agent", "plugin") names a package directory without the "/" the import
+    // check looks for; a fixture built that way stops matching the upstream package name it is meant to stand for.
+    const offenders = tracked
+      .filter((path) => /\.(ts|tsx|js|mjs|json|ya?ml)$/.test(path))
+      .filter((path) => !/^(docs\/|script\/migration\/|scripts\/upstream-sync\/|evals\/docs\/)/.test(path) && !/(^|\/)(reports|history)\//.test(path))
+      .filter((path) => path !== "bun.lock" && path !== "packages/product/src/index.ts" && path !== "packages/product/test/names.test.ts")
+      .filter((path) => /["'`]@loginom-ai-agent["'`]/.test(read(path)))
+    expect(offenders).toEqual([])
+  })
+
   test("Effect service keys use the upstream @opencode/ prefix", () => {
     const offenders = tracked
       .filter((path) => /^packages\/.*\.(ts|tsx)$/.test(path) && !path.includes("/generated"))

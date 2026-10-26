@@ -46,6 +46,8 @@ EXTRA_EDITS = [
     ("evals/test/cli.test.ts", 'path.join("packages", "agent")', 'path.join("packages", "opencode")', 1),
     ("packages/opencode/test/server/session-list.test.ts", '"packages", "agent"', '"packages", "opencode"', 4),
     ("packages/opencode/test/server/httpapi-session.test.ts", '"packages", "agent"', '"packages", "opencode"', 1),
+    # scope written as a separate path segment (the fixture directory of a fake plugin package)
+    ("packages/opencode/test/tool/registry.test.ts", '"node_modules", "@loginom-ai-agent", "plugin"', '"node_modules", "@opencode-ai", "plugin"', 1),
 ]
 
 
