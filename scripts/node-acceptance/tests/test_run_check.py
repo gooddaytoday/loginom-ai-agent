@@ -12,6 +12,70 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_all_regression_names_resolve_real_inputs(self):
+        names = ([f'n{i}' for i in range(1, 21)] + [f'p{i}' for i in range(1, 25)]
+                 + [f'q{i}' for i in range(1, 11)] + [f'r{i}' for i in range(1, 7)]
+                 + [f's{i}' for i in range(1, 9)]
+                 + [f'v{v}s{i}' for v in range(1, 4) for i in range(1, 7)])
+        for name in names:
+            with self.subTest(name=name):
+                case = runner.scenario(name)
+                self.assertTrue(case['prompt'].is_file())
+                self.assertTrue((case['source'] / 'oracle.py').is_file())
+                self.assertTrue(case['data'].is_dir())
+        for name in ['', 'p0', 'p25', 'v0s1', 'v4s1', 'v1s7', 'r0', 'r7', 'n21', 'q11', 's9', '../n1', 'clustering']:
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'Unknown scenario'):
+                runner.scenario(name)
+
+    def test_variants_reuse_demo_evidence_and_followups_use_documented_bases(self):
+        case = runner.scenario('v1s2')
+        demo = runner.scenario('s2')
+        self.assertEqual(case['source'], demo['source'])
+        self.assertEqual(case['data'], demo['data'])
+        self.assertEqual(case['prompt'].name, 'prompt-v1.md')
+        for name, node in [('r1', 'datamining-clustering'), ('r2', 'datamining-clustering'),
+                           ('r3', 'datamining-linregression'), ('r4', 'datamining-linregression'),
+                           ('r5', 'integration-restrequest'), ('r6', 'integration-restrequest')]:
+            self.assertEqual(runner.scenario(name)['base'].parent.name, node)
+        for name in ['p23', 'p24']:
+            self.assertEqual(runner.scenario(name)['base'], 's1')
+
+    def test_expected_modes_and_new_cold_fixtures_match_csv_oracles(self):
+        for name in ['n1', 'p1', 'p14', 'p24', 'v1s2', 'r1', 'r3', 'r5']:
+            expected = runner.expected_for(runner.scenario(name), '/personal/run.lgp')
+            self.assertEqual(expected['package_path'], '/personal/run.lgp')
+            self.assertTrue(expected['outputs'])
+        for name in ['n14', 'n15', 'n16', 'n17']:
+            case = runner.scenario(name)
+            reference = case['source'] / 'expected/reference.csv'
+            output = runner.expected_for(case, '/personal/run.lgp')['outputs'][0]
+            self.assertTrue(output['ordered'])
+            runner.check_csv(reference, output)
+            command = [sys.executable, '-B', str(case['source'] / 'oracle.py')]
+            self.assertEqual(subprocess.run(command + [str(reference)], capture_output=True).returncode, 0)
+            with tempfile.TemporaryDirectory() as folder:
+                bad = Path(folder) / 'bad.csv'
+                lines = reference.read_text().splitlines()
+                bad.write_text('\n'.join(lines[:-1]) + '\n')
+                self.assertNotEqual(subprocess.run(command + [str(bad)], capture_output=True).returncode, 0)
+                with self.assertRaisesRegex(AssertionError, 'CSV_ROW_COUNT'):
+                    runner.check_csv(bad, output)
+
+    def test_csv_declared_column_order_and_dates_keep_value_checks(self):
+        expected = {'columns': [{'name': 'Id', 'type': 'integer'}, {'name': 'Due', 'type': 'datetime'}],
+                    'column_order': 'any', 'rows': [{'Id': 1, 'Due': '2026-10-01T00:00:00.000'}]}
+        with tempfile.TemporaryDirectory() as folder:
+            actual = Path(folder) / 'actual.csv'
+            actual.write_text('Due,Id\n2026-10-01,1\n')
+            runner.check_csv(actual, expected)
+            actual.write_text('Due,Id\n2026-10-02,1\n')
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                runner.check_csv(actual, expected)
+            actual.write_text('Due,Id\n2026-10-01,1\n')
+            expected['column_order'] = 'exact'
+            with self.assertRaisesRegex(AssertionError, 'CSV_COLUMN_ORDER'):
+                runner.check_csv(actual, expected)
+
     def test_deadline_is_unknown_with_a_real_failure_journal(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder)
@@ -148,6 +212,8 @@ class RunCheckTests(unittest.TestCase):
         for word in ['n1 | PASS', '1.00/2.00', 'q7 | FAIL', 'cold/events:17', '/private/profile', 'COLD_FAILED', 'native/port']:
             self.assertIn(word, text)
         self.assertEqual(text.count('FAIL q7:'), 1)
+        table = [line for line in text.splitlines() if line.startswith('|')]
+        self.assertEqual(len({line.count('|') for line in table}), 1)
 
     def test_csv_full_file_and_order(self):
         expected = {'columns': [{'name': 'SKU', 'type': 'string'}, {'name': 'Count', 'type': 'integer'}], 'rows': [{'SKU': 'A', 'Count': 2}, {'SKU': 'B', 'Count': 3}], 'ordered': True}

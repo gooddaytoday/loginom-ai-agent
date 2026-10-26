@@ -1,0 +1,776 @@
+{
+  "package_path": "/stability-2026-10-20/n14.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/order-fees.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "OrderID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Product",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Warehouse",
+          "type": "string",
+          "label_any": true
+        },
+        {
+          "name": "Quantity",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "UnitFee",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Fee",
+          "type": "real",
+          "label_any": true,
+          "tolerance": {
+            "abs": 1e-08,
+            "rel": 1e-09
+          }
+        }
+      ],
+      "rows": [
+        {
+          "OrderID": 1,
+          "Product": "D",
+          "Warehouse": "West",
+          "Quantity": 2,
+          "UnitFee": null,
+          "Fee": null
+        },
+        {
+          "OrderID": 2,
+          "Product": "D",
+          "Warehouse": "West",
+          "Quantity": 9,
+          "UnitFee": null,
+          "Fee": null
+        },
+        {
+          "OrderID": 3,
+          "Product": "C",
+          "Warehouse": "West",
+          "Quantity": 6,
+          "UnitFee": 18,
+          "Fee": 108.0
+        },
+        {
+          "OrderID": 4,
+          "Product": "C",
+          "Warehouse": "West",
+          "Quantity": 6,
+          "UnitFee": 18,
+          "Fee": 108.0
+        },
+        {
+          "OrderID": 5,
+          "Product": "B",
+          "Warehouse": "West",
+          "Quantity": 7,
+          "UnitFee": 15,
+          "Fee": 105.0
+        },
+        {
+          "OrderID": 6,
+          "Product": "C",
+          "Warehouse": "North",
+          "Quantity": 7,
+          "UnitFee": 17,
+          "Fee": 119.0
+        },
+        {
+          "OrderID": 7,
+          "Product": "C",
+          "Warehouse": "East",
+          "Quantity": 1,
+          "UnitFee": 16,
+          "Fee": 16.0
+        },
+        {
+          "OrderID": 8,
+          "Product": "D",
+          "Warehouse": "West",
+          "Quantity": 6,
+          "UnitFee": null,
+          "Fee": null
+        },
+        {
+          "OrderID": 9,
+          "Product": "D",
+          "Warehouse": "North",
+          "Quantity": 5,
+          "UnitFee": 20,
+          "Fee": 100.0
+        },
+        {
+          "OrderID": 10,
+          "Product": "D",
+          "Warehouse": "West",
+          "Quantity": 4,
+          "UnitFee": null,
+          "Fee": null
+        },
+        {
+          "OrderID": 11,
+          "Product": "A",
+          "Warehouse": "West",
+          "Quantity": 6,
+          "UnitFee": 12,
+          "Fee": 72.0
+        },
+        {
+          "OrderID": 12,
+          "Product": "B",
+          "Warehouse": "East",
+          "Quantity": 7,
+          "UnitFee": 13,
+          "Fee": 91.0
+        },
+        {
+          "OrderID": 13,
+          "Product": "A",
+          "Warehouse": "East",
+          "Quantity": 1,
+          "UnitFee": 10,
+          "Fee": 10.0
+        },
+        {
+          "OrderID": 14,
+          "Product": "C",
+          "Warehouse": "North",
+          "Quantity": 7,
+          "UnitFee": 17,
+          "Fee": 119.0
+        },
+        {
+          "OrderID": 15,
+          "Product": "A",
+          "Warehouse": "North",
+          "Quantity": 7,
+          "UnitFee": 11,
+          "Fee": 77.0
+        },
+        {
+          "OrderID": 16,
+          "Product": "A",
+          "Warehouse": "East",
+          "Quantity": 3,
+          "UnitFee": 10,
+          "Fee": 30.0
+        },
+        {
+          "OrderID": 17,
+          "Product": "C",
+          "Warehouse": "North",
+          "Quantity": 1,
+          "UnitFee": 17,
+          "Fee": 17.0
+        },
+        {
+          "OrderID": 18,
+          "Product": "C",
+          "Warehouse": "West",
+          "Quantity": 3,
+          "UnitFee": 18,
+          "Fee": 54.0
+        },
+        {
+          "OrderID": 19,
+          "Product": "A",
+          "Warehouse": "East",
+          "Quantity": 1,
+          "UnitFee": 10,
+          "Fee": 10.0
+        },
+        {
+          "OrderID": 20,
+          "Product": "C",
+          "Warehouse": "West",
+          "Quantity": 9,
+          "UnitFee": 18,
+          "Fee": 162.0
+        },
+        {
+          "OrderID": 21,
+          "Product": "A",
+          "Warehouse": "East",
+          "Quantity": 5,
+          "UnitFee": 10,
+          "Fee": 50.0
+        },
+        {
+          "OrderID": 22,
+          "Product": "A",
+          "Warehouse": "North",
+          "Quantity": 9,
+          "UnitFee": 11,
+          "Fee": 99.0
+        },
+        {
+          "OrderID": 23,
+          "Product": "D",
+          "Warehouse": "West",
+          "Quantity": 2,
+          "UnitFee": null,
+          "Fee": null
+        },
+        {
+          "OrderID": 24,
+          "Product": "C",
+          "Warehouse": "East",
+          "Quantity": 5,
+          "UnitFee": 16,
+          "Fee": 80.0
+        },
+        {
+          "OrderID": 25,
+          "Product": "A",
+          "Warehouse": "East",
+          "Quantity": 8,
+          "UnitFee": 10,
+          "Fee": 80.0
+        },
+        {
+          "OrderID": 26,
+          "Product": "A",
+          "Warehouse": "East",
+          "Quantity": 1,
+          "UnitFee": 10,
+          "Fee": 10.0
+        },
+        {
+          "OrderID": 27,
+          "Product": "B",
+          "Warehouse": "East",
+          "Quantity": 9,
+          "UnitFee": 13,
+          "Fee": 117.0
+        },
+        {
+          "OrderID": 28,
+          "Product": "C",
+          "Warehouse": "West",
+          "Quantity": 4,
+          "UnitFee": 18,
+          "Fee": 72.0
+        },
+        {
+          "OrderID": 29,
+          "Product": "C",
+          "Warehouse": "North",
+          "Quantity": 1,
+          "UnitFee": 17,
+          "Fee": 17.0
+        },
+        {
+          "OrderID": 30,
+          "Product": "B",
+          "Warehouse": "East",
+          "Quantity": 2,
+          "UnitFee": 13,
+          "Fee": 26.0
+        },
+        {
+          "OrderID": 31,
+          "Product": "B",
+          "Warehouse": "East",
+          "Quantity": 2,
+          "UnitFee": 13,
+          "Fee": 26.0
+        },
+        {
+          "OrderID": 32,
+          "Product": "B",
+          "Warehouse": "North",
+          "Quantity": 9,
+          "UnitFee": 14,
+          "Fee": 126.0
+        },
+        {
+          "OrderID": 33,
+          "Product": "C",
+          "Warehouse": "West",
+          "Quantity": 3,
+          "UnitFee": 18,
+          "Fee": 54.0
+        },
+        {
+          "OrderID": 34,
+          "Product": "B",
+          "Warehouse": "East",
+          "Quantity": 1,
+          "UnitFee": 13,
+          "Fee": 13.0
+        },
+        {
+          "OrderID": 35,
+          "Product": "A",
+          "Warehouse": "North",
+          "Quantity": 9,
+          "UnitFee": 11,
+          "Fee": 99.0
+        },
+        {
+          "OrderID": 36,
+          "Product": "D",
+          "Warehouse": "North",
+          "Quantity": 8,
+          "UnitFee": 20,
+          "Fee": 160.0
+        },
+        {
+          "OrderID": 37,
+          "Product": "A",
+          "Warehouse": "North",
+          "Quantity": 8,
+          "UnitFee": 11,
+          "Fee": 88.0
+        },
+        {
+          "OrderID": 38,
+          "Product": "C",
+          "Warehouse": "North",
+          "Quantity": 4,
+          "UnitFee": 17,
+          "Fee": 68.0
+        },
+        {
+          "OrderID": 39,
+          "Product": "C",
+          "Warehouse": "East",
+          "Quantity": 7,
+          "UnitFee": 16,
+          "Fee": 112.0
+        },
+        {
+          "OrderID": 40,
+          "Product": "D",
+          "Warehouse": "North",
+          "Quantity": 6,
+          "UnitFee": 20,
+          "Fee": 120.0
+        },
+        {
+          "OrderID": 41,
+          "Product": "B",
+          "Warehouse": "North",
+          "Quantity": 7,
+          "UnitFee": 14,
+          "Fee": 98.0
+        },
+        {
+          "OrderID": 42,
+          "Product": "D",
+          "Warehouse": "North",
+          "Quantity": 8,
+          "UnitFee": 20,
+          "Fee": 160.0
+        },
+        {
+          "OrderID": 43,
+          "Product": "D",
+          "Warehouse": "North",
+          "Quantity": 4,
+          "UnitFee": 20,
+          "Fee": 80.0
+        },
+        {
+          "OrderID": 44,
+          "Product": "D",
+          "Warehouse": "North",
+          "Quantity": 5,
+          "UnitFee": 20,
+          "Fee": 100.0
+        },
+        {
+          "OrderID": 45,
+          "Product": "C",
+          "Warehouse": "North",
+          "Quantity": 2,
+          "UnitFee": 17,
+          "Fee": 34.0
+        },
+        {
+          "OrderID": 46,
+          "Product": "B",
+          "Warehouse": "North",
+          "Quantity": 3,
+          "UnitFee": 14,
+          "Fee": 42.0
+        },
+        {
+          "OrderID": 47,
+          "Product": "B",
+          "Warehouse": "North",
+          "Quantity": 1,
+          "UnitFee": 14,
+          "Fee": 14.0
+        },
+        {
+          "OrderID": 48,
+          "Product": "B",
+          "Warehouse": "North",
+          "Quantity": 6,
+          "UnitFee": 14,
+          "Fee": 84.0
+        },
+        {
+          "OrderID": 49,
+          "Product": "C",
+          "Warehouse": "North",
+          "Quantity": 4,
+          "UnitFee": 17,
+          "Fee": 68.0
+        },
+        {
+          "OrderID": 50,
+          "Product": "D",
+          "Warehouse": "North",
+          "Quantity": 2,
+          "UnitFee": 20,
+          "Fee": 40.0
+        },
+        {
+          "OrderID": 51,
+          "Product": "C",
+          "Warehouse": "West",
+          "Quantity": 2,
+          "UnitFee": 18,
+          "Fee": 36.0
+        },
+        {
+          "OrderID": 52,
+          "Product": "D",
+          "Warehouse": "West",
+          "Quantity": 1,
+          "UnitFee": null,
+          "Fee": null
+        },
+        {
+          "OrderID": 53,
+          "Product": "A",
+          "Warehouse": "East",
+          "Quantity": 3,
+          "UnitFee": 10,
+          "Fee": 30.0
+        },
+        {
+          "OrderID": 54,
+          "Product": "D",
+          "Warehouse": "North",
+          "Quantity": 5,
+          "UnitFee": 20,
+          "Fee": 100.0
+        },
+        {
+          "OrderID": 55,
+          "Product": "B",
+          "Warehouse": "West",
+          "Quantity": 6,
+          "UnitFee": 15,
+          "Fee": 90.0
+        },
+        {
+          "OrderID": 56,
+          "Product": "D",
+          "Warehouse": "West",
+          "Quantity": 2,
+          "UnitFee": null,
+          "Fee": null
+        },
+        {
+          "OrderID": 57,
+          "Product": "C",
+          "Warehouse": "East",
+          "Quantity": 8,
+          "UnitFee": 16,
+          "Fee": 128.0
+        },
+        {
+          "OrderID": 58,
+          "Product": "C",
+          "Warehouse": "East",
+          "Quantity": 2,
+          "UnitFee": 16,
+          "Fee": 32.0
+        },
+        {
+          "OrderID": 59,
+          "Product": "B",
+          "Warehouse": "North",
+          "Quantity": 2,
+          "UnitFee": 14,
+          "Fee": 28.0
+        },
+        {
+          "OrderID": 60,
+          "Product": "A",
+          "Warehouse": "West",
+          "Quantity": 4,
+          "UnitFee": 12,
+          "Fee": 48.0
+        },
+        {
+          "OrderID": 61,
+          "Product": "D",
+          "Warehouse": "East",
+          "Quantity": 2,
+          "UnitFee": 19,
+          "Fee": 38.0
+        },
+        {
+          "OrderID": 62,
+          "Product": "C",
+          "Warehouse": "West",
+          "Quantity": 8,
+          "UnitFee": 18,
+          "Fee": 144.0
+        },
+        {
+          "OrderID": 63,
+          "Product": "B",
+          "Warehouse": "North",
+          "Quantity": 3,
+          "UnitFee": 14,
+          "Fee": 42.0
+        },
+        {
+          "OrderID": 64,
+          "Product": "D",
+          "Warehouse": "East",
+          "Quantity": 5,
+          "UnitFee": 19,
+          "Fee": 95.0
+        },
+        {
+          "OrderID": 65,
+          "Product": "A",
+          "Warehouse": "East",
+          "Quantity": 3,
+          "UnitFee": 10,
+          "Fee": 30.0
+        },
+        {
+          "OrderID": 66,
+          "Product": "D",
+          "Warehouse": "North",
+          "Quantity": 9,
+          "UnitFee": 20,
+          "Fee": 180.0
+        },
+        {
+          "OrderID": 67,
+          "Product": "A",
+          "Warehouse": "North",
+          "Quantity": 5,
+          "UnitFee": 11,
+          "Fee": 55.0
+        },
+        {
+          "OrderID": 68,
+          "Product": "A",
+          "Warehouse": "West",
+          "Quantity": 2,
+          "UnitFee": 12,
+          "Fee": 24.0
+        },
+        {
+          "OrderID": 69,
+          "Product": "B",
+          "Warehouse": "West",
+          "Quantity": 7,
+          "UnitFee": 15,
+          "Fee": 105.0
+        },
+        {
+          "OrderID": 70,
+          "Product": "A",
+          "Warehouse": "East",
+          "Quantity": 8,
+          "UnitFee": 10,
+          "Fee": 80.0
+        },
+        {
+          "OrderID": 71,
+          "Product": "D",
+          "Warehouse": "North",
+          "Quantity": 3,
+          "UnitFee": 20,
+          "Fee": 60.0
+        },
+        {
+          "OrderID": 72,
+          "Product": "A",
+          "Warehouse": "West",
+          "Quantity": 9,
+          "UnitFee": 12,
+          "Fee": 108.0
+        },
+        {
+          "OrderID": 73,
+          "Product": "D",
+          "Warehouse": "East",
+          "Quantity": 5,
+          "UnitFee": 19,
+          "Fee": 95.0
+        },
+        {
+          "OrderID": 74,
+          "Product": "D",
+          "Warehouse": "East",
+          "Quantity": 5,
+          "UnitFee": 19,
+          "Fee": 95.0
+        },
+        {
+          "OrderID": 75,
+          "Product": "C",
+          "Warehouse": "East",
+          "Quantity": 3,
+          "UnitFee": 16,
+          "Fee": 48.0
+        },
+        {
+          "OrderID": 76,
+          "Product": "B",
+          "Warehouse": "West",
+          "Quantity": 1,
+          "UnitFee": 15,
+          "Fee": 15.0
+        },
+        {
+          "OrderID": 77,
+          "Product": "A",
+          "Warehouse": "East",
+          "Quantity": 4,
+          "UnitFee": 10,
+          "Fee": 40.0
+        },
+        {
+          "OrderID": 78,
+          "Product": "C",
+          "Warehouse": "North",
+          "Quantity": 8,
+          "UnitFee": 17,
+          "Fee": 136.0
+        },
+        {
+          "OrderID": 79,
+          "Product": "D",
+          "Warehouse": "North",
+          "Quantity": 8,
+          "UnitFee": 20,
+          "Fee": 160.0
+        },
+        {
+          "OrderID": 80,
+          "Product": "A",
+          "Warehouse": "West",
+          "Quantity": 1,
+          "UnitFee": 12,
+          "Fee": 12.0
+        },
+        {
+          "OrderID": 81,
+          "Product": "D",
+          "Warehouse": "West",
+          "Quantity": 1,
+          "UnitFee": null,
+          "Fee": null
+        },
+        {
+          "OrderID": 82,
+          "Product": "B",
+          "Warehouse": "East",
+          "Quantity": 6,
+          "UnitFee": 13,
+          "Fee": 78.0
+        },
+        {
+          "OrderID": 83,
+          "Product": "C",
+          "Warehouse": "West",
+          "Quantity": 7,
+          "UnitFee": 18,
+          "Fee": 126.0
+        },
+        {
+          "OrderID": 84,
+          "Product": "D",
+          "Warehouse": "West",
+          "Quantity": 2,
+          "UnitFee": null,
+          "Fee": null
+        },
+        {
+          "OrderID": 85,
+          "Product": "B",
+          "Warehouse": "East",
+          "Quantity": 1,
+          "UnitFee": 13,
+          "Fee": 13.0
+        },
+        {
+          "OrderID": 86,
+          "Product": "A",
+          "Warehouse": "North",
+          "Quantity": 8,
+          "UnitFee": 11,
+          "Fee": 88.0
+        },
+        {
+          "OrderID": 87,
+          "Product": "D",
+          "Warehouse": "North",
+          "Quantity": 3,
+          "UnitFee": 20,
+          "Fee": 60.0
+        },
+        {
+          "OrderID": 88,
+          "Product": "B",
+          "Warehouse": "West",
+          "Quantity": 6,
+          "UnitFee": 15,
+          "Fee": 90.0
+        },
+        {
+          "OrderID": 89,
+          "Product": "B",
+          "Warehouse": "East",
+          "Quantity": 3,
+          "UnitFee": 13,
+          "Fee": 39.0
+        },
+        {
+          "OrderID": 90,
+          "Product": "D",
+          "Warehouse": "East",
+          "Quantity": 3,
+          "UnitFee": 19,
+          "Fee": 57.0
+        }
+      ]
+    }
+  ]
+}
