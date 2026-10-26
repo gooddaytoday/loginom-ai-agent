@@ -18,6 +18,47 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
+    def test_all_86_model_commands_attach_initial_data_and_not_repeat_inputs(self):
+        names = ([f'{prefix}{i}' for prefix, count in [('n', 20), ('p', 24), ('s', 8), ('q', 10), ('r', 6)]
+                  for i in range(1, count + 1)] + [f'v{v}s{i}' for v in range(1, 4) for i in range(1, 7)])
+        self.assertEqual(len(names), 86)
+        for name in names:
+            case = runner.scenario(name)
+            steps = [case['base'], name] if case['base'] else [name]
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                workspace = root / 'workspace'
+                workspace.mkdir()
+                instance = runner.Runner.__new__(runner.Runner)
+                instance.out, instance.env = root, {}
+                for index, step in enumerate(steps):
+                    folder = root / str(index)
+                    folder.mkdir()
+                    spec = (dict(source=step, data=step / 'data')
+                            if isinstance(step, Path) else runner.scenario(step))
+                    inputs = sorted(p for p in spec['data'].iterdir() if p.is_file() and p.suffix in ['.csv', '.xlsx'])
+                    if step == 'p14': inputs = [spec['data'] / 'exhibits.xlsx']
+                    if isinstance(step, Path) and step.parent.name == 'datamining-linregression':
+                        inputs = [spec['data'] / 'train.csv']
+                    if index:
+                        inputs = ([spec['data'] / ('holdout.csv' if step == 'r3' else 'replace.csv')]
+                                  if step in ['r3', 'r4'] else [])
+                    # Stop at the process boundary after the real command and
+                    # workspace have been prepared; no model or oracle is mocked.
+                    with patch.object(instance, 'phase', side_effect=InterruptedError) as phase:
+                        with self.assertRaises(InterruptedError):
+                            instance.model(step, folder, root / 'profile', workspace, '/test/run.lgp',
+                                           {'package_directory': '/test'}, root / 'build',
+                                           session='base-session' if index else None)
+                    command = phase.call_args.args[1]
+                    attached = [Path(command[i + 1]) for i, item in enumerate(command) if item == '--file']
+                    self.assertEqual(sorted(attached), sorted(workspace / p.name for p in inputs))
+                    for source in inputs:
+                        self.assertEqual((workspace / source.name).read_bytes(), source.read_bytes())
+                    self.assertEqual(sorted(p.name for p in workspace.iterdir()),
+                                     sorted(set(p.name for p in inputs) | (set(previous) if index else set())))
+                    previous = [p.name for p in workspace.iterdir()]
+
     def test_all_regression_names_resolve_real_inputs(self):
         names = ([f'n{i}' for i in range(1, 21)] + [f'p{i}' for i in range(1, 25)]
                  + [f'q{i}' for i in range(1, 11)] + [f'r{i}' for i in range(1, 7)]
