@@ -188,7 +188,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         const result = yield* opencode.run("say hi", { format: "json" })
         opencode.expectExit(result, 0)
 
-        const events = opencode.parseJsonEvents(result.stdout)
+        const events = opencode.parseJsonEvents(result.stdout).filter(event => event.type !== "session.status")
         expect(events.length).toBeGreaterThan(0)
         for (const evt of events) {
           expect(typeof evt.type).toBe("string")
@@ -210,6 +210,24 @@ describe("opencode run (non-interactive subprocess)", () => {
             .slice(0, -1)
             .every((line) => line.length > 0),
         ).toBe(true)
+      }),
+    60_000,
+  )
+
+  cliIt.live(
+    "--format json retains a provider retry after a successful request",
+    ({ llm, opencode }) =>
+      Effect.gen(function* () {
+        yield* llm.error(429, { error: { message: "rate limit reached", type: "rate_limit_error" } })
+        yield* llm.text("recovered")
+        const result = yield* opencode.run("retry once", { format: "json", timeoutMs: 30_000 })
+        opencode.expectExit(result, 0)
+        expect(opencode.parseJsonEvents(result.stdout)).toEqual(expect.arrayContaining([
+          expect.objectContaining({ type: "session.status", status: { type: "busy" } }),
+          expect.objectContaining({ type: "session.status", status: expect.objectContaining({ type: "retry" }) }),
+          expect.objectContaining({ type: "session.status", status: { type: "idle" } }),
+          expect.objectContaining({ type: "text", part: expect.objectContaining({ text: "recovered" }) }),
+        ]))
       }),
     60_000,
   )
@@ -255,7 +273,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         })
 
         expect(result.exitCode).toBe(0)
-        const events = opencode.parseJsonEvents(result.stdout)
+        const events = opencode.parseJsonEvents(result.stdout).filter(event => event.type !== "session.status")
         expect(events.map((event) => event.type)).toEqual([
           "step_start",
           "reasoning",
@@ -300,7 +318,7 @@ describe("opencode run (non-interactive subprocess)", () => {
         yield* llm.text("recovered")
         const result = yield* opencode.run("fail after output", { format: "json" })
 
-        const events = opencode.parseJsonEvents(result.stdout)
+        const events = opencode.parseJsonEvents(result.stdout).filter(event => event.type !== "session.status")
         expect(result.exitCode).toBe(0)
         expect(events.map((event) => event.type)).toEqual([
           "step_start",

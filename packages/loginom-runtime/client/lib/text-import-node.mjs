@@ -6,9 +6,7 @@ import {configureTextImportFields,configureTextImportPatch,validateTextImportFie
 import {withBrowserReceipt} from './executor.mjs';
 import {readOutputDefinitionPages,readImportDefinitionPages} from './import-definition-pages.mjs';
 import {makeRetainedImportSourceCode,makeRetainedImportFormatCode,verifyConfiguredImportContinuation,verifyMappedImportContinuation,finishedImportSurface,verifyFinishedImportContinuation,verifyWaitingExecutionContinuation} from './node-import-continuation.mjs';
-import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable,restoreStoppedTableRead} from './node-output-procedure.mjs';
-import {readTableOutputPages} from './table-output-pages.mjs';
-import {decodeTableOutput} from './table-output-values.mjs';
+import {alignReadSchema} from './node-read-contract.mjs';
 import {createNodeExecutionProcedure} from './node-execution-procedure.mjs';
 import {closePreparedWizard} from './node-wizard-close.mjs';
 import {openPreparedWizard} from './node-wizard-open.mjs';
@@ -102,14 +100,14 @@ export function bindConfiguredOutputColumns(configured,actual,native) {
 
 // Host-owned support object. It is deliberately not registered in the public
 // catalog until execution, wide mapping and independent acceptance are complete.
-export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRead}) {
+export function createTextImportNodeSupport({targetOrigin,targetBuild}) {
   const nodeApplyHandlers=new Map([['imports.text',{revision:'text-import-output-v2',modes:['delimited'],
     parameter_schema:textImportParametersSchema,
     configurationReadback:textImportConfigurationReadback,
     validate:validateTextImportNodeParameters,
     configure:(ctx,p,drivers)=>drivers.configureTextImport(ctx,p)}]]);
   const nodeApplyDriverFactory=({operation,execute,onRecord,now,receiptOptions,readReceipt,verifiedUploads,uploadHistory})=>{
-    let channel,configured,outputColumns,owner,executionDriver,executionReceipt,sourceReceipt,activeSignal,readView;
+    let channel,configured,outputColumns,owner,executionDriver,executionReceipt,sourceReceipt,activeSignal;
     const continuationSignal={throwIfAborted:()=>activeSignal?.throwIfAborted(),get aborted(){return activeSignal?.aborted;},get reason(){return activeSignal?.reason;}};
     const enter=ctx=>{
       activeSignal=ctx.signal;
@@ -257,38 +255,17 @@ export function createTextImportNodeSupport({targetOrigin,targetBuild,onTableRea
         if(read.ports.length===0)return verified({status:'complete',ports:[],no_output_requested:true,execution_id:executionReceipt.execution_id,evidence_ref:ctx.receipt_id});
         requireValue(read.ports.length===1&&read.ports[0]===0,'Text import has one data output');
         requireValue(Array.isArray(outputColumns)&&outputColumns.length>0,'Verified output mapping is unavailable');
-        const opened=await openNewOutputTable(channel,0);readView={table:opened.table,formatProof:null,restored:false,formatting:{}};
-        const formatProof=read.require_exact_numbers?await configureTablePrecision(channel,opened.table,{progress:readView.formatting}):null;readView.formatProof=formatProof;
-        let readSettings,data,formatRestoration,raw;
-        try {
-          readSettings=await prepareTableRead(channel,opened.table);
-          raw=await readTableOutputPages(channel,opened.table,{sampleRows:read.sample_rows});
-          data=decodeTableOutput(raw,{formatProof,readSettings,expectedColumns:outputColumns,requireExactNumbers:read.require_exact_numbers});
-        } catch(error) {
-          // A settled ambiguous Filter click can leave our own draft open.
-          // Cancel it before restoring Format; never clean up a lost transport
-          // call or replace its primary error with a secondary cleanup failure.
-          if(!operation.transportUncertain&&operation.cleanupConfirmed===true) {
-            await restoreStoppedTableRead(channel,readView,error);readView=null;
-          }
-          throw error;
-        }
-        if(formatProof){formatRestoration=await restoreTablePrecision(channel,formatProof);readView.restored=true;}
-        const workflowReturn=await returnFromOutputTable(channel,opened.table);readView=null;
-        // Private acceptance may retain raw civil evidence; no public response/schema changes.
-        await onTableRead?.({raw,table_creation:opened,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:workflowReturn});
-        return verified({effect_possible:true,status:data.sample_complete?'complete':'partial',execution_id:executionReceipt.execution_id,evidence_ref:ctx.receipt_id,
-          ports:[{port:0,port_guid:opened.port_guid,fresh:true,freshness_basis:'new_bound_table_after_verified_node_execution',execution_id:executionReceipt.execution_id,...data}],
-          table_creation:opened,format_proof:formatProof,format_restoration:formatRestoration,read_settings:readSettings,workflow_return:workflowReturn});
+        const {output}=await channel.readOutputPort({port:0,execution:executionReceipt,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
+        requireValue(output.schema.every((field,index)=>field.name===outputColumns[index]?.name),'Import output field order differs from the configured output');
+        const aligned=alignReadSchema(output.schema,outputColumns);
+        output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
+        return verified({effect_possible:true,status:output.sample_complete?'complete':'partial',execution_id:executionReceipt.execution_id,evidence_ref:ctx.receipt_id,ports:[output]});
       },
       async releasePending(state,{signal}={}) {
         const deadline=now()+NODE_RELEASE_BUDGET_MS;
         enter({signal,deadline,document_id:state.request.document_id,workflow_ref:state.request.workflow_ref,node:state.node});
         signal?.throwIfAborted();
-        const view=state.pending.phase==='read'?readView:null;
-        return releasePendingNode({operation,channel,deadline,now,readReceipt,restoreRead:view?async()=>{
-          await restoreStoppedTableRead(channel,view);readView=null;return true;
-        }:undefined});
+        return releasePendingNode({operation,channel,deadline,now,readReceipt});
       },
       async verifyContinuation(state,{signal}={}) {
         if(!channel||!configured||state.pending||state.cleanup_complete!==true

@@ -17,7 +17,7 @@ def project_node(snapshot):
     if 'ports' in data:
         output['ports']=[]
         for port in data['ports']:
-            p=pick(port,'port port_guid fresh execution_id schema row_count sample sample_rows sample_complete precision table exact_table read_coverage read_consistency cell_precision binding limitations')
+            p=pick(port,'port port_guid fresh execution_id freshness_basis read_limit schema row_count sample sample_rows sample_complete precision table exact_table read_coverage read_consistency cell_precision binding limitations')
             p['schema']=[pick(c,'index name label type data_kind') for c in port['schema']]
             p['sample']=[]
             for row in port['sample']:

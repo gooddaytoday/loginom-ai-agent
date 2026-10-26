@@ -1,14 +1,131 @@
 import { expect, test } from "bun:test"
+
+const processDenial = process.env.EVAL_PROCESS_DENIAL_TESTS === "1" ? test : test.skip
 import path from "node:path"
 import { mkdir, mkdtemp, readFile, readdir, stat, symlink, writeFile, rm } from "node:fs/promises"
 import os from "node:os"
 import { spawn } from "node:child_process"
 import { loadConfig, repoRoot } from "../src/config"
 import { agentCommand } from "../src/cli"
-import { agentConfigJson, archiveProfileHistory, assertProfileClean, assertAuth, ensureProfile, management, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, waitProfileIdle } from "../src/profile"
+import { agentConfigJson, archiveProfileHistory, assertProfileClean, assertAuth, ensureProfile, management, pruneRuntimeAttempts, recoverIfNeeded, releaseStaleWriter, resetProfile, verifyProfile, waitProfileIdle } from "../src/profile"
 import { EvalFailure } from "../src/fail"
 import { writerIdentity } from "../src/process-supervisor"
 import { Database } from "bun:sqlite"
+
+test("management: binary commands explicitly select headless execution", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-headless-"))
+  let confirmed = false
+  try {
+    const driver = path.join(root, "management.ts")
+    await Bun.write(driver, `const headless = process.argv.includes("--headless")
+console.log(JSON.stringify({ state: headless ? "ready" : "headed" }))
+process.exit(headless ? 0 : 2)
+`)
+    const result = await management({ mode: "binary", cmd: [process.execPath, driver], cwd: root,
+      env: { PATH: process.env.PATH ?? "" } }, ["loginom", "status", "--format", "json"])
+    confirmed = result.processCleanup.status === "confirmed"
+    expect(result.exitCode).toBe(0)
+    expect(JSON.parse(result.stdout)).toEqual({ state: "ready" })
+    expect(confirmed).toBe(true)
+  } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
+})
+
+test("management: model commands preserve the standalone command selector", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-management-models-"))
+  let confirmed = false
+  try {
+    const driver = path.join(root, "models.ts")
+    await Bun.write(driver, `const models = process.argv[2] === "models"
+console.log(JSON.stringify({ models }))
+process.exit(models ? 0 : 2)
+`)
+    const result = await management({ mode: "binary", cmd: [process.execPath, driver], cwd: root,
+      env: { PATH: process.env.PATH ?? "" } }, ["models", "openai"])
+    confirmed = result.processCleanup.status === "confirmed"
+    expect(result.exitCode).toBe(0)
+    expect(JSON.parse(result.stdout)).toEqual({ models: true })
+    expect(confirmed).toBe(true)
+  } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
+})
+
+test("writerIdentity: observes an owner published during initial guard creation", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-writer-initialization-"))
+  try {
+    await mkdir(path.join(root, ".writer"), { mode: 0o700 })
+    const pending = writerIdentity(root).catch((error: unknown) => ({ error: error instanceof Error ? error.message : String(error) }))
+    // Creation publishes the directory before the asynchronous owner write.
+    await Bun.sleep(40)
+    await writeFile(path.join(root, ".writer/owner"), "initialized-nonce", { mode: 0o600 })
+    const directory = await stat(path.join(root, ".writer"))
+    expect(await pending).toEqual({ device: directory.dev, inode: directory.ino, owner: "initialized-nonce" })
+    expect(await Bun.file(path.join(root, ".writer/owner")).text()).toBe("initialized-nonce")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("assertAuth: shared mode refuses local auth and exposes only the provider status code", async () => {
+  const input = await sharedAuthFixture()
+  try {
+    const local = path.join(input.config.profileDir, "data/auth.json")
+    await writeFile(local, '{"openai":{"type":"oauth","refresh":"local-canary"}}', { mode: 0o600 })
+    await Bun.write(input.receipt, JSON.stringify({ format: "shared-oauth-status-v1", provider: "openai", status: "not_ready", code: "SHARED_AUTH_OAUTH_REQUIRED" }))
+    await expect(assertAuth(input.config, { ...input.command, env: { ...input.command.env, EVAL_FAKE_SHARED_AUTH_EXIT: "2" } })).rejects.toThrow("SHARED_AUTH_OAUTH_REQUIRED")
+    expect(JSON.parse((await Bun.file(input.calls).text()).trim())).toEqual({ args: ["providers", "status", "--provider", "openai", "--format", "json"],
+      sharedDir: input.config.auth.sharedDir, httpOnly: "false" })
+    expect(await Bun.file(local).text()).toContain("local-canary")
+  } finally { await rm(input.root, { recursive: true, force: true }) }
+})
+
+test("assertAuth: shared mode admits only the public verified receipt without a local auth file", async () => {
+  const input = await sharedAuthFixture()
+  try {
+    const ready = { format: "shared-oauth-status-v1", provider: "openai", status: "ready", generation: crypto.randomUUID(),
+      principal_sha256: "a".repeat(64), refresh_required: true }
+    await Bun.write(input.receipt, JSON.stringify(ready))
+    expect(await assertAuth(input.config, input.command)).toEqual({ generation: ready.generation,
+      principal_sha256: ready.principal_sha256, refresh_required: true })
+    expect(await Bun.file(path.join(input.config.profileDir, "data/auth.json")).exists()).toBe(false)
+  } finally { await rm(input.root, { recursive: true, force: true }) }
+})
+
+test("assertAuth: shared receipt tampering cannot admit a slot or expose raw provider output", async () => {
+  const input = await sharedAuthFixture()
+  try {
+    const ready = { format: "shared-oauth-status-v1", provider: "openai", status: "ready", generation: crypto.randomUUID(),
+      principal_sha256: "a".repeat(64), refresh_required: false }
+    for (const value of ["private-canary", { ...ready, provider: "other" }, { ...ready, generation: "private-canary" },
+      { ...ready, principal_sha256: "private-canary" }, { ...ready, refresh_required: "yes" },
+      { ...ready, status: "not_ready", code: "private-canary" }]) {
+      await Bun.write(input.receipt, JSON.stringify(value))
+      await expect(assertAuth(input.config, input.command)).rejects.toThrow("SHARED_AUTH_STATUS_INVALID")
+    }
+    await Bun.write(input.receipt, JSON.stringify(ready))
+    await expect(assertAuth(input.config, { ...input.command, env: { ...input.command.env, EVAL_FAKE_SHARED_AUTH_EXIT: "2" } }))
+      .rejects.toThrow("SHARED_AUTH_STATUS_INVALID")
+  } finally { await rm(input.root, { recursive: true, force: true }) }
+}, 20_000)
+
+test("assertAuth: shared grant and HTTP switch must match before any management process", async () => {
+  const input = await sharedAuthFixture()
+  try {
+    for (const env of [{ ...input.command.env, LOGINOM_AI_AGENT_SHARED_AUTH_DIR: path.join(input.root, "ungranted") },
+      { ...input.command.env, LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "true" }])
+      await expect(assertAuth(input.config, { ...input.command, env })).rejects.toThrow("SHARED_AUTH_ENV_MISMATCH")
+    expect(await Bun.file(input.receipt).exists()).toBe(false)
+    expect(await Bun.file(input.calls).exists()).toBe(false)
+  } finally { await rm(input.root, { recursive: true, force: true }) }
+})
+
+async function sharedAuthFixture() {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-shared-auth-admission-"))
+  const config = { ...loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "fake", EVAL_SLOTS_FILE: "fixture-programmatic-only",
+    EVAL_AGENT_MODEL: "openai/model", LOGINOM_DOCK_API_KEY: "fixture", EVAL_PROFILE_DIR: path.join(root, "profile") }),
+    auth: { sharedDir: path.join(root, "shared") } }
+  await Promise.all([path.join(config.profileDir, "data"), config.auth.sharedDir].map(dir => mkdir(dir, { recursive: true, mode: 0o700 })))
+  const receipt = path.join(root, "provider-status.json")
+  const calls = path.join(root, "provider-calls.jsonl")
+  const base = agentCommand(config, { PATH: process.env.PATH })
+  return { root, config, receipt, calls, command: { ...base, env: { ...base.env, EVAL_FAKE_SHARED_AUTH_RECEIPT: receipt, EVAL_FAKE_SHARED_AUTH_CALLS_FILE: calls } } }
+}
 
 test("archiveProfileHistory: история каждой попытки сохраняется вне mounts, OAuth и cli-profile остаются writable", async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "evals-profile-history-"))
@@ -39,6 +156,52 @@ test("archiveProfileHistory: история каждой попытки сохр
     expect(await Bun.file(path.join(profile, "data/auth.json")).text()).toContain("updated-token")
     await Bun.write(path.join(profile, "data/auth.json"), '{"openai":{"refresh":"next-token"}}')
     await assertProfileClean(profile)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test("archiveProfileHistory: explicit slot history root receives evidence while profile settings remain", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-slot-history-"))
+  const profile = path.join(dir, "profile")
+  const history = path.join(dir, "slot-history")
+  try {
+    await mkdir(path.join(profile, "data"), { recursive: true, mode: 0o700 })
+    await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), "history-bytes")
+    await Bun.write(path.join(profile, "cli-profile.json"), "settings")
+    const archive = await archiveProfileHistory(profile, "slot-a-1", history)
+    expect(path.dirname(archive)).toBe(history)
+    expect(await Bun.file(path.join(archive, "data/loginom-ai-agent.db")).text()).toBe("history-bytes")
+    expect(await Bun.file(path.join(profile, "data/loginom-ai-agent.db")).exists()).toBe(false)
+    expect(await Bun.file(path.join(profile, "cli-profile.json")).text()).toBe("settings")
+    expect(await Bun.file(`${profile}.history`).exists()).toBe(false)
+    await assertProfileClean(profile)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test.each(["same", "inside", "ancestor"] as const)("archiveProfileHistory: %s root refuses before moving history", async kind => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-slot-history-overlap-"))
+  const profile = path.join(dir, "profile")
+  try {
+    await mkdir(path.join(profile, "data"), { recursive: true, mode: 0o700 })
+    await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), "preserve-history")
+    const history = kind === "same" ? profile : kind === "inside" ? path.join(profile, "history") : dir
+    await expect(archiveProfileHistory(profile, "slot-a-1", history)).rejects.toThrow("PROFILE_HISTORY_ROOT")
+    expect(await Bun.file(path.join(profile, "data/loginom-ai-agent.db")).text()).toBe("preserve-history")
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test("archiveProfileHistory: symlink parent refuses before creating an archive in its target", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-slot-history-alias-"))
+  const profile = path.join(dir, "profile")
+  try {
+    await mkdir(path.join(profile, "data"), { recursive: true, mode: 0o700 })
+    await mkdir(path.join(dir, "other"), { mode: 0o700 })
+    await Bun.write(path.join(profile, "data/loginom-ai-agent.db"), "preserve-history")
+    await Bun.write(path.join(dir, "other/control"), "preserve-other")
+    await symlink(path.join(dir, "other"), path.join(dir, "alias"))
+    await expect(archiveProfileHistory(profile, "slot-a-1", path.join(dir, "alias/history"))).rejects.toThrow("PROFILE_HISTORY_ROOT")
+    expect(await Bun.file(path.join(profile, "data/loginom-ai-agent.db")).text()).toBe("preserve-history")
+    expect(await Bun.file(path.join(dir, "other/control")).text()).toBe("preserve-other")
+    expect(await Bun.file(path.join(dir, "other/history")).exists()).toBe(false)
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
 
@@ -236,7 +399,7 @@ test("waitProfileIdle: незарегистрированный owner с про�
 })
 
 for (const known of [false, true]) {
-  test(`releaseStaleWriter: EACCES env/cwd ${known ? "известного CLI сохраняет guard" : "постороннего процесса не мешает cleanup"}`, async () => {
+  processDenial(`releaseStaleWriter: EACCES env/cwd ${known ? "известного CLI сохраняет guard" : "постороннего процесса не мешает cleanup"}`, async () => {
     const profile = await mkdtemp(path.join(os.tmpdir(), "evals-private-process-"))
     await mkdir(path.join(profile, ".writer"))
     const child = spawn(process.execPath, ["-e", `
@@ -344,6 +507,184 @@ test("ensureProfile: ready с hasApiKey не вызывает setup и пише�
   expect((await ensureProfile(config, command)).fresh).toBe(false)
   expect(await Bun.file(path.join(profileDir, "setup-called")).exists()).toBe(false)
   expect(await Bun.file(path.join(profileDir, "config", "loginom-ai-agent.json")).exists()).toBe(true)
+})
+
+test.each(["username", "url", "missing-username", "missing-url"] as const)("ensureProfile v2: %s mismatch refuses before setup or config replacement", async kind => {
+  const context = await fakeProfile()
+  const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),
+    loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json")
+  const calls = path.join(context.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  try {
+    const mismatch = kind === "username" ? { username: "eval-b" } : kind === "url" ? { url: "http://127.0.0.1:80/app/" }
+      : kind === "missing-username" ? { username: undefined } : { url: undefined }
+    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username, ...mismatch }))
+    await Bun.write(path.join(context.profileDir, "config/loginom-ai-agent.json"), "preserve-config")
+    await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_CONNECTION_MISMATCH")
+    expect(await Bun.file(path.join(context.profileDir, "config/loginom-ai-agent.json")).text()).toBe("preserve-config")
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status"])
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test("ensureProfile v2: matching ready profile is reused without setup or generation change", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),
+    loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json")
+  const calls = path.join(context.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  try {
+    const view = { state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username, revision: 4, generation: 9 }
+    await Bun.write(state, JSON.stringify(view))
+    await Bun.write(path.join(context.profileDir, "cli-profile.json"), "preserve-profile")
+    expect(await ensureProfile(config, command)).toEqual({ fresh: false })
+    expect(await ensureProfile(config, command)).toEqual({ fresh: false })
+    expect(await Bun.file(state).json()).toEqual(view)
+    expect(await Bun.file(path.join(context.profileDir, "cli-profile.json")).text()).toBe("preserve-profile")
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "status"])
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test("verifyProfile checks a starting standalone host without setup or recovery", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, loginom: { ...context.config.loginom, url: "http://127.0.0.1:32791/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json"), check = path.join(context.profileDir, "check.json"), calls = path.join(context.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_CHECK_FILE: check, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  try {
+    await Bun.write(path.join(config.profileDir, "config/loginom-ai-agent.json"), JSON.stringify(agentConfigJson(config)))
+    await Bun.write(state, JSON.stringify({ state: "starting", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }))
+    await Bun.write(check, JSON.stringify({ receipt: { ok: true, code: "LOGINOM_CONNECTION_VALID", help: { state: "ready" } } }))
+    expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "check"])
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+  } finally { await rm(context.profileDir, { recursive: true }) }
+})
+
+test("verifyProfile accepts the native schema annotation while preserving permissions and file bytes", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json"), settings = path.join(context.profileDir, "config/loginom-ai-agent.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state } }
+  const saved = JSON.stringify({ $schema: "urn:loginom-ai-agent:config", ...agentConfigJson(config) }, null, 2)
+  try {
+    await Bun.write(settings, saved)
+    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }))
+    expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
+    expect(await Bun.file(settings).text()).toBe(saved)
+    await Bun.write(settings, JSON.stringify({ $schema: "urn:loginom-ai-agent:config", permission: { "*": "allow" } }))
+    await expect(verifyProfile(config, command)).rejects.toThrow("PROFILE_CONFIGURATION_DRIFT")
+    await Bun.write(settings, JSON.stringify({ $schema: "urn:other:config", ...agentConfigJson(config) }))
+    await expect(verifyProfile(config, command)).rejects.toThrow("PROFILE_CONFIGURATION_DRIFT")
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+  } finally { await rm(context.profileDir, { recursive: true }) }
+})
+
+test("verifyProfile checks readiness and saved configuration without setup or replacement", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),
+    loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json"), settings = path.join(context.profileDir, "config/loginom-ai-agent.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state } }
+  const saved = JSON.stringify(agentConfigJson(config), null, 2)
+  try {
+    await Bun.write(settings, saved)
+    await Bun.write(state, JSON.stringify({ state: "unconfigured", hasApiKey: false }))
+    await expect(verifyProfile(config, command)).rejects.toThrow("PROFILE_NOT_PREPARED")
+    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }))
+    expect((await verifyProfile(config, command)).processCleanup.status).toBe("confirmed")
+    await Bun.write(settings, '{"permission":{"*":"allow"}}')
+    await expect(verifyProfile(config, command)).rejects.toThrow("PROFILE_CONFIGURATION_DRIFT")
+    expect(await Bun.file(settings).text()).toBe('{"permission":{"*":"allow"}}')
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+  } finally { await rm(context.profileDir, { recursive: true }) }
+})
+
+test("ensureProfile v2: failed status cannot admit a matching ready profile", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),
+    loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state } }
+  try {
+    await Bun.write(state, JSON.stringify({ state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username, exitCode: 2 }))
+    await Bun.write(path.join(context.profileDir, "config/loginom-ai-agent.json"), "preserve-config")
+    await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_STATUS_FAILED")
+    expect(await Bun.file(path.join(context.profileDir, "config/loginom-ai-agent.json")).text()).toBe("preserve-config")
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(false)
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test("ensureProfile v2: successful setup exit with a foreign reply refuses before config replacement", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),
+    loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json")
+  const setup = path.join(context.profileDir, "setup.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_SETUP_FILE: setup } }
+  try {
+    await Bun.write(state, JSON.stringify({ state: "unconfigured", hasApiKey: false }))
+    const saved = { state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }
+    await Bun.write(setup, JSON.stringify({ reply: { ...saved, username: "eval-b" }, state: saved }))
+    await Bun.write(path.join(context.profileDir, "config/loginom-ai-agent.json"), "preserve-config")
+    await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_CONNECTION_MISMATCH")
+    expect(await Bun.file(path.join(context.profileDir, "config/loginom-ai-agent.json")).text()).toBe("preserve-config")
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(true)
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test("ensureProfile v2: setup acknowledgement does not replace fresh settings read-back", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),
+    loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json")
+  const setup = path.join(context.profileDir, "setup.json")
+  const calls = path.join(context.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_SETUP_FILE: setup, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  try {
+    await Bun.write(state, JSON.stringify({ state: "unconfigured", hasApiKey: false }))
+    const saved = { state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }
+    await Bun.write(setup, JSON.stringify({ reply: saved, state: { ...saved, username: "eval-b" } }))
+    await Bun.write(path.join(context.profileDir, "config/loginom-ai-agent.json"), "preserve-config")
+    await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_CONNECTION_MISMATCH")
+    expect(await Bun.file(path.join(context.profileDir, "config/loginom-ai-agent.json")).text()).toBe("preserve-config")
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "setup", "status"])
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test("ensureProfile v2: failed read-back refuses a successful matching setup", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),
+    loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json"), setup = path.join(context.profileDir, "setup.json")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_SETUP_FILE: setup } }
+  try {
+    await Bun.write(state, JSON.stringify({ state: "unconfigured", hasApiKey: false }))
+    const saved = { state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username }
+    await Bun.write(setup, JSON.stringify({ reply: saved, state: { ...saved, exitCode: 2 } }))
+    await Bun.write(path.join(context.profileDir, "config/loginom-ai-agent.json"), "preserve-config")
+    await expect(ensureProfile(config, command)).rejects.toThrow("PROFILE_STATUS_FAILED")
+    expect(await Bun.file(path.join(context.profileDir, "config/loginom-ai-agent.json")).text()).toBe("preserve-config")
+    expect(await Bun.file(path.join(context.profileDir, "setup-called")).exists()).toBe(true)
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
+})
+
+test("ensureProfile v2: fresh stdin setup binds settings and is reused on the next preparation", async () => {
+  const context = await fakeProfile()
+  const config = { ...context.config, slotsFile: path.join(context.profileDir, "fixture-slots.json"),
+    loginom: { ...context.config.loginom, url: "http://127.0.0.1:32771/app/", username: "eval-a" } }
+  const state = path.join(context.profileDir, "view.json")
+  const calls = path.join(context.profileDir, "calls.jsonl")
+  const command = { ...context.command, env: { ...context.command.env, EVAL_FAKE_STATE_FILE: state, EVAL_FAKE_MANAGEMENT_CALLS_FILE: calls } }
+  try {
+    await Bun.write(state, JSON.stringify({ state: "unconfigured", hasApiKey: false }))
+    expect(await ensureProfile(config, command)).toEqual({ fresh: true })
+    expect(await ensureProfile(config, command)).toEqual({ fresh: false })
+    expect(await Bun.file(state).json()).toEqual({ state: "ready", hasApiKey: true, url: config.loginom.url, username: config.loginom.username })
+    expect((await Bun.file(calls).text()).trim().split("\n").map(line => JSON.parse(line)[1])).toEqual(["status", "setup", "status", "status"])
+  } finally { await rm(context.profileDir, { recursive: true, force: true }) }
 })
 
 test("ensureProfile: source без cache/models.json засевает каталог из product snapshot", async () => {
@@ -651,4 +992,21 @@ test("writerIdentity: symlink owner не читает конфигурацию �
   await Bun.write(authorization, "private-authorization-token")
   await symlink(authorization, path.join(profile, ".writer/owner"))
   await expect(writerIdentity(profile)).rejects.toThrow("Writer owner")
+})
+
+test("management: missing writer owner is diagnostic after confirmed process cleanup", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-writer-diagnostic-"))
+  const profile = path.join(root, "profile")
+  try {
+    await mkdir(path.join(root, "fixtures"))
+    await mkdir(profile)
+    const script = path.join(root, "fixtures/fake-cli.ts")
+    await Bun.write(script, `import { mkdir } from "node:fs/promises"; await mkdir(${JSON.stringify(path.join(profile, ".writer"))}); await Bun.sleep(300); console.log("done")`)
+    const result = await management({ mode: "fake", cmd: [process.execPath, script], cwd: root,
+      env: { PATH: process.env.PATH ?? "", LOGINOM_AI_AGENT_CLI_PROFILE: profile } }, ["diagnostic"], undefined, 5000)
+    expect(result.exitCode).toBe(0)
+    expect(result.processCleanup).toMatchObject({ status: "confirmed", error: null, capture_complete: true, unknownProcesses: [] })
+    expect(result.processCleanup.writerRefusal).toBeDefined()
+    await expect(stat(path.join(profile, ".writer"))).rejects.toMatchObject({ code: "ENOENT" })
+  } finally { await rm(root, { recursive: true, force: true }) }
 })

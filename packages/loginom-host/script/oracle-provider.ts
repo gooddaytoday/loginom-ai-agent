@@ -20,6 +20,7 @@ export function oracleProvider(options: { directory: string; apiKey: string; onF
     port: 0,
     idleTimeout: 255,
     async fetch(request) {
+      if (request.method !== "POST") return new Response(null, { status: 405 })
       const body = (await request.json()) as {
         messages: { role: string; content: unknown; tool_call_id?: string }[]
         tools?: { function?: { name?: string } }[]

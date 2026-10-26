@@ -18,7 +18,7 @@ function fixture(mode='ready',{bound=true}={}) {
     signal:controller.signal,now:()=>clock,monotonicNow:()=>clock,wait:async ms=>{clock+=ms;if(mode==='cancel'&&clock>=10000)controller.abort();},
     record:async e=>{records.push(e);return structuredClone(e);},execute:async code=>{
       assert.equal(typeof code,'string');
-      if(code.includes('async function readOutputContext'))return {
+      if(!code.includes('function workspaceUiCapability')&&code.includes('async function readOutputContext'))return {
         ...(mode.startsWith('pending')&&clock>=10000&&clock<60000?{verified:false,reason:mode==='pending_wrong_reason'?'table_card_binding':'table_card_pending',
           pending_tables:[{view_guid:'new',port_guid:mode==='pending_foreign_port'?'foreign':port},...(mode==='pending_multiple'?[{view_guid:'other',port_guid:port}]:[])]}:{verified:true}),surface:'views',
         port_panels:[{port_guid:mode==='foreign_port'&&clock>=10000?'foreign':port,tid:'MF;TF-1;ViewsForm;cntPorts;'+port}],

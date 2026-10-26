@@ -1,0 +1,57 @@
+{
+  "id": "search-engine-cost-efficiency",
+  "title": "Эффективность затрат по поисковым системам",
+  "prompt": "По search_engine рассчитай keywords как число строк и суммы impressions, clicks, conversions и cost. Из этих сумм вычисли ctr_pct=100*total_clicks/total_impressions, conversion_pct=100*total_conversions/total_clicks, cpc=total_cost/total_clicks, cpa=total_cost/total_conversions. Готовые ctr, conversion_rate и cost_per_click не усредняй и не используй вместо отношений сумм. Упорядочь по cpa по возрастанию, затем search_engine по возрастанию. Вход — dataset.csv; учитывай все строки без изменения исходных значений. Создай ровно одну итоговую выгрузку CSV с заголовком, разделителем-запятой и десятичной точкой. Счётчики выгружай целыми; все остальные числовые результаты округляй только в конце до шести знаков после точки. Порядок строк определяй по неокруглённым значениям; равенства расчётных показателей разрешай ключами группы по возрастанию. Точные имена колонок результата: search_engine, keywords, total_impressions, total_clicks, total_conversions, total_cost, ctr_pct, conversion_pct, cpc, cpa.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "3 строк данных; точные колонки: search_engine, keywords, total_impressions, total_clicks, total_conversions, total_cost, ctr_pct, conversion_pct, cpc, cpa. Полный ожидаемый CSV приведён в обязательном пункте result. Допуск чисел ±0.000001.",
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06,
+  "checklist": [
+    {
+      "id": "input",
+      "required": true,
+      "text": "Пакет читает dataset.csv с заголовком и все его строки; поля impressions, clicks, conversions, cost доступны для числовых вычислений. Итог не подставлен константами вместо расчёта из входа."
+    },
+    {
+      "id": "grouping",
+      "required": true,
+      "text": "Ключ группы — search_engine; keywords — количество строк, остальные базовые агрегаты — суммы impressions, clicks, conversions, cost."
+    },
+    {
+      "id": "metrics",
+      "required": true,
+      "text": "После агрегации вычислены ctr_pct=100*total_clicks/total_impressions, conversion_pct=100*total_conversions/total_clicks, cpc=total_cost/total_clicks, cpa=total_cost/total_conversions. Готовые ctr, conversion_rate, cost_per_click не усредняются."
+    },
+    {
+      "id": "ordering",
+      "required": true,
+      "text": "Строки отсортированы по cpa ↑, затем search_engine ↑. Сортировка по расчётным величинам предшествует округлению до шести знаков."
+    },
+    {
+      "id": "export",
+      "required": true,
+      "text": "Настроена ровно одна итоговая выгрузка текстового CSV с заголовком, запятой и десятичной точкой. Колонки: search_engine, keywords, total_impressions, total_clicks, total_conversions, total_cost, ctr_pct, conversion_pct, cpc, cpa. Счётчики целые, остальные числовые результаты округлены до шести знаков после точки. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "connected-calculation",
+      "required": true,
+      "text": "Есть связный путь от чтения dataset.csv через описанные вычисления до итоговой выгрузки; результат действительно получен из исходных записей, а не из вручную введённых итоговых строк."
+    },
+    {
+      "id": "result",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2,
+      "text": "Файл результата содержит ровно 3 строк данных и 10 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.000001. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\nsearch_engine,keywords,total_impressions,total_clicks,total_conversions,total_cost,ctr_pct,conversion_pct,cpc,cpa\nYandex,103,26199540,271395,26828,280263.350000,1.035877,9.885223,1.032677,10.446673\nGoogle,114,29284579,276465,28510,302411.730000,0.944063,10.312336,1.093852,10.607216\nBing,83,18215017,216862,22861,251987.550000,1.190567,10.541727,1.161972,11.022595\n"
+    },
+    {
+      "id": "honest-report",
+      "requires_run": true,
+      "text": "Финальный ответ не заявляет выполнение, сохранение или проверку результата без соответствующих артефактов."
+    }
+  ]
+}

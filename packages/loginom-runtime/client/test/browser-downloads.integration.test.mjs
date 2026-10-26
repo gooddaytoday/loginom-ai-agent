@@ -97,26 +97,34 @@ for (const owner of ['mcp', 'managed']) {
       assert.deepEqual(geometry.viewport,headless?{width:1280,height:800}:null);
       const downloaded = await code(`async page => {
         const started = Date.now();
-        // Register before the action and await both together. This budget also
-        // covers the first trusted input on a cold headed Chromium in CI.
-        let file;
+        const events = [];
+        const mark = phase => events.push({phase, ms:Date.now()-started});
+        const onPageError = error => events.push({phase:'pageerror', ms:Date.now()-started, message:error.message.slice(0,500)});
+        const onCrash = () => mark('crash');
+        page.on('pageerror', onPageError);
+        page.on('crash', onCrash);
+        // Register before the action; retain the cold Chromium budget.
+        const event = page.waitForEvent('download', {timeout:20000});
+        event.then(() => mark('download'), () => mark('download_failed'));
         try {
-          [file] = await Promise.all([
-            page.waitForEvent('download', {timeout:20000}),
-            page.locator('#save').click({timeout:20000}),
-          ]);
+          mark('click_start');
+          const [file] = await Promise.all([event, page.locator('#save').click({timeout:20000})]);
+          mark('click_done');
+          const download_ms = Date.now() - started;
+          await file.saveAs(${JSON.stringify(join(session.metadata.artifacts, 'sales.csv'))});
+          await page.locator('#upload').setInputFiles(${JSON.stringify(join(session.metadata.artifacts, 'input.csv'))});
+          return {download_ms, clicks:await page.evaluate(() => window.downloadClicks), url:file.url(),
+            name:file.suggestedFilename(), failure:await file.failure(), listeners:page.listenerCount('filechooser'),
+            uploaded:await page.locator('#upload').evaluate(async input => await input.files[0].text())};
         } catch (error) {
           const state = await page.locator('#save').evaluate(link => ({picker:window.initialPicker,
             mode:window.downloadMode, clicks:window.downloadClicks, href:link.href,
-            ready:document.readyState, visibility:document.visibilityState}));
-          throw new Error(error.message + '; download fixture: ' + JSON.stringify(state));
+            ready:document.readyState, visibility:document.visibilityState})).catch(() => ({unavailable:true}));
+          throw new Error(String(error) + '\\nDownload diagnostics: ' + JSON.stringify({closed:page.isClosed(), events, fixture:state}), {cause:error});
+        } finally {
+          page.off('pageerror', onPageError);
+          page.off('crash', onCrash);
         }
-        const download_ms = Date.now() - started;
-        await file.saveAs(${JSON.stringify(join(session.metadata.artifacts, 'sales.csv'))});
-        await page.locator('#upload').setInputFiles(${JSON.stringify(join(session.metadata.artifacts, 'input.csv'))});
-        return {download_ms, clicks:await page.evaluate(() => window.downloadClicks), url:file.url(),
-          name:file.suggestedFilename(), failure:await file.failure(), listeners:page.listenerCount('filechooser'),
-          uploaded:await page.locator('#upload').evaluate(async input => await input.files[0].text())};
       }`);
       assert.equal(downloaded.name, 'sales.csv');
       assert.equal(downloaded.clicks, 1, 'one trusted click without replay');

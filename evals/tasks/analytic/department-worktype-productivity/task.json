@@ -1,0 +1,52 @@
+{
+  "id": "department-worktype-productivity",
+  "title": "Продуктивность форм работы по отделам",
+  "prompt": "Построй в Loginom воспроизводимый сценарий по прикреплённому dataset.csv. Все строки входного файла сохраняют исходный смысл; не используй внешние данные. По каждому department вычисли для каждого work_type Office/Remote/Hybrid число строк и среднее productivity_score. Выведи office_employees, avg_office_productivity, remote_employees, avg_remote_productivity, hybrid_employees, avg_hybrid_productivity и remote_minus_office=avg_remote_productivity-avg_office_productivity. На этих данных у каждого отдела представлены все три формы; получится пять строк. Сортируй remote_minus_office по убыванию, затем department по возрастанию. Другие признаки не используются. Выгрузи ровно один CSV с разделителем запятая, десятичной точкой и строкой заголовков. Счётчики запиши целыми; прочие числовые результаты округли до шести знаков после десятичной точки только в самом конце. Сортируй по неокруглённым расчётным значениям, затем округляй. Точные имена выходных колонок: department, office_employees, avg_office_productivity, remote_employees, avg_remote_productivity, hybrid_employees, avg_hybrid_productivity, remote_minus_office.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "5 строк данных; колонки department, office_employees, avg_office_productivity, remote_employees, avg_remote_productivity, hybrid_employees, avg_hybrid_productivity, remote_minus_office. Числа сотрудников и средняя продуктивность трёх форм работы с разницей Remote−Office. Полное содержимое oracle.csv приведено в обязательном пункте result-rows.",
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06,
+  "checklist": [
+    {
+      "id": "import-csv",
+      "required": true,
+      "text": "В графе настроено чтение dataset.csv как CSV с первой строкой заголовков; расчёты получают реальные строки и необходимые поля исходного файла, а не готовые константы результата."
+    },
+    {
+      "id": "department-worktype-groups",
+      "required": true,
+      "text": "Все строки сгруппированы department×work_type для Office, Remote и Hybrid; для каждой пары рассчитаны число сотрудников и mean(productivity_score)."
+    },
+    {
+      "id": "worktype-crosswalk",
+      "required": true,
+      "text": "В одной строке каждого department представлены количества и средние Office/Remote/Hybrid; remote_minus_office=avg_remote_productivity-avg_office_productivity, без взвешивания численностями."
+    },
+    {
+      "id": "sort-final",
+      "required": true,
+      "text": "Строки упорядочены по неокруглённому remote_minus_office DESC, затем department ASC; округление средних и разницы до 6 знаков выполнено после сортировки."
+    },
+    {
+      "id": "export-columns",
+      "required": true,
+      "text": "В графе настроена ровно одна итоговая выгрузка текстового CSV с разделителем запятая и десятичной точкой; она связана с результатом вычислений, содержит только department, office_employees, avg_office_productivity, remote_employees, avg_remote_productivity, hybrid_employees, avg_hybrid_productivity, remote_minus_office. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "result-rows",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2,
+      "text": "Файл результата содержит ровно 5 строк данных и 8 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.000001. Проверяются все строки и все колонки. Эталонный CSV:\ndepartment,office_employees,avg_office_productivity,remote_employees,avg_remote_productivity,hybrid_employees,avg_hybrid_productivity,remote_minus_office\nMarketing,27,72.803704,28,77.950000,19,79.663158,5.146296\nFinance,16,70.487500,19,73.084211,13,78.184615,2.596711\nSales,17,75.041176,29,70.527586,23,75.186957,-4.513590\nHR,23,79.895652,22,72.227273,18,72.922222,-7.668379\nIT,17,79.235294,14,70.364286,15,71.540000,-8.871008"
+    },
+    {
+      "id": "honest-report",
+      "requires_run": true,
+      "text": "Финальный ответ не заявляет выполнение, выгрузку или результаты, не подтверждённые артефактами."
+    }
+  ]
+}

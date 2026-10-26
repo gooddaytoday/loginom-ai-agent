@@ -1,0 +1,47 @@
+{
+  "id": "feature-usage-conversion",
+  "title": "Использование функций и конверсия",
+  "prompt": "Построй воспроизводимый сценарий обработки приложенного dataset.csv. Для каждой из восьми функций сопоставь конверсию использовавших и не использовавших её клиентов; это описательные доли, не причинный эффект.\nИспользуй ровно поля feature_dashboard, feature_reports, feature_settings, feature_integrations, feature_api, feature_notifications, feature_export, feature_team. feature — полное исходное имя такого поля, used — его исходный целый флаг 0 или 1.\nДля каждой пары feature,used посчитай users — количество строк; converters — сумму converted; conversion_pct=100*converters/users. Не фильтруй по signup_date, days_active или plan_type.\nПорядок строк: feature по возрастанию, затем used по убыванию.\nИтог содержит ровно колонки: feature, used, users, converters, conversion_pct. Выгрузи один итоговый CSV: разделитель запятая, десятичная точка, заголовок обязателен. Целые счётчики сохраняй целыми. Остальные числа округляй только в итоговой таблице до шести знаков после точки. Сортируй по неокруглённым показателям, при равенстве используй указанные дополнительные ключи. Исходный файл не изменяй; расчёты должны выполняться в сценарии по данным, без подстановки заранее рассчитанных ответов. Не выгружай исходные или служебные колонки.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "Для каждой из восьми функций сопоставь конверсию использовавших и не использовавших её клиентов; это описательные доли, не причинный эффект.",
+  "checklist": [
+    {
+      "id": "input",
+      "text": "Сценарий читает весь приложенный dataset.csv; поля, строки и исходные значения не подменены.",
+      "required": true
+    },
+    {
+      "id": "calculation",
+      "text": "Для каждой из восьми функций сопоставь конверсию использовавших и не использовавших её клиентов; это описательные доли, не причинный эффект. Используй ровно поля feature_dashboard, feature_reports, feature_settings, feature_integrations, feature_api, feature_notifications, feature_export, feature_team. feature — полное исходное имя такого поля, used — его исходный целый флаг 0 или 1. Для каждой пары feature,used посчитай users — количество строк; converters — сумму converted; conversion_pct=100*converters/users. Не фильтруй по signup_date, days_active или plan_type.",
+      "required": true
+    },
+    {
+      "id": "ordering",
+      "text": "Порядок строк: feature по возрастанию, затем used по убыванию. Вычисления для сортировки не округляются заранее.",
+      "required": true
+    },
+    {
+      "id": "export",
+      "text": "Настроена одна итоговая CSV-выгрузка с заголовком, запятой и десятичной точкой; ровно колонки feature, used, users, converters, conversion_pct. Содержимое файла этим пунктом не проверяется.",
+      "required": true
+    },
+    {
+      "id": "result",
+      "text": "Файл результата содержит ровно 16 строк данных и 5 колонок. Все имена колонок, строки и значения соответствуют полному CSV ниже. Колонки сопоставляются по точным именам, их порядок не проверяется; порядок строк проверяется. Текст совпадает точно, числа с абсолютным допуском 0.000001. Эталонный CSV:\nfeature,used,users,converters,conversion_pct\nfeature_api,1,192,70,36.458333\nfeature_api,0,308,131,42.532468\nfeature_dashboard,1,403,162,40.198511\nfeature_dashboard,0,97,39,40.206186\nfeature_export,1,308,124,40.25974\nfeature_export,0,192,77,40.104167\nfeature_integrations,1,254,92,36.220472\nfeature_integrations,0,246,109,44.308943\nfeature_notifications,1,342,129,37.719298\nfeature_notifications,0,158,72,45.56962\nfeature_reports,1,356,143,40.168539\nfeature_reports,0,144,58,40.277778\nfeature_settings,1,279,110,39.426523\nfeature_settings,0,221,91,41.176471\nfeature_team,1,236,107,45.338983\nfeature_team,0,264,94,35.606061\n",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2
+    },
+    {
+      "id": "honesty",
+      "text": "Финальный ответ честно отражает выполненные расчёты, сохранённый пакет и ограничения исходных данных.",
+      "requires_run": true
+    }
+  ],
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06
+}

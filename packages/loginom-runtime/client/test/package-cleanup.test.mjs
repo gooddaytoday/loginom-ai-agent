@@ -543,3 +543,178 @@ test('D56c Open diagnostics read native inventory/errors without binding or RPC 
  assert.equal(result.errors[0].text,'Open rejected');assert.equal(receipt.failedOpenCleanup,undefined);
  assert.deepEqual(f.events,[]);
 });
+
+// Both retained cold journals show an exact new package, writable mode,
+// PACKAGE_OPEN_REJECTED and the same renderer text under the TabForm mask.
+// Modal ownership below models the native ErrorMsg/FMessages contract; the
+// historical journals did not capture its data-tid or DOM (not a live proof).
+function failedOpenFixture(fault='none') {
+ const f=fixture(),c=f.context,m=c.bg.app.Application.FInstance.FMainForm.FMapTree;
+ const node=m.PackageNodes.Items(0),tab=c.ownedTab,r=c.__loginomDockPreparationV1.receipts.get('prepare');
+ f.state.tabTid='MF;cntMain;cntWorkspace;Workspace;t.br;tb-1';tab.classList={contains:()=>true};
+ const element=(tid,text='')=>({id:tid,isConnected:true,textContent:text,innerText:text,getAttribute:()=>tid,
+  contains(e){return e===this;},closest(){return null;},matches:()=>false,
+  getBoundingClientRect:()=>({x:100,y:100,width:200,height:100})});
+ const root=element('MF;TF-1'),error=element('msgbox'),body=element('messages',"Cannot read properties of undefined (reading 'TestableCellRenderer')"),ok=element('msgbox;tlb;ok','OK');
+ f.state.mask=true;f.state.openError=true;f.state.dismissals=0;
+ root.matches=()=>f.state.mask;root.contains=e=>e===root;
+ error.contains=e=>[error,body,ok].includes(e);
+ for(const e of [error,body,ok])e.getBoundingClientRect=()=>({x:100,y:100,width:f.state.openError?200:0,height:f.state.openError?100:0});
+ const native={$className:'bg.app.view.TabForm',el:{dom:root},hidden:false,Controller:{Node:{data:{node}}}};
+ const message={el:{dom:error}},messages={el:{dom:body}},info={};
+ const instance={FMessageBox:message,FMessages:messages,FErrorMessageInfo:info};
+ const button={el:{dom:ok},disabled:false,ownerCt:message};
+ c.bg.ext={errormessage:{ErrorMsg:{FInstance:instance}}};
+ c.Ext={getCmp:id=>id===root.id?native:id===error.id?message:id===ok.id?button:null};
+ c.innerWidth=1280;c.innerHeight=800;
+ c.bg.app.Application.FInstance.FMainForm.Items={Workspace:{getActiveTab:()=>native}};
+ const query=c.document.querySelectorAll;
+ c.document.querySelectorAll=q=>q.startsWith('[data-tid^="MF;cntMain;cntWorkspace')?[tab]:
+  q==='[data-tid="MF;TF-1"]'?[root]:q==='.bg-error-messages'?[body]:q==='[data-tid="msgbox;tlb;ok"]'?[ok]:
+  q==='[data-tid^="msgbox;tlb;"]'?(fault==='confirmation'?[ok,element('msgbox;tlb;yes')]:[ok]):
+  q.startsWith('[role="dialog"]')?[...(f.state.mask?[root]:[]),...(f.state.openError?[error]:[]),...(fault==='foreign dialog'?[element('foreign')]:[])]:query(q);
+ c.document.elementFromPoint=()=>fault==='covered'?element('cover'):ok;
+ Object.assign(r,{request:JSON.stringify({session:options.sessionId,intent:'open_package',packagePath:options.packagePath}),phase:'effect_possible',before:[],openSubmitted:true,
+  openAccount:options.account,openConnection:m.FServerConnection,openServerSession:m.FServerConnection.Session,packageInventoryBefore:0,
+  openError:{instance,message,root:error,messages,info,element:body}});
+ delete r.tab;delete r.packageNode;
+ if(fault==='unknown error')body.textContent='Unknown error';
+ if(fault==='unbound error')delete r.openError;
+ if(fault==='changed native')instance.FErrorMessageInfo={};
+ if(fault==='foreign account')f.state.account='foreign';
+ if(fault==='dirty')f.state.modified=true;
+ if(fault==='running')f.state.running=true;
+ const wait=f.page.waitForTimeout;
+ f.page.waitForTimeout=async ms=>{
+  if(ms>100)return new Promise(()=>{});
+  await wait(ms);
+  if(!['permanent mask','late modal'].includes(fault))f.state.mask=false;
+  if(fault==='late modal'){f.state.openError=false;f.state.mask=false;}
+  if(fault==='session after wait')m.FServerConnection.Session={};
+  if(fault==='late wait')f.state.clock+=30000;
+ };
+ ok.click=()=>{f.state.dismissals++;f.events.push('error-ok');if(fault!=='late modal')f.state.openError=false;
+  if(fault==='lost click')throw Error('lost OK reply');
+  if(fault==='late click')f.state.clock+=30000;
+ };
+ f.page.mouse={async click(){return ok.click();}};
+ return {...f,runFailed:async()=>{
+  const {makeFailedOpenCleanupCode}=await import(process.env.D78_CLEANUP_MODULE??'../lib/package-cleanup.mjs');
+  const code=makeFailedOpenCleanupCode({...options,operationId:'prepare'});
+  f.state.deadline=Number(code.match(/deadline=(\d+)/)[1]);f.state.clock=f.state.deadline-30000;
+  c.Date=class extends Date {static now(){return f.state.clock;}};
+  return vm.runInContext('('+code+')',c)(f.page);
+ }};
+}
+
+for(const sample of ['p15 cold:1–2','LAB-173 p24 cold1:1–2'])test('D78 replay '+sample+' dismisses only owned error, waits mask and closes/logs out',async()=>{
+ const f=failedOpenFixture(),result=await f.runFailed();
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(result.package_closed,true);assert.equal(result.logged_out,true);assert.equal(result.unsaved_changes_discarded,false);
+ assert.equal(f.state.dismissals,1);assert.equal(f.events.filter(x=>x==='close').length,1);
+ assert.ok(f.events.indexOf('error-ok')<f.events.indexOf('idle-wait'));
+ assert.ok(f.events.indexOf('idle-wait')<f.events.indexOf('close'));
+ assert.ok(f.events.indexOf('close')<f.events.indexOf('logout'));
+});
+
+test('D78 late own modal disappearance is read-only settlement, never another OK',async()=>{
+ const f=failedOpenFixture('late modal'),r=await f.runFailed();
+ assert.equal(r.status,'SUCCEEDED');assert.equal(f.state.dismissals,1);assert.equal(r.package_closed,true);assert.equal(r.logged_out,true);
+});
+
+test('D78 a later cleanup call cannot renew the failed Open cleanup deadline',async()=>{
+ const f=failedOpenFixture();
+ const r=f.context.__loginomDockPreparationV1.receipts.get('prepare');
+ r.failedOpenCleanupDeadline=Date.now()-1;
+ const result=await f.runFailed();
+ assert.equal(result.status,'BLOCKED');assert.equal(f.state.dismissals,0);assert.equal(f.events.includes('close'),false);
+});
+
+for(const fault of ['foreign dialog','covered','confirmation','unknown error','unbound error','changed native','foreign account','dirty','running',
+ 'session after wait','permanent mask','lost click','late click','late wait'])test('D78 keeps refusal/one-flight/deadline: '+fault,async()=>{
+ const f=failedOpenFixture(fault),result=await f.runFailed();
+ assert.equal(result.status,'BLOCKED',JSON.stringify(result));assert.equal(result.package_closed,false);assert.equal(result.logged_out,false);
+ assert.ok(f.state.dismissals<=1);assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+ if(['foreign dialog','covered','confirmation','unknown error','unbound error','changed native','foreign account'].includes(fault))assert.equal(f.state.dismissals,0);
+ assert.equal(result.unsaved_changes_discarded,false);
+});
+
+for(const race of ['foreign error','replacement session','moved button'])test('D78 OK transport race has zero gestures: '+race,async()=>{
+ const f=failedOpenFixture(),evaluate=f.page.evaluate;let changed=false;
+ f.page.evaluate=async(fn,arg)=>{
+  const value=await evaluate(fn,arg);
+  if(value?.dismiss&&!changed){
+   changed=true;
+   if(race==='foreign error')f.context.bg.ext.errormessage.ErrorMsg.FInstance.FErrorMessageInfo={foreign:true};
+   if(race==='replacement session')f.context.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.Session={foreign:true};
+   if(race==='moved button')f.context.document.elementFromPoint=()=>({id:'foreign-destructive-control'});
+  }
+  return value;
+ };
+ const result=await f.runFailed();
+ assert.equal(changed,true);assert.equal(result.status,'BLOCKED');
+ assert.equal(f.state.dismissals,0);assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+});
+
+for(const race of ['button reference','native control','geometry','label','deadline'])test('D78 pins exact OK reference/signature and original deadline: '+race,async()=>{
+ const f=failedOpenFixture(),c=f.context,evaluate=f.page.evaluate;
+ f.page.evaluate=async(fn,arg)=>{
+  const value=await evaluate(fn,arg);
+  if(value?.reason==='OWNED_OPEN_ERROR'){
+   const ok=c.document.querySelectorAll('[data-tid="msgbox;tlb;ok"]')[0];
+   if(race==='button reference'){
+    const replacement={...ok};
+    const query=c.document.querySelectorAll;
+    c.document.querySelectorAll=q=>query(q).map(e=>e===ok?replacement:e);
+   }
+   if(race==='native control'){
+    const get=c.Ext.getCmp,control=get(ok.id);c.Ext.getCmp=id=>id===ok.id?{...control}:get(id);
+   }
+   if(race==='geometry')ok.getBoundingClientRect=()=>({x:110,y:100,width:200,height:100});
+   if(race==='label')ok.innerText='Different';
+   if(race==='deadline')f.state.clock+=30000;
+  }
+  return value;
+ };
+ const result=await f.runFailed();
+ assert.equal(result.status,'BLOCKED');assert.equal(f.state.dismissals,0);
+ assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+});
+
+test('D78 OK receipt is retained and an ACK loss cannot repeat the gesture',async()=>{
+ const f=failedOpenFixture(),evaluate=f.page.evaluate;
+ f.page.evaluate=async(fn,arg)=>{
+  const result=await evaluate(fn,arg);
+  if(result?.gesture_returned===true)throw Error('lost guarded gesture ACK');
+  return result;
+ };
+ const first=await f.runFailed();assert.equal(first.status,'BLOCKED');assert.equal(f.state.dismissals,1);
+ const ledger=f.page[Symbol.for('loginom-dock.operation-receipts.v1')];
+ assert.equal(ledger.size,1);assert.equal([...ledger.values()][0].state,'unknown');
+ f.state.openError=true; // No acknowledgement and the same modal is still visible.
+ const second=await f.runFailed();assert.equal(second.status,'BLOCKED');assert.equal(f.state.dismissals,1);
+ assert.equal(f.events.includes('close'),false);assert.equal(f.events.includes('logout'),false);
+});
+
+for(const keepMask of [false,true])test('D78 own error disappearing before OK continues normal cleanup, mask='+keepMask,async()=>{
+ const f=failedOpenFixture(),evaluate=f.page.evaluate;let disappeared=false,okCallback=false;
+ const m=f.context.bg.app.Application.FInstance.FMainForm.FMapTree,close=m.ClosePackage;
+ m.ClosePackage=(...args)=>{assert.equal(okCallback,false,'OK callback must never start native Close');return close(...args);};
+ f.page.evaluate=async(fn,arg)=>{
+  okCallback=arg?.dismissOpenError===true;
+  const value=await evaluate(fn,arg);
+  if(okCallback)assert.notEqual(value?.started,true,'OK callback only dismisses its own error');
+  okCallback=false;
+  if(value?.reason==='OWNED_OPEN_ERROR'&&!disappeared){
+   disappeared=true;f.state.openError=false;f.state.mask=keepMask;
+  }
+  return value;
+ };
+ const result=await f.runFailed();
+ assert.equal(disappeared,true);assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(result.package_closed,true);assert.equal(result.logged_out,true);assert.equal(result.unsaved_changes_discarded,false);
+ assert.equal(f.state.dismissals,0);assert.equal(f.events.includes('error-ok'),false);
+ assert.equal(f.events.filter(x=>x==='close').length,1);assert.equal(f.events.filter(x=>x==='logout').length,1);
+ if(keepMask)assert.ok(f.events.indexOf('idle-wait')<f.events.indexOf('close'));
+ assert.ok(f.events.indexOf('close')<f.events.indexOf('logout'));assert.ok(f.state.clock<f.state.deadline);
+});

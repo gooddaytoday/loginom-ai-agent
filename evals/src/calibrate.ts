@@ -4,24 +4,34 @@ import type { EvalConfig } from "./config"
 import { loadTasks, rubricHash } from "./task"
 import { parseArtifactSource, unzip } from "./artifact"
 import { preflight } from "./preflight"
-import { judgeInfo, judgeTask, type JudgeSettings } from "./judge"
-import { describe, redact, stamp } from "./run"
+import { createJudgeGate, judgeInfo, type JudgeSettings } from "./judge"
+import { describe, installSigint, redact, stamp } from "./run"
 import { evalsRoot } from "./config"
 import { prepareCalibrationCases } from "./calibration-cases"
 import { checkOracle } from "./oracle"
 import { reserveRunDirectory } from "./run-directory"
 
-export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsRoot, "calibration")) {
+export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsRoot, "calibration"), onRunDirectory?: (directory: string) => Promise<void>) {
+  const controller = new AbortController()
+  const removeSigint = installSigint(controller)
+  return calibrateBody(config, corpusDir, controller.signal, onRunDirectory).finally(removeSigint)
+}
+
+async function calibrateBody(config: EvalConfig, corpusDir: string, signal: AbortSignal, onRunDirectory?: (directory: string) => Promise<void>) {
   const tasks = await loadTasks(config.tasksDir, config.only)
-  await preflight(config, parseArtifactSource("docker", config.loginom))
-  const judge = await judgeInfo(config)
+  await preflight(config, parseArtifactSource("docker", config.loginom), signal)
+  const judge = await judgeInfo(config, signal)
   const runDir = await reserveRunDirectory(config.resultsDir, `${stamp(new Date())}-calibrate`)
+  await onRunDirectory?.(runDir)
   const runId = path.basename(runDir)
   await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2))
+  const judgeAttempt = createJudgeGate()
   const settings: JudgeSettings = {
     command: config.judge.command,
     model: config.judge.model,
     reasoning: config.judge.reasoning,
+    env: config.judge.env,
+    systemd: config.judge.systemd,
     timeoutMs: config.judgeTimeoutMs,
     passThreshold: config.passThreshold,
   }
@@ -31,8 +41,10 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
     score: number | null; failed: string[]; error: string | null
     case_id?: string; expected_failed?: string[]; expected_oracle_pass?: boolean
     oracle_pass?: boolean | null; oracle_error?: string | null; expectations_met?: boolean
+    judge_cleanup_unconfirmed?: true
   }[] = []
   for (const [index, task] of tasks.entries()) {
+    if (signal.aborted) break
     const checklist = task.checklist.filter((item) => !item.requiresRun && (!item.requiresResultFile || !!task.oracle))
     if (!checklist.length) {
       rows.push({
@@ -48,6 +60,7 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
     // negative — эталон следующей задачи по кругу: судья обязан заметить подмену.
     const negative = tasks.length > 1 ? tasks[(index + 1) % tasks.length] : undefined
     for (const [kind, reference] of [["positive", task], ["negative", negative]] as const) {
+      if (signal.aborted) break
       if (!reference) continue
       const attemptDir = path.join(runDir, task.id, kind)
       const artifactDir = path.join(attemptDir, "artifact")
@@ -68,12 +81,13 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
       if (kind === "positive" && task.oracle)
         await cp(path.join(task.dir, task.oracle), path.join(artifactDir, "results", "calibration.result.csv"))
       const oracle = kind === "positive" && task.oracle ? await checkOracle(task, artifactDir) : { passed: null, error: null }
-      const judged = await judgeTask({
+      const judged = await judgeAttempt({
         task,
         artifactDir,
         prompt: task.prompt,
         outDir: path.join(attemptDir, "judge"),
         judge: settings,
+        signal,
         checklist: kind === "negative" ? checklist.filter((item) => !item.requiresResultFile) : checklist,
       }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
       rows.push({
@@ -84,14 +98,17 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
         score: judged.ok ? judged.score : null,
         failed: judged.ok ? judged.items.filter((item) => !item.passed).map((item) => item.id) : [],
         error: judged.ok ? null : judged.error,
+        ...("cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed ? { judge_cleanup_unconfirmed: true as const } : {}),
       })
       console.error(`[calibrate ${task.id}/${kind}] score=${judged.ok ? judged.score : "error"}`)
     }
   }
   for (const entry of cases.prepared) {
-    const judged = await judgeTask({
+    if (signal.aborted) break
+    const judged = await judgeAttempt({
       task: entry.task, artifactDir: entry.artifactDir, prompt: entry.task.prompt,
       outDir: path.join(path.dirname(entry.artifactDir), "judge"), judge: settings,
+      signal,
       checklist: entry.task.checklist.filter((item) => !item.requiresRun),
     }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
     const failed = judged.ok ? judged.items.filter((item) => !item.passed).map((item) => item.id) : []
@@ -103,6 +120,7 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
       expectations_met: judged.ok && entry.mutation.expected_failed.every((id) => failed.includes(id)) &&
         entry.oracle.passed === entry.mutation.expected_oracle_pass,
       score: judged.ok ? judged.score : null, failed, error: judged.ok ? null : judged.error,
+      ...("cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed ? { judge_cleanup_unconfirmed: true as const } : {}),
     })
     console.error("[calibrate " + entry.task.id + "/" + entry.mutation.id + "] score=" + (judged.ok ? judged.score : "error"))
   }
@@ -124,7 +142,7 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
   })
   await Bun.write(
     path.join(runDir, "calibration.json"),
-    JSON.stringify({ run_id: runId, judge, rubric_hash: await rubricHash(tasks), thresholds: config.calibration, calibration_hash: cases.hash, near_miss_coverage: Object.fromEntries(tasks.map((task) => [task.id, cases.prepared.filter((entry) => entry.task.id === task.id).length])), rows, warnings }, null, 2),
+    JSON.stringify({ run_id: runId, interrupted: signal.aborted, judge, rubric_hash: await rubricHash(tasks), thresholds: config.calibration, calibration_hash: cases.hash, near_miss_coverage: Object.fromEntries(tasks.map((task) => [task.id, cases.prepared.filter((entry) => entry.task.id === task.id).length])), rows, warnings }, null, 2),
   )
   const coverage = Object.fromEntries(tasks.map((task) => [task.id, cases.prepared.filter((entry) => entry.task.id === task.id).length]))
   const uncovered = tasks.filter((task) => !coverage[task.id]).map((task) => task.id)
@@ -132,6 +150,7 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
     `# Калибровка судьи ${runId}`,
     "",
     `Судья: ${judge.model}/${judge.reasoning} (${judge.codex_version ?? "?"}). Пороги: positive ≥ ${positiveMin}, negative ≤ ${negativeMax}.`,
+    ...(signal.aborted ? ["", "Калибровка прервана; новые вызовы судьи остановлены."] : []),
     "",
     "Корпус: " + cases.hash + ". Near-miss: " + cases.prepared.length + ". Без near-miss: " + (uncovered.join(", ") || "—") + ".",
     "",
@@ -151,5 +170,5 @@ export async function calibrate(config: EvalConfig, corpusDir = path.join(evalsR
   ].join("\n")
   await Bun.write(path.join(runDir, "calibration.md"), report)
   console.log(report)
-  return { code: warnings.length ? 1 : 0, runDir }
+  return { code: signal.aborted || warnings.length ? 1 : 0, runDir, judgeCleanupConfirmed: !rows.some(row => row.judge_cleanup_unconfirmed) }
 }

@@ -21,6 +21,31 @@ export function refuseJavascriptFullRead(read,data,returned,ctx) {
  const error=Error('JavaScript full output has '+data.row_count+' rows; the UI read limit is 100. Workflow restored; read a sample of at most 100 rows or verify the downloaded CSV Export.');
  error.nodePhaseRefusal=refusal;throw error;
 }
+export function verifiedJavascriptPortReadRefusal(refusal,node,execution,read) {
+ const p=refusal?.proof,r=p?.port_read,o=r?.output;
+ return read?.coverage==='full'&&read.sample_rows===100&&read.require_exact_numbers===true
+  &&refusal?.phase==='read'&&refusal.status==='FAILED'&&refusal.verification==='javascript_full_bound_refused'
+  &&refusal.effect_possible===false&&refusal.cleanup_complete===true&&refusal.settings_unchanged===true
+  &&execution?.status==='completed'&&same(p?.execution,execution)
+  &&r?.verified===true&&r.cleanup_complete===true&&owner(r.node_context,node)
+  &&o?.port===0&&o.fresh===true&&o.freshness_basis==='completed_execution_port_source'
+  &&o.execution_id===execution.execution_id&&typeof p.port_guid==='string'&&p.port_guid.length>0&&o.port_guid===p.port_guid
+  &&Number.isSafeInteger(o.row_count)&&o.row_count>0&&Number.isInteger(o.sample_rows)
+  &&o.sample_rows>=0&&o.sample_rows<=100&&o.sample_rows<o.row_count&&o.sample_complete===false
+  &&(o.row_count>100||o.read_limit==='preview_cell_or_byte_budget');
+}
+export function refuseJavascriptPortFullRead(read,result,ctx,portGuid) {
+ const output=result?.output;
+ const refusal={phase:'read',status:'FAILED',verification:'javascript_full_bound_refused',effect_possible:false,
+  cleanup_complete:true,settings_unchanged:true,proof:{execution:structuredClone(ctx.execution),port_guid:portGuid,
+   port_read:{verified:result?.verified,cleanup_complete:result?.cleanup_complete,node_context:result?.node_context,
+    output:Object.fromEntries(['port','port_guid','fresh','freshness_basis','execution_id','row_count','sample_rows','sample_complete','read_limit']
+     .filter(key=>Object.hasOwn(output??{},key)).map(key=>[key,output[key]]))}}};
+ if(!verifiedJavascriptPortReadRefusal(refusal,ctx.node,ctx.execution,read))throw Error('JavaScript full read refusal cleanup is unverified');
+ const error=Error(output.row_count>100?'JavaScript full output has '+output.row_count+' rows; the read limit is 100. Port cleanup confirmed; read a sample of at most 100 rows or verify the downloaded CSV Export.'
+  :'Full JavaScript output exceeds bounded read coverage (cell or byte limit). Port cleanup confirmed; read a sample or verify the downloaded CSV Export.');
+ error.nodePhaseRefusal=refusal;throw error;
+}
 export function verifiedNativeReadRefusal(refusal,node,execution,read) {
  const p=refusal?.proof,b=p?.binding;
  return read?.coverage==='full'&&refusal?.phase==='read'&&refusal.status==='FAILED'

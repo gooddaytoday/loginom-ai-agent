@@ -1,9 +1,395 @@
 import { expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, symlink } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, rename, rm, symlink, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { acquireHarnessLease, retireRecordedHarnessLease } from "../src/lease"
+import { acquireHarnessLease, acquireJudgeLease, acquireResourceLease, readResourceReservation, recoverResourceLease, reopenResourceLease, retireRecordedHarnessLease, writeLeaseReceipt } from "../src/lease"
+import type { Reservation } from "../src/lease"
 import { superviseProcess } from "../src/process-supervisor"
+
+async function resourceFixture() {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-resource-lease-"))
+  const lockRoot = path.join(root, "locks")
+  await mkdir(lockRoot, { mode: 0o700 })
+  const journal = path.join(root, "journal.json")
+  await writeFile(journal, "{}", { mode: 0o600 })
+  return { root, request: { key: "server:container", lockRoot, journal, commandId: "run-one" } }
+}
+
+test("startup reopens a dead owner's exact reservation without a new epoch", async () => {
+  const item = await resourceFixture()
+  try {
+    const child = Bun.spawn([process.execPath, "-e", `const {acquireResourceLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});const lease=await acquireResourceLease(${JSON.stringify(item.request)});await lease.close()`], { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(0)
+    const saved = (await readResourceReservation(item.request))!
+    const before = JSON.stringify(saved)
+    const lease = await reopenResourceLease(item.request, saved)
+    try {
+      expect(JSON.stringify(lease.reservation)).toBe(before)
+      expect(await readResourceReservation(item.request)).toEqual(saved)
+      await lease.assertHeld()
+      await expect(reopenResourceLease(item.request, saved)).rejects.toThrow("BUSY")
+      const proof = path.join(item.root, "startup-cleanup.json")
+      await writeLeaseReceipt(proof, { version: 2, status: "confirmed", key: saved.key, token: saved.token, revision: saved.revision })
+      await lease.release(proof)
+      expect((await readResourceReservation(item.request))?.state).toBe("released")
+    } finally { await lease.close() }
+    const live = await acquireResourceLease(item.request)
+    await live.close()
+    await expect(reopenResourceLease(item.request, live.reservation)).rejects.toThrow("BUSY")
+  } finally { await rm(item.root, { recursive: true }) }
+})
+
+test("resource set refuses a busy later key without reserving the earlier key", async () => {
+  const item = await resourceFixture()
+  const a = { ...item.request, key: "profile:a" }, b = { ...item.request, key: "profile:b" }
+  const held = await acquireResourceLease(b)
+  try {
+    const before = await Bun.file(held.receipt).text()
+    const { acquireResourceSet } = await import("../src/lease")
+    await expect(acquireResourceSet([b, a])).rejects.toThrow("BUSY")
+    expect(await readResourceReservation(a)).toBeUndefined()
+    expect(await Bun.file(held.receipt).text()).toBe(before)
+    await held.assertHeld()
+  } finally { await held.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource set retains unresolved later ownership without publishing another reservation", async () => {
+  const item = await resourceFixture()
+  const a = { ...item.request, key: "profile:a" }, b = { ...item.request, key: "profile:b" }
+  const retained = await acquireResourceLease(b)
+  await retained.close()
+  try {
+    const bytes = await Bun.file(retained.receipt).text()
+    const { acquireResourceSet } = await import("../src/lease")
+    await expect(acquireResourceSet([a, b])).rejects.toThrow("RECOVERY_REQUIRED")
+    expect(await readResourceReservation(a)).toBeUndefined()
+    expect(await Bun.file(retained.receipt).text()).toBe(bytes)
+    const unclaimed = await acquireResourceLease(a)
+    await unclaimed.close()
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource set owns every sorted key and releases each through its bound proof", async () => {
+  const item = await resourceFixture()
+  const requests = ["user:z", "profile:a", "server:b"].map(key => ({ ...item.request, key }))
+  const { acquireResourceSet } = await import("../src/lease")
+  const leases = await acquireResourceSet(requests)
+  try {
+    expect(leases.map(lease => lease.reservation.key)).toEqual(["profile:a", "server:b", "user:z"])
+    await Promise.all(leases.map(lease => lease.assertHeld()))
+    const child = Bun.spawn([process.execPath, "-e", `const {acquireResourceSet}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+      try { await acquireResourceSet(JSON.parse(process.argv[1])); process.exitCode=4 } catch(error) { console.log(error.message); process.exitCode=2 }`, JSON.stringify(requests)],
+      { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(2)
+    expect(await new Response(child.stdout).text()).toContain("BUSY")
+    expect(await new Response(child.stderr).text()).toBe("")
+    for (const lease of leases) {
+      const proof = path.join(item.root, `${lease.reservation.token}.closed.json`)
+      await writeLeaseReceipt(proof, { version: 2, status: "confirmed", key: lease.reservation.key, token: lease.reservation.token, revision: lease.reservation.revision })
+      await lease.release(proof)
+    }
+    const reused = await acquireResourceSet(requests)
+    try {
+      expect(reused.every(lease => lease.reservation.revision === 2)).toBe(true)
+      expect(reused.every(lease => !leases.some(old => old.reservation.token === lease.reservation.token))).toBe(true)
+    } finally { await Promise.all(reused.map(lease => lease.close())) }
+  } finally { await Promise.all(leases.map(lease => lease.close())); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource set validates keys and all admission predicates before publishing any owner", async () => {
+  const item = await resourceFixture()
+  const a = { ...item.request, key: "profile:a" }, b = { ...item.request, key: "profile:b" }
+  const { acquireResourceSet } = await import("../src/lease")
+  try {
+    for (const inputs of [[], [a, a], [a, { ...b, lockRoot: item.root }]])
+      await expect(acquireResourceSet(inputs)).rejects.toThrow("LEASE_KEYS_INVALID")
+    expect(await readdir(item.request.lockRoot)).toEqual([])
+    await expect(acquireResourceSet([b, a], async (_previous, input) => {
+      if (input.key === b.key) throw Error("RELEASE_FINALIZATION_REQUIRED")
+    })).rejects.toThrow("RELEASE_FINALIZATION_REQUIRED")
+    expect(await readResourceReservation(a)).toBeUndefined()
+    expect(await readResourceReservation(b)).toBeUndefined()
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource reservation readback validates the selected private root without changing ownership", async () => {
+  const item = await resourceFixture()
+  try {
+    expect(await readResourceReservation(item.request)).toBeUndefined()
+    const lease = await acquireResourceLease(item.request)
+    try {
+      const bytes = await Bun.file(lease.receipt).text()
+      expect(await readResourceReservation(item.request)).toEqual(lease.reservation)
+      expect(await Bun.file(lease.receipt).text()).toBe(bytes)
+      await chmod(item.request.lockRoot, 0o755)
+      await expect(readResourceReservation(item.request)).rejects.toThrow("LEASE_LOCK_ROOT")
+      await chmod(item.request.lockRoot, 0o700)
+    } finally { await lease.close() }
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("judge lease: different server controllers share the canonical CODEX_HOME OS guard", async () => {
+  const item = await resourceFixture()
+  const home = path.join(item.root, "judge-home")
+  const alias = path.join(item.root, "judge-alias")
+  await mkdir(home, { mode: 0o700 })
+  await symlink(home, alias)
+  await writeLeaseReceipt(item.request.journal, { commandId: "a", serverId: "server-a" })
+  const journal = path.join(item.root, "server-b.json")
+  await writeLeaseReceipt(journal, { commandId: "b", serverId: "server-b" })
+  const lease = await acquireJudgeLease({ codexHome: home, journal: item.request.journal, commandId: "a", lockRoot: item.request.lockRoot })
+  try {
+    expect(lease.reservation.key).toBe(`judge:${home}`)
+    const child = Bun.spawn([process.execPath, "-e", `const {acquireJudgeLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+      try {await acquireJudgeLease(${JSON.stringify({ codexHome: alias, journal, commandId: "b", lockRoot: item.request.lockRoot })});process.exit(4)}
+      catch(error) {console.log(error.message);process.exit(2)}`], { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(2)
+    expect(await new Response(child.stdout).text()).toContain("BUSY")
+    await new Response(child.stderr).text()
+  } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("judge lease: a dead holder leaves the shared home reserved until recovery", async () => {
+  const item = await resourceFixture()
+  const home = path.join(item.root, "judge-home")
+  await mkdir(home, { mode: 0o700 })
+  const input = { codexHome: home, journal: item.request.journal, commandId: "crashed", lockRoot: item.request.lockRoot }
+  const child = Bun.spawn([process.execPath, "-e", `const {acquireJudgeLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+    await acquireJudgeLease(${JSON.stringify(input)});console.log("READY");setInterval(()=>{},1000)`], { stdout: "pipe", stderr: "pipe" })
+  try {
+    const reader = child.stdout.getReader()
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain("READY")
+    reader.releaseLock()
+    child.kill("SIGKILL")
+    await child.exited
+    await expect(acquireJudgeLease({ ...input, commandId: "next" })).rejects.toThrow("RECOVERY_REQUIRED")
+  } finally { child.kill("SIGKILL"); await child.exited; await new Response(child.stderr).text(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: another Bun process cannot acquire the same OS guard", async () => {
+  const item = await resourceFixture()
+  const lease = await acquireResourceLease(item.request)
+  try {
+    const child = Bun.spawn([process.execPath, "-e", `const {acquireResourceLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+      try {await acquireResourceLease(${JSON.stringify(item.request)});process.exit(4)} catch(error) {console.log(error.message);process.exit(2)}`], { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(2)
+    expect(await new Response(child.stdout).text()).toContain("BUSY")
+  } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: SIGKILL frees guard but retained reservation blocks a new run", async () => {
+  const item = await resourceFixture()
+  const child = Bun.spawn([process.execPath, "-e", `const {acquireResourceLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+    await acquireResourceLease(${JSON.stringify(item.request)});console.log("READY");setInterval(()=>{},1000)`], { stdout: "pipe", stderr: "pipe" })
+  try {
+    const reader = child.stdout.getReader()
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain("READY")
+    reader.releaseLock()
+    child.kill("SIGKILL")
+    await child.exited
+    await expect(acquireResourceLease(item.request)).rejects.toThrow("RECOVERY_REQUIRED")
+  } finally { child.kill("SIGKILL"); await child.exited; await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: only matching confirmed evidence releases durable ownership", async () => {
+  const item = await resourceFixture()
+  const lease = await acquireResourceLease(item.request)
+  try {
+    const proof = path.join(item.root, "proof.json")
+    await writeFile(proof, JSON.stringify({ version: 2, status: "unknown", key: item.request.key, token: lease.reservation.token, revision: lease.reservation.revision }), { mode: 0o600 })
+    await expect(lease.release(proof)).rejects.toThrow("LEASE_RELEASE_UNCONFIRMED")
+    await writeFile(proof, JSON.stringify({ version: 2, status: "confirmed", key: item.request.key, token: lease.reservation.token, revision: lease.reservation.revision }), { mode: 0o600 })
+    await lease.release(proof)
+    const next = await acquireResourceLease({ ...item.request, commandId: "run-two" })
+    expect(next.reservation.token).not.toBe(lease.reservation.token)
+    expect(next.reservation.revision).toBe(2)
+    await next.close()
+  } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: private canonical lock root and journal are required before acquisition", async () => {
+  const item = await resourceFixture()
+  try {
+    await chmod(item.request.lockRoot, 0o755)
+    await expect(acquireResourceLease(item.request)).rejects.toThrow("LEASE_LOCK_ROOT")
+    await chmod(item.request.lockRoot, 0o700)
+    await chmod(item.request.journal, 0o644)
+    await expect(acquireResourceLease(item.request)).rejects.toThrow("LEASE_JOURNAL")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: replacing the guard inode cannot authorize release", async () => {
+  const item = await resourceFixture()
+  const lease = await acquireResourceLease(item.request)
+  try {
+    const guard = lease.guardFile
+    await rename(guard, `${guard}.old`)
+    await writeFile(guard, "", { mode: 0o600 })
+    const proof = path.join(item.root, "proof.json")
+    await writeFile(proof, JSON.stringify({ version: 2, status: "confirmed", key: item.request.key, token: lease.reservation.token, revision: lease.reservation.revision }), { mode: 0o600 })
+    await expect(lease.release(proof)).rejects.toThrow("LEASE_GUARD_CHANGED")
+  } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: corrupt or foreign released reservations never allow a new run", async () => {
+  const item = await resourceFixture()
+  const lease = await acquireResourceLease(item.request)
+  await lease.close()
+  try {
+    for (const value of ["invalid json", JSON.stringify({ state: "released" }), JSON.stringify({ ...lease.reservation, state: "released", key: "foreign" })]) {
+      await writeFile(lease.receipt, value, { mode: 0o600 })
+      await expect(acquireResourceLease(item.request)).rejects.toThrow("LEASE_RESERVATION_INVALID")
+    }
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: only one concurrent recovery CAS accepts the current token and revision", async () => {
+  const item = await resourceFixture()
+  try {
+    const module = JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))
+    const owner = Bun.spawn([process.execPath, "-e", `const {acquireResourceLease}=await import(${module});const lease=await acquireResourceLease(${JSON.stringify(item.request)});console.log(JSON.stringify(lease.reservation));await lease.close()`], { stdout: "pipe", stderr: "pipe" })
+    const saved: Reservation = JSON.parse(await new Response(owner.stdout).text())
+    expect(await owner.exited).toBe(0)
+    const outcomes = await Promise.all(["recover-one", "recover-two"].map(async commandId => {
+      const child = Bun.spawn([process.execPath, "-e", `const {recoverResourceLease}=await import(${module});try {
+        const lease=await recoverResourceLease(${JSON.stringify({ ...item.request, commandId })},${JSON.stringify({ token: saved.token, revision: saved.revision })});
+        console.log(JSON.stringify(lease.reservation));await lease.close()
+      } catch(error) {console.log(error.message);process.exitCode=2}`], { stdout: "pipe", stderr: "pipe" })
+      return { code: await child.exited, text: await new Response(child.stdout).text() }
+    }))
+    expect(outcomes.map(item => item.code).sort()).toEqual([0, 2])
+    expect(JSON.parse(outcomes.find(item => item.code === 0)!.text).state).toBe("recovery-only")
+    await expect(recoverResourceLease(item.request, { token: saved.token, revision: saved.revision })).rejects.toThrow("LEASE_CAS_STALE")
+    await expect(acquireResourceLease(item.request)).rejects.toThrow("RECOVERY_REQUIRED")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: interrupted recovery keeps lineage and rejects a foreign incident", async () => {
+  const item = await resourceFixture()
+  try {
+    const module = JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))
+    const owner = Bun.spawn([process.execPath, "-e", `const {acquireResourceLease}=await import(${module});const lease=await acquireResourceLease(${JSON.stringify(item.request)});console.log(JSON.stringify(lease.reservation));await lease.close()`], { stdout: "pipe", stderr: "pipe" })
+    const incident: Reservation = JSON.parse(await new Response(owner.stdout).text())
+    expect(await owner.exited).toBe(0)
+    const recovery = Bun.spawn([process.execPath, "-e", `const {recoverResourceLease}=await import(${module});const lease=await recoverResourceLease(${JSON.stringify(item.request)},${JSON.stringify({ token: incident.token, revision: incident.revision })});console.log(JSON.stringify(lease.reservation));await lease.close()`], { stdout: "pipe", stderr: "pipe" })
+    const current: Reservation = JSON.parse(await new Response(recovery.stdout).text())
+    expect(await recovery.exited).toBe(0)
+    await expect(recoverResourceLease(item.request, { token: current.token, revision: current.revision, incidentToken: "foreign" })).rejects.toThrow("LEASE_LINEAGE_INVALID")
+    const next = await recoverResourceLease(item.request, { token: current.token, revision: current.revision, incidentToken: incident.token })
+    expect(next.reservation.state).toBe("recovery-only")
+    expect(next.reservation.revision).toBe(3)
+    expect(next.reservation.lineage[0]!.owner).toEqual(incident.owner)
+    expect(next.reservation.lineage[0]!.commandId).toBe(incident.commandId)
+    await next.close()
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: guard FD is not inherited by an executed child", async () => {
+  const item = await resourceFixture()
+  const lease = await acquireResourceLease(item.request)
+  try {
+    const child = Bun.spawn([process.execPath, "-e", `const {readdir,readlink}=await import('node:fs/promises');console.log(JSON.stringify(await Promise.all((await readdir('/proc/self/fd')).map(fd=>readlink('/proc/self/fd/'+fd).catch(()=>null)))))`], { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(0)
+    expect(await new Response(child.stdout).text()).not.toContain(lease.guardFile)
+  } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: recovery checks live owner and missing original journal", async () => {
+  const item = await resourceFixture()
+  const lease = await acquireResourceLease(item.request)
+  await lease.close()
+  try {
+    await expect(recoverResourceLease(item.request, { token: lease.reservation.token, revision: lease.reservation.revision })).rejects.toThrow("BUSY")
+    const alternate = path.join(item.root, "recovery.json")
+    await writeFile(alternate, "{}", { mode: 0o600 })
+    await rm(item.request.journal)
+    await expect(recoverResourceLease({ ...item.request, journal: alternate }, { token: lease.reservation.token, revision: lease.reservation.revision })).rejects.toThrow("LEASE_JOURNAL")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: a corrupt lineage cannot authorize recovery", async () => {
+  const item = await resourceFixture()
+  const lease = await acquireResourceLease(item.request)
+  await lease.close()
+  try {
+    await writeFile(lease.receipt, JSON.stringify({ ...lease.reservation,
+      lineage: [{ token: "foreign", revision: 999, journal: item.request.journal, commandId: item.request.commandId, owner: lease.reservation.owner }] }), { mode: 0o600 })
+    await expect(recoverResourceLease(item.request, { token: lease.reservation.token, revision: lease.reservation.revision })).rejects.toThrow("LEASE_LINEAGE_INVALID")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: server restart with the same container ID cannot change the recovery fence", async () => {
+  const item = await resourceFixture()
+  const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
+    studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+  try {
+    const owner = Bun.spawn([process.execPath, "-e", `const {acquireResourceLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+      const lease=await acquireResourceLease(${JSON.stringify({ ...item.request, identity })});console.log(JSON.stringify(lease.reservation));await lease.close()`], { stdout: "pipe", stderr: "pipe" })
+    const saved: Reservation = JSON.parse(await new Response(owner.stdout).text())
+    expect(await owner.exited).toBe(0)
+    const restarted = { ...identity, startedAt: "2026-10-13T11:00:00Z", serverEpoch: "e".repeat(64) }
+    await expect(acquireResourceLease({ ...item.request, identity: restarted })).rejects.toThrow("RECOVERY_REQUIRED")
+    await expect(recoverResourceLease({ ...item.request, identity: restarted }, { token: saved.token, revision: saved.revision })).rejects.toThrow("LEASE_SERVER_GENERATION_CHANGED")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test.each(["pid-reuse", "old-boot"])("resource lease: %s permits recovery-only ownership without treating a current process as its owner", async kind => {
+  const item = await resourceFixture()
+  const lease = await acquireResourceLease(item.request)
+  await lease.close()
+  try {
+    await writeFile(lease.receipt, JSON.stringify({ ...lease.reservation, owner: { ...lease.reservation.owner,
+      ...(kind === "pid-reuse" ? { starttime: String(BigInt(lease.reservation.owner.starttime) + 1n) } : { bootId: crypto.randomUUID() }) } }), { mode: 0o600 })
+    const recovery = await recoverResourceLease(item.request, { token: lease.reservation.token, revision: lease.reservation.revision })
+    expect(recovery.reservation.state).toBe("recovery-only")
+    expect(recovery.reservation.owner.pid).toBe(process.pid)
+    await recovery.close()
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: SIGKILL after durable release permits a new run", async () => {
+  const item = await resourceFixture()
+  const child = Bun.spawn([process.execPath, "-e", `const {acquireResourceLease,writeLeaseReceipt}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+    const lease=await acquireResourceLease(${JSON.stringify(item.request)});const proof=${JSON.stringify(path.join(item.root, "proof.json"))};
+    await writeLeaseReceipt(proof,{version:2,status:"confirmed",key:lease.reservation.key,token:lease.reservation.token,revision:lease.reservation.revision});
+    await lease.release(proof);console.log("RELEASED");setInterval(()=>{},1000)`], { stdout: "pipe", stderr: "pipe" })
+  try {
+    const reader = child.stdout.getReader()
+    expect(new TextDecoder().decode((await reader.read()).value)).toContain("RELEASED")
+    reader.releaseLock()
+    child.kill("SIGKILL")
+    await child.exited
+    const next = await acquireResourceLease({ ...item.request, commandId: "run-two" })
+    expect(next.reservation.revision).toBe(2)
+    await next.close()
+  } finally { child.kill("SIGKILL"); await child.exited; await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: different servers cannot bypass one judge-home key", async () => {
+  const item = await resourceFixture()
+  const identity = { containerId: "a".repeat(64), startedAt: "2026-10-13T10:00:00Z", serverEpoch: "b".repeat(64),
+    studioContainerId: "c".repeat(64), studioStartedAt: "2026-10-13T10:00:00Z", configurationHash: "d".repeat(64) }
+  const request = { ...item.request, key: `judge:${path.join(item.root, "judge-home")}`, identity }
+  const lease = await acquireResourceLease(request)
+  try {
+    const child = Bun.spawn([process.execPath, "-e", `const {acquireResourceLease}=await import(${JSON.stringify(path.resolve(import.meta.dir, "../src/lease.ts"))});
+      try {await acquireResourceLease(${JSON.stringify({ ...request, identity: { ...identity, containerId: "f".repeat(64) } })});process.exitCode=4}
+      catch(error) {console.log(error.message);process.exitCode=2}`], { stdout: "pipe", stderr: "pipe" })
+    expect(await child.exited).toBe(2)
+    expect(await new Response(child.stdout).text()).toContain("BUSY")
+  } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("resource lease: a replaced owner snapshot cannot release with the old token", async () => {
+  const item = await resourceFixture()
+  const lease = await acquireResourceLease(item.request)
+  try {
+    await writeLeaseReceipt(lease.receipt, { ...lease.reservation, owner: { ...lease.reservation.owner, starttime: String(BigInt(lease.reservation.owner.starttime) + 1n) } })
+    const proof = path.join(item.root, "proof.json")
+    await writeFile(proof, JSON.stringify({ version: 2, status: "confirmed", key: item.request.key, token: lease.reservation.token, revision: lease.reservation.revision }), { mode: 0o600 })
+    await expect(lease.release(proof)).rejects.toThrow("LEASE_RELEASE_UNCONFIRMED")
+  } finally { await lease.close(); await rm(item.root, { recursive: true, force: true }) }
+})
 
 test("lease: второй harness не допускается, release проверяет свой owner", async () => {
   const profile = await mkdtemp(path.join(os.tmpdir(), "evals-lease-"))

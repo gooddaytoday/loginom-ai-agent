@@ -155,3 +155,16 @@ test('verified calculator rejection exposes its concrete corrected-request conti
   output:{node:{document_id:'d',workflow_id:'w',node_id:'n'},next_step:next,output:{status:'not_refreshed',ports:[]}}}});
  assert.deepEqual(r.next_step,next);assert.equal(validate(r).valid,true);
 });
+
+test('compact ordinary output preserves source freshness and typed values without workflow evidence',()=>{
+ const port={port:0,port_guid:'p',fresh:true,execution_id:'e',freshness_basis:'completed_execution_port_source',
+  read_limit:'preview_cell_or_byte_budget',schema:[],row_count:1,sample_rows:1,sample_complete:true,sample:[[{type:'real',value:-0,decimal:'-0',precision:'17_significant_digits',representation:'binary64',is_null:false},
+  {type:'integer',value:'9223372036854775807',precision:'exact_integer',is_null:false},
+  {type:'string',value:'  \r\n😀',precision:'source_text',representation:'data_source_string',is_null:false}]]};
+ const original={operation_id:'read',outcome:{status:'SUCCEEDED',output:{output:{ports:[port]}}}},before=structuredClone(original);
+ const compact=compactNodeResult(original);
+ assert.equal(compact.output.ports[0].freshness_basis,'completed_execution_port_source');
+ assert.equal(compact.output.ports[0].read_limit,'preview_cell_or_byte_budget');
+ assert.equal(Object.hasOwn(compact.output,'workflow_returned'),false);
+ assert.deepEqual(compact.output.ports[0].sample,port.sample);assert.deepEqual(original,before);
+});

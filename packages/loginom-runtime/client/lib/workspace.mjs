@@ -123,6 +123,8 @@ async function prepareWorkspace(page, options) {
       if(!element?.isConnected||component!==current.openDialog||component.$className!=='bg.filedialog.view.OpenDialogForm'||component.el?.dom!==element
         ||component.hidden!==false||Date.now()>=deadline)return {error:'UI_BLOCKED'};
       current.openSubmitted=true;
+      current.openErrorBefore=globalThis.bg?.ext?.errormessage?.ErrorMsg?.FInstance?.FErrorMessageInfo??null;
+      current.openErrorAbsent=openErrors.length===0;
       return {bound:true};
     }
     const map=app?.Application?.FInstance?.FMainForm?.FMapTree, connection=map?.FServerConnection;
@@ -168,7 +170,20 @@ async function prepareWorkspace(page, options) {
           || state.id!==options.workflowRef.document_id || tabTid!==options.workflowRef.tab_tid
           || crumbs.length!==options.workflowRef.navigation_path.length
           || crumbs.some((crumb,i)=>crumb.tid!==options.workflowRef.navigation_path[i].tid || crumb.label!==options.workflowRef.navigation_path[i].label))) return {error:'WORKFLOW_CHANGED'};
-      if (options.intent==='open_package' && openErrors.length) return {error:'PACKAGE_OPEN_REJECTED'};
+      if (options.intent==='open_package' && openErrors.length) {
+        // Capture only this Open's newly reported native error. This is not
+        // proof of no effect, nor permission to retry Open or dismiss other UI.
+        const instance=globalThis.bg?.ext?.errormessage?.ErrorMsg?.FInstance;
+        const message=instance?.FMessageBox,root=message?.el?.dom,messages=instance?.FMessages;
+        if(current?.openSubmitted===true&&current.openErrorAbsent===true&&!current.openError
+          &&openErrors.length===1&&openErrors[0]===messages?.el?.dom&&root?.contains(openErrors[0])
+          &&/^msgbox(?:-\d+)?$/.test(root.getAttribute('data-tid')??'')
+          &&globalThis.Ext?.getCmp?.(root.id)===message&&instance.FErrorMessageInfo
+          &&instance.FErrorMessageInfo!==current.openErrorBefore
+          &&(openErrors[0].textContent??'').trim()==="Cannot read properties of undefined (reading 'TestableCellRenderer')")
+          current.openError={instance,message,root,messages,info:instance.FErrorMessageInfo,element:openErrors[0]};
+        return {error:'PACKAGE_OPEN_REJECTED',renderer_error:!!current?.openError};
+      }
       if (!ready) return blockingWindows?{pending:true,blocking_windows:blockingWindows}:null;
       if (current?.tab && (tab!==current.tab || packageNode!==current.packageNode
           || JSON.stringify(crumbs)!==JSON.stringify(current.crumbs))) return {error:'WORKFLOW_CHANGED'};
@@ -265,7 +280,10 @@ async function prepareWorkspace(page, options) {
     }
     const verified=await wait('exact_workflow_ready',()=>inspect('verify'));
     if (verified.error) return result('NOT_READY',verified.error,{authenticated:true,
-      ...(verified.error==='PACKAGE_OPEN_REJECTED' ? {message:'Opening the existing saved package was rejected. A future Save path for a NEW task requires intent new_draft with no package_path; retain that name for Save. This opening has an unverified effect: reconcile the SAME operation_id before starting a different preparation.'} : {})});
+      ...(verified.error==='PACKAGE_OPEN_REJECTED' ? {message:(verified.renderer_error
+        ? 'Loginom could not render the opened package (TestableCellRenderer). '
+        : 'Loginom reported an error while opening the saved package. ')
+        +'The package may already be open; do not repeat Open. Reconcile the SAME operation_id and close the owned package/session before trying a new preparation.'} : {})});
     createdDraft=options.intent==='new_draft';
     return result('READY',null,{authenticated:true,...verified,replayed:old.exists===true});
   } catch (error) {

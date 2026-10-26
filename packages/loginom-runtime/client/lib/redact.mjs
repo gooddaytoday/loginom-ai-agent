@@ -7,6 +7,7 @@ const secretField = key => sensitiveKey.test(key.replace(/([a-z])([A-Z])/g, '$1_
 
 export function createRedactor(knownValues = []) {
   const known = new Set(knownValues.filter(value => typeof value === 'string' && value.length >= 4));
+  const scalar = value => JSON.isRawJSON(value) ? JSON.parse(value.rawJSON) : value;
   function text(raw) {
     let value = raw;
     for (const secret of [...known].sort((a, b) => b.length - a.length)) {
@@ -56,7 +57,8 @@ export function createRedactor(knownValues = []) {
     if (typeof value === 'string') {
       if (/^[\s]*[\[{]/.test(value)) {
         try {
-          const cleaned=JSON.stringify(clean(JSON.parse(value), seen, depth + 1, preserveJsonText));
+          const cleaned=JSON.stringify(clean(JSON.parse(value, (key, item, context) =>
+            typeof item === 'number' ? JSON.rawJSON(context.source) : item), seen, depth + 1, preserveJsonText));
           // Keep lossless JSON text when only insignificant whitespace differs.
           // Duplicate keys, noncanonical escapes or any redaction still use the
           // cleaned serialization, so discarded input cannot escape redaction.
@@ -68,18 +70,22 @@ export function createRedactor(knownValues = []) {
     }
     if (value == null || typeof value === 'number' || typeof value === 'boolean') return value;
     if (typeof value !== 'object' || seen.has(value)) throw new Error('Unsupported redaction input');
+    if (JSON.isRawJSON(value) && typeof scalar(value) === 'number') return value;
     seen.add(value);
     try {
       if (Buffer.isBuffer(value) || value instanceof Uint8Array) return '[binary omitted]';
       if (['system', 'developer'].includes(value.role) || ['analysis', 'summary'].includes(value.channel)) return { omitted: 'non-visible instructions or reasoning' };
       if (Array.isArray(value)) return value.map(item => clean(item, seen, depth + 1, preserveJsonText));
       if (['image', 'audio', 'video', 'image_url', 'input_image', 'resource'].includes(value.type)) return { type: 'text', text: '[binary artifact omitted]' };
-      if ((/password|secret|token|api.key|пароль/i.test(String(value.element || value.name || '')))
+      if ((/password|secret|token|api.key|пароль/i.test(String(scalar(value.element) || scalar(value.name) || '')))
           && ('text' in value || 'value' in value)) return { redacted: 'credential input' };
       const result = Object.create(null);
       for (const [key, item] of Object.entries(value)) {
         if (forbiddenKey.test(key)) continue;
-        if (usageCounters.has(key)) result[key] = item === null || (Number.isSafeInteger(item) && item >= 0) ? item : marker;
+        if (usageCounters.has(key)) {
+          const count = scalar(item);
+          result[key] = count === null || (Number.isSafeInteger(count) && count >= 0) ? item : marker;
+        }
         else if (secretField(key)) result[key] = marker;
         else if (['code', 'command', 'cmd'].includes(key) && typeof item === 'string'
             && /password|passwd|cookie|authorization|private.?key/i.test(item)) result[key] = '[credential operation omitted]';

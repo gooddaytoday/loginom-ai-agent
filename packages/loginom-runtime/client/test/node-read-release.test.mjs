@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {alignReadSchema,buildNodeReadRequest,isUnchangedTextImportExecution,isUnchangedTransformExecution} from '../lib/node-read-contract.mjs';
+import {releasePendingNode,NODE_RELEASE_BUDGET_MS} from '../lib/node-pending-release.mjs';
 import {createNodeReadDrivers} from '../lib/node-read-driver.mjs';
-import {buildNodeReadRequest} from '../lib/node-read-contract.mjs';
 import {Page,runtime,build} from './support/executor-fixture.mjs';
 
 const node={document_id:'doc',workflow_id:'wf',node_id:'sorting'};
@@ -13,7 +15,7 @@ const request=()=>buildNodeReadRequest({operation_id:'read-ru',source_operation_
 const refused={operation_id:'read-ru:n19',action_key:'ui.act',status:'NOT_APPLIED',phase:'preconditions',effect_possible:false,
  cleanup_complete:true,error:{code:'GRAPH_EXECUTION_CONTEXT_CHANGED'},trace:[{event:'ui_observation_started'}]};
 
-async function fixture(fault){
+async function fixture(fault,phase='finish'){
  const page=new Page();page.addNode('Report',104,104,[]);const calls=[],records=[];let operation,reads=0;
  const graph=()=>({complete:true,document_id:'doc',workflow_ref:workflow,nodes:[{ref:node,type:'transform.sorting',label:'Report',inputs:[],outputs:[0]}],
   links:fault==='graph-drift'&&reads++%2===1?[{source:'other',target:'sorting',output:0,input:0}]:[],foreign_links:[]});
@@ -26,11 +28,27 @@ async function fixture(fault){
   nodeTargetAdapterFactory:()=>({observe:async()=>structuredClone(graph()),preflight:ok}),
   nodeApplyDriverFactory:options=>{
    operation=options.operation;
-   const drivers=createNodeReadDrivers({...options,
-    execute:async()=>{calls.push('observe');return {status:'SUCCEEDED',output:snapshot()};},
-    readReceipt:async ref=>{calls.push('receipt:'+ref.id);return fault==='unsettled'?{state:'pending'}:
-     {state:'completed',receipt:{...refused,cleanup_complete:fault!=='cleanup'}};},
-   },{targetOrigin:'https://loginom.invalid',targetBuild:build});
+   const readReceipt=async ref=>{calls.push('receipt:'+ref.id);return fault==='unsettled'?{state:'pending'}:
+     {state:'completed',receipt:{...refused,cleanup_complete:fault!=='cleanup'}};};
+   const channel={async observe({ready}){calls.push('observe');const value=snapshot();if(!ready(value))throw Error('Readiness refused');return value;},
+    async readOutputPort({port}){
+     calls.push('read');
+     if(fault?.startsWith('second-')&&port===0){operation.portReadCleanupComplete=operation.cleanupConfirmed=true;return {output:{port,port_guid:'p0',
+      fresh:true,execution_id:'fresh',freshness_basis:'completed_execution_port_source',schema,row_count:0,sample_rows:0,sample_complete:true,sample:[]}};}
+     if(['unstarted','second-unstarted'].includes(fault))throw Error('Read refused before dispatch');
+     operation.portReadCleanupComplete=operation.cleanupConfirmed=!['port-cleanup','second-port-cleanup'].includes(fault);operation.transportUncertain=fault==='transport';
+     throw Error('The owned port read was refused after cleanup');
+    }};
+   const create=vm.runInNewContext('('+createNodeReadDrivers.toString()+')',{
+    createNodeProcedure:()=>channel,createNodeExecutionProcedure:()=>({async prepare(){},async waitCompleted(){return {
+     verified:true,owner_verified:true,cleanup_complete:true,status:'completed',execution_id:'fresh',process_id:'1.1',process_record_id:'child'};}}),
+    finishConfiguredGraph:async()=>{calls.push('finish');operation.lastReceipt={id:'read-ru:n19'};
+     return {verified:true,cleanup_complete:true,mode:'execute',execution_id:'fresh'};},
+    need:(ok,message)=>{if(!ok)throw Error(message);},verified:value=>({verified:true,cleanup_complete:true,...value}),
+    alignReadSchema,isUnchangedTextImportExecution,isUnchangedTransformExecution,releasePendingNode,NODE_RELEASE_BUDGET_MS,
+   });
+   const drivers=create({...options,readReceipt},{targetOrigin:'https://loginom.invalid',targetBuild:build});
+   if(phase==='read')return drivers;
    return {...drivers,finishGraph:async()=>{
     calls.push('finish');operation.cleanupConfirmed=true;operation.transportUncertain=fault==='transport';
     operation.lastReceipt={id:'read-ru:n19'};
@@ -39,9 +57,11 @@ async function fixture(fault){
     throw Error('The selected node or launch button changed before execution');
    }};
   }});
- f.startNodeApply(request());const job=await f.waitNodeApply('read-ru',{timeoutMs:1000});
+ const planned=request();
+ if(fault?.startsWith('second-')){planned.read.ports=[0,1];planned.parameters.schemas.push({port:1,schema});}
+ f.startNodeApply(planned);const job=await f.waitNodeApply('read-ru',{timeoutMs:1000});
  assert.equal(job.outcome?.status,'AMBIGUOUS',JSON.stringify(job));
- assert.equal(job.outcome.output.pending_phase,'finish');
+ assert.equal(job.outcome.output.pending_phase,phase);
  return {f,page,operation,calls,records};
 }
 
@@ -74,8 +94,50 @@ for(const fault of ['transport','unsettled','cleanup','foreign-node','graph-drif
  const save=await f.run('package.save_checkpoint',{path:'/user/data/packages/unsafe.lgp',conflict_policy:'fail'},{operationId:'unsafe-save'});
  assert.equal(save.status,'AMBIGUOUS');assert.equal(save.operation_id,'read-ru');assert.equal(page.storage.size,0);
 });
-test('the read driver does not advertise release for its unrestored Table phase',async()=>{
- const {f,operation}=await fixture();operation.nodeApply.pending.phase='read';
- assert.deepEqual((await f.inspect({operationId:'read-ru'})).output.recovery_options,[]);
- await assert.rejects(operation.nodeApplyDrivers.releasePending(operation.nodeApply),/Only a stopped output-read graph finish/);
+test('a settled refused read releases after its own cleanup and the same quiet graph without replay',async()=>{
+ const {f,operation,calls}=await fixture(undefined,'read');
+ assert.equal(operation.cleanupConfirmed,false,'Executor overwrites phase cleanup before release');
+ const settledRelease=await f.recover('read-ru',{strategy:'abandon_operation',recoveryOperationId:'release-read'});
+ assert.equal(settledRelease.status,'SUCCEEDED',JSON.stringify(settledRelease));
+ assert.equal(settledRelease.output.original_outcome.output.cleanup_complete,true);
+ assert.equal(settledRelease.output.original_outcome.output.execution.status,'completed');
+ assert.equal(operation.nodeApply.pending,null);assert.equal(f.hasUnsettledWork(),false);
+ assert.deepEqual(calls.filter(c=>['read','finish'].includes(c)),['finish','read']);
+ const before=calls.filter(c=>c==='finish').length;
+ await f.recover('read-ru',{strategy:'abandon_operation',recoveryOperationId:'release-read'});
+ const repeatedExecuteCount=calls.filter(c=>c==='finish').length-before;
+ assert.equal(repeatedExecuteCount,0);
+});
+for(const fault of ['unstarted','second-unstarted'])test('reread release accepts a stopped attempt before dispatch: '+fault,async()=>{
+ const {f,operation,calls}=await fixture(fault,'read');
+ const result=await f.recover('read-ru',{strategy:'abandon_operation',recoveryOperationId:'release-unstarted'});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(result.output.original_outcome.output.execution.status,'completed');
+ assert.equal(operation.nodeApply.pending,null);assert.equal(f.hasUnsettledWork(),false);
+ assert.equal(calls.filter(c=>c==='finish').length,1);
+ assert.equal(calls.filter(c=>c==='read').length,fault==='unstarted'?1:2);
+});
+for(const fault of ['transport','unsettled','cleanup','port-cleanup','second-port-cleanup','foreign-node','graph-drift'])test('read release retains unknown cleanup or context: '+fault,async()=>{
+ const {f,operation,calls}=await fixture(fault,'read');
+ if(fault==='transport')assert.equal(operation.transportUncertain,true);
+ const unknownRelease=await f.recover('read-ru',{strategy:'abandon_operation',recoveryOperationId:'unknown-read'}).catch(error=>error);
+ assert.notEqual(unknownRelease.status,'SUCCEEDED');assert.equal(operation.nodeApply.pending.phase,'read');
+ assert.equal(f.hasUnsettledWork(),true);assert.equal(calls.filter(c=>c==='finish').length,1);
+ if(fault.startsWith('second-'))assert.equal(calls.filter(c=>c==='read').length,2);
+});
+test('browser recovery read release also requires the last actual port cleanup',async()=>{
+ const settled=await fixture(undefined,'read');
+ const proof=await settled.operation.nodeApplyDrivers.recoveryReleasePending(settled.operation.nodeApply);
+ assert.equal(proof.cleanup_complete,true);assert.equal(settled.calls.filter(c=>c==='finish').length,1);
+ for(const fault of ['unstarted','second-unstarted']){
+  const unstarted=await fixture(fault,'read');
+  const proof=await unstarted.operation.nodeApplyDrivers.recoveryReleasePending(unstarted.operation.nodeApply);
+  assert.equal(proof.cleanup_complete,true);
+  assert.equal(unstarted.calls.filter(c=>c==='finish').length,1);
+ }
+ for(const fault of ['port-cleanup','second-port-cleanup']){
+  const unknown=await fixture(fault,'read');
+  await assert.rejects(()=>unknown.operation.nodeApplyDrivers.recoveryReleasePending(unknown.operation.nodeApply),/no confirmed settled cleanup/);
+  assert.equal(unknown.calls.filter(c=>c==='finish').length,1);
+ }
 });

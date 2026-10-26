@@ -1,0 +1,5 @@
+segment,customers,mean_recency_days,mean_frequency,mean_monetary_value,mean_net_purchase_value
+high_value,385,375.231169,5.093506,5005.947377,11496.291441
+mid_value,9,436.444444,1.000000,4879.687778,2466.598506
+low_value,5,271.600000,0.600000,3766.722000,1328.428240
+at_risk,1,627.000000,0.000000,2841.330000,0.000000

@@ -1,5 +1,36 @@
 # Перенос 35 аналитических eval-кейсов и изоляция ответов
 
+## Контракт пользовательских слотов — 2026-10-13
+
+Для нового режима нормативен [контракт v2](parallel-users-contract.md), фактический статус —
+[runbook](../../docs/testing/loginom-ai-agent/parallel-evals.md). Реализация начата; live v2 ещё не квалифицирован. Без
+EVAL_SLOTS_FILE остаётся legacy exclusive; прежние инструкции широкой очистки,
+миграции стенда и R/operations/stand.lease ниже относятся только к legacy.
+V2 создаёт новую пару на lg-pc-75 со своей сетью/портом; dev/legacy/remote
+стенды, исторические results и pins начатых серий сохраняются. Marker по
+/workdir/.loginom-evals-isolated.json имеет kind loginom-evals-users/version 2;
+совместимый v1 не создаётся, старые broad-cleanup executors на новой паре запрещены.
+
+Standalone prepare/verify выпускают доказанно чистые durable reservations и OS
+guards; readiness не резервирует среду. Crash освобождает guard, но retained
+reservation запрещает новый run. Recover требует incident/lineage/recovery-only
+CAS и новых proofs; отсутствие PID не разрешает takeover. Постоянный root
+/var/lib/loginom-evals/locks создаётся разовым bootstrap, prepare только проверяет
+его; stateDir и env/config не переносят global fence. Архив history/БД/WAL/SHM/inputs
+предшествует server close/readback; удаление только своего user root/backups
+требует closure proof. Unknown outcome сохраняет данные/fence; restart сервера
+для слота и широкая очистка запрещены. Admission failure до попыток — exit 2
+и preparation receipt без measured summary; карантин после dispatch — summary/exit 1.
+
+Node-evals выбирает архив по доверенному slot_id без fallback.
+interrupted_cleanup — null без interrupted попыток, иначе OR profile_recovered
+только interrupted попыток. Приёмка: немодельные session/ACL/backup/process
+gates, затем полный LLM N=2 → N=1 и node-evals с неизменными pins/условиями.
+Новые eval-прогоны используют openai/gpt-6-luna/high и судью gpt-6-sol/xhigh;
+исторические модели/defaults ниже описывают прежние серии. Admin secrets/state
+остаются вне mounts/env/results; shared model OAuth и private judge CODEX_HOME
+проверяются отдельно. Skip и исторический PASS не доказывают готовность v2.
+
 Дата: 2026-10-07. Статус: **план выполнен, минимальная приёмка пройдена**. Поправки пользователя включены; исходный Loginom восстановлен после согласованного эксклюзивного окна. Полная калибровка и baseline 35 не запускались.
 
 **Цель:** хранить полные неизменные кейсы в `evals/`, оставив оцениваемому агенту только задание, inputs и ресурсы продукта; harness и судья сохраняют доступ к оценочным материалам.

@@ -1,0 +1,101 @@
+data_id,title,mission,date,image_count,hd_image,media_type,creator,keywords_count
+1,space_event_1,Space Shuttle,2024-01-01,8,1,image,ESA,14
+2,space_event_2,Mercury,2024-01-02,4,1,video,NASA,5
+3,space_event_3,Artemis,2024-01-03,4,0,image,NASA,19
+4,space_event_4,Mercury,2024-01-04,5,1,image,SpaceX,16
+5,space_event_5,Space Shuttle,2024-01-05,5,1,video,SpaceX,12
+6,space_event_6,Mercury,2024-01-06,4,1,image,ESA,4
+7,space_event_7,Gemini,2024-01-07,4,1,image,JAXA,8
+8,space_event_8,Space Shuttle,2024-01-08,7,1,image,SpaceX,7
+9,space_event_9,Mercury,2024-01-09,5,0,image,JAXA,15
+10,space_event_10,Apollo,2024-01-10,4,0,image,NASA,6
+11,space_event_11,Mercury,2024-01-11,3,0,article,NASA,5
+12,space_event_12,Gemini,2024-01-12,9,1,image,NASA,14
+13,space_event_13,Artemis,2024-01-13,6,1,image,NASA,13
+14,space_event_14,Artemis,2024-01-14,6,1,image,ESA,10
+15,space_event_15,Artemis,2024-01-15,4,1,article,NASA,18
+16,space_event_16,Apollo,2024-01-16,7,0,image,SpaceX,4
+17,space_event_17,Gemini,2024-01-17,6,1,image,NASA,8
+18,space_event_18,Space Shuttle,2024-01-18,6,1,article,JAXA,11
+19,space_event_19,Artemis,2024-01-19,2,1,image,SpaceX,17
+20,space_event_20,Gemini,2024-01-20,6,1,image,JAXA,18
+21,space_event_21,Mercury,2024-01-21,4,1,image,JAXA,11
+22,space_event_22,Apollo,2024-01-22,7,1,image,ESA,16
+23,space_event_23,Gemini,2024-01-23,8,1,image,ESA,12
+24,space_event_24,Gemini,2024-01-24,6,0,video,JAXA,13
+25,space_event_25,Space Shuttle,2024-01-25,3,0,image,JAXA,16
+26,space_event_26,Gemini,2024-01-26,4,1,image,NASA,1
+27,space_event_27,Space Shuttle,2024-01-27,5,1,image,SpaceX,16
+28,space_event_28,Apollo,2024-01-28,3,1,image,NASA,15
+29,space_event_29,Apollo,2024-01-29,5,1,image,ESA,6
+30,space_event_30,Mercury,2024-01-30,8,1,article,ESA,12
+31,space_event_31,Space Shuttle,2024-01-31,8,0,image,NASA,8
+32,space_event_32,Space Shuttle,2024-02-01,5,1,video,SpaceX,7
+33,space_event_33,Artemis,2024-02-02,5,1,image,JAXA,2
+34,space_event_34,Artemis,2024-02-03,8,0,image,NASA,12
+35,space_event_35,Mercury,2024-02-04,5,1,image,ESA,14
+36,space_event_36,Apollo,2024-02-05,4,1,image,SpaceX,16
+37,space_event_37,ISS,2024-02-06,3,1,image,ESA,11
+38,space_event_38,Artemis,2024-02-07,7,1,image,SpaceX,9
+39,space_event_39,Gemini,2024-02-08,4,1,article,SpaceX,10
+40,space_event_40,Apollo,2024-02-09,4,1,image,SpaceX,17
+41,space_event_41,ISS,2024-02-10,5,1,image,NASA,12
+42,space_event_42,Gemini,2024-02-11,3,1,image,NASA,6
+43,space_event_43,Space Shuttle,2024-02-12,5,0,image,NASA,19
+44,space_event_44,Apollo,2024-02-13,4,1,image,SpaceX,11
+45,space_event_45,Mercury,2024-02-14,6,0,image,SpaceX,9
+46,space_event_46,Space Shuttle,2024-02-15,5,0,image,ESA,6
+47,space_event_47,Space Shuttle,2024-02-16,5,1,video,JAXA,16
+48,space_event_48,Gemini,2024-02-17,2,0,article,NASA,16
+49,space_event_49,Space Shuttle,2024-02-18,5,1,image,SpaceX,6
+50,space_event_50,Artemis,2024-02-19,3,0,image,ESA,5
+51,space_event_51,Apollo,2024-02-20,3,1,article,ESA,4
+52,space_event_52,Artemis,2024-02-21,5,0,image,ESA,2
+53,space_event_53,Gemini,2024-02-22,4,0,image,NASA,6
+54,space_event_54,ISS,2024-02-23,3,0,image,NASA,9
+55,space_event_55,Gemini,2024-02-24,4,1,image,JAXA,17
+56,space_event_56,Apollo,2024-02-25,2,1,image,ESA,14
+57,space_event_57,Space Shuttle,2024-02-26,6,0,image,NASA,7
+58,space_event_58,Mercury,2024-02-27,7,1,image,ESA,19
+59,space_event_59,Gemini,2024-02-28,3,1,image,SpaceX,1
+60,space_event_60,Apollo,2024-02-29,5,1,article,ESA,15
+61,space_event_61,Mercury,2024-03-01,4,1,image,JAXA,18
+62,space_event_62,Space Shuttle,2024-03-02,6,1,image,NASA,3
+63,space_event_63,ISS,2024-03-03,6,0,image,SpaceX,18
+64,space_event_64,Gemini,2024-03-04,2,1,video,NASA,2
+65,space_event_65,ISS,2024-03-05,2,1,article,SpaceX,10
+66,space_event_66,Apollo,2024-03-06,5,1,video,ESA,11
+67,space_event_67,ISS,2024-03-07,2,0,image,ESA,3
+68,space_event_68,ISS,2024-03-08,7,0,video,JAXA,7
+69,space_event_69,Apollo,2024-03-09,4,1,video,JAXA,8
+70,space_event_70,Apollo,2024-03-10,5,1,image,SpaceX,19
+71,space_event_71,Gemini,2024-03-11,7,1,image,JAXA,18
+72,space_event_72,ISS,2024-03-12,5,1,image,JAXA,13
+73,space_event_73,Mercury,2024-03-13,7,0,video,JAXA,13
+74,space_event_74,Apollo,2024-03-14,1,1,image,JAXA,19
+75,space_event_75,Space Shuttle,2024-03-15,3,1,image,ESA,12
+76,space_event_76,ISS,2024-03-16,4,1,article,JAXA,17
+77,space_event_77,Apollo,2024-03-17,9,0,article,ESA,12
+78,space_event_78,Mercury,2024-03-18,4,1,article,ESA,13
+79,space_event_79,Gemini,2024-03-19,5,1,article,NASA,12
+80,space_event_80,ISS,2024-03-20,6,0,image,ESA,19
+81,space_event_81,Apollo,2024-03-21,6,1,video,ESA,14
+82,space_event_82,Apollo,2024-03-22,3,1,image,JAXA,7
+83,space_event_83,Space Shuttle,2024-03-23,3,0,article,ESA,13
+84,space_event_84,Space Shuttle,2024-03-24,5,1,image,SpaceX,6
+85,space_event_85,ISS,2024-03-25,7,1,article,JAXA,19
+86,space_event_86,Apollo,2024-03-26,6,1,video,JAXA,19
+87,space_event_87,ISS,2024-03-27,6,1,article,JAXA,4
+88,space_event_88,Apollo,2024-03-28,4,1,image,NASA,19
+89,space_event_89,Space Shuttle,2024-03-29,7,0,image,JAXA,9
+90,space_event_90,Mercury,2024-03-30,4,1,article,ESA,16
+91,space_event_91,Artemis,2024-03-31,8,1,image,SpaceX,4
+92,space_event_92,Artemis,2024-04-01,5,1,article,JAXA,6
+93,space_event_93,Apollo,2024-04-02,5,1,image,JAXA,8
+94,space_event_94,Space Shuttle,2024-04-03,4,0,video,SpaceX,16
+95,space_event_95,Gemini,2024-04-04,5,1,image,JAXA,5
+96,space_event_96,Gemini,2024-04-05,2,1,video,NASA,10
+97,space_event_97,Artemis,2024-04-06,3,0,video,ESA,13
+98,space_event_98,Mercury,2024-04-07,7,1,image,SpaceX,14
+99,space_event_99,Artemis,2024-04-08,5,1,image,SpaceX,7
+100,space_event_100,Apollo,2024-04-09,6,1,image,NASA,6

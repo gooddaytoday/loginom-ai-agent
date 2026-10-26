@@ -1,0 +1,4 @@
+store,n,bread_count,milk_count,both_count,support,confidence,lift
+Store_A,497,155,164,53,10.663984,34.193548,1.036231
+Store_C,503,160,146,44,8.747515,27.5,0.947432
+Store_B,500,144,153,40,8,27.777778,0.907771

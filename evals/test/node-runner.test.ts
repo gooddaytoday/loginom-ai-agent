@@ -5,6 +5,7 @@ import { cp, mkdtemp, rm } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
 import { runNodeEvals } from "../src/node-runner"
 
+
 test("runner вызывает штатный fake harness без судьи и пишет FAIL при no_artifact вместо generic code=0", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-runner-"))
   const server = Bun.serve({ port: 0, fetch: () => Response.json({ status: "ok", result: { revision: "fixture" } }) })
@@ -37,6 +38,20 @@ test("runner отклоняет режимы с судьёй и сохранен
     expect(await runNodeEvals([flag], {})).toMatchObject({ code: 2, runDir: null })
   }
   expect(await runNodeEvals(["--unknown-flag"], {})).toMatchObject({ code: 2, runDir: null })
+})
+
+test("node runner CLI: help documents slots and strict parser refuses unknown flags", async () => {
+  const script = path.join(evalsRoot, "script/run-node-evals.ts")
+  const help = Bun.spawn([process.execPath, script, "--help"], { cwd: evalsRoot, env: { PATH: process.env.PATH }, stdout: "pipe", stderr: "pipe" })
+  expect(await help.exited).toBe(0)
+  const output = await new Response(help.stdout).text()
+  expect(output).toContain("--parallel")
+  expect(output).toContain("EVAL_SLOTS_FILE")
+  await new Response(help.stderr).text()
+  const bad = Bun.spawn([process.execPath, script, "--unexpected"], { cwd: evalsRoot, env: { PATH: process.env.PATH }, stdout: "pipe", stderr: "pipe" })
+  expect(await bad.exited).toBe(2)
+  expect(await new Response(bad.stderr).text()).toContain("unexpected")
+  await new Response(bad.stdout).text()
 })
 
 test("text import diagnostic pipeline completes without a package but does not certify missing refusal evidence", async () => {

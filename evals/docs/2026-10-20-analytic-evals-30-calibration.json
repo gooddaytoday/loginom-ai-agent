@@ -1,0 +1,831 @@
+{
+  "run_id": "20261020-004227-calibrate-f7LxCs",
+  "judge": {
+    "backend": "codex",
+    "codex_version": "codex-cli 0.157.0",
+    "model": "gpt-6-sol",
+    "reasoning": "xhigh",
+    "prompt_sha256": "6562edddd63d38ab7e8400795c6d1f1198bf2551e2b35baffe0b464248ab6daa",
+    "schema_sha256": "f7341e870bf242d31fce9d8d4c1cf79a239bf34e39860496acdb9d956ba7709a"
+  },
+  "rubric_hash": "6dc47e0fa91e8cfdd2d9d8062f9fd2c7758ace0868b498cf31526412c6503fe6",
+  "thresholds": {
+    "positiveMin": 90,
+    "negativeMax": 40
+  },
+  "calibration_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "near_miss_coverage": {
+    "age-pressure-correlation": 0,
+    "area-price-linear-fit": 0,
+    "bread-milk-affinity": 0,
+    "campaign-region-loss-share": 0,
+    "channel-unit-economics": 0,
+    "city-weather-risk": 0,
+    "cluster-label-crosswalk": 0,
+    "coin-market-momentum": 0,
+    "contract-payment-churn": 0,
+    "country-access-diversity": 0,
+    "currency-change-profile": 0,
+    "department-worktype-productivity": 0,
+    "district-weighted-indicators": 0,
+    "feature-usage-conversion": 0,
+    "journey-outcome-profile": 0,
+    "listing-promotion-efficiency": 0,
+    "mission-media-content": 0,
+    "monthly-retention-curve": 0,
+    "negative-words-rating": 0,
+    "price-quality-intent": 0,
+    "search-engine-cost-efficiency": 0,
+    "sector-weighted-allocation": 0,
+    "segment-net-purchase-value": 0,
+    "service-digital-processing": 0,
+    "social-engagement-roi": 0,
+    "source-device-conversion": 0,
+    "student-score-summary": 0,
+    "tenure-churn-profile": 0,
+    "treatment-followup-profile": 0,
+    "zscore-anomaly-check": 0
+  },
+  "rows": [
+    {
+      "task": "age-pressure-correlation",
+      "kind": "positive",
+      "reference": "age-pressure-correlation",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "age-pressure-correlation",
+      "kind": "negative",
+      "reference": "area-price-linear-fit",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 25,
+      "failed": [
+        "input",
+        "calculation",
+        "export"
+      ],
+      "error": null
+    },
+    {
+      "task": "area-price-linear-fit",
+      "kind": "positive",
+      "reference": "area-price-linear-fit",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "area-price-linear-fit",
+      "kind": "negative",
+      "reference": "bread-milk-affinity",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "regression-sums",
+        "ols-formula",
+        "single-final",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "bread-milk-affinity",
+      "kind": "positive",
+      "reference": "bread-milk-affinity",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "bread-milk-affinity",
+      "kind": "negative",
+      "reference": "campaign-region-loss-share",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "calculation",
+        "ordering",
+        "export"
+      ],
+      "error": null
+    },
+    {
+      "task": "campaign-region-loss-share",
+      "kind": "positive",
+      "reference": "campaign-region-loss-share",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "campaign-region-loss-share",
+      "kind": "negative",
+      "reference": "channel-unit-economics",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "grouping",
+        "metrics",
+        "ordering",
+        "export",
+        "connected-calculation"
+      ],
+      "error": null
+    },
+    {
+      "task": "channel-unit-economics",
+      "kind": "positive",
+      "reference": "channel-unit-economics",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "channel-unit-economics",
+      "kind": "negative",
+      "reference": "city-weather-risk",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "grouping",
+        "metrics",
+        "ordering",
+        "export",
+        "connected-calculation"
+      ],
+      "error": null
+    },
+    {
+      "task": "city-weather-risk",
+      "kind": "positive",
+      "reference": "city-weather-risk",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "city-weather-risk",
+      "kind": "negative",
+      "reference": "cluster-label-crosswalk",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "calculation",
+        "ordering",
+        "export"
+      ],
+      "error": null
+    },
+    {
+      "task": "cluster-label-crosswalk",
+      "kind": "positive",
+      "reference": "cluster-label-crosswalk",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "cluster-label-crosswalk",
+      "kind": "negative",
+      "reference": "coin-market-momentum",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "labels-preserved",
+        "cross-frequencies",
+        "sort-final",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "coin-market-momentum",
+      "kind": "positive",
+      "reference": "coin-market-momentum",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "coin-market-momentum",
+      "kind": "negative",
+      "reference": "contract-payment-churn",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "calculation",
+        "ordering",
+        "export"
+      ],
+      "error": null
+    },
+    {
+      "task": "contract-payment-churn",
+      "kind": "positive",
+      "reference": "contract-payment-churn",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "contract-payment-churn",
+      "kind": "negative",
+      "reference": "country-access-diversity",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "contract-payment-groups",
+        "churn-measures",
+        "sort-final",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "country-access-diversity",
+      "kind": "positive",
+      "reference": "country-access-diversity",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "country-access-diversity",
+      "kind": "negative",
+      "reference": "currency-change-profile",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "calculation",
+        "ordering",
+        "export"
+      ],
+      "error": null
+    },
+    {
+      "task": "currency-change-profile",
+      "kind": "positive",
+      "reference": "currency-change-profile",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "currency-change-profile",
+      "kind": "negative",
+      "reference": "department-worktype-productivity",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "calculation",
+        "ordering",
+        "export"
+      ],
+      "error": null
+    },
+    {
+      "task": "department-worktype-productivity",
+      "kind": "positive",
+      "reference": "department-worktype-productivity",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "department-worktype-productivity",
+      "kind": "negative",
+      "reference": "district-weighted-indicators",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "department-worktype-groups",
+        "worktype-crosswalk",
+        "sort-final",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "district-weighted-indicators",
+      "kind": "positive",
+      "reference": "district-weighted-indicators",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "district-weighted-indicators",
+      "kind": "negative",
+      "reference": "feature-usage-conversion",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "grouping",
+        "metrics",
+        "ordering",
+        "export",
+        "connected-calculation"
+      ],
+      "error": null
+    },
+    {
+      "task": "feature-usage-conversion",
+      "kind": "positive",
+      "reference": "feature-usage-conversion",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "feature-usage-conversion",
+      "kind": "negative",
+      "reference": "journey-outcome-profile",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "calculation",
+        "ordering",
+        "export"
+      ],
+      "error": null
+    },
+    {
+      "task": "journey-outcome-profile",
+      "kind": "positive",
+      "reference": "journey-outcome-profile",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "journey-outcome-profile",
+      "kind": "negative",
+      "reference": "listing-promotion-efficiency",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "grouping",
+        "metrics",
+        "ordering",
+        "export",
+        "connected-calculation"
+      ],
+      "error": null
+    },
+    {
+      "task": "listing-promotion-efficiency",
+      "kind": "positive",
+      "reference": "listing-promotion-efficiency",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "listing-promotion-efficiency",
+      "kind": "negative",
+      "reference": "mission-media-content",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "grouping",
+        "metrics",
+        "ordering",
+        "export",
+        "connected-calculation"
+      ],
+      "error": null
+    },
+    {
+      "task": "mission-media-content",
+      "kind": "positive",
+      "reference": "mission-media-content",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "mission-media-content",
+      "kind": "negative",
+      "reference": "monthly-retention-curve",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "calculation",
+        "ordering",
+        "export"
+      ],
+      "error": null
+    },
+    {
+      "task": "monthly-retention-curve",
+      "kind": "positive",
+      "reference": "monthly-retention-curve",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "monthly-retention-curve",
+      "kind": "negative",
+      "reference": "negative-words-rating",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "calculation",
+        "ordering",
+        "export"
+      ],
+      "error": null
+    },
+    {
+      "task": "negative-words-rating",
+      "kind": "positive",
+      "reference": "negative-words-rating",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "negative-words-rating",
+      "kind": "negative",
+      "reference": "price-quality-intent",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "negative-word-groups",
+        "review-statistics",
+        "sort-final",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "price-quality-intent",
+      "kind": "positive",
+      "reference": "price-quality-intent",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "price-quality-intent",
+      "kind": "negative",
+      "reference": "search-engine-cost-efficiency",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "price-quality-groups",
+        "intent-measures",
+        "sort-final",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "search-engine-cost-efficiency",
+      "kind": "positive",
+      "reference": "search-engine-cost-efficiency",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "search-engine-cost-efficiency",
+      "kind": "negative",
+      "reference": "sector-weighted-allocation",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "grouping",
+        "metrics",
+        "ordering",
+        "export",
+        "connected-calculation"
+      ],
+      "error": null
+    },
+    {
+      "task": "sector-weighted-allocation",
+      "kind": "positive",
+      "reference": "sector-weighted-allocation",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "sector-weighted-allocation",
+      "kind": "negative",
+      "reference": "segment-net-purchase-value",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "calculation",
+        "ordering",
+        "export"
+      ],
+      "error": null
+    },
+    {
+      "task": "segment-net-purchase-value",
+      "kind": "positive",
+      "reference": "segment-net-purchase-value",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "segment-net-purchase-value",
+      "kind": "negative",
+      "reference": "service-digital-processing",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "grouping",
+        "metrics",
+        "ordering",
+        "export",
+        "connected-calculation"
+      ],
+      "error": null
+    },
+    {
+      "task": "service-digital-processing",
+      "kind": "positive",
+      "reference": "service-digital-processing",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "service-digital-processing",
+      "kind": "negative",
+      "reference": "social-engagement-roi",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "grouping",
+        "metrics",
+        "ordering",
+        "export",
+        "connected-calculation"
+      ],
+      "error": null
+    },
+    {
+      "task": "social-engagement-roi",
+      "kind": "positive",
+      "reference": "social-engagement-roi",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "social-engagement-roi",
+      "kind": "negative",
+      "reference": "source-device-conversion",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "grouping",
+        "metrics",
+        "ordering",
+        "export",
+        "connected-calculation"
+      ],
+      "error": null
+    },
+    {
+      "task": "source-device-conversion",
+      "kind": "positive",
+      "reference": "source-device-conversion",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "source-device-conversion",
+      "kind": "negative",
+      "reference": "student-score-summary",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "input",
+        "grouping",
+        "metrics",
+        "ordering",
+        "export",
+        "connected-calculation"
+      ],
+      "error": null
+    },
+    {
+      "task": "student-score-summary",
+      "kind": "positive",
+      "reference": "student-score-summary",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "student-score-summary",
+      "kind": "negative",
+      "reference": "tenure-churn-profile",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "subject-summary",
+        "population-stddev",
+        "sort-final",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "tenure-churn-profile",
+      "kind": "positive",
+      "reference": "tenure-churn-profile",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "tenure-churn-profile",
+      "kind": "negative",
+      "reference": "treatment-followup-profile",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "tenure-groups",
+        "churn-measures",
+        "sort-final",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "treatment-followup-profile",
+      "kind": "positive",
+      "reference": "treatment-followup-profile",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "treatment-followup-profile",
+      "kind": "negative",
+      "reference": "zscore-anomaly-check",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "treatment-groups",
+        "followup-statistics",
+        "sort-final",
+        "export-columns"
+      ],
+      "error": null
+    },
+    {
+      "task": "zscore-anomaly-check",
+      "kind": "positive",
+      "reference": "zscore-anomaly-check",
+      "oracle_pass": true,
+      "oracle_error": null,
+      "score": 100,
+      "failed": [],
+      "error": null
+    },
+    {
+      "task": "zscore-anomaly-check",
+      "kind": "negative",
+      "reference": "age-pressure-correlation",
+      "oracle_pass": null,
+      "oracle_error": null,
+      "score": 0,
+      "failed": [
+        "import-csv",
+        "population-zscores",
+        "anomaly-prediction",
+        "confusion-measures",
+        "export-columns"
+      ],
+      "error": null
+    }
+  ],
+  "warnings": []
+}

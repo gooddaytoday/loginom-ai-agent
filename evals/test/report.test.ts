@@ -2,13 +2,70 @@ import { expect, test } from "bun:test"
 import { mkdtemp, readdir } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { aggregate, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "../src/report"
+import { aggregate, aggregateLimits, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "../src/report"
+import { comparisonSummary } from "./helpers/compare-summary"
+
+test("prepared run report links mandatory resource evidence and keeps quarantine for startup reconciliation", () => {
+  const run = comparisonSummary([{ successes: 1, attempts: 1 }], 1)
+  run.storage_leftovers = null
+  run.slots = [{ id: "a", username: "eval-a", profileDir: "/private/a", workspaceRoot: "/private/work-a", historyDir: "/private/history-a",
+    liveQualified: true, state: "quarantined" }]
+  const report = renderReport({ ...run, resources: { status: "incomplete", evidence: "resource-acceptance.json", codes: ["RESOURCE_SAMPLES_MISSING"] } })
+  expect(report).toContain("Ресурсы: incomplete")
+  expect(report).toContain("resource-acceptance.json")
+  expect(report).toContain("RESOURCE_SAMPLES_MISSING")
+  expect(report).not.toContain("parallel-env recover")
+})
 
 test("statusFor: ошибка изоляции останавливает запуск даже при exit 1 или timeout", () => {
   const run = { exitCode: 1, timedOut: false, interrupted: false, sandboxError: "SANDBOX_EXECUTION_FAILED" }
   expect(statusFor(run, false)).toEqual({ status: "harness_error", stop: true })
   expect(statusFor({ ...run, timedOut: true }, false)).toEqual({ status: "harness_error", stop: true })
   expect(statusFor({ ...run, sandboxError: null }, false)).toEqual({ status: "failed", stop: false })
+})
+
+test("report: parallel slots show wall time and receipts without a broad storage deletion command", () => {
+  const run = comparisonSummary([{ successes: 1, attempts: 1 }], 1)
+  run.started_at = "2026-10-14T00:00:00Z"
+  run.finished_at = "2026-10-14T00:00:12Z"
+  run.config.parallel = 2
+  run.loginom = { image_digest: "image", container: "users", storage_dir: "/workdir/UserStorage/eval-a" }
+  run.storage_leftovers = ["eval-fixture-task-1.lgp"]
+  run.slots = ["a", "b"].map(id => ({ id, username: `eval-${id}`, profileDir: `/tmp/profile-${id}`,
+    historyDir: `/tmp/history-${id}`, workspaceRoot: `/tmp/work-${id}`, liveQualified: false,
+    state: id === "a" ? "closed" : "quarantined", cleanup_receipt: `/tmp/controller/${id}.cleanup.json` }))
+  const report = renderReport(run)
+  expect(report).toContain("Параллельность: 2")
+  expect(report).toContain("Длительность прогона: 12.0s")
+  expect(report).toContain("Сумма времени агентов: 0.0s")
+  expect(report).toContain("b | eval-b | quarantined")
+  expect(report).toContain("/tmp/controller/b.cleanup.json")
+  expect(report).toContain("parallel-env recover")
+  expect(report).not.toContain("rm -f")
+})
+
+test("report: a failed slot listing preserves healthy slot details and identifies the recovery target", () => {
+  const run = comparisonSummary([{ successes: 1, attempts: 1 }], 1)
+  run.config.parallel = 2
+  run.storage_leftovers = null
+  run.slots = ["a", "b"].map(id => ({ id, username: `eval-${id}`, profileDir: `/tmp/profile-${id}`,
+    historyDir: `/tmp/history-${id}`, workspaceRoot: `/tmp/work-${id}`, liveQualified: false,
+    state: id === "a" ? "quarantined" : "closed", storage_root: `/tmp/storage/${id}`,
+    storage_leftovers: id === "a" ? null : [], storage_error: id === "a" ? "listing denied | unavailable\nretry" : null }))
+  const report = renderReport(run)
+  expect(report).toContain("a: /tmp/storage/a — не удалось получить листинг: listing denied \\| unavailable retry")
+  expect(report).toContain("b: /tmp/storage/b — остатков нет")
+  expect(report).toContain("parallel-env recover")
+  expect(report).not.toContain("rm -f")
+})
+
+test("report: a scoped attempt displays its slot next to its logical attempt number", () => {
+  const run = comparisonSummary([{ successes: 1, attempts: 1 }], 1)
+  run.config.parallel = 2
+  run.tasks[0]!.attempts[0]!.slot_id = "b"
+  const report = renderReport(run)
+  expect(report).toContain("| Задача | # | Слот | Статус |")
+  expect(report).toContain("| task-0 | 1 | b | completed |")
 })
 
 test("statusFor: таблица кодов выхода и приоритет timed_out/interrupted", () => {
@@ -270,4 +327,48 @@ test("writeSummary: пишет summary.json и report.md", async () => {
   expect(written.run_id).toBe("20260918-120000-abc1234")
   expect(await Bun.file(path.join(dir, "report.md")).exists()).toBe(true)
   expect((await readdir(dir)).filter((name) => name.endsWith(".tmp"))).toEqual([])
+})
+
+test("report: limit failure is visible beside successful quality metrics", () => {
+  const run = comparisonSummary([{ successes: 1, attempts: 1 }], 1)
+  run.parallel_limits = { status: "failed", codes: ["PROVIDER_HTTP_429"] }
+  const before = JSON.stringify(run)
+  const report = renderReport(run)
+  expect(report).toContain("Проверка лимитов: failed · PROVIDER_HTTP_429")
+  expect(report).toContain("completion_rate: 100.0%")
+  expect(JSON.stringify(run)).toBe(before)
+  expect(renderReport(comparisonSummary([{ successes: 1, attempts: 1 }], 1))).not.toContain("Проверка лимитов:")
+})
+
+test("aggregateLimits includes interrupted runs even when quality and spend exclude them", () => {
+  // Declared receipt coverage only; this is not a transport qualification.
+  const coverage = { provider: "complete", dock: "complete", judge: "complete" }
+  const attempts = [attempt({ status: "interrupted", pass: null, score: null, cost: 10,
+    limit_evidence: { coverage, events: [{ source: "provider", kind: "http", status: 429 }] } }),
+    attempt({ limit_evidence: { coverage, events: [] } })]
+  const before = JSON.stringify(attempts)
+  expect(aggregateLimits(attempts)).toEqual({ status: "failed", codes: ["PROVIDER_HTTP_429"] })
+  expect(aggregate(attempts, false)).toMatchObject({ total: 1, completed: 1, total_cost: 0.01 })
+  expect(JSON.stringify(attempts)).toBe(before)
+})
+
+test("aggregateLimits keeps empty, legacy and partially observed runs incomplete", () => {
+  const complete = attempt({ limit_evidence: { coverage: { provider: "complete", dock: "complete", judge: "complete" }, events: [] } })
+  expect(aggregateLimits([complete])).toEqual({ status: "passed", codes: [] })
+  for (const attempts of [[], [attempt({})], [complete, attempt({})], [complete, attempt({ limit_evidence: {
+    coverage: { provider: "complete", dock: "unavailable", judge: "complete" }, events: [] } })]])
+    expect(aggregateLimits(attempts).status).toBe("incomplete")
+})
+
+test("prepared limits require agent and judge observations while retaining unavailable Dock diagnostics", () => {
+  const measured = attempt({ judge_status: "scored", judge_attempts: 1,
+    limit_evidence: { coverage: { provider: "complete", dock: "unavailable", judge: "unavailable" }, events: [] } })
+  expect(aggregateLimits([measured], ["provider", "judge"])).toEqual({ status: "passed", codes: [] })
+  expect(aggregateLimits([measured]).status).toBe("incomplete")
+  expect(measured.limit_evidence?.coverage.dock).toBe("unavailable")
+  expect(aggregateLimits([{ ...measured, judge_status: "no_artifact", judge_attempts: 0 }], ["provider", "judge"]).status).toBe("passed")
+  expect(aggregateLimits([{ ...measured, judge_status: "error" }], ["provider", "judge"]).status).toBe("incomplete")
+  const summary = comparisonSummary([{ successes: 1, attempts: 1 }], 1)
+  summary.parallel_limits = { ...aggregateLimits([measured], ["provider", "judge"]), required_sources: ["provider", "judge"] }
+  expect(renderReport(summary)).toContain("Проверка лимитов обязательных источников (provider, judge): passed")
 })

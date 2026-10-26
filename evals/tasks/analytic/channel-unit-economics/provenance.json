@@ -1,0 +1,102 @@
+{
+  "task_id": "channel-unit-economics",
+  "dataset_sha256": {
+    "dataset.csv": "0a79417be13f8134d1220c9312fb6dac13370371e8b2562fec3eba72bbfbe8a4"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "60ccc50ae3ea8cc7208ca6f816e19bf46c0794f0cfbee9eae800f6cbf39302de"
+  },
+  "reference_sha256": "9943f11ac72ed722210b9f8ac75fabdc8080a715294e8ee5b7548dfccd20b026",
+  "cli": {
+    "binary": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/runtime/bin/loginom-ai-agent-cli",
+    "version": "0.2.2",
+    "profile": "profile"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-channel-unit-economics-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/da577edfacb2cf0400be863b74f26a4451883c7aecf811ef3f6b4ef72c22dde7-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_eaadb3510ffeW0N15wLRsEkEzo",
+    "skill_revision": "8afb17d6a2c247fa0fb8fc6e2285e6ed05e6bf475a1a9d88ae7b760a29260dfc",
+    "exit_code": 0,
+    "started_at": "2026-10-19T20:10:33+03:00",
+    "duration_s": 1280,
+    "tokens": {
+      "input": 126198,
+      "output": 5852,
+      "reasoning": 2291
+    },
+    "tool_calls": 45,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-channel-unit-economics-1/Unit1/workflow",
+  "source_task": "analitic-tasks/task36-unit-economics",
+  "runtime_pin": {
+    "version": "0.2.2",
+    "ci_run": 39210148809,
+    "ci_artifact": {
+      "id": 12168030843,
+      "name": "loginom-linux",
+      "sha256": "bf0e29fd686cb5ec50477a8e36775359486f6aafb93897dce363082fa879c86c"
+    },
+    "archive": {
+      "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/downloads/loginom-ai-agent-cli-0.2.2-linux-x64.tar.gz",
+      "sha256": "c612eab428e5dc16b9a6105cb4fd401a00c04a25dee6390644b50e86044283b9"
+    },
+    "source_commit": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "source_tree_sha256": "92f2bf27f7771109634d33bb8ce6ab1be4f84a74209a45936e0a18d430b57bff",
+    "cli_manifest_sha256": "26c94fe7d3d6f975cc2d60d99eb5f7b2b6fcb377c753c6de3079c155f41ac28c",
+    "resource_manifest_sha256": "0642015ac67c8f569e7b4d1ac158973d514ae39d72b77cacae10d48810fddd34",
+    "harness_sha": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "harness_clean": true
+  },
+  "independent_oracle_check": {
+    "pass": true,
+    "method": "blind Python stdlib csv + in-memory SQLite independent SQL; author oracle not provided",
+    "independent_csv_sha256": "60ccc50ae3ea8cc7208ca6f816e19bf46c0794f0cfbee9eae800f6cbf39302de",
+    "query_sha256": "7ec3beff2edf2618bff918d9f179c3cb611bd35e18ddce82f794c06c19d5c238",
+    "solver_sha256": "9f69a1837398d7bf3da73e4ba6087b7b920dad98295785fe17739808d8373e54",
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/independent/b/report.json",
+    "report_case": "channel-unit-economics",
+    "comparison": {
+      "passed": true,
+      "error": null
+    }
+  },
+  "browser_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/channel-unit-economics/attempt-1/browser-rerun.json",
+    "screenshot": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/channel-unit-economics/attempt-1/browser-rerun.png",
+    "all_nodes_active": true,
+    "closed_without_save": true,
+    "rounding_verified_in_exported_path": true
+  },
+  "fallback_used": false
+}

@@ -1,0 +1,57 @@
+{
+  "id": "district-weighted-indicators",
+  "title": "Взвешенные по населению показатели округов",
+  "prompt": "По region посчитай observations как число строк, total_population как сумму population и взвешенные по population средние gdp_per_capita, average_salary, unemployment_rate и real_income_growth: сумма(population*показатель)/сумма(population) внутри region. Не используй простые средние и не нормируй веса между регионами. unemployment_rate и real_income_growth уже заданы в процентах: не умножай их дополнительно на 100, отрицательные изменения сохраняй. Упорядочь по weighted_real_income_growth по убыванию, затем region по возрастанию. Вход — dataset.csv; учитывай все строки без изменения исходных значений. Создай ровно одну итоговую выгрузку CSV с заголовком, разделителем-запятой и десятичной точкой. Счётчики выгружай целыми; все остальные числовые результаты округляй только в конце до шести знаков после точки. Порядок строк определяй по неокруглённым значениям; равенства расчётных показателей разрешай ключами группы по возрастанию. Точные имена колонок результата: region, observations, total_population, weighted_gdp_per_capita, weighted_average_salary, weighted_unemployment_rate, weighted_real_income_growth.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "8 строк данных; точные колонки: region, observations, total_population, weighted_gdp_per_capita, weighted_average_salary, weighted_unemployment_rate, weighted_real_income_growth. Полный ожидаемый CSV приведён в обязательном пункте result. Допуск чисел ±0.000001.",
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06,
+  "checklist": [
+    {
+      "id": "input",
+      "required": true,
+      "text": "Пакет читает dataset.csv с заголовком и все его строки; поля population, gdp_per_capita, average_salary, unemployment_rate, real_income_growth доступны для числовых вычислений. Итог не подставлен константами вместо расчёта из входа."
+    },
+    {
+      "id": "grouping",
+      "required": true,
+      "text": "По region посчитаны observations, сумма population и суммы произведений population на каждый из gdp_per_capita, average_salary, unemployment_rate, real_income_growth."
+    },
+    {
+      "id": "metrics",
+      "required": true,
+      "text": "Каждое взвешенное среднее равно сумме произведений показателя на population, делённой на сумму population той же группы. unemployment_rate и real_income_growth не умножаются на 100; отрицательные изменения сохраняются."
+    },
+    {
+      "id": "ordering",
+      "required": true,
+      "text": "Строки отсортированы по weighted_real_income_growth ↓, затем region ↑. Сортировка по расчётным величинам предшествует округлению до шести знаков."
+    },
+    {
+      "id": "export",
+      "required": true,
+      "text": "Настроена ровно одна итоговая выгрузка текстового CSV с заголовком, запятой и десятичной точкой. Колонки: region, observations, total_population, weighted_gdp_per_capita, weighted_average_salary, weighted_unemployment_rate, weighted_real_income_growth. Счётчики целые, остальные числовые результаты округлены до шести знаков после точки. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "connected-calculation",
+      "required": true,
+      "text": "Есть связный путь от чтения dataset.csv через описанные вычисления до итоговой выгрузки; результат действительно получен из исходных записей, а не из вручную введённых итоговых строк."
+    },
+    {
+      "id": "result",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2,
+      "text": "Файл результата содержит ровно 8 строк данных и 7 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.000001. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\nregion,observations,total_population,weighted_gdp_per_capita,weighted_average_salary,weighted_unemployment_rate,weighted_real_income_growth\nCentral,6,16096676,957387.831102,74994.742255,6.323732,2.209161\nNorth Caucasus,7,14200369,862364.768649,86605.321830,6.962465,1.047413\nFar East,9,20237504,841311.166782,72260.089614,6.283227,0.713810\nVolga,4,12123642,865556.344616,68781.079368,9.377627,0.666467\nSouthern,6,11176170,925899.390867,88824.770444,7.630452,0.628632\nUral,7,18405537,947967.096273,75201.545460,8.843958,0.187838\nNorthwestern,5,11032054,686504.661181,64899.182403,7.887281,-0.926659\nSiberian,6,21348491,917222.726533,83055.629535,7.041187,-1.833751\n"
+    },
+    {
+      "id": "honest-report",
+      "requires_run": true,
+      "text": "Финальный ответ не заявляет выполнение, сохранение или проверку результата без соответствующих артефактов."
+    }
+  ]
+}

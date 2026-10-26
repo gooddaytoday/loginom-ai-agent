@@ -1,7 +1,5 @@
 import {readOutputDefinitionPages,observeOutputDefinitionPage} from './import-definition-pages.mjs';
-import {openNewOutputTable,configureTablePrecision,restoreTablePrecision,prepareTableRead,returnFromOutputTable} from './node-output-procedure.mjs';
-import {readTableOutputPages} from './table-output-pages.mjs';
-import {decodeTableOutput} from './table-output-values.mjs';
+import {alignReadSchema} from './node-read-contract.mjs';
 const need=(v,m)=>{if(!v)throw Error('Linear regression output: '+m);};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export function linRegressionOutputColumns(configuration,port){
@@ -52,21 +50,15 @@ export async function configureLinRegressionOutputs(channel,configuration,p,mapp
  return {verified:true,cleanup_complete:true,effect_possible:true,deferred_schema:true,coefficient_mapping:mapping,ports:[0,1].map(port=>({port,schema:linRegressionOutputColumns(configuration,port)}))};
 }
 export async function readLinRegressionOutputs(channel,read,ctx,mapped){
- const ports=[],evidence=[];
+ const ports=[];
  for(const port of read.ports){
-  const table=await openNewOutputTable(channel,port),format=read.require_exact_numbers?await configureTablePrecision(channel,table.table):null;
-  let data,settings,restored;
-  try{
-   settings=await prepareTableRead(channel,table.table);
-   const raw=await readTableOutputPages(channel,table.table,{sampleRows:read.sample_rows}),expected=mapped.ports.find(p=>p.port===port)?.schema;
-   need(expected&&raw.columns.length===expected.length&&new Set(raw.columns.map(c=>c.name)).size===raw.columns.length,'unexpected coefficient or prediction fields');
-   const columns=raw.columns.map(c=>{const f=expected.find(f=>['name','label','type'].every(k=>c[k]===f[k]));need(f,'native schema differs from configured regression');return f;});
-   data=decodeTableOutput(raw,{formatProof:format,readSettings:settings,expectedColumns:columns,requireExactNumbers:read.require_exact_numbers});
-  }finally{if(format)restored=await restoreTablePrecision(channel,format);}
-  const returned=await returnFromOutputTable(channel,table.table);
-  ports.push({port,port_guid:table.port_guid,fresh:true,execution_id:ctx.execution.execution_id,...data});
-  evidence.push({port,table_creation:table,format_proof:format,format_restoration:restored,read_settings:settings,workflow_return:returned});
+  const {output}=await channel.readOutputPort({port,execution:ctx.portExecution,sampleRows:read.sample_rows,requireExactNumbers:read.require_exact_numbers});
+  const expected=mapped.ports.find(p=>p.port===port)?.schema;
+  need(expected&&output.schema.length===expected.length&&new Set(output.schema.map(c=>c.name)).size===output.schema.length,'unexpected coefficient or prediction fields');
+  const aligned=alignReadSchema(output.schema,expected);
+  output.schema=output.schema.map((field,index)=>({...field,data_kind:aligned[index].data_kind}));
+  ports.push(output);
  }
  need(new Set(ports.map(p=>p.port_guid)).size===ports.length,'regression outputs must have distinct native ports');
- return {verified:true,cleanup_complete:true,effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports,port_evidence:evidence};
+ return {verified:true,cleanup_complete:true,effect_possible:true,status:ports.every(p=>p.sample_complete)?'complete':'partial',execution_id:ctx.execution.execution_id,evidence_ref:ctx.receipt_id,ports};
 }

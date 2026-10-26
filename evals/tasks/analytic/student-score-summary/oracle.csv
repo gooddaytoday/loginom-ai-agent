@@ -1,0 +1,4 @@
+subject,students,mean_score,min_score,max_score,population_stddev
+math_score,200,69.995000,40.000000,100.000000,17.821195
+reading_score,200,70.530000,40.000000,100.000000,17.922307
+writing_score,200,72.910000,40.000000,100.000000,17.209936

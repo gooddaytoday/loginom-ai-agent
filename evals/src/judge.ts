@@ -1,4 +1,5 @@
 import path from "node:path"
+import { childEnvironment } from "./child-environment"
 import { cp, mkdir, rm } from "node:fs/promises"
 import { evalsRoot } from "./config"
 import type { ChecklistItem, Task } from "./task"
@@ -6,6 +7,8 @@ import type { AgentRun } from "./cli"
 import { unzip } from "./artifact"
 import { EvalFailure } from "./fail"
 import { checkOracle } from "./oracle"
+import { superviseProcess } from "./process-supervisor"
+import { runJudgeUnit } from "./judge-unit"
 
 export const judgePromptFile = path.join(evalsRoot, "src", "judge-prompt.md")
 export const verdictSchemaFile = path.join(evalsRoot, "src", "verdict.schema.json")
@@ -22,6 +25,7 @@ export type JudgeSettings = {
   timeoutMs: number
   passThreshold: number
   env?: Record<string, string>
+  systemd?: boolean
 }
 type RunView = Pick<AgentRun, "finalText" | "tools" | "nodeReceipts" | "nodeReceiptsDropped">
 
@@ -73,11 +77,11 @@ function parseJson(text: string): unknown {
   }
 }
 
-export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" | "model" | "reasoning" | "env"> }) {
-  const version = await Bun.$`${config.judge.command} --version`.env(judgeEnvironment(config.judge.env)).quiet().nothrow()
+export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" | "model" | "reasoning" | "env" | "systemd"> }, signal?: AbortSignal) {
+  const version = await judgeVersion(config.judge, signal)
   return {
     backend: "codex" as const,
-    codex_version: version.exitCode === 0 ? version.text().trim() : null,
+    codex_version: version.exitCode === 0 ? version.stdout.trim() : null,
     model: config.judge.model,
     reasoning: config.judge.reasoning,
     prompt_sha256: new Bun.CryptoHasher("sha256").update(await Bun.file(judgePromptFile).bytes()).digest("hex"),
@@ -85,6 +89,15 @@ export async function judgeInfo(config: { judge: Pick<JudgeSettings, "command" |
   }
 }
 export type JudgeInfo = Awaited<ReturnType<typeof judgeInfo>>
+
+export async function judgeVersion(judge: Pick<JudgeSettings, "command" | "env" | "systemd">, signal?: AbortSignal) {
+  const version = await runJudge({ cmd: [...judge.command, "--version"], cwd: evalsRoot,
+    env: judgeEnvironment(judge.env), timeoutMs: 10_000, signal, owner: { kind: "judge", id: "version" } }, judge)
+    .catch(() => { throw new EvalFailure("Судья недоступен: проверка версии не подтверждена", 2) })
+  if (!version.cleanupConfirmed || version.timedOut || version.interrupted)
+    throw new EvalFailure("JUDGE_VERSION_UNCONFIRMED", 2)
+  return { exitCode: version.exitCode, stdout: version.stdout }
+}
 
 export function judgeEnvironment(env?: Record<string, string>) {
   return {
@@ -114,6 +127,18 @@ export function judgeCommand(input: { command: string[]; dir: string; model: str
     `model_reasoning_effort=${input.reasoning}`,
     "-c",
     "project_doc_max_bytes=0",
+    "-c",
+    "model_provider=evals-openai",
+    "-c",
+    "model_providers.evals-openai.name=OpenAI",
+    "-c",
+    "model_providers.evals-openai.requires_openai_auth=true",
+    "-c",
+    "model_providers.evals-openai.request_max_retries=0",
+    "-c",
+    "model_providers.evals-openai.stream_max_retries=0",
+    "-c",
+    "model_providers.evals-openai.supports_websockets=false",
     "--json",
     "--output-schema",
     path.join(input.dir, "verdict.schema.json"),
@@ -179,19 +204,56 @@ export async function judgeTask(input: {
   signal?: AbortSignal
   checklist?: ChecklistItem[]
 }) {
+  return judgeInvocation(input)
+}
+
+async function judgeInvocation(input: Parameters<typeof judgeTask>[0], admit?: () => void) {
   const checklist = input.checklist ?? input.task.checklist
   const checked = input.run ? await checkOracle(input.task, input.artifactDir) : { passed: null, error: null }
   const oracle = { oracle_pass: checked.passed, oracle_error: checked.error }
   await prepareJudgeDir({ ...input, dir: input.outDir, checklist })
+  admit?.()
   const first = await invoke(input, checklist, 1)
   if (first.ok) return { ...first, pass: first.pass && checked.passed !== false, ...oracle, attempts: 1 as const }
-  if (input.signal?.aborted) return { ok: false as const, error: first.error, ...oracle, attempts: 1 as const }
+  if (input.signal?.aborted || "cleanupUnconfirmed" in first) return { ...first, ok: false as const, error: first.error, ...oracle, attempts: 1 as const }
   const second = await invoke(input, checklist, 2)
   return second.ok
     ? { ...second, pass: second.pass && checked.passed !== false, ...oracle, attempts: 2 as const }
-    : { ok: false as const, error: `${first.error}; повтор: ${second.error}`, ...oracle, attempts: 2 as const }
+    : { ...second, ok: false as const, error: `${first.error}; повтор: ${second.error}`, ...oracle, attempts: 2 as const }
 }
-export type Judged = Awaited<ReturnType<typeof judgeTask>> | { ok: false; error: string; attempts: 0 }
+export type Judged = Awaited<ReturnType<typeof judgeTask>> | { ok: false; error: string; attempts: 0; cleanupUnconfirmed?: true }
+
+export function createJudgeGate() {
+  let sequence = Promise.resolve()
+  let poisoned = false
+  return (input: Parameters<typeof judgeTask>[0]): Promise<Judged> => {
+    const previous = sequence
+    const finished = Promise.withResolvers<void>()
+    // Cancelled waiters return early; later judges must still await their predecessor.
+    sequence = previous.then(() => finished.promise)
+    const cancelled = Promise.withResolvers<void>()
+    const abort = () => cancelled.resolve()
+    input.signal?.addEventListener("abort", abort, { once: true })
+    if (input.signal?.aborted) abort()
+    return Promise.race([previous, cancelled.promise]).then<Judged>(() => {
+      if (input.signal?.aborted) return { ok: false, error: "interrupted before judge", attempts: 0 }
+      if (poisoned) return { ok: false, error: "Judge gate blocked by unconfirmed cleanup", attempts: 0, cleanupUnconfirmed: true }
+      let admitted = false
+      return judgeInvocation(input, () => { admitted = true }).then(result => {
+        if ("cleanupUnconfirmed" in result && result.cleanupUnconfirmed) poisoned = true
+        return result
+      }).catch((error: unknown) => {
+        if (!admitted) throw error
+        // An exception can happen after spawning, before the cleanup outcome reaches this gate.
+        poisoned = true
+        return { ok: false, error: "Judge invocation failed without confirmed result", attempts: 0, cleanupUnconfirmed: true }
+      })
+    }).finally(() => {
+      input.signal?.removeEventListener("abort", abort)
+      finished.resolve()
+    })
+  }
+}
 
 export function judgedFields(judged: Judged) {
   if (judged.ok)
@@ -208,6 +270,7 @@ export function judgedFields(judged: Judged) {
       oracle_error: judged.oracle_error,
     }
   return {
+    ...("cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed ? { judge_cleanup_unconfirmed: true } : {}),
     score: null,
     structural_score: null,
     pass: "oracle_pass" in judged && judged.oracle_pass === false ? false : null,
@@ -228,23 +291,21 @@ async function invoke(
 ) {
   const verdictPath = path.join(input.outDir, "verdict.json")
   await rm(verdictPath, { force: true })
-  const proc = Bun.spawn(
-    judgeCommand({ command: input.judge.command, dir: input.outDir, model: input.judge.model, reasoning: input.judge.reasoning }),
-    {
-      cwd: input.outDir,
-      env: judgeEnvironment(input.judge.env),
-      stdin: Bun.file(path.join(input.outDir, "PROMPT.md")),
-      stdout: Bun.file(path.join(path.dirname(input.outDir), `judge-events-${attempt}.jsonl`)),
-      stderr: Bun.file(path.join(path.dirname(input.outDir), `judge-stderr-${attempt}.txt`)),
-    },
-  )
-  const timer = setTimeout(() => proc.kill("SIGKILL"), input.judge.timeoutMs)
-  const onAbort = () => proc.kill("SIGKILL")
-  input.signal?.addEventListener("abort", onAbort, { once: true })
-  if (input.signal?.aborted) proc.kill("SIGKILL")
-  const exitCode = await proc.exited
-  clearTimeout(timer)
-  input.signal?.removeEventListener("abort", onAbort)
+  const processDir = path.join(path.dirname(input.outDir), `judge-processes-${attempt}`)
+  await mkdir(processDir, { recursive: true, mode: 0o700 })
+  const supervised = await runJudge({
+    cmd: judgeCommand({ command: input.judge.command, dir: input.outDir, model: input.judge.model, reasoning: input.judge.reasoning }),
+    cwd: input.outDir, env: judgeEnvironment(input.judge.env),
+    stdin: await Bun.file(path.join(input.outDir, "PROMPT.md")).text(),
+    outDir: processDir,
+    timeoutMs: input.judge.timeoutMs, signal: input.signal,
+    owner: { kind: "judge", id: input.outDir },
+  }, input.judge)
+  await Bun.write(path.join(path.dirname(input.outDir), `judge-events-${attempt}.jsonl`), supervised.stdout)
+  await Bun.write(path.join(path.dirname(input.outDir), `judge-stderr-${attempt}.txt`), supervised.stderr)
+  if (!supervised.cleanupConfirmed) return { ok: false as const,
+    error: `Judge process cleanup unconfirmed: ${supervised.cleanupError ?? "unknown"}`, cleanupUnconfirmed: true }
+  const exitCode = supervised.exitCode
   if (exitCode !== 0) return { ok: false as const, error: `судья завершился кодом ${exitCode}` }
   const file = Bun.file(verdictPath)
   if (!(await file.exists())) return { ok: false as const, error: "verdict.json не создан" }
@@ -253,4 +314,13 @@ async function invoke(
   const scored = scoreVerdict(checklist, verdict, input.judge.passThreshold)
   if (!scored.ok) return { ok: false as const, error: scored.error }
   return { ...scored, verdict }
+}
+
+async function runJudge(input: Parameters<typeof superviseProcess>[0] & { timeoutMs: number; stdin?: string },
+  judge: Pick<JudgeSettings, "systemd">) {
+  if (judge.systemd) return runJudgeUnit({ ...input, env: { ...childEnvironment(input.env),
+    ...(input.env.CODEX_HOME ? { CODEX_HOME: input.env.CODEX_HOME } : {}) } })
+  const result = await superviseProcess(input)
+  return { ...result, cleanupConfirmed: result.processCleanup.status === "confirmed" && result.processCleanup.capture_complete,
+    cleanupError: result.processCleanup.error }
 }

@@ -1,3 +1,8 @@
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
 import unittest
 from copy import deepcopy
 from evidence import PREFIX
@@ -17,6 +22,62 @@ def fixture():
 
 
 class UserResultTests(unittest.TestCase):
+    def test_actual_port_projection_preserves_freshness_and_limits(self):
+        node=os.environ.get('LOGINOM_NODE') or shutil.which('node')
+        self.assertIsNotNone(node)
+        script="""
+import {readFileSync} from 'node:fs';
+import {pathToFileURL} from 'node:url';
+const {compactNodeResult}=await import(pathToFileURL(process.argv[1]));
+process.stdout.write(JSON.stringify(compactNodeResult(JSON.parse(readFileSync(0,'utf8')))));
+"""
+        for count in (2,1,0):
+            e=fixture();outcome=e['events'][2]['outcome'];port=outcome['output']['output']['ports'][0]
+            port.update(port=0,port_guid='port-guid',fresh=True,execution_id='execution',
+                freshness_basis='completed_execution_port_source',
+                schema=[dict(index=0,name='Value',label='Value',type='integer',data_kind='Непрерывный')],
+                row_count=2,sample=[[dict(type='integer',value=str(i),precision='exact_integer',
+                    representation='decimal_integer',is_null=False)] for i in (1,2)][:count],
+                sample_rows=count,sample_complete=count==2,
+                precision=dict(numbers_verified=True,limitations=[],strings='data source text'))
+            if count<2:
+                source=['small','x'*(512*1024+1)] if count else ['x'*(512*1024+1),'small']
+                self.assertGreater(len(source[count].encode('utf-8')),512*1024)
+                port['schema'][0].update(type='string',data_kind='Дискретный')
+                port.update(sample=[[dict(type='string',value=value,precision='source_text',
+                    representation='data_source_string',is_null=False)] for value in source[:count]],
+                    read_limit='preview_cell_or_byte_budget')
+            snapshot=dict(operation_id='node',attempt=1,state='settled',outcome=outcome,error=None)
+            reply=json.loads(subprocess.run([node,'--input-type=module','-e',script,
+                str(Path(__file__).resolve().parents[2]/'client/lib/user-results.mjs')],
+                input=json.dumps(snapshot),capture_output=True,text=True,check=True,timeout=10).stdout)
+            with self.subTest(count=count):
+                if count==2:
+                    self.assertEqual(project_node(snapshot),reply)
+                    e['tools'][1]['result']=reply
+                    self.assertTrue(normalize_user_evidence(e)[1]['passed'])
+                else:
+                    # Partial-preview advice has a separate historical projection limit.
+                    self.assertEqual(project_node(snapshot)['output']['ports'],reply['output']['ports'])
+
+    def test_port_metadata_and_sample_changes_are_rejected(self):
+        e=fixture();outcome=e['events'][2]['outcome'];port=outcome['output']['output']['ports'][0]
+        port.update(freshness_basis='completed_execution_port_source',read_limit='preview_cell_or_byte_budget')
+        e['tools'][1]['result']=project_node(dict(operation_id='node',attempt=1,state='settled',outcome=outcome,error=None))
+        e['tools'][1]['result']['output']['ports'][0].update({key:port[key] for key in ('freshness_basis','read_limit')})
+        before=deepcopy(e)
+        self.assertTrue(normalize_user_evidence(e)[1]['passed']);self.assertEqual(e,before)
+        for key in ('freshness_basis','read_limit'):
+            for removed in (False,True):
+                damaged=deepcopy(e);public_port=damaged['tools'][1]['result']['output']['ports'][0]
+                if removed:del public_port[key]
+                else:public_port[key]='foreign'
+                with self.subTest(key=key,removed=removed):self.assertFalse(normalize_user_evidence(damaged)[1]['passed'])
+        for count in (0,5):
+            damaged=deepcopy(e);public_port=damaged['tools'][1]['result']['output']['ports'][0]
+            public_port.update(sample=public_port['sample'][:count],sample_rows=count,sample_complete=False)
+            with self.subTest(count=count):self.assertFalse(normalize_user_evidence(damaged)[1]['passed'])
+
     def test_exact_projection_resolves_only_from_preparation_without_editing_input(self):
         e=fixture();before=deepcopy(e);normalized,r=normalize_user_evidence(e)
         self.assertTrue(r['passed']);self.assertEqual(e,before)
