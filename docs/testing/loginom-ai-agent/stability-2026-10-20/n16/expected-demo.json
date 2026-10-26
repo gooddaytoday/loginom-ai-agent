@@ -1,0 +1,357 @@
+{
+  "package_path": "/stability-2026-10-20/n16.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/late-books.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "LoanID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "DaysLate",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Label",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "LoanID": 1,
+          "DaysLate": 0,
+          "Label": "BOB-202402"
+        },
+        {
+          "LoanID": 2,
+          "DaysLate": 0,
+          "Label": "DAVE-202402"
+        },
+        {
+          "LoanID": 3,
+          "DaysLate": 0,
+          "Label": "CAROL-202402"
+        },
+        {
+          "LoanID": 4,
+          "DaysLate": 1,
+          "Label": "DAVE-202402"
+        },
+        {
+          "LoanID": 5,
+          "DaysLate": 2,
+          "Label": "BOB-202402"
+        },
+        {
+          "LoanID": 6,
+          "DaysLate": 3,
+          "Label": "ALICE-202402"
+        },
+        {
+          "LoanID": 7,
+          "DaysLate": 4,
+          "Label": "BOB-202402"
+        },
+        {
+          "LoanID": 8,
+          "DaysLate": 5,
+          "Label": "CAROL-202402"
+        },
+        {
+          "LoanID": 9,
+          "DaysLate": 0,
+          "Label": "ALICE-202402"
+        },
+        {
+          "LoanID": 10,
+          "DaysLate": 0,
+          "Label": "BOB-202403"
+        },
+        {
+          "LoanID": 11,
+          "DaysLate": 0,
+          "Label": "ALICE-202403"
+        },
+        {
+          "LoanID": 12,
+          "DaysLate": 0,
+          "Label": "ALICE-202403"
+        },
+        {
+          "LoanID": 13,
+          "DaysLate": 1,
+          "Label": "DAVE-202403"
+        },
+        {
+          "LoanID": 14,
+          "DaysLate": 2,
+          "Label": "CAROL-202403"
+        },
+        {
+          "LoanID": 15,
+          "DaysLate": 3,
+          "Label": "DAVE-202403"
+        },
+        {
+          "LoanID": 16,
+          "DaysLate": 4,
+          "Label": "CAROL-202403"
+        },
+        {
+          "LoanID": 17,
+          "DaysLate": 5,
+          "Label": "DAVE-202403"
+        },
+        {
+          "LoanID": 18,
+          "DaysLate": 0,
+          "Label": "DAVE-202403"
+        },
+        {
+          "LoanID": 19,
+          "DaysLate": 0,
+          "Label": "ALICE-202403"
+        },
+        {
+          "LoanID": 20,
+          "DaysLate": 0,
+          "Label": "DAVE-202403"
+        },
+        {
+          "LoanID": 21,
+          "DaysLate": 0,
+          "Label": "DAVE-202403"
+        },
+        {
+          "LoanID": 22,
+          "DaysLate": 1,
+          "Label": "CAROL-202403"
+        },
+        {
+          "LoanID": 23,
+          "DaysLate": 2,
+          "Label": "ALICE-202403"
+        },
+        {
+          "LoanID": 24,
+          "DaysLate": 3,
+          "Label": "BOB-202403"
+        },
+        {
+          "LoanID": 25,
+          "DaysLate": 4,
+          "Label": "ALICE-202403"
+        },
+        {
+          "LoanID": 26,
+          "DaysLate": 5,
+          "Label": "DAVE-202403"
+        },
+        {
+          "LoanID": 27,
+          "DaysLate": 0,
+          "Label": "BOB-202403"
+        },
+        {
+          "LoanID": 28,
+          "DaysLate": 0,
+          "Label": "CAROL-202403"
+        },
+        {
+          "LoanID": 29,
+          "DaysLate": 0,
+          "Label": "BOB-202403"
+        },
+        {
+          "LoanID": 30,
+          "DaysLate": 0,
+          "Label": "BOB-202403"
+        },
+        {
+          "LoanID": 31,
+          "DaysLate": 1,
+          "Label": "CAROL-202403"
+        },
+        {
+          "LoanID": 32,
+          "DaysLate": 2,
+          "Label": "BOB-202403"
+        },
+        {
+          "LoanID": 33,
+          "DaysLate": 3,
+          "Label": "ALICE-202403"
+        },
+        {
+          "LoanID": 34,
+          "DaysLate": 4,
+          "Label": "DAVE-202403"
+        },
+        {
+          "LoanID": 35,
+          "DaysLate": 5,
+          "Label": "DAVE-202403"
+        },
+        {
+          "LoanID": 36,
+          "DaysLate": 0,
+          "Label": "DAVE-202403"
+        },
+        {
+          "LoanID": 37,
+          "DaysLate": 0,
+          "Label": "ALICE-202403"
+        },
+        {
+          "LoanID": 38,
+          "DaysLate": 0,
+          "Label": "CAROL-202403"
+        },
+        {
+          "LoanID": 39,
+          "DaysLate": 0,
+          "Label": "BOB-202403"
+        },
+        {
+          "LoanID": 40,
+          "DaysLate": 1,
+          "Label": "ALICE-202403"
+        },
+        {
+          "LoanID": 41,
+          "DaysLate": 2,
+          "Label": "BOB-202404"
+        },
+        {
+          "LoanID": 42,
+          "DaysLate": 3,
+          "Label": "CAROL-202404"
+        },
+        {
+          "LoanID": 43,
+          "DaysLate": 4,
+          "Label": "CAROL-202404"
+        },
+        {
+          "LoanID": 44,
+          "DaysLate": 5,
+          "Label": "ALICE-202404"
+        },
+        {
+          "LoanID": 45,
+          "DaysLate": 0,
+          "Label": "DAVE-202404"
+        },
+        {
+          "LoanID": 46,
+          "DaysLate": 0,
+          "Label": "CAROL-202404"
+        },
+        {
+          "LoanID": 47,
+          "DaysLate": 0,
+          "Label": "ALICE-202404"
+        },
+        {
+          "LoanID": 48,
+          "DaysLate": 0,
+          "Label": "ALICE-202404"
+        },
+        {
+          "LoanID": 49,
+          "DaysLate": 1,
+          "Label": "CAROL-202404"
+        },
+        {
+          "LoanID": 50,
+          "DaysLate": 2,
+          "Label": "ALICE-202404"
+        },
+        {
+          "LoanID": 51,
+          "DaysLate": 3,
+          "Label": "CAROL-202404"
+        },
+        {
+          "LoanID": 52,
+          "DaysLate": 4,
+          "Label": "ALICE-202404"
+        },
+        {
+          "LoanID": 53,
+          "DaysLate": 5,
+          "Label": "ALICE-202404"
+        },
+        {
+          "LoanID": 54,
+          "DaysLate": 0,
+          "Label": "DAVE-202404"
+        },
+        {
+          "LoanID": 55,
+          "DaysLate": 0,
+          "Label": "ALICE-202404"
+        },
+        {
+          "LoanID": 56,
+          "DaysLate": 0,
+          "Label": "BOB-202404"
+        },
+        {
+          "LoanID": 57,
+          "DaysLate": 0,
+          "Label": "DAVE-202404"
+        },
+        {
+          "LoanID": 58,
+          "DaysLate": 1,
+          "Label": "ALICE-202404"
+        },
+        {
+          "LoanID": 59,
+          "DaysLate": 2,
+          "Label": "BOB-202404"
+        },
+        {
+          "LoanID": 60,
+          "DaysLate": 3,
+          "Label": "CAROL-202404"
+        },
+        {
+          "LoanID": 61,
+          "DaysLate": 4,
+          "Label": "BOB-202404"
+        },
+        {
+          "LoanID": 62,
+          "DaysLate": 5,
+          "Label": "CAROL-202404"
+        },
+        {
+          "LoanID": 63,
+          "DaysLate": 0,
+          "Label": "CAROL-202404"
+        },
+        {
+          "LoanID": 64,
+          "DaysLate": 0,
+          "Label": "DAVE-202404"
+        }
+      ]
+    }
+  ]
+}

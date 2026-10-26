@@ -1,0 +1,522 @@
+{
+  "package_path": "/stability-2026-10-20/n17.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "export_destination": "/stability-2026-10-20/parcel-queue.csv",
+      "ordered": true,
+      "columns": [
+        {
+          "name": "ParcelID",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Priority",
+          "type": "integer",
+          "label_any": true
+        },
+        {
+          "name": "Due",
+          "type": "datetime",
+          "label_any": true
+        },
+        {
+          "name": "Description",
+          "type": "string",
+          "label_any": true
+        }
+      ],
+      "rows": [
+        {
+          "ParcelID": 4,
+          "Priority": 4,
+          "Due": "2026-10-01T00:00:00.000",
+          "Description": "Parcel 4"
+        },
+        {
+          "ParcelID": 9,
+          "Priority": 4,
+          "Due": "2026-10-02T00:00:00.000",
+          "Description": "Parcel 9"
+        },
+        {
+          "ParcelID": 14,
+          "Priority": 4,
+          "Due": "2026-10-03T00:00:00.000",
+          "Description": "Parcel 14"
+        },
+        {
+          "ParcelID": 19,
+          "Priority": 4,
+          "Due": "2026-10-04T00:00:00.000",
+          "Description": "Parcel 19"
+        },
+        {
+          "ParcelID": 24,
+          "Priority": 4,
+          "Due": "2026-10-05T00:00:00.000",
+          "Description": "Parcel 24"
+        },
+        {
+          "ParcelID": 29,
+          "Priority": 4,
+          "Due": "2026-10-06T00:00:00.000",
+          "Description": "Parcel 29"
+        },
+        {
+          "ParcelID": 34,
+          "Priority": 4,
+          "Due": "2026-10-07T00:00:00.000",
+          "Description": "Parcel 34"
+        },
+        {
+          "ParcelID": 39,
+          "Priority": 4,
+          "Due": "2026-10-08T00:00:00.000",
+          "Description": "Parcel 39"
+        },
+        {
+          "ParcelID": 44,
+          "Priority": 4,
+          "Due": "2026-10-09T00:00:00.000",
+          "Description": "Parcel 44"
+        },
+        {
+          "ParcelID": 49,
+          "Priority": 4,
+          "Due": "2026-10-10T00:00:00.000",
+          "Description": "Parcel 49"
+        },
+        {
+          "ParcelID": 54,
+          "Priority": 4,
+          "Due": "2026-10-11T00:00:00.000",
+          "Description": "Parcel 54"
+        },
+        {
+          "ParcelID": 59,
+          "Priority": 4,
+          "Due": "2026-10-12T00:00:00.000",
+          "Description": "Parcel 59"
+        },
+        {
+          "ParcelID": 64,
+          "Priority": 4,
+          "Due": "2026-10-13T00:00:00.000",
+          "Description": "Parcel 64"
+        },
+        {
+          "ParcelID": 69,
+          "Priority": 4,
+          "Due": "2026-10-14T00:00:00.000",
+          "Description": "Parcel 69"
+        },
+        {
+          "ParcelID": 74,
+          "Priority": 4,
+          "Due": "2026-10-15T00:00:00.000",
+          "Description": "Parcel 74"
+        },
+        {
+          "ParcelID": 79,
+          "Priority": 4,
+          "Due": "2026-10-16T00:00:00.000",
+          "Description": "Parcel 79"
+        },
+        {
+          "ParcelID": 3,
+          "Priority": 3,
+          "Due": "2026-10-01T00:00:00.000",
+          "Description": "Parcel 3"
+        },
+        {
+          "ParcelID": 8,
+          "Priority": 3,
+          "Due": "2026-10-02T00:00:00.000",
+          "Description": "Parcel 8"
+        },
+        {
+          "ParcelID": 13,
+          "Priority": 3,
+          "Due": "2026-10-03T00:00:00.000",
+          "Description": "Parcel 13"
+        },
+        {
+          "ParcelID": 18,
+          "Priority": 3,
+          "Due": "2026-10-04T00:00:00.000",
+          "Description": "Parcel 18"
+        },
+        {
+          "ParcelID": 23,
+          "Priority": 3,
+          "Due": "2026-10-05T00:00:00.000",
+          "Description": "Parcel 23"
+        },
+        {
+          "ParcelID": 28,
+          "Priority": 3,
+          "Due": "2026-10-06T00:00:00.000",
+          "Description": "Parcel 28"
+        },
+        {
+          "ParcelID": 33,
+          "Priority": 3,
+          "Due": "2026-10-07T00:00:00.000",
+          "Description": "Parcel 33"
+        },
+        {
+          "ParcelID": 38,
+          "Priority": 3,
+          "Due": "2026-10-08T00:00:00.000",
+          "Description": "Parcel 38"
+        },
+        {
+          "ParcelID": 43,
+          "Priority": 3,
+          "Due": "2026-10-09T00:00:00.000",
+          "Description": "Parcel 43"
+        },
+        {
+          "ParcelID": 48,
+          "Priority": 3,
+          "Due": "2026-10-10T00:00:00.000",
+          "Description": "Parcel 48"
+        },
+        {
+          "ParcelID": 53,
+          "Priority": 3,
+          "Due": "2026-10-11T00:00:00.000",
+          "Description": "Parcel 53"
+        },
+        {
+          "ParcelID": 58,
+          "Priority": 3,
+          "Due": "2026-10-12T00:00:00.000",
+          "Description": "Parcel 58"
+        },
+        {
+          "ParcelID": 63,
+          "Priority": 3,
+          "Due": "2026-10-13T00:00:00.000",
+          "Description": "Parcel 63"
+        },
+        {
+          "ParcelID": 68,
+          "Priority": 3,
+          "Due": "2026-10-14T00:00:00.000",
+          "Description": "Parcel 68"
+        },
+        {
+          "ParcelID": 73,
+          "Priority": 3,
+          "Due": "2026-10-15T00:00:00.000",
+          "Description": "Parcel 73"
+        },
+        {
+          "ParcelID": 78,
+          "Priority": 3,
+          "Due": "2026-10-16T00:00:00.000",
+          "Description": "Parcel 78"
+        },
+        {
+          "ParcelID": 2,
+          "Priority": 2,
+          "Due": "2026-10-01T00:00:00.000",
+          "Description": "Parcel 2"
+        },
+        {
+          "ParcelID": 7,
+          "Priority": 2,
+          "Due": "2026-10-02T00:00:00.000",
+          "Description": "Parcel 7"
+        },
+        {
+          "ParcelID": 12,
+          "Priority": 2,
+          "Due": "2026-10-03T00:00:00.000",
+          "Description": "Parcel 12"
+        },
+        {
+          "ParcelID": 17,
+          "Priority": 2,
+          "Due": "2026-10-04T00:00:00.000",
+          "Description": "Parcel 17"
+        },
+        {
+          "ParcelID": 22,
+          "Priority": 2,
+          "Due": "2026-10-05T00:00:00.000",
+          "Description": "Parcel 22"
+        },
+        {
+          "ParcelID": 27,
+          "Priority": 2,
+          "Due": "2026-10-06T00:00:00.000",
+          "Description": "Parcel 27"
+        },
+        {
+          "ParcelID": 32,
+          "Priority": 2,
+          "Due": "2026-10-07T00:00:00.000",
+          "Description": "Parcel 32"
+        },
+        {
+          "ParcelID": 37,
+          "Priority": 2,
+          "Due": "2026-10-08T00:00:00.000",
+          "Description": "Parcel 37"
+        },
+        {
+          "ParcelID": 42,
+          "Priority": 2,
+          "Due": "2026-10-09T00:00:00.000",
+          "Description": "Parcel 42"
+        },
+        {
+          "ParcelID": 47,
+          "Priority": 2,
+          "Due": "2026-10-10T00:00:00.000",
+          "Description": "Parcel 47"
+        },
+        {
+          "ParcelID": 52,
+          "Priority": 2,
+          "Due": "2026-10-11T00:00:00.000",
+          "Description": "Parcel 52"
+        },
+        {
+          "ParcelID": 57,
+          "Priority": 2,
+          "Due": "2026-10-12T00:00:00.000",
+          "Description": "Parcel 57"
+        },
+        {
+          "ParcelID": 62,
+          "Priority": 2,
+          "Due": "2026-10-13T00:00:00.000",
+          "Description": "Parcel 62"
+        },
+        {
+          "ParcelID": 67,
+          "Priority": 2,
+          "Due": "2026-10-14T00:00:00.000",
+          "Description": "Parcel 67"
+        },
+        {
+          "ParcelID": 72,
+          "Priority": 2,
+          "Due": "2026-10-15T00:00:00.000",
+          "Description": "Parcel 72"
+        },
+        {
+          "ParcelID": 77,
+          "Priority": 2,
+          "Due": "2026-10-16T00:00:00.000",
+          "Description": "Parcel 77"
+        },
+        {
+          "ParcelID": 1,
+          "Priority": 1,
+          "Due": "2026-10-01T00:00:00.000",
+          "Description": "Parcel 1"
+        },
+        {
+          "ParcelID": 6,
+          "Priority": 1,
+          "Due": "2026-10-02T00:00:00.000",
+          "Description": "Parcel 6"
+        },
+        {
+          "ParcelID": 11,
+          "Priority": 1,
+          "Due": "2026-10-03T00:00:00.000",
+          "Description": "Parcel 11"
+        },
+        {
+          "ParcelID": 16,
+          "Priority": 1,
+          "Due": "2026-10-04T00:00:00.000",
+          "Description": "Parcel 16"
+        },
+        {
+          "ParcelID": 21,
+          "Priority": 1,
+          "Due": "2026-10-05T00:00:00.000",
+          "Description": "Parcel 21"
+        },
+        {
+          "ParcelID": 26,
+          "Priority": 1,
+          "Due": "2026-10-06T00:00:00.000",
+          "Description": "Parcel 26"
+        },
+        {
+          "ParcelID": 31,
+          "Priority": 1,
+          "Due": "2026-10-07T00:00:00.000",
+          "Description": "Parcel 31"
+        },
+        {
+          "ParcelID": 36,
+          "Priority": 1,
+          "Due": "2026-10-08T00:00:00.000",
+          "Description": "Parcel 36"
+        },
+        {
+          "ParcelID": 41,
+          "Priority": 1,
+          "Due": "2026-10-09T00:00:00.000",
+          "Description": "Parcel 41"
+        },
+        {
+          "ParcelID": 46,
+          "Priority": 1,
+          "Due": "2026-10-10T00:00:00.000",
+          "Description": "Parcel 46"
+        },
+        {
+          "ParcelID": 51,
+          "Priority": 1,
+          "Due": "2026-10-11T00:00:00.000",
+          "Description": "Parcel 51"
+        },
+        {
+          "ParcelID": 56,
+          "Priority": 1,
+          "Due": "2026-10-12T00:00:00.000",
+          "Description": "Parcel 56"
+        },
+        {
+          "ParcelID": 61,
+          "Priority": 1,
+          "Due": "2026-10-13T00:00:00.000",
+          "Description": "Parcel 61"
+        },
+        {
+          "ParcelID": 66,
+          "Priority": 1,
+          "Due": "2026-10-14T00:00:00.000",
+          "Description": "Parcel 66"
+        },
+        {
+          "ParcelID": 71,
+          "Priority": 1,
+          "Due": "2026-10-15T00:00:00.000",
+          "Description": "Parcel 71"
+        },
+        {
+          "ParcelID": 76,
+          "Priority": 1,
+          "Due": "2026-10-16T00:00:00.000",
+          "Description": "Parcel 76"
+        },
+        {
+          "ParcelID": 5,
+          "Priority": 0,
+          "Due": "2026-10-02T00:00:00.000",
+          "Description": "Parcel 5"
+        },
+        {
+          "ParcelID": 10,
+          "Priority": 0,
+          "Due": "2026-10-03T00:00:00.000",
+          "Description": "Parcel 10"
+        },
+        {
+          "ParcelID": 15,
+          "Priority": 0,
+          "Due": "2026-10-04T00:00:00.000",
+          "Description": "Parcel 15"
+        },
+        {
+          "ParcelID": 20,
+          "Priority": 0,
+          "Due": "2026-10-05T00:00:00.000",
+          "Description": "Parcel 20"
+        },
+        {
+          "ParcelID": 25,
+          "Priority": 0,
+          "Due": "2026-10-06T00:00:00.000",
+          "Description": "Parcel 25"
+        },
+        {
+          "ParcelID": 30,
+          "Priority": 0,
+          "Due": "2026-10-07T00:00:00.000",
+          "Description": "Parcel 30"
+        },
+        {
+          "ParcelID": 35,
+          "Priority": 0,
+          "Due": "2026-10-08T00:00:00.000",
+          "Description": "Parcel 35"
+        },
+        {
+          "ParcelID": 40,
+          "Priority": 0,
+          "Due": "2026-10-09T00:00:00.000",
+          "Description": "Parcel 40"
+        },
+        {
+          "ParcelID": 45,
+          "Priority": 0,
+          "Due": "2026-10-10T00:00:00.000",
+          "Description": "Parcel 45"
+        },
+        {
+          "ParcelID": 50,
+          "Priority": 0,
+          "Due": "2026-10-11T00:00:00.000",
+          "Description": "Parcel 50"
+        },
+        {
+          "ParcelID": 55,
+          "Priority": 0,
+          "Due": "2026-10-12T00:00:00.000",
+          "Description": "Parcel 55"
+        },
+        {
+          "ParcelID": 60,
+          "Priority": 0,
+          "Due": "2026-10-13T00:00:00.000",
+          "Description": "Parcel 60"
+        },
+        {
+          "ParcelID": 65,
+          "Priority": 0,
+          "Due": "2026-10-14T00:00:00.000",
+          "Description": "Parcel 65"
+        },
+        {
+          "ParcelID": 70,
+          "Priority": 0,
+          "Due": "2026-10-15T00:00:00.000",
+          "Description": "Parcel 70"
+        },
+        {
+          "ParcelID": 75,
+          "Priority": 0,
+          "Due": "2026-10-16T00:00:00.000",
+          "Description": "Parcel 75"
+        },
+        {
+          "ParcelID": 80,
+          "Priority": 0,
+          "Due": "2026-10-17T00:00:00.000",
+          "Description": "Parcel 80"
+        }
+      ]
+    }
+  ]
+}

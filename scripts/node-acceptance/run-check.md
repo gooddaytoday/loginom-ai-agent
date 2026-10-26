@@ -27,10 +27,16 @@ A supplied build must have matching SHA and `sourceDirty=false`.
 The per-host cache is `~/.cache/loginom-run-check/HOST/SHA/`; concurrent first
 builds of the same SHA are unsupported. Later batches reuse its manifest.
 
-Each n/s case starts with a new profile, chat, workspace and personal package.
-q1–q10 first run their documented base; s7/s8 first run s1. Only the business
-request and input CSVs reach the model; continuations reuse the session and
-package without attaching inputs again. CSV checks consume every exported row.
+Each n/p/s/v case starts with a new profile, chat, workspace and personal package.
+q1–q10 first run their documented base; s7/s8 and p23/p24 first run s1.
+r1/r2 start from the clustering task, r3/r4 from linear regression, and r5/r6
+from REST. Each continuation reuses that base session/package; r3 attaches
+holdout.csv and r4 attaches replace.csv only when requested. Only the business
+request and referenced input CSV/XLSX files reach the model; previously attached
+inputs are not attached again. p14 receives exhibits.xlsx, not its CSV copy. CSV checks consume every exported row. Node-base fixtures describe native port
+order; their tasks leave CSV order free, so only those base exports map columns
+by their unique names. Final continuation CSVs retain their fixture's ordering
+rules. Names, widths, counts and every value remain checked.
 Stock cold receives `--csv` and never reapplies node settings.
 Save, main close/logout and runtime-close ACK must all be confirmed.
 The table reports `port-read` and the observed path (`port`, `native`, or both).
@@ -52,8 +58,16 @@ An invalid port read marks the scenario FAIL but allows the remaining business
 steps and cold check when Save and main cleanup are confirmed. For q scenarios,
 this also retains failures from the base scenario in the final result.
 
-Pilot limits: cases without a cold JSON fixture (currently n14–n17) are refused
-before detach. No automatic retries or account switching. Failed and UNKNOWN
+Supported names: n1–n20, p1–p24, s1–s8, q1–q10, r1–r6, and
+v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
+`stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
+n13–n20 run their CSV-checking oracle plus a separate cold JSON fixture;
+n14–n17 previously lacked that fixture. Their new fixtures use the independent
+`expected/reference.csv`, preserve all rows/order/nulls, and add field types.
+n17 Due is a local date at midnight; the CSV oracle still requires ISO dates.
+p24 uses expected-demo.json and CSV labels, as documented in the dataset README.
+CSV comparison honors declared column-order freedom and checks every value.
+Unknown names are refused before detach. No automatic retries or account switching. Failed and UNKNOWN
 profiles/packages are retained; main cleanup never discards changes. Cold uses
 its stock diagnostic cleanup. Archive evidence before deleting run directories;
 never share a whole profile or `cold-config.json` (they contain credentials).

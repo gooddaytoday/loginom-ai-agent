@@ -2,6 +2,7 @@
 """Quiet, detached live acceptance runner. Python 3 standard library only."""
 import argparse
 import csv
+from datetime import datetime
 import io
 import json
 import math
@@ -36,13 +37,43 @@ def git(*args, cwd=REPO):
 
 
 def scenario(name):
-    if re.fullmatch(r'n(?:[1-9]|1[0-9]|20)', name):
-        return DATA / 'stability-2026-10-20' / name
-    if re.fullmatch(r'q(?:[1-9]|10)', name):
-        return DATA / 'stability-2026-10-20/followups' / name
-    if re.fullmatch(r's[1-8]', name):
-        return next((DATA / 'demo-2026-10-22').glob(name + '-*'))
-    raise ValueError('Unknown scenario: ' + name)
+    stability = DATA / 'stability-2026-10-20'
+    base = None
+    if re.fullmatch(r'(?:n(?:[1-9]|1[0-9]|20)|p(?:[1-9]|1[0-9]|2[0-4]))', name):
+        src = stability / name
+        base = 's1' if name in ['p23', 'p24'] else None
+    elif re.fullmatch(r'[qr][1-6]|q(?:[7-9]|10)', name):
+        src = stability / 'followups' / name
+        if name.startswith('r'):
+            node = ('datamining-clustering' if name in ['r1', 'r2'] else
+                    'datamining-linregression' if name in ['r3', 'r4'] else 'integration-restrequest')
+            base = REPO / 'docs/node-development/nodes' / node / 'acceptance'
+        else:
+            base = {'q1':'s1','q2':'s1','q3':'s3','q4':'s3','q5':'s4','q6':'s4','q7':'s5','q8':'s5','q9':'s6','q10':'s6'}[name]
+    elif re.fullmatch(r's[1-8]|v[1-3]s[1-6]', name):
+        src = next((DATA / 'demo-2026-10-22').glob((name[-2:] if name.startswith('v') else name) + '-*'))
+        base = 's1' if name in ['s7', 's8'] else None
+    else:
+        raise ValueError('Unknown scenario: ' + name)
+    prompt = (stability / src.name / ('prompt-' + name[:2] + '.md') if name.startswith('v') else
+              src / ('prompt-demo.md' if (src / 'prompt-demo.md').exists() else 'prompt.md'))
+    data = (base / 'data' if isinstance(base, Path) else
+            scenario(base)['data'] if base and not (src / 'data').is_dir() else src / 'data')
+    return dict(source=src, prompt=prompt, data=data, base=base)
+
+
+def expected_for(case, package):
+    src = case['source']
+    # CSV-checking oracles do not generate JSON. Their cold fixtures are separate.
+    if re.fullmatch(r'n(?:1[3-9]|20)', src.name) or case['prompt'].name == 'task.md' or src.name == 'p24':
+        expected = read(src / ('expected-demo.json' if (src / 'expected-demo.json').exists() else 'expected.json'))
+    else:
+        expected = json.loads(subprocess.check_output([sys.executable, '-B', str(src / 'oracle.py'), package]))
+    if 'outputs' not in expected:
+        expected = dict(package_path=expected['package_path'], nodes=expected['nodes'],
+                        outputs=[{k: v for k, v in expected.items() if k not in ['package_path', 'nodes']}])
+    expected['package_path'] = package
+    return expected
 
 
 def arguments(argv=None):
@@ -77,7 +108,7 @@ def load_ready(load, maximum):
 def summary(report):
     rows = ['SHA: ' + report['head'] + '; tree: ' + report['tree'] + '; sourceDirty=' + str(report.get('metadata', {}).get('sourceDirty', 'unverified')).lower(),
             '| сценарий | итог | CSV | Save | cold | cleanup | port-read | путь | load на старте |',
-            '|---|---|---|---|---|---|---|---|---|---|']
+            '|---|---|---|---|---|---|---|---|---|']
     for r in report['runs']:
         load = r.get('start_load', [])
         rows.append('| ' + ' | '.join([r['scenario'], r.get('status', 'RUNNING'),
@@ -91,12 +122,18 @@ def summary(report):
     return '\n'.join(rows) + '\n'
 
 
-def check_csv(path, expected, header='names'):
+def check_csv(path, expected, header='names', *, column_order=None):
     text = path.read_text(encoding='utf-8-sig')
     delimiter = csv.Sniffer().sniff(text[:8192], delimiters=',;\t').delimiter
     rows = list(csv.reader(io.StringIO(text), delimiter=delimiter))
     columns = expected['columns']
-    assert rows and rows[0] == [c.get('label', c['name']) if header == 'labels' else c['name'] for c in columns], 'CSV_COLUMN_ORDER'
+    names = [c.get('label', c['name']) if header == 'labels' else c['name'] for c in columns]
+    assert rows and len(rows[0]) == len(set(rows[0])) == len(columns), 'CSV_COLUMN_ORDER'
+    if (column_order or expected.get('column_order')) == 'any':
+        assert set(rows[0]) == set(names), 'CSV_COLUMN_ORDER'
+        columns = [columns[names.index(name)] for name in rows[0]]
+    else:
+        assert rows[0] == names, 'CSV_COLUMN_ORDER'
     assert all(len(row) == len(columns) for row in rows[1:]), 'CSV_ROW_WIDTH'
     assert len(rows) - 1 == len(expected['rows']), 'CSV_ROW_COUNT'
     def equal(actual, want):
@@ -113,6 +150,13 @@ def check_csv(path, expected, header='names'):
                     if not number.is_finite() or abs(number - goal) > delta: return False
                 except ArithmeticError:
                     return False
+            elif col['type'] == 'datetime':
+                try:
+                    if datetime.fromisoformat(value) != datetime.fromisoformat(target): return False
+                except ValueError:
+                    return False
+            elif isinstance(target, bool):
+                if value.lower() != str(target).lower(): return False
             elif value != str(target): return False
         return True
     remaining = list(expected['rows'])
@@ -252,28 +296,34 @@ class Runner:
         return build
 
     def model(self, case, folder, profile, workspace, package, login, build, session=None):
-        src = scenario(case)
-        prompt = (src / ('prompt-demo.md' if (src / 'prompt-demo.md').exists() else 'prompt.md')).read_text()
-        filenames = re.findall(r'[\w-]+\.csv', prompt)
-        exports = [name for name in filenames if not (src / 'data' / name).exists()]
-        assert exports, 'No export filename in business request'
-        destination = login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + exports[-1]
-        prompt = prompt.replace(exports[-1], destination) + f'\nСохрани пакет как {package}. Выгрузи и скачай полный итоговый CSV.'
+        spec = (dict(source=case, prompt=case / 'task.md', data=case / 'data')
+                if isinstance(case, Path) else scenario(case))
+        src = spec['source']
+        prompt = spec['prompt'].read_text().replace('{{PACKAGE_PATH}}', package)
+        expected = expected_for(spec, package)
+        filenames = re.findall(r'[\w-]+\.(?:csv|xlsx)', prompt)
+        exports = list(dict.fromkeys(name for name in filenames if not (spec['data'] / name).exists()))
+        if not exports:
+            count = 2 if src.parent.name == 'datamining-clustering' else 1
+            exports = [f'{src.parent.name}-{i + 1}.csv' for i in range(count)]
+            prompt += '\nВыгрузи и скачай таблицы в файлы ' + ', '.join(exports) + '.'
+        destinations = [login['package_directory'].rstrip('/') + '/' + self.out.name + '-' + folder.parent.name + '-' + name for name in exports]
+        for name, destination in zip(exports, destinations):
+            prompt = prompt.replace(name, destination)
+        prompt += f'\nСохрани пакет как {package}. Выгрузи и скачай полный итоговый CSV.'
         (folder / 'task.md').write_text(prompt)
-        oracle = src / 'oracle.py'
-        direct = '__name__' in oracle.read_text()
-        expected = read(src / 'expected-demo.json') if direct else json.loads(subprocess.check_output([sys.executable, '-B', str(oracle), package]))
-        expected['package_path'] = package
         for output in expected['outputs']:
-            if output['output_node_type'] == 'export_input': output['export_destination'] = destination
+            if output['output_node_type'] == 'export_input': output['export_destination'] = destinations[-1]
         write(folder / 'expected.json', expected)
         command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', 'openai/gpt-6.1-sol', '--variant', 'medium', '--dangerously-skip-permissions']
         if session: command += ['--session', session]
-        if not session:
-            for file in sorted((src / 'data').glob('*.csv')):
-                target = workspace / file.name
-                shutil.copyfile(file, target)
-                command += ['--file', target]
+        for name in dict.fromkeys(filenames):
+            file = spec['data'] / name
+            if not file.is_file(): continue
+            target = workspace / file.name
+            if target.exists(): continue
+            shutil.copyfile(file, target)
+            command += ['--file', target]
         env = dict(self.env, LOGINOM_AI_AGENT_CLI_PROFILE=str(profile), LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG='1', LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE='1', LOGINOM_AI_AGENT_PURE='1')
         self.phase('model', command + ['--', prompt], folder, env=env, cwd=workspace)
         events = list(records(folder / 'model.stdout'))
@@ -299,10 +349,16 @@ class Runner:
         assert cleanups and all(c.get('package_closed') is True and c.get('logged_out') is True and not c.get('unsaved_changes_discarded') for c in cleanups), 'MAIN_CLEANUP_UNCONFIRMED'
         assert acks and all(a.get('closed_ack') is True for a in acks), 'RUNTIME_CLOSE_ACK_MISSING'
         self.current['cleanup'] = 'main PASS'
-        shutil.copyfile(downloaded_csv(profile, destination), folder / 'actual.csv')
-        if direct:
-            self.phase('oracle', [sys.executable, '-B', oracle, folder / 'actual.csv'], folder, timeout=60)
-        delimiter = check_csv(folder / 'actual.csv', expected['outputs'][0], 'labels' if case == 'q6' else 'names')
+        header = 'labels' if case in ['q6', 'p24'] else 'names'
+        for index, destination in enumerate(destinations):
+            actual = folder / ('actual.csv' if len(destinations) == 1 else f'actual-{index + 1}.csv')
+            shutil.copyfile(downloaded_csv(profile, destination), actual)
+            if re.fullmatch(r'n(?:1[3-9]|20)', src.name):
+                self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', actual], folder, timeout=60)
+            # Node-base fixtures describe native port order, not CSV export order.
+            # Their task.md leaves export order free; continuation fixtures do not.
+            delimiter = check_csv(actual, expected['outputs'][index], header,
+                                  column_order='any' if isinstance(case, Path) else None)
         self.current['csv'] = 'PASS'
         return session, expected, delimiter
 
@@ -325,17 +381,17 @@ class Runner:
                     (profile / 'data/auth.json').symlink_to(Path.home() / '.local/state/loginom-cli-oauth/shared-oauth-v1/auth.json')
                     write(profile / 'config/loginom-ai-agent.json', {'provider': {'openai': {'models': {'gpt-6.1-sol': {'name': 'GPT-6.1 Sol', 'reasoning': True, 'tool_call': True, 'limit': {'context': 400000, 'output': 128000}, 'variants': {'medium': {'reasoningEffort': 'medium'}}}}}}})
                     case = r['scenario']
-                    base = {'q1':'s1','q2':'s1','q3':'s3','q4':'s3','q5':'s4','q6':'s4','q7':'s5','q8':'s5','q9':'s6','q10':'s6','s7':'s1','s8':'s1'}.get(case)
+                    base = scenario(case)['base']
                     session = None
                     for step in ([base, case] if base else [case]):
                         r.update(csv='—', save='—', cleanup='—')
-                        stage = folder / step
+                        stage = folder / (step.parent.name if isinstance(step, Path) else step)
                         stage.mkdir()
                         session, expected, delimiter = self.model(step, stage, profile, workspace, r['package'], login, build, session)
                     if self.options['cold']:
                         r['cold'] = 'FAIL'
                         write(folder / 'cold-config.json', {'loginom_url': login['url'], 'api_key': login['api_key'], 'workflow_profile': {'loginom_user': login['username'], 'password': login['password'], 'passwordless_login': login.get('passwordless_login', False)}})
-                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', stage / 'actual.csv', '--csv-delimiter', delimiter, '--csv-header', 'labels' if case == 'q6' else 'names'], folder)
+                        self.phase('cold', [build / 'resources/loginom/bin/node', REPO / 'scripts/node-acceptance/cold-check.mjs', '--config', folder / 'cold-config.json', '--resources', build / 'resources/loginom', '--saved', r['package'], '--expected', stage / 'expected.json', '--output', folder / 'cold', '--csv', stage / 'actual.csv', '--csv-delimiter', delimiter, '--csv-header', 'labels' if case in ['q6', 'p24'] else 'names'], folder)
                         cold = read(folder / 'cold/result.json')
                         assert cold['status'] == 'PASS' and cold.get('settingsReapplied') is False, 'COLD_FAILED'
                         assert all(cold['cleanup'].get(k) is True for k in ['package_closed', 'logged_out']), 'COLD_CLEANUP_UNCONFIRMED'
@@ -373,9 +429,10 @@ def main():
     names = args.scenarios.split(',')
     assert len(names) == len(set(names)), 'Duplicate scenario'
     for name in names:
-        src = scenario(name)
-        assert (src / 'oracle.py').is_file(), 'Scenario oracle missing'
-        assert '__name__' not in (src / 'oracle.py').read_text() or (src / 'expected-demo.json').exists(), 'Cold expected unavailable for ' + name
+        spec = scenario(name)
+        assert spec['prompt'].is_file(), 'Scenario prompt missing'
+        assert (spec['source'] / 'oracle.py').is_file(), 'Scenario oracle missing'
+        expected_for(spec, '/preflight/package.lgp')
     pair = args.pair.expanduser().resolve()
     for role in ['worker', 'reviewer']:
         config = read(pair / (role + '.json'))
