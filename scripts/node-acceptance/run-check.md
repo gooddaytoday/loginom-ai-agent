@@ -36,8 +36,11 @@ q1–q10 first run their documented base; s7/s8 and p23/p24 first run s1.
 r1/r2 start from the clustering task, r3/r4 from linear regression, and r5/r6
 from REST. Each continuation reuses that base session/package; r3 attaches
 holdout.csv and r4 attaches replace.csv only when requested. Only the business
-request and referenced input CSV/XLSX files reach the model; previously attached
-inputs are not attached again. p14 receives exhibits.xlsx, not its CSV copy. CSV checks consume every exported row. Node-base fixtures describe native port
+request and all input CSV/XLSX files in the first step's `data/` reach the model,
+even when their names are absent from the request. Previously attached inputs
+are not attached again. README exceptions remain: p14 receives exhibits.xlsx,
+not its CSV copy; the linear-regression base receives only train.csv, and
+r3/r4 attach only their new holdout.csv/replace.csv. CSV checks consume every exported row. Node-base fixtures describe native port
 order; their tasks leave CSV order free, so only those base exports map columns
 by their unique names. Final continuation CSVs retain their fixture's ordering
 rules. Names, widths, counts and every value remain checked.
