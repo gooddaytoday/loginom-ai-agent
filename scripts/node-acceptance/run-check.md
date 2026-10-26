@@ -11,6 +11,10 @@ task. `wait` returns 0 for all PASS, 1 for a finished failed/unknown batch, or 2
 for its own timeout. A timeout does not cancel the worker; repeat `wait`.
 The result directory is private (0700); `summary.md` and atomic `results.json`
 contain the report. Configs, profiles and raw logs stay private there.
+Results default to `~/.cache/loginom-runs/<timestamp>/`. The worker and its
+children use the result directory's `tmp/` for `TMPDIR`, `TMP` and `TEMP`;
+task-owned `CODEX_*` settings are not inherited. On Linux, keep an explicit
+`--out` path short: Chromium creates a Unix singleton socket under `tmp/`.
 
 The pair must contain `worker.json` and `reviewer.json` with the established
 `loginom` and `package_directory` fields. Runs use the worker account. OAuth is

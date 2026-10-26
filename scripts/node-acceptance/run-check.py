@@ -483,13 +483,21 @@ def main():
     if build:
         meta = read(build / 'cli-manifest.json')['metadata']
         assert meta['sourceCommit'] == head and meta['sourceDirty'] is False, 'Build SHA/cleanliness mismatch'
-    out = (args.out or REPO.parent / ('run-check-' + str(time.time_ns()))).expanduser().resolve()
+    # Chromium also puts its Unix singleton socket under TMPDIR. Keep the
+    # default short enough even when the checkout is in a deep task directory.
+    out = (args.out or Path.home() / '.cache/loginom-runs' / str(time.time_ns())).expanduser().resolve()
     out.mkdir(parents=True)
+    temporary = out / 'tmp'
+    temporary.mkdir()
+    # Detached workers outlive the task that owns the inherited temp directory.
+    # Set this before spawning so direct children (including oracles) inherit it.
+    env = {k: v for k, v in os.environ.items() if not k.startswith('CODEX_')}
+    env.update(TMPDIR=str(temporary), TMP=str(temporary), TEMP=str(temporary))
     request = vars(args) | {'pair': str(pair), 'build': str(build) if build else None, 'out': str(out)}
     write(out / 'request.json', request)
     write(out / 'results.json', {'head': head, 'tree': git('rev-parse', head + '^{tree}'), 'started': time.time(), 'phase': 'build', 'runs': [{'scenario': n, 'status': 'PENDING'} for n in names]})
     with (out / 'worker.log').open('wb') as log:
-        child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '_worker', str(out)], stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
+        child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '_worker', str(out)], env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
     write(out / 'worker.json', {'pid': child.pid})
     print(out)
     return 0
