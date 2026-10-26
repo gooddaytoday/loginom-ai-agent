@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { browserDownloadScript } from "../client/lib/browser-downloads.mjs"
 import { browserLaunch } from "../client/lib/browser-launch.mjs"
 import { createRedactor } from "../client/lib/redact.mjs"
+import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 
@@ -26,24 +27,29 @@ export function loginomAddress(value) {
 
 // This function is reachable only from the private host channel, never from model tools.
 // It performs login and identity read-back only; no file panel or folder permission probe.
-export async function loginPage(page, candidate) {
+export async function loginPage(page, candidate, { deadline = Infinity } = {}) {
   const started = performance.now()
   let phase = "goto", phaseStarted = started, original
+  const remaining = limit => {
+    const left = deadline - Date.now()
+    if (left <= 0) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
+    return Math.min(limit, left)
+  }
   try {
-    await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: 60_000 })
+    await page.goto(loginomAddress(candidate.url), { waitUntil: "domcontentloaded", timeout: remaining(60_000) })
     phase = "form"; phaseStarted = performance.now()
     const field = (name) => page.locator(`[data-tid="LoginForm;Login;${name}"]`)
     const avatar = page.locator('[data-tid="MF;cntMain;tlbMainToolbar;btnAvatar"]')
-    await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: 60_000 })
+    await avatar.or(field("edtUsername")).first().waitFor({ state: "visible", timeout: remaining(60_000) })
     if (!(await avatar.isVisible())) {
       phase = "submit"; phaseStarted = performance.now()
-      await field("edtUsername").locator("input").fill(candidate.username)
-      await field("edtUsername").locator("input").press("Tab")
+      await field("edtUsername").locator("input").fill(candidate.username, { timeout: remaining(30_000) })
+      await field("edtUsername").locator("input").press("Tab", { timeout: remaining(30_000) })
       const password = field("edtPassword").locator("input")
       // Passwordless accounts may make an already empty field readonly after username lookup.
-      if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password)
-      await field("btnLogin").click()
-      await avatar.waitFor({ state: "visible", timeout: 30_000 }).catch((error) => {
+      if (candidate.password !== "" || (await password.inputValue()) !== "") await password.fill(candidate.password, { timeout: remaining(30_000) })
+      await field("btnLogin").click({ timeout: remaining(30_000) })
+      await avatar.waitFor({ state: "visible", timeout: remaining(30_000) }).catch((error) => {
         original = error
         throw Error("LOGINOM_LOGIN_REJECTED")
       })
@@ -123,15 +129,22 @@ function loginFailure(error, candidate, phase, duration, elapsed) {
   }
 }
 
-export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, signal, onContextCreated }) {
+export async function loginBrowser({ browserPath, profile, candidate, headless = false, keepOpen = false, signal, onContextCreated,
+  deadline = Date.now() + 150_000, onRetry }) {
   signal?.throwIfAborted()
   const { chromium } = require("playwright-core")
   const launch = browserLaunch(headless)
   await mkdir(profile, { recursive: true, mode: 0o700 })
   signal?.throwIfAborted()
+  // Both attempts share the original admission deadline and the same profile.
+  const record = onRetry ?? createExecutionJournal({ directory: profile, metadata: { sessionId: null } })
+  for (let attempt = 0; attempt < 2; attempt++) {
+  signal?.throwIfAborted()
+  if (Date.now() >= deadline) throw Error("LOGINOM_LOGIN_UNAVAILABLE")
   const context = await chromium
     .launchPersistentContext(profile, {
       executablePath: browserPath,
+      timeout: Math.max(1, Math.min(30_000, deadline - Date.now())),
       headless,
       chromiumSandbox: true,
       // A retained context belongs to its runtime/cold owner. Its native
@@ -167,13 +180,14 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
   const close = () => closing.promise ??= context.close()
   const cancel = () => { void close().catch(() => undefined) }
   signal?.addEventListener("abort", cancel, { once: true })
+  const timer = setTimeout(cancel, Math.max(1, deadline - Date.now()))
   try {
     signal?.throwIfAborted()
     // This authenticated page predates MCP; its capability choice must already
     // match the executor's download/byte-verification path on the first load.
     await context.addInitScript({ content: browserDownloadScript(candidate.url) })
     if (onContextCreated) await onContextCreated(context)
-    const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate)
+    const result = await loginPage(context.pages()[0] ?? (await context.newPage()), candidate, { deadline })
     signal?.throwIfAborted()
     if (!keepOpen) {
       await close()
@@ -184,9 +198,16 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
   } catch (error) {
     await close().catch(() => { throw Error("LOGINOM_RUNTIME_CLEANUP_FAILED", error?.cause?.login ? { cause: error.cause } : undefined) })
     signal?.throwIfAborted()
+    // Only a classified transient login failure may retry, after confirmed close.
+    if (attempt === 0 && error?.message === "LOGINOM_LOGIN_UNAVAILABLE" && Date.now() < deadline) {
+      await record({ phase: "login_retry", attempt: 2, reason: error.message, login: error.cause?.login ?? null })
+      continue
+    }
     if (["LOGINOM_ACCOUNT_MISMATCH", "LOGINOM_LOGIN_REJECTED", "LOGINOM_FOCUS_SETUP_FAILED"].includes(error?.message)) throw error
     throw Error("LOGINOM_LOGIN_UNAVAILABLE", error?.cause?.login ? { cause: error.cause } : undefined)
   } finally {
+    clearTimeout(timer)
     signal?.removeEventListener("abort", cancel)
+  }
   }
 }
