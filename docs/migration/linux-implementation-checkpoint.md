@@ -9,19 +9,18 @@ CI40281597215 PASS на попытке1; matrix5/5; 30 assets/digests/SHA256SUMS
 Published2026-10-26T07:16:28Z, pre-release, latest=false, ID423944660; 30 URLs HTTP200.
 [Отчёт](../testing/loginom-ai-agent/reports/2026-10-26-v0.3.3-release.md).
 
-## 2026-10-26 — приватный candidate #74, без выпуска
+## 2026-10-26 — #74: Linux-проверки завершены, без выпуска
 
-CLI и Desktop: последний qualified clean source `8d65045b3e`, prod `0.3.2-localpaths74.8d65045b3e`, recovery0, ветка `local-file-paths`.
-CLI manifest/archive roundtrip и Desktop DEB/AppImage static PASS; independently6039CLI/5042Desktop files/hash/modes/source archive проверены.
-CLI archive SHA `3cc9ace3ca7730a4ccee4f7ae9b72c0086a0efa0c8f02294096019268f9f4ae4`; все digests в отчёте и task8-reprepare-20261026/candidate/qualification.json.
-B4 закрыт на9f723: UTF8 test image+native overflow guard; natural own-copy Save/replace, fullpath/local unchanged, physical*3, native Close/logout/ACK0/process0, fresh review Approved.
-B1–B4 и Task7 закрыты: оба reference/CLI/cold/oracle/collection validator и pair calibration100/0+100/0 PASS. Local edit CLI1/handledRead сохранён честно.
-Task8 benchmark: scores100/100/oracle2/2, execution1/2(edit CLI1/recoveredRead), native/process/storage cleanup0, fresh review Approved; own32795 остановлен с данными.
-Docs fix93f52: native Calc Expressions/v1 string map и отрицательный Markdown tripwire; TDD60+35/typecheck/actual package/report PASS. Runtime/automation/reference/benchmark evidence остаётся применимым.
-Historical93f52 DesktopCSV PASS/CLI2FAIL сохранены. New8d650 CLI2 canonical Save/nativeClose/logout/ACK0/physical*3+CSV PASS; first officialPASS/review, second originalFAIL740с paragraph-tripwire/editCLI1binaryRead. Corrected sentence verifier2files/+5/−3/10tests/typecheck/review: actualMD offlinePASS/oldnegative+*30REJECT, no newmodelPASS. P2 reprepare fixed77tests/review; Desktop2 pending/currentbenchmark2 RUNNING, Task8/B5 открыты.
-Bun1.3.14/Node24.19.0/Chromium1246; packaging13PASS/2skip, shortTMPDIR crash6PASS/exit0/99.48с/process0; исходный SIGILL на longTMPDIR сохранён, exact native cause не установлен.
-Own stand02/03/04 остановлены/snapshots, empty qualified05/06 без model calls; failed guards сохранены; общие сервисы/профили не менялись. Windows native NOT_RUN; full attribution README baseline mismatch не объявлен PASS. Merge/release не разрешены.
-[Отчёт](../testing/loginom-ai-agent/local-file-paths.md#task8-cli2-and-documentation-tripwire-correction-2026-10-26) · [блокеры](../testing/loginom-ai-agent/local-file-paths-blockers.md).
+Production source8d65045b3e, version0.3.2-localpaths74.8d65045b3e/prod/recovery0; branch local-file-paths.
+CLI archive/manifest, Desktop DEB/AppImage static,6039CLI/5042Desktop inventories/source archive independently Approved; packaging13PASS2skip/crash6PASS.
+B1–B5/задачи1–8 выполнены; итоговое независимое review Approved30/30, обязательных замечаний нет. Canonical поведение в дизайне, полный evidence в отчёте.
+B4 natural own-copy Save/replace/fullpath/local unchanged/physical*3/native Close/logout/ACK0 подтверждён на9f723; guards прошлых отказов сохранены.
+B5 minimal Save breadcrumb fix/TDD55+80/sourceGREEN2933мс; reprepare8d650 private-only binding/TDD77; affected installed runs и независимые reviews подтверждены.
+Routing6IDs×2 с source-aware reuse старых docs/TXT/CSV. Desktop transitions8d650/helper253f official2/2PASS628.2/611.70с; CLI firstPASS/second originalFAIL740.73с/CLI[1,0] сохранён, actualMD только offline reassessedPASS.
+Current benchmark8d650: score100/100/oracle2/2, original executionCSV0/edit1binaryRead; judge6-sol/xhigh/codex0.157.0/lease53released; Save/native/process/storagecleanup0/review Approved41/41.
+Оба reference/CLI/cold/oracle и pair calibration100/0+100/0 приняты, task-local scripts/installedskill unchanged. Model openai/gpt-6.1-sol/xhigh: CLI SQLite; Desktop backendmessages/:memory: (persistedDB не заявлен).
+Own CLI/Desktop/benchmark pairs archived/stopped, data/profiles/failedguards retained; прочие сервисы/профили не менялись. Windows native NOT_RUN/fullattribution README baseline mismatch отдельно; affected entries PASS.
+[Отчёт](../testing/loginom-ai-agent/local-file-paths.md#task8-final-linux-results-2026-10-26) · [блокеры](../testing/loginom-ai-agent/local-file-paths-blockers.md). Merge/push/release не выполняются.
 
 ## 2026-10-20 — v0.3.2 опубликован
 
