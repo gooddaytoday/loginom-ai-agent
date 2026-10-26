@@ -356,8 +356,16 @@ class Runner:
         write(folder / 'expected.json', expected)
         command = [build / 'bin/loginom-ai-agent-cli', 'run', '--headless', '--format', 'json', '--dir', workspace, '--model', 'openai/gpt-6.1-sol', '--variant', 'medium', '--dangerously-skip-permissions']
         if session: command += ['--session', session]
-        for name in dict.fromkeys(filenames):
-            file = spec['data'] / name
+        # Initial requests need their inputs even when the prose omits names.
+        # Continuations only admit new, explicitly requested files (r3/r4).
+        files = ([spec['data'] / name for name in dict.fromkeys(filenames)] if session else
+                 sorted(p for p in spec['data'].iterdir() if p.suffix in ['.csv', '.xlsx']))
+        # README exceptions: p14 tests Excel, and the regression base uses only
+        # train.csv; its other fixtures belong to later operator scenarios.
+        if case == 'p14': files = [spec['data'] / 'exhibits.xlsx']
+        if isinstance(case, Path) and src.parent.name == 'datamining-linregression':
+            files = [spec['data'] / 'train.csv']
+        for file in files:
             if not file.is_file(): continue
             target = workspace / file.name
             if target.exists(): continue
