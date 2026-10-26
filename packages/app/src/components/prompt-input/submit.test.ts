@@ -126,7 +126,7 @@ beforeAll(async () => {
     useSearchParams: () => [search, () => undefined],
   }))
 
-  mock.module("@loginom-ai-agent/sdk/v2/client", () => ({
+  mock.module("@opencode-ai/sdk/v2/client", () => ({
     createOpencodeClient: (input: { directory: string }) => {
       createdClients.push(input.directory)
       return clientFor(input.directory)
@@ -137,7 +137,7 @@ beforeAll(async () => {
     showToast: () => 0,
   }))
 
-  mock.module("@loginom-ai-agent/core/util/encode", () => ({
+  mock.module("@opencode-ai/core/util/encode", () => ({
     base64Encode: (value: string) => value,
   }))
 

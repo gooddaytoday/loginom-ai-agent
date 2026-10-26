@@ -1,17 +1,17 @@
-import { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
+import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { afterEach, describe, expect } from "bun:test"
 import { NodeHttpServer, NodeServices } from "@effect/platform-node"
-import { SessionV1 } from "@loginom-ai-agent/core/v1/session"
+import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { mkdir } from "node:fs/promises"
 import path from "node:path"
 import { Cause, Config, Effect, Exit, Layer } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse, HttpRouter, HttpServer } from "effect/unstable/http"
 import { layerWebSocketConstructorGlobal } from "effect/unstable/socket/Socket"
-import { AppNodeBuilder } from "@loginom-ai-agent/core/effect/app-node-builder"
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { CrossSpawnSpawner } from "@loginom-ai-agent/core/cross-spawn-spawner"
-import { Flag } from "@loginom-ai-agent/core/flag/flag"
-import { Ripgrep } from "@loginom-ai-agent/core/ripgrep"
+import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
+import { Flag } from "@opencode-ai/core/flag/flag"
+import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { registerAdapter } from "../../src/control-plane/adapters"
 import type { WorkspaceAdapter } from "../../src/control-plane/types"
 import { Workspace } from "../../src/control-plane/workspace"
@@ -25,11 +25,11 @@ import { ExperimentalPaths } from "../../src/server/routes/instance/httpapi/grou
 import { SessionPaths } from "../../src/server/routes/instance/httpapi/groups/session"
 import { Session } from "@/session/session"
 import { MessageID, PartID, SessionID, type SessionID as SessionIDType } from "../../src/session/schema"
-import { Database } from "@loginom-ai-agent/core/database/database"
-import { SessionInputTable, SessionMessageTable, SessionTable } from "@loginom-ai-agent/core/session/sql"
-import { SessionMessage } from "@loginom-ai-agent/core/session/message"
-import { ModelV2 } from "@loginom-ai-agent/core/model"
-import { ProviderV2 } from "@loginom-ai-agent/core/provider"
+import { Database } from "@opencode-ai/core/database/database"
+import { SessionInputTable, SessionMessageTable, SessionTable } from "@opencode-ai/core/session/sql"
+import { SessionMessage } from "@opencode-ai/core/session/message"
+import { ModelV2 } from "@opencode-ai/core/model"
+import { ProviderV2 } from "@opencode-ai/core/provider"
 import * as DateTime from "effect/DateTime"
 import { eq } from "drizzle-orm"
 import { resetDatabase } from "../fixture/db"
@@ -866,7 +866,7 @@ describe("session HttpApi", () => {
 
         const query = new URLSearchParams({
           scope: "project",
-          path: "packages/agent/src",
+          path: "packages/opencode/src",
           directory: currentDir,
         })
         const headers = { "x-opencode-directory": test.directory }

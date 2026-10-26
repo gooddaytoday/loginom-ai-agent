@@ -1,6 +1,6 @@
 import { expect } from "bun:test"
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { httpClient } from "@loginom-ai-agent/core/effect/app-node-platform"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { Duration, Effect, Layer, Option, Schema } from "effect"
 import { sql } from "drizzle-orm"
 import { HttpClient, HttpClientError, HttpClientResponse } from "effect/unstable/http"
@@ -19,7 +19,7 @@ import {
   RefreshToken,
   UserCode,
 } from "../../src/account/schema"
-import { Database } from "@loginom-ai-agent/core/database/database"
+import { Database } from "@opencode-ai/core/database/database"
 import { testEffect } from "../lib/effect"
 
 const truncate = Layer.effectDiscard(

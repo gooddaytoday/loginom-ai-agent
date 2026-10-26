@@ -1,9 +1,9 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import path from "path"
 import { Effect, Layer, Record, Result, Schema, Context } from "effect"
-import { NonNegativeInt } from "@loginom-ai-agent/core/schema"
-import { Global } from "@loginom-ai-agent/core/global"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { NonNegativeInt } from "@opencode-ai/core/schema"
+import { Global } from "@opencode-ai/core/global"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 
 export const OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"
 
@@ -47,7 +47,7 @@ export interface Interface {
   readonly remove: (key: string) => Effect.Effect<void, AuthError>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/Auth") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/Auth") {}
 
 const layer = Layer.effect(
   Service,

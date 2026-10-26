@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { Installation } from "../../src/installation"
-import { InstallationVersion } from "@loginom-ai-agent/core/installation/version"
+import { InstallationVersion } from "@opencode-ai/core/installation/version"
 
 for (const method of ["curl", "npm", "yarn", "pnpm", "bun", "brew", "scoop", "choco", "unknown"] as const) {
   test(`does not resolve upstream updates for ${method}`, async () => {

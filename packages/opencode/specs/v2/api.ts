@@ -1,7 +1,7 @@
 // @ts-nocheck
 
-import { OpenCode } from "@loginom-ai-agent/core"
-import { ReadTool } from "@loginom-ai-agent/core/tools"
+import { OpenCode } from "@opencode-ai/core"
+import { ReadTool } from "@opencode-ai/core/tools"
 
 const opencode = OpenCode.make({})
 

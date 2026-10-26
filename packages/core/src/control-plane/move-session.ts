@@ -64,7 +64,7 @@ export interface Interface {
   readonly moveSession: (input: Input) => Effect.Effect<void, Error>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/ControlPlaneMoveSession") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/ControlPlaneMoveSession") {}
 
 const layer = Layer.effect(
   Service,

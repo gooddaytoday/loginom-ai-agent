@@ -54,7 +54,7 @@ const contains = (root: string, path: string) =>
   (!relative(root, path).startsWith(".." + sep) && relative(root, path) !== ".." && !isAbsolute(relative(root, path)))
 if ([artifact, repo].some((root) => contains(root, output) || contains(output, root)))
   throw Error("SKILLS_ACCEPTANCE_OUTPUT_OVERLAP")
-const corpusBytes = await readFile(join(repo, "packages/agent/test/cli/package-docs-routing/cases.json"))
+const corpusBytes = await readFile(join(repo, "packages/opencode/test/cli/package-docs-routing/cases.json"))
 const corpusSchema = Schema.Struct({
   schema_version: Schema.Literal("loginom-skills-routing.v1"),
   fixtures: Schema.Record(Schema.String, Schema.String),

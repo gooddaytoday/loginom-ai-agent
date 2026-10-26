@@ -1,22 +1,22 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { path } from "@loginom-ai-agent/core/effect/app-node-platform"
-import { Global } from "@loginom-ai-agent/core/global"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { path } from "@opencode-ai/core/effect/app-node-platform"
+import { Global } from "@opencode-ai/core/global"
 import { InstanceStore } from "@/project/instance-store"
 import { Project } from "@/project/project"
-import { Database } from "@loginom-ai-agent/core/database/database"
+import { Database } from "@opencode-ai/core/database/database"
 import { eq } from "drizzle-orm"
-import { ProjectTable } from "@loginom-ai-agent/core/project/sql"
-import type { ProjectV2 } from "@loginom-ai-agent/core/project"
-import { Slug } from "@loginom-ai-agent/core/util/slug"
+import { ProjectTable } from "@opencode-ai/core/project/sql"
+import type { ProjectV2 } from "@opencode-ai/core/project"
+import { Slug } from "@opencode-ai/core/util/slug"
 import { errorMessage } from "../util/error"
 import { GlobalBus } from "@/bus/global"
 import { Git } from "@/git"
 import { Effect, Layer, Path, Schema, Scope, Context } from "effect"
 import { ChildProcess } from "effect/unstable/process"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
-import { AppProcess } from "@loginom-ai-agent/core/process"
+import { FSUtil } from "@opencode-ai/core/fs-util"
+import { AppProcess } from "@opencode-ai/core/process"
 import { InstanceState } from "@/effect/instance-state"
-import { WorktreeEvent } from "@loginom-ai-agent/schema/worktree-event"
+import { WorktreeEvent } from "@opencode-ai/schema/worktree-event"
 
 export const Event = WorktreeEvent
 
@@ -125,7 +125,7 @@ export interface Interface {
   readonly reset: (input: ResetInput) => Effect.Effect<boolean, Error>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/Worktree") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/Worktree") {}
 
 type GitResult = { code: number; text: string; stderr: string }
 

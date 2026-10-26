@@ -1,4 +1,4 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Context, Effect, Layer } from "effect"
 import open from "open"
 
@@ -6,7 +6,7 @@ export interface Interface {
   readonly open: (url: string) => Effect.Effect<void, Error>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/McpBrowser") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/McpBrowser") {}
 
 const layer = Layer.succeed(
   Service,

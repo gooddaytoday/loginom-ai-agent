@@ -337,7 +337,7 @@ test("agentCommand: из env-override выкидывает LOGINOM_/EVAL_/JUDGE_
   expect(command.env.PATH).toBe("p")
 })
 
-test("agentCommand: source-режим запускает standalone.ts из packages/agent с bundle", () => {
+test("agentCommand: source-режим запускает standalone.ts из packages/opencode с bundle", () => {
   const command = agentCommand(loadConfig([], { LOGINOM_DOCK_API_KEY: "k", EVAL_AGENT_MODEL: "m/x", JUDGE_MODEL: "j" }))
   expect(command.cmd).toEqual(["bun", "run", "src/standalone.ts"])
   expect(command.cwd.endsWith(path.join("packages", "agent"))).toBe(true)

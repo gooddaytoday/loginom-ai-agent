@@ -10,13 +10,13 @@ import {
   type TuiPluginStatus,
   type TuiSlotPlugin,
   type TuiTheme,
-} from "@loginom-ai-agent/plugin/tui"
+} from "@opencode-ai/plugin/tui"
 import path from "path"
 import { fileURLToPath } from "url"
 import { TuiConfig } from "@/config/tui"
-import { AppNodeBuilder } from "@loginom-ai-agent/core/effect/app-node-builder"
-import { errorData, errorMessage } from "@loginom-ai-agent/tui/util/error"
-import { isRecord } from "@loginom-ai-agent/tui/util/record"
+import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
+import { errorData, errorMessage } from "@opencode-ai/tui/util/error"
+import { isRecord } from "@opencode-ai/tui/util/record"
 import { resolveHostAttentionSoundPaths } from "@/config/tui-host-attention"
 import {
   readPackageThemes,
@@ -29,20 +29,20 @@ import {
 import { PluginLoader } from "@/plugin/loader"
 import { PluginMeta } from "@/plugin/meta"
 import { installPlugin as installModulePlugin, patchPluginConfig, readPluginManifest } from "@/plugin/install"
-import { hasTheme, upsertTheme } from "@loginom-ai-agent/tui/context/theme"
-import { Global } from "@loginom-ai-agent/core/global"
+import { hasTheme, upsertTheme } from "@opencode-ai/tui/context/theme"
+import { Global } from "@opencode-ai/core/global"
 import { Filesystem } from "@/util/filesystem"
 import { Process } from "@/util/process"
-import { Flock } from "@loginom-ai-agent/core/util/flock"
-import { Flag } from "@loginom-ai-agent/core/flag/flag"
+import { Flock } from "@opencode-ai/core/util/flock"
+import { Flag } from "@opencode-ai/core/flag/flag"
 import { internalTuiPlugins, type InternalTuiPlugin } from "./internal"
-import type { HostPluginApi, HostSlots } from "@loginom-ai-agent/tui/plugin/slots"
+import type { HostPluginApi, HostSlots } from "@opencode-ai/tui/plugin/slots"
 import { ConfigPlugin } from "@/config/plugin"
-import { ConfigPluginV1 } from "@loginom-ai-agent/core/v1/config/plugin"
-import { createCommandShim } from "@loginom-ai-agent/tui/plugin/command-shim"
+import { ConfigPluginV1 } from "@opencode-ai/core/v1/config/plugin"
+import { createCommandShim } from "@opencode-ai/tui/plugin/command-shim"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Effect } from "effect"
-import { createPluginRuntime, type PluginRuntime, type TuiPluginHost } from "@loginom-ai-agent/tui/plugin/runtime"
+import { createPluginRuntime, type PluginRuntime, type TuiPluginHost } from "@opencode-ai/tui/plugin/runtime"
 
 ensureRuntimePluginSupport({ additional: keymapRuntimeModules })
 

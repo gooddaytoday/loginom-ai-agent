@@ -1,5 +1,5 @@
 import { LocalContext } from "@/util/local-context"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import type * as Project from "./project"
 
 export interface InstanceContext {

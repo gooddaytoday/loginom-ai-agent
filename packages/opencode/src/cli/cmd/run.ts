@@ -1,8 +1,8 @@
 import { standaloneCancellation } from "../standalone-cancellation"
 import { exitCli } from "../exit"
 import { runToolOutcome } from "../run-outcome"
-import type { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 // CLI entry point for `opencode run` and `opencode --mini`.
 //
 // Handles three modes:
@@ -21,13 +21,13 @@ import path from "path"
 import { pathToFileURL } from "url"
 import { fileSnapshot } from "@/util/file-snapshot"
 import { Cause, Effect, Exit } from "effect"
-import { ProviderV2 } from "@loginom-ai-agent/core/provider"
-import { ModelV2 } from "@loginom-ai-agent/core/model"
+import { ProviderV2 } from "@opencode-ai/core/provider"
+import { ModelV2 } from "@opencode-ai/core/model"
 import { UI } from "../ui"
 import { effectCmd } from "../effect-cmd"
 import { EOL } from "os"
 import { Filesystem } from "@/util/filesystem"
-import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@loginom-ai-agent/sdk/v2"
+import { createOpencodeClient, type OpencodeClient, type ToolPart } from "@opencode-ai/sdk/v2"
 import { FormatError, FormatUnknownError } from "../error"
 import { INTERACTIVE_INPUT_ERROR, readPromptStdin, resolveInteractiveStdin } from "./run/runtime.stdin"
 

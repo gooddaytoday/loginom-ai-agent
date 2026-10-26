@@ -1,1 +1,1 @@
-export * from "@loginom-ai-agent/tui/logo"
+export * from "@opencode-ai/tui/logo"

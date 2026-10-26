@@ -50,14 +50,14 @@ command=[binary] if binary else [bun,'run','src/standalone.ts']
 subprocess.run([bun,'script/build-node-host.ts',str(bundle/'host')],cwd=repo/'packages/loginom-host',check=True,capture_output=True)
 env=dict(os.environ,LOGINOM_AI_AGENT_CLI_PROFILE=str(profile),LOGINOM_AI_AGENT_CLI_BUNDLE=str(bundle),LOGINOM_AI_AGENT_PURE='1',BUN_RUNTIME_TRANSPILER_CACHE_PATH='0',TERM='xterm-256color')
 if not unconfigured and not onboarding:
- setup=subprocess.run(command+['loginom','setup','--stdin-json','--format','json'],input='{"apiKey":"fixture-key"}',text=True,capture_output=True,cwd=repo/'packages/agent',env=env,timeout=15)
+ setup=subprocess.run(command+['loginom','setup','--stdin-json','--format','json'],input='{"apiKey":"fixture-key"}',text=True,capture_output=True,cwd=repo/'packages/opencode',env=env,timeout=15)
  assert setup.returncode==0,setup.stderr
 elif prompt_mode:
- status=subprocess.run(command+['loginom','status','--format','json'],text=True,capture_output=True,cwd=repo/'packages/agent',env=env,timeout=15)
+ status=subprocess.run(command+['loginom','status','--format','json'],text=True,capture_output=True,cwd=repo/'packages/opencode',env=env,timeout=15)
  assert status.returncode==0,status.stderr
 if cancel_stdin:
  if cancel_startup: (bundle/'delay-start').write_text('1')
- child=subprocess.Popen(command+['run','--headless','--format','json','--','pending input'],cwd=repo/'packages/agent',env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+ child=subprocess.Popen(command+['run','--headless','--format','json','--','pending input'],cwd=repo/'packages/opencode',env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
  try:
   deadline=time.monotonic()+30
   ready=(bundle/'starting') if cancel_startup else (profile/'data/loginom-ai-agent.db')
@@ -108,7 +108,7 @@ if prompt_mode:
  (profile/'config/loginom-ai-agent.json').write_text(json.dumps(config))
 session_id = None
 if resume_mode:
- seed = subprocess.run(command+['run','--headless','--model','test/test-model','--dangerously-skip-permissions','--','Call loginom_probe and report the result'],cwd=repo/'packages/agent',env=env,text=True,capture_output=True,timeout=60)
+ seed = subprocess.run(command+['run','--headless','--model','test/test-model','--dangerously-skip-permissions','--','Call loginom_probe and report the result'],cwd=repo/'packages/opencode',env=env,text=True,capture_output=True,timeout=60)
  assert seed.returncode==0, seed.stderr
  with sqlite3.connect('file:' + str(profile/'data/loginom-ai-agent.db') + '?mode=ro', uri=True) as db:
   sessions=list(db.execute('select id from session'))
@@ -126,7 +126,7 @@ if proxy_notice:
  for key in ['HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','NO_PROXY','http_proxy','https_proxy','all_proxy','no_proxy','NODE_USE_ENV_PROXY']:
   env.pop(key, None)
 master,slave=pty.openpty(); fcntl.ioctl(slave,termios.TIOCSWINSZ,struct.pack('HHHH',35,120,0,0))
-child=subprocess.Popen(command+(['--session','not-a-session'] if invalid_session else [])+([str(workspace)] if attachment_mode else [])+(['--no-headless'] + (['--continue'] if latest_mode else ['--session',session_id]) if resume_mode else ['--headless']) + (['--model','test/test-model','--dangerously-skip-permissions'] + ([] if attachment_mode or resume_mode else ['--prompt',('Say hello without Loginom' if unconfigured else 'Call loginom_probe and report the result')]) if prompt_mode else []),cwd=repo/'packages/agent',env=env,stdin=slave,stdout=slave,stderr=slave,start_new_session=True)
+child=subprocess.Popen(command+(['--session','not-a-session'] if invalid_session else [])+([str(workspace)] if attachment_mode else [])+(['--no-headless'] + (['--continue'] if latest_mode else ['--session',session_id]) if resume_mode else ['--headless']) + (['--model','test/test-model','--dangerously-skip-permissions'] + ([] if attachment_mode or resume_mode else ['--prompt',('Say hello without Loginom' if unconfigured else 'Call loginom_probe and report the result')]) if prompt_mode else []),cwd=repo/'packages/opencode',env=env,stdin=slave,stdout=slave,stderr=slave,start_new_session=True)
 os.close(slave); output=bytearray(); start=time.monotonic(); sent=0; setup_skipped=False; ready_at=None; setup_step=0; attachment_step=0; attachment_at=None; resumed=False
 setup_steps=[('Настроить Loginom сейчас?',b'\x1b[D\r'),('API-ключ',b'\x03' if cancel_setup else b'fixture-key\r'),('URL Loginom',b'\r'),('Имя пользователя',b'\r'),('Пароль Loginom',b'\x1b[B\r' if password_setup else b'\r')]
 if password_setup: setup_steps.append(('Новый пароль',b'fixture-password\r'))

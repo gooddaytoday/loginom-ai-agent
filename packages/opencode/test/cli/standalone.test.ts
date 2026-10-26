@@ -61,7 +61,7 @@ test("backend imports use isolated global paths and cannot inherit Desktop DB/co
     root,
     `import { standalone } from './src/cli/standalone.ts';
     await standalone(['models'], async () => {
-      const { Global } = await import('@loginom-ai-agent/core/global');
+      const { Global } = await import('@opencode-ai/core/global');
       const fs = await import('node:fs/promises');
       console.log(JSON.stringify({ paths: Global.Path, temporary: process.env.TMPDIR, realTemporary: await fs.realpath(process.env.TMPDIR), db: process.env.LOGINOM_AI_AGENT_DB,
         config: process.env.LOGINOM_AI_AGENT_CONFIG_DIR, auth: process.env.LOGINOM_AI_AGENT_AUTH_CONTENT }));
@@ -220,7 +220,7 @@ test("public CLI profile selector does not redirect ordinary Desktop Global impo
   const root = await temporary()
   const result = await run(
     root,
-    `const { Global } = await import('@loginom-ai-agent/core/global'); console.log(Global.Path.data)`,
+    `const { Global } = await import('@opencode-ai/core/global'); console.log(Global.Path.data)`,
   )
   expect(result.code).toBe(0)
   expect(result.out.trim()).toBe(path.join(root, "desktop-data", "loginom-ai-agent-dev"))

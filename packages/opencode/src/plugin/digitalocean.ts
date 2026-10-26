@@ -1,7 +1,7 @@
-import type { Hooks, PluginInput } from "@loginom-ai-agent/plugin"
-import type { Model } from "@loginom-ai-agent/sdk/v2"
-import { InstallationVersion } from "@loginom-ai-agent/core/installation/version"
-import { OauthCallbackPage } from "@loginom-ai-agent/core/oauth/page"
+import type { Hooks, PluginInput } from "@opencode-ai/plugin"
+import type { Model } from "@opencode-ai/sdk/v2"
+import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import { OauthCallbackPage } from "@opencode-ai/core/oauth/page"
 import { createServer } from "http"
 import open from "open"
 

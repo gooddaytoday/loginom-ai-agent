@@ -1,13 +1,13 @@
 This is a plugin to simulate a remote environment locally. Add this to `.loginom-ai-agent/loginom-ai-agent.jsonc`:
 
 ```json
-  "plugin": ["../packages/agent/src/control-plane/dev/debug-workspace-plugin.ts"],
+  "plugin": ["../packages/opencode/src/control-plane/dev/debug-workspace-plugin.ts"],
 ```
 
 In a separate terminal, run a separate OpenCode server. This will act like a remote server and the local instance will proxy all requests to it:
 
 ```
-./packages/agent/script/run-workspace-server
+./packages/opencode/script/run-workspace-server
 ```
 
 With the plugin install, you can now run OpenCode and create a `debug` workspace type. This will create a "remote" workspace which talks to the second workspace server started above.

@@ -1,5 +1,5 @@
 import fs from "fs/promises"
-import { Flock } from "@loginom-ai-agent/core/util/flock"
+import { Flock } from "@opencode-ai/core/util/flock"
 
 type Msg = {
   key: string

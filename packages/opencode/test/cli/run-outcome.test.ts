@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import type { ToolPart } from "@loginom-ai-agent/sdk/v2"
+import type { ToolPart } from "@opencode-ai/sdk/v2"
 import { runToolOutcome } from "../../src/cli/run-outcome"
 
 function part(tool: string, input: Record<string, unknown>, failed: boolean): ToolPart {

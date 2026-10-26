@@ -1,4 +1,4 @@
-import type { Model } from "@loginom-ai-agent/sdk/v2"
+import type { Model } from "@opencode-ai/sdk/v2"
 import { Schema } from "effect"
 
 const reasoningOption = Schema.Struct({

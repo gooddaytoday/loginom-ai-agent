@@ -1,5 +1,5 @@
 import { Option, Schema } from "effect"
-import { Loginom } from "@loginom-ai-agent/schema/loginom"
+import { Loginom } from "@opencode-ai/schema/loginom"
 import type { launchNodeHost } from "@loginom-ai-agent/loginom-host/node-client"
 
 const setupSchema = Schema.Struct({

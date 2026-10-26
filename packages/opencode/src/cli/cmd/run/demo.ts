@@ -15,7 +15,7 @@
 // Demo mode also handles permission and question replies locally, completing
 // or failing the synthetic tool parts as appropriate.
 import path from "path"
-import type { Event, ToolPart } from "@loginom-ai-agent/sdk/v2"
+import type { Event, ToolPart } from "@opencode-ai/sdk/v2"
 import { createSessionData, reduceSessionData, type SessionData } from "./session-data"
 import { writeSessionOutput } from "./stream"
 import type { FooterApi, PermissionReply, QuestionReject, QuestionReply, RunPrompt, StreamCommit } from "./types"
@@ -678,7 +678,7 @@ function emitTask(state: State): void {
     state: {
       status: "running",
       input: {
-        filePath: "packages/agent/src/cli/cmd/run/stream.ts",
+        filePath: "packages/opencode/src/cli/cmd/run/stream.ts",
         offset: 1,
         limit: 200,
       },

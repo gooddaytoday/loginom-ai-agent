@@ -1,4 +1,4 @@
-import type { Hooks, PluginInput } from "@loginom-ai-agent/plugin"
+import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 
 export async function CerebrasPlugin(_input: PluginInput): Promise<Hooks> {
   return {

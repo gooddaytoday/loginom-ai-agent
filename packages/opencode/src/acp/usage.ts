@@ -1,12 +1,12 @@
 import type { AgentSideConnection, Usage } from "@agentclientprotocol/sdk"
-import type { AssistantMessage as OpenCodeAssistantMessage, Message } from "@loginom-ai-agent/sdk/v2"
+import type { AssistantMessage as OpenCodeAssistantMessage, Message } from "@opencode-ai/sdk/v2"
 import { InstanceRef } from "@/effect/instance-ref"
 import { InstanceBootstrap } from "@/project/bootstrap"
 import { InstanceStore } from "@/project/instance-store"
-import { makeGlobalNode, Node } from "@loginom-ai-agent/core/effect/app-node"
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { ProviderV2 } from "@loginom-ai-agent/core/provider"
-import { ModelV2 } from "@loginom-ai-agent/core/model"
+import { makeGlobalNode, Node } from "@opencode-ai/core/effect/app-node"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { ProviderV2 } from "@opencode-ai/core/provider"
+import { ModelV2 } from "@opencode-ai/core/model"
 import { Provider } from "@/provider/provider"
 import { Context, Effect, Layer, SynchronizedRef } from "effect"
 
@@ -61,14 +61,14 @@ export interface Interface {
 }
 
 export class MessageLoader extends Context.Service<MessageLoader, MessageLoaderInterface>()(
-  "@loginom-ai-agent/ACPUsageMessageLoader",
+  "@opencode/ACPUsageMessageLoader",
 ) {}
 
 export class ContextLimitLoader extends Context.Service<ContextLimitLoader, ContextLimitLoaderInterface>()(
-  "@loginom-ai-agent/ACPUsageContextLimitLoader",
+  "@opencode/ACPUsageContextLimitLoader",
 ) {}
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/ACPUsage") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/ACPUsage") {}
 
 export function messageLoaderFromSDK(sdk: SDK): MessageLoaderInterface {
   return MessageLoader.of({

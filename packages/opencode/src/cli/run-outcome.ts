@@ -1,4 +1,4 @@
-import type { ToolPart } from "@loginom-ai-agent/sdk/v2"
+import type { ToolPart } from "@opencode-ai/sdk/v2"
 
 // Correlation is deliberately explicit: a different successful operation does not repair a failure.
 export function runToolOutcome() {

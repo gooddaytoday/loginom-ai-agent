@@ -1,9 +1,9 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { NodePath } from "@effect/platform-node"
 import { Cause, Duration, Effect, Layer, Option, Schedule, Context } from "effect"
 import path from "path"
 import type { Agent } from "../agent/agent"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { evaluate } from "@/permission/evaluate"
 import { Config } from "@/config/config"
 import { ToolID } from "./schema"
@@ -43,7 +43,7 @@ export interface Interface {
   readonly limits: () => Effect.Effect<{ maxLines: number; maxBytes: number }>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/Truncate") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/Truncate") {}
 
 const layer = Layer.effect(
   Service,

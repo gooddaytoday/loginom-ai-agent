@@ -7,7 +7,7 @@ import type {
   OpencodeClient,
   Session,
   TextPartInput,
-} from "@loginom-ai-agent/sdk/v2/client"
+} from "@opencode-ai/sdk/v2/client"
 import type {
   Project,
   ProjectCurrent,
@@ -21,7 +21,7 @@ import type {
   SessionPromptOutput,
   SessionShellInput,
   SessionShellOutput,
-} from "@loginom-ai-agent/client/promise"
+} from "@opencode-ai/client/promise"
 
 type LegacyClient = OpencodeClient
 type LegacyFor = (directory?: string) => LegacyClient

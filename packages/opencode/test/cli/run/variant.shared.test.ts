@@ -1,10 +1,10 @@
 import path from "path"
 import { NodeFileSystem } from "@effect/platform-node"
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { describe, expect, test } from "bun:test"
 import { Effect, FileSystem, Layer } from "effect"
-import { Global } from "@loginom-ai-agent/core/global"
+import { Global } from "@opencode-ai/core/global"
 import {
   createVariantRuntime,
   cycleVariant,

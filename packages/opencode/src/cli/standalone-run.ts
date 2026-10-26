@@ -1,12 +1,12 @@
 import { Option, Schema } from "effect"
-import { Loginom } from "@loginom-ai-agent/schema/loginom"
+import { Loginom } from "@opencode-ai/schema/loginom"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { launchNodeHost, NodeHostStartupError } from "@loginom-ai-agent/loginom-host/node-client"
 import type { cliProfile } from "@loginom-ai-agent/product/cli-profile"
 import { Product } from "@loginom-ai-agent/product"
 import { standaloneCancellation } from "./standalone-cancellation"
 import { standaloneBundle } from "./standalone-bundle"
-import { InstallationBrowserRecovery } from "@loginom-ai-agent/core/installation/version"
+import { InstallationBrowserRecovery } from "@opencode-ai/core/installation/version"
 
 export async function standaloneRun(args: string[], paths: ReturnType<typeof cliProfile>, mode: "run" | "tui" = "run") {
   const signal = mode === "run" ? standaloneCancellation() : undefined

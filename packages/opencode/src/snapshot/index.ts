@@ -1,15 +1,15 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Cause, Duration, Effect, Layer, Schedule, Schema, Semaphore, Context } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { formatPatch, structuredPatch } from "diff"
 import path from "path"
-import { AppProcess } from "@loginom-ai-agent/core/process"
+import { AppProcess } from "@opencode-ai/core/process"
 import { InstanceState } from "@/effect/instance-state"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
-import { Hash } from "@loginom-ai-agent/core/util/hash"
+import { FSUtil } from "@opencode-ai/core/fs-util"
+import { Hash } from "@opencode-ai/core/util/hash"
 import { Config } from "@/config/config"
-import { Global } from "@loginom-ai-agent/core/global"
-import { Info } from "@loginom-ai-agent/schema/file-diff"
+import { Global } from "@opencode-ai/core/global"
+import { Info } from "@opencode-ai/schema/file-diff"
 
 export const Patch = Schema.Struct({
   hash: Schema.String,
@@ -44,7 +44,7 @@ export interface Interface {
   readonly diffFull: (from: string, to: string) => Effect.Effect<FileDiff[]>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/Snapshot") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/Snapshot") {}
 
 const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | Config.Service> = Layer.effect(
   Service,

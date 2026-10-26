@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, spyOn } from "bun:test"
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Effect, Layer } from "effect"
 import fs from "fs/promises"
 import path from "path"
 import { pathToFileURL } from "url"
-import { CrossSpawnSpawner } from "@loginom-ai-agent/core/cross-spawn-spawner"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Config } from "@/config/config"
 import { disposeAllInstances, provideInstance, testInstanceStoreLayer, tmpdirScoped } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
@@ -13,7 +13,7 @@ import { testEffect } from "../lib/effect"
 const { Plugin } = await import("../../src/plugin/index")
 const { PluginLoader } = await import("../../src/plugin/loader")
 const { readPackageThemes } = await import("../../src/plugin/shared")
-const { Npm } = await import("@loginom-ai-agent/core/npm")
+const { Npm } = await import("@opencode-ai/core/npm")
 const { TestConfig } = await import("../fixture/config")
 const { RuntimeFlags } = await import("../../src/effect/runtime-flags")
 

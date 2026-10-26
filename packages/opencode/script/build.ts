@@ -33,7 +33,7 @@ const executable = standaloneFlag ? Product.cliExecutable : Product.executable
 if (standaloneFlag) process.env.MODELS_DEV_API_JSON ??= path.join(dir, "../product/models.json")
 const generated = await import("./generate.ts")
 
-import { Script } from "@loginom-ai-agent/script"
+import { Script } from "@opencode-ai/script"
 import pkg from "../package.json"
 
 const singleFlag = process.argv.includes("--single")

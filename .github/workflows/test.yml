@@ -228,7 +228,7 @@ jobs:
         run: bun run check:generated
 
       - name: Run HttpApi exerciser gates
-        working-directory: packages/agent
+        working-directory: packages/opencode
         # A rare hang inside the effect run otherwise holds the job until its 60-minute limit.
         timeout-minutes: 10
         run: bun run test:httpapi

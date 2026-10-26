@@ -6,7 +6,7 @@ import DESCRIPTION from "./lsp.txt"
 import { InstanceState } from "@/effect/instance-state"
 import { pathToFileURL } from "url"
 import { assertExternalDirectoryEffect } from "./external-directory"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 
 const operations = [
   "goToDefinition",

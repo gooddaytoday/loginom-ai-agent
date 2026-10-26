@@ -1,1 +1,1 @@
-export { default } from "@loginom-ai-agent/tui/parsers-config"
+export { default } from "@opencode-ai/tui/parsers-config"

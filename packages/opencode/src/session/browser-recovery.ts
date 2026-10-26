@@ -1,4 +1,4 @@
-import type { SessionV1 } from "@loginom-ai-agent/core/v1/session"
+import type { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Option, Schema } from "effect"
 import { isRecord } from "@/util/record"
 

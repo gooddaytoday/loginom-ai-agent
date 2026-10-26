@@ -19,10 +19,10 @@ if (process.versions.bun !== expectedBunVersion) {
 }
 '
 if [ "${LOGINOM_NODE_WORKFLOW:-}" = cli ]; then
-  export PATH="$PWD/packages/agent/node_modules/.bin:$PATH"
+  export PATH="$PWD/packages/opencode/node_modules/.bin:$PATH"
   echo "Checking CLI packages: Core, Agent, Host"
   (cd packages/core && bun typecheck)
-  (cd packages/agent && bun typecheck)
+  (cd packages/opencode && bun typecheck)
   (cd packages/loginom-host && bun typecheck)
 else
   bun typecheck

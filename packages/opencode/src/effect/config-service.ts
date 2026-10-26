@@ -28,7 +28,7 @@ export type ServiceClass<Self, Id extends string, Service> = Context.ServiceClas
  *
  * ```ts
  * class ServerAuthConfig extends ConfigService.Service<ServerAuthConfig>()(
- *   "@loginom-ai-agent/ServerAuthConfig",
+ *   "@opencode/ServerAuthConfig",
  *   {
  *     password: Config.string("LOGINOM_AI_AGENT_SERVER_PASSWORD").pipe(Config.option),
  *     username: Config.string("LOGINOM_AI_AGENT_SERVER_USERNAME").pipe(Config.withDefault("opencode")),

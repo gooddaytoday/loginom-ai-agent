@@ -1,6 +1,6 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Effect, Layer, Context, Schema } from "effect"
-import { SessionV1 } from "@loginom-ai-agent/core/v1/session"
+import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Snapshot } from "../snapshot"
 import { Storage } from "@/storage/storage"
@@ -23,7 +23,7 @@ export interface Interface {
   readonly cleanup: (session: Session.Info) => Effect.Effect<void>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/SessionRevert") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/SessionRevert") {}
 
 const layer = Layer.effect(
   Service,

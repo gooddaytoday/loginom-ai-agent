@@ -1,5 +1,5 @@
-import { NamedError } from "@loginom-ai-agent/core/util/error"
-import { ConfigErrorV1 } from "@loginom-ai-agent/core/v1/config/error"
+import { NamedError } from "@opencode-ai/core/util/error"
+import { ConfigErrorV1 } from "@opencode-ai/core/v1/config/error"
 import { Cause, Effect } from "effect"
 import { HttpRouter, HttpServerError, HttpServerRespondable, HttpServerResponse } from "effect/unstable/http"
 

@@ -1,2 +1,2 @@
-export * from "@loginom-ai-agent/tui/util/locale"
-export { Locale } from "@loginom-ai-agent/tui/util/locale"
+export * from "@opencode-ai/tui/util/locale"
+export { Locale } from "@opencode-ai/tui/util/locale"

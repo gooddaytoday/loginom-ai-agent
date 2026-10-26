@@ -1,7 +1,7 @@
-import type { Hooks, PluginInput } from "@loginom-ai-agent/plugin"
+import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { OAUTH_DUMMY_KEY } from "../auth"
-import { InstallationVersion } from "@loginom-ai-agent/core/installation/version"
-import { OauthCallbackPage } from "@loginom-ai-agent/core/oauth/page"
+import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import { OauthCallbackPage } from "@opencode-ai/core/oauth/page"
 import { createServer } from "http"
 import open from "open"
 

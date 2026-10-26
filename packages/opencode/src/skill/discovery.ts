@@ -1,11 +1,11 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { httpClient, path } from "@loginom-ai-agent/core/effect/app-node-platform"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { httpClient, path } from "@opencode-ai/core/effect/app-node-platform"
 import { NodePath } from "@effect/platform-node"
 import { Effect, Layer, Path, Schema, Context } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { withTransientReadRetry } from "@/util/effect-http-client"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
-import { Global } from "@loginom-ai-agent/core/global"
+import { FSUtil } from "@opencode-ai/core/fs-util"
+import { Global } from "@opencode-ai/core/global"
 
 const skillConcurrency = 4
 const fileConcurrency = 8
@@ -24,7 +24,7 @@ export interface Interface {
   readonly pull: (url: string) => Effect.Effect<string[]>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/SkillDiscovery") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/SkillDiscovery") {}
 
 const layer: Layer.Layer<Service, never, FSUtil.Service | Path.Path | HttpClient.HttpClient> = Layer.effect(
   Service,

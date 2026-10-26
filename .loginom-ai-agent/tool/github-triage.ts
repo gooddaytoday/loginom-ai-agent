@@ -1,5 +1,5 @@
 /// <reference path="../env.d.ts" />
-import { tool } from "@loginom-ai-agent/plugin"
+import { tool } from "@opencode-ai/plugin"
 
 const TEAM = {
   tui: ["kommander", "simonklee"],

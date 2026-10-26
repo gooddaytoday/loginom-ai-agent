@@ -1,5 +1,5 @@
-import { Glob } from "@loginom-ai-agent/core/util/glob"
-import { ConfigPluginV1 } from "@loginom-ai-agent/core/v1/config/plugin"
+import { Glob } from "@opencode-ai/core/util/glob"
+import { ConfigPluginV1 } from "@opencode-ai/core/v1/config/plugin"
 import { pathToFileURL } from "url"
 import { isPathPluginSpec, parsePluginSpecifier, resolvePathPluginTarget } from "@/plugin/shared"
 import path from "path"

@@ -1,1 +1,1 @@
-export * from "@loginom-ai-agent/tui/prompt/display"
+export * from "@opencode-ai/tui/prompt/display"

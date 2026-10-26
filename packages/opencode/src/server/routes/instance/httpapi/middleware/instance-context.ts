@@ -10,7 +10,7 @@ export class InstanceContextMiddleware extends HttpApiMiddleware.Service<
   {
     requires: WorkspaceRouteContext
   }
->()("@loginom-ai-agent/ExperimentalHttpApiInstanceContext") {}
+>()("@opencode/ExperimentalHttpApiInstanceContext") {}
 
 function decode(input: string): string {
   try {

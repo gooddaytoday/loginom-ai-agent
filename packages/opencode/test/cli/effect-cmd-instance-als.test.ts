@@ -1,6 +1,6 @@
 import { afterEach, expect } from "bun:test"
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Effect } from "effect"
 import { fileURLToPath } from "url"
 import { InstanceRef } from "../../src/effect/instance-ref"

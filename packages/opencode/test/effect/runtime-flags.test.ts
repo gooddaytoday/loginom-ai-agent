@@ -1,6 +1,6 @@
 import { describe, expect } from "bun:test"
 import { ConfigProvider, Effect, Layer } from "effect"
-import { AppNodeBuilder } from "@loginom-ai-agent/core/effect/app-node-builder"
+import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { RuntimeFlags } from "../../src/effect/runtime-flags"
 import { it } from "../lib/effect"
 

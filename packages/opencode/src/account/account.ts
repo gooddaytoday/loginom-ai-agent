@@ -1,7 +1,7 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { httpClient } from "@loginom-ai-agent/core/effect/app-node-platform"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { Cache, Clock, Duration, Effect, Layer, Option, Schema, SchemaGetter, Context } from "effect"
-import { serviceUse } from "@loginom-ai-agent/core/effect/service-use"
+import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import {
   FetchHttpClient,
   HttpClient,
@@ -182,7 +182,7 @@ export interface Interface {
   readonly poll: (input: Login) => Effect.Effect<PollResult, AccountError>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/Account") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/Account") {}
 
 export const use = serviceUse(Service)
 

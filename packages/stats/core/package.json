@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@loginom-ai-agent/stats-core",
+  "name": "@opencode-ai/stats-core",
   "version": "1.18.31",
   "private": true,
   "type": "module",

@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test"
 import { setTimeout as sleep } from "node:timers/promises"
-import { AppNodeBuilder } from "@loginom-ai-agent/core/effect/app-node-builder"
+import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { Effect, Layer } from "effect"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { McpAuth } from "../../src/mcp/auth"
 
 function authFile() {

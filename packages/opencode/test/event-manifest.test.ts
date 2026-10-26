@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { SessionEvent } from "@loginom-ai-agent/core/session/event"
-import { EventManifest as SchemaEventManifest } from "@loginom-ai-agent/schema/event-manifest"
+import { SessionEvent } from "@opencode-ai/core/session/event"
+import { EventManifest as SchemaEventManifest } from "@opencode-ai/schema/event-manifest"
 import { Todo } from "@/session/todo"
 import { EventManifest } from "@/event-manifest"
 

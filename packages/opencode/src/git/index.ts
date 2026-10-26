@@ -1,5 +1,5 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { AppProcess } from "@loginom-ai-agent/core/process"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { AppProcess } from "@opencode-ai/core/process"
 import { Effect, Layer, Context, Stream } from "effect"
 import { ChildProcess } from "effect/unstable/process"
 
@@ -98,7 +98,7 @@ const kind = (code: string): Kind => {
   return "modified"
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/Git") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/Git") {}
 
 const layer = Layer.effect(
   Service,

@@ -96,7 +96,7 @@ export interface Interface {
   readonly cancel: (id: string) => Effect.Effect<Info | undefined>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/BackgroundJob") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/BackgroundJob") {}
 
 function snapshot(job: Active): Info {
   return {

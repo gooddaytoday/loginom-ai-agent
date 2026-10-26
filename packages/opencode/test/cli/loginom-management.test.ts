@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { setupCandidate } from "../../src/cli/loginom-management"
-import type { Loginom } from "@loginom-ai-agent/schema/loginom"
+import type { Loginom } from "@opencode-ai/schema/loginom"
 
 const current: Loginom.View = {
   revision: 4,

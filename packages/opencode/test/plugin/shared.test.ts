@@ -17,15 +17,15 @@ describe("parsePluginSpecifier", () => {
   })
 
   test("parses scoped npm package without version", () => {
-    expect(parsePluginSpecifier("@loginom-ai-agent/acme")).toEqual({
-      pkg: "@loginom-ai-agent/acme",
+    expect(parsePluginSpecifier("@opencode/acme")).toEqual({
+      pkg: "@opencode/acme",
       version: "latest",
     })
   })
 
   test("parses scoped npm package with version", () => {
-    expect(parsePluginSpecifier("@loginom-ai-agent/acme@1.0.0")).toEqual({
-      pkg: "@loginom-ai-agent/acme",
+    expect(parsePluginSpecifier("@opencode/acme@1.0.0")).toEqual({
+      pkg: "@opencode/acme",
       version: "1.0.0",
     })
   })
@@ -38,8 +38,8 @@ describe("parsePluginSpecifier", () => {
   })
 
   test("parses scoped package with git+https url", () => {
-    expect(parsePluginSpecifier("@loginom-ai-agent/acme@git+https://github.com/opencode/acme.git")).toEqual({
-      pkg: "@loginom-ai-agent/acme",
+    expect(parsePluginSpecifier("@opencode/acme@git+https://github.com/opencode/acme.git")).toEqual({
+      pkg: "@opencode/acme",
       version: "git+https://github.com/opencode/acme.git",
     })
   })
@@ -52,8 +52,8 @@ describe("parsePluginSpecifier", () => {
   })
 
   test("parses scoped package with git+ssh url containing another @", () => {
-    expect(parsePluginSpecifier("@loginom-ai-agent/acme@git+ssh://git@github.com/opencode/acme.git")).toEqual({
-      pkg: "@loginom-ai-agent/acme",
+    expect(parsePluginSpecifier("@opencode/acme@git+ssh://git@github.com/opencode/acme.git")).toEqual({
+      pkg: "@opencode/acme",
       version: "git+ssh://git@github.com/opencode/acme.git",
     })
   })
@@ -66,22 +66,22 @@ describe("parsePluginSpecifier", () => {
   })
 
   test("parses npm alias using the alias name", () => {
-    expect(parsePluginSpecifier("acme@npm:@loginom-ai-agent/acme@1.0.0")).toEqual({
+    expect(parsePluginSpecifier("acme@npm:@opencode/acme@1.0.0")).toEqual({
       pkg: "acme",
-      version: "npm:@loginom-ai-agent/acme@1.0.0",
+      version: "npm:@opencode/acme@1.0.0",
     })
   })
 
   test("parses bare npm protocol specifier using the target package", () => {
-    expect(parsePluginSpecifier("npm:@loginom-ai-agent/acme@1.0.0")).toEqual({
-      pkg: "@loginom-ai-agent/acme",
+    expect(parsePluginSpecifier("npm:@opencode/acme@1.0.0")).toEqual({
+      pkg: "@opencode/acme",
       version: "1.0.0",
     })
   })
 
   test("parses unversioned npm protocol specifier", () => {
-    expect(parsePluginSpecifier("npm:@loginom-ai-agent/acme")).toEqual({
-      pkg: "@loginom-ai-agent/acme",
+    expect(parsePluginSpecifier("npm:@opencode/acme")).toEqual({
+      pkg: "@opencode/acme",
       version: "latest",
     })
   })

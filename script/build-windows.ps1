@@ -69,9 +69,9 @@ if (-not $SkipInstall) {
     "--frozen-lockfile",
     "--linker", "hoisted",
     "--ignore-scripts",
-    "--filter", "@loginom-ai-agent/desktop",
+    "--filter", "@opencode-ai/desktop",
     "--filter", "@loginom-ai-agent/loginom-host",
-    "--filter", "@loginom-ai-agent/agent"
+    "--filter", "opencode"
   )
 
   # The filtered graph contains optional editor grammars whose generic install

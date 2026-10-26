@@ -2,10 +2,10 @@ export * as ConfigV2Compat from "./v2-compat"
 
 import { isDeepStrictEqual } from "node:util"
 import { Option, Schema } from "effect"
-import { NonNegativeInt, PositiveInt } from "@loginom-ai-agent/core/schema"
-import { ConfigAttachmentV1 } from "@loginom-ai-agent/core/v1/config/attachment"
-import { ConfigLSPV1 } from "@loginom-ai-agent/core/v1/config/lsp"
-import { InvalidError } from "@loginom-ai-agent/core/v1/config/error"
+import { NonNegativeInt, PositiveInt } from "@opencode-ai/core/schema"
+import { ConfigAttachmentV1 } from "@opencode-ai/core/v1/config/attachment"
+import { ConfigLSPV1 } from "@opencode-ai/core/v1/config/lsp"
+import { InvalidError } from "@opencode-ai/core/v1/config/error"
 
 export interface Diagnostic {
   readonly kind: "invalid" | "unsupported" | "conflict"

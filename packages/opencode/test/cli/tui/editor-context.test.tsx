@@ -3,11 +3,11 @@ import os from "node:os"
 import path from "node:path"
 import { afterEach, expect, spyOn, test } from "bun:test"
 import { createRoot } from "solid-js"
-import { EditorContextProvider, useEditorContext, type EditorIntegration } from "@loginom-ai-agent/tui/context/editor"
+import { EditorContextProvider, useEditorContext, type EditorIntegration } from "@opencode-ai/tui/context/editor"
 import { tmpdir } from "../../fixture/fixture"
 import { FakeWebSocket } from "../../lib/websocket"
 import { TestTuiContexts } from "../../fixture/tui-environment"
-import { discoverEditorConnection } from "@loginom-ai-agent/tui/editor"
+import { discoverEditorConnection } from "@opencode-ai/tui/editor"
 
 const originalClaudePort = process.env.CLAUDE_CODE_SSE_PORT
 const originalOpencodePort = process.env.LOGINOM_AI_AGENT_EDITOR_SSE_PORT

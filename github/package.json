@@ -15,6 +15,6 @@
     "@actions/github": "6.0.1",
     "@octokit/graphql": "9.0.1",
     "@octokit/rest": "catalog:",
-    "@loginom-ai-agent/sdk": "workspace:*"
+    "@opencode-ai/sdk": "workspace:*"
   }
 }

@@ -1,11 +1,11 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { makeGlobalNode, Node } from "@loginom-ai-agent/core/effect/app-node"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { makeGlobalNode, Node } from "@opencode-ai/core/effect/app-node"
 import { GlobalBus } from "@/bus/global"
-import { serviceUse } from "@loginom-ai-agent/core/effect/service-use"
+import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import { WorkspaceContext } from "@/control-plane/workspace-context"
 import { InstanceRef } from "@/effect/instance-ref"
 import { disposeInstance as runDisposers } from "@/effect/instance-registry"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Context, Deferred, Duration, Effect, Exit, Layer, Scope } from "effect"
 import { type InstanceContext } from "./instance-context"
 import { InstanceBootstrap } from "./bootstrap-service"
@@ -26,7 +26,7 @@ export interface Interface {
   readonly provide: <A, E, R>(input: LoadInput, effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/InstanceStore") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/InstanceStore") {}
 
 export const use = serviceUse(Service)
 

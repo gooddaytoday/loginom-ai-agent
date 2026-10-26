@@ -84,8 +84,8 @@ reinstall diagnostic, отсутствие bundled skills/команд и вне
 Это контролируемая повреждённая копия native Desktop, отдельная от проверки
 неизменного установленного артефакта.
 
-Native TUI проверяет `packages/agent/test/cli/tui/package-docs-pty.py`:
-из `packages/agent` задать абсолютные `--binary`, новый `--artifacts` и
+Native TUI проверяет `packages/opencode/test/cli/tui/package-docs-pty.py`:
+из `packages/opencode` задать абсолютные `--binary`, новый `--artifacts` и
 `--attachment paste`/`mention` либо `--text-permission allow`/`deny`.
 `--reserved-diagnostics skills`/`commands` создаёт только собственные внешние
 коллизии и требует видимое предупреждение. `--modified-skill` вместе с paste
@@ -94,7 +94,7 @@ resources и CLI_BUNDLE. Python — внешний test driver; продукт �
 поставляемый Node. Provider управляемый, естественная активация проверяется
 отдельно; sampling процессов и profile cleanup сохраняются в evidence.
 
-CLI startup/Help/exit проверить из `packages/agent` командой
+CLI startup/Help/exit проверить из `packages/opencode` командой
 `bun test test/cli/standalone-preflight.test.ts -t 'ordinary standalone chat reaches|real Help refusal|lazy scenario preparation|Help preflight stays'`
 с абсолютными `LOGINOM_AI_AGENT_TEST_CLI_BIN` и `LOGINOM_AI_AGENT_TEST_NODE`.
 Native режим покрывает восемь случаев через compiled ресурсы: обычный чат без

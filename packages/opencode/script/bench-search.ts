@@ -1,8 +1,8 @@
 import { Effect } from "effect"
-import { Fff } from "@loginom-ai-agent/core/filesystem/fff.bun"
+import { Fff } from "@opencode-ai/core/filesystem/fff.bun"
 import { AppRuntime } from "@/effect/app-runtime"
-import { FileSystem } from "@loginom-ai-agent/core/filesystem"
-import { AbsolutePath } from "@loginom-ai-agent/core/schema"
+import { FileSystem } from "@opencode-ai/core/filesystem"
+import { AbsolutePath } from "@opencode-ai/core/schema"
 import { InstanceStore } from "@/project/instance-store"
 
 const dir = AbsolutePath.make(process.cwd())

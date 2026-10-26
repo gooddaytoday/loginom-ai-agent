@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { DateTime, Effect } from "effect"
 import path from "path"
 import { TRUNCATION_DIR, TRUNCATION_LOCK } from "@/tool/truncation-dir"

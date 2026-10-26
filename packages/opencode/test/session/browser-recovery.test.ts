@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
-import { SessionV1 } from "@loginom-ai-agent/core/v1/session"
-import { ProviderV2 } from "@loginom-ai-agent/core/provider"
-import { ModelV2 } from "@loginom-ai-agent/core/model"
+import { SessionV1 } from "@opencode-ai/core/v1/session"
+import { ProviderV2 } from "@opencode-ai/core/provider"
+import { ModelV2 } from "@opencode-ai/core/model"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { BrowserRecovery } from "../../src/session/browser-recovery"
 

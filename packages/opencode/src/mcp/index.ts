@@ -1,8 +1,8 @@
 import path from "node:path"
 import { pathToFileURL } from "node:url"
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { ConfigV1 } from "@loginom-ai-agent/core/v1/config/config"
-import { serviceUse } from "@loginom-ai-agent/core/effect/service-use"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
+import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import { Client, type ClientOptions } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js"
@@ -16,11 +16,11 @@ import {
   ToolListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js"
 import { Config } from "@/config/config"
-import { ConfigMCPV1 } from "@loginom-ai-agent/core/v1/config/mcp"
-import { NamedError } from "@loginom-ai-agent/core/util/error"
-import { InstallationVersion } from "@loginom-ai-agent/core/installation/version"
+import { ConfigMCPV1 } from "@opencode-ai/core/v1/config/mcp"
+import { NamedError } from "@opencode-ai/core/util/error"
+import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { withTimeout } from "@/util/timeout"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { McpOAuthPendingProvider, McpOAuthProvider, OAUTH_CALLBACK_PATH } from "./oauth-provider"
 import { McpOAuthCallback } from "./oauth-callback"
 import { McpAuth } from "./auth"
@@ -30,9 +30,9 @@ import { Cause, Effect, Exit, Layer, Context, Schema, Stream } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
-import { CrossSpawnSpawner } from "@loginom-ai-agent/core/cross-spawn-spawner"
+import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { McpCatalog } from "./catalog"
-import { McpEvent } from "@loginom-ai-agent/schema/mcp-event"
+import { McpEvent } from "@opencode-ai/schema/mcp-event"
 import { McpBrowser } from "./browser"
 
 const DEFAULT_TIMEOUT = 30_000
@@ -197,7 +197,7 @@ export interface Interface {
   readonly getAuthStatus: (mcpName: string) => Effect.Effect<AuthStatus>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/MCP") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/MCP") {}
 
 export const use = serviceUse(Service)
 

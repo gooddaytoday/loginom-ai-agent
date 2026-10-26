@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events"
 import { isAbsolute } from "node:path"
 import { Option, Schema } from "effect"
-import { Loginom } from "@loginom-ai-agent/schema/loginom"
+import { Loginom } from "@opencode-ai/schema/loginom"
 import { createLoginomHost } from "./host"
 import { loginomHostPort, type HostPort } from "./host-port"
 import { cliCredentials } from "./connection/cli-credentials"

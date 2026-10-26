@@ -1,10 +1,10 @@
 import { standaloneCancellation } from "../standalone-cancellation"
 import { EOL } from "os"
 import { Effect } from "effect"
-import { ModelsDev } from "@loginom-ai-agent/core/models-dev"
+import { ModelsDev } from "@opencode-ai/core/models-dev"
 import { effectCmd, fail } from "../effect-cmd"
 import { UI } from "../ui"
-import { ProviderV2 } from "@loginom-ai-agent/core/provider"
+import { ProviderV2 } from "@opencode-ai/core/provider"
 
 export const ModelsCommand = effectCmd({
   cancellation: standaloneCancellation,

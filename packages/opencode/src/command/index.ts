@@ -1,4 +1,4 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import path from "path"
 import { InstanceState } from "@/effect/instance-state"
 import { EffectBridge } from "@/effect/bridge"
@@ -9,8 +9,8 @@ import { MCP } from "../mcp"
 import { Skill } from "../skill"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
-import { LegacyEvent } from "@loginom-ai-agent/schema/legacy-event"
-import { NamedError } from "@loginom-ai-agent/core/util/error"
+import { LegacyEvent } from "@opencode-ai/schema/legacy-event"
+import { NamedError } from "@opencode-ai/core/util/error"
 import { isReservedSkillName } from "@loginom-ai-agent/product/skills"
 import { EventV2Bridge } from "@/event-v2-bridge"
 
@@ -56,7 +56,7 @@ export interface Interface {
   readonly list: () => Effect.Effect<Info[]>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/Command") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/Command") {}
 
 const layer = Layer.effect(
   Service,

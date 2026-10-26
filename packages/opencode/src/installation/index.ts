@@ -1,12 +1,12 @@
 import { Product } from "@loginom-ai-agent/product"
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { AppNodeBuilder } from "@loginom-ai-agent/core/effect/app-node-builder"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { Effect, Layer, Schema, Context } from "effect"
-import { serviceUse } from "@loginom-ai-agent/core/effect/service-use"
-import { makeRuntime } from "@loginom-ai-agent/core/effect/runtime"
+import { serviceUse } from "@opencode-ai/core/effect/service-use"
+import { makeRuntime } from "@opencode-ai/core/effect/runtime"
 import semver from "semver"
-import { InstallationChannel, InstallationVersion } from "@loginom-ai-agent/core/installation/version"
-import { InstallationEvent } from "@loginom-ai-agent/schema/installation-event"
+import { InstallationChannel, InstallationVersion } from "@opencode-ai/core/installation/version"
+import { InstallationEvent } from "@opencode-ai/schema/installation-event"
 
 export type Method = "curl" | "npm" | "yarn" | "pnpm" | "bun" | "brew" | "scoop" | "choco" | "unknown"
 
@@ -60,7 +60,7 @@ export interface Interface {
   readonly upgrade: (method: Method, target: string) => Effect.Effect<void, UpgradeFailedError>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/Installation") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/Installation") {}
 
 export const use = serviceUse(Service)
 

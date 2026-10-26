@@ -1,5 +1,5 @@
 import { rm } from "fs/promises"
-import { Database } from "@loginom-ai-agent/core/database/database"
+import { Database } from "@opencode-ai/core/database/database"
 import { disposeAllInstances } from "./fixture"
 
 export async function resetDatabase() {

@@ -1,9 +1,9 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import path from "path"
-import { Global } from "@loginom-ai-agent/core/global"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { Global } from "@opencode-ai/core/global"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Effect, Exit, Layer, Option, RcMap, Schema, Context, TxReentrantLock } from "effect"
-import { NonNegativeInt } from "@loginom-ai-agent/core/schema"
+import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { Git } from "@/git"
 
 type Migration = (dir: string, fs: FSUtil.Interface, git: Git.Interface) => Effect.Effect<void, FSUtil.Error>
@@ -58,7 +58,7 @@ export interface Interface {
   readonly list: (prefix: string[]) => Effect.Effect<string[][], FSUtil.Error>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/Storage") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/Storage") {}
 
 function file(dir: string, key: string[]) {
   return path.join(dir, ...key) + ".json"

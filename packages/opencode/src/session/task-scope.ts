@@ -1,4 +1,4 @@
-import type { SessionV1 } from "@loginom-ai-agent/core/v1/session"
+import type { SessionV1 } from "@opencode-ai/core/v1/session"
 import type { Schema } from "effect"
 import { HostTaskScope } from "@loginom-ai-agent/loginom-host/task-scope"
 import { MessageID, type PartID, type SessionID } from "./schema"

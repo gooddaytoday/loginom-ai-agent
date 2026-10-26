@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@loginom-ai-agent/schema",
+  "name": "@opencode-ai/schema",
   "private": true,
   "type": "module",
   "license": "MIT",

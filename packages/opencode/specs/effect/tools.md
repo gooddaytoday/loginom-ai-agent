@@ -1,6 +1,6 @@
 # Tool migration
 
-Practical reference for the current tool-migration state in `packages/agent`.
+Practical reference for the current tool-migration state in `packages/opencode`.
 
 ## Status
 
@@ -26,7 +26,7 @@ That means a tool does not need a separate `Tool.defineEffect(...)` helper to co
 
 ## Tests
 
-Tool tests should use the existing Effect helpers in `packages/agent/test/lib/effect.ts`:
+Tool tests should use the existing Effect helpers in `packages/opencode/test/lib/effect.ts`:
 
 - Use `testEffect(...)` / `it.live(...)` instead of creating fake local wrappers around effectful tools.
 - Yield the real tool export, then initialize it: `const info = yield* ReadTool`, `const tool = yield* info.init()`.

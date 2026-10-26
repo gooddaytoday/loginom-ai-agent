@@ -11,9 +11,9 @@ import type {
   ToolPart,
   FilePart,
   AgentPart,
-} from "@loginom-ai-agent/sdk/v2"
+} from "@opencode-ai/sdk/v2"
 import { DataProvider } from "../context/data"
-import { FileComponentProvider } from "@loginom-ai-agent/ui/context/file"
+import { FileComponentProvider } from "@opencode-ai/ui/context/file"
 import { SessionTurn } from "./session-turn"
 
 // ---------------------------------------------------------------------------

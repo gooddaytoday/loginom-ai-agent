@@ -2,27 +2,27 @@ export * as TuiConfig from "./tui"
 
 import path from "path"
 import { mergeDeep, unique } from "remeda"
-import { AppNodeBuilder } from "@loginom-ai-agent/core/effect/app-node-builder"
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
+import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Cause, Context, Effect, Fiber, Layer } from "effect"
 import { ConfigParse } from "@/config/parse"
 import * as ConfigPaths from "@/config/paths"
 import { migrateTuiConfig } from "./tui-migrate"
 import { resolveHostAttentionSoundPaths } from "./tui-host-attention"
-import { Flag } from "@loginom-ai-agent/core/flag/flag"
-import { isRecord } from "@loginom-ai-agent/tui/util/record"
-import { Global } from "@loginom-ai-agent/core/global"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { Flag } from "@opencode-ai/core/flag/flag"
+import { isRecord } from "@opencode-ai/tui/util/record"
+import { Global } from "@opencode-ai/core/global"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { CurrentWorkingDirectory } from "./tui-cwd"
 import { ConfigPlugin } from "@/config/plugin"
-import { TuiKeybind } from "@loginom-ai-agent/tui/config/keybind"
-import { InstallationLocal, InstallationVersion } from "@loginom-ai-agent/core/installation/version"
-import { makeRuntime } from "@loginom-ai-agent/core/effect/runtime"
+import { TuiKeybind } from "@opencode-ai/tui/config/keybind"
+import { InstallationLocal, InstallationVersion } from "@opencode-ai/core/installation/version"
+import { makeRuntime } from "@opencode-ai/core/effect/runtime"
 import { Filesystem } from "@/util/filesystem"
 import { ConfigVariable } from "@/config/variable"
-import { Npm } from "@loginom-ai-agent/core/npm"
+import { Npm } from "@opencode-ai/core/npm"
 import { FormatError, FormatUnknownError } from "@/cli/error"
-import { TuiConfig } from "@loginom-ai-agent/tui/config"
+import { TuiConfig } from "@opencode-ai/tui/config"
 
 export const Info = TuiConfig.Info
 export type Info = TuiConfig.Info
@@ -44,7 +44,7 @@ export interface Interface {
   readonly waitForDependencies: () => Effect.Effect<void>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/TuiConfig") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/TuiConfig") {}
 
 function pluginScope(file: string, ctx: { directory: string }): ConfigPlugin.Scope {
   if (Filesystem.contains(ctx.directory, file)) return "local"
@@ -238,7 +238,7 @@ const layer = Layer.effect(
           .install(dir, {
             add: [
               {
-                name: "@loginom-ai-agent/plugin",
+                name: "@opencode-ai/plugin",
                 version: InstallationLocal ? undefined : InstallationVersion,
               },
             ],

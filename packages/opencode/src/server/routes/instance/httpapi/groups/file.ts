@@ -1,5 +1,5 @@
-import { FileSystem } from "@loginom-ai-agent/core/filesystem"
-import { NonNegativeInt } from "@loginom-ai-agent/core/schema"
+import { FileSystem } from "@opencode-ai/core/filesystem"
+import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { LSP } from "@/lsp/lsp"
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"

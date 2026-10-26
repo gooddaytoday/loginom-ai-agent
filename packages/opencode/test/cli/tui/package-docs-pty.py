@@ -1,6 +1,6 @@
 """Linux native TUI acceptance; scripted provider tests mechanics, not model routing.
 
-Run from packages/agent with --binary /absolute/CLI and a new --artifacts directory.
+Run from packages/opencode with --binary /absolute/CLI and a new --artifacts directory.
 Python is the external test driver; the product executes the shipped Node scripts.
 """
 

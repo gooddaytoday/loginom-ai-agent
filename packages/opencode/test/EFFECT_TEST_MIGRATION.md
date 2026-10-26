@@ -127,7 +127,7 @@ test harness.
 8. Preserve concurrency with fibers, `Deferred`, and
    `Effect.all(..., { concurrency: "unbounded" })`; do not accidentally
    serialize formerly parallel behavior.
-9. Run the focused test file and `bun typecheck` from `packages/agent`.
+9. Run the focused test file and `bun typecheck` from `packages/opencode`.
 
 ## Good Examples
 
@@ -149,7 +149,7 @@ Do not maintain a long file checklist here. It goes stale quickly.
 When looking for the next target, search for current anti-patterns:
 
 ```bash
-git grep -n "Effect.runPromise\|ManagedRuntime\|Promise.withResolvers\|Bun.sleep\|withTestInstance" -- packages/agent/test
+git grep -n "Effect.runPromise\|ManagedRuntime\|Promise.withResolvers\|Bun.sleep\|withTestInstance" -- packages/opencode/test
 ```
 
 Then choose one file or one small cluster, keep the PR focused, and mention

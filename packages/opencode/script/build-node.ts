@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { Script } from "@loginom-ai-agent/script"
+import { Script } from "@opencode-ai/script"
 import path from "path"
 import { fileURLToPath } from "url"
 

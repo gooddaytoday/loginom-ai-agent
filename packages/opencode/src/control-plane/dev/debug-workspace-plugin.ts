@@ -1,4 +1,4 @@
-import type { Plugin } from "@loginom-ai-agent/plugin"
+import type { Plugin } from "@opencode-ai/plugin"
 import { rename, writeFile } from "node:fs/promises"
 import { randomInt } from "node:crypto"
 import { setTimeout as sleep } from "node:timers/promises"

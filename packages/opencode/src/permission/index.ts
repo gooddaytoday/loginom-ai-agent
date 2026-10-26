@@ -1,10 +1,10 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { ConfigPermissionV1 } from "@loginom-ai-agent/core/v1/config/permission"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { ConfigPermissionV1 } from "@opencode-ai/core/v1/config/permission"
 import { InstanceState } from "@/effect/instance-state"
-import { Wildcard } from "@loginom-ai-agent/core/util/wildcard"
+import { Wildcard } from "@opencode-ai/core/util/wildcard"
 import { Deferred, Effect, Layer, Context } from "effect"
 import os from "os"
-import { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
+import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { EventV2Bridge } from "@/event-v2-bridge"
 
 export const Event = PermissionV1.Event
@@ -37,7 +37,7 @@ export function evaluate(permission: string, pattern: string, ...rulesets: Permi
   )
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/Permission") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
 
 const layer = Layer.effect(
   Service,

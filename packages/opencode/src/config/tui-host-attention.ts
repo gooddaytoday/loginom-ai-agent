@@ -1,5 +1,5 @@
-import { TuiConfig } from "@loginom-ai-agent/tui/config"
-import { isRecord } from "@loginom-ai-agent/tui/util/record"
+import { TuiConfig } from "@opencode-ai/tui/config"
+import { isRecord } from "@opencode-ai/tui/util/record"
 import { Filesystem } from "@/util/filesystem"
 import { Schema } from "effect"
 

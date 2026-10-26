@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@loginom-ai-agent/tui",
+  "name": "@opencode-ai/tui",
   "version": "1.18.31",
   "private": true,
   "type": "module",
@@ -48,11 +48,11 @@
     "./component/register-spinner": "./src/component/register-spinner.ts"
   },
   "dependencies": {
-    "@loginom-ai-agent/core": "workspace:*",
+    "@opencode-ai/core": "workspace:*",
     "@loginom-ai-agent/product": "workspace:*",
-    "@loginom-ai-agent/plugin": "workspace:*",
-    "@loginom-ai-agent/sdk": "workspace:*",
-    "@loginom-ai-agent/ui": "workspace:*",
+    "@opencode-ai/plugin": "workspace:*",
+    "@opencode-ai/sdk": "workspace:*",
+    "@opencode-ai/ui": "workspace:*",
     "@opentui/core": "catalog:",
     "@opentui/keymap": "catalog:",
     "@opentui/solid": "catalog:",

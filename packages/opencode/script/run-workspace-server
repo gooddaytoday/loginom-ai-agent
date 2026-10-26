@@ -7,9 +7,9 @@
 // *Important*: make sure you add the debug workspace plugin first.
 // In `.loginom-ai-agent/loginom-ai-agent.jsonc` in the root of this project add:
 //
-// "plugin": ["../packages/agent/src/control-plane/dev/debug-workspace-plugin.ts"]
+// "plugin": ["../packages/opencode/src/control-plane/dev/debug-workspace-plugin.ts"]
 //
-// Afterwards, run `./packages/agent/script/run-workspace-server`
+// Afterwards, run `./packages/opencode/script/run-workspace-server`
 
 import { stat } from "node:fs/promises"
 import { setTimeout as sleep } from "node:timers/promises"

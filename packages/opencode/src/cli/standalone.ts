@@ -2,7 +2,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { Product, productChannel } from "@loginom-ai-agent/product"
 import { cliProfile } from "@loginom-ai-agent/product/cli-profile"
-import { InstallationChannel, InstallationVersion } from "@loginom-ai-agent/core/installation/version"
+import { InstallationChannel, InstallationVersion } from "@opencode-ai/core/installation/version"
 import { withStandaloneCancellation } from "./standalone-cancellation"
 import { acquireProfile, profileEnvironment } from "./profile"
 

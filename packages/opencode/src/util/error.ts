@@ -1,1 +1,1 @@
-export * from "@loginom-ai-agent/tui/util/error"
+export * from "@opencode-ai/tui/util/error"

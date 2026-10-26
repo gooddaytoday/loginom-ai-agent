@@ -1,4 +1,4 @@
-import { Flag } from "@loginom-ai-agent/core/flag/flag"
+import { Flag } from "@opencode-ai/core/flag/flag"
 import { productChannel, productSlug } from "@loginom-ai-agent/product"
 import { Effect } from "effect"
 import path from "path"

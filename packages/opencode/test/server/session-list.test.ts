@@ -1,14 +1,14 @@
 import { afterEach, describe, expect } from "bun:test"
 import { Effect } from "effect"
-import { AppNodeBuilder } from "@loginom-ai-agent/core/effect/app-node-builder"
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { Database } from "@loginom-ai-agent/core/database/database"
-import { SessionProjector } from "@loginom-ai-agent/core/session/projector"
+import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { Database } from "@opencode-ai/core/database/database"
+import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { Session as SessionNs } from "@/session/session"
 import { disposeAllInstances, provideInstance, TestInstance } from "../fixture/fixture"
 import { mkdir } from "fs/promises"
 import path from "path"
-import { SessionTable } from "@loginom-ai-agent/core/session/sql"
+import { SessionTable } from "@opencode-ai/core/session/sql"
 import { eq } from "drizzle-orm"
 import { testEffect } from "../lib/effect"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -165,7 +165,7 @@ describe("session.list", () => {
         const pathIDs = (yield* SessionNs.Service.use((session) =>
           session.list({
             directory: path.join(test.directory, "packages", "app"),
-            path: "packages/agent/src",
+            path: "packages/opencode/src",
           }),
         )).map((session) => session.id)
         expect(pathIDs).not.toContain(parent.id)
@@ -218,7 +218,7 @@ describe("session.list", () => {
         const pathIDs = (yield* SessionNs.Service.use((session) =>
           session.list({
             directory: path.join(test.directory, "packages", "opencode", "src"),
-            path: "packages/agent/src",
+            path: "packages/opencode/src",
           }),
         )).map((session) => session.id)
         expect(pathIDs).toContain(current.id)

@@ -13,7 +13,7 @@ const enabledByExperimental = (name: string) =>
     Config.map((flags) => Option.getOrElse(flags.enabled, () => flags.experimental)),
   )
 
-export class Service extends ConfigService.Service<Service>()("@loginom-ai-agent/RuntimeFlags", {
+export class Service extends ConfigService.Service<Service>()("@opencode/RuntimeFlags", {
   autoShare: bool("LOGINOM_AI_AGENT_AUTO_SHARE"),
   pure: bool("LOGINOM_AI_AGENT_PURE"),
   disableDefaultPlugins: bool("LOGINOM_AI_AGENT_DISABLE_DEFAULT_PLUGINS"),
@@ -76,4 +76,4 @@ export const layer = (overrides: Partial<Info> = {}) =>
 export const node = LayerNode.make({ service: Service, layer: Service.layer.pipe(Layer.orDie), deps: [] })
 
 export * as RuntimeFlags from "./runtime-flags"
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"

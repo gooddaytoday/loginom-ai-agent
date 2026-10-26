@@ -1,9 +1,9 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { InstanceState } from "@/effect/instance-state"
 import { SessionID } from "./schema"
 import { Effect, Layer, Context } from "effect"
 import { EventV2Bridge } from "@/event-v2-bridge"
-import { SessionStatusEvent } from "@loginom-ai-agent/schema/session-status-event"
+import { SessionStatusEvent } from "@opencode-ai/schema/session-status-event"
 
 export const Info = SessionStatusEvent.Info
 export type Info = SessionStatusEvent.Info
@@ -16,7 +16,7 @@ export interface Interface {
   readonly set: (sessionID: SessionID, status: Info) => Effect.Effect<void>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/SessionStatus") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/SessionStatus") {}
 
 const layer = Layer.effect(
   Service,

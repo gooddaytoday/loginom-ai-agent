@@ -1,6 +1,6 @@
-import { Dialog } from "@loginom-ai-agent/ui/dialog"
-import { useDialog } from "@loginom-ai-agent/ui/context/dialog"
-import { ServerConnection, SettingsLoginom, useServer, useSettings, useTabs } from "@loginom-ai-agent/app"
+import { Dialog } from "@opencode-ai/ui/dialog"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { ServerConnection, SettingsLoginom, useServer, useSettings, useTabs } from "@opencode-ai/app"
 import { onMount } from "solid-js"
 
 export function DesktopFirstLaunchOnboarding(props: { initialUrl: string; onLoaded: () => void }) {

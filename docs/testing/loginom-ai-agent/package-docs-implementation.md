@@ -1380,7 +1380,7 @@ renderer создаёт File из readPickedFile, а main ограничивае
 Ограничение сохранено явно; существующие picker tests **8 PASS**, 11 assertions
 (desktop-picker-limit-regression.log). Installed Desktop picker ещё не проверен.
 
-Повтор проверки из `packages/agent`, с неизменным испытуемым executable и
+Повтор проверки из `packages/opencode`, с неизменным испытуемым executable и
 новым родительским каталогом результатов для каждого приёмочного запуска:
 
 ```bash
@@ -1478,7 +1478,7 @@ bash/task/prepare. Browser runtime directory отсутствует. Отдел�
 монитор в эти новые тесты не добавлен; это не доказательство отсутствия любого
 кратковременного exec, наблюдение процессов ранее выполнено в native PTY.
 
-Проверки в `packages/agent`:
+Проверки в `packages/opencode`:
 
 ```bash
 LOGINOM_AI_AGENT_TEST_NODE=/home/kiselev/.local/share/loginom-ai-agent-acceptance/package-docs-20261006/node-v24.19.0-linux-x64/bin/node bun test test/cli/package-docs-pipeline.test.ts
@@ -1496,7 +1496,7 @@ shipped resource tree в собственный временный bundle, ме�
 явно разрешены в собственном тестовом профиле. Help проходит реальный MCP
 транспорт и schema discovery, ответы и выбор инструментов контролируются.
 
-Native-команда из `packages/agent` (каталог артефактов создать новым заранее):
+Native-команда из `packages/opencode` (каталог артефактов создать новым заранее):
 
 ```bash
 LOGINOM_AI_AGENT_TEST_CLI_BIN=/home/kiselev/.local/share/loginom-ai-agent-acceptance/package-docs-20261006/candidate-05d3d144b/payload/bin/loginom-ai-agent-cli LOGINOM_AI_AGENT_TEST_ARTIFACTS=/home/kiselev/.local/share/loginom-ai-agent-acceptance/package-docs-20261006/candidate-05d3d144b/full-docs-pipeline bun test test/cli/package-docs-pipeline.test.ts
@@ -1536,7 +1536,7 @@ narrative, выбор реальной моделью, live Help или уста
 
 ## Product routing corpus для живой модели
 
-Подготовлен `packages/agent/test/cli/package-docs-routing/cases.json`: 20
+Подготовлен `packages/opencode/test/cli/package-docs-routing/cases.json`: 20
 естественных русских запросов, 10 docs / 5 scenario / 5 default. Включены локальный
 путь, вложение, PDF/Word/Markdown, `.lgp` + PNG, кириллица/пробелы, внешний путь
 с permission refusal в run, отсутствующий файл/вход и ссылка только на текущий
@@ -1547,7 +1547,7 @@ narrative, выбор реальной моделью, live Help или уста
 выбора. README фиксирует отправку настоящих file parts, собственный server
 namespace и сбор доказательств для каждого повтора.
 
-Одноразовая статическая проверка из `packages/agent` подтвердила уникальные IDs,
+Одноразовая статическая проверка из `packages/opencode` подтвердила уникальные IDs,
 соотношение 10/5/5, существование всех трёх fixtures, их bytes/hashes, полный
 набор bindings и отсутствие slash-команд среди natural prompts. Prettier и
 `git diff --check` PASS. JSON отчёт сохранён в собственном acceptance-каталоге:
@@ -2284,7 +2284,7 @@ Signal collector повторил три проблемных файла **STABL
 каждый запуск **38 PASS / 9 FAIL**, 3.354 / 3.948 / 2.066 s, изолированные
 HOME/XDG, исходные hashes неизменны. Report `tui-source-signal-36f7cdf82/report.md`.
 Read-only history связывает значения со старым identity commit `d848db933`:
-ключ темы уже `loginom-ai-agent`, пути уже `packages/agent`, а ожидания остались
+ключ темы уже `loginom-ai-agent`, пути уже `packages/opencode`, а ожидания остались
 прежними; текстовые замены в snapshots не пересчитали переносы при width=72.
 Это диагноз устаревших тестов. Старые SHA не запускались, поэтому этот commit
 не объявляется экспериментально установленным первым падающим SHA.

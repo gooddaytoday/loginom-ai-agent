@@ -5,7 +5,7 @@
 // `LOGINOM_AI_AGENT_CONFIG_CONTENT` providing the test provider config inline.
 import { describe, expect } from "bun:test"
 import { Effect, Schema } from "effect"
-import { SessionV1 } from "@loginom-ai-agent/core/v1/session"
+import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { pathToFileURL } from "node:url"
 import { reply } from "../../lib/llm-server"
 import { cliIt } from "../../lib/cli-process"

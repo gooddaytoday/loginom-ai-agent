@@ -1,5 +1,5 @@
 import path from "path"
-import { Global } from "@loginom-ai-agent/core/global"
+import { Global } from "@opencode-ai/core/global"
 import { Semaphore } from "effect"
 
 export const TRUNCATION_DIR = path.join(Global.Path.data, "tool-output")

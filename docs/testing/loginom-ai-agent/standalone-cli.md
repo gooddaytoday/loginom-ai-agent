@@ -162,7 +162,7 @@ SHA256 `19b89496c4d39570ecad80ca6ac99c37a77c95179a0463f8a1b85fc48a276df1`.
 - Вложения file/data URL: полный snapshot остаётся для Dock, модель получает
   ограниченный текст (2000 строк / 50 KiB, до 2000 символов на строку).
 - Неверный `run --fork` и пустой ввод дают `CLI_ARGUMENT_INVALID` / 2.
-- Проверки packages/agent: 70 passed + 1 existing skip в первом проходе
+- Проверки packages/opencode: 70 passed + 1 existing skip в первом проходе
   standalone/standalone-status/session-prompt; 20 passed в финальном проходе
   standalone/standalone-status/run-outcome/loginom-result/attachment-preview.
   Повторный package `bun typecheck` и `git diff --check` — PASS.
@@ -282,7 +282,7 @@ headed окна закрыты. Старый failed delivery/recovery не пе�
 
 Этап 1 в работе: Product paths для трёх ОС, консервативный guard, ранний entry,
 изоляция Global и inherited config/auth/DB. `help/version` доступны через
-`bun run src/standalone.ts --help` из `packages/agent`. Default TUI dispatcher и private worker bridge подключены в исходниках;
+`bun run src/standalone.ts --help` из `packages/opencode`. Default TUI dispatcher и private worker bridge подключены в исходниках;
 Source PTY startup/exit проверен с runtime fixture; prompt/tool и native artifact
 TUI acceptance пока не выполнены. `run` проходит Loginom preflight до импорта backend и вызывает
 существующий v1 RunCommand. Management-команды `loginom`
@@ -309,15 +309,15 @@ MessagePort close в проверенном сценарии, несмотря �
 Проверки запускаются из package directories:
 
 - `packages/product`: `bun test`, `bun typecheck`.
-- `packages/agent`: `bun test test/cli/profile.test.ts test/cli/standalone.test.ts --timeout 30000`, `bun typecheck`.
-- `packages/agent`: `bun test test/cli/standalone-status.test.ts --timeout 30000` — реальный entry + построенный Node host, fixture bundle с комплектным Node; это не установленный архив.
+- `packages/opencode`: `bun test test/cli/profile.test.ts test/cli/standalone.test.ts --timeout 30000`, `bun typecheck`.
+- `packages/opencode`: `bun test test/cli/standalone-status.test.ts --timeout 30000` — реальный entry + построенный Node host, fixture bundle с комплектным Node; это не установленный архив.
 - `packages/core`: `bun typecheck`.
 
 Для development status заранее собрать host командой из `packages/loginom-host`:
 `bun script/build-node-host.ts <absolute-bundle-root>/host`. В bundle уже должен
 присутствовать `bin/node` (Windows: `bin/node.exe`) из закреплённых ресурсов.
 Передать абсолютный `LOGINOM_AI_AGENT_CLI_BUNDLE` и отдельный `LOGINOM_AI_AGENT_CLI_PROFILE`,
-затем из `packages/agent` выполнить `bun run dev:cli loginom status --format json`.
+затем из `packages/opencode` выполнить `bun run dev:cli loginom status --format json`.
 Это ручной development путь; подписи/hashes manifest и installed auto-discovery пока не проверяются.
 
 Автоматизация setup: `loginom setup --stdin-json --format json` принимает объект
@@ -381,7 +381,7 @@ backend/host/runtime/browser. Команда `loginom recover` подтверж�
 
 ### Source PTY startup/exit
 
-Из корня проекта: `python3 packages/agent/test/cli/tui/standalone-pty.py`.
+Из корня проекта: `python3 packages/opencode/test/cli/tui/standalone-pty.py`.
 Это ручной Linux acceptance harness, а не Bun test. Он собирает host во временный
 bundle, выполняет setup с fixture key, запускает настоящее TUI в PTY, закрывает
 provider modal через Escape и выходит Ctrl+D. Проверяет exit 0, освобождение guard
@@ -390,7 +390,7 @@ provider modal через Escape и выходит Ctrl+D. Проверяет ex
 не используются и не считаются проверенными.
 
 
-`python3 packages/agent/test/cli/tui/standalone-pty.py --prompt` добавляет локальный
+`python3 packages/opencode/test/cli/tui/standalone-pty.py --prompt` добавляет локальный
 HTTP-provider и Loginom tool fixture. Проверяет tools schema, фактический вызов
 через worker/private host, provider continuation, сохранённый tool/text в SQLite,
 выход и отсутствие дочерних процессов. Это source TUI prompt acceptance;
@@ -399,7 +399,7 @@ external model auth и живой Loginom oracle не проверяются.
 
 ### Native binary checkpoint
 
-Из `packages/agent`, Bun версии не ниже project pin:
+Из `packages/opencode`, Bun версии не ниже project pin:
 `LOGINOM_AI_AGENT_CHANNEL=dev bun script/build.ts --standalone --single --skip-install`.
 Standalone output находится в `dist-standalone/loginom-ai-agent-cli-linux-x64/bin/`;
 обычный `dist` не затрагивается. Это только native CLI/TUI, не полный дистрибутив.
@@ -479,7 +479,7 @@ dirname, bundled Node используется явно. Это management accep
 
 ### TUI без Loginom setup
 
-`python3 packages/agent/test/cli/tui/standalone-pty.py --unconfigured` проверяет
+`python3 packages/opencode/test/cli/tui/standalone-pty.py --unconfigured` проверяет
 предложение setup и выход из TUI без model provider. Добавить `--prompt` для
 обычного чата с локальным fixture provider: Loginom tools отсутствуют, ответ
 сохраняется в SQLite, runtime не запускается. Оба source сценария прошли.
@@ -490,7 +490,7 @@ setup и его секретные поля в этих сценариях не 
 ### Полный startup setup в PTY
 
 Из корня репозитория запустить
-`python3 packages/agent/test/cli/tui/standalone-pty.py --setup --prompt`;
+`python3 packages/opencode/test/cli/tui/standalone-pty.py --setup --prompt`;
 добавить `--password` для непустого пароля. Оба source сценария прошли:
 замаскированные secrets, правильные значения на private runtime boundary, tool
 и текст в истории, штатный cleanup. Отдельный `--cancel-setup` проверяет Ctrl+C
@@ -579,7 +579,7 @@ service `com.loginom.aiagent.cli.profile-key.v1`, account = SHA256 canonical pat
 после обновления подписанного helper и packaged host остаются отдельными проверками.
 
 
-Standalone cross-build: из packages/agent используйте pinned Bun и
+Standalone cross-build: из packages/opencode используйте pinned Bun и
 `bun script/build.ts --standalone --target=win32-x64 --skip-install` с новым
 абсолютным LOGINOM_AI_AGENT_BUILD_OUTPUT. Аналогично доступен darwin-arm64.
 Нужны optional native packages соответствующего target из bun.lock. Эта команда

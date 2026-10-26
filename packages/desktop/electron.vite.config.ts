@@ -1,6 +1,6 @@
 import { sentryVitePlugin } from "@sentry/vite-plugin"
 import { defineConfig } from "electron-vite"
-import appPlugin from "@loginom-ai-agent/app/vite"
+import appPlugin from "@opencode-ai/app/vite"
 import * as fs from "node:fs/promises"
 
 const LOGINOM_AI_AGENT_SERVER_DIST = "../agent/dist/node"
@@ -57,7 +57,7 @@ const require = __cjs_mod__.createRequire(import.meta.url);
       },
       externalizeDeps: {
         include: [nodePtyPkg],
-        exclude: ["@loginom-ai-agent/product", "@loginom-ai-agent/schema", "@loginom-ai-agent/loginom-host"],
+        exclude: ["@loginom-ai-agent/product", "@opencode-ai/schema", "@loginom-ai-agent/loginom-host"],
       },
     },
     plugins: [

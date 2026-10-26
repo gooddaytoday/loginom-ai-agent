@@ -3,7 +3,7 @@
   "scope": "product-routing",
   "fixtures": {
     "lgp": "packages/loginom-host/test/fixtures/package-docs/nested.lgp",
-    "png": "packages/agent/test/tool/fixtures/large-image.png",
+    "png": "packages/opencode/test/tool/fixtures/large-image.png",
     "csv": "packages/desktop/test/loginom/fixtures/standalone-cli/A/sales.csv"
   },
   "bindings": ["local_lgp", "unicode_lgp", "missing_lgp", "server_package"],

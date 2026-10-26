@@ -1,7 +1,7 @@
 import { access } from "node:fs/promises"
 import { dirname, isAbsolute, join, resolve } from "node:path"
 import { verifyCliManifest } from "@loginom-ai-agent/loginom-host/cli-manifest"
-import { InstallationVersion } from "@loginom-ai-agent/core/installation/version"
+import { InstallationVersion } from "@opencode-ai/core/installation/version"
 
 export async function standaloneBundle() {
   const installed = resolve(dirname(process.execPath), "..")

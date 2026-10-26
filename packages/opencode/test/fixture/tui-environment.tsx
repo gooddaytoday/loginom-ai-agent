@@ -4,7 +4,7 @@ import {
   TuiStartupProvider,
   TuiTerminalEnvironmentProvider,
   type TuiPaths,
-} from "@loginom-ai-agent/tui/context/runtime"
+} from "@opencode-ai/tui/context/runtime"
 import type { ParentProps } from "solid-js"
 
 export function TestTuiContexts(
@@ -17,7 +17,7 @@ export function TestTuiContexts(
   return (
     <TuiPathsProvider
       value={{
-        cwd: props.cwd ?? props.directory ?? "/tmp/opencode/packages/agent",
+        cwd: props.cwd ?? props.directory ?? "/tmp/opencode/packages/opencode",
         home: "/tmp/opencode/home",
         state: "/tmp/opencode/state",
         worktree: "/tmp/opencode",

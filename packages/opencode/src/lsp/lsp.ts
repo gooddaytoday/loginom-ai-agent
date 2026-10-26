@@ -1,5 +1,5 @@
-import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
-import { FSUtil } from "@loginom-ai-agent/core/fs-util"
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import * as LSPClient from "./client"
 import path from "path"
@@ -11,9 +11,9 @@ import { spawn as lspspawn } from "./launch"
 import { Effect, Layer, Context, Schema } from "effect"
 import { InstanceState } from "@/effect/instance-state"
 import { containsPath } from "@/project/instance-context"
-import { NonNegativeInt } from "@loginom-ai-agent/core/schema"
+import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { RuntimeFlags } from "@/effect/runtime-flags"
-import { LspEvent } from "@loginom-ai-agent/schema/lsp-event"
+import { LspEvent } from "@opencode-ai/schema/lsp-event"
 
 export const Event = LspEvent
 
@@ -133,7 +133,7 @@ export interface Interface {
   readonly outgoingCalls: (input: LocInput) => Effect.Effect<any[]>
 }
 
-export class Service extends Context.Service<Service, Interface>()("@loginom-ai-agent/LSP") {}
+export class Service extends Context.Service<Service, Interface>()("@opencode/LSP") {}
 
 const layer = Layer.effect(
   Service,
