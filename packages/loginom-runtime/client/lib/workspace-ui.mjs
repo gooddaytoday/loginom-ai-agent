@@ -1,5 +1,4 @@
 import {readPreparedNodeContext, validatePreparedNodeContext} from './node-context.mjs';
-import {readOutputContext} from './node-output-context.mjs';
 import {captureProcessNodeFocus,restoreProcessNodeFocus} from './process-node-focus.mjs';
 
 // Execution-journal diagnostics only. Never issue refs or classify a window as
@@ -90,7 +89,7 @@ export function validateUiAction(action, snapshot) {
   return action;
 }
 
-export function workspaceUiCapability(page, task, readNodeContext, captureProcessFocus, restoreProcessFocus, readOutputsContext) {
+export function workspaceUiCapability(page, task, readNodeContext, captureProcessFocus, restoreProcessFocus) {
   // Dispatch time consumes the bound node budget; it cannot restart in the browser.
   const started = Date.now(), deadline = Math.min(task.deadline??Infinity,
     started + (task.output_settlement_read?.timeout_ms??task.settlement_timeout_ms??task.opening_timeout_ms??15000));
@@ -167,10 +166,6 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       if(restored.restored){record('process_node_focus_restored',restored.proof);binding=await readNodeContext(page,task.prepared_node_context);timeout();}
     }
     if(binding?.verified!==true)fail('PREPARED_NODE_CONTEXT_CHANGED','The prepared package, workflow or node changed: '+(binding?.reason??'surface_unavailable'));
-    if(task.output_settlement_read&&(binding.surface!=='views'||binding.tid!==task.prepared_node_context.workflow_ref.prefix+';ViewsForm'
-      ||binding.document_id!==task.prepared_node_context.document_id||binding.workflow_id!==task.prepared_node_context.workflow_ref.workflow_id
-      ||binding.node_id!==task.prepared_node_context.node.node_id))
-      fail('PREPARED_NODE_CONTEXT_CHANGED','The bound Table owner changed');
     return binding;
   };
 
@@ -3788,20 +3783,9 @@ function readRenderedInputMapping(observation) {
       }
       observed.prepared_node_context=after;
     }
-    if(task.output_settlement_read) {
-      timeout();
-      const outputs=await readOutputsContext(page,task.prepared_node_context,boundNode);
-      timeout();
-      const port=task.output_settlement_read.port_guid;
-      const pending=outputs?.verified===false&&outputs.reason==='table_card_pending'&&outputs.pending_tables?.length===1
-        &&outputs.pending_tables[0].port_guid===port&&observed.ui.masks.length>0;
-      if(!observed.authenticated||observed.origin!==task.expected_origin||observed.loginom_build!==task.expected_build
-        ||observed.wizard?.status!=='absent'||observed.ui.dialogs.length||observed.ui.truncated?.dialogs||observed.ui.truncated?.masks
-        ||observed.ui.masks.some(m=>m.kind!=='busy'||m.dialog_ref||m.target_tid!==task.prepared_node_context.workflow_ref.prefix+';ViewsForm')
-        ||!(outputs?.verified===true||pending)||outputs.surface!=='views'
-        ||outputs.port_panels?.filter(p=>p.port_guid===port).length!==1)
-        fail('PREPARED_NODE_CONTEXT_CHANGED','The bound Table port or blockers changed');
-    }
+    // Private Table reads change only the time allowance. Root discovery
+    // intentionally omits blockers; the procedure checks the same owner,
+    // output port and blockers on the following full observation as usual.
     if(!rediscover&&settleMasks&&task.mode==='act'
       &&(task.snapshot?.wizard?.status==='observed'||['open_wizard','begin_wizard','confirm_wizard_deactivation'].includes(task.action?.verb)))
       return waitForMasks(observed,()=>readUi(false,false,false),ownedLoadingMask);
@@ -4724,5 +4708,5 @@ export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) 
   // Trusted composite operations may supply their own fresh native read after
   // a bounded preparatory gesture. This is not a public tool parameter.
   if(snapshotArgument)return `async (page, snapshot) => (${workspaceUiCapability.toString()})(page, {...${JSON.stringify(task)},snapshot}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;
-  return `async (page) => (${workspaceUiCapability.toString()})(page, ${JSON.stringify(task)}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()}${options.output_settlement_read?', '+readOutputContext.toString():''})`;
+  return `async (page) => (${workspaceUiCapability.toString()})(page, ${JSON.stringify(task)}, ${readPreparedNodeContext.toString()}, ${captureProcessNodeFocus.toString()}, ${restoreProcessNodeFocus.toString()})`;
 }

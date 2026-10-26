@@ -7,7 +7,7 @@ import {readPreparedNodeContext} from '../lib/node-context.mjs';
 const port='58f7e6c3-511e-39d7-8853-036e0a1a7612';
 const workflow_ref={workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'flow',label:'Scenario'}]};
 const binding={document_id:'doc',workflow_ref,node:{document_id:'doc',workflow_id:'wf',node_id:'node'}};
-function replay({delay='owner',fault}={}) {
+function replay({delay='owner',fault,roots=false}={}) {
   let clock=1000,delayed=false,ownerReads=0,monotonicReads=0;const records=[],budgets=[];
   const operation={id:'table-read',deadline:601000,action:{action_key:'node.apply',revision:'1'}};
   const context=()=>({verified:true,...binding.node,surface:'views',tid:'MF;TF-1;ViewsForm'});
@@ -16,10 +16,11 @@ function replay({delay='owner',fault}={}) {
   const readOwner=async()=>{ownerReads++;slow('owner');
     if(fault==='port_owner_expiry'&&ownerReads===3)clock=operation.deadline+1;
     return {...context(),...(fault==='foreign_owner'||fault==='changed_owner'&&ownerReads>1?{node_id:'other'}:{})};};
-  const page={evaluate:async(_fn,args)=>{if(args?.binding)return outputs();slow('DOM');return {authenticated:true,origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,
+  const page={evaluate:async(_fn,args)=>{if(args?.binding)return outputs();slow('DOM');const discover=roots&&args?.discoverRoots;return {authenticated:true,origin:'http://example.test',loginom_build:'7.4.2',workflow_ref,
+    ...(discover?{observation_kind:'roots'}:{}),
     dom_epoch:{document:'dom',revision:1},wizard:{status:'absent'},scan:{complete:true},
     ui:{elements:[{tid:'MF;TF-1;ViewsForm',ref:'ui-views',allowed_actions:[]}],dialogs:fault==='dialog'?[{ref:'foreign'}]:[],
-      masks:clock<28000||fault==='foreign_mask'?[{kind:'busy',target_tid:fault==='foreign_mask'?'foreign':'MF;TF-1;ViewsForm'}]:[],truncated:{dialogs:false,masks:false}}};}};
+      masks:!discover&&(clock<28000||fault==='foreign_mask')?[{kind:'busy',target_tid:fault==='foreign_mask'?'foreign':'MF;TF-1;ViewsForm'}]:[],truncated:{dialogs:!!discover,masks:!!discover}}};}};
   const sandbox=vm.createContext({Date:{now:()=>clock},readOwner});
   const channel=createNodeProcedure({operation,preparedNodeContext:binding,targetOrigin:'http://example.test',targetBuild:'7.4.2',
     now:()=>clock,monotonicNow:()=>{monotonicReads++;return clock;},wait:async ms=>{clock+=ms;},
@@ -46,6 +47,20 @@ for(const delay of ['owner','DOM'])test('D79 reviewer 26950ms '+delay+' read set
   assert.ok(f.budgets.every(n=>n>0&&n<=35000));
   const good=f.records.filter(e=>e.phase==='node_observation_sample'&&e.readiness.satisfied);
   assert.ok(good.length>=2);assert.equal(f.records.at(-1).phase,'node_observation_completed');
+});
+// LAB-139 n1:169, n5:152, n7:138: the owner remained on ViewsForm after
+// Add while its busy mask loaded. Roots deliberately omit blocker details;
+// only the following full observation can decide readiness or authorize action.
+test('D79 cold roots omission is not a context change',async()=>{
+  const f=replay({roots:true,delay:'none'});const s=await f.run();
+  assert.equal(s.node_outputs.tables[0].view_guid,'new');
+  assert.ok(f.records.some(e=>e.phase==='node_observation_sample'&&!e.readiness.satisfied&&e.outcome.output.ui.masks.length));
+  assert.ok(f.records.filter(e=>e.phase==='node_observation_sample'&&e.readiness.satisfied).length>=2);
+});
+for(const fault of ['foreign_owner','foreign_port','foreign_mask','unknown','response_expiry'])
+test('D79 omitted roots retain full settlement refusal for '+fault,async()=>{
+  const f=replay({roots:true,delay:'none',fault});await assert.rejects(f.run());
+  assert.ok(!f.records.some(e=>e.phase==='node_observation_completed'));
 });
 for(const fault of ['foreign_owner','changed_owner','foreign_port','foreign_mask','dialog','unknown','allowance','dispatch_allowance','transport_expiry','response_expiry','port_owner_expiry'])
 test('D79 bound read refuses '+fault+' without a usable observation',async()=>{
