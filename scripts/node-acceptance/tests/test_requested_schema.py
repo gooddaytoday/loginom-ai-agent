@@ -18,6 +18,18 @@ class RequestedSchemaOracle(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout), json.loads((scenario / 'expected-demo.json').read_text()))
 
+    def test_s8_oracle_preserves_required_labels_and_independent_values(self):
+        scenario = ROOT.parent / 'demo-2026-10-22/s8-rename'
+        result = subprocess.run([sys.executable, '-B', str(scenario / 'oracle.py')], capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        expected = json.loads(result.stdout)
+        self.assertEqual(expected, json.loads((scenario / 'expected.json').read_text()))
+        demo = json.loads((scenario / 'expected-demo.json').read_text())
+        del demo['outputs'][0]['export_destination']
+        self.assertEqual(expected, demo)
+        self.assertEqual([c['label'] for c in expected['outputs'][0]['columns']], ['Регион', 'Категория', 'Выручка'])
+        self.assertTrue(all(c.get('name_any') and not c.get('label_any') for c in expected['outputs'][0]['columns']))
+
     def test_cold_references_and_wrong_csv_against_independent_oracles(self):
         with tempfile.TemporaryDirectory(prefix='requested-schema-') as directory:
             for name in ['n13', 'n18', 'n19', 'n20']:

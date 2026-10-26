@@ -46,7 +46,11 @@
           "tolerance": {
             "abs": 1e-08,
             "rel": 1e-09
-          }
+          },
+          "types": [
+            "real",
+            "integer"
+          ]
         }
       ],
       "rows": [
