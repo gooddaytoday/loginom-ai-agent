@@ -834,7 +834,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       // Its exact native navigation binding distinguishes it from the workflow.
       ||wizard.status==='absent'&&preparedNodeId&&preparedGraphTid?.startsWith(workflow?.prefix+';Graph;')
         &&preparedNavigationNode?.tid===getTid(e)&&preparedNavigationNode.label===e.textContent.trim()
-        &&e.querySelectorAll('.bg-vendor-icon-javascript').length===1)
+        &&e.querySelectorAll('.bg-vendor-icon-javascript,.bg-vendor-icon-crosstab').length===1)
       &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'
       &&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')&&!sensitive(e)
       &&(tids.get(getTid(e))??[]).length===1
