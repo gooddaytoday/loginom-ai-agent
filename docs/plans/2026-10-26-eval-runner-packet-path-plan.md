@@ -1,6 +1,6 @@
 # Один paired packet trace runner2→runner3 — Implementation Plan
 
-> Статус: план независимо принят без обязательных замечаний; исполнение NOT RUN. Свежий native вход01:42:56UTC снова завершился timeout до dispatch; новых authoritative jobs нет. Следующая штатная попытка ожидается01:57UTC, setup планируется около01:48UTC. Native команды/расписание не меняются.
+> Статус: план независимо принят; оба capture подтвердили READY около01:47UTC и продолжают работу. Server keepalive0, kernel7200с; тихое окно допустимо после01:53:58UTC. Наблюдается существующая штатная попытка около01:57UTC. Результата ещё нет; native команды/расписание не меняются.
 
 **Goal:** на одной следующей штатной native попытке отделить R2 egress от hypervisor ingress и получить проверяемую локализацию либо INCONCLUSIVE, без попытки ремонта.
 **Гипотеза наблюдения:** SYN фактической попытки покидает R2, но не достигает hypervisor; наличие host SYN или отсутствие R2 SYN опровергнет именно эту границу для данного потока, не установит первопричину.
@@ -17,13 +17,13 @@
 - Private каталоги0700, текстовые headers/metadata/stderr0600; без payload, pcap и чтения VPN-секретов. Успех native workflow не зависит от диагностики.
 
 ## Один ограниченный проход
-- [ ] **1. Revalidate need до любых effects.** Root сначала продолжает текущую proc-диагностику и сверяет последний authoritative native collector outcome; если collector прошёл или сетевой барьер больше не подтверждается, отменить trace как NOT NEEDED, не открывая SSH/capture.
+- [x] **1. Revalidate need до любых effects.** Root сначала продолжает текущую proc-диагностику и сверяет последний authoritative native collector outcome; если collector прошёл или сетевой барьер больше не подтверждается, отменить trace как NOT NEEDED, не открывая SSH/capture.
   После ревью выбрать уже существующий enabled wakeup T с запасом на setup и ≥400с до actual попытки; начать примерно T−9мин. Старые00:27/00:42 окна не использовать; новую task/wakeup не создавать и расписание не сдвигать.
   Если окно или наблюдение более не нужны/не доступны, NOT RUN и stop. Проверяемый результат — актуальная необходимость и одно подходящее штатное окно.
-- [ ] **2. Подготовить единственный control transport.** Literal R2 `10.200.9.134:22`, прежняя auth через защищённый ENV, pinned known_hosts и `StrictHostKeyChecking=yes`, без multiplexing, `ServerAliveInterval=0`, `TCPKeepAlive=no`.
+- [x] **2. Подготовить единственный control transport.** Literal R2 `10.200.9.134:22`, прежняя auth через защищённый ENV, pinned known_hosts и `StrictHostKeyChecking=yes`, без multiplexing, `ServerAliveInterval=0`, `TCPKeepAlive=no`.
   В том же SSH проверить effective server `ClientAliveInterval=0` для его user/client context и kernel TCP keepalive **>1440с**, покрывающий всю held-сессию24мин; раньше наблюдались7200с. Неподходящие gates/ошибка sudo: NOT RUN, без sysctl/config-правок и слепого повтора.
   Remote foreground parent запускает собственный `sudo timeout --kill-after=2s 1200s tcpdump`, выводит в local private files, подтверждает listening и печатает единственный READY с UTC/gates/PID/PGID/путями.
-- [ ] **3. Запустить paired host capture и тишину control SSH.** R2 capture `-i any`: BPF `tcp and host 172.16.0.29 and port 2223 and (tcp[tcpflags] & (tcp-syn|tcp-rst) != 0)`; ожидаемые source10.200.9.134/ens18 не превращать в фильтр интерфейса.
+- [x] **3. Запустить paired host capture и тишину control SSH.** R2 capture `-i any`: BPF `tcp and host 172.16.0.29 and port 2223 and (tcp[tcpflags] & (tcp-syn|tcp-rst) != 0)`; ожидаемые source10.200.9.134/ens18 не превращать в фильтр интерфейса.
   Hypervisor: `sudo -n aa-exec -p unconfined -- timeout --kill-after=2s 1200s tcpdump -i any`; BPF **`tcp and port 2223 and (tcp[tcpflags] & (tcp-syn|tcp-rst) != 0)`**, без адресного фильтра, чтобы видеть translated destination/source.
   Оба collector: `TZ=UTC`, `-n -l -tttt -v -s 96`, только текстовые headers. Записать ready/listening UTC и локальное receive-UTC; если capture не готов, INCONCLUSIVE, без замещающей пробы.
   После READY до timeout control SSH не передаёт stdout/stderr, stdin-команды или streaming headers; parent только ждёт свой capture. Root tool yields1000мс, waits≤60с, без блокирующего ожидания400с.
@@ -43,4 +43,4 @@
 - Ни packet gap, ни успех не доказывают NAT-причину, исправление, автономность или actual R3 unit result. Получение логов после окна само создаёт WG-трафик и учитывается в будущих quiet-утверждениях.
 - Две точки capture — минимум для отсутствующего сравнения; существующие foreground timeout и held tool sessions достаточны, постоянный collector/monitor не нужен.
 
-Checkpoint: точный private v2-план принят (`eval-runner-packet-path-plan-v2-independent-review.json`); fresh need — `paired-trace-fresh-need-state.json`. Два временных collectors подготовлены и проверены синтаксически, setup/capture ещё не запускались. Конфигурация и расписание сохранены; proc-диагностика EvalOps остаётся основным путём.
+Checkpoint: точный private v2-план принят; fresh need подтверждён timeout01:42:56. Оба foreground capture READY, интервалы/handles/gates — private `paired-headers-live-state.json`; ждём одну штатную попытку и завершение capture около02:07UTC. Захваты имеют timeout1200+2с; для управляющего SSH записан операторский cutoff02:11UTC с проверкой прежнего local handle, автоматического outer timeout у него нет. Новых tasks, VM observers, настроек сети или расписания нет; результат/cleanup ещё не подтверждены.
