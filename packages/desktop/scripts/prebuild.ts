@@ -7,7 +7,7 @@ import { resolveChannel } from "./utils"
 
 const channel = resolveChannel()
 const packageDirectory = resolve(import.meta.dir, "..")
-const agentDirectory = resolve(packageDirectory, "../agent")
+const agentDirectory = resolve(packageDirectory, "../opencode")
 
 await copyIcons(channel, packageDirectory)
 if (process.platform === "linux")

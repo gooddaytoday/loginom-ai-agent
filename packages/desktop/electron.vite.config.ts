@@ -3,7 +3,7 @@ import { defineConfig } from "electron-vite"
 import appPlugin from "@opencode-ai/app/vite"
 import * as fs from "node:fs/promises"
 
-const LOGINOM_AI_AGENT_SERVER_DIST = "../agent/dist/node"
+const LOGINOM_AI_AGENT_SERVER_DIST = "../opencode/dist/node"
 
 const channel = (() => {
   const raw = process.env.LOGINOM_AI_AGENT_CHANNEL
