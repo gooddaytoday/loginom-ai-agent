@@ -345,9 +345,10 @@ class RunCheckTests(unittest.TestCase):
                 pair.mkdir()
                 for role in ['worker', 'reviewer']:
                     runner.write(pair / (role + '.json'), {'loginom': {'username': 'test'}, 'package_directory': '/test'})
-                out = path / 'results'
-                argv = ['run-check.py', 'start', '--head', 'HEAD', '--scenarios', 's1', '--pair', str(pair), '--out', str(out), '--spacing', '0', '--host-load-max', '1000000']
-                inherited = dict(TMPDIR=str(launcher), TMP=str(launcher), TEMP=str(launcher), CODEX_HOME=str(launcher / 'codex'), MULTICA_TASK_ID='test')
+                out = path / ('results' if exists else '.cache/loginom-runs/123')
+                argv = ['run-check.py', 'start', '--head', 'HEAD', '--scenarios', 's1', '--pair', str(pair), '--spacing', '0', '--host-load-max', '1000000']
+                if exists: argv += ['--out', str(out)]
+                inherited = dict(TMPDIR=str(launcher), TMP=str(launcher), TEMP=str(launcher), CODEX_HOME=str(launcher / 'codex'), MULTICA_DAEMON_PORT='12345')
                 popen = subprocess.Popen
                 def detach(command, **kwargs):
                     return spawn.return_value if '_worker' in command else popen(command, **kwargs)
@@ -355,18 +356,20 @@ class RunCheckTests(unittest.TestCase):
                 try:
                     with patch.dict(os.environ, inherited), patch.object(sys, 'argv', argv), redirect_stdout(io.StringIO()), patch.object(runner.subprocess, 'Popen', side_effect=detach) as spawn:
                         spawn.return_value.pid = 123
-                        self.assertEqual(runner.main(), 0)
+                        with patch.object(runner.Path, 'home', return_value=path), patch.object(runner.time, 'time_ns', return_value=123):
+                            self.assertEqual(runner.main(), 0)
                         environment = spawn.call_args.kwargs.get('env', dict(os.environ))
                     for key in ['TMPDIR', 'TMP', 'TEMP']:
                         self.assertEqual(environment[key], str(out / 'tmp'))
                     self.assertTrue((out / 'tmp').is_dir())
                     self.assertNotIn('CODEX_HOME', environment)
-                    self.assertNotIn('MULTICA_TASK_ID', environment)
+                    self.assertEqual(environment['MULTICA_DAEMON_PORT'], '12345')
                     self.assertEqual(environment.get('HOME'), os.environ.get('HOME'))
                     self.assertEqual(runner.read(out / 'request.json')['pair'], str(pair))
                     if exists: shutil.rmtree(launcher)
                     with patch.dict(os.environ, environment, clear=True):
                         instance = runner.Runner(out)
+                        self.assertNotIn('MULTICA_DAEMON_PORT', instance.env)
                         # A real phase child must create files after the launcher's
                         # directory disappears, just as Chromium and the oracle do.
                         instance.phase('probe', [sys.executable, '-c',
