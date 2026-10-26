@@ -48,6 +48,16 @@ posixTest("resource outputs cannot overlap the canonical product skills input", 
   expect(await readFile(join(productSkillsDirectory, "loginom-automation/SKILL.md"), "utf8")).toBe(original)
 })
 
+posixTest("resource staging cannot overwrite the synthetic-data generator source", async () => {
+  const source = resolve(import.meta.dir, "../src/synthetic-data")
+  const before = await readFile(join(source, "run.ts"))
+  for (const destination of [source, join(source, "generated")]) {
+    await expect(stageResources({ destination, node: "/missing/node", browsers: "/missing/browser", target, flavor: "cli" }))
+      .rejects.toThrow("LOGINOM_BUILD_OUTPUT_OVERLAP")
+  }
+  expect(await readFile(join(source, "run.ts"))).toEqual(before)
+})
+
 posixTest("resource staging cannot overwrite the package-docs generator source", async () => {
   const source = resolve(import.meta.dir, "../src/package-docs")
   const before = await readFile(join(source, "extract.ts"))
@@ -139,9 +149,10 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
       const destination = join(root, "resources")
       await stageResources({ destination, node, browsers, target, flavor: "cli" })
       const skills = await verifyBundledSkills(destination)
-      expect(skills.map((skill) => skill.name).toSorted()).toEqual(["loginom-automation", "package-docs"])
+      expect(skills.map((skill) => skill.name).toSorted()).toEqual(["loginom-automation", "package-docs", "synthetic-data"])
       const manifest = await Bun.file(join(destination, "resource-manifest.json")).json()
       expect(manifest.files.some((file: { path: string }) => file.path === "skills/package-docs/scripts/package-docs.mjs")).toBe(true)
+      expect(manifest.files.some((file: { path: string }) => file.path === "skills/synthetic-data/scripts/synthetic-data.mjs")).toBe(true)
       expect(await Bun.file(join(destination, "THIRD_PARTY_NOTICES.md")).text()).toContain("Golos")
       const notices = await Bun.file(join(destination, "licenses/package-docs/inventory.json")).json()
       expect(notices.packages.some((pkg: { name: string }) => pkg.name === "@zip.js/zip.js")).toBe(true)
@@ -171,6 +182,8 @@ test.skipIf(!process.env.LOGINOM_AI_AGENT_TEST_NODE || !process.env.LOGINOM_AI_A
         "loginom-automation/references/workflow.md",
         "package-docs/SKILL.md",
         "package-docs/assets/fonts/OFL.txt",
+        "synthetic-data/SKILL.md",
+        "synthetic-data/references/spec.md",
       ]) {
         expect(await readFile(join(destination, "skills", path)))
           .toEqual(await readFile(join(productSkillsDirectory, path)))

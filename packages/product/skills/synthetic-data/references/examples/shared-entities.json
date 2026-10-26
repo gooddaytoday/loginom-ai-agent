@@ -1,0 +1,54 @@
+{
+  "name": "shared",
+  "seed": 4,
+  "entities": [
+    {
+      "name": "items",
+      "columns": ["id", "kind", "title"],
+      "rows": [
+        ["a", "sensor", "north"],
+        ["b", "meter", "south"],
+        ["c", "sensor", "east"]
+      ]
+    }
+  ],
+  "tables": [
+    {
+      "name": "catalog",
+      "enumerate": "items",
+      "columns": [
+        { "name": "id", "type": "linked", "link": "items" },
+        { "name": "kind", "type": "linked", "link": "items" },
+        { "name": "title", "type": "linked", "link": "items" }
+      ]
+    },
+    {
+      "name": "log",
+      "rows": 12,
+      "columns": [
+        { "name": "at", "type": "date", "from": "2024-05-01", "to": "2024-05-20" },
+        { "name": "id", "type": "linked", "link": "items" }
+      ]
+    },
+    {
+      "name": "north",
+      "rows": 8,
+      "columns": [
+        { "name": "id", "type": "linked", "link": "items" },
+        { "name": "kind", "type": "linked", "link": "items" },
+        { "name": "title", "type": "linked", "link": "items" },
+        { "name": "value", "type": "int", "min": 1, "max": 20 }
+      ]
+    },
+    {
+      "name": "south",
+      "rows": 8,
+      "columns": [
+        { "name": "id", "type": "linked", "link": "items" },
+        { "name": "kind", "type": "linked", "link": "items" },
+        { "name": "title", "type": "linked", "link": "items" },
+        { "name": "value", "type": "int", "min": 1, "max": 20 }
+      ]
+    }
+  ]
+}
