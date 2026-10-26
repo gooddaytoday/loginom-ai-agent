@@ -1060,9 +1060,13 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
     const graph=exact(binding.prefix+';ModelForm;cmpDiagram');
     if(!(card?.Controller?.FController instanceof app.ModelForm)||graph.length!==1
         ||card.Controller.FController.FDiagram?.FmxGraph?.container!==graph[0])throw Error('Saved continuation graph changed');
-    const crumbs=[...document.querySelectorAll('[data-tid^='+JSON.stringify(binding.prefix+';cnrNaviMode;b.s_')+']')]
-      .map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
-    if(crumbs.length<3||crumbs.length>32)throw Error('Saved continuation navigation unavailable');
+    const elements=[...document.querySelectorAll('[data-tid^='+JSON.stringify(binding.prefix+';cnrNaviMode;b.s_')+']')];
+    if(elements.length<3||elements.length>32)throw Error('Saved continuation navigation unavailable');
+    const workflowCrumbs=elements.filter(element=>{
+      const component=globalThis.Ext?.getCmp?.(element.id);
+      return component?.el?.dom===element&&component?._node?.data?.node===workflowNode;
+    });
+    const crumbs=elements.slice(0,elements.indexOf(workflowCrumbs[0])+1).map(e=>({tid:e.getAttribute('data-tid'),label:e.textContent.trim()}));
     const result=new Map();
     for(const record of preparation.receipts.values()) {
       if(record.phase!=='verified'||record.tab!==tabs[0]||typeof record.workflowId!=='string')continue;
@@ -1075,6 +1079,7 @@ function browserCapability(page, task, readNodeTargetGraph, rebindTargetEpochs, 
         record.nodeTargetWorkflowNode=workflowNode;
       }
       if(record.packageNode!==packageNode||record.nodeTargetWorkflowNode!==workflowNode)throw Error('Saved continuation native identity changed');
+      if(workflowCrumbs.length!==1||crumbs.length<3)throw Error('Saved continuation workflow breadcrumb unavailable');
       result.set(record.workflowId,{document_id:preparation.id,workflow_ref:{...binding,workflow_id:record.workflowId,navigation_path:crumbs}});
       if(result.size>32)throw Error('Saved continuation bound exceeded');
     }
