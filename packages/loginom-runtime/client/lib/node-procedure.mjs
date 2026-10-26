@@ -55,6 +55,7 @@ export class NodeProcedureStepError extends Error {
 // Остаток бюджета наблюдения бывает короче самого чтения; обрезанный до него
 // таймаут выдаёт исчерпание ожидания за потерю транспорта.
 const MIN_OBSERVATION_READ_MS = 5000;
+const OUTPUT_SETTLEMENT_READ_MS = 35000;
 
 const canonical = value => Array.isArray(value) ? value.map(canonical)
   : value && typeof value === 'object'
@@ -392,17 +393,27 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       snapshotTableDialog=null;
       snapshotWizardConfirmation=null;
       const step = nextStep(), id = operation.id + ':n' + step;
-      // Post-launch console settling shares the parent's clock and deadline.
+      // Bound Table and post-launch console settling share the parent's clock and deadline.
       // Other observation windows retain their monotonic elapsed-time policy.
-      const started = now(), monotonicStarted = monotonicNow();
-      const observationNow = settleProcessConsole?.quiet ? now : () => started + monotonicNow() - monotonicStarted;
+      const started = now(), monotonicStarted = settleOutputPort||settleProcessConsole?.quiet?undefined:monotonicNow();
+      const observationNow = settleOutputPort||settleProcessConsole?.quiet ? now : () => started + monotonicNow() - monotonicStarted;
       let deadline = Math.min(settleWizard?.deadline??Infinity,settleOutputPort||settleProcessConsole?.quiet?operation.deadline:Math.min(operation.deadline, started + timeoutMs));
       const readTimeout = () => Math.min(35000, Math.max(settleWizard||settleProcessConsole?.quiet?0:MIN_OBSERVATION_READ_MS, Math.min(deadline,settleWizard?.deadline??Infinity) - observationNow()));
-      const read = async (code,options) => {
-        if((settleWizard||settleProcessConsole?.quiet)&&observationNow()>=deadline)throw new NodeReadinessTimeout(condition);
+      const read = async (code,options,readDeadline=deadline) => {
+        const limit=settleOutputPort?Math.min(readDeadline,deadline,now()+OUTPUT_SETTLEMENT_READ_MS):deadline;
+        if((settleOutputPort||settleWizard||settleProcessConsole?.quiet)&&observationNow()>=limit)throw new NodeReadinessTimeout(condition);
+        if(settleOutputPort)options={...options,timeout:Math.max(1,limit-now())};
         const value=await execute(code,options);
-        if((settleWizard||settleProcessConsole?.quiet)&&observationNow()>=deadline)throw new NodeReadinessTimeout(condition);
+        if((settleOutputPort||settleWizard||settleProcessConsole?.quiet)&&observationNow()>=limit)throw new NodeReadinessTimeout(condition);
         return value;
+      };
+      const readUi = options => {
+        if(!settleOutputPort)return read(makeWorkspaceUiCode(options),{timeout:readTimeout()});
+        // Capture before transport: dispatch and browser reads consume one allowance.
+        const readDeadline=Math.min(deadline,now()+OUTPUT_SETTLEMENT_READ_MS);
+        return read(makeWorkspaceUiCode({...options,deadline:readDeadline,
+          output_settlement_read:{port_guid:settleOutputPort,timeout_ms:OUTPUT_SETTLEMENT_READ_MS}}),
+        {timeout:Math.max(1,readDeadline-now())},readDeadline);
       };
       const assertSettlement = state => {
         if(!settleWizard)return;
@@ -427,10 +438,9 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         if (observationNow() >= deadline) break;
         sampleStarted = observationNow();
         // Rediscover the root: wizard transitions and combo portals can replace it.
-        const roots = await read(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
+        const roots = await readUi({ mode: 'observe', operation_id: id,
           ...boundOptions,
-          discover_roots: true, expected_origin: targetOrigin, expected_build: targetBuild }),
-        { timeout: readTimeout() });
+          discover_roots: true, expected_origin: targetOrigin, expected_build: targetBuild });
         if (roots.status !== 'SUCCEEDED') {
           if (timeScanRefusal(roots,'workspace.observe')) {
             await entry('node_observation_scan_retried',{step,sample,internal_operation_id:id,
@@ -508,13 +518,12 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
         const nativeProcesses=readProcesses?await read(makeNodeProcessContextCode(preparedNodeContext),
           {timeout:readTimeout()}):null;
         if (observationNow() >= deadline) break;
-        result = await read(makeWorkspaceUiCode({ mode: 'observe', operation_id: id,
+        result = await readUi({ mode: 'observe', operation_id: id,
           ...boundOptions,
           root_ref: root, expected_origin: targetOrigin, expected_build: targetBuild,
           ...(importColumnPage===undefined?{}:{import_column_page:importColumnPage}),
           ...(outputColumnPage===undefined?{}:{output_column_page:outputColumnPage}),
-          ...(tableFormatPage===undefined?{}:{table_format_page:tableFormatPage}) }),
-        { timeout: readTimeout() });
+          ...(tableFormatPage===undefined?{}:{table_format_page:tableFormatPage}) });
         if(result.status==='SUCCEEDED'&&readMissingValues&&result.output.wizard?.stage==='missing_values'&&result.output.ui.dialogs.length===1){
           // Ext's message box has no root data-tid. Re-read its observed portal;
           // native field ownership and exact prompt controls are checked below.
@@ -750,7 +759,7 @@ export function createNodeProcedure({ operation, execute, record, wrapMutation,
       const persisted = await entry('node_observation_completed', { step, internal_operation_id: id,
         readiness: { policy: 'semantic_condition_v2', required_samples: confirmIdentity ? 2 : 1, identity_sha256: previousIdentity, condition, satisfied: true, timeout_ms: deadline-started, ...(settleOutputPort?{settle_output_port:settleOutputPort,deadline}:{}), ...(settleProcessConsole?.quiet?{console_epoch_settlement:true,deadline}:{}), elapsed_ms: observationNow() - started }, outcome: structuredClone(result) });
       if (!persisted?.outcome?.output) throw new Error('Node observation requires a durable journal acknowledgement');
-      if(settleWizard&&observationNow()>=Math.min(deadline,settleWizard.deadline))throw new NodeReadinessTimeout(condition);
+      if((settleOutputPort||settleWizard)&&observationNow()>=Math.min(deadline,settleWizard?.deadline??Infinity))throw new NodeReadinessTimeout(condition);
       evidenceSnapshot = structuredClone(persisted.outcome.output);
       snapshot = structuredClone(result.output);
       snapshotTableDialog=tableDialog?structuredClone(tableDialog):null;

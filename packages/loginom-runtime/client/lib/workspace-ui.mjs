@@ -92,7 +92,7 @@ export function validateUiAction(action, snapshot) {
 export function workspaceUiCapability(page, task, readNodeContext, captureProcessFocus, restoreProcessFocus) {
   // Dispatch time consumes the bound node budget; it cannot restart in the browser.
   const started = Date.now(), deadline = Math.min(task.deadline??Infinity,
-    started + (task.settlement_timeout_ms??task.opening_timeout_ms??15000));
+    started + (task.output_settlement_read?.timeout_ms??task.settlement_timeout_ms??task.opening_timeout_ms??15000));
   const trace = [], handles = [];
   let postActionRoot;
   let cancellationSurfaceReads=0;
@@ -3783,6 +3783,9 @@ function readRenderedInputMapping(observation) {
       }
       observed.prepared_node_context=after;
     }
+    // Private Table reads change only the time allowance. Root discovery
+    // intentionally omits blockers; the procedure checks the same owner,
+    // output port and blockers on the following full observation as usual.
     if(!rediscover&&settleMasks&&task.mode==='act'
       &&(task.snapshot?.wizard?.status==='observed'||['open_wizard','begin_wizard','confirm_wizard_deactivation'].includes(task.action?.verb)))
       return waitForMasks(observed,()=>readUi(false,false,false),ownedLoadingMask);
@@ -4667,8 +4670,17 @@ function readRenderedInputMapping(observation) {
 export function makeWorkspaceUiCode(options, { snapshotArgument = false } = {}) {
   if (!options || !['observe', 'act'].includes(options.mode)) throw new Error('Workspace UI mode must be observe or act');
   if(options.deadline!==undefined&&(!Number.isFinite(options.deadline)||options.deadline<=0
-    ||options.opening_timeout_ms===undefined&&options.settlement_timeout_ms===undefined))
+    ||options.opening_timeout_ms===undefined&&options.settlement_timeout_ms===undefined&&options.output_settlement_read===undefined))
     throw Error('Absolute node deadline requires a bounded opening or settlement wait');
+  if(options.output_settlement_read!==undefined) {
+    const r=options.output_settlement_read;
+    if(options.mode!=='observe'||snapshotArgument||!options.prepared_node_context||!Number.isFinite(options.deadline)||options.deadline<=0
+      ||options.opening_timeout_ms!==undefined||options.settlement_timeout_ms!==undefined||options.action!==undefined
+      ||!r||Object.keys(r).sort().join(',')!=='port_guid,timeout_ms'
+      ||typeof r.port_guid!=='string'||!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(r.port_guid)
+      ||!Number.isInteger(r.timeout_ms)||r.timeout_ms<1||r.timeout_ms>35000)
+      throw Error('Private Table read requires its exact owner, port and bounded absolute deadline');
+  }
   if(options.preserve_join_mapping!==undefined&&(options.preserve_join_mapping!==true||!options.prepared_node_context
     ||options.mode!=='act'||options.action?.verb!=='wizard_step'||options.action.expected_stage!=='join'
     ||options.snapshot?.wizard?.stage!=='input_mapping'||options.snapshot?.wizard?.owner_context?.status!=='observed'
