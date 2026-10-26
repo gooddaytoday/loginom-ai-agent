@@ -30,7 +30,10 @@ function fixture(failure, error, authenticated = false) {
     goto: async (url, options) => { assert.equal(url, "https://example.test/app/?opaque=private-query&testable=true#private-fragment")
       assert.deepEqual(options, {waitUntil:"domcontentloaded",timeout:60000}); await run("goto", "navigate") },
     locator: selector => selector.includes("btnAvatar") ? avatar : field(selector),
-    evaluate: async () => { await run("identity", "read"); return failure === "identity:mismatch" ? "other" : candidate.username },
+    evaluate: async fn => {
+      if (fn.name === "themeStylesheetMissing") return false
+      await run("identity", "read"); return failure === "identity:mismatch" ? "other" : candidate.username
+    },
   }
   return { calls, page }
 }

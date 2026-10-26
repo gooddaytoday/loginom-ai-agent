@@ -63,7 +63,7 @@ test('D17 third REST encoder does not reuse the two preceding rendered node labe
  assert.ok(children.every(child=>child.parameters.source_text===children[0].parameters.source_text));
 });
 
-test('existing connected REST refuses before creating another codec or connection and points to the same node',async()=>{
+test('D82 existing connected REST refuses before effects and directs changed queries to a separate connection',async()=>{
  for(const source of ['owned-encoder','foreign-source']) {
   const r={...request(),target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'flow',node_id:'rest'}},
    mode:'request',finish:'execute',mappings:[],read:{ports:[],sample_rows:0,require_exact_numbers:false},
@@ -82,7 +82,10 @@ test('existing connected REST refuses before creating another codec or connectio
   assert.equal(result.cleanup_complete,true);assert.equal(result.pending_phase,null);
   assert.deepEqual(calls,['observe']);assert.deepEqual(graph,before);
   assert.match(result.error.message,/next_step: dock_node_apply with a NEW operation_id/);
-  assert.match(result.error.message,/NEW integration.rest_request target/);assert.match(result.error.message,/same connection\/query_parameters/);
+  assert.match(result.error.message,/NEW integration.rest_request target/);assert.match(result.error.message,/NEW unique connection name and base_url/);
+  assert.match(result.error.message,/reuse.*only.*unchanged/);
+  assert.doesNotThrow(()=>validateNodeApplyRequest({...r,target:{kind:'new',type:'integration.rest_request'},
+   parameters:{...r.parameters,connection:{name:'Echo with Source',base_url:'https://echo.test/anything'}}},support.nodeApplyHandlers));
   assert.equal(events.some(e=>e.operation_id!==r.operation_id),false);
   assert.doesNotThrow(()=>validateNodeApplyRequest({...r,inputs:[],parameters:{},finish:'done'},support.nodeApplyHandlers));
  }

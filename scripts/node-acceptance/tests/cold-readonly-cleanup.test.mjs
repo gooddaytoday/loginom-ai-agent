@@ -60,6 +60,7 @@ for(const scenario of ['readonly','foreign path','dirty readonly','writable'])te
  assert.equal(result.status,'FAIL');assert.equal(result.error,'COLD_PACKAGE_NOT_WRITABLE');
  assert.equal(result.cleanup.package_closed,['readonly','writable'].includes(scenario));
  assert.equal(result.cleanup.logged_out,result.cleanup.package_closed);
+ assert.equal(result.cleanup.reason,scenario==='foreign path'?'CLEANUP_NOT_ADMITTED':scenario==='dirty readonly'?'UNSAVED_CHANGES':null);
  if(scenario!=='foreign path'){
   assert.equal(calls[0].diagnosticReadOnly,scenario!=='writable');
   if(scenario!=='writable'){assert.equal(calls[0].diagnosticDiscard,false);assert.equal(calls[0].diagnosticWaitForIdle,false);}
@@ -85,6 +86,7 @@ for(const scenario of ['clean','dirty','foreign','expired','already dispatched']
  else {
   const result=writes.get('cold/result.json');assert.equal(result.error,'COLD_CANCELLED');
   assert.equal(result.cleanup.package_closed,scenario==='clean');
+  assert.equal(result.cleanup.reason,scenario==='clean'?null:scenario==='dirty'?'UNSAVED_CHANGES':'CLEANUP_NOT_ADMITTED');
   assert.equal(result.cancellation.lock_may_remain,scenario!=='clean');
   if(scenario==='dirty')assert.equal(writes.get('cold/cleanup.json').reason,'UNSAVED_CHANGES');
  }
@@ -122,6 +124,8 @@ for(const scenario of ['clean writer','dirty writer','no effect','transport lost
  const result=writes.get('cold/result.json');assert.equal(result.error,'COLD_PACKAGE_OPEN_NOT_READY');
  assert.equal(result.reason,'PACKAGE_OPEN_REJECTED');assert.equal(result.status,'FAIL');
  assert.equal(result.cleanup.package_closed,['clean writer','journal failure'].includes(scenario));
+ assert.equal(result.cleanup.reason,['clean writer','journal failure'].includes(scenario)?null:
+  scenario==='dirty writer'?'UNSAVED_CHANGES':scenario==='transport lost'?'COLD_PACKAGE_CLEANUP_UNCONFIRMED':'CLEANUP_NOT_ADMITTED');
  if(scenario==='dirty writer')assert.equal(result.cleanup.reason,'UNSAVED_CHANGES');
  if(scenario==='transport lost')assert.equal(result.cleanup.status,'BLOCKED');
 });

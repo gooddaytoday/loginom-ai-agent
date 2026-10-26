@@ -8,9 +8,53 @@ import {describeNodeTypes} from '../lib/node-contracts.mjs';
 import {userActionInventory} from '../lib/user-workflow.mjs';
 import {createRedactor} from '../lib/redact.mjs';
 import {nodeResultReply} from '../lib/node-result-reply.mjs';
+import {compactNodeResult,userResultSchema} from '../lib/user-results.mjs';
+import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 
 const reply=value=>({content:[{type:'text',text:JSON.stringify(value)}]});
 const bytes=value=>Buffer.byteLength(JSON.stringify(value),'utf8');
+
+test('only user-v1 wait removes the structured table copy and retains the declared output schema',()=>{
+ const result={operation_id:'large-js',attempt:1,state:'settled',outcome:{status:'SUCCEEDED',effect_possible:true,
+  cleanup_complete:true,action_key:'node.apply',phase:'read',output:{configuration:{verified:true,readback:{kind:'javascript'}},
+   output:{status:'complete',ports:[{port:0,schema:Array.from({length:6},(_,index)=>({index,name:'Field'+index,label:'Field'+index,type:'string'})),
+    row_count:29,sample_rows:29,sample_complete:true,sample:Array.from({length:29},(_,row)=>Array.from({length:6},(_,column)=>({
+     type:'string',is_null:false,value:row+':'+column+':'+ 'данные'.repeat(5),precision:'source_text',representation:'data_source_string'})))}]}}}};
+ const before=JSON.stringify(result),value=compactNodeResult(result),original={...reply(value),structuredContent:value};
+ assert.ok(bytes(original)>46000);
+ const delivered=nodeResultReply(result,{userProfile:true,tool:'dock_node_wait'});
+ assert.notEqual(delivered.isError,true);
+ assert.ok(bytes(delivered)<=46000);
+ assert.deepEqual(JSON.parse(delivered.content[0].text),value);
+ const expected=structuredClone(value);delete expected.output.ports;
+ assert.deepEqual(delivered.structuredContent,expected);
+ assert.equal(new AjvJsonSchemaValidator().getValidator(userResultSchema)(delivered.structuredContent).valid,true);
+ assert.equal(JSON.stringify(result),before);
+ for(const tool of ['dock_node_apply','dock_node_status','dock_node_resume','dock_node_read','dock_node_cancel','dock_node_stop','dock_operation_inspect',undefined]){
+  assert.equal(nodeResultReply(result,{userProfile:true,tool}).isError,true);
+  assert.deepEqual(nodeResultReply(result,{tool}),nodeResultReply(result));
+ }
+ // Even one serialized table can exceed the unchanged final-envelope budget.
+ result.outcome.output.output.ports[0].sample[0][0].value='"'.repeat(24000);
+ const oversized=JSON.stringify(result),refused=nodeResultReply(result,{userProfile:true,tool:'dock_node_wait'});
+ assert.equal(refused.isError,true);
+ assert.equal(JSON.parse(refused.content[0].text).error.code,'USER_RESPONSE_BUDGET');
+ assert.equal(JSON.parse(refused.content[0].text).original_operation_id,'large-js');
+ assert.equal(JSON.stringify(result),oversized);
+});
+
+test('user-v1 wait preserves replies without ports and measures structured metadata as well as table text',()=>{
+ for(const result of [{operation_id:'running',state:'running',progress:{pending_phase:'read'}},
+  {operation_id:'settled',state:'settled',outcome:{status:'FAILED',effect_possible:false,cleanup_complete:true,
+   error:{code:'TEST_REFUSAL',message:'test'},output:{output:{status:'not_requested'}}}}]){
+  assert.deepEqual(nodeResultReply(result,{userProfile:true,tool:'dock_node_wait'}),nodeResultReply(result,{userProfile:true}));
+ }
+ const result={operation_id:'large-metadata',state:'settled',outcome:{status:'SUCCEEDED',effect_possible:true,cleanup_complete:true,
+  output:{configuration:{readback:{kind:'javascript',source:'x'.repeat(24000)}},output:{status:'complete',ports:[]}}}};
+ const compact=compactNodeResult(result);
+ assert.ok(bytes(reply(compact))<46000);
+ assert.equal(nodeResultReply(result,{userProfile:true,tool:'dock_node_wait'}).isError,true);
+});
 function catalog(types) {
  const config={targetOrigin:'http://loginom.test',targetBuild:'7.4.2',redactor:createRedactor()};
  const handlers=createCandidateNodeSupport(config).nodeApplyHandlers;

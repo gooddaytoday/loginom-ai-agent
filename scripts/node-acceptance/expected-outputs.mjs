@@ -55,6 +55,7 @@ export function parseExpectedOutputs(expected){
   for(const c of output.columns)if(Object.hasOwn(c,'types'))need(Array.isArray(c.types)&&c.types.length>0
    &&new Set(c.types).size===c.types.length&&c.types.includes(c.type)
    &&(c.types.every(t=>['integer','real'].includes(t))
+    ||c.types.length===2&&c.types.includes('datetime')&&c.types.includes('string')
     ||c.category_labels_any&&c.types.every(t=>['string','integer','real'].includes(t))),'EXPECTED_TYPES_INVALID');
   for(const c of output.columns)if(c.category_labels_any)need(['string','integer','real'].includes(c.type)
    &&output.rows.every(r=>typeof r[c.name]==='string'&&r[c.name].trim().length>0
@@ -174,7 +175,8 @@ function matchesCell(cell,column,want){
  }
  if(want===null)return cell.is_null===true&&cell.value===null&&(!nativeRequired||cell.cell_type==='null');
  if(cell.is_null)return false;
- const type=column.type==='variant'?want.cell_type:column.type;
+ const type=column.type==='variant'?want.cell_type
+  :column.types?.includes('datetime')&&column.types?.includes('string')?'datetime':column.type;
  if(nativeRequired){
   if(cell.cell_type!==type)return false;
   if(want.bytes_le!==undefined&&cell.native.bytes_le!==want.bytes_le)return false;
@@ -183,8 +185,13 @@ function matchesCell(cell,column,want){
   want=want.value;
  }
  if(type==='datetime'&&!nativeRequired){
-  if(typeof want!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(want)
-   ||cell.precision!=='millisecond'||cell.representation!=='local_datetime'||cell.timezone!=='unspecified')return false;
+  // An explicitly allowed ISO date string denotes midnight, never a timezone
+  // conversion or a truncated time. Native DateTime still requires precision.
+  if(column.types?.includes('string')&&typeof want==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(want))want+='T00:00:00.000';
+  if(typeof want!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}$/.test(want))return false;
+  if(cell.type==='string'&&column.types?.includes('string'))return typeof cell.value==='string'
+   &&(/^\d{4}-\d{2}-\d{2}$/.test(cell.value)?cell.value+'T00:00:00.000':cell.value)===want;
+  if(cell.precision!=='millisecond'||cell.representation!=='local_datetime'||cell.timezone!=='unspecified')return false;
  }
  let value=cell.value;
  if(cell.type==='integer'||column.type==='variant'&&type==='integer'){
