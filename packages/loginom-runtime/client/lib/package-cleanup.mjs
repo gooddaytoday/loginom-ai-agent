@@ -126,9 +126,11 @@ export function parsePackageCleanupResult(response, expected) {
 async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
   const {sessionId, documentId, account, packagePath, tabTid, timeoutMs} = options;
   const receipt = {version:1, session_id:sessionId, document_id:documentId, account, package_path:packagePath,
-    package_closed:false, logged_out:false, unsaved_changes_discarded:false, stage:'close_request', started_at:new Date().toISOString()};
+    package_closed:false, logged_out:false, unsaved_changes_discarded:false, stage:'close_request', started_at:new Date().toISOString(),
+    deadline_at:new Date(deadline).toISOString()};
   let closeStarted=false;
   const finish = async (status, reason, extra = {}) => {
+    if(status==='BLOCKED'&&receipt.stage==='logout_menu_open')receipt.logout_menu_failed_at=new Date().toISOString();
     if(status==='BLOCKED'&&receipt.stage==='logout_menu_open'&&deadline>Date.now()) {
       receipt.logout_menu_readback={status:'unavailable'};
       try {
