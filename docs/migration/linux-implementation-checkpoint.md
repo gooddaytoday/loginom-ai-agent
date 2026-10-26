@@ -11,17 +11,17 @@ Published2026-10-26T07:16:28Z, pre-release, latest=false, ID423944660; 30 URLs H
 
 ## 2026-10-26 — приватный candidate #74, без выпуска
 
-CLI и Desktop: clean source `93f52cc169`, prod `0.3.2-localpaths74.93f52cc169`, recovery0, ветка `local-file-paths`.
+CLI и Desktop: последний qualified clean source `2206d4e288`, prod `0.3.2-localpaths74.2206d4e288`, recovery0, ветка `local-file-paths`.
 CLI manifest/archive roundtrip и Desktop DEB/AppImage static PASS; independently6039CLI/5042Desktop files/hash/modes/source archive проверены.
-CLI archive SHA `b8d46216e4aba743895576e9e03d7042f18be3ee2ca6a8e2bb1b0d01d22c61c7`; все digests в отчёте и docs-fixed-candidate/qualification.json.
+CLI archive SHA `9eaddd12d31b81dc2b422e295863fb62ae979cbe2ea1110fa5ac7d60b3c79f8a`; все digests в отчёте и task8-save-receipt-20261026/candidate/qualification.json.
 B4 закрыт на9f723: UTF8 test image+native overflow guard; natural own-copy Save/replace, fullpath/local unchanged, physical*3, native Close/logout/ACK0/process0, fresh review Approved.
 B1–B4 и Task7 закрыты: оба reference/CLI/cold/oracle/collection validator и pair calibration100/0+100/0 PASS. Local edit CLI1/handledRead сохранён честно.
 Task8 benchmark: scores100/100/oracle2/2, execution1/2(edit CLI1/recoveredRead), native/process/storage cleanup0, fresh review Approved; own32795 остановлен с данными.
 Docs fix93f52: native Calc Expressions/v1 string map и отрицательный Markdown tripwire; TDD60+35/typecheck/actual package/report PASS. Runtime/automation/reference/benchmark evidence остаётся применимым.
-Source-frozen93f52: DesktopCSV PASS; CLI2 transitions FAIL/SAVE_RECEIPT_MISSING/noACK/guards. B5 sourceRED Approved; nativeworkflow crumb fix3files/+65/−13/review/executor55+siblings80/attribution2 PASS. ONE sourceGREEN32803 Save2933ms/ordinary nativeClose+logout/ACK0/sourceSHA прежний; physical10038/SHA2065d4…/graph+JS+CSV30/60/75 PASS, ownstand архивирован/остановлен. Newcandidate/четыре transitions/два affected benchmark впереди; Task8 открыт, legacy docs/TXT reuse подтверждён.
+Source-frozen93f52: DesktopCSV PASS; CLI2 transitions FAIL/SAVE_RECEIPT_MISSING/noACK/guards. B5 sourceRED Approved; nativeworkflow crumb fix3files/+65/−13/review/executor55+siblings80/attribution2 PASS. ONE sourceGREEN32803 Save2933ms/ordinary nativeClose+logout/ACK0/sourceSHA прежний; physical10038/SHA2065d4…/graph+JS+CSV30/60/75 PASS, ownstand архивирован/остановлен. Candidate2206 qualified/review Approved; оба CLI prestart отказаны inventory до model/native admission (sidecar вынесен наружу). Final review нашёл serverprepare/reload regression: minimum private-only binding fix3files/+36/−4, behavioral RED→GREEN/77tests PASS; review/newcandidate/четыре transitions/два affected benchmark впереди; Task8 открыт, legacy docs/TXT reuse подтверждён.
 Bun1.3.14/Node24.19.0/Chromium1246; packaging13PASS/2skip, shortTMPDIR crash6PASS/exit0/process0; исходный SIGILL на longTMPDIR сохранён, exact native cause не установлен.
 Own stand02/03/04 остановлены/snapshots, empty qualified05/06 без model calls; failed guards сохранены; общие сервисы/профили не менялись. Windows native NOT_RUN; full attribution README baseline mismatch не объявлен PASS. Merge/release не разрешены.
-[Отчёт](../testing/loginom-ai-agent/local-file-paths.md#task8-candidate93f52-qualification-2026-10-26) · [блокеры](../testing/loginom-ai-agent/local-file-paths-blockers.md).
+[Отчёт](../testing/loginom-ai-agent/local-file-paths.md#task8-prestart-admission-and-public-re-preparation-regression-2026-10-26) · [блокеры](../testing/loginom-ai-agent/local-file-paths-blockers.md).
 
 ## 2026-10-20 — v0.3.2 опубликован
 

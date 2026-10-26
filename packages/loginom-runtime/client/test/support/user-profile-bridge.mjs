@@ -2,6 +2,7 @@ import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm,writeFile } from 'node:fs/promises';
 import {createHash} from 'node:crypto';
+import {runInContext,runInNewContext} from 'node:vm';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -9,6 +10,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createArtifactStore } from '../../lib/artifacts.mjs';
 import { createBundledSkillFixture } from './bundled-skill-fixture.mjs';
 import { createActionCatalogFixture } from './action-catalog-fixture.mjs';
+import { Page } from './workspace-ui-fixture.mjs';
 
 test('managed user preparation returns local pins and dynamic knowledge without static workflow instructions', async t => {
   const resources = await createBundledSkillFixture(t);
@@ -17,7 +19,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
   const compatibility = { profile_id: 'unit-linux-chromium', loginom_build: '7.4.2', platform: 'linux', browser: 'chromium' };
   const catalog = await createActionCatalogFixture(compatibility);
   const browserCalls=[];
-  const packageDeliveries=[];let expectedPackage=null,expectedOperation=null,openFailure=null,deliveryAbort=null,unconfirmedUpload=false;
+  const packageDeliveries=[];let expectedPackage=null,expectedOperation=null,openFailure=null,deliveryAbort=null,unconfirmedUpload=false,reloadedPage=null;
   class ExternalClient {
     constructor(identity) { this.browser = identity.name === 'loginom-dock-browser'; }
     async connect(transport) { this.transport = transport; }
@@ -33,6 +35,8 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       assert.equal(request.name, 'browser_run_code_unsafe');
       browserCalls.push(request);
       const code = request.arguments.code;
+      if(reloadedPage&&code.includes('async function prepareWorkspace('))
+        return {content:[{type:'text',text:JSON.stringify(await runInNewContext(code)(reloadedPage))}]};
       if(expectedPackage&&code.includes('async function prepareWorkspace(')&&!code.includes('"identityOnly":true'))
         assert.equal(session.metadata.workspaceReady,false,'open must not reuse the prior READY');
       if(openFailure&&code.includes('async function prepareWorkspace(')&&!code.includes('"identityOnly":true')){
@@ -98,6 +102,34 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.deepEqual(result.input_artifacts, []);
     assert.ok(result.knowledge.node_types.length > 0);
     assert.ok(result.knowledge.actions.some(action => action.action_key === 'package.save_checkpoint'));
+    assert.equal(session.metadata.storageBinding.document_id,'fixture-document');
+    reloadedPage=new Page();reloadedPage.app.Version=compatibility.loginom_build;
+    Object.assign(reloadedPage.location,{origin:'https://loginom.invalid',pathname:'/'});
+    Object.assign(reloadedPage.context,{innerWidth:1000,innerHeight:800,outerWidth:1000,outerHeight:900,screen:{availWidth:1000,availHeight:900}});
+    class PackageTreeNode {constructor(path){this.PackageFileName=path;}}
+    let openedPackage=null,openedPath=null;
+    reloadedPage.app.PackageTreeNode=PackageTreeNode;
+    reloadedPage.app.Application={FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node:openedPackage}}}})}},FMapTree:{FServerConnection:{UserName:'user'}}}}};
+    reloadedPage.add('button','MF;TF-1;HomePage;btnCreateUnsavedPackage');
+    reloadedPage.url=()=>config.loginomUrl;
+    reloadedPage.evaluate=async(fn,args)=>{reloadedPage.context.args=args;return runInContext(`(${fn.toString()})(args)`,reloadedPage.context);};
+    reloadedPage.locator=selector=>({isVisible:async()=>true,locator:()=>({isVisible:async()=>true,fill:async value=>{openedPath=value;}}),click:async()=>{
+      reloadedPage.events.push(selector);
+      if(selector.includes('OpenDialogForm;btnOpen')){
+        openedPackage=new PackageTreeNode(openedPath);
+        for(const name of ['cmpDiagram','pnlWorkarea'])reloadedPage.add('div','MF;TF-1;ModelForm;'+name);
+        for(const [i,label] of ['Server','Packages','Package','Module','Workflow'].entries())reloadedPage.add('div','MF;TF-1;cnrNaviMode;b.s_'+i,label);
+      }
+    }});
+    const reopened=await client.callTool({name:'dock_prepare',arguments:{intent:'open_package',operation_id:'server-after-reload',package_path:'/user/existing.lgp'}});
+    assert.notEqual(reopened.isError,true,JSON.stringify(reopened));
+    const rebound=JSON.parse(reopened.content[0].text);
+    assert.equal(rebound.prepared,true,JSON.stringify(rebound.workspace));assert.equal(rebound.workspace.status,'READY');
+    assert.equal(rebound.workspace.package_ref.path,'/user/existing.lgp');
+    assert.notEqual(rebound.workspace.document_id,'fixture-document');
+    assert.equal(session.metadata.storageBinding.document_id,rebound.workspace.document_id);
+    assert.equal(reloadedPage.events.filter(selector=>selector.includes('OpenDialogForm;btnOpen')).length,1);
+    reloadedPage=null;
     const rejected=await client.callTool({name:'dock_action_describe',arguments:{action_key:'package.save_checkpoint',node_types:['imports.text','transform.join_data','exports.text']}});
     const failure=JSON.parse(rejected.content[0].text);
     assert.equal(failure.request_rejected,true);

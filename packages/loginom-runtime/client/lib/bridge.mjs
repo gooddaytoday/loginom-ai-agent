@@ -364,7 +364,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                     operation_id:preparationRequest.operation_id,target:identity.target};
                 }
                 const code = makeWorkspacePrepareCode({ ...workspaceOptions, recoverOnly,
-                  storageBinding:session.metadata.storageBinding??null,
+                  storageBinding:privatePackage?session.metadata.storageBinding??null:null,
                   ...(privatePackage?{timeoutMs:remaining()}:{}) });
                 const response = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
                   code:privatePackage?withStorageIdentity(code,session.metadata.storageBinding):code,
