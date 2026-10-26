@@ -1,3 +1,4 @@
+import { validateRootTerminality, type RootTerminalityProof } from "./root-terminality"
 import { EvalFailure } from "./fail"
 import path from "node:path"
 import { lstat, mkdir, realpath, rename } from "node:fs/promises"
@@ -21,12 +22,15 @@ export async function assertSessionBackupEmpty(file: SlotFile, identity: ServerI
 }
 
 export async function cleanupSlotStorage(file: SlotFile, server: Awaited<ReturnType<typeof acquireResourceLease>>, lease: SlotLease,
-  admin: Pick<AdminConnection, "identity" | "inspectSessionInventory" | "closeUserSession">, processes: ProcessCleanup | TerminalPreparationProof, prefixes: string[], attemptDirs: string[] = [], reuse?: StartupArchive, startup = false) {
+  admin: Pick<AdminConnection, "identity" | "inspectSessionInventory" | "closeUserSession">, processes: ProcessCleanup | TerminalPreparationProof | RootTerminalityProof, prefixes: string[], attemptDirs: string[] = [], reuse?: StartupArchive, startup = false) {
   if (startup && (prefixes.length || attemptDirs.length)) throw new EvalFailure("STARTUP_ARCHIVE_SCOPE", 2)
+  const rootTerminal = "kind" in processes && processes.kind === "root-terminality" ? processes : undefined
+  if (rootTerminal && (!startup || prefixes.length || attemptDirs.length)) throw new EvalFailure("ROOT_TERMINALITY_SCOPE", 2)
   const terminal = "kind" in processes && processes.kind === "terminal-preparation" ? processes : undefined
   const continuous = "status" in processes ? processes : undefined
   if (terminal && (prefixes.length || attemptDirs.length)) throw new EvalFailure("TERMINAL_PREPARATION_SCOPE", 2)
-  if (terminal) await validateTerminalPreparation(terminal, server, lease)
+  if (rootTerminal) await validateRootTerminality(rootTerminal, server, lease)
+  else if (terminal) await validateTerminalPreparation(terminal, server, lease)
   else if (!continuous || continuous.status !== "confirmed" || !continuous.capture_complete || continuous.unknownProcesses?.length)
     throw new EvalFailure("SLOT_PROCESS_CLEANUP_UNCONFIRMED", 2)
   if (reuse) {
@@ -49,6 +53,7 @@ export async function cleanupSlotStorage(file: SlotFile, server: Awaited<ReturnT
     ["device", "inode", "uid", "gid"].some(key => published[key] !== storage[key as keyof typeof storage]))
     throw new EvalFailure("USER_STORAGE_OWNERSHIP", 2)
   if (terminal) await validateTerminalPreparation(terminal, server, lease)
+  if (rootTerminal) await validateRootTerminality(rootTerminal, server, lease)
   if (reuse) await validateStartupArchive(reuse, server, lease)
   if (continuous) await releaseStaleWriter(lease.slot.profileDir, continuous.writerRefusal ? undefined : continuous.writer)
   // Zero-attempt startup uses the existing durable mover. Its stable journal retains

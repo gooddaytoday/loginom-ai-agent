@@ -1,3 +1,4 @@
+import { rootTerminalityForSlot, type RootRecovery, type RootTerminalityProof } from "./root-terminality"
 import { observeTerminalPreparation, type TerminalPreparationProof } from "./terminal-preparation"
 import { readStartupArchive } from "./startup-archive"
 import { EvalFailure } from "./fail"
@@ -46,7 +47,7 @@ export async function releaseClosedEnvironment(file: SlotFile, identity: ServerI
   } finally { if (environment) await Promise.all([environment.server.close(), ...environment.slots.map(lease => lease.close())]) }
 }
 
-export async function reconcileEnvironment(file: SlotFile, identity: ServerIdentity, binary: string, lockRoot = globalLockRoot) {
+export async function reconcileEnvironment(file: SlotFile, identity: ServerIdentity, binary: string, lockRoot = globalLockRoot, rootRecovery?: RootRecovery) {
   const environment = await reopenEnvironmentLeases(file, identity, lockRoot)
   if (!environment) return
   try {
@@ -66,7 +67,8 @@ export async function reconcileEnvironment(file: SlotFile, identity: ServerIdent
     const reconciled = []
     for (const lease of environment.slots) {
       const recovery = command.unitBinding ? { unitBinding: command.unitBinding, owner: reservation.owner, server: environment.server, lease } : undefined
-      let processes: ProcessCleanup | TerminalPreparationProof | undefined = await readStartupManagement({ stateDir: file.controller.stateDir, commandId: reservation.commandId,
+      let processes: ProcessCleanup | TerminalPreparationProof | RootTerminalityProof | undefined = rootRecovery
+        ? await rootTerminalityForSlot(rootRecovery, environment.server, lease) : await readStartupManagement({ stateDir: file.controller.stateDir, commandId: reservation.commandId,
         slotId: lease.slot.id, producerPid: reservation.owner.pid, runDir: command.runDir, recovery })
       const prefixes: string[] = [], attemptDirs: string[] = []
       for (const attempt of command.attempts?.filter(attempt => attempt.slotId === lease.slot.id) ?? []) {
