@@ -11,16 +11,17 @@ Published2026-10-26T07:16:28Z, pre-release, latest=false, ID423944660; 30 URLs H
 
 ## 2026-10-26 — приватный candidate #74, без выпуска
 
-CLI и Desktop: чистый source `9f7233ce71`, prod `0.3.2-localpaths74.9f7233ce71`, ветка `local-file-paths`.
-CLI build/manifest/archive roundtrip PASS; Desktop DEB/AppImage static PASS (5042 resources), ASAR version совпала.
-CLI archive SHA `b12b98881eb9d38bf97377f8fb197775ff6eab689aacd6d7d3b026c7020d9ca7`; digests — в отчёте/evidence.
-B4: Unicode upload исправлен task-local ENV LANG=C.UTF-8; native overflow ownership fix прошёл TDD395+222,3 typecheck и review.
-B4 закрыт: один installed CLI/DB6.1-sol/xhigh220,81с, Save own uploadD/replace, physical Unit.xml only*2→*3, native Close/logout/ACK0/no writer/processes0; fresh review Approved.
-Прежние selected routing4/4 CLI9cb и4/4 Desktopbbd остаются отдельными receipts; затронутые новым runtime кейсы требуют повтора.
-B1/B2/B3/B4 закрыты; оба reference/CLI/cold/oracle/collection validator приняты. Local edit CLI1/handledRead отражён честно; pair calibration и Task8 ещё впереди.
-Bun1.3.14 / Node24.19.0 / Chromium1246; crash logging и packaging tests13pass/2platformskip PASS.
-Own stand32794 после reference/cold остановлен с полными snapshots; общие установки/профили/сервисы не менялись, прежние failed guards сохранены. Windows native NOT_RUN; общий attribution verifier имеет прежний README mismatch.
-[Отчёт](../testing/loginom-ai-agent/local-file-paths.md#b4-autonomous-diagnosis-resumed-2026-10-26) · [блокеры](../testing/loginom-ai-agent/local-file-paths-blockers.md).
+CLI и Desktop: clean source `93f52cc169`, prod `0.3.2-localpaths74.93f52cc169`, recovery0, ветка `local-file-paths`.
+CLI manifest/archive roundtrip и Desktop DEB/AppImage static PASS; independently6039CLI/5042Desktop files/hash/modes/source archive проверены.
+CLI archive SHA `b8d46216e4aba743895576e9e03d7042f18be3ee2ca6a8e2bb1b0d01d22c61c7`; все digests в отчёте и docs-fixed-candidate/qualification.json.
+B4 закрыт на9f723: UTF8 test image+native overflow guard; natural own-copy Save/replace, fullpath/local unchanged, physical*3, native Close/logout/ACK0/process0, fresh review Approved.
+B1–B4 и Task7 закрыты: оба reference/CLI/cold/oracle/collection validator и pair calibration100/0+100/0 PASS. Local edit CLI1/handledRead сохранён честно.
+Task8 benchmark: scores100/100/oracle2/2, execution1/2(edit CLI1/recoveredRead), native/process/storage cleanup0, fresh review Approved; own32795 остановлен с данными.
+Docs fix93f52: native Calc Expressions/v1 string map и отрицательный Markdown tripwire; TDD60+35/typecheck/actual package/report PASS. Runtime/automation/reference/benchmark evidence остаётся применимым.
+Source-frozen93f52 CLI2 transitions идут на свежих stand02/03, затем Desktop3 на отдельных stands; unchanged legacy docs/TXT reuse подтверждён hashes. Полной Task8 acceptance ещё нет.
+Bun1.3.14/Node24.19.0/Chromium1246; packaging13PASS/2skip, shortTMPDIR crash6PASS/exit0/process0; исходный SIGILL на longTMPDIR сохранён, exact native cause не установлен.
+Own completed stands остановлены/snapshots, failed guards сохранены; общие сервисы/профили не менялись. Windows native NOT_RUN; full attribution README baseline mismatch не объявлен PASS. Merge/release не разрешены.
+[Отчёт](../testing/loginom-ai-agent/local-file-paths.md#task8-candidate93f52-qualification-2026-10-26) · [блокеры](../testing/loginom-ai-agent/local-file-paths-blockers.md).
 
 ## 2026-10-20 — v0.3.2 опубликован
 
