@@ -1,4 +1,5 @@
 import { installationNode } from "./product/installation"
+import { skillSource } from "./product/skill-source"
 
 // Fork-owned seams between upstream files and Loginom code. Upstream files call
 // these members instead of carrying the product behavior inline; the
@@ -6,4 +7,5 @@ import { installationNode } from "./product/installation"
 // root has to wire them. See docs/upstream-sync/adr-0001-modular-integration.md.
 export const ProductHooks = {
   installationNode,
+  skillSource,
 } as const

@@ -18,8 +18,7 @@ import { Glob } from "@opencode-ai/core/util/glob"
 import { Discovery } from "./discovery"
 import { isRecord } from "@/util/record"
 import { escapeHtml } from "@/util/html"
-import { verifyProductSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
-import { isReservedSkillName, reservedSkillNames } from "@loginom-ai-agent/product/skills"
+import { ProductHooks } from "@/product-hooks"
 
 const CLAUDE_EXTERNAL_DIR = ".claude"
 const AGENTS_EXTERNAL_DIR = ".agents"
@@ -80,10 +79,7 @@ export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Ski
   available: Schema.Array(Schema.String),
 }) {
   override get message() {
-    const hint = reservedSkillNames.some((name) => name === this.name)
-      ? " Bundled skills are unavailable. Verify the Loginom resource path or reinstall the application."
-      : ""
-    return `Skill "${this.name}" not found. Available skills: ${this.available.join(", ") || "none"}${hint}`
+    return `Skill "${this.name}" not found. Available skills: ${this.available.join(", ") || "none"}${ProductHooks.skillSource.notFoundHint(this.name)}`
   }
 }
 
@@ -139,14 +135,8 @@ const add = Effect.fnUntraced(function* (
 
   if (!isSkillFrontmatter(md.data)) return
 
-  if (origin.source !== "bundled" && isReservedSkillName(md.data.name)) {
-    yield* Effect.logWarning("ignored reserved product skill from an untrusted source", { skill: match })
-    const { Session } = yield* Effect.promise(() => import("@/session/session"))
-    yield* events.publish(Session.Event.Error, {
-      error: new NamedError.Unknown({
-        message: `Ignored external skill '${md.data.name}': this name is reserved for a bundled Loginom skill.`,
-      }).toObject(),
-    })
+  if (!ProductHooks.skillSource.admits(md.data.name, origin.source)) {
+    yield* ProductHooks.skillSource.refuseSkill(events, { name: md.data.name, location: match })
     return
   }
 
@@ -309,20 +299,7 @@ const layer = Layer.effect(
           source: "builtin",
         }
         if (flags.loginomResources) {
-          const bundled = yield* Effect.tryPromise(() => verifyProductSkills(flags.loginomResources!)).pipe(
-            Effect.catch(
-              Effect.fnUntraced(function* () {
-                const { Session } = yield* Effect.promise(() => import("@/session/session"))
-                yield* events.publish(Session.Event.Error, {
-                  error: new NamedError.Unknown({
-                    message: "Bundled skills are unavailable. Verify the Loginom resource path or reinstall the application.",
-                  }).toObject(),
-                })
-                yield* Effect.logWarning("bundled skill verification failed")
-                return []
-              }),
-            ),
-          )
+          const bundled = yield* ProductHooks.skillSource.bundled(flags.loginomResources, events)
           for (const skill of bundled) yield* add(s, skill.location, events, { source: "bundled", digest: skill.digest })
         }
         yield* loadSkills(s, yield* InstanceState.get(discovered), events)

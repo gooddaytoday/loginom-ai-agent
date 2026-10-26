@@ -10,8 +10,7 @@ import { Skill } from "../skill"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
 import { LegacyEvent } from "@opencode-ai/schema/legacy-event"
-import { NamedError } from "@opencode-ai/core/util/error"
-import { isReservedSkillName } from "@loginom-ai-agent/product/skills"
+import { ProductHooks } from "@/product-hooks"
 import { EventV2Bridge } from "@/event-v2-bridge"
 
 type State = {
@@ -66,16 +65,6 @@ const layer = Layer.effect(
     const skill = yield* Skill.Service
     const events = yield* EventV2Bridge.Service
 
-    const warnReserved = Effect.fn("Command.warnReserved")(function* (name: string, source: "config" | "MCP") {
-      yield* Effect.logWarning("ignored reserved product command from an external source", { name, source })
-      const { Session } = yield* Effect.promise(() => import("@/session/session"))
-      yield* events.publish(Session.Event.Error, {
-        error: new NamedError.Unknown({
-          message: `Ignored external command '${name}' from ${source}: this name is reserved for a bundled Loginom skill.`,
-        }).toObject(),
-      })
-    })
-
     const init = Effect.fn("Command.state")(function* (ctx: InstanceContext) {
       const cfg = yield* config.get()
       const bridge = yield* EffectBridge.make()
@@ -102,8 +91,8 @@ const layer = Layer.effect(
       }
 
       for (const [name, command] of Object.entries(cfg.command ?? {})) {
-        if (isReservedSkillName(name)) {
-          yield* warnReserved(name, "config")
+        if (ProductHooks.skillSource.isReserved(name)) {
+          yield* ProductHooks.skillSource.refuseCommand(events, { name, source: "config" })
           continue
         }
         commands[name] = {
@@ -121,8 +110,8 @@ const layer = Layer.effect(
       }
 
       for (const [name, prompt] of Object.entries(yield* mcp.prompts())) {
-        if (isReservedSkillName(name)) {
-          yield* warnReserved(name, "MCP")
+        if (ProductHooks.skillSource.isReserved(name)) {
+          yield* ProductHooks.skillSource.refuseCommand(events, { name, source: "MCP" })
           continue
         }
         commands[name] = {
@@ -160,7 +149,7 @@ const layer = Layer.effect(
           name: item.name,
           description: item.description,
           source: "skill",
-          subtask: item.source === "bundled" && isReservedSkillName(item.name) ? false : undefined,
+          subtask: ProductHooks.skillSource.commandSubtask(item),
           get template() {
             if (!dir) return item.content
             return [
