@@ -27,7 +27,11 @@
         {
           "name": "Due",
           "type": "datetime",
-          "label_any": true
+          "label_any": true,
+          "types": [
+            "datetime",
+            "string"
+          ]
         },
         {
           "name": "Description",

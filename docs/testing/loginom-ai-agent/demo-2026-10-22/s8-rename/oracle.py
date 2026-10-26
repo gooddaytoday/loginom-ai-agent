@@ -18,12 +18,12 @@ def read(name):
 NODE_TYPES = []
 OUTPUT_TYPE = 'export_input'
 ORDERED = True
-COLUMNS = [('Регион', 'string'), ('Категория', 'string'), ('Выручка', 'real')]
+COLUMNS = [('Region', 'Регион', 'string'), ('Category', 'Категория', 'string'), ('Revenue', 'Выручка', 'real')]
 
 totals = defaultdict(Decimal)
 for sale in read("sales.csv"):
     totals[sale["Region"], sale["Category"]] += Decimal(sale["Quantity"]) * Decimal(sale["Price"])
-rows = [{"Регион": region, "Категория": category, "Выручка": float(total)}
+rows = [{"Region": region, "Category": category, "Revenue": float(total)}
         for (region, category), total in sorted(totals.items(), key=lambda pair: (-pair[1], *pair[0]))]
 
 expected = {
@@ -32,7 +32,8 @@ expected = {
     "outputs": [{
         "output_node_type": OUTPUT_TYPE,
         "ordered": ORDERED,
-        "columns": [{"name": name, "label": name, "type": kind} for name, kind in COLUMNS],
+        "column_order": "exact",
+        "columns": [{"name": name, "label": label, "type": kind, "name_any": True} for name, label, kind in COLUMNS],
         "rows": rows,
     }],
 }
