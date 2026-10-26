@@ -73,11 +73,11 @@ Runner2 daemon active/enabled, `/usr/local/bin/multica` — официальны
 
 ## 4. Сеть, изоляция и постоянные каталоги
 
-Есть enabled WireGuard `wg0` и ZeroTier; маршруты хоста к runner2 идут через WireGuard. Обратный read-only ICMP probe runner2 → приватный WireGuard-адрес ноутбука успешен, около 22 мс. Host sshd отсутствует и для выбранной схемы не нужен.
+В офисной сети владелец оставляет WireGuard выключенным. Текущий путь — прежний QEMU user-mode NAT с SSH гостя через hostfwd на собственном адресе `172.16.0.29:2223`; этот /32 принадлежит только host loopback. Публичный bind и `0.0.0.0` не используются. Host sshd не нужен.
 
-Выбран один путь: QEMU user-mode NAT, hostfwd **только на приватном VPN-адресе ноутбука**, свободный сейчас TCP 2223 → SSH 22 гостя. Не использовать публичный bind или `0.0.0.0`. Возможность привязки hostfwd к конкретному адресу подтверждает [официальная документация QEMU](https://www.qemu.org/docs/master/system/qemu-manpage.html). Схема реализована: SSH с закреплённым host key проверен из фактических задач всех трёх агентов.
+Host устанавливает reverse SSH к runner2; тот слушает только `127.0.0.1:2224` и передаёт поток к прежнему hostfwd. Это один обычный OpenSSH под systemd, без смены VM, batch или runtime. Alias `eval-runner-3` на общем runtime swarm использует этот loopback endpoint; user, HostKeyAlias и закреплённый known_hosts сохранены. Порт относится к SSH config, а не к `server.json`. Секрет находится в root-private systemd credential вне Git.
 
-На фактическом пользователе runtime swarm добавить отдельный SSH alias runner3 с private endpoint/Port и проверенным host key. Все три агента при рекомендуемой схеме используют этот runtime, но каждый должен получить собственную проверку доступа из task с его защищённым env. Loopback ноутбука сам по себе для swarm не работает. Новый endpoint и секреты хранить вне Git; порт относится к SSH config, не к неподдерживаемым полям `server.json`.
+Первоначальный доступ всех трёх агентов был проверен через прежний VPN-путь. После офисной поставки actual native вход EvalOps и ограниченный restart транспорта подтверждены; matrix campaigns не повторялись. Точный план, проверки и ограничения — [офисный SSH-транспорт](2026-10-26-runner3-ssh-transport-plan.md). Общие VPN, офисные маршруты и другие ресурсы не изменяются.
 
 В госте Studio слушает только `127.0.0.1:8083/app/`; Server/Studio имеют собственную Docker network и имена `eval-runner-3-server`, `eval-runner-3-studio`, `eval-runner-3-net`. Native alias `loginom-server-7.4.2-test` сохраняется внутри этой отдельной сети. Наружу открывается только SSH. Порт 8083 проверить в госте до создания pair.
 
@@ -90,7 +90,7 @@ Runner2 daemon active/enabled, `/usr/local/bin/multica` — официальны
 - frozen checkout: внутри guest runner root `autonomous/checkouts/<S>/evals`; CLI installation — отдельный immutable tree вне checkout; judge distribution/home — отдельные private каталоги;
 - `slots.json` лежит вне своего `controller.stateDir`; native lock root остаётся штатным `/var/lib/loginom-evals/locks`. Не создавать общий NFS/state с runner2.
 
-Host systemd unit запускает QEMU от `eval3` с явным KVM-доступом и зависимостью от VPN; гостевой reboot не должен завершать VM (`-no-reboot` не использовать). Guest Docker и SSH enabled; campaign instance включается до старта. Campaign unit берётся из готового template, batch unit — из действующего принятого runner2 template с заменой только путей/имени. `WorkingDirectory`, `ExecStart`, `server.json`, preflight и verify обязаны указывать один checkout S.
+Host systemd unit запускает QEMU от `eval3` с явным KVM-доступом; root ExecStartPre создаёт только собственный loopback /32 до QEMU bind, зависимости от VPN нет; гостевой reboot не должен завершать VM (`-no-reboot` не использовать). Guest Docker и SSH enabled; campaign instance включается до старта. Campaign unit берётся из готового template, batch unit — из действующего принятого runner2 template с заменой только путей/имени. `WorkingDirectory`, `ExecStart`, `server.json`, preflight и verify обязаны указывать один checkout S.
 
 Контейнеры native pair намеренно имеют `restart=no`: после reboot их запускает guarded `prepare-generation` на прежних owned IDs. Не заменять это `restart=always`. Автозагрузка ноутбука может быть настроена для новой VM, но reboot ноутбука не проводится и не засчитывается. Sleep/выключение ноутбука и пользовательского proxy — внешняя причина недоступности.
 
