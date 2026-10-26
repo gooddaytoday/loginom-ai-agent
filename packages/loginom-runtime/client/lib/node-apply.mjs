@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {verifiedCalculatorRequestRefusal} from './calculator-request-refusal.mjs';
-import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUiReadRefusal} from './native-read-refusal.mjs';
+import {verifiedNativeReadRefusal,verifiedExportReadRefusal,verifiedJavascriptUiReadRefusal,verifiedJavascriptPortReadRefusal} from './native-read-refusal.mjs';
 import {verifiedJavascriptExistingSchemaRefusal} from './javascript-existing-schema-refusal.mjs';
 import {verifiedJavascriptWizardRefusal} from './javascript-wizard-recovery.mjs';
 import {verifiedJavascriptSourcePolicyRefusal} from './javascript-source-policy-refusal.mjs';
@@ -213,7 +213,8 @@ export async function applyNode({request, operation, handlers, drivers, record,
       const refusal=error.nodePhaseRefusal;
       if(name==='read'&&request.target.type==='programming.javascript'
         &&operation.cleanupConfirmed===true&&!operation.transportUncertain
-        &&verifiedJavascriptUiReadRefusal(refusal,state.node,state.execution,request.read)){
+        &&(verifiedJavascriptUiReadRefusal(refusal,state.node,state.execution,request.read)
+          ||verifiedJavascriptPortReadRefusal(refusal,state.node,state.execution,request.read))){
         await acknowledge({phase:'node_phase_refused',signature,receipt:{...pending,...refusal}});
         state.effect_possible=previousEffect;state.pending=null;state.cleanup_complete=true;state.verified_refusal=true;
         state.javascript_read_refusal=true;
@@ -468,7 +469,7 @@ export async function applyNode({request, operation, handlers, drivers, record,
           :state.export_download_refusal?{tool:'dock_action_run',original_operation_id:operation.id,
           instruction:'The native export completed, but its download was not confirmed. The original scenario is restored, its temporary download lease released and no phase remains unresolved. Save the scenario with dock_action_run using action_key package.save_checkpoint, a NEW operation_id and the task package path in parameters.path. Report the download as unconfirmed. Do not resume this failed operation, repeat export, or recreate the node.'}
           :state.javascript_read_refusal?{tool:'dock_node_apply',original_operation_id:operation.id,
-          instruction:'JavaScript full reading exceeds the 100-row UI limit. The Table read has returned to the workflow, precision restored and execution retained. No phase remains unresolved; saving or another action is allowed. Do not recreate or reconfigure the node. Use a NEW operation_id on the SAME existing target with parameters:{}, inputs:[], mappings:[], finish:"execute" and read:{ports:[0],sample_rows:100,require_exact_numbers:true} without full coverage for a sample, or verify the complete downloaded CSV Export.'}
+          instruction:'JavaScript full reading exceeds the bounded row, cell or byte window. The owned output read has confirmed cleanup and execution is retained. No phase remains unresolved; saving or another action is allowed. Do not recreate or reconfigure the node. Use a NEW operation_id on the SAME existing target with parameters:{}, inputs:[], mappings:[], finish:"execute" and read:{ports:[0],sample_rows:100,require_exact_numbers:true} without full coverage for a sample, or verify the complete downloaded CSV Export.'}
           :state.native_read_refusal?{tool:'dock_node_apply',original_operation_id:operation.id,
           instruction:'Full native reading was refused by the unchanged 50x8 limit. The owned Preview is closed, workflow restored and execution retained. No operation remains unresolved; saving or another action is allowed. Do not recreate or reconfigure the node. For a scalar report use a NEW operation_id with the SAME existing target, parameters:{}, inputs:[], mappings:[], finish:"execute" and read:{ports:[0],sample_rows:100,require_exact_numbers:true} without full coverage. This does not authorize ordinary reading of Variant values.'}:correctNodeRequest(request,state.node,state.export_destination_conflict===true)}:{}),
       ...(state.correctable_import_request&&state.cleanup_complete&&!state.pending?{next_step:{tool:'dock_node_apply',original_operation_id:operation.id,
@@ -548,8 +549,9 @@ export async function releaseNodeApply({operation,handlers,drivers,record,signal
   const result={operation_id:operation.id,status:'FAILED',effect_possible:true,phases:state.phases.map(({value,...p})=>p),
     node:state.node,execution,output:state.output,package_saved:false,cleanup_complete:true,
     warnings:[...(proof.cleanup.wizard_closed?['The unsaved wizard draft of this node was cancelled during release.']:[]),
-      ...(proof.cleanup.read_view_restored?['The output Table view opened for reading was restored and closed during release.']:[]),
-      ...(proof.cleanup.views_returned?['The node visualizers opened for reading were left during release; a Table visualizer added by the stopped read may remain on its output port.']:[])],
+      ...(!readingOnly&&proof.cleanup.read_view_restored?['The output Table view opened for reading was restored and closed during release.']:[]),
+      ...(proof.cleanup.views_returned?[readingOnly?'The node visualizers were left during release.'
+        :'The node visualizers opened for reading were left during release; a Table visualizer added by the stopped read may remain on its output port.']:[])],
     configuration,checkpoint_kind:'local_node_released',persisted_package_verified:false,pending_phase:null,released_phase:pending.phase,
     error:{code:'NODE_OPERATION_RELEASED',message:'Phase '+pending.phase+' stopped without a verified receipt. The operation was released after Dock proved the node rests unlocked on an unchanged quiet graph; nothing of the stopped phase was repeated.'},
     next_step:exportRelease?{tool:'dock_action_run',original_operation_id:operation.id,

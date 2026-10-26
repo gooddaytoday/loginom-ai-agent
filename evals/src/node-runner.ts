@@ -2,17 +2,19 @@ import path from "node:path"
 import { main } from "./run"
 import { evalsRoot, loadConfig } from "./config"
 import { loadTasks } from "./task"
-import { validateNodeRun } from "./node-evals"
+import { requireNodeEvidenceSlot, validateNodeRun } from "./node-evals"
 import { coverageCaseIds, nodeCaseIds } from "./node-cases"
 import { collectNodeNativeEvidence } from "./node-native"
 import { textImportIds, textImportChecks, collectTextImportEvidence, assertTextImportModel } from "./text-import"
+import type { RunSummary } from "./report"
 
 export async function runNodeEvals(argv: string[], env: Record<string, string | undefined>) {
-  try { return await executeNodeEvals(argv, env) }
-  catch (error) { return { code: 2, runDir: null, error: error instanceof Error ? error.message : String(error) } }
+  const state = { runDir: null as string | null }
+  try { return await executeNodeEvals(argv, env, state) }
+  catch (error) { return { code: 2, runDir: state.runDir, error: error instanceof Error ? error.message : String(error) } }
 }
 
-async function executeNodeEvals(argv: string[], env: Record<string, string | undefined>) {
+async function executeNodeEvals(argv: string[], env: Record<string, string | undefined>, state: { runDir: string | null }) {
   if (argv.some((arg) => ["--calibrate", "--judge-only", "--keep-storage", "--dry-run", "--reset-profile"].includes(arg.split("=")[0]!)))
     return { code: 2, runDir: null, error: "unsupported mode: code-only live runner" }
   const args = ["--tasks", path.join(evalsRoot, "tasks/node-evals"), ...argv, "--skip-judge", "--repeat", "1"]
@@ -25,14 +27,15 @@ async function executeNodeEvals(argv: string[], env: Record<string, string | und
       throw Error(`unknown required ID: ${item.id}`)
   }
   const run = await main(args, env)
-  const summary=await Bun.file(path.join(run.runDir,"summary.json")).json()
-  for(const task of summary.tasks) if(task.id==="crosstable-min-max" || coverageCaseIds.includes(task.id)) for(const attempt of task.attempts) {
-    if(attempt.status==="completed" && attempt.environment_cleanup?.status==="confirmed")
-      await collectNodeNativeEvidence(path.join(run.runDir,task.id,String(attempt.attempt)),config.profileDir)
-  }
-  for (const task of summary.tasks) if (textImportIds.includes(task.id)) for (const attempt of task.attempts) {
-    if (attempt.status === "completed" && attempt.environment_cleanup?.status === "confirmed")
-      await collectTextImportEvidence(path.join(run.runDir, task.id, String(attempt.attempt)), config.profileDir)
+  state.runDir = run.runDir
+  const summary=await Bun.file(path.join(run.runDir,"summary.json")).json() as RunSummary
+  for (const task of summary.tasks) for (const attempt of task.attempts) {
+    if (attempt.status !== "completed" || attempt.environment_cleanup?.status !== "confirmed") continue
+    const slot = requireNodeEvidenceSlot(summary, attempt.slot_id)
+    if (task.id === "crosstable-min-max" || coverageCaseIds.includes(task.id))
+      await collectNodeNativeEvidence(path.join(run.runDir, task.id, String(attempt.attempt)), slot?.profileDir ?? config.profileDir, slot?.historyDir)
+    if (textImportIds.includes(task.id))
+      await collectTextImportEvidence(path.join(run.runDir, task.id, String(attempt.attempt)), slot?.profileDir ?? config.profileDir, slot?.historyDir)
   }
   const verdict = await validateNodeRun(run.runDir, tasks.map((task) => task.id), config.tasksDir)
   await Bun.write(path.join(run.runDir, "code-verdict.json"), JSON.stringify(verdict, null, 2) + "\n")

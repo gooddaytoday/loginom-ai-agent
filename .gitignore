@@ -4,6 +4,9 @@ node_modules
 .sst
 .env
 .env.local
+.env.*
+!.env.example
+!.env.*.example
 local.env
 .idea
 .vscode

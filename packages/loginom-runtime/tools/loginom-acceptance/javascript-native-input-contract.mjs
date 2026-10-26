@@ -30,12 +30,13 @@ export function nativeInputRequest({prepared,storage,artifact,uploadOperationId,
 
 export function verifyNativeInputUi(table,fixtureId='real'){
   const fixture=javascriptNativeFixture(fixtureId),expectedValues=fixture.values;
-  need(table?.row_count===fixture.rows&&table.sample_rows===fixture.rows&&table.sample_complete===true&&table.filter_enabled===false
+  need(table?.row_count===fixture.rows&&table.sample_rows===fixture.rows&&table.sample_complete===true
+    &&(table.filter_enabled===false||!Object.hasOwn(table,'filter_enabled')&&table.freshness_basis==='completed_execution_port_source')
     &&table.precision?.numbers_verified===true&&table.precision.limitations?.length===0&&!table.limitations?.length
     &&table.schema?.length===1&&table.schema[0].name==='Value'&&table.schema[0].label==='Value'&&table.schema[0].type===fixture.type
     &&table.sample?.length===fixture.rows&&table.sample.every((row,i)=>row.length===1&&row[0].type===fixture.type
       &&row[0].is_null===(expectedValues[i]===null)&&Object.is(row[0].value,expectedValues[i])
-      &&row[0].precision===(expectedValues[i]===null?'exact_null':fixture.type==='datetime'?'millisecond':fixture.type==='integer'?'exact_integer':fixture.type==='real'?'17_significant_digits':fixture.id==='boolean'?'exact_boolean':'display_text')),'complete typed UI oracle differs');
+      &&row[0].precision===(expectedValues[i]===null?'exact_null':fixture.type==='datetime'?'millisecond':fixture.type==='integer'?'exact_integer':fixture.type==='real'?'17_significant_digits':fixture.id==='boolean'?'exact_boolean':row[0].representation==='data_source_string'?'source_text':'display_text')),'complete typed UI oracle differs');
   return {verified:true,rows:fixture.rows,columns:1,native_bytes_verified:false};
 }
 

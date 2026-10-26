@@ -1,8 +1,10 @@
 import path from "node:path"
 import { spawn } from "node:child_process"
+import { Readable, Writable } from "node:stream"
 import os from "node:os"
-import { constants } from "node:fs"
+import { constants, type Stats } from "node:fs"
 import { lstat, mkdtemp, open, readdir, readFile, readlink, realpath, stat, writeFile, rm } from "node:fs/promises"
+import { createJsonOutputRedactor, createOutputRedactor } from "./output-redaction"
 
 export type ProcessIdentity = {
   pid: number; starttime: string; uid: number; parent: number; group: number; session: number
@@ -12,8 +14,9 @@ type ProcessView = ProcessIdentity & { args: string[]; cwd: string; name: string
 type ProcessOrigin = { via: "launcher" | "cli" | "parent" | "subreaper"; parent?: string; observed_at: string }
 type ProcessEntry = {
   process: ProcessIdentity; origin?: ProcessOrigin; admission: "pending" | "allowed" | "refused"
-  binding?: { runtimeDirectory: string; observed_at: string }; helper?: boolean; foreign?: boolean
+  binding?: { runtimeDirectory: string; observed_at: string }; helper?: boolean
 }
+export type ProcessOwner = { kind: "slot" | "admin" | "judge" | "command"; id: string }
 export type WriterIdentity = { device: number; inode: number; owner: string }
 export type RegistrationIdentity = { device: number; inode: number; uid: number; mode: number; bytes: string; mtimeNs: string; ctimeNs: string }
 export type OwnedRegistration = { profile: string; acquiredAt: string; original: ProcessCleanup; marker: RegistrationIdentity }
@@ -24,20 +27,47 @@ export type ProcessCleanup = {
   observation_mode?: "continuous" | "unit_after_exit" | "writer_release_settlement"
   verification?: { observed_at: string; owned_remaining: number }[]
   origins?: { pid: number; starttime: string; via: ProcessOrigin["via"]; parent_pid: number | null; parent_starttime: string | null; observed_at: string }[]
-  observations?: { count: number; max_duration_ms: number }
+  observations?: { count: number; max_duration_ms: number; max_start_delay_ms?: number; max_gap_ms?: number }
   polling?: { interval_ms: number; observed_at: string }[]
   settlement?: { started_at: string; source_processes: number; passes: { observed_at: string; inspected: number; owned_remaining: number; native_remaining: number }[] }
   admissions?: { pid: number; starttime: string; status: ProcessEntry["admission"] }[]
   selectedCli?: { executable: string; device: number; inode: number }
   launcher?: { kind: "linux_subreaper"; pid: number; cli_pid: number | null; ready: boolean }
+  lifetime?: { producer_pid: number; owner: ProcessOwner; launcher: ProcessIdentity; started_at: string; finished_at: string | null }
   browserBindings?: { process: ProcessIdentity; runtimeDirectory: string; observed_at: string }[]
   bindingRefusals?: { process: ProcessIdentity; has_data_dir: boolean; data_inside_profile: boolean; new_runtime_match: boolean; executable_match: boolean; ancestry_match: boolean }[]
+  peerProcesses?: { process: ProcessIdentity; launcher: ProcessIdentity; owner: ProcessOwner }[]
+  writerRefusal?: WriterUnavailable["refusal"]
 }
+
+// Only this module can publish a spawned launcher and its admitted ancestry.
+const liveSupervisors = new Map<string, {
+  launcher: ProcessIdentity; entries: Map<string, ProcessEntry>; cleanup: ProcessCleanup; owner: ProcessOwner; live(): ProcessIdentity[]
+}>()
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error)
 const gone = (error: unknown) => ["ENOENT", "ESRCH"].includes((error as NodeJS.ErrnoException).code ?? "")
 const key = (process: ProcessIdentity) => `${process.pid}:${process.starttime}`
 const inside = (file: string, root: string) => file === root || file.startsWith(root + path.sep)
+
+class WriterUnavailable extends Error {
+  readonly refusal
+  constructor(info: Stats, operation: string, phase: string | null, code: string | null) {
+    super("Writer owner unavailable")
+    this.refusal = { operation, phase, code, observedAt: new Date().toISOString(),
+      directory: { device: info.dev, inode: info.ino, uid: info.uid, mode: info.mode & 0o777 } }
+  }
+}
+
+// Resource observers receive copies, never the identity records used for signaling.
+export function supervisedProcesses() {
+  return { producer_pid: process.pid, observed_at: new Date().toISOString(), scopes: [...liveSupervisors.values()].map(scope => {
+    const observed = scope.cleanup.observation_mode === "continuous" && scope.cleanup.capture_complete && scope.cleanup.error === null &&
+      (scope.cleanup.observations?.count ?? 0) > 0 && !scope.cleanup.unknownProcesses?.length
+    return { owner: { ...scope.owner }, launcher: { ...scope.launcher }, status: observed ? "observed" as const : "unavailable" as const,
+      processes: observed ? scope.live().filter(process => scope.entries.get(key(process))?.admission === "allowed").map(process => ({ ...process })) : null }
+  }) }
+}
 
 export async function writerIdentity(profile: string): Promise<WriterIdentity | null> {
   const directory = path.join(profile, ".writer")
@@ -49,16 +79,15 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
   if (!info.isDirectory() || info.isSymbolicLink()) throw Error("Writer is not a private directory")
   const ownerPath = path.join(directory, "owner")
   const ownerBefore = await lstat(ownerPath).catch(async (error: NodeJS.ErrnoException) => {
-    if (error.code !== "ENOENT") throw Error("Writer owner unavailable")
-    await observeWriterRelease(directory, info)
-    return undefined
+    if (error.code !== "ENOENT") throw new WriterUnavailable(info, "owner-stat", null, error.code ?? null)
+    return observeWriterTransition(directory, info, true)
   })
   if (!ownerBefore) return null
   if (!ownerBefore.isFile() || ownerBefore.isSymbolicLink()) throw Error("Writer owner is not a private file")
   const file = await open(ownerPath, constants.O_RDONLY | constants.O_NOFOLLOW)
     .catch(async (error: NodeJS.ErrnoException) => {
-      if (error.code !== "ENOENT") throw Error("Writer owner unavailable")
-      await observeWriterRelease(directory, info)
+      if (error.code !== "ENOENT") throw new WriterUnavailable(info, "owner-open", null, error.code ?? null)
+      await observeWriterTransition(directory, info)
       return undefined
     })
   if (!file) return null
@@ -69,7 +98,7 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
     const owner = await file.readFile("utf8")
     const observed = await Promise.all([lstat(directory), lstat(ownerPath)]).catch(async (error: NodeJS.ErrnoException) => {
       if (error.code !== "ENOENT") throw error
-      await observeWriterRelease(directory, info)
+      await observeWriterTransition(directory, info)
       return undefined
     })
     if (!observed) return null
@@ -81,8 +110,8 @@ export async function writerIdentity(profile: string): Promise<WriterIdentity | 
   } finally { await file.close() }
 }
 
-/** CLI release unlinks owner before rmdir. Only that bounded ENOENT window is retried. */
-async function observeWriterRelease(directory: string, expected: Awaited<ReturnType<typeof lstat>>) {
+/** Initial creation and release both have bounded ownerless windows; an observed owner cannot be replaced. */
+async function observeWriterTransition(directory: string, expected: Stats, acquiring = false) {
   let absent = 0
   for (let attempt = 0; attempt < 6; attempt++) {
     const current = await lstat(directory).catch((error: NodeJS.ErrnoException) => {
@@ -97,11 +126,14 @@ async function observeWriterRelease(directory: string, expected: Awaited<ReturnT
         if (error.code === "ENOENT") return undefined
         throw error
       })
-      if (owner) throw Error("Writer owner identity changed during release")
+      if (owner) {
+        if (!acquiring) throw Error("Writer owner identity changed during release")
+        return owner
+      }
     } else if (++absent === 2) return
     if (attempt < 5) await Bun.sleep(20)
   }
-  throw Error("Writer owner unavailable")
+  throw new WriterUnavailable(expected, "transition", acquiring ? "acquiring" : "releasing", null)
 }
 
 async function processView(pid: number, required = true, owners: ProcessIdentity[] = [], retries = 2): Promise<ProcessView | undefined> {
@@ -110,7 +142,12 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
     const directory = `/proc/${pid}`
     const owner = await stat(directory)
     if (owner.uid !== process.getuid?.()) {
-      if (required || owners.some((entry) => entry.pid === pid)) throw Error("Process UID changed")
+      if (required || owners.some((entry) => entry.pid === pid)) {
+        // Diagnostic samples do not relax the UID refusal or establish a stable identity.
+        const raw = await readFile(path.join(directory, "stat"), "utf8").catch(() => null)
+        const fields = raw?.slice(raw.lastIndexOf(")") + 2).split(" ")
+        throw Error(`Process UID changed (proc_uid=${owner.uid}, starttime=${fields?.[19] ?? "unknown"}, state=${fields?.[0] ?? "unknown"})`)
+      }
       return undefined
     }
     const raw = await readFile(path.join(directory, "stat"), "utf8")
@@ -144,7 +181,7 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
   } catch (error) {
     if (gone(error)) return undefined
     const denied = ["EACCES", "EPERM"].includes((error as NodeJS.ErrnoException).code ?? "")
-    if (!relevant && denied) return undefined
+    if (denied && !required && !await hasOwnedAncestry(pid, owners)) return undefined
     // exec can briefly reset dumpability. A fresh complete read must still
     // establish identity; persistent denial consumes the same bounded budget.
     if (relevant && denied && retries) {
@@ -154,6 +191,35 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
     // These reads only use /proc paths; retain the cause without exposing argv.
     throw Error(`Cannot inspect process identity PID ${pid}: ${message(error)}`, { cause: error })
   }
+}
+
+/** Read only kernel ancestry; foreign executable/env permissions cannot confer ownership. */
+export async function hasOwnedAncestry(pid: number, owners: Pick<ProcessIdentity, "pid" | "starttime">[]) {
+  if (!Number.isSafeInteger(pid) || pid < 1) throw Error("Invalid process identity")
+  const seen = new Set<number>()
+  let current = pid
+  while (current) {
+    if (seen.has(current)) throw Error("Process parent chain changed")
+    seen.add(current)
+    const raw = await readFile(`/proc/${current}/stat`, "utf8").catch(async error => {
+      if (!gone(error)) throw error
+      const candidate = await stat(`/proc/${pid}`).catch(error => {
+        if (gone(error)) return undefined
+        throw error
+      })
+      // A vanished ancestor is still a refusal while the original candidate lives.
+      if (candidate) throw error
+      return undefined
+    })
+    if (raw === undefined) return false
+    const fields = raw.slice(raw.lastIndexOf(")") + 2).split(" ")
+    if (current === pid && ["Z", "X"].includes(fields[0] ?? "")) return false
+    const parent = Number(fields[1])
+    if (!Number.isSafeInteger(parent) || parent < 0 || !/^\d+$/.test(fields[19] ?? "")) throw Error("Process parent chain unavailable")
+    if (owners.some(owner => owner.pid === current && owner.starttime === fields[19])) return true
+    current = parent
+  }
+  return false
 }
 
 async function snapshot(owners: ProcessIdentity[] = []) {
@@ -331,9 +397,10 @@ async function browserIdentity(cmd: string[], env: Record<string, string>) {
  * Unknown native children block continuation rather than becoming guessed owners.
  */
 export async function superviseProcess(input: {
-  cmd: string[]; cwd: string; env: Record<string, string>; timeoutMs: number
-  profileDir?: string; outDir?: string; stdin?: string; signal?: AbortSignal; sandbox?: string[]
+  cmd: string[]; cwd: string; env: Record<string, string>; timeoutMs: number | null
+  profileDir?: string; outDir?: string; stdin?: string | ReadableStream<Uint8Array>; stdout?: WritableStream<Uint8Array>; signal?: AbortSignal; sandbox?: string[]; captureSecrets?: string[]
   observationMode?: "continuous" | "unit_after_exit"
+  owner?: ProcessOwner
 }) {
   if (process.platform !== "linux") throw Error("Process ownership supervision requires Linux /proc")
   if (input.observationMode !== undefined && input.observationMode !== "continuous" && input.observationMode !== "unit_after_exit")
@@ -364,11 +431,13 @@ export async function superviseProcess(input: {
   }) : undefined
   const files = input.outDir ? await Promise.all(["events.jsonl", "stderr.txt"]
     .map((name) => open(path.join(input.outDir!, name), "w", 0o600))) : []
+  const redactors = files.map((_, index) => index === 0 ? createJsonOutputRedactor(input.captureSecrets ?? []) : createOutputRedactor(input.captureSecrets ?? []))
   let writing = Promise.resolve()
   const capsule = await mkdtemp(path.join(os.tmpdir(), "evals-launcher-"))
   const nonce = crypto.randomUUID()
   await writeFile(path.join(capsule, "command.json"), JSON.stringify({ cmd: input.sandbox ?? input.cmd, cwd: input.cwd, nonce,
     sandbox: Boolean(input.sandbox) }), { mode: 0o600 })
+  const dispatchedAt = new Date().toISOString()
   const proc = spawn(process.execPath, [path.join(import.meta.dir, "process-launcher.ts"), capsule], { cwd: input.cwd, env: input.env,
     detached: true, stdio: [input.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"] })
   let cliExitCode: number | undefined, cliPid: number | undefined, reaperReady = false
@@ -378,6 +447,7 @@ export async function superviseProcess(input: {
   const exited = new Promise<void>((resolve) => {
     finish = resolve
     proc.once("exit", () => {
+      if (cleanup.lifetime) cleanup.lifetime.finished_at = new Date().toISOString()
       if (cliExitCode === undefined) cleanup.error ??= "Launcher ended without CLI exit receipt"
       resolve()
     })
@@ -416,17 +486,29 @@ export async function superviseProcess(input: {
     if (state.error) cleanup.error ??= "Launcher admission failed"
     if (state.exit_code !== null && Number.isSafeInteger(state.exit_code)) { cliExitCode = state.exit_code; finish() }
   }
+  const transport: Promise<void>[] = []
+  const transportAbort = new AbortController()
   if (input.stdin !== undefined) {
     proc.stdin!.on("error", () => { cleanup.error ??= "Command stdin delivery failed" })
-    proc.stdin!.end(input.stdin)
+    if (typeof input.stdin === "string") proc.stdin!.end(input.stdin)
+    else transport.push(input.stdin.pipeTo(Writable.toWeb(proc.stdin!), { signal: transportAbort.signal }).catch(() => {
+      cleanup.error ??= "Command stdin delivery failed"
+    }))
   }
+  if (input.stdout) transport.push(Readable.toWeb(proc.stdout!).pipeTo(input.stdout, { signal: transportAbort.signal }).catch(() => {
+    cleanup.capture_complete = false; cleanup.error ??= "Output transport failed"
+  }))
   const stdout: Uint8Array[] = [], stderr: Uint8Array[] = []
   for (const [index, stream] of [proc.stdout!, proc.stderr!].entries()) {
+    if (index === 0 && input.stdout) continue
     stream.on("data", (chunk: Buffer) => {
       (index === 0 ? stdout : stderr).push(chunk)
-      if (files[index]) writing = writing.then(async () => { await files[index]!.write(chunk) }).catch(() => {
-        cleanup.capture_complete = false; cleanup.error ??= "Output capture write failed"
-      })
+      if (files[index]) {
+        const captured = redactors[index]!(chunk)
+        writing = writing.then(async () => { if (captured.length) await files[index]!.write(captured) }).catch(() => {
+          cleanup.capture_complete = false; cleanup.error ??= "Output capture write failed"
+        })
+      }
     })
   }
   const streams = Promise.all([proc.stdout!, proc.stderr!].map((stream) => new Promise<void>((resolve) => {
@@ -443,22 +525,41 @@ export async function superviseProcess(input: {
     // Keep it unadmitted until CLI identity or native admission resolves it.
     const tracked: ProcessEntry = ledger.get(key(entry)) ?? { process: identity(entry),
       admission: browser && via === "subreaper" ? "pending" : "allowed" }
-    if (tracked.foreign) {
-      tracked.foreign = false; tracked.admission = "refused"
-      cleanup.error ??= `Browser binding differs PID ${entry.pid}`
-    }
     tracked.origin = { via, parent: parent ? key(parent) : undefined, observed_at: new Date().toISOString() }
     ledger.set(key(entry), tracked)
   }
-  if (root) track(root, "launcher")
+  let lastOwn: ProcessIdentity[] = []
+  if (root) {
+    track(root, "launcher")
+    cleanup.lifetime = { producer_pid: process.pid, owner: { ...(input.owner ?? { kind: "command", id: profile ?? input.cwd }) },
+      launcher: identity(root), started_at: dispatchedAt, finished_at: null }
+    liveSupervisors.set(key(root), { launcher: identity(root), entries: ledger, cleanup,
+      owner: input.owner ?? { kind: "command", id: profile ?? input.cwd }, live: () => lastOwn })
+  }
   if (registration) {
     await registration.writeFile(String(proc.pid ?? "unidentified")).catch(() => { cleanup.error = "Process registration write failed" })
     await registration.close().catch(() => { cleanup.error ??= "Process registration close failed" })
   }
   let scanning = Promise.resolve(), stopped = false, timedOut = false, interrupted = false
-  let lastOwn: ProcessIdentity[] = []
   const scan = async () => {
-    const live = await snapshot([...ledger.values()].filter((entry) => entry.origin).map((entry) => entry.process))
+    const registered = [...liveSupervisors.values()]
+    const live = await snapshot(registered.flatMap(supervisor => [...supervisor.entries.values()]
+      .filter(entry => entry.origin).map(entry => entry.process)))
+    const peers = registered.filter(supervisor => supervisor.entries !== ledger && supervisor.cleanup.launcher?.ready &&
+      live.some(current => sameIdentity(current, supervisor.launcher)))
+    cleanup.peerProcesses = peers.flatMap(supervisor => [...supervisor.entries.values()]
+      .filter(entry => entry.origin && entry.admission === "allowed" && live.some(current => sameIdentity(current, entry.process)))
+      .map(entry => ({ process: entry.process, launcher: supervisor.launcher, owner: supervisor.owner })))
+    const peerIds = new Set(cleanup.peerProcesses.map(entry => key(entry.process)))
+    // Fresh kernel ancestry marks peer descendants as foreign even when the
+    // peer has not admitted a short-lived intermediate process. It grants no signal authority.
+    for (let pass = 0; pass < live.length; pass++) {
+      const descendants = live.filter(entry => !peerIds.has(key(entry)) && !ledger.get(key(entry))?.origin &&
+        live.some(parent => parent.pid === entry.parent && peerIds.has(key(parent))))
+      if (!descendants.length) break
+      descendants.forEach(entry => peerIds.add(key(entry)))
+    }
+    for (const [id, entry] of ledger) if (!entry.origin && peerIds.has(id)) ledger.delete(id)
     for (const entry of ledger.values()) {
       if (!entry.origin) continue
       const current = live.find((candidate) => candidate.pid === entry.process.pid)
@@ -523,7 +624,12 @@ export async function superviseProcess(input: {
         entry.admission = "allowed"
     }
     if (profile && root && live.some((entry) => key(entry) === key(root))) {
-      const writer = await writerIdentity(profile)
+      const writer = await writerIdentity(profile).catch(error => {
+        if (!(error instanceof WriterUnavailable)) throw error
+        // The process tree still has to drain; stale-writer removal belongs to the profile owner.
+        cleanup.writerRefusal ??= error.refusal
+        return null
+      })
       if (writer && !cleanup.writer) cleanup.writer = writer
       if (writer && cleanup.writer && JSON.stringify(writer) !== JSON.stringify(cleanup.writer)) cleanup.error ??= "Writer identity changed"
     }
@@ -546,9 +652,11 @@ export async function superviseProcess(input: {
       }
       // An adopted process with a lost chain may be a browser helper outside the
       // bundle. Adoption cannot bypass executable admission, including its children.
-      const native = live.filter((entry) => !isWrapper(entry) && (entry.device === browser.device && entry.inode === browser.inode ||
+      const native = (await Promise.all(live.filter((entry) => !peerIds.has(key(entry)) && !isWrapper(entry) && (entry.device === browser.device && entry.inode === browser.inode ||
         inside(entry.executable, browser.directory) || ledger.has(key(entry)) &&
           (browserAncestor(ledger.get(key(entry))!, false) || cliPid !== undefined && entry.pid !== cliPid && ledger.get(key(entry))!.origin?.via === "subreaper")))
+        .map(async entry => ledger.get(key(entry))?.origin || root && await hasOwnedAncestry(entry.pid, [root]) ? entry : undefined)))
+        .filter(entry => entry !== undefined)
       // Establish exact root bindings first. Helpers cannot supply a missing
       // root proof, even when the kernel has adopted them to our launcher.
       for (const current of native) {
@@ -567,14 +675,11 @@ export async function superviseProcess(input: {
         const knownType = type && ["zygote", "gpu-process", "utility", "renderer", "broker", ...(browser.fake ? ["parent", "helper"] : [])].includes(type)
         const knownExecutable = browser.helpers.some((helper) => current.device === helper.device && current.inode === helper.inode)
         if (!entry.origin) {
-          const parent = live.find((candidate) => candidate.pid === current.parent)
-          const parentData = parent ? dataDir(parent) : undefined
-          entry.foreign ||= Boolean(data && !inside(data, profile!) || parentData && !inside(parentData, profile!))
-          entry.admission = entry.foreign ? "refused" : "pending"
+          entry.admission = "pending"
           continue
         }
         if (entry.admission === "refused") continue
-        if (entry.foreign || entry.binding && data && data !== path.join(entry.binding.runtimeDirectory, "browser-profile") || data && (!runtime || !mainExecutable) || mainExecutable && type && !knownType || !mainExecutable && !knownExecutable) {
+        if (entry.binding && data && data !== path.join(entry.binding.runtimeDirectory, "browser-profile") || data && (!runtime || !mainExecutable) || mainExecutable && type && !knownType || !mainExecutable && !knownExecutable) {
           entry.admission = "refused"
           cleanup.bindingRefusals ??= []
           cleanup.bindingRefusals.push({ process: identity(current), has_data_dir: Boolean(data), data_inside_profile: Boolean(data && inside(data, profile!)),
@@ -599,7 +704,7 @@ export async function superviseProcess(input: {
     }
     const owned = [...ledger.values()].filter((entry) => entry.origin)
     cleanup.processes = owned.map((entry) => entry.process)
-    cleanup.unknownProcesses = [...ledger.values()].filter((entry) => !entry.foreign && entry.admission !== "allowed").map((entry) => entry.process)
+    cleanup.unknownProcesses = [...ledger.values()].filter((entry) => entry.admission !== "allowed").map((entry) => entry.process)
     cleanup.browserBindings = owned.filter((entry) => entry.binding).map((entry) => ({ process: entry.process, ...entry.binding! }))
     cleanup.admissions = [...ledger.values()].map((entry) => ({ pid: entry.process.pid, starttime: entry.process.starttime, status: entry.admission }))
     cleanup.origins = owned.map((entry) => {
@@ -613,17 +718,32 @@ export async function superviseProcess(input: {
   // Trusted fixtures intentionally make their own /proc unreadable. The private
   // live subreaper receipt retains the boundary until strict shutdown scans.
   let unitActive = input.observationMode === "unit_after_exit"
-  const checkedScan = () => {
+  let lastObservation: number | undefined
+  const checkedScan = (scheduledAt = performance.now()) => {
     let confirmed = false
     scanning = scanning.then(async () => {
       const started = Date.now()
-      try { await readReceipt(); if (!unitActive) await scan(); confirmed = true }
+      cleanup.observations ??= { count: 0, max_duration_ms: 0, max_start_delay_ms: 0, max_gap_ms: 0 }
+      try {
+        await readReceipt()
+        if (!unitActive) {
+          const actual = performance.now()
+          cleanup.observations.max_start_delay_ms = Math.max(cleanup.observations.max_start_delay_ms ?? 0, actual - scheduledAt)
+          cleanup.observations.max_gap_ms = Math.max(cleanup.observations.max_gap_ms ?? 0, lastObservation === undefined ? 0 : actual - lastObservation)
+          lastObservation = actual
+          await scan()
+        }
+        confirmed = true
+      }
       finally {
-        cleanup.observations ??= { count: 0, max_duration_ms: 0 }
         cleanup.observations.count++
         cleanup.observations.max_duration_ms = Math.max(cleanup.observations.max_duration_ms, Date.now() - started)
       }
-    }).catch((error) => { cleanup.error ??= message(error) })
+    }).catch((error) => {
+      cleanup.peerProcesses = []
+      cleanup.error ??= message(error)
+      if (error instanceof WriterUnavailable) cleanup.writerRefusal ??= error.refusal
+    })
     return scanning.then(() => confirmed)
   }
   await checkedScan()
@@ -631,10 +751,10 @@ export async function superviseProcess(input: {
   // the admission window faster; do not enqueue stale scans when /proc is slow.
   let pollPending = false, nextPoll = 0
   const poll = setInterval(() => {
-    if (stopped || pollPending || Date.now() < nextPoll) return
+    if (stopped || pollPending || performance.now() < nextPoll) return
     pollPending = true
-    const started = Date.now()
-    void checkedScan().finally(() => {
+    const started = performance.now()
+    void checkedScan(nextPoll || started).finally(() => {
       const fast = ![...ledger.values()].some((entry) => entry.origin?.via === "cli") ||
         browser && (!cleanup.browserBindings?.length || cleanup.runtimeDirectories.some((directory) =>
           !cleanup.browserBindings?.some((binding) => binding.runtimeDirectory === directory)) || cleanup.unknownProcesses?.length)
@@ -655,7 +775,8 @@ export async function superviseProcess(input: {
     for (const candidate of candidates) {
       if (Date.now() >= deadline) { cleanup.error ??= "Process cleanup deadline exceeded"; return }
       if (!await checkedScan()) return
-      const tracked = ledger.get(candidate)!
+      const tracked = ledger.get(candidate)
+      if (!tracked) continue
       const saved = tracked.process
       if (tracked.admission !== "allowed" || !tracked.origin || root && key(saved) === key(root)) continue
       // bwrap does not forward signals. Killing either reaper first bypasses
@@ -672,7 +793,7 @@ export async function superviseProcess(input: {
   }
   let budgetEnded: () => void = () => {}
   const budget = new Promise<void>((resolve) => { budgetEnded = resolve })
-  const timer = setTimeout(() => { timedOut = true; budgetEnded() }, input.timeoutMs)
+  const timer = input.timeoutMs === null ? undefined : setTimeout(() => { timedOut = true; budgetEnded() }, input.timeoutMs)
   const abort = () => { interrupted = true; budgetEnded() }
   input.signal?.addEventListener("abort", abort, { once: true })
   if (input.signal?.aborted) abort()
@@ -680,10 +801,15 @@ export async function superviseProcess(input: {
   unitActive = false
   clearTimeout(timer)
   input.signal?.removeEventListener("abort", abort)
-  const deadline = Date.now() + 60_000
+  // Slot CLI owns up to 90s of Host teardown before external escalation.
+  const interruptGraceMs = input.owner?.kind === "slot" ? 90_000 : 30_000
+  const deadline = Date.now() + interruptGraceMs + 30_000
   if (timedOut || interrupted) {
     await signalOwned("SIGINT")
-    await Promise.race([exited, Bun.sleep(30_000)])
+    const grace = Promise.withResolvers<void>()
+    const graceTimer = setTimeout(grace.resolve, interruptGraceMs)
+    try { await Promise.race([exited, grace.promise]) }
+    finally { clearTimeout(graceTimer) }
   }
   await signalOwned("SIGTERM")
   const remaining = async (wrappers = false) => {
@@ -738,7 +864,20 @@ export async function superviseProcess(input: {
       proc.stdout!.destroy(); proc.stderr!.destroy()
     }
   })])
+  for (const [index, redact] of redactors.entries()) {
+    const tail = redact(Buffer.alloc(0), true)
+    writing = writing.then(async () => { if (tail.length) await files[index]!.write(tail) }).catch(() => {
+      cleanup.capture_complete = false; cleanup.error ??= "Output capture write failed"
+    })
+  }
   await writing
+  const transportDeadline = Promise.withResolvers<void>()
+  const transportTimer = setTimeout(() => {
+    cleanup.capture_complete = false; cleanup.error ??= "Output transport deadline exceeded"
+    transportAbort.abort(); transportDeadline.resolve()
+  }, 1_000)
+  await Promise.race([Promise.all(transport), transportDeadline.promise])
+  clearTimeout(transportTimer)
   for (const file of files) {
     await file.sync().catch(() => { cleanup.error ??= "Output capture sync failed"; cleanup.capture_complete = false })
     await file.close().catch(() => { cleanup.error ??= "Output capture close failed"; cleanup.capture_complete = false })
@@ -752,7 +891,10 @@ export async function superviseProcess(input: {
       !(sandboxTerminated && (timedOut || interrupted) && cliExitCode !== undefined && cliExitCode >= 128)
       ? "SANDBOX_EXECUTION_FAILED" : null) : null }
   if (input.outDir) {
-    await Bun.write(path.join(input.outDir, "process-cleanup.json"), JSON.stringify(cleanup, null, 2)).catch(() => {
+    await open(path.join(input.outDir, "process-cleanup.json"), "w", 0o600).then(async file => {
+      try { await file.writeFile(JSON.stringify(cleanup, null, 2)); await file.sync() }
+      finally { await file.close() }
+    }).catch(() => {
       cleanup.status = "failed"; cleanup.error ??= "Process evidence persistence failed"
     })
   }
@@ -765,5 +907,6 @@ export async function superviseProcess(input: {
   if (marker && cleanup.status === "confirmed") await rm(marker, { force: true }).catch(() => {
     cleanup.status = "failed"; cleanup.error ??= "Process registration release failed"
   })
+  if (root && cleanup.status === "confirmed") liveSupervisors.delete(key(root))
   return result
 }

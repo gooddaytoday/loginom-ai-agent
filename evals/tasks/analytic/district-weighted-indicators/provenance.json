@@ -1,0 +1,179 @@
+{
+  "task_id": "district-weighted-indicators",
+  "dataset_sha256": {
+    "dataset.csv": "9880e101d4fd96e428f4efa9fb5b99ff7bff03fcae2163c1d79235d58a6f0b24"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "4d7af9e8d0bb457cdea538bac8e6d439b20e3280231eefc2823ab4b92b0fad02"
+  },
+  "reference_sha256": "d70c46bda9b488305bcdedafc162f23d385410705a4fe026543eb282ea0ef911",
+  "cli": {
+    "binary": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/runtime/bin/loginom-ai-agent-cli",
+    "version": "0.2.2",
+    "profile": "profile"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-district-weighted-indicators-2.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/c97b36251e2d238ffe1be6caf01da658e2a539ee7d07c60262802632e826e207-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 2,
+    "total": 2,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_eaa1aff0affewAgCrlGyVSvafQ",
+    "skill_revision": "8afb17d6a2c247fa0fb8fc6e2285e6ed05e6bf475a1a9d88ae7b760a29260dfc",
+    "exit_code": 0,
+    "started_at": "2026-10-19T23:40:29+03:00",
+    "duration_s": 1328,
+    "tokens": {
+      "input": 182933,
+      "output": 6676,
+      "reasoning": 2728
+    },
+    "tool_calls": 52,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-district-weighted-indicators-2/Unit1/workflow",
+  "source_task": "analitic-tasks/task55-rosstat",
+  "runtime_pin": {
+    "version": "0.2.2",
+    "ci_run": 39210148809,
+    "ci_artifact": {
+      "id": 12168030843,
+      "name": "loginom-linux",
+      "sha256": "bf0e29fd686cb5ec50477a8e36775359486f6aafb93897dce363082fa879c86c"
+    },
+    "archive": {
+      "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/downloads/loginom-ai-agent-cli-0.2.2-linux-x64.tar.gz",
+      "sha256": "c612eab428e5dc16b9a6105cb4fd401a00c04a25dee6390644b50e86044283b9"
+    },
+    "source_commit": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "source_tree_sha256": "92f2bf27f7771109634d33bb8ce6ab1be4f84a74209a45936e0a18d430b57bff",
+    "cli_manifest_sha256": "26c94fe7d3d6f975cc2d60d99eb5f7b2b6fcb377c753c6de3079c155f41ac28c",
+    "resource_manifest_sha256": "0642015ac67c8f569e7b4d1ac158973d514ae39d72b77cacae10d48810fddd34",
+    "harness_sha": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "harness_clean": true
+  },
+  "independent_oracle_check": {
+    "pass": true,
+    "method": "blind Python stdlib csv + in-memory SQLite independent SQL; author oracle not provided",
+    "independent_csv_sha256": "4d7af9e8d0bb457cdea538bac8e6d439b20e3280231eefc2823ab4b92b0fad02",
+    "query_sha256": "32c82a4b31e08b2caacdb107c264350c02b3fe6a5ce763d797c0c0c0b2aa1365",
+    "solver_sha256": "9f69a1837398d7bf3da73e4ba6087b7b920dad98295785fe17739808d8373e54",
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/independent/b/report.json",
+    "report_case": "district-weighted-indicators",
+    "comparison": {
+      "passed": true,
+      "error": null
+    }
+  },
+  "browser_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/district-weighted-indicators/attempt-2/browser-rerun.json",
+    "screenshot": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/district-weighted-indicators/attempt-2/browser-rerun.png",
+    "all_nodes_active": true,
+    "closed_without_save": true,
+    "rounding_verified_in_exported_path": true
+  },
+  "graph_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/district-weighted-indicators/attempt-2/graph-inspection.json",
+    "node_count": 8,
+    "connected": true,
+    "original_population_weights": true,
+    "sum_weighted_products_divided_by_sum_population": true,
+    "input_percentages_no_rescale": true,
+    "raw_sort_before_round": true
+  },
+  "fallback_used": false,
+  "attempt_history": [
+    {
+      "number": 1,
+      "assisted": false,
+      "classification": "technical-ui-blocker",
+      "exit_code": 1,
+      "content_failure_counted": false,
+      "analytic_revision": "primary",
+      "operation_id": "weighted-means-01",
+      "phase": "input_mapping",
+      "reason": "calculator done available readiness timeout; original input Done reference unavailable; abandon rejected by ambiguous UI ref then mask/dialog",
+      "cleanup": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/district-weighted-indicators/attempt-1/cleanup.json",
+      "evidence": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/district-weighted-indicators/attempt-1/cleanup-evidence",
+      "next": "repeat unchanged primary attempt2 without hint; no analytic fallback",
+      "classification_evidence": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/district-weighted-indicators/attempt-1/attempt-classification.json",
+      "cleanup_verified": {
+        "pass": true,
+        "at": "2026-10-19T20:40:14.441061+00:00",
+        "runtime_pid": 857518,
+        "cli_pids": [
+          857114,
+          857115
+        ],
+        "process_close_proof": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/district-weighted-indicators/attempt-1/cleanup-evidence/process-close-proof.json",
+        "resource_close": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/district-weighted-indicators/attempt-1/cleanup-evidence/native/resource-close.jsonl",
+        "browser_close": "fulfilled 2026-10-19T20:37:42.448Z",
+        "release_stale_writer": {
+          "expectedIdentity": {
+            "device": 2050,
+            "inode": 210915587,
+            "owner": "0e11d8b5-ad97-4732-bcd0-f3e715628399"
+          },
+          "result": true,
+          "proof": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/district-weighted-indicators/attempt-1/cleanup-evidence/release-stale-writer.json"
+        },
+        "status": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/district-weighted-indicators/attempt-1/cleanup-evidence/status.json",
+        "recovery_ids": [],
+        "connection_check": {
+          "ok": true,
+          "code": "LOGINOM_CONNECTION_VALID",
+          "help": {
+            "state": "ready"
+          },
+          "browser": {
+            "state": "verified"
+          }
+        },
+        "writer_absent": true
+      }
+    },
+    {
+      "number": 2,
+      "classification": "accepted",
+      "analytic_revision": "primary",
+      "assisted": false,
+      "exit_code": 0,
+      "cli_check": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/district-weighted-indicators/attempt-2/check.json",
+      "rerun_check": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/district-weighted-indicators/attempt-2/check-rerun.json",
+      "in_attempt_technical_recovery": {
+        "operation_id": "weighted-means",
+        "phase": "output_mapping",
+        "reason": "complete output definition page readiness timeout; no mutation authorized for stopped phase",
+        "resolution": "inspect then abandon_operation released_after_proof; weighted-means-repair succeeded",
+        "events": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/district-weighted-indicators/attempt-2/events.jsonl",
+        "content_failure_counted": false
+      }
+    }
+  ]
+}

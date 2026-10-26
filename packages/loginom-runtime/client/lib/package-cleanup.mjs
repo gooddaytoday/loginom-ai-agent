@@ -1,3 +1,5 @@
+import {withBrowserReceipt} from './executor.mjs';
+
 // Explicit isolated-run teardown. Never save, stop nodes, or close a package
 // in another Loginom session. The CLI never opts into diagnostic discard.
 // Loginom's own close guard remains
@@ -24,6 +26,9 @@ export function makeFailedOpenCleanupCode(options) {
   const o={sessionId:options.sessionId,account:options.account,packagePath:options.packagePath,
     origin:new URL(options.loginomUrl).origin,loginomBuild:options.loginomBuild,operationId:options.operationId,
     timeoutMs:options.timeoutMs??8000,diagnosticDiscard:false,diagnosticWaitForIdle:false};
+  const gesture=withBrowserReceipt('perform()',{
+    receipt_namespace:'failed-open-cleanup:'+o.sessionId,operation_id:o.operationId+':cleanup-error-ok',
+    receipt_signature:JSON.stringify(o)});
   return `async page=>{
     const o=${JSON.stringify(o)},deadline=${Date.now()+30000};
     const blocked=reason=>({version:1,session_id:o.sessionId,package_path:o.packagePath,status:'BLOCKED',reason,
@@ -36,7 +41,8 @@ export function makeFailedOpenCleanupCode(options) {
         if(Date.now()>=deadline)return blocked('CLEANUP_DEADLINE_EXCEEDED');
         if(!bound)return blocked('FAILED_OPEN_OWNER_UNCONFIRMED');
         return (${closeOwnedPackage.toString()})(page,{...o,documentId:bound.document_id,tabTid:bound.tab_tid,
-          diagnosticReadOnly:bound.read_only},deadline);
+          diagnosticReadOnly:bound.read_only,failedOpenOperation:o.operationId},Math.min(deadline,bound.cleanup_deadline),
+          perform=>(${gesture})(page));
       } catch {return blocked('FAILED_OPEN_CLEANUP_UNCONFIRMED');}
     })()]);
   }`;
@@ -63,8 +69,10 @@ function bindFailedOpen(o) {
   let n=f.Items?.Workspace?.getActiveTab()?.Controller?.Node?.data?.node;const seen=new Set();
   for(let i=0;n&&n!==node&&i<32&&!seen.has(n);i++){seen.add(n);n=n.ParentNode;}
   if(n!==node||Date.now()>=o.deadline)return null;
+  r.failedOpenCleanupDeadline=Math.min(r.failedOpenCleanupDeadline??o.deadline,o.deadline);
+  if(Date.now()>=r.failedOpenCleanupDeadline)return null;
   r.tab=tab;r.packageNode=node;r.failedOpenCleanup=true;
-  return {document_id:prep.id,tab_tid:tab.getAttribute('data-tid'),read_only:node.ReadOnly};
+  return {document_id:prep.id,tab_tid:tab.getAttribute('data-tid'),read_only:node.ReadOnly,cleanup_deadline:r.failedOpenCleanupDeadline};
 }
 
 // Journal snapshot only: no preparation binding or native mutations.
@@ -86,9 +94,13 @@ function readColdOpenFailure(o) {
     packages.push({path:scalar(node.PackageFileName),read_only:typeof node.ReadOnly==='boolean'?node.ReadOnly:null,
       lock_owner:data(node,['LockOwner','LockOwnerName'])});
   }
+  const error=globalThis.bg?.ext?.errormessage?.ErrorMsg?.FInstance,dialog=error?.FMessageBox?.el?.dom;
   return {status:'observed',package_count:Number.isSafeInteger(count)?count:null,inventory_complete:packages.length===count,packages,
     server_session:data(m.FServerConnection.Session,['SessionID','SessionId','ID','Id']),
     lock_owner_availability:'explicit_native_data_properties_only',
+    error_window:dialog?{tid:scalar(dialog.getAttribute?.('data-tid')),native_bound:globalThis.Ext?.getCmp?.(dialog.id)===error.FMessageBox,
+      messages_bound:dialog.contains?.(error.FMessages?.el?.dom)===true,
+      visible:!!dialog.getBoundingClientRect().width&&!!dialog.getBoundingClientRect().height&&getComputedStyle(dialog).visibility!=='hidden'}:null,
     errors:[...document.querySelectorAll('.bg-error-messages')].slice(0,8).map(e=>({text:(e.textContent??'').slice(0,2048),
       visible:!!e.getBoundingClientRect().width&&!!e.getBoundingClientRect().height&&getComputedStyle(e).visibility!=='hidden'}))};
 }
@@ -111,7 +123,7 @@ export function parsePackageCleanupResult(response, expected) {
   throw Error('Bound package cleanup receipt missing');
 }
 
-async function closeOwnedPackage(page, options, deadline) {
+async function closeOwnedPackage(page, options, deadline, guardedDismiss) {
   const {sessionId, documentId, account, packagePath, tabTid, timeoutMs} = options;
   const receipt = {version:1, session_id:sessionId, document_id:documentId, account, package_path:packagePath,
     package_closed:false, logged_out:false, unsaved_changes_discarded:false, stage:'close_request', started_at:new Date().toISOString()};
@@ -145,7 +157,7 @@ async function closeOwnedPackage(page, options, deadline) {
     return ms;
   };
   try {
-    const beginClose = () => page.evaluate(async ({options:o, deadline}) => {
+    const beginClose = (dismissOpenError=false) => page.evaluate(async ({options:o, deadline,dismissOpenError}) => {
       const app = globalThis.bg?.app, f = app?.Application?.FInstance?.FMainForm, m = f?.FMapTree;
       const prep = globalThis.__loginomDockPreparationV1;
       const identity = JSON.stringify(o);
@@ -167,7 +179,7 @@ async function closeOwnedPackage(page, options, deadline) {
         &&state.serverSession===m.FServerConnection.Session;
       if(!ownerBound())return {reason:'CLEANUP_SESSION_CHANGED'};
       const visible = e => !!e.getBoundingClientRect().width && !!e.getBoundingClientRect().height && getComputedStyle(e).visibility !== 'hidden';
-      if ([...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)) return {reason:'DIALOG_OR_OPERATION_OPEN'};
+      if (!o.failedOpenOperation&&[...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)) return {reason:'DIALOG_OR_OPERATION_OPEN'};
       if (m.PackageNodes?.Count !== 1) return {reason:'PACKAGE_INVENTORY_CHANGED'};
       const node = m.PackageNodes.Items(0), normalized = value => typeof value === 'string' && value ? '/'+value.replaceAll('\\','/').replace(/^\/+/, '') : null;
       if (normalized(node.PackageFileName) !== o.packagePath || node.ReadOnly !== o.diagnosticReadOnly) return {reason:'PACKAGE_IDENTITY_CHANGED'};
@@ -177,6 +189,77 @@ async function closeOwnedPackage(page, options, deadline) {
       });
       const tabBound = () => prepared?.packageNode === node && prepared.tab?.getAttribute('data-tid') === o.tabTid && document.contains(prepared.tab);
       if (!tabBound()) return {reason:'TAB_IDENTITY_CHANGED'};
+      if(o.failedOpenOperation&&(dismissOpenError||[...document.querySelectorAll('[role="dialog"],.x-message-box,.bg-mask-message,.x-mask-msg')].some(visible)
+        ||state.open_error_dismiss_started)) {
+        if(prep.receipts.get(o.failedOpenOperation)!==prepared||prepared.failedOpenCleanup!==true
+          ||prepared.phase!=='effect_possible'||prepared.openSubmitted!==true||prepared.packageInventoryBefore!==0
+          ||prepared.openAccount!==o.account||prepared.openConnection!==m.FServerConnection
+          ||prepared.openServerSession!==m.FServerConnection.Session)return {reason:'FAILED_OPEN_OWNER_CHANGED'};
+        const prefix=o.tabTid.match(/;tb(-\d+)?$/);
+        if(!prefix)return {reason:'FAILED_OPEN_OWNER_CHANGED'};
+        const roots=[...document.querySelectorAll('[data-tid='+JSON.stringify('MF;TF'+(prefix[1]??''))+']')];
+        const root=roots.length===1&&roots[0],native=root&&globalThis.Ext?.getCmp?.(root.id);
+        if(!root||native?.$className!=='bg.app.view.TabForm'||native.el?.dom!==root
+          ||f.Items?.Workspace?.getActiveTab()!==native||native.hidden!==false)return {reason:'FAILED_OPEN_OWNER_CHANGED'};
+        const inactive=e=>{
+          const picker=e.closest?.('[data-tid="OpenDialogForm"]')??e,c=globalThis.Ext?.getCmp?.(picker.id);
+          return picker===prepared.openDialogElement&&c===prepared.openDialog&&c?.hidden===true&&c.el?.dom===picker;
+        };
+        const blockers=[...document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog,.x-message-box,.bg-mask-message,.x-mask-msg')]
+          .filter(e=>visible(e)&&!inactive(e));
+        const loading=e=>(e===root||root.contains(e))&&e.matches('.bg-mask-message,.x-mask-msg');
+        const error=prepared.openError;
+        const instance=globalThis.bg?.ext?.errormessage?.ErrorMsg?.FInstance;
+        const errorBound=error&&instance===error.instance&&instance.FMessageBox===error.message
+          &&instance.FMessages===error.messages&&instance.FErrorMessageInfo===error.info
+          &&error.message.el?.dom===error.root&&error.messages.el?.dom===error.element
+          &&globalThis.Ext?.getCmp?.(error.root.id)===error.message&&error.root.contains(error.element)
+          &&(error.element.textContent??'').trim()==="Cannot read properties of undefined (reading 'TestableCellRenderer')";
+        const errors=[...document.querySelectorAll('.bg-error-messages')].filter(visible);
+        if(errors.length&&(!errorBound||errors.length!==1||errors[0]!==error.element))return {reason:'DIALOG_OR_OPERATION_OPEN'};
+        if(blockers.some(e=>!loading(e)&&!(errorBound&&(e===error.root||error.root.contains(e)))))return {reason:'DIALOG_OR_OPERATION_OPEN'};
+        if(state.open_error_dismiss_started&&!errorBound)return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+        if(errorBound&&visible(error.root)) {
+          const tid=error.root.getAttribute('data-tid');
+          if(!/^msgbox(?:-\d+)?$/.test(tid??'')||!visible(error.element))return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+          if(state.open_error_dismiss_started)return {reason:'OWNED_OPEN_ERROR_CLOSING'};
+          const buttons=[...document.querySelectorAll('[data-tid='+JSON.stringify(tid+';tlb;ok')+']')];
+          const button=buttons.length===1&&buttons[0],control=button&&globalThis.Ext?.getCmp?.(button.id);
+          const choices=[...document.querySelectorAll('[data-tid^='+JSON.stringify(tid+';tlb;')+']')]
+            .filter(e=>visible(e)&&/;(ok|yes|no|cancel)$/.test(e.getAttribute('data-tid')??''));
+          if(!button||button.isConnected!==true||button.getAttribute('data-tid')!==tid+';tlb;ok'
+            ||!error.root.contains(button)||!visible(button)||button.innerText?.trim()!=='OK'
+            ||choices.length!==1||choices[0]!==button||control?.el?.dom!==button||control.disabled!==false)return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+          let parent=control;const seen=new Set();
+          for(let i=0;parent&&parent!==error.message&&i<16&&!seen.has(parent);i++){seen.add(parent);parent=parent.ownerCt;}
+          if(parent!==error.message)return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+          const b=button.getBoundingClientRect(),x=b.x+b.width/2,y=b.y+b.height/2,hit=document.elementFromPoint(x,y);
+          if(!Number.isFinite(x)||!Number.isFinite(y)||x<0||y<0||x>=innerWidth||y>=innerHeight
+            ||!(hit===button||button.contains(hit))||Date.now()>=deadline)return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+          const signature=JSON.stringify([tid,button.tagName,button.getAttribute('type'),button.innerText,
+            control.disabled,b.x,b.y,b.width,b.height]);
+          const target=state.open_error_target;
+          if(!dismissOpenError) {
+            if(!target)state.open_error_target={button,control,signature};
+            else if(target.button!==button||target.control!==control||target.signature!==signature)
+              return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+            return {reason:'OWNED_OPEN_ERROR',dismiss:{tid:tid+';tlb;ok'}};
+          }
+          if(!target||target.button!==button||target.control!==control||target.signature!==signature)
+            return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+          // No await/RPC between the complete native owner/ref/hit-test proof
+          // and this sole DOM gesture. Never dispatch to retained coordinates.
+          if(Date.now()>=deadline)return {reason:'CLEANUP_DEADLINE_EXCEEDED'};
+          state.open_error_dismiss_started=true;
+          button.click();
+          return {dismiss:{tid:tid+';tlb;ok'},gesture_returned:true};
+        }
+        if(state.open_error_dismiss_started&&(visible(error?.root)||visible(error?.element)))return {reason:'FAILED_OPEN_ERROR_UNCONFIRMED'};
+        if(blockers.some(loading))return {reason:'OWNED_OPEN_LOADING'};
+        // This callback is only for OK. If its owned error vanished in transit,
+        // leave Close to the ordinary path and its fresh native guards.
+        if(dismissOpenError)return {reason:'OWNED_OPEN_ERROR_ABSENT'};
+      }
       const openOwnerBound=()=>{
         if(prepared?.failedOpenCleanup!==true)return true;
         if(prepared.openConnection!==m.FServerConnection||prepared.openServerSession!==m.FServerConnection.Session)return false;
@@ -218,17 +301,33 @@ async function closeOwnedPackage(page, options, deadline) {
         state.done = true;
       }, () => { state.done = true; state.failed = true; });
       return {started:true, packages_before:1, modified, display_name:node.DisplayName};
-    }, {options, deadline});
+    }, {options, deadline,dismissOpenError});
     let before = await beginClose();
+    if(before.reason==='OWNED_OPEN_ERROR') {
+      if(!guardedDismiss)return finish('BLOCKED','FAILED_OPEN_ERROR_UNCONFIRMED');
+      const ready=await guardedDismiss(()=>beginClose(true));
+      if(Date.now()>=deadline)return finish('BLOCKED','CLEANUP_DEADLINE_EXCEEDED');
+      if(ready.dismiss) {
+        receipt.stage='failed_open_error_dismiss';
+        if(ready.gesture_returned!==true)return finish('BLOCKED','FAILED_OPEN_ERROR_UNCONFIRMED');
+        receipt.open_error_cleanup={tid:ready.dismiss.tid,gesture_attempted:true,gesture_returned:true};
+      } else if(!['OWNED_OPEN_LOADING','OWNED_OPEN_ERROR_ABSENT'].includes(ready.reason)) {
+        return finish('BLOCKED',ready.reason??'FAILED_OPEN_ERROR_UNCONFIRMED');
+      }
+      // A lost/late acknowledgement is never permission to click OK again.
+      if(Date.now()>=deadline)return finish('BLOCKED','CLEANUP_DEADLINE_EXCEEDED');
+      before=ready.reason==='OWNED_OPEN_LOADING'?ready:await beginClose();
+    }
     const idleDeadline = Math.min(deadline, Date.now()+timeoutMs);
     // Cold owns an isolated diagnostic session. Wait only for a blocked gate;
     // every read repeats the original guards and never dismisses a dialog.
     // A known running state of the exact owned package may also settle within
     // this cleanup call's original deadline. Unknown/foreign states cannot.
     while (options.diagnosticWaitForIdle && before.reason === 'DIALOG_OR_OPERATION_OPEN'
-      ||before.reason==='RUNNING_NODES'&&before.own_running===true) {
+      ||before.reason==='RUNNING_NODES'&&before.own_running===true
+      ||options.failedOpenOperation&&['OWNED_OPEN_LOADING','OWNED_OPEN_ERROR_CLOSING'].includes(before.reason)) {
       receipt.stage = 'idle_wait';
-      const waitDeadline=before.reason==='RUNNING_NODES'?deadline:idleDeadline;
+      const waitDeadline=before.reason==='RUNNING_NODES'||before.reason.startsWith('OWNED_OPEN_')?deadline:idleDeadline;
       const left = waitDeadline-Date.now();
       if (left <= 0) return finish('BLOCKED', before.reason);
       await page.waitForTimeout(Math.min(100, left));

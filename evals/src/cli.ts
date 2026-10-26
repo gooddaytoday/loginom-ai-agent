@@ -4,6 +4,8 @@ import { evalsRoot, repoRoot } from "./config"
 import { superviseProcess } from "./process-supervisor"
 import { sandboxCommand, SandboxFailure, assertNoDebuggers } from "./sandbox"
 import { assertProfileClean } from "./profile"
+import { redactKnownSecrets } from "./output-redaction"
+import { childEnvironment } from "./child-environment"
 
 const saveActions = new Set(["package.save_as", "package.save_checkpoint"])
 const nodeTools = new Set(["loginom_dock_node_apply", "loginom_dock_node_resume", "loginom_dock_node_wait"])
@@ -21,9 +23,9 @@ type Part = {
   tokens?: { input?: number; output?: number; reasoning?: number }
   state?: { status?: string; input?: Record<string, unknown>; output?: string; error?: string }
 }
-type Event = { type?: string; sessionID?: string; part?: Part; error?: { name?: string; data?: { message?: string } } }
+type Event = { type?: string; sessionID?: string; part?: Part; status?: { type?: string }; error?: { name?: string; data?: { message?: string; statusCode?: number } } }
 
-export function parseEvents(text: string) {
+export function parseEvents(text: string, secrets: string[] = []) {
   const events = text.split("\n").flatMap((line) => {
     const parsed = parseJson(line)
     return typeof parsed === "object" && parsed !== null ? [parsed as Event] : []
@@ -44,16 +46,21 @@ export function parseEvents(text: string) {
       return found ? [found] : []
     })
   const receipts = truncateReceipts(
-    tools.filter((part) => nodeTools.has(part.tool ?? "") && completed(part)).map((part) => part.state?.output ?? ""),
+    tools.filter((part) => nodeTools.has(part.tool ?? "") && completed(part)).map((part) => redactKnownSecrets(part.state?.output ?? "", secrets)),
   )
   const prepare = tools.find((part) => part.tool === "loginom_dock_prepare" && completed(part))
   const preparation = firstJsonObject(prepare?.state?.output ?? "") as { skillRevision?: unknown } | undefined
   const errorEvents = events.filter((event) => event.type === "error")
+  const sessionId = events.find(event => typeof event.sessionID === "string")?.sessionID
+  const statuses = events.filter(event => event.type === "session.status")
+  const providerComplete = Boolean(sessionId) && statuses[0]?.status?.type === "busy" && statuses.at(-1)?.status?.type === "idle" &&
+    events.every(event => event.sessionID === undefined || event.sessionID === sessionId) && !tools.some(part => part.tool === "task") &&
+    events.length === text.split("\n").filter(line => line.trim()).length
   const steps = events.filter((event) => event.type === "step_finish").map((event) => event.part)
   const sum = (pick: (part: Part | undefined) => number | undefined) =>
     steps.reduce((acc, part) => acc + (pick(part) ?? 0), 0)
   return {
-    sessionId: events.find((event) => typeof event.sessionID === "string")?.sessionID,
+    sessionId,
     saveReceipts,
     nodeReceipts: receipts.kept,
     nodeReceiptsDropped: receipts.dropped,
@@ -65,6 +72,16 @@ export function parseEvents(text: string) {
       input: sum((part) => part?.tokens?.input),
       output: sum((part) => part?.tokens?.output),
       reasoning: sum((part) => part?.tokens?.reasoning),
+    },
+    limitEvidence: {
+      // runAgent supplies a title; delegated sessions and older/partial streams stay unqualified.
+      coverage: { provider: providerComplete ? "complete" : "unavailable", dock: "unavailable", judge: "unavailable" },
+      events: [
+        ...errorEvents.flatMap(event => event.error?.name === "APIError" && event.error.data?.statusCode === 429
+          ? [{ source: "provider" as const, kind: "http" as const, status: 429 as const }] : []),
+        ...events.filter(event => event.type === "session.status" && event.status?.type === "retry")
+          .map(() => ({ source: "provider" as const, kind: "retry" as const })),
+      ],
     },
     errors: errorEvents.flatMap((event) => (event.error?.name ? [event.error.name] : [])),
     errorTexts: errorEvents.map((event) => `${event.error?.name ?? ""} ${event.error?.data?.message ?? ""}`),
@@ -106,11 +123,13 @@ export function agentCommand(config: EvalConfig, env: Record<string, string | un
     value === undefined || droppedChildEnv.test(key) ? [] : [[key, value] as const],
   )
   const isolated: Record<string, string> = {
-    ...Object.fromEntries(inherited),
+    ...(config.slotsFile && config.agent.cliMode === "binary" ? childEnvironment(env) : Object.fromEntries(inherited)),
     LOGINOM_AI_AGENT_CLI_PROFILE: config.profileDir,
     LOGINOM_AI_AGENT_PURE: "1",
     LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG: "1",
     LOGINOM_AI_AGENT_DISABLE_CLAUDE_CODE_PROMPT: "1",
+    ...(config.slotsFile ? { LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS: "false" } : {}),
+    ...(config.slotsFile && config.auth ? { LOGINOM_AI_AGENT_SHARED_AUTH_DIR: config.auth.sharedDir } : {}),
   }
   if (config.agent.cliMode === "source")
     return {
@@ -135,6 +154,7 @@ export async function runAgent(input: {
   timeoutMs: number
   outDir: string
   profileDir?: string
+  slotId?: string
   signal?: AbortSignal
 }) {
   const args = [
@@ -146,6 +166,8 @@ export async function runAgent(input: {
     input.model,
     "--variant",
     input.variant ?? "default",
+    "--title",
+    `eval-${input.taskId}`,
     ...input.files.flatMap((file) => ["--file", file]),
     "--dir",
     input.workdir,
@@ -165,8 +187,9 @@ export async function runAgent(input: {
   const processRun = await superviseProcess({
     cmd, cwd: boundary?.cwd ?? input.command.cwd,
     env: boundary?.env ?? { ...input.command.env, EVAL_TASK_ID: input.taskId }, sandbox: boundary?.cmd,
-    profileDir: input.profileDir, outDir: input.outDir,
+    profileDir: input.profileDir, outDir: input.outDir, captureSecrets: input.command.cleanupSecrets,
     timeoutMs: input.timeoutMs, signal: input.signal,
+    owner: { kind: "slot", id: input.slotId ?? input.profileDir ?? input.workdir },
   }).catch((error: unknown) => {
     if (boundary) throw new SandboxFailure("не удалось запустить или проверить процессы границы")
     throw error
@@ -174,18 +197,21 @@ export async function runAgent(input: {
   const stdout = processRun.stdout
   const stderr = processRun.stderr
   const exitCode = processRun.exitCode
-  const parsed = parseEvents(stdout)
+  const parsed = parseEvents(stdout, input.command.cleanupSecrets)
   const run = {
     exitCode,
     timedOut: processRun.timedOut,
     interrupted: processRun.interrupted,
     startedAt: processRun.startedAt,
     durationMs: processRun.durationMs,
+    // Session/artifact/revision bindings are used by cleanup and evidence readers.
     ...parsed,
+    ...redactKnownSecrets({ finalText: parsed.finalText, errors: parsed.errors, errorTexts: parsed.errorTexts }, input.command.cleanupSecrets ?? []),
+    tools: parsed.tools.map(tool => ({ ...tool, error: redactKnownSecrets(tool.error, input.command.cleanupSecrets ?? []) })),
     processCleanup: processRun.processCleanup,
     sandboxError: processRun.sandboxError,
     failureKind: failureKind({ exitCode, errors: parsed.errors, errorTexts: parsed.errorTexts, stderr }),
-    stderrHead: stderr.split("\n").slice(0, 20).join("\n"),
+    stderrHead: redactKnownSecrets(stderr, input.command.cleanupSecrets ?? []).split("\n").slice(0, 20).join("\n"),
   }
   await Bun.write(path.join(input.outDir, "run.json"), JSON.stringify(run, null, 2)).catch(() => {
     run.processCleanup.status = "failed"

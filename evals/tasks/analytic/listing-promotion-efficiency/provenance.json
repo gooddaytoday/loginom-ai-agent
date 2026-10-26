@@ -1,0 +1,307 @@
+{
+  "task_id": "listing-promotion-efficiency",
+  "dataset_sha256": {
+    "dataset.csv": "34637525ab07cf7905dc47a785bd362b2064123a3275fb1e42734e17712cba18"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "ba471c8414e965c32e4580f389ace2e7561acfc307df7ef7264dc3a666926e67"
+  },
+  "reference_sha256": "b0b2d6f21f80a4a772e9b72bfafa74f6a460362d1de43a4a51dcd1487590df7e",
+  "cli": {
+    "binary": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/runtime/bin/loginom-ai-agent-cli",
+    "version": "0.2.2",
+    "profile": "profile"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-listing-promotion-efficiency-2.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/658a9949adb97371abb75a915b58f5e0ee4ace317646412a41d1063f8b55c187-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 2,
+    "total": 2,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_ea9f06062ffenWYE4uJkWmBPGU",
+    "skill_revision": "8afb17d6a2c247fa0fb8fc6e2285e6ed05e6bf475a1a9d88ae7b760a29260dfc",
+    "exit_code": 0,
+    "started_at": "2026-10-20T00:27:03+03:00",
+    "duration_s": 1832,
+    "tokens": {
+      "input": 181840,
+      "output": 12170,
+      "reasoning": 10809
+    },
+    "tool_calls": 91,
+    "tool_errors": 11,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-listing-promotion-efficiency-2/Unit1/workflow",
+  "source_task": "analitic-tasks/task57-avito-analytics",
+  "runtime_pin": {
+    "version": "0.2.2",
+    "ci_run": 39210148809,
+    "ci_artifact": {
+      "id": 12168030843,
+      "name": "loginom-linux",
+      "sha256": "bf0e29fd686cb5ec50477a8e36775359486f6aafb93897dce363082fa879c86c"
+    },
+    "archive": {
+      "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/downloads/loginom-ai-agent-cli-0.2.2-linux-x64.tar.gz",
+      "sha256": "c612eab428e5dc16b9a6105cb4fd401a00c04a25dee6390644b50e86044283b9"
+    },
+    "source_commit": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "source_tree_sha256": "92f2bf27f7771109634d33bb8ce6ab1be4f84a74209a45936e0a18d430b57bff",
+    "cli_manifest_sha256": "26c94fe7d3d6f975cc2d60d99eb5f7b2b6fcb377c753c6de3079c155f41ac28c",
+    "resource_manifest_sha256": "0642015ac67c8f569e7b4d1ac158973d514ae39d72b77cacae10d48810fddd34",
+    "harness_sha": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "harness_clean": true
+  },
+  "independent_oracle_check": {
+    "pass": true,
+    "method": "blind Python stdlib csv + in-memory SQLite independent SQL; author oracle not provided",
+    "independent_csv_sha256": "ba471c8414e965c32e4580f389ace2e7561acfc307df7ef7264dc3a666926e67",
+    "query_sha256": "b6d499e00e5b3eecb80e3498c110591381018b33acf7d78a2502579a7c01a8cc",
+    "solver_sha256": "9f69a1837398d7bf3da73e4ba6087b7b920dad98295785fe17739808d8373e54",
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/independent/b/report.json",
+    "report_case": "listing-promotion-efficiency",
+    "comparison": {
+      "passed": true,
+      "error": null
+    }
+  },
+  "browser_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/listing-promotion-efficiency/attempt-2/browser-rerun.json",
+    "screenshot": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/listing-promotion-efficiency/attempt-2/browser-rerun.png",
+    "all_nodes_active": true,
+    "closed_without_save": true,
+    "rounding_verified_in_exported_path": true,
+    "rounding_position": "after numeric calculations, before group-key sorting only"
+  },
+  "graph_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/listing-promotion-efficiency/attempt-2/graph-inspection.json",
+    "node_count": 9,
+    "export_path_node_count": 6,
+    "auxiliary_branch_node_count": 3,
+    "connected_export_path": true,
+    "ratios_from_sums": true,
+    "response_arithmetic_mean_times_100": true,
+    "auxiliary_branch_cold_rerun_pass": true,
+    "rounding_before_group_keys_sort_does_not_affect_order": true
+  },
+  "fallback_used": false,
+  "attempt_history": [
+    {
+      "number": 1,
+      "assisted": false,
+      "classification": "technical-ui-blocker",
+      "exit_code": 1,
+      "content_failure_counted": false,
+      "analytic_revision": "primary",
+      "operation_id": "export-final-csv-001",
+      "phase": "input_mapping",
+      "reason": "input_port_context unobserved and Done has no allowed finish_wizard despite complete six-field page; exports.text lacks releasePending verifier, recovery_options empty. Error wording does not prove stale browser transport.",
+      "terminal_inspect": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/listing-promotion-efficiency/attempt-1/terminal-operation-inspect.json",
+      "cleanup": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/listing-promotion-efficiency/attempt-1/cleanup.json",
+      "evidence": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/listing-promotion-efficiency/attempt-1/cleanup-evidence",
+      "next": "unchanged primary attempt2 without hint; no analytic fallback",
+      "diagnosis": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/reports/diagnosis-t57-export.md",
+      "possible_hint": "Short neutral labels without filename/path; overflow hypothesis only, not live-proven.",
+      "classification_evidence": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/listing-promotion-efficiency/attempt-1/attempt-classification.json",
+      "cleanup_verified": {
+        "pass": true,
+        "at": "2026-10-19T21:26:48.681741+00:00",
+        "runtime_pid": 925589,
+        "cli_pids": [
+          925039,
+          925040
+        ],
+        "process_close_proof": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/listing-promotion-efficiency/attempt-1/cleanup-evidence/process-close-proof.json",
+        "resource_close": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/listing-promotion-efficiency/attempt-1/cleanup-evidence/native/resource-close.jsonl",
+        "browser_close": "fulfilled 2026-10-19T21:24:51.747Z",
+        "release_stale_writer": {
+          "expectedIdentity": {
+            "device": 2050,
+            "inode": 210915621,
+            "owner": "8ae3c1d4-642c-4269-baa7-ca83f42bdeda"
+          },
+          "result": true,
+          "proof": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/listing-promotion-efficiency/attempt-1/cleanup-evidence/release-stale-writer.json"
+        },
+        "status": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/listing-promotion-efficiency/attempt-1/cleanup-evidence/status.json",
+        "recovery_ids": [],
+        "connection_check": {
+          "ok": true,
+          "code": "LOGINOM_CONNECTION_VALID",
+          "help": {
+            "state": "ready"
+          },
+          "browser": {
+            "state": "verified"
+          }
+        },
+        "writer_absent": true
+      }
+    },
+    {
+      "number": 2,
+      "classification": "accepted",
+      "analytic_revision": "primary",
+      "assisted": false,
+      "exit_code": 0,
+      "cli_check": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/listing-promotion-efficiency/attempt-2/check.json",
+      "rerun_check": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/listing-promotion-efficiency/attempt-2/check-rerun.json",
+      "technical_diagnosis": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/reports/diagnosis-t57-export.md",
+      "in_attempt_errors": [
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "metrics-raw-001",
+          "phase": "output_mapping",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Node procedure readiness timeout: complete output definition page at 0; no mutation was authorized"
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "metrics-raw-002",
+          "phase": "open",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Node procedure step did not confirm completion; inspect before retry: The intended node wizard was not confirmed after one click; inspect the current view before retry",
+            "cause": {
+              "code": "WIZARD_OPEN_NOT_CONFIRMED",
+              "message": "The intended node wizard was not confirmed after one click; inspect the current view before retry"
+            }
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "format-six-decimals-001",
+          "phase": "open",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Node procedure step did not confirm completion; inspect before retry: The intended node wizard was not confirmed after one click; inspect the current view before retry",
+            "cause": {
+              "code": "WIZARD_OPEN_NOT_CONFIRMED",
+              "message": "The intended node wizard was not confirmed after one click; inspect the current view before retry"
+            }
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "format-six-decimals-002",
+          "phase": "output_mapping",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Mapping must account for every configured source field"
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "format-six-decimals-003",
+          "phase": "open",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Node procedure step did not confirm completion; inspect before retry: The intended node wizard was not confirmed after one click; inspect the current view before retry",
+            "cause": {
+              "code": "WIZARD_OPEN_NOT_CONFIRMED",
+              "message": "The intended node wizard was not confirmed after one click; inspect the current view before retry"
+            }
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "format-six-decimals-004",
+          "phase": "open",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Node procedure step did not confirm completion; inspect before retry: The intended node wizard was not confirmed after one click; inspect the current view before retry",
+            "cause": {
+              "code": "WIZARD_OPEN_NOT_CONFIRMED",
+              "message": "The intended node wizard was not confirmed after one click; inspect the current view before retry"
+            }
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "final-schema-001",
+          "phase": "node_incomplete",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "reform preflight requires an active source output"
+          }
+        },
+        {
+          "tool": "loginom_dock_node_read",
+          "operation_id": "read-formatted-table-001",
+          "phase": "request_rejected",
+          "error": {
+            "code": "REQUEST_REJECTED",
+            "message": "Invalid parameters.source_operation_id: a completed local table node operation with confirmed cleanup is required",
+            "parameter_path": "source_operation_id"
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "activate-formatting-005",
+          "phase": "open",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Node procedure step did not confirm completion; inspect before retry: The intended node wizard was not confirmed after one click; inspect the current view before retry",
+            "cause": {
+              "code": "WIZARD_OPEN_NOT_CONFIRMED",
+              "message": "The intended node wizard was not confirmed after one click; inspect the current view before retry"
+            }
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "activate-formatting-short-label-006",
+          "phase": "open",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Node procedure step did not confirm completion; inspect before retry: The intended node wizard was not confirmed after one click; inspect the current view before retry",
+            "cause": {
+              "code": "WIZARD_OPEN_NOT_CONFIRMED",
+              "message": "The intended node wizard was not confirmed after one click; inspect the current view before retry"
+            }
+          }
+        },
+        {
+          "tool": "loginom_dock_node_wait",
+          "operation_id": "export-final-csv-001",
+          "phase": "node_incomplete",
+          "error": {
+            "code": "NODE_APPLY_STOPPED",
+            "message": "Graph gesture refused before effect: Canvas outline control unavailable"
+          }
+        }
+      ],
+      "in_attempt_resolution": "supported inspect/release and existing-node reconfiguration; final successful numeric/CSV calculation, final field projection, key sort and one export; auxiliary branch verified by cold run",
+      "content_failure_counted": false,
+      "events": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/listing-promotion-efficiency/attempt-2/events.jsonl"
+    }
+  ]
+}

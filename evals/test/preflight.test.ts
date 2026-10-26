@@ -1,14 +1,212 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdtemp, mkdir, symlink, rm } from "node:fs/promises"
+import { chmod, mkdtemp, mkdir, symlink, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
-import { evalsRoot, loadConfig } from "../src/config"
+import { evalsRoot, loadConfig, type EvalConfig } from "../src/config"
 import { parseArtifactSource } from "../src/artifact"
 import { EvalFailure } from "../src/fail"
-import { agentInfo, checkFreeSpace, checkStorage, checkSandbox, dockSkillRevision, preflight } from "../src/preflight"
+import { agentInfo, checkFreeSpace, checkStorage, checkSandbox, dockSkillRevision, preflight, verifyAdminRuntime } from "../src/preflight"
 import { probeJudgeEnvironment } from "./helpers/judge-probe"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
+
+test("preflight preserves the judge systemd boundary for its version probe", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-preflight-unit-"))
+  try {
+    const wrapper = path.join(root, "judge-wrapper"), systemctl = path.join(root, "systemctl")
+    await writeFile(wrapper, '#!/bin/sh\ntest -n "$LOGINOM_EVALS_JUDGE_UNIT" || exit 64\nprintf "unit-codex 1.0\\n"\n', { mode: 0o700 })
+    await writeFile(systemctl, '#!/bin/sh\nprintf "LoadState=not-found\\nActiveState=inactive\\nMainPID=0\\n"\nexit 4\n', { mode: 0o700 })
+    const config: EvalConfig = loadConfig(["--judge-only", "fixture"], { JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: wrapper })
+    config.judge = { ...config.judge, systemd: true, env: { PATH: root + ":" + process.env.PATH! } }
+    expect((await preflight(config, parseArtifactSource("docker", config.loginom))).codex).toEqual({ version: "unit-codex 1.0" })
+  } finally { await rm(root, { recursive: true }) }
+})
+
+test("preflight: a cancelled admission does not start the judge version probe", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-preflight-cancelled-"))
+  try {
+    const probe = path.join(root, "version.json")
+    const config = loadConfig(["--judge-only", "fixture"], { JUDGE_MODEL: "fake",
+      EVAL_JUDGE_COMMAND: `${fakeJudge} --version-home-file ${probe}` })
+    const abort = new AbortController()
+    abort.abort()
+    await expect(preflight(config, parseArtifactSource("docker", config.loginom), abort.signal)).rejects.toThrow("JUDGE_VERSION_UNCONFIRMED")
+    expect(await Bun.file(probe).exists()).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test("preflight: parent auth cannot admit an empty explicit judge home", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-home-"))
+  try {
+    const desktop = path.join(root, "parent-home")
+    const judge = path.join(root, "judge-home")
+    const binary = path.join(root, "codex")
+    const observed = path.join(root, "version-home")
+    await Promise.all([desktop, judge].map(dir => mkdir(dir, { mode: 0o700 })))
+    await writeFile(path.join(desktop, "auth.json"), "{}", { mode: 0o600 })
+    await writeFile(binary, '#!/bin/sh\nprintf "%s" "$CODEX_HOME" > "$PROBE_JUDGE_HOME_FILE"\nprintf "fake-codex 0.0.0\\n"\n', { mode: 0o700 })
+    const child = Bun.spawn([process.execPath, "-e", `
+      import { loadConfig } from ${JSON.stringify(path.join(evalsRoot, "src/config.ts"))};
+      import { preflight } from ${JSON.stringify(path.join(evalsRoot, "src/preflight.ts"))};
+      import { parseArtifactSource } from ${JSON.stringify(path.join(evalsRoot, "src/artifact.ts"))};
+      const config = loadConfig(["--judge-only", "fixture"], { JUDGE_MODEL: "fake" });
+      config.judge = { ...config.judge, command: [${JSON.stringify(binary)}], env: { CODEX_HOME: ${JSON.stringify(judge)} } };
+      try { await preflight(config, parseArtifactSource("docker", config.loginom)); console.log(JSON.stringify({ admitted: true })); }
+      catch (error) { console.log(JSON.stringify({ admitted: false, error: error.message })); }
+    `], { env: { ...process.env, CODEX_HOME: desktop, PROBE_JUDGE_HOME_FILE: observed }, stdout: "pipe", stderr: "pipe" })
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
+    expect(JSON.parse(stdout)).toEqual({ admitted: false, error: `Нет входа Codex: отсутствует ${path.join(judge, "auth.json")}. Выполните: codex login` })
+    expect(await Bun.file(observed).text()).toBe(judge)
+    expect(await Bun.file(path.join(desktop, "auth.json")).text()).toBe("{}")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+async function runtimeFixture(directory = os.tmpdir()) {
+  const root = await mkdtemp(path.join(directory, "evals-admin-runtime-"))
+  const executable = Buffer.alloc(64)
+  executable.set([0x7f, 0x45, 0x4c, 0x46, 2, 1])
+  executable.writeUInt16LE(62, 18)
+  const payload = [
+    { path: "bin/loginom-ai-agent-cli", content: executable, mode: 0o755 },
+    { path: "resources/loginom/bin/node", content: executable, mode: 0o755 },
+    { path: "resources/loginom/browsers/chrome", content: executable, mode: 0o755 },
+    { path: "resources/loginom/runtime/client/package.json", content: "{}", mode: 0o644 },
+    { path: "resources/loginom/runtime/client/node_modules/playwright-core/package.json", content: '{"main":"index.js"}', mode: 0o644 },
+    { path: "resources/loginom/runtime/client/node_modules/playwright-core/index.js", content: "module.exports={}", mode: 0o644 },
+  ]
+  const resource = { protocol: 1, target: "linux-x64", node: "bin/node", browser: "browsers/chrome",
+    nodeSha256: new Bun.CryptoHasher("sha256").update(executable).digest("hex"), browserSha256: new Bun.CryptoHasher("sha256").update(executable).digest("hex"),
+    files: payload.filter(file => file.path.startsWith("resources/loginom/")).map(file => ({ path: file.path.slice("resources/loginom/".length),
+      sha256: new Bun.CryptoHasher("sha256").update(file.content).digest("hex") })) }
+  const files = [...payload, { path: "resources/loginom/resource-manifest.json", content: JSON.stringify(resource), mode: 0o644 }]
+  await Promise.all(files.map(async file => {
+    await mkdir(path.dirname(path.join(root, file.path)), { recursive: true })
+    await writeFile(path.join(root, file.path), file.content)
+    await chmod(path.join(root, file.path), file.mode)
+  }))
+  const manifest = { format: "loginom-cli-artifact-v1", metadata: { platform: "linux", arch: "x64", sourceCommit: "a".repeat(40), sourceTreeSha256: "b".repeat(64) },
+    files: files.map(file => ({ path: file.path, sha256: new Bun.CryptoHasher("sha256").update(file.content).digest("hex"), mode: file.mode })) }
+  await writeFile(path.join(root, "cli-manifest.json"), JSON.stringify(manifest))
+  return { root, manifest, resource, binary: path.join(root, "bin/loginom-ai-agent-cli") }
+}
+
+test("admin runtime: selects only manifest-verified installed Node, browser and client paths", async () => {
+  const item = await runtimeFixture()
+  try {
+    const runtime = await verifyAdminRuntime(item.binary)
+    expect(runtime).toMatchObject({ installation: item.root, resources: `${item.root}/resources/loginom`,
+      node: `${item.root}/resources/loginom/bin/node`, browser: `${item.root}/resources/loginom/browsers/chrome`,
+      clientPackage: `${item.root}/resources/loginom/runtime/client/package.json` })
+    expect(runtime.manifestHash).toMatch(/^[a-f0-9]{64}$/)
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("admin runtime: refuses a changed dependency before executing any binary", async () => {
+  const item = await runtimeFixture()
+  try {
+    await writeFile(`${item.root}/resources/loginom/runtime/client/node_modules/playwright-core/index.js`, "throw Error('must not execute')")
+    await expect(verifyAdminRuntime(item.binary)).rejects.toThrow("ADMIN_RUNTIME_HASH")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("admin runtime: manifest paths and symlinks cannot escape the installed payload", async () => {
+  const item = await runtimeFixture()
+  try {
+    await writeFile(`${item.root}/outside`, "outside")
+    const entry = item.manifest.files.find(file => file.path.endsWith("playwright-core/index.js"))!
+    await rm(path.join(item.root, entry.path))
+    await symlink(path.join(item.root, "outside"), path.join(item.root, entry.path))
+    await writeFile(`${item.root}/cli-manifest.json`, JSON.stringify({ ...item.manifest,
+      files: item.manifest.files.map(file => file === entry ? { ...file, mode: 0o777, link: `${item.root}/outside`, sha256: new Bun.CryptoHasher("sha256").update("outside").digest("hex") } : file) }))
+    // The target is outside the claimed dependency subtree but still in installation:
+    // undeclared target must be rejected by the full inventory check.
+    await expect(verifyAdminRuntime(item.binary)).rejects.toThrow("ADMIN_RUNTIME_INVENTORY")
+    await writeFile(`${item.root}/cli-manifest.json`, JSON.stringify({ ...item.manifest,
+      files: item.manifest.files.map(file => file === entry ? { ...file, path: "../outside" } : file) }))
+    await expect(verifyAdminRuntime(item.binary)).rejects.toThrow("ADMIN_RUNTIME_PATH")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("admin runtime: executable and manifest modes are verified before launch", async () => {
+  const item = await runtimeFixture()
+  try {
+    await chmod(`${item.root}/resources/loginom/bin/node`, 0o644)
+    await expect(verifyAdminRuntime(item.binary)).rejects.toThrow("ADMIN_RUNTIME_MODE")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("admin runtime: full POSIX permission bits must match the manifest", async () => {
+  const item = await runtimeFixture()
+  try {
+    // Bun's chmod masks special bits; the fixture must establish the real mode.
+    expect(await Bun.spawn(["/bin/chmod", "4755", item.binary], { stdout: "ignore", stderr: "ignore" }).exited).toBe(0)
+    await writeFile(path.join(item.root, "cli-manifest.json"), JSON.stringify({ ...item.manifest,
+      files: item.manifest.files.map(file => file.path === "bin/loginom-ai-agent-cli" ? { ...file, mode: 0o4755 } : file) }))
+    expect((await verifyAdminRuntime(item.binary)).installation).toBe(item.root)
+    await chmod(item.binary, 0o755)
+    await expect(verifyAdminRuntime(item.binary)).rejects.toThrow("ADMIN_RUNTIME_MODE")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("admin runtime: malformed or mismatched manifest targets fail with safe codes", async () => {
+  const item = await runtimeFixture()
+  try {
+    await writeFile(`${item.root}/cli-manifest.json`, '{"password":"secret-canary"')
+    await expect(verifyAdminRuntime(item.binary)).rejects.toThrow("ADMIN_RUNTIME_INVALID")
+    await writeFile(`${item.root}/cli-manifest.json`, JSON.stringify({ ...item.manifest, metadata: { ...item.manifest.metadata, platform: "win32" } }))
+    await expect(verifyAdminRuntime(item.binary)).rejects.toThrow("ADMIN_RUNTIME_TARGET")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("admin runtime: resource claims must match the complete CLI payload", async () => {
+  const item = await runtimeFixture()
+  try {
+    const resource = { ...item.resource, nodeSha256: "0".repeat(64) }
+    await writeFile(`${item.root}/resources/loginom/resource-manifest.json`, JSON.stringify(resource))
+    await writeFile(`${item.root}/cli-manifest.json`, JSON.stringify({ ...item.manifest,
+      files: item.manifest.files.map(file => file.path.endsWith("resource-manifest.json") ? { ...file,
+        sha256: new Bun.CryptoHasher("sha256").update(JSON.stringify(resource)).digest("hex") } : file) }))
+    await expect(verifyAdminRuntime(item.binary)).rejects.toThrow("ADMIN_RUNTIME_RESOURCE")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("admin runtime: a declared executable with the wrong ELF target is refused", async () => {
+  const item = await runtimeFixture()
+  try {
+    const header = Buffer.alloc(64)
+    header.set([0x7f, 0x45, 0x4c, 0x46, 2, 1])
+    header.writeUInt16LE(183, 18)
+    await writeFile(`${item.root}/bin/loginom-ai-agent-cli`, header)
+    await writeFile(`${item.root}/cli-manifest.json`, JSON.stringify({ ...item.manifest,
+      files: item.manifest.files.map(file => file.path === "bin/loginom-ai-agent-cli" ? { ...file,
+        sha256: new Bun.CryptoHasher("sha256").update(header).digest("hex") } : file) }))
+    await expect(verifyAdminRuntime(item.binary)).rejects.toThrow("ADMIN_RUNTIME_EXECUTABLE")
+  } finally { await rm(item.root, { recursive: true, force: true }) }
+})
+
+test("admin runtime: a symlink with a matching hash cannot point outside installation", async () => {
+  const item = await runtimeFixture()
+  const external = await mkdtemp(path.join(os.tmpdir(), "evals-admin-external-"))
+  try {
+    const target = `${external}/module.js`
+    const entry = item.manifest.files.find(file => file.path.endsWith("playwright-core/index.js"))!
+    await writeFile(target, "module.exports={}")
+    await rm(path.join(item.root, entry.path))
+    await symlink(target, path.join(item.root, entry.path))
+    await writeFile(`${item.root}/cli-manifest.json`, JSON.stringify({ ...item.manifest,
+      files: item.manifest.files.map(file => file === entry ? { ...file, link: target, mode: 0o777 } : file) }))
+    await expect(verifyAdminRuntime(item.binary)).rejects.toThrow("ADMIN_RUNTIME_PATH")
+  } finally { await Promise.all([item.root, external].map(root => rm(root, { recursive: true, force: true }))) }
+})
+
+test("admin runtime: manifest paths cannot select a checkout bundle", async () => {
+  const root = await mkdtemp(path.join(evalsRoot, ".admin-runtime-test-"))
+  try {
+    const item = await runtimeFixture(root)
+    await expect(verifyAdminRuntime(item.binary)).rejects.toThrow("ADMIN_RUNTIME_PATH")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("preflight: live source отклонён до обращения к Loginom с инструкцией binary", async () => {
   const config = loadConfig(["--skip-judge"], { LOGINOM_DOCK_API_KEY: "fixture", EVAL_AGENT_MODEL: "m/x", LOGINOM_URL: "http://127.0.0.1:1" })

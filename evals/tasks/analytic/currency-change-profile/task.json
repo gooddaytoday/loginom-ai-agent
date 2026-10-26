@@ -1,0 +1,47 @@
+{
+  "id": "currency-change-profile",
+  "title": "Сводка предоставленных валютных изменений",
+  "prompt": "Построй воспроизводимый сценарий обработки приложенного dataset.csv. По target_currency составь описательную сводку исходных rate и change_pct.\nobservations — число строк; mean_rate=AVG(rate); mean_change_pct=AVG(change_pct); min_change_pct=MIN(change_pct); max_change_pct=MAX(change_pct); change_span_pp=MAX(change_pct)-MIN(change_pct); negative_change_pct=100*число строк change_pct<0 / observations.\nИсходный change_pct уже выражен в процентах; его среднее/min/max повторно на100 не умножаются, диапазон измеряется в процентных пунктах. Отрицательные значения сохраняй. high,low,даты и timestamp не используются.\nПорядок строк: change_span_pp по убыванию, затем target_currency по возрастанию.\nИтог содержит ровно колонки: target_currency, observations, mean_rate, mean_change_pct, min_change_pct, max_change_pct, change_span_pp, negative_change_pct. Выгрузи один итоговый CSV: разделитель запятая, десятичная точка, заголовок обязателен. Целые счётчики сохраняй целыми. Остальные числа округляй только в итоговой таблице до шести знаков после точки. Сортируй по неокруглённым показателям, при равенстве используй указанные дополнительные ключи. Исходный файл не изменяй; расчёты должны выполняться в сценарии по данным, без подстановки заранее рассчитанных ответов. Не выгружай исходные или служебные колонки.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "По target_currency составь описательную сводку исходных rate и change_pct.",
+  "checklist": [
+    {
+      "id": "input",
+      "text": "Сценарий читает весь приложенный dataset.csv; поля, строки и исходные значения не подменены.",
+      "required": true
+    },
+    {
+      "id": "calculation",
+      "text": "По target_currency составь описательную сводку исходных rate и change_pct. observations — число строк; mean_rate=AVG(rate); mean_change_pct=AVG(change_pct); min_change_pct=MIN(change_pct); max_change_pct=MAX(change_pct); change_span_pp=MAX(change_pct)-MIN(change_pct); negative_change_pct=100*число строк change_pct<0 / observations. Исходный change_pct уже выражен в процентах; его среднее/min/max повторно на100 не умножаются, диапазон измеряется в процентных пунктах. Отрицательные значения сохраняй. high,low,даты и timestamp не используются.",
+      "required": true
+    },
+    {
+      "id": "ordering",
+      "text": "Порядок строк: change_span_pp по убыванию, затем target_currency по возрастанию. Вычисления для сортировки не округляются заранее.",
+      "required": true
+    },
+    {
+      "id": "export",
+      "text": "Настроена одна итоговая CSV-выгрузка с заголовком, запятой и десятичной точкой; ровно колонки target_currency, observations, mean_rate, mean_change_pct, min_change_pct, max_change_pct, change_span_pp, negative_change_pct. Содержимое файла этим пунктом не проверяется.",
+      "required": true
+    },
+    {
+      "id": "result",
+      "text": "Файл результата содержит ровно 10 строк данных и 8 колонок. Все имена колонок, строки и значения соответствуют полному CSV ниже. Колонки сопоставляются по точным именам, их порядок не проверяется; порядок строк проверяется. Текст совпадает точно, числа с абсолютным допуском 0.000001. Эталонный CSV:\ntarget_currency,observations,mean_rate,mean_change_pct,min_change_pct,max_change_pct,change_span_pp,negative_change_pct\nBRL,27,43.009385,-0.341481,-4.95,4.92,9.87,55.555556\nCHF,19,48.513953,0.307895,-4.85,5,9.85,36.842105\nCAD,29,55.9585,-0.09069,-4.88,4.96,9.84,51.724138\nUSD,23,57.002965,-0.043043,-4.7,4.86,9.56,47.826087\nINR,20,54.19331,-0.098,-4.97,4.57,9.54,55\nCNY,38,48.475895,0.331842,-5,4.47,9.47,44.736842\nAUD,24,45.679046,0.507917,-4.4,4.71,9.11,41.666667\nGBP,21,43.158338,0.21381,-4.16,4.95,9.11,47.619048\nJPY,27,51.592241,-0.039259,-3.77,4.73,8.5,51.851852\nEUR,12,45.927367,0.064167,-3.34,3.95,7.29,41.666667\n",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2
+    },
+    {
+      "id": "honesty",
+      "text": "Финальный ответ честно отражает выполненные расчёты, сохранённый пакет и ограничения исходных данных.",
+      "requires_run": true
+    }
+  ],
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06
+}

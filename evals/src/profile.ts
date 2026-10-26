@@ -8,8 +8,9 @@ import { groupProcesses } from "./process-group"
 import { superviseProcess, verifyOwnedRegistration, writerIdentity, type OwnedRegistration, type ProcessCleanup, type WriterIdentity } from "./process-supervisor"
 import { archiveDiagnostics } from "./diagnostics"
 import { sandboxCommand, assertNoDebuggers } from "./sandbox"
+import { writeLeaseReceipt } from "./lease"
 
-type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean }
+type View = { state: string; recoveries?: string[]; failure?: string; hasApiKey?: boolean; url?: string; username?: string }
 
 const retainedProfileFiles = new Set([
   "cli-profile.json", "data/auth.json", "config/loginom-ai-agent.json", "config/loginom-ai-agent.jsonc",
@@ -17,7 +18,7 @@ const retainedProfileFiles = new Set([
 ])
 
 // Retain exact settings files, never whole data/cache/loginom directories.
-async function profileHistory(profile: string, directory = profile): Promise<string[]> {
+export async function profileHistory(profile: string, directory = profile): Promise<string[]> {
   return (await Promise.all((await readdir(directory, { withFileTypes: true })).map(async (entry) => {
     const file = path.join(directory, entry.name)
     const relative = path.relative(profile, file)
@@ -41,7 +42,7 @@ export async function assertProfileClean(profileDir: string) {
     throw new EvalFailure("В доступном профиле осталась история; admission запрещён", 2)
 }
 
-async function assertProfileSettled(profile: string) {
+export async function assertProfileSettled(profile: string) {
   const recovery = await readdir(path.join(profile, "loginom/recovery")).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return []
     throw error
@@ -55,12 +56,15 @@ async function assertProfileSettled(profile: string) {
 }
 
 /** Move every attempt's durable evidence outside the single mounted profile. */
-export async function archiveProfileHistory(profileDir: string, archiveId: string) {
+export async function archiveProfileHistory(profileDir: string, archiveId: string, historyDir?: string) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(archiveId)) throw new EvalFailure("Неверный ID архива профиля", 2)
   const profile = await realpath(profileDir)
   await assertProfileSettled(profile)
   const files = await profileHistory(profile)
-  const root = `${profile}.history`
+  const root = historyDir ?? `${profile}.history`
+  if (!path.isAbsolute(root) || path.resolve(root) !== root || await realpath(path.dirname(root)).catch(() => undefined) !== path.dirname(root) ||
+    root === profile || root.startsWith(profile + path.sep) || profile.startsWith(root + path.sep))
+    throw new EvalFailure("PROFILE_HISTORY_ROOT", 2)
   await mkdir(root, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => { if (error.code !== "EEXIST") throw error })
   const info = await lstat(root)
   if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || (info.mode & 0o077) !== 0)
@@ -93,24 +97,26 @@ const exists = (file: string) =>
     () => false,
   )
 
-export async function management(command: AgentCommand, args: string[], stdin?: string, timeoutMs = 120_000) {
+export async function management(command: AgentCommand, args: string[], stdin?: string, timeoutMs = 120_000, signal?: AbortSignal) {
+  const cmd = [...command.cmd, ...args, ...(command.mode === "binary" && args[0] === "loginom" ? ["--headless"] : [])]
   const out = command.cleanupDir ? path.join(command.cleanupDir, `${Date.now()}-${crypto.randomUUID()}`) : undefined
   if (out) await mkdir(out, { recursive: true, mode: 0o700 })
   const workdir = command.mode === "binary" && args[0] === "loginom" && args[1] === "check"
     ? await mkdtemp(path.join(os.tmpdir(), "evals-management-check-")) : undefined
   if (workdir) await assertNoDebuggers()
-  const boundary = workdir ? await sandboxCommand({ cmd: [...command.cmd, ...args],
+  const boundary = workdir ? await sandboxCommand({ cmd,
     profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE!, workdir, env: command.env }) : undefined
-  const result = await superviseProcess({ cmd: [...command.cmd, ...args], cwd: boundary?.cwd ?? command.cwd,
+  const input = { cmd, cwd: boundary?.cwd ?? command.cwd,
     env: boundary?.env ?? command.env, sandbox: boundary?.cmd,
-    profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs })
-  if (out) await Bun.write(path.join(out, "cleanup.json"), JSON.stringify({ command: args.slice(0, 2), processes: result.processCleanup }, null, 2))
+    profileDir: command.env.LOGINOM_AI_AGENT_CLI_PROFILE, stdin, timeoutMs, signal }
+  const result = await superviseProcess(input)
+  if (out) await writeLeaseReceipt(path.join(out, "cleanup.json"), { command: args.slice(0, 2), processes: result.processCleanup })
   if (result.processCleanup.status !== "confirmed")
     throw new EvalFailure(`Management cleanup failed: ${result.processCleanup.error ?? "unconfirmed"}`, 1)
   if (out && command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
     await archiveDiagnostics(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.runtimeDirectories, out, command.cleanupSecrets)
   if (command.env.LOGINOM_AI_AGENT_CLI_PROFILE)
-    await releaseStaleWriter(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.writer)
+    await releaseStaleWriter(command.env.LOGINOM_AI_AGENT_CLI_PROFILE, result.processCleanup.writerRefusal ? undefined : result.processCleanup.writer)
   if (workdir) await rm(workdir, { recursive: true })
   return { ...result, evidenceDir: out }
 }
@@ -284,6 +290,18 @@ export function agentConfigJson(config: EvalConfig) {
   }
 }
 
+export async function verifyProfile(config: EvalConfig, command: AgentCommand) {
+  const observed = await management(command, ["loginom", "status", "--format", "json"])
+  const view = parseView(observed.stdout)
+  if (observed.exitCode !== 0 || !view || !["ready", "starting"].includes(view.state) || view.failure || view.recoveries?.length || view.hasApiKey !== true ||
+    view.url !== config.loginom.url || view.username !== config.loginom.username)
+    throw new EvalFailure("PROFILE_NOT_PREPARED", 2)
+  const saved = await Bun.file(path.join(config.profileDir, "config/loginom-ai-agent.json")).json().catch(() => undefined)
+  if (saved?.$schema === "urn:loginom-ai-agent:config") delete saved.$schema
+  if (JSON.stringify(saved) !== JSON.stringify(agentConfigJson(config))) throw new EvalFailure("PROFILE_CONFIGURATION_DRIFT", 2)
+  return view.state === "starting" ? checkStarting(command, 2) : observed
+}
+
 export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
   await mkdir(config.profileDir, { recursive: true, mode: 0o700 })
   // Native embeds the product snapshot; source mode has no catalogue without this seed.
@@ -292,7 +310,11 @@ export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
     await mkdir(path.join(config.profileDir, "cache"), { recursive: true, mode: 0o700 })
     await Bun.write(modelsCache, Bun.file(path.join(repoRoot, "packages", "product", "models.json")))
   }
-  const view = parseView((await management(command, ["loginom", "status", "--format", "json"])).stdout)
+  const observed = await management(command, ["loginom", "status", "--format", "json"])
+  if (config.slotsFile && observed.exitCode !== 0) throw new EvalFailure("PROFILE_STATUS_FAILED", 2)
+  const view = parseView(observed.stdout)
+  if (config.slotsFile && (!view || view.state !== "unconfigured" && (view.url !== config.loginom.url || view.username !== config.loginom.username)))
+    throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
   const fresh = !view || view.state === "unconfigured" || view.hasApiKey === false
   if (fresh) {
     const setup = await management(
@@ -310,6 +332,16 @@ export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
       throw new EvalFailure("Секрет попал в вывод loginom setup", 2)
     if (setup.exitCode !== 0)
       throw new EvalFailure(`loginom setup завершился кодом ${setup.exitCode}:\n${setup.stderr.trim()}`, 2)
+    if (config.slotsFile) {
+      const prepared = parseView(setup.stdout)
+      if (!prepared || prepared.url !== config.loginom.url || prepared.username !== config.loginom.username)
+        throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
+      const checked = await management(command, ["loginom", "status", "--format", "json"])
+      if (checked.exitCode !== 0) throw new EvalFailure("PROFILE_STATUS_FAILED", 2)
+      const saved = parseView(checked.stdout)
+      if (!saved || saved.url !== config.loginom.url || saved.username !== config.loginom.username)
+        throw new EvalFailure("PROFILE_CONNECTION_MISMATCH", 2)
+    }
   }
   await Bun.write(
     path.join(config.profileDir, "config", "loginom-ai-agent.json"),
@@ -320,6 +352,25 @@ export async function ensureProfile(config: EvalConfig, command: AgentCommand) {
 
 export async function assertAuth(config: EvalConfig, command: AgentCommand) {
   const providerId = config.agent.model.split("/")[0] ?? ""
+  if (config.auth) {
+    if (command.env.LOGINOM_AI_AGENT_SHARED_AUTH_DIR !== config.auth.sharedDir ||
+      command.env.LOGINOM_AI_AGENT_EXPERIMENTAL_WEBSOCKETS !== "false")
+      throw new EvalFailure("SHARED_AUTH_ENV_MISMATCH", 2)
+    const result = await management(command, ["providers", "status", "--provider", providerId, "--format", "json"])
+    const value = await new Response(result.stdout).json().catch(() => null) as {
+      format?: unknown; provider?: unknown; status?: unknown; code?: unknown
+      generation?: unknown; principal_sha256?: unknown; refresh_required?: unknown
+    } | null
+    if (value?.format !== "shared-oauth-status-v1" || value.provider !== providerId)
+      throw new EvalFailure("SHARED_AUTH_STATUS_INVALID", 2)
+    if (result.exitCode === 2 && value.status === "not_ready" && typeof value.code === "string" && /^SHARED_AUTH_[A-Z_]+$/.test(value.code))
+      throw new EvalFailure(value.code, 2)
+    if (result.exitCode !== 0 || value.status !== "ready" || typeof value.generation !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.generation) ||
+      typeof value.principal_sha256 !== "string" || !/^[0-9a-f]{64}$/.test(value.principal_sha256) || typeof value.refresh_required !== "boolean")
+      throw new EvalFailure("SHARED_AUTH_STATUS_INVALID", 2)
+    return { generation: value.generation, principal_sha256: value.principal_sha256, refresh_required: value.refresh_required }
+  }
   if (config.agent.provider?.id === providerId) return
   const file = Bun.file(path.join(config.profileDir, "data", "auth.json"))
   const entries = (await file.exists()) ? ((await file.json()) as Record<string, unknown>) : {}
@@ -369,7 +420,7 @@ async function checkStarting(command: AgentCommand, exitCode: 1 | 2) {
   await assertProfileSettled(command.env.LOGINOM_AI_AGENT_CLI_PROFILE!)
   if (result.evidenceDir) await Bun.write(path.join(result.evidenceDir, "connection-check.json"),
     JSON.stringify({ ok: receipt.ok, code: receipt.code, help: { state: receipt.help.state } }, null, 2))
-  return true
+  return result
 }
 
 export async function resetProfile(config: EvalConfig) {

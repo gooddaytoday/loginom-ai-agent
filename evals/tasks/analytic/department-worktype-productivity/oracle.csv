@@ -1,0 +1,6 @@
+department,office_employees,avg_office_productivity,remote_employees,avg_remote_productivity,hybrid_employees,avg_hybrid_productivity,remote_minus_office
+Marketing,27,72.803704,28,77.950000,19,79.663158,5.146296
+Finance,16,70.487500,19,73.084211,13,78.184615,2.596711
+Sales,17,75.041176,29,70.527586,23,75.186957,-4.513590
+HR,23,79.895652,22,72.227273,18,72.922222,-7.668379
+IT,17,79.235294,14,70.364286,15,71.540000,-8.871008

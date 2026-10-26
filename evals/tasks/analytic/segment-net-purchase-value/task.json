@@ -1,0 +1,57 @@
+{
+  "id": "segment-net-purchase-value",
+  "title": "Средняя чистая стоимость покупок по готовым сегментам",
+  "prompt": "Используй готовый segment без повторной сегментации. Для каждого клиента вычисли net_purchase_value=avg_order_value*frequency*(1-return_rate). По segment выведи customers, средние recency_days, frequency, monetary_value и net_purchase_value. Это среднее индивидуальных произведений; не произведение групповых средних и не CLV. Упорядочь по mean_net_purchase_value по убыванию, затем segment по возрастанию. Вход — dataset.csv; учитывай все строки без изменения исходных значений. Создай ровно одну итоговую выгрузку CSV с заголовком, разделителем-запятой и десятичной точкой. Счётчики выгружай целыми; все остальные числовые результаты округляй только в конце до шести знаков после точки. Порядок строк определяй по неокруглённым значениям; равенства расчётных показателей разрешай ключами группы по возрастанию. Точные имена колонок результата: segment, customers, mean_recency_days, mean_frequency, mean_monetary_value, mean_net_purchase_value.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "4 строк данных; точные колонки: segment, customers, mean_recency_days, mean_frequency, mean_monetary_value, mean_net_purchase_value. Полный ожидаемый CSV приведён в обязательном пункте result. Допуск чисел ±0.000001.",
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06,
+  "checklist": [
+    {
+      "id": "input",
+      "required": true,
+      "text": "Пакет читает dataset.csv с заголовком и все его строки; поля recency_days, frequency, monetary_value, avg_order_value, return_rate доступны для числовых вычислений. Итог не подставлен константами вместо расчёта из входа."
+    },
+    {
+      "id": "grouping",
+      "required": true,
+      "text": "Группировка использует исходный segment; посчитаны количество клиентов и средние исходных recency_days, frequency, monetary_value."
+    },
+    {
+      "id": "metrics",
+      "required": true,
+      "text": "Сначала для каждой входной строки считается avg_order_value*frequency*(1-return_rate), затем среднее этих значений по segment. Групповые средние не перемножаются; показатель не подменяется CLV."
+    },
+    {
+      "id": "ordering",
+      "required": true,
+      "text": "Строки отсортированы по mean_net_purchase_value ↓, затем segment ↑. Сортировка по расчётным величинам предшествует округлению до шести знаков."
+    },
+    {
+      "id": "export",
+      "required": true,
+      "text": "Настроена ровно одна итоговая выгрузка текстового CSV с заголовком, запятой и десятичной точкой. Колонки: segment, customers, mean_recency_days, mean_frequency, mean_monetary_value, mean_net_purchase_value. Счётчики целые, остальные числовые результаты округлены до шести знаков после точки. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "connected-calculation",
+      "required": true,
+      "text": "Есть связный путь от чтения dataset.csv через описанные вычисления до итоговой выгрузки; результат действительно получен из исходных записей, а не из вручную введённых итоговых строк."
+    },
+    {
+      "id": "result",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2,
+      "text": "Файл результата содержит ровно 4 строк данных и 6 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.000001. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\nsegment,customers,mean_recency_days,mean_frequency,mean_monetary_value,mean_net_purchase_value\nhigh_value,385,375.231169,5.093506,5005.947377,11496.291441\nmid_value,9,436.444444,1.000000,4879.687778,2466.598506\nlow_value,5,271.600000,0.600000,3766.722000,1328.428240\nat_risk,1,627.000000,0.000000,2841.330000,0.000000\n"
+    },
+    {
+      "id": "honest-report",
+      "requires_run": true,
+      "text": "Финальный ответ не заявляет выполнение, сохранение или проверку результата без соответствующих артефактов."
+    }
+  ]
+}

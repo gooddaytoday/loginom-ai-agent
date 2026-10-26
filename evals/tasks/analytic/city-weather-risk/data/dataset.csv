@@ -1,0 +1,301 @@
+request_id,city,country,season,temperature,feels_like,humidity,pressure,wind_speed,cloudiness,visibility,weather_main,uv_index,request_timestamp
+1,Samara,Russia,Summer,-4.9,20.1,41,1007,6.0,14,3014,Clouds,1.3,1702444291
+2,Yekaterinburg,Russia,Winter,17.8,-3.7,88,1023,8.7,82,8896,Snow,10.1,1700147745
+3,Perm,Russia,Summer,-6.9,17.5,66,999,8.0,6,1204,Clear,7.9,1703792824
+4,Volgograd,Russia,Spring,3.3,-11.9,90,1039,9.1,27,1581,Snow,4.4,1700137686
+5,Ufa,Russia,Autumn,12.6,12.9,72,1003,11.5,50,6675,Snow,1.7,1705250295
+6,Omsk,Russia,Winter,18.0,26.6,99,1029,12.2,57,6347,Clear,9.7,1704151923
+7,Perm,Russia,Autumn,-13.0,-32.1,68,1028,10.8,4,3643,Clouds,9.1,1705679980
+8,Kazan,Russia,Spring,-0.0,-7.0,85,1030,14.3,4,9017,Clouds,7.9,1705149534
+9,Samara,Russia,Spring,-2.1,13.7,92,1011,0.3,93,3297,Clear,3.0,1703314344
+10,Rostov,Russia,Spring,-4.8,2.0,75,1020,2.9,95,1874,Clouds,4.4,1700049976
+11,Novosibirsk,Russia,Summer,31.5,10.6,40,1015,0.1,7,6560,Clear,1.1,1702522620
+12,Samara,Russia,Summer,11.1,-4.1,91,1037,9.7,63,1689,Clear,2.1,1702027320
+13,Ufa,Russia,Autumn,-13.9,6.3,54,1032,13.5,9,5000,Snow,8.6,1701812105
+14,Ufa,Russia,Autumn,18.8,2.7,81,1013,3.7,37,1671,Clear,7.9,1705761703
+15,Omsk,Russia,Winter,36.8,22.5,33,1015,13.9,95,8927,Snow,6.5,1701947238
+16,Kazan,Russia,Winter,20.5,8.8,88,981,0.9,91,2171,Clouds,9.9,1709784404
+17,Yekaterinburg,Russia,Autumn,-17.8,10.1,49,994,14.0,80,6591,Snow,6.4,1706330034
+18,Omsk,Russia,Summer,-2.3,-1.2,92,1013,5.3,94,7342,Clouds,5.1,1704809045
+19,Omsk,Russia,Spring,24.0,-2.3,83,1015,1.5,7,2449,Clear,3.7,1708597467
+20,Novosibirsk,Russia,Autumn,-5.6,-1.5,86,985,7.3,24,3539,Rain,10.3,1706402891
+21,Nizhny Novgorod,Russia,Winter,11.7,10.9,70,1018,3.9,72,4959,Clear,0.9,1707031845
+22,Kazan,Russia,Summer,16.6,-1.3,32,1021,4.3,65,7285,Clouds,10.2,1705394418
+23,St Petersburg,Russia,Autumn,-8.9,9.3,35,1030,4.6,78,6432,Mist,9.1,1700045475
+24,Omsk,Russia,Autumn,4.1,36.1,34,1030,12.0,49,5260,Clear,1.4,1708080552
+25,Krasnoyarsk,Russia,Summer,-43.6,18.1,34,1037,8.1,66,3361,Clouds,6.2,1703303364
+26,Voronezh,Russia,Autumn,-10.4,0.1,83,1033,4.7,48,7164,Rain,9.5,1705396364
+27,Nizhny Novgorod,Russia,Summer,1.2,23.0,76,991,9.2,35,4670,Snow,6.3,1703239254
+28,St Petersburg,Russia,Spring,-13.7,-1.1,78,982,10.7,67,2753,Rain,10.0,1701099577
+29,Krasnoyarsk,Russia,Summer,29.5,-25.6,38,1024,4.1,77,9100,Clear,10.4,1709232689
+30,Kazan,Russia,Summer,-16.5,-10.1,49,997,6.2,40,2938,Rain,4.6,1706483485
+31,Moscow,Russia,Summer,-1.6,-23.1,90,1019,1.8,88,9562,Clear,4.2,1704623037
+32,Krasnoyarsk,Russia,Autumn,7.0,-0.3,64,1000,2.7,61,6976,Rain,10.3,1706959972
+33,Rostov,Russia,Autumn,26.6,5.3,79,994,10.2,9,7588,Mist,7.4,1707232024
+34,Nizhny Novgorod,Russia,Summer,-16.5,30.1,91,1012,2.7,20,9616,Rain,1.3,1701602970
+35,Perm,Russia,Autumn,22.4,9.9,46,1014,7.9,35,7304,Snow,0.5,1708191922
+36,Krasnoyarsk,Russia,Winter,5.2,1.7,32,1005,10.6,11,8345,Clear,6.2,1708274125
+37,Chelyabinsk,Russia,Winter,-9.7,17.4,61,987,1.6,90,8875,Rain,10.2,1701531064
+38,Moscow,Russia,Autumn,11.9,-28.2,42,1015,8.5,1,7633,Snow,9.3,1704411887
+39,Ufa,Russia,Autumn,8.0,8.5,97,1027,3.8,12,1597,Clear,7.4,1708615797
+40,Ufa,Russia,Summer,-4.0,16.6,43,1009,14.4,52,4062,Snow,1.5,1702076198
+41,Volgograd,Russia,Spring,6.0,-17.2,40,1002,7.3,31,3336,Clear,2.8,1707466511
+42,Rostov,Russia,Autumn,-0.8,22.2,85,1021,12.1,94,1572,Rain,9.6,1701468919
+43,Krasnoyarsk,Russia,Winter,6.7,10.1,96,1023,8.3,15,8521,Snow,2.0,1703281941
+44,Krasnoyarsk,Russia,Summer,14.9,-1.2,58,993,0.7,31,7171,Rain,3.1,1703410580
+45,Volgograd,Russia,Autumn,28.8,14.5,38,993,9.5,31,8097,Clear,1.4,1704999111
+46,Voronezh,Russia,Winter,-13.6,39.1,96,981,14.3,97,3090,Clouds,7.4,1703685104
+47,Voronezh,Russia,Winter,37.0,7.7,54,1034,9.0,10,7566,Clouds,10.4,1707659791
+48,Volgograd,Russia,Spring,-24.3,8.7,71,1016,12.3,9,5624,Mist,3.0,1701420858
+49,Voronezh,Russia,Summer,2.7,-1.9,38,984,13.3,14,2633,Clouds,5.2,1701748982
+50,Novosibirsk,Russia,Summer,13.8,-7.7,69,1017,3.4,16,2517,Clouds,7.0,1706563614
+51,Krasnoyarsk,Russia,Spring,9.2,17.5,54,1024,3.2,39,4648,Rain,11.0,1709833673
+52,Samara,Russia,Spring,-4.3,-7.8,34,1020,9.2,17,2537,Clouds,1.2,1704896799
+53,Yekaterinburg,Russia,Summer,1.9,6.1,40,1033,6.2,54,4137,Rain,5.5,1708466685
+54,Chelyabinsk,Russia,Summer,-2.4,-2.2,88,1039,12.6,72,7985,Rain,4.2,1707479816
+55,Novosibirsk,Russia,Autumn,-3.8,12.2,67,1026,13.5,24,1097,Snow,9.5,1706007509
+56,Kazan,Russia,Autumn,17.7,10.0,34,993,5.3,58,4750,Clouds,5.2,1704445818
+57,Novosibirsk,Russia,Spring,10.4,20.6,77,1035,3.6,77,9535,Clouds,1.2,1705122964
+58,Samara,Russia,Autumn,-5.4,-2.7,47,1018,11.7,88,9174,Clear,7.0,1706433636
+59,Kazan,Russia,Winter,18.5,1.0,99,1004,4.1,21,9103,Clear,8.5,1704095077
+60,Chelyabinsk,Russia,Autumn,9.6,-9.7,66,999,12.3,29,6413,Clear,0.0,1709172800
+61,Samara,Russia,Autumn,17.2,-1.7,89,981,6.4,83,5666,Clear,9.4,1706263998
+62,St Petersburg,Russia,Winter,14.4,10.7,77,1018,10.0,84,1610,Rain,2.0,1704630232
+63,Yekaterinburg,Russia,Spring,-7.4,16.4,57,985,1.4,43,2727,Rain,6.1,1700920114
+64,Chelyabinsk,Russia,Winter,-3.4,-8.8,98,996,9.4,31,2854,Clouds,4.6,1708990499
+65,Krasnoyarsk,Russia,Autumn,16.2,18.0,69,1038,6.8,50,6055,Snow,7.9,1708147047
+66,Voronezh,Russia,Spring,14.2,25.3,74,1004,8.8,45,3324,Mist,4.1,1702182926
+67,St Petersburg,Russia,Autumn,4.7,11.2,91,1036,2.5,20,6774,Snow,9.6,1702485670
+68,Rostov,Russia,Winter,6.8,33.2,87,1007,11.1,98,7519,Rain,8.0,1703344250
+69,Chelyabinsk,Russia,Winter,24.2,-6.6,96,981,12.9,31,2749,Clouds,7.1,1704023278
+70,Rostov,Russia,Autumn,-3.9,-13.7,85,1014,3.3,93,1781,Clouds,8.8,1700537977
+71,Kazan,Russia,Summer,13.2,-21.7,69,1016,1.4,38,8548,Clear,8.3,1709946749
+72,St Petersburg,Russia,Summer,2.0,27.4,69,984,0.4,11,7823,Clouds,0.4,1703668280
+73,Yekaterinburg,Russia,Winter,1.7,14.8,62,980,9.6,46,3105,Mist,4.3,1702723408
+74,Krasnoyarsk,Russia,Winter,21.5,4.2,35,1019,9.1,17,4867,Snow,10.2,1704784808
+75,Volgograd,Russia,Summer,17.4,9.2,48,991,8.2,20,8193,Clear,1.4,1706637640
+76,Krasnoyarsk,Russia,Summer,17.2,-11.9,69,1035,3.5,12,5976,Clouds,8.1,1706837388
+77,Samara,Russia,Autumn,24.6,41.7,88,1015,5.9,20,3113,Snow,10.7,1704654419
+78,Krasnoyarsk,Russia,Autumn,5.3,6.9,88,1024,8.9,7,6879,Clear,0.6,1708430899
+79,Perm,Russia,Summer,15.2,6.6,77,1002,7.5,45,4970,Clouds,7.5,1704622580
+80,Omsk,Russia,Autumn,0.3,15.9,70,1026,14.8,6,8264,Snow,5.1,1704589058
+81,Volgograd,Russia,Autumn,9.9,12.2,42,1010,2.0,22,2577,Clouds,6.4,1707245136
+82,Novosibirsk,Russia,Spring,3.0,8.4,74,990,10.4,95,3274,Clear,0.9,1708379966
+83,Voronezh,Russia,Autumn,6.5,-6.9,82,989,6.1,74,5869,Clouds,0.5,1702122827
+84,Moscow,Russia,Winter,13.9,12.1,71,982,6.4,85,7744,Snow,7.3,1707432300
+85,Yekaterinburg,Russia,Autumn,-7.3,33.2,92,1033,10.8,21,3426,Clouds,9.1,1707637174
+86,St Petersburg,Russia,Autumn,36.4,25.2,56,993,10.4,88,6546,Clear,8.6,1700708672
+87,Omsk,Russia,Summer,-10.1,28.9,67,995,14.9,21,7852,Clouds,6.0,1706921154
+88,Yekaterinburg,Russia,Winter,-13.2,-2.7,89,989,1.9,91,3551,Clouds,1.1,1708725977
+89,St Petersburg,Russia,Autumn,22.4,-9.8,36,1008,1.6,28,7411,Clouds,7.6,1704507167
+90,Voronezh,Russia,Autumn,16.9,3.1,34,989,10.9,12,1007,Rain,2.7,1702227039
+91,Nizhny Novgorod,Russia,Spring,14.4,5.8,74,991,8.7,81,9087,Clear,10.0,1700296063
+92,Nizhny Novgorod,Russia,Autumn,14.4,21.4,87,1009,4.1,1,3555,Snow,9.2,1701383875
+93,Rostov,Russia,Autumn,4.8,-20.4,60,1020,1.2,28,1475,Clear,7.8,1706625169
+94,Yekaterinburg,Russia,Spring,-8.5,27.9,52,980,1.3,84,6416,Clouds,10.4,1701876336
+95,Nizhny Novgorod,Russia,Summer,6.1,2.6,71,984,13.4,78,9676,Clear,0.3,1707541586
+96,Perm,Russia,Autumn,-5.2,-1.4,39,999,2.9,51,8239,Clouds,8.1,1703956778
+97,Volgograd,Russia,Spring,19.6,-10.2,61,987,4.9,26,7710,Clouds,3.6,1702887757
+98,St Petersburg,Russia,Winter,2.8,-19.8,82,1022,3.4,49,6000,Clouds,10.0,1702468665
+99,Rostov,Russia,Summer,-7.4,17.3,59,991,5.3,94,5654,Clear,2.9,1706472973
+100,Krasnoyarsk,Russia,Winter,0.2,6.1,68,980,1.0,78,9078,Rain,8.0,1700692924
+101,St Petersburg,Russia,Winter,11.2,-14.3,60,1036,7.8,22,7063,Clear,9.7,1702570115
+102,Rostov,Russia,Spring,-3.5,-14.4,31,1033,1.0,87,3285,Rain,0.5,1701661655
+103,Voronezh,Russia,Autumn,-7.3,-0.0,41,999,12.0,43,6223,Mist,4.4,1707499066
+104,Yekaterinburg,Russia,Spring,8.7,30.0,68,1007,3.5,76,7971,Clouds,8.4,1704672412
+105,Voronezh,Russia,Spring,8.7,1.1,95,1036,8.1,21,4525,Clouds,5.0,1703100498
+106,Volgograd,Russia,Spring,-2.6,-17.5,42,1022,13.2,42,3822,Clouds,2.9,1709412528
+107,Volgograd,Russia,Spring,-2.1,1.3,75,1016,9.8,36,5943,Clear,2.4,1707181479
+108,Omsk,Russia,Summer,8.5,0.9,56,1026,8.0,60,7530,Clouds,1.4,1703811666
+109,Voronezh,Russia,Autumn,-16.7,-35.5,46,1016,4.9,96,1258,Rain,9.4,1703819712
+110,Samara,Russia,Winter,-16.1,4.2,89,991,5.0,55,1282,Clouds,6.3,1701033668
+111,Krasnoyarsk,Russia,Winter,-5.8,1.5,93,1016,10.0,2,2898,Clear,0.8,1707712079
+112,Chelyabinsk,Russia,Autumn,1.8,15.4,64,1028,14.9,62,5135,Snow,4.2,1705604327
+113,Voronezh,Russia,Winter,9.7,32.7,99,1028,9.9,18,7629,Clouds,4.0,1702473199
+114,Omsk,Russia,Autumn,27.1,21.9,59,1035,8.4,22,4200,Snow,2.0,1708271330
+115,Kazan,Russia,Winter,17.9,1.0,92,1023,11.0,28,6110,Clouds,4.8,1708686283
+116,Perm,Russia,Spring,2.6,-11.6,57,1035,7.0,29,8167,Clouds,3.7,1700708175
+117,St Petersburg,Russia,Winter,4.7,43.6,89,1007,0.9,38,1612,Clear,3.8,1701867306
+118,Volgograd,Russia,Autumn,-10.0,5.9,66,1026,8.4,24,1687,Clear,8.1,1708652233
+119,Kazan,Russia,Autumn,4.7,5.2,51,994,14.4,7,4690,Mist,2.5,1700842840
+120,Omsk,Russia,Autumn,0.7,4.6,97,985,2.6,57,9804,Clear,7.1,1704394643
+121,Rostov,Russia,Autumn,9.8,8.0,49,1023,10.4,15,3307,Mist,6.3,1705889118
+122,Chelyabinsk,Russia,Autumn,-7.4,2.8,97,1038,3.0,71,8133,Clouds,6.2,1705128643
+123,Krasnoyarsk,Russia,Summer,12.8,-3.6,93,999,8.0,0,7509,Clear,7.3,1700125355
+124,Krasnoyarsk,Russia,Summer,28.0,-3.2,46,1029,1.5,4,6906,Clear,6.0,1704222102
+125,Krasnoyarsk,Russia,Winter,3.4,4.5,41,993,6.8,2,3591,Clear,9.7,1700615937
+126,Perm,Russia,Autumn,11.0,-3.2,51,981,11.3,64,8183,Mist,7.4,1701375607
+127,Chelyabinsk,Russia,Winter,15.4,-5.7,46,988,5.2,3,6248,Clouds,6.0,1700019477
+128,Perm,Russia,Autumn,-1.0,6.6,39,1016,10.0,98,9766,Clouds,9.1,1703556210
+129,Volgograd,Russia,Autumn,8.4,1.2,94,999,11.9,95,6108,Clouds,6.7,1706508856
+130,Perm,Russia,Summer,5.2,27.6,51,1005,13.9,63,4604,Clear,3.2,1702487111
+131,Moscow,Russia,Summer,6.5,-34.8,79,1008,3.5,97,1669,Clouds,2.3,1702009606
+132,Chelyabinsk,Russia,Spring,-6.6,21.4,43,980,6.0,88,5364,Clear,1.7,1701559757
+133,Samara,Russia,Summer,5.4,23.7,93,1034,2.3,9,8329,Snow,9.9,1707315830
+134,Chelyabinsk,Russia,Spring,12.5,-26.1,76,1014,14.9,20,2283,Clouds,7.8,1706156738
+135,Omsk,Russia,Spring,26.8,-0.1,58,985,13.9,45,1923,Clouds,10.3,1703432207
+136,Moscow,Russia,Spring,19.4,-0.6,65,1016,8.1,90,2125,Clouds,6.6,1706171638
+137,Krasnoyarsk,Russia,Spring,37.3,-16.1,81,1032,12.6,26,2529,Clouds,5.2,1701881297
+138,Omsk,Russia,Spring,-6.5,-6.7,36,1038,7.8,65,9438,Mist,0.7,1706083059
+139,Omsk,Russia,Winter,18.1,-11.7,58,984,9.4,40,4711,Clouds,7.4,1709212367
+140,Volgograd,Russia,Summer,7.8,31.3,40,1012,1.3,12,9004,Clear,6.4,1704529275
+141,Ufa,Russia,Spring,37.8,19.0,62,1028,11.3,8,7274,Rain,10.9,1708519792
+142,Novosibirsk,Russia,Autumn,-7.1,24.1,35,1030,1.9,35,4864,Clear,2.6,1701135627
+143,Moscow,Russia,Summer,-7.6,15.8,61,993,12.4,85,8833,Clear,5.8,1700245300
+144,Omsk,Russia,Summer,-4.0,-11.9,80,991,11.7,89,7788,Mist,7.2,1708972618
+145,Novosibirsk,Russia,Spring,-26.9,-2.9,87,1021,10.6,57,1226,Rain,7.1,1700092036
+146,Novosibirsk,Russia,Winter,-2.9,12.3,55,999,0.5,53,1264,Mist,6.2,1705995802
+147,Moscow,Russia,Spring,-6.4,-13.3,75,1032,4.5,11,1645,Clouds,8.5,1706439051
+148,Ufa,Russia,Winter,7.3,15.7,58,1029,3.9,80,8544,Clouds,2.3,1700853392
+149,Kazan,Russia,Autumn,10.1,1.4,33,1003,5.4,77,6569,Clear,8.0,1706015877
+150,Rostov,Russia,Summer,33.1,-0.6,42,1038,1.3,13,3990,Clear,6.8,1708670304
+151,Samara,Russia,Autumn,19.3,15.7,68,1022,14.1,33,3504,Snow,9.9,1703662340
+152,Rostov,Russia,Winter,-3.7,11.7,44,1013,8.3,52,1587,Clouds,9.3,1709579064
+153,Chelyabinsk,Russia,Winter,-8.5,-0.4,58,1004,4.6,19,5079,Snow,3.5,1709378637
+154,Krasnoyarsk,Russia,Autumn,12.4,22.4,58,1029,6.0,74,4348,Rain,3.0,1700154692
+155,Samara,Russia,Winter,-14.8,-11.2,61,1008,6.7,15,7299,Clear,10.8,1708362101
+156,Chelyabinsk,Russia,Autumn,32.5,14.2,31,1036,9.0,94,4831,Clouds,5.8,1704457335
+157,Omsk,Russia,Summer,22.7,13.9,76,1018,7.7,69,9381,Rain,10.0,1701657888
+158,Krasnoyarsk,Russia,Autumn,-2.0,0.4,51,1010,13.8,55,2715,Clear,1.8,1702585917
+159,St Petersburg,Russia,Summer,-20.7,9.9,56,1035,7.5,82,7450,Snow,7.1,1708110129
+160,Moscow,Russia,Autumn,25.3,-13.8,96,1026,14.9,57,6433,Clouds,8.9,1706147560
+161,Samara,Russia,Winter,3.3,18.9,85,1022,12.8,3,2098,Clear,10.4,1707946258
+162,Samara,Russia,Autumn,23.6,2.2,50,1029,3.1,3,8096,Clouds,3.7,1707557845
+163,Voronezh,Russia,Winter,-18.9,-2.8,76,1002,14.0,19,3326,Mist,8.0,1701824964
+164,Omsk,Russia,Autumn,-4.0,20.7,88,1023,1.7,9,7416,Clear,5.9,1707724922
+165,Kazan,Russia,Autumn,5.1,-5.6,35,1017,12.3,23,7980,Snow,0.7,1708152513
+166,Novosibirsk,Russia,Spring,5.7,-16.1,48,999,5.7,98,7763,Clear,7.6,1709777117
+167,Krasnoyarsk,Russia,Winter,-1.8,-18.3,86,1002,13.2,25,2674,Rain,7.6,1706789408
+168,Omsk,Russia,Spring,14.3,14.1,98,1024,13.0,36,8950,Rain,10.2,1704764812
+169,Nizhny Novgorod,Russia,Winter,-11.0,-14.2,32,1031,12.1,84,9915,Clouds,5.5,1701568146
+170,Ufa,Russia,Spring,2.9,31.3,30,995,11.9,53,7049,Clouds,2.5,1700483455
+171,Novosibirsk,Russia,Summer,6.8,-26.2,87,1029,4.6,20,2089,Rain,0.5,1704036405
+172,Moscow,Russia,Autumn,12.7,30.4,67,1021,1.2,73,5578,Clouds,4.6,1708935827
+173,Novosibirsk,Russia,Winter,15.7,8.2,44,1039,6.0,37,1155,Rain,3.3,1702186268
+174,Kazan,Russia,Winter,-11.9,3.5,63,1034,2.6,45,2958,Clear,8.4,1704445975
+175,Volgograd,Russia,Autumn,-18.0,-3.2,90,987,10.4,3,7344,Snow,3.9,1702871656
+176,Voronezh,Russia,Winter,24.2,11.0,64,1029,5.2,59,6779,Rain,10.4,1704708569
+177,Novosibirsk,Russia,Winter,10.0,4.4,93,1000,14.6,56,7144,Mist,10.6,1703855933
+178,Moscow,Russia,Spring,-6.2,21.5,54,980,9.6,44,6063,Clear,6.8,1702326729
+179,Kazan,Russia,Winter,28.3,6.7,53,1034,12.3,19,4830,Clouds,10.2,1706695233
+180,Rostov,Russia,Summer,6.7,7.3,41,987,2.0,16,9831,Clouds,8.4,1708274437
+181,Samara,Russia,Summer,22.7,-0.5,47,1008,12.9,70,7659,Clouds,6.0,1703907129
+182,Volgograd,Russia,Autumn,6.0,4.1,44,1011,13.8,3,1441,Clouds,2.0,1700095556
+183,Voronezh,Russia,Winter,35.9,9.6,56,1017,7.3,92,7040,Clear,5.0,1705399869
+184,Samara,Russia,Autumn,31.3,-20.7,89,984,9.1,13,6925,Rain,6.2,1703469992
+185,Ufa,Russia,Summer,1.3,-15.2,75,1026,11.5,2,8358,Clouds,9.5,1709944145
+186,Chelyabinsk,Russia,Winter,19.6,16.1,46,1001,2.6,87,5628,Clear,5.3,1706139353
+187,Volgograd,Russia,Winter,14.7,7.6,82,1026,7.5,79,7370,Rain,9.9,1700652755
+188,Volgograd,Russia,Autumn,25.5,2.2,37,1013,6.0,57,1948,Clouds,7.4,1703666344
+189,Rostov,Russia,Summer,-9.5,5.3,56,980,2.2,54,9179,Clear,1.5,1705650352
+190,Rostov,Russia,Winter,15.3,10.2,75,1034,5.5,3,7115,Mist,10.9,1700743088
+191,Krasnoyarsk,Russia,Autumn,20.9,-3.1,79,1034,1.0,23,1459,Mist,5.8,1700059778
+192,Perm,Russia,Summer,-21.4,-6.7,32,1005,0.4,33,8568,Clouds,4.3,1709483017
+193,Novosibirsk,Russia,Autumn,-12.7,7.9,93,1022,2.0,29,5646,Clear,7.3,1705003361
+194,Volgograd,Russia,Spring,-25.6,-9.7,73,989,14.4,81,1392,Rain,1.2,1708075042
+195,Samara,Russia,Winter,1.0,11.1,82,1009,8.2,18,2787,Clouds,7.0,1707706113
+196,Moscow,Russia,Spring,15.8,-20.5,53,1029,14.5,30,8374,Clouds,5.5,1709901691
+197,Yekaterinburg,Russia,Summer,27.5,20.4,89,997,6.5,59,2138,Clouds,4.5,1702173513
+198,Perm,Russia,Spring,6.1,12.1,32,996,4.7,59,5741,Clouds,10.5,1709787557
+199,Yekaterinburg,Russia,Spring,29.4,8.8,49,1005,7.6,18,8418,Clouds,5.7,1708910762
+200,Voronezh,Russia,Summer,-15.7,19.7,75,987,6.6,48,7362,Clouds,2.4,1706913462
+201,Kazan,Russia,Autumn,-20.6,30.0,44,1026,1.6,62,3454,Rain,5.0,1701011930
+202,Samara,Russia,Spring,4.2,20.2,54,1019,9.6,82,4674,Mist,10.1,1705862044
+203,Samara,Russia,Autumn,10.8,-22.6,46,1028,3.2,21,2377,Clouds,1.9,1709468133
+204,Perm,Russia,Spring,4.5,-14.2,38,991,9.3,23,7701,Rain,2.4,1708280083
+205,Volgograd,Russia,Autumn,-26.0,-4.4,67,1006,9.8,75,3597,Snow,0.1,1701785818
+206,Ufa,Russia,Summer,3.7,5.4,77,987,2.3,29,1141,Clouds,0.2,1702951720
+207,Perm,Russia,Spring,-14.6,12.8,89,1004,0.9,57,3659,Clouds,9.1,1709548725
+208,Yekaterinburg,Russia,Summer,15.0,-5.9,92,1025,11.7,30,5596,Rain,8.1,1702082963
+209,Perm,Russia,Spring,10.5,7.8,31,983,6.9,99,6661,Clouds,3.9,1705962859
+210,Samara,Russia,Summer,-9.1,-6.3,40,1012,0.9,63,7142,Snow,7.7,1704256146
+211,Ufa,Russia,Summer,-2.7,-4.2,93,980,14.9,18,6626,Clouds,4.3,1709670114
+212,Novosibirsk,Russia,Spring,-10.9,-16.1,50,998,0.9,47,9787,Mist,10.5,1700289134
+213,Nizhny Novgorod,Russia,Spring,4.1,-8.8,47,1010,10.4,44,9472,Clear,10.6,1707632285
+214,Krasnoyarsk,Russia,Spring,19.3,-15.3,93,995,14.8,99,1423,Clear,4.3,1704324660
+215,St Petersburg,Russia,Winter,-9.8,-9.6,67,993,3.6,93,7999,Rain,9.4,1702866069
+216,Rostov,Russia,Autumn,12.6,20.8,61,1032,2.1,54,5249,Clear,8.5,1700737090
+217,Perm,Russia,Winter,-3.0,-9.2,40,1027,1.8,54,2750,Clear,3.4,1709303173
+218,Voronezh,Russia,Winter,-6.9,44.5,74,984,4.5,96,5757,Clouds,2.6,1703835598
+219,Chelyabinsk,Russia,Summer,3.4,12.4,62,1020,1.5,17,2967,Clear,5.0,1704982042
+220,Kazan,Russia,Spring,-10.5,7.8,70,1005,10.4,62,5088,Clear,8.6,1701052425
+221,Nizhny Novgorod,Russia,Autumn,-3.3,-7.9,37,1007,0.9,91,5178,Mist,10.6,1706303816
+222,Krasnoyarsk,Russia,Summer,-13.0,15.5,40,981,7.6,46,8789,Clear,8.4,1700777567
+223,Krasnoyarsk,Russia,Winter,34.5,-3.6,80,1029,15.0,74,3946,Rain,9.4,1702716207
+224,Krasnoyarsk,Russia,Spring,5.5,6.8,70,985,12.2,56,6394,Rain,6.6,1706552901
+225,Krasnoyarsk,Russia,Summer,-5.5,43.4,46,988,9.2,44,8880,Mist,9.2,1701749736
+226,Yekaterinburg,Russia,Spring,8.2,3.6,75,1012,4.6,32,6075,Clear,8.6,1709958842
+227,Voronezh,Russia,Summer,3.3,22.2,61,1020,9.4,16,8230,Snow,4.1,1706721635
+228,Voronezh,Russia,Spring,1.7,-5.5,83,1004,7.9,69,2531,Clouds,6.1,1700051707
+229,Ufa,Russia,Winter,14.2,4.5,49,1027,6.4,3,3990,Rain,8.9,1708669441
+230,Rostov,Russia,Autumn,16.4,31.6,62,992,2.0,19,8155,Rain,0.5,1709477571
+231,Samara,Russia,Winter,-3.0,-4.4,69,988,13.3,46,5493,Snow,8.9,1706104128
+232,Krasnoyarsk,Russia,Autumn,-3.6,32.2,61,1032,6.7,90,1933,Clouds,2.0,1701877145
+233,Chelyabinsk,Russia,Spring,0.9,15.6,31,992,2.9,14,2460,Rain,5.7,1709223482
+234,Samara,Russia,Summer,-29.5,-3.4,62,1010,5.5,69,3723,Clouds,8.9,1709278101
+235,Voronezh,Russia,Winter,-17.7,14.5,59,1020,6.2,46,1285,Rain,2.8,1706687666
+236,Moscow,Russia,Autumn,25.5,19.6,62,990,12.4,77,1264,Mist,2.7,1700778799
+237,Moscow,Russia,Winter,29.7,14.3,55,983,11.0,74,7816,Clear,4.4,1707079701
+238,Chelyabinsk,Russia,Autumn,1.3,-18.6,51,1013,11.5,8,2762,Mist,9.8,1700879459
+239,Ufa,Russia,Winter,13.6,-5.9,95,1017,0.2,89,1040,Clear,0.0,1708249953
+240,Voronezh,Russia,Autumn,9.7,1.3,67,1025,6.2,15,6827,Clear,9.9,1701822744
+241,Chelyabinsk,Russia,Autumn,51.2,3.9,75,983,7.2,68,9259,Clear,1.7,1708167707
+242,Yekaterinburg,Russia,Spring,21.8,14.3,44,1017,0.3,60,1987,Clouds,10.9,1703843139
+243,Perm,Russia,Autumn,3.1,7.7,73,998,3.9,9,8804,Rain,10.5,1704447395
+244,Chelyabinsk,Russia,Spring,-9.3,-15.0,78,985,11.4,49,8789,Clear,5.4,1709240658
+245,Novosibirsk,Russia,Autumn,-19.1,10.7,90,1013,2.1,2,6717,Clear,5.6,1702361216
+246,Samara,Russia,Summer,8.1,14.2,96,997,8.0,76,4198,Mist,5.3,1707446153
+247,Nizhny Novgorod,Russia,Summer,-6.3,13.4,35,992,3.2,93,6374,Snow,7.0,1702567587
+248,Omsk,Russia,Summer,-16.3,21.2,38,1020,0.2,69,5790,Snow,1.0,1700264237
+249,Ufa,Russia,Autumn,-4.7,17.5,35,1002,3.6,80,8183,Snow,0.4,1704469353
+250,Chelyabinsk,Russia,Spring,-11.2,11.9,61,998,14.6,50,3524,Rain,0.6,1704840351
+251,Voronezh,Russia,Spring,30.3,3.9,70,1024,12.0,18,3479,Clear,4.9,1702514719
+252,Kazan,Russia,Autumn,18.2,-19.9,37,990,14.4,41,6154,Clouds,3.0,1701908911
+253,Moscow,Russia,Summer,4.9,11.4,79,980,7.3,34,1778,Rain,6.8,1704002981
+254,Novosibirsk,Russia,Summer,27.2,8.1,91,1003,1.6,45,2492,Clear,10.9,1701419920
+255,Rostov,Russia,Spring,6.2,9.1,91,1033,8.2,25,1660,Rain,4.2,1708360777
+256,Krasnoyarsk,Russia,Summer,-7.9,-14.2,36,986,6.8,68,2348,Clear,6.3,1702179441
+257,Omsk,Russia,Winter,27.8,-11.2,33,1004,12.7,92,8851,Clouds,4.6,1702737946
+258,Volgograd,Russia,Spring,13.1,20.8,35,1000,1.5,63,8156,Clouds,9.3,1709838074
+259,Ufa,Russia,Summer,-10.6,4.4,87,994,7.3,36,3044,Rain,9.9,1709749844
+260,Nizhny Novgorod,Russia,Spring,2.1,15.2,51,980,2.3,83,8368,Clouds,9.7,1702088062
+261,Omsk,Russia,Winter,-8.1,5.4,55,991,4.9,48,4516,Rain,10.7,1701834907
+262,Chelyabinsk,Russia,Spring,-15.7,5.4,32,1037,11.1,20,5577,Clear,0.3,1708352110
+263,Yekaterinburg,Russia,Spring,18.9,19.1,70,986,7.1,73,1727,Clear,9.2,1703861774
+264,Moscow,Russia,Spring,33.6,-2.7,89,994,5.6,63,8468,Snow,8.3,1703633795
+265,Voronezh,Russia,Spring,-16.0,6.4,43,1000,5.9,4,1342,Rain,2.5,1703477084
+266,Moscow,Russia,Winter,13.4,-1.9,41,998,6.9,99,2447,Clear,10.5,1704327802
+267,Rostov,Russia,Autumn,-4.8,-1.5,41,1039,11.8,69,7581,Snow,1.6,1703399752
+268,Yekaterinburg,Russia,Spring,-2.3,0.4,42,1008,13.4,89,7317,Clear,7.5,1703800986
+269,Krasnoyarsk,Russia,Spring,-3.9,8.3,54,1004,14.3,3,1526,Clouds,2.5,1705332889
+270,Voronezh,Russia,Summer,-8.0,-2.2,74,1012,11.8,38,7748,Clear,4.7,1700723858
+271,Samara,Russia,Spring,5.7,23.8,48,1028,4.7,34,1405,Rain,7.9,1700044816
+272,St Petersburg,Russia,Summer,-7.5,-8.4,84,1011,10.3,0,8986,Rain,6.2,1700004138
+273,Novosibirsk,Russia,Autumn,9.1,2.2,74,1028,6.6,23,4740,Clear,4.7,1704163960
+274,Moscow,Russia,Winter,4.2,-1.6,37,1014,3.8,56,2846,Snow,3.6,1707081905
+275,Kazan,Russia,Winter,1.4,26.7,82,1023,12.6,99,2478,Clouds,9.2,1703864044
+276,Moscow,Russia,Autumn,-8.6,7.9,84,1017,0.6,69,1771,Clear,1.6,1706647463
+277,Omsk,Russia,Winter,-3.7,20.5,61,1005,13.5,40,6525,Clear,4.7,1707088166
+278,Moscow,Russia,Autumn,16.3,-17.3,80,990,6.9,53,9770,Clear,9.9,1700221552
+279,Ufa,Russia,Autumn,12.5,9.0,73,1014,9.6,45,1193,Clear,9.3,1708432372
+280,Moscow,Russia,Autumn,-9.7,18.3,99,987,9.9,59,3007,Clouds,4.4,1701897951
+281,St Petersburg,Russia,Winter,6.5,6.2,47,1025,13.4,59,2185,Snow,8.4,1705862835
+282,St Petersburg,Russia,Summer,16.3,21.0,51,993,9.6,56,3394,Clouds,9.1,1708705070
+283,Krasnoyarsk,Russia,Autumn,-20.0,-2.8,66,989,9.2,30,5005,Clear,9.8,1709278463
+284,Nizhny Novgorod,Russia,Spring,13.2,26.1,85,981,1.0,83,8429,Clear,6.0,1709803326
+285,Samara,Russia,Winter,-4.9,39.5,88,1025,7.8,23,3261,Clear,2.2,1702157280
+286,Kazan,Russia,Autumn,13.6,-0.4,32,988,2.3,88,4736,Clouds,2.8,1700808301
+287,Moscow,Russia,Autumn,-6.4,-1.7,57,982,11.1,35,7716,Rain,3.3,1705476420
+288,Moscow,Russia,Spring,-22.1,26.8,64,1000,7.7,84,5875,Clear,6.5,1706296495
+289,Novosibirsk,Russia,Summer,-19.4,28.7,90,1005,10.2,29,9921,Rain,0.4,1704346657
+290,Voronezh,Russia,Summer,5.7,-2.8,83,987,0.6,23,5378,Snow,7.0,1700112935
+291,St Petersburg,Russia,Summer,8.9,-1.3,92,1027,1.3,29,8815,Clouds,4.0,1708200252
+292,Kazan,Russia,Autumn,-8.6,0.8,36,981,10.7,85,4451,Snow,3.2,1709726914
+293,Krasnoyarsk,Russia,Autumn,14.6,-15.2,78,985,1.1,91,8616,Clouds,9.7,1702150205
+294,Rostov,Russia,Autumn,-19.9,-8.8,60,1007,1.1,6,3800,Rain,5.1,1705424441
+295,Nizhny Novgorod,Russia,Winter,4.0,-10.1,87,1032,0.2,34,9333,Clouds,1.0,1704280650
+296,Samara,Russia,Spring,-13.2,-6.5,90,1008,14.3,54,6410,Clouds,9.1,1704523535
+297,Yekaterinburg,Russia,Autumn,-4.8,4.5,53,1005,11.1,91,2455,Clear,0.5,1704752989
+298,Samara,Russia,Spring,5.7,8.5,49,1004,5.3,13,7892,Clouds,8.0,1709757999
+299,Ufa,Russia,Spring,-7.9,28.3,66,991,4.4,9,6808,Clear,8.5,1704310518
+300,Omsk,Russia,Summer,-0.8,-10.0,33,984,5.2,79,7796,Clouds,3.9,1709241937

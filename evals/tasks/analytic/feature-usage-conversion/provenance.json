@@ -1,0 +1,98 @@
+{
+  "task_id": "feature-usage-conversion",
+  "dataset_sha256": {
+    "dataset.csv": "35428957eb13cc9730078b6bc1bfb834907fe09574dda0de0ae77ddf1d3dc96b"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "2f354cf9e68df7c53dace9408e691dca1926c7074e8ca5c2bf2fc650e7cbf299"
+  },
+  "reference_sha256": "20a2bc64c32571a56fa1f763df9894b76c737467de475d245ad11073e175b5f1",
+  "cli": {
+    "binary": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/runtime/bin/loginom-ai-agent-cli",
+    "version": "0.2.2",
+    "profile": "profile"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-feature-usage-conversion-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/e3ba231968547c56ae8ad194c5f4f207f858a04a1cc20e16adb7587456ace8e9-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_eacc6d9b1ffeod28kUJtNlbivn",
+    "skill_revision": "8afb17d6a2c247fa0fb8fc6e2285e6ed05e6bf475a1a9d88ae7b760a29260dfc",
+    "exit_code": 0,
+    "started_at": "2026-10-19T11:13:25+03:00",
+    "duration_s": 918,
+    "tokens": {
+      "input": 118388,
+      "output": 4043,
+      "reasoning": 2600
+    },
+    "tool_calls": 32,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-feature-usage-conversion-1/Unit1/workflow",
+  "source_task": "analitic-tasks/task40-product-analytics",
+  "runtime_pin": {
+    "version": "0.2.2",
+    "ci_run": 39210148809,
+    "ci_artifact": {
+      "id": 12168030843,
+      "name": "loginom-linux",
+      "sha256": "bf0e29fd686cb5ec50477a8e36775359486f6aafb93897dce363082fa879c86c"
+    },
+    "archive": {
+      "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/downloads/loginom-ai-agent-cli-0.2.2-linux-x64.tar.gz",
+      "sha256": "c612eab428e5dc16b9a6105cb4fd401a00c04a25dee6390644b50e86044283b9"
+    },
+    "source_commit": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "source_tree_sha256": "92f2bf27f7771109634d33bb8ce6ab1be4f84a74209a45936e0a18d430b57bff",
+    "cli_manifest_sha256": "26c94fe7d3d6f975cc2d60d99eb5f7b2b6fcb377c753c6de3079c155f41ac28c",
+    "resource_manifest_sha256": "0642015ac67c8f569e7b4d1ac158973d514ae39d72b77cacae10d48810fddd34",
+    "harness_sha": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "harness_clean": true
+  },
+  "independent_oracle_check": {
+    "pass": true,
+    "method": "blind SQLite SQL, author oracle not provided",
+    "independent_csv_sha256": "e0a9667d4f35ffbd1d83b9fb768c5e7c0d8f364648f34ad4aed00a678ba919b2",
+    "query_sha256": "f4e52a7c464bba73e5aaabcfa4dab7fe9a1b329c33fdd75e33d9a19ca925f1a9",
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/independent/root/feature-usage-conversion/report.json",
+    "comparison": {
+      "passed": true,
+      "error": null
+    }
+  },
+  "browser_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/feature-usage-conversion/attempt-1/browser-rerun.json",
+    "screenshot": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/feature-usage-conversion/attempt-1/browser-rerun.png",
+    "all_nodes_active": true,
+    "closed_without_save": true
+  }
+}

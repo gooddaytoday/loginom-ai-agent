@@ -8,13 +8,14 @@ import { EvalFailure } from "../src/fail"
 
 const tasksDir = path.join(evalsRoot, "tasks")
 
-test("loadTasks: встроенный аналитический корпус содержит 35 закреплённых задач и поддерживает only", async () => {
+test("loadTasks: встроенный аналитический корпус содержит 65 закреплённых задач и поддерживает only", async () => {
   const dir = path.join(tasksDir, "analytic")
   const tasks = await loadTasks(dir)
-  expect(tasks).toHaveLength(35)
-  expect(await agentInputsHash(tasks)).toBe("d7d221ed5177a195d346f01b793b7f8c51c15998bfee660d19bb93fce4b394f8")
-  expect(await rubricHash(tasks)).toBe("73af640ae4e61e51961d9157c0eb554cb4a2f5e2a364d20360253ad5dc30f273")
+  expect(tasks).toHaveLength(65)
+  expect(await agentInputsHash(tasks)).toBe("dd1a21c6be4e0482ea3d1fd700ec1f5e4140abb037502d0310f16fda8e9773cc")
+  expect(await rubricHash(tasks)).toBe("a39049e6d2660ce57f9ae23dd3e1ddbc99ea4d1adb8cfa8c953c2c7582579377")
   expect((await loadTasks(dir, ["sales-by-category"])).map((task) => task.id)).toEqual(["sales-by-category"])
+  expect((await loadTasks(dir, ["monthly-retention-curve"])).map((task) => task.id)).toEqual(["monthly-retention-curve"])
 })
 
 test("loadTasks: читает три core-задачи в порядке id", async () => {

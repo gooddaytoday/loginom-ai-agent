@@ -25,6 +25,8 @@ export async function releasePendingNode({operation,channel,readReceipt,restoreR
  requireValue(Number.isFinite(deadline),'Release requires an explicit finite deadline');
  requireValue(!operation.transportUncertain,'The last browser call has not confirmed completion; inspect the operation again later');
  let settleWizard,beforeSettlement;
+ if(operation.portReadCleanupComplete!==undefined)requireValue(operation.portReadCleanupComplete===true,
+  'The last output-port read has no confirmed settled cleanup');
  if(operation.lastReceipt){
   const response=await readReceipt(operation.lastReceipt);
   requireValue(response?.state==='completed'&&response.receipt?.cleanup_complete===true,

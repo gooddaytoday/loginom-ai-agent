@@ -208,6 +208,7 @@ page = context.pages()[0]
     action: { action_key: "acceptance.cold_read", revision: "1" },
     deadline: Date.now() + 540_000,
   }
+  const coldReadCeiling={operation_id:operation.id,node:structuredClone(node),deadline_at:operation.deadline,total_ms:540_000};
   const processObservation=coldProcessObservation(execute,{node,operation,record});
   const procedure = createNodeProcedure({
     operation,
@@ -331,7 +332,7 @@ page = context.pages()[0]
   await returnFromOutputTable(channel, opened.table)
   }
 
-  actual.push({node,type:target.type,label:target.label,output_port:outputPort,execution,data,
+  actual.push({node,type:target.type,label:target.label,output_port:outputPort,execution,data,cold_read_ceiling:coldReadCeiling,
    ...(content_candidate?{content_candidate:true}:{})});
   // Preserve independently read values before correspondence can refuse. A
   // failed match is still FAIL; this private checkpoint makes it diagnosable.

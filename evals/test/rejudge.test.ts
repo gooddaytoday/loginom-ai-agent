@@ -1,14 +1,95 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { cp, mkdtemp, rm } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { evaluationContractHash } from "../src/evaluation"
 import { analyzeComparison } from "../src/compare-analysis"
 import { main } from "../src/run"
-import { evalsRoot } from "../src/config"
+import { evalsRoot, loadConfig, type EvalConfig } from "../src/config"
+import { rejudge } from "../src/rejudge"
 import type { RunSummary } from "../src/report"
 
+
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
+
+test("judge-only stops spawning judges after unconfirmed process cleanup", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-uncertain-"))
+  const env = { EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake",
+    EVAL_JUDGE_COMMAND: `${fakeJudge} --gate-log ${path.join(root, "judge.jsonl")}` }
+  try {
+    const run = await main(["--dry-run", "--only", "group-sum-qty", "--repeat", "2"], env)
+    await mkdir(path.join(run.runDir!, "group-sum-qty", "1", "judge-processes-1", "process-cleanup.json"), { recursive: true, mode: 0o700 })
+    expect((await main(["--judge-only", path.basename(run.runDir!)], env)).code).toBe(0)
+    const summary = await Bun.file(path.join(run.runDir!, "summary.json")).json() as RunSummary
+    expect(summary.tasks[0]!.attempts.map(attempt => attempt.judge_cleanup_unconfirmed)).toEqual([true, true])
+    expect(summary.tasks[0]!.attempts.map(attempt => attempt.judge_attempts)).toEqual([1, 0])
+    expect(summary.metrics.completed).toBe(2)
+    const rows = (await Bun.file(path.join(root, "judge.jsonl")).text()).trim().split("\n").map(line => JSON.parse(line))
+    expect(rows.filter(row => row.kind === "start")).toHaveLength(1)
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
+test("judge-only reads a legacy summary without adding slot fields or changing quality denominators", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-legacy-slots-"))
+  const env = { EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: fakeJudge }
+  try {
+    const run = await main(["--dry-run"], env)
+    const file = Bun.file(path.join(run.runDir!, "summary.json"))
+    const legacy = await file.json() as RunSummary
+    delete legacy.slots
+    delete legacy.config.parallel
+    legacy.tasks.forEach(task => task.attempts.forEach(attempt => { delete attempt.slot_id }))
+    await Bun.write(file, JSON.stringify(legacy))
+    expect((await main(["--judge-only", legacy.run_id], env)).code).toBe(0)
+    const after = await file.json() as RunSummary
+    expect(after.slots).toBeUndefined()
+    expect(after.config.parallel).toBeUndefined()
+    expect(after.tasks.flatMap(task => task.attempts).every(attempt => attempt.slot_id === undefined)).toBe(true)
+    expect(after.metrics.total).toBe(3)
+    expect(after.metrics.completed).toBe(1)
+    expect(after.metrics.pass_evaluated_count).toBe(3)
+    expect(after.metrics.pass_rate).toBeCloseTo(1 / 3, 3)
+    expect(after.metrics.mean_score).toBe(33.3)
+    expect(await Bun.file(path.join(run.runDir!, "summary.prev.json")).json()).toEqual(legacy)
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
+
+test("rejudge removes its SIGINT handler after success and failed result persistence", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-signal-"))
+  const listeners = process.listeners("SIGINT")
+  const env = { EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake", EVAL_JUDGE_COMMAND: fakeJudge }
+  try {
+    const dry = await main(["--dry-run", "--only", "group-sum-qty"], env)
+    const runId = path.basename(dry.runDir!)
+    const config = loadConfig(["--judge-only", runId], env)
+    expect((await rejudge(config, runId)).code).toBe(0)
+    expect(process.listeners("SIGINT")).toEqual(listeners)
+    const result = path.join(dry.runDir!, "group-sum-qty", "1", "result.json")
+    await rm(result)
+    await mkdir(result)
+    await expect(rejudge(config, runId)).rejects.toThrow()
+    expect(process.listeners("SIGINT")).toEqual(listeners)
+  } finally {
+    process.listeners("SIGINT").filter(listener => !listeners.includes(listener)).forEach(listener => process.off("SIGINT", listener))
+    await rm(root, { recursive: true, force: true })
+  }
+}, 30_000)
+
+test("rejudge uses the configured private judge home for version and execution", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-rejudge-home-"))
+  const env = { EVAL_RESULTS_DIR: path.join(root, "results"), JUDGE_MODEL: "fake",
+    EVAL_JUDGE_COMMAND: `${fakeJudge} --version-home-file ${path.join(root, "version.json")} --gate-log ${path.join(root, "judge.jsonl")}` }
+  try {
+    const dry = await main(["--dry-run", "--only", "group-sum-qty"], env)
+    const config: EvalConfig = loadConfig(["--judge-only", path.basename(dry.runDir!)], env)
+    config.judge.env = { CODEX_HOME: path.join(root, "private-judge") }
+    expect((await rejudge(config, path.basename(dry.runDir!))).code).toBe(0)
+    expect((await Bun.file(path.join(root, "version.json")).json()).codexHome).toBe(config.judge.env.CODEX_HOME)
+    const rows = (await Bun.file(path.join(root, "judge.jsonl")).text()).trim().split("\n").map(line => JSON.parse(line))
+    expect(rows.map(row => row.kind)).toEqual(["start", "end"])
+    expect(rows.map(row => row.codexHome)).toEqual([config.judge.env.CODEX_HOME, config.judge.env.CODEX_HOME])
+  } finally { await rm(root, { recursive: true, force: true }) }
+}, 30_000)
 
 function overrideJudgeEnv() {
   const original = {

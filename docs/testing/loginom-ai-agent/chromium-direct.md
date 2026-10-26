@@ -92,6 +92,13 @@ LOGINOM_DOCK_TEST_BROWSER=/absolute/path/to/pinned/chromium \
 - При `LOGINOM_DOCK_TEST_PUBLIC_APP=1` managed Chromium открывает HTTPS Loginom
   и проверяет форму входа при активном системном прокси, без ввода пользовательских данных.
 
+При ошибке download тест выводит относительное время начала и завершения клика,
+события download, ошибок страницы и crash. Ожидание download остаётся 5000 мс;
+диагностика не добавляет повторов или ожиданий. Это позволяет различить задержку
+клика и отсутствие download после клика. Повторный сбой MCP на Ubuntu в
+[PR #237](https://github.com/gooddaytoday/loginom-ai-agent/pull/237) пока не имеет
+установленной причины; один успешный повтор не подтверждает исправление.
+
 ## Результаты
 
 Реализация: `connection-check.mjs` и `session.mjs`; backend не изменялся.

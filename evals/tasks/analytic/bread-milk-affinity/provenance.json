@@ -1,0 +1,163 @@
+{
+  "task_id": "bread-milk-affinity",
+  "dataset_sha256": {
+    "dataset.csv": "0a9552125966aaf018d6d1c5bf8d9639b2097bf47c2098f01f5c3ff2649fc869"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "4efdd622cb77cfe294af84f0776cdabfa725612b0ef2f0f2692e244eff0c3981"
+  },
+  "reference_sha256": "aa9e99407cc3dedd9a161ac0f8bf7d16c5e30b68c9096ef61e4af288f2151089",
+  "cli": {
+    "binary": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/runtime/bin/loginom-ai-agent-cli",
+    "version": "0.2.2",
+    "profile": "profile"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-bread-milk-affinity-4.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/072a5c1e461bb3dbe89cf3ee162001fad66d86c8909bbaae32a0e8ba5c040c21-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 4,
+    "total": 4,
+    "assisted": true,
+    "hint": "Техническая подсказка для CLI 0.2.2: узлу, который определяет наличие Bread и Milk в корзине, дай короткое имя «Флаги корзин». В названиях узлов избегай слов token, токен и токены: в этой версии они вызывают ложное срабатывание защиты UI-ссылок при настройке входных полей. Используй обычный параметр имени узла и штатные инструменты. Выполни всё аналитическое задание исходного промпта, включая распознавание полных названий товаров, расчёты из сумм, сортировку и одну итоговую выгрузку.",
+    "session_id": "ses_eac422d3affewzy8c618B064V7",
+    "skill_revision": "8afb17d6a2c247fa0fb8fc6e2285e6ed05e6bf475a1a9d88ae7b760a29260dfc",
+    "exit_code": 0,
+    "started_at": "2026-10-19T13:38:28+03:00",
+    "duration_s": 1330,
+    "tokens": {
+      "input": 143331,
+      "output": 5491,
+      "reasoning": 1579
+    },
+    "tool_calls": 47,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-bread-milk-affinity-4/Unit1/workflow",
+  "source_task": "analitic-tasks/task10-market-basket",
+  "revision": "primary-v2",
+  "spec_correction": {
+    "kind": "author-spec-units-correction",
+    "before": "support/confidence fractions",
+    "after": "support/confidence percent x100; lift unchanged",
+    "reason": "General approved plan requires event shares in percent; no exception was approved for T10",
+    "previous_revision": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/revisions/bread-milk-affinity/primary-v1",
+    "model_content_failure": false,
+    "fallback": false
+  },
+  "runtime_pin": {
+    "version": "0.2.2",
+    "ci_run": 39210148809,
+    "ci_artifact": {
+      "id": 12168030843,
+      "name": "loginom-linux",
+      "sha256": "bf0e29fd686cb5ec50477a8e36775359486f6aafb93897dce363082fa879c86c"
+    },
+    "archive": {
+      "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/downloads/loginom-ai-agent-cli-0.2.2-linux-x64.tar.gz",
+      "sha256": "c612eab428e5dc16b9a6105cb4fd401a00c04a25dee6390644b50e86044283b9"
+    },
+    "source_commit": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "source_tree_sha256": "92f2bf27f7771109634d33bb8ce6ab1be4f84a74209a45936e0a18d430b57bff",
+    "cli_manifest_sha256": "26c94fe7d3d6f975cc2d60d99eb5f7b2b6fcb377c753c6de3079c155f41ac28c",
+    "resource_manifest_sha256": "0642015ac67c8f569e7b4d1ac158973d514ae39d72b77cacae10d48810fddd34",
+    "harness_sha": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "harness_clean": true
+  },
+  "independent_oracle_check": {
+    "pass": true,
+    "method": "blind independent standard-library calculation; only v2 prompt and CSV provided",
+    "result": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/independent/v2/bread-milk-affinity/independent.csv",
+    "script": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/independent/v2/bread-milk-affinity/calculate.py",
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/independent/v2/bread-milk-affinity/report.json",
+    "independent_csv_sha256": "d9b51262a520a3cb04477030f7f5ad6cf12c0d0e549a352a111185996a92e4a4",
+    "calculation_sha256": "925e868921443122ab190c680d2a993f55d5cef708bc94f94e8ae17100fdb4cc",
+    "comparison": {
+      "passed": true,
+      "error": null
+    }
+  },
+  "browser_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/bread-milk-affinity/attempt-4/browser-rerun.json",
+    "screenshot": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/bread-milk-affinity/attempt-4/browser-rerun.png",
+    "all_nodes_active": true,
+    "closed_without_save": true,
+    "rounding_verified_in_exported_path": true
+  },
+  "technical_hint": {
+    "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/bread-milk-affinity/technical-label-hint.txt",
+    "sha256": "e88e77f309b3ce324dc363086b32c9b99ca24726f691aa9005f74113af2ba017",
+    "rationale": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/bread-milk-affinity/hint-rationale.json",
+    "scope": "neutral node labels only; task analytics unchanged"
+  },
+  "attempt_history": [
+    {
+      "number": 1,
+      "classification": "technical-ui-blocker",
+      "content_failure_counted": false,
+      "exit_code": 1,
+      "classification_evidence": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/bread-milk-affinity/attempt-1/attempt-classification.json",
+      "cleanup_report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/bread-milk-affinity/attempt-1/cleanup.json",
+      "cleanup_status": "complete",
+      "revision": "primary-v1",
+      "assisted": false
+    },
+    {
+      "number": 2,
+      "classification": "technical-ui-blocker",
+      "content_failure_counted": false,
+      "exit_code": 1,
+      "classification_evidence": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/bread-milk-affinity/attempt-2/attempt-classification.json",
+      "cleanup_report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/bread-milk-affinity/attempt-2/cleanup.json",
+      "cleanup_status": "complete",
+      "revision": "primary-v1",
+      "assisted": false
+    },
+    {
+      "number": 3,
+      "classification": "author-spec-units-correction",
+      "content_failure_counted": false,
+      "exit_code": 1,
+      "classification_evidence": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/bread-milk-affinity/attempt-3/attempt-classification.json",
+      "cleanup_report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/bread-milk-affinity/attempt-3/cleanup.json",
+      "cleanup_status": "complete",
+      "revision": "primary-v1",
+      "assisted": true
+    },
+    {
+      "number": 4,
+      "classification": "accepted",
+      "revision": "primary-v2",
+      "content_failure_counted": false,
+      "exit_code": 0,
+      "assisted": true,
+      "cli_check": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/bread-milk-affinity/attempt-4/check.json",
+      "rerun_check": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/bread-milk-affinity/attempt-4/check-rerun.json"
+    }
+  ],
+  "fallback_used": false
+}

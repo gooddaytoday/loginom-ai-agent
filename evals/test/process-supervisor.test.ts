@@ -1,12 +1,143 @@
 import { expect, test } from "bun:test"
+
+const processDenial = process.env.EVAL_PROCESS_DENIAL_TESTS === "1" ? test : test.skip
 import { spawn } from "node:child_process"
 import { cp, mkdir, mkdtemp, readFile, readlink, rm, stat } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
 import { agentCommand, runAgent } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
-import { signalProcess, superviseProcess, type ProcessIdentity } from "../src/process-supervisor"
+import { hasOwnedAncestry, signalProcess, superviseProcess, type ProcessIdentity } from "../src/process-supervisor"
 import { archiveDiagnostics } from "../src/diagnostics"
+
+test("supervisor persists its actual launcher lifetime bound to the admitted owner and birth", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-launcher-lifetime-"))
+  const owner = { kind: "command" as const, id: crypto.randomUUID() }
+  let confirmed = false
+  try {
+    const before = Date.now()
+    const run = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(100)"], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 5000, outDir: root, owner })
+    confirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    expect(confirmed).toBe(true)
+    const lifetime = run.processCleanup.lifetime
+    expect(lifetime).toMatchObject({ producer_pid: process.pid, owner })
+    expect(lifetime?.launcher).toEqual(run.processCleanup.processes.find(item => item.pid === run.processCleanup.launcher?.pid))
+    expect(Date.parse(lifetime!.started_at)).toBeGreaterThanOrEqual(before)
+    expect(Date.parse(lifetime!.finished_at!)).toBeGreaterThan(Date.parse(lifetime!.started_at))
+    expect(Date.parse(lifetime!.finished_at!)).toBeLessThanOrEqual(Date.parse(run.processCleanup.verification![0]!.observed_at))
+    expect((await Bun.file(path.join(root, "process-cleanup.json")).json()).lifetime).toEqual(lifetime)
+    expect((await stat(path.join(root, "process-cleanup.json"))).mode & 0o777).toBe(0o600)
+  } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
+}, 10000)
+
+test("supervisor retains an interrupted launcher lifetime and publishes none before dispatch", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-interrupted-lifetime-"))
+  const owner = { kind: "judge" as const, id: crypto.randomUUID() }
+  let confirmed = false
+  try {
+    const skipped = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(120000)"], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 300, owner, signal: AbortSignal.abort() })
+    expect(skipped.interrupted).toBe(true)
+    expect(skipped.processCleanup.lifetime).toBeUndefined()
+    const run = await superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(120000)"], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 300, outDir: root, owner })
+    confirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    expect(confirmed).toBe(true)
+    expect(run.timedOut).toBe(true)
+    expect(run.processCleanup.lifetime?.owner).toEqual(owner)
+    expect(Number.isFinite(Date.parse(run.processCleanup.lifetime!.finished_at!))).toBe(true)
+    expect((await Bun.file(path.join(root, "process-cleanup.json")).json()).lifetime).toEqual(run.processCleanup.lifetime)
+  } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
+}, 10000)
+
+test.each(["SIGINT", "timeout"])("supervisor lets a slot finish cleanup after %s beyond the old grace", async (stop) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-slot-cleanup-grace-"))
+  const abort = new AbortController()
+  const output: string[] = []
+  let confirmed = false
+  try {
+    const run = await superviseProcess({
+      cmd: [process.execPath, "-e", `process.on('SIGINT', () => {
+        setTimeout(() => { console.log('cleanup-complete'); process.exit(130) }, 33_000)
+      }); console.log('ready'); setInterval(() => {}, 1000)`],
+      cwd: root, env: { PATH: process.env.PATH ?? "" }, timeoutMs: stop === "timeout" ? 1000 : 10_000, signal: abort.signal,
+      owner: { kind: "slot", id: crypto.randomUUID() },
+      stdout: new WritableStream<Uint8Array>({ write(chunk) {
+        const text = new TextDecoder().decode(chunk)
+        output.push(text)
+        if (stop === "SIGINT" && text.includes("ready")) abort.abort()
+      } }),
+    })
+    confirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    expect(run.interrupted).toBe(stop === "SIGINT")
+    expect(run.timedOut).toBe(stop === "timeout")
+    expect(run.exitCode).toBe(130)
+    expect(output.join("")).toContain("cleanup-complete")
+    expect(run.processCleanup).toMatchObject({ status: "confirmed", error: null, unknownProcesses: [] })
+    expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
+  } finally { if (confirmed) await rm(root, { recursive: true, force: true }) }
+}, 70_000)
+
+test("supervisor releases its interrupt grace timer when the owned command exits", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-interrupt-timer-"))
+  let cleanupConfirmed = true
+  try {
+    const script = path.join(root, "supervise.ts")
+    const result = path.join(root, "result.json")
+    await Bun.write(script, `import { superviseProcess } from ${JSON.stringify(path.join(evalsRoot, "src/process-supervisor.ts"))}
+const abort = new AbortController()
+const output = new TransformStream()
+const reader = output.readable.getReader()
+const pending = superviseProcess({cmd:[process.execPath,"-e","console.log('ready'); await Bun.sleep(120000)"],
+  cwd:${JSON.stringify(root)},env:{PATH:process.env.PATH},timeoutMs:10000,stdout:output.writable,signal:abort.signal})
+await reader.read()
+abort.abort()
+while (!(await reader.read()).done) {}
+reader.releaseLock()
+const run = await pending
+await Bun.write(${JSON.stringify(result)}, JSON.stringify({interrupted:run.interrupted,cleanup:run.processCleanup}))
+`)
+    cleanupConfirmed = false
+    const run = await superviseProcess({ cmd: [process.execPath, script], cwd: root,
+      env: { PATH: process.env.PATH ?? "" }, timeoutMs: 10_000 })
+    cleanupConfirmed = run.processCleanup.status === "confirmed" && run.processCleanup.capture_complete
+    expect(run.processCleanup.status).toBe("confirmed")
+    const saved = await Bun.file(result).json()
+    expect(saved.interrupted).toBe(true)
+    expect(saved.cleanup.status).toBe("confirmed")
+    expect(run.timedOut).toBe(false)
+    expect(run.exitCode).toBe(0)
+  } finally { if (cleanupConfirmed) await rm(root, { recursive: true, force: true }) }
+}, 45_000)
+
+test("supervisor streams repeated pipe exchanges and confirms process exit", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-stream-transport-"))
+  const input = new TransformStream<Uint8Array, Uint8Array>()
+  const output = new TransformStream<Uint8Array, Uint8Array>()
+  const writer = input.writable.getWriter()
+  const reader = output.readable.getReader()
+  const abort = new AbortController()
+  const pending = superviseProcess({
+    cmd: [process.execPath, "-e", 'const {createInterface}=await import("node:readline");for await(const line of createInterface({input:process.stdin})){await Bun.sleep(50);process.stdout.write(line+"\\n")}'],
+    cwd: root, env: { PATH: process.env.PATH ?? "" }, timeoutMs: null,
+    stdin: input.readable, stdout: output.writable, signal: abort.signal,
+  })
+  try {
+    for (const line of ["first", "second", "third"]) {
+      await writer.write(new TextEncoder().encode(line + "\n"))
+      expect(new TextDecoder().decode((await reader.read()).value)).toBe(line + "\n")
+    }
+    await writer.close()
+    expect((await reader.read()).done).toBe(true)
+    const run = await pending
+    expect(run.stdout).toBe("")
+    expect(run.exitCode).toBe(0)
+    expect(run.timedOut).toBe(false)
+    expect(run.processCleanup).toMatchObject({ status: "confirmed", error: null, capture_complete: true, observation_mode: "continuous" })
+    expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
+  } finally { abort.abort(); await reader.cancel(); await pending; await rm(root, { recursive: true, force: true }) }
+}, 10_000)
 
 test("supervisor retains the live launcher until the terminated CLI exit receipt is observed", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-exit-receipt-"))
@@ -22,6 +153,25 @@ test("supervisor retains the live launcher until the terminated CLI exit receipt
     expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 45_000)
+
+test("supervisor bounds a stalled pipe consumer after its owned process exits", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-stream-stalled-"))
+  const blocked = Promise.withResolvers<void>()
+  const pending = superviseProcess({
+    cmd: [process.execPath, "-e", 'process.stdout.write("ready\\n"); await Bun.sleep(50)'],
+    cwd: root, env: { PATH: process.env.PATH ?? "" }, timeoutMs: 1_000,
+    stdout: new WritableStream<Uint8Array>({ write() { return blocked.promise } }),
+  })
+  try {
+    const settled = await Promise.race([pending.then(() => true), Bun.sleep(2_500).then(() => false)])
+    blocked.resolve()
+    const run = await pending
+    expect(settled).toBe(true)
+    expect(run.exitCode).toBe(0)
+    expect(run.processCleanup).toMatchObject({ status: "failed", capture_complete: false, error: "Output transport deadline exceeded" })
+    expect(run.processCleanup.verification?.map(pass => pass.owned_remaining)).toEqual([0, 0])
+  } finally { blocked.resolve(); await pending; await rm(root, { recursive: true, force: true }) }
+}, 5_000)
 
 test("trusted unit: native commands cannot request observation after exit", async () => {
   await expect(superviseProcess({ cmd: [process.execPath, "-e", "process.exit(0)"], cwd: evalsRoot,
@@ -76,7 +226,7 @@ for (const stop of ["timeout", "interrupt"] as const) test(`trusted unit: ${stop
   } finally { signal.abort(); await pending; await rm(root, { recursive: true, force: true }) }
 }, 10_000)
 
-test("trusted unit: protected fixture ends before unit exit and final drain confirms cleanup", async () => {
+processDenial("trusted unit: protected fixture ends before unit exit and final drain confirms cleanup", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-trusted-unit-"))
   const cwd = path.join(root, "evals")
   await mkdir(cwd)
@@ -99,7 +249,7 @@ test("trusted unit: protected fixture ends before unit exit and final drain conf
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 10_000)
 
-test("trusted unit: protected leftover fails strict drain and is never signaled as unknown", async () => {
+processDenial("trusted unit: protected leftover fails strict drain and is never signaled as unknown", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-trusted-leftover-"))
   const cwd = path.join(root, "evals")
   await mkdir(cwd)
@@ -129,7 +279,7 @@ test("trusted unit: protected leftover fails strict drain and is never signaled 
   } finally { await rm(root, { recursive: true, force: true }) }
 }, 10_000)
 
-test("signalProcess: краткий запрет чтения собственного /proc пережидается без ослабления identity", async () => {
+processDenial("signalProcess: краткий запрет чтения собственного /proc пережидается без ослабления identity", async () => {
   const child = spawn(process.execPath, ["-e", `
     const {dlopen}=await import('bun:ffi');
     const library=dlopen('libc.so.6',{prctl:{args:['i32','u64','u64','u64','u64'],returns:'i32'}});
@@ -156,7 +306,7 @@ test("signalProcess: краткий запрет чтения собственн
   } finally { child.kill("SIGKILL"); await exited }
 }, 5_000)
 
-test("signalProcess: постоянный запрет чтения собственного /proc остаётся отказом и не посылает сигнал", async () => {
+processDenial("signalProcess: постоянный запрет чтения собственного /proc остаётся отказом и не посылает сигнал", async () => {
   const child = spawn(process.execPath, ["-e", `
     const {dlopen}=await import('bun:ffi');
     const library=dlopen('libc.so.6',{prctl:{args:['i32','u64','u64','u64','u64'],returns:'i32'}});
@@ -199,7 +349,7 @@ test("signalProcess: другая birth или executable identity не разр
   } finally { child.kill("SIGKILL"); await exited }
 })
 
-test("supervisor: собственный detached browser закрыт, неизвестный helper остаётся и блокирует продолжение", async () => {
+test("supervisor: own detached browser closes while a proven foreign helper stays alive", async () => {
   const out = await mkdtemp(path.join(os.tmpdir(), "evals-browser-proof-"))
   const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-browser-bundle-"))
   await Bun.build({ entrypoints: [path.join(evalsRoot, "fixtures/fake-browser.ts")], compile: { outfile: path.join(bundle, "chrome") } })
@@ -215,14 +365,193 @@ test("supervisor: собственный detached browser закрыт, неиз
   try {
     const run = await pending
     expect(run.exitCode).toBe(0)
-    expect(run.processCleanup.status).toBe("failed")
-    expect(run.processCleanup.error).toContain("Unexplained browser/helper")
+    expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.processCleanup.error).toBeNull()
+    expect(run.processCleanup.unknownProcesses).toEqual([])
     expect(unknown.exitCode).toBeNull()
     const pid = Number(await Bun.file(pidFile).text())
     const state = (await Bun.$`ps -o stat= -p ${pid}`.quiet().nothrow()).text().trim()
     expect(state === "" || state.startsWith("Z")).toBe(true)
-  } finally { unknown.kill("SIGKILL"); await exited }
+  } finally {
+    unknown.kill("SIGKILL"); await exited
+    await rm(out, { recursive: true, force: true })
+    await rm(bundle, { recursive: true, force: true })
+  }
 }, 20_000)
+
+test("a refused child of a proven peer quarantines its owner without blocking A cleanup", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-peer-refused-child-"))
+  const bundle = path.join(root, "bundle"), a = path.join(root, "a"), b = path.join(root, "b")
+  await Promise.all([mkdir(bundle), mkdir(a), mkdir(b)])
+  await cp(Bun.which("node")!, path.join(bundle, "chrome"), { dereference: true })
+  await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
+  const script = path.join(root, "browser.mjs"), trigger = path.join(root, "trigger"), pidFile = path.join(root, "bad.pid")
+  await Bun.write(script, `import {spawn} from "node:child_process";import {access,writeFile,rename} from "node:fs/promises";
+setInterval(()=>{},1000);
+if(process.argv.some(arg=>arg.startsWith(${JSON.stringify("--user-data-dir=" + b + path.sep)}))){
+  while(!await access(${JSON.stringify(trigger)}).then(()=>true,()=>false)) await new Promise(resolve=>setTimeout(resolve,10));
+  const child=spawn(process.execPath,[${JSON.stringify(script)},"--type=helper",${JSON.stringify("--user-data-dir=" + path.join(root, "outside"))}],{stdio:"ignore",env:process.env});
+  await writeFile(${JSON.stringify(pidFile + ".tmp")},String(child.pid));
+  await rename(${JSON.stringify(pidFile + ".tmp")},${JSON.stringify(pidFile)});
+}`)
+  const abort = new AbortController()
+  const commandA = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: a })
+  const commandB = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: b })
+  const pendingA = runAgent({ command: { ...commandA, env: { ...commandA.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+    EVAL_FAKE_BROWSER_PID_FILE: path.join(a, "browser.pid"), EVAL_FAKE_BROWSER_SCRIPT: script, EVAL_FAKE_EXIT_DELAY_MS: "1500" } },
+    taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: a, outDir: a, profileDir: a, timeoutMs: 30_000 })
+  const pendingB = runAgent({ command: { ...commandB, env: { ...commandB.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+    EVAL_FAKE_BROWSER_PID_FILE: path.join(b, "browser.pid"), EVAL_FAKE_BROWSER_SCRIPT: script, EVAL_FAKE_EXIT_DELAY_MS: "20000" } },
+    taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: b, outDir: b, profileDir: b, timeoutMs: 30_000, signal: abort.signal })
+  let child: ProcessIdentity | undefined
+  let settled = false
+  try {
+    const deadline = Date.now() + 5000
+    while (!await Bun.file(path.join(a, "browser.pid")).exists() || !await Bun.file(path.join(b, "browser.pid")).exists()) {
+      if (Date.now() > deadline) throw Error("Peer browsers did not start")
+      await Bun.sleep(10)
+    }
+    await Bun.write(trigger, "create refused peer child")
+    while (!await Bun.file(pidFile).exists()) {
+      if (Date.now() > deadline) throw Error("Refused child did not start")
+      await Bun.sleep(10)
+    }
+    const pid = Number(await Bun.file(pidFile).text())
+    const fields = (await readFile(`/proc/${pid}/stat`, "utf8")).split(") ").at(-1)!.split(" ")
+    const executable = await stat(`/proc/${pid}/exe`)
+    child = { pid, starttime: fields[19]!, uid: (await stat(`/proc/${pid}`)).uid, parent: Number(fields[1]), group: Number(fields[2]), session: Number(fields[3]),
+      executable: await readlink(`/proc/${pid}/exe`), device: executable.dev, inode: executable.ino }
+    const finishedA = await pendingA
+    expect(finishedA.processCleanup).toMatchObject({ status: "confirmed", error: null, unknownProcesses: [] })
+    expect(finishedA.processCleanup.processes.some(process => process.pid === pid)).toBe(false)
+    expect((await readFile(`/proc/${pid}/stat`, "utf8")).split(") ").at(-1)!.split(" ")[19]).toBe(child.starttime)
+    await signalProcess(child, "SIGKILL")
+    abort.abort()
+    const finishedB = await pendingB
+    expect(finishedB.processCleanup.status).toBe("failed")
+    expect(finishedB.processCleanup.error).toContain("Browser binding differs")
+    settled = finishedA.processCleanup.capture_complete && finishedB.processCleanup.capture_complete &&
+      finishedB.processCleanup.verification?.every(pass => pass.owned_remaining === 0) === true
+  } finally {
+    try { if (child) await signalProcess(child, "SIGKILL") }
+    finally {
+      abort.abort()
+      await Promise.all([pendingA, pendingB])
+      if (settled) await rm(root, { recursive: true, force: true })
+    }
+  }
+}, 40_000)
+
+for (const delay of [0, 2800]) test(`parallel supervisors preserve a sibling's reparented browser heartbeat (helper delay ${delay})`, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-parallel-browser-"))
+  const bundle = path.join(root, "bundle")
+  const a = path.join(root, "a"), b = path.join(root, "b")
+  await Promise.all([mkdir(bundle), mkdir(a), mkdir(b)])
+  await cp(Bun.which("node")!, path.join(bundle, "chrome"), { dereference: true })
+  const script = path.join(root, "browser.mjs")
+  await cp(path.join(evalsRoot, "fixtures/fake-browser.ts"), script)
+  await Bun.write(path.join(bundle, "resource-manifest.json"), JSON.stringify({ browser: "chrome" }))
+  const abort = new AbortController()
+  const commandA = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: a })
+  const pendingA = runAgent({ command: { ...commandA, env: { ...commandA.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+    EVAL_FAKE_BROWSER_PID_FILE: path.join(a, "browser.pid"), EVAL_FAKE_BROWSER_SCRIPT: script, EVAL_FAKE_EXIT_DELAY_MS: "1500",
+    EVAL_FAKE_EXIT_MARKER: path.join(a, "exit-marker.json") } },
+    taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: a, outDir: a, profileDir: a, timeoutMs: 30_000 })
+  for (let wait = 0; wait < 200 && !await Bun.file(path.join(a, "browser.pid")).exists(); wait++) await Bun.sleep(10)
+  await Bun.sleep(250)
+  const commandB = agentCommand({ ...loadConfig(["--dry-run"], {}), profileDir: b })
+  const heartbeat = path.join(b, "heartbeat")
+  const pendingB = runAgent({ command: { ...commandB, env: { ...commandB.env, EVAL_FAKE_BROWSER_BUNDLE: bundle,
+    EVAL_FAKE_BROWSER_PID_FILE: path.join(b, "browser.pid"), EVAL_FAKE_BROWSER_HELPER_PID_FILE: path.join(b, "helper.pid"),
+    EVAL_FAKE_BROWSER_SCRIPT: script, EVAL_FAKE_BROWSER_CLEAR_TITLE: "1", EVAL_FAKE_BROWSER_HEARTBEAT: heartbeat,
+    EVAL_FAKE_BROWSER_HELPER_DELAY_MS: String(delay), EVAL_FAKE_EXIT_DELAY_MS: "20000" } },
+    taskId: "default", model: "fake/model", prompt: "test", files: [], workdir: b, outDir: b, profileDir: b,
+    timeoutMs: 30_000, signal: abort.signal })
+  try {
+    for (let wait = 0; wait < 500 && !await Bun.file(heartbeat).exists(); wait++) await Bun.sleep(10)
+    const before = await Bun.file(heartbeat).text()
+    const helper = Number(await Bun.file(path.join(b, "helper.pid")).text())
+    const birth = (await readFile(`/proc/${helper}/stat`, "utf8")).split(") ")[1]!.split(" ")[19]
+    const finishedA = await pendingA
+    if (delay) {
+      const ended = await Bun.file(path.join(a, "exit-marker.json")).json()
+      const created = (await stat(path.join(b, "helper.pid"))).mtimeMs
+      expect(created).toBeGreaterThan(ended.at)
+      expect(created).toBeLessThan(Date.parse(finishedA.processCleanup.verification![0]!.observed_at))
+    }
+    expect(finishedA.processCleanup).toMatchObject({ status: "confirmed", error: null, unknownProcesses: [] })
+    expect(finishedA.processCleanup.processes.some(entry => entry.pid === helper)).toBe(false)
+    expect(await Bun.file(heartbeat).text()).not.toBe(before)
+    const current = (await readFile(`/proc/${helper}/stat`, "utf8")).split(") ")[1]!.split(" ")
+    expect(current[19]).toBe(birth)
+    expect(["Z", "X"]).not.toContain(current[0])
+    expect((await readFile(`/proc/${helper}/cmdline`, "utf8")).replaceAll("\0", "")).toBe("")
+    expect(finishedA.processCleanup.peerProcesses?.find(entry => entry.process.pid === helper)).toMatchObject({
+      process: { starttime: birth }, owner: { kind: "slot", id: b } })
+    abort.abort()
+    const finishedB = await pendingB
+    expect(finishedB.processCleanup).toMatchObject({ status: "confirmed", error: null, unknownProcesses: [] })
+    expect(finishedB.processCleanup.processes.find(entry => entry.pid === helper)?.starttime).toBe(birth)
+    expect(finishedB.processCleanup.origins?.find(entry => entry.pid === helper)?.via).toBe("subreaper")
+    await rm(root, { recursive: true })
+  } finally { abort.abort(); await Promise.all([pendingA, pendingB]) }
+}, 40_000)
+
+test("parallel observation evidence records delayed starts separately from scan duration", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-observation-delay-"))
+  const ready = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+  const runs = ready.map(signal => superviseProcess({ cmd: [process.execPath, "-e", "console.log('ready'); await Bun.sleep(1000)"],
+    cwd: root, env: { PATH: process.env.PATH ?? "" }, timeoutMs: 3_000,
+    stdout: new WritableStream<Uint8Array>({ write(chunk) { if (new TextDecoder().decode(chunk).includes("ready")) signal.resolve() } }) }))
+  try {
+    await Promise.all(ready.map(signal => signal.promise))
+    await Bun.sleep(150)
+    const until = performance.now() + 400
+    // Stall the real controller event loop while both native children are live.
+    while (performance.now() < until) {}
+    for (const run of await Promise.all(runs)) {
+      expect(run.processCleanup.status).toBe("confirmed")
+      expect(run.processCleanup.observations?.max_start_delay_ms).toBeGreaterThanOrEqual(100)
+      expect(run.processCleanup.observations?.max_gap_ms).toBeGreaterThanOrEqual(300)
+    }
+  } finally { await Promise.all(runs); await rm(root, { recursive: true }) }
+}, 10_000)
+
+processDenial("parallel registry does not publish a fresh peer claim for an unreadable live process", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-peer-unreadable-"))
+  const a = path.join(root, "a"), b = path.join(root, "b")
+  await Promise.all([mkdir(a), mkdir(b)])
+  const heartbeat = path.join(b, "heartbeat")
+  const ready = Promise.withResolvers<number>()
+  const pendingA = superviseProcess({ cmd: [process.execPath, "-e", "await Bun.sleep(1200)"], cwd: a,
+    env: { PATH: process.env.PATH ?? "" }, outDir: a, timeoutMs: 5_000, owner: { kind: "slot", id: "a" } })
+  const pendingB = superviseProcess({ cmd: [process.execPath, "-e", `
+    const {dlopen}=await import('bun:ffi');
+    const library=dlopen('libc.so.6',{prctl:{args:['i32','u64','u64','u64','u64'],returns:'i32'}});
+    await Bun.write(${JSON.stringify(heartbeat)},String(Date.now()));
+    const timer=setInterval(()=>{void Bun.write(${JSON.stringify(heartbeat)},String(Date.now()))},50);
+    await Bun.sleep(500);
+    if(library.symbols.prctl(4,0,0,0,0)!==0)process.exit(2);
+    console.log(process.pid);
+    await Bun.sleep(2500);
+    clearInterval(timer);
+  `], cwd: b, env: { PATH: process.env.PATH ?? "" }, outDir: b, timeoutMs: 5_000, owner: { kind: "slot", id: "b" },
+    stdout: new WritableStream<Uint8Array>({ write(chunk) { ready.resolve(Number(new TextDecoder().decode(chunk).trim())) } }) })
+  try {
+    const pid = await Promise.race([ready.promise, pendingB.then(() => { throw Error("Protected peer ended before readiness") })])
+    const before = await Bun.file(heartbeat).text()
+    const run = await pendingA
+    expect(run.processCleanup.status).toBe("failed")
+    expect(run.processCleanup.error).toContain("Cannot inspect process identity")
+    expect(run.processCleanup.peerProcesses?.some(entry => entry.process.pid === pid)).toBe(false)
+    expect(run.processCleanup.processes.some(entry => entry.pid === pid)).toBe(false)
+    expect(await Bun.file(heartbeat).text()).not.toBe(before)
+    expect((await readFile(`/proc/${pid}/stat`, "utf8")).split(") ")[1]!.split(" ")[0]).not.toBe("Z")
+    const finishedB = await pendingB
+    expect(finishedB.exitCode).toBe(0)
+    expect(finishedB.processCleanup.status).toBe("failed")
+  } finally { await Promise.all([pendingA, pendingB]); await rm(root, { recursive: true }) }
+}, 10_000)
 
 test("supervisor: происхождение без точного browser profile не разрешает сигнал браузеру", async () => {
   const out = await mkdtemp(path.join(os.tmpdir(), "evals-browser-binding-"))
@@ -361,7 +690,7 @@ test("supervisor: новый противоречащий profile после bin
 }, 20_000)
 
 
-test("supervisor: новый чужой Chromium с другим profile остаётся живым", async () => {
+test("supervisor: Chromium with readable foreign ancestry stays alive without quarantine", async () => {
   const out = await mkdtemp(path.join(os.tmpdir(), "evals-foreign-browser-"))
   const bundle = await mkdtemp(path.join(os.tmpdir(), "evals-foreign-browser-bundle-"))
   await Bun.build({ entrypoints: [path.join(evalsRoot, "fixtures/fake-browser.ts")], compile: { outfile: path.join(bundle, "chrome") } })
@@ -371,14 +700,21 @@ test("supervisor: новый чужой Chromium с другим profile ост�
     EVAL_FAKE_BROWSER_PID_FILE: path.join(out, "browser.pid") } }, taskId: "default", model: "fake/model", prompt: "test",
     files: [], workdir: out, outDir: out, profileDir: out, timeoutMs: 30_000 })
   await Bun.sleep(300)
-  const foreign = spawn(path.join(bundle, "chrome"), ["--user-data-dir=/tmp/other-browser-profile"], { detached: true, stdio: "ignore" })
+  const foreign = spawn(path.join(bundle, "chrome"), [`--user-data-dir=${path.join(bundle, "foreign-profile")}`], { detached: true, stdio: "ignore" })
   const exited = new Promise((resolve) => foreign.once("exit", resolve))
   try {
     const run = await pending
     expect(run.processCleanup.status).toBe("confirmed")
+    expect(run.processCleanup.error).toBeNull()
+    expect(run.processCleanup.unknownProcesses).toEqual([])
+    expect(run.processCleanup.processes.some(entry => entry.pid === foreign.pid)).toBe(false)
     expect(foreign.exitCode).toBeNull()
     process.kill(foreign.pid!, 0)
-  } finally { foreign.kill("SIGKILL"); await exited }
+  } finally {
+    foreign.kill("SIGKILL"); await exited
+    await rm(out, { recursive: true, force: true })
+    await rm(bundle, { recursive: true, force: true })
+  }
 }, 20_000)
 
 test("supervisor: неизвестный потомок браузера вне bundle остаётся живым и запрещает переход", async () => {
@@ -478,3 +814,50 @@ test("supervisor: неизвестный adopted helper вне bundle не по�
     }
   }
 }, 20_000)
+
+test("supervisor ancestry: kernel parent chain proves own or foreign and rejects invalid identities", async () => {
+  const raw = await readFile(`/proc/${process.pid}/stat`, "utf8")
+  const owner = { pid: process.pid, starttime: raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19]! }
+  expect(await hasOwnedAncestry(process.pid, [owner])).toBe(true)
+  expect(await hasOwnedAncestry(1, [owner])).toBe(false)
+  expect(await hasOwnedAncestry(process.pid, [{ ...owner, starttime: "0" }])).toBe(false)
+  expect(await hasOwnedAncestry(Number.MAX_SAFE_INTEGER, [owner])).toBe(false)
+  await expect(hasOwnedAncestry(0, [owner])).rejects.toThrow("Invalid process identity")
+})
+
+test("supervisor ancestry: a reaped candidate is absent rather than an unreadable live chain", async () => {
+  const raw = await readFile(`/proc/${process.pid}/stat`, "utf8")
+  const owner = { pid: process.pid, starttime: raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19]! }
+  const child = Bun.spawn([process.execPath, "-e", "process.exit(0)"], { stdout: "ignore", stderr: "ignore" })
+  expect(await child.exited).toBe(0)
+  expect(await hasOwnedAncestry(child.pid, [owner])).toBe(false)
+})
+
+test("supervisor ancestry: an unreaped zombie is not a live owned candidate", async () => {
+  const parent = spawn(Bun.which("python3")!, ["-c", `import os, sys
+child = os.fork()
+if child == 0:
+    os._exit(0)
+print(child, flush=True)
+sys.stdin.readline()
+os.waitpid(child, 0)
+`], { stdio: ["pipe", "pipe", "ignore"] })
+  const exited = new Promise(resolve => parent.once("exit", resolve))
+  try {
+    const pid = Number(await new Promise<Buffer>(resolve => parent.stdout!.once("data", resolve)))
+    const deadline = Date.now() + 2_000
+    let state = ""
+    while (state !== "Z" && Date.now() < deadline) {
+      const raw = await readFile(`/proc/${pid}/stat`, "utf8")
+      state = raw.slice(raw.lastIndexOf(")") + 2).split(" ")[0]!
+      if (state !== "Z") await Bun.sleep(10)
+    }
+    expect(state).toBe("Z")
+    const raw = await readFile(`/proc/${process.pid}/stat`, "utf8")
+    const owner = { pid: process.pid, starttime: raw.slice(raw.lastIndexOf(")") + 2).split(" ")[19]! }
+    expect(await hasOwnedAncestry(pid, [owner])).toBe(false)
+  } finally {
+    parent.stdin!.end("\n")
+    await exited
+  }
+})

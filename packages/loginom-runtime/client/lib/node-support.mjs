@@ -23,7 +23,7 @@ import {NODE_READ_MODE,isUnchangedTextImportExecution,isUnchangedTransformExecut
 import {createNodeReadDrivers} from './node-read-driver.mjs';
 
 // The journal canonicalizes JSON text and redacts URL credentials. Prepare
-// public table evidence the same way before the existing exact ACK comparison.
+// public port evidence the same way before the existing exact ACK comparison.
 export function nodeOutputForJournal(value,redactor){
  const cleaned=redactor.redact(value);
  if(cleaned?.type==='redaction_failure')throw Error('Node output could not be redacted');
@@ -42,10 +42,10 @@ export function createCandidateNodeSupport(config) {
  return {nodeApplyHandlers,nodeApplyDriverFactory:options=>{
   const type=options.operation.parameters?.target?.type;
   const readOnly=options.operation.parameters?.mode===NODE_READ_MODE||isUnchangedTextImportExecution(options.operation.parameters)||isUnchangedTransformExecution(options.operation.parameters);
+  const drivers=(()=>{
   if(readOnly||['integration.rest_request','transform.join_data'].includes(type)){
-   const drivers=readOnly?createNodeReadDrivers(options,{...config,redactor})
+   return readOnly?createNodeReadDrivers(options,{...config,redactor})
     :(type==='integration.rest_request'?rest:join).nodeApplyDriverFactory(options);
-   return {...drivers,readOutput:async(...args)=>nodeOutputForJournal(await drivers.readOutput(...args),redactor)};
   }
   if(type==='datamining.lin_regression')return linregression.nodeApplyDriverFactory(options);
   if(type==='datamining.clustering')return clustering.nodeApplyDriverFactory(options);
@@ -66,9 +66,14 @@ export function createCandidateNodeSupport(config) {
   if(type==='transform.calculator')return calculator.nodeApplyDriverFactory(options);
   if(type==='programming.javascript'){
    if(!javascript)throw Error('JavaScript requires the validated 7.4.2 target and origin');
-   const drivers=javascript.nodeApplyDriverFactory(options);
-   return {...drivers,readOutput:async(...args)=>nodeOutputForJournal(await drivers.readOutput(...args),redactor)};
+   return javascript.nodeApplyDriverFactory(options);
   }
   throw Error('No candidate driver for '+type);
+  })();
+  return {...drivers,readOutput:async(...args)=>{
+   const value=await drivers.readOutput(...args);
+   return readOnly||['integration.rest_request','transform.join_data','programming.javascript'].includes(type)
+    ||value.ports?.some(port=>port.freshness_basis==='completed_execution_port_source')?nodeOutputForJournal(value,redactor):value;
+  }};
  }};
 }

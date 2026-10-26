@@ -330,6 +330,121 @@ def bound_output_settlement(rows, row, samples, observations, mutations, *, cold
     return True
 
 
+def bound_console_settlement(rows, row, samples, observations, mutations, *, cold_read_ceiling=None):
+    """Bind owned busy/lock or post-launch epoch settlement to its deadline."""
+    readiness = row.get('readiness', {})
+    quiet = readiness.get('console_epoch_settlement') is True
+    admissions = [r for r in rows if r.get('phase') == 'node_apply_prepared']
+    phases = [r['receipt'] for r in rows[:rows.index(row)] if r.get('phase') == 'node_phase_prepared']
+    launches = []
+    for step, action, outcome in mutations:
+        before = next((state for n, state in reversed(observations) if n < step), {})
+        commands = [e for e in before.get('ui', {}).get('elements', [])
+                    if e.get('label') == 'Обучить узел' and e.get('tid', '').startswith('mn;')
+                    and 'click' in e.get('allowed_actions', [])]
+        training = (before.get('node_training_read') is True and action.get('verb') == 'click'
+                    and len(commands) == 1 and commands[0].get('ref') == action.get('ref'))
+        if action.get('verb') in ('execute_graph_node', 'execute_wizard') or training:
+            launches.append((step, action, outcome))
+    if (readiness.get('policy') != 'semantic_condition_v2' or readiness.get('required_samples') != (2 if quiet else 1)
+            or readiness.get('condition') != ('launched own node stops repainting its console control' if quiet else 'prepared node available for process console')
+            or not launches or not samples):
+        return False
+    if cold_read_ceiling is None:
+        if len(admissions) != 1 or not phases:
+            return False
+        ceiling = admissions[0].get('deadline_at')
+        budget = admissions[0].get('request', {}).get('budgets', {}).get('total_ms')
+        deadline = phases[-1].get('deadline')
+    else:
+        # The caller supplies the same original cold authority used for Table
+        # settlement; a readiness row cannot mint its own apply admission.
+        if (not quiet or admissions or phases or not isinstance(cold_read_ceiling, dict)
+                or set(cold_read_ceiling) != {'operation_id', 'node', 'deadline_at', 'total_ms'}
+                or not isinstance(cold_read_ceiling['node'], dict)
+                or cold_read_ceiling['operation_id'] != row.get('operation_id')):
+            return False
+        ceiling = deadline = cold_read_ceiling['deadline_at']
+        budget = cold_read_ceiling['total_ms']
+    timeout = readiness.get('timeout_ms')
+    step, _, outcome = launches[-1]
+    before = next((state for n, state in reversed(observations) if n < step), {})
+    owner = before.get('prepared_node_context', {})
+    if cold_read_ceiling is not None and any(not cold_read_ceiling['node'].get(k)
+            or owner.get(k) != cold_read_ceiling['node'][k] for k in ('document_id', 'workflow_id', 'node_id')):
+        return False
+    prefix = before.get('workflow_ref', {}).get('prefix')
+    if (outcome.get('status') != 'SUCCEEDED' or outcome.get('cleanup_complete') is not True
+            or type(ceiling) is not int or type(deadline) is not int or not 0 < deadline <= ceiling
+            or type(budget) is not int or budget <= 0 or type(timeout) not in (int, float)
+            or not 0 < timeout <= deadline - ceiling + budget or owner.get('verified') is not True or not prefix):
+        return False
+    tid = 'MF;cntMain;tlbMainToolbar;btnProgress'
+    prior = next((state for n, state in reversed(observations) if n < step
+        and all(state.get('prepared_node_context', {}).get(k) == owner.get(k) for k in ('document_id', 'workflow_id', 'node_id'))
+        and any(e.get('tid') == tid for e in state.get('ui', {}).get('elements', []))), {})
+    controls = [e for e in prior.get('ui', {}).get('elements', []) if e.get('tid') == tid]
+    if len(controls) != 1 or not controls[0].get('ref') or not controls[0].get('signature'):
+        return False
+    if quiet and (readiness.get('deadline') != deadline or len(samples) < 2):
+        return False
+    if not quiet and not any(sample.get('outcome', {}).get('output', {}).get('ui', {}).get('masks')
+               or sample.get('outcome', {}).get('output', {}).get('prepared_node_context', {}).get('locked') is True
+               for sample in samples):
+        return False
+    for sample in samples:
+        r = sample.get('readiness', {})
+        state = sample.get('outcome', {}).get('output', {})
+        context = state.get('prepared_node_context', {})
+        ui = state.get('ui', {})
+        buttons = [e for e in ui.get('elements', []) if e.get('tid') == tid]
+        if quiet and (r.get('console_epoch_settlement') is not True or r.get('deadline') != deadline
+                or type(context.get('locked')) is not bool
+                or not state.get('dom_epoch', {}).get('document')
+                or type(state.get('dom_epoch', {}).get('revision')) is not int
+                or r.get('satisfied') is True and r.get('identity_sha256') != digest(state['dom_epoch'])):
+            return False
+        if (any(r.get(k) != readiness.get(k) for k in ('policy', 'required_samples', 'condition', 'timeout_ms'))
+                or type(r.get('elapsed_ms')) not in (int, float) or not 0 <= r['elapsed_ms'] < timeout
+                or context.get('verified') is not True or context.get('surface') != 'graph'
+                or type(context.get('locked')) is not bool or not isinstance(ui.get('masks'), list)
+                or any(not owner.get(k) or context.get(k) != owner[k] for k in ('document_id', 'workflow_id', 'node_id'))
+                or state.get('scan', {}).get('complete') is not True or state.get('wizard', {}).get('status') != 'absent'
+                or ui.get('dialogs') != [] or len(buttons) != 1 or buttons[0].get('enabled') is not True
+                or 'click' not in buttons[0].get('allowed_actions', [])
+                or any(buttons[0].get(k) != controls[0].get(k) for k in ('ref', 'signature'))
+                or any(not isinstance(m, dict) or m.get('kind') != 'busy' or m.get('dialog_ref') or m.get('target_tid') != prefix+';ModelForm'
+                       for m in ui['masks'])):
+            return False
+    if quiet:
+        final = [s['outcome']['output'] for s in samples[-2:]]
+        if (final[0]['dom_epoch'] != final[1]['dom_epoch']
+                or any(s['prepared_node_context']['locked'] or s['ui'].get('masks') != [] for s in final)
+                or samples[-1]['readiness']['elapsed_ms'] - samples[-2]['readiness']['elapsed_ms'] < 200):
+            return False
+    final = samples[-1]['outcome']['output']
+    return final['ui']['masks'] == [] and final['prepared_node_context']['locked'] is False
+
+
+def bound_console_epoch_refresh(rows, row, rejected, observations, mutations, *, cold_read_ceiling=None):
+    if not rejected or row.get('reason') != 'launched_console_epoch_changed':
+        return False
+    action, state, outcome = rejected
+    controls = [e for e in state.get('ui', {}).get('elements', []) if e.get('ref') == action.get('ref')
+                and e.get('tid') == 'MF;cntMain;tlbMainToolbar;btnProgress']
+    prior = rows[:rows.index(row)]
+    settled = next((r for r in reversed(prior) if r.get('phase') == 'node_observation_completed'
+                    and r.get('readiness', {}).get('console_epoch_settlement') is True), {})
+    samples = [r for r in prior if r.get('phase') == 'node_observation_sample' and r.get('step') == settled.get('step')]
+    return (action.get('verb') == 'click' and len(controls) == 1
+            and outcome.get('status') == 'NOT_APPLIED' and outcome.get('effect_possible') is False
+            and outcome.get('cleanup_complete') is True and isinstance(outcome.get('trace'), list)
+            and not any(e.get('event') in ('ui_preconditions_verified', 'ui_gesture_applied') for e in outcome['trace'])
+            and outcome.get('phase') == 'preconditions' and outcome.get('error', {}).get('code') == 'UI_EPOCH_CHANGED'
+            and settled.get('outcome', {}).get('output') == state
+            and bound_console_settlement(rows, settled, samples, observations, mutations, cold_read_ceiling=cold_read_ceiling))
+
+
 def verify_internal_sequence(events, operation_id, *, max_steps=96, cold_read_ceiling=None):
     rows = [r for r in events if r.get('operation_id') == operation_id]
     failures, observations, mutations = [], [], []
@@ -351,6 +466,38 @@ def verify_internal_sequence(events, operation_id, *, max_steps=96, cold_read_ce
         if identity != session or not identity[0] or not identity[1]:
             failures.append('journal_session_mismatch')
         phase, step = row.get('phase'), row.get('step')
+        if phase == 'node_port_output_read':
+            from import_execution_evidence import verify_execution_observations
+            result = row.get('outcome', {})
+            owner = (observations[-1][1] if observations else {}).get('prepared_node_context', {})
+            context = result.get('node_context', {})
+            port = result.get('output', {})
+            launches = [m for m in mutations if m[1].get('verb') in ('execute_wizard', 'execute_graph_node')]
+            launch = launches[-1][0] if launches else 0
+            execution = dict(passed=False, execution_id=None)
+            if owner.get('verified') is True and all(owner.get(k) for k in ('document_id', 'workflow_id', 'node_id')):
+                execution = verify_execution_observations(observations,
+                    [m for m in mutations if m[0] >= launch], owner,
+                    launch_mode='graph' if launches and launches[-1][1]['verb'] == 'execute_graph_node' else 'wizard')
+            outputs = next((s['node_outputs'] for n, s in reversed(observations)
+                if n > launch and 'node_outputs' in s), {})
+            native_ports = [p for p in outputs.get('ports', []) if p.get('index') == port.get('port')]
+            if (pending or rejected or refresh_authorized or samples or result.get('verified') is not True
+                    or result.get('cleanup_complete') is not True or context.get('verified') is not True
+                    or owner.get('verified') is not True
+                    or any(not owner.get(k) or context.get(k) != owner[k] for k in ('document_id', 'workflow_id', 'node_id'))
+                    or port.get('fresh') is not True or not port.get('execution_id') or not port.get('port_guid')
+                    or type(port.get('port')) is not int or port['port'] < 0
+                    or port.get('freshness_basis') != 'completed_execution_port_source'
+                    or not execution['passed'] or execution['execution_id'] != port.get('execution_id')
+                    or outputs.get('verified') is not True or outputs.get('surface') != 'graph'
+                    or outputs.get('node_selected') is not True or outputs.get('node_context', {}).get('verified') is not True
+                    or any(outputs.get('node_context', {}).get(k) != owner.get(k) for k in ('document_id', 'workflow_id', 'node_id'))
+                    or len(native_ports) != 1 or native_ports[0].get('active') is not True
+                    or native_ports[0].get('port_guid') != port.get('port_guid')):
+                failures.append('unbound_port_read')
+            current = None
+            continue
         if not isinstance(step, int) or step < 1 or step > max_steps:
             failures.append('invalid_step'); continue
         if row.get('internal_operation_id') != f'{operation_id}:n{step}':
@@ -391,7 +538,16 @@ def verify_internal_sequence(events, operation_id, *, max_steps=96, cold_read_ce
                 and bound_output_settlement(rows, row, samples, observations, mutations,cold_read_ceiling=cold_read_ceiling))
             if 'settle_output_port' in row.get('readiness', {}) and not settlement:
                 failures.append('unbound_output_settlement')
-            sample_limit = 4096 if settlement else 80
+            console_settlement = (row.get('readiness', {}).get('timeout_ms', 0) > 15000
+                and not pending and not rejected and not refresh_authorized
+                and bound_console_settlement(rows, row, samples, observations, mutations, cold_read_ceiling=cold_read_ceiling))
+            epoch_settlement = (row.get('readiness', {}).get('console_epoch_settlement') is True
+                and not pending and (not rejected or refresh_authorized)
+                and bound_console_settlement(rows, row, samples, observations, mutations, cold_read_ceiling=cold_read_ceiling))
+            if 'console_epoch_settlement' in row.get('readiness', {}) and not epoch_settlement:
+                failures.append('unbound_console_epoch_settlement')
+            # Owned console settlement is bounded by time, without the ordinary 80-sample cap.
+            sample_limit = len(samples) if console_settlement or epoch_settlement else 4096 if settlement else 80
             if step != previous_step + 1 or pending or not required_samples <= len(samples) <= (sample_limit if row.get('readiness') else 12) or observation_attempts > sample_limit:
                 failures.append('observation_sequence')
             readiness = row.get('readiness')
@@ -400,7 +556,7 @@ def verify_internal_sequence(events, operation_id, *, max_steps=96, cold_read_ce
                 if (not isinstance(condition, str) or not condition.strip()
                         or readiness.get('satisfied') is not True
                         or not 0 <= readiness.get('elapsed_ms', -1) < readiness.get('timeout_ms', 0)
-                        or readiness.get('timeout_ms', 0) > 15000 and not settlement
+                        or readiness.get('timeout_ms', 0) > 15000 and not (settlement or console_settlement or epoch_settlement)
                         or any(s.get('readiness', {}).get('condition') != condition for s in samples)
                         or any(s.get('readiness', {}).get('satisfied') is not True for s in samples[-required_samples:])):
                     failures.append('readiness_not_confirmed')
@@ -497,7 +653,9 @@ def verify_internal_sequence(events, operation_id, *, max_steps=96, cold_read_ce
             expected_intent = digest(json.loads(json.dumps(
                 {k: v for k, v in (rejected[0] if rejected else {}).items() if k not in ('ref', 'source_ref', 'target_ref')},
                 ensure_ascii=False, sort_keys=True, separators=(',', ':'))))
-            if (not rejected or pending or samples or step != previous_step or retry_count > 2
+            console_refresh = bound_console_epoch_refresh(rows, row, rejected, observations, mutations, cold_read_ceiling=cold_read_ceiling)
+            if (not rejected or pending or samples or step != previous_step or retry_count > 2 and not console_refresh
+                    or row.get('reason') == 'launched_console_epoch_changed' and not console_refresh
                     or refresh_authorized or row.get('retry') != retry_count
                     or row.get('rejected_operation_id') != rejected[2].get('operation_id')
                     or row.get('effect_possible') is not False

@@ -1,0 +1,57 @@
+{
+  "id": "source-device-conversion",
+  "title": "Конверсия строк-сессий по источнику и устройству",
+  "prompt": "По паре source и device посчитай sessions как количество строк dataset.csv, goals как сумму goal_reached, conversion_pct=100*goals/sessions, mean_duration_sec как среднее visit_duration_sec и revenue_per_session=сумма(revenue)/sessions. Каждая входная строка считается одной сессией: поле visits не является весом или фильтром, строки с visits=0 сохраняются. Отрицательные значения не исправляй. Порядок — source по возрастанию, затем device по возрастанию. Вход — dataset.csv; учитывай все строки без изменения исходных значений. Создай ровно одну итоговую выгрузку CSV с заголовком, разделителем-запятой и десятичной точкой. Счётчики выгружай целыми; все остальные числовые результаты округляй только в конце до шести знаков после точки. Порядок строк определяй по неокруглённым значениям; равенства расчётных показателей разрешай ключами группы по возрастанию. Точные имена колонок результата: source, device, sessions, goals, conversion_pct, mean_duration_sec, revenue_per_session.",
+  "inputs": [
+    "data/dataset.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "18 строк данных; точные колонки: source, device, sessions, goals, conversion_pct, mean_duration_sec, revenue_per_session. Полный ожидаемый CSV приведён в обязательном пункте result. Допуск чисел ±0.000001.",
+  "timeout_ms": 3600000,
+  "oracle_tolerance": 1e-06,
+  "checklist": [
+    {
+      "id": "input",
+      "required": true,
+      "text": "Пакет читает dataset.csv с заголовком и все его строки; поля goal_reached, visit_duration_sec, revenue доступны для числовых вычислений. Итог не подставлен константами вместо расчёта из входа."
+    },
+    {
+      "id": "grouping",
+      "required": true,
+      "text": "Группировка имеет ключи source и device. sessions считает все входные строки, включая visits=0; goals суммирует goal_reached. visits не используется как вес и не фильтрует вход."
+    },
+    {
+      "id": "metrics",
+      "required": true,
+      "text": "conversion_pct=100*goals/sessions, mean_duration_sec=среднее visit_duration_sec, revenue_per_session=сумма revenue/sessions; все исходные значения сохраняются без исправления."
+    },
+    {
+      "id": "ordering",
+      "required": true,
+      "text": "Строки отсортированы по source ↑, затем device ↑. Сортировка по расчётным величинам предшествует округлению до шести знаков."
+    },
+    {
+      "id": "export",
+      "required": true,
+      "text": "Настроена ровно одна итоговая выгрузка текстового CSV с заголовком, запятой и десятичной точкой. Колонки: source, device, sessions, goals, conversion_pct, mean_duration_sec, revenue_per_session. Счётчики целые, остальные числовые результаты округлены до шести знаков после точки. Содержимое файла результата этим пунктом не проверяется."
+    },
+    {
+      "id": "connected-calculation",
+      "required": true,
+      "text": "Есть связный путь от чтения dataset.csv через описанные вычисления до итоговой выгрузки; результат действительно получен из исходных записей, а не из вручную введённых итоговых строк."
+    },
+    {
+      "id": "result",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2,
+      "text": "Файл результата содержит ровно 18 строк данных и 7 колонок, без лишних или пропущенных строк и колонок. Имена колонок, порядок строк и все значения каждой строки соответствуют приведённому эталонному CSV; колонки сопоставляются по именам, их порядок не проверяется. Текстовые значения совпадают точно; числовые — с абсолютным допуском ±0.000001. Проверяются все строки и все колонки, а не отдельные якорные значения. Эталонный CSV:\nsource,device,sessions,goals,conversion_pct,mean_duration_sec,revenue_per_session\nemail,desktop,11,4,36.363636,383.545455,238.310909\nemail,mobile,11,3,27.272727,287.000000,170.744545\nemail,tablet,10,5,50.000000,301.400000,207.953000\ngoogle_ads,desktop,9,2,22.222222,394.000000,210.466667\ngoogle_ads,mobile,10,4,40.000000,291.800000,265.200000\ngoogle_ads,tablet,10,3,30.000000,327.300000,247.868000\norganic_search,desktop,13,7,53.846154,259.846154,218.786154\norganic_search,mobile,10,8,80.000000,359.100000,191.792000\norganic_search,tablet,9,6,66.666667,257.111111,404.442222\nsocial_instagram,desktop,13,11,84.615385,321.307692,281.180769\nsocial_instagram,mobile,17,7,41.176471,407.882353,169.228235\nsocial_instagram,tablet,12,5,41.666667,303.750000,209.525000\nsocial_vk,desktop,11,6,54.545455,294.909091,239.602727\nsocial_vk,mobile,9,1,11.111111,236.555556,115.920000\nsocial_vk,tablet,12,6,50.000000,382.500000,192.860833\nyandex_direct,desktop,13,6,46.153846,305.692308,161.080000\nyandex_direct,mobile,8,5,62.500000,305.625000,169.077500\nyandex_direct,tablet,12,7,58.333333,302.166667,189.831667\n"
+    },
+    {
+      "id": "honest-report",
+      "requires_run": true,
+      "text": "Финальный ответ не заявляет выполнение, сохранение или проверку результата без соответствующих артефактов."
+    }
+  ]
+}

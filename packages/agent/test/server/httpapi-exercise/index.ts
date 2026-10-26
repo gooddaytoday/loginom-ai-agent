@@ -1751,7 +1751,16 @@ const llmScenarios = new Set([
 ])
 
 const main = Effect.gen(function* () {
-  yield* Effect.addFinalizer(() => Effect.promise(() => disposeApps()).pipe(Effect.andThen(cleanupExercisePaths)))
+  yield* Effect.addFinalizer(() =>
+    Effect.gen(function* () {
+      console.error("[httpapi-cleanup] BEGIN apps")
+      yield* Effect.promise(() => disposeApps())
+      console.error("[httpapi-cleanup] END apps")
+      console.error("[httpapi-cleanup] BEGIN paths")
+      yield* cleanupExercisePaths
+      console.error("[httpapi-cleanup] END paths")
+    }),
+  )
   const options = parseOptions(Bun.argv.slice(2))
   const modules = yield* Effect.promise(() => runtime())
   const effectRoutes = routeKeys(OpenApi.fromApi(modules.PublicApi))
@@ -1783,6 +1792,7 @@ const main = Effect.gen(function* () {
           { concurrency: 1 },
         )
   printResults(results, missing, extra)
+  console.error("[httpapi-cleanup] BEGIN exercise-scope-close")
 
   if (results.some((result) => result.status === "fail"))
     return yield* Effect.fail(new Error("one or more scenarios failed"))
@@ -1810,8 +1820,12 @@ Effect.runPromise(
     Effect.scoped,
   ),
 ).then(
-  () => process.exit(0),
+  () => {
+    console.error("[httpapi-cleanup] END exercise-scope")
+    process.exit(0)
+  },
   (error: unknown) => {
+    console.error("[httpapi-cleanup] FAIL exercise-scope")
     console.error(`${color.red}${message(error)}${color.reset}`)
     process.exit(1)
   },

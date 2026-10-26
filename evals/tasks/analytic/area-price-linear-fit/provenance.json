@@ -1,0 +1,100 @@
+{
+  "task_id": "area-price-linear-fit",
+  "dataset_sha256": {
+    "dataset.csv": "34d0a43ee2c4bf3a34fc421b1418d50850a9b8ade1ab8f9abff69d6152239da7"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "e0d0e1e8c1cbb3945f4f9e976f2a33be4b12338f106d86b12dd39d6cde71e3ca"
+  },
+  "reference_sha256": "f270771d516ffe8fe2e0b6fa9aa77775d8e8bc602c043bd458612716ed077cc7",
+  "cli": {
+    "binary": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/runtime/bin/loginom-ai-agent-cli",
+    "version": "0.2.2",
+    "profile": "profile"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://localhost/app/",
+    "build": "7.4.2",
+    "container": "loginom-server-7.4.2-test",
+    "package": "/user/analytic-evals-area-price-linear-fit-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/dataset.csv",
+        "storage": "/user/c90fe62c770b3a95ea430b6910f08ef942f744230f7243d964c4ea87dab8ddfc-0-dataset.csv",
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_eabba18c0ffeb2P0dshAXqKQNF",
+    "skill_revision": "8afb17d6a2c247fa0fb8fc6e2285e6ed05e6bf475a1a9d88ae7b760a29260dfc",
+    "exit_code": 0,
+    "started_at": "2026-10-19T16:07:06+03:00",
+    "duration_s": 1690,
+    "tokens": {
+      "input": 136783,
+      "output": 8936,
+      "reasoning": 4973
+    },
+    "tool_calls": 67,
+    "tool_errors": 6,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://localhost/app/?testable=true#packages/user/analytic-evals-area-price-linear-fit-1/Unit1/workflow",
+  "source_task": "analitic-tasks/task11-regression",
+  "runtime_pin": {
+    "version": "0.2.2",
+    "ci_run": 39210148809,
+    "ci_artifact": {
+      "id": 12168030843,
+      "name": "loginom-linux",
+      "sha256": "bf0e29fd686cb5ec50477a8e36775359486f6aafb93897dce363082fa879c86c"
+    },
+    "archive": {
+      "path": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/downloads/loginom-ai-agent-cli-0.2.2-linux-x64.tar.gz",
+      "sha256": "c612eab428e5dc16b9a6105cb4fd401a00c04a25dee6390644b50e86044283b9"
+    },
+    "source_commit": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "source_tree_sha256": "92f2bf27f7771109634d33bb8ce6ab1be4f84a74209a45936e0a18d430b57bff",
+    "cli_manifest_sha256": "26c94fe7d3d6f975cc2d60d99eb5f7b2b6fcb377c753c6de3079c155f41ac28c",
+    "resource_manifest_sha256": "0642015ac67c8f569e7b4d1ac158973d514ae39d72b77cacae10d48810fddd34",
+    "harness_sha": "a0c3eb758bd5b2d492aa525815f0e9009b3d8835",
+    "harness_clean": true
+  },
+  "independent_oracle_check": {
+    "pass": true,
+    "method": "blind SQLite SQL, author oracle not provided",
+    "independent_csv_sha256": "e0d0e1e8c1cbb3945f4f9e976f2a33be4b12338f106d86b12dd39d6cde71e3ca",
+    "query_sha256": "72c8c78c419697814380190ffd2d738580dea449633ed1771f4fe606a808ca12",
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/independent/a/area-price-linear-fit/report.json",
+    "comparison": {
+      "passed": true,
+      "error": null
+    }
+  },
+  "browser_evidence": {
+    "report": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/area-price-linear-fit/attempt-1/browser-rerun.json",
+    "screenshot": "/home/kiselev/storage/tmp/analytic-evals-0.2.2/analytic-evals/area-price-linear-fit/attempt-1/browser-rerun.png",
+    "all_nodes_active": true,
+    "closed_without_save": true,
+    "rounding_verified_in_exported_path": true
+  },
+  "fallback_used": false
+}

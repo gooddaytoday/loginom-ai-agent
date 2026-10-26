@@ -1,0 +1,13 @@
+service,is_digital,applications,mean_processing_days,mean_satisfaction,approved_pct
+Birth certificate,0,3,7.333333,6.333333,33.333333
+Birth certificate,1,18,14.055556,4.333333,38.888889
+Business registration,0,4,8.750000,3.750000,75.000000
+Business registration,1,11,15.181818,4.818182,27.272727
+Car registration,0,1,12.000000,9.000000,0.000000
+Car registration,1,11,13.727273,5.090909,45.454545
+Passport,0,2,22.500000,6.500000,50.000000
+Passport,1,17,16.882353,4.235294,47.058824
+Property registration,0,5,6.800000,4.800000,40.000000
+Property registration,1,16,12.937500,5.375000,25.000000
+Tax filing,0,3,20.666667,7.333333,33.333333
+Tax filing,1,9,11.333333,5.777778,33.333333

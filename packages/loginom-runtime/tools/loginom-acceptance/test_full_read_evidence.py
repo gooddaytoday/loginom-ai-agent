@@ -25,4 +25,15 @@ class FullReadTests(unittest.TestCase):
         r,e=self.fixture(0,10);e[0]['result']['output']['ports'][0]['schema']=[]
         self.assertFalse(verify_full_read(e,r,0)['passed'])
 
+    def test_missing_filter_flag_requires_completed_execution_port_source(self):
+        for basis in (None,'table','completed_execution_port_source'):
+            for flag in ('missing',None,False,True):
+                with self.subTest(basis=basis,flag=flag):
+                    r,e=self.fixture();port=e[0]['result']['output']['ports'][0]
+                    port['freshness_basis']=basis
+                    if flag=='missing':del port['filter_enabled']
+                    else:port['filter_enabled']=flag
+                    allowed=flag is False or (flag=='missing' and basis=='completed_execution_port_source')
+                    self.assertEqual(verify_full_read(e,r,8)['passed'],allowed)
+
 if __name__=='__main__':unittest.main()

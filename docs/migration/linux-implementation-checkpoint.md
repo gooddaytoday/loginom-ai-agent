@@ -1,5 +1,72 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-26 — v0.3.3 опубликован
+
+Release source: `2eea642cf2f0363e12aa1a0078a3740a75cdda42`, ветка `loginom` (PR #441: v033-rel4 9f1d4a48).
+Выпуск после исправления дефектов проверки (кроме перечисленных в отчёте ограничений): чтение вывода из порта (#440), мс в CSV, консоль после запуска, cleanup после ошибки открытия.
+CI40281597215 PASS на попытке1; matrix5/5; 30 assets/digests/SHA256SUMS и три manifests 0.3.3/prod/browserRecovery=true сверены.
+Финальная регрессия: 76/78 PASS, оба FAIL (D79, D80) исправлены и перепроверены адресно (15/15 cold).
+Published2026-10-26T07:16:28Z, pre-release, latest=false, ID423944660; 30 URLs HTTP200.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-26-v0.3.3-release.md).
+
+## 2026-10-20 — v0.3.2 опубликован
+
+Release source: `c130548bbe19515ea226796054786574ed2fc4a2`, ветка `loginom` (PR #286: demo-022 f9c302b3).
+Финальный стабильный выпуск: release-драйверы JS/Export/target, подсказки модели, Калькулятор Token, выход после Save.
+CI39529632751 PASS на попытке1; matrix5/5; 30 assets/digests/SHA256SUMS и три manifests 0.3.2/prod/browserRecovery=true сверены.
+Финальная регрессия на кандидате: 12/12 агентов PASS по бизнес-критерию, 25+ доп. этапов PASS.
+Published2026-10-21T02:19:48Z, pre-release, latest=false, ID419071056; 30 URLs HTTP200.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-20-v0.3.2-release.md).
+
+## 2026-10-20 — v0.3.1 опубликован
+
+Release source: `57f0a4557ed50cee66a662b45a8956d9893832b5`, ветка `loginom` (PR #267: demo-022 после v0.3.0).
+Главное: #264 — на macOS узел JavaScript не настраивался (`Control+A` вместо `ControlOrMeta+A`).
+CI39460728575 PASS на попытке2: попытка1 — chromium-direct flake и Windows DPAPI PowerShell на раннере.
+30 assets/digests/SHA256SUMS сверены; три manifests 0.3.1/prod/browserRecovery=true/dirty=false; matrix5/5.
+Published2026-10-20T17:45:13Z, pre-release, latest=false, ID418688690; 30 URLs HTTP200.
+Живая проверка JavaScript на macOS — владелец/тестировщики.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-20-v0.3.1-release.md).
+
+## 2026-10-20 — v0.3.0 опубликован
+
+Release source: `992fd1c34ad41b541c045d67c552b36e86160141`, ветка `loginom` (PR #240: demo-022 + #185/#237).
+Новый annotated tag `v0.3.0`; существующие теги не менялись. Канал prod, `browserRecovery=true` на трёх ОС.
+CI39406706038 PASS на попытке2: попытка1 — macOS source checks зависли (EPERM в build-command, правка #242).
+Linux DEB offline non-root matrix5/5; static/native отчёты PASS.
+Все30 assets скачаны: 29 SHA256SUMS entries и все GitHub digests сверены; три manifests согласованы.
+Published2026-10-20T11:11:11Z, pre-release=true, latest=false, ID418302931; 30 URLs HTTP200.
+Installed/live приёмка: Linux CLI — сквады на mas3; macOS/Windows — живые тестировщики.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-20-v0.3.0-release.md).
+
+## 2026-10-19 — Desktop и CLI v0.2.2 установлены
+
+Точные опубликованные DEB/CLI из `a0c3eb758bd5b2d492aa525815f0e9009b3d8835`:
+SHA256 PASS; Desktop apt upgrade0.2.0→0.2.2, dpkg verify и5019 resources PASS.
+Installed ASAR равен DEB; GUI first-launch smoke в отдельном профиле PASS.
+CLI `/opt/loginom-ai-agent-cli/0.2.2`: manifest/version/help/native status PASS.
+Публичный launcher переключён;неиспользуемый старый payload0.2.0 удалён.
+3504 durable profile files unchanged;runtime/cache/logs исключены из snapshot.
+Оба Chromium sandbox root:root4755. Bundled AppArmor profile неприменим;
+GUI smoke PASS. Live Loginom/provider и сценарии не проверялись.
+Следующий шаг: обычный запуск;полная live приёмка отдельно при поручении.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-19-v0.2.2-release.md#установка-desktop-и-cli-в-текущую-систему-linux).
+
+## 2026-10-19 — v0.2.2 опубликован
+
+Release source: `a0c3eb758bd5b2d492aa525815f0e9009b3d8835`, ветка `loginom`.
+Новый annotated tag `v0.2.2`; существующие теги не менялись.
+CI39210148809 PASS на попытке2: Linux/Windows/macOS, общие тесты/typecheck,
+Chromium/cleanup и Linux DEB offline non-root matrix5/5.
+Первая macOS CLI build зависла в Bun и остановлена watchdog600s;
+неизменённый повтор PASS, первопричина зависания не установлена.
+Все30 GitHub digests,29 SHA256SUMS entries и bytes19 metadata файлов сверены.
+Три manifests подтверждают единый чистый source/version;30 публичных URLs HTTP200.
+Published2026-10-19T07:24:08Z, pre-release=true, latest=false, ID417009838.
+Установка и installed GUI/live приёмка не выполнялись; профили не менялись.
+Следующий шаг: installed/live приёмка точных артефактов при отдельном поручении.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-19-v0.2.2-release.md).
+
 ## 2026-10-16 — v0.2.1 опубликован
 
 Release source:`e98b2597492c0fcad18d3e72a8c7533ae10cfa30`,ветка `loginom`.
