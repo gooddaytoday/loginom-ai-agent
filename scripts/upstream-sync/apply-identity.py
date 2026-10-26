@@ -9,7 +9,8 @@ and tests still carry the upstream spelling; this applies the fork's spelling to
 documents) is a product decision per string and is NOT changed here; see catalog entry CAT-03.
 
 Usage: apply-identity.py --repo DIR [--since REV] [--check] [PATH ...]
-  --since REV  only files that differ from REV (use the pre-merge fork SHA after resolving a merge)
+  --since REV  only files that differ from REV in the working tree, staged or not, new or moved (use the pre-merge fork SHA
+               while resolving a merge: HEAD is still the fork before the merge commit)
   --check      change nothing, list files that would change, exit 1 if any
 Without PATHs it covers the source trees the guard test names.test.ts scans.
 """
@@ -49,8 +50,11 @@ def main():
     if a.paths:
         files = a.paths
     elif a.since:
-        files = subprocess.run(["git", "-C", a.repo, "diff", "--name-only", "--diff-filter=AM", a.since, "HEAD"],
-                               capture_output=True, check=True, env=env).stdout.decode().splitlines()
+        changed_since = subprocess.run(["git", "-C", a.repo, "diff", "--name-only", "--no-renames", "--diff-filter=AM", a.since],
+                                       capture_output=True, check=True, env=env).stdout.decode().splitlines()
+        untracked = subprocess.run(["git", "-C", a.repo, "ls-files", "--others", "--exclude-standard"],
+                                   capture_output=True, check=True, env=env).stdout.decode().splitlines()
+        files = changed_since + untracked
     else:
         files = subprocess.run(["git", "-C", a.repo, "ls-files"], capture_output=True, check=True, env=env).stdout.decode().splitlines()
     changed = []
