@@ -28,19 +28,23 @@ export function isUnchangedTextImportExecution(request){
   &&!Array.isArray(request.parameters.settings)&&Object.keys(request.parameters.settings).length===0
   &&Array.isArray(request.read?.ports)&&request.read.ports.length===1&&request.read.ports[0]===0;
 }
-function retainedMappingSchemas(node,sourceId){
+function retainedMappingSchemas(node,sourceId,type){
  const r=node.configuration?.readback;
  if(!r)return [];
  const javascript=r.kind==='javascript';
+ // REST retains connection settings at Done, not an output-mapping wizard.
+ // Its table schemas must still come from the completed output below.
+ const rest=type==='integration.rest_request'&&r.kind==='rest_request';
  need(node.configuration.status==='applied'
   &&r.scope===(javascript?'observed_after_verified_finish':'observed_before_verified_finish')
   &&r.values_are===(javascript?'independent_owned_source_readback':'observed_ui_values')
   &&['document_id','workflow_id','node_id'].every(k=>r.node?.[k]===node.node[k])
   &&Array.isArray(r.receipt_ids)&&r.receipt_ids.length>0&&new Set(r.receipt_ids).size===r.receipt_ids.length
-  &&r.receipt_ids.includes(sourceId+':finish')&&r.receipt_ids.includes(sourceId+':output_mapping')
+  &&(rest?['configure','node_finish']:['finish','output_mapping']).every(phase=>r.receipt_ids.includes(sourceId+':'+phase))
   &&r.receipt_ids.every(id=>node.phases?.filter(p=>p.receipt_id===id&&id===sourceId+':'+p.phase
    &&p.status==='verified').length===1),
   'Invalid parameters.source_operation_id: output mapping readback ownership or receipts differ');
+ if(rest)return [];
  if(javascript)need(['code','declared'].includes(r.schema_mode)&&r.settings_preserved===true
   &&r.wizard_commit_verified===true&&r.execution_effects?.explicit_execute_requested===true
   &&r.execution_effects.internal_execution_started===null
@@ -78,7 +82,7 @@ export function buildNodeReadRequest(args,source){
  // original operation requested no preview. Fresh execution and table-schema
  // comparison remain mandatory in the read driver; callers cannot supply this.
  const crossPolicy=retainCrossTableReadPolicy(source,args.source_operation_id);
- const retained=request.target.type==='transform.cross_table'?[]:retainedMappingSchemas(node,args.source_operation_id);
+ const retained=request.target.type==='transform.cross_table'?[]:retainedMappingSchemas(node,args.source_operation_id,request.target.type);
  // JS binds to the owned full mapping even when an earlier preview exists.
  const schemas=javascript?retained:[...previews,...retained.filter(p=>!previews.some(s=>s.port===p.port))];
  need(schemas?.length>0,'Invalid parameters.source_operation_id: the source operation has no verified table output');
