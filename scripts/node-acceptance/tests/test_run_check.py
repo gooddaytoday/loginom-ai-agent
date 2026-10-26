@@ -1,11 +1,16 @@
 import copy
+from contextlib import redirect_stdout
 import csv
 import importlib.util
+import io
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('run_check', Path(__file__).resolve().parents[1] / 'run-check.py')
 runner = importlib.util.module_from_spec(spec)
@@ -329,6 +334,53 @@ class RunCheckTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(out.exists())
                 self.assertEqual(result.stdout, '')
+
+    def test_worker_and_phase_survive_missing_launcher_temp(self):
+        for exists in [True, False]:
+            with self.subTest(launcher_temp_exists=exists), tempfile.TemporaryDirectory() as folder:
+                path = Path(folder)
+                launcher = path / 'launcher'
+                if exists: launcher.mkdir()
+                pair = path / 'pair'
+                pair.mkdir()
+                for role in ['worker', 'reviewer']:
+                    runner.write(pair / (role + '.json'), {'loginom': {'username': 'test'}, 'package_directory': '/test'})
+                out = path / 'results'
+                argv = ['run-check.py', 'start', '--head', 'HEAD', '--scenarios', 's1', '--pair', str(pair), '--out', str(out), '--spacing', '0', '--host-load-max', '1000000']
+                inherited = dict(TMPDIR=str(launcher), TMP=str(launcher), TEMP=str(launcher), CODEX_HOME=str(launcher / 'codex'), MULTICA_TASK_ID='test')
+                popen = subprocess.Popen
+                def detach(command, **kwargs):
+                    return spawn.return_value if '_worker' in command else popen(command, **kwargs)
+                mask = os.umask(0o077)
+                try:
+                    with patch.dict(os.environ, inherited), patch.object(sys, 'argv', argv), redirect_stdout(io.StringIO()), patch.object(runner.subprocess, 'Popen', side_effect=detach) as spawn:
+                        spawn.return_value.pid = 123
+                        self.assertEqual(runner.main(), 0)
+                        environment = spawn.call_args.kwargs.get('env', dict(os.environ))
+                    for key in ['TMPDIR', 'TMP', 'TEMP']:
+                        self.assertEqual(environment[key], str(out / 'tmp'))
+                    self.assertTrue((out / 'tmp').is_dir())
+                    self.assertNotIn('CODEX_HOME', environment)
+                    self.assertNotIn('MULTICA_TASK_ID', environment)
+                    self.assertEqual(environment.get('HOME'), os.environ.get('HOME'))
+                    self.assertEqual(runner.read(out / 'request.json')['pair'], str(pair))
+                    if exists: shutil.rmtree(launcher)
+                    with patch.dict(os.environ, environment, clear=True):
+                        instance = runner.Runner(out)
+                        # A real phase child must create files after the launcher's
+                        # directory disappears, just as Chromium and the oracle do.
+                        instance.phase('probe', [sys.executable, '-c',
+                            'import json, os, tempfile; from pathlib import Path; '
+                            'p = Path(tempfile.mkdtemp()); '
+                            'print(json.dumps(dict(parent=str(p.parent), '
+                            'temp=[os.environ[k] for k in ["TMPDIR", "TMP", "TEMP"]], '
+                            'codex=os.environ.get("CODEX_HOME"))))'], out)
+                    observed = runner.read(out / 'probe.stdout')
+                    self.assertEqual(observed['parent'], str(out / 'tmp'))
+                    self.assertEqual(observed['temp'], [str(out / 'tmp')] * 3)
+                    self.assertIsNone(observed['codex'])
+                finally:
+                    os.umask(mask)
 
     def test_arguments_and_load_boundary(self):
         args = runner.arguments(['start', '--head', 'abc123', '--scenarios', 'n1,q7', '--pair', '/pair', '--cold'])
