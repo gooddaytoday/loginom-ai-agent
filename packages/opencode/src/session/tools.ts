@@ -1,3 +1,4 @@
+import { ProductHooks } from "@/product-hooks"
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
@@ -37,19 +38,6 @@ const MCP_RESOURCE_TOOLS = {
   listTemplates: "list_mcp_resource_templates",
   read: "read_mcp_resource",
 } as const
-const LOGINOM_LOCAL_TOOLS = new Set(["find", "search", "read", "grep", "glob", "list", "tree", "dock_diagnostics"])
-const DOCS_BUILTINS = new Set([
-  "read",
-  "glob",
-  "grep",
-  "edit",
-  "write",
-  "apply_patch",
-  "todowrite",
-  "question",
-  "skill",
-  "package_docs_run",
-])
 const MAX_MCP_RESOURCE_BLOB_BYTES = 10 * 1024 * 1024
 const SUPPORTED_MCP_RESOURCE_ATTACHMENT_MIMES = new Set([
   "application/pdf",
@@ -151,7 +139,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     providerID: input.model.providerID,
     agent: input.agent,
     permission: input.session.permission,
-    allowed: (item) => permitsTool(profile, item.id, item.origin),
+    allowed: (item) => ProductHooks.toolPolicy.permits(profile, item.id, item.origin),
   })
   if (profile === "package-docs") {
     const { PackageDocsTool } = yield* Effect.promise(() => import("@/tool/package-docs"))
@@ -161,7 +149,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   for (const item of definitions) {
     const origin = item.origin
     const id = item.id
-    if (!permitsTool(profile, id, origin)) continue
+    if (!ProductHooks.toolPolicy.permits(profile, id, origin)) continue
     const schema = ProviderTransform.schema(input.model, ToolJsonSchema.fromTool(item))
     tools[item.id] = tool({
       description: item.description,
@@ -169,7 +157,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       execute(args, options) {
         return run.promise(
           Effect.gen(function* () {
-            if (!permitsTool(profile, id, origin)) return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
+            if (!ProductHooks.toolPolicy.permits(profile, id, origin)) return yield* Effect.die(ProductHooks.toolPolicy.denied())
             const ctx = context(args, options)
             const activate = input.activate
             if (id === "skill" && origin === "builtin" && task && activate)
@@ -207,7 +195,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   }
 
   const hasMcpResourceServer =
-    profile !== "package-docs" &&
+    ProductHooks.toolPolicy.allowsMcp(profile) &&
     Object.values(yield* mcp.clients()).some((client) => !!client.getServerCapabilities()?.resources)
   if (hasMcpResourceServer) {
     tools[MCP_RESOURCE_TOOLS.list] = tool({
@@ -459,9 +447,9 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   }
 
   for (const [key, entry] of Object.entries(
-    profile === "package-docs" || flags.experimentalCodeMode ? {} : yield* mcp.tools(),
+    !ProductHooks.toolPolicy.allowsMcp(profile) || flags.experimentalCodeMode ? {} : yield* mcp.tools(),
   )) {
-    if (!permitsTool(profile, key, "external")) continue
+    if (!ProductHooks.toolPolicy.permits(profile, key, "external")) continue
     const item = McpCatalog.convertTool(entry.def, entry.client, entry.timeout)
     const execute = item.execute
     if (!execute) continue
@@ -598,7 +586,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     })
     if (task && catalog)
       for (const definition of catalog.tools) {
-        if (profile !== "loginom-automation" && !LOGINOM_LOCAL_TOOLS.has(definition.name)) continue
+        if (!ProductHooks.toolPolicy.permitsLoginom(profile, definition.name)) continue
         // Browser recovery screenshots reach the model as real image content; a
         // text-only model keeps working from the DOM instead of an unreadable image.
         if (definition.name === "browser_take_screenshot" && !input.model.capabilities.input.image) continue
@@ -619,8 +607,8 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           execute(args, options) {
             return run.promise(
               Effect.gen(function* () {
-                if (profile !== "loginom-automation" && !LOGINOM_LOCAL_TOOLS.has(definition.name))
-                  return yield* Effect.die(Error("LOGINOM_SCOPE_DENIED"))
+                if (!ProductHooks.toolPolicy.permitsLoginom(profile, definition.name))
+                  return yield* Effect.die(ProductHooks.toolPolicy.denied())
                 const ctx = context(args, options)
                 yield* plugin.trigger(
                   "tool.execute.before",
@@ -635,7 +623,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                       args,
                       task.taskMessageID,
                       options.abortSignal,
-                      LOGINOM_LOCAL_TOOLS.has(definition.name) ? undefined : admissions,
+                      ProductHooks.toolPolicy.isLocalLoginom(definition.name) ? undefined : admissions,
                     ),
                   ),
                 )
@@ -695,11 +683,6 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
 
   return tools
 })
-
-function permitsTool(profile: TaskScope.Profile, id: string, origin: Tool.Def["origin"]) {
-  if (profile === "package-docs") return origin === "builtin" && DOCS_BUILTINS.has(id)
-  return id !== "package_docs_run" && (profile !== "loginom-automation" || id !== "task")
-}
 
 function toRecord(value: unknown) {
   if (isRecord(value)) return value

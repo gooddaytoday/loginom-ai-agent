@@ -1,4 +1,5 @@
 import { installationNode } from "./product/installation"
+import { toolPolicy } from "./product/tool-policy"
 import { skillSource } from "./product/skill-source"
 
 // Fork-owned seams between upstream files and Loginom code. Upstream files call
@@ -8,4 +9,5 @@ import { skillSource } from "./product/skill-source"
 export const ProductHooks = {
   installationNode,
   skillSource,
+  toolPolicy,
 } as const
