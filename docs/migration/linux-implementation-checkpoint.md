@@ -9,16 +9,18 @@ CI40281597215 PASS на попытке1; matrix5/5; 30 assets/digests/SHA256SUMS
 Published2026-10-26T07:16:28Z, pre-release, latest=false, ID423944660; 30 URLs HTTP200.
 [Отчёт](../testing/loginom-ai-agent/reports/2026-10-26-v0.3.3-release.md).
 
-## 2026-10-21 — приватный candidate #74, без выпуска
+## 2026-10-26 — приватный candidate #74, без выпуска
 
-Clean CLI source `9cb57e9cd9`, prod `0.3.2-localpaths74.9cb57e9cd9`; Desktop source `bbd2e1af7d`, `0.3.2-localpaths74.bbd2e1af7`, ветка `local-file-paths`.
-CLI private native install/manifest/archive roundtrip PASS; Desktop DEB/AppImage static PASS (5042 resources).
-Selected routing4/4 на prod CLI и4/4 на native Desktop: PDF/GUI permissions/CSV35/20/TXT; manual PDF/facts и process cleanup подтверждены. Итоговое независимое review Approved; это частичная приёмка #74, не release gate.
-Pinned Bun1.3.14 / Node24.19.0 / Chromium1246; общие установки/профили/сервисы не менялись.
-CSV reference CLI/model DB/cold browser MCP/oracle PASS; local edit/transition fixture и pair calibration ждут B1, isolated benchmark — B3.
-Default-save отдельно FAILED/UNKNOWN доopen: upload deadline, no ACK, retained guard (B4); повторов/обхода/увеличения таймаутов нет.
-Собственные stand-контейнеры остановлены с сохранением state/storage; guards B2/B4 сохранены. Windows native NOT_RUN.
-[Отчёт](../testing/loginom-ai-agent/local-file-paths.md#task-8-independent-routing-acceptance-in-progress) · [решения владельца](../testing/loginom-ai-agent/local-file-paths-blockers.md).
+CLI и Desktop: чистый source `9f7233ce71`, prod `0.3.2-localpaths74.9f7233ce71`, ветка `local-file-paths`.
+CLI build/manifest/archive roundtrip PASS; Desktop DEB/AppImage static PASS (5042 resources), ASAR version совпала.
+CLI archive SHA `b12b98881eb9d38bf97377f8fb197775ff6eab689aacd6d7d3b026c7020d9ca7`; digests — в отчёте/evidence.
+B4: Unicode upload исправлен task-local ENV LANG=C.UTF-8; native overflow ownership fix прошёл TDD395+222,3 typecheck и review.
+B4 закрыт: один installed CLI/DB6.1-sol/xhigh220,81с, Save own uploadD/replace, physical Unit.xml only*2→*3, native Close/logout/ACK0/no writer/processes0; fresh review Approved.
+Прежние selected routing4/4 CLI9cb и4/4 Desktopbbd остаются отдельными receipts; затронутые новым runtime кейсы требуют повтора.
+B1/B2/B3 закрыты; CSV reference принят. Local edit reference, pair calibration и полный isolated benchmark ещё не завершены.
+Bun1.3.14 / Node24.19.0 / Chromium1246; crash logging и packaging tests13pass/2platformskip PASS.
+Own stand32794 со snapshot используется для Task7/newprofile; общие установки/профили/сервисы не менялись, прежние failed guards сохранены. Windows native NOT_RUN; общий attribution verifier имеет прежний README mismatch.
+[Отчёт](../testing/loginom-ai-agent/local-file-paths.md#b4-autonomous-diagnosis-resumed-2026-10-26) · [блокеры](../testing/loginom-ai-agent/local-file-paths-blockers.md).
 
 ## 2026-10-20 — v0.3.2 опубликован
 
