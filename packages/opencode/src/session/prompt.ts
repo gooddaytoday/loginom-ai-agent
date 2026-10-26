@@ -1,4 +1,5 @@
-import { ProductHooks } from "@/product-hooks"
+import { attachmentResolver } from "@/product/attachment-resolver"
+import { turnLifecycle } from "@/product/turn-lifecycle"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import path from "path"
@@ -187,7 +188,7 @@ const layer = Layer.effect(
             type: "file",
             url: pathToFileURL(filepath).href,
             filename: name,
-            mime: stat.type === "Directory" ? "application/x-directory" : ProductHooks.attachmentResolver.mentionMime(filepath),
+            mime: stat.type === "Directory" ? "application/x-directory" : attachmentResolver.mentionMime(filepath),
           })
         }),
         { concurrency: "unbounded", discard: true },
@@ -809,7 +810,7 @@ const layer = Layer.effect(
                     sessionID: input.sessionID,
                     type: "text",
                     synthetic: true,
-                    text: yield* ProductHooks.attachmentResolver.dataContext(part.url, fsys),
+                    text: yield* attachmentResolver.dataContext(part.url, fsys),
                   },
                   { ...part, messageID: info.id, sessionID: input.sessionID },
                 ]
@@ -818,7 +819,7 @@ const layer = Layer.effect(
             case "file:": {
               yield* Effect.logInfo("file", { mime: part.mime })
               const filepath = fileURLToPath(part.url)
-              const loginomPackage = ProductHooks.attachmentResolver.packageParts(part, filepath, {
+              const loginomPackage = attachmentResolver.packageParts(part, filepath, {
                 messageID: info.id,
                 sessionID: input.sessionID,
               })
@@ -882,7 +883,7 @@ const layer = Layer.effect(
                 )
                 if (Exit.isSuccess(exit)) {
                   const result = exit.value
-                  const snapshot = yield* ProductHooks.attachmentResolver.snapshot({
+                  const snapshot = yield* attachmentResolver.snapshot({
                     filepath,
                     url,
                     filename: part.filename,
@@ -1124,9 +1125,9 @@ const layer = Layer.effect(
 
     const runLoop: (sessionID: SessionID) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.run")(
       function* (sessionID: SessionID) {
-        yield* ProductHooks.attachmentResolver.retainCompacted(db, fsys, sessionID)
+        yield* attachmentResolver.retainCompacted(db, fsys, sessionID)
 
-        const turn = yield* ProductHooks.turnLifecycle.acquireRun({ sessionID, sessions, agents, permission })
+        const turn = yield* turnLifecycle.acquireRun({ sessionID, sessions, agents, permission })
         const ctx = yield* InstanceState.context
         let structured: unknown
         let step = 0
@@ -1529,7 +1530,7 @@ const layer = Layer.effect(
               // Subtasks receive text, so retain attachment context after template and shell expansion.
               prompt: [
                 templateParts.find((y) => y.type === "text")?.text ?? "",
-                ...(input.parts?.flatMap((part) => ProductHooks.attachmentResolver.subtaskText(part)) ?? []),
+                ...(input.parts?.flatMap((part) => attachmentResolver.subtaskText(part)) ?? []),
               ].join("\n\n"),
             },
           ]

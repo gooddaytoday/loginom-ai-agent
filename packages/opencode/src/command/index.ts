@@ -10,7 +10,7 @@ import { Skill } from "../skill"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
 import { LegacyEvent } from "@opencode-ai/schema/legacy-event"
-import { ProductHooks } from "@/product-hooks"
+import { skillSource } from "@/product/skill-source"
 import { EventV2Bridge } from "@/event-v2-bridge"
 
 type State = {
@@ -91,8 +91,8 @@ const layer = Layer.effect(
       }
 
       for (const [name, command] of Object.entries(cfg.command ?? {})) {
-        if (ProductHooks.skillSource.isReserved(name)) {
-          yield* ProductHooks.skillSource.refuseCommand(events, { name, source: "config" })
+        if (skillSource.isReserved(name)) {
+          yield* skillSource.refuseCommand(events, { name, source: "config" })
           continue
         }
         commands[name] = {
@@ -110,8 +110,8 @@ const layer = Layer.effect(
       }
 
       for (const [name, prompt] of Object.entries(yield* mcp.prompts())) {
-        if (ProductHooks.skillSource.isReserved(name)) {
-          yield* ProductHooks.skillSource.refuseCommand(events, { name, source: "MCP" })
+        if (skillSource.isReserved(name)) {
+          yield* skillSource.refuseCommand(events, { name, source: "MCP" })
           continue
         }
         commands[name] = {
@@ -149,7 +149,7 @@ const layer = Layer.effect(
           name: item.name,
           description: item.description,
           source: "skill",
-          subtask: ProductHooks.skillSource.commandSubtask(item),
+          subtask: skillSource.commandSubtask(item),
           get template() {
             if (!dir) return item.content
             return [

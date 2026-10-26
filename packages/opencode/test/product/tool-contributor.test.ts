@@ -4,7 +4,7 @@ import type { Tool as AITool } from "ai"
 import { MessageID, SessionID } from "@/session/schema"
 import type { TaskScope } from "@/session/task-scope"
 import type { Provider } from "@/provider/provider"
-import { ProductHooks } from "../../src/product-hooks"
+import { toolContributor } from "../../src/product/tool-contributor"
 import type { ContributeInput } from "../../src/product/tool-contributor"
 
 const sessionID = SessionID.make("ses_contributor")
@@ -44,13 +44,13 @@ function setup(options: { profile: TaskScope.Profile; task?: boolean; image?: bo
     task,
     profile: options.profile,
   } as unknown as ContributeInput
-  return { tools, status, requested, run: () => Effect.runPromise(ProductHooks.toolContributor.contribute(input)) }
+  return { tools, status, requested, run: () => Effect.runPromise(toolContributor.contribute(input)) }
 }
 
 const schemaOf = (tool: AITool) =>
   (tool.inputSchema as { jsonSchema: { properties: object; required?: string[] } }).jsonSchema
 
-describe("ProductHooks.toolContributor", () => {
+describe("toolContributor", () => {
   test("automation receives the whole catalog under the loginom_ prefix without the host token", async () => {
     const run = setup({ profile: "loginom-automation" })
     await run.run()

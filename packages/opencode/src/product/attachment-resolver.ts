@@ -17,12 +17,9 @@ type Draft<T> = T extends SessionV1.Part ? Omit<T, "id"> & { id?: string } : nev
 type FileDraft = Omit<SessionV1.FilePart, "id" | "sessionID" | "messageID"> & { id?: string }
 type Owner = { messageID: MessageID; sessionID: SessionID }
 
-// Attachments reach the model as bounded text, while the bytes a user attached
-// stay the only source for a later transfer to Loginom.
 export const attachmentResolver = {
   mentionMime: (filepath: string) => (FSUtil.mimeType(filepath) === PACKAGE_MIME ? PACKAGE_MIME : "text/plain"),
 
-  // A scenario package is never read into the conversation, only referenced by path.
   packageParts(part: FileDraft, filepath: string, owner: Owner): Draft<SessionV1.Part>[] | undefined {
     if (part.mime !== PACKAGE_MIME && !filepath.toLowerCase().endsWith(".lgp")) return undefined
     return [
@@ -34,8 +31,7 @@ export const attachmentResolver = {
   dataContext: (url: string, fsys: FSUtil.Interface) =>
     attachmentContext(decodeDataUrl(url)).pipe(Effect.provideService(FSUtil.Service, fsys)),
 
-  // A CLI attachment is read once from disk; the preview shown to the model and
-  // the bytes kept for the Dock transfer come from that same snapshot.
+  // Use the same original-user snapshot for model context and admission.
   // Line references never authorize transferring the rest of the file.
   snapshot: Effect.fnUntraced(function* (input: {
     filepath: string

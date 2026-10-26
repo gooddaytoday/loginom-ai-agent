@@ -1,4 +1,5 @@
-import { ProductHooks } from "@/product-hooks"
+import { toolContributor } from "@/product/tool-contributor"
+import { toolPolicy } from "@/product/tool-policy"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
 import { Agent } from "@/agent/agent"
@@ -137,13 +138,13 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     providerID: input.model.providerID,
     agent: input.agent,
     permission: input.session.permission,
-    allowed: (item) => ProductHooks.toolPolicy.permits(profile, item.id, item.origin),
+    allowed: (item) => toolPolicy.permits(profile, item.id, item.origin),
   })
-  definitions.push(...(yield* ProductHooks.toolContributor.definitions(profile)))
+  definitions.push(...(yield* toolContributor.definitions(profile)))
   for (const item of definitions) {
     const origin = item.origin
     const id = item.id
-    if (!ProductHooks.toolPolicy.permits(profile, id, origin)) continue
+    if (!toolPolicy.permits(profile, id, origin)) continue
     const schema = ProviderTransform.schema(input.model, ToolJsonSchema.fromTool(item))
     tools[item.id] = tool({
       description: item.description,
@@ -151,7 +152,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
       execute(args, options) {
         return run.promise(
           Effect.gen(function* () {
-            if (!ProductHooks.toolPolicy.permits(profile, id, origin)) return yield* Effect.die(ProductHooks.toolPolicy.denied())
+            if (!toolPolicy.permits(profile, id, origin)) return yield* Effect.die(toolPolicy.denied())
             const ctx = context(args, options)
             const activate = input.activate
             if (id === "skill" && origin === "builtin" && task && activate)
@@ -189,7 +190,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   }
 
   const hasMcpResourceServer =
-    ProductHooks.toolPolicy.allowsMcp(profile) &&
+    toolPolicy.allowsMcp(profile) &&
     Object.values(yield* mcp.clients()).some((client) => !!client.getServerCapabilities()?.resources)
   if (hasMcpResourceServer) {
     tools[MCP_RESOURCE_TOOLS.list] = tool({
@@ -441,9 +442,9 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   }
 
   for (const [key, entry] of Object.entries(
-    !ProductHooks.toolPolicy.allowsMcp(profile) || flags.experimentalCodeMode ? {} : yield* mcp.tools(),
+    !toolPolicy.allowsMcp(profile) || flags.experimentalCodeMode ? {} : yield* mcp.tools(),
   )) {
-    if (!ProductHooks.toolPolicy.permits(profile, key, "external")) continue
+    if (!toolPolicy.permits(profile, key, "external")) continue
     const item = McpCatalog.convertTool(entry.def, entry.client, entry.timeout)
     const execute = item.execute
     if (!execute) continue
@@ -545,7 +546,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     tools[key] = item
   }
 
-  yield* ProductHooks.toolContributor.contribute({
+  yield* toolContributor.contribute({
     tools,
     loginom: input.loginom,
     loginomStatus: input.loginomStatus,

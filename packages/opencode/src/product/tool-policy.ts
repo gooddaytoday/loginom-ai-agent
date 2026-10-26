@@ -15,8 +15,6 @@ const DOCS_BUILTINS = new Set([
   "package_docs_run",
 ])
 
-// What the model may see and call in each task profile. The same predicate
-// filters the tool set and is checked again when a tool executes.
 export const toolPolicy = {
   permits(profile: TaskScope.Profile, id: string, origin: Tool.Def["origin"]) {
     if (profile === "package-docs") return origin === "builtin" && DOCS_BUILTINS.has(id)

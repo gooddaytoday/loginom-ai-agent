@@ -21,8 +21,6 @@ export type AcquireInput = {
   permission: Permission.Interface
 }
 
-// One agent run owns one Host lease. The lease is released when the run's scope
-// closes, whether the run finished, failed or was cancelled.
 const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
   const { sessionID, sessions, agents, permission } = input
   const status: { failure?: string } = {}
@@ -40,8 +38,6 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
   )
   let activation: Pending | undefined
 
-  // The profile of a task is applied on a turn boundary: a grant requested by a
-  // command or by a completed skill call becomes effective before the next model step.
   const beforeTurn = Effect.fnUntraced(function* (turn: { session: Session.Info; history: History }) {
     const { session, history } = turn
     const currentTask = TaskScope.derive({ sessionID, messages: history, revert: session.revert })
@@ -149,8 +145,6 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
     }
   })
 
-  // The reminder is sent once per recovery attempt and keeps the turn going; a second
-  // end of turn is no progress, so the attempt is stopped instead of repeating the instruction.
   const endTurn = Effect.fnUntraced(function* (turn: {
     session: Session.Info
     history: History
@@ -159,6 +153,7 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
     const recovery = BrowserRecovery.active(turn.history)
     const task = TaskScope.derive({ sessionID, messages: turn.history, revert: turn.session.revert })
     if (recovery && !recovery.reminded) {
+      // One reminder per attempt; the lease still holds the page for this step.
       const reminder: SessionV1.User = {
         id: MessageID.ascending(),
         sessionID,
@@ -179,6 +174,7 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
       } satisfies SessionV1.TextPart)
       return "continue" as const
     }
+    // A second end of turn is no progress: stop the attempt instead of repeating the instruction.
     if (recovery && loginom && task)
       yield* Effect.promise(() =>
         loginom
@@ -196,8 +192,6 @@ const acquireRun = Effect.fnUntraced(function* (input: AcquireInput) {
     return "exit" as const
   })
 
-  // Called after the skill tool loaded a bundled skill: the profile is requested now
-  // and applied by the next beforeTurn once the tool call is recorded as completed.
   const afterTool = (skill: Skill.Info, source: { scope: TaskScope.Info; messageID: MessageID; callID: string }) =>
     Effect.gen(function* () {
       const grant = TaskScope.bundledActivation(skill)

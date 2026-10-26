@@ -11,8 +11,6 @@ const reportError = Effect.fnUntraced(function* (events: Events, message: string
   yield* events.publish(Session.Event.Error, { error: new NamedError.Unknown({ message }).toObject() })
 })
 
-// Reserved names belong to the skills the product ships. Only the `bundled`
-// source may declare them; every other source is refused, never shadowed.
 export const skillSource = {
   isReserved: isReservedSkillName,
 
@@ -34,8 +32,6 @@ export const skillSource = {
     )
   }),
 
-  // A damaged or incomplete resource directory yields no bundled skills and an
-  // error event. It never falls back to another location.
   bundled: Effect.fnUntraced(function* (resources: string, events: Events) {
     return yield* Effect.tryPromise(() => verifyProductSkills(resources)).pipe(
       Effect.catch(

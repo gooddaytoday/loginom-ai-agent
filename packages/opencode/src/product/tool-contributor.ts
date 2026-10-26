@@ -33,8 +33,6 @@ export type ContributeInput = {
   context: (args: Record<string, unknown>, options: ToolExecutionOptions) => Tool.Context
 }
 
-// Adds the Loginom Host tool catalog to the model's tool set. A failed catalog
-// request leaves the set unchanged and records the failure for the system prompt.
 const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
   const { tools, history, task, profile, run, plugin, truncate, context } = input
   const loginom = input.loginom
@@ -167,7 +165,6 @@ const contribute = Effect.fnUntraced(function* (input: ContributeInput) {
   }
 })
 
-// The package-docs profile carries its own executor next to the registry's tools.
 const definitions = Effect.fnUntraced(function* (profile: TaskScope.Profile) {
   if (profile !== "package-docs") return []
   const { PackageDocsTool } = yield* Effect.promise(() => import("@/tool/package-docs"))

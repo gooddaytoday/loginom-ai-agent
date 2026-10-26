@@ -1,5 +1,5 @@
 import { Product } from "@loginom-ai-agent/product"
-import { ProductHooks } from "@/product-hooks"
+import { installationNode } from "@/product/installation"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
@@ -328,7 +328,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
 )
 
 export const upstreamNode = LayerNode.make({ service: Service, layer: layer, deps: [httpClient, AppProcess.node] })
-export const node = ProductHooks.installationNode({ Service, UpgradeFailedError })
+export const node = installationNode({ Service, UpgradeFailedError })
 
 const { runPromise } = makeRuntime(Service, AppNodeBuilder.build(node))
 

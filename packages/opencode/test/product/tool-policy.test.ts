@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { ProductHooks } from "../../src/product-hooks"
+import { toolPolicy } from "../../src/product/tool-policy"
 
-const policy = ProductHooks.toolPolicy
+const policy = toolPolicy
 const docsBuiltins = [
   "read",
   "glob",
@@ -15,7 +15,7 @@ const docsBuiltins = [
   "package_docs_run",
 ]
 
-describe("ProductHooks.toolPolicy", () => {
+describe("toolPolicy", () => {
   test("package-docs exposes only its built-in tools", () => {
     for (const id of docsBuiltins) expect(policy.permits("package-docs", id, "builtin")).toBe(true)
     for (const id of ["bash", "task", "webfetch", "websearch", "dock_diagnostics"])

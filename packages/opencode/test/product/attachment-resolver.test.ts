@@ -5,9 +5,9 @@ import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { Effect } from "effect"
 import { MessageID, SessionID } from "@/session/schema"
-import { ProductHooks } from "../../src/product-hooks"
+import { attachmentResolver } from "../../src/product/attachment-resolver"
 
-const resolver = ProductHooks.attachmentResolver
+const resolver = attachmentResolver
 const owner = { messageID: MessageID.ascending(), sessionID: SessionID.make("ses_attachment") }
 const previousRoot = process.env.LOGINOM_AI_AGENT_CLI_ROOT
 const directories: string[] = []
@@ -26,7 +26,7 @@ async function attached(name: string, content: string) {
   return { filepath, url: new URL(pathToFileURL(filepath).href) }
 }
 
-describe("ProductHooks.attachmentResolver", () => {
+describe("attachmentResolver", () => {
   test("an @-mentioned scenario package keeps its own media type", () => {
     expect(resolver.mentionMime("/work/demo.lgp")).toBe("application/x-loginom-package")
     expect(resolver.mentionMime("/work/notes.txt")).toBe("text/plain")

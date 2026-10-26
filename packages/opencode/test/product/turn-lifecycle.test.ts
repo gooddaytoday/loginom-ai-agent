@@ -4,7 +4,7 @@ import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import type { SessionV1 } from "@opencode-ai/core/v1/session"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import type { Skill } from "@/skill"
-import { ProductHooks } from "../../src/product-hooks"
+import { turnLifecycle } from "../../src/product/turn-lifecycle"
 
 const sessionID = SessionID.make("ses_turn_lifecycle")
 const taskMessageID = MessageID.ascending()
@@ -47,7 +47,7 @@ function fakes() {
 
 const acquire = () => {
   const { written, input } = fakes()
-  return { written, run: ProductHooks.turnLifecycle.acquireRun(input) }
+  return { written, run: turnLifecycle.acquireRun(input) }
 }
 
 function recoveryHistory(reminded: boolean): SessionV1.WithParts[] {
@@ -94,7 +94,7 @@ const user = {
 } as unknown as SessionV1.User
 const session = { id: sessionID } as never
 
-describe("ProductHooks.turnLifecycle", () => {
+describe("turnLifecycle", () => {
   test("the Host lease is released when the run's scope closes, however it ends", async () => {
     for (const end of ["success", "failure"] as const) {
       const requests = connect()

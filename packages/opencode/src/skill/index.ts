@@ -18,7 +18,7 @@ import { Glob } from "@opencode-ai/core/util/glob"
 import { Discovery } from "./discovery"
 import { isRecord } from "@/util/record"
 import { escapeHtml } from "@/util/html"
-import { ProductHooks } from "@/product-hooks"
+import { skillSource } from "@/product/skill-source"
 
 const CLAUDE_EXTERNAL_DIR = ".claude"
 const AGENTS_EXTERNAL_DIR = ".agents"
@@ -79,7 +79,7 @@ export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("Ski
   available: Schema.Array(Schema.String),
 }) {
   override get message() {
-    return `Skill "${this.name}" not found. Available skills: ${this.available.join(", ") || "none"}${ProductHooks.skillSource.notFoundHint(this.name)}`
+    return `Skill "${this.name}" not found. Available skills: ${this.available.join(", ") || "none"}${skillSource.notFoundHint(this.name)}`
   }
 }
 
@@ -135,8 +135,8 @@ const add = Effect.fnUntraced(function* (
 
   if (!isSkillFrontmatter(md.data)) return
 
-  if (!ProductHooks.skillSource.admits(md.data.name, origin.source)) {
-    yield* ProductHooks.skillSource.refuseSkill(events, { name: md.data.name, location: match })
+  if (!skillSource.admits(md.data.name, origin.source)) {
+    yield* skillSource.refuseSkill(events, { name: md.data.name, location: match })
     return
   }
 
@@ -299,7 +299,7 @@ const layer = Layer.effect(
           source: "builtin",
         }
         if (flags.loginomResources) {
-          const bundled = yield* ProductHooks.skillSource.bundled(flags.loginomResources, events)
+          const bundled = yield* skillSource.bundled(flags.loginomResources, events)
           for (const skill of bundled) yield* add(s, skill.location, events, { source: "bundled", digest: skill.digest })
         }
         yield* loadSkills(s, yield* InstanceState.get(discovered), events)
