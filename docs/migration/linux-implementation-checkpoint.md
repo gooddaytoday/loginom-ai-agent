@@ -17,9 +17,9 @@ CLI archive SHA `b12b98881eb9d38bf97377f8fb197775ff6eab689aacd6d7d3b026c7020d9ca
 B4: Unicode upload исправлен task-local ENV LANG=C.UTF-8; native overflow ownership fix прошёл TDD395+222,3 typecheck и review.
 B4 закрыт: один installed CLI/DB6.1-sol/xhigh220,81с, Save own uploadD/replace, physical Unit.xml only*2→*3, native Close/logout/ACK0/no writer/processes0; fresh review Approved.
 Прежние selected routing4/4 CLI9cb и4/4 Desktopbbd остаются отдельными receipts; затронутые новым runtime кейсы требуют повтора.
-B1/B2/B3 закрыты; CSV reference принят. Local edit reference, pair calibration и полный isolated benchmark ещё не завершены.
+B1/B2/B3/B4 закрыты; оба reference/CLI/cold/oracle/collection validator приняты. Local edit CLI1/handledRead отражён честно; pair calibration и Task8 ещё впереди.
 Bun1.3.14 / Node24.19.0 / Chromium1246; crash logging и packaging tests13pass/2platformskip PASS.
-Own stand32794 со snapshot используется для Task7/newprofile; общие установки/профили/сервисы не менялись, прежние failed guards сохранены. Windows native NOT_RUN; общий attribution verifier имеет прежний README mismatch.
+Own stand32794 после reference/cold остановлен с полными snapshots; общие установки/профили/сервисы не менялись, прежние failed guards сохранены. Windows native NOT_RUN; общий attribution verifier имеет прежний README mismatch.
 [Отчёт](../testing/loginom-ai-agent/local-file-paths.md#b4-autonomous-diagnosis-resumed-2026-10-26) · [блокеры](../testing/loginom-ai-agent/local-file-paths-blockers.md).
 
 ## 2026-10-20 — v0.3.2 опубликован
