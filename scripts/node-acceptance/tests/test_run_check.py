@@ -1,4 +1,5 @@
 import copy
+import csv
 import importlib.util
 from pathlib import Path
 import subprocess
@@ -99,11 +100,114 @@ class RunCheckTests(unittest.TestCase):
             runner.check_csv(actual, expected, column_order='any')
             self.assertEqual(expected, before)
             with self.assertRaisesRegex(AssertionError, 'CSV_COLUMN_ORDER'):
-                runner.check_csv(actual, expected)
+                runner.check_csv(actual, expected, column_order='exact')
             rows[-1] = rows[-1].replace(',20.1', ',999')
             actual.write_text(','.join(names) + '\n' + '\n'.join(rows) + '\n')
             with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
                 runner.check_csv(actual, expected, column_order='any')
+
+    def test_all_86_expected_specifications_have_audited_fields(self):
+        names = ([f'{prefix}{i}' for prefix, count in [('n', 20), ('p', 24), ('s', 8), ('q', 10), ('r', 6)]
+                  for i in range(1, count + 1)] + [f'v{v}s{i}' for v in range(1, 4) for i in range(1, 7)])
+        fields = set()
+        for name in names:
+            case = runner.scenario(name)
+            demo = case['source'] / 'expected-demo.json'
+            specifications = [runner.expected_for(case, '/audit/test.lgp')]
+            if demo.exists(): specifications.append(runner.read(demo))
+            for output in [output for spec in specifications for output in spec.get('outputs', [spec])]:
+                for column in output['columns']: fields.update(column)
+        self.assertEqual(len(names), 86)
+        self.assertEqual(fields, {'name', 'label', 'type', 'types', 'tolerance', 'label_any', 'name_any', 'category_labels_any'})
+
+    def test_n19_file_oracle_accepts_labels_but_rejects_bad_centers_and_extra_rows(self):
+        case = runner.scenario('n19')
+        output = runner.expected_for(case, '/test.lgp')['outputs'][0]
+        with tempfile.TemporaryDirectory() as folder:
+            actual = Path(folder) / 'actual.csv'
+            rows = [dict(row, Group=str((row['ID'] - 1) // 30)) for row in reversed(output['rows'])]
+            command = [sys.executable, '-B', str(case['source'] / 'oracle.py'), str(actual)]
+            for data, accepted in [(rows, True), (rows + [rows[0]], False),
+                                   ([dict(row, Group=str(row['ID'] % 3)) for row in rows], False)]:
+                with actual.open('w') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=[c['name'] for c in output['columns']])
+                    writer.writeheader()
+                    writer.writerows(data)
+                result = subprocess.run(command, capture_output=True, text=True)
+                self.assertEqual(result.returncode == 0, accepted, result.stdout + result.stderr)
+
+    def csv_result(self, expected, text, **options):
+        with tempfile.TemporaryDirectory() as folder:
+            actual = Path(folder) / 'actual.csv'
+            actual.write_text(text)
+            return runner.check_csv(actual, expected, **options)
+
+    def test_csv_categories_are_a_bijection_not_fixed_labels(self):
+        output = runner.expected_for(runner.scenario('n19'), '/test.lgp')['outputs'][0]
+        with tempfile.TemporaryDirectory() as folder:
+            actual = Path(folder) / 'actual.csv'
+            def write(rows):
+                with actual.open('w') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=[c['name'] for c in output['columns']])
+                    writer.writeheader()
+                    writer.writerows(rows)
+            rows = [dict(row, Group=str((row['ID'] - 1) // 30)) for row in reversed(output['rows'])]
+            write(rows)
+            self.assertEqual(runner.check_csv(actual, output), ',')
+            for bad in [rows + [rows[0]], [dict(row, Group=str(row['ID'] % 3)) for row in rows],
+                        [dict(row, Hours=999) if row['ID'] == 1 else row for row in rows]]:
+                write(bad)
+                with self.assertRaises(AssertionError): runner.check_csv(actual, output)
+
+    def test_csv_header_freedoms_keep_unique_value_binding(self):
+        output = {'columns': [{'name': 'Key', 'type': 'string'},
+                              {'name': 'Amount', 'label': 'Old label', 'label_any': True, 'type': 'real'}],
+                  'rows': [{'Key': 'A', 'Amount': 2}, {'Key': 'B', 'Amount': 3}]}
+        self.csv_result(output, 'New label,Key\n2,A\n3,B\n', header='labels')
+        output['columns'][1].update(name_any=True)
+        self.csv_result(output, 'Revenue,Key\n2,A\n3,B\n')
+        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+            self.csv_result(output, 'Revenue,Key\n3,A\n2,B\n')
+        ambiguous = {'columns': [dict(name=name, type='real', name_any=True, label_any=True) for name in ['X', 'Y']],
+                     'rows': [{'X': 1, 'Y': 1}]}
+        with self.assertRaisesRegex(AssertionError, 'CSV_COLUMN'):
+            self.csv_result(ambiguous, 'First,Second\n1,1\n')
+        output['columns'][1]['label_any'] = False
+        with self.assertRaisesRegex(AssertionError, 'CSV_COLUMN'):
+            self.csv_result(output, 'New label,Key\n2,A\n3,B\n', header='labels')
+
+    def test_csv_unspecified_column_order_matches_stock_any(self):
+        output = {'columns': [{'name': 'A', 'type': 'integer'}, {'name': 'B', 'type': 'string'}],
+                  'rows': [{'A': 1, 'B': 'text'}]}
+        self.csv_result(output, 'B,A\ntext,1.0\n')
+        output['column_order'] = 'exact'
+        with self.assertRaisesRegex(AssertionError, 'CSV_COLUMN'):
+            self.csv_result(output, 'B,A\ntext,1\n')
+
+    def test_csv_overlapping_tolerances_use_complete_matching(self):
+        output = {'columns': [{'name': 'Value', 'type': 'real', 'tolerance': {'abs': 1}}],
+                  'rows': [{'Value': 1}, {'Value': 0}], 'ordered': False}
+        self.csv_result(output, 'Value\n0\n2\n')
+        output['ordered'] = True
+        with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+            self.csv_result(output, 'Value\n0\n2\n')
+        output['rows'] = [{'Value': 1}]
+        output['columns'][0]['tolerance'] = {'abs': 0, 'rel': 0}
+        self.csv_result(output, 'Value\n1.0000000000000001\n')
+        output['rows'] = [{'Value': 100}]
+        output['columns'][0]['tolerance'] = {'abs': 0.01, 'rel': 0.02}
+        self.csv_result(output, 'Value\n102\n')
+        for value in ['102.01', 'NaN', 'Infinity', '-Infinity']:
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, 'Value\n' + value + '\n')
+
+    def test_csv_types_labels_nulls_and_order_remain_checked(self):
+        output = {'columns': [{'name': 'Value', 'type': 'integer', 'types': ['integer', 'real'], 'label': 'Number'}],
+                  'rows': [{'Value': None}, {'Value': 2}], 'ordered': True}
+        self.csv_result(output, 'Number\n""\n2.0\n', header='labels')
+        for text in ['Number\n0\n2\n', 'Number\n2\n""\n', 'Number\n""\n3\n']:
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                self.csv_result(output, text, header='labels')
 
     def test_deadline_is_unknown_with_a_real_failure_journal(self):
         with tempfile.TemporaryDirectory() as folder:
