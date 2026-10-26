@@ -8,6 +8,7 @@ import {applyNode,releaseNodeApply,validateNodeApplyRequest} from '../lib/node-a
 import {dispatchNodeApi,nodeApiTools} from '../lib/node-api.mjs';
 import {createUserWorkflowBindings} from '../lib/user-workflow.mjs';
 import {javascriptCodeReadback} from '../lib/javascript-code-node.mjs';
+import {restRequestReadback} from '../lib/rest-request-node.mjs';
 const node={document_id:'doc',workflow_id:'wf',node_id:'node'};
 const schema=[{index:0,name:'value',label:'Value',type:'real'}];
 const source=()=>({parameters:{contract_revision:'1.0.0',target:{type:'transform.calculator',label:'Calculation'},workflow_ref:{workflow_id:'wf',prefix:'MF;TF-1',tab_tid:'MF;cntMain;cntWorkspace;Workspace;t.br;tb-1',navigation_path:[{tid:'MF;TF-1;path',label:'Scenario'}]}},outcome:{status:'SUCCEEDED',cleanup_complete:true,output:{node,cleanup_complete:true,execution:{status:'completed'},output:{ports:[{port:0,schema}]}}}});
@@ -167,6 +168,34 @@ function unreadSource(){
   {index:0,name:'hidden',label:'Hidden',type:'string',data_kind:'Дискретный',source_name:'hidden',excluded:true},
   {...schema[0],index:1,data_kind:'Непрерывный',source_name:'value',excluded:false}]}}};return s;
 }
+function restSource(){
+ const s=source(),n=s.outcome.output;s.parameters.target.type='integration.rest_request';
+ n.output.ports[0].port=1;
+ n.phases=['configure','node_finish','output_mapping','finish','execute','read'].map(phase=>({phase,
+  receipt_id:'created:'+phase,status:'verified',value:phase==='configure'
+   ?{configuration:{verified:true,node_context:node,query_parameters:[]}}
+   :phase==='node_finish'?{settings_applied:true,mode:'done',node_context:node}:{}}));
+ n.configuration={status:'applied',readback:restRequestReadback({node:structuredClone(node),phases:n.phases,operation_id:'created'})};
+ return s;
+}
+test('REST reread uses observed port schemas with the handler configuration and Done receipts',()=>{
+ const s=restSource(),before=structuredClone(s),request=buildNodeReadRequest(args,s);
+ assert.deepEqual(request.parameters.schemas,[{port:1,schema}]);assert.deepEqual(s,before);
+ assert.deepEqual(s.outcome.output.configuration.readback.receipt_ids,['created:configure','created:node_finish']);
+ assert.throws(()=>buildNodeReadRequest({...args,read:{ports:[0],sample_rows:0}},s),/choose ports present/);
+ const missing=restSource();missing.outcome.output.output.ports=[];
+ assert.throws(()=>buildNodeReadRequest(args,missing),/no verified table output/);
+});
+for(const [name,mutate] of Object.entries({
+ owner:s=>s.outcome.output.configuration.readback.node.node_id='foreign',
+ foreignReceipt:s=>s.outcome.output.configuration.readback.receipt_ids[0]='foreign:configure',
+ missingDone:s=>s.outcome.output.configuration.readback.receipt_ids.pop(),
+ duplicateReceipt:s=>s.outcome.output.configuration.readback.receipt_ids.push('created:configure'),
+ unverifiedPhase:s=>s.outcome.output.phases[0].status='pending',
+ wrongType:s=>s.parameters.target.type='transform.calculator',
+}))test('REST reread retains ownership and phase guards: '+name,()=>{
+ const s=restSource();mutate(s);assert.throws(()=>buildNodeReadRequest(args,s));
+});
 test('first read uses verified local output mapping without a prior preview',()=>{
  const s=unreadSource(),before=structuredClone(s),r=buildNodeReadRequest(args,s);validateNodeApplyRequest(r,handlers);
  assert.deepEqual(r.parameters.schemas,[{port:0,schema:[{...schema[0],data_kind:'Непрерывный'}]}]);assert.deepEqual(s,before);
