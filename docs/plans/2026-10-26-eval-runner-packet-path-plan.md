@@ -1,6 +1,6 @@
 # Один paired packet trace runner2→runner3 — Implementation Plan
 
-> Статус: план независимо принят; оба capture подтвердили READY около01:47UTC и продолжают работу. Server keepalive0, kernel7200с; тихое окно допустимо после01:53:58UTC. Наблюдается существующая штатная попытка около01:57UTC. Результата ещё нет; native команды/расписание не меняются.
+> Статус: один проход завершён; наблюдение и очистка независимо проверены. R2 отправил семь SYN штатной попытки01:57UTC, ответов в его capture нет. Локализация потери — INCONCLUSIVE: host log пуст, но счётчик libpcap содержит10 received, которые нельзя сопоставить потоку. Новых проб и сетевых изменений не выполняли.
 
 **Goal:** на одной следующей штатной native попытке отделить R2 egress от hypervisor ingress и получить проверяемую локализацию либо INCONCLUSIVE, без попытки ремонта.
 **Гипотеза наблюдения:** SYN фактической попытки покидает R2, но не достигает hypervisor; наличие host SYN или отсутствие R2 SYN опровергнет именно эту границу для данного потока, не установит первопричину.
@@ -27,10 +27,10 @@
   Hypervisor: `sudo -n aa-exec -p unconfined -- timeout --kill-after=2s 1200s tcpdump -i any`; BPF **`tcp and port 2223 and (tcp[tcpflags] & (tcp-syn|tcp-rst) != 0)`**, без адресного фильтра, чтобы видеть translated destination/source.
   Оба collector: `TZ=UTC`, `-n -l -tttt -v -s 96`, только текстовые headers. Записать ready/listening UTC и локальное receive-UTC; если capture не готов, INCONCLUSIVE, без замещающей пробы.
   После READY до timeout control SSH не передаёт stdout/stderr, stdin-команды или streaming headers; parent только ждёт свой capture. Root tool yields1000мс, waits≤60с, без блокирующего ожидания400с.
-- [ ] **4. Наблюдать одну actual native попытку.** Оба capture должны перекрывать её начало/конец; outcome берётся из штатного native evidence, не из новой observer-команды.
+- [x] **4. Наблюдать одну actual native попытку.** Оба capture должны перекрывать её начало/конец; outcome берётся из штатного native evidence, не из новой observer-команды.
   `quietEligible=true` только при gates, непрерывном control SSH и actual start≥400с после последнего setup/READY; использовать R2 SYN/READY одного clock domain либо достоверные actual timestamps, не один wakeup timestamp.
   Setup SSH primed WG; даже quietEligible не означает cold/полный простой peer. Иной трафик возможен. Раннее/неизвестное начало или обрыв SSH исключают quiet-утверждение; не повторять тест и не продлевать bounds.
-- [ ] **5. Получить один proof и убрать только свои процессы.** Дождаться штатных capture timeout; через ту же held SSH вернуть R2 logs/exits/own-PID cleanup facts. Отдельно записать remote event, local receive и file mtime, не подменяя одно другим.
+- [x] **5. Получить один proof и убрать только свои процессы.** Дождаться штатных capture timeout; через ту же held SSH вернуть R2 logs/exits/own-PID cleanup facts. Отдельно записать remote event, local receive и file mtime, не подменяя одно другим.
   Сопоставить обе 4-tuple с учётом наблюдаемой трансляции по TCP sequence/ACK, interface/direction и UTC. Неоднозначные потоки, clock/window gap, неизвестная смена task port или drops, мешающие выводу отсутствия, — INCONCLUSIVE.
   Native success + matched handshake: observed path only, не fix. Timeout + R2 SYN без host SYN при полном окне: gap между точками наблюдения, не NAT/route diagnosis.
   Host SYN и исходящий SYNACK без его возврата на R2: наблюдение обратного gap. Actual timeout без R2 egress при полном `any` capture: sender-path gap, не обвинение native кода.
@@ -43,4 +43,9 @@
 - Ни packet gap, ни успех не доказывают NAT-причину, исправление, автономность или actual R3 unit result. Получение логов после окна само создаёт WG-трафик и учитывается в будущих quiet-утверждениях.
 - Две точки capture — минимум для отсутствующего сравнения; существующие foreground timeout и held tool sessions достаточны, постоянный collector/monitor не нужен.
 
-Checkpoint: точный private v2-план принят; fresh need подтверждён timeout01:42:56. Оба foreground capture READY, интервалы/handles/gates — private `paired-headers-live-state.json`; ждём одну штатную попытку и завершение capture около02:07UTC. Захваты имеют timeout1200+2с; для управляющего SSH записан операторский cutoff02:11UTC с проверкой прежнего local handle, автоматического outer timeout у него нет. Новых tasks, VM observers, настроек сети или расписания нет; результат/cleanup ещё не подтверждены.
+Checkpoint:
+- READY R2 01:47:02UTC, host01:47:18UTC; actual native task `01a175ed-67da-7825-8417-b88c3ac294be` получил connect timeout01:57:57.679309UTC. Quiet bound выполнен; cold peer не заявляется.
+- R2: семь SYN одного потока `10.200.9.134:60918 →172.16.0.29:2223`, sequence2336086804, 01:57:47.668491–01:57:54.871153UTC; SYNACK/RST не наблюдались. Host: пустой log, counters0captured/10received/0dropped. По [pcap_stats](https://www.tcpdump.org/manpages/pcap_stats.3pcap.html) received может включать непрочитанные пакеты; этот счётчик не доказывает достижение или отсутствие нужного потока.
+- Capture завершились штатными timeout exit124 в02:07:02/02:07:18UTC; все записанные собственные дочерние PID отсутствуют. Held SSH завершился exit0 в02:07:02UTC до операторского cutoff; действующего handle/cutoff нет. Автоматического outer timeout не было; сохранены фактические timestamps.
+- Private proof: `preparation-accounting/paired-header-observation-assembled.json`, `paired-capture-tool-final.json`, `paired-trace-localization-independent-review.json` (PASS observation/cleanup, INCONCLUSIVE localization). Receive time и local file mtime отделены от packet time; remote R2 mtime не собирали.
+- Следующий шаг — продолжение штатной диагностики EvalOps; повтор capture и причинность NAT не заявлены. Текущие отдельные route/listener/firewall snapshots не обнаружили доказанной адресной сетевой правки и не являются новым packet proof.
