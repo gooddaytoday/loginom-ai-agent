@@ -85,6 +85,26 @@ class RunCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, 'CSV_COLUMN_ORDER'):
                 runner.check_csv(actual, expected)
 
+    def test_native_base_export_maps_csv_columns_without_changing_fixture(self):
+        source = runner.REPO / 'docs/node-development/nodes/datamining-clustering/acceptance'
+        expected = runner.expected_for(dict(source=source, prompt=source / 'task.md'), '/personal/run.lgp')['outputs'][0]
+        before = copy.deepcopy(expected)
+        # Actual smoke-1/r1 header: Cluster,Distance,RowID,X,Y. The native
+        # port fixture orders X/Y before RowID; task.md prescribes no CSV order.
+        names = ['Cluster', 'Distance', 'RowID', 'X', 'Y']
+        with tempfile.TemporaryDirectory() as folder:
+            actual = Path(folder) / 'actual.csv'
+            rows = [','.join(str(row[name]) for name in names) for row in expected['rows']]
+            actual.write_text(','.join(names) + '\n' + '\n'.join(rows) + '\n')
+            runner.check_csv(actual, expected, column_order='any')
+            self.assertEqual(expected, before)
+            with self.assertRaisesRegex(AssertionError, 'CSV_COLUMN_ORDER'):
+                runner.check_csv(actual, expected)
+            rows[-1] = rows[-1].replace(',20.1', ',999')
+            actual.write_text(','.join(names) + '\n' + '\n'.join(rows) + '\n')
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
+                runner.check_csv(actual, expected, column_order='any')
+
     def test_deadline_is_unknown_with_a_real_failure_journal(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder)

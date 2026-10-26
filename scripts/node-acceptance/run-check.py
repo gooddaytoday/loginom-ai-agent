@@ -122,14 +122,14 @@ def summary(report):
     return '\n'.join(rows) + '\n'
 
 
-def check_csv(path, expected, header='names'):
+def check_csv(path, expected, header='names', *, column_order=None):
     text = path.read_text(encoding='utf-8-sig')
     delimiter = csv.Sniffer().sniff(text[:8192], delimiters=',;\t').delimiter
     rows = list(csv.reader(io.StringIO(text), delimiter=delimiter))
     columns = expected['columns']
     names = [c.get('label', c['name']) if header == 'labels' else c['name'] for c in columns]
     assert rows and len(rows[0]) == len(set(rows[0])) == len(columns), 'CSV_COLUMN_ORDER'
-    if expected.get('column_order') == 'any':
+    if (column_order or expected.get('column_order')) == 'any':
         assert set(rows[0]) == set(names), 'CSV_COLUMN_ORDER'
         columns = [columns[names.index(name)] for name in rows[0]]
     else:
@@ -355,7 +355,10 @@ class Runner:
             shutil.copyfile(downloaded_csv(profile, destination), actual)
             if re.fullmatch(r'n(?:1[3-9]|20)', src.name):
                 self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', actual], folder, timeout=60)
-            delimiter = check_csv(actual, expected['outputs'][index], header)
+            # Node-base fixtures describe native port order, not CSV export order.
+            # Their task.md leaves export order free; continuation fixtures do not.
+            delimiter = check_csv(actual, expected['outputs'][index], header,
+                                  column_order='any' if isinstance(case, Path) else None)
         self.current['csv'] = 'PASS'
         return session, expected, delimiter
 

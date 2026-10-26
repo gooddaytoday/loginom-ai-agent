@@ -33,7 +33,10 @@ r1/r2 start from the clustering task, r3/r4 from linear regression, and r5/r6
 from REST. Each continuation reuses that base session/package; r3 attaches
 holdout.csv and r4 attaches replace.csv only when requested. Only the business
 request and referenced input CSV/XLSX files reach the model; previously attached
-inputs are not attached again. p14 receives exhibits.xlsx, not its CSV copy. CSV checks consume every exported row.
+inputs are not attached again. p14 receives exhibits.xlsx, not its CSV copy. CSV checks consume every exported row. Node-base fixtures describe native port
+order; their tasks leave CSV order free, so only those base exports map columns
+by their unique names. Final continuation CSVs retain their fixture's ordering
+rules. Names, widths, counts and every value remain checked.
 Stock cold receives `--csv` and never reapplies node settings.
 Save, main close/logout and runtime-close ACK must all be confirmed.
 The table reports `port-read` and the observed path (`port`, `native`, or both).
