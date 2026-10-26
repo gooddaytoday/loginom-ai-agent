@@ -76,7 +76,10 @@ test("new path answers require the exact Read value and facts from the modified 
     { tool: "package_docs_run", state: { status: "completed", input: { operation: "emit", lgp: path, format: "md" } } },
   ]
   expect(() => verifyLocalFileAnswer("docs-after-edit", docs, path, "Готово", "amount_double = amount * 3")).not.toThrow()
+  expect(() => verifyLocalFileAnswer("docs-after-edit", docs, path, "Готово",
+    "amount_double\n\nФормула и параметры выражений в извлечённых настройках отсутствуют; в частности, сохранение формулы `amount*3` по извлечённой структуре проверить нельзя.")).toThrow("MODIFIED_DOC_FACTS_NOT_VERIFIED")
   expect(() => verifyLocalFileAnswer("docs-after-edit", docs, path, "Готово", "amount_double = amount * 2")).toThrow()
+  expect(() => verifyLocalFileAnswer("docs-after-edit", docs, path, "Готово", "amount_double = amount * 30")).toThrow("MODIFIED_DOC_FACTS_NOT_VERIFIED")
   expect(() => verifyLocalFileAnswer("docs-after-edit", docs, path, "amount*3")).toThrow()
   docs[1]!.state.input.lgp = "/foreign/original.lgp"
   expect(() => verifyLocalFileAnswer("docs-after-edit", docs, path, "Готово", "amount_double = amount*3")).toThrow()

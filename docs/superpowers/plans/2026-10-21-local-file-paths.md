@@ -205,7 +205,7 @@ JUDGE_MODEL=gpt-6-sol JUDGE_REASONING=xhigh bun --no-env-file run src/run.ts --c
 **Критерии:** результаты раздела [проверок дизайна](../specs/2026-10-21-local-file-paths-design.md#проверки-и-размещение-кейсов), без новых acceptance требований.
 
 - [ ] Переиспользовать candidate задачи 7, если relevant code не менялся; иначе собрать новый и повторить только затронутые проверки. Выполнить mandatory package tests/typechecks, resource/attribution checks. В отчёте отделить source smoke задачи 2, reference authoring и installed acceptance.
-- [ ] Один live scenario проход двух IDs через штатный isolated harness. Проверить installed EVAL_CLI_BIN, dedicated endpoint, модель/variant, private profiles/results; из `evals`:
+- [x] Один live scenario проход двух IDs через штатный isolated harness. Проверить installed EVAL_CLI_BIN, dedicated endpoint, модель/variant, private profiles/results; из `evals`:
 
 ```bash
 env -u EVAL_SLOTS_FILE EVAL_REPEAT=1 bun --no-env-file run src/run.ts --tasks tasks/local-path-scenarios --only csv-two-paths,local-lgp-edit --repeat 1 --skip-judge
@@ -223,7 +223,7 @@ bun --no-env-file run src/run.ts --judge-only "$LOCAL_PATHS_RUN_ID"
 
 ## Planning checkpoint
 
-- 2026-10-26, новый clean CLI/Desktop candidate `9f7233ce71`; текущая часть — B4 и fixture/test/reports/checkpoints. Код задач1–6 и fixture-пункт6 готовы; задача7 завершена, задача8 незавершена. Поведение остаётся каноническим в дизайне.
+- 2026-10-26: задачи1–7 готовы, B1–B4 закрыты; Task8 benchmark9f723: score100/100/оба oracle, execution1/2 (edit CLI1/recovered Read), native/process cleanup PASS, fresh review Approved. Следующий candidate включает minimal Calc Expressions/docs fact fix4files/+25/−4; TDD60+35/typecheck/actual package/report checks PASS; перед live — review и clean build. Поведение каноническое в дизайне.
 - Оценки/сигналы не повышены. Task3:25files/+1219/−150 против сигнала44/2220; native IPC A→B6867/6338мс, SHA/graph/ACK/exit0 подтверждены.
 - Source checks: task4 agent179pass/1existing skip/969assertions, Host17/110; task5 93/503 плюс final27/234; task6 51/207. Typecheck/reviews Approved.
 - Task6 сигнал470 строк сработал на472: пересмотр Approved minimal wiring; итог20files/+449/−107, baseline сохранён. Старые20cases/fixtures/turn branches/default repeat неизменны.
@@ -240,4 +240,4 @@ bun --no-env-file run src/run.ts --judge-only "$LOCAL_PATHS_RUN_ID"
 - Windows native NOT_RUN: среды нет, условие продолжения в отчёте. Общий attribution verifier имеет прежний README hash mismatch;13 затронутых entries подтверждены, release gate не объявлялся PASS.
 - Own failed-source и routing server/Studio остановлены с сохранением state/storage; B2 profile восстановлен offline; stopped default-save и другие failed B1 profiles/guards остаются в карантине. Общие приложения/профили/сервисы не менялись.
 - Archive hook: core.bare восстановлен false; task7/clean-git-hooks очищает local Git vars и вызывает исходный Husky/scanner без skip, review Approved. Проверять commit tree/bare=false, tracked hook/scanner не менять.
-- Final independent review выполненной части без истории: Approved, обязательных замечаний нет; raw receipts/physical LGP/PDF/candidate hashes проверены. Private evidence: /home/kiselev/storage/tmp/local-paths-74-ptufs123/; отчёт docs/testing/loginom-ai-agent/local-file-paths.md. Далее live edit transitions и isolated benchmark; Task7 завершена; B4 закрыт; merge/release не разрешены.
+- Final independent review выполненной части без истории: Approved, обязательных замечаний нет; raw receipts/physical LGP/PDF/candidate hashes проверены. Private evidence: /home/kiselev/storage/tmp/local-paths-74-ptufs123/; отчёт docs/testing/loginom-ai-agent/local-file-paths.md. CLI CSV-path PASS, edit-after-docs PASS с Save recovery; исходный docs-after-edit semantic-incomplete сохранён. Далее затронутые docs transitions на новом CLI/Desktop и финальное review; Task7/benchmark завершены; merge/release не разрешены.

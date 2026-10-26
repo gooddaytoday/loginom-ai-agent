@@ -18,7 +18,11 @@ export function verifyLocalFileAnswer(id, tools, path, text, markdown) {
   if (id === "docs-after-edit") {
     assert.ok(tools.some(tool => tool.tool === "package_docs_run" && tool.state.status === "completed" && tool.state.input.operation === "extract" && tool.state.input.lgp === path), "MODIFIED_DOC_SOURCE_NOT_VERIFIED")
     assert.ok(tools.some(tool => tool.tool === "package_docs_run" && tool.state.status === "completed" && tool.state.input.operation === "emit" && tool.state.input.lgp === path && tool.state.input.format === "md"), "MODIFIED_DOC_EMIT_SOURCE_NOT_VERIFIED")
-    assert.ok(markdown?.includes("amount_double") && markdown.replace(/[\s`\[\]\\]/g, "").includes("amount*3"), "MODIFIED_DOC_FACTS_NOT_VERIFIED")
+    // This is a tripwire for the known refusal, alongside manual review of the document.
+    const formula = markdown?.split(/\n\s*\n/).some(paragraph =>
+      !/(?:нельзя|невозможно|отсутству|не\s+(?:указан|подтвержд|представлен)|cannot\s+(?:verify|confirm))/iu.test(paragraph) &&
+      /\bamount\s*\*\s*3(?![\p{L}\p{N}_]|\.\d)/u.test(paragraph.replace(/[`\[\]\\]/g, "")))
+    assert.ok(markdown?.includes("amount_double") && formula, "MODIFIED_DOC_FACTS_NOT_VERIFIED")
   }
 }
 

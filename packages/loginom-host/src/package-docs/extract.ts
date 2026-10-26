@@ -94,11 +94,17 @@ function nodeEntry(node: Element, path: string, depth: number) {
     const name = port.getAttribute("Name") || portNames[guid.toLowerCase()] || ""
     return { guid, name, display_name: port.getAttribute("DisplayName") || name }
   })
+  const expressions = engine_type === "TBGCalcData" ? items(child(engine, "Expressions")).map((expression) => ({
+    Name: expression.getAttribute("Name") ?? "", DataType: expression.getAttribute("DataType") ?? "", Expression: expression.getAttribute("Expression") ?? "",
+  })) : []
   return { guid, name, display_name, label, service_name, engine_type, vendor_guid: node.getAttribute("VendorGuid") ?? "",
     input_ports: ports("InputPorts"), output_ports: ports("OutputPorts"), service_input_ports: ports("ServiceInputPorts"), service_output_ports: ports("ServiceOutputPorts"),
-    settings_main: Object.fromEntries(Array.from(engine?.attributes ?? []).filter((attribute) =>
-      !["type", "Guid"].includes(attribute.localName) && attribute.namespaceURI !== "http://www.w3.org/2000/xmlns/" && attribute.value && attribute.value.length < 500)
-      .map((attribute) => [attribute.localName, attribute.value])),
+    settings_main: Object.fromEntries([
+      ...Array.from(engine?.attributes ?? []).filter((attribute) =>
+        !["type", "Guid"].includes(attribute.localName) && attribute.namespaceURI !== "http://www.w3.org/2000/xmlns/" && attribute.value && attribute.value.length < 500)
+        .map((attribute) => [attribute.localName, attribute.value]),
+      ...(expressions.length ? [["Expressions", JSON.stringify(expressions)]] : []),
+    ]),
     path, depth, hierarchy_token: `${label}:${service_name}:${guid}` }
 }
 
