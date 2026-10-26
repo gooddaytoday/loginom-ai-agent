@@ -29,18 +29,22 @@ runtime ACK/exit0 и освобождение профиля подтвержд�
 без сохранения байты reference и исходного пакета не изменились. Детали и SHA —
 в `local-lgp-edit/provenance.json`. Файлы и исторические проверки `csv-two-paths`
 сохранены без изменений.
-Калибровка и isolated benchmark **NOT_RUN**. Reference authoring не заменяет
-sandbox benchmark или Desktop/CLI routing acceptance.
+Обычная калибровка пары **PASS** (2026-10-26): оба positive100/oracle=true,
+оба foreign negative0, пороги90/40; near-miss не добавлялись. Судья
+`gpt-6-sol/xhigh`, `codex-cli 0.157.0`, четыре оценки без встроенных повторов,
+236.04 с, warnings0/exit0 и подтверждённая очистка/освобождённая judge lease.
+Run: `20261026-142707-calibrate-NprfPu`. Рубрики и inputs не менялись.
+Первые отказы подготовки (`JUDGE_VERSION_UNCONFIRMED`, затем401 старого private
+OAuth) сохранены отдельно; они не дали модельных вердиктов. Восстановлены только
+private config/auth судьи под lease, глобальные файлы остались прежними.
+[Проверки и evidence](../../../docs/testing/loginom-ai-agent/local-file-paths.md#task7-pair-calibration-passed-2026-10-26).
 
-Следующий шаг — выполнить из `evals` платную калибровку только пары
-(каждый reference служит foreign negative другому):
-
-```sh
-JUDGE_MODEL=gpt-6-sol JUDGE_REASONING=xhigh bun run src/run.ts --calibrate --tasks tasks/local-path-scenarios --only csv-two-paths,local-lgp-edit
-```
-
-Затем live benchmark по задаче 8 с явным `EVAL_REPEAT=1`; его фактические model и
-variant будут записаны отдельно. Повторные benchmark/corpus сюда не добавляются.
+Isolated benchmark **NOT_RUN**. Reference authoring и calibration не заменяют
+sandbox benchmark или Desktop/CLI routing acceptance. Следующий шаг — задача8:
+один live проход пары с явным `EVAL_REPEAT=1`, затем оценка тех же артефактов
+штатным `--judge-only` через offline judge gate. Это сохраняет исходный execution
+status и не запускает агента повторно. Model/variant записываются отдельно.
+Новых benchmark/corpus не добавляется.
 
 Хэши коллекции из task-local `validate_collection.ts`:
 
