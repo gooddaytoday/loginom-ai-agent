@@ -1,5 +1,14 @@
 # Linux: завершение реализации — 2026-09-16
 
+## 2026-10-26 — v0.3.3 опубликован
+
+Release source: `2eea642cf2f0363e12aa1a0078a3740a75cdda42`, ветка `loginom` (PR #441: v033-rel4 9f1d4a48).
+Выпуск после исправления дефектов проверки (кроме перечисленных в отчёте ограничений): чтение вывода из порта (#440), мс в CSV, консоль после запуска, cleanup после ошибки открытия.
+CI40281597215 PASS на попытке1; matrix5/5; 30 assets/digests/SHA256SUMS и три manifests 0.3.3/prod/browserRecovery=true сверены.
+Финальная регрессия: 76/78 PASS, оба FAIL (D79, D80) исправлены и перепроверены адресно (15/15 cold).
+Published2026-10-26T07:16:28Z, pre-release, latest=false, ID423944660; 30 URLs HTTP200.
+[Отчёт](../testing/loginom-ai-agent/reports/2026-10-26-v0.3.3-release.md).
+
 ## 2026-10-20 — v0.3.2 опубликован
 
 Release source: `c130548bbe19515ea226796054786574ed2fc4a2`, ветка `loginom` (PR #286: demo-022 f9c302b3).
