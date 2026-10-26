@@ -15,7 +15,6 @@ import socket
 import subprocess
 import sys
 import time
-from decimal import Decimal
 
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / 'docs/testing/loginom-ai-agent'
@@ -122,48 +121,88 @@ def summary(report):
     return '\n'.join(rows) + '\n'
 
 
-def check_csv(path, expected, header='names', *, column_order=None):
+def csv_delimiter(path):
     text = path.read_text(encoding='utf-8-sig')
-    delimiter = csv.Sniffer().sniff(text[:8192], delimiters=',;\t').delimiter
-    rows = list(csv.reader(io.StringIO(text), delimiter=delimiter))
+    try:
+        return csv.Sniffer().sniff(text[:8192], delimiters=',;\t').delimiter
+    except csv.Error:
+        # A single-column CSV has no delimiter to infer.
+        if not any(char in text for char in ',;\t'): return ','
+        raise
+
+
+def check_csv(path, expected, header='names', *, column_order=None):
+    delimiter = csv_delimiter(path)
+    rows = list(csv.reader(io.StringIO(path.read_text(encoding='utf-8-sig')), delimiter=delimiter))
     columns = expected['columns']
-    names = [c.get('label', c['name']) if header == 'labels' else c['name'] for c in columns]
     assert rows and len(rows[0]) == len(set(rows[0])) == len(columns), 'CSV_COLUMN_ORDER'
-    if (column_order or expected.get('column_order')) == 'any':
-        assert set(rows[0]) == set(names), 'CSV_COLUMN_ORDER'
-        columns = [columns[names.index(name)] for name in rows[0]]
-    else:
-        assert rows[0] == names, 'CSV_COLUMN_ORDER'
     assert all(len(row) == len(columns) for row in rows[1:]), 'CSV_ROW_WIDTH'
     assert len(rows) - 1 == len(expected['rows']), 'CSV_ROW_COUNT'
-    def equal(actual, want):
-        for value, col in zip(actual, columns):
-            target = want[col['name']]
-            if target is None:
-                if value != '': return False
-            elif col['type'] in ['integer', 'real']:
-                try:
-                    number = Decimal(value.replace(',', '.'))
-                    goal = Decimal(str(target))
-                    tolerance = col.get('tolerance', {})
-                    delta = max(Decimal(str(tolerance.get('abs', 0))), Decimal(str(tolerance.get('rel', 0))) * abs(goal))
-                    if not number.is_finite() or abs(number - goal) > delta: return False
-                except ArithmeticError:
-                    return False
-            elif col['type'] == 'datetime':
-                try:
-                    if datetime.fromisoformat(value) != datetime.fromisoformat(target): return False
-                except ValueError:
-                    return False
-            elif isinstance(target, bool):
-                if value.lower() != str(target).lower(): return False
-            elif value != str(target): return False
-        return True
-    remaining = list(expected['rows'])
-    for row in rows[1:]:
-        match = next((i for i, want in enumerate(remaining) if equal(row, want)), None)
-        assert match is not None and (not expected.get('ordered') or match == 0), 'CSV_VALUES_OR_ORDER'
-        remaining.pop(match)
+
+    def equal(value, col, target):
+        if col.get('category_labels_any'): return bool(value.strip())
+        if target is None: return value == ''
+        if col['type'] in ['integer', 'real']:
+            try:
+                number = float(value.replace(',', '.'))
+                goal = float(target)
+                if not math.isfinite(number) or not math.isfinite(goal): return False
+                tolerance = col.get('tolerance', {})
+                absolute, relative = tolerance.get('abs', 0), tolerance.get('rel', 0)
+                difference = abs(number - goal)
+                return (difference <= max(absolute, relative * abs(goal)) if math.isfinite(difference)
+                        else abs(number / 2 - goal / 2) <= max(absolute / 2, relative * (abs(goal) / 2)))
+            except (ValueError, OverflowError):
+                return False
+        if col['type'] == 'datetime':
+            try: return datetime.fromisoformat(value) == datetime.fromisoformat(target)
+            except ValueError: return False
+        if isinstance(target, bool): return value.lower() == str(target).lower()
+        return value == str(target)
+
+    def matching(options, unique=False):
+        # Same augmenting-path and ambiguity policy as expected-outputs.mjs.
+        def run(blocked=None):
+            owners = {}
+            def assign(want, seen):
+                for actual in options[want]:
+                    if actual in seen or (want, actual) == blocked: continue
+                    seen.add(actual)
+                    if actual not in owners or assign(owners[actual], seen):
+                        owners[actual] = want
+                        return True
+                return False
+            if not all(assign(want, set()) for want in range(len(options))): return None
+            return [next(actual for actual, owner in owners.items() if owner == want) for want in range(len(options))]
+        result = run()
+        if result is None or unique and any(run((want, actual)) is not None for want, actual in enumerate(result)): return None
+        return result
+
+    def fits(name, col):
+        return (col.get('label_any') if header == 'labels' else col.get('name_any')) or name == (col.get('label', col['name']) if header == 'labels' else col['name'])
+
+    if (column_order or expected.get('column_order')) == 'exact':
+        assert all(fits(name, col) for name, col in zip(rows[0], columns)), 'CSV_COLUMN_ORDER'
+        indices = list(range(len(columns)))
+    else:
+        flexible = any(c.get('label_any') if header == 'labels' else c.get('name_any') for c in columns)
+        indices = matching([[i for i, name in enumerate(rows[0]) if fits(name, col)
+                             and (not flexible or matching([[j for j, row in enumerate(rows[1:])
+                                  if equal(row[i], col, want[col['name']])] for want in expected['rows']]) is not None)]
+                            for col in columns], unique=flexible)
+        assert indices is not None, 'CSV_COLUMN_ORDER'
+    options = [[j for j, row in enumerate(rows[1:]) if all(equal(row[indices[i]], col, want[col['name']])
+                for i, col in enumerate(columns))] for want in expected['rows']]
+    categories = [i for i, col in enumerate(columns) if col.get('category_labels_any')]
+    pairs = matching(options, unique=bool(categories)) if not expected.get('ordered') else (
+        list(range(len(options))) if all(i in choices for i, choices in enumerate(options)) else None)
+    assert pairs is not None, 'CSV_VALUES_OR_ORDER'
+    for i in categories:
+        forward, reverse = {}, {}
+        for want, actual in enumerate(pairs):
+            key, value = expected['rows'][want][columns[i]['name']], rows[actual + 1][indices[i]]
+            assert forward.get(key, value) == value and reverse.get(value, key) == key, 'CSV_VALUES_OR_ORDER'
+            forward[key], reverse[value] = value, key
     return delimiter
 
 
@@ -355,6 +394,9 @@ class Runner:
             shutil.copyfile(downloaded_csv(profile, destination), actual)
             if re.fullmatch(r'n(?:1[3-9]|20)', src.name):
                 self.phase('oracle', [sys.executable, '-B', src / 'oracle.py', actual], folder, timeout=60)
+                # The CSV oracle owns its documented value/order freedoms.
+                delimiter = csv_delimiter(actual)
+                continue
             # Node-base fixtures describe native port order, not CSV export order.
             # Their task.md leaves export order free; continuation fixtures do not.
             delimiter = check_csv(actual, expected['outputs'][index], header,

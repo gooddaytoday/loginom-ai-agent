@@ -61,7 +61,8 @@ this also retains failures from the base scenario in the final result.
 Supported names: n1–n20, p1–p24, s1–s8, q1–q10, r1–r6, and
 v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
 `stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
-n13–n20 run their CSV-checking oracle plus a separate cold JSON fixture;
+n13–n20 use their CSV-checking oracle as the CSV verdict, without rechecking
+values against the separate cold JSON fixture;
 n14–n17 previously lacked that fixture. Their new fixtures use the independent
 `expected/reference.csv`, preserve all rows/order/nulls, and add field types.
 n17 Due is a local date at midnight; the CSV oracle still requires ISO dates.
@@ -74,3 +75,25 @@ never share a whole profile or `cold-config.json` (they contain credentials).
 
 Offline tests: from `scripts/node-acceptance/tests`, run
 `python3 -m unittest test_run_check -v`.
+
+CSV specification audit (all 86 supported names, including variants):
+
+| Field | Names using it | CSV behavior / stock cold responsibility |
+|---|---:|---|
+| `name`, `label` | 86 / 29 | Check the selected header mode; cold checks both native metadata fields. |
+| `label_any` | 58 | Free labels only in labels mode; names stay bound. Native labels remain governed by stock cold. |
+| `name_any` | 1 (p22) | Bind freely named columns uniquely by complete column values, then check row associations. |
+| `category_labels_any` | 1 (n19) | CSV oracle owns n19; generic matching preserves a nonempty bijection of categories. |
+| `type`, `types` | 86 / 5 | CSV compares serialized values, including numeric equivalents. Stock cold alone verifies native types and allowed type sets. |
+| `tolerance` (`abs`, `rel`) | 20 | Preserve finite numeric values within the declared maximum absolute/relative tolerance; use complete row matching when ranges overlap. |
+| `ordered` | 86 | Preserve sequence when true; otherwise match every row, including duplicates. |
+| `column_order` | 48 | Exact when declared; otherwise map unique headers, as in the stock matcher. Node-base CSV override remains independent of native port order. |
+
+Counts above describe the specifications actually loaded by the runner. All
+static `expected-demo.json` files were also inspected: they introduce no extra
+fields (p17 has `name_any` there, while its current oracle generates fixed names).
+No additional value-set field occurs in these fixtures or generated JSON.
+Native output selectors (`output_node_type`, `output_port`, `export_destination`),
+metadata and precision checks stay with the unchanged stock cold checker. CSV
+cannot establish native types or labels absent from its selected header mode.
+Date/time normalization, nulls, full row counts and widths remain checked.
