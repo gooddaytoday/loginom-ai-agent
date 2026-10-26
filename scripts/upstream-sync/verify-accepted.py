@@ -98,6 +98,9 @@ def main():
         present = collections.Counter(content(entry))
         return [l for l in wanted if l.strip() and not (present[l] > 0 or present[identity(l)] > 0)]
 
+    def differs_from_upstream(r, u):
+        return r[0] != u[0] or bool(missing_from(r, content(u)))
+
     def blank(entry):
         return not any(l.strip() for l in content(entry))
 
@@ -112,7 +115,6 @@ def main():
             problems.append((category, path, detail))
 
     def check_merged(path, f, u, r, added):
-        """Both sides changed the path (or both added it); r is the result's entry."""
         if r is None:
             fail_unless("FAIL merged-deleted", path, "both sides changed it; the result deletes it", theirs)
         elif blank(r) and not blank(f) and not blank(u):
@@ -162,7 +164,7 @@ def main():
                 counts["added"] += 1
             elif r is None:
                 fail_unless("FAIL added-missing", path, "upstream added the file; nothing equal to it exists in the result", {**ours, **theirs})
-            elif r[0] != u[0] or missing_from(r, content(u)):
+            elif differs_from_upstream(r, u):
                 fail_unless("FAIL added-truncated", path, "upstream added the file; the result has the path but its content or mode differs", {**ours, **theirs})
             else:
                 counts["added"] += 1
@@ -190,7 +192,7 @@ def main():
             elif f is None:
                 counts["renamed"] += 1       # the fork deleted the file; the deletion is a catalog matter, not a loss here
             elif f == base.get(old):
-                if r[0] != u[0] or missing_from(r, content(u)):
+                if differs_from_upstream(r, u):
                     fail_unless("FAIL renamed-truncated", new, f"upstream renamed {old}; the result has the file but its content or mode differs", {**ours, **theirs})
                 else:
                     counts["renamed"] += 1
