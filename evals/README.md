@@ -89,6 +89,24 @@ docker create --name loginom-evals-isolated --restart=no \
   sha256:5e3c79877de937aae168ecdcaf70c837bbbcf04e8f4262c2a976ac283ea394c2
 ```
 
+Имя Docker-сети произвольно: legacy admission ищет точный alias
+`loginom-server-7.4.2-test` среди всех сетей выделенного сервера. Для собственного
+стенда создайте отдельный bridge и подключите к нему сервер с этим alias и
+собственную Studio без mounts, с `restart=no` и отдельным loopback-портом;
+`LOGINOM_URL` должен указывать на этот порт. Для нового стенда без предшественника
+поле `previous_container_id` в маркере опускается. Если предшественник указан,
+проверки его остановки и restart policy сохраняются. Общие сервисы продолжат работу.
+
+До eval подтвердите общий NetworkID контейнеров, разрешение alias внутри Studio
+в точный IP выделенного сервера, единственный Apache `ProxyPass`
+`"ws://loginom-server-7.4.2-test:8080/ws/"` и отдаваемый `server.json` с
+`wsproxy: true` после запуска entrypoint Studio. Затем выполните штатные
+`loginom setup`/`loginom check` на новом профиле: browser должен быть `verified`.
+Alias и HTTP 200 сами по себе не подтверждают маршрут браузера. Сохраните evidence;
+по завершении остановите собственную пару, сохранив её данные и квитанции.
+Команды остановки и восстановления прежнего сервера ниже относятся только
+к варианту с общей Studio в `loginom-net`.
+
 Пустой bind `/workdir` скрыл бы конфиги образа. Не копируйте writable layer,
 UserStorage, backups, testdata и socket volume исходного сервера. Для этого
 образа нужны `/app/libxml2.so.16` и `/app/libxml2.so.16.1.2`: перенесите только эти
