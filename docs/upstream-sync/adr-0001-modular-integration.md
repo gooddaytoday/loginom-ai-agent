@@ -2,7 +2,7 @@
 
 ## Статус
 
-Accepted. Направление выбрано координатором LAB-198 по отчёту LAB-199; уточнения автора реализации (LAB-207) и отклонения от плана — в разделах «Решение» и «Открытые решения». В репозитории прежних ADR нет; формат и место (`docs/upstream-sync/`) выбраны здесь.
+Accepted. Направление выбрано координатором LAB-198 по отчёту LAB-199; уточнения автора реализации (LAB-207), реализация швов `ProductHooks` (LAB-280) и отклонения от плана — в разделах «Решение», «Швы ProductHooks» и «Открытые решения». В репозитории прежних ADR нет; формат и место (`docs/upstream-sync/`) выбраны здесь.
 
 ## Дата
 
@@ -20,7 +20,7 @@ Accepted. Направление выбрано координатором LAB-1
 1. **Внутренние имена возвращены к upstream.** Правило: *если пакет, каталог или ключ сервиса существует в OpenCode, он носит имя OpenCode*. Каталог `packages/agent` → `packages/opencode`; пакет `@loginom-ai-agent/agent` → `opencode`; `@loginom-ai-agent/<пакет>` → `@opencode-ai/<пакет>` для 35 пакетов, существующих в upstream; `"@loginom-ai-agent/<Имя>"` → `"@opencode/<Имя>"` для ключей сервисов. Пакеты только форка — `product`, `loginom-host`, `runtime` (`packages/loginom-runtime`), `site`, `evals` — сохраняют область `@loginom-ai-agent`. Преобразование — построчное относительно общей базы (`scripts/upstream-sync/revert-names.py`): строка форка, равная прямому преобразованию строки базы, заменяется строкой базы дословно, поэтому неоднозначное `../agent/agent` (каталог `src/agent`) не портится.
 2. **Внешние имена и литералы `LOGINOM_AI_AGENT_*` не меняются.** Никакого загрузочного сопоставления `LOGINOM_AI_AGENT_*` → `OPENCODE_*` нет (альтернатива C). Изоляция профилей обеспечивается тем, что продукт читает только `LOGINOM_AI_AGENT_*`; требование «очистка унаследованного окружения» выполняется охранным тестом `packages/core/test/flag-identity.test.ts` (унаследованные `OPENCODE_*` не меняют ни один флаг и ни один путь) и `packages/product/test/names.test.ts` (в исходниках нет чтений `OPENCODE_*`, кроме ключей сторонних провайдеров `OPENCODE_API_KEY`, `OPENCODE_GO_API_KEY`). Новый код upstream приводится к именам продукта инструментом `scripts/upstream-sync/apply-identity.py`.
 3. **Особенности Loginom живут в пакетах форка** (`product`: идентичность, каналы, пины выпуска, встроенные скиллы; `loginom-host`: Host, подключения, восстановление, ресурсы; `loginom-runtime`: исполнитель и браузер) **и в минимальных, описанных адаптерах внутри файлов upstream** — они перечислены в [catalog.md](catalog.md) с назначением, причиной, компонентами, способом проверки и политикой владения.
-4. **Шесть швов `ProductHooks` описаны, но не реализованы в этом PR.** См. «Контракты швов» ниже. Причины: (а) цель по метрике достигнута без них (см. «Последствия»); (б) файлы, в которых швы должны появиться (`session/tools.ts`, `session/prompt.ts`, `tool/registry.ts`, `skill/index.ts`, `command/index.ts`), реализуют G1, G3, G4, G6, а проверить перенос на живом Desktop и Loginom в этой единице нельзя (LAB-206 — отдельный стенд); (в) в дельте v1.19.4 эти файлы не конфликтуют, а частота правок upstream в них низкая (LAB-199: `session/tools.ts`, `tool/registry.ts` — по 7 коммитов за последние 1000, `session/prompt.ts` — менее 7), поэтому выигрыш от шва мал, а цена ошибки — ослабленная гарантия. Это перенос реализации, не отказ от направления: условия включения шва — в разделе «Условия пересмотра».
+4. **Шесть швов `ProductHooks` реализованы** (LAB-280), каждый отдельным коммитом с охранным тестом, проверенным на «красное»; таблица — в разделе «Швы ProductHooks». Первая версия этого ADR (LAB-207) откладывала их из-за отсутствия стенда для живой проверки; стенд LAB-206 появился, но живые сценарии этого PR по-прежнему не заменяются: перенос проверен охранными тестами G1–G6 и мутациями, живая проверка кандидата — отдельный этап.
 5. **Каталог оставшихся изменений проверяется машиной.** `docs/upstream-sync/catalog.json` + `scripts/upstream-sync/catalog-check.py`: каждое расхождение с upstream обязано принадлежать записи, пустая запись — ошибка.
 6. **Процедура синхронизации — репетиция в отдельном клоне** ([procedure.md](procedure.md)): фиксация версий по SHA, метрика конфликтов, разбор по классам, проверки, сравнение внешней совместимости, проверка «обновления приняты, а не отброшены». Процедура не меняет рабочую ветку и ничего не публикует.
 7. **Охранные тесты входят в CI.** `packages/product/test/{repo-paths,names}.test.ts` и `packages/core/test/flag-identity.test.ts`; в `turbo.json` добавлена задача `@loginom-ai-agent/product#test`, поэтому и прежние тесты `product` впервые выполняются в `unit`.
@@ -60,9 +60,22 @@ Accepted. Направление выбрано координатором LAB-1
 |---|---:|
 | форк `2e6f66a9` (до) | 69 |
 | после чистого переименования каталога (`ff6d1941`, 891 переименование, все R100) | 63 |
-| после возврата внутренних имён (`c201f28a`) | **19** |
+| после возврата внутренних имён (`c201f28a`) | 19 |
+| после шва 1 `installationNode` (`72a7f03e`) | 17 |
+| после швов 2–6 (`08e1876d`, `ef595a2f`, `8e54950b`, `ab25238a`, `1e01da73`) и снятия зонтичного объекта (`5506e9eb`) | **17** |
 
-Прогноз LAB-199 для того же шага был 21 (синтетический коммит); реальный коммит дал меньше, потому что корневой `package.json` и `ecosystem.mdx` перестали конфликтовать. Остаток — 19 путей: lock-файл (1), манифесты `opencode` и Desktop (2), триггеры CI и `.gitignore` (3), служба установки (2), код форка внутри файлов upstream (5), тесты с одинаковой правкой на обеих сторонах (2), внешние имена (4).
+Прогноз LAB-199 для того же шага был 21 (синтетический коммит); реальный коммит дал меньше, потому что корневой `package.json` и `ecosystem.mdx` перестали конфликтовать. Остаток — 19 путей: lock-файл (1), манифесты `opencode` и Desktop (2), триггеры CI и `.gitignore` (3), служба установки (2; после шва 1 — 0), код форка внутри файлов upstream (5), тесты с одинаковой правкой на обеих сторонах (2), внешние имена (4).
+
+Швы 2–6 не меняют метрику на этой дельте: v1.19.4 не правит `skill/`, `command/`, `session/tools.ts`, `session/prompt.ts` (проверено `git diff 501ff62c 148842ef`). Их цель — другая: сократить построчное расхождение с upstream в файлах, которые v1.19.4 не затронул, но затронут следующие выпуски.
+
+| Файл upstream | строк расхождения с базой `501ff62c`: `f7f9c760` → итог |
+|---|---:|
+| `installation/index.ts` | 280 → 7 |
+| `test/installation/installation.test.ts` | 247 → 2 |
+| `session/prompt.ts` | 421 → 176 |
+| `session/tools.ts` | 233 → 95 |
+| `skill/index.ts` | 96 → 73 |
+| `command/index.ts` | 29 → 18 |
 
 **Расхождения с upstream в существующих файлах:** 2650 → 1200 (`catalog-check.py`).
 
@@ -75,22 +88,30 @@ Accepted. Направление выбрано координатором LAB-1
 - Размещение зависимостей в `bun.lock` (hoisting) определяется bun 1.3.14; набор разрешённых `name@version` сохранён.
 
 **Риски.**
-- Оставшиеся 19 конфликтов и файлы CAT-05 не защищены швами: при росте частоты правок upstream в `session/*` метрика ухудшится.
+- Швы 2–6 уменьшают, но не убирают расхождение в `session/*`, `skill/`, `command/`: остаются передача `source` по цепочке загрузки скиллов, нормализация метаданных частей и вызовы швов. Выигрыш от них проверяется только на выпусках, которые эти файлы затрагивают; на v1.19.4 он не наблюдаем.
+- Интерфейс шва 1 повторяет `Installation.Interface` upstream: когда v1.19.4 добавит `upgradeMajor`, `product/installation.ts` перестанет собираться, пока метод не реализован (typecheck укажет на него).
 - Оценка LAB-199 для типичного окна upstream после возврата только внутренних имён — около 47 конфликтов (при медианной дельте); удержание ≤ 34 в среднем требует политик из каталога (манифесты, CI, словари) или швов. Доля конфликтов на затронутый файл (0,38–0,43) проверяется репетицией и следующими выпусками.
 - Живая проверка установленного Desktop, macOS и Windows в этой единице не проводилась (`NOT_RUN`).
 
-## Контракты швов `ProductHooks` (проект, не реализован)
+## Швы ProductHooks
 
-Один Effect-сервис `ProductHooks` в новом файле `packages/opencode/src/product-hooks.ts` с пустой реализацией по умолчанию; реализация — в `loginom-host` и `product`, слой подключается в корне сборки приложения. Каждый шов вводится отдельным небольшим коммитом, одним исполнителем общих файлов, вместе с охранным тестом, проверенным на «красное»; порядок — от наименее рискованного.
+Шов — модуль форка в `packages/opencode/src/product/`, который файл upstream импортирует напрямую и вызывает вместо встроенного кода Loginom. Реализация по умолчанию и есть продуктовая: ни один корень композиции ничего не подключает, поэтому слой, пропущенный в одном из рантаймов, не может молча «разрешить всё».
 
-| № | Шов | Методы | Места вызова сейчас | Инвариант, который нельзя ослабить | Охранные тесты |
-|---|---|---|---|---|---|
-| 1 | `installationLayer` | подмена слоя `Installation` | `installation/index.ts:69`; корни композиции `effect/app-runtime.ts:105`, `server/routes/instance/httpapi/server.ts:260` | CLI не обращается к каналам upstream | `test/installation/installation.test.ts` |
-| 2 | `SkillSourcePolicy` | `skillSource(origin)` | `skill/index.ts:142,312`; `command/index.ts` | зарезервированные имена принимаются только от `bundled`; повреждённая копия — отказ без запасного пути | G6 |
-| 3 | `ToolPolicy` | `toolPolicy(profile, id, origin)` | `session/tools.ts:154,164,172,464,699`; штамп `origin` в `tool/registry.ts:260-261` | двухуровневая проверка: фильтр набора модели и проверка при вызове | G1 |
-| 4 | `ToolContributor` | `contributeTools(ctx)` | `session/tools.ts:567` | инструменты Dock доступны только после успешного `prepare`; путь от модели не даёт доступа к файлу | G1 |
-| 5 | `AttachmentResolver` | `resolveAttachment(part)` | `session/prompt.ts` (`fileSnapshot`, `attachmentPreview`), `util/file-snapshot.ts` | передача датасета привязана к байтам исходного вложения пользователя | G1 |
-| 6 | `TurnLifecycle` | `acquireRun`, `beforeTurn`, `afterTool`, `releaseRun` | `session/prompt.ts:1180` (аренда Host), `:1347` (напоминание о восстановлении), `:1648` (`loop`) | аренда освобождается при любой отмене; профиль применяется на границе хода | G1, G3, G4 |
+**Отклонения от первоначального проекта (LAB-207).**
+- **Не Effect-сервис, а модули.** Проект предлагал сервис `ProductHooks` с пустой реализацией по умолчанию и слоем в корне сборки. В `packages/opencode/src` рантаймы строятся не менее чем в десяти местах (`makeRuntime(…)`, `AppNodeBuilder.build(…)`: `installation/index.ts`, `effect/app-runtime.ts`, `server/routes/instance/httpapi/server.ts`, `acp/service.ts`, `config/tui.ts`, `cli/cmd/run/*` и др.); слой с пустой реализацией в любом из них дал бы для G1 и G6 «разрешить всё» при зелёных модульных тестах (fail-open), а охранные тесты, собирающие свои слои, пришлось бы править. Модуль, импортируемый напрямую, такого состояния не имеет.
+- **Нет файла `product-hooks.ts`.** Объект-«зонтик» `ProductHooks`, импортирующий все швы, был введён и убран: загрузка `skill/index.ts` первым тянула через него `session/*` и падала с `Cannot access 'node' before initialization` (`agent.ts` читает `Skill.node`). Каждый файл upstream импортирует только свой шов; порядок загрузки охраняет `packages/opencode/test/product/load-order.test.ts` (шов, импортирующий `session/prompt`, даёт 5 падений на 12 учтённых случаях).
+- **Состав методов уточнён по коду.** Таблица ниже — фактический контракт; прежние имена методов из проекта указаны в последнем столбце.
+
+| № | Шов (модуль) | Контракт | Файлы upstream, которые его вызывают | Инвариант | Охранные тесты (новые / прежние) | Имя в проекте |
+|---|---|---|---|---|---|---|
+| 1 | `installationNode` (`product/installation.ts`) | узел слоя `Installation`: версия установленная, метод `unknown`, `upgrade` всегда `UpgradeFailedError`; в upstream остаётся нетронутый `upstreamNode` | `installation/index.ts` (`node = installationNode({ Service, UpgradeFailedError })`) | CLI не обращается к каналам upstream | `test/installation/product-installation.test.ts` (в том числе через `AppRuntime`) / `test/installation/installation.test.ts` — upstream-версия, идёт против `upstreamNode` | `installationLayer` |
+| 2 | `skillSource` (`product/skill-source.ts`) | `admits(name, source)`, `isReserved(name)`, `refuseSkill`, `refuseCommand`, `bundled(resources, events)`, `notFoundHint(name)`, `commandSubtask(skill)` | `skill/index.ts`, `command/index.ts` | зарезервированные имена принимаются только от `bundled`; повреждённый каталог — пустой список и событие ошибки, без запасного пути | `test/product/skill-source.test.ts` / `test/skill/bundled-skills.test.ts`, `test/cli/bundled-skills.test.ts` | `SkillSourcePolicy` |
+| 3 | `toolPolicy` (`product/tool-policy.ts`) | `permits(profile, id, origin)`, `permitsLoginom(profile, name)`, `isLocalLoginom(name)`, `allowsMcp(profile)`, `denied()` | `session/tools.ts` (фильтр набора, проверка при вызове, MCP) | двухуровневая проверка: набор модели и вызов | `test/product/tool-policy.test.ts` / `test/session/profile-tools.test.ts` | `ToolPolicy` |
+| 4 | `toolContributor` (`product/tool-contributor.ts`) | `contribute(input)` добавляет каталог Host в набор модели; `definitions(profile)` — исполнитель `package-docs` | `session/tools.ts` | инструменты Dock — только после успешного `prepare`; токен Host не виден модели; ошибка каталога не добавляет инструментов | `test/product/tool-contributor.test.ts` / `test/session/tools.test.ts` | `ToolContributor` |
+| 5 | `attachmentResolver` (`product/attachment-resolver.ts`) | `mentionMime`, `packageParts`, `dataContext`, `snapshot`, `retainCompacted`, `subtaskText` | `session/prompt.ts` | передача датасета привязана к байтам исходного вложения; пакет сценария не читается в разговор | `test/product/attachment-resolver.test.ts` / `test/session/prompt.test.ts`, `test/util/attachment-preview.test.ts` | `AttachmentResolver` |
+| 6 | `turnLifecycle` (`product/turn-lifecycle.ts`) | `acquireRun` (аренда Host, освобождается при закрытии области), `beforeTurn`, `afterTool`, `endTurn`, `system` | `session/prompt.ts` | аренда освобождается при любой отмене; профиль применяется на границе хода; напоминание о восстановлении — один раз за попытку | `test/product/turn-lifecycle.test.ts` / `test/session/prompt.test.ts`, `browser-recovery.test.ts` | `TurnLifecycle` (`releaseRun` — финализатор `acquireRun`; `endTurn` добавлен) |
+
+Не вынесено и остаётся описанным в каталоге: ярлыки происхождения инструмента в `tool/registry.ts` (`origin`, `allowed`) — это механизм, которым пользуется `toolPolicy`; передача `source` по цепочке `scan` → `add` в `skill/index.ts`; нормализация метаданных частей (`TaskScope.sanitize`, `cleanMetadata`) в `prompt.ts` и `tools.ts`; мост TUI (`cli/cmd/tui.ts`).
 
 ## Открытые решения владельца
 
@@ -101,7 +122,7 @@ Accepted. Направление выбрано координатором LAB-1
 
 ## Условия пересмотра
 
-- Репетиция обновления или два следующих выпуска дают более 34 конфликтных путей либо долю конфликтов на затронутый файл вне диапазона 0,3–0,55: ввести политики CAT-01/02/03 и швы из таблицы, начиная с `installationLayer` и `SkillSourcePolicy`.
-- Появится стенд живых сценариев Desktop и Loginom (LAB-206): включить швы 3–6 по одному с охранными тестами и живой проверкой.
+- Репетиция обновления или два следующих выпуска дают более 34 конфликтных путей либо долю конфликтов на затронутый файл вне диапазона 0,3–0,55: ввести политики CAT-01/02/03 и вынести оставшиеся участки CAT-05/06 (передача `source`, нормализация метаданных частей) за границы швов.
+- Живая проверка кандидата (Desktop и Loginom на стенде LAB-206) показала расхождение с v0.3.3 в поведении, которое прикрывает шов: откатить соответствующий коммит (швы независимы) и разобрать причину.
 - Upstream переименует каталоги или пакеты: `repo-paths.test.ts` и `names.test.ts` укажут, что обновить; `catalog.json` получает новое значение `against`.
 - Если решение C (сопоставление окружения) снова станет предметом обсуждения: сначала новая оценка риска G2 и замена буквальной проверки ENV-01 на проверку по артефактам.
