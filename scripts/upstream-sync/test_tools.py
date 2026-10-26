@@ -4,6 +4,7 @@
 Every test builds a base commit, a fork commit and an upstream commit, then a "resolution" the way a person would leave it,
 and asserts what the tool reports. Run: python3 -I scripts/upstream-sync/test_tools.py
 """
+import json
 import os
 import subprocess
 import sys
@@ -296,6 +297,70 @@ class AcceptedModesAndRenames(FixtureCase):
         fx = self.seed_rename(lambda: self.fx.write("src/old.ts", lines_with(1, "fork 1"))); fx.resolve({"src/new.ts": ""})
         self.assertEqual(fx.accepted()[0], 1)
 
+
+
+class CatalogCheckUncommittedMerge(FixtureCase):
+    def seed(self):
+        """Upstream has a.txt, b.txt, x.txt; the fork committed a change to a.txt and describes only that in the catalog."""
+        fx = self.fx
+        fx.write("a.txt", BODY); fx.write("b.txt", BODY); fx.write("x.txt", BODY)
+        fx.git("add", "-A"); fx.git("commit", "-q", "-m", "upstream")
+        self.upstream = fx.git("rev-parse", "HEAD")
+        fx.write("a.txt", lines_with(1, "fork 1"))
+        fx.write("docs/upstream-sync/catalog.md", "## CAT-01 a\n")
+        self.entry(["a.txt"])
+        fx.git("add", "-A"); fx.git("commit", "-q", "-m", "fork")
+        return fx
+
+    def entry(self, paths):
+        self.fx.write("docs/upstream-sync/catalog.json", json.dumps({"against": self.upstream, "entries": [{"id": "CAT-01", "paths": paths}]}))
+
+    def check(self):
+        p = subprocess.run([sys.executable, "-I", str(HERE / "catalog-check.py"), "--repo", str(self.fx.dir), "--against", self.upstream],
+                           capture_output=True, text=True, env=ENV)
+        return p.returncode, p.stdout + p.stderr
+
+    def test_passes_when_every_divergence_is_described(self):
+        self.seed()
+        self.assertEqual(self.check()[0], 0)
+
+    def test_sees_a_staged_change_before_the_merge_commit(self):
+        fx = self.seed()
+        fx.write("b.txt", lines_with(2, "resolution 2")); fx.git("add", "b.txt")
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("b.txt", out)
+
+    def test_sees_an_unstaged_change_before_the_merge_commit(self):
+        fx = self.seed()
+        fx.write("b.txt", lines_with(2, "resolution 2"))
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("b.txt", out)
+
+    def test_sees_a_file_deleted_by_the_resolution(self):
+        fx = self.seed()
+        (fx.dir / "b.txt").unlink()
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("b.txt", out)
+
+    def test_follows_a_rename_that_ends_in_an_untracked_file(self):
+        fx = self.seed()
+        self.entry(["a.txt", "y.txt"])
+        fx.git("add", "-A"); fx.git("commit", "-q", "-m", "catalog")
+        fx.git("rm", "-q", "x.txt"); fx.write("y.txt", lines_with(1, "moved 1"))
+        code, out = self.check()
+        self.assertEqual(code, 0, out)
+        self.assertIn("2 divergent upstream files", out)
+        self.assertEqual(fx.git("diff", "--cached", "--name-only"), "x.txt")
+        self.assertEqual(fx.git("ls-files", "--others", "--exclude-standard"), "y.txt")
+
+    def test_leaves_the_index_alone(self):
+        fx = self.seed()
+        fx.write("untracked.txt", "new\n")
+        self.check()
+        self.assertEqual(fx.git("diff", "--cached", "--name-only"), "")
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
