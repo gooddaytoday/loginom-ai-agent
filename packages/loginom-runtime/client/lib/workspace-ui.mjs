@@ -788,6 +788,22 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         controls:Object.fromEntries(wizardButtons.map(name=>{const found=matching(';'+name);return [name,
           {status:found.length===1?'observed':found.length?'ambiguous':'unobserved',enabled:found.length===1?enabled(found[0]):null}];}))};
     }
+    const nativeOverflowNode=element=>{
+      if(wizard.status!=='observed'||!preparedNodeId
+        ||!(preparedNodeWizard||preparedInputPort?.direction==='input'||preparedOutputPort?.direction==='output')
+        ||getComputedStyle(element).display!=='none'||getComputedStyle(element).visibility!=='visible'
+        ||getComputedStyle(element).opacity==='0'||element.hasAttribute('hidden')||sensitive(element)||!visibleAncestors(element.parentElement))return false;
+      const icons=element.querySelectorAll('[class*="bg-vendor-icon-"]');
+      if(icons.length!==1||getComputedStyle(icons[0]).display==='none'||getComputedStyle(icons[0]).visibility!=='visible'
+        ||getComputedStyle(icons[0]).opacity==='0'||icons[0].hasAttribute('hidden')||sensitive(icons[0]))return false;
+      const app=globalThis.bg?.app,component=globalThis.Ext?.getCmp?.(element.id);
+      let node=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab()?.Controller?.Node?.data?.node;
+      for(let i=0;node&&i<4;i++,node=node.ParentNode) {
+        if(app.ModelNodeTreeNode&&node instanceof app.ModelNodeTreeNode)
+          return node.FGuid===preparedNodeId&&component?.el?.dom===element&&component?._node?.data?.node===node;
+      }
+      return false;
+    };
     // Source validation is data from this exact visible wizard field. Do not
     // infer it from global alerts, tooltip HTML or a hidden wizard card.
     if(wizard.status==='observed' && wizard.stage==='text_import_file') {
@@ -868,19 +884,19 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&e.textContent.trim()==='Выходные порты'&&(getTid(e)??'').endsWith('>Выходные_порты')
           &&e.querySelectorAll('.maptree-icon-modeloutputports').length===1
           &&(tids.get((getTid(e)??'').slice(0,-'>Выходные_порты'.length))??[]).filter(parent=>panels[0].contains(parent)
-            &&(visible(parent)||hiddenExportNode(parent))&&parent.querySelectorAll('.'+preparedOutputPort.node_icon_class).length===1).length===1;
+            &&(visible(parent)||hiddenExportNode(parent)||nativeOverflowNode(parent))&&parent.querySelectorAll('.'+preparedOutputPort.node_icon_class).length===1).length===1;
         const overflowNodeSettings=e=>preparedNodeWizard===true&&getComputedStyle(e).display==='none'
           &&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
           &&e.textContent.trim()==='Настройка'&&(getTid(e)??'').endsWith('>Настройка')
           &&e.querySelectorAll('.maptree-icon-wizard').length===1
           &&(tids.get((getTid(e)??'').slice(0,-'>Настройка'.length))??[]).filter(parent=>panels[0].contains(parent)
-            &&(visible(parent)||hiddenExportNode(parent))&&parent.querySelectorAll('[class*="bg-vendor-icon-"]').length===1).length===1;
+            &&(visible(parent)||hiddenExportNode(parent)||nativeOverflowNode(parent))&&parent.querySelectorAll('[class*="bg-vendor-icon-"]').length===1).length===1;
         const crumbs=all.filter(e=>{charge();return (getTid(e)??'').startsWith(prefix) && panels[0].contains(e) && !sensitive(e)
-          && (visible(e)||hiddenExportNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
+          && (visible(e)||hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
             &&e.querySelectorAll('.maptree-icon-wizard').length===1);});
         if(crumbs.length>32)ownerContext.status='bounded';
         else if(crumbs.length) {
-          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
+          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
             overflow_context:overflowSocket(e),
             wizard_icon:e.querySelectorAll('.maptree-icon-wizard').length===1,
             workflow_icon:e.querySelectorAll('.maptree-icon-workflow').length===1,
@@ -1001,13 +1017,13 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
           &&crumbs.length===9&&crumbs[5].querySelectorAll('.bg-vendor-icon-restclient').length===1;
         if(crumbs.length>32)context.status='bounded';
-        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
+        else if(crumbs.length===9&&crumbs.every((e,i)=>(inside(e,panel)||i===5&&(hiddenExportNode(e)||nativeOverflowNode(e)||hiddenInputNode(e))||(i>=7||i===6&&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
               ||singleInputOverflow||joinInputOverflow||restInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1))&&preparedInputPort?.direction==='input'&&!sensitive(e))&&(getTid(e)??'').startsWith(prefix))) {
           // Ext may hide the final input/wizard breadcrumbs in the overflow menu.
           // Join input roles have fixed captions; retain the native port and node icon binding.
           const hiddenCaption=(e,i)=>preparedInputPort?.direction==='input'&&!visible(e)
-            &&(i===5&&(hiddenExportNode(e)||hiddenInputNode(e))||i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
+            &&(i===5&&(hiddenExportNode(e)||nativeOverflowNode(e)||hiddenInputNode(e))||i===6&&e.textContent.trim()==='Входные порты'&&e.querySelectorAll('.maptree-icon-modelinputports').length===1
               &&(crumbs[5].querySelectorAll('.bg-vendor-icon-uniondata').length===1
               ||singleInputOverflow||joinInputOverflow||restInputOverflow
               ||preparedInputPort?.port===0&&preparedInputPort.native_index===1&&crumbs[5].querySelectorAll('.bg-vendor-icon-exporttextfile').length===1)
@@ -1036,7 +1052,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
             &&folder.tid===node.tid+'>Входные_порты'&&port.tid===folder.tid+'>'+format(port.label)
             &&last.tid===port.tid+'>Настройка';
           const iconCount=(e,selector)=>{const found=e.querySelectorAll(selector);charge();return found.length===1
-            &&(inside(found[0],e)||e===crumbs[5]&&(hiddenExportNode(e)||hiddenInputNode(e))||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
+            &&(inside(found[0],e)||e===crumbs[5]&&(hiddenExportNode(e)||nativeOverflowNode(e)||hiddenInputNode(e))||e===crumbs[8]&&preparedInputPort?.direction==='input')?1:0;};
           const icons=iconCount(crumbs[4],'.maptree-icon-workflow')===1
             &&iconCount(crumbs[5],'[class*="bg-vendor-icon-"]')===1
             &&iconCount(crumbs[8],'.maptree-icon-wizard')===1;
