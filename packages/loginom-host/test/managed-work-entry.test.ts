@@ -27,11 +27,21 @@ test("actual managed entry reads live bridge work and dispatching over private I
       new URL("../../loginom-runtime/src/call-timeout.mjs", import.meta.url),
       "utf8",
     ),
-    "runtime/src/resources.mjs": "export async function verifyResources() { return {} }",
+    "runtime/src/resources.mjs": `export async function verifyResources() {
+      return { manifestHash: 'fixture', manifest: { actionManifestSha256: 'fixture' } };
+    }`,
     "runtime/src/connection-check.mjs": `
       export const loginomAddress = value => value;
       export const loginBrowser = async () => ({ context: { close: async () => {} } });`,
     "runtime/client/package.json": JSON.stringify({ type: "module" }),
+    "runtime/client/lib/execution-journal.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/execution-journal.mjs", import.meta.url),
+      "utf8",
+    ),
+    "runtime/client/lib/redact.mjs": await readFile(
+      new URL("../../loginom-runtime/client/lib/redact.mjs", import.meta.url),
+      "utf8",
+    ),
     "runtime/client/lib/session.mjs": `
       import { readFileSync } from 'node:fs';
       export async function createSession() {
@@ -67,7 +77,7 @@ test("actual managed entry reads live bridge work and dispatching over private I
     "runtime/client/node_modules/@playwright/mcp/index.js":
       "exports.createConnection = async () => ({ connect: async () => {}, close: async () => {} })",
   }
-  // Entry, validator, timeout and resource cleanup are byte-identical copies.
+  // Entry, validator, timeout, journal/redactor and resource cleanup are byte-identical copies.
   // Only external browser/MCP/bridge boundaries are controlled.
   for (const [name, contents] of Object.entries(files)) {
     const target = join(directory, name)

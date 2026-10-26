@@ -8,6 +8,7 @@ import { verifyResources } from "./resources.mjs"
 import { validateStartInput } from "./start-input.mjs"
 import { closeManagedResources } from "./managed-resources-close.mjs"
 import { runtimeCallTimeout } from "./call-timeout.mjs"
+import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
 import { loginBrowser, loginomAddress } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
 import { admitStartupArtifacts } from "../client/lib/artifacts.mjs"
@@ -95,6 +96,8 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
+      // Match the existing supervisor allowance; retries never restart it.
+      const deadline = Date.now() + (input.validation === true ? 210_000 : 120_000)
       const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery } = validateStartInput(input)
       const resources = await verifyResources(input.resources)
       // A new process must never overwrite the receipts or browser state of a crashed attempt.
@@ -120,6 +123,9 @@ async function handle(message) {
         candidate: input.connection,
         headless: input.headless === true,
         signal: state.startupController.signal,
+        deadline,
+        onRetry: createExecutionJournal({ directory, metadata: { sessionId: input.chat,
+          clientRevision: resources.manifestHash, actionManifestDigest: resources.manifest.actionManifestSha256 } }),
       }
       if (input.validation === true) {
         await loginBrowser(login)
