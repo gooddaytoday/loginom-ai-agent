@@ -1,8 +1,6 @@
 import { ProductHooks } from "@/product-hooks"
-import { loginomResultState, loginomResultSummary } from "./loginom-result"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
 import { hostError } from "@loginom-ai-agent/loginom-host/errors"
-import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js"
 import { Agent } from "@/agent/agent"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Provider } from "@/provider/provider"
@@ -18,7 +16,7 @@ import { Truncate } from "@/tool/truncate"
 
 import { Plugin } from "@/plugin"
 import type { TaskPromptOps } from "@/tool/task"
-import { type Tool as AITool, type JSONSchema7, tool, jsonSchema, type ToolExecutionOptions, asSchema } from "ai"
+import { type Tool as AITool, tool, jsonSchema, type ToolExecutionOptions, asSchema } from "ai"
 import { Effect } from "effect"
 import { MessageV2 } from "./message-v2"
 import { Session } from "./session"
@@ -141,11 +139,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     permission: input.session.permission,
     allowed: (item) => ProductHooks.toolPolicy.permits(profile, item.id, item.origin),
   })
-  if (profile === "package-docs") {
-    const { PackageDocsTool } = yield* Effect.promise(() => import("@/tool/package-docs"))
-    const docs = yield* PackageDocsTool
-    definitions.push({ ...(yield* Tool.init(docs)), origin: "builtin" })
-  }
+  definitions.push(...(yield* ProductHooks.toolContributor.definitions(profile)))
   for (const item of definitions) {
     const origin = item.origin
     const id = item.id
@@ -551,135 +545,21 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     tools[key] = item
   }
 
-  const loginom = input.loginom
-  if (loginom) {
-    if (input.loginomStatus) delete input.loginomStatus.failure
-    const failed = (phase: string, error: unknown) => {
-      if (input.loginomStatus) input.loginomStatus.failure = phase + ": " + hostError(error)
-    }
-    const catalog = yield* Effect.promise(() =>
-      loginom
-        .tools()
-        .then((value) => ListToolsResultSchema.parse(value))
-        .catch((error) => {
-          failed("catalog", error)
-          return undefined
-        }),
-    )
-    if (!catalog) return tools
-    const admissions = history.flatMap((message) => {
-      if (message.info.role !== "user" || TaskScope.replayOf(message)) return []
-      const files = message.parts.flatMap((part) => {
-        if (
-          part.type !== "file" ||
-          !part.url.startsWith("data:") ||
-          !part.filename ||
-          part.filename.toLowerCase().endsWith(".lgp") ||
-          part.mime.toLowerCase().split(";")[0] === "application/x-loginom-package"
-        )
-          return []
-        const match = part.url.match(/^data:([^,]*);base64,([A-Za-z0-9+/=]*)$/)
-        if (!match || match[1].toLowerCase().split(";")[0] === "application/x-loginom-package") return []
-        return [{ name: part.filename, data: match[2] }]
-      })
-      return files.length ? [{ userMessage: message.info.id, files }] : []
-    })
-    if (task && catalog)
-      for (const definition of catalog.tools) {
-        if (!ProductHooks.toolPolicy.permitsLoginom(profile, definition.name)) continue
-        // Browser recovery screenshots reach the model as real image content; a
-        // text-only model keeps working from the DOM instead of an unreadable image.
-        if (definition.name === "browser_take_screenshot" && !input.model.capabilities.input.image) continue
-        const key = `loginom_${definition.name}`
-        tools[key] = tool({
-          description: definition.description,
-          inputSchema: jsonSchema(
-            ProviderTransform.schema(input.model, {
-              ...definition.inputSchema,
-              properties: Object.fromEntries(
-                Object.entries(definition.inputSchema.properties ?? {}).filter(
-                  ([name]) => name !== "host_context_token",
-                ),
-              ),
-              required: definition.inputSchema.required?.filter((name) => name !== "host_context_token"),
-            } as JSONSchema7),
-          ),
-          execute(args, options) {
-            return run.promise(
-              Effect.gen(function* () {
-                if (!ProductHooks.toolPolicy.permitsLoginom(profile, definition.name))
-                  return yield* Effect.die(ProductHooks.toolPolicy.denied())
-                const ctx = context(args, options)
-                yield* plugin.trigger(
-                  "tool.execute.before",
-                  { tool: key, sessionID: ctx.sessionID, callID: options.toolCallId },
-                  { args },
-                )
-                yield* ctx.ask({ permission: key, metadata: {}, patterns: ["*"], always: ["*"] })
-                const result = yield* Effect.promise(async () =>
-                  CallToolResultSchema.parse(
-                    await loginom.call(
-                      definition.name,
-                      args,
-                      task.taskMessageID,
-                      options.abortSignal,
-                      ProductHooks.toolPolicy.isLocalLoginom(definition.name) ? undefined : admissions,
-                    ),
-                  ),
-                )
-                yield* plugin.trigger(
-                  "tool.execute.after",
-                  { tool: key, sessionID: ctx.sessionID, callID: options.toolCallId, args },
-                  result,
-                )
-                const text = result.content.flatMap((block) => (block.type === "text" ? [block.text] : []))
-                const truncated = yield* truncate.output(text.join("\n\n"), {}, input.agent)
-                const state = loginomResultState(result)
-                const summary = truncated.truncated ? loginomResultSummary(result) : undefined
-                const content =
-                  truncated.truncated && summary
-                    ? `${summary}\n\nTable data and verbose details were omitted by the backend response limit. The complete original result is retained at ${truncated.outputPath}. Do not infer unread data or repeat mutations solely to retrieve omitted text.`
-                    : truncated.content
-                if (state === "failed") {
-                  yield* ctx.metadata({
-                    title: definition.name,
-                    metadata: { generation: loginom.generation, isError: true },
-                  })
-                  throw new Error(content || "LOGINOM_TOOL_FAILED")
-                }
-                const output = {
-                  title: definition.name,
-                  output: content,
-                  metadata: {
-                    generation: loginom.generation,
-                    truncated: truncated.truncated,
-                    ...(state === "pending" ? { loginomPending: true } : {}),
-                    ...(truncated.truncated ? { outputPath: truncated.outputPath } : {}),
-                  },
-                  attachments: result.content.flatMap((block) =>
-                    block.type === "image"
-                      ? [
-                          {
-                            type: "file" as const,
-                            mime: block.mimeType,
-                            url: `data:${block.mimeType};base64,${block.data}`,
-                            id: PartID.ascending(),
-                            sessionID: ctx.sessionID,
-                            messageID: input.processor.message.id,
-                          },
-                        ]
-                      : [],
-                  ),
-                  content: result.content,
-                }
-                if (options.abortSignal?.aborted) yield* input.processor.completeToolCall(options.toolCallId, output)
-                return output
-              }),
-            )
-          },
-        })
-      }
-  }
+  yield* ProductHooks.toolContributor.contribute({
+    tools,
+    loginom: input.loginom,
+    loginomStatus: input.loginomStatus,
+    agent: input.agent,
+    model: input.model,
+    processor: input.processor,
+    history,
+    task,
+    profile,
+    run,
+    plugin,
+    truncate,
+    context,
+  })
 
   return tools
 })
