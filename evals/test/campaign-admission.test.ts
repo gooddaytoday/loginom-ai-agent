@@ -274,3 +274,11 @@ test("campaign quality includes scored FAIL and excludes technical failure", () 
   for (const status of ["infra_error", "harness_error", "interrupted"] as const) expect(isQualityResult({ ...qualityFail, status })).toBe(false)
   expect(isQualityResult({ ...qualityFail, judge_status: "error" })).toBe(false)
 })
+
+test("historical failed connection startup is not quality while ordinary FAIL remains counted", () => {
+  const saved = { ...emptyResult("task", 1, false), status: "failed" as const, judge_status: "no_artifact" as const,
+    pass: false, score: 0, errors: ["LOGINOM_CONNECTION_NOT_READY"] }
+  expect(isQualityResult(saved)).toBe(false)
+  expect(isQualityResult({ ...saved, errors: ["ToolError"] })).toBe(true)
+  expect(isQualityResult({ ...saved, status: "completed", judge_status: "scored" })).toBe(true)
+})
