@@ -2006,8 +2006,8 @@
   },
   "packages/loginom-runtime/client/test/workspace.test.mjs": {
     "baseHash": "1fb5d7d07fb6fa868127a15b31b6ba6e880c1d25f292518f9edcf40f42b0e29d",
-    "hash": "96715b1ee16bb81ef11106c127847983c9002d1b8ac60dae8a2b9ee92a645bc2",
-    "reason": "Regress private login followed by workspace preparation using the same canonical public/custom URL; preserve strict foreign-page rejection. D78: bind only the submitted Open native renderer error, dismiss its sole owned OK once and wait its own TabForm mask within the original cleanup deadline; retain all other refusals and test no replay. Issue #74: private local-package preparation reuses authenticated storage binding, original upload receipts and native FileStore completion without download; preserve ownership, uncertainty, cleanup and shared deadlines. Related behavioral regressions cover the changed boundary. Source attribution is not installed acceptance."
+    "hash": "e4cce62780df54f7e2c6b0fde221a5305ab9f0eeed8dc0c19913e971c8fddf41",
+    "reason": "Regress private login followed by workspace preparation using the same canonical public/custom URL; preserve strict foreign-page rejection. D78: bind only the submitted Open native renderer error, dismiss its sole owned OK once and wait its own TabForm mask within the original cleanup deadline; retain all other refusals and test no replay. Issue #74: private local-package preparation reuses authenticated storage binding, original upload receipts and native FileStore completion without download; preserve ownership, uncertainty, cleanup and shared deadlines. Related behavioral regressions cover the changed boundary. Source attribution is not installed acceptance. Regress original-ID server-path continuation after a confirmed pre-open refusal through native preparation and prepareWorkspaceSession; retain the original foreign graph baseline and refuse uncertain reserved attempts without another gesture."
   },
   "packages/product/skills/loginom-automation/SKILL.md": {
     "baseHash": "b6c82e54976d232bcac64b536cc3dca7d638c62ae935d98e30db2affd24cfebb",
@@ -2416,8 +2416,8 @@
   },
   "packages/loginom-runtime/client/lib/workspace.mjs": {
     "baseHash": "1dd8c3bdf0b5045d3cba24dadce0cf910e9ca1ffd61b87d858c5fcd2515fb482",
-    "reason": " D78: bind only the submitted Open native renderer error, dismiss its sole owned OK once and wait its own TabForm mask within the original cleanup deadline; retain all other refusals and test no replay. Issue #74: private local-package preparation reuses authenticated storage binding, original upload receipts and native FileStore completion without download; preserve ownership, uncertainty, cleanup and shared deadlines. Related behavioral regressions cover the changed boundary. Source attribution is not installed acceptance.",
-    "hash": "c314fe9bb75b3f089714f0b7fe1022d8039ec9575ee08d249216407baf992686"
+    "reason": " D78: bind only the submitted Open native renderer error, dismiss its sole owned OK once and wait its own TabForm mask within the original cleanup deadline; retain all other refusals and test no replay. Issue #74: private local-package preparation reuses authenticated storage binding, original upload receipts and native FileStore completion without download; preserve ownership, uncertainty, cleanup and shared deadlines. Related behavioral regressions cover the changed boundary. Source attribution is not installed acceptance. Permit an original reserved open_package receipt to continue only after confirmed no-effect refusal; recheck its original foreign graphs before opening and retain recoverOnly reconciliation for uncertain outcomes.",
+    "hash": "a582e8ca6ce2b2d020aa5b9e40d4cb271aaea2fa1981667fce1cb88432534f12"
   },
   "packages/loginom-runtime/client/test/package-cleanup.test.mjs": {
     "baseHash": "279ccf1f2270864aba986bf6e002b76d01d0b0a23b03b3232ce6a81daaa6f8b3",

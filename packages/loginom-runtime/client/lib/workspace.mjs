@@ -110,8 +110,9 @@ async function prepareWorkspace(page, options) {
     const knownWorkflow = options.intent==='existing_workflow' ? [...state.receipts.values()].find(r=>r.workflowId===options.workflowRef.workflow_id && r.tab) : null;
     const receipt = state.receipts.get(options.operationId);
     if (receipt && receipt.request !== request) return {error:'OPERATION_CONFLICT'};
-    if (mode==='reserve') {
-      if (receipt) return {error:'OPERATION_EXISTS'};
+    if (mode==='reserve' && receipt?.preserved.some(item=>!tabs.includes(item.tab)
+        || !item.graph.isConnected || item.graph.innerHTML!==item.html)) return {error:'FOREIGN_WORKFLOW_CHANGED'};
+    if (mode==='reserve' && !receipt) {
       const preserved = tabs.map(t => {
         const ending=t.getAttribute('data-tid').match(/;tb(-\d+)?$/)?.[1]??'';
         const diagrams=exact('MF;TF'+ending+';ModelForm;cmpDiagram');
@@ -257,10 +258,12 @@ async function prepareWorkspace(page, options) {
     const old=await inspect('lookup');
     if (old.error) return result('NOT_READY',old.error,{authenticated:true});
     if (old.missing) return missingPackage(old);
-    if (old.exists) {
+    // A confirmed pre-open refusal may continue without replacing its original receipt.
+    if (old.phase==='reserved' && (options.intent!=='open_package' || options.recoverOnly))
+      return result('NOT_READY','PREVIOUS_ATTEMPT_NOT_COMPLETED',{authenticated:true});
+    if (old.exists && old.phase!=='reserved') {
       if (old.tab_tid) await tid(old.tab_tid).click({timeout:remaining()});
-      else if (old.phase==='reserved') return result('NOT_READY','PREVIOUS_ATTEMPT_NOT_COMPLETED',{authenticated:true});
-      effectPossible=old.phase!=='reserved';
+      effectPossible=true;
     } else {
       if (options.recoverOnly) return result('NOT_READY','RECEIPT_LOST',{authenticated:true});
       const before=await wait('workspace_entry_ready',async()=>{const state=await inspect('observe');return state.error || state.hard_blocked || (!state.blocked && (state.ready || state.home_ready || state.files_ready
