@@ -205,6 +205,24 @@ test("changed source invalidates profile pages, scans and samples", async () => 
   })
 })
 
+test("exact scan finding a late missing formula cache makes settings incomplete", async () => {
+  const rows =
+    header +
+    Array.from({ length: 100000 }, (_, i) => {
+      const r = i + 2
+      return `<row r="${r}">${text("A", r, "North")}${i === 99999 ? `<c r="B${r}"><f>1+1</f></c>` : num("B", r, "1.25")}</row>`
+    }).join("")
+  await fixture(rows, async (path, dir) => {
+    const p = await profile(path, dir)
+    expect(p.coverage.eof).toBe(false)
+    expect(p.settings_complete).toBe(true)
+    await scanFile(p.profile_id, dir)
+    const full = await profilePage(p.profile_id, dir)
+    expect(full.settings_complete).toBe(false)
+    expect("missing_cached_values" in full && full.missing_cached_values).toBe(1)
+  })
+}, 30000)
+
 test("ZIP expansion, XML depth, cell size and DTD limits", async () => {
   for (const sheet of [
     "<a>".repeat(70) + "</a>".repeat(70),

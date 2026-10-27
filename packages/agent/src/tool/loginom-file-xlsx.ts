@@ -746,7 +746,9 @@ function xlsxReply(p: Stored, cursor = 0) {
     ...(p.header_rows < 1 ? ["Excel runtime requires 1–10 header rows"] : []),
     ...(p.blank_rows !== "import" ? ["Excel runtime imports blank rows; blank_rows=skip cannot be applied"] : []),
     ...(!p.shared_strings_complete ? ["Shared strings quick budget reached; exact scan required"] : []),
-    ...(p.missing_cached_values ? ["Formulas without cached values; no formula evaluation"] : []),
+    ...((p.scan?.missing_cached_values ?? p.missing_cached_values)
+      ? ["Formulas without cached values; no formula evaluation"]
+      : []),
     ...(p.columns.some((c) => c.type === "boolean") ? ["Excel runtime does not support boolean column type"] : []),
     ...(new Set(p.columns.map((c) => c.name)).size !== p.columns.length ? ["Duplicate source headers"] : []),
     ...(p.columns.some((c) => !c.name || c.name.length > 120 || /[\x00-\x1f]/.test(c.name))
