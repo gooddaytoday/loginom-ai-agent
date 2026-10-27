@@ -1,5 +1,4 @@
-import { Cause, Effect } from "effect"
-import { PlatformError } from "effect/PlatformError"
+import { Effect } from "effect"
 import { tool, jsonSchema, type Tool as AITool, type ToolExecutionOptions, type JSONSchema7 } from "ai"
 import { join } from "node:path"
 import { Global } from "@loginom-ai-agent/core/global"
@@ -111,14 +110,7 @@ export const loginomFileTools = Effect.fn("Loginom.fileTools")(function* (
                 .ask({ permission: definition.name, metadata: {}, patterns: [source], always: ["*"] })
                 .pipe(Effect.catchCause((cause) => localFilePermissionFailure(source, cause, ctx)))
               // Always re-authorize the original path, including both sides of symlinks.
-              const authorized = yield* authorizeLoginomFile(source, ctx).pipe(
-                Effect.catchCause((cause) => {
-                  const error = Cause.squash(cause)
-                  if (stored && error instanceof PlatformError && error.reason._tag === "NotFound")
-                    return Effect.die(Error("LOGINOM_FILE_CHANGED: " + source))
-                  return Effect.failCause(cause)
-                }),
-              )
+              const authorized = yield* authorizeLoginomFile(source, ctx)
               const value = yield* Effect.promise(async (signal) => {
                 const abort = AbortSignal.any([signal, ctx.abort])
                 if (definition.name === "loginom_file_profile") {
