@@ -403,22 +403,13 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
   const batch = journal.batches.at(-1)
   let pending: CampaignKey[] | undefined
   let pendingJudge: { key: CampaignKey; resultFile: string } | undefined
-  if (unit.active) {
-    if (!batch || batch.accounted) {
-      journal.blocker = "UNOWNED_BATCH_ACTIVE"
-      if (now - journal.lastProgressAt >= campaignLimits(manifest).noProgressMs) {
-        journal.final = "partial"
-        return { journal, action: "finalize" as const, next: [] }
-      }
-      return { journal, action: "blocked" as const, next: [] }
-    }
+  if (unit.active && (!batch || batch.accounted)) {
+    journal.blocker = "UNOWNED_BATCH_ACTIVE"
     if (now - journal.lastProgressAt >= campaignLimits(manifest).noProgressMs) {
       journal.final = "partial"
-      journal.blocker = "NO_PROGRESS_LIMIT"
-      journal.cleanupVerified = false
       return { journal, action: "finalize" as const, next: [] }
     }
-    return { journal, action: "wait" as const, next: [] }
+    return { journal, action: "blocked" as const, next: [] }
   }
   const completions = new Map<string, { completedAt?: number; completionOrder?: number; quality?: boolean }>()
   try {
@@ -437,7 +428,7 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
             commandId?: string; phase?: string; slotIds?: unknown[]; unitBinding?: { invocation?: string };
             attempts?: { taskId: string; attempt: number; purpose: string; completedAt?: number; completionOrder?: number; quality?: boolean }[]; admissionBlocker?: string }
           // The old initial receipt precedes every write-ahead admission; its writer must have exited.
-          const admissions = native.attempts === undefined && native.phase === "cli_admitted" &&
+          const admissions = !unit.active && native.attempts === undefined && native.phase === "cli_admitted" &&
             /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(native.commandId ?? "") &&
             path.basename(saved.commandJournal) === `run-command-${native.commandId}.json` &&
             Array.isArray(native.slotIds) && native.slotIds.length === manifest.parallel && new Set(native.slotIds).size === native.slotIds.length &&
@@ -450,16 +441,18 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
           for (const attempt of admissions.filter(attempt => attempt.purpose === "measurement"))
             completions.set(path.join(runDir, attempt.taskId, "1/result.json"), attempt)
           if (native.admissionBlocker) journal.blocker ??= native.admissionBlocker
-        } catch { admissionConfirmed = false; journal.blocker ??= "ADMISSION_STATE_UNCONFIRMED" }
+        } catch { admissionConfirmed = false; if (!unit.active) journal.blocker ??= "ADMISSION_STATE_UNCONFIRMED" }
       }
-      if (admissionConfirmed) {
-        if (startedAttempts < (batch.startedAttempts ?? 0)) { admissionConfirmed = false; journal.blocker ??= "ADMISSION_STATE_UNCONFIRMED" }
-        else batch.startedAttempts = startedAttempts
+      if (!unit.active) {
+        if (admissionConfirmed) {
+          if (startedAttempts < (batch.startedAttempts ?? 0)) { admissionConfirmed = false; journal.blocker ??= "ADMISSION_STATE_UNCONFIRMED" }
+          else batch.startedAttempts = startedAttempts
+        }
+        const totalStarted = journal.batches.reduce((total, item) => total + (item.startedAttempts ?? 0), 0)
+        if (totalStarted < (journal.startedAttempts ?? 0)) { admissionConfirmed = false; journal.blocker ??= "ADMISSION_STATE_UNCONFIRMED" }
+        else journal.startedAttempts = totalStarted
       }
-      const totalStarted = journal.batches.reduce((total, item) => total + (item.startedAttempts ?? 0), 0)
-      if (totalStarted < (journal.startedAttempts ?? 0)) { admissionConfirmed = false; journal.blocker ??= "ADMISSION_STATE_UNCONFIRMED" }
-      else journal.startedAttempts = totalStarted
-      const probes = await Promise.all(runs.map(async run => {
+      const probes = unit.active ? [] : await Promise.all(runs.map(async run => {
         const file = Bun.file(path.join(batch.resultsDir, run, "request-preflight.json"))
         return await file.exists() ? file.json() as Promise<{ code: string | null }> : null
       }))
@@ -467,6 +460,8 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
       for (const key of batch.keys) {
         for (const run of runs) {
           const resultFile = path.join(batch.resultsDir, run, key.taskId, "1/result.json")
+          const completion = completions.get(resultFile)
+          if (unit.active && !Number.isSafeInteger(completion?.completedAt)) continue
           if (!(await Bun.file(resultFile).exists())) continue
           const result = await Bun.file(resultFile).json() as AttemptResult
           if (result.task_id !== key.taskId || result.attempt !== 1) throw Error("CAMPAIGN_RESULT_IDENTITY")
@@ -501,9 +496,9 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
             pendingJudge ??= { key, resultFile }
           }
           const counted = resources.status !== "failed" && (key.corpus === "node" ? node?.code !== undefined && node.code !== 2 : isQualityResult(result))
-          const completion = completions.get(resultFile)
-          const completedAt = awaitingJudge && result.judge_status === "skipped" ? undefined : Math.min(now, completion && (key.corpus === "node" || completion.quality === counted) && Number.isSafeInteger(completion.completedAt)
-            ? completion.completedAt! : Math.floor((await stat(resultFile)).mtimeMs))
+          const completedAt = awaitingJudge && result.judge_status === "skipped" ? undefined
+            : completion && (key.corpus === "node" || completion.quality === counted) && Number.isSafeInteger(completion.completedAt)
+              ? Math.min(now, completion.completedAt!) : unit.active ? undefined : Math.min(now, Math.floor((await stat(resultFile)).mtimeMs))
           const entry = { key, resultFile, status: result.status, counted, pass: node && node.code !== 2 ? node.verdict === "PASS" : result.pass, score: result.score, resources,
             completedAt,
             cleanupConfirmed: !awaitingJudge && !result.judge_cleanup_unconfirmed && result.environment_cleanup?.status === "confirmed" &&
@@ -515,12 +510,12 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
           if (index < 0) journal.attempts.push(entry)
         }
       }
-      if (!batch.started && unit.invocation === batch.invocationBefore && !probes.some(probe => probe) &&
+      if (!unit.active && !batch.started && unit.invocation === batch.invocationBefore && !probes.some(probe => probe) &&
         !journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep)))
         pending = batch.keys
-      if (!pending) batch.accounted = admissionConfirmed && !assessmentPending
-      if (probes.some(probe => probe?.code === null)) journal.emptyPreflights = 0
-      if (!pending && !batch.keys.every(key => journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep) && keyId(attempt.key) === keyId(key)))) {
+      if (!unit.active && !pending) batch.accounted = admissionConfirmed && !assessmentPending
+      if (!unit.active && probes.some(probe => probe?.code === null)) journal.emptyPreflights = 0
+      if (!unit.active && !pending && !batch.keys.every(key => journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep) && keyId(attempt.key) === keyId(key)))) {
         const failure = probes.find(probe => probe && ["REQUEST_PREFLIGHT_EMPTY", "REQUEST_PREFLIGHT_FAILED"].includes(probe.code ?? ""))
         if (failure && !journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep))) {
           journal.consecutiveErrors++
@@ -551,8 +546,10 @@ export async function campaignTick(manifest: CampaignManifest, previous: Campaig
   if (journal.blocker?.startsWith("NO_PROGRESS_LIMIT") || now - journal.lastProgressAt >= campaignLimits(manifest).noProgressMs) {
     journal.final = "partial"
     if (!journal.blocker?.startsWith("NO_PROGRESS_LIMIT")) journal.blocker = `NO_PROGRESS_LIMIT${journal.blocker ? `:${journal.blocker}` : ""}`
+    if (unit.active) journal.cleanupVerified = false
     return { journal, action: "finalize" as const, next: [] }
   }
+  if (unit.active) return { journal, action: "wait" as const, next: [] }
   const missing = manifest.keys.filter(key => !journal.attempts.some(attempt => attempt.counted && keyId(attempt.key) === keyId(key)))
   if (pendingJudge) return journal.repairing || journal.blocker
     ? { journal, action: "blocked" as const, next: [] }

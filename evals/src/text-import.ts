@@ -1,5 +1,6 @@
 import path from "node:path"
 import { confirmedProfileArchive } from "./profile-archive"
+import { writeLeaseReceipt } from "./lease"
 import { readdir } from "node:fs/promises"
 import cases from "./text-import-cases.json"
 import { evalsRoot } from "./config"
@@ -42,5 +43,5 @@ export async function collectTextImportEvidence(attemptDir: string, profileDir: 
     }
   }
   await visit(archive)
-  await Bun.write(path.join(attemptDir, "native-import.json"), JSON.stringify({ version: 1, archive, files }, null, 2) + "\n")
+  await writeLeaseReceipt(path.join(attemptDir, "native-import.json"), { version: 1, archive, files })
 }
