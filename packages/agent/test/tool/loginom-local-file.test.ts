@@ -54,7 +54,7 @@ it.instance("snapshots the authorized realpath when a symlink changes during a p
   }),
 )
 
-it.instance("oversize registration errors include the source path and limit without an attachment hint", () =>
+it.instance("oversize registration errors include the typed cause, exact limit and next step", () =>
   Effect.gen(function* () {
     const instance = yield* TestInstance
     const path = instance.directory + "/large.csv"
@@ -69,12 +69,43 @@ it.instance("oversize registration errors include the source path and limit with
     const result = yield* snapshotLoginomFile(path, yield* context).pipe(Effect.exit)
     expect(Exit.isFailure(result)).toBe(true)
     if (Exit.isFailure(result)) {
+      expect(String(Cause.squash(result.cause))).toContain("LOGINOM_FILE_TOO_LARGE")
       expect(String(Cause.squash(result.cause))).toContain(path)
-      expect(String(Cause.squash(result.cause))).toContain("16 MiB")
+      expect(String(Cause.squash(result.cause))).toContain('"actual":16777217,"limit":16777216')
+      expect(String(Cause.squash(result.cause))).toContain("профиль и выборка")
       expect(String(Cause.squash(result.cause))).not.toContain("--file")
     }
   }),
 )
+
+for (const mode of ["missing", "directory", "denied"] as const) {
+  it.instance(`local file registration reports ${mode} without reading or admitting bytes`, () =>
+    Effect.gen(function* () {
+      const fs = yield* FSUtil.Service
+      const instance = yield* TestInstance
+      const path = instance.directory + "/refused.csv"
+      if (mode === "directory") yield* fs.makeDirectory(path)
+      if (mode === "denied") {
+        yield* fs.writeFileString(path, "private bytes")
+        yield* fs.chmod(path, 0)
+      }
+      const result = yield* snapshotLoginomFile(path, yield* context).pipe(Effect.exit)
+      if (mode === "denied") yield* fs.chmod(path, 0o600)
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) {
+        const text = String(Cause.squash(result.cause))
+        expect(text).toContain(
+          {
+            missing: "LOGINOM_FILE_NOT_FOUND",
+            directory: "LOGINOM_FILE_NOT_REGULAR",
+            denied: "LOGINOM_FILE_ACCESS_DENIED",
+          }[mode],
+        )
+        expect(text).not.toContain("private bytes")
+      }
+    }),
+  )
+}
 
 it.instance(
   "configured deny is reported before an OS-inaccessible requested path is resolved",
@@ -110,7 +141,7 @@ it.instance(
       expect(Exit.isFailure(result)).toBe(true)
       if (Exit.isFailure(result)) {
         expect(Cause.squash(result.cause)).toBeInstanceOf(PermissionV1.DeniedError)
-        expect(String(Cause.squash(result.cause))).toContain(path)
+        expect(String(Cause.squash(result.cause))).toContain("LOGINOM_FILE_ACCESS_DENIED")
         expect(String(Cause.squash(result.cause))).not.toMatch(/EACCES|--file/)
       }
       expect(metadata).toEqual([{ permissionDenied: true }])

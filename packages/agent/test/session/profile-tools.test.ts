@@ -107,38 +107,54 @@ it.instance("automation registers exact local bytes after preparation without se
   }),
 )
 
-it.instance("profile tools preserve changed-source code when the original file disappears before reauthorization", () =>
-  Effect.gen(function* () {
-    const fs = yield* FSUtil.Service
-    const instance = yield* TestInstance
-    const path = instance.directory + "/profile-source.csv"
-    yield* fs.writeFileString(path, "region;amount\nNorth;1,25\n")
-    const resolved = yield* resolveProfile(
-      "loginom-automation",
-      preparedLoginom(async () => []),
-    )
-    const profile = resolved.tools.loginom_file_profile?.execute
-    const scan = resolved.tools.loginom_file_scan?.execute
-    const sample = resolved.tools.loginom_file_sample?.execute
-    if (!profile || !scan || !sample) throw Error("File tools are missing")
-    const result = yield* Effect.promise(() =>
-      profile({ path }, { toolCallId: "profile-source", abortSignal: new AbortController().signal, messages: [] }),
-    )
-    if (!isRecord(result) || typeof result.output !== "string") throw Error("Profile output missing")
-    const id = JSON.parse(result.output).profile_id
-    yield* fs.remove(path)
-    for (const execute of [scan, sample]) {
-      const failure = yield* Effect.promise(() =>
-        execute(
-          { profile_id: id },
-          { toolCallId: "changed-source", abortSignal: new AbortController().signal, messages: [] },
-        ),
-      ).pipe(Effect.exit)
-      expect(Exit.isFailure(failure)).toBe(true)
-      if (Exit.isFailure(failure)) expect(String(Cause.squash(failure.cause))).toContain("LOGINOM_FILE_CHANGED")
-    }
-  }),
-)
+for (const change of ["disappears", "changes", "is replaced", "symlink is redirected"] as const) {
+  const code = change === "disappears" ? "LOGINOM_FILE_NOT_FOUND" : "LOGINOM_FILE_CHANGED"
+  it.instance(`profile tools preserve ${code} when the original file ${change} before reauthorization`, () =>
+    Effect.gen(function* () {
+      const fs = yield* FSUtil.Service
+      const instance = yield* TestInstance
+      const path = instance.directory + "/profile-source.csv"
+      if (change === "symlink is redirected") {
+        yield* fs.writeFileString(path + ".target", "region;amount\nNorth;1,25\n")
+        yield* fs.symlink(path + ".target", path)
+      } else yield* fs.writeFileString(path, "region;amount\nNorth;1,25\n")
+      const resolved = yield* resolveProfile(
+        "loginom-automation",
+        preparedLoginom(async () => []),
+      )
+      const profile = resolved.tools.loginom_file_profile?.execute
+      const scan = resolved.tools.loginom_file_scan?.execute
+      const sample = resolved.tools.loginom_file_sample?.execute
+      if (!profile || !scan || !sample) throw Error("File tools are missing")
+      const result = yield* Effect.promise(() =>
+        profile({ path }, { toolCallId: "profile-source", abortSignal: new AbortController().signal, messages: [] }),
+      )
+      if (!isRecord(result) || typeof result.output !== "string") throw Error("Profile output missing")
+      const id = JSON.parse(result.output).profile_id
+      if (change === "disappears") yield* fs.remove(path)
+      if (change === "changes") yield* fs.writeFileString(path, "region;amount\nNorth;1,25\nSouth;2,5\n")
+      if (change === "is replaced") {
+        yield* fs.rename(path, path + ".old")
+        yield* fs.writeFileString(path, "region;amount\nNorth;1,25\n")
+      }
+      if (change === "symlink is redirected") {
+        yield* fs.writeFileString(path + ".new", "region;amount\nNorth;1,25\n")
+        yield* fs.remove(path)
+        yield* fs.symlink(path + ".new", path)
+      }
+      for (const execute of [scan, sample]) {
+        const failure = yield* Effect.promise(() =>
+          execute(
+            { profile_id: id },
+            { toolCallId: "reauthorized-source", abortSignal: new AbortController().signal, messages: [] },
+          ),
+        ).pipe(Effect.exit)
+        expect(Exit.isFailure(failure)).toBe(true)
+        if (Exit.isFailure(failure)) expect(String(Cause.squash(failure.cause))).toContain(code)
+      }
+    }),
+  )
+}
 
 it.instance("local package prepare snapshots bytes into its private input and strips the OS path", () =>
   Effect.gen(function* () {
@@ -306,6 +322,7 @@ it.instance("local file tool permission failures retain path, typed marker and t
               : PermissionV1.DeniedError,
         )
         expect(String(error)).toContain(path)
+        expect(String(error)).toContain("LOGINOM_FILE_ACCESS_DENIED")
         expect(String(error).includes("--file")).toBe(action !== "deny")
         if (action === "feedback") expect(String(error)).toContain("Do not read this file")
       }

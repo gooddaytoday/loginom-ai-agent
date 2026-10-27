@@ -336,6 +336,7 @@ it.instance(
       if (Exit.isFailure(result)) {
         expect(String(Cause.squash(result.cause))).toContain(path)
         expect(String(Cause.squash(result.cause))).toMatch(/EACCES|permission|доступ/i)
+        expect(String(Cause.squash(result.cause))).toContain("LOGINOM_FILE_ACCESS_DENIED")
         expect(String(Cause.squash(result.cause))).not.toContain("--file")
       }
       expect(input.requests).toEqual([])
@@ -361,6 +362,9 @@ it.instance(
         if (Exit.isFailure(result)) {
           expect(String(Cause.squash(result.cause))).toContain(path)
           expect(String(Cause.squash(result.cause))).toMatch(reason)
+          expect(String(Cause.squash(result.cause))).toContain(
+            path === directory ? "LOGINOM_FILE_NOT_REGULAR" : "LOGINOM_FILE_NOT_FOUND",
+          )
           expect(String(Cause.squash(result.cause))).not.toContain("--file")
         }
         expect(input.requests).toEqual([])
@@ -1065,6 +1069,7 @@ it.instance(
       if (Exit.isFailure(result)) {
         expect(Cause.squash(result.cause)).toBeInstanceOf(PermissionV1.RejectedError)
         expect(String(Cause.squash(result.cause))).toContain("--file")
+        expect(String(Cause.squash(result.cause))).toContain("LOGINOM_FILE_ACCESS_DENIED")
       }
     }),
   20_000,

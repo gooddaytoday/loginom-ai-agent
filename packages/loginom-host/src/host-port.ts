@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto"
 import type { createLoginomHost } from "./host"
 import type { InputFile } from "./inputs"
-import { hostError } from "./errors"
+import { hostException, hostFailure } from "./errors"
 import { runtimeCallTimeout } from "../../loginom-runtime/src/call-timeout.mjs"
 import { HostTaskScope } from "./task-scope"
 import { Schema } from "effect"
@@ -531,7 +531,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           if (error instanceof Error && error.message === "LOGINOM_RUNTIME_UNAVAILABLE") throw error
           // A journal write failure precedes runtime dispatch and cannot establish
           // an uncertain external operation without an admitted journal identity.
-          if (!recovery.id) throw new Error(hostError(error))
+          if (!recovery.id) throw hostException(error)
           await abandon(run)
           service.markRuntimeStale(run.chat)
           throw new Error("LOGINOM_CALL_UNCERTAIN")
@@ -548,7 +548,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
         }
       }
     } catch (error) {
-      reply({ id: data.id, error: hostError(error) }, runs.get(input.run)?.lease?.generation)
+      reply({ id: data.id, ...hostFailure(error) }, runs.get(input.run)?.lease?.generation)
     }
   }
   port.on("message", ({ data }) => {

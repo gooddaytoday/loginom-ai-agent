@@ -12,6 +12,7 @@ import { TaskScope } from "@/session/task-scope"
 import { Tool } from "./tool"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { fileSnapshot } from "@/util/file-snapshot"
+import { fileError, hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 
 const attachmentHint = ". Для CLI передайте файл через --file; в Desktop/TUI приложите файл к сообщению."
 
@@ -19,7 +20,7 @@ export const snapshotLoginomFile = Effect.fn("Loginom.snapshotLocalFile")(functi
   const source = yield* authorizeLoginomFile(path, ctx)
   const bytes = yield* Effect.tryPromise({
     try: () => fileSnapshot(source.canonicalPath, 16 * 1024 * 1024),
-    catch: (error) => Error(`${error instanceof Error ? error.message : String(error)} Путь: ${source.sourcePath}`),
+    catch: (error) => Error(hostErrorText(error) + " Путь: " + source.sourcePath),
   })
   return {
     sourcePath: source.sourcePath,
@@ -52,11 +53,20 @@ export const authorizeLoginomFile = Effect.fn("Loginom.authorizeLocalFile")(func
       return yield* Effect.die(new LocalFileDenied(sourcePath, rules))
     })
   yield* checkDeny(sourcePath)
-  const canonicalPath = yield* fs.realPath(sourcePath)
+  const canonicalPath = yield* fs
+    .realPath(sourcePath)
+    .pipe(Effect.mapError((error) => Error(hostErrorText(fileError(error)) + " Путь: " + sourcePath)))
   yield* checkDeny(canonicalPath)
-  if ((yield* fs.stat(canonicalPath)).type !== "File")
-    return yield* Effect.die(Error("Путь указывает на каталог или специальный файл: " + sourcePath))
-  yield* fs.access(canonicalPath, { readable: true })
+  if (
+    (yield* fs
+      .stat(canonicalPath)
+      .pipe(Effect.mapError((error) => Error(hostErrorText(fileError(error)) + " Путь: " + sourcePath)))).type !==
+    "File"
+  )
+    return yield* Effect.die(Error(hostErrorText("LOGINOM_FILE_NOT_REGULAR") + " Путь: " + sourcePath))
+  yield* fs
+    .access(canonicalPath, { readable: true })
+    .pipe(Effect.mapError((error) => Error(hostErrorText(fileError(error)) + " Путь: " + sourcePath)))
   const history = yield* sessions.messages({ sessionID: ctx.sessionID })
   const attachments = TaskScope.visible({ sessionID: ctx.sessionID, messages: history, revert: session.revert })
     .filter((message) => message.info.role === "user" && !TaskScope.replayOf(message))
@@ -100,7 +110,7 @@ class LocalFileDenied extends PermissionV1.DeniedError {
     super({ ruleset })
   }
   override get message() {
-    return super.message + " Путь: " + this.path
+    return hostErrorText("LOGINOM_FILE_ACCESS_DENIED") + " " + super.message + " Путь: " + this.path
   }
 }
 
@@ -109,7 +119,7 @@ class LocalFileRejected extends PermissionV1.RejectedError {
     super()
   }
   override get message() {
-    return super.message + " Путь: " + this.path + attachmentHint
+    return hostErrorText("LOGINOM_FILE_ACCESS_DENIED") + " " + super.message + " Путь: " + this.path + attachmentHint
   }
 }
 
@@ -121,6 +131,6 @@ class LocalFileCorrected extends PermissionV1.CorrectedError {
     super({ feedback })
   }
   override get message() {
-    return super.message + " Путь: " + this.path + attachmentHint
+    return hostErrorText("LOGINOM_FILE_ACCESS_DENIED") + " " + super.message + " Путь: " + this.path + attachmentHint
   }
 }

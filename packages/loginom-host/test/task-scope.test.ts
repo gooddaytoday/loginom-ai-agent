@@ -283,16 +283,14 @@ test("private package input is rejected before startup or input staging outside 
       },
     ])
       await expect(f.client.request(request.method, request.input)).rejects.toThrow("LOGINOM_SCOPE_DENIED")
-    for (const invalid of [
-      null,
-      {},
-      { ...packageInput, admissionID: "" },
-      { ...packageInput, file: { name: "input.lgp", data: 5 } },
-      { ...packageInput, file: { name: "input.lgp", data: "YQ" } },
-    ])
-      await expect(f.client.request("call", { ...call, packageInput: invalid })).rejects.toThrow(
-        "LOGINOM_HOST_REQUEST_FAILED",
-      )
+    for (const [invalid, code] of [
+      [null, "LOGINOM_HOST_REQUEST_FAILED"],
+      [{}, "LOGINOM_HOST_REQUEST_FAILED"],
+      [{ ...packageInput, admissionID: "" }, "LOGINOM_HOST_REQUEST_FAILED"],
+      [{ ...packageInput, file: { name: "input.lgp", data: 5 } }, "LOGINOM_HOST_REQUEST_FAILED"],
+      [{ ...packageInput, file: { name: "input.lgp", data: "YQ" } }, "LOGINOM_INPUT_INVALID"],
+    ] as const)
+      await expect(f.client.request("call", { ...call, packageInput: invalid })).rejects.toThrow(code)
     await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
     expect(await readdir(f.root)).not.toContain("runtime")
     expect(await readdir(f.root)).not.toContain("inputs")

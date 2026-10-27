@@ -1,6 +1,6 @@
 import { attachmentContext, attachmentPreview } from "@/util/attachment-preview"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
-import { hostError } from "@loginom-ai-agent/loginom-host/errors"
+import { hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { LayerNode } from "@loginom-ai-agent/core/effect/layer-node"
 import { PermissionV1 } from "@loginom-ai-agent/core/v1/permission"
 import path from "path"
@@ -1180,7 +1180,7 @@ const layer = Layer.effect(
         const loginom = yield* Effect.acquireRelease(
           Effect.promise(() =>
             LoginomHost.acquire(sessionID).catch((error) => {
-              loginomStatus.failure = "acquire: " + hostError(error)
+              loginomStatus.failure = "acquire: " + hostErrorText(error)
               return undefined
             }),
           ),
