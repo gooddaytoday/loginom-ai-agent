@@ -107,6 +107,39 @@ it.instance("automation registers exact local bytes after preparation without se
   }),
 )
 
+it.instance("profile tools preserve changed-source code when the original file disappears before reauthorization", () =>
+  Effect.gen(function* () {
+    const fs = yield* FSUtil.Service
+    const instance = yield* TestInstance
+    const path = instance.directory + "/profile-source.csv"
+    yield* fs.writeFileString(path, "region;amount\nNorth;1,25\n")
+    const resolved = yield* resolveProfile(
+      "loginom-automation",
+      preparedLoginom(async () => []),
+    )
+    const profile = resolved.tools.loginom_file_profile?.execute
+    const scan = resolved.tools.loginom_file_scan?.execute
+    const sample = resolved.tools.loginom_file_sample?.execute
+    if (!profile || !scan || !sample) throw Error("File tools are missing")
+    const result = yield* Effect.promise(() =>
+      profile({ path }, { toolCallId: "profile-source", abortSignal: new AbortController().signal, messages: [] }),
+    )
+    if (!isRecord(result) || typeof result.output !== "string") throw Error("Profile output missing")
+    const id = JSON.parse(result.output).profile_id
+    yield* fs.remove(path)
+    for (const execute of [scan, sample]) {
+      const failure = yield* Effect.promise(() =>
+        execute(
+          { profile_id: id },
+          { toolCallId: "changed-source", abortSignal: new AbortController().signal, messages: [] },
+        ),
+      ).pipe(Effect.exit)
+      expect(Exit.isFailure(failure)).toBe(true)
+      if (Exit.isFailure(failure)) expect(String(Cause.squash(failure.cause))).toContain("LOGINOM_FILE_CHANGED")
+    }
+  }),
+)
+
 it.instance("local package prepare snapshots bytes into its private input and strips the OS path", () =>
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
@@ -638,6 +671,8 @@ for (const profile of ["default", "package-docs", "loginom-automation"] as const
       expect(!!tools.loginom_dock_prepare).toBe(profile === "loginom-automation")
       expect(!!tools.loginom_browser_click).toBe(profile === "loginom-automation")
       expect(!!tools.loginom_file_admit).toBe(profile === "loginom-automation")
+      for (const name of ["loginom_file_profile", "loginom_file_scan", "loginom_file_sample"])
+        expect(!!tools[name]).toBe(profile === "loginom-automation")
       expect(!!tools.package_docs_run).toBe(profile === "package-docs")
       expect(!!tools.task).toBe(profile === "default")
       expect(!!tools.bash).toBe(profile !== "package-docs")
@@ -675,6 +710,7 @@ for (const image of [false, true])
       }
       const { tools } = yield* resolveProfile("loginom-automation", loginom, image)
       expect(tools.loginom_file_admit).toBeUndefined()
+      expect(tools.loginom_file_profile).toBeUndefined()
       expect(tools.loginom_dock_browser_recovery).toBeDefined()
       expect(tools.loginom_browser_snapshot).toBeDefined()
       expect(!!tools.loginom_browser_take_screenshot).toBe(image)
