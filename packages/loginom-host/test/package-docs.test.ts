@@ -569,6 +569,14 @@ test("Node extraction matches the saved Python structure of a Cyrillic two-node 
   expect(createHash("sha256").update(await readFile(source)).digest("hex")).toBe(before)
 })
 
+test("native Calculator expressions retain their name, data type and exact formula", async () => {
+  const structure = await extractPackage(join(import.meta.dir, "../../opencode/test/cli/package-docs-routing/fixtures/edit-source.lgp"))
+  const calculator = structure.modules[0].workflow_nodes.find((node) => node.guid === "9cfc49f4-987a-43bf-920f-5f2b81f0b893")
+  expect(calculator?.settings_main.Expressions).toBe(JSON.stringify([
+    { Name: "amount_double", DataType: "dtFloat", Expression: "amount * 2" },
+  ]))
+})
+
 test("nested workflows match the frozen Python structure, identities and statistics", async () => {
   const expected: Awaited<ReturnType<typeof extractPackage>> = await Bun.file(join(fixtures, "nested.structure.json")).json()
   expect(await extractPackage(join(fixtures, "nested.lgp"))).toEqual(expected)

@@ -2,11 +2,13 @@
   "schema_version": "loginom-skills-routing.v1",
   "scope": "product-routing",
   "fixtures": {
+    "edit_lgp": "packages/opencode/test/cli/package-docs-routing/fixtures/edit-source.lgp",
     "lgp": "packages/loginom-host/test/fixtures/package-docs/nested.lgp",
     "png": "packages/opencode/test/tool/fixtures/large-image.png",
-    "csv": "packages/desktop/test/loginom/fixtures/standalone-cli/A/sales.csv"
+    "csv": "packages/desktop/test/loginom/fixtures/standalone-cli/A/sales.csv",
+    "text": "packages/opencode/test/cli/package-docs-routing/fixtures/read-control.txt"
   },
-  "bindings": ["local_lgp", "unicode_lgp", "missing_lgp", "server_package"],
+  "bindings": ["local_lgp", "unicode_lgp", "missing_lgp", "server_package", "external_csv", "external_text", "created_lgp"],
   "cases": [
     {
       "id": "docs-local-path",
@@ -202,6 +204,56 @@
         "result": "saved-executed-package",
         "transition": "new-user-turn"
       }
+    },
+    {
+      "id": "edit-after-docs",
+      "group": "scenario",
+      "fixture": "edit_lgp",
+      "setup": {
+        "action": "document-through-real-user-turn",
+        "prompt": "Подготовь Markdown-документацию пакета {{unicode_lgp}}.",
+        "input": "external-text-path",
+        "expectedProfile": "package-docs"
+      },
+      "prompt": "В локальном пакете {{unicode_lgp}} исправь amount_double: amount*3 вместо amount*2. Сохрани остальные узлы и связи, выполни сценарий и сохрани пакет в {{server_package}}.",
+      "input": "external-text-path",
+      "expected": {
+        "profile": "loginom-automation",
+        "result": "saved-executed-package",
+        "transition": "new-user-turn"
+      }
+    },
+    {
+      "id": "docs-after-edit",
+      "group": "docs",
+      "fixture": "edit_lgp",
+      "setup": {
+        "action": "edit-through-real-user-turn",
+        "prompt": "В локальном пакете {{unicode_lgp}} исправь amount_double: amount*3 вместо amount*2. Сохрани остальные узлы и связи, выполни сценарий и сохрани пакет в {{server_package}}.",
+        "input": "external-text-path",
+        "expectedProfile": "loginom-automation"
+      },
+      "prompt": "Подготовь Markdown-документацию изменённого локального пакета {{created_lgp}}.",
+      "input": "created-lgp-path",
+      "expected": {
+        "profile": "package-docs",
+        "result": "md",
+        "transition": "new-user-turn"
+      }
+    },
+    {
+      "id": "scenario-create-path",
+      "group": "scenario",
+      "prompt": "Построй в Loginom сценарий: используй CSV {{external_csv}}, сгруппируй строки по Category и просуммируй amount. Выполни сценарий и сохрани пакет в {{server_package}}.",
+      "input": "csv-path",
+      "expected": { "profile": "loginom-automation", "result": "saved-executed-package" }
+    },
+    {
+      "id": "text-read",
+      "group": "default",
+      "prompt": "Прочитай файл {{external_text}} и ответь только значением поля контрольная_строка.",
+      "input": "text-path",
+      "expected": { "profile": "default", "result": "PATH-74-АБВ-37", "output": "none" }
     },
     {
       "id": "default-node-purpose",

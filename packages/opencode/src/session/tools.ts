@@ -551,6 +551,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     loginom: input.loginom,
     loginomStatus: input.loginomStatus,
     agent: input.agent,
+    directory: input.session.directory,
     model: input.model,
     processor: input.processor,
     history,

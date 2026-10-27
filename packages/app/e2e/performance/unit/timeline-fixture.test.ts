@@ -7,7 +7,7 @@ import {
   validateTimelineEvent,
   validateTimelineMessages,
   type PartSeed,
-} from "./fixture"
+} from "../timeline-stability/fixture"
 
 describe("timeline fixture validation", () => {
   test("accepts a valid timeline", () => {

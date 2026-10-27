@@ -120,6 +120,25 @@ function restoreJudgeEnv(original: ReturnType<typeof overrideJudgeEnv>) {
   else process.env.FAKE_CODEX_FLAKY_MARKER = original.flaky
 }
 
+test("--judge-only: сохраняет failed inputs-unchanged даже при наличии артефакта", async () => {
+  const original = overrideJudgeEnv()
+  const dry = await main(["--dry-run", "--only", "group-sum-qty"])
+  try {
+    const file = Bun.file(path.join(dry.runDir!, "summary.json"))
+    const summary = await file.json() as RunSummary
+    const attempt = summary.tasks[0]!.attempts[0]!
+    Object.assign(attempt, { status: "failed", pass: false, errors: ["INPUTS_CHANGED: data/sales.csv"],
+      checklist: [{ id: "inputs-unchanged", passed: false, evidence: "inputs.json" }] })
+    await Bun.write(file, JSON.stringify(summary))
+    await main(["--judge-only", path.basename(dry.runDir!)])
+    expect((await file.json()).tasks[0].attempts[0]).toEqual(attempt)
+    expect(await Bun.file(path.join(dry.runDir!, "group-sum-qty/1/judge/verdict.json")).exists()).toBe(false)
+  } finally {
+    restoreJudgeEnv(original)
+    await rm(dry.runDir!, { recursive: true, force: true })
+  }
+}, 30_000)
+
 test("--judge-only: пересуживает попытки с артефактом, сохраняет prev, не трогает остальные", async () => {
   const original = overrideJudgeEnv()
   let runDir: string | undefined

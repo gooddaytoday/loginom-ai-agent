@@ -1,5 +1,75 @@
 import {workspaceUiCapability} from './workspace-ui.mjs';
 
+// Private package path: retain the native owner before the existing upload,
+// then observe completion without changing its original submission receipt.
+export async function completePackageUpload(page,task,upload,waitReady=waitArtifactDiscoveryReady) {
+ let binding,receipt=null;
+ const trace=[];
+ const result=(status,completion=null,error=null)=>({status,action_key:'artifact.package_completion',action_revision:'1',
+  operation_id:task.operation_id,phase:'native_completion',effect_possible:receipt?.effect_possible===true,
+  cleanup_complete:receipt?.cleanup_complete!==false,output:{upload:receipt,...(completion?{completion}:{})},error,trace});
+ try {
+  if(Date.now()>=task.deadline_at)throw Error('PACKAGE_UPLOAD_DEADLINE');
+  binding=await page.evaluateHandle(t=>{
+   const prep=globalThis.__loginomDockPreparationV1,main=globalThis.bg?.app?.Application?.FInstance?.FMainForm;
+   const card=main?.Items?.Workspace?.getActiveTab?.(),controller=card?.Controller,form=controller?.FController;
+   const sender=form?.FFileSenderManager,input=form?.FFileInput,prefix=t.snapshot.workflow_ref.prefix;
+   const gridTid=prefix+';FileStorageForm;pnlFileStorage;tbl';
+   const grids=[...document.querySelectorAll('[data-tid='+JSON.stringify(gridTid)+']')];
+   const tabs=[...document.querySelectorAll('[data-tid='+JSON.stringify(t.snapshot.workflow_ref.tab_tid)+']')];
+   const grid=grids[0],view=grid&&globalThis.Ext?.getCmp?.(grid.id),store=view?.getStore?.(),records=store?.getRange?.();
+   if(location.origin!==t.expected_origin||globalThis.bg?.app?.Version!==t.expected_build
+     ||prep?.document!==document||prep.id!==t.binding.document_id||main.FMapTree?.FServerConnection?.UserName!==t.binding.loginom_account
+     ||grids.length!==1||tabs.length!==1||!tabs[0].classList.contains('x-tab-active')
+     ||form?.constructor?.name!=='FileStorageForm'||sender?.constructor?.name!=='FileSenderManager'
+     ||!input?.isConnected||input.files?.length!==0||sender.FActiveLoadersCount!==0||sender.FLastConflictResult!==undefined
+     ||Object.keys(sender.FCurrentUploadFilePaths??{}).length||sender.CurrentDirectory!==t.artifact.upload.directory+'/'
+     ||view.el?.dom!==grid||!form.FView?.el?.dom?.contains(grid)||store?.isLoading?.()!==false||store.isBufferedStore
+     ||!Number.isSafeInteger(store.loadCount)||!Array.isArray(records)||store.getCount?.()!==records.length||store.getTotalCount?.()!==records.length
+     ||records.some(r=>r.data?.FileName===t.artifact.name||r.data?.FilePath===t.artifact.upload.destination||r.data?.id===t.artifact.upload.destination))
+    throw Error('PACKAGE_UPLOAD_BINDING_UNAVAILABLE');
+   return {document,prep,card,controller,form,sender,input,grid,gridTid,tab:tabs[0],view,store,loadCount:store.loadCount};
+  },task);
+  const minimum=(await page.evaluate(b=>b.loadCount,binding))+1;
+  if(Date.now()>=task.deadline_at)throw Error('PACKAGE_UPLOAD_DEADLINE');
+  receipt=await upload(page);
+  if(receipt.status!=='AMBIGUOUS'||receipt.error?.code!=='UPLOAD_SERVER_VERIFICATION_REQUIRED'
+    ||receipt.output?.upload_submitted!==true||receipt.cleanup_complete!==true)
+   return result(receipt.status==='NOT_APPLIED'?'NOT_APPLIED':'AMBIGUOUS',null,{code:'PACKAGE_UPLOAD_NOT_CONFIRMED',message:'Original upload did not confirm a completed submission'});
+  await waitReady(page,task,task.deadline_at,trace,minimum);
+  const completion=await page.evaluate(({b,t,minimum})=>{
+   const main=globalThis.bg?.app?.Application?.FInstance?.FMainForm,card=main?.Items?.Workspace?.getActiveTab?.();
+   const grids=[...document.querySelectorAll('[data-tid='+JSON.stringify(b.gridTid)+']')];
+   const visible=e=>e.isConnected&&e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden';
+   const blocked=[...document.querySelectorAll('.x-mask,.x-mask-msg,.bg-mask-message'),...document.querySelectorAll('[role="dialog"],.x-message-box')].some(visible);
+   if(document!==b.document||globalThis.__loginomDockPreparationV1!==b.prep||b.prep.id!==t.binding.document_id
+     ||location.origin!==t.expected_origin||globalThis.bg?.app?.Version!==t.expected_build||main.FMapTree?.FServerConnection?.UserName!==t.binding.loginom_account
+     ||card!==b.card||card.Controller!==b.controller||card.Controller.FController!==b.form||b.form.FFileSenderManager!==b.sender
+     ||b.form.FFileInput!==b.input||!b.input.isConnected||b.input.files.length!==0||b.sender.FActiveLoadersCount!==0
+     ||Object.keys(b.sender.FCurrentUploadFilePaths??{}).length||b.sender.FLastConflictResult!==undefined
+     ||b.sender.CurrentDirectory!==t.artifact.upload.directory+'/'||!b.tab.isConnected||!b.tab.classList.contains('x-tab-active')
+     ||grids.length!==1||grids[0]!==b.grid||globalThis.Ext?.getCmp?.(b.grid.id)!==b.view||b.view.el?.dom!==b.grid||b.view.getStore()!==b.store
+     ||b.store.isLoading()||b.store.isBufferedStore||!Number.isSafeInteger(b.store.loadCount)||b.store.loadCount<minimum||blocked)
+    throw Error('PACKAGE_UPLOAD_OWNER_CHANGED');
+   const records=b.store.getRange(),data=b.store.getData?.(),source=data?.getSource?.()?.items;
+   if(!Array.isArray(records)||b.store.getCount()!==records.length||b.store.getTotalCount()!==records.length
+     ||!Array.isArray(data?.items)||data.items.length!==records.length||data.items.some(r=>!records.includes(r))
+     ||source&&(!Array.isArray(source)||source.length!==records.length||source.some(r=>!records.includes(r))))throw Error('PACKAGE_UPLOAD_STORE_INCOMPLETE');
+   const matches=records.filter(r=>r.data?.FileName===t.artifact.name||r.data?.FilePath===t.artifact.upload.destination||r.data?.id===t.artifact.upload.destination);
+   const row=matches[0]?.data;
+   if(matches.length!==1||row.Type!==0||row.FileName!==t.artifact.name||row.FilePath!==t.artifact.upload.destination
+     ||row.id!==t.artifact.upload.destination||row.Size!==t.artifact.bytes)throw Error('PACKAGE_UPLOAD_ROW_MISMATCH');
+   return {artifact_id:t.artifact.artifact_id,destination:t.artifact.upload.destination,bytes:row.Size,bytes_source:'native_file_store',
+    upload_completion_verified:true,load_count:b.store.loadCount,
+    files_entry:{document_id:b.prep.id,tab_tid:t.snapshot.workflow_ref.tab_tid,directory:t.artifact.upload.directory}};
+  },{b:binding,t:task,minimum});
+  if(Date.now()>=task.deadline_at)throw Error('PACKAGE_UPLOAD_DEADLINE');
+  return result('SUCCEEDED',completion);
+ }catch(error){return result(receipt?.effect_possible?'AMBIGUOUS':'NOT_APPLIED',null,
+  {code:'PACKAGE_UPLOAD_COMPLETION_UNCONFIRMED',message:String(error.message).slice(0,500)});}
+ finally{if(binding)await binding.dispose();}
+}
+
 // Upload submission can settle before its file grid reload does. Wait on the
 // same native directory/view/store before discovery or scrolling, without
 // refreshing, downloading, or resubmitting anything while it is covered.

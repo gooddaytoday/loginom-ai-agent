@@ -60,6 +60,10 @@ test("actual managed entry reads live bridge work and dispatching over private I
           browser_transport_closed: true, browser_process_terminated: true, clipboard_leases_retained: 0,
         }),
         hasActiveWork: () => work().activeWork, hasUnsettledWork: () => work().unsettledWork,
+        prepareLocalPackage: async (args, pair, { signal }) => {
+          signal.throwIfAborted();
+          return { content: [{ type: 'text', text: JSON.stringify({ args, pair, private: true }) }] };
+        },
       } }`,
     "runtime/client/node_modules/@modelcontextprotocol/sdk/package.json": JSON.stringify({ type: "commonjs" }),
     "runtime/client/node_modules/@modelcontextprotocol/sdk/client/index.js": `
@@ -115,6 +119,13 @@ test("actual managed entry reads live bridge work and dispatching over private I
       await Bun.write(work, JSON.stringify(state))
       expect(await runtime.request("work")).toEqual({ ...state, dispatching: false })
     }
+    const args = { intent: "open_package", operation_id: "local-package" }
+    const packageArtifact = { artifactID: "artifact", uploadGrantID: "grant" }
+    expect(await runtime.request("call", { name: "dock_prepare", arguments: args, packageArtifact })).toEqual({
+      result: { content: [{ type: "text", text: JSON.stringify({ args, pair: packageArtifact, private: true }) }] },
+      recoveryPending: false,
+      activeWork: false,
+    })
     const call = runtime
       .request("call", { name: "fixture", arguments: { hold: true } })
       .catch((error: unknown) => error)

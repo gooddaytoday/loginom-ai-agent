@@ -87,12 +87,14 @@ const channel=new MessageChannel();
 function port(raw){return {on(event,listener){raw.on(event,event==='message'?data=>listener({data}):listener)},start(){raw.start()},postMessage(value){raw.postMessage(value)}}}
 const client=transport(port(channel.port2));
 const service={recoveries:new Map(),acquire(){return {generation:7,release(){},holdRecovery(){}}},
+ api:{async status(){return {state:'ready',generation:7,hasApiKey:true}}},hasRuntime(){return true},
  async retireRuntime(){},resetRestarts(){},journal:{pending(){return []},async settle(){}},
  async inputs(generation,chat,message,files){return inputStore(process.argv[3]).admit(`${generation}:${chat}`,message,files,'/jsteach')},
  async runtime(){return {async request(method,input){if(method!=='admit')throw Error('unexpected request');return input.files}}}};
 const close=loginomHostPort(port(channel.port1),service);
 await client.request('acquire',{session:'actual-session',run:'own-run'});
-const result=await client.request('admit',{run:'own-run',userMessage:'actual-message',files:[{name:'sales.csv',data:'eA=='}]});
+await client.request('scope',{run:'own-run',mode:'bind',scope:{taskMessageID:'msg_actual',profile:'loginom-automation'}});
+const result=await client.request('admit',{run:'own-run',userMessage:'msg_actual',files:[{name:'sales.csv',data:'eA=='}]});
 console.log(JSON.stringify(result.map(file=>file.name)));
 await client.request('release',{run:'own-run'});client.close();channel.port1.close();channel.port2.close();
 """
@@ -101,7 +103,7 @@ await client.request('release',{run:'own-run'});client.close();channel.port1.clo
             result=subprocess.run([os.environ['LOGINOM_BUN'],str(script_path),str(root),str(Path(directory)/'inputs')],
                 stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=15)
             self.assertEqual(result.returncode,0,result.stderr)
-            self.assertEqual(json.loads(result.stdout),[host_artifact_name(7,'actual-session','actual-message',0,'sales.csv')])
+            self.assertEqual(json.loads(result.stdout),[host_artifact_name(7,'actual-session','msg_actual',0,'sales.csv')])
 
     def test_private_testable_url_form_is_exact_and_never_rewritten(self):
         self.result['loginomUrl']=self.expected['loginom_url']+'?testable=true'

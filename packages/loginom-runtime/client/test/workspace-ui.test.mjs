@@ -2489,8 +2489,8 @@ test('wizard cancellation confirms the original graph after one exact affirmativ
 });
 
 for(const completion of ['done','execute'])test('wizard '+completion+' waits for the expected graph node without claiming execution completion',async()=>{
-  for(const mode of ['bound_rename','bound_rename_document_id','bound_rename_workflow_id','bound_rename_node_id','bound_rename_navigation_node','bound_rename_wrong_tid','bound_rename_user_label','bound_rename_unbound','success','bound_surface','bound_multiline','bound_multiline_wrong_text','bound_foreign','bound_graph_unlock','bound_graph_lock_churn','wrapped_label','wrapped_filename','wrapped_grouping','different_key','comma_collision','duplicate_label','duplicate_body','actual_space','wrong_label','dialog','still_open','lost_reply','empty_label','stale_region','late_body','late_epoch','epoch_churn','late_mask','late_tab','late_duplicate']) {
-    const expected=mode.startsWith('bound_rename')?'data.csv':mode.startsWith('bound_multiline')?'Дубликаты: out: Value, Amount; in: Key (+1)':mode==='wrapped_filename'?'sales 2026.csv':mode==='wrapped_grouping'?'Quantity, Revenue, Id по Region':mode==='comma_collision'?'A, B':mode==='empty_label'?'':'Сумма';
+  for(const mode of ['bound_rename','bound_rename_multiline','bound_rename_multiline_wrong_text','bound_rename_multiline_user_label','bound_rename_document_id','bound_rename_workflow_id','bound_rename_node_id','bound_rename_navigation_node','bound_rename_wrong_tid','bound_rename_user_label','bound_rename_unbound','success','bound_surface','bound_multiline','bound_multiline_wrong_text','bound_foreign','bound_graph_unlock','bound_graph_lock_churn','wrapped_label','wrapped_filename','wrapped_grouping','different_key','comma_collision','duplicate_label','duplicate_body','actual_space','wrong_label','dialog','still_open','lost_reply','empty_label','stale_region','late_body','late_epoch','epoch_churn','late_mask','late_tab','late_duplicate']) {
+    const expected=mode.startsWith('bound_rename_multiline')?'cols: Category; rows: Region; cells: Amount':mode.startsWith('bound_rename')?'data.csv':mode.startsWith('bound_multiline')?'Дубликаты: out: Value, Amount; in: Key (+1)':mode==='wrapped_filename'?'sales 2026.csv':mode==='wrapped_grouping'?'Quantity, Revenue, Id по Region':mode==='comma_collision'?'A, B':mode==='empty_label'?'':'Сумма';
     const page=new Page(),base='MF;TF-1;',panel=page.add('div',base+'NavigationBar;NavigationPanel');
     let path='';const breadcrumbs=[];
     for(const label of ['Сервер','Пакеты','Package1','Модуль1','Сценарий','Old','Настройка']) {
@@ -2501,7 +2501,7 @@ for(const completion of ['done','execute'])test('wizard '+completion+' waits for
       if(label==='Настройка')page.add('span',null,'',undefined,crumb).attrs.class='maptree-icon-wizard';
     }
     const wizard=page.add('div',base+'WizrdMCF');
-    for(const [key,value] of [['edtDisplayName',expected],['cbxNodeTitleMode',mode==='bound_rename_user_label'?'Пользовательская метка':'Автоматическая метка']]) {
+    for(const [key,value] of [['edtDisplayName',expected],['cbxNodeTitleMode',['bound_rename_user_label','bound_rename_multiline_user_label'].includes(mode)?'Пользовательская метка':'Автоматическая метка']]) {
       const owner=page.add('div',base+'WizrdMCF;DoneWizard;'+key,'',undefined,wizard);
       page.add('input',null,'',undefined,owner).value=value;
     }
@@ -2510,7 +2510,7 @@ for(const completion of ['done','execute'])test('wizard '+completion+' waits for
       let postClickReads=0;
       const readNode=async()=>{const graph=page.events.includes('click')&&++postClickReads>1;
         const value={verified:true,document_id:'doc',workflow_id:'workflow',node_id:graph&&mode==='bound_foreign'?'foreign':'node',
-          surface:graph?'graph':'wizard',tid:base+(graph?'Graph;'+(mode.startsWith('bound_rename')?(postClickReads<4?'Old':mode==='bound_rename_wrong_tid'?'Other.csv':'data.csv'):mode.startsWith('bound_multiline')?'Дубликаты:__out:_Value_Amount;_in:_Key_(+1)':'Сумма'):'WizrdMCF'),
+          surface:graph?'graph':'wizard',tid:base+(graph?'Graph;'+(mode.startsWith('bound_rename')?(postClickReads<4?'Old':mode==='bound_rename_wrong_tid'?'Other.csv':mode.startsWith('bound_rename_multiline')?'cols:_Category;__rows:_Region;__cells:_Amount':'data.csv'):mode.startsWith('bound_multiline')?'Дубликаты:__out:_Value_Amount;_in:_Key_(+1)':'Сумма'):'WizrdMCF'),
           ...(graph&&['bound_graph_unlock','bound_graph_lock_churn'].includes(mode)?{locked:mode==='bound_graph_unlock'?postClickReads<4:postClickReads%2===1}:{})};
         if(graph&&postClickReads>=4&&['bound_rename_document_id','bound_rename_workflow_id','bound_rename_node_id','bound_rename_navigation_node'].includes(mode))
           value[mode.slice('bound_rename_'.length)]='foreign';
@@ -2525,10 +2525,10 @@ for(const completion of ['done','execute'])test('wizard '+completion+' waits for
     const transition=()=>{
       if(mode==='still_open')return;
       wizard.remove();breadcrumbs.at(-1).remove();breadcrumbs.at(-2).remove();
-      const graph=page.add('div',base+'ModelForm;cmpDiagram'),name=mode.startsWith('bound_multiline')?'Дубликаты:__out:_Value_Amount;_in:_Key_(+1)':mode==='wrong_label' || mode==='different_key'?'Other':mode==='actual_space'?'Сум_ма':expected.replace(/\s/g,'_').replace(/,/g,'');
+      const graph=page.add('div',base+'ModelForm;cmpDiagram'),name=mode.startsWith('bound_rename_multiline')?'cols:_Category;__rows:_Region;__cells:_Amount':mode.startsWith('bound_multiline')?'Дубликаты:__out:_Value_Amount;_in:_Key_(+1)':mode==='wrong_label' || mode==='different_key'?'Other':mode==='actual_space'?'Сум_ма':expected.replace(/\s/g,'_').replace(/,/g,'');
       const node=page.add('g',base+'Graph;'+name,'',undefined,graph);
       const wrapped=['wrapped_label','actual_space','wrapped_filename','wrapped_grouping'].includes(mode);
-      const label=page.add('span',base+'Graph;'+name+';Label;Label',wrapped?'':mode==='bound_multiline_wrong_text'?'Дубликаты: Other':mode==='wrong_label'?'Other':mode==='comma_collision'?'A B':expected,undefined,node);
+      const label=page.add('span',base+'Graph;'+name+';Label;Label',wrapped?'':mode==='bound_rename_multiline_wrong_text'?'cols: Other':mode==='bound_multiline_wrong_text'?'Дубликаты: Other':mode==='wrong_label'?'Other':mode==='comma_collision'?'A B':expected,undefined,node);
       finishedNode=node;finishedLabel=label;finishedGraph=graph;
       if(['wrapped_label','actual_space'].includes(mode)){page.add('span',null,mode==='actual_space'?'Сум ':'Сум',undefined,label);page.add('br',null,'',undefined,label);page.add('span',null,'ма',undefined,label);}
       if(mode==='wrapped_filename' || mode==='wrapped_grouping') {
@@ -2565,7 +2565,7 @@ for(const completion of ['done','execute'])test('wizard '+completion+' waits for
     };
     if(mode==='bound_rename_unbound')delete snapshot.prepared_node_context;
     const result=await page.act({verb:completion==='done'?'finish_wizard':'execute_wizard',ref:button.ref},snapshot);
-    const success=['bound_rename','success','bound_surface','bound_multiline','bound_graph_unlock','wrapped_label','wrapped_filename','wrapped_grouping','stale_region','late_body','late_epoch'].includes(mode);
+    const success=['bound_rename','bound_rename_multiline','success','bound_surface','bound_multiline','bound_graph_unlock','wrapped_label','wrapped_filename','wrapped_grouping','stale_region','late_body','late_epoch'].includes(mode);
     assert.equal(result.status,success?'SUCCEEDED':'AMBIGUOUS',mode+JSON.stringify(result.error));
     assert.equal(page.events.filter(e=>e==='click').length,1);
     if(completion==='execute' && success) {
@@ -4507,7 +4507,7 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
       }
       return next;
     }));
-  return {page};
+  return {page,binding};
 }
 
 test('JavaScript input0 overflow preserves the owned typed close confirmation',async()=>{
@@ -4701,6 +4701,89 @@ test('D52 hidden tabular node requires exact native opening and known mode',asyn
  }
 });
 
+
+async function calculatorNodeOverflowFixture() {
+  const {page,binding}=await joinInputPortOverflowFixture('valid',0,'calculator');
+  const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
+  const name='b3657cf2824ae7d0ba40e53c603a5ccf52a9abd04beb7a866eab38e857b771a5_0_Пакет_для_доработки__74';
+  const rects=[[182,47],[229,94.875],[324,660.078125],[985,101.984375],[1087,110.03125]];
+  for(const [i,c] of crumbs.entries()) {
+    c.attrs['data-tid']=c.attrs['data-tid'].replaceAll('JoinDiagnostic',name).replaceAll('Общая_выручка_к_каждому_товару','amount_double');
+    if(i===2)c.ownText=name;if(i===5)c.ownText='amount_double';
+    c.box=i<5?{x:rects[i][0],y:41,width:rects[i][1],height:24}:{x:0,y:0,width:0,height:0};
+    if(i>=5)c.style.display='none';
+    for(const icon of c.children)icon.box={x:c.box.x+1,y:c.box.y+1,width:16,height:16};
+  }
+  page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  binding.navigation_node={tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()};
+  class ModelNodeTreeNode{};
+  const nodeTree=Object.assign(new ModelNodeTreeNode(),{FGuid:'node'}),component={el:{dom:crumbs[5]},_node:{data:{node:nodeTree}}};
+  crumbs[5].id='overflow-node';
+  Object.assign(page.app,{ModelNodeTreeNode,Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node:{ParentNode:{ParentNode:{ParentNode:nodeTree}}}}}}})}}}}}});
+  page.context.Ext={getCmp:id=>id===crumbs[5].id?component:null};
+  const wizard=page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF"]')[0],c=mappingCoverageFixture(page,4);page.context.innerWidth=1280;
+  for(const child of [...c.form.children]) {
+    if(child.attrs['data-tid']?.endsWith(';btnAddMappingColumn')){child.remove();continue;}
+    for(const e of [child,...child.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('MF;TF-1;','MF;TF-5;').replace('ColumnsMappingEngineOutputPortWizard','TuneDataSourceMappingWizard').replace('colDefaultUsageType_','colUsageType_');
+    wizard.append(child);
+  }
+  c.form.remove();page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1208,y:380,width:64,height:64},wizard);
+  return {page,crumbs,nodeTree,component,wizard,binding};
+}
+
+test('Calculator input Done keeps the exact native node hidden by the admitted package breadcrumb',async()=>{
+  const {page}=await calculatorNodeOverflowFixture(),r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  assert.equal(r.output.wizard.input_port_context.status,'observed');
+  assert.ok(r.output.ui.elements.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone').allowed_actions.includes('finish_wizard'));
+  assert.deepEqual(page.events,[]);
+});
+
+test('hidden Calculator node refuses foreign native identity, DOM and CSS owners',async()=>{
+  for(const fault of ['guid','tree','dom','component','hidden','visibility','opacity','sensitive','icon_css','unknown_mode','both_modes','foreign_path','foreign_label','missing_navigation','missing_guid','missing_opening']) {
+    const {page,crumbs,nodeTree,component,binding}=await calculatorNodeOverflowFixture();
+    if(fault==='guid')nodeTree.FGuid='foreign';if(fault==='tree')component._node.data.node={FGuid:'node'};
+    if(fault==='dom')component.el.dom={};if(fault==='component')page.context.Ext=null;
+    if(fault==='hidden')crumbs[5].attrs.hidden='';if(fault==='visibility')crumbs[5].style.visibility='hidden';
+    if(fault==='opacity')crumbs[5].style.opacity='0';if(fault==='sensitive')crumbs[5].attrs['aria-label']='api-key';
+    if(fault==='icon_css')crumbs[5].children[0].style.visibility='hidden';
+    if(fault==='unknown_mode')page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;rbTable"]')[0].attrs.class='';
+    if(fault==='both_modes')page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;rbLinks"]')[0].attrs.class='x-form-cb-checked';
+    if(fault==='foreign_path')binding.navigation_node.tid+='-foreign';
+    if(fault==='foreign_label')binding.navigation_node.label+=' foreign';
+    if(fault==='missing_navigation')delete binding.navigation_node;
+    if(fault==='missing_guid')delete binding.input_port.port_guid;
+    if(fault==='missing_opening')delete binding.input_port.opening_operation_id;
+    const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+    assert.notEqual(r.output.wizard.input_port_context.status,'observed',fault);
+    assert.ok(!r.output.ui.elements.some(e=>e.allowed_actions.includes('finish_wizard')),fault);assert.deepEqual(page.events,[]);
+  }
+});
+
+test('Calculator main wizard keeps its exact overflow node and Settings owner',async()=>{
+  const {page,crumbs,wizard,nodeTree}=await calculatorNodeOverflowFixture();
+  for(const e of [...wizard.children])e.remove();
+  page.add('button','MF;TF-5;WizrdMCF;CalcDataWizard;btnAddExpr','',undefined,wizard);
+  crumbs[6].attrs['data-tid']=crumbs[5].attrs['data-tid']+'>Настройка';crumbs[6].ownText='Настройка';
+  for(const e of [...crumbs[6].children])e.remove();page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-wizard';
+  crumbs[7].remove();crumbs[8].remove();
+  page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>({Controller:{Node:{data:{node:{ParentNode:nodeTree}}}}});
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},async()=>({verified:true,surface:'wizard',node_id:'node'})));
+  const r=await page.execute({mode:'observe'});assert.equal(r.output.wizard.stage,'calculator');
+  assert.equal(r.output.wizard.owner_context.status,'observed');assert.equal(r.output.wizard.owner_context.node.label,'amount_double');assert.deepEqual(page.events,[]);
+});
+
+test('Calculator output Done keeps its exact overflow node and output folder owner',async()=>{
+  const {page,crumbs,wizard}=await calculatorNodeOverflowFixture();
+  for(const e of [wizard,...wizard.descendants()])if(e.attrs['data-tid'])e.attrs['data-tid']=e.attrs['data-tid'].replace('TuneDataSourceMappingWizard','ColumnsMappingEngineOutputPortWizard').replace('colUsageType_','colDefaultUsageType_');
+  for(const c of crumbs.slice(6))c.attrs['data-tid']=c.attrs['data-tid'].replace('Входные_порты','Выходные_порты').replace('Входной_источник_данных','Результат');
+  crumbs[6].ownText='Выходные порты';crumbs[6].children.at(-1).attrs.class='maptree-icon-modeloutputports';
+  crumbs[7].ownText='Результат';crumbs[7].children[0].attrs.class='bg-vendor-icon-deriveddatasourceoutputsocketdef';
+  const port={direction:'output',port:0,native_index:0,port_guid:'output',opening_operation_id:'output-open',node_icon_class:'bg-vendor-icon-calcdata'};
+  page.execute=async options=>clone(await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,{expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-5',navigation_path:[]}},...options},async()=>({verified:true,surface:'wizard',node_id:'node',output_port:port})));
+  const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
+  assert.equal(r.output.wizard.port_context.status,'observed');assert.equal(r.output.wizard.port_context.node.label,'amount_double');
+  assert.ok(r.output.ui.elements.find(e=>e.tid==='MF;TF-5;WizrdMCF;btnDone').allowed_actions.includes('finish_wizard'));assert.deepEqual(page.events,[]);
+});
 
 test('three-input Union offers Done and owned close only with its exact numbered overflow owner',async()=>{
  for(const port of [1,2])for(const mode of ['valid','union_wrong_number','wrong_icon','missing_native_port','unverified_owner']) {
@@ -5550,7 +5633,7 @@ test('typed output-port finish requires complete output mapping and its own port
 });
 
 test('overflow output socket requires a current native owner and visible actionable Done',async()=>{
-  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns','filterdata','javascript','joindata'])for(const outputPort of vendor==='filterdata'?[0,1]:[0])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','bound_folder_wrong_path','bound_folder_duplicate','bound_folder_hidden_owner','bound_folder_hidden_visibility','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
+  for(const vendor of ['groupdata','sorting','uniondata','crosstab','calcdata','reformcolumns','filterdata','javascript','joindata','importtextfile'])for(const outputPort of vendor==='filterdata'?[0,1]:[0])for(const socketIcon of ['deriveddatasourceoutputsocketdef','datasetoutputsocketdef'])for(const mode of ['bound_folder','bound_folder_wrong_icon','bound_folder_wrong_caption','bound_folder_wrong_type','bound_folder_wrong_port','bound_folder_wrong_index','bound_folder_missing_guid','bound_folder_missing_opening','bound_folder_missing_native_icon','bound_folder_wrong_native_icon','bound_folder_unbound','bound_folder_wrong_path','bound_folder_duplicate','bound_folder_hidden_owner','bound_folder_hidden_visibility','valid','unbound','stale_owner','foreign_port','missing_guid','missing_opening','wrong_index',
     'duplicate_socket','wrong_socket_icon','missing_settings','hidden_ancestor','hidden_visibility','disabled_done','hidden_done']){
     const {page}=outputPortFinishFixture();
     const find=suffix=>page.document.all().find(e=>e.attrs['data-tid']?.endsWith(suffix));
@@ -5600,7 +5683,7 @@ test('overflow output socket requires a current native owner and visible actiona
     const controls=raw.output.ui.elements.filter(e=>e.allowed_actions.includes('finish_wizard'));
     assert.equal(controls.length,accepted?1:0,vendor+': '+socketIcon+': '+mode);
     if(accepted){assert.equal(raw.output.wizard.port_context.status,'observed');assert.equal(controls[0].wizard_finish.mode,'output_port');}
-    if(['javascript','joindata'].includes(vendor)&&mode.startsWith('bound_folder')) {
+    if(['javascript','joindata','importtextfile'].includes(vendor)&&mode.startsWith('bound_folder')) {
       const dialog=page.add('div',null,'',{x:400,y:200,width:400,height:150});dialog.attrs.class='x-window';
       page.add('h1',null,'Подтвердить',undefined,dialog).attrs.role='heading';
       page.add('span',null,'Вы действительно хотите закрыть мастер настройки?',undefined,dialog);
@@ -5993,6 +6076,20 @@ test('owned import preview preserves scroll identity geometry schema and wizard 
  assert.equal(navigated.status,'SUCCEEDED',JSON.stringify(navigated.error));
  assert.equal(navigated.output.wizard.stage,'output_mapping');
  assert.equal(f.page.events.filter(e=>e==='click').length,1);
+});
+
+test('private parent deadline prevents a navigation gesture after its remaining budget',async()=>{
+  const clock=fixtureClock(),page=new Page({clock:clock.Date});
+  page.add('button','Safe;btnAction','Action');
+  const snapshot=await page.observe(),target=snapshot.ui.elements.find(element=>element.tid==='Safe;btnAction');
+  const locator=page.locator.bind(page);
+  page.locator=selector=>{
+    const control=locator(selector),count=control.count;
+    control.count=async()=>{clock.advance(250);return count();};return control;
+  };
+  const result=await page.execute({mode:'act',operation_id:'navigation',action:{verb:'click',ref:target.ref},snapshot,deadline_at:250});
+  assert.equal(result.status,'NOT_APPLIED');assert.equal(result.error.code,'UI_DEADLINE_EXCEEDED');
+  assert.equal(result.effect_possible,false);assert.deepEqual(page.events,[]);
 });
 
 test('wide import definitions have addressed pages with one schema identity and explicit completeness',async()=>{

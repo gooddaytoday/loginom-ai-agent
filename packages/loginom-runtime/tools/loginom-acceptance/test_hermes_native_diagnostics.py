@@ -9,7 +9,10 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location("dock_native_diagnostics", ROOT / "plugins/loginom-dock-hermes/__init__.py")
+PLUGIN = ROOT / "plugins/loginom-dock-hermes/__init__.py"
+if not PLUGIN.exists():
+    raise unittest.SkipTest("Hermes integration is archived; see docs/migration/source-selection.md")
+spec = importlib.util.spec_from_file_location("dock_native_diagnostics", PLUGIN)
 native = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(native)
 

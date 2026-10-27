@@ -117,7 +117,8 @@ test.each(["clean", "reserved", "reserved-command", "modified", "missing", "unli
         [...(kind === "reserved-command" ? ["--command", "package-docs"] : []), "--", "Проверь каталог skills."],
         undefined,
         {
-          PATH: "/nonexistent",
+          // Git keeps the fixture project bounded; rg, tar and gzip remain unavailable.
+          PATH: fixture.gitOnlyPath,
           ...(fixture.binary && kind === "clean" ? { LOGINOM_AI_AGENT_CLI_BUNDLE: undefined } : {}),
           ...(kind === "wrong-root" ? { LOGINOM_AI_AGENT_CLI_BUNDLE: join(fixture.directory, "missing-root") } : {}),
         },

@@ -308,6 +308,7 @@ it.live("the same skill realpath is discovered only once through two configured 
       expect(yield* skills.dirs()).toHaveLength(3)
       expect((yield* skills.require("sample")).location).toBe(join(source, "sample/SKILL.md"))
     }),
+    { git: true },
   ),
 )
 

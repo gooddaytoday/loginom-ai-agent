@@ -180,7 +180,7 @@ it.instance(
   20_000,
 )
 
-for (const state of ["reverted", "message-reverted", "replayed"] as const) {
+for (const state of ["reverted", "message-reverted", "replayed", "query", "fragment", "other-file"] as const) {
   it.instance(
     "a " + state + " attachment must request fresh read permission before extracting a package",
     () =>
@@ -190,7 +190,9 @@ for (const state of ["reverted", "message-reverted", "replayed"] as const) {
         const sessions = yield* Session.Service
         const permissions = yield* Permission.Service
         const input = yield* prepare({
-          attachment: pathToFileURL(fixture).href,
+          attachment:
+            pathToFileURL(state === "other-file" ? join(resources, "resource-manifest.json") : fixture).href +
+            (state === "query" ? "?start=1" : state === "fragment" ? "#range" : ""),
           permission: [
             { permission: "external_directory", pattern: "*", action: "allow" },
             { permission: "read", pattern: "*", action: "ask" },
@@ -316,6 +318,109 @@ it.instance(
 )
 
 it.instance(
+  "an OS read refusal names the file without suggesting an attachment",
+  () =>
+    Effect.gen(function* () {
+      if (process.platform === "win32") return
+      const instance = yield* TestInstance
+      const fs = yield* FSUtil.Service
+      const path = join(instance.directory, "unreadable.lgp")
+      yield* fs.copyFile(fixture, path)
+      const input = yield* prepare()
+      const result = yield* Effect.acquireUseRelease(
+        fs.chmod(path, 0),
+        () => input.tool.execute({ operation: "extract", lgp: path }, input.ctx).pipe(Effect.exit),
+        () => fs.chmod(path, 0o600).pipe(Effect.orDie),
+      )
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) {
+        expect(String(Cause.squash(result.cause))).toContain(path)
+        expect(String(Cause.squash(result.cause))).toMatch(/EACCES|permission|доступ/i)
+        expect(String(Cause.squash(result.cause))).not.toContain("--file")
+      }
+      expect(input.requests).toEqual([])
+    }),
+  20_000,
+)
+
+it.instance(
+  "local path filesystem errors include their reason and path without an attachment hint",
+  () =>
+    Effect.gen(function* () {
+      const instance = yield* TestInstance
+      const fs = yield* FSUtil.Service
+      const directory = join(instance.directory, "Каталог #1.lgp")
+      yield* fs.makeDirectory(directory)
+      for (const [path, reason] of [
+        [join(instance.directory, "missing.lgp"), /not.?found|ENOENT|отсутствует/i],
+        [directory, /directory|каталог/i],
+      ] as const) {
+        const input = yield* prepare()
+        const result = yield* input.tool.execute({ operation: "extract", lgp: path }, input.ctx).pipe(Effect.exit)
+        expect(Exit.isFailure(result)).toBe(true)
+        if (Exit.isFailure(result)) {
+          expect(String(Cause.squash(result.cause))).toContain(path)
+          expect(String(Cause.squash(result.cause))).toMatch(reason)
+          expect(String(Cause.squash(result.cause))).not.toContain("--file")
+        }
+        expect(input.requests).toEqual([])
+      }
+    }),
+  20_000,
+)
+
+it.instance(
+  "configured file deny beats an attachment and an earlier always approval",
+  () =>
+    Effect.gen(function* () {
+      const permissions = yield* Permission.Service
+      const input = yield* prepare({
+        attachment: pathToFileURL(fixture).href,
+        permission: [{ permission: "read", pattern: "*", action: "deny" }],
+      })
+      const approval = yield* permissions
+        .ask({
+          sessionID: input.ctx.sessionID,
+          permission: "read",
+          patterns: ["previous.txt"],
+          always: ["*"],
+          metadata: {},
+          ruleset: [],
+        })
+        .pipe(Effect.forkScoped)
+      const request = yield* pollWithTimeout(
+        permissions.list().pipe(Effect.map((items) => items.find((item) => item.sessionID === input.ctx.sessionID))),
+        "previous read approval did not appear",
+      )
+      yield* permissions.reply({ requestID: request.id, reply: "always" })
+      yield* Fiber.join(approval)
+      const metadata: unknown[] = []
+      const result = yield* input.tool
+        .execute(
+          { operation: "extract", lgp: fixture },
+          {
+            ...input.ctx,
+            metadata: (value) =>
+              Effect.sync(() => {
+                metadata.push(value.metadata)
+              }),
+          },
+        )
+        .pipe(Effect.exit)
+      expect(Exit.isFailure(result)).toBe(true)
+      if (Exit.isFailure(result)) {
+        expect(Cause.squash(result.cause)).toBeInstanceOf(PermissionV1.DeniedError)
+        expect(String(Cause.squash(result.cause))).toContain(fixture)
+        expect(String(Cause.squash(result.cause))).not.toContain("--file")
+      }
+      expect(metadata).toContainEqual({ permissionDenied: true })
+      expect(input.requests).toEqual([])
+    }),
+  { git: true },
+  20_000,
+)
+
+it.instance(
   "an original attachment does not override the user's explicit read deny",
   () =>
     Effect.gen(function* () {
@@ -359,7 +464,7 @@ it.instance(
       const result = yield* input.tool.execute({ operation: "extract", lgp: fixture }, input.ctx).pipe(Effect.exit)
       expect(Exit.isFailure(result)).toBe(true)
       if (Exit.isFailure(result)) expect(Cause.squash(result.cause)).toBeInstanceOf(PermissionV1.DeniedError)
-      expect(input.requests.map((request) => request.permission)).toEqual(["external_directory"])
+      expect(input.requests.map((request) => request.permission)).toEqual([])
       expect(yield* fs.exists(join(instance.directory, ".work"))).toBe(false)
     }),
   20_000,
@@ -376,7 +481,7 @@ it.instance(
       const result = yield* input.tool.execute({ operation: "extract", lgp: fixture }, input.ctx).pipe(Effect.exit)
       expect(Exit.isFailure(result)).toBe(true)
       if (Exit.isFailure(result)) expect(Cause.squash(result.cause)).toBeInstanceOf(PermissionV1.DeniedError)
-      expect(input.requests.map((request) => request.permission)).toEqual(["external_directory"])
+      expect(input.requests.map((request) => request.permission)).toEqual([])
     }),
   20_000,
 )
@@ -735,7 +840,7 @@ it.instance(
         .pipe(Effect.exit)
       expect(Exit.isFailure(result)).toBe(true)
       if (Exit.isFailure(result)) expect(Cause.squash(result.cause)).toBeInstanceOf(PermissionV1.DeniedError)
-      expect(input.requests.map((request) => request.permission)).toEqual(["external_directory"])
+      expect(input.requests.map((request) => request.permission)).toEqual([])
     }),
   20_000,
 )

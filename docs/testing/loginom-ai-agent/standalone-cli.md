@@ -21,6 +21,12 @@ scripted; реальный Xiaomi smoke Desktop проверен отдельн�
 
 ## Linux: текущая установка и исторические проверки
 
+Для контейнерной CLI-приёмки задавать `LANG=C.UTF-8` в образе. В pinned
+Chromium1246 без locale успешный `setInputFiles` для кириллического имени может
+оставить пустой `FileList`; ASCII-копия тех же bytes читается. Native проверка
+с `LANG=C.UTF-8` проходит и для staging0400/0500. Это условие тестовой среды,
+не обход подтверждения upload; текущий результат #74 — в [журнале](local-file-paths.md).
+
 **Актуальный изолированный кандидат package-docs, 2026-10-08:** чистый
 `49b1584f23b4aa47e18b26119389d6f45623fc94`,0.1.17, полный CLI TAR.GZ SHA256
 `3de2ad8eabb0625dee91076ea02e12c2b09a71f82abdc140adbd80824a661f4f`, manifest

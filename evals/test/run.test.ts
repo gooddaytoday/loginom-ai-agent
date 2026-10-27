@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import os from "node:os"
 import path from "node:path"
-import { cp, mkdir, mkdtemp, readdir, rm } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, readdir, rm, symlink, lstat } from "node:fs/promises"
 import { parseArtifactSource } from "../src/artifact"
 import { agentCommand } from "../src/cli"
 import { evalsRoot, loadConfig } from "../src/config"
@@ -42,6 +42,74 @@ test("main: real slots require a recorded resource budget before reading private
       .rejects.toThrow("RESOURCE_BUDGET_REQUIRED")
     expect(await readdir(root)).toEqual([])
   } finally { await rm(root, { recursive: true }) }
+})
+
+test("runAttempt: paths сохраняет вложенные входы без --file и раскрывает внутренний symlink", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-staged-paths-"))
+  try {
+    const root = path.join(directory, "tasks/group-sum-qty")
+    await cp(path.join(evalsRoot, "tasks/group-sum-qty"), root, { recursive: true })
+    const inputs = ["data/Первый #1/sales.csv", "data/Второй %2/sales.csv"]
+    await mkdir(path.dirname(path.join(root, inputs[0]!)), { recursive: true })
+    await symlink(path.join(root, "data/sales.csv"), path.join(root, inputs[0]!))
+    await Bun.write(path.join(root, inputs[1]!), "amount\n7\n")
+    const raw = await Bun.file(path.join(root, "task.json")).json()
+    await Bun.write(path.join(root, "task.json"), JSON.stringify({ ...raw, input_mode: "paths", inputs,
+      prompt: inputs.map(rel => `{{INPUT_ROOT}}/${rel}`).join(" и ") }))
+    const [task] = await loadTasks(path.dirname(root))
+    const config = loadConfig(["--dry-run"], { EVAL_WORKSPACE_ROOT: path.join(directory, "workspace") })
+    const command = agentCommand(config)
+    const argsFile = path.join(directory, "args.json")
+    const input = { config, command: { ...command, env: { ...command.env, EVAL_FAKE_ARGS_FILE: argsFile } },
+      source: parseArtifactSource(config.artifactSource, config.loginom), task: task!, attempt: 1, runId: "paths",
+      runDir: path.join(directory, "results"), signal: new AbortController().signal, profileRecovered: false, skipJudge: true }
+    const { result } = await runAttempt(input)
+    const workdir = path.join(config.agent.workspaceRoot, "paths/group-sum-qty/1")
+    const args = await Bun.file(argsFile).json()
+    expect(result.status).toBe("completed")
+    expect(args).not.toContain("--file")
+    expect(args.at(-1)).not.toContain("{{INPUT_ROOT}}")
+    expect(await Bun.file(path.join(directory, "results/group-sum-qty/1/inputs.json")).json()).toMatchObject({ passed: true })
+    for (const rel of inputs) {
+      expect(args.at(-1)).toContain(path.join(workdir, rel))
+      expect(await Bun.file(path.join(workdir, rel)).text()).toBe(await Bun.file(path.join(root, rel)).text())
+      expect((await lstat(path.join(workdir, rel))).isSymbolicLink()).toBe(false)
+    }
+    await mkdir(path.join(directory, "results/group-sum-qty/2/inputs.json"), { recursive: true })
+    const refused = await runAttempt({ ...input, attempt: 2 })
+    expect(refused.result).toMatchObject({ status: "completed", package_path: result.package_path,
+      environment_cleanup: { status: "failed" } })
+    expect(refused.stop).toBe(true)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test.each(["write", "delete"])("runAttempt: paths фиксирует %s входа и не вызывает судью", async (change) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "evals-changed-paths-"))
+  try {
+    const config = loadConfig(["--dry-run"], { EVAL_WORKSPACE_ROOT: path.join(directory, "workspace") })
+    const [task] = await loadTasks(config.tasksDir, ["group-sum-qty"])
+    const command = agentCommand(config)
+    const argsFile = path.join(directory, "args.json")
+    const pending = runAttempt({ config, command: { ...command, env: { ...command.env,
+      EVAL_FAKE_ARGS_FILE: argsFile, EVAL_FAKE_SLEEP_MS: "500" } },
+      source: parseArtifactSource(config.artifactSource, config.loginom), task: { ...task!, inputMode: "paths" },
+      attempt: 1, runId: "changed", runDir: path.join(directory, "results"), signal: new AbortController().signal,
+      profileRecovered: false, skipJudge: false,
+      judge: { command: ["bun", path.join(evalsRoot, "fixtures/fake-codex.ts")], model: "fake", reasoning: "high", timeoutMs: 5000, passThreshold: 70 } })
+    const deadline = Date.now() + 5000
+    while (!(await Bun.file(argsFile).exists()) && Date.now() < deadline) await Bun.sleep(5)
+    expect(await Bun.file(argsFile).exists()).toBe(true)
+    const staged = path.join(config.agent.workspaceRoot, "changed/group-sum-qty/1/data/sales.csv")
+    if (change === "write") await Bun.write(staged, "changed")
+    if (change === "delete") await rm(staged)
+    const { result } = await pending
+    expect(result).toMatchObject({ status: "failed", pass: false, judge_status: "skipped", judge_attempts: 0,
+      checklist: [{ id: "inputs-unchanged", passed: false, evidence: "inputs.json" }] })
+    expect(result.errors.join(" ")).toContain("INPUTS_CHANGED")
+    const evidence = await Bun.file(path.join(directory, "results/group-sum-qty/1/inputs.json")).json()
+    expect(evidence.passed).toBe(false)
+    expect(evidence.before).not.toBe(evidence.after)
+  } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
 test("runAttempt: live binary без выделенного Loginom останавливается до агента и судьи", async () => {

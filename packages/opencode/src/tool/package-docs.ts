@@ -1,20 +1,16 @@
-import { Cause, Effect, Schema } from "effect"
+import { Effect, Schema } from "effect"
 import { ChildProcess } from "effect/unstable/process"
 import { createHash } from "node:crypto"
 import { basename, dirname, extname, isAbsolute, join, relative, sep } from "node:path"
-import { fileURLToPath } from "node:url"
 import { AppProcess } from "@opencode-ai/core/process"
 import { FSUtil } from "@opencode-ai/core/fs-util"
-import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { verifyBundledSkills } from "@loginom-ai-agent/loginom-host/bundled-skills"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { InstanceState } from "@/effect/instance-state"
 import { Agent } from "@/agent/agent"
-import { Permission } from "@/permission"
 import { Session } from "@/session/session"
-import { TaskScope } from "@/session/task-scope"
 import { Tool } from "./tool"
-import { assertExternalDirectoryEffect } from "./external-directory"
+import { authorizeLoginomFile } from "./loginom-local-file"
 
 export const Parameters = Schema.Union([
   Schema.Struct({ operation: Schema.Literal("extract"), lgp: Schema.String }),
@@ -31,9 +27,9 @@ export const PackageDocsTool = Tool.define(
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
     const sessions = yield* Session.Service
+    const agents = yield* Agent.Service
     const appProcess = yield* AppProcess.Service
     const flags = yield* RuntimeFlags.Service
-    const agents = yield* Agent.Service
 
     return {
       description:
@@ -42,46 +38,15 @@ export const PackageDocsTool = Tool.define(
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         Effect.gen(function* () {
           if (ctx.abort.aborted) return yield* Effect.die(AppProcess.abortError(ctx.abort))
+          const { canonicalPath: lgp } = yield* authorizeLoginomFile(params.lgp, ctx).pipe(
+            Effect.provideService(FSUtil.Service, fs),
+            Effect.provideService(Session.Service, sessions),
+            Effect.provideService(Agent.Service, agents),
+          )
           const instance = yield* InstanceState.context
           const session = yield* sessions.get(ctx.sessionID)
           const directory = yield* fs.realPath(session.directory)
-          const requested = isAbsolute(params.lgp) ? params.lgp : join(directory, params.lgp)
-          const lgp = yield* fs.realPath(requested)
           if (extname(lgp).toLowerCase() !== ".lgp") return yield* Effect.die(Error("PACKAGE_DOCS_LGP_REQUIRED"))
-          const history = yield* sessions.messages({ sessionID: ctx.sessionID })
-          const attachments = TaskScope.visible({ sessionID: ctx.sessionID, messages: history, revert: session.revert })
-            .filter((message) => message.info.role === "user" && !TaskScope.replayOf(message))
-            .flatMap((message) => message.parts.filter((part) => part.type === "file"))
-          const attached = yield* Effect.forEach(attachments, (part) =>
-            Effect.gen(function* () {
-              const url = URL.parse(part.url)
-              if (!url || url.protocol !== "file:" || url.search || url.hash) return false
-              return (yield* fs.realPath(fileURLToPath(url)).pipe(Effect.orElseSucceed(() => undefined))) === lgp
-            }),
-          )
-          const rules = Permission.merge((yield* agents.get(ctx.agent)).permission, session.permission ?? [])
-          const readPatterns = [...new Set([requested, lgp].map((path) => relative(instance.worktree, path)))]
-          yield* Effect.gen(function* () {
-            if (
-              !attached.some(Boolean) ||
-              Permission.evaluate("external_directory", join(dirname(lgp), "*").replaceAll("\\", "/"), rules).action ===
-                "deny"
-            ) {
-              yield* assertExternalDirectoryEffect(ctx, lgp)
-            }
-            if (
-              !attached.some(Boolean) ||
-              readPatterns.some((pattern) => Permission.evaluate("read", pattern, rules).action === "deny")
-            ) {
-              yield* ctx.ask({ permission: "read", patterns: readPatterns, always: ["*"], metadata: { filepath: lgp } })
-            }
-          }).pipe(
-            Effect.catchCause((cause) => {
-              if (Cause.squash(cause) instanceof PermissionV1.RejectedError)
-                return Effect.die(new PackageReadRejected({}))
-              return Effect.failCause(cause)
-            }),
-          )
           const stem = basename(lgp, extname(lgp))
           const work = join(
             directory,
@@ -183,12 +148,6 @@ export const PackageDocsTool = Tool.define(
     }
   }),
 )
-
-class PackageReadRejected extends PermissionV1.RejectedError {
-  override get message() {
-    return super.message + " Для CLI передайте пакет через --file; в Desktop/TUI приложите файл к сообщению."
-  }
-}
 
 const availableReport = Effect.fn("PackageDocs.availableReport")(function* (
   fs: FSUtil.Interface,

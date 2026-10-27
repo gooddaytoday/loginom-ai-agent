@@ -1,14 +1,14 @@
 import { constants } from "node:fs"
 import { open } from "node:fs/promises"
 
-// Read only the explicitly attached file, with a bound on allocation and reads.
+// Read an authorized file, with a bound on allocation and reads.
 // O_NONBLOCK lets us reject a FIFO after fstat without waiting for a writer.
-export async function fileSnapshot(path: string) {
+export async function fileSnapshot(path: string, maxBytes = 10 * 1024 * 1024) {
   const handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK)
   try {
     const stat = await handle.stat()
-    if (!stat.isFile() || stat.size > 10 * 1024 * 1024)
-      throw Error("Cannot attach local file larger than 10 MiB or a special file")
+    if (!stat.isFile() || stat.size > maxBytes)
+      throw Error(`Cannot attach local file larger than ${maxBytes / 1024 / 1024} MiB or a special file`)
     const bytes = Buffer.alloc(stat.size)
     let offset = 0
     while (offset < bytes.length) {

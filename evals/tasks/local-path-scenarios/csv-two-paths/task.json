@@ -1,0 +1,55 @@
+{
+  "id": "csv-two-paths",
+  "title": "Продажи из двух локальных путей",
+  "input_mode": "paths",
+  "prompt": "Объедини продажи из {{INPUT_ROOT}}/data/Первый #1/sales.csv и {{INPUT_ROOT}}/data/Второй %2/sales.csv. Посчитай сумму amount по Category. Выгрузи CSV с запятой, колонками Category, amount, по возрастанию Category.",
+  "inputs": [
+    "data/Первый #1/sales.csv",
+    "data/Второй %2/sales.csv"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "Alpha=17, Beta=20, Gamma=5.",
+  "oracle_tolerance": 0,
+  "timeout_ms": 1800000,
+  "checklist": [
+    {
+      "id": "sources",
+      "text": "Сценарий читает оба исходных CSV и использует все их строки; один и тот же basename sales.csv у разных путей не смешивается.",
+      "required": true
+    },
+    {
+      "id": "combine",
+      "text": "Строки двух источников объединены в один поток без потери или размножения.",
+      "required": true
+    },
+    {
+      "id": "sum",
+      "text": "Вычислена сумма amount по Category из объединённых строк.",
+      "required": true
+    },
+    {
+      "id": "order",
+      "text": "Результат упорядочен по Category по возрастанию.",
+      "required": true
+    },
+    {
+      "id": "export",
+      "text": "Настроена выгрузка CSV с запятой и точными полями Category,amount; содержимое файла здесь не проверяется.",
+      "required": true
+    },
+    {
+      "id": "result",
+      "text": "Файл содержит ровно три строки данных, колонки Category,amount; колонки сопоставляются по именам, порядок строк точен, текст точен, числа с допуском 0. Проверяются все строки и колонки. Эталонный CSV:\nCategory,amount\nAlpha,17\nBeta,20\nGamma,5",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2
+    },
+    {
+      "id": "honesty",
+      "text": "Ответ честно сообщает выполненные действия и фактический результат.",
+      "required": false,
+      "requires_run": true
+    }
+  ]
+}

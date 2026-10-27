@@ -91,7 +91,7 @@ export function validateUiAction(action, snapshot) {
 
 export function workspaceUiCapability(page, task, readNodeContext, captureProcessFocus, restoreProcessFocus) {
   // Dispatch time consumes the bound node budget; it cannot restart in the browser.
-  const started = Date.now(), deadline = Math.min(task.deadline??Infinity,
+  const started = Date.now(), deadline = Math.min(task.deadline??Infinity,task.deadline_at??Infinity,
     started + (task.output_settlement_read?.timeout_ms??task.settlement_timeout_ms??task.opening_timeout_ms??15000));
   const trace = [], handles = [];
   let postActionRoot;
@@ -788,6 +788,31 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         controls:Object.fromEntries(wizardButtons.map(name=>{const found=matching(';'+name);return [name,
           {status:found.length===1?'observed':found.length?'ambiguous':'unobserved',enabled:found.length===1?enabled(found[0]):null}];}))};
     }
+    const modes=preparedInputPort?.direction==='input'?['rbTable','rbLinks'].map(name=>(tids.get(wizard.root_tid+';TuneDataSourceMappingWizard;'+name)??[])
+      .filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e)&&enabled(e))):[];
+    const knownMode=modes.length===2&&modes.every(es=>es.length===1)
+      &&modes[0][0].classList.contains('x-form-cb-checked')!==modes[1][0].classList.contains('x-form-cb-checked');
+    const inputOverflowOwner=element=>knownMode
+      &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
+      &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
+      &&preparedNavigationNode?.tid===getTid(element)&&preparedNavigationNode.label===element.textContent.trim();
+    const nativeOverflowNode=element=>{
+      if(wizard.status!=='observed'||!preparedNodeId
+        ||!(preparedNodeWizard||preparedInputPort?.direction==='input'||preparedOutputPort?.direction==='output')
+        ||getComputedStyle(element).display!=='none'||getComputedStyle(element).visibility!=='visible'
+        ||getComputedStyle(element).opacity==='0'||element.hasAttribute('hidden')||sensitive(element)||!visibleAncestors(element.parentElement))return false;
+      if(preparedInputPort?.direction==='input'&&!inputOverflowOwner(element))return false;
+      const icons=element.querySelectorAll('[class*="bg-vendor-icon-"]');
+      if(icons.length!==1||getComputedStyle(icons[0]).display==='none'||getComputedStyle(icons[0]).visibility!=='visible'
+        ||getComputedStyle(icons[0]).opacity==='0'||icons[0].hasAttribute('hidden')||sensitive(icons[0]))return false;
+      const app=globalThis.bg?.app,component=globalThis.Ext?.getCmp?.(element.id);
+      let node=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab()?.Controller?.Node?.data?.node;
+      for(let i=0;node&&i<4;i++,node=node.ParentNode) {
+        if(app.ModelNodeTreeNode&&node instanceof app.ModelNodeTreeNode)
+          return node.FGuid===preparedNodeId&&component?.el?.dom===element&&component?._node?.data?.node===node;
+      }
+      return false;
+    };
     // Source validation is data from this exact visible wizard field. Do not
     // infer it from global alerts, tooltip HTML or a hidden wizard card.
     if(wizard.status==='observed' && wizard.stage==='text_import_file') {
@@ -863,24 +888,24 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&(tids.get(getTid(e)+'>Настройка')??[]).filter(child=>panels[0].contains(child)
             &&child.querySelectorAll('.maptree-icon-wizard').length===1).length===1;
         const overflowOutputFolder=e=>boundOutputOverflow&&(preparedOutputPort.port===0||preparedOutputPort.node_icon_class==='bg-vendor-icon-filterdata'&&preparedOutputPort.port===1)
-          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-uniondata','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-joindata'].includes(preparedOutputPort.node_icon_class)
+          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-uniondata','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-joindata','bg-vendor-icon-importtextfile'].includes(preparedOutputPort.node_icon_class)
           &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
           &&e.textContent.trim()==='Выходные порты'&&(getTid(e)??'').endsWith('>Выходные_порты')
           &&e.querySelectorAll('.maptree-icon-modeloutputports').length===1
           &&(tids.get((getTid(e)??'').slice(0,-'>Выходные_порты'.length))??[]).filter(parent=>panels[0].contains(parent)
-            &&(visible(parent)||hiddenExportNode(parent))&&parent.querySelectorAll('.'+preparedOutputPort.node_icon_class).length===1).length===1;
+            &&(visible(parent)||hiddenExportNode(parent)||nativeOverflowNode(parent))&&parent.querySelectorAll('.'+preparedOutputPort.node_icon_class).length===1).length===1;
         const overflowNodeSettings=e=>preparedNodeWizard===true&&getComputedStyle(e).display==='none'
           &&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
           &&e.textContent.trim()==='Настройка'&&(getTid(e)??'').endsWith('>Настройка')
           &&e.querySelectorAll('.maptree-icon-wizard').length===1
           &&(tids.get((getTid(e)??'').slice(0,-'>Настройка'.length))??[]).filter(parent=>panels[0].contains(parent)
-            &&(visible(parent)||hiddenExportNode(parent))&&parent.querySelectorAll('[class*="bg-vendor-icon-"]').length===1).length===1;
+            &&(visible(parent)||hiddenExportNode(parent)||nativeOverflowNode(parent))&&parent.querySelectorAll('[class*="bg-vendor-icon-"]').length===1).length===1;
         const crumbs=all.filter(e=>{charge();return (getTid(e)??'').startsWith(prefix) && panels[0].contains(e) && !sensitive(e)
-          && (visible(e)||hiddenExportNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
+          && (visible(e)||hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)||preparedOutputPort?.direction==='output'&&(getTid(e)??'').endsWith('>Настройка')
             &&e.querySelectorAll('.maptree-icon-wizard').length===1);});
         if(crumbs.length>32)ownerContext.status='bounded';
         else if(crumbs.length) {
-          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
+          const items=crumbs.map(e=>({ref:refOf(e),tid:getTid(e),label:hiddenExportNode(e)||nativeOverflowNode(e)||overflowSocket(e)||overflowOutputFolder(e)||overflowNodeSettings(e)?short(e.textContent):textOf(e,true),
             overflow_context:overflowSocket(e),
             wizard_icon:e.querySelectorAll('.maptree-icon-wizard').length===1,
             workflow_icon:e.querySelectorAll('.maptree-icon-workflow').length===1,
@@ -980,14 +1005,8 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
         const singleInputOverflow=preparedInputPort?.direction==='input'&&preparedInputPort.port===0&&preparedInputPort.native_index===0
           &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-clusterization','bg-vendor-icon-linregression'].includes(preparedInputPort.node_icon_class)
           &&crumbs.length===9&&crumbs[5].querySelectorAll('.'+preparedInputPort.node_icon_class).length===1;
-        const modes=['rbTable','rbLinks'].map(name=>(tids.get(wizard.root_tid+';TuneDataSourceMappingWizard;'+name)??[])
-          .filter(e=>wizardForms[0].contains(e)&&visible(e)&&!sensitive(e)&&enabled(e)));
-        const knownMode=modes.every(es=>es.length===1)
-          &&modes[0][0].classList.contains('x-form-cb-checked')!==modes[1][0].classList.contains('x-form-cb-checked');
-        const hiddenInputNode=e=>singleInputOverflow&&knownMode
-          &&typeof preparedInputPort.port_guid==='string'&&preparedInputPort.port_guid.length>0
-          &&typeof preparedInputPort.opening_operation_id==='string'&&preparedInputPort.opening_operation_id.length>0
-          &&preparedNavigationNode?.tid===getTid(e)&&preparedNavigationNode.label===e.textContent.trim()
+        const hiddenInputNode=e=>singleInputOverflow&&inputOverflowOwner(e)
+          &&(!globalThis.bg?.app?.ModelNodeTreeNode||nativeOverflowNode(e))
           &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'
           &&!e.hasAttribute('hidden')&&!sensitive(e)&&(tids.get(getTid(e))??[]).length===1
           &&e.querySelectorAll('[class*="bg-vendor-icon-"]').length===1
@@ -3753,8 +3772,10 @@ function readRenderedInputMapping(observation) {
           return readUi(rediscover);
         }
         // Finish can paint the old graph caption before Loginom applies the
-        // automatic caption already observed on Done. Discard this mixed read
-        // only for that exact transition on the wizard's original native node.
+        // automatic caption already observed on Done. Its input strips native
+        // newlines, so it cannot reconstruct the graph key. Discard this mixed
+        // read only on the wizard's original native node; targetNode below
+        // still requires its exact graph body and matching rendered caption.
         const finish=task.snapshot?.ui?.elements?.find(e=>e.ref===task.action?.ref)?.wizard_finish;
         const ownerPrefix=finish?.owner?.path?.at(-3)?.tid+'>';
         const graphPrefix=task.prepared_node_context?.workflow_ref?.prefix+';Graph;';
@@ -3766,7 +3787,7 @@ function readRenderedInputMapping(observation) {
           &&['document_id','workflow_id','node_id'].every(k=>nodeContext[k]===task.snapshot.prepared_node_context[k])
           &&nodeContext.node_id===task.prepared_node_context?.node.node_id
           &&nodeContext.tid===graphPrefix+finish.owner.node.tid.slice(ownerPrefix.length)
-          &&after.tid===graphPrefix+finish.completion.fields.label.value.replace(/\s/g,'_').replace(/,/g,'')
+          &&after.tid?.startsWith(graphPrefix)&&after.tid!==nodeContext.tid
           &&same({...nodeContext,tid:after.tid},after)&&finishSurfaceReads<2) {
           record('wizard_finish_label_rediscovery',{attempt:++finishSurfaceReads,node_id:after.node_id,before_tid:nodeContext.tid,after_tid:after.tid});
           timeout();return readUi(rediscover);

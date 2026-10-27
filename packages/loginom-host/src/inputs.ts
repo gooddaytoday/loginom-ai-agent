@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { basename, join } from "node:path"
 
 export type InputFile = { name: string; data: string }
-// Only trusted user-message attachments reach this entrypoint. It accepts bytes, never model-selected OS paths.
+// Only backend-authorized inputs reach this entrypoint. It accepts bytes, never model-selected OS paths.
 export function inputStore(root: string) {
   return {
     async admit(chat: string, userMessage: string, files: InputFile[], folder: string) {
@@ -13,8 +13,7 @@ export function inputStore(root: string) {
         if (typeof file.name !== "string" || typeof file.data !== "string" || file.data.length > 24 * 1024 * 1024)
           throw new Error("LOGINOM_INPUT_INVALID")
         const name = basename(file.name.replaceAll("\\", "/"))
-        if (!name || name === "." || name === ".." || /[\x00-\x1f\x7f]/.test(name))
-          throw new Error("LOGINOM_INPUT_INVALID")
+        if (!name || name === "." || name === "..") throw new Error("LOGINOM_INPUT_INVALID")
         const bytes = Buffer.from(file.data, "base64")
         if (bytes.toString("base64") !== file.data || bytes.length > 16 * 1024 * 1024)
           throw new Error("LOGINOM_INPUT_INVALID")
@@ -57,7 +56,7 @@ export function inputStore(root: string) {
           )
           return {
             sourcePath,
-            name: `${identity}-${index}-${file.name.slice(-120)}`,
+            name: `${identity}-${index}-${file.name.replace(/[\\/:<>"|?*%#\x00-\x1f\x7f]|[. ]+$/g, "_").slice(-120)}`,
             bytes: file.bytes.length,
             sha256: file.sha256,
             upload: { directory: folder, overwrite: "reject" },
