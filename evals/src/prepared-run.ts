@@ -198,8 +198,7 @@ export async function runPreparedSlots(config: EvalConfig, nodeEvaluation = fals
       context.confirmed = false
       await admit(context.lease.slot.id, taskId, 1, "preflight")
       const probe = await requestPreflight({ command: context.command, taskId, model: context.config.agent.model, variant: context.config.agent.variant,
-        workdir, outDir: out, profileDir: context.config.profileDir, slotId: context.lease.slot.id,
-        timeoutMs: Math.min(...tasks.map(task => taskTimeoutMs(config, task))), signal: controller.signal })
+        workdir, outDir: out, profileDir: context.config.profileDir, slotId: context.lease.slot.id, signal: controller.signal })
       await writeLeaseReceipt(path.join(out, "cleanup.json"), { processes: probe.run.processCleanup, nextAdmissionAllowed: false })
       const cleanup = await cleanupSlotStorage(file, environment.server, context.lease, admin, probe.run.processCleanup, [`eval-${runId}-${taskId}-1`], [out])
       await writeSlotCleanup(context, cleanup)
