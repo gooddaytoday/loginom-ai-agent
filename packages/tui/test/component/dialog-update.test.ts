@@ -3,7 +3,7 @@ import { updateTarget } from "../../src/component/dialog-update"
 import { isVersionGreater, visibleNotice } from "../../src/context/update-notification"
 
 describe("dialog update", () => {
-  test("uses the normal OpenCode 1 update when a newer release exists", () => {
+  test("uses the normal update when a newer release exists", () => {
     expect(updateTarget({ current: "1.4.0", latest: "1.4.2" })).toEqual({ type: "latest", version: "1.4.2" })
   })
 
