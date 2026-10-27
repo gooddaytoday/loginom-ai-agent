@@ -37,7 +37,7 @@ Run: `20261026-142707-calibrate-NprfPu`. Рубрики и inputs не меня�
 Первые отказы подготовки (`JUDGE_VERSION_UNCONFIRMED`, затем401 старого private
 OAuth) сохранены отдельно; они не дали модельных вердиктов. Восстановлены только
 private config/auth судьи под lease, глобальные файлы остались прежними.
-[Проверки и evidence](../../../docs/testing/loginom-ai-agent/local-file-paths.md#task7-pair-calibration-passed-2026-10-26).
+[Проверки и evidence](../../../docs/testing/loginom-ai-agent/local-file-paths.md#калибровка).
 
 Isolated benchmark выполнен26.10: run `20261026-144455-ad02b483d9-CahUF0`,
 один sandbox проход пары с `--repeat 1 --skip-judge`, затем штатный `--judge-only`
@@ -46,7 +46,7 @@ Isolated benchmark выполнен26.10: run `20261026-144455-ad02b483d9-CahUF0
 exit1/393.106с (`CLI_TOOL_FAILED` после исправленной моделью ошибки binary Read).
 Native Close/logout/ACK0, input hashes и process/profile/storage cleanup подтверждены
 для обоих. Candidate9f723/DB6.1-sol/xhigh; свежий независимый review Approved.
-[Подробности](../../../docs/testing/loginom-ai-agent/local-file-paths.md#task8-isolated-benchmark-and-documentation-regression-2026-10-26).
+[Подробности](../../../docs/testing/loginom-ai-agent/local-file-paths.md#benchmark).
 Routing acceptance остаётся отдельной проверкой; новых benchmark/corpus не добавлено.
 
 Хэши коллекции из task-local `validate_collection.ts`:

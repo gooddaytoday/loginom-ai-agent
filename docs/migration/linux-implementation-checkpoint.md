@@ -11,16 +11,14 @@ Published2026-10-26T07:16:28Z, pre-release, latest=false, ID423944660; 30 URLs H
 
 ## 2026-10-26 — #74: Linux-проверки завершены, без выпуска
 
-Production source8d65045b3e, version0.3.2-localpaths74.8d65045b3e/prod/recovery0; branch local-file-paths.
-CLI archive/manifest, Desktop DEB/AppImage static,6039CLI/5042Desktop inventories/source archive independently Approved; packaging13PASS2skip/crash6PASS.
-B1–B5/задачи1–8 выполнены; итоговое независимое review Approved30/30, обязательных замечаний нет. Canonical поведение в дизайне, полный evidence в отчёте.
-B4 natural own-copy Save/replace/fullpath/local unchanged/physical*3/native Close/logout/ACK0 подтверждён на9f723; guards прошлых отказов сохранены.
-B5 minimal Save breadcrumb fix/TDD55+80/sourceGREEN2933мс; reprepare8d650 private-only binding/TDD77; affected installed runs и независимые reviews подтверждены.
-Routing6IDs×2 с source-aware reuse старых docs/TXT/CSV. Desktop transitions8d650/helper253f official2/2PASS628.2/611.70с; CLI firstPASS/second originalFAIL740.73с/CLI[1,0] сохранён, actualMD только offline reassessedPASS.
-Current benchmark8d650: score100/100/oracle2/2, original executionCSV0/edit1binaryRead; judge6-sol/xhigh/codex0.157.0/lease53released; Save/native/process/storagecleanup0/review Approved41/41.
-Оба reference/CLI/cold/oracle и pair calibration100/0+100/0 приняты, task-local scripts/installedskill unchanged. Model openai/gpt-6.1-sol/xhigh: CLI SQLite; Desktop backendmessages/:memory: (persistedDB не заявлен).
-Own CLI/Desktop/benchmark pairs archived/stopped, data/profiles/failedguards retained; прочие сервисы/профили не менялись. Windows native NOT_RUN/fullattribution README baseline mismatch отдельно; affected entries PASS.
-[Отчёт](../testing/loginom-ai-agent/local-file-paths.md#task8-final-linux-results-2026-10-26) · [блокеры](../testing/loginom-ai-agent/local-file-paths-blockers.md). Merge/push/release не выполняются.
+Installed production source8d65045b3e/version0.3.2-localpaths74.8d65045b3e/recovery0; Desktop harness253f. CLI/archive/Desktop inventories/static/packaging13PASS2SKIP/crash6PASS независимо проверены.
+Задачи1–8/B1–B5 завершены, итоговое review Approved30/30. Canonical поведение — в дизайне; точные source pins повторно использованных результатов — в [отчёте](../testing/loginom-ai-agent/local-file-paths.md#результат).
+B4 natural own-copy Save/replace/fullpath/local unchanged/physical*3/native Close/logout/ACK0 на9f723; B5 explicit-save переходы на8d650 подтверждены. Исходные failed receipts/guards сохранены.
+Routing6IDs×2: Desktop transitions official2/2PASS628.2/611.70с; CLI first officialPASS, second originalFAIL740.73с/CLI[1,0], actual Markdown только derived offlinePASS helper253f.
+Benchmark8d650: качество100/100/oracle2/2 отдельно от execution completion1/2 (CSV0/edit1binaryRead); judge6-sol/xhigh/codex0.157.0/lease53released, Save/native/process/storage cleanup и review Approved41/41.
+Оба reference/cold/oracle и calibration100/0+100/0 приняты. Agent openai/gpt-6.1-sol/xhigh: CLI SQLite, Desktop backendmessages/:memory:; persisted Desktop DB не заявлен.
+Own pairs archived/stopped/data/profiles/failedguards retained; Windows native NOT_RUN и общий attribution README baseline mismatch сохраняются. [Закрытые отказы и recovery](../testing/loginom-ai-agent/local-file-paths.md#закрытые-отказы).
+Это историческая installed приёмка; последующие continuation/rebase/локальные source-проверки указаны в отчёте. Слияние и выпуск требуют отдельной команды владельца.
 
 ## 2026-10-20 — v0.3.2 опубликован
 

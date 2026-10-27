@@ -223,17 +223,12 @@ bun --no-env-file run src/run.ts --judge-only "$LOCAL_PATHS_RUN_ID"
 
 ## Planning checkpoint
 
-- 2026-10-26: задачи1–8/B1–B5 выполнены в Linux; итоговое независимое review Approved30/30, обязательных замечаний нет. [Итог и evidence](../../testing/loginom-ai-agent/local-file-paths.md#task8-final-linux-results-2026-10-26).
-- Production candidate8d650, prod0.3.2-localpaths74.8d65045b3e/recovery0; build/inventory/archive/static/public seed/packaging13+2skip/crash6PASS, independent artifacts Approved.
-- Ранняя source CLI проверка2CSV/--auto завершена отдельно от installed acceptance. TDD/typechecks задач2–6 и независимые reviews завершены; оценки/сигналы не повышены.
-- Task3 native A→B6867/6338мс/граф/ACK0,25files/+1219/−150 против сигнала44files/2220строк. Общий diff — итог ниже в отчёте.
-- B1 UI seed→candidate CLI→cold source9873/SHA4313… принят; B2 exactprofile offline recovered с архивом guard; B3 own-network preflight подтверждён. История отказов сохранена.
-- B4: UTF8 test image и native overflow guard; natural own-copy Save/replace, final fullpath/local unchanged, physical*3/Close/logout/ACK0, независимый review Approved.
-- Task7: оба reference/CLI/cold/oracle/collection hashes приняты; pair calibration100/0+100/0, оба oracletrue/warnings0/lease51released. Installed skill не менялся.
-- Routing6IDs×2: source-aware reuse старых docs/TXT/CSV; current CLI transitions Save/physical/native PASS, first officialPASS, second originalFAIL/CLI[1,0] и только derived offline MD PASS сохранены.
-- Desktop transitions candidate8d/harness253f official2/2PASS628.2/611.70с, actualbackendsol/xhigh(:memory:), GUIonce/noattachments, physical*3/CSV/Save/Close/logout/ACK0/process0.
-- Benchmark currentrun20261026-183856-8d65045b3e-d81SnM: score100/100/oracle2/2, executionCSV0/edit1binaryRead сохранён; judge6-sol/xhigh/0.157.0/lease53released, native/process/storagecleanup0/review Approved41/41.
-- B5 Save predicate fix2206: RED→GREEN55+80/sourceGREEN2933мс и currentinstalled transitions подтверждены. Reprepare8d650: private-only binding/RED→GREEN77/review Approved.
-- Helper253f sentence-scope:2files/+5/−3/RED→GREEN10/typecheck/review; preserved actualMD PASS/priornegative+*30REJECT, production/evals/skills8d неизменны.
-- Только own CLI/Desktop/benchmark пары архивированы/остановлены; data/profiles/failedguards retained. Windows native NOT_RUN; fullattribution README baseline mismatch отдельно, affected entries PASS.
-- Checkpoints≤20строк; commit через исходный Husky/scanner с clean-git-hooks, проверить tree/clean/core.bare=false. Merge/push/release не выполняются.
+- 26.10.2026: задачи1–8/B1–B5 завершены в Linux, review Approved30/30. [Итоговый отчёт](../../testing/loginom-ai-agent/local-file-paths.md#результат) хранит версии, сценарии, отказы и evidence; исходные оценки/сигналы выше не повышались.
+- Installed candidate8d650/prod0.3.2-localpaths74.8d65045b3e/recovery0 и Desktop harness253f qualified; build/inventory/archive/static/packaging13PASS2SKIP/crash6PASS. Это pins приёмки26.10, не более поздней ветки.
+- Ранний source CLI2CSV/--auto и TDD/typechecks задач2–6 завершены отдельно. Task3 A→B6867/6338мс/ACK0;25files/+1219/−150 против исходного44files/2220строк.
+- B1 assisted UI→CLI→cold source9873/SHA4313…; B2 offline recovery исходного профиля с архивом guard; B3 own-network preflight. B4 natural own-copy Save/replace/fullpath/local unchanged/physical*3/Close/logout/ACK0 на9f723.
+- Task7: оба reference/cold/oracle/collection hashes приняты, calibration100/0+100/0/oracletrue/lease51released; installed skill не менялся. Edit reference CLI1binaryRead сохранён.
+- Routing6IDs×2 с точными reuse pins в отчёте: Desktop transitions8d650/helper253f official2/2PASS; CLI first officialPASS, second originalFAIL/CLI[1,0] и только derived offline MarkdownPASS.
+- Benchmark20261026-183856-8d65045b3e-d81SnM:100/100/oracle2/2, execution completion1/2 (CSV0/edit1binaryRead); same-run judge6-sol/xhigh/0.157.0/lease53released, native/process/storage cleanup/review Approved41/41.
+- B5 native workflow breadcrumb fix/TDD55+80/sourceGREEN2933мс и public reprepare private-only binding/TDD77 подтверждены affected installed runs. Helper253f sentence-scope сохраняет original outcomes и priornegative/*30 rejection.
+- Own pairs archived/stopped/data/profiles/failedguards retained; Windows native NOT_RUN, fullattribution README baseline mismatch отдельно от affected PASS. Последующие source-only проверки не повышают историческую installed приёмку; слияние/выпуск — отдельная команда.
