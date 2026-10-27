@@ -89,3 +89,56 @@ Assertions, native ownership/cleanup и проверки целостности 
 - Локальные логи и результаты серии:
   `/home/kiselev/storage/tmp/autonomus-eval-pr-20261027/`;
   Docker trace: `/home/kiselev/storage/tmp/isolated-storage-trace-1JUJGwzr/`.
+
+
+### Проверка окружения и fixture fixes
+
+- Полный диагностический прогон на `05bb48274f` завершился: **1370 PASS /
+  77 SKIP / 7 FAIL**, 1454 tests / 112 files / 7296 assertions, 1927,67 с.
+  Это не успешный полный прогон. Шесть отказов требуют настоящего host:
+  root UID/initial user namespace, Docker host PID в `/proc`, видимый чужой
+  браузер для существующего guard у двух node-eval-ops tests и чужой PID 1.
+  В приватном namespace сам runner был PID 1; его ancestry test на host —
+  **1 PASS / 5 assertions**. Позитивные root witness/host anchors на host —
+  **9 PASS / 1 root-only SKIP / 44 assertions**. Остальная host-группа
+  проверяется отдельно, без изменения guards. Седьмой отказ — timeout
+  unactivated-observation test; для него требуется отдельный тихий прогон.
+- Подтверждены только fixture-дефекты: heartbeat читался до появления и
+  проверялся через произвольные 80 мс; finally использовал неподдержанный
+  `--kill-whom`. После RED исправлены initial heartbeat до ready, ожидание
+  продвижения в прежнем 8-секундном deadline и `--kill-who=all`. Runtime,
+  ownership assertions и production deadlines не изменены. Архивная копия:
+  initial **7 PASS**, затем **5 независимых запусков по 7 PASS**; все own
+  unit/cgroup/PID/temp cleanup проверены. Независимый review: APPROVED.
+- CI push `40494448958`: 8 product jobs PASS, evals-unit **1305 PASS /
+  65 SKIP / 1 FAIL** — watcher подписывался после записи 2000 файлов и
+  пропускал archive event. PR job `40494455427` на том же SHA без изменений:
+  **1306 PASS / 65 SKIP / 0 FAIL**, что подтверждает flaky fixture.
+  Одобрен минимальный reorder подписки перед записью; все assertions,
+  2000 файлов и deadlines сохраняются. Fixture передаёт существующий
+  `TMPDIR` дочернему CLI для соблюдения правил временных файлов.
+- На `05bb48274f` typecheck/secrets/PR metadata, workspace unit, Desktop,
+  app e2e, Chromium на трёх ОС и probe cleanup на двух ОС — PASS. Candidate
+  `40494523716`: Linux build и Linux OS matrix — PASS; macOS ещё идёт;
+  Windows Desktop+CLI собраны, затем DPAPI roundtrip завершился отказом
+  около существующего 15-секундного process deadline. Такой же native
+  codec/test прошёл на Windows 2022 и 2025 в `40493706267`; причиной
+  production defect это пока не признано. На итоговом SHA требуется новый
+  candidate без изменения timeout и ожиданий. Cut/release jobs не запускаются.
+- Полные логи/точные source hashes, команды и cleanup evidence хранятся в
+  `/home/kiselev/storage/tmp/autonomus-eval-pr-20261027/`.
+
+- Финальные fixture patches независимо проверены двумя агентами: APPROVED.
+  Infra-retry: **5 независимых narrow PASS** по 8 assertions и весь файл
+  **11 PASS / 79 assertions**. В shared-копии native fixtures: **7 PASS /
+  58 assertions**, units отсутствуют после finally; `bun typecheck` PASS.
+- Correct-host группа завершилась **37 PASS / 6 SKIP / 3 FAIL**: root
+  witness, native host anchors и node-eval-ops guards корректны; три Docker
+  resource fixtures получили свои прежние 15/30/15-секундные timeouts.
+  Первые два уже PASS в полном namespace-прогоне, третий требует host PID.
+  На момент отказа I/O pressure full avg10 24–37%, storage tmp — HDD
+  `/dev/sda2`; Docker version отвечает за 19 мс. Задержка исследуется узко;
+  оснований менять assertions, storage guards или deadlines нет.
+- Candidate macOS build/verify/offline-smoke обоих продуктов — PASS.
+  После отправки fixture commit итоговые SHA/run links и результаты
+  обновляются в PR #466, чтобы запись проверок сама не запускала новый CI.
