@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import yargs from "yargs"
+import { UpgradeCommand } from "../../src/cli/cmd/upgrade"
 import { shouldNotify } from "../../src/cli/upgrade"
 
 const base = { autoupdate: undefined, disabled: false, always: false, current: "1.4.0", latest: "1.4.1" }
@@ -30,5 +32,17 @@ describe("upgrade check", () => {
 
   test("always-notify flag forces a notice for the current version", () => {
     expect(shouldNotify({ ...base, latest: "1.4.0", always: true })).toBe(true)
+  })
+})
+
+describe("upgrade command", () => {
+  test("does not accept --major", async () => {
+    const parser = UpgradeCommand.builder(yargs([]).exitProcess(false).fail(false)).strict()
+    await expect(parser.parseAsync(["--major"])).rejects.toThrow("Unknown argument: major")
+  })
+
+  test("still accepts a target and a method", async () => {
+    const parser = UpgradeCommand.builder(yargs([]).exitProcess(false).fail(false)).strict()
+    expect(await parser.parseAsync(["1.2.3", "--method", "npm"])).toMatchObject({ target: "1.2.3", method: "npm" })
   })
 })

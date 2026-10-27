@@ -72,20 +72,22 @@ async function install(input: { env?: Record<string, string>; args?: string[] })
 }
 
 describe("install script", () => {
-  test("refuses an OpenCode 2 VERSION before downloading anything", async () => {
+  test("refuses a 2.x VERSION before downloading anything and offers no OpenCode 2 instructions", async () => {
     for (const version of ["2.0.0", "v2.0.27", "10.1.0"]) {
       const result = await install({ env: { VERSION: version } })
       expect(result.code).toBe(1)
-      expect(result.output).toContain("https://opencode.ai/v2/install")
+      expect(result.output).toContain("is not a 1.x release")
+      expect(result.output).not.toMatch(/opencode\.ai\/v2|OpenCode 2|--major/)
       expect(result.curl).toEqual([])
       expect(result.installed).toBe(false)
     }
   })
 
-  test("refuses an OpenCode 2 --version", async () => {
+  test("refuses a 2.x --version", async () => {
     const result = await install({ args: ["--version", "2.0.0"] })
     expect(result.code).toBe(1)
-    expect(result.output).toContain("opencode upgrade --major")
+    expect(result.output).toContain("is not a 1.x release")
+    expect(result.output).not.toMatch(/opencode\.ai\/v2|OpenCode 2|--major/)
   })
 
   test.skipIf(process.platform !== "linux")("installs an explicit OpenCode 1 version", async () => {
