@@ -100,7 +100,10 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
     need(sources.length===1&&sources[0].type==='bg-vendor-icon-restclientconnection','existing REST connection reference differs');
     const tid=await page.evaluate(id=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;const ns=d.FNodes.FCollection.filter(n=>n.FGuid===id);if(ns.length!==1||ns[0].FIconCls!=='bg-vendor-icon-restclientconnection')throw Error('REST connection reference changed');return d.FmxGraph.view.getState(ns[0].FCell)?.shape?.node?.getAttribute('data-tid');},edge.source);
     need(tid?.startsWith(t.workflow_ref.prefix+';Graph;'),'existing REST reference is not rendered');
-    await guard();await find(tid+';NodesControls').hover({timeout:remaining()});await click(tid+';ReferenceInfo');
+    await guard();need(await find(tid).count()===1,'existing REST reference is ambiguous');
+    const body=await find(tid).evaluate(e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y),tid=e.getAttribute('data-tid'),part=hit?.closest('[data-tid]')?.getAttribute('data-tid');
+     if(r.width<=0||r.height<=0||x<0||y<0||x>=innerWidth||y>=innerHeight||!(part===tid||part?.startsWith(tid+';')))throw Error('REST reference body is not reachable');return {x,y};});
+    await page.mouse.move(body.x,body.y);await click(tid+';ReferenceInfo');
     sourceConnectionId=await wait('existing reference source connection',()=>page.evaluate(b=>{
      const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller,n=c.Node.data.node;
      if(c.FController.constructor.name!=='ConnectionsViewWizard'||n.constructor.name!=='ConnectionTreeNode')return null;

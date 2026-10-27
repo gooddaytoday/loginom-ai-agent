@@ -8,7 +8,7 @@ import {runRestStep} from '../lib/rest-step.mjs';
 import {createRestRequestNodeSupport} from '../lib/rest-request-node.mjs';
 
 const cases={reuse:'D88 reuses the confirmed existing REST service reference without another palette drag',render_wait:'REST waits for the created connection port to render without repeating the drag',wrongref:'REST rejects a rendered port belonging to another node type',refresh:'REST refreshes its loaded empty palette once, then waits for rows before one drag',refresh_foreign:'REST refuses refreshing a palette after its workflow owner changes',refresh_populated:'REST does not refresh a palette that already contains tree rows',mime:'REST explicitly writes and rereads the saved allowed response Content-Type',mime_stale:'REST refuses an allowed response Content-Type that did not persist',input:'a retained visible REST container cannot authorize filling its zero-sized input',parameter:'REST waits for the added parameter type before checking string bindings',palette:'REST waits for the newly expanded palette item before its single drag',animation:'REST does not start a drag from a hit-testable row inside its native tree animation',expander:'REST expands the moving connection tree with one stable locator click',confirm:'REST confirms one owned active-connection deactivation',foreign:'REST refuses a deactivation question belonging to another connection tree'};
-Object.assign(cases,{reuse_foreign:'D88 refuses a different requested service before changing its settings',reuse_module:'D88 refuses a reference whose source belongs to another module',reuse_changed:'D88 refuses a service edge changed during persisted readback',reuse_ambiguous:'D88 refuses ambiguous existing service edges',reuse_incomplete:'D88 refuses an incomplete graph before reference navigation',placement_below:'REST finds a free visible drop when its preferred row is below the canvas',placement_scrolled:'REST places one connection inside a zoomed translated and scrolled canvas',placement_full:'REST refuses an unconfirmed crowded-canvas reveal without starting a drag'});
+Object.assign(cases,{reuse_hidden_controls:'D88 reveals a reference through its rendered body when its hover controls are absent',reuse_foreign:'D88 refuses a different requested service before changing its settings',reuse_module:'D88 refuses a reference whose source belongs to another module',reuse_changed:'D88 refuses a service edge changed during persisted readback',reuse_ambiguous:'D88 refuses ambiguous existing service edges',reuse_incomplete:'D88 refuses an incomplete graph before reference navigation',placement_below:'REST finds a free visible drop when its preferred row is below the canvas',placement_scrolled:'REST places one connection inside a zoomed translated and scrolled canvas',placement_full:'REST refuses an unconfirmed crowded-canvas reveal without starting a drag'});
 Object.assign(cases,{placement_native:'serialized REST capability reveals real free space using bounded native outline zoom',placement_crowded:'REST reveals bounded model space on a crowded canvas before its sole connection drag',placement_changed:'REST refuses a changed graph after connection placement navigation',placement_unknown:'REST retains uncertainty after an unconfirmed viewport gesture',placement_still_full:'REST bounds settled viewport passes and never drags onto a still crowded canvas',placement_late_changed:'REST rechecks the graph after waiting for its connection palette item',placement_hidden:'REST refuses a connection drop when navigation cannot reveal model space'});
 Object.assign(cases,{placement_reselect:'D28 J2 reselects a free visible connection point after zoom with overflow y843 and zero native scroll'});
 Object.assign(cases,{placement_dense:'D28 connection searches a narrow visible gap before unreachable overflow'});
@@ -36,7 +36,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
  const sourceScope=vm.createContext({bg:{app:{Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:sourceController})}}}}}}}});
  const sourceRead=(fn,arg)=>vm.runInContext('('+fn.toString()+')',sourceScope)(arg);
  const serviceEdge={tid:prefix+';Graph;↶Echo|Output_Connection-0|REST|Input_Connection-0',source:'saved-reference',target:'rest',output:'connection:0',input:'connection:0'};
- let serviceGraphReads=0;
+ let serviceGraphReads=0,referenceMoves=0;
  if(reusing){placementGraph.nodes=[{ref:{document_id:'doc',workflow_id:'flow',node_id:'rest'},type:'integration.rest_request'},{ref:{document_id:'doc',workflow_id:'flow',node_id:'saved-reference'},type:'bg-vendor-icon-restclientconnection'}];placementGraph.rest_connection_links=[serviceEdge,...(stage==='reuse_ambiguous'?[{...serviceEdge,source:'other'}]:[])];if(stage==='reuse_incomplete')placementGraph.complete=false;}
  const recoveryWorkflow={},recoveryTree={id:'palette',isConnected:true,getBoundingClientRect:()=>({width:270,height:597}),querySelector:()=>stage==='refresh_populated'?{}:null};
  const recoveryForm={contains:e=>e===recoveryTree};
@@ -58,8 +58,8 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
  const previous={document:globalThis.document,innerWidth:globalThis.innerWidth,innerHeight:globalThis.innerHeight};
  globalThis.innerWidth=1280;globalThis.innerHeight=800;
  const locator=(selector,input=false)=>({
-  count:async()=>selector.startsWith('.x-mask')?0:selector==='.x-window:visible'?(opening&&!confirmations?1:0):selector.includes('pnlConnections;headercontainer;text_Root>Текущий_модуль>')&&!expanded?0:1,
-  hover:async()=>{assert.ok(selector.includes(';NodesControls'));},
+  count:async()=>stage==='reuse_hidden_controls'&&selector.includes(';ReferenceInfo')&&!referenceMoves?0:selector.startsWith('.x-mask')?0:selector==='.x-window:visible'?(opening&&!confirmations?1:0):selector.includes('pnlConnections;headercontainer;text_Root>Текущий_модуль>')&&!expanded?0:1,
+  hover:async()=>{assert.ok(selector.includes(';NodesControls'));if(stage==='reuse_hidden_controls'&&!referenceMoves)throw Error('NodesControls is not rendered before body hover');},
   click:async()=>{if(selector.includes('btnShowOutline')){outline=!outline;return;}if(selector.includes('bg-workflow-outline-toolbar')){nativeScale=stage==='placement_reselect'?Math.max(0.3855432894295314,nativeScale/1.1):nativeScale/1.1;zoomClicks++;if(stage==='placement_reselect')navigated=true;return;}assert.ok(selector.includes(';TreeExpander'));expanded=true;expansions++;},
   getAttribute:async()=> 'Уменьшить масштаб',waitFor:async()=>{},
   locator:child=>child==='input'?locator(selector,true):locator(selector+' '+child),
@@ -93,7 +93,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
     if(!stage.startsWith('placement_'))return {x:500,y:400};
     const box=['placement_reselect','placement_dense'].includes(stage)?{x:324,y:100,right:1274,bottom:794,width:950,height:694}:{x:300,y:100,right:850,bottom:400,width:550,height:300};
     const occupied=stage==='placement_reselect'?[{left:324,right:navigated?940:1082,top:100,bottom:100+1928*nativeScale-128-.01,width:navigated?616:758,height:694}]:stage==='placement_native'?[{left:300,right:300+550*nativeScale,top:100,bottom:100+300*nativeScale,width:550*nativeScale,height:300*nativeScale}]:(['placement_full','placement_still_full','placement_hidden'].includes(stage)||stage==='placement_before_drag'&&palettePoints>0||['placement_crowded','placement_changed','placement_unknown','placement_late_changed','placement_before_drag'].includes(stage)&&!navigated)?[{left:300,right:850,top:100,bottom:400,width:550,height:300}]:[];
-    if(reusing){assert.equal(downCount,0);assert.equal(upCount,0);assert.equal(queryFills,0);if(stage==='reuse'){assert.equal(result.verified,true,result.error);assert.equal(result.connection.reference_node_id,'saved-reference');assert.equal(serviceGraphReads,2);}else{assert.equal(result.verified,false);assert.match(result.error,/requested connection differs|source owner differs|connection changed|connection is ambiguous|complete owned graph/);}return;}
+    if(reusing){assert.equal(downCount,0);assert.equal(upCount,0);assert.equal(queryFills,0);if(['reuse','reuse_hidden_controls'].includes(stage)){assert.equal(result.verified,true,result.error);assert.equal(result.connection.reference_node_id,'saved-reference');assert.equal(serviceGraphReads,2);}else{assert.equal(result.verified,false);assert.match(result.error,/requested connection differs|source owner differs|connection changed|connection is ambiguous|complete owned graph/);}return;}
   if(stage==='placement_dense')occupied.push({left:324,right:700,top:100,bottom:794,width:376,height:694},{left:950,right:1274,top:100,bottom:794,width:324,height:694});
     const element={scrollLeft:stage==='placement_scrolled'?180:0,scrollTop:stage==='placement_scrolled'?350:0,getBoundingClientRect:()=>box,querySelectorAll:()=>occupied.map(r=>({getBoundingClientRect:()=>r})),contains:()=>false};
     if(stage==='placement_reselect')for(const key of ['scrollLeft','scrollTop'])Object.defineProperty(element,key,{get:()=>0,set:()=>{}});
@@ -106,7 +106,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
    }
    const zero=input&&selector.includes('pedURL')&&++urlPoints%2===1||selector.includes(item)&&++palettePoints===1&&stage!=='animation';
    const element={getBoundingClientRect:()=>({x:100,y:100,width:zero?0:100,height:zero?0:24}),
-    closest:selector=>selector==='.x-tree-animator-wrap'&&stage==='animation'&&lastSelector.includes(item)&&palettePoints===1?{}:null,contains:()=>false,classList:{contains:()=>false}};
+    getAttribute:()=>JSON.parse(selector.slice(10,-1)),closest:selector=>selector==='[data-tid]'?element:selector==='.x-tree-animator-wrap'&&stage==='animation'&&lastSelector.includes(item)&&palettePoints===1?{}:null,contains:()=>false,classList:{contains:()=>false}};
    globalThis.document={elementFromPoint:()=>element};
    return fn(element);
   },
@@ -119,7 +119,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
   press:async()=>{},
  });
  const page={locator,mouse:{click:async()=>{if(lastSelector.includes(';ReferenceInfo'))sourceController.FController.constructor.name='ConnectionsViewWizard';if(lastSelector.includes('pnlVendorsContainer;p.h;p.t'))vendorRestores++;if(lastSelector.includes(';WizardModelConnectionForm;btnDone'))wizardCloses++;if(lastSelector.includes('btnAdd'))added=true;if(lastSelector.includes('btnConfigConnection')&&['confirm','foreign'].includes(stage))opening=true;if(lastSelector.includes('msgbox;tlb;yes')){confirmations++;assert.equal(confirmations,1);}},dblclick:async()=>{},
-  move:async()=>{if(held){dragMoves++;}},
+  move:async()=>{if(!held&&reusing)referenceMoves++;if(held){dragMoves++;}},
   down:async()=>{assert.equal(palettePoints,2);if(stage==='palette')throw Error('fixture stopped before the sole palette drag');held=true;downCount++;},
   up:async()=>{held=false;upCount++;}},waitForTimeout:async()=>{if(stage==='refresh_populated')throw Error('fixture stopped while waiting for existing rows');},
   evaluate:async(fn,arg)=>{
@@ -161,7 +161,7 @@ for(const [scenario,title]of Object.entries(cases))test(title,async()=>{
    if(stage==='placement_changed')placementGraph.nodes[0].position.x++;
    await args.guard();return {fully_visible:!['placement_hidden','placement_reselect'].includes(stage),zoom_steps:3,navigation_steps:[]};
   },nodePlacementViewport,nodePlacementPoint,nodePlacementOverflow,samePlacementGraph,{});
-  if(reusing){assert.equal(downCount,0);assert.equal(upCount,0);assert.equal(queryFills,0);if(stage==='reuse'){assert.equal(result.verified,true,result.error);assert.equal(result.connection.reference_node_id,'saved-reference');assert.equal(serviceGraphReads,2);}else{assert.equal(result.verified,false);assert.match(result.error,/requested connection differs|source owner differs|connection changed|connection is ambiguous|complete owned graph/);}return;}
+  if(reusing){assert.equal(downCount,0);assert.equal(upCount,0);assert.equal(queryFills,0);if(['reuse','reuse_hidden_controls'].includes(stage)){assert.equal(result.verified,true,result.error);assert.equal(result.connection.reference_node_id,'saved-reference');assert.equal(serviceGraphReads,2);}else{assert.equal(result.verified,false);assert.match(result.error,/requested connection differs|source owner differs|connection changed|connection is ambiguous|complete owned graph/);}return;}
   if(stage==='placement_dense'){assert.equal(result.verified,true,result.error);assert.equal(navigationCalls,0);assert.equal(downCount,1);assert.equal(upCount,1);return;}
   if(stage==='placement_reselect'){
    assert.equal(result.verified,true,result.error);assert.equal(zoomClicks,2);assert.equal(outline,false);
