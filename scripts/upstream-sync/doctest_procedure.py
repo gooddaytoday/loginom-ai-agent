@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Runs the command blocks of docs/upstream-sync/procedure.md verbatim, in order, in one shell, from the root of a clean clone.
+"""Runs the command blocks of docs/upstream-sync/procedure.md verbatim, in order, from the root of a clean clone.
 
 A block is a fenced code block whose info string holds `doc-test` and `step=<name>`. Blocks marked `doc-test:manual` are
 steps a person does (resolving conflicts); the runner replaces them with the --resolve command. A block that still holds a
 placeholder (`<...>`) or an optional `[--flag ...]` cannot run verbatim and fails the test: the document must be executable.
+The blocks before a manual step share one shell. A person's manual work ends that shell, so the blocks after it run in a new
+shell that starts from the exported environment and the `env` block only: everything else must come from the files the
+document's own blocks wrote (`$OUT/pins.env`).
 
 Usage: doctest_procedure.py --src CLEAN_CLONE --out NEW_EMPTY_DIR --log FILE [--resolve CMD] [--through STEP] [--doc FILE]
   --through STEP   stop after the block with step=STEP (default: accepted)
@@ -48,7 +51,9 @@ def main():
     if not found:
         print("no doc-test blocks in the document", file=sys.stderr)
         return 2
-    script, steps = ["set -euo pipefail", f'export OUT={a.out!r}'], []
+    header = ["set -euo pipefail", f'export OUT={a.out!r}']
+    env_block = next((b["text"] for b in found if b["step"] == "env" and not b["manual"]), "")
+    segments, script, steps = [], list(header), []
     for b in found:
         if not b["manual"]:
             bad = re.findall(r"<[A-Za-z][^>\s]*>|\[--[^\]]*\]", b["text"])
@@ -60,7 +65,9 @@ def main():
             if not a.resolve:
                 print("the document has a manual step and no --resolve command was given", file=sys.stderr)
                 return 2
-            script += [a.resolve, '[ ! -f "$OUT/doc-test.env" ] || . "$OUT/doc-test.env"']
+            script.append(a.resolve)
+            segments.append(script)
+            script = [*header, env_block, '[ ! -f "$OUT/doc-test.env" ] || . "$OUT/doc-test.env"']
         else:
             script.append(b["text"])
         steps.append(b["step"])
@@ -69,6 +76,7 @@ def main():
     else:
         print(f"no block with step={a.through}", file=sys.stderr)
         return 2
+    segments.append(script)
     env = dict(os.environ)
     for key, value in (("GIT_AUTHOR_NAME", "doc-test"), ("GIT_AUTHOR_EMAIL", "doc-test@example.invalid"),
                        ("GIT_COMMITTER_NAME", "doc-test"), ("GIT_COMMITTER_EMAIL", "doc-test@example.invalid")):
@@ -76,7 +84,11 @@ def main():
     with open(a.log, "w", encoding="utf-8") as log:
         log.write("steps: " + " ".join(steps) + "\n")
         log.flush()
-        p = subprocess.run(["bash", "-c", "\n".join(script)], cwd=a.src, env=env, stdout=log, stderr=subprocess.STDOUT)
+        for segment in segments:
+            p = subprocess.run(["bash", "-c", "\n".join(segment)], cwd=a.src, env=env, stdout=log, stderr=subprocess.STDOUT)
+            log.flush()
+            if p.returncode:
+                break
     print(f"procedure doc-test: steps {' '.join(steps)}; exit {p.returncode}; log {a.log}")
     return p.returncode
 

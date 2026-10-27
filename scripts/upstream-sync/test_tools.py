@@ -480,5 +480,60 @@ class CatalogCheckUncommittedMerge(FixtureCase):
         self.check()
         self.assertEqual(fx.git("diff", "--cached", "--name-only"), "")
 
+
+class CheckCompatAllow(FixtureCase):
+    """F7 of LAB-303: `check` must hand --allow prefixes to the compat comparison, so expected differences (versions,
+    branches) are reported as ALLOWED instead of failing the step."""
+
+    FAKE_BUN = """#!/usr/bin/env bash
+case "$*" in
+  *compat-snapshot.ts*) while [ $# -gt 0 ]; do [ "$1" = --out ] && echo '{}' >"$2"; shift; done ;;
+  *compat-compare.ts*) printf '%s\\n' "$*" >>"$(dirname "$0")/compare-args.log" ;;
+esac
+"""
+    SKIP = "install,typecheck,tests,check,httpapi,catalog,guards,build"
+
+    def prepared(self):
+        fx = self.fx
+        fx.write("a.txt", BODY)
+        upstream = fx.commit("upstream")
+        out = fx.dir / "out"
+        rehearsal = out / "rehearsal"
+        subprocess.run(["git", "clone", "-q", str(fx.dir), str(rehearsal)], check=True, env=ENV)
+        (out / "before").mkdir()
+        (out / "pins.env").write_text(f"FORK_SHA={'0' * 40}\nUPSTREAM_SHA={upstream}\n")
+        bun = out / "bun"
+        bun.write_text(self.FAKE_BUN)
+        bun.chmod(0o755)
+        return out, bun
+
+    def check(self, *extra):
+        out, bun = self.prepared()
+        p = subprocess.run(["bash", str(HERE / "sync-upstream.sh"), "check", "--out", str(out), "--skip", self.SKIP,
+                            "--bun", str(bun), *extra], capture_output=True, text=True, env=ENV)
+        log = out / "compare-args.log"
+        return p, log.read_text() if log.exists() else ""
+
+    def test_passes_the_allowed_prefixes_to_the_comparison(self):
+        p, compared = self.check("--allow", "workspaces.packages", "--allow", "workflows")
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn("--allow workspaces.packages --allow workflows", compared)
+
+    def test_compares_without_allowances_by_default(self):
+        p, compared = self.check()
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertNotIn("--allow", compared)
+        self.assertIn("compat-compare.ts", compared)
+
+
+class RepositoryHygiene(unittest.TestCase):
+    """F10 of LAB-303: packages/opencode/config.json is written by `bun test` and must never reach `git add -A`."""
+
+    def test_the_test_run_config_file_is_ignored(self):
+        root = HERE.parents[1]
+        p = subprocess.run(["git", "-C", str(root), "check-ignore", "-q", "packages/opencode/config.json"], env=ENV)
+        self.assertEqual(p.returncode, 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -114,12 +114,22 @@ cat >"$R/docs/upstream-sync/merge-decisions.json" <<'JSON'
 JSON
 RESOLVE
 chmod +x "$W/resolve.sh"
-DOCENV=(FORK_URL="$F" UPSTREAM_URL="$U" TAG=v1.1.0 CHECK_SKIP=install,typecheck,tests,check,httpapi,guards,build,compat GIT_ALLOW_PROTOCOL=file)
+# the fork branch moves after the operator chose FORK: the rehearsal must stay on the chosen SHA (F4 of LAB-303)
+echo moved >"$F/moved-after-pin.txt"; git -C "$F" add -A; git -C "$F" commit -q -m "the branch moves"
+DOCENV_BASE=(FORK_URL="$F" UPSTREAM_URL="$U" TAG=v1.1.0 CHECK_SKIP=install,typecheck,tests,check,httpapi,guards,build,compat GIT_ALLOW_PROTOCOL=file)
+DOCENV=(FORK_SHA="$FORK" "${DOCENV_BASE[@]}")
 doctest() { env "${DOCENV[@]}" python3 -I "$HERE/doctest_procedure.py" --src "$DOC" --resolve "$W/resolve.sh" "$@"; }
 doctest --doc "$HERE/../../docs/upstream-sync/procedure.md" --out "$W/doc-out" --log "$W/doctest.log" >"$W/doctest.out" 2>&1 \
   || { tail -60 "$W/doctest.log" >&2; cat "$W/doctest.out" >&2; fail "procedure.md does not run verbatim"; }
 grep -q 'RESULT: ACCEPTED' "$W/doctest.log" || fail "the procedure document did not end in ACCEPTED: $(tail -5 "$W/doctest.log")"
 grep -q '^catalog	PASS' "$W/doc-out/check/summary.tsv" || fail "the catalog step of check did not pass"
+grep -qx "FORK_SHA=$FORK" "$W/doc-out/pins.env" || fail "the rehearsal did not stay on the chosen fork SHA: $(cat "$W/doc-out/pins.env")"
+# without a chosen fork SHA the document stops at pin: the tip of a branch is not a pin (F4 of LAB-303)
+if env "${DOCENV_BASE[@]}" python3 -I "$HERE/doctest_procedure.py" --src "$DOC" --resolve "$W/resolve.sh" --doc "$HERE/../../docs/upstream-sync/procedure.md" \
+  --out "$W/doc-out-nosha" --log "$W/doctest-nosha.log" >"$W/doctest-nosha.out" 2>&1; then fail "the doc-test ran without FORK_SHA"; fi
+[ "$(grep '^### step=' "$W/doctest-nosha.log" | tail -1 | sed 's/^### step=\([a-z]*\).*/\1/')" = pin ] \
+  || fail "a missing FORK_SHA did not stop the document at pin: $(tail -5 "$W/doctest-nosha.log")"
+grep -q 'FORK_SHA' "$W/doctest-nosha.log" || fail "the pin step did not name FORK_SHA: $(tail -5 "$W/doctest-nosha.log")"
 # the document must fail when a command depends on the working directory (C4 of LAB-300): with the same environment as the
 # positive run, so that it fails at the step under test and not at the network
 sed 's#--repo "\$OUT/rehearsal"#--repo rehearsal#' "$HERE/../../docs/upstream-sync/procedure.md" >"$W/procedure-relative.md"
