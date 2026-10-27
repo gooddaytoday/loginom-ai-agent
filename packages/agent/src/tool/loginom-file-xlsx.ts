@@ -659,6 +659,7 @@ export async function profileXlsx(path: string, dir: string, options: XlsxOption
       invalid("header_rows must be 0..10")
     let previous = 0,
       width = 0
+    const technicalNames = new Set<string>()
     const eof = await book.rows(
       sheet,
       async (r) => {
@@ -684,10 +685,10 @@ export async function profileXlsx(path: string, dir: string, options: XlsxOption
           })
         for (let i = p.columns.length; i < width; i++) {
           const name = p.header_rows ? (values.get(i + 1)?.value ?? `Column${i + 1}`) : `Column${i + 1}`
-          const technical =
-            /^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(name) && !p.columns.some((c) => c.technical_name === name)
-              ? name
-              : `Column${i + 1}`
+          const base = /^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(name) ? name : `Column${i + 1}`
+          let technical = base
+          for (let suffix = i + 1; technicalNames.has(technical); suffix++) technical = `${base}_${suffix}`
+          technicalNames.add(technical)
           p.columns.push({
             name,
             label: name,

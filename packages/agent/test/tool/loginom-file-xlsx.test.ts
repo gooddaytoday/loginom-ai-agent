@@ -151,6 +151,24 @@ test("wide worksheet profiles within 8 KiB but is not importable", async () => {
   )
 })
 
+test("generated technical names cannot collide with existing ASCII headers", async () => {
+  await fixture(
+    `<row r="1">${text("A", 1, "Column2")}${text("B", 1, "Сумма")}</row><row r="2">${text("A", 2, "North")}${num("B", 2, "1.25")}</row>`,
+    async (path, dir) => {
+      const p = await profile(path, dir)
+      expect(new Set(p.settings.excel.columns.map((c) => c.name)).size).toBe(2)
+      validateExcelParameters(
+        {
+          source: { artifact_id: "a", upload_operation_id: "u" },
+          excel: { ...p.settings.excel, source_path: "/sample.xlsx" },
+        },
+        "xlsx",
+        { inputs: [], mappings: [], finish: "done", read: { ports: [] } },
+      )
+    },
+  )
+})
+
 test("blank row policy, header policy and first type mismatch", async () => {
   const rows =
     header +
