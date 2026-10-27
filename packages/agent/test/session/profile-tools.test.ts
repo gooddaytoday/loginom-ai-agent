@@ -273,6 +273,7 @@ it.instance("local file tool permission failures retain path, typed marker and t
               : PermissionV1.DeniedError,
         )
         expect(String(error)).toContain(path)
+        expect(String(error)).toContain("LOGINOM_FILE_ACCESS_DENIED")
         expect(String(error).includes("--file")).toBe(action !== "deny")
         if (action === "feedback") expect(String(error)).toContain("Do not read this file")
       }

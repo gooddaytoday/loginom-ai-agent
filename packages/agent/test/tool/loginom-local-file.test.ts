@@ -70,6 +70,7 @@ it.instance("oversize registration errors include the typed cause, exact limit a
     expect(Exit.isFailure(result)).toBe(true)
     if (Exit.isFailure(result)) {
       expect(String(Cause.squash(result.cause))).toContain("LOGINOM_FILE_TOO_LARGE")
+      expect(String(Cause.squash(result.cause))).toContain(path)
       expect(String(Cause.squash(result.cause))).toContain('"actual":16777217,"limit":16777216')
       expect(String(Cause.squash(result.cause))).toContain("профиль и выборка")
       expect(String(Cause.squash(result.cause))).not.toContain("--file")

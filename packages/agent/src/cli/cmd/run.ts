@@ -397,19 +397,23 @@ export const RunCommand = effectCmd({
         for (const filePath of list) {
           const resolvedPath = path.resolve(args.attach ? root : (directory ?? root), filePath)
           const info = await stat(resolvedPath).catch((error) => {
-            UI.error(hostErrorText(fileError(error)))
+            UI.error(hostErrorText(fileError(error)) + " Путь: " + resolvedPath)
             return exitCli(1)
           })
           const isDirectory = info.isDirectory()
           if ((args.attach || process.env.LOGINOM_AI_AGENT_CLI_ROOT) && isDirectory) {
-            UI.error(hostErrorText("LOGINOM_FILE_NOT_REGULAR"))
+            UI.error(
+              hostErrorText("LOGINOM_FILE_NOT_REGULAR") +
+                ". Cannot attach local directory without a shared filesystem: " +
+                filePath,
+            )
             exitCli(1)
           }
 
           const detected = FSUtil.mimeType(resolvedPath)
           if (!args.attach && detected === "application/x-loginom-package") {
             if (!info.isFile()) {
-              UI.error(hostErrorText("LOGINOM_FILE_NOT_REGULAR"))
+              UI.error(hostErrorText("LOGINOM_FILE_NOT_REGULAR") + " Путь: " + resolvedPath)
               exitCli(1)
             }
             files.push({
@@ -424,7 +428,7 @@ export const RunCommand = effectCmd({
           const content = await (async () => {
             if (!args.attach && !process.env.LOGINOM_AI_AGENT_CLI_ROOT) return
             return fileSnapshot(resolvedPath).catch((error: unknown) => {
-              UI.error(hostErrorText(error))
+              UI.error(hostErrorText(error) + " Путь: " + resolvedPath)
               return exitCli(1)
             })
           })()
