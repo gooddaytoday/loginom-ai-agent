@@ -4,6 +4,7 @@ import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import { Deferred, Effect } from "effect"
 import { Global } from "@opencode-ai/core/global"
 import { Flag } from "@opencode-ai/core/flag/flag"
+import { Product } from "@loginom-ai-agent/product"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
 import { ExitProvider, useExit } from "./context/exit"
@@ -752,7 +753,7 @@ function App(props: { onSnapshot?: () => Promise<string[]>; pluginHost: TuiPlugi
         ? [
             {
               name: "opencode.update",
-              title: "Update OpenCode",
+              title: `Update ${Product.name}`,
               slashName: "update",
               run: () => update.open?.(),
               category: "System",

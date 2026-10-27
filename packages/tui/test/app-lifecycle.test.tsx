@@ -285,3 +285,57 @@ test("fatal startup errors set a nonzero exit after scoped cleanup", async () =>
     mock.restore()
   }
 })
+
+test("the update command in the palette is named after the product", async () => {
+  const setup = await createTestRenderer({ width: 100, height: 100, useThread: false })
+  const core = await import("@opentui/core")
+  mock.module("@opentui/core", () => ({ ...core, createCliRenderer: async () => setup.renderer }))
+  const events = createEventSource()
+  const calls = createFetch()
+  let api: TuiPluginApi | undefined
+  let started!: () => void
+  const ready = new Promise<void>((resolve) => {
+    started = resolve
+  })
+
+  try {
+    const { run } = await import("../src/app")
+    const task = Effect.runPromise(
+      run({
+        url: "http://test",
+        directory,
+        config: createTuiResolvedConfig({ plugin_enabled: {} }),
+        fetch: calls.fetch,
+        events: events.source,
+        args: {},
+        updater: {
+          subscribe: () => () => {},
+          check: async () => ({ current: "0.0.0" }),
+          apply: async () => {},
+        },
+        pluginHost: {
+          async start(input) {
+            api = input.api
+            started()
+          },
+          async dispose() {},
+        },
+      }).pipe(Effect.provide(AppNodeBuilder.build(Global.node))),
+    )
+
+    await ready
+    await setup.renderOnce()
+    api?.keymap.dispatchCommand("command.palette.show")
+    await setup.renderOnce()
+    await setup.renderOnce()
+    const frame = setup.captureCharFrame()
+    api?.keymap.dispatchCommand("app.exit")
+    await task
+
+    expect(frame).toContain("Update Loginom AI Agent")
+    expect(frame).not.toContain("Update OpenCode")
+  } finally {
+    if (!setup.renderer.isDestroyed) setup.renderer.destroy()
+    mock.restore()
+  }
+})

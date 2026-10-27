@@ -112,6 +112,7 @@
 - **Почему не вынесено.** Слот `home_logo` существует в upstream (`packages/tui/src/routes/home.tsx`, `mode="replace"`) и мог бы заменить правку; подключение плагина через `OPENCODE_TUI_CONFIG` из встроенных ресурсов не проверялось (UNVERIFIED).
 - **Компоненты.** `packages/tui/**`; 32 файла.
 - **Проверка при обновлении.** `bun test` в `packages/tui`; живой LNX-C5.
+- **Известное при обновлении: название пункта обновления (v1.19.4, LAB-353).** Upstream v1.19.4 добавил в палитру команд пункт «Update OpenCode» (`packages/tui/src/app.tsx`, команда `opencode.update`, слэш `/update`); на PR #452 его нет. Название команды видит пользователь, поэтому оно идёт от имени продукта через `Product.name` (`Update ${Product.name}`), как строки `packages/opencode/src/product/installation.ts` и `cli/standalone.ts`. `apply-identity` его не меняет (CAT-03: видимые строки бренда — решение по строке), правило для PR #452 не предлагается: строка появилась только в v1.19.4. Охраняет тест «the update command in the palette is named after the product» в `packages/tui/test/app-lifecycle.test.tsx`. Остальные строки «OpenCode» в `packages/tui/src` (заголовок терминала, подсказки, диалоги провайдеров) в PR #452 такие же и этим коммитом не меняются.
 - **Политика.** `merge`.
 
 ## CAT-12 Ядро: идентичность и общие пакеты
