@@ -11,7 +11,7 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { Auth } from "../auth"
 import { Env } from "../env"
 import { applyEdits, modify } from "jsonc-parser"
-import { InstallationLocal, InstallationVersion } from "@opencode-ai/core/installation/version"
+import { pluginDependency } from "@/product/installation"
 import { existsSync } from "fs"
 import { Account } from "@/account/account"
 import { isRecord } from "@/util/record"
@@ -450,14 +450,7 @@ const layer = Layer.effect(
           yield* ensureGitignore(dir).pipe(Effect.orDie)
 
           const dep = yield* npmSvc
-            .install(dir, {
-              add: [
-                {
-                  name: "@opencode-ai/plugin",
-                  version: InstallationLocal ? undefined : InstallationVersion,
-                },
-              ],
-            })
+            .install(dir, { add: [pluginDependency()] })
             .pipe(
               Effect.exit,
               Effect.tap((exit) =>

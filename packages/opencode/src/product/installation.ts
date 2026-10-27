@@ -1,6 +1,6 @@
 import { Product } from "@loginom-ai-agent/product"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import { InstallationLocal, InstallationVersion } from "@opencode-ai/core/installation/version"
 import { Effect, Layer, type Context } from "effect"
 import type { Interface, UpgradeFailedError } from "@/installation"
 
@@ -30,4 +30,8 @@ export function installationNode<Id>(binding: Binding<Id>) {
     ),
     deps: [],
   })
+}
+
+export function pluginDependency(release = { local: InstallationLocal, version: InstallationVersion }) {
+  return { name: "@loginom-ai-agent/plugin", version: release.local ? undefined : release.version }
 }

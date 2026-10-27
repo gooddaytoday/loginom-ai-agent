@@ -1,4 +1,4 @@
-import { expect } from "bun:test"
+import { expect, test } from "bun:test"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
@@ -12,6 +12,7 @@ import { Config } from "@/config/config"
 import { CurrentWorkingDirectory } from "@/config/tui-cwd"
 import { TuiConfig } from "../../src/config/tui"
 import { Env } from "../../src/env"
+import { pluginDependency } from "../../src/product/installation"
 import { AccountTest } from "../fake/account"
 import { AuthTest } from "../fake/auth"
 import { TestInstance } from "../fixture/fixture"
@@ -81,3 +82,11 @@ server.instance("tui config requests the public plugin package in the background
     expect(added.map((item) => item.version)).toEqual(added.map(() => undefined))
   }),
 )
+
+test("a release build requests the public plugin package at the product version", () => {
+  expect(pluginDependency({ local: false, version: "0.3.5" })).toEqual({ name: publicName, version: "0.3.5" })
+})
+
+test("a development build requests the latest public plugin package", () => {
+  expect(pluginDependency({ local: true, version: "local" })).toEqual({ name: publicName, version: undefined })
+})
