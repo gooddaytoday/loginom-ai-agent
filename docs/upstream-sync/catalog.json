@@ -1,6 +1,6 @@
 {
   "comment": "Source of truth for which fork changes inside upstream files are described in catalog.md. First matching entry wins. Checked by scripts/upstream-sync/catalog-check.py.",
-  "against": "501ff62cbf40d4ff260b48c9f1fc113e9b9a83e1",
+  "against": "148842ef7cb1bc34192b3fff57d0f9721ab9c801",
   "entries": [
     { "id": "CAT-01", "title": "Manifests and lockfile", "paths": ["bun.lock", "**/package.json"] },
     {
