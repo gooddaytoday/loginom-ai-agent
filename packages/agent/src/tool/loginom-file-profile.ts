@@ -40,7 +40,7 @@ export const loginomFileTools = Effect.fn("Loginom.fileTools")(function* (
     {
       name: "loginom_file_profile",
       description:
-        "Profile a local CSV/TSV/TXT by literal path BEFORE Read or admission, especially files >16 MiB. Reads at most 8 MiB within a 5-second quick budget. Returns encoding, dialect, column types, heuristic row estimate and import settings (source_path is empty until delivery). Unconfirmed seek windows never supply typed records. Specify overrides for ambiguous encoding/header/dialect. For wide tables, call again with profile_id and continuation; assemble all columns before importing. Does not validate the whole file: use loginom_file_scan for exact count/types.",
+        "Profile a local CSV/TSV/TXT or XLSX by literal path BEFORE Read or admission. XLSX is recognized by ZIP workbook relationships; reads bounded streaming XML, disk-indexed shared strings, sheet names/visibility, dimensions, date system, cached formulas and Excel import settings. Quick budget: 8 MiB decoded content / about 5 seconds. Select sheet_name if needed. settings.source delivery IDs and source_path are filled after sample delivery. Excel runtime supports 1–8 columns, 1–10 header rows and imports blank rows; respect settings_complete=false. CSV returns encoding/dialect and paginated columns. Does not validate the whole file: use loginom_file_scan for exact count/types.",
       properties: {
         path: { type: "string" },
         profile_id: { type: "string" },
@@ -53,6 +53,22 @@ export const loginomFileTools = Effect.fn("Loginom.fileTools")(function* (
         text_qualifier: { type: "string", enum: ['"', "'", ""] },
         rows_to_skip: { type: "integer", minimum: 0, maximum: 1000000 },
         first_line_as_title: { type: "boolean" },
+        sheet_name: {
+          type: "string",
+          maxLength: 120,
+          description: "Exact XLSX worksheet name; default first worksheet",
+        },
+        header_rows: {
+          type: "integer",
+          minimum: 0,
+          maximum: 10,
+          description: "XLSX header rows; default 1. Runtime Excel import requires 1–10.",
+        },
+        blank_rows: {
+          type: "string",
+          enum: ["import", "skip"],
+          description: "XLSX exact count policy; default import matches Excel runtime.",
+        },
         decimal_separator: { type: "string", enum: [".", ","] },
         null_marker: { type: "string", maxLength: 256 },
       },
@@ -61,14 +77,14 @@ export const loginomFileTools = Effect.fn("Loginom.fileTools")(function* (
     {
       name: "loginom_file_scan",
       description:
-        "Separate cancellable streaming pass over a previously authorized profile: exact logical DATA record count (excludes skipped records/header; quoted newlines stay in the same record), SHA-256, disk boundary index, and first type/field-count violation with physical line/byte offset. Can take minutes for GB files. Cancellation remains partial. Records >8 MiB fail. Request only when full count/type validation or reservoir sampling is needed; sampling alone is not full validation.",
+        "Separate cancellable streaming pass over a previously authorized CSV/XLSX profile: exact DATA count under the profile's header/blank-row policy, SHA-256 and first type violation. XLSX reports sheet, worksheet row, column and expected type; byte_offset=0 is not an XML seek position. CSV reports physical line/byte offset and disk boundary index. Can take minutes. Cancellation remains partial; missing formula caches are explicit violations. Sampling alone is not full validation.",
       properties: { profile_id: { type: "string" } },
       required: ["profile_id"],
     },
     {
       name: "loginom_file_sample",
       description:
-        "Create a local <=8 MiB byte-exact sample from a profile: BOM/preamble/header once, complete records, original encoding/dialect/line endings. Uses confirmed head, plus deterministic reservoir if an exact scan exists. Returns a session file and manifest; next call loginom_file_admit on the returned sample path, then deliver its artifact and build the scenario on that sample. The full calculation will be available after loading the full file; report sample-only results honestly.",
+        "Create a local <=8 MiB sample from a CSV/XLSX profile. CSV preserves original bytes, BOM/preamble/header and dialect. XLSX returns a small XLSX of the selected sheet: headers, cell order/types, number/date formats and 1900/1904 system, rewritten row numbers/shared strings; formulas become cached values, missing caches refuse sampling. Uses confirmed head plus seeded reservoir after exact scan. Next call loginom_file_admit on the returned path, then artifact_deliver and build the scenario using settings.excel for XLSX. Report sample-only results honestly; full calculation requires loading the full file.",
       properties: {
         profile_id: { type: "string" },
         seed: { type: "integer" },
