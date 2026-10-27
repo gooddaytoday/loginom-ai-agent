@@ -36,13 +36,19 @@ describe("upgrade check", () => {
 })
 
 describe("upgrade command", () => {
+  const parse = (args: string[]) =>
+    yargs(args)
+      .exitProcess(false)
+      .fail(false)
+      .strict()
+      .command({ command: UpgradeCommand.command, builder: UpgradeCommand.builder, handler: () => {} })
+      .parseAsync()
+
   test("does not accept --major", async () => {
-    const parser = UpgradeCommand.builder(yargs([]).exitProcess(false).fail(false)).strict()
-    await expect(parser.parseAsync(["--major"])).rejects.toThrow("Unknown argument: major")
+    await expect(Promise.resolve().then(() => parse(["upgrade", "--major"]))).rejects.toThrow("Unknown argument: major")
   })
 
   test("still accepts a target and a method", async () => {
-    const parser = UpgradeCommand.builder(yargs([]).exitProcess(false).fail(false)).strict()
-    expect(await parser.parseAsync(["1.2.3", "--method", "npm"])).toMatchObject({ target: "1.2.3", method: "npm" })
+    expect(await parse(["upgrade", "1.2.3", "--method", "npm"])).toMatchObject({ target: "1.2.3", method: "npm" })
   })
 })
