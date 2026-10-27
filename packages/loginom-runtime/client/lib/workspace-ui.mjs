@@ -863,7 +863,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&(tids.get(getTid(e)+'>Настройка')??[]).filter(child=>panels[0].contains(child)
             &&child.querySelectorAll('.maptree-icon-wizard').length===1).length===1;
         const overflowOutputFolder=e=>boundOutputOverflow&&(preparedOutputPort.port===0||preparedOutputPort.node_icon_class==='bg-vendor-icon-filterdata'&&preparedOutputPort.port===1)
-          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-uniondata','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-joindata'].includes(preparedOutputPort.node_icon_class)
+          &&['bg-vendor-icon-groupdata','bg-vendor-icon-sorting','bg-vendor-icon-uniondata','bg-vendor-icon-crosstab','bg-vendor-icon-calcdata','bg-vendor-icon-reformcolumns','bg-vendor-icon-filterdata','bg-vendor-icon-javascript','bg-vendor-icon-joindata','bg-vendor-icon-importtextfile'].includes(preparedOutputPort.node_icon_class)
           &&getComputedStyle(e).display==='none'&&getComputedStyle(e).visibility==='visible'&&getComputedStyle(e).opacity!=='0'&&!e.hasAttribute('hidden')
           &&e.textContent.trim()==='Выходные порты'&&(getTid(e)??'').endsWith('>Выходные_порты')
           &&e.querySelectorAll('.maptree-icon-modeloutputports').length===1
