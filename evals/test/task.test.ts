@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
-import { mkdtemp, writeFile, cp, mkdir, rm } from "node:fs/promises"
+import { mkdtemp, writeFile, cp, mkdir, rm, symlink } from "node:fs/promises"
 import os from "node:os"
 import { loadTasks, agentInputsHash, rubricHash, buildAgentPrompt, taskTimeoutMs } from "../src/task"
 import { evalsRoot } from "../src/config"
@@ -53,6 +53,48 @@ test("loadTasks: inputs с одинаковым именем отклоняют�
     expect(error.message).toContain("group-sum-qty")
     expect(error.message).toContain("left/data.csv")
     expect(error.message).toContain("right/data.csv")
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test("loadTasks: paths сохраняет разные вложенные пути с одинаковым basename", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-input-paths-"))
+  try {
+    const root = path.join(dir, "group-sum-qty")
+    await cp(path.join(tasksDir, "group-sum-qty"), root, { recursive: true })
+    const raw = await Bun.file(path.join(root, "task.json")).json()
+    const inputs = ["left/sales.csv", "right/sales.csv"]
+    for (const rel of inputs) await Bun.write(path.join(root, rel), rel)
+    await Bun.write(path.join(root, "task.json"), JSON.stringify({ ...raw, input_mode: "paths", inputs }))
+    const [task] = await loadTasks(dir)
+    expect(task).toMatchObject({ inputMode: "paths", inputs })
+    const hash = await agentInputsHash([task!])
+    expect(hash).not.toBe(await agentInputsHash([{ ...task!, inputMode: undefined }]))
+    await cp(root, path.join(dir, "copy/group-sum-qty"), { recursive: true })
+    expect(await agentInputsHash(await loadTasks(path.join(dir, "copy")))).toBe(hash)
+    await Bun.write(path.join(root, inputs[1]!), "changed")
+    expect(await agentInputsHash([task!])).not.toBe(hash)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test("loadTasks: paths отклоняет повтор пути и выход из case, включая symlink", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "evals-path-boundary-"))
+  try {
+    const root = path.join(dir, "group-sum-qty")
+    await cp(path.join(tasksDir, "group-sum-qty"), root, { recursive: true })
+    const file = path.join(root, "task.json")
+    const raw = await Bun.file(file).json()
+    const outside = path.join(dir, "outside.csv")
+    await Bun.write(outside, "outside")
+    await symlink(outside, path.join(root, "escape.csv"))
+    for (const inputs of [["data/sales.csv", "data/sales.csv"], ["data/./sales.csv", "data/sales.csv"],
+      ["../outside.csv"], [outside], ["escape.csv"], [""]]) {
+      await Bun.write(file, JSON.stringify({ ...raw, input_mode: "paths", inputs }))
+      await expect(loadTasks(dir)).rejects.toThrow(EvalFailure)
+    }
+    for (const input_mode of [null, "url"]) {
+      await Bun.write(file, JSON.stringify({ ...raw, input_mode }))
+      await expect(loadTasks(dir)).rejects.toThrow("input_mode")
+    }
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
 

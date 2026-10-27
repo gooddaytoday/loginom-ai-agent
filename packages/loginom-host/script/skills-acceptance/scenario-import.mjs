@@ -63,14 +63,24 @@ export function verifyCalculatorModification(tools, input) {
     ),
     "SCENARIO_ACTIVATION_NOT_VERIFIED",
   )
-  const receipts = completedDockReceipts(tools).map((receipt) => receipt.body)
+  const completed = completedDockReceipts(tools)
+  if (input.lgpPath) {
+    const prepared = completed.find(receipt => receipt.tool.tool === "loginom_dock_prepare" && receipt.tool.state.input?.local_package_path === input.lgpPath)?.body
+    const proof = prepared?.local_package_upload
+    assert.ok(prepared?.prepared === true && prepared.workspace?.status === "READY" && proof?.cleanup_complete && proof.upload_completion_verified,
+      "SCENARIO_LOCAL_PREPARE_NOT_VERIFIED")
+    assert.equal(proof.source_sha256, input.lgpSha256, "SCENARIO_LOCAL_SOURCE_CHANGED")
+    assert.equal(prepared.workspace.package_ref.path, proof.destination)
+  }
+  const multiplier = input.lgpPath ? 3 : 2
+  const receipts = completed.map((receipt) => receipt.body)
   const calculator = receipts.findLast(
     (r) => r.status === "SUCCEEDED" && r.configuration?.readback?.kind === "calculator",
   )
   assert.ok(calculator, "SCENARIO_CALCULATOR_NOT_VERIFIED")
   const expression = calculator.configuration.readback.expressions.find((e) => e.name === "amount_double")
   assert.ok(
-    expression && ["amount*2", "2*amount"].includes(expression.formula.replace(/\s/g, "")),
+    expression && [`amount*${multiplier}`, `${multiplier}*amount`].includes(expression.formula.replace(/\s/g, "")),
     "SCENARIO_FORMULA_CHANGED",
   )
   assert.equal(calculator.execution.status, "completed")
@@ -88,16 +98,17 @@ export function verifyCalculatorModification(tools, input) {
   assert.deepEqual(
     port.sample.map((row) => [row[indices[0]].value, Number(row[indices[1]].value), Number(row[indices[2]].value)]),
     [
-      ["Alpha", 10, 20],
-      ["Beta", 20, 40],
-      ["Alpha", 25, 50],
+      ["Alpha", 10, 10 * multiplier],
+      ["Beta", 20, 20 * multiplier],
+      ["Alpha", 25, 25 * multiplier],
     ],
   )
   const saved = receipts.findLast((r) => r.status === "SUCCEEDED" && r.action_key === "package.save_checkpoint")
   assert.ok(saved && receipts.indexOf(saved) > receipts.indexOf(calculator), "SCENARIO_SAVE_NOT_VERIFIED")
   assert.equal(saved.output.save_completed, true)
   assert.equal(saved.output.package_ref.path, input.packagePath)
-  return { builtNodes: { source: input.sourceNode, calculator: calculator.node.node_id } }
+  return { builtNodes: { source: input.sourceNode, calculator: calculator.node.node_id },
+    ...(input.lgpPath ? { inputSha256: input.lgpSha256 } : {}) }
 }
 
 export function verifyImportExecution(tools, input) {

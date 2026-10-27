@@ -1,0 +1,73 @@
+{
+  "task_id": "csv-two-paths",
+  "dataset_sha256": {
+    "data/Первый #1/sales.csv": "26ede826511af4f1eac9e9c77b73bf7223f3b0b825a2f6651cde451b68f89588",
+    "data/Второй %2/sales.csv": "35c77a35fcd4f72646bead3cbb7dc6dd57ac91b748b3602af84aee1cdf2bbf83"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "74ae6be4467d32a382feae4ab0866643066a351ea9a05834223a0cfb8309d30a"
+  },
+  "reference_sha256": "1261ecada13e79468a4df864eb8ff5d898ffb3213a502f4c158cceca1dd77b59",
+  "cli": {
+    "binary": "/home/kiselev/storage/tmp/local-paths-74-ptufs123/task7/install-home/.local/bin/loginom-ai-agent-cli",
+    "version": "0.0.0-dev-202610211509",
+    "profile": "csv-profile"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://127.0.0.1:32778/app/",
+    "build": "7.4.2",
+    "container": "593e6d89687a02c040e82c9effa62f29eb5f7f4bccf07a83f103666614aceaf7",
+    "package": "/user/local-path-scenarios-csv-two-paths-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/Первый #1/sales.csv",
+        "source_sha256": "26ede826511af4f1eac9e9c77b73bf7223f3b0b825a2f6651cde451b68f89588",
+        "storage": [
+          "/user/ef3be726fa56dbe741d06365cbedf521c2f9fabebd3932e04304dc7cbf44a5bd-0-sales.csv"
+        ],
+        "matches": true
+      },
+      {
+        "input": "data/Второй %2/sales.csv",
+        "source_sha256": "35c77a35fcd4f72646bead3cbb7dc6dd57ac91b748b3602af84aee1cdf2bbf83",
+        "storage": [
+          "/user/e48f04160ea41e0ab500082415a5b4ed023df0605c814470230e77b0d653465c-0-sales.csv"
+        ],
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_ea0ed294dffeu1XjCDVSbzXBws",
+    "skill_revision": "b58e06d07448e3206886cc7178750c394a1f292b1dd40c9421e1cf5c27d68ec7",
+    "exit_code": 0,
+    "started_at": "2026-10-21T18:27:08+03:00",
+    "duration_s": 570,
+    "tokens": {
+      "input": 78740,
+      "output": 3577,
+      "reasoning": 48
+    },
+    "tool_calls": 33,
+    "tool_errors": 0,
+    "memory_tool_calls": 0,
+    "errors": []
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://127.0.0.1:32778/app/?testable=true#packages/user/local-path-scenarios-csv-two-paths-1/Unit1/workflow"
+}

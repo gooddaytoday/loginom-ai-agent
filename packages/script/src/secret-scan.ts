@@ -51,6 +51,9 @@ async function main() {
   const preferred = join(homedir(), "storage", "tmp")
   const temp = await mkdtemp(join(process.env.TMPDIR || (existsSync(preferred) ? preferred : tmpdir()), "secret-scan-"))
   await chmod(temp, 0o700)
+  // Hooks export repository-local Git variables; snapshots must select their own repository.
+  const localEnv = git("rev-parse", "--local-env-vars").trim().split("\n")
+  const snapshotEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => !localEnv.includes(name)))
   try {
     await Bun.write(join(temp, "ignore"), "")
     await Bun.write(join(temp, "audit.toml"), "[extend]\nuseDefault = true\n")
@@ -111,15 +114,17 @@ async function main() {
         }
         if (archivePattern.test(file)) {
           const blob = new Uint8Array(await Bun.file(file).arrayBuffer())
-          const oid = gitInput(blob, "hash-object", "--stdin").trim()
+          const oid = gitInput(blob, ["hash-object", "--stdin"]).trim()
           archives.set(oid, { oid, file, current: true, blob })
           continue
         }
         await mkdir(dirname(join(directory, file)), { recursive: true })
         await Bun.write(join(directory, file), Bun.file(file))
       }
-      await indexSnapshot(directory)
-      findings.push(...(await scan(binary, ["git", "--staged", directory], temp, "current", config, ignore)))
+      await indexSnapshot(directory, snapshotEnv)
+      findings.push(
+        ...(await scan(binary, ["git", "--staged", directory], temp, "current", config, ignore, snapshotEnv)),
+      )
     }
     if (archives.size) {
       const directory = join(temp, "archives")
@@ -128,8 +133,16 @@ async function main() {
         const blob = archive.blob || gitBlob(archive.oid)
         await unpack(blob, archive.file, join(directory, archive.oid))
       }
-      await indexSnapshot(directory)
-      for (const finding of await scan(binary, ["git", "--staged", directory], temp, "archives", config, ignore)) {
+      await indexSnapshot(directory, snapshotEnv)
+      for (const finding of await scan(
+        binary,
+        ["git", "--staged", directory],
+        temp,
+        "archives",
+        config,
+        ignore,
+        snapshotEnv,
+      )) {
         const oid = finding.File.split("/")[0]
         const archive = oid ? archives.get(oid) : undefined
         if (!archive) throw new ScanFailure("Secret scan incomplete: archive report cannot be mapped.")
@@ -273,11 +286,11 @@ async function unpack(blob: Uint8Array, file: string, directory: string, depth =
   }
 }
 
-async function indexSnapshot(directory: string) {
-  git("-C", directory, "init", "-q")
+async function indexSnapshot(directory: string, env: NodeJS.ProcessEnv) {
+  gitInput(undefined, ["-C", directory, "init", "-q"], env)
   // Disable repository-supplied filters and diff drivers in this private snapshot.
   await Bun.write(join(directory, ".git", "info", "attributes"), "* -filter -text diff\n")
-  git("-C", directory, "-c", "core.autocrlf=false", "add", "--all", "--force")
+  gitInput(undefined, ["-C", directory, "-c", "core.autocrlf=false", "add", "--all", "--force"], env)
 }
 
 function commit(ref: string) {
@@ -308,7 +321,15 @@ function pushRevisions(input: string, remote: string) {
     })
 }
 
-async function scan(binary: string, args: string[], temp: string, name: string, config: string, ignore: string) {
+async function scan(
+  binary: string,
+  args: string[],
+  temp: string,
+  name: string,
+  config: string,
+  ignore: string,
+  env = process.env,
+) {
   const report = join(temp, `${name}.json`)
   const result = Bun.spawnSync(
     [
@@ -327,7 +348,7 @@ async function scan(binary: string, args: string[], temp: string, name: string, 
       "--report-format=json",
       `--report-path=${report}`,
     ],
-    { env: { ...process.env, TMPDIR: temp, TMP: temp, TEMP: temp }, stdout: "ignore", stderr: "pipe" },
+    { env: { ...env, TMPDIR: temp, TMP: temp, TEMP: temp }, stdout: "ignore", stderr: "pipe" },
   )
   const diagnostic = result.stderr
     .toString()
@@ -344,11 +365,11 @@ async function scan(binary: string, args: string[], temp: string, name: string, 
 }
 
 function git(...args: string[]) {
-  return gitInput(undefined, ...args)
+  return gitInput(undefined, args)
 }
 
-function gitInput(input: Uint8Array | undefined, ...args: string[]) {
-  const result = Bun.spawnSync(["git", ...args], { stdin: input ? Buffer.from(input) : "ignore" })
+function gitInput(input: Uint8Array | undefined, args: string[], env = process.env) {
+  const result = Bun.spawnSync(["git", ...args], { env, stdin: input ? Buffer.from(input) : "ignore" })
   if (result.exitCode) throw new ScanFailure("Secret scan incomplete: Git data unavailable. Run git fetch and retry.")
   return result.stdout.toString()
 }

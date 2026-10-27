@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 
 const processDenial = process.env.EVAL_PROCESS_DENIAL_TESTS === "1" ? test : test.skip
 import { spawn } from "node:child_process"
-import { mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, readlink, rm, stat } from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
 import { evalsRoot } from "../src/config"
@@ -106,7 +106,10 @@ test("writer-release settlement refuses a live foreign native process without si
   const exited = new Promise(resolve => child.once("exit", resolve))
   try {
     while (!await Bun.file(ready).exists()) await Bun.sleep(10)
-    await expect(observeWriterReleaseSettlement(f.profile, f.original, f.acquired)).rejects.toThrow("busy or foreign")
+    expect(child.exitCode).toBeNull()
+    // On a busy host an unreadable native process can refuse the census before the readable child.
+    await expect(observeWriterReleaseSettlement(f.profile, f.original, f.acquired)).rejects.toThrow(
+      /^(?:Writer-release processes busy or foreign$|Cannot inspect process identity PID \d+:)/)
     expect(child.exitCode).toBeNull()
   } finally { child.kill("SIGTERM"); await exited; await f.dispose() }
 })
@@ -116,13 +119,25 @@ processDenial("writer-release settlement refuses an inaccessible native process"
   const ready = path.join(f.root, "ready")
   const child = spawn(process.execPath, ["-e", `process.title='loginom-ai-protected';
     const {dlopen,ptr}=await import('bun:ffi'); const lib=dlopen('libc.so.6',{prctl:{args:['i32','u64','u64','u64','u64'],returns:'i32'}});
-    const name=Buffer.from('loginom-ai-test\\0');
+    const name=Buffer.alloc(16);name.write('loginom-ai-test');
     if(lib.symbols.prctl(15,BigInt(ptr(name)),0,0,0)!==0 || lib.symbols.prctl(4,0,0,0,0)!==0)process.exit(2);
-    await Bun.write(${JSON.stringify(ready)},'ready');setTimeout(()=>process.exit(0),1000);`], { stdio: "ignore" })
+    process.stdin.resume();process.stdin.on('end',()=>process.exit(0));
+    setTimeout(()=>process.exit(3),10000);await Bun.write(${JSON.stringify(ready)},'ready');`], { stdio: ["pipe", "ignore", "ignore"] })
   const exited = new Promise(resolve => child.once("exit", resolve))
   try {
     while (!await Bun.file(ready).exists() && child.exitCode === null) await Bun.sleep(10)
     expect(await Bun.file(ready).exists()).toBe(true)
+    expect(child.exitCode).toBeNull()
+    expect((await stat(`/proc/${child.pid}`)).uid).toBe(process.getuid!())
+    const raw = await readFile(`/proc/${child.pid}/stat`, "utf8")
+    expect(raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(")"))).toBe("loginom-ai-test")
+    const fields = raw.slice(raw.lastIndexOf(")") + 2).split(" ")
+    expect(["Z", "X"]).not.toContain(fields[0])
+    await expect(readlink(`/proc/${child.pid}/exe`)).rejects.toMatchObject({ code: "EACCES" })
     await expect(observeWriterReleaseSettlement(f.profile, f.original, f.acquired)).rejects.toThrow("Cannot inspect process identity")
-  } finally { await exited; await f.dispose() }
+    expect(child.exitCode).toBeNull()
+    const after = await readFile(`/proc/${child.pid}/stat`, "utf8")
+    expect(after.slice(after.lastIndexOf(")") + 2).split(" ")[19]).toBe(fields[19])
+    await expect(readlink(`/proc/${child.pid}/exe`)).rejects.toMatchObject({ code: "EACCES" })
+  } finally { child.stdin!.end(); await exited; await f.dispose() }
 })

@@ -82,11 +82,11 @@ test.describe("timeline adverse visual stability", () => {
   test("preserves an explicit shell state across virtualization", async ({ page }) => {
     const targetID = "prt_virtual_shell"
     const messages = [
-      userMessage(undefined, { id: "msg_0000_virtual_user", created: 1700000000000 }),
+      userMessage(undefined, { id: "msg_0000_virtual_user", created: 1699990000000 }),
       assistantMessage([shell(targetID, "completed", lines(20))], {
         id: "msg_0001_virtual_assistant",
         parentID: "msg_0000_virtual_user",
-        created: 1700000001000,
+        created: 1699990001000,
       }),
       ...history(35, 10),
     ]

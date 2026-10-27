@@ -1,0 +1,20 @@
+{
+  "required_type_fragments": [
+    "TBGImportTextFile",
+    "TBGUnionData",
+    "TBGGroupDataEngine",
+    "TBGSortingEngine",
+    "TBGExportTextFile"
+  ],
+  "linked_nodes": true,
+  "path": {
+    "from": "TBGImportTextFile",
+    "to": "TBGExportTextFile"
+  },
+  "inputs": {
+    "type_fragment": "TBGImportTextFile",
+    "suffixes": [
+      "sales.csv"
+    ]
+  }
+}

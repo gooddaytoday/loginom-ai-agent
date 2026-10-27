@@ -1,0 +1,88 @@
+{
+  "task_id": "local-lgp-edit",
+  "dataset_sha256": {
+    "data/Пакет #1/sales.lgp": "4313b47f09cc875993e8acc42ef2d35baec7d7dc61589af817d413b37261e7bf"
+  },
+  "oracle_sha256": {
+    "oracle.csv": "ac1398b99e692338e383c49ec26caae7707b7faeeaf1306b224a36a70f36a6c0"
+  },
+  "reference_sha256": "5dd377cdef037d13eb9e80ff8fb80f8387e812646d5b82f240e32cea87d30e35",
+  "cli": {
+    "binary": "/home/kiselev/storage/tmp/local-paths-74-ptufs123/task7-edit-reference-20261026/home/.local/bin/loginom-ai-agent-cli",
+    "version": "0.3.2-localpaths74.9f7233ce71",
+    "profile": "profile"
+  },
+  "model": {
+    "id": "openai/gpt-6.1-sol",
+    "variant": "xhigh",
+    "confirmed_in_session_db": true
+  },
+  "loginom": {
+    "url": "http://127.0.0.1:32794/app/",
+    "build": null,
+    "container": "45104b59b6d8d3f51a704877c9506243a028a8e28136768fe3d96f23ae5a9f29",
+    "package": "/user/local-path-scenarios-local-lgp-edit-1.lgp",
+    "package_origin": "receipt",
+    "inputs": [
+      {
+        "input": "data/Пакет #1/sales.lgp",
+        "source_sha256": "4313b47f09cc875993e8acc42ef2d35baec7d7dc61589af817d413b37261e7bf",
+        "storage": [
+          "/user/86c532c40924b70dd09cafc9b1f87d2b5b74987ee37fbb003be2f0c3017365fe-0-sales.lgp"
+        ],
+        "matches": true
+      }
+    ]
+  },
+  "attempt": {
+    "number": 1,
+    "total": 1,
+    "assisted": false,
+    "hint": null,
+    "session_id": "ses_e879fe184ffe0J4rO9AqBlI6jT",
+    "skill_revision": "b58e06d07448e3206886cc7178750c394a1f292b1dd40c9421e1cf5c27d68ec7",
+    "exit_code": 1,
+    "started_at": "2026-10-26T16:22:04+03:00",
+    "duration_s": 300,
+    "tokens": {
+      "input": 77825,
+      "output": 2067,
+      "reasoning": 337
+    },
+    "tool_calls": 23,
+    "tool_errors": 1,
+    "memory_tool_calls": 0,
+    "errors": [
+      "CLI_TOOL_FAILED"
+    ],
+    "handled_tool_error": {
+      "tool": "read",
+      "error": "Cannot read binary file",
+      "after_skill_activation": true,
+      "effect": "CLI_TOOL_FAILED exit 1; model continued through Loginom and saved the verified package/CSV",
+      "retried_model": false
+    }
+  },
+  "checks": {
+    "model_confirmed": true,
+    "inputs_match": true,
+    "cli_check": true,
+    "rerun_check": true
+  },
+  "scenario_url": "http://127.0.0.1:32794/app/?testable=true#packages/user/local-path-scenarios-local-lgp-edit-1/Unit1/workflow",
+  "verification": {
+    "preserved_original_workflow_guids": 4,
+    "preserved_original_workflow_links_and_endpoints": 3,
+    "additional_nodes_allowed": true,
+    "source_code_unchanged": true,
+    "formula": "amount*3",
+    "cold_browser_mcp": "PASS: Packages/Open, Execute All, active nodes, Close without Save, logout",
+    "package_sha256_after_cold_no_save": "5dd377cdef037d13eb9e80ff8fb80f8387e812646d5b82f240e32cea87d30e35",
+    "input_sha256_after_cold": "4313b47f09cc875993e8acc42ef2d35baec7d7dc61589af817d413b37261e7bf",
+    "native_package_close_logout": true,
+    "runtime_closed_ack": true,
+    "runtime_exit_code": 0,
+    "profile_writer_absent": true,
+    "remaining_payload_processes": 0
+  }
+}
