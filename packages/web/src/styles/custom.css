@@ -29,8 +29,7 @@
   --sl-color-bg-surface: var(--sl-color-bg-nav);
   --sl-color-divider: var(--sl-color-gray-5);
 
-  /* Fixed v2 announcement bar rendered below the header by PageFrame */
-  --v2-banner-height: 2.75rem;
+  --v2-banner-height: 0rem;
 }
 
 :root[data-has-hero] {
