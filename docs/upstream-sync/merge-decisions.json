@@ -1,0 +1,95 @@
+{
+  "format": 1,
+  "decisions": [
+    {
+      "path": ".github/workflows/test.yml",
+      "rule": "CAT-02",
+      "reason": "блок `on:` — fork-owned (`branches: [\"**\"]`); в группе взят `v1` вместо `dev`, префикс `tests-` оставлен Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    },
+    {
+      "path": ".github/workflows/typecheck.yml",
+      "rule": "CAT-02",
+      "reason": "kept-fork: блок `on:` форка (проверки на любой ветке и PR); фильтр `pull_request: branches: [v1]` относится к ветке v1 upstream, которой у форка нет Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    },
+    {
+      "path": ".gitignore",
+      "rule": "PROCEDURE-2",
+      "reason": "объединены обе строки: `/artifacts/` upstream и `/.local/project-memory/` форка Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    },
+    {
+      "path": "bun.lock",
+      "rule": "CAT-01",
+      "reason": "регенерирован `bun install --lockfile-only` Bun 1.3.14 (версия форка) от блокировки upstream v1.19.4 с объединёнными манифестами: версия workspace Desktop 0.3.4 (v0.3.4); имена и версии зависимостей, которые форк не менял, совпадают с блокировкой upstream (0 расхождений, lockcmp); корневой `packageManager` остаётся 1.4.4 из слияния до коммита переноса Bun. Переработано (rework): fork-сторона изменилась (3dd591334f), старый lock не переносился"
+    },
+    {
+      "path": "docs/upstream-sync/catalog.json",
+      "rule": "PROCEDURE-2",
+      "reason": "`against` переведён на SHA принятого тега v1.19.4 (шаг 2.6 процедуры); записи LAB-325 из 95e0c1fd сохранены; `catalog-check.py` без неописанных расхождений. Отклонение от оракула, а не конфликт: на 95e0c1fd файл сливается автоматически. Сверено: исходная запись 08fff0fa"
+    },
+    {
+      "path": "install",
+      "rule": "STANDING-7",
+      "reason": "блок отказа «OpenCode 2» upstream принят слиянием; путь установки `~/.loginom-ai-agent/bin` сохранён (поведение v0.3.3, ADR-0001 п. 4); подавление предложения OpenCode 2 — отдельный коммит (шаг 3, таблица LAB-305) Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    },
+    {
+      "path": "packages/desktop/package.json",
+      "rule": "STANDING-7",
+      "reason": "версия Desktop 0.3.4 (сторона форка изменилась коммитом 3dd591334f: v0.3.4 — эталон STANDING-6); остальное — разрешение 08fff0fa: `git merge-file` (текущее 08fff0fa, база a934b1b8, другое 95e0c1fd) без конфликтов; внутреннее имя @opencode-ai/desktop и extraMetadata.name сохранены. Переработано (rework): fork-сторона изменилась"
+    },
+    {
+      "path": "packages/opencode/package.json",
+      "rule": "CAT-01",
+      "reason": "версия 0.1.0 — fork-owned (CAT-01 version); остальное объединено Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    },
+    {
+      "path": "packages/opencode/script/build.ts",
+      "rule": "CAT-02",
+      "reason": "обе секции: codesign ad-hoc upstream для darwin и standalone-секции форка; путь codesign `${output}/${name}/bin/${executable}` Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    },
+    {
+      "path": "packages/opencode/src/cli/cmd/tui.ts",
+      "rule": "CAT-08",
+      "reason": "`createUpdater` upstream вместо старого `setTimeout`, `try`-обёртка запуска и мост Loginom форка Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    },
+    {
+      "path": "packages/opencode/src/cli/upgrade.ts",
+      "rule": "CAT-04",
+      "reason": "upstream (`shouldNotify`, `{available}`/`{major}`) + имена флагов форка + строка форка: при методе `unknown` вернуть `undefined`; предложения OpenCode 2 (`{major}`) подавляются отдельным коммитом (шаг 3) Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    },
+    {
+      "path": "packages/opencode/src/provider/provider.ts",
+      "rule": "CAT-07",
+      "reason": "блок `timeoutFetch` upstream; правка форка (`callerSignal`, восстановление `HeaderTimeoutError`, G3) перенесена в него Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    },
+    {
+      "path": "packages/opencode/src/share/share-next.ts",
+      "rule": "ADR-1",
+      "reason": "deleted-follow-upstream: решение владельца 27.10 (ADR-0001 «Открытые решения», п. 1, вариант (б); порядок работы LAB-198, п. 7): файл удалён вслед за upstream, вызовы не возвращаются; `LOGINOM_AI_AGENT_AUTO_SHARE` и `LOGINOM_AI_AGENT_DISABLE_SHARE` остаются как no-op отдельным коммитом (шаг 3) Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    },
+    {
+      "path": "packages/opencode/test/cli/run/run-process.test.ts",
+      "rule": "PROCEDURE-2",
+      "reason": "вариант upstream: `cliIt.live` (то же исправление на обеих сторонах) Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    },
+    {
+      "path": "packages/opencode/test/session/llm.test.ts",
+      "rule": "PROCEDURE-2",
+      "reason": "объединены оба набора тестов: матрица заголовков upstream и сценарии форка Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    },
+    {
+      "path": "packages/tui/src/app.tsx",
+      "rule": "CAT-11",
+      "reason": "обработчик обновления удалён (upstream), `session.error` не возвращён (форк, коммит 83a2aff2) Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    },
+    {
+      "path": "packages/tui/src/routes/home.tsx",
+      "rule": "CAT-11",
+      "reason": "`height={1}` форка + `onSizeChange` upstream Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    },
+    {
+      "path": "packages/web/src/content/docs/cli.mdx",
+      "rule": "PROCEDURE-2",
+      "reason": "таблица `LOGINOM_AI_AGENT_*` форка + новое описание и `--major` upstream (ручная замена, F6 LAB-303); описание `--major` убирается отдельным коммитом (шаг 3) Сверено (LAB-338): стадии 1/2/3 конфликта (база/форк/upstream) на 95e0c1fd побайтно равны a934b1b8 (merge-tree), разрешение 08fff0fa перенесено без изменений"
+    }
+  ]
+}
