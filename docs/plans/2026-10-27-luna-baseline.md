@@ -22,7 +22,8 @@
 - Исполнитель EvalBaseline, управляющая модель сохраняется. Карточка
   назначается EvalOps без squad; одно native-поручение EvalBaseline из
   настоящей задачи EvalOps с подтверждённым delegated_from_task_id.
-- EvalOps periodic 1800 секунд до прочитанного итога измерений. Затем
+- EvalOps periodic 3600 секунд до прочитанного итога измерений (поручение
+  владельца 27.10; прежние 1800 секунд заменены). Затем
   событийный надзор доставки и отдельного ответа исполнителя. Scoped
   blocked rule и native delegation failure; дополнительный scheduler нет.
 - Бюджет: 281 started measurement attempts, 3 последовательные технические
@@ -314,3 +315,9 @@ controller PID3611721 и batch3 PID3612033. Harness по-прежнему clean 
 - LAB-334 остаётся in_progress; scoped periodic EvalOps включён с interval_seconds=1800, blocked-rule также включён. Исходный clock сохранён.
 - Несекретные доказательства: `/home/kiselev/storage/tmp/luna-baseline-20261027/direct-launch-repair/launch-verification.json` и `six-slot-verification.json` в том же каталоге.
 - Запуск принят; дальше штатная campaign-служба продолжает отсутствующие измерения. Полный baseline и доставка ещё не завершены.
+
+27.10.2026 по новому поручению владельца интервал существующего scoped EvalOps
+wakeup `01a17d3c-c444-7348-ac61-c7920991bafa` изменён на 3600 секунд.
+Read-back подтвердил enabled=true и ближайшее пробуждение в 17:51 МСК;
+событийное blocked-правило сохранено. Остальные кампании и standing defaults
+не менялись. Evidence: `wakeup-hourly-readback.json` в private каталоге кампании.
