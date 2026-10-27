@@ -7,7 +7,7 @@
   },
   "include": [
     "./performance/timeline-stability/**/*.spec.ts",
-    "./performance/timeline-stability/fixture.test.ts",
+    "./performance/unit/timeline-fixture.test.ts",
     "./performance/timeline-stability/fixture.ts",
     "./performance/unit/visual-stability.test.ts",
     "./reproduction/timeline-suspense/**/*.ts",

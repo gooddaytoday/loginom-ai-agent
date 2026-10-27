@@ -101,8 +101,8 @@
   },
   "packages/loginom-runtime/tools/loginom-acceptance/test_provenance.py": {
     "baseHash": "937824198d7c084ca10d000fbefdba30b53f02855f768fe2e40e52ed13d50707",
-    "hash": "f0db86dee8377e3a20b6d5b27e1d9e31bbc41d21f8b0c7c8eea1a351947c8ea4",
-    "reason": "Repair the upstream syntax error (duplicate loginom_user keyword argument) so the provenance tests import under unittest discovery; assertions unchanged."
+    "hash": "8df523ef5de021033bf20cc7a715106970bb82425ac4076b1bf05a29ea5b6f86",
+    "reason": "Keep the existing fully synthetic preflight test independent of the archived Hermes native skill: supply its own temporary skill bytes and matching repository root. Preserve no-model/no-browser assertions and dependency probes."
   },
   "services/loginom-ai/deploy/loginom-dock/build-action-catalog.mjs": {
     "baseHash": "8a4c29d40d4c86dccea28598907a4c88e6fc8ab072b81ae0de8b93ae55e9bd6d",
@@ -2438,5 +2438,15 @@
     "baseHash": "bad690e4af7c26d0d7343d971bf0874ef83f1a6132c299de75788b0acfc537fb",
     "hash": "672fd7d00fa46b60957fa1e8593d9f11474e660a477d627057e5976ebfb2a34a",
     "reason": "Issue #74: private local-package preparation reuses authenticated storage binding, original upload receipts and native FileStore completion without download; preserve ownership, uncertainty, cleanup and shared deadlines. Related behavioral regressions cover the changed boundary. Source attribution is not installed acceptance."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/test_date_time_saved_import.py": {
+    "baseHash": "a1431de6eed9a1a7a1c9de2db7a5ca0b824fc715d97e6a7c80a53c95c722f1ea",
+    "hash": "9caead89448d3671b0b9b22d5a6803b6dfdd4afc16030e795c7e8dbfa8be6c72",
+    "reason": "Read frozen historical Date/Time fixtures and their relative timeout receipt from the imported service docs root while keeping runtime cwd and current fixtures unchanged. Preserve all protocol and fixture assertions; source-only test repair."
+  },
+  "packages/loginom-runtime/tools/loginom-acceptance/test_hermes_native_diagnostics.py": {
+    "baseHash": "730ff449a6c6f78bb70cdff949ba080887ade953035489328e4e1afed4995a88",
+    "hash": "adb4a4fe2ae02850c93972ddf81ec54b3a9098c2cbb412e39d3c2351ca0cf455",
+    "reason": "Mark the unavailable Hermes plugin as an explicit unittest skip at collection, consistent with the archived integration boundary in source-selection.md. Preserve all historical assertions when the plugin is present; do not restore a runtime dependency or claim active-product acceptance."
   }
 }

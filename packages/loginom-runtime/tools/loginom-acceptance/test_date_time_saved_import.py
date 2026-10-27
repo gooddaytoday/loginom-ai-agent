@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+SERVICE_ROOT = ROOT.parents[1] / 'services/loginom-ai'
 
 
 class SavedImportProtocol(unittest.TestCase):
@@ -33,19 +34,19 @@ class SavedImportProtocol(unittest.TestCase):
                        cwd=ROOT, check=True, capture_output=True, text=True)
 
     def test_expectation_v2_changes_only_excluded_label(self):
-        old = ROOT/'docs/loginom-dock/node13-live-preflight/frozen-v1'
-        new = ROOT/'docs/loginom-dock/node13-live-preflight/frozen-v2'
+        old = SERVICE_ROOT/'docs/loginom-dock/node13-live-preflight/frozen-v1'
+        new = SERVICE_ROOT/'docs/loginom-dock/node13-live-preflight/frozen-v2'
         expected = json.loads((old/'expected.json').read_text())
         expected['excluded'][0]['label'] = 'Дата'
         self.assertEqual(expected, json.loads((new/'expected.json').read_text()))
         self.assertEqual((old/'sales.csv').read_bytes(), (new/'sales.csv').read_bytes())
         self.assertEqual((old/'date-time-sales.txt').read_text().replace('его служебную метку DateB', 'его служебную метку «Дата»'),
-                         (ROOT/'docs/loginom-dock/node13-live-preflight/frozen-v2/date-time-sales.txt').read_text())
+                         (new/'date-time-sales.txt').read_text())
 
     def test_v3_retains_data_and_explicitly_requires_nine_operations(self):
         import hashlib
-        old = ROOT/'docs/loginom-dock/node13-live-preflight/frozen-v2'
-        new = ROOT/'docs/loginom-dock/node13-live-preflight/frozen-v3'
+        old = SERVICE_ROOT/'docs/loginom-dock/node13-live-preflight/frozen-v2'
+        new = SERVICE_ROOT/'docs/loginom-dock/node13-live-preflight/frozen-v3'
         for name in ('expected.json',):
             self.assertEqual((old/name).read_bytes(), (new/name).read_bytes())
         version = json.loads((new/'version.json').read_text())
@@ -54,14 +55,14 @@ class SavedImportProtocol(unittest.TestCase):
         self.assertEqual(version['requests'], dict(done=2,execute=7,total=9))
         self.assertEqual(version['goal_sha256'],hashlib.sha256(goal).hexdigest())
         self.assertEqual(version['parent_goal_sha256'],hashlib.sha256((old/'date-time-sales.txt').read_bytes()).hexdigest())
-        timeout = json.loads((ROOT/version['timeout_receipt']).read_text())
+        timeout = json.loads((SERVICE_ROOT/version['timeout_receipt']).read_text())
         self.assertEqual(timeout['status'], 'AMBIGUOUS')
         self.assertGreaterEqual(timeout['elapsed_ms'], timeout['deadline_ms'])
         self.assertFalse(timeout['original_replayed'])
         self.assertFalse(timeout['operation_cleanup_complete'])
 
     def test_v4_splits_source_and_target_without_changing_effective_tables(self):
-        old=ROOT/'docs/loginom-dock/node13-live-preflight/frozen-v3'
+        old=SERVICE_ROOT/'docs/loginom-dock/node13-live-preflight/frozen-v3'
         new=ROOT/'tools/loginom-acceptance/fixtures/date-time'
         before=json.loads((old/'expected.json').read_text());after=json.loads((new/'expected.json').read_text())
         before['excluded'][0]['label']='DateB'
