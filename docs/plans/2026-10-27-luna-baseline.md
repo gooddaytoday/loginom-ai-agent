@@ -246,6 +246,23 @@ EvalOps принял этот план в `01a17d52-1a38-7c7a-88b7-a783cdbedfbc`
 Следующая точка проверки: terminal/cleanup, repair/resume и requestPreflight
 READY всех шести, затем первые настоящие ordinary3 и analytic6.
 
+В 15:31 первое periodic-пробуждение EvalOps выполнило штатный quiet
+check-in. Controller автоматически учёл первый неуспешный preflight
+(startedAttempts=0, consecutiveErrors=1) и начал batch2 без измерений.
+По независимому review закреплённого кода прежнее ожидание уточнено:
+`repair` разрешён при active batch; inactive guard относится к `resume`.
+Штатный hold проще остановки units и не требует ручной правки journal.
+
+В 15:36 EvalOps выполнил штатный `repair --repairer EvalOps` под lock:
+read-back подтвердил repairing=true, repairer=EvalOps, прежний owner/clock,
+startedAttempts=0. Review comment `01a17d5c-1f39-70b9-b9cf-1a42c9de7039`;
+native task `01a17d5c-1f4f-7e0c-9467-0c3037417912`. Активный request-preflight
+не отменён, новые measurement admissions и следующий batch заблокированы.
+После natural terminal и cleanup: stop только нового campaign-controller,
+точечное изменение controller.env, штатный resume из нового env с тем же
+repairer, затем start controller. Не выполнять restart поверх активного
+batch и не добавлять отдельный verify поверх resume.
+
 Исходные метрики LAB-262 извлечены без её изменения в private receipt
 `lab262-source-metrics.json`: raw 208/234 (71/69/68 по раундам), diagnostic
 corrected 221/234 (75/73/73); четыре измерения без LGP и CSV. Реальная
