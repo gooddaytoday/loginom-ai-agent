@@ -58,7 +58,7 @@ LAB-262 и её результаты/конфигурация/незавершё
 - [x] Первый reserve выполнить с authenticated issue.created_at через
   `--initial-progress-at` до remote readiness. Срок и issue ID сохранять.
 - [x] Подтвердить доступ EvalOps/EvalBaseline из их runtime и native delegation.
-- [ ] Проверить существующие освобождённые slots штатным fresh native verify N6
+- [x] Проверить существующие освобождённые slots штатным fresh native verify N6
   с новым binary, browser, bwrap, auth и подтверждённым cleanup. Повторный
   prepare нужен только при установленном дефекте подготовки.
 - [ ] Проверить READY всех шести слотов штатным requestPreflight. Первые
@@ -206,3 +206,47 @@ pins и reservations и в 15:11 МСК начал fresh managed native verify N
 для всех шести слотов, затем проверить ordinary3 и analytic6 как реальные
 измерения. Запуск/продолжение принадлежат EvalBaseline и campaign-службе;
 технический ремонт координирует EvalOps. Не дублировать активные операции.
+
+### Модельный gate и ремонт сетевого окружения
+
+В 15:13 МСК initial native verify завершилась `ready=true`, code 0,
+6/6 slots, finalization=released; prepare и изменения пользователей не
+потребовались. Command ID `af9a486d-e867-4e6c-b28d-14f4ba36d91c`.
+EvalBaseline включил и запустил точный campaign unit; controller сам создал
+первый ordinary batch `20261027-121306-ed129d19-dtocol` в `batches/1`.
+Локальная проверка pins/environment прошла, но модельный requestPreflight
+ещё не получил READY: это отдельный gate, не результат native verify.
+
+На 15:24 МСК measurement admissions и результатов по-прежнему 0/234.
+В `request-preflight-a` наблюдались штатные retries 1–3 с `Cannot connect
+to API: Unable to connect`. CLI log подтверждает alias Luna-fast, но не
+завершённый ответ, xhigh по истории или фактически обслуженный priority.
+Controller/batch активны, исходный clock и pins сохранены. Службы не
+останавливали, новые модельные запросы и smoke не создавали.
+
+EvalOps read-only локализовал причину: proxy отсутствует уже в controller,
+batch и CLI; прямые TCP к chatgpt.com остаются SYN-SENT. Через существующий
+`http://127.0.0.1:2080` endpoint без авторизации отвечает HEAD 405 с TLS.
+Это подтверждает транспортный путь, а не готовность модели/авторизации.
+Сетевые службы и настройки LAB-262 не изменялись.
+
+Минимальный environment repair независимо принят и передан EvalOps
+комментарием `01a17d51-4a86-799e-bce2-563527b34903`. После terminal batch
+и подтверждённого cleanup: штатный repair ownership/lock; proxy только в
+новом controller.env (batch.env производный), согласованные HTTP(S)_PROXY
+и lowercase, ограниченный NO_PROXY для loopback/фактического Loginom;
+restart только нового controller и штатный resume. Код не меняется,
+проверяются env diff/read-back, effective env и настоящий requestPreflight.
+Обновления pins, продукта, clock, бюджета, auth seed и старых служб нет.
+Отдельный verify поверх штатного resume не добавляется.
+
+EvalOps принял этот план в `01a17d52-1a38-7c7a-88b7-a783cdbedfbc`.
+На 15:25 изменение ещё не применено из-за активного batch; продолжение
+сохраняется на существующих blocked/periodic wakeups, без новых таймеров.
+Следующая точка проверки: terminal/cleanup, repair/resume и requestPreflight
+READY всех шести, затем первые настоящие ordinary3 и analytic6.
+
+Исходные метрики LAB-262 извлечены без её изменения в private receipt
+`lab262-source-metrics.json`: raw 208/234 (71/69/68 по раундам), diagnostic
+corrected 221/234 (75/73/73); четыре измерения без LGP и CSV. Реальная
+стоимость неизвестна. Сравнение будет дополнено новыми измерениями.
