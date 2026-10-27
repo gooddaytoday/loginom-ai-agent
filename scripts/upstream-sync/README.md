@@ -19,6 +19,6 @@ Tools of the OpenCode update procedure. Read [docs/upstream-sync/procedure.md](.
 | `selftest.sh` | Offline test of the procedure on a synthetic upstream and fork; also runs `test_tools.py`, `test_acceptance.py`, `test_stand.sh` and the procedure doc-test |
 | `test_tools.py` | Behavior tests of `apply-identity.py`, `merge_oracle.py` and the gate `verify-accepted.py` on synthetic merges (findings F1–F3 of LAB-302 included) (stdlib `unittest`, `python3 -I scripts/upstream-sync/test_tools.py`) |
 | `revert-names.py`, `rename-lock.py` | One-time tools that returned the internal names to upstream (history, not for reuse) |
-| `reference/` | Baselines of LAB-198: 69 conflicting paths of `2e6f66a9` + `v1.19.4` and 69 of `db130098` (v0.3.4) + `v1.19.4` (`baseline-v034-*`), their types, the 21 that remain when only internal names are restored |
+| `reference/` | Baselines of LAB-198: 69 conflicting paths of `2e6f66a9` + `v1.19.4`, 69 of `db130098` (v0.3.4) + `v1.19.4` (`baseline-v034-*`) and 69 of `20222c2b` (v0.3.5) + `v1.19.4` (`baseline-v035-*`), their types, the 21 that remain when only internal names are restored |
 
 The full LAB-199 research (classification of 2650 files, counterfactual merges, churn windows) is on the branch `lab-198-s1-research` at `96c8bc4ebf2c5c5fd8f0c7d968085e7e5be4a316`.

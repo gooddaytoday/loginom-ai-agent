@@ -178,7 +178,7 @@ scripts/upstream-sync/selftest.sh
 
 ## Воспроизведение метрики LAB-198 в чистой копии
 
-У метрики две базы. Исходная — `loginom`@`2e6f66a9` (v0.3.3), 69 путей. После выпуска v0.3.4 (`db130098`, 40 коммитов) метрика измерена заново тем же способом: B034 — тоже 69 путей, и список пути в путь совпадает с исходным (SHA-256 `79cf0bc5…fcda6f`). Итог сравнивается с обеими: он должен быть не больше 34 и не больше ⌊B034 / 2⌋.
+У метрики три базы. Исходная — `loginom`@`2e6f66a9` (v0.3.3), 69 путей. После выпуска v0.3.4 (`db130098`, 40 коммитов) метрика измерена заново тем же способом: B034 — тоже 69 путей. После выпуска v0.3.5 (`20222c2b`, ещё 59 коммитов) — B035, тоже 69 путей. Списки путей всех трёх баз совпадают побайтно (SHA-256 `79cf0bc5…fcda6f`). Итог сравнивается со всеми: он должен быть не больше 34 и не больше ⌊B / 2⌋ последней базы (B035 = 69, значит ≤ 34).
 
 ```bash
 git clone https://github.com/gooddaytoday/loginom-ai-agent.git src && cd src
@@ -189,12 +189,17 @@ scripts/upstream-sync/measure-conflicts.sh --out ../baseline --compare scripts/u
 # база 2: v0.3.4 (db130098), эталон B034 = 69; тот же upstream, другой FORK_SHA
 FORK_SHA=$(sed -n 's/^FORK_SHA=//p' scripts/upstream-sync/reference/lab-198-baseline-v034.env) \
   scripts/upstream-sync/measure-conflicts.sh --out ../baseline-v034 --compare scripts/upstream-sync/reference/baseline-v034-unmerged-paths.txt      # 69
+# база 3: v0.3.5 (20222c2b), эталон B035 = 69; тот же upstream, третий FORK_SHA
+FORK_SHA=$(sed -n 's/^FORK_SHA=//p' scripts/upstream-sync/reference/lab-198-baseline-v035.env) \
+  scripts/upstream-sync/measure-conflicts.sh --out ../baseline-v035 --compare scripts/upstream-sync/reference/baseline-v035-unmerged-paths.txt      # 69
 # итог
 FORK_SHA=<итоговый SHA> scripts/upstream-sync/measure-conflicts.sh --out ../final
 python3 scripts/upstream-sync/conflict-classes.py --before scripts/upstream-sync/reference/baseline-conflicts.tsv \
   --after ../final/conflicts.tsv --residual scripts/upstream-sync/reference/forecast-tier1-conflicts.tsv                                       # классы против базы 1
 python3 scripts/upstream-sync/conflict-classes.py --before scripts/upstream-sync/reference/baseline-v034-conflicts.tsv \
   --after ../final/conflicts.tsv --residual scripts/upstream-sync/reference/forecast-tier1-conflicts.tsv                                       # классы против базы 2
+python3 scripts/upstream-sync/conflict-classes.py --before scripts/upstream-sync/reference/baseline-v035-conflicts.tsv \
+  --after ../final/conflicts.tsv --residual scripts/upstream-sync/reference/forecast-tier1-conflicts.tsv                                       # классы против базы 3
 ```
 
-Файлы `reference/baseline-*` — эталон 69, `reference/baseline-v034-*` — эталон B034; эталон 69 не удаляется.
+Файлы `reference/baseline-*` — эталон 69, `reference/baseline-v034-*` — эталон B034, `reference/baseline-v035-*` — эталон B035; прежние эталоны не удаляются. Сырой `conflict-classes.py` на сырых базах завершается кодом 4 из-за путей без правила (30 в каждой, измерено в LAB-354); это прежнее поведение, а не свойство B035.
