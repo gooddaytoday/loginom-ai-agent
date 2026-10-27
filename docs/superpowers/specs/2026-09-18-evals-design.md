@@ -1,5 +1,36 @@
 # Eval-прогоны Loginom AI Agent: дизайн MVP
 
+## Завершение автономной кампании — 2026-10-27
+
+Для автономного controller этот раздел имеет приоритет над прежними
+описаниями публикации. [Согласованный дизайн](2026-10-27-autonomous-eval-completion-design.md)
+и [runbook](../../../evals/docs/autonomous-campaigns.md) уточняют существующий
+путь без нового scheduler или runtime dependencies.
+
+- Проверенный terminal outcome публикуется и читается обратно до доставки
+  архива; полный требует всех ключей и cleanup, частичный указывает ограничения.
+- Итог одновременно является единственным адресным поручением с
+  `<!-- eval-handoff:CAMPAIGN -->`. Единственный агент из `manifest.executor`
+  разрешается через `GET /api/agents` workspace; `executorAgentId` сохраняется
+  до POST, `reportCommentId` — после подтверждения публикации.
+- Отдельный финальный ответ EvalRunner обязателен. Засчитывается только
+  comment с `author_type=agent`, `author_id=executorAgentId`,
+  `parent_id=reportCommentId` и `<!-- eval-executor-final:CAMPAIGN -->`.
+  После read-back ID хранится в `executorResponseCommentId`; машинный итог
+  не заменяет ответ. Повтор/restart сверяет marker и ID перед публикацией.
+- После read-back итога выключается собственный periodic. `published=true`
+  и `in_review` требуют прочитанного ответа и проверенного download/hash архива;
+  затем выключаются оставшиеся собственные wakeups. Чужие правила сохраняются.
+  Ошибки доставки/отключения не теряют результат и не повторяют измерения.
+- Обычный прогон ведёт systemd controller. Новые кампании используют имеющиеся
+  blocked/native failure события и periodic fallback 7200 с; действующие правила
+  меняются только штатной установкой, без автоматической массовой правки.
+- Старый `published=true` принимается без новых полей. Исторический внешний
+  partial без нового handoff-marker сохраняет старый terminal path без архива
+  с недоступного хоста. Новые snapshot partial требуют локального snapshot-архива
+  и ответа исполнителя; возвращение хоста не открывает admission заново и
+  не подтверждает cleanup само по себе. Исторические данные не переписываются.
+
 ## Контракт пользовательских слотов — 2026-10-13
 
 Для нового режима нормативен [контракт v2](../../../evals/docs/parallel-users-contract.md), фактический статус —
