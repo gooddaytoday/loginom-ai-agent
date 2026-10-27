@@ -91,6 +91,15 @@ await writeFile(join(hungBin, "bin", "gsettings"), "#!/bin/sh\n/bin/sleep 30\n",
 const failed = await launch({
   XDG_CURRENT_DESKTOP: "GNOME",
   PATH: `${join(hungBin, "bin")}:${process.env.PATH ?? ""}`,
+  HTTP_PROXY: "",
+  HTTPS_PROXY: "",
+  ALL_PROXY: "",
+  NO_PROXY: "",
+  http_proxy: "",
+  https_proxy: "",
+  all_proxy: "",
+  no_proxy: "",
+  NODE_USE_ENV_PROXY: "",
 })
 try {
   const log = await waitForLog(failed.root, "system proxy: failed", 20_000)

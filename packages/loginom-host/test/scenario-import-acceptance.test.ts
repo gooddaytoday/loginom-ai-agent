@@ -78,6 +78,25 @@ test("calculator acceptance requires the original source and exact doubled outpu
   })
 })
 
+test("local package edit verifies source preparation and tripled calculator rows", async () => {
+  const { fixture, calculator } = await calculatorFixture()
+  fixture.options.lgpPath = "/input/Исходный.lgp"
+  fixture.options.lgpSha256 = "a".repeat(64)
+  const prepared = fixture.tools.find((tool: { tool: string }) => tool.tool === "loginom_dock_prepare")
+  prepared.state.input = { local_package_path: fixture.options.lgpPath }
+  prepared.state.output = JSON.stringify({ prepared: true, workspace: { status: "READY", package_ref: { path: "/user/upload.lgp" } },
+    local_package_upload: { destination: "/user/upload.lgp", source_sha256: fixture.options.lgpSha256, cleanup_complete: true, upload_completion_verified: true } })
+  calculator.configuration.readback.expressions[0].formula = "amount * 3"
+  calculator.output.ports[0].sample.forEach((row: { value?: string }[], index: number) => { row[2] = { value: ["30", "60", "75"][index] } })
+  fixture.tools.findLast((tool: { tool: string }) => tool.tool === "loginom_dock_node_wait").state.output = JSON.stringify(calculator)
+  expect((await verify(fixture, "verifyCalculatorModification")).code).toBe(0)
+  prepared.state.input.local_package_path = "/input/foreign.lgp"
+  expect((await verify(fixture, "verifyCalculatorModification")).code).toBe(1)
+  prepared.state.input.local_package_path = fixture.options.lgpPath
+  fixture.options.lgpSha256 = "b".repeat(64)
+  expect((await verify(fixture, "verifyCalculatorModification")).code).toBe(1)
+})
+
 test("import setup does not accept an unfinished activation from a projected tool event", async () => {
   const fixture = await Bun.file(resolve(import.meta.dir, "fixtures/scenario-import.json")).json()
   fixture.tools.find((t: { tool: string }) => t.tool === "skill").state.status = "pending"

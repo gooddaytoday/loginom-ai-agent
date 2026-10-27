@@ -112,6 +112,10 @@ export async function rejudge(config: EvalConfig, runId: string, onRunDirectory?
     for (const group of prev.tasks) {
       const task = tasks.find((item) => item.id === group.id)
       for (const attempt of group.attempts) {
+        if (attempt.checklist?.some(item => item.id === "inputs-unchanged" && !item.passed)) {
+          attempts.push(attempt)
+          continue
+        }
         const dir = path.join(runDir, group.id, String(attempt.attempt))
         const artifactDir = path.join(dir, "artifact")
         const units = await Array.fromAsync(new Bun.Glob("unpacked/Unit_*/Unit.xml").scan(artifactDir)).catch(() => [])

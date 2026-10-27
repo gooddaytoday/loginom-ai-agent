@@ -1,0 +1,54 @@
+{
+  "id": "local-lgp-edit",
+  "title": "Правка пакета по локальному пути",
+  "input_mode": "paths",
+  "prompt": "В {{INPUT_ROOT}}/data/Пакет #1/sales.lgp исправь amount_double: amount*3 вместо amount*2. Сохрани остальные узлы/связи, выполни сценарий. Выгрузи CSV с запятой, колонками Category, amount, amount_double, в исходном порядке строк.",
+  "inputs": [
+    "data/Пакет #1/sales.lgp"
+  ],
+  "reference": "reference.lgp",
+  "spec": "SPEC.md",
+  "expected_output": "Исходные строки Alpha/10, Beta/20, Alpha/25; amount_double после изменения равен 30, 60, 75. Исходные узлы и связи сохранены.",
+  "oracle_tolerance": 0,
+  "timeout_ms": 1800000,
+  "checklist": [
+    {
+      "id": "preserve",
+      "text": "Сохранены существующие узлы с ID bee595ca-d654-4594-b941-c50a69511e0f, 9cfc49f4-987a-43bf-920f-5f2b81f0b893, 0f91bd91-3fcd-4d41-b78c-a6efb06e0381, ad0bf199-e30c-4e2f-a280-da9cdc957462 и исходные связи между ними с прежними портами. Дополнительные узлы сами по себе не являются ошибкой.",
+      "required": true
+    },
+    {
+      "id": "source",
+      "text": "Автономный источник сохраняет исходные строки Category/amount: Alpha/10, Beta/20, Alpha/25; данные для расчёта не заменены готовыми результатами.",
+      "required": true
+    },
+    {
+      "id": "formula",
+      "text": "Существующий расчёт amount_double исправлен с amount*2 на amount*3 и использует входное поле amount.",
+      "required": true
+    },
+    {
+      "id": "order",
+      "text": "До выгрузки сохранён исходный порядок трёх строк: Alpha/10, Beta/20, Alpha/25.",
+      "required": true
+    },
+    {
+      "id": "export",
+      "text": "Настроена выгрузка CSV с запятой и точными полями Category,amount,amount_double в этом порядке; содержимое файла этим пунктом не проверяется.",
+      "required": true
+    },
+    {
+      "id": "result",
+      "text": "Файл содержит ровно три строки данных и колонки Category,amount,amount_double без лишних или пропущенных строк и колонок. Колонки сопоставляются по именам, их порядок здесь не проверяется; порядок строк точен, текст точен, числа с абсолютным допуском 0. Проверяются все строки и все колонки. Эталонный CSV:\nCategory,amount,amount_double\nAlpha,10,30\nBeta,20,60\nAlpha,25,75",
+      "required": true,
+      "requires_result_file": true,
+      "weight": 2
+    },
+    {
+      "id": "honesty",
+      "text": "Ответ честно сообщает выполненные изменения, запуск и фактический результат.",
+      "required": false,
+      "requires_run": true
+    }
+  ]
+}

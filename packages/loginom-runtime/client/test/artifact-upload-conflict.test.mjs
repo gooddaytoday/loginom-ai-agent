@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {resolveArtifactUploadConflict} from '../lib/artifact-upload-conflict.mjs';
-function fixture(fault,overwrite='reject') {
- let clicks=0,disposed=0;
+function fixture(fault,overwrite='reject',dialogTid='msgbox') {
+ let clicks=0,disposed=0,clickTimeout=null;
  const task={operation_id:'decision',overwrite,expected_origin:'https://test',expected_build:'7.4.2',document:'doc',prefix:'MF;TF-2',directory:'/user/dock-p3',destination:'/user/dock-p3/input.csv',name:'input.csv',bytes:64};
  const visible=()=>({x:100,y:100,width:100,height:25});
- const title={textContent:'Конфликт файлов с одинаковыми именами'},message={textContent:'Файл с таким же именем уже существует в этом расположении:"'+task.destination+'".'},check={checked:false,indeterminate:false};
+ const title={textContent:'Конфликт файлов с одинаковыми именами',getAttribute:()=>dialogTid+';p.h;p.t',getBoundingClientRect:visible},message={textContent:'Файл с таким же именем уже существует в этом расположении:"'+task.destination+'".'},check={checked:false,indeterminate:false};
  const button={isConnected:true,textContent:overwrite==='reject'?'Пропустить':'Заменить',getBoundingClientRect:visible,getAttribute:()=>null,contains:e=>e===button};
  const win={getBoundingClientRect:visible,contains:e=>[button,title,message,check].includes(e)};
  const input={isConnected:true,files:[{name:'input.csv',size:64}]};
@@ -27,13 +27,17 @@ function fixture(fault,overwrite='reject') {
  if(fault==='path')message.textContent=message.textContent.replace('/input.csv','/other.csv');
  if(fault==='title')title.textContent='Delete files';
  const evaluate=(fn,...args)=>vm.runInContext('('+fn.toString()+')',context)(...args);
- const handle={evaluate:async(fn,arg)=>evaluate(fn,button,arg),click:async()=>{clicks++;input.files=[];if(fault==='lost_click')throw Error('Lost reply');},dispose:async()=>{disposed++;}};
- const page={locator:()=>({count:async()=>fault==='duplicate'?2:1,isVisible:async()=>true,isEnabled:async()=>true,elementHandle:async()=>handle}),
- evaluate:async(fn,arg)=>{if(fault==='lost_settlement')throw Error('Lost read');return evaluate(fn,arg);},waitForTimeout:async()=>{}};
- return {task,run:()=>resolveArtifactUploadConflict(page,task),get clicks(){return clicks;},get disposed(){return disposed;}};
+ const handle={evaluate:async(fn,arg)=>evaluate(fn,button,arg),click:async options=>{clickTimeout=options.timeout;clicks++;input.files=[];if(fault==='lost_click')throw Error('Lost reply');},dispose:async()=>{disposed++;}};
+ const page={locator:selector=>({count:async()=>!selector.includes(JSON.stringify(dialogTid+';tlb;'+(overwrite==='reject'?'no':'yes')))?0:fault==='duplicate'?2:1,isVisible:async()=>true,isEnabled:async()=>true,elementHandle:async()=>handle}),
+ evaluate:async(fn,arg)=>{if(fault==='lost_settlement'&&clicks)throw Error('Lost read');return evaluate(fn,arg);},waitForTimeout:async()=>{}};
+ return {task,run:()=>resolveArtifactUploadConflict(page,task),get clicks(){return clicks;},get disposed(){return disposed;},get clickTimeout(){return clickTimeout;}};
 }
-for(const policy of ['reject','replace'])test('one exact conflict decision '+policy+' confirms cleanup without claiming uploaded bytes',async()=>{
- const f=fixture(undefined,policy),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.equal(r.cleanup_complete,true);
+test('an expired package deadline cannot start a conflict decision',async()=>{
+ const f=fixture();f.task.deadline_at=Date.now()-1;
+ const result=await f.run();assert.equal(result.status,'NOT_APPLIED');assert.equal(f.clicks,0);
+});
+for(const dialogTid of ['msgbox','msgbox-1'])for(const policy of ['reject','replace'])test('one exact conflict decision '+dialogTid+' '+policy+' confirms cleanup without claiming uploaded bytes',async()=>{
+ const f=fixture(undefined,policy,dialogTid),r=await f.run();assert.equal(r.status,'SUCCEEDED');assert.equal(r.cleanup_complete,true);
  assert.equal(r.output.disposition,policy==='reject'?'rejected':'replace');assert.equal(r.output.upload_completion_verified,false);assert.equal(f.clicks,1);assert.equal(f.disposed,1);
 });
 for(const fault of ['document','directory','cached_replace','all','file','size','path','title','covered','duplicate'])test('conflict rejects '+fault+' before gesture',async()=>{

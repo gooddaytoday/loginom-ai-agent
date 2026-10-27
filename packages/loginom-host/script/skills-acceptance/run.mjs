@@ -8,7 +8,8 @@ import { observeProcesses } from "./processes.mjs"
 import { collectExecutionJournals } from "./journals.mjs"
 import { verifySalesScenario } from "./scenario.mjs"
 import { verifyImportBuild, verifyCalculatorModification, verifyImportExecution } from "./scenario-import.mjs"
-import { acceptanceTurns } from "./turns.mjs"
+import { acceptanceTurns, prepareAcceptanceInputs, acceptanceInputPath, acceptanceCliPermission } from "./turns.mjs"
+import { verifyLocalFileAnswer } from "./receipts.mjs"
 const chunks = []
 for await (const chunk of process.stdin) chunks.push(chunk)
 const input = JSON.parse(Buffer.concat(chunks).toString())
@@ -18,7 +19,6 @@ const secrets = [
   ...(input.auth.type === "api" ? [input.auth.key] : [input.auth.access, input.auth.refresh]),
 ]
 const testcase = input.testcase
-const docsFirst = testcase.id === "scenario-after-docs"
 const turns = acceptanceTurns(testcase)
 const transition = turns.length > 1
 const scenario = turns.some((turn) => turn.scenario)
@@ -97,14 +97,14 @@ const local = "/home/tester/workspace/Сценарий.LGP",
   lgp = "/home/tester/input/Исходный сценарий.LGP",
   png = "/home/tester/input/Контекст.png"
 const csv = "/home/tester/input/sales.csv"
-if (scenario) await cp(input.fixtures.csv, csv)
-if (testcase.input === "workspace-path") await cp(input.fixtures.lgp, local)
-if (docsFirst || ["lgp-attachment", "lgp-and-png-attachments", "external-text-path"].includes(testcase.input))
-  await cp(input.fixtures.lgp, lgp)
-if (testcase.input === "lgp-and-png-attachments") await cp(input.fixtures.png, png)
+const text = "/home/tester/input/Контроль.txt", created = "/home/tester/workspace/Изменённый пакет.LGP"
+await prepareAcceptanceInputs(turns, input.fixtures, { local, lgp, png, csv, text, created })
 const bindings = {
   local_lgp: local,
   unicode_lgp: lgp,
+  external_csv: csv,
+  external_text: text,
+  created_lgp: created,
   missing_lgp: "/home/tester/workspace/Отсутствующий.LGP",
   server_package: scenario ? input.packagePath : "/user/package-docs-acceptance/not-opened/missing.lgp",
 }
@@ -119,7 +119,8 @@ for (const [turnIndex, turn] of turns.entries()) {
   if (transition) await mkdir(evidence, { mode: 0o700 })
   const scenario = turn.scenario
   const priorFiles = new Set(await readdir("/home/tester/workspace", { recursive: true }))
-  const originalPath = scenario ? csv : turn.input === "workspace-path" ? local : lgp
+  const originalPath = acceptanceInputPath(turn, { csv, text, local, lgp, created })
+  const permission = acceptanceCliPermission(testcase, turn, originalPath)
   const original = await readFile(originalPath).then(
     (bytes) => createHash("sha256").update(bytes).digest("hex"),
     () => undefined,
@@ -160,7 +161,7 @@ for (const [turnIndex, turn] of turns.entries()) {
       LOGINOM_AI_AGENT_DISABLE_MODELS_FETCH: "1",
       ...(input.modelsPath ? { LOGINOM_AI_AGENT_MODELS_PATH: input.modelsPath } : {}),
       LOGINOM_AI_AGENT_DISABLE_PROJECT_CONFIG: "1",
-      LOGINOM_AI_AGENT_CONFIG_CONTENT: JSON.stringify({ model: input.model, enabled_providers: [providerID] }),
+      LOGINOM_AI_AGENT_PERMISSION: JSON.stringify(permission.permission ?? {}),
     },
   })
   const events = []
@@ -202,6 +203,9 @@ for (const [turnIndex, turn] of turns.entries()) {
     headless: input.headless,
     case: testcase.id,
     prompt: turn.prompt,
+    argv: args.slice(1),
+    permission,
+    originalPath,
     wallMs: Date.now() - started,
     originalSha256: original,
     afterSha256: await readFile(originalPath).then(
@@ -230,19 +234,15 @@ for (const [turnIndex, turn] of turns.entries()) {
   await writeFile(join(evidence, "result.json"), JSON.stringify(result, null, 2))
   await cp("/home/tester/workspace", join(evidence, "workspace"), { recursive: true })
   if (scenario) {
-    const csvSha256 = createHash("sha256")
-      .update(await readFile(input.fixtures.csv))
+    const localEdit = turn.verification === "local-calculator"
+    const inputSha256 = createHash("sha256")
+      .update(await readFile(localEdit ? input.fixtures[turn.fixture ?? "lgp"] : input.fixtures.csv))
       .digest("hex")
-    assert.equal(
-      createHash("sha256")
-        .update(await readFile(csv))
-        .digest("hex"),
-      csvSha256,
-    )
+    assert.equal(original, inputSha256)
     const verify =
       turn.verification === "import"
         ? verifyImportBuild
-        : turn.verification === "calculator"
+        : localEdit || turn.verification === "calculator"
           ? verifyCalculatorModification
           : turn.verification === "execution"
             ? verifyImportExecution
@@ -251,7 +251,8 @@ for (const [turnIndex, turn] of turns.entries()) {
       result,
       verify(tools, {
         skills: input.skills,
-        csvSha256,
+        ...(localEdit ? { lgpPath: originalPath, lgpSha256: inputSha256 } : { csvSha256: inputSha256 }),
+        ...(turn.input === "csv-path" ? { csvPath: originalPath } : {}),
         packagePath: input.packagePath,
         sourceNode: built?.builtNodes.source,
       }),
@@ -276,6 +277,8 @@ for (const [turnIndex, turn] of turns.entries()) {
   assert.equal(result.afterSha256, original)
   if (!scenario)
     assert.ok(!tools.some((t) => t.tool.startsWith("loginom_dock_") && t.tool !== "loginom_dock_diagnostics"))
+  if (!scenario) verifyLocalFileAnswer(testcase.id, tools, originalPath, result.text,
+    reports[0]?.endsWith(".md") ? await readFile(join("/home/tester/workspace", reports[0]), "utf8") : undefined)
   if (turn.expected.profile === "package-docs")
     assert.ok(
       tools.some(
@@ -306,7 +309,7 @@ for (const [turnIndex, turn] of turns.entries()) {
     sessionID = ids[0]
     if (turnIndex === 0 && scenario) {
       built = result
-      if (turns[1].input !== "lgp-attachment") continue
+      if (!["lgp-attachment", "created-lgp-path"].includes(turns[1].input)) continue
       console.log(
         JSON.stringify({
           event: "saved-package-input-required",
@@ -317,7 +320,7 @@ for (const [turnIndex, turn] of turns.entries()) {
       const deadline = Date.now() + 60000
       let bytes
       while (Date.now() < deadline && !bytes) {
-        bytes = await readFile(lgp).catch(() => undefined)
+        bytes = await readFile(acceptanceInputPath(turns[1], { lgp, created })).catch(() => undefined)
         if (!bytes) await scheduler.wait(200)
       }
       assert.ok(bytes, "CREATED_PACKAGE_TRANSFER_TIMEOUT")

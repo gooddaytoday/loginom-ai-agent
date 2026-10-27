@@ -241,7 +241,7 @@ async function observeWriterTransition(directory: string, expected: Stats, acqui
   throw new WriterUnavailable(expected, "transition", acquiring ? "acquiring" : "releasing", null)
 }
 
-async function processView(pid: number, required = true, owners: ProcessIdentity[] = [], retries = 2): Promise<ProcessView | undefined> {
+async function processView(pid: number, required = true, owners: ProcessIdentity[] = [], retries = 2, strictNative = false): Promise<ProcessView | undefined> {
   let relevant = required
   try {
     const directory = `/proc/${pid}`
@@ -275,7 +275,7 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
     if (finalExecutable.dev !== info.dev || finalExecutable.ino !== info.ino || final[1] !== fields[1] || final[2] !== fields[2] || final[3] !== fields[3]) {
       if (retries) {
         await Bun.sleep(20)
-        return processView(pid, relevant, owners, retries - 1)
+        return processView(pid, relevant, owners, retries - 1, strictNative)
       }
       throw Error("Process identity did not settle during read")
     }
@@ -286,12 +286,13 @@ async function processView(pid: number, required = true, owners: ProcessIdentity
   } catch (error) {
     if (gone(error)) return undefined
     const denied = ["EACCES", "EPERM"].includes((error as NodeJS.ErrnoException).code ?? "")
-    if (denied && !required && !await hasOwnedAncestry(pid, owners)) return undefined
+    // Settlement also requires the absence of unreadable foreign native processes.
+    if (denied && !required && !(strictNative && relevant) && !await hasOwnedAncestry(pid, owners)) return undefined
     // exec can briefly reset dumpability. A fresh complete read must still
     // establish identity; persistent denial consumes the same bounded budget.
     if (relevant && denied && retries) {
       await Bun.sleep(20)
-      return processView(pid, relevant, owners, retries - 1)
+      return processView(pid, relevant, owners, retries - 1, strictNative)
     }
     // These reads only use /proc paths; retain the cause without exposing argv.
     throw Error(`Cannot inspect process identity PID ${pid}: ${message(error)}`, { cause: error })
@@ -335,9 +336,9 @@ export async function hasOwnedAncestry(pid: number, owners: Pick<ProcessIdentity
   }
 }
 
-async function snapshot(owners: ProcessIdentity[] = []) {
+async function snapshot(owners: ProcessIdentity[] = [], strictNative = false) {
   return (await Promise.all((await readdir("/proc")).filter((name) => /^\d+$/.test(name))
-    .map((pid) => processView(Number(pid), false, owners)))).filter((entry) => entry !== undefined)
+    .map((pid) => processView(Number(pid), false, owners, 2, strictNative)))).filter((entry) => entry !== undefined)
 }
 
 /** Inspect only the canonical, private sibling registration; never follow aliases. */
@@ -421,7 +422,7 @@ export async function observeWriterReleaseSettlement(profile: string, original: 
   const started_at = new Date().toISOString()
   const passes: NonNullable<ProcessCleanup["settlement"]>["passes"] = []
   for (let pass = 0; pass < 2; pass++) {
-    const current = await snapshot(original.processes)
+    const current = await snapshot(original.processes, true)
     const owned = current.filter(process => ids.has(key(process)) || original.processes.some(saved => saved.pid === process.pid || saved.group === process.group) ||
       inside(process.cwd, profile) || process.args.some(arg => arg === profile || arg.startsWith(profile + path.sep)))
     const native = current.filter(process => /^(?:loginom-ai-|chrome|chromium)/.test(process.name) ||

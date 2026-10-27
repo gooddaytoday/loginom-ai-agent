@@ -161,15 +161,19 @@ function nativeFixture({empty=false,parent=false,blocked=false,loading=false,mas
  grid.querySelectorAll=selector=>selector.includes('data-tid^')&&parent?[parentCell]:[];
  const records=parent?[{internalId:'parent-record'}]:empty?[]:[{internalId:'file-record'}];
  const store={$className:'Ext.data.Store',loadCount:1,isLoading:()=>loading,getData:()=>({items:records}),getCount:()=>records.length,
-  getTotalCount:()=>records.length+(incomplete?1:0)};
+  getTotalCount:()=>records.length+(incomplete?1:0),getRange:()=>records};
  let currentStore=store,dialog=false;
  const view={el:{dom:grid},getStore:()=>currentStore};
  const card={Controller:{Node:{data:{node:{}}}}};let active=card,hit=blocked?element('foreign'):empty||parent?placeholder:grid;
+ class FileSenderManager{constructor(){this.CurrentDirectory='/user/';this.FActiveLoadersCount=0;this.FCurrentUploadFilePaths={};}}
+ class FileStorageForm{constructor(){this.FFileInput={isConnected:true,files:[]};this.FFileSenderManager=new FileSenderManager();this.FView={el:{dom:root}};}}
+ const form=new FileStorageForm();card.Controller.FController=form;
  const doc={querySelectorAll:selector=>selector.includes('x-mask')?mask?[mask==='foreign'?element('foreign-mask'):root]:[]:selector.includes('role=')?dialog?[element('dialog')]:[]:
   selector==='[data-tid='+JSON.stringify(gridTid)+']'?[grid]:selector==='[data-tid="tab"]'?[tab]:selector==='[data-tid='+JSON.stringify(rootTid)+']'?[root]:[],
   elementFromPoint:()=>hit};
  const realm=vm.createContext({document:doc,location:{origin:'https://test'},getComputedStyle:()=>({visibility:'visible'}),
-  bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>active}}}}}}},Ext:{getCmp:()=>view}});
+  bg:{app:{Version:'7.4.2',Application:{FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>active}},FMapTree:{FServerConnection:{UserName:'operator'}}}}}}},Ext:{getCmp:()=>view}});
+ realm.__loginomDockPreparationV1={document:doc,id:'prep-doc'};
  realm[Symbol.for('loginom-dock.workspace-ui.identity.v1')]={epoch:'doc'};
  const invoke=(fn,args)=>vm.runInContext('('+fn.toString()+')',realm)(args);
  let disposed=0,waits=0,onWait=()=>{loading=false;mask=false;root.className='test';if(!blocked)hit=empty||parent?placeholder:grid;store.loadCount++;};
@@ -184,7 +188,9 @@ function nativeFixture({empty=false,parent=false,blocked=false,loading=false,mas
   }};
  const task={snapshot:{workflow_ref:{prefix,tab_tid:'tab'},dom_epoch:{document:'doc'}},expected_origin:'https://test',expected_build:'7.4.2',artifact:{name:'source.csv'}};
  const trace=[];
- return {run:(minimum=null,refresh=null,deadline=started+5000)=>vm.runInContext('('+waitArtifactDiscoveryReady.toString()+')',realm)(page,task,deadline,trace,minimum,refresh),trace,task,
+ return {run:(minimum=null,refresh=null,deadline=started+5000)=>vm.runInContext('('+waitArtifactDiscoveryReady.toString()+')',realm)(page,task,deadline,trace,minimum,refresh),trace,task,page,
+  native:{form,store,card},
+  publishFile:({name,path,bytes,type=0})=>{records.splice(0,records.length,{data:{FileName:name,FilePath:path,id:path,Size:bytes,Type:type}});store.loadCount++;hit=grid;},
   onEvaluate:fn=>{onEvaluate=fn;},elapse:ms=>{elapsed+=ms;},waitDisposals,
   showDialog:()=>{dialog=true;},changeContext:()=>{realm.location.origin='https://foreign';},
   replaceStore:()=>{currentStore={...store};},
@@ -195,6 +201,40 @@ function nativeFixture({empty=false,parent=false,blocked=false,loading=false,mas
   advanceLoad:()=>{store.loadCount++;},
   changeOwner:()=>{onWait=()=>{active={...card};};},get waits(){return waits;},get disposed(){return disposed;}};
 }
+for(const fault of [null,'size','path','kind','owner','sender','pending','generation','unknown','conflict'])test('private package completion retains native owner, exact row and original receipt: '+fault,async()=>{
+ const {completePackageUpload}=await import('../lib/artifact-discovery.mjs');
+ const f=nativeFixture({empty:true});
+ const task={...f.task,deadline_at:Date.now()+5000,binding:{document_id:'prep-doc',loginom_account:'operator'},
+  artifact:{artifact_id:'package-1',name:'Пакет.lgp',bytes:42,sha256:'a'.repeat(64),upload:{directory:'/user',destination:'/user/Пакет.lgp'}}};
+ const original={status:fault==='conflict'?'FAILED':'AMBIGUOUS',action_key:'artifact.upload',action_revision:'1',operation_id:'upload-package',phase:'submitted',
+  effect_possible:true,cleanup_complete:true,output:{upload_submitted:true,destination:task.artifact.upload.destination},
+  error:{code:fault==='unknown'?'BROWSER_CALL_UNCERTAIN':fault==='conflict'?'UPLOAD_PATH_CONFLICT':'UPLOAD_SERVER_VERIFICATION_REQUIRED',message:'pending'},trace:[]};
+ let submissions=0;
+ const result=await completePackageUpload(f.page,task,async()=>{
+  submissions++;f.publishFile({name:task.artifact.name,path:fault==='path'?'/user/other.lgp':task.artifact.upload.destination,bytes:fault==='size'?41:42,type:fault==='kind'?1:0});
+  if(fault==='owner')f.replaceStore();
+  if(fault==='sender')f.native.form.FFileSenderManager={...f.native.form.FFileSenderManager};
+  if(fault==='pending')f.native.form.FFileSenderManager.FCurrentUploadFilePaths.pending=true;
+  if(fault==='generation'){f.native.store.loadCount--;f.failWait();}
+  return original;
+ });
+ if(fault){
+  assert.equal(result.status,'AMBIGUOUS');assert.deepEqual(result.output.upload,original);
+  assert.equal(Object.hasOwn(result.output,'completion'),false);assert.equal(submissions,1);
+  assert.match(result.error.message,['size','path','kind'].includes(fault)?/ROW_MISMATCH/:
+   ['owner','sender','pending'].includes(fault)?/OWNER_CHANGED/:fault==='generation'?/deadline/:/completed submission/);
+  assert.equal(f.disposed,['unknown','conflict'].includes(fault)?1:2);
+  return;
+ }
+ assert.equal(result.status,'SUCCEEDED');assert.equal(result.action_key,'artifact.package_completion');
+ assert.deepEqual(result.output.upload,original);assert.equal(submissions,1);
+ assert.equal(result.output.completion.destination,task.artifact.upload.destination);
+ assert.equal(result.output.completion.bytes,42);assert.equal(result.output.completion.bytes_source,'native_file_store');
+ assert.equal(result.output.completion.upload_completion_verified,true);
+ assert.equal(Object.hasOwn(result.output.completion,'sha256'),false);
+ assert.equal(f.disposed,2);
+});
+
 test('serialized final readiness reread settles same-owner races before and after the only Refresh',async()=>{
  for(const postRefresh of [false,true]){
   const f=nativeFixture({empty:true});let refreshes=0;

@@ -117,6 +117,80 @@ test("pre-push checks all outgoing commits, using the remote SHA from stdin", as
   ).toBe(2)
 })
 
+test("pre-push scans archive snapshots without changing the source repository under hook Git environment", async () => {
+  const root = await repo()
+  const base = git(root, "rev-parse", "HEAD")
+  const token = "ghp_" + "tR7mPQ2x9L4n6V1s3X5z0C8w2B7d4F6h9J1k"
+  await Bun.write(join(root, "settings.xml"), `<token>${token}</token>`)
+  expect(Bun.spawnSync(["zip", "-q", "package.lgp", "settings.xml"], { cwd: root }).exitCode).toBe(0)
+  git(root, "add", "package.lgp")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "archive")
+  const head = git(root, "rev-parse", "HEAD")
+  const config = await Bun.file(join(root, ".git", "config")).bytes()
+  const index = await Bun.file(join(root, ".git", "index")).bytes()
+  const result = invoke(root, ["push", "origin"], `refs/heads/topic ${head} refs/heads/topic ${base}\n`, {
+    GIT_DIR: join(root, ".git"),
+  })
+  expect(result.code).toBe(2)
+  expect(result.output).toContain("package.lgp!settings.xml")
+  expect(result.output).toContain("github-pat")
+  expect(result.output).toContain(head)
+  expect(result.output).not.toContain(token)
+  expect(await Bun.file(join(root, ".git", "config")).bytes()).toEqual(config)
+  expect(await Bun.file(join(root, ".git", "index")).bytes()).toEqual(index)
+})
+
+test("pre-push scans clean archives from a linked worktree without changing its source config or index", async () => {
+  const source = await repo()
+  const root = join(source, "linked")
+  git(source, "worktree", "add", "-qb", "topic", root)
+  const base = git(root, "rev-parse", "HEAD")
+  await Bun.write(join(root, "settings.xml"), "safe")
+  expect(Bun.spawnSync(["zip", "-q", "package.lgp", "settings.xml"], { cwd: root }).exitCode).toBe(0)
+  git(root, "add", "package.lgp")
+  git(root, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "archive")
+  const directory = git(root, "rev-parse", "--absolute-git-dir")
+  const head = git(root, "rev-parse", "HEAD")
+  const config = await Bun.file(join(source, ".git", "config")).bytes()
+  const index = await Bun.file(join(directory, "index")).bytes()
+  const result = invoke(root, ["push", "origin"], `refs/heads/topic ${head} refs/heads/topic ${base}\n`, {
+    GIT_DIR: directory,
+  })
+  expect(result.code).toBe(0)
+  expect(result.output).toContain('"status":"clean"')
+  expect(result.output).toContain('"archives":1')
+  expect(await Bun.file(join(source, ".git", "config")).bytes()).toEqual(config)
+  expect(await Bun.file(join(directory, "index")).bytes()).toEqual(index)
+})
+
+test("staged archive scan preserves source selection through an alternate Git index", async () => {
+  const root = await repo()
+  const token = "ghp_" + "tR7mPQ2x9L4n6V1s3X5z0C8w2B7d4F6h9J1k"
+  await Bun.write(join(root, "settings.xml"), `<token>${token}</token>`)
+  expect(Bun.spawnSync(["zip", "-q", "package.lgp", "settings.xml"], { cwd: root }).exitCode).toBe(0)
+  git(root, "add", "package.lgp")
+  const alternate = join(root, "alternate-index")
+  await Bun.write(alternate, Bun.file(join(root, ".git", "index")))
+  git(root, "reset", "-q", "HEAD", "--", "package.lgp")
+  const config = await Bun.file(join(root, ".git", "config")).bytes()
+  const index = await Bun.file(join(root, ".git", "index")).bytes()
+  const staged = await Bun.file(alternate).bytes()
+  const result = invoke(root, ["staged"], "", {
+    GIT_DIR: join(root, ".git"),
+    GIT_COMMON_DIR: join(root, ".git"),
+    GIT_WORK_TREE: root,
+    GIT_INDEX_FILE: alternate,
+    GIT_OBJECT_DIRECTORY: join(root, ".git", "objects"),
+  })
+  expect(result.code).toBe(2)
+  expect(result.output).toContain("package.lgp!settings.xml")
+  expect(result.output).toContain("github-pat")
+  expect(result.output).not.toContain(token)
+  expect(await Bun.file(join(root, ".git", "config")).bytes()).toEqual(config)
+  expect(await Bun.file(join(root, ".git", "index")).bytes()).toEqual(index)
+  expect(await Bun.file(alternate).bytes()).toEqual(staged)
+})
+
 test("range scan finds a secret in a deleted intermediate lgp", async () => {
   const root = await repo()
   const base = git(root, "rev-parse", "HEAD")
@@ -164,6 +238,25 @@ test("audit covers side branches and current untracked files", async () => {
   expect(result.code).toBe(2)
   expect(result.output).toContain("old.txt")
   expect(result.output).toContain("new.txt")
+})
+
+test("audit scans the current snapshot independently of the source Git environment", async () => {
+  const root = await repo()
+  const token = "ghp_" + "tR7mPQ2x9L4n6V1s3X5z0C8w2B7d4F6h9J1k"
+  await Bun.write(join(root, "new.txt"), `token=${token}`)
+  const config = await Bun.file(join(root, ".git", "config")).bytes()
+  const index = await Bun.file(join(root, ".git", "index")).bytes()
+  const result = invoke(root, ["audit"], "", {
+    GIT_DIR: join(root, ".git"),
+    GIT_WORK_TREE: root,
+    GIT_INDEX_FILE: join(root, ".git", "index"),
+  })
+  expect(result.code).toBe(2)
+  expect(result.output).toContain("new.txt")
+  expect(result.output).toContain("github-pat")
+  expect(result.output).not.toContain(token)
+  expect(await Bun.file(join(root, ".git", "config")).bytes()).toEqual(config)
+  expect(await Bun.file(join(root, ".git", "index")).bytes()).toEqual(index)
 })
 
 test("new branches require a baseline and scan only commits beyond it", async () => {

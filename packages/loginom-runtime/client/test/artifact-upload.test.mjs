@@ -1,22 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Page,runtime} from './support/executor-fixture.mjs';
+import {makeArtifactUploadCode} from '../lib/executor.mjs';
 
-function fixture() {
+function fixture(name='data.csv') {
   const page=new Page(),baseSnapshot=page.uiSnapshot.bind(page),baseLocator=page.locator.bind(page);
   let submitted=0,released=0,staged=0;
-  const artifact={artifact_id:'artifact-1',name:'data.csv',bytes:3,sha256:'a'.repeat(64),
-    upload:{grant_id:'grant-1',directory:'/test',destination:'/test/data.csv',overwrite:'replace'}};
+  const timeouts=[];
+  const artifact={artifact_id:'artifact-1',name,bytes:3,sha256:'a'.repeat(64),
+    upload:{grant_id:'grant-1',directory:'/test',destination:'/test/'+name,overwrite:'replace'}};
   page.storage='/test';page.blocked=false;page.inputCount=1;page.failSubmission=false;
   page.uiSnapshot=()=>({...baseSnapshot(),file_storage:{status:'observed',directory:page.storage,listing_complete:false}});
   const element={isConnected:true,tagName:'INPUT',type:'file',files:[]};
   const input={count:async()=>page.inputCount,isEnabled:async()=>true,elementHandle:async()=>input,
     evaluate:async(fn,arg)=>fn(element,arg),dispose:async()=>{},
-    setInputFiles:async path=>{assert.equal(path,'/private/staged/data.csv');submitted++;if(page.failSubmission)throw new Error('private error');}};
+    setInputFiles:async(path,options)=>{assert.equal(path,'/private/staged/'+name);timeouts.push(options.timeout);submitted++;
+      await page.afterUpload?.();if(page.failSubmission)throw new Error('private error');}};
   page.locator=selector=>selector.includes('FileStorageForm;tbrActions')
     ? {count:async()=>1,isVisible:async()=>!page.blocked,isEnabled:async()=>true,locator:()=>input} : baseLocator(selector);
   const store={list:()=>[structuredClone(artifact)],getUploadGrant(id,grant){if(id!==artifact.artifact_id || grant!==artifact.upload.grant_id)throw new Error('not authorized');return structuredClone(artifact);},
-    stageUpload:async()=>{staged++;return {path:'/private/staged/data.csv',verify:async()=>artifact,release:async()=>{released++;}};}};
+    stageUpload:async()=>{staged++;return {path:'/private/staged/'+name,verify:async()=>artifact,release:async()=>{released++;}};}};
   const events=[];
   const rt=runtime(page,{artifactStore:store,onRecord:async event=>events.push(event)});
   const request=async()=>({artifactId:artifact.artifact_id,grantId:artifact.upload.grant_id,
@@ -27,8 +30,86 @@ function fixture() {
     const form=new FileStorageForm();page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>({Controller:{FController:form}});
     return form;
   };
-  return {page,rt,artifact,request,events,store,native,counts:()=>({submitted,released,staged})};
+  return {page,rt,artifact,request,events,store,native,timeouts,counts:()=>({submitted,released,staged})};
 }
+
+test('private delivery observations bound browser transport to the remaining deadline',async()=>{
+  const f=fixture(),timeouts=[],signal=new AbortController().signal;
+  const rt=runtime(f.page,{execute:async(code,options)=>{timeouts.push(options.timeout);assert.equal(options.signal,signal);return f.page.execute(code);}});
+  await rt.observe({scope:'roots',signal,deadlineAt:f.page.clock+250});
+  assert.deepEqual(timeouts,[250]);
+});
+
+test('private delivery navigation bounds browser transport to its remaining deadline',async()=>{
+  const f=fixture(),timeouts=[];f.page.addNode('Target',104,104);
+  const rt=runtime(f.page,{execute:async(code,options)=>{timeouts.push(options.timeout);return f.page.execute(code);}});
+  const read=await rt.observe(),target=read.output.ui.elements.find(element=>element.label==='Target');
+  const result=await rt.uiAct({verb:'click',ref:target.ref},{operationId:'navigation',observationId:read.output.observation_id,
+    deadlineAt:f.page.clock+250});
+  assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));assert.equal(timeouts.at(-1),250);
+});
+
+test('an expired package deadline refuses the native upload before file selection',async()=>{
+  const f=fixture('data.lgp');f.artifact.upload.overwrite='reject';f.native();
+  const result=await f.page.execute(makeArtifactUploadCode({operation_id:'expired',artifact:f.artifact,
+    upload_path:'/private/staged/data.lgp',snapshot:f.page.uiSnapshot(),decide_conflicts:true,
+    expected_build:f.page.app.Version,expected_origin:'https://loginom.invalid',deadline_at:f.page.clock}));
+  assert.equal(result.status,'NOT_APPLIED');assert.equal(result.effect_possible,false);
+  assert.equal(f.counts().submitted,0);
+});
+
+test('package upload and sender settlement share the remaining original deadline',async()=>{
+  const f=fixture('data.lgp');f.artifact.upload.overwrite='reject';const form=f.native();
+  await f.rt.observe();f.page.context.document={querySelectorAll:()=>[]};
+  f.page.afterUpload=()=>{form.FFileSenderManager.FActiveLoadersCount=1;};
+  const deadline=f.page.clock+2500;
+  const result=await f.page.execute(makeArtifactUploadCode({operation_id:'short-budget',artifact:f.artifact,
+    upload_path:'/private/staged/data.lgp',snapshot:f.page.uiSnapshot(),decide_conflicts:true,
+    expected_build:f.page.app.Version,expected_origin:'https://loginom.invalid',deadline_at:deadline}));
+  assert.equal(result.status,'AMBIGUOUS');assert.equal(result.error.code,'UPLOAD_DECISION_UNKNOWN');
+  assert.equal(f.counts().submitted,1);assert.deepEqual(f.timeouts,[2500]);assert.ok(f.page.clock<=deadline);
+});
+
+for(const fault of [null,'journal','missing_ack','cleanup','proof','cancel'])test('private package completion settles only with durable proof and cleanup: '+fault,async()=>{
+  const f=fixture('data.lgp');f.artifact.upload.overwrite='reject';let browserUploads=0;
+  const controller=new AbortController();
+  if(fault==='cleanup'){
+    const stage=f.store.stageUpload;
+    f.store.stageUpload=async()=>{const lease=await stage();return {...lease,release:async()=>{await lease.release();throw Error('Lease cleanup unconfirmed');}};};
+  }
+  const original={status:'AMBIGUOUS',action_key:'artifact.upload',action_revision:'1',operation_id:'package-upload',phase:'submitted',
+    effect_possible:true,cleanup_complete:true,output:{upload_submitted:true,destination:'/test/data.lgp'},
+    error:{code:'UPLOAD_SERVER_VERIFICATION_REQUIRED',message:'pending'},trace:[]};
+  const proof={artifact_id:'artifact-1',destination:'/test/data.lgp',bytes:fault==='proof'?2:3,bytes_source:'native_file_store',upload_completion_verified:true,
+    files_entry:{document_id:'prep-doc',tab_tid:f.page.tabTid,directory:'/test'}};
+  const rt=runtime(f.page,{artifactStore:f.store,now:Date.now,getStorageBinding:()=>({document_id:'prep-doc',loginom_account:'user'}),
+    onRecord:async event=>{f.events.push(event);if(event.phase==='package_upload_completed'){
+      if(fault==='journal')throw Error('Journal unavailable');if(fault==='missing_ack')return;
+    }return event;},execute:async(code,options)=>{
+      if(!code.includes('async function completePackageUpload'))return f.page.execute(code);
+      assert.ok(options.timeout>0&&options.timeout<=10000);
+      browserUploads++;
+      if(fault==='cancel')controller.abort();
+      return {status:'SUCCEEDED',action_key:'artifact.package_completion',action_revision:'1',operation_id:'package-upload',phase:'native_completion',
+        effect_possible:true,cleanup_complete:true,output:{upload:structuredClone(original),completion:proof},error:null,trace:[]};
+    }});
+  const request={artifactId:'artifact-1',grantId:'grant-1',operationId:'package-upload',
+    observationId:(await rt.observe()).output.observation_id,deadline:Date.now()+10000,signal:controller.signal};
+  assert.deepEqual(await rt.uploadPackageArtifact(request),original);
+  assert.equal(rt.hasUnsettledWork(),true);assert.equal(f.counts().released,0);
+  if(fault&&fault!=='cancel'){
+    await assert.rejects(()=>rt.completePackageArtifact({operationId:'package-upload'}),
+      fault==='journal'?/Journal/:fault==='missing_ack'?/acknowledged/:fault==='cleanup'?/cleanup/:/unconfirmed/);
+    assert.equal(rt.hasUnsettledWork(),true);assert.equal(browserUploads,1);
+    return;
+  }
+  const completed=await rt.completePackageArtifact({operationId:'package-upload'});
+  assert.equal(completed.upload_completion_verified,true);assert.equal(completed.source_sha256,f.artifact.sha256);
+  assert.equal(Object.hasOwn(completed,'sha256'),false);assert.equal(completed.cleanup_complete,true);
+  assert.equal(browserUploads,1);assert.equal(f.counts().released,1);assert.equal(rt.hasUnsettledWork(),false);
+  assert.deepEqual((await rt.inspect({operationId:'package-upload'})).output.outcome,original);
+  assert.equal(f.events.filter(event=>event.phase==='package_upload_completed').length,1);
+});
 
 test('upload uses the admitted path once and leaves server verification pending',async()=>{
   const f=fixture(),request=await f.request();
