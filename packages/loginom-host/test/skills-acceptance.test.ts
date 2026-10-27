@@ -118,6 +118,14 @@ linuxTest.each([
   ["desktop", "not-in-corpus", "SKILLS_ACCEPTANCE_UNKNOWN_CASE"],
   ["run", "docs-external-unicode-path", "cli-manifest.json"],
   ["run", "scenario-create", "cli-manifest.json"],
+  ["run", "scenario-create-path", "cli-manifest.json"],
+  ["desktop", "scenario-create-path", "release-manifest.json"],
+  ["run", "text-read", "cli-manifest.json"],
+  ["desktop", "text-read", "release-manifest.json"],
+  ["run", "edit-after-docs", "cli-manifest.json"],
+  ["desktop", "edit-after-docs", "release-manifest.json"],
+  ["run", "docs-after-edit", "cli-manifest.json"],
+  ["desktop", "docs-after-edit", "release-manifest.json"],
 ])("live acceptance validates %s case %s before creating results", async (interfaceName, cases, error) => {
   const root = await mkdtemp(join(tmpdir(), "loginom-acceptance-preflight-"))
   try {

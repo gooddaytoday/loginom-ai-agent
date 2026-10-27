@@ -5,6 +5,36 @@ const packagePath = "/user/skills-acceptance-owned.lgp"
 const digest = "a".repeat(64)
 const csvSha256 = "b".repeat(64)
 const skills = [{ name: "loginom-automation", digest }]
+
+test("CSV path acceptance binds admission, delivery and import to the same source", async () => {
+  const csvPath = "/input/Продажи.csv", destination = "/user/own-sales.csv"
+  const values = bodies()
+  values[0] = { input_artifacts: [] }
+  Object.assign(values[1]!, { configuration: { readback: { kind: "text_import", source: { source_path: destination } } } })
+  const admit = { tool: "loginom_file_admit", state: { status: "completed", input: { path: csvPath }, output: JSON.stringify({
+    source_path: csvPath, artifact: { artifact_id: "artifact", sha256: csvSha256, upload: { grant_id: "grant", destination } } }) } }
+  const delivered = { tool: "loginom_dock_artifact_deliver", state: { status: "completed",
+    input: { operation_id: "delivery", artifact_id: "artifact", upload_grant_id: "grant" }, output: JSON.stringify({ operation_id: "delivery",
+      outcome: { status: "SUCCEEDED", sha256: csvSha256, destination, cleanup_complete: true, upload_completion_verified: true } }) } }
+  const actual = tools(values)
+  actual.splice(2, 0, admit, delivered)
+  expect((await verify(values, "", { tools: actual, csvPath })).code).toBe(0)
+  delivered.state.output = JSON.stringify({ operation_id: "delivery", status: "SUCCEEDED", cleanup_complete: true,
+    output: { status: "SUCCEEDED", sha256: csvSha256, destination, cleanup_complete: true, upload_completion_verified: true } })
+  expect((await verify(values, "", { tools: actual, csvPath })).code).toBe(0)
+  for (const missing of ["loginom_file_admit", "loginom_dock_artifact_deliver"])
+    expect((await verify(values, "", { tools: actual.filter(tool => tool.tool !== missing), csvPath })).code).toBe(1)
+  admit.state.input.path = "/input/foreign.csv"
+  expect((await verify(values, "", { tools: actual, csvPath })).code).toBe(1)
+  admit.state.input.path = csvPath
+  delivered.state.input.artifact_id = "foreign"
+  expect((await verify(values, "", { tools: actual, csvPath })).code).toBe(1)
+  delivered.state.input.artifact_id = "artifact"
+  Object.assign(values[1]!.configuration!.readback!, { source: { source_path: "/user/foreign.csv" } })
+  Object.assign(actual[4]!.state, { output: JSON.stringify(values[1]) })
+  expect((await verify(values, "", { tools: actual, csvPath })).code).toBe(1)
+})
+
 function bodies(inputHash = csvSha256, amount = 35, path = packagePath) {
   return [
     { input_artifacts: [{ sha256: inputHash }] },
@@ -55,7 +85,7 @@ function tools(values = bodies(), advice = "") {
   ]
 }
 
-async function verify(values = bodies(), advice = "") {
+async function verify(values = bodies(), advice = "", paths?: { tools: unknown[]; csvPath: string }) {
   const nativeNode = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!nativeNode) throw Error("LOGINOM_AI_AGENT_TEST_NODE_REQUIRED")
   const child = Bun.spawn(
@@ -66,7 +96,7 @@ async function verify(values = bodies(), advice = "") {
       `import { verifySalesScenario } from ${JSON.stringify(new URL("../script/skills-acceptance/scenario.mjs", import.meta.url).href)}
 const input = JSON.parse(process.argv[1])
 console.log(JSON.stringify(verifySalesScenario(input.tools, input.options)))`,
-      JSON.stringify({ tools: tools(values, advice), options: { skills, csvSha256, packagePath } }),
+      JSON.stringify({ tools: paths?.tools ?? tools(values, advice), options: { skills, csvSha256, packagePath, ...(paths ? { csvPath: paths.csvPath } : {}) } }),
     ],
     { stdout: "pipe", stderr: "pipe" },
   )

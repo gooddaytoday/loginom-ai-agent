@@ -258,14 +258,17 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   await mkdir(workdir, { recursive: true })
   const files = await Promise.all(
     task.inputs.map(async (rel) => {
-      const dest = path.join(workdir, path.basename(rel))
-      await cp(path.join(task.dir, rel), dest)
+      const dest = path.join(workdir, task.inputMode ? rel : path.basename(rel))
+      if (task.inputMode) await mkdir(path.dirname(dest), { recursive: true })
+      await cp(path.join(task.dir, rel), dest, { dereference: task.inputMode === "paths" })
       return dest
     }),
   )
   const name = `eval-${input.runId}-${task.id}-${attempt}`
+  const inputHash = task.inputMode ? await agentInputsHash([{ ...task, dir: workdir }]) : undefined
   const packagePath = `/${config.loginom.username}/${name}.lgp`
-  const prompt = buildAgentPrompt(task.prompt, packagePath, `${name}.result.csv`, task.outputMode)
+  const prompt = buildAgentPrompt(task.inputMode ? task.prompt.replaceAll("{{INPUT_ROOT}}", () => workdir) : task.prompt,
+    packagePath, `${name}.result.csv`, task.outputMode)
   await Bun.write(path.join(outDir, "prompt.txt"), prompt)
   const storageBefore = config.dryRun ? [] : await storageEntryExists(input.source, `${name}.result.csv`)
     .then(exists => exists ? [`${name}.result.csv`] : [], () => null)
@@ -278,7 +281,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     profileDir: config.dryRun ? undefined : config.profileDir,
     slotId: input.slot?.lease.slot.id ?? input.slotId ?? "default",
     prompt,
-    files,
+    files: task.inputMode ? [] : files,
     workdir,
     timeoutMs: taskTimeoutMs(config, task),
     outDir,
@@ -289,6 +292,15 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   Object.assign(base, { status: early.status, exit_code: run.exitCode, timed_out: run.timedOut, interrupted: run.interrupted,
     duration_ms: run.durationMs, cost: run.cost, tokens: run.tokens, counters: run.counters,
     session_id: run.sessionId ?? null, errors: run.errors, stderr_head: run.stderrHead, limit_evidence: run.limitEvidence })
+  const integrity = task.inputMode ? await agentInputsHash([{ ...task, dir: workdir }]).then(
+    after => ({ before: inputHash, after, passed: after === inputHash }),
+    error => ({ before: inputHash, after: null, passed: false, error: describe(error) }),
+  ) : undefined
+  const inputFailure = integrity?.passed === false ? { pass: false,
+    checklist: [{ id: "inputs-unchanged", passed: false, evidence: "inputs.json" }],
+    errors: [...run.errors, "INPUTS_CHANGED: входы paths изменены или недоступны; см. inputs.json"],
+  } : undefined
+  if (inputFailure) Object.assign(base, inputFailure, { status: early.status === "no_artifact" || early.status === "failed" ? "failed" : early.status })
   const fetched =
     early.status === "interrupted" || early.status === "harness_error" || early.status === "infra_error"
       ? undefined
@@ -318,7 +330,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
           (error: unknown) => describe(error),
         )
       : null)
-  const noJudge = status === "harness_error" || status === "interrupted" || status === "infra_error"
+  const noJudge = Boolean(inputFailure) || status === "harness_error" || status === "interrupted" || status === "infra_error"
   const judged =
     artifact && !noJudge && !input.signal.aborted && input.judge && !input.skipJudge
       ? await (input.judgeGate ?? judgeTask)({
@@ -351,12 +363,13 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     ...base,
     ...judgeFields,
     ...(judgeCleanupFailed ? { judge_cleanup_unconfirmed: true } : {}),
+    ...inputFailure,
     ...((judged || !skippedJudge) && input.evaluationHash ? { evaluation_contract_hash: input.evaluationHash } : {}),
-    status,
+    status: inputFailure && ["completed", "no_artifact", "failed"].includes(status) ? "failed" : status,
     exit_code: run.exitCode,
     timed_out: run.timedOut,
     interrupted: run.interrupted,
-    failure_kind: status === "failed" ? run.failureKind : null,
+    failure_kind: inputFailure && ["completed", "no_artifact", "failed"].includes(status) ? "other" : status === "failed" ? run.failureKind : null,
     duration_ms: run.durationMs,
     cost: run.cost,
     tokens: run.tokens,
@@ -373,7 +386,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     action_manifest_sha256: run.actionManifestSha256 ?? null,
     skill_revision: run.skillRevision ?? null,
     session_id: run.sessionId ?? null,
-    errors: run.errors,
+    errors: base.errors,
     stderr_head: run.stderrHead.trim() ? run.stderrHead : null,
     harness_error:
       artifactError ?? run.sandboxError ??
@@ -382,6 +395,7 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
         : null),
   }
   Object.assign(base, result)
+  if (integrity) await Bun.write(path.join(outDir, "inputs.json"), JSON.stringify(integrity, null, 2))
   await writeLeaseReceipt(path.join(outDir, "cleanup.json"), { processes: run.processCleanup,
     ...(input.slot ? { slotId: input.slot.lease.slot.id, serverEpoch: input.slot.lease.identity.serverEpoch,
       serverSessions: "unknown", storageDeletionAllowed: false, nextAdmissionAllowed: false } : {}) })

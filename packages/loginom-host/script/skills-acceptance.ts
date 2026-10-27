@@ -1,9 +1,11 @@
 import { Schema } from "effect"
+import { decodeAcceptanceCorpus } from "./skills-acceptance/corpus"
 import { createHash } from "node:crypto"
 import { chmod, cp, mkdir, readFile, readdir, realpath, writeFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { parseArgs } from "node:util"
-import { acceptanceTurns } from "./skills-acceptance/turns.mjs"
+import { acceptanceTurns, acceptanceInputPath } from "./skills-acceptance/turns.mjs"
+import { verifyPreservedGraph } from "./skills-acceptance/receipts.mjs"
 import { verifyCliManifest } from "../src/cli-manifest"
 import { verifyProductSkills } from "../src/bundled-skills"
 import { decodeManifest, fileHash, verifyResourceTree } from "../../desktop/scripts/release/manifest"
@@ -55,23 +57,7 @@ const contains = (root: string, path: string) =>
 if ([artifact, repo].some((root) => contains(root, output) || contains(output, root)))
   throw Error("SKILLS_ACCEPTANCE_OUTPUT_OVERLAP")
 const corpusBytes = await readFile(join(repo, "packages/agent/test/cli/package-docs-routing/cases.json"))
-const corpusSchema = Schema.Struct({
-  schema_version: Schema.Literal("loginom-skills-routing.v1"),
-  fixtures: Schema.Record(Schema.String, Schema.String),
-  cases: Schema.Array(
-    Schema.Struct({
-      id: Schema.String,
-      group: Schema.String,
-      prompt: Schema.String,
-      input: Schema.String,
-      connection: Schema.optional(Schema.String),
-      setup: Schema.optional(Schema.Unknown),
-      followup: Schema.optional(Schema.Unknown),
-      expected: Schema.Struct({ profile: Schema.String, result: Schema.Unknown }),
-    }),
-  ),
-})
-const corpus = Schema.decodeUnknownSync(corpusSchema)(JSON.parse(corpusBytes.toString()))
+const corpus = decodeAcceptanceCorpus(JSON.parse(corpusBytes.toString()))
 const ids = args.cases.split(",")
 if (new Set(ids).size !== ids.length) throw Error("SKILLS_ACCEPTANCE_DUPLICATE_CASE")
 const cases = ids.map((id) => {
@@ -91,15 +77,16 @@ const cases = ids.map((id) => {
       "none",
       "server-reference-only",
       "external-text-path",
-      ...(transition ? ["created-lgp-attachment"] : []),
-      ...(scenario ? ["csv-attachment"] : []),
+      "text-path",
+      ...(transition ? ["created-lgp-attachment", "created-lgp-path"] : []),
+      ...(scenario ? ["csv-attachment", "csv-path"] : []),
       ...(scenario && transition ? ["own-created-server-package"] : []),
     ].includes(value.input)
   )
     throw Error("SKILLS_ACCEPTANCE_PERMISSION_ADAPTER_REQUIRED")
   return value
 })
-const browserCases = cases.filter((value) => value.group === "scenario" || value.id === "docs-after-build")
+const browserCases = cases.filter((value) => acceptanceTurns(value).some(turn => turn.scenario))
 const resources = join(artifact, args.interface === "run" ? "resources/loginom" : "linux-unpacked/resources/loginom")
 const cliMetadata =
   args.interface === "run" ? await verifyCliManifest(artifact, { platform: "linux", arch: "x64" }) : undefined
@@ -416,16 +403,18 @@ async function readDriverOutput(
       try {
         const packagePath = `/${privateInput.connection!.username}/skills-acceptance-${sha(output).slice(0, 12)}-${testcase.id}-${attempt}.lgp`
         if (
-          !["docs-after-build", "scenario-then-docs"].includes(testcase.id) ||
+          !["docs-after-build", "scenario-then-docs", "docs-after-edit"].includes(testcase.id) ||
           transferred ||
           value.packagePath !== packagePath ||
           value.attempt !== attempt
         )
           throw Error("SKILLS_ACCEPTANCE_PACKAGE_TRANSFER_INVALID")
         transferred = true
+        const destination = acceptanceInputPath(acceptanceTurns(testcase)[1]!, {
+          lgp: "/home/tester/input/Исходный сценарий.LGP", created: "/home/tester/workspace/Изменённый пакет.LGP" })
         const saved = join(runRoot, "created-package.lgp")
         await command(["docker", "cp", args["package-container"] + ":/workdir/UserStorage" + packagePath, saved])
-        await command(["docker", "cp", saved, container + ":/home/tester/input/Исходный сценарий.LGP"])
+        await command(["docker", "cp", saved, container + ":" + destination])
         await command([
           "docker",
           "exec",
@@ -434,7 +423,7 @@ async function readDriverOutput(
           container,
           "chown",
           "1200:1200",
-          "/home/tester/input/Исходный сценарий.LGP",
+          destination,
         ])
       } catch {
         // Keep draining until the driver exits; its bounded transfer wait retains failed evidence.
@@ -460,13 +449,15 @@ async function verifySavedPackage(testcase: (typeof cases)[number], attempt: num
   const nodes = structure.modules.flatMap((module) => module.workflow_nodes)
   const links = structure.modules.flatMap((module) => module.links)
   const ids = result.builtNodes as { source: string; grouping?: string; calculator?: string }
+  const localEdit = testcase.fixture === "edit_lgp"
+  if (localEdit) verifyPreservedGraph(await extractPackage(fixtures.edit_lgp!), structure, ids.calculator!)
   const target = ids.grouping ?? ids.calculator
   const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
   if (
-    !nodes.some((node) => same(node.guid, ids.source)) ||
+    !localEdit && (!nodes.some((node) => same(node.guid, ids.source)) ||
     (target &&
       (!nodes.some((node) => same(node.guid, target)) ||
-        !links.some((link) => same(link.source_node_guid, ids.source) && same(link.target_node_guid, target))))
+        !links.some((link) => same(link.source_node_guid, ids.source) && same(link.target_node_guid, target)))))
   )
     throw Error("SKILLS_ACCEPTANCE_SAVED_GRAPH_MISMATCH")
   await Bun.write(
@@ -479,9 +470,9 @@ async function verifySavedPackage(testcase: (typeof cases)[number], attempt: num
         linked: target ? true : undefined,
         expectedRows: ids.calculator
           ? [
-              ["Alpha", 10, 20],
-              ["Beta", 20, 40],
-              ["Alpha", 25, 50],
+              ["Alpha", 10, localEdit ? 30 : 20],
+              ["Beta", 20, localEdit ? 60 : 40],
+              ["Alpha", 25, localEdit ? 75 : 50],
             ]
           : ids.grouping
             ? [

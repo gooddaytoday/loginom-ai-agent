@@ -51,7 +51,7 @@ test('bootstrap stops the DOM walk at its budget and cannot claim readiness',asy
   assert.equal(scanned,4000);assert.equal(result.output.scan.complete,false);
   assert.equal(result.output.target_state,'indeterminate');
 });
-function pageFixture({ authenticated = false, workflow = false, actualBuild = build, loseReply = false, blocked = false, entryDelay = 0, busyTicks = 0, fileExists = true, fileRead = null, fileDialog = {} } = {}) {
+function pageFixture({ authenticated = false, workflow = false, actualBuild = build, loseReply = false, refuseMenuOnce = false, blocked = false, entryDelay = 0, busyTicks = 0, fileExists = true, fileRead = null, fileDialog = {} } = {}) {
   const events = [], tabs = [], packages = new Map();
   let url = 'about:blank', active = null, openedPath = null, pickerOpen = fileDialog.foreign === true;
   const element = (tid, text = '') => ({tid,textContent:text,innerHTML:'',isConnected:true,
@@ -70,6 +70,8 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
     tabs.push(tab);active=tab;packages.set(tab,new PackageNode(path));
   };
   class PackageNode { constructor(path) {this.PackageFileName=path;this.PackageName='Draft';} }
+  class FileSenderManager{constructor(){this.CurrentDirectory='/user/';this.FActiveLoadersCount=0;this.FCurrentUploadFilePaths={};}}
+  class FileStorageForm{constructor(root){this.FView={el:{dom:root}};this.FFileInput={isConnected:true,files:[]};this.FFileSenderManager=new FileSenderManager();}}
   if (workflow) add(null);
   else {add(null);tabs[0].home=element('MF;TF-2;HomePage;btnCreateUnsavedPackage');tabs[0].graph=null;tabs[0].area=null;packages.delete(tabs[0]);}
   const context=createContext({Date,Math,Map,Set,JSON,screen:{availWidth:1000,availHeight:900},
@@ -85,9 +87,9 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
       if(prefix)return tabs.flatMap(t=>t.crumbs).filter(e=>e.tid.startsWith(JSON.parse(prefix[1])));
       const exact=selector.match(/^\[data-tid=(".*")\]$/);
       if(exact && JSON.parse(exact[1]).endsWith(';HomePage;btnCreateUnsavedPackage') && entryDelay>0)return [];
-      return exact?tabs.flatMap(t=>[t.graph,t.area,t.home]).filter(e=>e && e.tid===JSON.parse(exact[1])):[];
+      return exact?tabs.flatMap(t=>[t.graph,t.area,t.home,t.files]).filter(e=>e && e.tid===JSON.parse(exact[1])):[];
     }},bg:{app:{Version:actualBuild,PackageTreeNode:PackageNode,Application:{FInstance:{FMainForm:{Items:{Workspace:{
-      getActiveTab:()=>({Controller:{Node:{data:{node:packages.get(active)}}}}),
+      getActiveTab:()=>({Controller:{Node:{data:{node:packages.get(active)}},FController:active?.filesForm}}),
     }},FMapTree:{FServerConnection:{UserName:'test-account'}}}}}}}});
   const map=context.bg.app.Application.FInstance.FMainForm.FMapTree;
   map.PackageNodes={get Count(){return packages.size;}};
@@ -102,11 +104,13 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
     },
     async count() { return selector.includes('x-form-invalid')?0:1; },
     async click() {
+      if(refuseMenuOnce&&selector.includes('btnPackagesMenu')){refuseMenuOnce=false;throw new Error('menu unavailable');}
       if(selector.includes('btnLogin')) {events.push('login');authenticated=true;}
       else if(selector.includes('btnCreateUnsavedPackage')) {
         events.push('create_draft');if(active?.home)tabs.splice(tabs.indexOf(active),1);add(null);
         if(loseReply){loseReply=false;throw new Error('lost response');}
-      } else if(selector.includes('btnOpen"')){events.push('open_package');add(openedPath);nativePicker.hidden=fileDialog.hidden!==false;}
+      } else if(selector.includes('btnOpen"')){events.push('open_package');add(openedPath);nativePicker.hidden=fileDialog.hidden!==false;
+        if(loseReply){loseReply=false;throw new Error('lost response');}}
       else if(selector.includes('t.br;tb'))active=tabs.find(t=>selector.includes(t.tid));
       else {assert.equal(entryDelay,0,'menu must wait for homepage readiness');events.push('menu');if(selector.includes('btnOpenPackage'))pickerOpen=true;}
     },
@@ -114,7 +118,7 @@ function pageFixture({ authenticated = false, workflow = false, actualBuild = bu
     async press(key) { assert.equal(key,'Tab');assert.ok(selector.includes('edtUsername'));events.push('username_lookup'); },
     locator(child) { return locator(selector + ' ' + child); },
   });
-  return { events, tabs, context, openFiles() {add(null);const tab=tabs.at(-1);tab.graph=null;tab.area=null;packages.delete(tab);}, page: {
+  return { events, tabs, context, openFiles() {add(null);const tab=tabs.at(-1);tab.graph=null;tab.area=null;packages.delete(tab);tab.files=element('MF;TF-'+(tabs.length+1)+';FileStorageForm');tab.filesForm=new FileStorageForm(tab.files);}, page: {
     url: () => url,
     async goto(value) { url = value;context.location={origin:new URL(value).origin,pathname:new URL(value).pathname};events.push('navigate'); },
     async evaluate(fn,args) {context.args=args;return runInContext(`(${fn.toString()})(args)`,context);},
@@ -156,6 +160,110 @@ test('normal preparation opens Loginom and asks for login without assuming test 
   const state = await execute(fixture);
   assert.equal(state.status, 'LOGIN_REQUIRED');
   assert.deepEqual(fixture.events, ['navigate']);
+});
+
+test('private identity observation binds the real preparation document without a draft, receipt or READY',async()=>{
+  const fixture=pageFixture({authenticated:true});
+  const identity=await execute(fixture,{identityOnly:true});
+  assert.equal(identity.status,'BOUND');
+  assert.equal(identity.authenticated,true);assert.equal(identity.effect_possible,false);
+  assert.equal(identity.loginom_account,'test-account');
+  assert.equal(identity.document_id,fixture.context.__loginomDockPreparationV1.id);
+  assert.equal(fixture.context.__loginomDockPreparationV1.receipts.size,0);
+  assert.deepEqual(fixture.events,['navigate']);
+  const prepared=await execute(fixture,{operationId:'actual-open'});
+  assert.equal(prepared.status,'READY');assert.equal(prepared.document_id,identity.document_id);
+});
+
+test('server-path opening from the exact native Files directory preserves the existing workflow and storage identity',async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true});
+  const identity=await execute(fixture,{identityOnly:true});
+  fixture.openFiles();
+  const state=await execute(fixture,{intent:'open_package',operationId:'package-B',packagePath:'/user/B.lgp',timeoutMs:500,
+    storageBinding:{document_id:identity.document_id,loginom_account:'test-account',origin:'http://loginom.example',loginom_build:build}});
+  assert.equal(state.status,'READY',JSON.stringify(state));assert.equal(state.package_ref.path,'/user/B.lgp');
+  assert.equal(state.document_id,identity.document_id);assert.equal(state.operation_id,'package-B');
+  assert.ok(state.preserved_workflows.some(workflow=>workflow.graph_unchanged===true));
+  assert.equal(fixture.events.filter(event=>event==='open_package').length,1);
+  assert.equal(fixture.events.includes('create_draft'),false);
+});
+
+test('opening from Files refuses a changed storage account before the open gesture',async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true});
+  const identity=await execute(fixture,{identityOnly:true});fixture.openFiles();
+  const locator=fixture.page.locator;
+  fixture.page.locator=selector=>{
+    const control=locator(selector),click=control.click;
+    control.click=async()=>{await click();if(selector.includes('btnPackagesMenu'))
+      fixture.context.bg.app.Application.FInstance.FMainForm.FMapTree.FServerConnection.UserName='foreign';};
+    return control;
+  };
+  const state=await execute(fixture,{intent:'open_package',operationId:'changed-account',packagePath:'/user/B.lgp',timeoutMs:500,
+    storageBinding:{document_id:identity.document_id,loginom_account:'test-account',origin:'http://loginom.example',loginom_build:build}});
+  assert.equal(state.reason,'STORAGE_IDENTITY_CHANGED');assert.equal(state.effect_possible,false);
+  assert.equal(fixture.events.includes('open_package'),false);
+});
+
+test('a lost package opening reply reconciles the original receipt without another open',async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true,loseReply:true});
+  const options={intent:'open_package',operationId:'lost-open',packagePath:'/user/B.lgp',timeoutMs:500};
+  const first=await execute(fixture,options);
+  assert.equal(first.status,'NOT_READY');assert.equal(first.effect_possible,true);
+  const reconciled=await execute(fixture,{...options,recoverOnly:true});
+  assert.equal(reconciled.status,'READY');assert.equal(reconciled.package_ref.path,'/user/B.lgp');
+  assert.equal(fixture.events.filter(event=>event==='open_package').length,1);
+});
+
+test('server-path continuation opens once with the original ID after a confirmed pre-open refusal',async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true,refuseMenuOnce:true});
+  fixture.openFiles();
+  const metadata={skillRevision:'skill'};
+  const request={operation_id:'uploaded-open',intent:'open_package',package_path:'/user/uploaded.lgp',workflow_ref:null};
+  const continuation={metadata,request,assertAllowed(){},assertTarget(){},record:async()=>{},save:async()=>{},
+    prepare:({recoverOnly})=>execute(fixture,{intent:request.intent,operationId:request.operation_id,
+      packagePath:request.package_path,timeoutMs:500,recoverOnly})};
+  const first=await prepareWorkspaceSession(continuation);
+  assert.equal(first.reason,'PREPARATION_INTERRUPTED');assert.equal(first.effect_possible,false);
+  assert.equal(metadata.workspaceReady,false);assert.equal(fixture.events.includes('open_package'),false);
+  const opened=await prepareWorkspaceSession(continuation);
+  assert.equal(opened.status,'READY',JSON.stringify(opened));
+  assert.equal(opened.operation_id,request.operation_id);assert.equal(opened.package_ref.path,request.package_path);
+  assert.equal(opened.preserved_workflows[0].graph_unchanged,true);assert.equal(metadata.workspaceReady,true);
+  await prepareWorkspaceSession(continuation);
+  assert.equal(fixture.events.filter(event=>event==='open_package').length,1);
+  assert.equal(fixture.events.includes('create_draft'),false);
+});
+
+test('reserved opening continuation refuses a changed original foreign graph before another gesture',async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true,refuseMenuOnce:true});
+  fixture.openFiles();
+  const options={intent:'open_package',operationId:'refused-open',packagePath:'/user/uploaded.lgp',timeoutMs:500};
+  const first=await execute(fixture,options);
+  assert.equal(first.reason,'PREPARATION_INTERRUPTED');assert.equal(first.effect_possible,false);
+  fixture.tabs[0].graph.innerHTML='changed';
+  const events=fixture.events.slice();
+  const continued=await execute(fixture,options);
+  assert.equal(continued.reason,'FOREIGN_WORKFLOW_CHANGED');assert.equal(continued.effect_possible,false);
+  assert.deepEqual(fixture.events,events);
+});
+
+test('an uncertain preparation reply cannot restart opening from a reserved browser receipt',async()=>{
+  const fixture=pageFixture({authenticated:true,workflow:true,refuseMenuOnce:true});
+  const metadata={skillRevision:'skill'};
+  const request={operation_id:'unknown-open',intent:'open_package',package_path:'/user/uploaded.lgp',workflow_ref:null};
+  const continuation={metadata,request,assertAllowed(){},assertTarget(){},record:async()=>{},save:async()=>{},
+    prepare:async({recoverOnly})=>{
+      const state=await execute(fixture,{intent:request.intent,operationId:request.operation_id,
+        packagePath:request.package_path,timeoutMs:500,recoverOnly});
+      if(!recoverOnly)throw new Error('preparation reply lost');
+      return state;
+    }};
+  await assert.rejects(prepareWorkspaceSession(continuation),/preparation reply lost/);
+  assert.equal(metadata.workspacePreparation.effect_possible,true);
+  const events=fixture.events.slice();
+  const reconciled=await prepareWorkspaceSession(continuation);
+  assert.equal(reconciled.reason,'PREVIOUS_ATTEMPT_NOT_COMPLETED');assert.equal(reconciled.effect_possible,true);
+  assert.equal(metadata.workspaceReady,false);assert.deepEqual(fixture.events,events);
 });
 
 for (const address of ['https://app.loginom.ai', 'https://app.loginom.ai/app/', 'https://app.loginom.ai/?lang=ru&testable=false', 'https://private.example/custom/?lang=ru', 'https://private.example/app']) {
@@ -499,6 +607,18 @@ test('a new attempt after a no-effect refusal is uncertain until its own reply a
   await prepareWorkspaceSession(args);
   await assert.rejects(prepareWorkspaceSession(args),/reply lost/);
   await assert.rejects(prepareWorkspaceSession(args),/receipt missing/);
+});
+
+test('a new explicit package can follow a verified no-effect open refusal',async()=>{
+  const metadata={skillRevision:'skill'};
+  const options={metadata,assertAllowed(){},assertTarget(){},record:async()=>{},save:async()=>{},
+    request:{operation_id:'refused-open',intent:'open_package',package_path:'/user/A.lgp'},
+    prepare:async()=>({status:'NOT_READY',reason:'UI_BLOCKED',effect_possible:false,created_draft:false,authenticated:true})};
+  await prepareWorkspaceSession(options);
+  const state=await prepareWorkspaceSession({...options,
+    request:{operation_id:'new-open',intent:'open_package',package_path:'/user/B.lgp'},
+    prepare:async({recoverOnly})=>{assert.equal(recoverOnly,false);return {status:'READY',effect_possible:true,target:{},workflow_ref:{}};}});
+  assert.equal(state.status,'READY');assert.equal(metadata.workspaceReady,true);
 });
 
 for(const variant of ['lost','effect','created','unauthenticated','cancelled','same-id'])

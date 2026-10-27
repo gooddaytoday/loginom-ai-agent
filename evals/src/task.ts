@@ -1,5 +1,5 @@
 import path from "node:path"
-import { readdir } from "node:fs/promises"
+import { readdir, realpath } from "node:fs/promises"
 import { EvalFailure } from "./fail"
 import type { EvalConfig } from "./config"
 
@@ -39,6 +39,8 @@ async function loadTask(dir: string) {
   if (raw.id !== id) throw new EvalFailure(`${id}: поле id ("${String(raw.id)}") должно совпадать с именем каталога`, 2)
   if (raw.output_mode !== undefined && raw.output_mode !== "diagnostic")
     throw new EvalFailure(`${id}: output_mode должен быть diagnostic или отсутствовать`, 2)
+  if (raw.input_mode !== undefined && raw.input_mode !== "attachment" && raw.input_mode !== "paths")
+    throw new EvalFailure(`${id}: input_mode должен быть attachment, paths или отсутствовать`, 2)
   const checkerFiles = strings(raw, "checker_files", id)
   if (new Set(checkerFiles).size !== checkerFiles.length || checkerFiles.some(file => !file || path.isAbsolute(file) || file.split(/[\\/]/).includes("..")))
     throw new EvalFailure(`${id}: checker_files должны быть уникальными относительными путями`, 2)
@@ -48,6 +50,7 @@ async function loadTask(dir: string) {
     title: text(raw, "title", id),
     prompt: text(raw, "prompt", id),
     inputs: strings(raw, "inputs", id),
+    ...(raw.input_mode === "paths" ? { inputMode: "paths" as const } : {}),
     reference: raw.output_mode === "diagnostic" ? "" : text(raw, "reference", id),
     ...(raw.output_mode === "diagnostic" ? { outputMode: "diagnostic" as const } : {}),
     ...(checkerFiles.length ? { checkerFiles } : {}),
@@ -59,9 +62,20 @@ async function loadTask(dir: string) {
     oracleTolerance: oracleTolerance(raw, id),
   }
   const collisions = task.inputs.filter((file, index, files) =>
-    files.some((other, otherIndex) => index !== otherIndex && path.basename(file) === path.basename(other)))
+    files.some((other, otherIndex) => index !== otherIndex &&
+      (task.inputMode ? path.normalize(file) === path.normalize(other) : path.basename(file) === path.basename(other))))
   if (collisions.length)
     throw new EvalFailure(`${id}: inputs должны иметь уникальные имена файлов; конфликт: ${collisions.join(", ")}`, 2)
+  if (task.inputMode) {
+    const root = await realpath(dir)
+    for (const rel of task.inputs) {
+      if (!rel || path.isAbsolute(rel) || path.win32.isAbsolute(rel) || rel.split(/[\\/]/).includes(".."))
+        throw new EvalFailure(`${id}: input должен быть относительным путём внутри case: ${rel}`, 2)
+      const source = await realpath(path.join(dir, rel)).catch(() => undefined)
+      if (source && (path.isAbsolute(path.relative(root, source)) || path.relative(root, source).split(path.sep)[0] === ".."))
+        throw new EvalFailure(`${id}: input выходит из case: ${rel}`, 2)
+    }
+  }
   for (const rel of [task.reference, task.spec, ...task.inputs, ...checkerFiles].filter(Boolean)) {
     if (!(await Bun.file(path.join(dir, rel)).exists())) throw new EvalFailure(`${id}: файл "${rel}" не найден`, 2)
   }
@@ -156,6 +170,7 @@ export async function agentInputsHash(tasks: Task[], tail = agentPromptTail) {
   hashPart(hasher, "prompt_tail", tail)
   for (const task of tasks) {
     hasher.update(`${task.id}\n`)
+    if (task.inputMode) hashPart(hasher, "input_mode", task.inputMode)
     if (task.outputMode) hashPart(hasher, "diagnostic_prompt_tail", diagnosticPromptTail)
     hashPart(hasher, "prompt", task.prompt)
     for (const rel of [...task.inputs].sort()) hashPart(hasher, `input:${rel}`, await Bun.file(path.join(task.dir, rel)).bytes())

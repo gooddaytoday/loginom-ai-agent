@@ -1,7 +1,7 @@
 import { expect } from "bun:test"
 import { constants } from "node:fs"
-import { cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
-import { dirname, isAbsolute, join, resolve } from "node:path"
+import { cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises"
+import { basename, dirname, isAbsolute, join, resolve } from "node:path"
 import { tmpdir } from "node:os"
 import { copyProductSkillsFixture } from "../../../loginom-host/test/fixtures/product-skills"
 import { resourceInventory } from "../../../loginom-runtime/src/resource-inventory.mjs"
@@ -13,6 +13,12 @@ export async function standaloneFixture(binary?: string) {
   const bundle = join(directory, "bundle")
   const profile = join(directory, "profile")
   try {
+    const git = Bun.which("git")
+    if (!git) throw Error("Git is required for the standalone test project")
+    expect(Bun.spawnSync([git, "init", "--quiet", directory]).exitCode).toBe(0)
+    const gitOnlyPath = join(directory, "executables")
+    await mkdir(gitOnlyPath)
+    await symlink(git, join(gitOnlyPath, basename(git)))
     if (binary) {
       await cp(resolve(dirname(binary), "../resources/loginom"), bundle, {
         recursive: true,
@@ -62,6 +68,7 @@ export async function standaloneFixture(binary?: string) {
       profile,
       binary,
       channel,
+      gitOnlyPath,
       async [Symbol.asyncDispose]() {
         await rm(directory, { recursive: true, force: true })
       },

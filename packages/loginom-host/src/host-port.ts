@@ -15,6 +15,13 @@ const Admissions = Schema.Array(
     files: Schema.Array(Schema.Struct({ name: Schema.String, data: Schema.String })),
   }),
 )
+const PackageInput = Schema.Struct({
+  admissionID: Schema.NonEmptyString,
+  file: Schema.Struct({ name: Schema.String, data: Schema.String }),
+})
+const PackageAdmission = Schema.Tuple([
+  Schema.Struct({ artifact_id: Schema.NonEmptyString, upload: Schema.Struct({ grant_id: Schema.NonEmptyString }) }),
+])
 const diagnosticTool = {
   name: "dock_diagnostics",
   description:
@@ -72,6 +79,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       applyingScope: boolean
       catalog: Set<string>
       admitted: Set<string>
+      packagePreparation?: AbortController
       // Operation of a browser recovery attempt that still holds the page.
       recovery?: string
     }
@@ -146,6 +154,24 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       return
     }
     try {
+      const hasPackageInput = "packageInput" in input && input.packageInput !== undefined
+      if (hasPackageInput && (data.method !== "call" || !("name" in input) || input.name !== prepareTool.name))
+        throw new Error("LOGINOM_SCOPE_DENIED")
+      const packageInput = hasPackageInput ? Schema.decodeUnknownSync(PackageInput)(input.packageInput) : undefined
+      if (packageInput) {
+        const args = "args" in input ? input.args : undefined
+        if (
+          !args ||
+          typeof args !== "object" ||
+          !("intent" in args) ||
+          args.intent !== "open_package" ||
+          "package_path" in args ||
+          "local_package_path" in args ||
+          "workflow_ref" in args ||
+          !packageInput.file.name.toLowerCase().endsWith(".lgp")
+        )
+          throw new Error("LOGINOM_SCOPE_DENIED")
+      }
       if (data.method === "acquire") {
         if (
           !("session" in input) ||
@@ -285,6 +311,9 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
       // own journal and lease; a known no-dispatch refusal is not uncertainty.
       if (data.method === "call" && run.dispatching) throw new Error("LOGINOM_CALL_BUSY")
       if (data.method === "call") run.dispatching = true
+      if (packageInput) run.packagePreparation = new AbortController()
+      const packageAborted = () =>
+        packageInput && (state.closed || run.released || run.packagePreparation?.signal.aborted)
       if (browserCall) run.browserDispatching = true
       run.calls++
       try {
@@ -366,6 +395,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           return
         }
         if (data.method === "interrupt") {
+          run.packagePreparation?.abort()
           if (!run.lease) {
             const status = await service.api.status()
             if (service.hasRuntime(status.generation, run.chat)) await connectionLease(input.run, run)
@@ -424,6 +454,13 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           throw new Error("LOGINOM_SCOPE_DENIED")
         const recovery = { id: undefined as string | undefined }
         try {
+          const packageAdmission = packageInput
+            ? {
+                userMessage: packageInput.admissionID,
+                files: await service.inputs(lease.generation, run.chat, packageInput.admissionID, [packageInput.file]),
+              }
+            : undefined
+          if (packageAborted()) throw new Error("LOGINOM_RUN_ABORTED")
           // A dead runtime is replaced before admission. Past the relaunch limit this
           // is a known refusal, not an uncertain dispatch.
           if (!service.hasRuntime(lease.generation, run.chat)) {
@@ -431,21 +468,30 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             run.catalog = new Set([prepareTool.name])
           }
           const runtime = await service.runtime(lease.generation, run.chat)
+          if (packageAborted()) throw new Error("LOGINOM_RUN_ABORTED")
+          const packageArtifact = packageAdmission
+            ? await runtime.request("admit", packageAdmission).then((value) => {
+                const [artifact] = Schema.decodeUnknownSync(PackageAdmission)(value)
+                return { artifactID: artifact.artifact_id, uploadGrantID: artifact.upload.grant_id }
+              })
+            : undefined
+          if (packageAborted()) throw new Error("LOGINOM_RUN_ABORTED")
           for (const admission of admissions) {
             const files = await service.inputs(lease.generation, run.chat, admission.userMessage, [...admission.files])
             if (run.admitted.has(admission.userMessage)) continue
             await runtime.request("admit", { files, userMessage: admission.userMessage })
             run.admitted.add(admission.userMessage)
           }
+          if (packageAborted()) throw new Error("LOGINOM_RUN_ABORTED")
           recovery.id = await service.journal.begin(run.chat, lease.generation)
           run.active.add(recovery.id)
-          if (!service.hasRuntime(lease.generation, run.chat)) {
+          if (!service.hasRuntime(lease.generation, run.chat) || packageAborted()) {
             // Exit during journal admission precedes dispatch. Settle this unused
             // record, and require explicit preparation before a replacement owner.
             await service.journal.settle(recovery.id, true)
             run.active.delete(recovery.id)
             recovery.id = undefined
-            throw new Error("LOGINOM_SCOPE_DENIED")
+            throw new Error(packageAborted() ? "LOGINOM_RUN_ABORTED" : "LOGINOM_SCOPE_DENIED")
           }
           if (state.closed) throw new Error("LOGINOM_HOST_CLOSED")
           const result = await runtime.request(
@@ -453,6 +499,7 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
             {
               name: input.name,
               arguments: "args" in input ? input.args : undefined,
+              ...(packageArtifact ? { packageArtifact } : {}),
             },
             runtimeCallTimeout(input.name, "args" in input ? input.args : undefined) + 15_000,
           )
@@ -490,7 +537,10 @@ export function loginomHostPort(port: HostPort, service: Awaited<ReturnType<type
           throw new Error("LOGINOM_CALL_UNCERTAIN")
         }
       } finally {
-        if (data.method === "call") run.dispatching = false
+        if (data.method === "call") {
+          run.dispatching = false
+          run.packagePreparation = undefined
+        }
         if (browserCall) run.browserDispatching = false
         run.calls--
         if (run.released && !run.calls) {

@@ -239,15 +239,22 @@ async function handle(message) {
       return
     }
     if (message.operation !== "call" || state.controller) throw Error("LOGINOM_REQUEST_INVALID")
+    if (message.input.packageArtifact !== undefined && message.input.name !== "dock_prepare")
+      throw Error("LOGINOM_REQUEST_INVALID")
     const controller = new AbortController()
     state.controller = controller
     try {
       // Allow the bounded owned read and cleanup to return before the outer IPC
       // deadlines. Other tools retain room for a 60-second dock_node_wait.
-      const result = await state.client.callTool(message.input, undefined, {
+      const options = {
         signal: controller.signal,
         timeout: runtimeCallTimeout(message.input.name, message.input.arguments),
-      })
+      }
+      const result = message.input.packageArtifact !== undefined
+        ? await state.bridge.prepareLocalPackage(message.input.arguments, message.input.packageArtifact, {
+            signal: AbortSignal.any([controller.signal, AbortSignal.timeout(options.timeout)]),
+          })
+        : await state.client.callTool(message.input, undefined, options)
       send({
         id: message.id,
         result: {

@@ -9,6 +9,17 @@ CI40281597215 PASS на попытке1; matrix5/5; 30 assets/digests/SHA256SUMS
 Published2026-10-26T07:16:28Z, pre-release, latest=false, ID423944660; 30 URLs HTTP200.
 [Отчёт](../testing/loginom-ai-agent/reports/2026-10-26-v0.3.3-release.md).
 
+## 2026-10-26 — #74: Linux-проверки завершены, без выпуска
+
+Installed production source8d65045b3e/version0.3.2-localpaths74.8d65045b3e/recovery0; Desktop harness253f. CLI/archive/Desktop inventories/static/packaging13PASS2SKIP/crash6PASS независимо проверены.
+Задачи1–8/B1–B5 завершены, итоговое review Approved30/30. Canonical поведение — в дизайне; точные source pins повторно использованных результатов — в [отчёте](../testing/loginom-ai-agent/local-file-paths.md#результат).
+B4 natural own-copy Save/replace/fullpath/local unchanged/physical*3/native Close/logout/ACK0 на9f723; B5 explicit-save переходы на8d650 подтверждены. Исходные failed receipts/guards сохранены.
+Routing6IDs×2: Desktop transitions official2/2PASS628.2/611.70с; CLI first officialPASS, second originalFAIL740.73с/CLI[1,0], actual Markdown только derived offlinePASS helper253f.
+Benchmark8d650: качество100/100/oracle2/2 отдельно от execution completion1/2 (CSV0/edit1binaryRead); judge6-sol/xhigh/codex0.157.0/lease53released, Save/native/process/storage cleanup и review Approved41/41.
+Оба reference/cold/oracle и calibration100/0+100/0 приняты. Agent openai/gpt-6.1-sol/xhigh: CLI SQLite, Desktop backendmessages/:memory:; persisted Desktop DB не заявлен.
+Own pairs archived/stopped/data/profiles/failedguards retained; Windows native NOT_RUN и общий attribution README baseline mismatch сохраняются. [Закрытые отказы и recovery](../testing/loginom-ai-agent/local-file-paths.md#закрытые-отказы).
+Это историческая installed приёмка; последующие continuation/rebase/локальные source-проверки указаны в отчёте. Слияние и выпуск требуют отдельной команды владельца.
+
 ## 2026-10-20 — v0.3.2 опубликован
 
 Release source: `c130548bbe19515ea226796054786574ed2fc4a2`, ветка `loginom` (PR #286: demo-022 f9c302b3).

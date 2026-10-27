@@ -11,7 +11,7 @@ import { connectionStore } from "../src/connection/connection-store"
 import { credentials } from "../src/connection/credentials"
 import { stageKnowledgeFixture, waitForKnowledge } from "./fixtures/knowledge"
 
-async function fixture(configured = false) {
+async function fixture(configured = false, admissionResult?: unknown) {
   const node = process.env.LOGINOM_AI_AGENT_TEST_NODE
   if (!node) throw Error("Set LOGINOM_AI_AGENT_TEST_NODE to the pinned Node binary")
   const directory = await mkdtemp(join(tmpdir(), "loginom-task-scope-"))
@@ -58,11 +58,11 @@ async function fixture(configured = false) {
       if (message.operation === 'fixture.state') { Object.assign(work, message.input); send(true); }
       if (message.operation === 'fixture.exit') process.send({ id: message.id, result: true }, () => process.disconnect());
       if (message.operation === 'admit') {
-        appendFileSync(${JSON.stringify(marker)}, JSON.stringify({ operation: 'admit', userMessage: message.input.userMessage }) + '\\n');
-        send([]);
+        appendFileSync(${JSON.stringify(marker)}, JSON.stringify({ operation: 'admit', ...message.input }) + '\\n');
+        send(${JSON.stringify(admissionResult) ?? "undefined"} ?? message.input.files.map((file, index) => ({ artifact_id: 'artifact-' + index, name: file.name, upload: { grant_id: 'grant-' + index } })));
       }
       if (message.operation === 'call') {
-        appendFileSync(${JSON.stringify(marker)}, JSON.stringify({ operation: 'call', name: message.input.name }) + '\\n');
+        appendFileSync(${JSON.stringify(marker)}, JSON.stringify({ operation: 'call', ...message.input }) + '\\n');
         if (message.input.name === 'dock_prepare') prepared = message.input.arguments?.fixtureFailure !== true;
         send({ result: { content: [], ...(prepared ? {} : { isError: true }) }, recoveryPending: false, activeWork: false });
       }
@@ -251,6 +251,179 @@ test("first authorized prepare admits original bytes before workspace work and n
     expect(events[1].userMessage).toBe("msg_early_csv")
     expect(await readdir(join(f.root, "recovery"))).toEqual([])
   } finally {
+    await f.close()
+  }
+})
+
+test("private package input is rejected before startup or input staging outside its prepare contract", async () => {
+  const f = await fixture(true)
+  try {
+    const packageInput = { admissionID: "local-package-1", file: { name: "input.lgp", data: "YQ==" } }
+    const call = {
+      run: "one",
+      name: "dock_prepare",
+      userMessage: "msg_original",
+      args: { intent: "open_package" },
+      packageInput,
+    }
+    await expect(f.client.request("call", call)).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    await f.scope("bind", "loginom-automation")
+    for (const request of [
+      { method: "tools", input: call },
+      { method: "admit", input: { ...call, files: [] } },
+      { method: "call", input: { ...call, name: "find" } },
+      { method: "call", input: { ...call, name: "dock_diagnostics" } },
+      { method: "call", input: { ...call, args: { intent: "new_draft" } } },
+      { method: "call", input: { ...call, args: { intent: "open_package", package_path: "/user/other.lgp" } } },
+      { method: "call", input: { ...call, args: { intent: "open_package", workflow_ref: {} } } },
+      { method: "call", input: { ...call, args: { intent: "open_package", local_package_path: "/outside.lgp" } } },
+      {
+        method: "call",
+        input: { ...call, packageInput: { ...packageInput, file: { name: "input.csv", data: "YQ==" } } },
+      },
+    ])
+      await expect(f.client.request(request.method, request.input)).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    for (const invalid of [
+      null,
+      {},
+      { ...packageInput, admissionID: "" },
+      { ...packageInput, file: { name: "input.lgp", data: 5 } },
+      { ...packageInput, file: { name: "input.lgp", data: "YQ" } },
+    ])
+      await expect(f.client.request("call", { ...call, packageInput: invalid })).rejects.toThrow(
+        "LOGINOM_HOST_REQUEST_FAILED",
+      )
+    await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
+    expect(await readdir(f.root)).not.toContain("runtime")
+    expect(await readdir(f.root)).not.toContain("inputs")
+    expect(await readdir(join(f.root, "recovery"))).toEqual([])
+  } finally {
+    await f.close()
+  }
+})
+
+test("private package prepare stages exact bytes and forwards only one admitted artifact and grant", async () => {
+  const f = await fixture(true)
+  try {
+    await f.scope("bind", "loginom-automation")
+    const bytes = Buffer.from([0, 255, 128, 10])
+    const args = { intent: "open_package", operation_id: "open-local-1" }
+    await f.client.request("call", {
+      run: "one",
+      name: "dock_prepare",
+      userMessage: "msg_original",
+      args,
+      packageInput: { admissionID: "local-package-1", file: { name: "План #2.lgp", data: bytes.toString("base64") } },
+    })
+    const events = (await readFile(f.marker, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+    expect(events.map((event) => event.operation)).toEqual(["start", "admit", "call"])
+    expect(events[1].userMessage).toBe("local-package-1")
+    expect(events[1].files).toHaveLength(1)
+    expect(events[1].files[0]).toMatchObject({
+      name: expect.stringMatching(/-0-План _2\.lgp$/),
+      bytes: bytes.length,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      upload: { directory: "/user", overwrite: "reject" },
+    })
+    expect(await readFile(events[1].files[0].sourcePath)).toEqual(bytes)
+    expect(events[2].arguments).toEqual(args)
+    expect(events[2].packageArtifact).toEqual({ artifactID: "artifact-0", uploadGrantID: "grant-0" })
+    expect(await readdir(join(f.root, "recovery"))).toEqual([])
+    await expect(
+      f.client.request("admit", {
+        run: "one",
+        userMessage: "msg_ordinary_lgp",
+        files: [{ name: "input.lgp", data: bytes.toString("base64") }],
+      }),
+    ).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+    await expect(
+      f.client.request("call", {
+        run: "one",
+        name: "dock_prepare",
+        userMessage: "msg_original",
+        args: {},
+        admissions: [
+          { userMessage: "msg_ordinary_lgp", files: [{ name: "input.lgp", data: bytes.toString("base64") }] },
+        ],
+      }),
+    ).rejects.toThrow("LOGINOM_SCOPE_DENIED")
+  } finally {
+    await f.close()
+  }
+})
+
+test.each([
+  { admissionResult: [] },
+  { admissionResult: [{ artifact_id: "artifact-0" }] },
+  { admissionResult: [0, 1].map((id) => ({ artifact_id: "artifact-" + id, upload: { grant_id: "grant-" + id } })) },
+])("private package prepare refuses an invalid admission reply before dispatch: %j", async ({ admissionResult }) => {
+  const f = await fixture(true, admissionResult)
+  try {
+    await f.scope("bind", "loginom-automation")
+    await expect(
+      f.client.request("call", {
+        run: "one",
+        name: "dock_prepare",
+        userMessage: "msg_original",
+        args: { intent: "open_package" },
+        packageInput: { admissionID: "local-package-1", file: { name: "input.lgp", data: "YQ==" } },
+      }),
+    ).rejects.toThrow("LOGINOM_HOST_REQUEST_FAILED")
+    const events = (await readFile(f.marker, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+    expect(events.map((event) => event.operation)).toEqual(["start", "admit"])
+    expect(await readdir(join(f.root, "recovery"))).toEqual([])
+  } finally {
+    await f.close()
+  }
+})
+
+test("interrupt during private package staging prevents runtime startup and does not poison the next call", async () => {
+  const f = await fixture(true)
+  const staged = Promise.withResolvers<void>()
+  const resume = Promise.withResolvers<void>()
+  const inputs = f.host.inputs
+  f.host.inputs = async (...args) => {
+    const files = await inputs(...args)
+    staged.resolve()
+    await resume.promise
+    return files
+  }
+  try {
+    await f.scope("bind", "loginom-automation")
+    const call = {
+      run: "one",
+      name: "dock_prepare",
+      userMessage: "msg_original",
+      args: { intent: "open_package" },
+      packageInput: { admissionID: "local-package-1", file: { name: "input.lgp", data: "YQ==" } },
+    }
+    const preparing = f.client.request("call", call).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    await staged.promise
+    expect(await f.client.request("interrupt", { run: "one" })).toBe(true)
+    resume.resolve()
+    const failure = await preparing
+    expect(failure).toBeInstanceOf(Error)
+    expect(String(failure)).toContain("LOGINOM_HOST_REQUEST_FAILED")
+    await expect(access(f.marker)).rejects.toMatchObject({ code: "ENOENT" })
+    expect(await readdir(f.root)).not.toContain("runtime")
+    expect(await readdir(join(f.root, "recovery"))).toEqual([])
+    await f.client.request("call", { ...call, packageInput: { ...call.packageInput, admissionID: "local-package-2" } })
+    const events = (await readFile(f.marker, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+    expect(events.map((event) => event.operation)).toEqual(["start", "admit", "call"])
+  } finally {
+    resume.resolve()
     await f.close()
   }
 })

@@ -608,20 +608,24 @@ async function continuationPage() {
  const tab={classList:{contains:name=>name==='x-tab-active'}};
  const card={Controller:{FController:page.model,Node:{data:{node:flow}}}};
  page.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab=()=>card;
- let parentActive=false;
+ let parentLength=0;const components=new Map();
  const crumbs=()=>{
-  const labels=['Server','Packages',page.packagePath?'Saved':'Draft','Module','Workflow'];
-  return labels.slice(0,parentActive?4:5).map((label,i)=>page.element(page.prefix+';cnrNaviMode;b.s_'+labels.slice(0,i+1).join('>'),{text:label,textContent:label,kind:i===3?'save_nav_parent':'save_crumb'}));
+  const labels=['Server','Packages',page.packagePath?'Saved':'Draft','Module','Workflow',...(page.continuationSuffix?[page.continuationSuffix]:[])];
+  return labels.slice(0,parentLength||labels.length).map((label,i)=>{
+   const element=page.element(page.prefix+';cnrNaviMode;b.s_'+labels.slice(0,i+1).join('>'),{id:'save-crumb-'+i,text:label,textContent:label,kind:i>=3?'save_nav_parent':'save_crumb',navigationLength:i+1,visible:!page.hiddenAncestors||i>=3});
+   components.set(element.id,{el:{dom:element},_node:{data:{node:i===4?flow:null}}});return element;
+  });
  };
  const elements=page.elements.bind(page),click=page.click.bind(page);
- page.elements=()=>[...elements(),...crumbs(),...(parentActive?[page.element(page.prefix+';ListViewForm;MapTreeForm;colNavigation_Server>Packages>Saved>Module>Workflow;TreeText',{text:'Workflow',textContent:'Workflow',kind:'save_tree'})]:[])];
- page.click=async item=>{if(item.kind==='save_nav_parent'){parentActive=true;return;}return click(item);};
- page.afterDoubleClick=async()=>{parentActive=false;page.editor=null;};
+ page.elements=()=>[...elements(),...crumbs(),...(parentLength?[page.element(page.prefix+';ListViewForm;MapTreeForm;colNavigation_Server>Packages>Saved>Module>Workflow;TreeText',{text:'Workflow',textContent:'Workflow',kind:'save_tree'})]:[])];
+ page.click=async item=>{if(item.kind==='save_nav_parent'){parentLength=item.navigationLength;return;}return click(item);};
+ page.afterDoubleClick=async()=>{parentLength=0;page.editor=null;};
  const document={querySelectorAll:selector=>{
    if(selector.includes('cnrNaviMode'))return crumbs();
    if(selector.includes('cmpDiagram'))return [page.model.FDiagram.FmxGraph.container];
    if(selector.includes('tb-1'))return [tab];return [];
  }};
+ page.context.Ext={getCmp:id=>components.get(id)};
  page.context.document=document;
  page.context.__loginomDockPreparationV1={document,id:'doc',receipts:new Map([['prepared',{phase:'verified',workflowId:'workflow',tab,packageNode:pkg,nodeTargetWorkflowNode:flow}]])};
  return {page,flow,card};
@@ -636,6 +640,49 @@ test('saved continuation returns current navigation with the same native workflo
  assert.equal(continuation.workflow_ref.workflow_id,'workflow');assert.equal(continuation.previous_workflow_ref.workflow_id,'workflow');
  assert.equal(continuation.previous_workflow_ref.navigation_path[2].label,'Draft');assert.equal(continuation.workflow_ref.navigation_path[2].label,'Saved');
  assert.equal(continuation.workflow_ref.tab_tid,continuation.previous_workflow_ref.tab_tid);
+});
+
+test('saved continuation ends at its native workflow after a visible ExportCSV breadcrumb',async()=>{
+ const {page}=await continuationPage();page.continuationSuffix='ExportCSV';
+ const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/exported.lgp',conflict_policy:'fail'});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ const [continuation]=result.output.workflow_continuations;
+ assert.equal(continuation.previous_workflow_ref.navigation_path.at(-1).label,'Workflow');
+ assert.equal(continuation.workflow_ref.navigation_path.at(-1).label,'Workflow');
+ assert.equal(page.events.includes('package_closed'),false);assert.equal(page.events.includes('package_reopened'),false);
+});
+
+test('saved continuation refuses ambiguous native workflow breadcrumbs before Save',async()=>{
+ const {page,flow}=await continuationPage();page.continuationSuffix='ExportCSV';
+ const getCmp=page.context.Ext.getCmp;
+ page.context.Ext.getCmp=id=>{const component=getCmp(id);if(id==='save-crumb-5')component._node.data.node=flow;return component;};
+ const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/ambiguous.lgp',conflict_policy:'fail'});
+ assert.equal(result.status,'FAILED',JSON.stringify(result));
+ assert.equal(result.effect_possible,false);assert.equal(page.storage.size,0);
+ assert.equal(result.trace.some(row=>row.event==='save_requested'),false);
+});
+
+test('saved continuation refuses missing or foreign workflow breadcrumbs before Save',async()=>{
+ for(const mode of ['missing','missing_component','foreign_workflow','foreign_dom']){
+  const {page}=await continuationPage(),query=page.context.document.querySelectorAll,getCmp=page.context.Ext.getCmp;
+  if(mode==='missing')page.context.document.querySelectorAll=selector=>query(selector).filter(e=>e.id!=='save-crumb-4');
+  page.context.Ext.getCmp=id=>{const component=getCmp(id);if(id!=='save-crumb-4')return component;
+   if(mode==='missing_component')return undefined;
+   if(mode==='foreign_workflow')component._node.data.node=new page.app.WorkFlowTreeNode();
+   if(mode==='foreign_dom')component.el.dom={};return component;};
+  const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/refused.lgp',conflict_policy:'fail'});
+  assert.equal(result.status,'FAILED',mode+JSON.stringify(result));assert.match(result.error.message,/workflow breadcrumb unavailable/);
+  assert.equal(result.effect_possible,false);assert.equal(page.storage.size,0);assert.equal(result.trace.some(row=>row.event==='save_requested'),false);
+ }
+});
+
+test('saved continuation retains hidden ancestors before its native workflow',async()=>{
+ const {page}=await continuationPage();page.hiddenAncestors=true;page.continuationSuffix='ExportCSV';
+ const result=await run(page,'package.save_checkpoint',{path:'/user/data/packages/hidden.lgp',conflict_policy:'fail'});
+ assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ const [continuation]=result.output.workflow_continuations;
+ assert.deepEqual(continuation.previous_workflow_ref.navigation_path.map(e=>e.label),['Server','Packages','Draft','Module','Workflow']);
+ assert.deepEqual(continuation.workflow_ref.navigation_path.map(e=>e.label),['Server','Packages','Saved','Module','Workflow']);
 });
 
 test('JavaScript saver drives real save capability twice through verified navigation changes', async () => {

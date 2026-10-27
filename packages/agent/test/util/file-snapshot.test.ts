@@ -4,6 +4,25 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileSnapshot } from "../../src/util/file-snapshot"
 
+test("snapshot accepts the explicit 16 MiB boundary and rejects a larger file", async () => {
+  const root = await mkdtemp(join(tmpdir(), "loginom-file-snapshot-"))
+  try {
+    const input = join(root, "large.bin")
+    const limit = 16 * 1024 * 1024
+    const handle = await open(input, "w")
+    try {
+      await handle.truncate(limit)
+      expect((await fileSnapshot(input, limit)).length).toBe(limit)
+      await handle.truncate(limit + 1)
+      await expect(fileSnapshot(input, limit)).rejects.toThrow("16 MiB")
+    } finally {
+      await handle.close()
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test("attachment snapshots preserve exact bytes and reject oversized or special files", async () => {
   const directory = await mkdtemp(join(tmpdir(), "loginom-file-snapshot-"))
   try {

@@ -1,0 +1,67 @@
+{
+  "schema_version": "loginom-local-edit-fixture.v1",
+  "sha256": "4313b47f09cc875993e8acc42ef2d35baec7d7dc61589af817d413b37261e7bf",
+  "bytes": 9873,
+  "candidate_source": "9cb57e9cd9f09799625e3c97e720cc730da29515",
+  "cli_version": "0.3.2-localpaths74.9cb57e9cd9",
+  "model": "openai/gpt-6.1-sol",
+  "variant": "xhigh",
+  "session_id": "ses_e88b0f56bffeZt0BwZJPkK8D5t",
+  "source_attempt": 4,
+  "assisted": true,
+  "duration_seconds": 583,
+  "ui_seed_sha256": "64dda3a5a0d2ab8d68460c88829ab4b566999d66f32aff981ac4337a29770205",
+  "source_code_sha256": "4293b89cdd1fb021c82616c72ff0b87ef861b00c6f65a370da0b767805cc17c4",
+  "source_code_unchanged": true,
+  "declared_columns": {
+    "Category": "string",
+    "amount": "integer"
+  },
+  "cold_input_mapping_before_execute": true,
+  "source_guid": "bee595ca-d654-4594-b941-c50a69511e0f",
+  "calculator_guid": "9cfc49f4-987a-43bf-920f-5f2b81f0b893",
+  "original_link_guid": "87c97678-2c8a-41d1-80ed-4f90538fb86c",
+  "all_node_guids": [
+    "bee595ca-d654-4594-b941-c50a69511e0f",
+    "9cfc49f4-987a-43bf-920f-5f2b81f0b893",
+    "0f91bd91-3fcd-4d41-b78c-a6efb06e0381",
+    "ad0bf199-e30c-4e2f-a280-da9cdc957462"
+  ],
+  "formula": "amount * 2",
+  "autonomous": true,
+  "external_input_files": [],
+  "csv_columns": [
+    "Category",
+    "amount",
+    "amount_double"
+  ],
+  "csv_rows": [
+    [
+      "Alpha",
+      10,
+      20
+    ],
+    [
+      "Beta",
+      20,
+      40
+    ],
+    [
+      "Alpha",
+      25,
+      50
+    ]
+  ],
+  "csv_sha256": "19cc18c207d184b97893ca81b232ab58ccb8cefbe801f0f0698632d050f146db",
+  "cli_oracle_pass": true,
+  "browser_cold_oracle_pass": true,
+  "package_sha_unchanged_after_cold": true,
+  "cli_exit_code": 0,
+  "runtime_closed_ack": true,
+  "runtime_exit_code": 0,
+  "writer_retained": false,
+  "browser_close_without_save": true,
+  "evidence_root": "/home/kiselev/storage/tmp/local-paths-74-ptufs123/b1-close-20261026",
+  "staged_eval_input": "/home/kiselev/storage/tmp/local-paths-74-ptufs123/b1-close-20261026/work/drafts/local-path-scenarios/local-lgp-edit/data/Пакет #1/sales.lgp",
+  "acceptance_scope": "UI-seeded, CLI-authored source fixture; scenario reference and routing/model acceptance remain separate"
+}

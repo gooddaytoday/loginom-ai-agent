@@ -7,11 +7,13 @@ import { join, basename, relative } from "node:path"
 import { pathToFileURL } from "node:url"
 import { setTimeout } from "node:timers/promises"
 import { promisify } from "node:util"
+import { tmpdir } from "node:os"
 import { observeProcesses } from "./processes.mjs"
 import { collectExecutionJournals } from "./journals.mjs"
 import { verifySalesScenario } from "./scenario.mjs"
 import { verifyImportBuild, verifyCalculatorModification, verifyImportExecution } from "./scenario-import.mjs"
-import { acceptanceTurns } from "./turns.mjs"
+import { acceptanceTurns, prepareAcceptanceInputs, acceptanceInputPath } from "./turns.mjs"
+import { verifyLocalFileAnswer } from "./receipts.mjs"
 
 const chunks = []
 for await (const chunk of process.stdin) chunks.push(chunk)
@@ -30,7 +32,7 @@ const sha = (bytes) => createHash("sha256").update(bytes).digest("hex")
 const failures = []
 
 for (const testcase of input.cases) {
-  const docsFirst = testcase.id === "scenario-after-docs"
+  const docsFirst = ["scenario-after-docs", "edit-after-docs"].includes(testcase.id)
   const turns = acceptanceTurns(testcase)
   const transition = turns.length > 1
   const scenario = turns.some((turn) => turn.scenario)
@@ -38,8 +40,8 @@ for (const testcase of input.cases) {
   for (let attempt = 1; attempt <= input.repeat; attempt++) {
     const evidence = join(input.output, testcase.id, "attempt-" + attempt)
     await mkdir(evidence, { mode: 0o700 })
-    const root = await mkdtemp("/tmp/loginom-live-gui-")
-    const temporary = await mkdtemp("/tmp/la-")
+    const root = await mkdtemp(join(tmpdir(), "loginom-live-gui-"))
+    const temporary = await mkdtemp(join(tmpdir(), "la-"))
     const home = join(root, "home"),
       workspace = join(root, "workspace"),
       profile = join(root, "profile")
@@ -49,14 +51,14 @@ for (const testcase of input.cases) {
       external = join(filesRoot, "Исходный сценарий.LGP")
     const png = join(filesRoot, "Контекст.png"),
       csv = join(filesRoot, "sales.csv")
-    if (scenario) await cp(input.fixtures.csv, csv)
-    if (testcase.input === "workspace-path") await cp(input.fixtures.lgp, local)
-    if (docsFirst || ["lgp-attachment", "lgp-and-png-attachments", "external-text-path"].includes(testcase.input))
-      await cp(input.fixtures.lgp, external)
-    if (testcase.input === "lgp-and-png-attachments") await cp(input.fixtures.png, png)
+    const text = join(filesRoot, "Контроль.txt"), created = join(workspace, "Изменённый пакет.LGP")
+    await prepareAcceptanceInputs(turns, input.fixtures, { local, lgp: external, png, csv, text, created })
     const bindings = {
       local_lgp: local,
       unicode_lgp: external,
+      external_csv: csv,
+      external_text: text,
+      created_lgp: created,
       missing_lgp: join(workspace, "Отсутствующий.LGP"),
       server_package: scenario
         ? `/${input.connection.username}/skills-acceptance-${sha(input.output).slice(0, 12)}-${testcase.id}-${attempt}.lgp`
@@ -161,7 +163,7 @@ for (const testcase of input.cases) {
       }
       await call("/auth/" + providerID, "PUT", input.auth)
       sessionID = (await call("/session", "POST", { title: testcase.id + " " + attempt })).id
-      if (testcase.input === "external-text-path") {
+      if (turns.some(turn => ["external-text-path", "csv-path", "text-path"].includes(turn.input))) {
         // The permission must be visible in the same session before approving it in the GUI.
         const route = "/" + Buffer.from(workspace).toString("base64url") + "/session/" + sessionID
         await page.evaluate(async (route) => {
@@ -188,10 +190,11 @@ for (const testcase of input.cases) {
       let built
       for (const [turnIndex, turn] of turns.entries()) {
         const scenario = turn.scenario
+        const permissionOffset = permissions.length
         const prompt = bindPrompt(turn.prompt)
         const priorMessages = new Set((await call(`/session/${sessionID}/message`)).map((message) => message.info.id))
         const priorFiles = new Set(await readdir(workspace))
-        const originalPath = scenario ? csv : turn.input === "workspace-path" ? local : external
+        const originalPath = acceptanceInputPath(turn, { csv, text, local, lgp: external, created })
         const originalSha = await readFile(originalPath).then(sha, () => undefined)
         const files =
           turn.input === "lgp-attachment"
@@ -241,11 +244,11 @@ for (const testcase of input.cases) {
           await save("session-status.json", status[sessionID] ?? { type: "idle" })
           for (const request of pending.filter((request) => request.sessionID === sessionID)) {
             const approve =
-              testcase.input === "external-text-path" &&
-              request.metadata?.filepath === external &&
+              ["external-text-path", "csv-path", "text-path"].includes(turn.input) &&
+              request.metadata?.filepath === originalPath &&
               request.patterns.length === 1 &&
               ((request.permission === "external_directory" && request.patterns[0] === join(filesRoot, "*")) ||
-                (request.permission === "read" && request.patterns[0] === relative(workspace, external)))
+                (request.permission === "read" && [relative(workspace, originalPath), relative("/", originalPath)].includes(request.patterns[0])))
             const decision = {
               request,
               reply: approve ? "once" : "reject",
@@ -325,7 +328,8 @@ for (const testcase of input.cases) {
             .join("\n"),
           reports,
           browserExecs: execs,
-          permissions,
+          permissions: permissions.slice(permissionOffset),
+          originalPath,
           inputShaBefore: originalSha,
           inputShaAfter: await readFile(originalPath).then(sha, () => undefined),
         }
@@ -336,12 +340,13 @@ for (const testcase of input.cases) {
           "EXPECTED_BROWSER_EXEC_SCOPE",
         )
         if (scenario) {
-          const csvSha256 = sha(await readFile(input.fixtures.csv))
-          assert.equal(originalSha, csvSha256)
+          const localEdit = turn.verification === "local-calculator"
+          const inputSha256 = sha(await readFile(localEdit ? input.fixtures[turn.fixture ?? "lgp"] : input.fixtures.csv))
+          assert.equal(originalSha, inputSha256)
           const verify =
             turn.verification === "import"
               ? verifyImportBuild
-              : turn.verification === "calculator"
+              : localEdit || turn.verification === "calculator"
                 ? verifyCalculatorModification
                 : turn.verification === "execution"
                   ? verifyImportExecution
@@ -350,7 +355,8 @@ for (const testcase of input.cases) {
             result,
             verify(tools, {
               skills: input.skills,
-              csvSha256,
+              ...(localEdit ? { lgpPath: originalPath, lgpSha256: inputSha256 } : { csvSha256: inputSha256 }),
+              ...(turn.input === "csv-path" ? { csvPath: originalPath } : {}),
               packagePath: bindings.server_package,
               sourceNode: built?.builtNodes.source,
             }),
@@ -363,6 +369,8 @@ for (const testcase of input.cases) {
           assert.ok(
             !tools.some((part) => part.tool.startsWith("loginom_dock_") && part.tool !== "loginom_dock_diagnostics"),
           )
+        if (!scenario) verifyLocalFileAnswer(testcase.id, tools, originalPath, result.text,
+          reports[0]?.endsWith(".md") ? await readFile(join(workspace, reports[0]), "utf8") : undefined)
         if (turn.expected.profile === "package-docs")
           assert.ok(
             tools.some(
@@ -374,18 +382,19 @@ for (const testcase of input.cases) {
             ),
           )
         if (turn.expected.profile === "default") assert.ok(!tools.some((part) => part.state.metadata?.activation))
-        const format = turn.input === "external-text-path" ? "pdf" : turn.expected.result
+        const expected = turn.expected.result?.desktop ?? turn.expected.result
+        const format = expected === "pdf-after-permission" ? "pdf" : expected
         if (["pdf", "docx", "md"].includes(format)) {
-          if (testcase.input === "external-text-path") {
+          if (turn.input === "external-text-path") {
             assert.ok(
-              permissions.some((row) => row.request.permission === "external_directory"),
+              result.permissions.some((row) => row.request.permission === "external_directory"),
               "NO_EXTERNAL_PERMISSION",
             )
             assert.ok(
-              permissions.every((row) => row.reply === "once" && row.acknowledged),
+              result.permissions.every((row) => row.reply === "once" && row.acknowledged),
               "UNEXPECTED_EXTERNAL_PERMISSION",
             )
-          } else assert.equal(permissions.length, 0, "UNEXPECTED_PERMISSION_FOR_ADMITTED_ATTACHMENT")
+          } else assert.equal(result.permissions.length, 0, "UNEXPECTED_PERMISSION_FOR_ADMITTED_ATTACHMENT")
           assert.equal(reports.length, 1)
           assert.ok(reports[0].endsWith("." + format))
           assert.ok(
@@ -406,16 +415,17 @@ for (const testcase of input.cases) {
           await save("turn-" + (turnIndex + 1) + "/messages.json", messages)
           if (turnIndex === 0 && scenario) {
             built = result
-            if (turns[1].input !== "lgp-attachment") continue
+            if (!["lgp-attachment", "created-lgp-path"].includes(turns[1].input)) continue
+            const destination = acceptanceInputPath(turns[1], { lgp: external, created })
             // The path is owned by this output/case/attempt, never supplied by the model.
             await promisify(execFile)(
               "docker",
-              ["cp", input.packageContainer + ":/workdir/UserStorage" + bindings.server_package, external],
+              ["cp", input.packageContainer + ":/workdir/UserStorage" + bindings.server_package, destination],
               { timeout: 30000 },
             )
             await save("created-package.json", {
               packagePath: bindings.server_package,
-              sha256: sha(await readFile(external)),
+              sha256: sha(await readFile(destination)),
               sessionID,
             })
           }

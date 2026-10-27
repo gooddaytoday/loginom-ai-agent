@@ -100,10 +100,10 @@ export async function checkIsolatedLoginom(source: ArtifactSource, slot?: SlotSt
     : undefined
   if (disabled?.exitCode !== 0 || disabled.text().trim() !== "true")
     throw new EvalFailure("Изолированный eval требует явно выключенный Python в Components.cfg (проверка xmllint)", 2)
-  const inspected = await Bun.$`docker inspect --format ${'{{json (index .NetworkSettings.Networks "loginom-net")}}'} ${storage.containerId}`.quiet().nothrow()
-  const network = inspected.exitCode === 0 ? inspected.json() as { Aliases?: string[] } | null : null
-  if (!network?.Aliases?.includes("loginom-server-7.4.2-test"))
-    throw new EvalFailure("Изолированный Loginom требует network alias loginom-server-7.4.2-test в loginom-net для Studio", 2)
+  const inspected = await Bun.$`docker inspect --format ${"{{json .NetworkSettings.Networks}}"} ${storage.containerId}`.quiet().nothrow()
+  const networks = inspected.exitCode === 0 ? inspected.json() as Record<string, { Aliases?: string[] }> | null : null
+  if (!Object.values(networks ?? {}).some(network => network.Aliases?.includes("loginom-server-7.4.2-test")))
+    throw new EvalFailure("Изолированный Loginom требует network alias loginom-server-7.4.2-test для Studio", 2)
 }
 
 export async function checkSandbox(config: EvalConfig) {
