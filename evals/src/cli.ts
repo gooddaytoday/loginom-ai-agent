@@ -184,9 +184,10 @@ export async function runAgent(input: {
   const boundary = input.command.mode === "binary" ? await sandboxCommand({ cmd,
     profileDir: input.profileDir ?? input.command.env.LOGINOM_AI_AGENT_CLI_PROFILE!, workdir: input.workdir, env: input.command.env })
     .catch(() => { throw new SandboxFailure("не удалось подготовить binary CLI, профиль или mounts") }) : undefined
+  const env: Record<string, string> = boundary?.env ?? { ...input.command.env, EVAL_TASK_ID: input.taskId }
   const processRun = await superviseProcess({
     cmd, cwd: boundary?.cwd ?? input.command.cwd,
-    env: boundary?.env ?? { ...input.command.env, EVAL_TASK_ID: input.taskId }, sandbox: boundary?.cmd,
+    env, sandbox: boundary?.cmd,
     profileDir: input.profileDir, outDir: input.outDir, captureSecrets: input.command.cleanupSecrets,
     timeoutMs: input.timeoutMs, signal: input.signal,
     owner: { kind: "slot", id: input.slotId ?? input.profileDir ?? input.workdir },
@@ -200,6 +201,9 @@ export async function runAgent(input: {
   const parsed = parseEvents(stdout, input.command.cleanupSecrets)
   const run = {
     exitCode,
+    timeoutMs: input.timeoutMs,
+    connectionEnvironment: { httpProxy: Boolean(env.HTTP_PROXY || env.http_proxy), httpsProxy: Boolean(env.HTTPS_PROXY || env.https_proxy),
+      allProxy: Boolean(env.ALL_PROXY || env.all_proxy), noProxy: Boolean(env.NO_PROXY || env.no_proxy), nodeUseEnvProxy: env.NODE_USE_ENV_PROXY === "1" },
     timedOut: processRun.timedOut,
     interrupted: processRun.interrupted,
     startedAt: processRun.startedAt,

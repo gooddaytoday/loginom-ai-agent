@@ -11,6 +11,68 @@ import { probeJudgeEnvironment } from "./helpers/judge-probe"
 
 const fakeJudge = `bun ${path.join(evalsRoot, "fixtures", "fake-codex.ts")}`
 
+test.each([undefined, 900_000, 1_800_000, 3_600_000])("request preflight uses its own three-minute ceiling for timeout %s", async timeoutMs => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-request-preflight-timeout-"))
+  try {
+    const config = loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "fake", EVAL_PROFILE_DIR: path.join(root, "profile"),
+      EVAL_AGENT_MODEL: "provider/pinned", LOGINOM_DOCK_API_KEY: "fixture-key" })
+    await mkdir(config.profileDir, { mode: 0o700 })
+    const probe = await requestPreflight({ command: agentCommand(config), taskId: "request-preflight-ready", model: config.agent.model,
+      workdir: root, outDir: root, profileDir: config.profileDir, slotId: "a", timeoutMs })
+    expect(probe.code).toBe(null)
+    expect(await Bun.file(path.join(root, "run.json")).json()).toMatchObject({ timeoutMs: 180_000, timedOut: false,
+      processCleanup: { status: "confirmed" } })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test.each([false, true])("request preflight records only safe effective child connection flags: proxy settings %s", async configured => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-request-preflight-connection-"))
+  try {
+    const config = loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "fake", EVAL_PROFILE_DIR: path.join(root, "profile"),
+      EVAL_AGENT_MODEL: "provider/pinned", LOGINOM_DOCK_API_KEY: "fixture-key" })
+    await mkdir(config.profileDir, { mode: 0o700 })
+    const command = agentCommand(config, { PATH: process.env.PATH, HOME: process.env.HOME, ...(configured ? {
+      HTTP_PROXY: "http://credential-user:credential-password@private-proxy.invalid:8080", https_proxy: "http://private-proxy.invalid:8080",
+      ALL_PROXY: "socks5://private-proxy.invalid:1080", no_proxy: "private-loginom.invalid,127.0.0.1", NODE_USE_ENV_PROXY: "1",
+      UNRELATED_SECRET: "unrelated-canary" } : {}) })
+    const probe = await requestPreflight({ command, taskId: "request-preflight-ready", model: config.agent.model,
+      workdir: root, outDir: root, profileDir: config.profileDir, slotId: "a" })
+    expect(probe.code).toBe(null)
+    const evidence = await Bun.file(path.join(root, "run.json")).text()
+    expect(JSON.parse(evidence).connectionEnvironment).toEqual({ httpProxy: configured, httpsProxy: configured, allProxy: configured,
+      noProxy: configured, nodeUseEnvProxy: configured })
+    for (const value of ["credential-user", "credential-password", "private-proxy.invalid", "private-loginom.invalid", "unrelated-canary"])
+      expect(evidence).not.toContain(value)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test.each(["timeout", "cancelled"] as const)("request preflight preserves process cleanup after %s without a measurement", async outcome => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-request-preflight-stop-"))
+  try {
+    const config = loadConfig(["--skip-judge"], { EVAL_CLI_MODE: "fake", EVAL_PROFILE_DIR: path.join(root, "profile"),
+      EVAL_AGENT_MODEL: "provider/pinned", LOGINOM_DOCK_API_KEY: "fixture-key" })
+    await mkdir(config.profileDir, { mode: 0o700 })
+    const command = agentCommand(config)
+    const argsFile = path.join(root, "args.json")
+    command.env.EVAL_FAKE_ARGS_FILE = argsFile
+    command.env.EVAL_FAKE_EXIT_DELAY_MS = "10000"
+    const controller = new AbortController()
+    const pending = requestPreflight({ command, taskId: "request-preflight-ready", model: config.agent.model, workdir: root,
+      outDir: root, profileDir: config.profileDir, slotId: "a", timeoutMs: outcome === "timeout" ? 1_000 : 5_000, signal: controller.signal })
+    if (outcome === "cancelled") {
+      const deadline = Date.now() + 3_000
+      while (!await Bun.file(argsFile).exists() && Date.now() < deadline) await Bun.sleep(10)
+      controller.abort()
+    }
+    const probe = await pending
+    expect(probe.code).toBe("REQUEST_PREFLIGHT_FAILED")
+    expect(probe.run).toMatchObject({ timedOut: outcome === "timeout", interrupted: outcome === "cancelled",
+      processCleanup: { status: "confirmed" } })
+    expect(await Bun.file(argsFile).exists()).toBe(true)
+    expect(await Bun.file(path.join(root, "result.json")).exists()).toBe(false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
 test.each([
   ["request-preflight-empty", "REQUEST_PREFLIGHT_EMPTY"],
   ["request-preflight-provider-error", "REQUEST_PREFLIGHT_FAILED"],

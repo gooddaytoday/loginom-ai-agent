@@ -22,8 +22,9 @@ export type Environment = {
   loginom: { imageDigest: string | null } | null
 }
 
-export async function requestPreflight(input: Omit<Parameters<typeof runAgent>[0], "prompt" | "files">) {
-  const run = await runAgent({ ...input, files: [], prompt: "Ответь одним словом READY. Не вызывай инструменты и не изменяй файлы или Loginom." })
+export async function requestPreflight(input: Omit<Parameters<typeof runAgent>[0], "prompt" | "files" | "timeoutMs"> & { timeoutMs?: number }) {
+  const run = await runAgent({ ...input, timeoutMs: Math.min(input.timeoutMs ?? 180_000, 180_000), files: [],
+    prompt: "Ответь одним словом READY. Не вызывай инструменты и не изменяй файлы или Loginom." })
   const code = run.exitCode !== 0 || run.timedOut || run.interrupted || run.sandboxError || run.processCleanup.status !== "confirmed"
     || !run.finalText?.trim() && run.failureKind === "provider"
     ? "REQUEST_PREFLIGHT_FAILED" : run.finalText?.trim() ? null : "REQUEST_PREFLIGHT_EMPTY"
