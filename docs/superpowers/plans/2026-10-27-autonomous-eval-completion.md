@@ -36,35 +36,35 @@ comments/mentions. Разделить прочитанный итог, отве�
 в journal до POST. `reportCommentId` служит ID адресного итога/поручения;
 новое поле хранит ID проверенного отдельного ответа исполнителя.
 
-- [ ] RED: upload возвращает 503. Вызвать `publishCampaign` и проверить:
+- [x] RED: upload возвращает 503. Вызвать `publishCampaign` и проверить:
   `comments.some(c => c.content.includes('mention://agent/runner'))`,
   periodic disabled, `journal.published !== true`, attempts неизменны.
-- [ ] GREEN: итог и read-back идут до upload; trigger-preview подавляет всех
+- [x] GREEN: итог и read-back идут до upload; trigger-preview подавляет всех
   кроме назначенного исполнителя. Периодический wakeup выключается отдельно
   от `finishCampaignIssue`, чужие правила сохраняются.
-- [ ] RED: вызвать публикацию повторно после потери HTTP ответа POST и restart
+- [x] RED: вызвать публикацию повторно после потери HTTP ответа POST и restart
   с прочитанным journal. Проверить ровно одно поручение по campaign marker.
-- [ ] GREEN: сначала read-back существующего поручения; сохранённый target ID
+- [x] GREEN: сначала read-back существующего поручения; сохранённый target ID
   не разрешать заново при переименовании агента. Не заявлять exactly-once
   транзакцию вне возможностей API; инструкция исполнителю требует проверки
   собственного уже опубликованного финального marker.
-- [ ] RED: архив доставлен, но ответа нет или ответ чужой/без marker/другой
+- [x] RED: архив доставлен, но ответа нет или ответ чужой/без marker/другой
   ветки. Проверить `published !== true`, статус не `in_review`.
-- [ ] GREEN: принять только отдельный comment с `author_type=agent`,
+- [x] GREEN: принять только отдельный comment с `author_type=agent`,
   `author_id=executorAgentId`, `parent_id=reportCommentId` и отдельным
   `<!-- eval-executor-final:CAMPAIGN -->`; сохранить ID и проверить повторно.
-- [ ] RED: правильный ответ пришёл при недоставленном архиве. Проверить,
+- [x] RED: правильный ответ пришёл при недоставленном архиве. Проверить,
   что ответ засчитан, а archive retry сохраняется. После восстановления upload
   проверить один архив, `published=true`, `in_review`, все own wakeups disabled.
-- [ ] GREEN: удалить предположение «final comment означает доставленный
+- [x] GREEN: удалить предположение «final comment означает доставленный
   архив». Сохранить hash/download/CAS и idempotent retry; новый publisher
   различает машинный итог и отдельный ответ исполнителя.
-- [ ] Проверить partial от недоступного хоста, старый `published=true`,
+- [x] Проверить partial от недоступного хоста, старый `published=true`,
   отключение правила после временного 503 и отсутствие повторных admissions.
-- [ ] По исходному no-progress сроку отсутствие ответа исполнителя вызывает
+- [x] По исходному no-progress сроку отсутствие ответа исполнителя вызывает
   существующий `blocked` один раз; полный итог измерений сохраняется.
-- [ ] Запустить `TMPDIR=/home/kiselev/storage/tmp bun test --isolate test/campaign-publishing.test.ts test/campaign-finalization.test.ts test/campaign-snapshot.test.ts`.
-- [ ] Commit: `fix(evals): deliver executor final independently of archives`.
+- [x] Запустить `TMPDIR=/home/kiselev/storage/tmp bun test --isolate test/campaign-publishing.test.ts test/campaign-finalization.test.ts test/campaign-snapshot.test.ts`.
+- [x] Commit: `fix(evals): deliver executor final independently of archives`.
 
 ## 2. Узкие исправления и удаление лишней работы
 
@@ -72,21 +72,21 @@ comments/mentions. Разделить прочитанный итог, отве�
 `evals/src/slot-storage.ts`, существующие archive/slot-storage tests;
 `evals/script/run-campaign.ts`, `evals/test/campaign-limits.test.ts`.
 
-- [ ] RED: перенести из `68686f224a` только один поведенческий тест legal
+- [x] RED: перенести из `68686f224a` только один поведенческий тест legal
   omission optional `source.bytes/sha256`; убедиться, что он падает.
-- [ ] GREEN: условие принимает отсутствие optional metadata, но сравнивает
+- [x] GREEN: условие принимает отсутствие optional metadata, но сравнивает
   переданное значение с реальными source bytes/hash. Затем negative test
   подтверждает отказ неверных переданных значений.
-- [ ] Проверить потребителей `archiveStartupHistory`; удалить возвращаемый
+- [x] Проверить потребителей `archiveStartupHistory`; удалить возвращаемый
   предварительный inventory, который никто не использует. Сохранить inventory
   после cleanup и проверки mover. Проверить существующими поведенческими tests.
-- [ ] RED: принадлежащий кампании active batch после no-progress срока не
+- [x] RED: принадлежащий кампании active batch после no-progress срока не
   возвращает бесконечный `wait`. Проверить отсутствие next admissions и
   `cleanupVerified !== true` для работающих ресурсов.
-- [ ] GREEN: срок применяется и на этом пути, результат становится честным
+- [x] GREEN: срок применяется и на этом пути, результат становится честным
   partial, прежние процессы/результаты не объявляются очищенными фиктивно.
-- [ ] Запустить focused node-evidence/archive/campaign-limits tests.
-- [ ] Commit: `fix(evals): preserve valid evidence and enforce campaign deadline`.
+- [x] Запустить focused node-evidence/archive/campaign-limits tests.
+- [x] Commit: `fix(evals): preserve valid evidence and enforce campaign deadline`.
 
 ## 3. Один текущий runbook
 
@@ -94,29 +94,43 @@ comments/mentions. Разделить прочитанный итог, отве�
 `docs/plans/2026-10-23-autonomous-evals-plan.md`,
 `docs/superpowers/specs/2026-09-18-evals-design.md`.
 
-- [ ] Описать текущие reserve/service/repair/resume/final команды из server
+- [x] Описать текущие reserve/service/repair/resume/final команды из server
   config, разделение результатов/очистки/архива/ответа исполнителя.
-- [ ] Standing и wakeup инструкции: обычный batch ведёт служба; existing
+- [x] Standing и wakeup инструкции: обычный batch ведёт служба; existing
   blocked/delegation события и fallback 7200 секунд. Отдельный финал
   EvalRunner обязателен; повторные измерения не разрешены.
-- [ ] Сослаться на исторические планы вместо массового перемещения файлов.
+- [x] Сослаться на исторические планы вместо массового перемещения файлов.
   Явно сохранить незавершённый LAB-170 и исторические SHA/receipts.
-- [ ] Обновить owning contract и короткую ссылку из AGENTS; состояние
+- [x] Обновить owning contract и короткую ссылку из AGENTS; состояние
   разработки вести в checkpoint этого плана.
-- [ ] Commit: `docs(evals): consolidate autonomous campaign operations`.
+- [x] Commit: `docs(evals): consolidate autonomous campaign operations`.
 
 ## 4. Проверка результата и готовность к интеграции
 
-- [ ] Из `evals/`: `TMPDIR=/home/kiselev/storage/tmp bun typecheck`.
-- [ ] Из `evals/`: `TMPDIR=/home/kiselev/storage/tmp bun test --isolate --timeout 30000`.
+- [x] Из `evals/`: `TMPDIR=/home/kiselev/storage/tmp bun typecheck`.
+- [x] Из `evals/`: `TMPDIR=/home/kiselev/storage/tmp bun test --isolate --timeout 30000`.
   Настоящий Node должен быть в PATH; явные opt-in live flags не включать.
-- [ ] Независимое ревью итогового diff: обязательный отдельный ответ, finite
+- [x] Независимое ревью итогового diff: обязательный отдельный ответ, finite
   lifecycle, отсутствие потерянных результатов/дублей, гарантий cleanup.
-- [ ] Проверить интеграцию текущего `loginom`, сохранив его продуктовые
+- [x] Проверить интеграцию текущего `loginom`, сохранив его продуктовые
   исправления. Финальный `git diff --check`, clean status и checkpoint.
-- [ ] Сообщить отдельно, что живое внедрение/модельная кампания не выполнялись.
+- [x] Сообщить отдельно, что живое внедрение/модельная кампания не выполнялись.
 
 ## Checkpoint
+
+### Дополнение владельца: два исправления из lab262-analysis
+
+- Последние коммиты на момент поручения: `6d7614544b`, `5c47047060`.
+  План переноса независимо проверен: Approved.
+- `6d7614544b` уже полностью представлен в `97abbfba5f`: production и test
+  blobs совпали (`git diff --exit-code`), дублирующий пустой коммит не создан.
+- `5c47047060` перенесён целиком с исходной ссылкой cherry-pick: inspector,
+  тип XML, оба mapping validator, AutoSync tests и документация.
+- Общий suite был начат до этого переноса. После его завершения отдельно
+  проверены затронутые node/text-import/admission на итоговом коде: 334 PASS /
+  5 SKIP / 0 FAIL, 2036 assertions, 31 files, 250,64 с; typecheck — PASS.
+  Это новая проверка интегрированного HEAD; исторические replay из исходного
+  документа не пересчитывались и не выдаются за новую приёмку.
 
 - Дизайн выбран владельцем; спецификация и план прошли независимое review:
   Approved, обязательные замечания устранены до реализации.
@@ -126,3 +140,49 @@ comments/mentions. Разделить прочитанный итог, отве�
   дали нестабильный отказ, воспроизведённый отдельной проверкой окружения;
   тот же узкий тест прошёл на baseline и текущей ветке без изменения guards.
 - `9ac910cfd2`: текущий runbook, owning contract и ссылки на историю.
+
+- `d8410610be`: завершение/ответ исполнителя, ошибки доставки, snapshot и
+  deadline; 58 focused PASS и 2 clock PASS. Независимое финальное code review
+  — Approved, обязательных замечаний нет.
+- `b108d69e3e`: текущий `loginom` интегрирован без конфликтов, его изменения
+  сохранены. Он включён для проверки совместимости с базой интеграции;
+  для исправления завершения эта операция не была необходимой.
+- `50fe818789`: полный перенос AutoSync fix из `5c47047060`. Проверка
+  типов после переноса — PASS; адресные Import/AutoSync — 4 PASS,
+  65 assertions. Независимое review переноса — Approved.
+- Общая регрессия завершилась exit 1: **1364 PASS / 84 SKIP / 4 FAIL /
+  1 error**, 7245 assertions, 1452 tests / 111 files, 2403,63 с.
+  Точные flags: `EVAL_SYSTEMD_TESTS=0 EVAL_PAIR_INTEGRATION=0
+  EVAL_PROCESS_DENIAL_TESTS=0`; Node v22.16.0 в PATH. Suite начат до
+  переноса AutoSync; затронутая группа дополнительно проверена на итоговом коде.
+- Четыре падения общего suite: `sandbox.test.ts` (unknown shell/helper:
+  ожидался cleanup `failed`, получен `confirmed`), два timeout 30000 мс в
+  `judge-environment.test.ts` (saved generation и saved invoke budget),
+  timeout 20000 мс в `isolated-storage.test.ts` (доступный прежний сервер).
+  Поздний `JUDGE_VERSION_UNCONFIRMED` после первого timeout учтён Bun как
+  отдельный error, а не пятый упавший тест.
+- Независимый сбор сигнала: связанные tests/fixtures/runtime blobs совпадают
+  с исходным `60a82320a9`. Последовательные повторы без изменения лимитов:
+  sandbox — 1 PASS / 8 assertions; judge-environment — 22 PASS / 122
+  assertions, включая оба исходных timeout. Причина этих трёх общих падений
+  и наличие их на baseline не установлены.
+- Узкий isolated-storage повторил timeout 20000 мс на текущем коде и на
+  исходном `60a82320a9`. В отдельном baseline-архиве 11 исходников/fixtures
+  сверены с `git show`; hashes сохранены. Наличие timeout до изменений
+  подтверждено, но зависшая операция и причина не установлены: baseline
+  остановился раньше, чем текущая ветка. Таймауты не повышались, несвязанный
+  runtime не менялся. Все четыре контейнера двух повторов отсутствуют;
+  точное владение и уборка подтверждены в `rerun-fixture-cleanup.json`.
+- Логи: `/home/kiselev/storage/tmp/autonomus-eval-verification-20261027/`
+  (`full-suite.log`, `imported-fixes-final.log`,
+  `typecheck-final-with-autosync.log`, `node-affected-final.log`,
+  `rerun-*.log`, baseline hashes и cleanup JSON).
+- Итоговое независимое review области и достаточности проверки — Approved
+  для согласованных исправлений: проверки завершения, импортированные
+  правки, затронутые callers и typecheck прошли. Сохранены full-suite FAIL и
+  отдельный исходный timeout; полная готовность к слиянию не подтверждена.
+  `git diff loginom..HEAD --check` и текущий `git diff --check` — PASS.
+- Работа локальная: живые Multica agents/rules не изменены, обновление
+  runner не устанавливалось, модельные кампании и push не выполнялись.
+  Частота fallback 7200 с описана для установки новых кампаний в runbook;
+  это не подтверждение изменения уже действующих правил.
