@@ -12,6 +12,13 @@ type Binding<Id> = {
 // Desktop owns the signed product update channel. CLI must never discover or
 // install an upstream OpenCode release, even for a legacy installation method.
 export function installationNode<Id>(binding: Binding<Id>) {
+  const unconfigured = () =>
+    Effect.fail(
+      new binding.UpgradeFailedError({
+        stderr: `Automatic CLI updates are not configured for ${Product.name}. Install a ${Product.name} package.`,
+      }),
+    )
+
   return LayerNode.make({
     service: binding.Service,
     layer: Layer.succeed(
@@ -20,12 +27,8 @@ export function installationNode<Id>(binding: Binding<Id>) {
         info: () => Effect.succeed({ version: InstallationVersion, latest: InstallationVersion }),
         method: () => Effect.succeed("unknown"),
         latest: () => Effect.succeed(InstallationVersion),
-        upgrade: () =>
-          Effect.fail(
-            new binding.UpgradeFailedError({
-              stderr: `Automatic CLI updates are not configured for ${Product.name}. Install a ${Product.name} package.`,
-            }),
-          ),
+        upgrade: unconfigured,
+        upgradeMajor: unconfigured,
       }),
     ),
     deps: [],
