@@ -58,6 +58,11 @@ describe("package names", () => {
     expect(named(`${pluginName}/server`)).toBe(false)
     expect(named(`${pluginName}-next`)).toBe(true)
     expect(named(`${pluginName}_v2`)).toBe(true)
+    expect(named(`${pluginName}.next`)).toBe(true)
+    expect(named(`${pluginName}~next`)).toBe(true)
+    expect(named(`"${pluginName}".`)).toBe(false)
+    expect(usesForkScopeForUpstream("@loginom-ai-agent/runtime.x")).toBe(true)
+    expect(usesForkScopeForUpstream("@loginom-ai-agent/runtime")).toBe(false)
     expect(named(pluginName, `${pluginName}-next`)).toBe(true)
   })
 
@@ -74,6 +79,7 @@ describe("package names", () => {
 
   test("a longer package name that starts with the public plugin name is not a request for it", () => {
     expect(requestsPluginInstallName(`${pluginName}-next`)).toBe(false)
+    expect(requestsPluginInstallName(`${pluginName}.next`)).toBe(false)
     expect(requestsPluginInstallName(`${pluginName}-next\n${pluginName}`)).toBe(true)
     expect(requestsPluginInstallName(pluginName)).toBe(true)
   })
