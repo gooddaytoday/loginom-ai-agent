@@ -202,4 +202,4 @@ python3 scripts/upstream-sync/conflict-classes.py --before scripts/upstream-sync
   --after ../final/conflicts.tsv --residual scripts/upstream-sync/reference/forecast-tier1-conflicts.tsv                                       # классы против базы 3
 ```
 
-Файлы `reference/baseline-*` — эталон 69, `reference/baseline-v034-*` — эталон B034, `reference/baseline-v035-*` — эталон B035; прежние эталоны не удаляются. Сырой `conflict-classes.py` на сырых базах завершается кодом 4 из-за путей без правила (30 в каждой, измерено в LAB-354); это прежнее поведение, а не свойство B035.
+Файлы `reference/baseline-*` — эталон 69, `reference/baseline-v034-*` — эталон B034, `reference/baseline-v035-*` — эталон B035; прежние эталоны не удаляются.
