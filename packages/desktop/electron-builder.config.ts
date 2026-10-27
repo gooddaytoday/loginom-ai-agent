@@ -52,6 +52,7 @@ const config: Configuration = {
   },
   directories: { output: "dist", buildResources: "resources" },
   extraMetadata: {
+    name: `${Product.namespace}/desktop`,
     productName: productName(channel),
     desktopName: `${appId}.desktop`,
     ...(process.env.LOGINOM_AI_AGENT_VERSION ? { version: process.env.LOGINOM_AI_AGENT_VERSION } : {}),
