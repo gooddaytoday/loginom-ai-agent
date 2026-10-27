@@ -55,7 +55,7 @@ export async function publishCampaignSnapshot(snapshotFile: string, config: Para
   Object.assign(journal, { final: "partial", cleanupVerified: false,
     blocker: "NO_PROGRESS_LIMIT:HOST_UNAVAILABLE", blockerKind: "external", snapshotObservedAt: observedAt })
   await writeLeaseReceipt(journalFile, journal)
-  await publishCampaign(snapshot.manifest, journal, config)
+  await publishCampaign(snapshot.manifest, journal, config, now)
   return journal
 }
 

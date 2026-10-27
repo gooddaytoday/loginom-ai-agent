@@ -366,15 +366,22 @@ test("three consecutive empty request preflights block a campaign without spendi
 
 test("campaign publishes its saved FAIL once and reads back the final issue and disabled wakeup", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-campaign-publish-"))
-  const comments: { id: string; content: string }[] = []
+  const comments: { id: string; content: string; author_type?: string; author_id?: string; parent_id?: string }[] = []
   const attachments: { id: string; filename: string }[] = []
   let uploaded = new Uint8Array()
   let downloads = 0
   let unwantedAgentRuns = 0
   const issue = { revision: 1, status: "in_progress" }
-  const wakeup = { id: "timer", enabled: true }
+  const wakeup = { id: "timer", kind: "every", enabled: true }
   const server = Bun.serve({ port: 0, async fetch(request) {
     const route = new URL(request.url).pathname
+    if (route === "/api/agents") return Response.json([{ id: "runner", name: "EvalBaseline" }])
+    if (route.startsWith("/api/comments/") && request.method === "PUT") {
+      const comment = comments.find(item => route === `/api/comments/${item.id}`)!
+      const data = await request.json()
+      Object.assign(comment, data, { attachments: data.attachment_ids?.map((id: string) => ({ id })) })
+      return Response.json(comment)
+    }
     if (route === "/api/upload-file") {
       const data = await request.formData()
       const file = data.get("file") as File
@@ -385,14 +392,16 @@ test("campaign publishes its saved FAIL once and reads back the final issue and 
     }
     if (route.endsWith("/download")) { downloads++; return new Response(uploaded) }
     if (route.endsWith("/attachments")) return Response.json(attachments)
-    if (route.endsWith("/comments/trigger-preview")) return Response.json({ agents: [{ id: "baseline" }] })
+    if (route.endsWith("/comments/trigger-preview")) return Response.json({ agents: [{ id: "baseline" }, { id: "runner" }] })
     if (route.endsWith("/comments")) {
       if (request.method === "POST") {
         const data = await request.json()
         if (!data.suppress_agent_ids?.includes("baseline")) unwantedAgentRuns++
         comments.push({ ...data, id: "report" })
       }
-      return Response.json(request.method === "POST" ? comments.at(-1) : comments)
+      if (request.method === "POST") return Response.json(comments.at(-1))
+      if (comments.length === 1) comments.push({ id: "runner-final", content: "<!-- eval-executor-final:publish -->", author_type: "agent", author_id: "runner", parent_id: "report" })
+      return Response.json(comments)
     }
     if (route.endsWith("/disable")) { wakeup.enabled = false; return Response.json(wakeup) }
     if (route.endsWith("/wakeups")) return Response.json([wakeup])
@@ -409,7 +418,7 @@ test("campaign publishes its saved FAIL once and reads back the final issue and 
     const config = { stateDir: root, multica: { url: `http://127.0.0.1:${server.port}`, workspace: "lab", issueId: "issue", tokenFile: path.join(root, "token") } }
     await publishCampaign(manifest, journal, config)
     await publishCampaign(manifest, journal, config)
-    expect(comments).toHaveLength(1)
+    expect(comments).toHaveLength(2)
     expect(comments[0]!.content).toContain("полный")
     expect(comments[0]!.content).toContain("FAIL")
     expect(comments[0]!.content).toContain("ресурсы=incomplete; RESOURCE_OBSERVATIONS_INCOMPLETE")

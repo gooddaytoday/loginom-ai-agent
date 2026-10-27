@@ -151,3 +151,23 @@ test("budget counts native measurement admissions without results and excludes p
     expect(tick.next).toEqual([])
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test("an owned active batch expires honestly and a completed full result survives delivery waiting", async () => {
+  const manifest: CampaignManifest = { id: "owned-deadline", server: "runner2", executor: "EvalBaseline", parallel: 1, batchSize: 1,
+    keys: [{ corpus: "ordinary", taskId: "first", round: 1 }], pins: {}, limits: { noProgressMs: 1000 } }
+  const journal: CampaignJournal = { manifestHash: "test", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
+    repairing: false, repairer: null, batches: [{ id: "owned", keys: manifest.keys, resultsDir: "/unread-active-results", started: true, invocationBefore: "prior" }],
+    attempts: [], lastProgressAt: 1000, consecutiveErrors: 0 }
+  const active = { active: true, invocation: "owned", exitCode: 0 }
+  expect((await campaignTick(manifest, journal, active, 1999)).action).toBe("wait")
+  const expired = await campaignTick(manifest, journal, active, 2000)
+  expect(expired).toMatchObject({ action: "finalize", next: [], journal: { final: "partial", blocker: "NO_PROGRESS_LIMIT" } })
+  expect(expired.journal.cleanupVerified).not.toBe(true)
+  expect(expired.journal.batches[0]!.accounted).not.toBe(true)
+  expect(expired.journal.attempts).toEqual([])
+  for (const unit of [undefined, { active: false, invocation: "finished", exitCode: 0 }]) {
+    const completed = await campaignTick(manifest, { ...journal, final: "full", cleanupVerified: true }, unit, 3000)
+    expect(completed.journal.final).toBe("full")
+    expect(completed.action).toBe("finalize")
+  }
+})
