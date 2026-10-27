@@ -475,7 +475,7 @@ page = context.pages()[0]
    ...(state.exportObservation?{export_observation:state.exportObservation}:{}),
    ...(state.cancelled?{cancellation:{signal:state.cancelled,cleanup_budget_exhausted:false,
     lock_may_remain:state.cleanup?.package_closed!==true}}:{}),
-   cleanup:{status:state.cleanup?.status??'BLOCKED',reason:state.cleanup?.reason??(state.cleanup?'CLEANUP_UNCONFIRMED':'CLEANUP_NOT_ADMITTED'),
+   cleanup:{status:state.cleanup?.status??'BLOCKED',reason:state.cleanup?.reason??(state.cleanup?.status==='SUCCEEDED'?null:state.cleanup?'CLEANUP_UNCONFIRMED':'CLEANUP_NOT_ADMITTED'),
     package_closed:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.package_closed===true,
     logged_out:state.cleanup?.status==='SUCCEEDED'&&state.cleanup.logged_out===true}},null,2)+'\n')
   } finally {

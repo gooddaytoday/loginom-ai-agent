@@ -6,8 +6,8 @@ import {parseExpectedOutputs,matchExpectedOutputs,matchesExpectedOutput} from '.
 const fixture=name=>JSON.parse(readFileSync(new URL('../../../docs/testing/loginom-ai-agent/stability-2026-10-20/'+name+'/expected-demo.json',import.meta.url)));
 function actual(want,types={},names={}){
  const columns=want.columns.map(c=>({name:names[c.name]??c.name,label:names[c.name]??c.name,type:types[c.name]??c.type}));
- const sample=want.rows.map(row=>want.columns.map((c,i)=>({type:columns[i].type,is_null:false,
-  value:columns[i].type==='integer'?String(row[c.name]):row[c.name]})));
+ const sample=want.rows.map(row=>want.columns.map((c,i)=>({type:columns[i].type,is_null:row[c.name]===null,
+  value:row[c.name]===null?null:columns[i].type==='integer'?String(row[c.name]):row[c.name]})));
  return {node:{node_id:'output'},type:'transform.group_data',output_port:0,
   data:{schema:columns,row_count:sample.length,sample_complete:true,precision:{numbers_verified:true},sample}};
 }
@@ -108,4 +108,79 @@ test('unprescribed native types also preserve numeric source columns and exact p
   const i=want.columns.findIndex(c=>c.type==='integer');const bad=structuredClone(a);bad.data.sample[0][i].value+=.5;check(bad,want,false);
  }
  const want=parseExpectedOutputs(fixture('p22')).outputs[0];check(actual(want,{Products:'real',Revenue:'integer'}),want);
+});
+
+
+test('s8 requires each Russian label while allowing internal names, with exact values and order',()=>{
+ const expected=JSON.parse(readFileSync(new URL('../../../docs/testing/loginom-ai-agent/demo-2026-10-22/s8-rename/expected.json',import.meta.url)));
+ const want=parseExpectedOutputs(expected).outputs[0];
+ for(const names of [{},Object.fromEntries(want.columns.map((c,i)=>[c.name,'Field'+i]))]){
+  const a=actual(want,{},names);a.data.schema.forEach((c,i)=>{c.label=want.columns[i].label;});check(a,want);
+  for(const change of [b=>b.data.sample[0][2].value++,b=>b.data.sample.reverse(),
+   b=>b.data.sample.pop(),b=>b.data.schema.pop(),
+   b=>{b.data.schema.reverse();b.data.sample.forEach(r=>r.reverse());},
+   b=>{b.data.schema[2].type='integer';b.data.sample.forEach(r=>{r[2].type='integer';r[2].value=String(r[2].value);});},
+   ...want.columns.map((c,i)=>b=>{b.data.schema[i].label=c.name;})]){
+   const bad=structuredClone(a);change(bad);check(bad,want,false);
+  }
+ }
+});
+
+test('n14 accepts integer or real Fee including nulls without changing values or row order',()=>{
+ const want=parseExpectedOutputs(fixture('n14')).outputs[0];
+ for(const type of ['integer','real']){
+  const a=actual(want,{Fee:type});check(a,want);
+  for(const change of [b=>b.data.sample.reverse(),b=>{b.data.sample[2][5].value=999;},
+   b=>{b.data.sample[0][5].is_null=false;b.data.sample[0][5].value=0;},
+   b=>{b.data.schema[5].type='string';b.data.sample.forEach(r=>{r[5].type='string';});}]){
+   const bad=structuredClone(a);change(bad);check(bad,want,false);
+  }
+ }
+});
+
+test('n17 accepts ISO date strings or precise civil datetimes while preserving dates and order',()=>{
+ const want=parseExpectedOutputs(fixture('n17')).outputs[0];
+ for(const type of ['datetime','string']){
+  const a=actual(want,{Due:type});
+  a.data.sample.forEach(row=>Object.assign(row[2],type==='datetime'
+   ?{precision:'millisecond',representation:'local_datetime',timezone:'unspecified'}
+   :{value:row[2].value.slice(0,10)}));
+  check(a,want);
+  for(const change of [b=>b.data.sample.reverse(),b=>{b.data.sample[0][2].value='2026-10-02';},
+   b=>{b.data.sample[0][2].value='2026-10-01T12:00:00.000';},
+   b=>{b.data.sample[0][2].is_null=true;b.data.sample[0][2].value=null;},
+   b=>{b.data.sample[0][2].value='2026-10-01T00:00:00.000Z';}]){
+   const bad=structuredClone(a);change(bad);check(bad,want,false);
+  }
+  const strict=structuredClone(want);strict.columns.forEach(c=>delete c.types);
+  if(type==='string')check(a,strict,false);
+ }
+});
+
+test('only the explicit datetime/string pair extends nonnumeric types',()=>{
+ const fixture=types=>({package_path:'/own/p.lgp',nodes:[],outputs:[{output_node_type:'export_input',
+  columns:[{name:'Due',type:'datetime',types}],rows:[{Due:'2026-10-01T00:00:00.000'}]}]});
+ for(const types of [['datetime','string'],['string','datetime']])assert.doesNotThrow(()=>parseExpectedOutputs(fixture(types)));
+ for(const types of [['datetime'],['datetime','datetime'],['datetime','integer'],['datetime','real'],
+  ['datetime','boolean'],['datetime','variant'],['datetime','string','integer'],['string','boolean']]){
+  assert.throws(()=>parseExpectedOutputs(fixture(types)),{message:'EXPECTED_TYPES_INVALID'});
+ }
+});
+
+
+test('datetime/string compatibility remains exact, symmetric, and isolated from native expectations',()=>{
+ const want={columns:[{name:'Due',type:'string',types:['string','datetime']}],rows:[{Due:'2026-10-01'}]};
+ const a=actual(want,{Due:'datetime'}).data;
+ Object.assign(a.sample[0][0],{value:'2026-10-01T00:00:00.000',precision:'millisecond',representation:'local_datetime',timezone:'unspecified'});
+ assert.equal(matchesExpectedOutput(a,want),true);
+ for(const change of [{value:'2026-10-01T00:00:00.001'},{precision:'display_text'},
+  {representation:'native_serial'},{timezone:'UTC'}]){
+  const bad=structuredClone(a);Object.assign(bad.sample[0][0],change);assert.equal(matchesExpectedOutput(bad,want),false);
+ }
+ const strings=actual(want).data;assert.equal(matchesExpectedOutput(strings,want),true);
+ strings.sample[0][0].value='2026-10-01T00:00:00.000';assert.equal(matchesExpectedOutput(strings,want),true);
+ const withTime=structuredClone(want);withTime.rows[0].Due='2026-10-01T00:00:00.001';
+ strings.sample[0][0].value='2026-10-01';assert.equal(matchesExpectedOutput(strings,withTime),false);
+ withTime.rows[0].Due={cell_type:'datetime',value:'2026-10-01T00:00:00.000'};
+ assert.equal(matchesExpectedOutput(a,withTime),false);
 });
