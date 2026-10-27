@@ -18,6 +18,20 @@ describe("RuntimeFlags", () => {
     }),
   )
 
+  it.effect("the retired share variables are accepted and change no other flag", () =>
+    Effect.gen(function* () {
+      const without = ({ autoShare: _autoShare, ...rest }: RuntimeFlags.Info) => rest
+      const plain = yield* readFlags.pipe(Effect.provide(fromConfig({})))
+      const shared = yield* readFlags.pipe(
+        Effect.provide(
+          fromConfig({ LOGINOM_AI_AGENT_AUTO_SHARE: "true", LOGINOM_AI_AGENT_DISABLE_SHARE: "true" }),
+        ),
+      )
+
+      expect(without(shared)).toEqual(without(plain))
+    }),
+  )
+
   it.effect("layer parses plugin flags from the active ConfigProvider", () =>
     Effect.gen(function* () {
       const flags = yield* readFlags.pipe(
