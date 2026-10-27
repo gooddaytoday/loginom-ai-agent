@@ -9,17 +9,20 @@
         {
           "name": "Region",
           "label": "Регион",
-          "type": "string"
+          "type": "string",
+          "name_any": true
         },
         {
           "name": "Category",
           "label": "Категория",
-          "type": "string"
+          "type": "string",
+          "name_any": true
         },
         {
           "name": "Revenue",
           "label": "Выручка",
-          "type": "real"
+          "type": "real",
+          "name_any": true
         }
       ],
       "rows": [
@@ -54,7 +57,8 @@
           "Revenue": 6182.0
         }
       ],
-      "export_destination": "/demo-2026-10-22/revenue-ru.csv"
+      "export_destination": "/demo-2026-10-22/revenue-ru.csv",
+      "column_order": "exact"
     }
   ]
 }

@@ -1,6 +1,6 @@
 import test, {mock} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,rm,writeFile} from 'node:fs/promises';
+import {mkdtemp,rm,writeFile,readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -10,6 +10,8 @@ import {createArtifactStore} from '../../lib/artifacts.mjs';
 import {javascriptParametersSchema} from '../../lib/node-api.mjs';
 import {createBundledSkillFixture} from './bundled-skill-fixture.mjs';
 import {createActionCatalogFixture} from './action-catalog-fixture.mjs';
+import {userResultSchema} from '../../lib/user-results.mjs';
+import {AjvJsonSchemaValidator} from '@modelcontextprotocol/sdk/validation/ajv';
 
 // Real bridge, factories, bundled skill, MCP Server/Client and schemas; only
 // external catalog delivery and browser transport are simulated. No browser/model is run.
@@ -42,6 +44,16 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   }
  }
  class ExternalTransport {}
+ // Supply a completed worker receipt upstream of the real bridge/reply/budget
+ // path. Neither the production serializer nor its schema validation is mocked.
+ const worker={operation_id:'large-worker',attempt:1,state:'settled',outcome:{status:'SUCCEEDED',effect_possible:true,
+  cleanup_complete:true,action_key:'node.apply',phase:'read',output:{configuration:{verified:true,readback:{kind:'javascript'}},
+   output:{status:'complete',ports:[{port:0,schema:[{index:0,name:'Value',label:'Value',type:'string'}],row_count:1,
+    sample_rows:1,sample_complete:true,sample:[[{type:'string',is_null:false,value:'x'.repeat(24000),precision:'source_text'}]]}]}}}};
+ const nodeApi=await import('../../lib/node-api.mjs');
+ mock.module('../../lib/node-api.mjs',{namedExports:{...nodeApi,
+  dispatchNodeApi:async(runtime,name,args,options)=>['dock_node_wait','dock_node_status'].includes(name)
+   ?worker:nodeApi.dispatchNodeApi(runtime,name,args,options)}});
  mock.module('@modelcontextprotocol/sdk/client/index.js',{namedExports:{Client:ExternalClient}});
  mock.module('@modelcontextprotocol/sdk/client/stdio.js',{namedExports:{StdioClientTransport:ExternalTransport,getDefaultEnvironment:()=>({})}});
  mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js',{namedExports:{StreamableHTTPClientTransport:ExternalTransport}});
@@ -101,6 +113,21 @@ test('user-v1 final reply budgets and prepare knowledge admission over real MCP'
   assert.equal(js.javascript_knowledge.column_names.normalization_algorithm_verified,false);
   assert.equal(js.javascript_knowledge.column_names.add_column_verified,false);
   assert.equal(js.session_manifest.skillRevision,revision);assert.equal(js.knowledge_sha256.length,64);
+  const waitTool=(await client.listTools()).tools.find(tool=>tool.name==='dock_node_wait');
+  assert.deepEqual(waitTool.outputSchema,userResultSchema);
+  const beforeWorker=JSON.stringify(worker),wait=await call('dock_node_wait',{operation_id:worker.operation_id});
+  assert.notEqual(wait.isError,true);
+  assert.ok(size(wait)<=46000);
+  assert.equal(parse(wait).output.ports[0].sample[0][0].value,'x'.repeat(24000));
+  const expectedMetadata=structuredClone(parse(wait));delete expectedMetadata.output.ports;
+  assert.deepEqual(wait.structuredContent,expectedMetadata);
+  assert.equal(new AjvJsonSchemaValidator().getValidator(waitTool.outputSchema)(wait.structuredContent).valid,true);
+  assert.equal(JSON.stringify(worker),beforeWorker);
+  const diagnosticPath=join(directory,'diagnostics',createHash('sha256').update('dock:'+session.metadata.sessionId).digest('hex'),'events.jsonl');
+  const logged=(await readFile(diagnosticPath,'utf8')).trim().split('\n').map(JSON.parse)
+   .find(event=>event.tool_name==='dock_node_wait');
+  assert.deepEqual(logged.result,worker);
+  assert.equal((await call('dock_node_status',{operation_id:worker.operation_id})).isError,true);
   const all=await call('dock_action_describe',{node_types:parse(inventory).available_node_types});
   assert.equal(all.isError,true);assert.equal(parse(all).error.scope,'whole_response');assert.ok(size(all)<2000);
   const pair=await call('dock_action_describe',{node_types:['imports.text','programming.javascript']});

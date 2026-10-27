@@ -9,17 +9,20 @@
         {
           "name": "Region",
           "label": "Регион",
-          "type": "string"
+          "type": "string",
+          "name_any": true
         },
         {
           "name": "Category",
           "label": "Категория",
-          "type": "string"
+          "type": "string",
+          "name_any": true
         },
         {
           "name": "Revenue",
           "label": "Выручка",
-          "type": "real"
+          "type": "real",
+          "name_any": true
         }
       ],
       "rows": [
@@ -53,7 +56,8 @@
           "Category": "Офис",
           "Revenue": 6182.0
         }
-      ]
+      ],
+      "column_order": "exact"
     }
   ]
 }
