@@ -40,8 +40,7 @@ export function DialogUpdate(props: {
 
   const target = () => {
     const version = check()
-    if (!version?.latest) return undefined
-    return updateTarget(version)
+    return version?.latest ? updateTarget(version) : undefined
   }
   const state = createMemo(() => {
     const current = props.state()
