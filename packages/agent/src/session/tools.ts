@@ -581,6 +581,8 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     )
     if (!catalog) return tools
     if (profile === "loginom-automation" && catalog.tools.some((item) => item.name === "dock_action_describe")) {
+      const { loginomFileTools } = yield* Effect.promise(() => import("@/tool/loginom-file-profile"))
+      Object.assign(tools, yield* loginomFileTools(context))
       const { snapshotLoginomFile, localFilePermissionFailure } = yield* Effect.promise(
         () => import("@/tool/loginom-local-file"),
       )
