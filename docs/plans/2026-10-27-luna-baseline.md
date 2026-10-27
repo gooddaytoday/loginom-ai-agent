@@ -61,9 +61,12 @@ LAB-262 и её результаты/конфигурация/незавершё
 - [x] Проверить существующие освобождённые slots штатным fresh native verify N6
   с новым binary, browser, bwrap, auth и подтверждённым cleanup. Повторный
   prepare нужен только при установленном дефекте подготовки.
-- [ ] Проверить READY всех шести слотов штатным requestPreflight. Первые
-  ordinary3 и первый analytic6 являются baseline-измерениями; подтвердить
-  события/историю/артефакты/судью/очистку и реальный N6 overlap.
+- [x] Подтвердить READY всех шести слотов штатным requestPreflight и первые
+  ordinary3 как baseline-измерения: события/история/артефакты/судья/очистка.
+- [x] Подтвердить реальный N6 overlap первого analytic6: шесть measurement
+  admissions и одновременно шесть CLI с закреплёнными model/variant.
+- [ ] После завершения первого analytic6 проверить его результаты,
+  обязательные артефакты, судейство и cleanup.
 - [ ] Довести службой все 234 ключа без ручной остановки после первых batch.
 - [ ] Подтвердить финал, доставку, отдельный ответ и post-final no-op.
 - [ ] Сохранить сравнение с LAB-262 и итоговый checkpoint.
@@ -300,3 +303,14 @@ controller PID3611721 и batch3 PID3612033. Harness по-прежнему clean 
 приёмка READY/измерений; на этом снимке результатов 0/234. Фактический
 модельный старт и первые ordinary3/analytic6 дальше проверяет чат стенда
 вместе с EvalOps. Новая source-политика preflight на runner не установлена.
+
+### Проверенный запуск — 27.10.2026, 16:04 МСК
+
+- Прямой чат стенда подтвердил 6/6 `READY`, exit 0 и cleanup на batch3; история CLI содержит `openai/gpt-6-luna-fast`, `xhigh`.
+- Первые три ordinary-измерения учтены: 3 PASS, все score=100, judge_status=scored, LGP сохранены, cleanupConfirmed=true.
+- Batch4 автоматически перешёл к шести analytic-кейсам; после 6/6 READY в 16:04:41 одновременно наблюдались шесть CLI-процессов в собственном systemd cgroup и шесть native admissions purpose=measurement, слоты a–f.
+- `repairing=false`, blocker отсутствует, consecutiveErrors=0; acceptedHarness остаётся clean `ed129d19471d1fd42f2e6104486df6e7dd0f943f`, CLI — исходный `05bb`.
+- Fast-mode проверенного каталога запрашивает `service_tier=priority`; обслуженный tier в проверенных событиях и истории отсутствует, его подтверждение не заявляется.
+- LAB-334 остаётся in_progress; scoped periodic EvalOps включён с interval_seconds=1800, blocked-rule также включён. Исходный clock сохранён.
+- Несекретные доказательства: `/home/kiselev/storage/tmp/luna-baseline-20261027/direct-launch-repair/launch-verification.json` и `six-slot-verification.json` в том же каталоге.
+- Запуск принят; дальше штатная campaign-служба продолжает отсутствующие измерения. Полный baseline и доставка ещё не завершены.
