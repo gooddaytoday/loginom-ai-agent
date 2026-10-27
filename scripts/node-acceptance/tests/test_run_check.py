@@ -18,10 +18,10 @@ spec.loader.exec_module(runner)
 
 
 class RunCheckTests(unittest.TestCase):
-    def test_all_86_model_commands_attach_initial_data_and_not_repeat_inputs(self):
-        names = ([f'{prefix}{i}' for prefix, count in [('n', 20), ('p', 24), ('s', 8), ('q', 10), ('r', 6)]
+    def test_all_87_model_commands_attach_initial_data_and_not_repeat_inputs(self):
+        names = ([f'{prefix}{i}' for prefix, count in [('n', 20), ('p', 25), ('s', 8), ('q', 10), ('r', 6)]
                   for i in range(1, count + 1)] + [f'v{v}s{i}' for v in range(1, 4) for i in range(1, 7)])
-        self.assertEqual(len(names), 86)
+        self.assertEqual(len(names), 87)
         for name in names:
             case = runner.scenario(name)
             steps = [case['base'], name] if case['base'] else [name]
@@ -60,7 +60,7 @@ class RunCheckTests(unittest.TestCase):
                     previous = [p.name for p in workspace.iterdir()]
 
     def test_all_regression_names_resolve_real_inputs(self):
-        names = ([f'n{i}' for i in range(1, 21)] + [f'p{i}' for i in range(1, 25)]
+        names = ([f'n{i}' for i in range(1, 21)] + [f'p{i}' for i in range(1, 26)]
                  + [f'q{i}' for i in range(1, 11)] + [f'r{i}' for i in range(1, 7)]
                  + [f's{i}' for i in range(1, 9)]
                  + [f'v{v}s{i}' for v in range(1, 4) for i in range(1, 7)])
@@ -70,9 +70,30 @@ class RunCheckTests(unittest.TestCase):
                 self.assertTrue(case['prompt'].is_file())
                 self.assertTrue((case['source'] / 'oracle.py').is_file())
                 self.assertTrue(case['data'].is_dir())
-        for name in ['', 'p0', 'p25', 'v0s1', 'v4s1', 'v1s7', 'r0', 'r7', 'n21', 'q11', 's9', '../n1', 'clustering']:
+        for name in ['', 'p0', 'p26', 'v0s1', 'v4s1', 'v1s7', 'r0', 'r7', 'n21', 'q11', 's9', '../n1', 'clustering']:
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'Unknown scenario'):
                 runner.scenario(name)
+
+    def test_p25_source_oracle_and_strict_result(self):
+        case = runner.scenario('p25')
+        source = runner.REPO / 'evals/tasks/node-evals/crosstable-local-variable-bindings'
+        self.assertEqual(case['prompt'].read_text(), runner.read(source / 'task.json')['prompt'])
+        self.assertEqual((case['data'] / 'sales.csv').read_bytes(), (source / 'data/sales.csv').read_bytes())
+        command = [sys.executable, '-B', str(case['source'] / 'oracle.py')]
+        for cwd in [runner.REPO, case['source']]:
+            actual = subprocess.check_output(command, cwd=cwd)
+            for name in ['expected.json', 'expected-demo.json']:
+                self.assertEqual(actual, (case['source'] / name).read_bytes())
+        output = runner.expected_for(case, '/personal/p25.lgp')['outputs'][0]
+        self.assertEqual([(c['name'], c['label'], c['type']) for c in output['columns']], [
+            ('Region', 'Region', 'string'), ('A_Amount_Sum', 'A.Amount.Сумма', 'real'),
+            ('A_Amount_Count', 'A.Amount.Количество', 'integer')])
+        self.assertTrue(all(not c.get('label_any') for c in output['columns']))
+        self.csv_result(output, 'A_Amount_Count,Region,A_Amount_Sum\n2,N,15\n1,S,3\n')
+        for text in ['Region,A_Amount_Sum,A_Amount_Count\nS,3,1\nN,15,2\n',
+                     'Region,A_Amount_Sum,A_Amount_Count\nN,15,2\nS,999,1\n']:
+            with self.assertRaisesRegex(AssertionError, 'CSV_VALUES_OR_ORDER'):
+                self.csv_result(output, text)
 
     def test_variants_reuse_demo_evidence_and_followups_use_documented_bases(self):
         case = runner.scenario('v1s2')
@@ -152,8 +173,8 @@ class RunCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, 'CSV_VALUES'):
                 runner.check_csv(actual, expected, column_order='any')
 
-    def test_all_86_expected_specifications_have_audited_fields(self):
-        names = ([f'{prefix}{i}' for prefix, count in [('n', 20), ('p', 24), ('s', 8), ('q', 10), ('r', 6)]
+    def test_all_87_expected_specifications_have_audited_fields(self):
+        names = ([f'{prefix}{i}' for prefix, count in [('n', 20), ('p', 25), ('s', 8), ('q', 10), ('r', 6)]
                   for i in range(1, count + 1)] + [f'v{v}s{i}' for v in range(1, 4) for i in range(1, 7)])
         fields = set()
         for name in names:
@@ -163,7 +184,7 @@ class RunCheckTests(unittest.TestCase):
             if demo.exists(): specifications.append(runner.read(demo))
             for output in [output for spec in specifications for output in spec.get('outputs', [spec])]:
                 for column in output['columns']: fields.update(column)
-        self.assertEqual(len(names), 86)
+        self.assertEqual(len(names), 87)
         self.assertEqual(fields, {'name', 'label', 'type', 'types', 'tolerance', 'label_any', 'name_any', 'category_labels_any'})
 
     def test_n19_file_oracle_accepts_labels_but_rejects_bad_centers_and_extra_rows(self):

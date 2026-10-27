@@ -1,0 +1,50 @@
+{
+  "package_path": "/stability-2026-10-20/p25.lgp",
+  "nodes": [
+    {
+      "type": "imports.text"
+    },
+    {
+      "type": "transform.cross_table"
+    },
+    {
+      "type": "exports.text"
+    }
+  ],
+  "outputs": [
+    {
+      "output_node_type": "export_input",
+      "ordered": true,
+      "column_order": "any",
+      "columns": [
+        {
+          "name": "Region",
+          "label": "Region",
+          "type": "string"
+        },
+        {
+          "name": "A_Amount_Sum",
+          "label": "A.Amount.Сумма",
+          "type": "real"
+        },
+        {
+          "name": "A_Amount_Count",
+          "label": "A.Amount.Количество",
+          "type": "integer"
+        }
+      ],
+      "rows": [
+        {
+          "Region": "N",
+          "A_Amount_Sum": 15.0,
+          "A_Amount_Count": 2
+        },
+        {
+          "Region": "S",
+          "A_Amount_Sum": 3.0,
+          "A_Amount_Count": 1
+        }
+      ]
+    }
+  ]
+}

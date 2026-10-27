@@ -10,7 +10,7 @@
 ## Запуск регрессии
 
 [`run-check`](../../../../scripts/node-acceptance/run-check.md) принимает n1–n20,
-p1–p24, q1–q10, r1–r6, s1–s8 и перефразировки v1s1–v3s6.
+p1–p25, q1–q10, r1–r6, s1–s8 и перефразировки v1s1–v3s6.
 Перефразировки используют данные и oracle исходного демо; продолжения запускают
 документированную базу в том же чате и пакете. Для n14–n17 добавлены отдельные
 cold JSON-эталоны по независимым `expected/reference.csv`; CSV-oracle остаются
@@ -80,6 +80,7 @@ Excel и две смешанные короткие просьбы; [покры�
 | [n10: энергия](n10/) | Линейная регрессия (2 признака) | [prompt](n10/prompt.md) | [energy](n10/data/energy.csv) | [expected](n10/expected-demo.json) |
 | [n11: HTTP-отражение](n11/) | REST-запрос → извлечение стабильных полей | [prompt](n11/prompt.md) | [requests](n11/data/requests.csv) | [expected](n11/expected-demo.json) |
 | [n12: чистый расход](n12/) | Фильтр → Калькулятор → Линейная регрессия → Экспорт | [prompt](n12/prompt.md) | [batches](n12/data/batches.csv) | [expected](n12/expected-demo.json) |
+| [p25: импорт без метки → Кросс-таблица](p25/README.md) | Импорт → Кросс-таблица → Экспорт; регрессия D83 | [prompt](p25/prompt.md) | [sales](p25/data/sales.csv) | [expected](p25/expected-demo.json) |
 
 ## Смысл перефразировок
 
