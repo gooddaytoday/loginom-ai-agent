@@ -4,6 +4,8 @@ import { join } from "node:path"
 const src = join(import.meta.dir, "../../src")
 const modules = [
   "installation",
+  "config/config",
+  "config/tui",
   "skill",
   "command",
   "session/tools",
