@@ -173,12 +173,12 @@ scripts/upstream-sync/selftest.sh
 ```bash
 git clone https://github.com/gooddaytoday/loginom-ai-agent.git src && cd src
 git checkout <итоговый SHA>
+set -a; . scripts/upstream-sync/reference/lab-198-baseline.env; set +a      # UPSTREAM_TAG, UPSTREAM_SHA и FORK_SHA базы 1
 # база 1: v0.3.3 (2e6f66a9), эталон 69
-( set -a; . scripts/upstream-sync/reference/lab-198-baseline.env; set +a
-  scripts/upstream-sync/measure-conflicts.sh --out ../baseline --compare scripts/upstream-sync/reference/baseline-unmerged-paths.txt )          # 69
-# база 2: v0.3.4 (db130098), эталон B034 = 69
-( set -a; . scripts/upstream-sync/reference/lab-198-baseline-v034.env; set +a
-  scripts/upstream-sync/measure-conflicts.sh --out ../baseline-v034 --compare scripts/upstream-sync/reference/baseline-v034-unmerged-paths.txt )   # 69
+scripts/upstream-sync/measure-conflicts.sh --out ../baseline --compare scripts/upstream-sync/reference/baseline-unmerged-paths.txt                  # 69
+# база 2: v0.3.4 (db130098), эталон B034 = 69; тот же upstream, другой FORK_SHA
+FORK_SHA=$(sed -n 's/^FORK_SHA=//p' scripts/upstream-sync/reference/lab-198-baseline-v034.env) \
+  scripts/upstream-sync/measure-conflicts.sh --out ../baseline-v034 --compare scripts/upstream-sync/reference/baseline-v034-unmerged-paths.txt      # 69
 # итог
 FORK_SHA=<итоговый SHA> scripts/upstream-sync/measure-conflicts.sh --out ../final
 python3 scripts/upstream-sync/conflict-classes.py --before scripts/upstream-sync/reference/baseline-conflicts.tsv \
