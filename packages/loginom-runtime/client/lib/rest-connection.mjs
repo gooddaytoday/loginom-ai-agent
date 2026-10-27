@@ -15,7 +15,7 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
   if(p?.document!==document||p.id!==t.document_id||!r)throw Error('Prepared workflow is unavailable');
   return {p,r,workflow:r.nodeTargetWorkflowNode,module:r.nodeTargetWorkflowNode.ParentNode,packageNode:r.packageNode,tab:r.tab};
  },t);
- let effect=false,placementNavigation;
+ let effect=false,placementNavigation,reusedReference,sourceConnectionId;
  try{
   const guard=async()=>{
    remaining();need(await page.evaluate(({b,t})=>{
@@ -87,6 +87,33 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
    }finally{await opening.dispose();}
   };
   const moduleTid=t.workflow_ref.navigation_path.at(-2).tid,form=t.workflow_ref.prefix+';ConnectionsViewWizard',wizard=t.workflow_ref.prefix+';WizardModelConnectionForm',fields=wizard+';ConnectionWizard;';
+  if(t.existing_target){
+   need(t.existing_target.document_id===t.document_id&&t.existing_target.workflow_id===t.workflow_ref.workflow_id,'existing REST owner differs');
+   const graph=await readPlacementGraph(page,{request:{document_id:t.document_id,workflow_ref:t.workflow_ref},origin:t.origin,build:t.build,types});
+   need(graph.complete===true&&graph.interaction_ready===true&&graph.document_id===t.document_id&&JSON.stringify(graph.workflow_ref)===JSON.stringify(t.workflow_ref),'complete owned graph required for existing REST');
+   const targets=graph.nodes.filter(n=>n.ref.node_id===t.existing_target.node_id);
+   need(targets.length===1&&targets[0].type==='integration.rest_request'&&['document_id','workflow_id','node_id'].every(k=>targets[0].ref[k]===t.existing_target[k]),'existing REST identity differs');
+   const edges=(graph.rest_connection_links??[]).filter(e=>e.target===t.existing_target.node_id&&e.input==='connection:0');
+   need(edges.length<=1,'existing REST connection is ambiguous');
+   if(edges.length){
+    const edge=edges[0],sources=graph.nodes.filter(n=>n.ref.node_id===edge.source);
+    need(sources.length===1&&sources[0].type==='bg-vendor-icon-restclientconnection','existing REST connection reference differs');
+    const tid=await page.evaluate(id=>{const d=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController.FDiagram;const ns=d.FNodes.FCollection.filter(n=>n.FGuid===id);if(ns.length!==1||ns[0].FIconCls!=='bg-vendor-icon-restclientconnection')throw Error('REST connection reference changed');return d.FmxGraph.view.getState(ns[0].FCell)?.shape?.node?.getAttribute('data-tid');},edge.source);
+    need(tid?.startsWith(t.workflow_ref.prefix+';Graph;'),'existing REST reference is not rendered');
+    await guard();need(await find(tid).count()===1,'existing REST reference is ambiguous');
+    const body=await find(tid).evaluate(e=>{const r=e.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y),tid=e.getAttribute('data-tid'),part=hit?.closest('[data-tid]')?.getAttribute('data-tid');
+     if(r.width<=0||r.height<=0||x<0||y<0||x>=innerWidth||y>=innerHeight||!(part===tid||part?.startsWith(tid+';')))throw Error('REST reference body is not reachable');return {x,y};});
+    await page.mouse.move(body.x,body.y);await click(tid+';ReferenceInfo');
+    sourceConnectionId=await wait('existing reference source connection',()=>page.evaluate(b=>{
+     const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller,n=c.Node.data.node;
+     if(c.FController.constructor.name!=='ConnectionsViewWizard'||n.constructor.name!=='ConnectionTreeNode')return null;
+     const id=n.FConnectionNode?.__ObjectId;
+     if(n.ParentNode!==b.module.FConnectionsNode||typeof id?.Module!=='string'||!Number.isSafeInteger(id.Instance))throw Error('REST reference source owner differs');
+     return {Module:id.Module,Instance:id.Instance};
+    },owner));
+    reusedReference={node_id:edge.source,edge};
+   }
+  }
   await click(moduleTid);
   const connections=await wait('module connections entry',async()=>{
    const es=await page.locator('[data-tid^='+JSON.stringify(t.workflow_ref.prefix+';ListViewForm;cntTile;ListView;headercontainer;title_')+']').evaluateAll(es=>es.filter(e=>e.textContent.trim()==='Подключения').map(e=>e.getAttribute('data-tid')));return es.length===1?es[0]:null;
@@ -104,6 +131,7 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
   }
   await click(tile.tid);await openSettings();
   const connectionOwner=await page.evaluateHandle(()=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return {wizard:c.FController,node:c.Node.data.node.ParentNode};});
+  if(sourceConnectionId)need(await page.evaluate(({b,id})=>{const actual=b.node.FConnectionNode?.__ObjectId;return actual?.Module===id.Module&&actual.Instance===id.Instance;},{b:connectionOwner,id:sourceConnectionId}),'requested connection differs from the existing REST reference; use a new REST target and operation_id');
   const read=async()=>{
    await guard();need(await page.evaluate(b=>{const c=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller;return c.FController===b.wizard&&c.Node.data.node.ParentNode===b.node&&b.wizard.FModelNode===b.node.FConnectionNode;},connectionOwner),'connection wizard owner changed');
    const value=name=>find(fields+name).locator('input').inputValue();
@@ -147,6 +175,14 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
    const es=await page.locator('[data-tid^='+JSON.stringify(t.workflow_ref.prefix+';ListViewForm;cntTile;ListView;headercontainer;title_')+']').evaluateAll((es,label)=>es.filter(e=>e.textContent.trim()===label).map(e=>e.getAttribute('data-tid')),t.workflow_ref.navigation_path.at(-1).label);return es.length===1?es[0]:null;
   });
   await click(workflow,true);const graphTid=t.workflow_ref.prefix+';ModelForm;cmpDiagram';await wait('original workflow graph',()=>find(graphTid).isVisible());await quiet();
+  const connection={name:persisted.name,base_url:persisted.base_url,method:'GET',url_mode:'query',authentication:'none',verify_server_certificate:true,...(t.connection.response_content_type!==undefined?{response_content_type:persisted.response_content_type}:{}),query_parameters:persisted.parameters.map(p=>p.name)};
+  if(reusedReference){
+   const graph=await readPlacementGraph(page,{request:{document_id:t.document_id,workflow_ref:t.workflow_ref},origin:t.origin,build:t.build,types});
+   need(graph.complete===true&&graph.interaction_ready===true&&graph.document_id===t.document_id&&JSON.stringify(graph.workflow_ref)===JSON.stringify(t.workflow_ref)
+    &&(graph.rest_connection_links??[]).filter(e=>e.target===t.existing_target.node_id&&e.input==='connection:0').length===1
+    &&graph.rest_connection_links.some(e=>JSON.stringify(e)===JSON.stringify(reusedReference.edge)),'existing REST connection changed during readback');
+   return {verified:true,cleanup_complete:true,effect_possible:effect,connection:{...connection,reference_node_id:reusedReference.node_id},document_id:t.document_id,workflow_id:t.workflow_ref.workflow_id};
+  }
   const header=t.workflow_ref.prefix+';ModelForm;pnlConnectionsContainer;p.h;p.t';
   const itemPrefix=t.workflow_ref.prefix+';ModelForm;pnlConnections;headercontainer;text_Root>Текущий_модуль';
   if(!await find(itemPrefix+';TreeText').isVisible()){
@@ -252,7 +288,7 @@ export async function restConnectionCapability(page,t,readPlacementGraph=readGra
   try{await page.mouse.move(target.x,target.y,{steps:12});}finally{await page.mouse.up();}
   const reference=await wait('connection graph reference',()=>page.evaluate(before=>{const m=bg.app.Application.FInstance.FMainForm.Items.Workspace.getActiveTab().Controller.FController;const added=m.FDiagram.FNodes.FCollection.filter(n=>!before.some(b=>b.id===n.FGuid));if(added.length>1)throw Error('Unexpected graph additions');const n=added[0];if(!n)return null;const ports=(n.FPorts??[]).flatMap(p=>p.FCollection??[]);if(ports.length!==1)throw Error('New node is not a connection reference');const tid=m.FDiagram.FmxGraph.view.getState(ports[0].FCell)?.shape?.node?.getAttribute('data-tid');if(!tid)return null;if(!tid.endsWith(';Output_Connection-0'))throw Error('New node is not a connection reference');return {node_id:n.FGuid};},beforeGraph));
   await click(t.workflow_ref.prefix+';ModelForm;pnlVendorsContainer;p.h;p.t');await quiet();
-  return {verified:true,cleanup_complete:true,effect_possible:true,...(placementNavigation?{placement_navigation:placementNavigation}:{}),connection:{name:persisted.name,base_url:persisted.base_url,method:'GET',url_mode:'query',authentication:'none',verify_server_certificate:true,...(t.connection.response_content_type!==undefined?{response_content_type:persisted.response_content_type}:{}),query_parameters:persisted.parameters.map(p=>p.name),reference_node_id:reference.node_id},document_id:t.document_id,workflow_id:t.workflow_ref.workflow_id};
+  return {verified:true,cleanup_complete:true,effect_possible:true,...(placementNavigation?{placement_navigation:placementNavigation}:{}),connection:{...connection,reference_node_id:reference.node_id},document_id:t.document_id,workflow_id:t.workflow_ref.workflow_id};
  }catch(error){return {verified:false,cleanup_complete:!effect,effect_possible:effect,...(placementNavigation?{placement_navigation:placementNavigation}:{}),error:String(error.message).slice(0,1000)};}
  finally{await owner.dispose();}
 }
