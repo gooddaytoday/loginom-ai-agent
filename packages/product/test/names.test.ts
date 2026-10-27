@@ -11,16 +11,18 @@ const { paths: tracked, read } = trackedSnapshot(root)
 
 const FORK_ONLY = ["product", "loginom-host", "runtime", "site", "evals"]
 
-const NAME_CHAR = "[A-Za-z0-9_-]"
+const NAME_CHAR = "[A-Za-z0-9._~-]"
+const NAME_END = `(?![A-Za-z0-9_~-]|\\.${NAME_CHAR})`
 const pluginName = "@loginom-ai-agent/plugin"
-const pluginInstallName = new RegExp(`${pluginName}(?!${NAME_CHAR})`, "g")
+const forkOnlyName = `@loginom-ai-agent/${FORK_ONLY[0]}`
+const pluginInstallName = new RegExp(`${pluginName}${NAME_END}`, "g")
 const pluginInstallFiles = new Set([
   "packages/opencode/src/product/installation.ts",
   "packages/opencode/test/product/plugin-dependency.test.ts",
   "packages/product/test/names.test.ts",
 ])
 const forkScopeOutsideForkOnly = new RegExp(
-  `@loginom-ai-agent/(?!(?:${FORK_ONLY.join("|")})(?!${NAME_CHAR}))${NAME_CHAR}+`,
+  `@loginom-ai-agent/(?!(?:${FORK_ONLY.join("|")})${NAME_END})${NAME_CHAR}+`,
 )
 const withoutPluginInstallName = (text: string) => text.replaceAll(pluginInstallName, "")
 const requestsPluginInstallName = (text: string) => text.search(pluginInstallName) !== -1
@@ -61,8 +63,8 @@ describe("package names", () => {
     expect(named(`${pluginName}.next`)).toBe(true)
     expect(named(`${pluginName}~next`)).toBe(true)
     expect(named(`"${pluginName}".`)).toBe(false)
-    expect(usesForkScopeForUpstream("@loginom-ai-agent/runtime.x")).toBe(true)
-    expect(usesForkScopeForUpstream("@loginom-ai-agent/runtime")).toBe(false)
+    expect(usesForkScopeForUpstream(`${forkOnlyName}.x`)).toBe(true)
+    expect(usesForkScopeForUpstream(forkOnlyName)).toBe(false)
     expect(named(pluginName, `${pluginName}-next`)).toBe(true)
   })
 
