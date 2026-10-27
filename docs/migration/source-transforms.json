@@ -2006,7 +2006,7 @@
   },
   "packages/loginom-runtime/client/test/workspace.test.mjs": {
     "baseHash": "1fb5d7d07fb6fa868127a15b31b6ba6e880c1d25f292518f9edcf40f42b0e29d",
-    "hash": "e4cce62780df54f7e2c6b0fde221a5305ab9f0eeed8dc0c19913e971c8fddf41",
+    "hash": "445f3e3272e732e2f589d5a1cdf93feea9b9accf5c89be6afdd2f4073480d8fd",
     "reason": "Regress private login followed by workspace preparation using the same canonical public/custom URL; preserve strict foreign-page rejection. D78: bind only the submitted Open native renderer error, dismiss its sole owned OK once and wait its own TabForm mask within the original cleanup deadline; retain all other refusals and test no replay. Issue #74: private local-package preparation reuses authenticated storage binding, original upload receipts and native FileStore completion without download; preserve ownership, uncertainty, cleanup and shared deadlines. Related behavioral regressions cover the changed boundary. Source attribution is not installed acceptance. Regress original-ID server-path continuation after a confirmed pre-open refusal through native preparation and prepareWorkspaceSession; retain the original foreign graph baseline and refuse uncertain reserved attempts without another gesture."
   },
   "packages/product/skills/loginom-automation/SKILL.md": {
