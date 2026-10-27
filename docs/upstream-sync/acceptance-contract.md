@@ -167,4 +167,4 @@
 
 ## Тест процедуры
 
-[`doctest_procedure.py`](../../scripts/upstream-sync/doctest_procedure.py) выполняет блоки с пометкой `doc-test` из [procedure.md](procedure.md) дословно, в одной оболочке, из корня чистого клона, вплоть до `accepted`. Ручной шаг 2 заменяется командой `--resolve`; блок с `<...>` или необязательным `[--флаг]` не проходит. `selftest.sh` запускает его офлайн на синтетическом форке и upstream. Сборка Desktop и шаги, которым нужны bun 1.3.14, Node 24.19 и Chromium, получают `NOT_RUN` с причиной (`CHECK_SKIP`).
+[`doctest_procedure.py`](../../scripts/upstream-sync/doctest_procedure.py) выполняет блоки с пометкой `doc-test` из [procedure.md](procedure.md) дословно, из корня чистого клона, вплоть до `accepted`: до ручного шага одной оболочкой, после него в новой, где заданы только `OUT` и блок `env` (остальное блоки берут из `pins.env`). Ручной шаг 2 заменяется командой `--resolve`; блок с `<...>` или необязательным `[--флаг]` не проходит. `selftest.sh` запускает его офлайн на синтетическом форке и upstream. Сборка Desktop и шаги, которым нужны bun 1.3.14, Node 24.19 и Chromium, получают `NOT_RUN` с причиной (`CHECK_SKIP`).
