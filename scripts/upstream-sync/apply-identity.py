@@ -12,9 +12,7 @@ Usage: apply-identity.py --repo DIR [--since REV] [--check] [PATH ...]
   --since REV  only files that differ from REV in the working tree, staged or not, new or moved (use the pre-merge fork SHA
                while resolving a merge: HEAD is still the fork before the merge commit)
   --check      change nothing, list files that would change, exit 1 if any
-Without PATHs it covers the source trees the guard test names.test.ts scans, and the user documentation
-(packages/web/src/content/docs): its tables name the variables and files the product reads, so a stale OPENCODE_* there
-misstates the external interface (F6 of LAB-303).
+Without PATHs it covers the source trees the guard test names.test.ts scans.
 """
 import argparse
 import os
@@ -24,9 +22,9 @@ import sys
 
 SOURCES = re.compile(
     r"^(packages/(opencode|core|desktop|loginom-host|loginom-runtime|product|app|cli|server|schema|tui|ui|session-ui|sdk|enterprise)/(src|script|scripts|test|tests|e2e|test-browser|bin)/"
-    r"|packages/[^/]+/(package\.json|[^/]*\.config\.ts)$|script/|\.github/|packages/web/src/content/docs/)"
+    r"|packages/[^/]+/(package\.json|[^/]*\.config\.ts)$|script/|\.github/)"
 )
-TEXT = re.compile(r"\.(ts|tsx|js|mjs|cjs|json|jsonc|yml|yaml|ps1|sh|txt|md|mdx)$")
+TEXT = re.compile(r"\.(ts|tsx|js|mjs|cjs|json|jsonc|yml|yaml|ps1|sh|txt|md)$")
 PROVIDER_KEYS = ("OPENCODE_API_KEY", "OPENCODE_GO_API_KEY")
 # Archived upstream workflows keep upstream spelling; the guard test spells inherited OPENCODE_* names on purpose.
 EXCLUDED = (".github/archived/", "packages/core/test/flag-identity.test.ts", "scripts/upstream-sync/")

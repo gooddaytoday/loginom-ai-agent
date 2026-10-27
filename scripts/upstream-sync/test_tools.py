@@ -147,14 +147,16 @@ class ApplyIdentitySince(FixtureCase):
         fx.begin_merge()
         self.assertEqual(fx.identity("--since", fx.fork, "--check")[0], 0)
 
-    def test_f6_names_the_variables_in_the_cli_reference_table(self):
-        doc = "packages/web/src/content/docs/cli.mdx"
-        table = "| `OPENCODE_CONFIG` | Path to a config file |\n| `OPENCODE_API_KEY` | Zen key |\nSee `ai.opencode.managed`.\n"
-        fx = self.seed(lambda: self.fx.write(doc, table))
+    DOC = "packages/web/src/content/docs/cli.mdx"
+    TABLE = "| `OPENCODE_CONFIG` | Path to a config file |\n| `OPENCODE_API_KEY` | Zen key |\nSee `ai.opencode.managed`.\n"
+
+    def test_f6_the_documented_step_names_the_variables_in_a_docs_table(self):
+        fx = self.seed(lambda: self.fx.write(self.DOC, self.TABLE))
         fx.begin_merge()
-        code, out, _ = fx.identity("--since", fx.fork)
-        self.assertEqual(out.split(), [doc])
-        text = (fx.dir / doc).read_text()
+        self.assertEqual(fx.identity("--since", fx.fork, "--check")[0], 0)
+        code, out, _ = fx.identity(self.DOC)
+        self.assertEqual(out.split(), [self.DOC])
+        text = (fx.dir / self.DOC).read_text()
         self.assertIn("`LOGINOM_AI_AGENT_CONFIG`", text)
         self.assertIn("`OPENCODE_API_KEY`", text)
         self.assertIn("`ai.opencode.managed`", text)
@@ -352,6 +354,30 @@ class GateLab302Findings(GateCase):
         fx.resolve({"src/new.ts": lines_with(1, "fork 1").replace("line 10\n", "upstream 10\n"), "src/old.ts": lines_with(1, "fork 1")})
         self.assertRejected(fx, "deviation", "src/old.ts")
 
+
+class GateDocsIdentity(GateCase):
+    """F6 of LAB-303: the oracle does not map the user documentation, so the step that names its variables by hand leaves
+    a deviation, and the procedure asks for a record of it."""
+
+    DOC = ApplyIdentitySince.DOC
+    NAMED = "| `LOGINOM_AI_AGENT_CONFIG` | Path to a config file |\n"
+
+    def seed(self):
+        return self.fx.start(lambda: self.fx.write("fork.txt", "fork\n"), lambda: self.fx.write("other.txt", "other\n"),
+                             lambda: self.fx.write(self.DOC, "| `OPENCODE_CONFIG` | Path to a config file |\n"))
+
+    def test_the_hand_named_table_needs_a_record(self):
+        fx = self.seed()
+        fx.resolve(edits={self.DOC: self.NAMED})
+        code, out = fx.accepted()
+        self.assertEqual(code, 1, out)
+        self.assertIn(f"FAIL deviation: {self.DOC}", out)
+
+    def test_the_record_makes_it_pass(self):
+        fx = self.seed()
+        fx.resolve(edits={self.DOC: self.NAMED}, decisions={self.DOC: ("ADR-1", "variable names given the product spelling")})
+        code, out = fx.accepted()
+        self.assertEqual(code, 0, out)
 
 class GateInput(GateCase):
     def seed(self):
