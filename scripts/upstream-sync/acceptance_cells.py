@@ -109,10 +109,10 @@ def lacks(r, wanted):
 
 
 def retained(b, f, u, r):
-    """Copies of a line upstream removed that the merged text r still holds, for lines the fork left alone."""
+    """Copies of a line upstream removed that the merged text r may still hold: more than fork + upstream - base allows."""
     c = lambda e: collections.Counter(identity(l) for l in e.lines if l.strip())
     cb, cf, cu, cr = c(b), c(f), c(u), c(r)
-    return sum(cr[l] - cu[l] for l in cb if cf[l] == cb[l] and cu[l] < cb[l] and cr[l] > cu[l])
+    return sum(cr[l] - max(cu[l] + cf[l] - cb[l], 0) for l in cb if cu[l] < cb[l] and cr[l] > max(cu[l] + cf[l] - cb[l], 0))
 
 
 # ---- the oracle: the contract in code ---------------------------------------------------------------------------
@@ -246,6 +246,10 @@ def scenarios(tag=""):
     add("M", "text", "edit, upstream removes a line", b, body(c, [FK]), without,
         Ent("text", "".join(l + "\n" for i, l in enumerate(body(c, [FK]).lines[:12], 1) if i != 10)), note="removal")
     c = sid()
+    twice = body(c, extra=[f"{c} push", f"{c} push"])
+    once = body(c, extra=[f"{c} push"])
+    add("M", "text", "edit, both remove one copy of a repeated line", twice, once, once, body(c), note="removal2")
+    c = sid()
     fk = body(c, [FK], extra=[f"{c} push"])
     add("M", "text", "edit, fork already has the line upstream adds", body(c), fk, body(c, [UP], extra=[f"{c} push"]),
         body(c, [FK, UP], extra=[f"{c} push"]), added=(f"{c} line 10 up", f"{c} push"), note="forkline")
@@ -354,7 +358,7 @@ def result_for(s, kind):
         put(tgt, Ent("text", "", s.u.exe))
     elif kind == "lost-line":
         src = s.m or (s.u if s.f in (None, s.b) or s.f == s.u else None)
-        if src is None or src.kind != "text" or not s.added or s.note in ("dup", "removal"):
+        if src is None or src.kind != "text" or not s.added or s.note in ("dup", "removal", "removal2"):
             return None
         lines = src.data.split("\n")
         drop = next((i for i, l in enumerate(lines) if l == s.added[0] or l.startswith(s.added[0])), None)
@@ -370,12 +374,12 @@ def result_for(s, kind):
         del lines[max(i for i, l in enumerate(lines) if l.endswith(" push"))]
         put(tgt, dataclasses.replace(src, data="\n".join(lines)))
     elif kind == "removal-kept":
-        if s.note != "removal":
+        if s.note not in ("removal", "removal2"):
             return None
-        put(tgt, dataclasses.replace(s.m, data=s.m.data + s.b.lines[9] + "\n"))
+        put(tgt, dataclasses.replace(s.m, data=s.m.data + s.b.lines[9 if s.note == "removal" else 12] + "\n"))
     elif kind == "reorder":
         src = s.m or (s.u if s.f in (None, s.b) else None)
-        if src is None or src.kind != "text" or s.note in ("dup", "names", "removal"):
+        if src is None or src.kind != "text" or s.note in ("dup", "names", "removal", "removal2"):
             return None
         put(tgt, dataclasses.replace(src, data="".join(l + "\n" for l in reversed(src.data.rstrip("\n").split("\n")))))
     elif kind == "extra":

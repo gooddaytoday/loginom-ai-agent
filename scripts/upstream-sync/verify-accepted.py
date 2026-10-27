@@ -32,8 +32,8 @@ A DECISION or FAIL* entry is accepted only through --allow-ours / --allow-theirs
 `path  # reason`: the reason is the recorded owner decision (see docs/upstream-sync/catalog.md for ownership policies).
 
 Line level is a heuristic: for text, upstream's added lines must appear in the result as a multiset after the fork's names
-are applied (OPENCODE_X and LOGINOM_AI_AGENT_X are one line), and copies of a line upstream removed must be gone when the
-fork did not change that line's count. It does not check order or position, and a line the fork already had satisfies an
+are applied (OPENCODE_X and LOGINOM_AI_AGENT_X are one line), and a line upstream removed copies of may not appear more
+often than fork + upstream - base allows (so a removal is reported whenever it may have been kept). It does not check order or position, and a line the fork already had satisfies an
 equal line upstream added.
 
 Usage: verify-accepted.py --repo DIR --base SHA --fork SHA --upstream SHA [--allow-ours F] [--allow-theirs F] [--strict-lines]
@@ -149,10 +149,9 @@ def main():
         return sum((counted(wanted) - counted(lines(v))).values())
 
     def retained(b, f, u, r):
-        """Copies of a line upstream removed that the merged text still holds, for lines the fork left alone."""
+        """Lines upstream removed copies of that the merged text may still hold: more copies than fork + upstream - base allows."""
         cb, cf, cu, cr = (counted(lines(v)) for v in (b, f, u, r))
-        leftovers = {l: cr[l] - cu[l] for l in cb if cf[l] == cb[l] and cu[l] < cb[l] and cr[l] > cu[l]}
-        return leftovers
+        return {l: cr[l] - max(cu[l] + cf[l] - cb[l], 0) for l in cb if cu[l] < cb[l] and cr[l] > max(cu[l] + cf[l] - cb[l], 0)}
 
     def same(r, u):
         if r is None or u is None:

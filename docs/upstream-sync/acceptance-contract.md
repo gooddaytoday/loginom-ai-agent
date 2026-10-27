@@ -49,70 +49,71 @@
 | 009 | M | text | none, upstream line has an OPENCODE_ name | ok | NU | NU | ok | NU | NU | · | · | · | · | · | · | · |
 | 010 | M | text | edit, upstream adds the same line twice | TT/t | KF/o | ok* | ok | MD/t | ME/t | · | ok* | · | · | · | · | · |
 | 011 | M | text | edit, upstream removes a line | TT/t | KF/o | ok* | ok | MD/t | ME/t | · | · | ok* | · | · | · | · |
-| 012 | M | text | edit, fork already has the line upstream adds | TT/t | KF/o | ok* | ok | MD/t | ME/t | ok* | · | · | ok | · | · | · |
-| 013 | M | mode | none | ok | NU | NU | · | NU | NU | · | · | · | NU | · | · | · |
-| 014 | M | mode | edit | TT/t | KF/o | ML/e | ok | MD/t | ME/t | · | · | · | ok | · | · | · |
-| 015 | M | mode | same | ok | ok | NU | · | MD/t | ME/t | · | · | · | NU | · | · | · |
-| 016 | M | mode | delete | FD/t | FD/o | FD/t | · | FD/o | FD/t | · | · | · | FD/t | · | · | · |
-| 017 | M | bin | none | ok | NU | NU | · | NU | · | · | · | · | · | · | · | · |
-| 018 | M | bin | edit | TT/t | KF/o | NS | · | MD/t | · | · | · | · | · | · | · | · |
-| 019 | M | bin | same | ok | ok | NU | · | MD/t | · | · | · | · | · | · | · | · |
-| 020 | M | bin | delete | FD/t | FD/o | FD/t | · | FD/o | · | · | · | · | · | · | · | · |
-| 021 | M | link | none | ok | NU | NU | · | NU | · | · | · | · | · | · | · | · |
-| 022 | M | link | edit | TT/t | KF/o | NS | · | MD/t | · | · | · | · | · | · | · | · |
-| 023 | M | link | same | ok | ok | NU | · | MD/t | · | · | · | · | · | · | · | · |
-| 024 | M | link | delete | FD/t | FD/o | FD/t | · | FD/o | · | · | · | · | · | · | · | · |
-| 025 | M | sub | none | ok | NU | NU | · | NU | · | · | · | · | · | · | · | · |
-| 026 | M | sub | edit | TT/t | KF/o | NS | · | MD/t | · | · | · | · | · | · | · | · |
-| 027 | M | sub | same | ok | ok | NU | · | MD/t | · | · | · | · | · | · | · | · |
-| 028 | M | sub | delete | FD/t | FD/o | FD/t | · | FD/o | · | · | · | · | · | · | · | · |
-| 029 | M | file to symlink | none | ok | NU | NU | · | NU | · | · | · | · | · | · | · | · |
-| 030 | M | file to symlink | edit | TT/t | KF/o | NS | · | MD/t | · | · | · | · | · | · | · | · |
-| 031 | M | file to symlink | same | ok | ok | NU | · | MD/t | · | · | · | · | · | · | · | · |
-| 032 | M | file to symlink | delete | FD/t | FD/o | FD/t | · | FD/o | · | · | · | · | · | · | · | · |
-| 033 | M | symlink to file | none | ok | NU | NU | · | NU | NU | · | · | · | NU | · | · | · |
-| 034 | M | symlink to file | edit | TT/t | KF/o | NS | · | MD/t | ME/t | · | · | · | · | · | · | · |
-| 035 | M | symlink to file | same | ok | ok | NU | · | MD/t | ME/t | · | · | · | · | · | · | · |
-| 036 | M | symlink to file | delete | FD/t | FD/o | FD/t | · | FD/o | FD/t | · | · | · | FD/t | · | · | · |
-| 037 | D | text | none | ok | DK | DK | · | ok | · | · | · | · | · | · | · | · |
-| 038 | D | text | edit | DD/t | DK/o | DK/o | · | DD/t | · | · | · | · | · | · | · | · |
-| 039 | D | text | delete | ok | ok | DK | · | ok | · | · | · | · | · | · | · | · |
-| 040 | D | text | chmod | DD/t | DK/o | DK/o | · | DD/t | · | · | · | · | · | · | · | · |
-| 041 | D | text | rename | DD/t | DK/o | DK/o | · | DD/t | · | · | · | · | · | · | · | · |
-| 042 | D | bin | none | ok | DK | DK | · | ok | · | · | · | · | · | · | · | · |
-| 043 | D | bin | edit | DD/t | DK/o | DK/o | · | DD/t | · | · | · | · | · | · | · | · |
-| 044 | D | link | none | ok | DK | DK | · | ok | · | · | · | · | · | · | · | · |
-| 045 | D | link | edit | DD/t | DK/o | DK/o | · | DD/t | · | · | · | · | · | · | · | · |
-| 046 | D | sub | none | ok | DK | DK | · | ok | · | · | · | · | · | · | · | · |
-| 047 | D | sub | edit | DD/t | DK/o | DK/o | · | DD/t | · | · | · | · | · | · | · | · |
-| 048 | A | text | none | ok | AM/e | · | · | AM/e | AT/e | AT/e | · | · | ok | ok | ok | · |
-| 049 | A | text | same | ok | ok | · | · | AM/e | AT/e | AT/e | · | · | · | ok | ok | · |
-| 050 | A | text | different | TT/t | KF/o | · | ok* | MD/t | ME/t | ok* | · | · | ok* | · | MD/t | · |
-| 051 | A | text | none, two identical lines | ok | AM/e | · | · | AM/e | AT/e | · | AT/e | · | · | ok | ok | · |
-| 052 | A | text | none, executable | ok | AM/e | · | · | AM/e | AT/e | AT/e | · | · | ok | ok | ok | · |
-| 053 | A | bin | none | ok | AM/e | · | · | AM/e | · | · | · | · | · | · | ok | · |
-| 054 | A | bin | same | ok | ok | · | · | AM/e | · | · | · | · | · | · | ok | · |
-| 055 | A | bin | different | TT/t | KF/o | · | · | MD/t | · | · | · | · | · | · | MD/t | · |
-| 056 | A | link | none | ok | AM/e | · | · | AM/e | · | · | · | · | · | · | ok | · |
-| 057 | A | link | same | ok | ok | · | · | AM/e | · | · | · | · | · | · | ok | · |
-| 058 | A | link | different | TT/t | KF/o | · | · | MD/t | · | · | · | · | · | · | MD/t | · |
-| 059 | A | sub | none | ok | AM/e | · | · | AM/e | · | · | · | · | · | · | ok | · |
-| 060 | A | sub | same | ok | ok | · | · | AM/e | · | · | · | · | · | · | ok | · |
-| 061 | A | sub | different | TT/t | KF/o | · | · | MD/t | · | · | · | · | · | · | MD/t | · |
-| 062 | R | text | none | ok | DK | · | · | RM | RT/e | · | · | · | ok | ok | ok | DK |
-| 063 | R | text | edit | TT/t | KF/o | TT/t | · | MD/t | ME/t | · | · | · | ok | · | MD/t | · |
-| 064 | R | text | delete | FD/t | FD/o | FD/t | · | FD/o | FD/t | · | · | · | FD/t | FD/t | FD/t | · |
-| 065 | R | text | rename to the same path | ok | DK | · | · | RM | RT/e | · | · | · | ok | ok | ok | DK |
-| 066 | R | text | rename elsewhere | ok | ok | · | · | RM | RT/e | · | · | · | ok | ok | · | · |
-| 067 | R | text | none | ok | DK | DK | · | RM | RT/e | RT/e | · | · | ok | ok | ok | DK |
-| 068 | R | text | edit | TT/t | KF/o | ok* | ok | MD/t | ME/t | ok* | · | · | ok | · | MD/t | · |
-| 069 | R | text | delete | FD/t | FD/o | FD/t | · | FD/o | FD/t | FD/t | · | · | FD/t | FD/t | FD/t | · |
-| 070 | R | text | rename to the same path | ok | DK | DK | · | RM | RT/e | RT/e | · | · | ok | ok | ok | DK |
-| 071 | R | text | rename elsewhere | ok | RT/e | RT/e | · | RM | RT/e | RT/e | · | · | ok | ok | · | · |
-| 072 | R | bin | none | ok | DK | · | · | RM | · | · | · | · | · | · | ok | DK |
-| 073 | R | bin | delete | FD/t | FD/o | FD/t | · | FD/o | · | · | · | · | · | · | FD/t | · |
-| 074 | R | link | none | ok | DK | · | · | RM | · | · | · | · | · | · | ok | DK |
-| 075 | R | link | delete | FD/t | FD/o | FD/t | · | FD/o | · | · | · | · | · | · | FD/t | · |
+| 012 | M | text | edit, both remove one copy of a repeated line | ok | ok | NU | NU | MD/t | ME/t | · | · | ok | · | · | · | · |
+| 013 | M | text | edit, fork already has the line upstream adds | TT/t | KF/o | ok* | ok | MD/t | ME/t | ok* | · | · | ok | · | · | · |
+| 014 | M | mode | none | ok | NU | NU | · | NU | NU | · | · | · | NU | · | · | · |
+| 015 | M | mode | edit | TT/t | KF/o | ML/e | ok | MD/t | ME/t | · | · | · | ok | · | · | · |
+| 016 | M | mode | same | ok | ok | NU | · | MD/t | ME/t | · | · | · | NU | · | · | · |
+| 017 | M | mode | delete | FD/t | FD/o | FD/t | · | FD/o | FD/t | · | · | · | FD/t | · | · | · |
+| 018 | M | bin | none | ok | NU | NU | · | NU | · | · | · | · | · | · | · | · |
+| 019 | M | bin | edit | TT/t | KF/o | NS | · | MD/t | · | · | · | · | · | · | · | · |
+| 020 | M | bin | same | ok | ok | NU | · | MD/t | · | · | · | · | · | · | · | · |
+| 021 | M | bin | delete | FD/t | FD/o | FD/t | · | FD/o | · | · | · | · | · | · | · | · |
+| 022 | M | link | none | ok | NU | NU | · | NU | · | · | · | · | · | · | · | · |
+| 023 | M | link | edit | TT/t | KF/o | NS | · | MD/t | · | · | · | · | · | · | · | · |
+| 024 | M | link | same | ok | ok | NU | · | MD/t | · | · | · | · | · | · | · | · |
+| 025 | M | link | delete | FD/t | FD/o | FD/t | · | FD/o | · | · | · | · | · | · | · | · |
+| 026 | M | sub | none | ok | NU | NU | · | NU | · | · | · | · | · | · | · | · |
+| 027 | M | sub | edit | TT/t | KF/o | NS | · | MD/t | · | · | · | · | · | · | · | · |
+| 028 | M | sub | same | ok | ok | NU | · | MD/t | · | · | · | · | · | · | · | · |
+| 029 | M | sub | delete | FD/t | FD/o | FD/t | · | FD/o | · | · | · | · | · | · | · | · |
+| 030 | M | file to symlink | none | ok | NU | NU | · | NU | · | · | · | · | · | · | · | · |
+| 031 | M | file to symlink | edit | TT/t | KF/o | NS | · | MD/t | · | · | · | · | · | · | · | · |
+| 032 | M | file to symlink | same | ok | ok | NU | · | MD/t | · | · | · | · | · | · | · | · |
+| 033 | M | file to symlink | delete | FD/t | FD/o | FD/t | · | FD/o | · | · | · | · | · | · | · | · |
+| 034 | M | symlink to file | none | ok | NU | NU | · | NU | NU | · | · | · | NU | · | · | · |
+| 035 | M | symlink to file | edit | TT/t | KF/o | NS | · | MD/t | ME/t | · | · | · | · | · | · | · |
+| 036 | M | symlink to file | same | ok | ok | NU | · | MD/t | ME/t | · | · | · | · | · | · | · |
+| 037 | M | symlink to file | delete | FD/t | FD/o | FD/t | · | FD/o | FD/t | · | · | · | FD/t | · | · | · |
+| 038 | D | text | none | ok | DK | DK | · | ok | · | · | · | · | · | · | · | · |
+| 039 | D | text | edit | DD/t | DK/o | DK/o | · | DD/t | · | · | · | · | · | · | · | · |
+| 040 | D | text | delete | ok | ok | DK | · | ok | · | · | · | · | · | · | · | · |
+| 041 | D | text | chmod | DD/t | DK/o | DK/o | · | DD/t | · | · | · | · | · | · | · | · |
+| 042 | D | text | rename | DD/t | DK/o | DK/o | · | DD/t | · | · | · | · | · | · | · | · |
+| 043 | D | bin | none | ok | DK | DK | · | ok | · | · | · | · | · | · | · | · |
+| 044 | D | bin | edit | DD/t | DK/o | DK/o | · | DD/t | · | · | · | · | · | · | · | · |
+| 045 | D | link | none | ok | DK | DK | · | ok | · | · | · | · | · | · | · | · |
+| 046 | D | link | edit | DD/t | DK/o | DK/o | · | DD/t | · | · | · | · | · | · | · | · |
+| 047 | D | sub | none | ok | DK | DK | · | ok | · | · | · | · | · | · | · | · |
+| 048 | D | sub | edit | DD/t | DK/o | DK/o | · | DD/t | · | · | · | · | · | · | · | · |
+| 049 | A | text | none | ok | AM/e | · | · | AM/e | AT/e | AT/e | · | · | ok | ok | ok | · |
+| 050 | A | text | same | ok | ok | · | · | AM/e | AT/e | AT/e | · | · | · | ok | ok | · |
+| 051 | A | text | different | TT/t | KF/o | · | ok* | MD/t | ME/t | ok* | · | · | ok* | · | MD/t | · |
+| 052 | A | text | none, two identical lines | ok | AM/e | · | · | AM/e | AT/e | · | AT/e | · | · | ok | ok | · |
+| 053 | A | text | none, executable | ok | AM/e | · | · | AM/e | AT/e | AT/e | · | · | ok | ok | ok | · |
+| 054 | A | bin | none | ok | AM/e | · | · | AM/e | · | · | · | · | · | · | ok | · |
+| 055 | A | bin | same | ok | ok | · | · | AM/e | · | · | · | · | · | · | ok | · |
+| 056 | A | bin | different | TT/t | KF/o | · | · | MD/t | · | · | · | · | · | · | MD/t | · |
+| 057 | A | link | none | ok | AM/e | · | · | AM/e | · | · | · | · | · | · | ok | · |
+| 058 | A | link | same | ok | ok | · | · | AM/e | · | · | · | · | · | · | ok | · |
+| 059 | A | link | different | TT/t | KF/o | · | · | MD/t | · | · | · | · | · | · | MD/t | · |
+| 060 | A | sub | none | ok | AM/e | · | · | AM/e | · | · | · | · | · | · | ok | · |
+| 061 | A | sub | same | ok | ok | · | · | AM/e | · | · | · | · | · | · | ok | · |
+| 062 | A | sub | different | TT/t | KF/o | · | · | MD/t | · | · | · | · | · | · | MD/t | · |
+| 063 | R | text | none | ok | DK | · | · | RM | RT/e | · | · | · | ok | ok | ok | DK |
+| 064 | R | text | edit | TT/t | KF/o | TT/t | · | MD/t | ME/t | · | · | · | ok | · | MD/t | · |
+| 065 | R | text | delete | FD/t | FD/o | FD/t | · | FD/o | FD/t | · | · | · | FD/t | FD/t | FD/t | · |
+| 066 | R | text | rename to the same path | ok | DK | · | · | RM | RT/e | · | · | · | ok | ok | ok | DK |
+| 067 | R | text | rename elsewhere | ok | ok | · | · | RM | RT/e | · | · | · | ok | ok | · | · |
+| 068 | R | text | none | ok | DK | DK | · | RM | RT/e | RT/e | · | · | ok | ok | ok | DK |
+| 069 | R | text | edit | TT/t | KF/o | ok* | ok | MD/t | ME/t | ok* | · | · | ok | · | MD/t | · |
+| 070 | R | text | delete | FD/t | FD/o | FD/t | · | FD/o | FD/t | FD/t | · | · | FD/t | FD/t | FD/t | · |
+| 071 | R | text | rename to the same path | ok | DK | DK | · | RM | RT/e | RT/e | · | · | ok | ok | ok | DK |
+| 072 | R | text | rename elsewhere | ok | RT/e | RT/e | · | RM | RT/e | RT/e | · | · | ok | ok | · | · |
+| 073 | R | bin | none | ok | DK | · | · | RM | · | · | · | · | · | · | ok | DK |
+| 074 | R | bin | delete | FD/t | FD/o | FD/t | · | FD/o | · | · | · | · | · | · | FD/t | · |
+| 075 | R | link | none | ok | DK | · | · | RM | · | · | · | · | · | · | ok | DK |
+| 076 | R | link | delete | FD/t | FD/o | FD/t | · | FD/o | · | · | · | · | · | · | FD/t | · |
 
 | Kind of divergence (exit code: described / undescribed) | committed | staged | worktree |
 |---|---|---|---|
@@ -131,7 +132,7 @@
 
 ## Что гарантирует `--strict-lines` и чего нет
 
-Строчный уровень — эвристика, а не доказательство слияния. Для объединённого файла (правило 3) проверяются строки, которые добавил upstream (разность `-U0` базы и upstream), как мультимножество непустых строк после замены имён: каждая строка должна встречаться в результате не реже, чем её добавил upstream (`dup-lost` — потеря одной из двух одинаковых строк теперь видна). Проверяются и удалённые upstream строки: если форк не менял число копий строки, в результате их не должно быть больше, чем в upstream (`removal-kept`).
+Строчный уровень — эвристика, а не доказательство слияния. Для объединённого файла (правило 3) проверяются строки, которые добавил upstream (разность `-U0` базы и upstream), как мультимножество непустых строк после замены имён: каждая строка должна встречаться в результате не реже, чем её добавил upstream (`dup-lost` — потеря одной из двух одинаковых строк теперь видна). Проверяются и удалённые upstream строки: копий такой строки в результате не должно быть больше, чем допускают форк, upstream и база (форк + upstream − база; `removal-kept`). Предупреждение выдаётся везде, где удалённая upstream строка могла остаться.
 
 Не проверяется, и это пределы:
 
@@ -139,7 +140,7 @@
 |---|---|---|
 | Порядок и положение строк (`reorder`) | Слияние законно переставляет блоки; сравнивать последовательность — давать отказы на правильных слияниях | Строки на месте; потери нет |
 | Строка форка совпадает со строкой, добавленной upstream (`forkline`) | Git сам сливает одинаковые добавления в одну строку | Содержимое есть; строка форка и upstream — одна |
-| Строка, число копий которой изменили обе стороны | Изменение числа копий нельзя отнести к одной стороне | **Может оставить удалённую upstream строку без предупреждения.** Предел назван, потому что иначе не выразить; владелец видит такие файлы в строке `merged` отчёта и решает по каталогу |
+| Обе стороны удалили одну и ту же копию повторяющейся строки | Копии одинаковы, какую из них удалила какая сторона, неизвестно | Предупреждение выдаётся и тогда, когда копия удалена законно (ложное срабатывание; под `--strict-lines` отказ). Предел в сторону осторожности: оставленная копия не остаётся незамеченной |
 | Положение добавленного файла (`elsewhere`) | Каталоги форка могут быть перемещены; в результате важно, что байты upstream есть | Побайтово равное содержимое присутствует, режим и тип совпадают |
 | Содержимое файла после записи владельца | Запись — решение человека, а не проверка | Запись обязательна и хранится в файле с причиной; молча не принимается |
 | Содержимое подмодуля | Объекты подмодуля не в этом репозитории | Указатель сравнивается целиком; иной указатель — `neither-side`/`kept-fork`/`took-theirs` |
