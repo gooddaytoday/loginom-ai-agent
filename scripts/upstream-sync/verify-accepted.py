@@ -58,7 +58,7 @@ def read_decisions(repo, entries):
         return {}, []
     try:
         doc = json.loads(git(repo, "cat-file", "blob", entries[DECISIONS_PATH][1])[1])
-        assert doc["format"] == FORMAT and isinstance(doc["decisions"], list)
+        assert type(doc["format"]) is int and doc["format"] == FORMAT and isinstance(doc["decisions"], list)
     except (ValueError, KeyError, TypeError, AssertionError):
         return {}, [("bad-record", DECISIONS_PATH, f"not a decision file of format {FORMAT}")]
     catalog_ids = set()

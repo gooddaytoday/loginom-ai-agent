@@ -19,7 +19,6 @@ import argparse
 import dataclasses
 import importlib.util
 import os
-import re
 import subprocess
 import sys
 import tempfile
@@ -40,7 +39,6 @@ MERGE_CFG = ("-c", "rerere.enabled=false", "-c", "merge.directoryRenames=conflic
              "-c", "core.autocrlf=false", "-c", "core.safecrlf=false", "-c", "core.ignorecase=false", "-c", "core.fsmonitor=false",
              "-c", "core.hooksPath=/dev/null", "-c", "gc.auto=0")
 REGULAR = ("100644", "100755")
-PARKED = re.compile(r"~[0-9a-f]{40}$")
 CONFLICT_KINDS = {
     frozenset("123"): "content",
     frozenset("12"): "modified by the fork, deleted by upstream",
@@ -86,23 +84,37 @@ def write_tree(repo, entries):
 
 def merge_tree(repo, fork, upstream):
     """-> (tree id, {conflicted path: kind}, parked names). Exit code 1 of merge-tree means conflicts, not failure."""
-    rc, out = git(repo, *MERGE_CFG, "merge-tree", "--write-tree", "-z", "--no-messages", fork, upstream, ok=(0, 1))
+    rc, out = git(repo, *MERGE_CFG, "merge-tree", "--write-tree", "-z", fork, upstream, ok=(0, 1))
     tree, _, rest = out.partition(b"\0")
+    records = [r.decode() for r in rest.split(b"\0")]
+    end = records.index("") if "" in records else len(records)
     stages = {}
-    for rec in rest.split(b"\0"):
-        if rec:
-            meta, path = rec.split(b"\t", 1)
-            stages.setdefault(path.decode(), set()).add(meta.decode().split()[2])
+    for rec in records[:end]:
+        meta, path = rec.split("\t", 1)
+        stages.setdefault(path, set()).add(meta.split()[2])
     if bool(stages) != bool(rc):
         raise RuntimeError(f"merge-tree exit code {rc} does not match its conflict list ({len(stages)} paths)")
-    parked = {p for p in stages if PARKED.search(p) and PARKED.sub("", p) in stages}
+    parked = parked_names(records[end + 1:], (fork, upstream))
     merged = {}
     for path, found in stages.items():
-        merged.setdefault(PARKED.sub("", path) if path in parked else path, set()).update(found)
-    clash = {PARKED.sub("", p) for p in parked}
+        merged.setdefault(parked.get(path, path), set()).update(found)
+    clash = set(parked.values())
     kinds = {path: "file types clash" if path in clash else CONFLICT_KINDS.get(frozenset(found), "conflict")
              for path, found in merged.items()}
     return tree.decode(), kinds, frozenset(parked)
+
+
+def parked_names(messages, labels):
+    """{parked name: path} from the messages of merge-tree -z: count, paths, type, text. Only a `distinct types` text parks a
+    name, at `path~<label>`; a name of that shape that Git did not park is an ordinary path."""
+    out, i = {}, 0
+    while i < len(messages) and messages[i].isdigit():
+        count = int(messages[i])
+        paths, text = messages[i + 1:i + 1 + count], messages[i + 2 + count]
+        if text.startswith("CONFLICT (distinct types)"):
+            out.update({p: q for p in paths for q in paths if any(p == f"{q}~{label}" for label in labels)})
+        i += count + 3
+    return out
 
 
 def blob_text(repo, sha):
