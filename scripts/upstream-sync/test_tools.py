@@ -355,6 +355,79 @@ class GateLab302Findings(GateCase):
         self.assertRejected(fx, "deviation", "src/old.ts")
 
 
+class GateParkedNames(GateCase):
+    """F1 of LAB-308: a name of the form `path~<40 hex>` is parked by Git only when file types clash in this merge.
+    Two ordinary conflicting files with such names are two conflicts, each needing its own record."""
+
+    LOOKALIKE = "settings.json~" + "a" * 40
+
+    def seed_lookalike(self):
+        def side(label):
+            return lambda: (self.fx.write("settings.json", f"{label}\n"), self.fx.write(self.LOOKALIKE, f"{label}\n"))
+        return self.fx.start(lambda: (self.fx.write("settings.json", "base\n"), self.fx.write(self.LOOKALIKE, "base\n")),
+                             side("fork"), side("upstream"))
+
+    def test_a_conflict_at_a_name_shaped_like_a_parked_one_needs_its_own_record(self):
+        fx = self.seed_lookalike()
+        fx.resolve({"settings.json": "fork\n", self.LOOKALIKE: "fork\n"}, decisions={"settings.json": ("ADR-1", "kept the fork version")})
+        self.assertRejected(fx, "conflict", self.LOOKALIKE)
+
+    def test_the_records_for_both_conflicts_pass(self):
+        fx = self.seed_lookalike()
+        fx.resolve({"settings.json": "fork\n", self.LOOKALIKE: "fork\n"},
+                   decisions={"settings.json": ("ADR-1", "kept the fork version"), self.LOOKALIKE: ("ADR-1", "kept the fork version")})
+        self.assertAccepted(fx)
+
+    def seed_clash(self):
+        def upstream():
+            (self.fx.dir / "link").unlink()
+            os.symlink("target.txt", self.fx.dir / "link")
+        return self.fx.start(lambda: (self.fx.write("link", "target.txt"), self.fx.write("target.txt", "t\n")),
+                             lambda: self.fx.write("link", "fork edit\n"), upstream)
+
+    def keep_the_fork_file(self, fx):
+        def hook():
+            for path in [fx.dir / "link", *fx.dir.glob("link~*")]:
+                path.unlink(missing_ok=True)
+            fx.write("link", "fork edit\n")
+        return hook
+
+    def test_file_types_that_clash_in_this_merge_fold_into_one_conflict(self):
+        fx = self.seed_clash()
+        fx.resolve(decisions={"link": ("ADR-1", "the fork keeps the regular file")}, hook=self.keep_the_fork_file(fx))
+        out = self.assertAccepted(fx)
+        self.assertIn("| conflict | 1 | 1 |", out)
+
+    def test_the_clash_still_needs_its_record(self):
+        fx = self.seed_clash()
+        fx.resolve(hook=self.keep_the_fork_file(fx))
+        out = self.assertRejected(fx, "conflict", "link")
+        self.assertNotIn("link~", out)
+
+
+class GateDecisionFormat(GateCase):
+    """F2 of LAB-308: the format is the integer 1, not anything that compares equal to it."""
+
+    def seed(self):
+        return self.fx.start(lambda: self.fx.write("keep.txt", "keep\n"), lambda: self.fx.write("fork.txt", "fork\n"),
+                             lambda: self.fx.write("up.txt", "up\n"))
+
+    def resolve_with_format(self, value):
+        fx = self.seed()
+        record = {"path": "up.txt", "rule": "ADR-1", "reason": "dropped"}
+        fx.resolve(deletes=["up.txt"], hook=lambda: fx.write("docs/upstream-sync/merge-decisions.json", json.dumps({"format": value, "decisions": [record]})))
+        return fx
+
+    def test_accepts_the_integer_one(self):
+        self.assertAccepted(self.resolve_with_format(1))
+
+    def test_rejects_true_as_the_format(self):
+        self.assertRejected(self.resolve_with_format(True), "bad-record", "docs/upstream-sync/merge-decisions.json")
+
+    def test_rejects_a_float_one_as_the_format(self):
+        self.assertRejected(self.resolve_with_format(1.0), "bad-record", "docs/upstream-sync/merge-decisions.json")
+
+
 class GateDocsIdentity(GateCase):
     """F6 of LAB-303: the oracle does not map the user documentation, so the step that names its variables by hand leaves
     a deviation, and the procedure asks for a record of it."""
