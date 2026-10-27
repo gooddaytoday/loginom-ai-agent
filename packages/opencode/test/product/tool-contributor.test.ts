@@ -9,17 +9,25 @@ import type { ContributeInput } from "../../src/product/tool-contributor"
 
 const sessionID = SessionID.make("ses_contributor")
 const taskMessageID = MessageID.ascending()
-const catalog = ["find", "dock_prepare", "dock_run", "browser_take_screenshot"].map((name) => ({
-  name,
-  description: `${name} tool`,
-  inputSchema: {
-    type: "object" as const,
-    properties: { host_context_token: { type: "string" }, path: { type: "string" } },
-    required: ["host_context_token", "path"],
-  },
-}))
+const catalogOf = (names: string[]) =>
+  names.map((name) => ({
+    name,
+    description: `${name} tool`,
+    inputSchema: {
+      type: "object" as const,
+      properties: { host_context_token: { type: "string" }, path: { type: "string" } },
+      required: ["host_context_token", "path"],
+    },
+  }))
+const catalog = catalogOf(["find", "dock_prepare", "dock_run", "browser_take_screenshot"])
 
-function setup(options: { profile: TaskScope.Profile; task?: boolean; image?: boolean; fail?: boolean }) {
+function setup(options: {
+  profile: TaskScope.Profile
+  task?: boolean
+  image?: boolean
+  fail?: boolean
+  catalog?: ReturnType<typeof catalogOf>
+}) {
   const requested: string[] = []
   const status: { failure?: string } = {}
   const tools: Record<string, AITool> = {}
@@ -31,7 +39,7 @@ function setup(options: { profile: TaskScope.Profile; task?: boolean; image?: bo
       async tools() {
         requested.push("catalog")
         if (options.fail) throw Error("LOGINOM_KNOWLEDGE_UNAVAILABLE")
-        return { tools: catalog }
+        return { tools: options.catalog ?? catalog }
       },
     },
     loginomStatus: status,
@@ -55,10 +63,29 @@ describe("toolContributor", () => {
     const run = setup({ profile: "loginom-automation" })
     await run.run()
     expect(Object.keys(run.tools).toSorted()).toEqual(["loginom_dock_prepare", "loginom_dock_run", "loginom_find"])
-    for (const tool of Object.values(run.tools)) {
-      expect(Object.keys(schemaOf(tool).properties)).toEqual(["path"])
+    for (const [name, tool] of Object.entries(run.tools)) {
+      expect(Object.keys(schemaOf(tool).properties)).toEqual(
+        name === "loginom_dock_prepare" ? ["path", "local_package_path"] : ["path"],
+      )
       expect(schemaOf(tool).required).toEqual(["path"])
     }
+  })
+
+  test("a local file can be registered only by automation, and only when the catalog describes dock actions", async () => {
+    const withDescribe = catalogOf(["find", "dock_action_describe"])
+    const automation = setup({ profile: "loginom-automation", catalog: withDescribe })
+    await automation.run()
+    expect(Object.keys(automation.tools).toSorted()).toEqual([
+      "loginom_dock_action_describe",
+      "loginom_file_admit",
+      "loginom_find",
+    ])
+    const without = setup({ profile: "loginom-automation" })
+    await without.run()
+    expect(without.tools.loginom_file_admit).toBeUndefined()
+    const ordinary = setup({ profile: "default", catalog: withDescribe })
+    await ordinary.run()
+    expect(ordinary.tools.loginom_file_admit).toBeUndefined()
   })
 
   test("the default profile receives only the read-only local tools", async () => {
