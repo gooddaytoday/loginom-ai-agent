@@ -14,5 +14,13 @@
 ## Checkpoint
 
 - Исходный HEAD: `299049c48101e479ea758da48cc34e592accef96`; ветка `local-file-paths`.
-- Локальные исправления проверены и независимо Approved в предыдущем задании; сейчас ожидают commit/push.
-- Следующий шаг: независимая проверка плана, актуальные remote refs и публикация.
+- План независимо Approved. Локальные исправления сохранены в `0157c935d0`; range scan38коммитов/3архива clean, дерево чистое до следующего исправления.
+- Два actual push остановлены hook: у временного Git snapshot наследуется `GIT_DIR`; `git init` меняет source core.bare=true, затем add отказывает. Вне hook scanner clean.
+- Собственное повреждение конфигурации восстановлено: core.bare=false, прежний HEAD/ветка/чистое дерево подтверждены; другие refs и файлы не менялись.
+- Исправлена граница Git env: source-контекст сохранён, временные init/add/Gitleaks очищают repository-local переменные по штатному списку Git.
+- Настоящий Gitleaks: RED повреждения индекса → GREEN; четыре регрессии, полный script34/34 и typecheck PASS. Независимое ревью APPROVED, обязательных замечаний нет.
+- Следующий шаг: штатный push с hooks, PR и candidate; CI links/results фиксируются в PR и task-local evidence `/home/kiselev/storage/tmp/local-paths-74-pr-ci-lq14rnwu/`.
+
+## Уточнение после первого push
+
+В существующем scanner разделить Git-контекст исходного репозитория и временных snapshot. На временных Git init/add и вызове Gitleaks для них убрать repository-local переменные окружения по штатному списку Git; исходные range/index/blob операции и пользовательскую Git-конфигурацию сохранить. Проверить настоящим Gitleaks на собственной fixture: hook env, секрет внутри архива с redaction, чистый архив, неизменность source config/index. Один RED→минимальный GREEN за цикл, затем полный package-local набор и typecheck, независимое ревью. Настоящий hook не повторять до исправления; shared repo не использовать как воспроизводящую fixture.
