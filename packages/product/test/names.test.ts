@@ -11,17 +11,19 @@ const { paths: tracked, read } = trackedSnapshot(root)
 
 const FORK_ONLY = ["product", "loginom-host", "runtime", "site", "evals"]
 
-const pluginInstallName = "@loginom-ai-agent/plugin"
+const NAME_CHAR = "[A-Za-z0-9_-]"
+const pluginName = "@loginom-ai-agent/plugin"
+const pluginInstallName = new RegExp(`${pluginName}(?!${NAME_CHAR})`, "g")
 const pluginInstallFiles = new Set([
   "packages/opencode/src/product/installation.ts",
   "packages/opencode/test/product/plugin-dependency.test.ts",
   "packages/product/test/names.test.ts",
 ])
 const forkScopeOutsideForkOnly = new RegExp(
-  `@loginom-ai-agent/(?!(?:${FORK_ONLY.join("|")})(?![A-Za-z0-9_-]))[A-Za-z0-9_-]+`,
+  `@loginom-ai-agent/(?!(?:${FORK_ONLY.join("|")})(?!${NAME_CHAR}))${NAME_CHAR}+`,
 )
 const withoutPluginInstallName = (text: string) => text.replaceAll(pluginInstallName, "")
-const requestsPluginInstallName = (text: string) => text.includes(pluginInstallName)
+const requestsPluginInstallName = (text: string) => text.search(pluginInstallName) !== -1
 const usesForkScopeForUpstream = (text: string) => forkScopeOutsideForkOnly.test(text)
 const manifests = tracked.filter(
   (path) => /^(packages|apps|evals)\/.*package\.json$/.test(path) || path === "evals/package.json",
@@ -51,14 +53,12 @@ describe("package names", () => {
   })
 
   test("the install seam may name only the public plugin package, not a longer name that starts with it", () => {
-    const allowed = withoutPluginInstallName('{ name: "@loginom-ai-agent/plugin" }')
-    const lookalike = withoutPluginInstallName('{ name: "@loginom-ai-agent/plugin-next" }')
-    const lookalikeNextToAllowed = withoutPluginInstallName(
-      'name: "@loginom-ai-agent/plugin"\nexport const second = "@loginom-ai-agent/plugin-next"',
-    )
-    expect([allowed, lookalike, lookalikeNextToAllowed].map(usesForkScopeForUpstream)).toEqual([false, true, true])
-    expect(usesForkScopeForUpstream(withoutPluginInstallName("@loginom-ai-agent/plugin/server"))).toBe(false)
-    expect(usesForkScopeForUpstream(withoutPluginInstallName("@loginom-ai-agent/plugin_v2"))).toBe(true)
+    const named = (...names: string[]) => usesForkScopeForUpstream(withoutPluginInstallName(names.join("\n")))
+    expect(named(pluginName)).toBe(false)
+    expect(named(`${pluginName}/server`)).toBe(false)
+    expect(named(`${pluginName}-next`)).toBe(true)
+    expect(named(`${pluginName}_v2`)).toBe(true)
+    expect(named(pluginName, `${pluginName}-next`)).toBe(true)
   })
 
   test("the public plugin name is requested only by the background install seam and its test", () => {
@@ -73,9 +73,9 @@ describe("package names", () => {
   })
 
   test("a longer package name that starts with the public plugin name is not a request for it", () => {
-    expect(requestsPluginInstallName('name: "@loginom-ai-agent/plugin-next"')).toBe(false)
-    expect(requestsPluginInstallName('name: "@loginom-ai-agent/plugin-next"\nname: "@loginom-ai-agent/plugin"')).toBe(true)
-    expect(requestsPluginInstallName('name: "@loginom-ai-agent/plugin"')).toBe(true)
+    expect(requestsPluginInstallName(`${pluginName}-next`)).toBe(false)
+    expect(requestsPluginInstallName(`${pluginName}-next\n${pluginName}`)).toBe(true)
+    expect(requestsPluginInstallName(pluginName)).toBe(true)
   })
 
   test("the fork scope is not spelled as a separate path segment or string", () => {
