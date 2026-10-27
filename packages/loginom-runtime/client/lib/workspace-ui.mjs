@@ -3753,8 +3753,10 @@ function readRenderedInputMapping(observation) {
           return readUi(rediscover);
         }
         // Finish can paint the old graph caption before Loginom applies the
-        // automatic caption already observed on Done. Discard this mixed read
-        // only for that exact transition on the wizard's original native node.
+        // automatic caption already observed on Done. Its input strips native
+        // newlines, so it cannot reconstruct the graph key. Discard this mixed
+        // read only on the wizard's original native node; targetNode below
+        // still requires its exact graph body and matching rendered caption.
         const finish=task.snapshot?.ui?.elements?.find(e=>e.ref===task.action?.ref)?.wizard_finish;
         const ownerPrefix=finish?.owner?.path?.at(-3)?.tid+'>';
         const graphPrefix=task.prepared_node_context?.workflow_ref?.prefix+';Graph;';
@@ -3766,7 +3768,7 @@ function readRenderedInputMapping(observation) {
           &&['document_id','workflow_id','node_id'].every(k=>nodeContext[k]===task.snapshot.prepared_node_context[k])
           &&nodeContext.node_id===task.prepared_node_context?.node.node_id
           &&nodeContext.tid===graphPrefix+finish.owner.node.tid.slice(ownerPrefix.length)
-          &&after.tid===graphPrefix+finish.completion.fields.label.value.replace(/\s/g,'_').replace(/,/g,'')
+          &&after.tid?.startsWith(graphPrefix)&&after.tid!==nodeContext.tid
           &&same({...nodeContext,tid:after.tid},after)&&finishSurfaceReads<2) {
           record('wizard_finish_label_rediscovery',{attempt:++finishSurfaceReads,node_id:after.node_id,before_tid:nodeContext.tid,after_tid:after.tid});
           timeout();return readUi(rediscover);
