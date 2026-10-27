@@ -48,18 +48,19 @@ LAB-262 и её результаты/конфигурация/незавершё
   Вариант Bun baseline выбирать только при отсутствии AVX2 на runner.
 - [x] Выполнить verify-cli-candidate, проверить payload/archive/hash,
   доставить полный artifact в новый immutable каталог и проверить снова.
-- [ ] Зафиксировать harness/corpus/input/rubric/checker, каталог моделей,
+- [x] Зафиксировать harness/corpus/input/rubric/checker, каталог моделей,
   skills, judge executable/config и Loginom images/resource pins.
-- [ ] После build/offline checks создать отдельную карточку и campaign ID,
+- [x] После build/offline checks создать отдельную карточку и campaign ID,
   новые manifest/journal/results и ровно 234 уникальных ключа.
-- [ ] Опубликовать несекретный паспорт сборки и проверить upload/download.
+- [x] Опубликовать несекретный паспорт сборки и проверить upload/download.
   Маленький файл не доказывает доставку большого архива.
-- [ ] Создать scoped wakeups (periodic 1800 + blocked), перечитать их.
-- [ ] Первый reserve выполнить с authenticated issue.created_at через
+- [x] Создать scoped wakeups (periodic 1800 + blocked), перечитать их.
+- [x] Первый reserve выполнить с authenticated issue.created_at через
   `--initial-progress-at` до remote readiness. Срок и issue ID сохранять.
-- [ ] Подтвердить доступ EvalOps/EvalBaseline из их runtime и native delegation.
-- [ ] Подготовить fresh scoped slots и штатные native prepare/verify N6 с
-  новым binary, browser, bwrap, auth и подтверждённым cleanup.
+- [x] Подтвердить доступ EvalOps/EvalBaseline из их runtime и native delegation.
+- [ ] Проверить существующие освобождённые slots штатным fresh native verify N6
+  с новым binary, browser, bwrap, auth и подтверждённым cleanup. Повторный
+  prepare нужен только при установленном дефекте подготовки.
 - [ ] Проверить READY всех шести слотов штатным requestPreflight. Первые
   ordinary3 и первый analytic6 являются baseline-измерениями; подтвердить
   события/историю/артефакты/судью/очистку и реальный N6 overlap.
@@ -106,11 +107,9 @@ LAB-262 завершила 234 измерения (208 PASS/26 FAIL), но ар�
 ## Checkpoint
 
 27.10.2026: реализация начата по явному поручению владельца. Ветка создана,
-runtime/agent models не менялись; карточка и новые измерения ещё не созданы.
-Параллельно проверяются artifact build, offline evidence и read-only runner1.
+runtime/agent models не менялись. Подготовка, freeze и handoff завершены;
+текущая точка продолжения приведена в последнем подразделе ниже.
 Private evidence: `/home/kiselev/storage/tmp/luna-baseline-20261027/`.
-Следующий шаг: принять проверенный полный CLI и свободную совместимую
-среду, затем создать карточку и выполнить anchored reserve.
 
 ### Подготовка поставки
 
@@ -127,8 +126,8 @@ publisher продолжает доставку. Это не readiness ново�
 
 Отдельный новый harness/state размещается внутри существующего разрешённого
 каталога `full-corpus-033/baseline-luna`; CLI — в отдельном runtime-каталоге.
-Так используется прежний строгий root judge helper без его изменения и
-без новой sudo rule. Native slots/pair/resource budget сохраняются; их
+Так используется прежний строгий root judge helper без его изменения.
+Native slots/pair/resource budget сохраняются; их
 повторно проверит новая поставка. Прежний одинаковый frozen catalog
 `ac20d24a2b631a32b596ab5de765dfe8d5049d7d7081838745cfa29d917d189a`
 уже содержит Luna/xhigh/priority, поэтому обновлять профили не требуется.
@@ -168,3 +167,42 @@ CLI и новый harness установлены отдельно, старые 
 независимый review и visudo/effective-policy read-back — PASS.
 Следующий шаг: закрепить финальный acceptedHarness, создать новую карточку,
 scoped wakeups и 234-key manifest, выполнить anchored reserve и передать Ops.
+
+### Freeze, LAB-334 и native handoff
+
+Карточка [LAB-334](https://mas.kartamyshev.dev/lab/issues/LAB-334) создана
+27.10.2026 в 14:59:39 МСК после build/offline qualification. Campaign ID
+`luna-xhigh-fast-20261027`; карточка назначена EvalOps без squad.
+Accepted harness — чистый `ed129d19471d1fd42f2e6104486df6e7dd0f943f`;
+product source по-прежнему `05bb48274f53f510fb19c4d79a6272a8ee474178`.
+Позднейшие doc-only commits не меняют установленный acceptedHarness.
+
+Новые config/state/manifest/journal находятся в
+`/home/user/.local/state/loginom-evals/runner1/full-corpus-033/baseline-luna/`.
+Проверены 234 уникальных ключа, corpus/input/rubric/checker pins, resource
+budget, judge и images. Manifest после штатной JSON canonicalization имеет
+SHA-256 `b488bf70037772958e579a57a4bf08a880b8ebfa8c401a8ae5c9431163f3ae47`.
+Ordinary fallback timeout закреплён `EVAL_TASK_TIMEOUT_MS=900000`;
+analytic/node сохраняют явные timeout кейсов. Полный несекретный паспорт
+прикреплён к карточке, скачан обратно и проверен по SHA-256
+`0b26e6fb2f9221f9d6703a5ce936ebc73b87fa889858c51b710e545439b65df9`.
+
+Первый reserve выполнен до readiness с authenticated created_at карточки:
+`initialProgressAt=1793102379000`. Повтор Ops сохранил owner/clock.
+Включены и перечитаны только scoped wakeups: periodic 1800 секунд
+`01a17d3c-c444-7348-ac61-c7920991bafa` и blocked
+`01a17d3c-a11e-70c7-bd06-d8ba69dabf0a`. Уведомление о delegated task failure
+обеспечивается native delegation; дополнительного scheduler нет.
+
+EvalOps лично подтвердил SSH и свободные ресурсы, затем передал ровно одно
+поручение из task `01a17d41-9879-7820-bc6a-ba9f49d43ebe`.
+EvalBaseline task `01a17d43-779b-79c4-afba-80a72b154c81` имеет точную native
+атрибуцию delegation с evidence comment `01a17d43-7770-7c3f-a8f3-aaec4b343e60`.
+Исполнитель принял поручение, самостоятельно подтвердил SSH, clean HEAD,
+pins и reservations и в 15:11 МСК начал fresh managed native verify N6
+под controllerLock. Измерения на этой точке ещё не подтверждены.
+
+Следующий шаг: дождаться verify/cleanup и штатного requestPreflight READY
+для всех шести слотов, затем проверить ordinary3 и analytic6 как реальные
+измерения. Запуск/продолжение принадлежат EvalBaseline и campaign-службе;
+технический ремонт координирует EvalOps. Не дублировать активные операции.
