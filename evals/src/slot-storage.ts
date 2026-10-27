@@ -96,7 +96,7 @@ export async function archiveStartupHistory(file: SlotFile, lease: SlotLease) {
   await mkdir(archive, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => { if (error.code !== "EEXIST") throw error })
   await archiveProfileEvidence(lease.slot.profileDir, archive, journal)
   await lease.assertHeld()
-  return { archive, journal, inventory: await startupArchiveInventory(lease.slot.historyDir, archive) }
+  return { archive, journal }
 }
 
 export async function archiveSlotWorkspaces(slot: SlotLease["slot"], archive: string, prefixes: string[], attemptDirs: string[]) {

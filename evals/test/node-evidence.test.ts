@@ -24,6 +24,17 @@ test("положительное native доказательство и negative
       return validateNodeAttempt(root, root, "/user/node-evals-crosstable-fixed-sum-3.lgp")
     }
     expect(await check()).toEqual({ errors: [], failures: [] })
+    const optionalMetadata = structuredClone(events)
+    const source = optionalMetadata.find((event: { part: { state: { input: { target?: { type: string } } } } }) =>
+      event.part.state.input.target?.type === "imports.text").part.state.input.parameters.source
+    delete source.bytes
+    delete source.sha256
+    expect(await check(optionalMetadata)).toEqual({ errors: [], failures: [] })
+    for (const [key, value] of Object.entries({ bytes: 0, sha256: "0".repeat(64) })) {
+      source[key] = value
+      expect((await check(optionalMetadata)).failures.join(" ")).toContain("input")
+      delete source[key]
+    }
     await Bun.write(path.join(root, "data/sales.csv"), input.replace("N,A,10", "N,A,11"))
     expect((await check()).failures.join(" ")).toContain("input")
     await Bun.write(path.join(root, "data/sales.csv"), input)

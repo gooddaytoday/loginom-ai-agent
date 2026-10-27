@@ -34,8 +34,8 @@ export async function checkNodeEvidence(taskDir: string, attemptDir: string, id:
         const input = request.input, r = receipt.output, src = input.parameters?.source, rb = r.configuration?.readback
         return delivery && input.target?.type === "imports.text" && r.node?.node_id === imp?.id && r.execution?.status === "completed" &&
           src?.upload_operation_id === delivery.output.output.upload_operation_id &&
-          (src.bytes === source.length || contract.native && src.bytes === undefined) &&
-          (src.sha256 === hash || contract.native && src.sha256 === undefined) &&
+          (src.bytes === source.length || src.bytes === undefined) &&
+          (src.sha256 === hash || src.sha256 === undefined) &&
           rb?.source?.source_path === delivery.output.output.destination && rb?.source?.first_line_as_title === true && (rb?.format?.delimiter === "," || contract.native && rb?.format?.delimiter === "Запятая") &&
           (!contract.native || input.document_id === r.node.document_id && input.workflow_ref?.workflow_id === r.node.workflow_id &&
             (index === 0 ? input.target.kind === "new" : input.target.kind === "existing" &&
