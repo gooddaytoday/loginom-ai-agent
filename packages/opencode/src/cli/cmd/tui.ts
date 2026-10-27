@@ -94,7 +94,6 @@ function createUpdater(latest: () => Promise<UpdateNotice | undefined>): UpdateS
       const { Installation } = await import("@/installation")
       const method = await Installation.method()
       if (method === "unknown") throw new Error("Installation method not found")
-      if (target.type === "major") return Installation.upgradeMajor(method)
       return Installation.upgrade(method, target.version)
     },
   }
