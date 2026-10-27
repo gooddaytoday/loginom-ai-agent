@@ -266,7 +266,7 @@ test('an uncertain preparation reply cannot restart opening from a reserved brow
   assert.equal(metadata.workspaceReady,false);assert.deepEqual(fixture.events,events);
 });
 
-for (const address of ['https://app.loginom.ai', 'https://app.loginom.ai/app/', 'https://app.loginom.ai/?lang=ru&testable=false', 'https://private.example/custom/?lang=ru']) {
+for (const address of ['https://app.loginom.ai', 'https://app.loginom.ai/app/', 'https://app.loginom.ai/?lang=ru&testable=false', 'https://private.example/custom/?lang=ru', 'https://private.example/app']) {
   test('private login and preparation share the canonical address: '+address, async () => {
     const fixture=pageFixture();
     await loginPage(fixture.page,{url:address,username:'test-account',password:''});
@@ -280,8 +280,27 @@ for (const address of ['https://app.loginom.ai', 'https://app.loginom.ai/app/', 
   });
 }
 
+test('public /app preparation accepts the page after its trailing-slash redirect', async () => {
+  const fixture=pageFixture();
+  const goto=fixture.page.goto;
+  fixture.page.goto=async value=>{
+    const url=new URL(value);
+    if(url.origin==='https://app.loginom.ai' && url.pathname==='/app')url.pathname='/app/';
+    await goto(url.href);
+  };
+  const address='https://app.loginom.ai/app?lang=ru';
+  await loginPage(fixture.page,{url:address,username:'test-account',password:''});
+  const state=await execute(fixture,{loginomUrl:loginomAddress(address)});
+  assert.equal(state.status,'READY',JSON.stringify(state));
+  assert.equal(state.authenticated,true);
+  assert.equal(fixture.events.filter(event=>event==='create_draft').length,1);
+  assert.equal(new URL(fixture.page.url()).searchParams.get('lang'),'ru');
+  assert.equal(new URL(fixture.page.url()).searchParams.get('testable'),'true');
+  assert.equal(loginomAddress('https://private.example/app'),'https://private.example/app?testable=true');
+});
+
 test('prepared login rejects a foreign path or origin before creating a draft', async () => {
-  for (const address of ['https://app.loginom.ai/foreign/', 'https://other.example/app/']) {
+  for (const address of ['https://app.loginom.ai/foreign/', 'https://other.example/app/', 'http://app.loginom.ai/app/', 'https://app.loginom.ai/app-other/']) {
     const fixture=pageFixture();
     await loginPage(fixture.page,{url:'https://app.loginom.ai',username:'test-account',password:''});
     await fixture.page.goto(address);

@@ -65,7 +65,7 @@ An invalid port read marks the scenario FAIL but allows the remaining business
 steps and cold check when Save and main cleanup are confirmed. For q scenarios,
 this also retains failures from the base scenario in the final result.
 
-Supported names: n1–n20, p1–p24, s1–s8, q1–q10, r1–r6, and
+Supported names: n1–n20, p1–p25, s1–s8, q1–q10, r1–r6, and
 v1s1–v3s6 (three prompt variants for each s1–s6). Variants read
 `stability-2026-10-20/sN-*/prompt-vK.md` and reuse the demo's data/oracle.
 n13–n20 use their CSV-checking oracle as the CSV verdict, without rechecking
@@ -83,18 +83,18 @@ never share a whole profile or `cold-config.json` (they contain credentials).
 Offline tests: from `scripts/node-acceptance/tests`, run
 `python3 -m unittest test_run_check -v`.
 
-CSV specification audit (all 86 supported names, including variants):
+CSV specification audit (all 87 supported names, including variants):
 
 | Field | Names using it | CSV behavior / stock cold responsibility |
 |---|---:|---|
-| `name`, `label` | 86 / 29 | Check the selected header mode; cold checks both native metadata fields. |
+| `name`, `label` | 87 / 30 | Check the selected header mode; cold checks both native metadata fields. |
 | `label_any` | 58 | Free labels only in labels mode; names stay bound. Native labels remain governed by stock cold. |
-| `name_any` | 1 (p22) | Bind freely named columns uniquely by complete column values, then check row associations. |
+| `name_any` | 2 (n18, p22) | Bind freely named columns uniquely by complete column values, then check row associations. |
 | `category_labels_any` | 1 (n19) | CSV oracle owns n19; generic matching preserves a nonempty bijection of categories. |
-| `type`, `types` | 86 / 5 | CSV compares serialized values, including numeric equivalents. Stock cold alone verifies native types and allowed type sets. |
+| `type`, `types` | 87 / 7 | CSV compares serialized values, including numeric equivalents. Stock cold alone verifies native types and allowed type sets. |
 | `tolerance` (`abs`, `rel`) | 20 | Preserve finite numeric values within the declared maximum absolute/relative tolerance; use complete row matching when ranges overlap. |
-| `ordered` | 86 | Preserve sequence when true; otherwise match every row, including duplicates. |
-| `column_order` | 48 | Exact when declared; otherwise map unique headers, as in the stock matcher. Node-base CSV override remains independent of native port order. |
+| `ordered` | 87 | Preserve sequence when true; otherwise match every row, including duplicates. |
+| `column_order` | 50 | Exact when declared; otherwise map unique headers, as in the stock matcher. Node-base CSV override remains independent of native port order. |
 
 Counts above describe the specifications actually loaded by the runner. All
 static `expected-demo.json` files were also inspected: they introduce no extra

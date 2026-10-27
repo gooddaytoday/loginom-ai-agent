@@ -38,7 +38,7 @@ def git(*args, cwd=REPO):
 def scenario(name):
     stability = DATA / 'stability-2026-10-20'
     base = None
-    if re.fullmatch(r'(?:n(?:[1-9]|1[0-9]|20)|p(?:[1-9]|1[0-9]|2[0-4]))', name):
+    if re.fullmatch(r'(?:n(?:[1-9]|1[0-9]|20)|p(?:[1-9]|1[0-9]|2[0-5]))', name):
         src = stability / name
         base = 's1' if name in ['p23', 'p24'] else None
     elif re.fullmatch(r'[qr][1-6]|q(?:[7-9]|10)', name):
