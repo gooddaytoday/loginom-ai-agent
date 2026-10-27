@@ -17,7 +17,6 @@ export function shouldNotify(input: {
   return Installation.isUpdate(input.current, input.latest)
 }
 
-// Returns undefined when checks are disabled or fail, so the TUI only suggests OpenCode 2 after a successful check.
 export async function upgrade() {
   const config = await AppRuntime.runPromise(Config.Service.use((cfg) => cfg.getGlobal()))
   if (config.autoupdate === false || Flag.LOGINOM_AI_AGENT_DISABLE_AUTOUPDATE) return
@@ -26,7 +25,7 @@ export async function upgrade() {
   const latest = await Installation.latest(method).catch(() => {})
   if (!latest) return
   if (
-    shouldNotify({
+    !shouldNotify({
       autoupdate: config.autoupdate,
       disabled: Flag.LOGINOM_AI_AGENT_DISABLE_AUTOUPDATE,
       always: Flag.LOGINOM_AI_AGENT_ALWAYS_NOTIFY_UPDATE,
@@ -34,6 +33,6 @@ export async function upgrade() {
       latest,
     })
   )
-    return { type: "available" as const, version: latest }
-  return { type: "major" as const }
+    return
+  return { type: "available" as const, version: latest }
 }

@@ -134,13 +134,7 @@ function UpdateNotification(props: { width: number }) {
         >
           <text fg={theme.textMuted}>
             <span style={{ fg: theme.primary }}>{state.type === "installed" ? "/exit" : "/update"}</span>
-            {state.type === "available"
-              ? ` to install v${state.version}`
-              : state.type === "major"
-                ? " to upgrade to OpenCode 2.0"
-                : state.target.type === "major"
-                  ? " restart to use OpenCode 2.0"
-                  : ` restart to use v${state.target.version}`}
+            {state.type === "available" ? ` to install v${state.version}` : ` restart to use v${state.target.version}`}
           </text>
         </box>
       )}
