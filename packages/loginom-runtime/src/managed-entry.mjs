@@ -11,7 +11,7 @@ import { runtimeCallTimeout } from "./call-timeout.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
 import { loginBrowser, loginomAddress } from "./connection-check.mjs"
 import { createSession } from "../client/lib/session.mjs"
-import { admitStartupArtifacts } from "../client/lib/artifacts.mjs"
+import { admitStartupArtifacts, artifactFailure } from "../client/lib/artifacts.mjs"
 import { createBridge } from "../client/lib/bridge.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
@@ -277,7 +277,7 @@ async function handle(message) {
     if (message.operation === "start" && error?.message === "LOGINOM_RUNTIME_CLEANUP_FAILED")
       state.startupCleanupFailed = true
     const code = /^LOGINOM_[A-Z_]+$/.test(error?.message ?? "") ? error.message : "LOGINOM_RUNTIME_FAILED"
-    send({ id: message.id, error: code }, message.operation === "close")
+    send({ id: message.id, ...(artifactFailure(error) ?? { error: code }) }, message.operation === "close")
     if (message.operation === "start") {
       // Clean up immediately, but keep IPC until the owner requests an acknowledged close.
       // close() retains a rejection so that the later close request reports cleanup failure.

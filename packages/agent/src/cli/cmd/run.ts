@@ -20,6 +20,8 @@ import type { Argv } from "yargs"
 import path from "path"
 import { pathToFileURL } from "url"
 import { fileSnapshot } from "@/util/file-snapshot"
+import { stat } from "node:fs/promises"
+import { fileError, hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { Cause, Effect, Exit } from "effect"
 import { ProviderV2 } from "@loginom-ai-agent/core/provider"
 import { ModelV2 } from "@loginom-ai-agent/core/model"
@@ -394,22 +396,20 @@ export const RunCommand = effectCmd({
 
         for (const filePath of list) {
           const resolvedPath = path.resolve(args.attach ? root : (directory ?? root), filePath)
-          if (!(await Filesystem.exists(resolvedPath))) {
-            UI.error(`File not found: ${filePath}`)
-            exitCli(1)
-          }
-
-          const stat = Filesystem.stat(resolvedPath)
-          const isDirectory = stat?.isDirectory() ?? false
+          const info = await stat(resolvedPath).catch((error) => {
+            UI.error(hostErrorText(fileError(error)))
+            return exitCli(1)
+          })
+          const isDirectory = info.isDirectory()
           if ((args.attach || process.env.LOGINOM_AI_AGENT_CLI_ROOT) && isDirectory) {
-            UI.error(`Cannot attach local directory without a shared filesystem: ${filePath}`)
+            UI.error(hostErrorText("LOGINOM_FILE_NOT_REGULAR"))
             exitCli(1)
           }
 
           const detected = FSUtil.mimeType(resolvedPath)
           if (!args.attach && detected === "application/x-loginom-package") {
-            if (!stat?.isFile()) {
-              UI.error(`Cannot attach a non-regular Loginom package: ${filePath}`)
+            if (!info.isFile()) {
+              UI.error(hostErrorText("LOGINOM_FILE_NOT_REGULAR"))
               exitCli(1)
             }
             files.push({
@@ -423,8 +423,8 @@ export const RunCommand = effectCmd({
 
           const content = await (async () => {
             if (!args.attach && !process.env.LOGINOM_AI_AGENT_CLI_ROOT) return
-            return fileSnapshot(resolvedPath).catch((error: Error) => {
-              UI.error(`${error.message}: ${filePath}`)
+            return fileSnapshot(resolvedPath).catch((error: unknown) => {
+              UI.error(hostErrorText(error))
               return exitCli(1)
             })
           })()

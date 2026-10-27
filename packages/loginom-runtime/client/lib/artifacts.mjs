@@ -8,6 +8,20 @@ import {requireExportDestination,requireStorageDestination} from './storage-poli
 import {protectWindowsDirectory} from './platform.mjs';
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+const fileCodes = new Set(['LOGINOM_FILE_TOO_LARGE','LOGINOM_FILE_NOT_FOUND','LOGINOM_FILE_NOT_REGULAR','LOGINOM_FILE_ACCESS_DENIED','LOGINOM_FILE_CHANGED']);
+function fileFailure(code,details={}) {
+  return Object.assign(new Error(code),{details});
+}
+// Only known file failures may carry numeric metadata through managed IPC.
+export function artifactFailure(error) {
+  if(!fileCodes.has(error?.message))return null;
+  const details={};
+  if(error.message==='LOGINOM_FILE_TOO_LARGE')for(const key of ['actual','limit']) {
+    const value=error.details?.[key];
+    if(Number.isSafeInteger(value)&&value>=0)details[key]=value;
+  }
+  return {error:error.message,details};
+}
 const validName = name => typeof name==='string' && name.length>0 && name.length<=200
   && !/[\\/:<>"|?*\x00-\x1f\x7f]/.test(name) && !/[. ]$/.test(name)
   && !/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name);
@@ -38,14 +52,15 @@ export async function admitStartupArtifacts(store, requests) {
         || !['bytes,name,sha256,sourcePath','bytes,name,sha256,sourcePath,upload'].includes(Object.keys(request).sort().join(','))
         || typeof request.sourcePath!=='string' || !isAbsolute(request.sourcePath)
         || !validName(request.name) || !Number.isSafeInteger(request.bytes)
-        || request.bytes<0 || request.bytes>16*1024*1024
+        || request.bytes<0
         || typeof request.sha256!=='string' || !/^[a-f0-9]{64}$/.test(request.sha256)) throw new Error('Invalid input artifact request');
+    if(request.bytes>16*1024*1024)throw fileFailure('LOGINOM_FILE_TOO_LARGE',{actual:request.bytes,limit:16*1024*1024});
     if(Object.hasOwn(request,'upload'))validateUploadAuthorization(request.upload);
     const name=request.name.normalize('NFC').toLowerCase();
     if (names.has(name)) throw new Error('Input artifact names must be distinct');
     names.add(name);total+=request.bytes;
   }
-  if (total>64*1024*1024) throw new Error('Input artifact batch exceeds its byte limit');
+  if (total>64*1024*1024) throw fileFailure('LOGINOM_FILE_TOO_LARGE',{actual:total,limit:64*1024*1024});
   const admitted=[];
   try { for (const request of requests) admitted.push(await store.admit(request)); }
   catch (error) {
@@ -56,14 +71,16 @@ export async function admitStartupArtifacts(store, requests) {
 }
 
 async function readVerified(path, expected, maxBytes) {
-  if (!Number.isSafeInteger(expected.bytes) || expected.bytes<0 || expected.bytes>maxBytes
+  if (!Number.isSafeInteger(expected.bytes) || expected.bytes<0
       || !/^[a-f0-9]{64}$/.test(expected.sha256)) throw new Error('Invalid artifact identity');
+  if(expected.bytes>maxBytes)throw fileFailure('LOGINOM_FILE_TOO_LARGE',{actual:expected.bytes,limit:maxBytes});
+  try {
   const info=await lstat(path);
-  if (!info.isFile() || info.isSymbolicLink()) throw new Error('Artifact must be a regular file');
+  if (!info.isFile() || info.isSymbolicLink()) throw fileFailure('LOGINOM_FILE_NOT_REGULAR');
   const file=await open(path,constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
   try {
     const stat=await file.stat();
-    if (!stat.isFile() || stat.size!==expected.bytes || stat.ino!==info.ino || stat.dev!==info.dev) throw new Error('Artifact changed before reading');
+    if (!stat.isFile() || stat.size!==expected.bytes || stat.ino!==info.ino || stat.dev!==info.dev) throw fileFailure('LOGINOM_FILE_CHANGED');
     // Bounded even if another process grows the file after stat().
     const bytes=Buffer.alloc(expected.bytes+1);let offset=0;
     while(offset<bytes.length) {
@@ -72,9 +89,14 @@ async function readVerified(path, expected, maxBytes) {
       offset+=result.bytesRead;
     }
     const result=bytes.subarray(0,offset);
-    if (offset!==expected.bytes || sha(result)!==expected.sha256) throw new Error('Artifact size or SHA does not match the admitted identity');
+    if (offset!==expected.bytes || sha(result)!==expected.sha256) throw fileFailure('LOGINOM_FILE_CHANGED');
     return result;
   } finally {await file.close();}
+  } catch(error) {
+    if(['ENOENT','ENOTDIR'].includes(error.code))throw fileFailure('LOGINOM_FILE_NOT_FOUND');
+    if(['EACCES','EPERM'].includes(error.code))throw fileFailure('LOGINOM_FILE_ACCESS_DENIED');
+    throw error;
+  }
 }
 
 export async function createArtifactStore({directory,maxBytes=16*1024*1024,sessionId=null,storageDirectories=null}) {

@@ -1,6 +1,6 @@
 import { loginomResultState, loginomResultSummary } from "./loginom-result"
 import { LoginomHost } from "@loginom-ai-agent/loginom-host/adapter"
-import { hostError } from "@loginom-ai-agent/loginom-host/errors"
+import { hostError, hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
 import { CallToolResultSchema, ListToolsResultSchema } from "@modelcontextprotocol/sdk/types.js"
 import { Agent } from "@/agent/agent"
 import { SessionV1 } from "@loginom-ai-agent/core/v1/session"
@@ -568,7 +568,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   if (loginom) {
     if (input.loginomStatus) delete input.loginomStatus.failure
     const failed = (phase: string, error: unknown) => {
-      if (input.loginomStatus) input.loginomStatus.failure = phase + ": " + hostError(error)
+      if (input.loginomStatus) input.loginomStatus.failure = phase + ": " + hostErrorText(error)
     }
     const catalog = yield* Effect.promise(() =>
       loginom
@@ -616,7 +616,11 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                 )
               ctx.abort.throwIfAborted()
               const artifacts = yield* Effect.promise(() =>
-                loginom.admit(JSON.stringify(["local-file", ctx.messageID, ctx.callID]), [source.file]),
+                loginom
+                  .admit(JSON.stringify(["local-file", ctx.messageID, ctx.callID]), [source.file])
+                  .catch((error) => {
+                    throw Error(hostErrorText(error))
+                  }),
               )
               if (!Array.isArray(artifacts) || artifacts.length !== 1)
                 return yield* Effect.die(Error("LOGINOM_INPUT_INVALID: " + source.sourcePath))
@@ -749,14 +753,18 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
                     : undefined
                 const result = yield* Effect.promise(async () =>
                   CallToolResultSchema.parse(
-                    await loginom.call(
-                      definition.name,
-                      forwarded,
-                      task.taskMessageID,
-                      options.abortSignal,
-                      LOGINOM_LOCAL_TOOLS.has(definition.name) ? undefined : admissions,
-                      packageInput,
-                    ),
+                    await loginom
+                      .call(
+                        definition.name,
+                        forwarded,
+                        task.taskMessageID,
+                        options.abortSignal,
+                        LOGINOM_LOCAL_TOOLS.has(definition.name) ? undefined : admissions,
+                        packageInput,
+                      )
+                      .catch((error) => {
+                        throw Error(hostErrorText(error))
+                      }),
                   ),
                 )
                 yield* plugin.trigger(
