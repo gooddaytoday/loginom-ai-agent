@@ -314,14 +314,70 @@ Details ограничены, без credential/байтов файла/stack; �
 
 ## Desktop и инструкции модели
 
-Для этапа 2 выбираем минимальный Desktop UX: до чтения `attachment-picker.ts`
-проверяет stat и отклоняет файл >16 МиБ с actual/limit и подсказкой
-«Большой файл: укажите путь к нему в сообщении; агент создаст профиль и выборку».
-Без выделения ArrayBuffer и base64. Вложение-ссылка через renderer в этом этапе
-не вводится; путь из сообщения проходит обычный `authorizeLoginomFile`.
-CLI `--file` сохраняет явный 10 МиБ отказ с такой же подсказкой.
+Большое вложение данных **обрабатывается**, а не отклоняется из-за размера.
+Порог Desktop — **>16 МиБ на файл**, по границе нынешнего byte admission host;
+CLI `--file` — **>10 МиБ**, по границе нынешнего snapshot CLI. Ровно 16/10 МиБ
+соответственно и меньшие файлы идут нынешним путём с его совокупными лимитами.
+Большие ссылки не входят в бюджет байтов inline-вложений; предел SHA-сверки
+серверной копии остаётся 16 МиБ независимо от способа приложения файла.
 
-Skill `packages/product/skills/loginom-automation`: >16 МиБ → profile, уточнение
+Desktop picker возвращает descriptor `local_reference` с исходным `sourcePath`
+и metadata **до** `readPickedFile`/`readAttachment` в `attachment-picker.ts`.
+Renderer не создаёт для него `new File([bytes])` или фиктивный пустой File:
+ссылка хранит настоящий размер и не маскируется под малое вложение.
+Drag-and-drop использует `getPathForFile` в `prompt-input/attachments.ts` и тот
+же descriptor; ветка выбирается до чтения содержимого и `draftStore.putBlob` /
+`createBlobReference`. Для большого файла без `sourcePath` (например, вставка
+из буфера) — понятный отказ: «У вложения нет пути на диске. Сохраните файл и
+приложите его через выбор файла либо укажите путь». Blob не сохраняется даже
+временно; малые вложения без пути сохраняют нынешнее поведение.
+
+`build-request-parts.ts` формирует обычный `file` part с правильно экранированным
+`file://` URL, по образцу ветки `LOGINOM_PACKAGE_MIME` для `.lgp`; сам `.lgp`
+сохраняет свою отдельную обработку. В draftStore/IndexedDB допускаются только
+descriptor и ссылка, **без большого blob**; `submit.ts` не вызывает для ссылки
+`blobDataUrl`, в сессии нет `data:`/base64 и байтов файла. При восстановлении
+черновика/сессии ссылка остаётся ссылкой, без обхода через inline-сериализацию.
+`attachment-preview.ts` не декодирует её как текст: вместо текстового превью
+модель получает ограниченный профиль через `loginom_file_profile` этой ссылки.
+Backend разрешает file URL через `fileURLToPath` и receipt перед авторизацией;
+query/fragment запрещены, пробелы, кириллица, `%` и `#` остаются частью пути.
+`session/tools.ts` исключает ссылки из byte-групп обычных вложений: большой файл
+не читается и не пересылается в host на каждом Dock-вызове. Host получает
+авторизованный grant/descriptor по описанному выше пути доставки, с повторным
+использованием в пределах действующей generation, а не повторной отправкой bytes.
+
+В момент добавления вложения доверенный native/backend слой фиксирует receipt:
+исходный и canonical path, file identity (file ID / dev+ino), size, mtime с
+доступной точностью, ctime где доступен. Picker делает это при выборе; для
+drag-and-drop — до добавления ссылки в draft, сверяя также File size/lastModified
+с native stat. Renderer не является авторитетом identity: receipt хранится
+доверенно и связывается с attachment и исходным user-message при отправке;
+произвольные metadata/URL модели не создают grant. Отпечаток не обновляется
+на более новый файл при отправке, восстановлении сессии или вызове инструмента.
+
+При profile, sample, полном проходе и staging сверяем receipt до/после чтения,
+включая canonical target: удалённый файл → `LOGINOM_FILE_NOT_FOUND`, замена,
+перенаправление symlink или изменение → `LOGINOM_FILE_CHANGED`. Не прикладываем
+автоматически новое содержимое по прежнему имени: требуется новое вложение.
+SHA в момент добавления ещё не вычислен; он считается потоком позже и привязан
+к исходному receipt и SHA точного прохода по уже описанным правилам snapshot.
+Так проверка сохранности не требует чтения нескольких ГБ в picker/renderer.
+Вложение даёт чтение без повторного ask через `authorizeLoginomFile`, как в
+[дизайне #465, п. 4](2026-10-21-local-file-paths-design.md#общая-авторизация-локального-пути);
+явный deny по исходному/canonical пути и права ОС сохраняют приоритет.
+
+CLI `--file` фиксирует такой же receipt при обработке аргумента и для файла
+>10 МиБ создаёт `file://` part через `pathToFileURL`, без `fileSnapshot`,
+base64 или отказа из-за прежнего 10-МиБ лимита. Передача через CLI в локальный
+backend сохраняет reference/receipt и авторизацию вложения. Недоступный backend
+путь не разрешается чтением одноимённого файла другой машины (граница доставки
+по локальной ссылке описана выше). После принятия большого вложения оба входа
+выполняют тот же цикл profile → sample → сценарий → полный файл → один execute
+→ сверка; oracle модели не передаётся.
+
+Skill `packages/product/skills/loginom-automation`: большие dataset file-ссылки
+(включая CLI >10 МиБ), а также пути >16 МиБ → profile, уточнение
 неоднозначного диалекта, sample, сценарий на sample, exact full scan, доставка
 полного файла, source patch/readback, один execute, N и business сверка, Save.
 Не использовать Read для «посмотреть первые строки» большого датасета:
@@ -338,11 +394,16 @@ Skill `packages/product/skills/loginom-automation`: >16 МиБ → profile, ут
    exact scan, bounded ответ, lineage; генератор с независимым oracle.
 3. **Доставка по ссылке.** Backend grants + staging + private IPC, asynchronous
    start/status/cancel, FileStore size, dedup и cleanup; изменение host AGENTS.
+   Доверенный attachment receipt с отпечатком при вложении, сохранение file-ссылки
+   в backend и исключение её из inline byte admission/повторных Dock-пересылок.
 4. **Источники и полный расчёт.** Storage refs без повторного full upload,
    потоковый browser download/cache для server-only sample, source patch с
    неизменной схемой, полный execution receipt/count, text/Excel lineage >16 МиБ.
-5. **Интеграция и приёмка.** Skill, Desktop отказ до чтения, CLI подсказка,
-   run-check сценарии, RSS и отказные сценарии, cold/cleanup на точном SHA.
+5. **Интеграция и приёмка.** Skill; Desktop picker и drag-and-drop → reference
+   без чтения/Blob; renderer → server и CLI `--file` → file part/receipt/profile;
+   понятная подсказка для большого вложения без пути. Run-check сценарии
+   «большой CSV приложен к чату» для Desktop и CLI, RSS и отказные сценарии,
+   cold/cleanup на точном SHA.
 
 Большая часть логики — новые Loginom-specific файлы. В унаследованных
 `session/tools.ts`, `cli/cmd/run.ts`, `prompt.ts` — только тонкая проводка,
@@ -370,6 +431,9 @@ CSV и XLSX: seed, точный target bytes/minimum boundary, rows, encoding, d
 | Проверка | Критерий |
 |---|---|
 | Большой CSV | Целевой размер; UTF-8 и cp1251; `;` + decimal comma; LF/CRLF; кавычки, escaped quotes и multiline, header + skip, последний LF без фантомной строки |
+| Большой CSV в Desktop-чате | Отдельно picker и drag-and-drop с sourcePath, путь renderer → server без подмены server request: file:// part + доверенный receipt; модель получает профиль; sample→full даёт oracle/N. Нет большого readPickedFile/ArrayBuffer, blob в draftStore/IndexedDB, data:/base64 в сессии и bytes на повторных Dock-вызовах; повторное открытие draft/сессии сохраняет ссылку |
+| Большой CSV через CLI --file | Продуктовый standalone CLI, тот же целевой файл: >10 МиБ → file:// + receipt без snapshot/base64 и повторного ask; profile→sample→full, точные суммы/N, Save/cold/cleanup |
+| Границы вложений и изменение источника | Desktop: ровно 16 МиБ inline, 16 МиБ+1 ссылкой; CLI: ровно 10 МиБ inline, 10 МиБ+1 ссылкой. Большой файл без sourcePath отклонён до blob/чтения с подсказкой; малый без пути работает. Изменение, удаление, замена inode/symlink после вложения, в том числе до отправки и после восстановления сессии → CHANGED/NOT_FOUND без загрузки нового содержимого; explicit deny важнее вложения |
 | Тип глубоко в файле | Изменение после всех быстрых окон; exact scan находит первое нарушение с logical record/physical line/offset; sample не объявляет full validation |
 | XLSX | Около 500 тыс. строк, 1–8 колонок, SST, даты, NULL; sample XLSX сохраняет семантику; full N и суммы равны oracle |
 | Бизнес-сценарий | «Сумма продаж по регионам» построен на sample; после source switch один full execute, точные N и суммы, schema/mapping сохранены |
