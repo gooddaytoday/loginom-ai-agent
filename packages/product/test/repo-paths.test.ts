@@ -1,15 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { existsSync, readFileSync, statSync } from "node:fs"
+import { existsSync, statSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
+import { trackedSnapshot } from "./tracked"
 
 // Guards for the failure that renaming or moving a package produces silently: CI, turbo and build scripts keep
 // pointing at the old location. The sync procedure (docs/upstream-sync/procedure.md) runs this file after a merge.
 const root = resolve(import.meta.dir, "../../..")
-const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 29 })
-  .split("\0")
-  .filter(Boolean)
-const read = (path: string) => readFileSync(join(root, path), "utf8")
+const { paths: tracked, read } = trackedSnapshot(root)
 const isDir = (path: string) => existsSync(path) && statSync(path).isDirectory()
 
 // Workspace packages as the root manifest declares them.

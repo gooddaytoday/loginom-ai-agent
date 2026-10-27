@@ -1,17 +1,13 @@
 import { describe, expect, test } from "bun:test"
-import { execFileSync } from "node:child_process"
-import { readFileSync } from "node:fs"
-import { join, resolve } from "node:path"
+import { resolve } from "node:path"
+import { trackedSnapshot } from "./tracked"
 
 // Naming policy (docs/upstream-sync/adr-0001-modular-integration.md): packages that exist in OpenCode keep the
 // upstream names so that a merge of an upstream tag does not conflict on every import and manifest. Packages that
 // exist only in this fork keep the @loginom-ai-agent scope. External names (LOGINOM_AI_AGENT_*, executable, app ids)
 // are product identity and are covered by identity.test.ts and the compat snapshot.
 const root = resolve(import.meta.dir, "../../..")
-const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 29 })
-  .split("\0")
-  .filter(Boolean)
-const read = (path: string) => readFileSync(join(root, path), "utf8")
+const { paths: tracked, read } = trackedSnapshot(root)
 
 const FORK_ONLY = ["product", "loginom-host", "runtime", "site", "evals"]
 const manifests = tracked.filter(
