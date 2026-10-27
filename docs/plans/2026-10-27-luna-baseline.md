@@ -38,7 +38,7 @@ LAB-262 и её результаты/конфигурация/незавершё
 
 - [x] Создать чистую ветку от согласованного SHA.
 - [x] Сохранить этот план и исходные решения до acceptedHarness freeze.
-- [ ] Подтвердить обязательные offline checks закреплённого исходного кода.
+- [x] Подтвердить обязательные offline checks закреплённого исходного кода.
   Использовать применимые exact-SHA/tree evidence; при необходимости из
   evals выполнить `bun typecheck`, unit/full suite и native fixtures.
 - [x] Собрать/получить полный CLI штатным build-cli.ts: Bun 1.3.14,
@@ -46,7 +46,7 @@ LAB-262 и её результаты/конфигурация/незавершё
   Локальная версия `0.3.4-baseline.<SHA>`; CI candidate допустим при
   совпадении source SHA, architecture, manifest и build options.
   Вариант Bun baseline выбирать только при отсутствии AVX2 на runner.
-- [ ] Выполнить verify-cli-candidate, проверить payload/archive/hash,
+- [x] Выполнить verify-cli-candidate, проверить payload/archive/hash,
   доставить полный artifact в новый immutable каталог и проверить снова.
 - [ ] Зафиксировать harness/corpus/input/rubric/checker, каталог моделей,
   skills, judge executable/config и Loginom images/resource pins.
@@ -143,3 +143,28 @@ heartbeat; cleanup использовал неподдерживаемый syste
 diff независимо проверены отдельными агентами. Production harness и CLI
 этими fixes не меняются. Typecheck и итог full-suite qualification пока
 ожидаются; исходный полный suite выполняется другой задачей и не дублируется.
+
+### Offline qualification завершена
+
+Полный исходный suite завершён: 1370 PASS / 77 SKIP / 7 FAIL,
+1454 tests / 7296 assertions. Это не чистый PASS: пять ошибок окружения
+успешно перепроверены на настоящем host; native recovery — на runner1.
+Последний fixture ошибочно не записывал обязательный attempt/result.json.
+Его test-only исправление использует тот же emptyResult-based attempt в
+summary и result; отрицательная проверка process proof сохранена.
+Exact RED → GREEN на runner1 — 1/1, typecheck и соседний offline test — PASS;
+план и diff приняты независимыми рецензентами. Production-код не менялся.
+
+PR evals-unit на исходном SHA: 1306 PASS / 65 SKIP / 0 FAIL
+(job 122156426465). Этот unit job исключает Docker node-ops fixtures,
+поэтому они проверены отдельно. Push job того же SHA упал в SIGINT fixture:
+watcher не успел послать сигнал; тот же test прошёл в local full suite и PR.
+Это существующее ограничение flaky fixture, не production blocker baseline.
+Полные диагностики находятся в private evidence, не в Git.
+
+CLI и новый harness установлены отдельно, старые десять защищённых файлов
+не изменились. Новые templates проверены и пока не активированы. Единственный
+новый sudo grant разрешает start ровно `loginom-evals-baseline-luna@6.service`;
+независимый review и visudo/effective-policy read-back — PASS.
+Следующий шаг: закрепить финальный acceptedHarness, создать новую карточку,
+scoped wakeups и 234-key manifest, выполнить anchored reserve и передать Ops.
