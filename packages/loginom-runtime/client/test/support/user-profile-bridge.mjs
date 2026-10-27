@@ -107,7 +107,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     Object.assign(reloadedPage.location,{origin:'https://loginom.invalid',pathname:'/'});
     Object.assign(reloadedPage.context,{innerWidth:1000,innerHeight:800,outerWidth:1000,outerHeight:900,screen:{availWidth:1000,availHeight:900}});
     class PackageTreeNode {constructor(path){this.PackageFileName=path;}}
-    let openedPackage=null,openedPath=null;
+    let openedPackage=null,openedPath=null,openDialog=null;
     reloadedPage.app.PackageTreeNode=PackageTreeNode;
     reloadedPage.app.Application={FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>({Controller:{Node:{data:{node:openedPackage}}}})}},FMapTree:{FServerConnection:{UserName:'user'}}}}};
     reloadedPage.add('button','MF;TF-1;HomePage;btnCreateUnsavedPackage');
@@ -115,7 +115,13 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     reloadedPage.evaluate=async(fn,args)=>{reloadedPage.context.args=args;return runInContext(`(${fn.toString()})(args)`,reloadedPage.context);};
     reloadedPage.locator=selector=>({isVisible:async()=>true,locator:()=>({isVisible:async()=>true,fill:async value=>{openedPath=value;}}),click:async()=>{
       reloadedPage.events.push(selector);
+      if(selector.includes('btnOpenPackage')){
+        const element=reloadedPage.add('div','OpenDialogForm');element.id='reloaded-open-picker';element.attrs.class='x-window';
+        openDialog={$className:'bg.filedialog.view.OpenDialogForm',el:{dom:element},hidden:false};
+        reloadedPage.context.Ext={getCmp:id=>id===element.id?openDialog:null};
+      }
       if(selector.includes('OpenDialogForm;btnOpen')){
+        openDialog.hidden=true;
         openedPackage=new PackageTreeNode(openedPath);
         for(const name of ['cmpDiagram','pnlWorkarea'])reloadedPage.add('div','MF;TF-1;ModelForm;'+name);
         for(const [i,label] of ['Server','Packages','Package','Module','Workflow'].entries())reloadedPage.add('div','MF;TF-1;cnrNaviMode;b.s_'+i,label);

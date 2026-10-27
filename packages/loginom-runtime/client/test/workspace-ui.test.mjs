@@ -4507,7 +4507,7 @@ async function joinInputPortOverflowFixture(mode='valid',port=1,vendor='join') {
       }
       return next;
     }));
-  return {page};
+  return {page,binding};
 }
 
 test('JavaScript input0 overflow preserves the owned typed close confirmation',async()=>{
@@ -4703,7 +4703,7 @@ test('D52 hidden tabular node requires exact native opening and known mode',asyn
 
 
 async function calculatorNodeOverflowFixture() {
-  const {page}=await joinInputPortOverflowFixture('valid',0,'calculator');
+  const {page,binding}=await joinInputPortOverflowFixture('valid',0,'calculator');
   const crumbs=page.document.querySelectorAll('[data-tid^="MF;TF-5;cnrNaviMode;b.s_"]');
   const name='b3657cf2824ae7d0ba40e53c603a5ccf52a9abd04beb7a866eab38e857b771a5_0_Пакет_для_доработки__74';
   const rects=[[182,47],[229,94.875],[324,660.078125],[985,101.984375],[1087,110.03125]];
@@ -4715,6 +4715,7 @@ async function calculatorNodeOverflowFixture() {
     for(const icon of c.children)icon.box={x:c.box.x+1,y:c.box.y+1,width:16,height:16};
   }
   page.add('span',null,'',{x:0,y:0,width:0,height:0},crumbs[6]).attrs.class='maptree-icon-modelinputports';
+  binding.navigation_node={tid:crumbs[5].attrs['data-tid'],label:crumbs[5].textContent.trim()};
   class ModelNodeTreeNode{};
   const nodeTree=Object.assign(new ModelNodeTreeNode(),{FGuid:'node'}),component={el:{dom:crumbs[5]},_node:{data:{node:nodeTree}}};
   crumbs[5].id='overflow-node';
@@ -4727,7 +4728,7 @@ async function calculatorNodeOverflowFixture() {
     wizard.append(child);
   }
   c.form.remove();page.add('button','MF;TF-5;WizrdMCF;btnDone','Готово',{x:1208,y:380,width:64,height:64},wizard);
-  return {page,crumbs,nodeTree,component,wizard};
+  return {page,crumbs,nodeTree,component,wizard,binding};
 }
 
 test('Calculator input Done keeps the exact native node hidden by the admitted package breadcrumb',async()=>{
@@ -4738,13 +4739,20 @@ test('Calculator input Done keeps the exact native node hidden by the admitted p
 });
 
 test('hidden Calculator node refuses foreign native identity, DOM and CSS owners',async()=>{
-  for(const fault of ['guid','tree','dom','component','hidden','visibility','opacity','sensitive','icon_css']) {
-    const {page,crumbs,nodeTree,component}=await calculatorNodeOverflowFixture();
+  for(const fault of ['guid','tree','dom','component','hidden','visibility','opacity','sensitive','icon_css','unknown_mode','both_modes','foreign_path','foreign_label','missing_navigation','missing_guid','missing_opening']) {
+    const {page,crumbs,nodeTree,component,binding}=await calculatorNodeOverflowFixture();
     if(fault==='guid')nodeTree.FGuid='foreign';if(fault==='tree')component._node.data.node={FGuid:'node'};
     if(fault==='dom')component.el.dom={};if(fault==='component')page.context.Ext=null;
     if(fault==='hidden')crumbs[5].attrs.hidden='';if(fault==='visibility')crumbs[5].style.visibility='hidden';
     if(fault==='opacity')crumbs[5].style.opacity='0';if(fault==='sensitive')crumbs[5].attrs['aria-label']='api-key';
     if(fault==='icon_css')crumbs[5].children[0].style.visibility='hidden';
+    if(fault==='unknown_mode')page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;rbTable"]')[0].attrs.class='';
+    if(fault==='both_modes')page.document.querySelectorAll('[data-tid="MF;TF-5;WizrdMCF;TuneDataSourceMappingWizard;rbLinks"]')[0].attrs.class='x-form-cb-checked';
+    if(fault==='foreign_path')binding.navigation_node.tid+='-foreign';
+    if(fault==='foreign_label')binding.navigation_node.label+=' foreign';
+    if(fault==='missing_navigation')delete binding.navigation_node;
+    if(fault==='missing_guid')delete binding.input_port.port_guid;
+    if(fault==='missing_opening')delete binding.input_port.opening_operation_id;
     const r=await page.execute({mode:'observe',output_column_page:{offset:0,limit:8}});
     assert.notEqual(r.output.wizard.input_port_context.status,'observed',fault);
     assert.ok(!r.output.ui.elements.some(e=>e.allowed_actions.includes('finish_wizard')),fault);assert.deepEqual(page.events,[]);
