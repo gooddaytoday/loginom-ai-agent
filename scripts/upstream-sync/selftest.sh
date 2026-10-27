@@ -2,7 +2,8 @@
 # Offline self-test of the sync procedure on a synthetic upstream and fork (no network, no bun).
 # Covers: pin refuses pre-releases, prepare reports the expected conflicts and refuses a reused directory,
 # accepted rejects "keep the fork's whole file" and accepts a real merge with a recorded decision; test_tools.py covers the
-# edge cases of accepted and apply-identity.
+# edge cases of accepted and apply-identity; test_acceptance.py runs every cell of docs/upstream-sync/acceptance-contract.md as a
+# Git merge; doctest_procedure.py runs the command blocks of procedure.md verbatim from a clean clone, `pin` to `accepted`.
 # Usage: scripts/upstream-sync/selftest.sh   (exit 0 = all assertions held)
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -79,4 +80,37 @@ grep -q '"loginom-ai-agent.json"' "$IDREPO/packages/core/src/x.ts" || fail "conf
 python3 -I "$HERE/apply-identity.py" --repo "$IDREPO" --check >/dev/null 2>&1 || fail "apply-identity is not idempotent"
 # --- behavior tests of apply-identity.py and verify-accepted.py on synthetic merges (one test per counterexample)
 python3 -I "$HERE/test_tools.py" >"$W/test_tools.log" 2>&1 || { cat "$W/test_tools.log" >&2; fail "test_tools.py failed"; }
+# --- every cell of the acceptance contract, as a real Git merge
+python3 -I "$HERE/test_acceptance.py" >"$W/test_acceptance.log" 2>&1 || { tail -60 "$W/test_acceptance.log" >&2; fail "test_acceptance.py failed"; }
+# --- procedure.md, verbatim, in a clean clone: pin -> prepare -> (manual step 2 by a script) -> identity -> catalog -> commit -> check -> accepted
+DOC=$W/doc-clone; git init -q -b main "$DOC"; mkdir -p "$DOC/scripts" "$DOC/docs"
+cp -R "$HERE" "$DOC/scripts/upstream-sync"; cp -R "$HERE/../../docs/upstream-sync" "$DOC/docs/upstream-sync"
+rm -rf "$DOC/scripts/upstream-sync/__pycache__"; git -C "$DOC" add -A; git -C "$DOC" commit -q -m "tools and procedure"
+cat >"$W/resolve.sh" <<'RESOLVE'
+#!/usr/bin/env bash
+# The person's part of procedure step 2 on the synthetic merge: resolve both conflicts, describe the divergence in the catalog.
+set -euo pipefail
+. "$OUT/pins.env"; R=$OUT/rehearsal
+for i in $(seq 1 12); do if [ "$i" = 5 ]; then echo "line 5 fork+upstream"; else echo "line $i"; fi; done >"$R/pkg/b.txt"
+git -C "$R" add pkg/b.txt; git -C "$R" rm -q -f del.txt
+mkdir -p "$R/docs/upstream-sync"
+printf '{"against": "%s", "entries": [{"id": "CAT-01", "paths": ["pkg/*.txt"]}]}\n' "$UPSTREAM_SHA" >"$R/docs/upstream-sync/catalog.json"
+printf '## CAT-01 fork edits\n' >"$R/docs/upstream-sync/catalog.md"
+printf 'del.txt  # owner decision: the fork no longer ships this file\n' >"$OUT/decisions-theirs.txt"
+echo "ALLOW_THEIRS=$OUT/decisions-theirs.txt" >"$OUT/doc-test.env"
+RESOLVE
+chmod +x "$W/resolve.sh"
+FORK_URL=$F UPSTREAM_URL=$U TAG=v1.1.0 CHECK_SKIP=install,typecheck,tests,check,httpapi,guards,build,compat \
+  python3 -I "$HERE/doctest_procedure.py" --doc "$HERE/../../docs/upstream-sync/procedure.md" --src "$DOC" --out "$W/doc-out" \
+  --log "$W/doctest.log" --resolve "$W/resolve.sh" >"$W/doctest.out" 2>&1 || { tail -60 "$W/doctest.log" >&2; cat "$W/doctest.out" >&2; fail "procedure.md does not run verbatim"; }
+grep -q 'RESULT: ACCEPTED' "$W/doctest.log" || fail "the procedure document did not end in ACCEPTED: $(tail -5 "$W/doctest.log")"
+grep -q '^catalog	PASS' "$W/doc-out/check/summary.tsv" || fail "the catalog step of check did not pass"
+# the document must fail when a command depends on the working directory (C4 of LAB-300) or keeps a placeholder
+sed 's#--repo "\$OUT/rehearsal"#--repo rehearsal#' "$HERE/../../docs/upstream-sync/procedure.md" >"$W/procedure-relative.md"
+if python3 -I "$HERE/doctest_procedure.py" --doc "$W/procedure-relative.md" --src "$DOC" --out "$W/doc-out-relative" --log "$W/doctest-relative.log" \
+    --resolve "$W/resolve.sh" >/dev/null 2>&1; then fail "the doc-test passed a document with a relative --repo path"; fi
+sed 's#--fork-sha "\$FORK_SHA"#--fork-sha <FORK_SHA>#' "$HERE/../../docs/upstream-sync/procedure.md" >"$W/procedure-placeholder.md"
+if python3 -I "$HERE/doctest_procedure.py" --doc "$W/procedure-placeholder.md" --src "$DOC" --out "$W/doc-out-placeholder" --log "$W/doctest-placeholder.log" \
+    --resolve "$W/resolve.sh" >/dev/null 2>&1; then fail "the doc-test passed a document with a placeholder"; fi
+[ -z "${DOCTEST_LOG:-}" ] || cp "$W/doctest.log" "$DOCTEST_LOG"
 echo "SELFTEST PASS"

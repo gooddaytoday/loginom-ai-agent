@@ -5,7 +5,10 @@ A cell is red when the tool's verdict differs from the contract's. Run: python3 
 """
 import importlib.util
 import os
+import sys
 import unittest
+
+sys.dont_write_bytecode = True
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -26,12 +29,10 @@ class VerifyAcceptedCells(unittest.TestCase):
                 self.assertEqual(r["problems"], [])
 
     def test_the_findings_of_lab_300_are_cells(self):
-        ids = {r["id"]: r for r in self.results}
         rename_edit = [r for r in self.results if r["scenario"].op == "R" and r["scenario"].fork == "edit" and r["kind"] == "up"]
         self.assertTrue(rename_edit and all(r["verdict"].cat == "took-theirs" for r in rename_edit), "C1: rename/modify taken from upstream")
         dups = [r for r in self.results if r["kind"] == "dup-lost"]
         self.assertEqual(sorted((r["scenario"].op, r["verdict"].code()) for r in dups), [("A", "AT/e"), ("M", "ok*")], "C2: repeated lines")
-        self.assertTrue(ids)
 
 
 class CatalogCheckCells(unittest.TestCase):

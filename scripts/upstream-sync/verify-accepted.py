@@ -3,27 +3,38 @@
 
 A conflict can be "resolved" by choosing the fork's whole file; the metric then looks perfect and the update is lost.
 For every file upstream changed since the merge base this compares four versions: base, fork (pre-merge), upstream and
-the committed merge result, and reports:
+the committed merge result. A version is a mode and a content; a file turned into a symlink or a lost executable bit is a
+difference. The verdicts are fixed by docs/upstream-sync/acceptance-contract.md; every cell of that contract is a test
+(acceptance_cells.py). Verdicts:
 
-  took-upstream     fork never touched the file, result equals upstream                    (expected)
-  merged            both sides changed the file, result differs from both                  (expected)
-  upstream-lines    for merged files: lines upstream added that are missing in the result  (warning, see --strict-lines)
-  kept-fork         both changed it, result equals the fork's file: upstream's change was dropped        FAIL
-  took-theirs       both changed it, result equals upstream's file: the fork's change was dropped        FAIL
-  merged-deleted    both changed it, the result deletes it                                               FAIL
-  merged-emptied    both changed it, the result is an empty file                                         FAIL
-  not-upstream      fork never touched it, result differs from upstream (content, mode or file type)     FAIL
-  added-missing     upstream added a file and nothing equal to it exists in the result                  FAIL
-  added-truncated   upstream added a file; the result has the path but lacks lines of it (or its mode)   FAIL
-  renamed-truncated upstream renamed a file the fork did not touch; the result lacks lines of it         FAIL
-  deleted-kept      upstream deleted a file the fork changed and the result keeps it                    DECISION
-  deleted-dropped   upstream deleted a file the fork changed and the result deletes it                  DECISION
+  fork did not touch the file (or made the same change)   result must be upstream's version (names mapped), else
+      not-upstream      FAIL     changed or modified file differs from upstream's
+      deleted-kept      FAIL     upstream deleted it (or renamed it away) and the result still has it
+      added-missing     FAIL*    upstream added it and the result has nothing equal to it
+      added-truncated   FAIL*    added file present but lacks lines (or has another mode or type)
+      renamed-missing   FAIL     upstream renamed it and the new path is absent
+      renamed-truncated FAIL*    renamed file present but lacks lines (or has another mode or type)
+  both sides changed it (differently)
+      kept-fork         DECISION result equals the fork's version: upstream's change is dropped         (--allow-ours)
+      took-theirs       DECISION result equals upstream's version: the fork's change is dropped         (--allow-theirs)
+      merged-deleted    FAIL*    the result deletes it                                                   (--allow-theirs)
+      merged-emptied    FAIL*    the result is an empty file                                             (--allow-theirs)
+      neither-side      FAIL     a file that cannot be merged line by line (binary, symlink, submodule) is neither version
+      mode-lost         FAIL*    the merged file lost the executable bit one side changed
+      upstream-lines    warning  lines upstream added are missing from the merged text (--strict-lines fails)
+  one side deleted what the other changed
+      deleted-kept      DECISION upstream deleted a file the fork changed (or moved) and the result keeps it   (--allow-ours)
+      deleted-dropped   DECISION ... and the result deletes it                                                  (--allow-theirs)
+      fork-deleted      DECISION the fork deleted a file upstream changed; absent: (--allow-ours), present: (--allow-theirs)
+  * cleared by the decision file named on the right of the same row; added-*, renamed-truncated and mode-lost by either file.
 
-FAIL and DECISION entries are accepted only through --allow-ours / --allow-theirs files whose lines are
+A DECISION or FAIL* entry is accepted only through --allow-ours / --allow-theirs files whose lines are
 `path  # reason`: the reason is the recorded owner decision (see docs/upstream-sync/catalog.md for ownership policies).
---allow-ours covers kept-fork, deleted-kept; --allow-theirs covers took-theirs, deleted-dropped, merged-deleted,
-merged-emptied; either file covers added-missing, added-truncated, renamed-truncated.
-Files are compared by mode and content: a lost executable bit or a file turned into a symlink is a difference.
+
+Line level is a heuristic: for text, upstream's added lines must appear in the result as a multiset after the fork's names
+are applied (OPENCODE_X and LOGINOM_AI_AGENT_X are one line), and copies of a line upstream removed must be gone when the
+fork did not change that line's count. It does not check order or position, and a line the fork already had satisfies an
+equal line upstream added.
 
 Usage: verify-accepted.py --repo DIR --base SHA --fork SHA --upstream SHA [--allow-ours F] [--allow-theirs F] [--strict-lines]
 Exit code 0: every upstream change is accounted for; 1: unexplained entries.
@@ -42,6 +53,24 @@ _apply_identity = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_apply_identity)
 identity = _apply_identity.transform
 
+DECISIONS = {"deleted-kept", "deleted-dropped", "fork-deleted"}
+DETAIL = {
+    "not-upstream": "the result differs from upstream's version",
+    "deleted-kept": "upstream deleted or renamed it away; the result still has it",
+    "deleted-dropped": "upstream deleted a file the fork changed; the result deletes it",
+    "added-missing": "upstream added the file; nothing equal to it exists in the result",
+    "added-truncated": "upstream added the file; the result has the path but its content or mode differs",
+    "renamed-missing": "upstream renamed the file; the new path is absent from the result",
+    "renamed-truncated": "upstream renamed the file; the result has it but its content or mode differs",
+    "kept-fork": "result equals the fork's version; upstream's change is dropped",
+    "took-theirs": "result equals upstream's version; the fork's change is dropped",
+    "merged-deleted": "both sides changed it; the result deletes it",
+    "merged-emptied": "both sides changed it; the result is an empty file",
+    "neither-side": "both sides changed a file that cannot be merged by lines; the result is neither version",
+    "mode-lost": "the merged file lost the mode one side changed",
+    "fork-deleted": "the fork deleted a file upstream changed; record the owner decision",
+}
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -53,8 +82,8 @@ def main():
     a = ap.parse_args()
     env = dict(os.environ, GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1", LC_ALL="C")
 
-    def git(*args, check=True):
-        return subprocess.run(["git", "-C", a.repo, *args], capture_output=True, check=check, env=env).stdout
+    def git(*args):
+        return subprocess.run(["git", "-C", a.repo, *args], capture_output=True, check=True, env=env).stdout
 
     def tree(rev):
         out = {}
@@ -88,116 +117,140 @@ def main():
 
     ours, theirs = allow(a.allow_ours), allow(a.allow_theirs)
     base, fork, up, res = tree(a.base), tree(a.fork), tree(a.upstream), tree("HEAD")
-    result_blobs = set(res.values())
+    result_versions = set(res.values())
     moved = {old: new for st, old, new in changes(a.base, a.fork) if st == "R"}   # fork-side renames
+    blobs = {}
 
-    def content(entry):
-        return blob_lines(a, env, entry[1])
+    def data(v):
+        if v[1] not in blobs:
+            blobs[v[1]] = subprocess.run(["git", "-C", a.repo, "cat-file", "blob", v[1]], capture_output=True, env=env).stdout
+        return blobs[v[1]]
 
-    def missing_from(entry, wanted):
-        present = collections.Counter(content(entry))
-        return [l for l in wanted if l.strip() and not (present[l] > 0 or present[identity(l)] > 0)]
+    def kind(v):
+        if v[0] == "160000":
+            return "sub"
+        if v[0] == "120000":
+            return "link"
+        return "bin" if b"\0" in data(v)[:8000] else "text"
 
-    def differs_from_upstream(r, u):
-        return r[0] != u[0] or bool(missing_from(r, content(u)))
+    def lines(v):
+        return data(v).decode("latin-1").split("\n")
 
-    def blank(entry):
-        return not any(l.strip() for l in content(entry))
+    def mergeable(*vs):
+        return all(v is None or kind(v) == "text" for v in vs)
+
+    def blank(v):
+        return kind(v) == "text" and not any(l.strip() for l in lines(v))
+
+    def counted(ls):
+        return collections.Counter(identity(l) for l in ls if l.strip())
+
+    def lacks(v, wanted):
+        return sum((counted(wanted) - counted(lines(v))).values())
+
+    def retained(b, f, u, r):
+        """Copies of a line upstream removed that the merged text still holds, for lines the fork left alone."""
+        cb, cf, cu, cr = (counted(lines(v)) for v in (b, f, u, r))
+        leftovers = {l: cr[l] - cu[l] for l in cb if cf[l] == cb[l] and cu[l] < cb[l] and cr[l] > cu[l]}
+        return leftovers
+
+    def same(r, u):
+        if r is None or u is None:
+            return r is u
+        if r == u:
+            return True
+        return r[0] == u[0] and kind(u) == "text" and kind(r) == "text" and identity(data(r).decode("latin-1")) == identity(data(u).decode("latin-1"))
+
+    def holds(r, u):
+        """r has upstream's file: same mode and type, and every line of it (text) or the same bytes (other)."""
+        if r is None or r[0] != u[0] or kind(r) != kind(u):
+            return False
+        return lacks(r, lines(u)) == 0 if kind(u) == "text" else r == u
+
+    def judge(op, b, f, u, r, added, old_left, fork_moved):
+        """-> (category or None, who may record the decision, upstream lines missing). The contract, cell by cell."""
+        if u is None and fork_moved and f == b:
+            return ("deleted-dropped", "theirs", 0) if r is None else ("deleted-kept", "ours", 0)
+        if f == b or (f == u and op in ("A", "R", "D")):
+            if u is None:
+                return ("deleted-kept", None, 0) if r is not None else (None, None, 0)
+            if old_left:
+                return "deleted-kept", None, 0
+            if op in ("A", "R"):
+                if holds(r, u):
+                    return None, None, 0
+                if op == "R":
+                    return ("renamed-missing", None, 0) if r is None else ("renamed-truncated", "either", 0)
+                return ("added-missing" if r is None else "added-truncated"), "either", 0
+            return (None, None, 0) if same(r, u) else ("not-upstream", None, 0)
+        if f == u:
+            if r is None:
+                return "merged-deleted", "theirs", 0
+            if blank(r) and not blank(u):
+                return "merged-emptied", "theirs", 0
+            return (None, None, 0) if same(r, u) else ("not-upstream", None, 0)
+        if u is None:
+            return ("deleted-dropped", "theirs", 0) if r is None else ("deleted-kept", "ours", 0)
+        if f is None:
+            return "fork-deleted", ("ours" if r is None else "theirs"), 0
+        if r is None:
+            return "merged-deleted", "theirs", 0
+        if r == f:
+            return "kept-fork", "ours", 0
+        if r == u:
+            return "took-theirs", "theirs", 0
+        if blank(r) and not blank(f) and not blank(u):
+            return "merged-emptied", "theirs", 0
+        if not mergeable(b, f, u):
+            return "neither-side", None, 0
+        want_mode = u[0] if b is not None and u[0] != b[0] else f[0]
+        if kind(r) != "text" or r[0] != want_mode:
+            return "mode-lost", "either", 0
+        return None, None, lacks(r, added) + sum(retained(b, f, u, r).values() if b is not None else [])
 
     counts = collections.Counter()
-    problems = []      # (category, path, detail)
+    problems = []      # (kind, category, path, detail)
     warnings = []
 
-    def fail_unless(category, path, detail, allowed):
-        if path in allowed:
-            counts[category.split(" ", 1)[1] + " (allowed)"] += 1
-        else:
-            problems.append((category, path, detail))
-
-    def check_merged(path, f, u, r, added):
-        if r is None:
-            fail_unless("FAIL merged-deleted", path, "both sides changed it; the result deletes it", theirs)
-        elif blank(r) and not blank(f) and not blank(u):
-            fail_unless("FAIL merged-emptied", path, "both sides changed it; the result is an empty file", theirs)
-        else:
-            counts["merged"] += 1
-            if f != u:
-                missing = missing_from(r, [l for l in added if l.strip()])
-                if missing:
-                    warnings.append((path, len(missing), len([l for l in added if l.strip()]), missing[:3]))
-
     for status, old, new in changes(a.base, a.upstream):
-        path = moved.get(new if status != "D" else old, new if status != "D" else old)
-        if status in ("M", "T"):
-            b, f, u, r = base.get(old), fork.get(path), up.get(new), res.get(path)
-            if f is None:
-                # fork deleted a file upstream still maintains
-                category = "fork-deleted"
-                counts[category] += 1
-                if path not in ours and path not in theirs and r is not None:
-                    problems.append(("FAIL fork-deleted-reappeared", path, "fork deleted it, result has it again"))
-                continue
-            if f == b:
-                if r == u:
-                    counts["took-upstream"] += 1
-                else:
-                    problems.append(("FAIL not-upstream", path, "fork never changed it but the result differs from upstream"))
-                continue
-            if r == f and f != u:
-                if path in ours: counts["kept-fork (allowed)"] += 1
-                else: problems.append(("FAIL kept-fork", path, "result equals the fork's file; upstream's change is dropped"))
-            elif r == u and f != u:
-                if path in theirs: counts["took-theirs (allowed)"] += 1
-                else: problems.append(("FAIL took-theirs", path, "result equals upstream's file; the fork's change is dropped"))
-            else:
-                check_merged(path, f, u, r, lines_added(a, env, old, new))
-        elif status == "A":
-            f, u, r = fork.get(path), up[new], res.get(path)
-            if f is not None and f != u:
-                if r == f:
-                    fail_unless("FAIL kept-fork", path, "both sides added it; the result equals the fork's file", ours)
-                elif r == u:
-                    fail_unless("FAIL took-theirs", path, "both sides added it; the result equals upstream's file", theirs)
-                else:
-                    check_merged(path, f, u, r, content(u))
-            elif u in result_blobs:
-                counts["added"] += 1
-            elif r is None:
-                fail_unless("FAIL added-missing", path, "upstream added the file; nothing equal to it exists in the result", {**ours, **theirs})
-            elif differs_from_upstream(r, u):
-                fail_unless("FAIL added-truncated", path, "upstream added the file; the result has the path but its content or mode differs", {**ours, **theirs})
-            else:
-                counts["added"] += 1
-        elif status == "D":
-            if old in fork and fork[old] == base.get(old):
-                counts["deleted"] += 1       # fork never touched it; deletion is the expected outcome
-                if old in res:
-                    problems.append(("FAIL deleted-kept", old, "unchanged in the fork, deleted upstream, still in the result"))
-                continue
-            kept = (moved.get(old, old)) in res
-            category = "deleted-kept" if kept else "deleted-dropped"
-            allowed = (ours if kept else theirs).get(moved.get(old, old)) or (ours if kept else theirs).get(old)
-            if allowed is not None:
-                counts[f"{category} (allowed)"] += 1
-            else:
-                problems.append(("DECISION " + category, old, "upstream deleted a file the fork changed; record the owner decision"))
-        elif status == "R":
-            u = up[new]
-            r = res.get(new) or res.get(moved.get(old, old))
-            f = fork.get(moved.get(old, old))
-            if r is None and u not in result_blobs:
-                problems.append(("FAIL renamed-missing", new, f"upstream renamed {old}; the new path is absent from the result"))
-            elif r == u or u in result_blobs:
-                counts["renamed"] += 1
-            elif f is None:
-                counts["renamed"] += 1       # the fork deleted the file; the deletion is a catalog matter, not a loss here
-            elif f == base.get(old):
-                if differs_from_upstream(r, u):
-                    fail_unless("FAIL renamed-truncated", new, f"upstream renamed {old}; the result has the file but its content or mode differs", {**ours, **theirs})
-                else:
-                    counts["renamed"] += 1
-            else:
-                check_merged(new, f, u, r, lines_added(a, env, old, new))
+        op = {"M": "M", "T": "M", "A": "A", "D": "D", "R": "R"}.get(status, "M")
+        fpath = moved.get(old, old)
+        fork_moved = fpath != old
+        b = base.get(old) if op != "A" else None
+        u = up.get(new) if op != "D" else None
+        f = fork.get(new if op == "A" else fpath)
+        if op == "R":
+            r = res.get(new) if res.get(new) is not None else res.get(fpath if fpath != new else old)
+            old_left = old in res and old != new
+        elif op == "M":
+            r, old_left = res.get(fpath), False
+        elif op == "A":
+            r, old_left = res.get(new), False
+        else:
+            r, old_left = res.get(fpath if fork_moved else old), False
+        if r is None and op in ("A", "R") and u in result_versions and (f is None or f == b or f == u):
+            r = u                     # a fork directory move can place the file elsewhere; its bytes are in the result
+        path = new if op in ("A", "R") else (fpath if op == "M" else old)
+        added = []
+        if u is not None and f is not None and f != b and f != u and (b is not None or op == "A"):
+            added = [l for l in (lines(u) if b is None else added_lines(a, env, old, new)) if l.strip()]
+        category, who, missing = judge(op, b, f, u, r, added, old_left, fork_moved)
+        if category is None:
+            both = f not in (None, b) and f != u
+            key = {"A": "added", "D": "deleted", "R": "renamed"}.get(op) or ("merged" if both else "took-upstream")
+            counts[key] += 1
+            if missing:
+                gone = list((counted(added) - counted(lines(r))).elements())
+                kept = list(retained(b, f, u, r)) if b is not None else []
+                what = "lines" if gone else "lines removed by upstream are still present"
+                warnings.append((path, missing, len(added) or missing, (gone or kept or [''])[:3], what))
+            continue
+        names = {path, old, new, fpath}
+        cleared = (who in ("ours", "either") and names & ours.keys()) or (who in ("theirs", "either") and names & theirs.keys())
+        if cleared:
+            counts[category + " (allowed)"] += 1
+        else:
+            problems.append(("DECISION" if who in ("ours", "theirs") and category in DECISIONS else "FAIL", category, path, DETAIL[category]))
 
     print("| Category | Files |")
     print("|---|---:|")
@@ -205,25 +258,21 @@ def main():
         print(f"| {key} | {value} |")
     if warnings:
         print(f"\nupstream-added lines missing from merged files ({len(warnings)} files; mapped through the fork's identity names):")
-        for path, n, total, sample in warnings:
-            print(f"- {path}: {n}/{total} lines, e.g. {sample[0][:100]!r}")
+        for path, n, total, sample, what in warnings:
+            print(f"- {path}: {n}/{total} {what}, e.g. {sample[0][:100]!r}")
     if problems:
         print("\nunexplained:")
-        for category, path, detail in problems:
-            print(f"- {category}: {path} — {detail}")
+        for kind_, category, path, detail in problems:
+            print(f"- {kind_} {category}: {path} — {detail}")
     failed = bool(problems) or (a.strict_lines and bool(warnings))
     print("\nRESULT:", "UNEXPLAINED ENTRIES" if failed else "ACCEPTED")
     sys.exit(1 if failed else 0)
 
 
-def lines_added(a, env, old, new):
+def added_lines(a, env, old, new):
     out = subprocess.run(["git", "-C", a.repo, "diff", "-U0", "--no-color", f"{a.base}:{old}", f"{a.upstream}:{new}"],
-                         capture_output=True, env=env).stdout.decode("utf-8", "replace")
+                         capture_output=True, env=env).stdout.decode("latin-1")
     return [l[1:] for l in out.split("\n") if l.startswith("+") and not l.startswith("+++")]
-
-
-def blob_lines(a, env, sha):
-    return subprocess.run(["git", "-C", a.repo, "cat-file", "blob", sha], capture_output=True, env=env).stdout.decode("utf-8", "replace").split("\n")
 
 
 if __name__ == "__main__":

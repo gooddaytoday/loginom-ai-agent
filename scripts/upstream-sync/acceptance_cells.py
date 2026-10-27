@@ -17,6 +17,7 @@ Usage: acceptance_cells.py [--tools DIR] [--markdown] [--list]
 import argparse
 import collections
 import dataclasses
+import hashlib
 import importlib.util
 import json
 import os
@@ -76,11 +77,7 @@ def binary(cid, tag):
 
 
 def sub(cid, tag):
-    return Ent("sub", __import__("hashlib").sha1(f"{cid}-{tag}".encode()).hexdigest())
-
-
-def text_lines(e):
-    return [l for l in e.data.split("\n") if l.strip()]
+    return Ent("sub", hashlib.sha1(f"{cid}-{tag}".encode()).hexdigest())
 
 
 def norm(e):
@@ -109,6 +106,13 @@ def lacks(r, wanted):
     have = collections.Counter(identity(l) for l in r.lines if l.strip())
     need = collections.Counter(identity(l) for l in wanted if l.strip())
     return sum((need - have).values())
+
+
+def retained(b, f, u, r):
+    """Copies of a line upstream removed that the merged text r still holds, for lines the fork left alone."""
+    c = lambda e: collections.Counter(identity(l) for l in e.lines if l.strip())
+    cb, cf, cu, cr = c(b), c(f), c(u), c(r)
+    return sum(cr[l] - cu[l] for l in cb if cf[l] == cb[l] and cu[l] < cb[l] and cr[l] > cu[l])
 
 
 # ---- the oracle: the contract in code ---------------------------------------------------------------------------
@@ -174,7 +178,7 @@ def expect(b, f, u, r, op, added=(), old_left=False, fork_moved=False):
     want_exe = u.exe if b is not None and u.exe != b.exe else f.exe
     if r.kind != "text" or r.exe != want_exe:
         return Verdict("mode-lost", "either")
-    return Verdict(warn=lacks(r, added) > 0)
+    return Verdict(warn=lacks(r, added) > 0 or b is not None and retained(b, f, u, r) > 0)
 
 
 # ---- scenarios ---------------------------------------------------------------------------------------------------
@@ -236,6 +240,11 @@ def scenarios(tag=""):
     dup = body(c, [UP], extra=[f"{c} push", f"{c} push"])
     add("M", "text", "edit, upstream adds the same line twice", b, body(c, [FK]), dup,
         body(c, [FK, UP], extra=[f"{c} push", f"{c} push"]), added=(f"{c} line 10 up", f"{c} push", f"{c} push"), note="dup")
+    c = sid()
+    b = body(c)
+    without = Ent("text", "".join(l + "\n" for i, l in enumerate(b.lines[:12], 1) if i != 10))
+    add("M", "text", "edit, upstream removes a line", b, body(c, [FK]), without,
+        Ent("text", "".join(l + "\n" for i, l in enumerate(body(c, [FK]).lines[:12], 1) if i != 10)), note="removal")
     c = sid()
     fk = body(c, [FK], extra=[f"{c} push"])
     add("M", "text", "edit, fork already has the line upstream adds", body(c), fk, body(c, [UP], extra=[f"{c} push"]),
@@ -301,7 +310,7 @@ def scenarios(tag=""):
                 "delete": (None, None, "upren"), "rename to the same path": (b, u, "upren"),
                 "rename elsewhere": (b, u, "both"),
             }[fork]
-            s = add("R", "text", fork + ("" if not edit else ""), b, f, u, m, layout, added, note=label)
+            add("R", "text", fork, b, f, u, m, layout, added, note=label)
     for shape, make in (("bin", binary), ("link", link)):
         for fork in ("none", "delete"):
             c = sid()
@@ -312,7 +321,7 @@ def scenarios(tag=""):
 
 # ---- results ------------------------------------------------------------------------------------------------------
 
-RESULTS = ("up", "fork", "base", "merge", "gone", "empty", "lost-line", "dup-lost", "reorder", "extra", "elsewhere", "old-kept")
+RESULTS = ("up", "fork", "base", "merge", "gone", "empty", "lost-line", "dup-lost", "removal-kept", "reorder", "extra", "elsewhere", "old-kept")
 
 
 def result_for(s, kind):
@@ -345,7 +354,7 @@ def result_for(s, kind):
         put(tgt, Ent("text", "", s.u.exe))
     elif kind == "lost-line":
         src = s.m or (s.u if s.f in (None, s.b) or s.f == s.u else None)
-        if src is None or src.kind != "text" or not s.added or s.note == "dup":
+        if src is None or src.kind != "text" or not s.added or s.note in ("dup", "removal"):
             return None
         lines = src.data.split("\n")
         drop = next((i for i, l in enumerate(lines) if l == s.added[0] or l.startswith(s.added[0])), None)
@@ -360,9 +369,13 @@ def result_for(s, kind):
         lines = src.data.split("\n")
         del lines[max(i for i, l in enumerate(lines) if l.endswith(" push"))]
         put(tgt, dataclasses.replace(src, data="\n".join(lines)))
+    elif kind == "removal-kept":
+        if s.note != "removal":
+            return None
+        put(tgt, dataclasses.replace(s.m, data=s.m.data + s.b.lines[9] + "\n"))
     elif kind == "reorder":
         src = s.m or (s.u if s.f in (None, s.b) else None)
-        if src is None or src.kind != "text" or s.note in ("dup", "names"):
+        if src is None or src.kind != "text" or s.note in ("dup", "names", "removal"):
             return None
         put(tgt, dataclasses.replace(src, data="".join(l + "\n" for l in reversed(src.data.rstrip("\n").split("\n")))))
     elif kind == "extra":
@@ -585,8 +598,7 @@ CATALOG_WHERE = ("committed", "staged", "worktree")
 
 def catalog_cells():
     return [{"id": f"{k}|{w}|{d}", "kind": k, "where": w, "described": d}
-            for k in CATALOG_KINDS for w in CATALOG_WHERE for d in (True, False)
-]
+            for k in CATALOG_KINDS for w in CATALOG_WHERE for d in (True, False)]
 
 
 def catalog_expect(kind, described):
@@ -678,14 +690,10 @@ def markdown():
     for sid, s in scs.items():
         row = [by[sid][k].code() if k in by[sid] else "·" for k in RESULTS]
         out.append(f"| {sid:03d} | {s.op} | {s.shape} | {s.fork} | " + " | ".join(row) + " |")
-    out += ["", "| Kind of divergence | committed | staged | worktree |", "|---|---|---|---|"]
+    out += ["", "| Kind of divergence (exit code: described / undescribed) | committed | staged | worktree |", "|---|---|---|---|"]
     for k in CATALOG_KINDS:
-        cols = []
-        for w in CATALOG_WHERE:
-            described = "exit %d" % catalog_expect(k, True)[0]
-            undescribed = "exit %d" % catalog_expect(k, False)[0]
-            cols.append(f"{described} / {undescribed}")
-        out.append(f"| {k} | " + " | ".join(cols) + " |")
+        verdict = f"{catalog_expect(k, True)[0]} / {catalog_expect(k, False)[0]}"
+        out.append(f"| {k} | " + " | ".join([verdict] * len(CATALOG_WHERE)) + " |")
     return "\n".join(out) + "\n"
 
 
