@@ -168,12 +168,23 @@ scripts/upstream-sync/selftest.sh
 
 ## Воспроизведение метрики LAB-198 в чистой копии
 
+У метрики две базы. Исходная — `loginom`@`2e6f66a9` (v0.3.3), 69 путей. После выпуска v0.3.4 (`db130098`, 40 коммитов) метрика измерена заново тем же способом: B034 — тоже 69 путей, и список пути в путь совпадает с исходным (SHA-256 `79cf0bc5…fcda6f`). Итог сравнивается с обеими: он должен быть не больше 34 и не больше ⌊B034 / 2⌋.
+
 ```bash
 git clone https://github.com/gooddaytoday/loginom-ai-agent.git src && cd src
 git checkout <итоговый SHA>
-set -a; . scripts/upstream-sync/reference/lab-198-baseline.env; set +a      # UPSTREAM_TAG, UPSTREAM_SHA, FORK_SHA исходной точки
-scripts/upstream-sync/measure-conflicts.sh --out ../baseline --compare scripts/upstream-sync/reference/baseline-unmerged-paths.txt   # 69
-FORK_SHA=<итоговый SHA> scripts/upstream-sync/measure-conflicts.sh --out ../final                                                    # итог
+# база 1: v0.3.3 (2e6f66a9), эталон 69
+( set -a; . scripts/upstream-sync/reference/lab-198-baseline.env; set +a
+  scripts/upstream-sync/measure-conflicts.sh --out ../baseline --compare scripts/upstream-sync/reference/baseline-unmerged-paths.txt )          # 69
+# база 2: v0.3.4 (db130098), эталон B034 = 69
+( set -a; . scripts/upstream-sync/reference/lab-198-baseline-v034.env; set +a
+  scripts/upstream-sync/measure-conflicts.sh --out ../baseline-v034 --compare scripts/upstream-sync/reference/baseline-v034-unmerged-paths.txt )   # 69
+# итог
+FORK_SHA=<итоговый SHA> scripts/upstream-sync/measure-conflicts.sh --out ../final
 python3 scripts/upstream-sync/conflict-classes.py --before scripts/upstream-sync/reference/baseline-conflicts.tsv \
-  --after ../final/conflicts.tsv --residual scripts/upstream-sync/reference/forecast-tier1-conflicts.tsv
+  --after ../final/conflicts.tsv --residual scripts/upstream-sync/reference/forecast-tier1-conflicts.tsv                                       # классы против базы 1
+python3 scripts/upstream-sync/conflict-classes.py --before scripts/upstream-sync/reference/baseline-v034-conflicts.tsv \
+  --after ../final/conflicts.tsv --residual scripts/upstream-sync/reference/forecast-tier1-conflicts.tsv                                       # классы против базы 2
 ```
+
+Файлы `reference/baseline-*` — эталон 69, `reference/baseline-v034-*` — эталон B034; эталон 69 не удаляется.
