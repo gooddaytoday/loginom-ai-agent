@@ -5,7 +5,7 @@
 #   sync-upstream.sh pin      --tag vX.Y.Z [--upstream-url URL]
 #   sync-upstream.sh prepare  --fork-sha SHA --tag vX.Y.Z --upstream-sha SHA --out DIR [--fork-url URL] [--upstream-url URL]
 #   sync-upstream.sh check    --out DIR [--skip build,tests] [--bun PATH]
-#   sync-upstream.sh accepted --out DIR [--allow-ours FILE] [--allow-theirs FILE]
+#   sync-upstream.sh accepted --out DIR [--merge REV]
 #
 # pin       Resolves a stable tag to its commit and prints UPSTREAM_TAG / UPSTREAM_SHA. Pre-releases are refused.
 # prepare   Fresh clone of the fork at FORK_SHA, upstream tag fetched and verified against UPSTREAM_SHA, rehearsal
@@ -14,7 +14,9 @@
 # check     After the merge is committed: lockfile, typecheck, CI test commands, generated-client check, builds and the
 #           external-compatibility comparison against the pre-merge fork. Every step is PASS, FAIL or NOT_RUN; a FAIL is
 #           never hidden. Exit code is non-zero if any step failed.
-# accepted  Verifies that upstream's changes were taken, not discarded by choosing the fork's whole file.
+# accepted  The acceptance gate: compares the merge commit (the HEAD of DIR/rehearsal) with the mechanical merge of the same two
+#           parents and requires a decision record, committed with the merge, for every conflicted or deviating path.
+#           --merge REV names the merge commit when later commits sit on top of it (default HEAD).
 #
 # Full procedure, ownership policies and acceptance: docs/upstream-sync/procedure.md
 set -euo pipefail
@@ -24,12 +26,12 @@ FORK_URL_DEFAULT=https://github.com/gooddaytoday/loginom-ai-agent.git
 UPSTREAM_URL_DEFAULT=https://github.com/anomalyco/opencode.git
 
 die() { echo "ERROR: $*" >&2; exit 1; }
-usage() { sed -n '2,22p' "$0"; exit "${1:-0}"; }
+usage() { sed -n '2,25p' "$0"; exit "${1:-0}"; }
 [ $# -ge 1 ] || usage 2
 CMD=$1; shift
 
 TAG= FORK_SHA= UPSTREAM_SHA= OUT= FORK_URL=$FORK_URL_DEFAULT UPSTREAM_URL=$UPSTREAM_URL_DEFAULT
-SKIP= BUN=bun ALLOW_OURS= ALLOW_THEIRS=
+SKIP= BUN=bun MERGE=HEAD
 while [ $# -gt 0 ]; do
   case $1 in
     --tag) TAG=$2; shift 2 ;;
@@ -40,8 +42,7 @@ while [ $# -gt 0 ]; do
     --upstream-url) UPSTREAM_URL=$2; shift 2 ;;
     --skip) SKIP=$2; shift 2 ;;
     --bun) BUN=$2; shift 2 ;;
-    --allow-ours) ALLOW_OURS=$2; shift 2 ;;
-    --allow-theirs) ALLOW_THEIRS=$2; shift 2 ;;
+    --merge) MERGE=$2; shift 2 ;;
     -h|--help) usage 0 ;;
     *) die "unknown argument: $1" ;;
   esac
@@ -177,10 +178,7 @@ accepted)
   [ -f "$OUT/pins.env" ] || die "$OUT is not a prepared rehearsal"
   # shellcheck disable=SC1091
   . "$OUT/pins.env"
-  args=(--repo "$OUT/rehearsal" --base "$MERGE_BASE" --fork "$FORK_SHA" --upstream "$UPSTREAM_SHA")
-  [ -z "$ALLOW_OURS" ] || args+=(--allow-ours "$ALLOW_OURS")
-  [ -z "$ALLOW_THEIRS" ] || args+=(--allow-theirs "$ALLOW_THEIRS")
-  python3 -I "$HERE/verify-accepted.py" "${args[@]}"
+  python3 -I "$HERE/verify-accepted.py" --repo "$OUT/rehearsal" --fork "$FORK_SHA" --upstream "$UPSTREAM_SHA" --merge "$MERGE"
   ;;
 
 *) usage 2 ;;

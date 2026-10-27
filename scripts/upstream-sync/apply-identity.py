@@ -30,6 +30,11 @@ PROVIDER_KEYS = ("OPENCODE_API_KEY", "OPENCODE_GO_API_KEY")
 EXCLUDED = (".github/archived/", "packages/core/test/flag-identity.test.ts", "scripts/upstream-sync/")
 
 
+def wants(path):
+    """The files this tool covers when no PATHs are named: source trees the guard test scans, text only."""
+    return not path.startswith(EXCLUDED) and bool(SOURCES.match(path) and TEXT.search(path))
+
+
 def transform(text):
     text = re.sub(r"\bOPENCODE_[A-Z0-9_]+", lambda m: m.group(0) if m.group(0) in PROVIDER_KEYS else "LOGINOM_AI_AGENT_" + m.group(0)[len("OPENCODE_"):], text)
     text = re.sub(r"(?<![a-zA-Z0-9])\.opencode(?=[/\\\s\"'`)]|$)", ".loginom-ai-agent", text)
@@ -59,7 +64,7 @@ def main():
         files = subprocess.run(["git", "-C", a.repo, "ls-files"], capture_output=True, check=True, env=env).stdout.decode().splitlines()
     changed = []
     for path in files:
-        if path.startswith(EXCLUDED) or not (a.paths or (SOURCES.match(path) and TEXT.search(path))):
+        if path.startswith(EXCLUDED) or not (a.paths or wants(path)):
             continue
         full = os.path.join(a.repo, path)
         if not os.path.isfile(full) or os.path.islink(full):

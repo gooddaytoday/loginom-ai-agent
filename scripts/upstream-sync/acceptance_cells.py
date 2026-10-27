@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""The closed case space of the acceptance tools, as data, with one oracle and one generator.
+"""The closed case space of the acceptance tools, as data, with an independent model and a generator.
 
 The contract is docs/upstream-sync/acceptance-contract.md; this file is its source. A cell is one file in a real Git
 merge: a base commit, the fork's commit, upstream's commit and a merge commit (parents: fork, upstream) whose tree holds
 whatever the "resolution" left for that file. Every cell lives under its own directory and has contents no other cell
 shares, so Git's rename detection cannot pair files across cells.
 
-  verify-accepted.py   cells = upstream change x fork change x what the merge left. The oracle `expect` states the verdict
-                       from the three versions and the result alone; it never looks at the tool.
+  verify-accepted.py   cells = upstream change x fork change x what the merge left. The model states the verdict of a
+                       cell by running `git merge --no-commit` (the index route of `prepare`, not the merge-tree route the
+                       gate uses) and the identity mapping; it never looks at the gate. A cell needs a decision record when
+                       Git leaves its path conflicted (C) or the commit differs from Git's merge (D); otherwise it is ok.
+                       Each cell is run on its own: every other cell is recorded, so the exit code and the RESULT line
+                       of the run belong to that cell alone.
   catalog-check.py     cells = kind of divergence x where it sits (commit, index, working tree) x described or not.
 
 Usage: acceptance_cells.py [--tools DIR] [--markdown] [--list]
@@ -16,6 +20,7 @@ Usage: acceptance_cells.py [--tools DIR] [--markdown] [--list]
 """
 import argparse
 import collections
+import concurrent.futures
 import dataclasses
 import hashlib
 import importlib.util
@@ -30,6 +35,8 @@ sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENV = dict(os.environ, GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1", LC_ALL="C",
            GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.invalid", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.invalid")
+MERGE_CFG = ("-c", "rerere.enabled=false", "-c", "merge.directoryRenames=conflict", "-c", "merge.conflictStyle=merge",
+             "-c", "merge.renameLimit=30000", "-c", "diff.renameLimit=30000", "-c", "merge.renormalize=false", "-c", "core.autocrlf=false")
 _spec = importlib.util.spec_from_file_location("apply_identity", os.path.join(HERE, "apply-identity.py"))
 _identity = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_identity)
@@ -80,107 +87,6 @@ def sub(cid, tag):
     return Ent("sub", hashlib.sha1(f"{cid}-{tag}".encode()).hexdigest())
 
 
-def norm(e):
-    return identity(e.data)
-
-
-def mergeable(*ents):
-    return all(e is None or e.kind == "text" for e in ents)
-
-
-def blank(e):
-    return e.kind == "text" and not e.data.strip()
-
-
-def same(r, u):
-    """Equal as versions; text equal after the fork's names are applied to upstream's spelling."""
-    if r is None or u is None:
-        return r is u
-    if r.kind != u.kind or r.mode != u.mode:
-        return False
-    return norm(r) == norm(u) if u.kind == "text" else r == u
-
-
-def lacks(r, wanted):
-    """Wanted lines (multiset, non-blank, fork names applied) that the text result r does not contain."""
-    have = collections.Counter(identity(l) for l in r.lines if l.strip())
-    need = collections.Counter(identity(l) for l in wanted if l.strip())
-    return sum((need - have).values())
-
-
-def retained(b, f, u, r):
-    """Copies of a line upstream removed that the merged text r may still hold: more than fork + upstream - base allows."""
-    c = lambda e: collections.Counter(identity(l) for l in e.lines if l.strip())
-    cb, cf, cu, cr = c(b), c(f), c(u), c(r)
-    return sum(cr[l] - max(cu[l] + cf[l] - cb[l], 0) for l in cb if cu[l] < cb[l] and cr[l] > max(cu[l] + cf[l] - cb[l], 0))
-
-
-# ---- the oracle: the contract in code ---------------------------------------------------------------------------
-
-@dataclasses.dataclass(frozen=True)
-class Verdict:
-    cat: str = None            # None = ACCEPTED
-    allow: str = None          # None | ours | theirs | either: the record that clears it
-    warn: bool = False         # accepted, but upstream-added lines are missing: --strict-lines fails it
-
-    def code(self):
-        if self.cat is None:
-            return "ok*" if self.warn else "ok"
-        return CODES[self.cat] + ({"ours": "/o", "theirs": "/t", "either": "/e"}.get(self.allow) or "")
-
-
-CODES = {"kept-fork": "KF", "took-theirs": "TT", "merged-deleted": "MD", "merged-emptied": "ME", "not-upstream": "NU",
-         "added-missing": "AM", "added-truncated": "AT", "renamed-missing": "RM", "renamed-truncated": "RT",
-         "deleted-kept": "DK", "deleted-dropped": "DD", "fork-deleted": "FD", "mode-lost": "ML", "neither-side": "NS"}
-
-
-def expect(b, f, u, r, op, added=(), old_left=False, fork_moved=False):
-    """Verdict for one file. b, f, u, r: base, fork, upstream and result versions of the file (None = absent).
-    op: how upstream changed it (A add, D delete, M modify, R rename); added: the lines upstream added;
-    old_left: upstream renamed the file and the result still holds the old path;
-    fork_moved: the fork renamed the file (its content may be unchanged)."""
-    if u is None and fork_moved and f == b:               # upstream deletes what the fork moved: the fork's move is a change
-        return Verdict("deleted-dropped", "theirs") if r is None else Verdict("deleted-kept", "ours")
-    if f == b or f == u and op in ("A", "R", "D"):        # the fork holds nothing the result could lose
-        if u is None:
-            return Verdict("deleted-kept") if r is not None else Verdict()
-        if old_left:
-            return Verdict("deleted-kept")
-        if op in ("A", "R"):
-            ok = r is not None and r.kind == u.kind and r.mode == u.mode and (
-                lacks(r, u.lines) == 0 if u.kind == "text" else r == u)
-            if ok:
-                return Verdict()
-            if op == "R":
-                return Verdict("renamed-missing") if r is None else Verdict("renamed-truncated", "either")
-            return Verdict("added-missing" if r is None else "added-truncated", "either")
-        return Verdict() if same(r, u) else Verdict("not-upstream")
-    if f == u:                                            # both made the same change: the result must keep it
-        if r is None:
-            return Verdict("merged-deleted", "theirs")
-        if blank(r) and not blank(u):
-            return Verdict("merged-emptied", "theirs")
-        return Verdict() if same(r, u) else Verdict("not-upstream")
-    if u is None:                                         # upstream deleted what the fork changed: the owner decides
-        return Verdict("deleted-dropped", "theirs") if r is None else Verdict("deleted-kept", "ours")
-    if f is None:                                         # the fork deleted what upstream changed: the owner decides
-        return Verdict("fork-deleted", "ours" if r is None else "theirs")
-    if r is None:
-        return Verdict("merged-deleted", "theirs")
-    if r == f:
-        return Verdict("kept-fork", "ours")
-    if r == u:
-        return Verdict("took-theirs", "theirs")
-    if blank(r) and not blank(f) and not blank(u):
-        return Verdict("merged-emptied", "theirs")
-    if not mergeable(b, f, u):
-        return Verdict("neither-side")
-    want_exe = u.exe if b is not None and u.exe != b.exe else f.exe
-    if r.kind != "text" or r.exe != want_exe:
-        return Verdict("mode-lost", "either")
-    return Verdict(warn=lacks(r, added) > 0 or b is not None and retained(b, f, u, r) > 0)
-
-
 # ---- scenarios ---------------------------------------------------------------------------------------------------
 
 @dataclasses.dataclass
@@ -199,8 +105,8 @@ class Scenario:
 
     @property
     def paths(self):
-        d = f"cells/{self.sid}"
-        return {"P": f"{d}/a", "N": f"{d}/b", "Q": f"{d}/c"}
+        d = f"packages/core/src/cells/{self.sid}"
+        return {"P": f"{d}/a.ts", "N": f"{d}/b.ts", "Q": f"{d}/c.ts", "M": f"{d}/m.ts"}
 
     @property
     def target(self):
@@ -389,24 +295,19 @@ def result_for(s, kind):
     elif kind == "elsewhere":
         if s.op not in ("A", "R") or s.u is None or s.layout in ("forkren", "both"):
             return None
-        put(tgt + ".moved", s.u)
+        put(p["M"], s.u)
     elif kind == "old-kept":
-        if not ren or s.f != s.b:
+        if not ren:
             return None
-        put(tgt, s.u)
-        put(old, s.b)
+        if s.f == s.b:
+            put(tgt, s.u)
+            put(old, s.b)
+        elif s.f is not None and s.m is not None:
+            put(tgt, s.m)
+            put(old, s.f)
+        else:
+            return None
     return res
-
-
-def judged(s, kind, res):
-    """The version of the file the oracle compares: the result at the file's current path, else at its old path."""
-    p = s.paths
-    tgt = res.get(p[s.target])
-    if tgt is None and s.layout == "upren":
-        tgt = res.get(p["P"])
-    if tgt is None and s.f in (None, s.b, s.u):
-        tgt = res.get(p[s.target] + ".moved")
-    return tgt
 
 
 def build_cells():
@@ -417,12 +318,8 @@ def build_cells():
         for kind in RESULTS:
             s = per_kind[kind][i]
             res = result_for(s, kind)
-            if res is None:
-                continue
-            r = judged(s, kind, res)
-            old_left = s.layout == "upren" and s.paths["P"] in res
-            v = expect(s.b, s.f, s.u, r, s.op, s.added, old_left, s.layout == "forkren")
-            cells.append({"id": s.sid, "n": i, "s": s, "kind": kind, "res": res, "verdict": v})
+            if res is not None:
+                cells.append({"id": s.sid, "n": i, "s": s, "kind": kind, "res": res})
     return cells
 
 
@@ -475,7 +372,8 @@ def commit(repo, tree, message, *parents):
 
 
 def build_repo(repo, cells):
-    """base, fork and upstream commits and a merge commit of the fork and upstream whose tree is the chosen results."""
+    """base, fork and upstream commits, a merge commit of the fork and upstream whose tree is the chosen results, and the
+    model: Git's own merge of fork and upstream through the index (the route of `prepare`), with the fork's names applied."""
     base, fork, up = {}, {}, {}
     for s in (c["s"] for c in cells):
         p = s.paths
@@ -498,99 +396,141 @@ def build_repo(repo, cells):
     result = {}
     for c in cells:
         result.update({path: e for path, e in c["res"].items()})
-    c_res = commit(repo, write_tree(repo, result), "merge", c_fork, c_up)
+    t_res = write_tree(repo, result)
+    c_res = commit(repo, t_res, "merge", c_fork, c_up)
     git(repo, "update-ref", "refs/heads/base", c_res)
     git(repo, "checkout", "-q", "-f", "--detach", c_fork)
-    merge = subprocess.run(["git", "-C", repo, "-c", "rerere.enabled=false", "merge", "--no-commit", "--no-ff", c_up],
-                           capture_output=True, env=ENV)
-    unmerged = len(set(git(repo, "diff", "--name-only", "--diff-filter=U", check=False).split("\n")) - {""})
+    subprocess.run(["git", "-C", repo, *MERGE_CFG, "merge", "--no-commit", "--no-ff", c_up], capture_output=True, env=ENV)
+    expected, conflicts = {}, set()
+    fork_entries = ls_tree(repo, c_fork)
+    for mode_sha_stage, path in ls_files_stages(repo):
+        mode, sha, stage = mode_sha_stage
+        if stage != "0":
+            conflicts.add(re.sub(r"~(HEAD|[0-9a-f]{40})$", "", path))
+        elif fork_entries.get(path) != (mode, sha) and _identity.wants(path) and mode in ("100644", "100755"):
+            text = subprocess.run(["git", "-C", repo, "cat-file", "blob", sha], capture_output=True, env=ENV).stdout
+            try:
+                mapped = identity(text.decode("utf-8"))
+            except UnicodeDecodeError:
+                mapped = None
+            if mapped is not None and mapped.encode() != text:
+                sha = subprocess.run(["git", "-C", repo, "hash-object", "-w", "--stdin"], input=mapped.encode(),
+                                     capture_output=True, env=ENV, check=True).stdout.decode().strip()
+            expected[path] = (mode, sha)
+        else:
+            expected[path] = (mode, sha)
     git(repo, "merge", "--abort", check=False)
     git(repo, "checkout", "-q", "-f", "--detach", c_res)
-    return c_base, c_fork, c_up, unmerged
+    return Repo(c_fork, c_up, t_res, ls_tree(repo, t_res), expected, conflicts)
 
 
-# ---- running verify-accepted ----------------------------------------------------------------------------------
-
-LINE = re.compile(r"^- (?:FAIL|DECISION) (\S+): (\S+) — ")
-WARN = re.compile(r"^- (\S+): \d+/\d+ lines")
+Repo = collections.namedtuple("Repo", "fork upstream result_tree result expected conflicts")
 
 
-def run_verify(tools, repo, shas, ours=(), theirs=(), strict=False):
-    """-> (exit code, {cell directory: set of categories}, set of cell directories with a line warning)."""
-    with tempfile.TemporaryDirectory() as tmp:
-        cmd = [sys.executable, "-I", os.path.join(tools, "verify-accepted.py"), "--repo", repo,
-               "--base", shas[0], "--fork", shas[1], "--upstream", shas[2]]
-        for flag, paths in (("--allow-ours", ours), ("--allow-theirs", theirs)):
-            if paths:
-                f = os.path.join(tmp, flag[2:])
-                open(f, "w").write("".join(f"{p}  # contract cell\n" for p in sorted(paths)))
-                cmd += [flag, f]
-        if strict:
-            cmd.append("--strict-lines")
-        p = subprocess.run(cmd, capture_output=True, text=True, env=ENV)
-    cats, warns = collections.defaultdict(set), set()
-    for line in p.stdout.split("\n"):
-        m = LINE.match(line)
-        if m:
-            cats[cell_dir(m.group(2))].add(m.group(1))
-        m = WARN.match(line)
-        if m:
-            warns.add(cell_dir(m.group(1)))
-    return p.returncode, cats, warns, p.stdout + p.stderr
+def ls_tree(repo, rev):
+    out = {}
+    for rec in subprocess.run(["git", "-C", repo, "ls-tree", "-r", "-z", rev], capture_output=True, env=ENV, check=True).stdout.split(b"\0"):
+        if rec:
+            meta, path = rec.split(b"\t", 1)
+            mode, _, sha = meta.decode().split()
+            out[path.decode()] = (mode, sha)
+    return out
 
 
-def cell_dir(path):
-    m = re.match(r"cells/([^/]+)/", path)
-    return m.group(1) if m else path
+def ls_files_stages(repo):
+    for rec in subprocess.run(["git", "-C", repo, "ls-files", "-s", "-z"], capture_output=True, env=ENV, check=True).stdout.split(b"\0"):
+        if rec:
+            meta, path = rec.split(b"\t", 1)
+            mode, sha, stage = meta.decode().split()
+            yield (mode, sha, stage), path.decode()
 
 
-def evaluate_verify(tools):
-    cells = build_cells()
+@dataclasses.dataclass(frozen=True)
+class Verdict:
+    """What a cell needs from the gate: nothing (ok), or a decision record for a conflicted path (C) or a deviating path (D)."""
+    needs: tuple = ()          # ((category, path), ...)
+
+    def code(self):
+        cats = {c for c, _ in self.needs}
+        return "C" if "conflict" in cats else "D" if cats else "ok"
+
+
+def verdict_of(model, sid):
+    prefix = f"packages/core/src/cells/{sid}/"
+    needs = [("conflict", p) for p in model.conflicts if p.startswith(prefix)]
+    for path in set(model.result) | set(model.expected):
+        if path.startswith(prefix) and path not in model.conflicts and model.result.get(path) != model.expected.get(path):
+            needs.append(("deviation", path))
+    return Verdict(tuple(sorted(needs)))
+
+
+def judged_cells(repo, keep=None):
+    cells = [c for c in build_cells() if keep is None or keep(c)]
+    model = build_repo(repo, cells)
+    for c in cells:
+        c["verdict"] = verdict_of(model, c["s"].sid)
+    return cells, model
+
+
+# ---- running the gate -------------------------------------------------------------------------------------------------
+
+FAIL = re.compile(r"^- FAIL (\S+): (\S+) — ")
+
+
+def merge_with(repo, model, paths):
+    """A merge commit of the cells' results that carries a decision record for each of `paths`."""
+    entries = dict(model.result)
+    if paths:
+        doc = {"format": 1, "decisions": [{"path": p, "rule": "PROCEDURE-2", "reason": "contract cell"} for p in sorted(paths)]}
+        blob = subprocess.run(["git", "-C", repo, "hash-object", "-w", "--stdin"], input=json.dumps(doc).encode(), capture_output=True,
+                              env=ENV, check=True).stdout.decode().strip()
+        entries["docs/upstream-sync/merge-decisions.json"] = ("100644", blob)
+    lines = "".join(f"{mode} {sha}\t{path}\n" for path, (mode, sha) in sorted(entries.items()))
+    index = tempfile.mktemp(prefix="cells.index.", dir=os.path.join(repo, ".git"))
+    env = dict(ENV, GIT_INDEX_FILE=index)
+    git(repo, "update-index", "--add", "--index-info", stdin=lines.encode(), env=env)
+    tree = git(repo, "write-tree", env=env)
+    os.unlink(index)
+    return commit(repo, tree, "merge", model.fork, model.upstream)
+
+
+def run_gate(tools, repo, model, paths):
+    """-> (exit code, {(category, path)}, whether the RESULT line says ACCEPTED/REJECTED, output)."""
+    merged = merge_with(repo, model, paths)
+    p = subprocess.run([sys.executable, "-I", os.path.join(tools, "verify-accepted.py"), "--repo", repo, "--fork", model.fork,
+                        "--upstream", model.upstream, "--merge", merged], capture_output=True, text=True, env=ENV)
+    fails = {(m.group(1), m.group(2)) for m in map(FAIL.match, p.stdout.split("\n")) if m}
+    verdict = "ACCEPTED" if "RESULT: ACCEPTED" in p.stdout else "REJECTED" if "RESULT: REJECTED" in p.stdout else None
+    return p.returncode, fails, verdict, p.stdout + p.stderr
+
+
+def evaluate_verify(tools, keep=None):
     with tempfile.TemporaryDirectory(prefix="acceptance-cells.") as repo:
-        shas = build_repo(repo, cells)[:3]
-        decide = {"ours": set(), "theirs": set(), "either": set()}
-        swapped = {"ours": set(), "theirs": set(), "either": set()}
-        for c in cells:
-            v = c["verdict"]
-            if v.allow:
-                for path in {p for p in c["s"].paths.values() if p.startswith("cells/")}:
-                    decide[v.allow].add(path)
-        right_ours = decide["ours"] | decide["either"]
-        right_theirs = decide["theirs"]
-        wrong_ours = decide["theirs"]
-        wrong_theirs = decide["ours"] | decide["either"]
-        runs = {
-            "plain": run_verify(tools, repo, shas),
-            "strict": run_verify(tools, repo, shas, strict=True),
-            "recorded": run_verify(tools, repo, shas, right_ours, right_theirs),
-            "wrong-side": run_verify(tools, repo, shas, wrong_ours, wrong_theirs),
-        }
+        cells, model = judged_cells(repo, keep)
+        every = {p for c in cells for _, p in c["verdict"].needs}
+        plain = run_gate(tools, repo, model, set())
+        recorded = run_gate(tools, repo, model, every)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max(2, os.cpu_count() or 2)) as pool:
+            alone = {c["id"]: pool.submit(run_gate, tools, repo, model, every - {p for _, p in c["verdict"].needs})
+                     for c in cells if c["verdict"].needs}
+            alone = {sid: f.result() for sid, f in alone.items()}
     results = []
     for c in cells:
         v, s = c["verdict"], c["s"]
-        d = s.sid
-        want_cats = {v.cat} if v.cat else set()
-        got = {name: (r[1].get(d, set()), d in r[2]) for name, r in runs.items()}
+        want = set(v.needs)
+        prefix = f"packages/core/src/cells/{s.sid}/"
         problems = []
-        if got["plain"][0] != want_cats:
-            problems.append(f"plain: want {sorted(want_cats) or 'ACCEPTED'}, got {sorted(got['plain'][0]) or 'ACCEPTED'}")
-        if v.cat is None and got["plain"][1] != v.warn:
-            problems.append(f"plain: line warning {'expected' if v.warn else 'not expected'}")
-        strict_cats = got["strict"][0]
-        if strict_cats != want_cats:
-            problems.append(f"strict: want {sorted(want_cats) or 'ACCEPTED'}, got {sorted(strict_cats) or 'ACCEPTED'}")
-        if v.cat is None and v.warn and not got["strict"][1]:
-            problems.append("strict: the missing upstream lines were not reported")
-        if v.allow:
-            if got["recorded"][0]:
-                problems.append(f"recorded: a decision for {d} did not clear {sorted(got['recorded'][0])}")
-            wrong_clears = v.allow == "either"
-            if v.allow != "either" and got["wrong-side"][0] != want_cats:
-                problems.append(f"wrong-side: a decision on the other side changed {sorted(want_cats)} to {sorted(got['wrong-side'][0]) or 'ACCEPTED'}")
-            if wrong_clears and got["wrong-side"][0]:
-                problems.append("wrong-side: 'either' file did not clear it")
+        got = {f for f in plain[1] if f[1].startswith(prefix)}
+        if got != want:
+            problems.append(f"all unrecorded: want {sorted(want) or 'no FAIL'}, got {sorted(got) or 'no FAIL'}")
+        if recorded[0] != 0 or recorded[2] != "ACCEPTED" or recorded[1]:
+            problems.append(f"all recorded: exit {recorded[0]}, verdict {recorded[2]}, FAIL lines {len(recorded[1])}; want exit 0, ACCEPTED, none")
+        if want:
+            rc, fails, verdict, _ = alone[s.sid]
+            if rc != 1 or verdict != "REJECTED" or fails != want:
+                problems.append(f"alone unrecorded: exit {rc}, verdict {verdict}, FAIL {sorted(fails)}; want exit 1, REJECTED, {sorted(want)}")
         results.append({"id": c["id"], "scenario": s, "kind": c["kind"], "verdict": v, "problems": problems})
-    return results, runs
+    return results, {"plain": plain, "recorded": recorded}
 
 
 # ---- catalog-check ---------------------------------------------------------------------------------------------
@@ -685,7 +625,8 @@ def evaluate_catalog(tools):
 # ---- the contract tables ------------------------------------------------------------------------------------------
 
 def markdown():
-    cells = build_cells()
+    with tempfile.TemporaryDirectory(prefix="acceptance-cells.") as repo:
+        cells, _ = judged_cells(repo)
     by = collections.defaultdict(dict)
     for c in cells:
         by[c["n"] + 1][c["kind"]] = c["verdict"]
@@ -710,10 +651,10 @@ def main():
     if a.markdown:
         print(markdown(), end="")
         return 0
-    cells = build_cells()
     if a.list:
-        for c in cells:
-            print(c["id"], c["s"].op, c["s"].shape, c["s"].fork, c["kind"], c["verdict"].code())
+        with tempfile.TemporaryDirectory(prefix="acceptance-cells.") as repo:
+            for c in judged_cells(repo)[0]:
+                print(c["id"], c["s"].op, c["s"].shape, c["s"].fork, c["kind"], c["verdict"].code())
         return 0
     verify, runs = evaluate_verify(a.tools)
     catalog = evaluate_catalog(a.tools)

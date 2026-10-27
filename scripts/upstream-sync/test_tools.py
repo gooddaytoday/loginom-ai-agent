@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-"""Behavior tests for apply-identity.py and verify-accepted.py on private Git fixtures (no network, no bun).
+"""Behavior tests for apply-identity.py, merge_oracle.py and the gate verify-accepted.py on private Git fixtures (no network, no bun).
 
 Every test builds a base commit, a fork commit and an upstream commit, then a "resolution" the way a person would leave it,
 and asserts what the tool reports. Run: python3 -I scripts/upstream-sync/test_tools.py
 """
+import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+
+sys.dont_write_bytecode = True
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -68,21 +72,26 @@ class Fixture:
         self.git("checkout", "-q", "--detach", self.fork)
         self.git("-c", "rerere.enabled=false", "merge", "--no-commit", "--no-ff", self.upstream, check=False)
 
-    def resolve(self, edits=None, deletes=()):
-        """Merge upstream into the fork, apply `edits` {path: text} and `deletes`, commit as the result."""
+    def resolve(self, edits=None, deletes=(), decisions=None, hook=None):
+        """Merge upstream into the fork, apply `edits` {path: text} and `deletes`, write the decision file from `decisions`
+        {path: (rule, reason)}, run `hook`, commit as the result; `self.result` is that merge commit."""
         self.begin_merge()
         for path, text in (edits or {}).items():
             self.write(path, text)
         for path in deletes:
             (self.dir / path).unlink()
+        if decisions:
+            self.write("docs/upstream-sync/merge-decisions.json", json.dumps(
+                {"format": 1, "decisions": [{"path": p, "rule": r, "reason": t} for p, (r, t) in decisions.items()]}))
+        if hook:
+            hook()
         self.git("add", "-A")
         self.git("commit", "-q", "-m", "result")
+        self.result = self.git("rev-parse", "HEAD")
 
-    def accepted(self, *extra, strict=False):
-        cmd = [sys.executable, "-I", str(HERE / "verify-accepted.py"), "--repo", str(self.dir), "--base", self.base,
-               "--fork", self.fork, "--upstream", self.upstream, *extra]
-        if strict:
-            cmd.append("--strict-lines")
+    def accepted(self, *extra, merge=None):
+        cmd = [sys.executable, "-I", str(HERE / "verify-accepted.py"), "--repo", str(self.dir), "--fork", self.fork,
+               "--upstream", self.upstream, "--merge", merge or self.result, *extra]
         p = subprocess.run(cmd, capture_output=True, text=True, env=ENV)
         return p.returncode, p.stdout + p.stderr
 
@@ -139,123 +148,123 @@ class ApplyIdentitySince(FixtureCase):
         self.assertEqual(fx.identity("--since", fx.fork, "--check")[0], 0)
 
 
-class AcceptedNewFiles(FixtureCase):
+class GateCase(FixtureCase):
+    """Tests of the acceptance gate: each builds a real Git merge, leaves a result the way a person would, and asserts the verdict."""
+
+    def assertRejected(self, fx, category, path, *extra):
+        code, out = fx.accepted(*extra)
+        self.assertEqual(code, 1, out)
+        self.assertIn(f"FAIL {category}: {path}", out)
+        self.assertIn("RESULT: REJECTED", out)
+        return out
+
+    def assertAccepted(self, fx, *extra):
+        code, out = fx.accepted(*extra)
+        self.assertEqual(code, 0, out)
+        self.assertIn("RESULT: ACCEPTED", out)
+        return out
+
+
+class GateNewFiles(GateCase):
     NEW = "export const a = 1\nexport const flag = process.env.OPENCODE_NEW_FLAG\nexport const b = 2\n"
+    PATH = "packages/core/src/new.ts"
 
     def seed(self):
         return self.fx.start(lambda: self.fx.write("keep.txt", "keep\n"), lambda: self.fx.write("fork.txt", "fork\n"),
-                             lambda: self.fx.write("src/new.ts", self.NEW))
-
-    def test_accepts_the_file_as_it_came(self):
-        fx = self.seed(); fx.resolve()
-        self.assertEqual(fx.accepted(strict=True)[0], 0)
+                             lambda: self.fx.write(self.PATH, self.NEW))
 
     def test_accepts_the_file_with_the_fork_names(self):
-        fx = self.seed(); fx.resolve({"src/new.ts": self.NEW.replace("OPENCODE_", "LOGINOM_AI_AGENT_")})
-        self.assertEqual(fx.accepted(strict=True)[0], 0)
+        fx = self.seed(); fx.resolve({self.PATH: self.NEW.replace("OPENCODE_", "LOGINOM_AI_AGENT_")})
+        self.assertAccepted(fx)
+
+    def test_rejects_the_file_with_upstream_names_where_the_oracle_maps_them(self):
+        fx = self.seed(); fx.resolve()
+        self.assertRejected(fx, "deviation", self.PATH)
 
     def test_rejects_an_empty_file_in_place_of_the_added_one(self):
-        fx = self.seed(); fx.resolve({"src/new.ts": ""})
-        for strict in (False, True):
-            code, out = fx.accepted(strict=strict)
-            self.assertEqual(code, 1, out)
-            self.assertIn("src/new.ts", out)
+        fx = self.seed(); fx.resolve({self.PATH: ""})
+        self.assertRejected(fx, "deviation", self.PATH)
 
     def test_rejects_a_truncated_added_file(self):
-        fx = self.seed(); fx.resolve({"src/new.ts": "export const a = 1\n"})
-        for strict in (False, True):
-            code, out = fx.accepted(strict=strict)
-            self.assertEqual(code, 1, out)
-            self.assertIn("added-truncated: src/new.ts", out)
+        fx = self.seed(); fx.resolve({self.PATH: "export const a = 1\n"})
+        self.assertRejected(fx, "deviation", self.PATH)
 
     def test_rejects_a_missing_added_file(self):
-        fx = self.seed(); fx.resolve(deletes=["src/new.ts"])
-        self.assertEqual(fx.accepted()[0], 1)
+        fx = self.seed(); fx.resolve(deletes=[self.PATH])
+        self.assertRejected(fx, "deviation", self.PATH)
 
-    def test_accepts_a_truncated_file_with_a_recorded_decision(self):
-        fx = self.seed(); fx.resolve({"src/new.ts": "export const a = 1\n"})
-        allow = fx.dir.parent / "allow-theirs.txt"
-        allow.write_text("src/new.ts  # owner: product ships its own version\n")
-        self.assertEqual(fx.accepted("--allow-theirs", str(allow), strict=True)[0], 0)
+    def test_accepts_a_truncated_file_with_a_decision_and_warns(self):
+        fx = self.seed(); fx.resolve({self.PATH: "export const a = 1\n"}, decisions={self.PATH: ("STANDING-7", "product ships its own version")})
+        out = self.assertAccepted(fx)
+        self.assertIn(f"- {self.PATH}: upstream-added lines missing", out)
 
 
-class AcceptedBothSidesChanged(FixtureCase):
+class GateBothSidesChanged(GateCase):
     def seed(self):
         return self.fx.start(lambda: self.fx.write("src/a.ts", BODY),
                              lambda: self.fx.write("src/a.ts", lines_with(1, "fork 1")),
                              lambda: self.fx.write("src/a.ts", lines_with(10, "upstream 10") + "extra upstream\n"))
 
-    def test_accepts_a_real_merge(self):
+    def test_accepts_the_mechanical_merge(self):
         fx = self.seed(); fx.resolve()
-        self.assertEqual(fx.accepted(strict=True)[0], 0)
+        out = self.assertAccepted(fx)
+        self.assertIn("| conflict | 0 | 0 |", out)
 
     def test_rejects_deleting_a_file_both_sides_changed(self):
         fx = self.seed(); fx.resolve(deletes=["src/a.ts"])
-        for strict in (False, True):
-            code, out = fx.accepted(strict=strict)
-            self.assertEqual(code, 1, out)
-            self.assertIn("merged-deleted: src/a.ts", out)
+        self.assertRejected(fx, "deviation", "src/a.ts")
 
-    def test_accepts_the_deletion_as_a_recorded_decision(self):
-        fx = self.seed(); fx.resolve(deletes=["src/a.ts"])
-        allow = fx.dir.parent / "allow-theirs.txt"
-        allow.write_text("src/a.ts  # owner: the product dropped this module\n")
-        code, out = fx.accepted("--allow-theirs", str(allow), strict=True)
-        self.assertEqual(code, 0, out)
-        self.assertIn("merged-deleted (allowed)", out)
+    def test_accepts_the_deletion_with_a_decision(self):
+        fx = self.seed(); fx.resolve(deletes=["src/a.ts"], decisions={"src/a.ts": ("ADR-1", "the product dropped this module")})
+        self.assertAccepted(fx)
 
-    def test_an_allowance_for_another_path_does_not_cover_it(self):
-        fx = self.seed(); fx.resolve(deletes=["src/a.ts"])
-        allow = fx.dir.parent / "allow-theirs.txt"
-        allow.write_text("src/other.ts  # owner decision\n")
-        self.assertEqual(fx.accepted("--allow-theirs", str(allow))[0], 1)
+    def test_a_decision_for_another_path_does_not_cover_it(self):
+        fx = self.seed(); fx.resolve(deletes=["src/a.ts"], decisions={"src/other.ts": ("ADR-1", "a decision")})
+        out = self.assertRejected(fx, "deviation", "src/a.ts")
+        self.assertIn("FAIL stale-record: src/other.ts", out)
 
     def test_rejects_an_emptied_merge_result(self):
         fx = self.seed(); fx.resolve({"src/a.ts": ""})
-        for strict in (False, True):
-            code, out = fx.accepted(strict=strict)
-            self.assertEqual(code, 1, out)
-            self.assertIn("merged-emptied: src/a.ts", out)
+        self.assertRejected(fx, "deviation", "src/a.ts")
 
-    def test_a_partly_missing_upstream_line_is_a_warning_unless_strict(self):
+    def test_rejects_a_partly_missing_upstream_line(self):
         fx = self.seed(); fx.resolve({"src/a.ts": lines_with(1, "fork 1").replace("line 10\n", "upstream 10\n")})
-        code, out = fx.accepted()
-        self.assertEqual(code, 0, out)
-        self.assertIn("upstream-added lines missing", out)
-        self.assertEqual(fx.accepted(strict=True)[0], 1)
+        self.assertRejected(fx, "deviation", "src/a.ts")
 
 
-class AcceptedAddAdd(FixtureCase):
+class GateAddAdd(GateCase):
     def seed(self):
         return self.fx.start(lambda: self.fx.write("keep.txt", "keep\n"),
                              lambda: self.fx.write("src/x.ts", "export const fork = 1\n"),
                              lambda: self.fx.write("src/x.ts", "export const upstream = 1\n"))
 
-    def test_rejects_the_fork_file_when_both_sides_added_the_path(self):
-        fx = self.seed(); fx.resolve({"src/x.ts": "export const fork = 1\n"})
-        code, out = fx.accepted()
-        self.assertEqual(code, 1, out)
-        self.assertIn("kept-fork: src/x.ts", out)
-
-    def test_accepts_a_combination_of_both(self):
+    def test_every_conflicted_path_needs_a_decision_even_when_it_combines_both(self):
         fx = self.seed(); fx.resolve({"src/x.ts": "export const fork = 1\nexport const upstream = 1\n"})
-        self.assertEqual(fx.accepted(strict=True)[0], 0)
+        self.assertRejected(fx, "conflict", "src/x.ts")
 
-    def test_rejects_an_empty_result(self):
+    def test_accepts_a_combination_of_both_with_a_decision(self):
+        fx = self.seed(); fx.resolve({"src/x.ts": "export const fork = 1\nexport const upstream = 1\n"},
+                                     decisions={"src/x.ts": ("PROCEDURE-2", "both declarations kept")})
+        out = self.assertAccepted(fx)
+        self.assertNotIn("warnings", out)
+
+    def test_the_fork_file_alone_passes_with_a_decision_and_a_warning(self):
+        fx = self.seed(); fx.resolve({"src/x.ts": "export const fork = 1\n"}, decisions={"src/x.ts": ("PROCEDURE-2", "fork file kept")})
+        self.assertIn("upstream-added lines missing", self.assertAccepted(fx))
+
+    def test_rejects_an_empty_result_without_a_decision(self):
         fx = self.seed(); fx.resolve({"src/x.ts": ""})
-        self.assertEqual(fx.accepted()[0], 1)
+        self.assertRejected(fx, "conflict", "src/x.ts")
 
 
-class AcceptedModesAndRenames(FixtureCase):
+class GateModesAndRenames(GateCase):
     def test_rejects_a_lost_executable_bit(self):
         fx = self.fx.start(lambda: self.fx.write("run.sh", "echo hi\n", 0o644), lambda: self.fx.write("fork.txt", "f\n"),
                            lambda: self.fx.write("run.sh", "echo hi\n", 0o755))
         fx.resolve()
-        self.assertEqual(fx.accepted()[0], 0)
-        fx.git("update-index", "--chmod=-x", "run.sh"); fx.git("commit", "-q", "-m", "lost mode")
-        code, out = fx.accepted()
-        self.assertEqual(code, 1, out)
-        self.assertIn("run.sh", out)
+        self.assertAccepted(fx)
+        fx.resolve(hook=lambda: (fx.dir / "run.sh").chmod(0o644))
+        self.assertRejected(fx, "deviation", "run.sh")
 
     def test_rejects_a_regular_file_where_upstream_made_a_symlink(self):
         def upstream():
@@ -264,10 +273,9 @@ class AcceptedModesAndRenames(FixtureCase):
         fx = self.fx.start(lambda: (self.fx.write("link", "target.txt"), self.fx.write("target.txt", "t\n")),
                            lambda: self.fx.write("fork.txt", "f\n"), upstream)
         fx.resolve()
-        self.assertEqual(fx.accepted()[0], 0)
-        fx.git("rm", "-q", "--cached", "link"); (fx.dir / "link").unlink(); fx.write("link", "target.txt")
-        fx.git("add", "-A"); fx.git("commit", "-q", "-m", "regular instead of symlink")
-        self.assertEqual(fx.accepted()[0], 1)
+        self.assertAccepted(fx)
+        fx.resolve(hook=lambda: ((fx.dir / "link").unlink(), fx.write("link", "target.txt")))
+        self.assertRejected(fx, "deviation", "link")
 
     def seed_rename(self, fork_edit):
         def upstream():
@@ -277,26 +285,136 @@ class AcceptedModesAndRenames(FixtureCase):
 
     def test_accepts_a_rename_the_merge_carried_out(self):
         fx = self.seed_rename(lambda: self.fx.write("fork.txt", "f\n")); fx.resolve()
-        self.assertEqual(fx.accepted(strict=True)[0], 0)
+        self.assertAccepted(fx)
 
     def test_rejects_an_empty_file_in_place_of_the_renamed_one(self):
         fx = self.seed_rename(lambda: self.fx.write("fork.txt", "f\n")); fx.resolve({"src/new.ts": ""})
-        code, out = fx.accepted()
-        self.assertEqual(code, 1, out)
-        self.assertIn("src/new.ts", out)
+        self.assertRejected(fx, "deviation", "src/new.ts")
 
     def test_rejects_a_rename_whose_content_was_replaced(self):
         fx = self.seed_rename(lambda: self.fx.write("fork.txt", "f\n")); fx.resolve({"src/new.ts": BODY})
-        self.assertEqual(fx.accepted()[0], 1)
+        self.assertRejected(fx, "deviation", "src/new.ts")
 
     def test_accepts_a_rename_merged_with_a_fork_edit(self):
         fx = self.seed_rename(lambda: self.fx.write("src/old.ts", lines_with(1, "fork 1"))); fx.resolve()
-        self.assertEqual(fx.accepted(strict=True)[0], 0)
+        self.assertAccepted(fx)
 
     def test_rejects_a_renamed_and_edited_file_resolved_empty(self):
         fx = self.seed_rename(lambda: self.fx.write("src/old.ts", lines_with(1, "fork 1"))); fx.resolve({"src/new.ts": ""})
-        self.assertEqual(fx.accepted()[0], 1)
+        self.assertRejected(fx, "deviation", "src/new.ts")
 
+
+class GateLab302Findings(GateCase):
+    """F1-F3 of the verification of LAB-302: each was ACCEPTED by the line-level gate, with no record and under strict lines."""
+    SERVICE = ('product = "upstream"\nversion = 1\ncalls = []\ndef authorize(): calls.append("authorize")\n'
+               'def publish(): calls.append("publish")\npublish()\nauthorize()\nprint(calls)\n')
+
+    def test_f1_upstream_reorders_calls_and_the_result_keeps_the_old_order(self):
+        up = self.SERVICE.replace("version = 1", "version = 2").replace("publish()\nauthorize()", "authorize()\npublish()")
+        fork = self.SERVICE.replace('"upstream"', '"fork"')
+        fx = self.fx.start(lambda: self.fx.write("service.py", self.SERVICE), lambda: self.fx.write("service.py", fork),
+                           lambda: self.fx.write("service.py", up))
+        fx.resolve({"service.py": fork.replace("version = 1", "version = 2")})
+        self.assertRejected(fx, "conflict", "service.py")
+
+    def test_f1_the_same_file_with_the_fix_reordered_is_not_a_clean_merge_either(self):
+        up = self.SERVICE.replace("publish()\nauthorize()", "authorize()\npublish()")
+        fork = self.SERVICE.replace('"upstream"', '"fork"').replace("version = 1\ncalls", "version = 1\n\ncalls")
+        fx = self.fx.start(lambda: self.fx.write("service.py", self.SERVICE), lambda: self.fx.write("service.py", fork),
+                           lambda: self.fx.write("service.py", up))
+        fx.resolve({"service.py": fork})
+        self.assertRejected(fx, "deviation", "service.py")
+
+    def test_f2_upstream_copies_a_command_and_the_result_drops_the_copy(self):
+        launcher = "#!/bin/sh\necho helper\n"
+        fx = self.fx.start(lambda: self.fx.write("bin/old-command", launcher, 0o755), lambda: self.fx.write("fork.txt", "fork\n"),
+                           lambda: self.fx.write("bin/new-command", launcher, 0o755))
+        self.assertIn("C100", fx.git("diff", "-M", "-C", "--find-copies-harder", "--name-status", fx.base, fx.upstream))
+        fx.resolve(deletes=["bin/new-command"])
+        self.assertRejected(fx, "deviation", "bin/new-command")
+
+    def test_f3_upstream_renames_and_edits_and_the_result_keeps_the_old_path(self):
+        def rename():
+            self.fx.git("mv", "src/old.ts", "src/new.ts"); self.fx.write("src/new.ts", lines_with(10, "upstream 10"))
+        fx = self.fx.start(lambda: self.fx.write("src/old.ts", BODY), lambda: self.fx.write("src/old.ts", lines_with(1, "fork 1")), rename)
+        fx.resolve({"src/new.ts": lines_with(1, "fork 1").replace("line 10\n", "upstream 10\n"), "src/old.ts": lines_with(1, "fork 1")})
+        self.assertRejected(fx, "deviation", "src/old.ts")
+
+
+class GateInput(GateCase):
+    def seed(self):
+        return self.fx.start(lambda: self.fx.write("keep.txt", "keep\n"), lambda: self.fx.write("fork.txt", "fork\n"),
+                             lambda: self.fx.write("up.txt", "up\n"))
+
+    def test_judges_only_the_merge_commit_and_lists_the_commits_after_it(self):
+        fx = self.seed(); fx.resolve()
+        fx.write("later.txt", "a build fix\n"); fx.commit("build fix after the merge")
+        out = self.assertAccepted(fx)
+        self.assertIn("commits after the merge, not judged (1)", out)
+        self.assertIn("build fix after the merge", out)
+
+    def test_refuses_a_commit_that_is_not_a_merge_of_the_two(self):
+        fx = self.seed(); fx.resolve()
+        code, out = fx.accepted(merge=fx.upstream)
+        self.assertEqual(code, 2, out)
+
+    def test_a_decision_for_a_path_that_matches_the_oracle_is_stale(self):
+        fx = self.seed(); fx.resolve(decisions={"up.txt": ("ADR-1", "no need")})
+        self.assertRejected(fx, "stale-record", "up.txt")
+
+    def test_a_rule_must_name_a_known_source(self):
+        fx = self.seed(); fx.resolve({"up.txt": ""}, decisions={"up.txt": ("because", "reason")})
+        out = self.assertRejected(fx, "bad-record", "up.txt")
+        self.assertIn("FAIL deviation: up.txt", out)
+
+    def test_a_catalog_rule_must_exist_in_the_catalog_of_the_commit(self):
+        fx = self.seed()
+        fx.resolve({"up.txt": "", "docs/upstream-sync/catalog.json": json.dumps({"against": fx.upstream, "entries": [{"id": "CAT-01", "paths": []}]})},
+                   decisions={"up.txt": ("CAT-09", "reason"), "docs/upstream-sync/catalog.json": ("CAT-01", "against moved")})
+        out = self.assertRejected(fx, "bad-record", "up.txt")
+        self.assertNotIn("bad-record: docs/upstream-sync/catalog.json", out)
+
+    def test_a_decision_needs_a_reason(self):
+        fx = self.seed(); fx.resolve({"up.txt": ""}, decisions={"up.txt": ("ADR-1", "  ")})
+        self.assertRejected(fx, "bad-record", "up.txt")
+
+
+class OracleIsMechanical(FixtureCase):
+    def test_two_fresh_clones_under_hostile_configuration_give_one_tree(self):
+        fx = self.fx.start(lambda: self.fx.write("packages/core/src/a.ts", BODY), lambda: self.fx.write("fork.txt", "f\n"),
+                           lambda: self.fx.write("packages/core/src/a.ts", lines_with(3, "x = process.env.OPENCODE_FLAG")))
+        trees, scratch = [], Path(tempfile.mkdtemp(prefix="oracle-clones."))
+        self.addCleanup(shutil.rmtree, scratch, True)
+        for i in range(2):
+            home = scratch / f"home{i}"
+            home.mkdir()
+            (home / ".gitconfig").write_text("[merge]\n\trenames = false\n\tconflictStyle = diff3\n[rerere]\n\tenabled = true\n[core]\n\tautocrlf = true\n")
+            clone = scratch / f"clone{i}"
+            subprocess.run(["git", "clone", "-q", str(fx.dir), str(clone)], check=True, capture_output=True, env=ENV)
+            env = dict(os.environ, HOME=str(home), TZ=["Asia/Tokyo", "America/Lima"][i])
+            out = subprocess.run([sys.executable, "-I", str(HERE / "merge_oracle.py"), "--repo", str(clone), "--fork", fx.fork,
+                                  "--upstream", fx.upstream, "--print-tree"], capture_output=True, text=True, env=env, check=True).stdout.strip()
+            trees.append(out)
+        self.assertEqual(trees[0], trees[1])
+        shown = subprocess.run(["git", "-C", str(clone), "show", f"{trees[0]}:packages/core/src/a.ts"], capture_output=True, text=True, env=ENV).stdout
+        self.assertEqual(shown.count("LOGINOM_AI_AGENT_FLAG"), 1)
+
+    def test_applying_the_identity_to_the_oracle_again_changes_nothing(self):
+        fx = self.fx.start(lambda: self.fx.write("packages/core/src/a.ts", BODY), lambda: self.fx.write("fork.txt", "f\n"),
+                           lambda: self.fx.write("packages/core/src/a.ts", lines_with(3, "x = process.env.OPENCODE_FLAG")))
+        spec = importlib.util.spec_from_file_location("merge_oracle", HERE / "merge_oracle.py")
+        mo = importlib.util.module_from_spec(spec); spec.loader.exec_module(mo)
+        o = mo.oracle(str(fx.dir), fx.fork, fx.upstream)
+        again = mo.apply_identity(str(fx.dir), o.entries, mo.tree_entries(str(fx.dir), fx.fork))
+        self.assertEqual(mo.write_tree(str(fx.dir), again), o.tree)
+
+    def test_a_file_the_merge_did_not_change_keeps_its_upstream_spelling(self):
+        fx = self.fx.start(lambda: self.fx.write("packages/core/src/a.ts", "x = process.env.OPENCODE_OLD\n"), lambda: self.fx.write("fork.txt", "f\n"),
+                           lambda: self.fx.write("up.txt", "u\n"))
+        spec = importlib.util.spec_from_file_location("merge_oracle", HERE / "merge_oracle.py")
+        mo = importlib.util.module_from_spec(spec); spec.loader.exec_module(mo)
+        o = mo.oracle(str(fx.dir), fx.fork, fx.upstream)
+        self.assertEqual(o.entries["packages/core/src/a.ts"], mo.tree_entries(str(fx.dir), fx.fork)["packages/core/src/a.ts"])
 
 
 class CatalogCheckUncommittedMerge(FixtureCase):

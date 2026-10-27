@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Offline self-test of the sync procedure on a synthetic upstream and fork (no network, no bun).
 # Covers: pin refuses pre-releases, prepare reports the expected conflicts and refuses a reused directory,
-# accepted rejects "keep the fork's whole file" and accepts a real merge with a recorded decision; test_tools.py covers the
-# edge cases of accepted and apply-identity; test_acceptance.py runs every cell of docs/upstream-sync/acceptance-contract.md as a
-# Git merge; doctest_procedure.py runs the command blocks of procedure.md verbatim from a clean clone, `pin` to `accepted`.
+# accepted rejects a merge without decision records and accepts the same merge with records committed in it; test_tools.py covers
+# the gate, the oracle and apply-identity on synthetic merges; test_acceptance.py runs every cell of
+# docs/upstream-sync/acceptance-contract.md as a Git merge and mutates the gate to prove the cells see its exit code and verdict;
+# doctest_procedure.py runs the command blocks of procedure.md verbatim from a clean clone, `pin` to `accepted`.
 # Usage: scripts/upstream-sync/selftest.sh   (exit 0 = all assertions held)
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -52,22 +53,29 @@ if "$HERE/sync-upstream.sh" prepare --fork-sha "$FORK" --tag v1.1.0 --upstream-s
 [ "$(git -C "$OUT/clone" remote get-url --push origin)" = DISABLED ] || fail "push URL is not disabled"
 
 R=$OUT/rehearsal
-# --- a "resolution" that keeps the fork's whole files must be rejected
+# --- a merge without decision records is rejected: both paths are conflicts of the mechanical merge
 git -C "$R" checkout -q --ours pkg/b.txt; git -C "$R" add pkg/b.txt
-git -C "$R" add del.txt; git -C "$R" commit -q -m "merge (bad)"
-if "$HERE/sync-upstream.sh" accepted --out "$OUT" >"$W/bad.log" 2>&1; then fail "accepted passed a resolution that drops upstream's change"; fi
-grep -q 'FAIL kept-fork: pkg/b.txt' "$W/bad.log" || fail "kept-fork not reported: $(cat "$W/bad.log")"
-grep -q 'DECISION deleted-kept: del.txt' "$W/bad.log" || fail "deleted-kept not reported"
+git -C "$R" add del.txt; git -C "$R" commit -q -m "merge (no records)"
+if "$HERE/sync-upstream.sh" accepted --out "$OUT" >"$W/bad.log" 2>&1; then fail "accepted passed a merge without decision records"; fi
+grep -q 'FAIL conflict: pkg/b.txt' "$W/bad.log" || fail "the conflict at pkg/b.txt was not reported: $(cat "$W/bad.log")"
+grep -q 'FAIL conflict: del.txt' "$W/bad.log" || fail "the conflict at del.txt was not reported"
+grep -q 'RESULT: REJECTED' "$W/bad.log" || fail "no REJECTED result"
 
-# --- a real merge, with the deletion recorded as an owner decision
+# --- the same files merged properly, with one record for each conflicted path committed in the merge
 git -C "$R" reset -q --hard "$FORK"
 set +e; git -C "$R" -c rerere.enabled=false merge --no-commit --no-ff "$UP" >/dev/null 2>&1; set -e
 seq_file | sed 's/^line 5$/line 5 fork+upstream/' >"$R/pkg/b.txt"; git -C "$R" add pkg/b.txt
-git -C "$R" rm -q -f del.txt; git -C "$R" commit -q -m "merge (good)"
-printf 'del.txt  # owner decision: the fork no longer ships this file\n' >"$W/allow-theirs.txt"
-"$HERE/sync-upstream.sh" accepted --out "$OUT" --allow-theirs "$W/allow-theirs.txt" >"$W/good.log" 2>&1 || fail "accepted rejected a real merge: $(cat "$W/good.log")"
+git -C "$R" rm -q -f del.txt
+mkdir -p "$R/docs/upstream-sync"
+cat >"$R/docs/upstream-sync/merge-decisions.json" <<'JSON'
+{"format": 1, "decisions": [
+ {"path": "pkg/b.txt", "rule": "PROCEDURE-2", "reason": "both edits of line 5 kept"},
+ {"path": "del.txt", "rule": "ADR-1", "reason": "the fork no longer ships this file"}]}
+JSON
+git -C "$R" add -A; git -C "$R" commit -q -m "merge (with records)"
+"$HERE/sync-upstream.sh" accepted --out "$OUT" >"$W/good.log" 2>&1 || fail "accepted rejected a merge with records: $(cat "$W/good.log")"
 grep -q 'RESULT: ACCEPTED' "$W/good.log" || fail "no ACCEPTED result"
-grep -q '| merged | 2 |' "$W/good.log" || fail "expected two merged files: $(cat "$W/good.log")"
+grep -q '| conflict | 2 | 2 |' "$W/good.log" || fail "expected two recorded conflicts: $(cat "$W/good.log")"
 # --- apply-identity: new upstream code gets the fork's external names, provider keys stay
 IDREPO=$W/identity; mkdir -p "$IDREPO/packages/core/src"; git init -q "$IDREPO"
 printf 'const a = process.env.OPENCODE_NEW_FLAG\nconst k = process.env.OPENCODE_API_KEY\nconst d = ".opencode/agent"\nconst c = "opencode.json"\n' >"$IDREPO/packages/core/src/x.ts"
@@ -88,7 +96,8 @@ cp -R "$HERE" "$DOC/scripts/upstream-sync"; cp -R "$HERE/../../docs/upstream-syn
 rm -rf "$DOC/scripts/upstream-sync/__pycache__"; git -C "$DOC" add -A; git -C "$DOC" commit -q -m "tools and procedure"
 cat >"$W/resolve.sh" <<'RESOLVE'
 #!/usr/bin/env bash
-# The person's part of procedure step 2 on the synthetic merge: resolve both conflicts, describe the divergence in the catalog.
+# The person's part of procedure step 2 on the synthetic merge: resolve both conflicts, describe the divergence in the catalog,
+# record a decision for each conflicted path in the file that is committed with the merge.
 set -euo pipefail
 . "$OUT/pins.env"; R=$OUT/rehearsal
 for i in $(seq 1 12); do if [ "$i" = 5 ]; then echo "line 5 fork+upstream"; else echo "line $i"; fi; done >"$R/pkg/b.txt"
@@ -96,21 +105,32 @@ git -C "$R" add pkg/b.txt; git -C "$R" rm -q -f del.txt
 mkdir -p "$R/docs/upstream-sync"
 printf '{"against": "%s", "entries": [{"id": "CAT-01", "paths": ["pkg/*.txt"]}]}\n' "$UPSTREAM_SHA" >"$R/docs/upstream-sync/catalog.json"
 printf '## CAT-01 fork edits\n' >"$R/docs/upstream-sync/catalog.md"
-printf 'del.txt  # owner decision: the fork no longer ships this file\n' >"$OUT/decisions-theirs.txt"
-echo "ALLOW_THEIRS=$OUT/decisions-theirs.txt" >"$OUT/doc-test.env"
+cat >"$R/docs/upstream-sync/merge-decisions.json" <<'JSON'
+{"format": 1, "decisions": [
+ {"path": "pkg/b.txt", "rule": "CAT-01", "reason": "both edits of line 5 kept"},
+ {"path": "del.txt", "rule": "CAT-01", "reason": "the fork no longer ships this file"},
+ {"path": "docs/upstream-sync/catalog.json", "rule": "PROCEDURE-2", "reason": "against moved to the merged tag"},
+ {"path": "docs/upstream-sync/catalog.md", "rule": "PROCEDURE-2", "reason": "the divergence is described"}]}
+JSON
 RESOLVE
 chmod +x "$W/resolve.sh"
-FORK_URL=$F UPSTREAM_URL=$U TAG=v1.1.0 CHECK_SKIP=install,typecheck,tests,check,httpapi,guards,build,compat \
-  python3 -I "$HERE/doctest_procedure.py" --doc "$HERE/../../docs/upstream-sync/procedure.md" --src "$DOC" --out "$W/doc-out" \
-  --log "$W/doctest.log" --resolve "$W/resolve.sh" >"$W/doctest.out" 2>&1 || { tail -60 "$W/doctest.log" >&2; cat "$W/doctest.out" >&2; fail "procedure.md does not run verbatim"; }
+DOCENV=(FORK_URL="$F" UPSTREAM_URL="$U" TAG=v1.1.0 CHECK_SKIP=install,typecheck,tests,check,httpapi,guards,build,compat GIT_ALLOW_PROTOCOL=file)
+doctest() { env "${DOCENV[@]}" python3 -I "$HERE/doctest_procedure.py" --src "$DOC" --resolve "$W/resolve.sh" "$@"; }
+doctest --doc "$HERE/../../docs/upstream-sync/procedure.md" --out "$W/doc-out" --log "$W/doctest.log" >"$W/doctest.out" 2>&1 \
+  || { tail -60 "$W/doctest.log" >&2; cat "$W/doctest.out" >&2; fail "procedure.md does not run verbatim"; }
 grep -q 'RESULT: ACCEPTED' "$W/doctest.log" || fail "the procedure document did not end in ACCEPTED: $(tail -5 "$W/doctest.log")"
 grep -q '^catalog	PASS' "$W/doc-out/check/summary.tsv" || fail "the catalog step of check did not pass"
-# the document must fail when a command depends on the working directory (C4 of LAB-300) or keeps a placeholder
+# the document must fail when a command depends on the working directory (C4 of LAB-300): with the same environment as the
+# positive run, so that it fails at the step under test and not at the network
 sed 's#--repo "\$OUT/rehearsal"#--repo rehearsal#' "$HERE/../../docs/upstream-sync/procedure.md" >"$W/procedure-relative.md"
-if python3 -I "$HERE/doctest_procedure.py" --doc "$W/procedure-relative.md" --src "$DOC" --out "$W/doc-out-relative" --log "$W/doctest-relative.log" \
-    --resolve "$W/resolve.sh" >/dev/null 2>&1; then fail "the doc-test passed a document with a relative --repo path"; fi
+if doctest --doc "$W/procedure-relative.md" --out "$W/doc-out-relative" --log "$W/doctest-relative.log" >"$W/doctest-relative.out" 2>&1; then
+  fail "the doc-test passed a document with a relative --repo path"; fi
+[ "$(grep '^### step=' "$W/doctest-relative.log" | tail -1 | sed 's/^### step=\([a-z]*\).*/\1/')" = identity ] \
+  || fail "the relative --repo path did not fail at the identity step: $(tail -5 "$W/doctest-relative.log")"
+grep -q '^### step=prepare' "$W/doctest-relative.log" || fail "the negative doc-test never reached prepare, so the network is not excluded"
 sed 's#--fork-sha "\$FORK_SHA"#--fork-sha <FORK_SHA>#' "$HERE/../../docs/upstream-sync/procedure.md" >"$W/procedure-placeholder.md"
-if python3 -I "$HERE/doctest_procedure.py" --doc "$W/procedure-placeholder.md" --src "$DOC" --out "$W/doc-out-placeholder" --log "$W/doctest-placeholder.log" \
-    --resolve "$W/resolve.sh" >/dev/null 2>&1; then fail "the doc-test passed a document with a placeholder"; fi
+if doctest --doc "$W/procedure-placeholder.md" --out "$W/doc-out-placeholder" --log "$W/doctest-placeholder.log" >"$W/doctest-placeholder.out" 2>&1; then
+  fail "the doc-test passed a document with a placeholder"; fi
+grep -q 'is not executable as written' "$W/doctest-placeholder.out" || fail "the placeholder was not what failed: $(cat "$W/doctest-placeholder.out")"
 [ -z "${DOCTEST_LOG:-}" ] || cp "$W/doctest.log" "$DOCTEST_LOG"
 echo "SELFTEST PASS"

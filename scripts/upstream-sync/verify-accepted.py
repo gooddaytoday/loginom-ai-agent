@@ -1,277 +1,165 @@
 #!/usr/bin/env python3
-"""Checks that a merge of an upstream tag took upstream's changes instead of discarding them.
+"""The acceptance gate: is a merge commit of the fork and an upstream commit the mechanical merge plus recorded decisions?
 
-A conflict can be "resolved" by choosing the fork's whole file; the metric then looks perfect and the update is lost.
-For every file upstream changed since the merge base this compares four versions: base, fork (pre-merge), upstream and
-the committed merge result. A version is a mode and a content; a file turned into a symlink or a lost executable bit is a
-difference. The verdicts are fixed by docs/upstream-sync/acceptance-contract.md; every cell of that contract is a test
-(acceptance_cells.py). Verdicts:
+The gate looks at one commit, the merge commit, and at nothing else. It builds the oracle (merge_oracle.py: Git's own merge of
+the two parents with the settings of `prepare`, plus apply-identity) and compares the merge commit's tree with it byte for byte.
+Two kinds of path need a decision record in the merge commit itself, `docs/upstream-sync/merge-decisions.json`:
 
-  fork did not touch the file (or made the same change)   result must be upstream's version (names mapped), else
-      not-upstream      FAIL     changed or modified file differs from upstream's
-      deleted-kept      FAIL     upstream deleted it (or renamed it away) and the result still has it
-      added-missing     FAIL*    upstream added it and the result has nothing equal to it
-      added-truncated   FAIL*    added file present but lacks lines (or has another mode or type)
-      renamed-missing   FAIL     upstream renamed it and the new path is absent
-      renamed-truncated FAIL*    renamed file present but lacks lines (or has another mode or type)
-  both sides changed it (differently)
-      kept-fork         DECISION result equals the fork's version: upstream's change is dropped         (--allow-ours)
-      took-theirs       DECISION result equals upstream's version: the fork's change is dropped         (--allow-theirs)
-      merged-deleted    FAIL*    the result deletes it                                                   (--allow-theirs)
-      merged-emptied    FAIL*    the result is an empty file                                             (--allow-theirs)
-      neither-side      FAIL     a file that cannot be merged line by line (binary, symlink, submodule) is neither version
-      mode-lost         FAIL*    the merged file lost the executable bit one side changed
-      upstream-lines    warning  lines upstream added are missing from the merged text (--strict-lines fails)
-  one side deleted what the other changed
-      deleted-kept      DECISION upstream deleted a file the fork changed (or moved) and the result keeps it   (--allow-ours)
-      deleted-dropped   DECISION ... and the result deletes it                                                  (--allow-theirs)
-      fork-deleted      DECISION the fork deleted a file upstream changed; absent: (--allow-ours), present: (--allow-theirs)
-  * cleared by the decision file named on the right of the same row; added-*, renamed-truncated and mode-lost by either file.
+  conflict    the oracle's merge left the path conflicted: whatever the commit holds there was chosen by a person
+  deviation   the path is not conflicted, and the commit holds other bytes (mode, type, or absence) than the oracle
 
-A DECISION or FAIL* entry is accepted only through --allow-ours / --allow-theirs files whose lines are
-`path  # reason`: the reason is the recorded owner decision (see docs/upstream-sync/catalog.md for ownership policies).
+A path without a record is a FAIL. A record without such a path is a FAIL too (stale). Everything else is accepted without
+a judgment. The gate has no heuristics: it does not say that a conflict was resolved correctly in meaning. The reviewer judges
+that from the records. Line-level observations (upstream-added lines missing, upstream-removed lines still present) are printed
+as warnings next to recorded paths and never decide the result. Commits after the merge (build, fixes) are listed, not judged.
 
-Line level is a heuristic: for text, upstream's added lines must appear in the result as a multiset after the fork's names
-are applied (OPENCODE_X and LOGINOM_AI_AGENT_X are one line), and a line upstream removed copies of may not appear more
-often than fork + upstream - base allows (so a removal is reported whenever it may have been kept). It does not check order or position, and a line the fork already had satisfies an
-equal line upstream added.
+Decision file (format 1, committed together with the merge; the file itself is exempt from the comparison):
+  {"format": 1, "decisions": [{"path": "<path>", "rule": "<rule>", "reason": "<why>"}]}
+  rule: CAT-<n> (an entry of docs/upstream-sync/catalog.json in the same commit), ADR-<n>, STANDING-<n> or PROCEDURE-<n>,
+  optionally followed by #anchor. reason: a sentence naming what was chosen and why.
 
-Usage: verify-accepted.py --repo DIR --base SHA --fork SHA --upstream SHA [--allow-ours F] [--allow-theirs F] [--strict-lines]
-Exit code 0: every upstream change is accounted for; 1: unexplained entries.
+Usage: verify-accepted.py --repo DIR --fork SHA --upstream SHA [--merge REV]
+  --merge REV  the merge commit (default HEAD); its parents must be exactly --fork and --upstream
+Exit code 0: ACCEPTED; 1: REJECTED; 2: the input is not a merge of these two commits.
 """
 import argparse
 import collections
 import importlib.util
+import json
 import os
+import re
 import subprocess
 import sys
 
-# The fork spells some external identifiers differently; upstream lines are compared after the mapping apply-identity.py applies.
 sys.dont_write_bytecode = True
-_spec = importlib.util.spec_from_file_location("apply_identity", os.path.join(os.path.dirname(os.path.abspath(__file__)), "apply-identity.py"))
-_apply_identity = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_apply_identity)
-identity = _apply_identity.transform
+HERE = os.path.dirname(os.path.abspath(__file__))
 
-DECISIONS = {"deleted-kept", "deleted-dropped", "fork-deleted"}
-DETAIL = {
-    "not-upstream": "the result differs from upstream's version",
-    "deleted-kept": "upstream deleted or renamed it away; the result still has it",
-    "deleted-dropped": "upstream deleted a file the fork changed; the result deletes it",
-    "added-missing": "upstream added the file; nothing equal to it exists in the result",
-    "added-truncated": "upstream added the file; the result has the path but its content or mode differs",
-    "renamed-missing": "upstream renamed the file; the new path is absent from the result",
-    "renamed-truncated": "upstream renamed the file; the result has it but its content or mode differs",
-    "kept-fork": "result equals the fork's version; upstream's change is dropped",
-    "took-theirs": "result equals upstream's version; the fork's change is dropped",
-    "merged-deleted": "both sides changed it; the result deletes it",
-    "merged-emptied": "both sides changed it; the result is an empty file",
-    "neither-side": "both sides changed a file that cannot be merged by lines; the result is neither version",
-    "mode-lost": "the merged file lost the mode one side changed",
-    "fork-deleted": "the fork deleted a file upstream changed; record the owner decision",
-}
+
+def load(name, file):
+    spec = importlib.util.spec_from_file_location(name, os.path.join(HERE, file))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+oracle_module = load("merge_oracle", "merge_oracle.py")
+identity = oracle_module._identity.transform
+git = oracle_module.git
+
+DECISIONS_PATH = "docs/upstream-sync/merge-decisions.json"
+CATALOG_PATH = "docs/upstream-sync/catalog.json"
+FORMAT = 1
+RULE = re.compile(r"^(CAT|ADR|STANDING|PROCEDURE)-(\d+)(#\S+)?$")
+
+
+def read_decisions(repo, entries):
+    """-> ({path: (rule, reason)}, [problem]) from the decision file in the merge commit's tree."""
+    if DECISIONS_PATH not in entries:
+        return {}, []
+    try:
+        doc = json.loads(git(repo, "cat-file", "blob", entries[DECISIONS_PATH][1])[1])
+        assert doc["format"] == FORMAT and isinstance(doc["decisions"], list)
+    except (ValueError, KeyError, TypeError, AssertionError):
+        return {}, [("bad-record", DECISIONS_PATH, f"not a decision file of format {FORMAT}")]
+    catalog_ids = set()
+    if CATALOG_PATH in entries:
+        catalog_ids = {e["id"] for e in json.loads(git(repo, "cat-file", "blob", entries[CATALOG_PATH][1])[1]).get("entries", [])}
+    records, problems = {}, []
+    for d in doc["decisions"]:
+        path, rule, reason = (d.get(k) if isinstance(d, dict) else None for k in ("path", "rule", "reason"))
+        if not (isinstance(path, str) and isinstance(rule, str) and isinstance(reason, str) and reason.strip()):
+            problems.append(("bad-record", str(path), "a decision needs path, rule and reason"))
+        elif not RULE.match(rule) or (rule.startswith("CAT-") and rule.split("#")[0] not in catalog_ids):
+            problems.append(("bad-record", path, f"rule {rule!r} is not CAT-<n> of the catalog, ADR-<n>, STANDING-<n> or PROCEDURE-<n>"))
+        elif path in records:
+            problems.append(("bad-record", path, "two decisions for one path"))
+        else:
+            records[path] = (rule, reason.strip())
+    return records, problems
+
+
+def required(orc, result):
+    """{path: (category, detail)} for every path that needs a decision."""
+    need = {path: ("conflict", kind) for path, kind in orc.conflicts.items()}
+    for path in set(orc.entries) | set(result):
+        if path in need or path in orc.parked or path == DECISIONS_PATH or orc.entries.get(path) == result.get(path):
+            continue
+        want, got = orc.entries.get(path), result.get(path)
+        need[path] = ("deviation", "absent from the oracle" if want is None else "missing from the commit" if got is None
+                      else "mode or type differs from the oracle" if want[0] != got[0] else "content differs from the oracle")
+    return need
+
+
+def text_lines(repo, entry):
+    if entry is None or entry[0] not in oracle_module.REGULAR:
+        return None
+    text = oracle_module.blob_text(repo, entry[1])
+    return None if text is None else [identity(l) for l in text.split("\n") if l.strip()]
+
+
+def line_warnings(repo, base_entries, up_entries, result, path):
+    """Upstream lines the commit lacks at a recorded path, and lines upstream removed that it still holds."""
+    base, up, res = (text_lines(repo, e.get(path)) for e in (base_entries, up_entries, result))
+    if up is None or res is None:
+        return []
+    cb, cu, cr = (collections.Counter(x or []) for x in (base, up, res))
+    lacking = sum(((cu - cb) - cr).values())
+    kept = sum(max(cr[l] - cu[l], 0) for l in cb if cu[l] < cb[l])
+    return [f"{what}: {n}" for what, n in (("upstream-added lines missing", lacking), ("upstream-removed lines still present", kept)) if n]
 
 
 def main():
     ap = argparse.ArgumentParser()
-    for key in ("repo", "base", "fork", "upstream"):
+    for key in ("repo", "fork", "upstream"):
         ap.add_argument("--" + key, required=True)
-    ap.add_argument("--allow-ours")
-    ap.add_argument("--allow-theirs")
-    ap.add_argument("--strict-lines", action="store_true")
+    ap.add_argument("--merge", default="HEAD")
     a = ap.parse_args()
-    env = dict(os.environ, GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1", LC_ALL="C")
+    repo = a.repo
+    merge = git(repo, "rev-parse", "--verify", a.merge + "^{commit}")[1].decode().strip()
+    parents = git(repo, "rev-list", "--parents", "-n", "1", merge)[1].decode().split()[1:]
+    if parents != [a.fork, a.upstream]:
+        print(f"ERROR: {merge} has parents {parents}, not exactly the fork {a.fork} and upstream {a.upstream}", file=sys.stderr)
+        sys.exit(2)
 
-    def git(*args):
-        return subprocess.run(["git", "-C", a.repo, *args], capture_output=True, check=True, env=env).stdout
+    orc = oracle_module.oracle(repo, a.fork, a.upstream)
+    result = oracle_module.tree_entries(repo, merge)
+    records, problems = read_decisions(repo, result)
+    need = required(orc, result)
+    for path, (category, detail) in sorted(need.items()):
+        if path not in records:
+            problems.append((category, path, detail))
+    for path in sorted(set(records) - set(need)):
+        problems.append(("stale-record", path, "recorded, but the commit matches the oracle there"))
 
-    def tree(rev):
-        out = {}
-        for rec in git("ls-tree", "-r", "-z", rev).split(b"\0"):
-            if rec:
-                meta, path = rec.split(b"\t", 1)
-                mode, _, sha = meta.decode().split()
-                out[path.decode()] = (mode, sha)
-        return out
-
-    def changes(x, y):
-        raw = git("diff", "-l30000", "-M", "--name-status", "-z", x, y).split(b"\0")
-        res, i = [], 0
-        while i < len(raw) - 1:
-            st = raw[i].decode(); i += 1
-            if st[0] == "R":
-                res.append(("R", raw[i].decode(), raw[i + 1].decode())); i += 2
-            else:
-                res.append((st[0], raw[i].decode(), raw[i].decode())); i += 1
-        return res
-
-    def allow(path):
-        entries = {}
-        if path:
-            for line in open(path, encoding="utf-8"):
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    name, _, reason = line.partition("#")
-                    entries[name.strip()] = reason.strip()
-        return entries
-
-    ours, theirs = allow(a.allow_ours), allow(a.allow_theirs)
-    base, fork, up, res = tree(a.base), tree(a.fork), tree(a.upstream), tree("HEAD")
-    result_versions = set(res.values())
-    moved = {old: new for st, old, new in changes(a.base, a.fork) if st == "R"}   # fork-side renames
-    blobs = {}
-
-    def data(v):
-        if v[1] not in blobs:
-            blobs[v[1]] = subprocess.run(["git", "-C", a.repo, "cat-file", "blob", v[1]], capture_output=True, env=env).stdout
-        return blobs[v[1]]
-
-    def kind(v):
-        if v[0] == "160000":
-            return "sub"
-        if v[0] == "120000":
-            return "link"
-        return "bin" if b"\0" in data(v)[:8000] else "text"
-
-    def lines(v):
-        return data(v).decode("latin-1").split("\n")
-
-    def mergeable(*vs):
-        return all(v is None or kind(v) == "text" for v in vs)
-
-    def blank(v):
-        return kind(v) == "text" and not any(l.strip() for l in lines(v))
-
-    def counted(ls):
-        return collections.Counter(identity(l) for l in ls if l.strip())
-
-    def lacks(v, wanted):
-        return sum((counted(wanted) - counted(lines(v))).values())
-
-    def retained(b, f, u, r):
-        """Lines upstream removed copies of that the merged text may still hold: more copies than fork + upstream - base allows."""
-        cb, cf, cu, cr = (counted(lines(v)) for v in (b, f, u, r))
-        return {l: cr[l] - max(cu[l] + cf[l] - cb[l], 0) for l in cb if cu[l] < cb[l] and cr[l] > max(cu[l] + cf[l] - cb[l], 0)}
-
-    def same(r, u):
-        if r is None or u is None:
-            return r is u
-        if r == u:
-            return True
-        return r[0] == u[0] and kind(u) == "text" and kind(r) == "text" and identity(data(r).decode("latin-1")) == identity(data(u).decode("latin-1"))
-
-    def holds(r, u):
-        """r has upstream's file: same mode and type, and every line of it (text) or the same bytes (other)."""
-        if r is None or r[0] != u[0] or kind(r) != kind(u):
-            return False
-        return lacks(r, lines(u)) == 0 if kind(u) == "text" else r == u
-
-    def judge(op, b, f, u, r, added, old_left, fork_moved):
-        """-> (category or None, who may record the decision, upstream lines missing). The contract, cell by cell."""
-        if u is None and fork_moved and f == b:
-            return ("deleted-dropped", "theirs", 0) if r is None else ("deleted-kept", "ours", 0)
-        if f == b or (f == u and op in ("A", "R", "D")):
-            if u is None:
-                return ("deleted-kept", None, 0) if r is not None else (None, None, 0)
-            if old_left:
-                return "deleted-kept", None, 0
-            if op in ("A", "R"):
-                if holds(r, u):
-                    return None, None, 0
-                if op == "R":
-                    return ("renamed-missing", None, 0) if r is None else ("renamed-truncated", "either", 0)
-                return ("added-missing" if r is None else "added-truncated"), "either", 0
-            return (None, None, 0) if same(r, u) else ("not-upstream", None, 0)
-        if f == u:
-            if r is None:
-                return "merged-deleted", "theirs", 0
-            if blank(r) and not blank(u):
-                return "merged-emptied", "theirs", 0
-            return (None, None, 0) if same(r, u) else ("not-upstream", None, 0)
-        if u is None:
-            return ("deleted-dropped", "theirs", 0) if r is None else ("deleted-kept", "ours", 0)
-        if f is None:
-            return "fork-deleted", ("ours" if r is None else "theirs"), 0
-        if r is None:
-            return "merged-deleted", "theirs", 0
-        if r == f:
-            return "kept-fork", "ours", 0
-        if r == u:
-            return "took-theirs", "theirs", 0
-        if blank(r) and not blank(f) and not blank(u):
-            return "merged-emptied", "theirs", 0
-        if not mergeable(b, f, u):
-            return "neither-side", None, 0
-        want_mode = u[0] if b is not None and u[0] != b[0] else f[0]
-        if kind(r) != "text" or r[0] != want_mode:
-            return "mode-lost", "either", 0
-        return None, None, lacks(r, added) + sum(retained(b, f, u, r).values() if b is not None else [])
-
-    counts = collections.Counter()
-    problems = []      # (kind, category, path, detail)
+    base = git(repo, "merge-base", a.fork, a.upstream)[1].decode().strip()
+    base_entries, up_entries = oracle_module.tree_entries(repo, base), oracle_module.tree_entries(repo, a.upstream)
     warnings = []
+    for path in sorted(set(records) & set(need)):
+        warnings += [(path, w) for w in line_warnings(repo, base_entries, up_entries, result, path)]
+    after = git(repo, "rev-list", "--reverse", f"{merge}..HEAD")[1].decode().split()
 
-    for status, old, new in changes(a.base, a.upstream):
-        op = {"M": "M", "T": "M", "A": "A", "D": "D", "R": "R"}.get(status, "M")
-        fpath = moved.get(old, old)
-        fork_moved = fpath != old
-        b = base.get(old) if op != "A" else None
-        u = up.get(new) if op != "D" else None
-        f = fork.get(new if op == "A" else fpath)
-        if op == "R":
-            r = res.get(new) if res.get(new) is not None else res.get(fpath if fpath != new else old)
-            old_left = old in res and old != new
-        elif op == "M":
-            r, old_left = res.get(fpath), False
-        elif op == "A":
-            r, old_left = res.get(new), False
-        else:
-            r, old_left = res.get(fpath if fork_moved else old), False
-        if r is None and op in ("A", "R") and u in result_versions and (f is None or f == b or f == u):
-            r = u                     # a fork directory move can place the file elsewhere; its bytes are in the result
-        path = new if op in ("A", "R") else (fpath if op == "M" else old)
-        added = []
-        if u is not None and f is not None and f != b and f != u and (b is not None or op == "A"):
-            added = [l for l in (lines(u) if b is None else added_lines(a, env, old, new)) if l.strip()]
-        category, who, missing = judge(op, b, f, u, r, added, old_left, fork_moved)
-        if category is None:
-            both = f not in (None, b) and f != u
-            key = {"A": "added", "D": "deleted", "R": "renamed"}.get(op) or ("merged" if both else "took-upstream")
-            counts[key] += 1
-            if missing:
-                gone = list((counted(added) - counted(lines(r))).elements())
-                kept = list(retained(b, f, u, r)) if b is not None else []
-                what = "lines" if gone else "lines removed by upstream are still present"
-                warnings.append((path, missing, len(added) or missing, (gone or kept or [''])[:3], what))
-            continue
-        names = {path, old, new, fpath}
-        cleared = (who in ("ours", "either") and names & ours.keys()) or (who in ("theirs", "either") and names & theirs.keys())
-        if cleared:
-            counts[category + " (allowed)"] += 1
-        else:
-            problems.append(("DECISION" if who in ("ours", "theirs") and category in DECISIONS else "FAIL", category, path, DETAIL[category]))
-
-    print("| Category | Files |")
-    print("|---|---:|")
-    for key, value in sorted(counts.items()):
-        print(f"| {key} | {value} |")
+    print(f"merge {merge}  oracle tree {orc.tree}")
+    print("| Paths | Count | Recorded |")
+    print("|---|---:|---:|")
+    kinds = collections.Counter(c for c, _ in need.values())
+    for category in ("conflict", "deviation"):
+        print(f"| {category} | {kinds[category]} | {sum(1 for p, (c, _) in need.items() if c == category and p in records)} |")
+    print(f"| equal to the oracle | {len(set(result) - set(need) - {DECISIONS_PATH})} | |")
     if warnings:
-        print(f"\nupstream-added lines missing from merged files ({len(warnings)} files; mapped through the fork's identity names):")
-        for path, n, total, sample, what in warnings:
-            print(f"- {path}: {n}/{total} {what}, e.g. {sample[0][:100]!r}")
+        print(f"\nwarnings at recorded paths ({len({p for p, _ in warnings})}); they do not decide the result:")
+        for path, text in warnings:
+            print(f"- {path}: {text}")
+    if after:
+        print(f"\ncommits after the merge, not judged ({len(after)}):")
+        for sha in after:
+            print(f"- {git(repo, 'log', '-1', '--format=%h %s', sha)[1].decode().strip()}")
     if problems:
         print("\nunexplained:")
-        for kind_, category, path, detail in problems:
-            print(f"- {kind_} {category}: {path} — {detail}")
-    failed = bool(problems) or (a.strict_lines and bool(warnings))
-    print("\nRESULT:", "UNEXPLAINED ENTRIES" if failed else "ACCEPTED")
-    sys.exit(1 if failed else 0)
-
-
-def added_lines(a, env, old, new):
-    out = subprocess.run(["git", "-C", a.repo, "diff", "-U0", "--no-color", f"{a.base}:{old}", f"{a.upstream}:{new}"],
-                         capture_output=True, env=env).stdout.decode("latin-1")
-    return [l[1:] for l in out.split("\n") if l.startswith("+") and not l.startswith("+++")]
+        for category, path, detail in problems:
+            print(f"- FAIL {category}: {path} — {detail}")
+    accepted = not problems
+    print("\nRESULT:", "ACCEPTED" if accepted else "REJECTED")
+    sys.exit(0 if accepted else 1)
 
 
 if __name__ == "__main__":
