@@ -357,6 +357,15 @@ for (const failure of [
               ),
             }
           },
+          async reserveReference() {
+            throw Error("Unexpected reference reservation")
+          },
+          async admitReference() {
+            throw Error("Unexpected reference admission")
+          },
+          async discardReference() {
+            throw Error("Unexpected reference discard")
+          },
           async admit(message, files) {
             admitted.push({ message, files })
             throw Error("Eager attachment admission is forbidden")

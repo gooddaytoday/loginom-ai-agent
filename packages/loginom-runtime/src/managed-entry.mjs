@@ -29,6 +29,8 @@ const state = {
   browserProfile: undefined,
   browserServer: undefined,
   inputs: new Map(),
+  owner: undefined,
+  uploadDirectory: undefined,
 }
 const requests = new Set()
 const terminalTrace = (stage) => {
@@ -96,6 +98,8 @@ async function handle(message) {
       if (state.starting) throw Error("LOGINOM_ALREADY_STARTED")
       state.starting = true
       const input = message.input
+      state.owner = { chat: input.chat, generation: input.generation }
+      state.uploadDirectory = `/${input.connection.username}`
       // Match the existing supervisor allowance; retries never restart it.
       const deadline = Date.now() + (input.validation === true ? 210_000 : 120_000)
       const { acceptanceCleanupPackage, closeSavedPackageOnShutdown, browserRecovery } = validateStartInput(input)
@@ -211,6 +215,17 @@ async function handle(message) {
           dispatching: state.controller !== undefined,
         },
       })
+      return
+    }
+    if (message.operation === "admitReference") {
+      const reference = message.input?.reference
+      if (!reference || reference.chat !== state.owner?.chat || reference.generation !== state.owner?.generation)
+        throw Error("LOGINOM_INPUT_INVALID")
+      const result = await state.session.artifactStore.admitReference(reference, {
+        directory: state.uploadDirectory,
+        overwrite: "reject",
+      })
+      send({ id: message.id, result })
       return
     }
     if (message.operation === "admit") {
