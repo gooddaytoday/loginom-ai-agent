@@ -64,14 +64,14 @@ test('D17 third REST encoder does not reuse the two preceding rendered node labe
 });
 
 test('D82 existing connected REST refuses before effects and directs changed queries to a separate connection',async()=>{
- for(const source of ['owned-encoder','foreign-source']) {
+ for(const [source,output] of [['owned-encoder',0],['foreign-source',0],['import',1]]) {
   const r={...request(),target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'flow',node_id:'rest'}},
    mode:'request',finish:'execute',mappings:[],read:{ports:[],sample_rows:0,require_exact_numbers:false},
    budgets:{configure_ms:600000,execute_ms:600000,total_ms:600000}};
   r.parameters.connection={name:'Echo',base_url:'https://echo.test/anything'};
   const graph={complete:true,document_id:'doc',workflow_ref:r.workflow_ref,
    nodes:[{ref:r.target.ref,type:'integration.rest_request'},{ref:{node_id:source},type:'programming.javascript'}],
-   links:[{source,output:0,target:'rest',input:0}]},before=structuredClone(graph),calls=[],events=[];
+   links:[{source,output,target:'rest',input:0}]},before=structuredClone(graph),calls=[],events=[];
   const operation={id:r.operation_id,parameters:r,nodeTargetAdapter:{observe:async()=>{calls.push('observe');return graph;}}};
   const support=createRestRequestNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
   const drivers=support.nodeApplyDriverFactory({operation,now:Date.now,onRecord:async e=>e,receiptOptions:()=>({}),
@@ -99,7 +99,7 @@ test('D19 empty inputs names the executable same-source retry instead of reading
  assert.throws(()=>validateNodeApplyRequest(r,support.nodeApplyHandlers),/next_step:.*same raw source.*finish=execute/);
 });
 
-test('D19 the explicitly confirmed connected raw source reaches encoder preparation',async()=>{
+test('D88 the explicitly confirmed connected source is preserved before connection validation',async()=>{
  const r={...request(),target:{kind:'existing',type:'integration.rest_request',ref:{document_id:'doc',workflow_id:'flow',node_id:'rest'}},
   mode:'request',finish:'execute',mappings:[],read:{ports:[],sample_rows:0,require_exact_numbers:false}};
  r.parameters.connection={name:'Echo',base_url:'https://echo.test/anything'};
@@ -109,7 +109,9 @@ test('D19 the explicitly confirmed connected raw source reaches encoder preparat
  const operation={id:r.operation_id,parameters:r,nodeTargetAdapter:{observe:async()=>graph}};
  const events=[];
  const support=createRestRequestNodeSupport({targetOrigin:'https://app.loginom.ai',targetBuild:'7.4.2'});
- const drivers=support.nodeApplyDriverFactory({operation,now:Date.now,onRecord:async e=>{events.push(e);return e;},receiptOptions:()=>({}),execute:async()=>{throw Error('encoder reached');}});
- await assert.rejects(drivers.beforeTarget({deadline:Date.now()+60000}),/query encoder did not complete/);
- assert.ok(events.some(e=>e.operation_id?.startsWith('rest-url-')),'the same source must start the encoder lifecycle');
+ const drivers=support.nodeApplyDriverFactory({operation,now:Date.now,onRecord:async e=>{events.push(e);return e;},receiptOptions:()=>({}),execute:async code=>{assert.match(code,/rest_connection/);throw Error('connection validation reached');}});
+ await assert.rejects(drivers.beforeTarget({deadline:Date.now()+60000}),/connection validation reached/);
+ assert.equal(operation.restQueryEncoder,undefined,'the confirmed input must not get another encoder');
+ assert.equal(operation.restQueryInput,undefined,'the existing data edge must not be authorized for replacement');
+ assert.equal(events.some(e=>e.operation_id?.startsWith('rest-url-')),false);
 });
