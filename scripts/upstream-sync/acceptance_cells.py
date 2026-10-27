@@ -400,13 +400,15 @@ def build_repo(repo, cells):
     c_res = commit(repo, t_res, "merge", c_fork, c_up)
     git(repo, "update-ref", "refs/heads/base", c_res)
     git(repo, "checkout", "-q", "-f", "--detach", c_fork)
-    subprocess.run(["git", "-C", repo, *MERGE_CFG, "merge", "--no-commit", "--no-ff", c_up], capture_output=True, env=ENV)
+    merged = subprocess.run(["git", "-C", repo, *MERGE_CFG, "merge", "--no-commit", "--no-ff", c_up], capture_output=True, text=True, env=ENV)
+    clashes = set(re.findall(r"^CONFLICT \(distinct types\): (.+) had different types on each side;", merged.stdout, re.M))
+    parked = {f"{path}~{label}" for path in clashes for label in ("HEAD", c_up)}
     expected, conflicts = {}, set()
     fork_entries = ls_tree(repo, c_fork)
     for mode_sha_stage, path in ls_files_stages(repo):
         mode, sha, stage = mode_sha_stage
         if stage != "0":
-            conflicts.add(re.sub(r"~(HEAD|[0-9a-f]{40})$", "", path))
+            conflicts.add(path.rsplit("~", 1)[0] if path in parked else path)
         elif fork_entries.get(path) != (mode, sha) and _identity.wants(path) and mode in ("100644", "100755"):
             text = subprocess.run(["git", "-C", repo, "cat-file", "blob", sha], capture_output=True, env=ENV).stdout
             try:

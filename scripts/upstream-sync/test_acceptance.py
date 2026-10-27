@@ -99,6 +99,30 @@ class TwoRoutesOfGit(unittest.TestCase):
         self.assertEqual(outside, [])
 
 
+class LookalikeOfAParkedName(unittest.TestCase):
+    """R3 of LAB-312: `path~<40 hex>` is a parked name only when Git reports a file-types clash at `path`; a real file of that name
+    is a conflict of its own, in the model of the index route as in the oracle."""
+
+    def conflicting_cells(self):
+        class Twin(cells.Scenario):
+            @property
+            def paths(self):
+                return {k: v + "~" + "a" * 40 for k, v in super().paths.items()}
+
+        sid = "900"
+        args = (sid, "M", "text", "both edit one line", cells.body(sid), cells.body(sid, [(5, "fk")]), cells.body(sid, [(5, "up")]),
+                cells.body(sid, [(5, "fk up")]))
+        return [{"id": sid, "n": 0, "s": s, "kind": "merge", "res": cells.result_for(s, "merge")}
+                for s in (cells.Scenario(*args), Twin(*args))]
+
+    def test_the_model_counts_the_lookalike_as_a_second_conflict(self):
+        with tempfile.TemporaryDirectory(prefix="acceptance-cells.") as repo:
+            model = cells.build_repo(repo, self.conflicting_cells())
+            orc = merge_oracle.oracle(repo, model.fork, model.upstream)
+        self.assertEqual(len(orc.conflicts), 2)
+        self.assertEqual(set(model.conflicts), set(orc.conflicts))
+
+
 class CatalogCheckCells(unittest.TestCase):
     def test_every_cell_gets_the_contract_verdict(self):
         for r in cells.evaluate_catalog(HERE):
