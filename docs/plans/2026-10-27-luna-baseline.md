@@ -267,3 +267,20 @@ batch и не добавлять отдельный verify поверх resume.
 `lab262-source-metrics.json`: raw 208/234 (71/69/68 по раундам), diagnostic
 corrected 221/234 (75/73/73); четыре измерения без LGP и CSV. Реальная
 стоимость неизвестна. Сравнение будет дополнено новыми измерениями.
+
+### Продолжение после hold
+
+Свежий read-only снимок 15:49 МСК подтвердил terminal второго batch в
+15:46:21: exit 2, оба batch accounted, startedAttempts=0, attempts=[],
+consecutiveErrors=2. Request-preflight process cleanup подтверждён;
+campaign-wide cleanupVerified ещё отсутствует. Hold не создал третий batch.
+Сам repairing=true не переводит issue в blocked в ed129, поэтому следующий
+шаг был адресно передан EvalOps (`01a17d68-2a12-74ce-97bd-1369c7b7acad`).
+
+Прямое продолжение environment repair взял отдельный чат стенда по явному
+поручению владельца; он координируется с действующей задачей EvalOps.
+Новых поручений/мутаций окружения из этого чата не выполнять параллельно.
+Source-политика preflight доработана отдельно, проверена и опубликована
+в `8685deb150`; [checkpoint доработки](2026-10-27-preflight-readiness.md).
+Стоящие инструкции трёх агентов обновлены с read-back, но установленный
+acceptedHarness ed129, CLI05bb и условия LAB-334 этим не меняются.

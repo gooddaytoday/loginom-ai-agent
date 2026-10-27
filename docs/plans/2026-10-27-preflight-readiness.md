@@ -41,7 +41,7 @@ requestPreflight без новых запросов, зависимостей и
   NO_PROXY, обход local Loginom, несекретный transport freeze до измерений;
   отдельно local verify, HTTP path и requestPreflight READY всех slots.
   Default periodic оставить только здесь; active scoped wakeups не менять.
-- [ ] Перечитать ID/инструкции EvalOps, EvalBaseline и EvalRunner в Multica.
+- [x] Перечитать ID/инструкции EvalOps, EvalBaseline и EvalRunner в Multica.
   Сохранить before/after вне Git; изменить только instructions: короткие
   обязанности + одна ссылка на канонический runbook; удалить постоянное
   утверждение о runner1 и копии интервалов. Все остальные поля сохранить.
@@ -51,7 +51,7 @@ requestPreflight без новых запросов, зависимостей и
 - [x] Адресные поведенческие тесты и `bun typecheck` из evals. Независимый
   review полного diff по Ponytail, секретам, callsites, fixtures и границам
   measurement/cleanup/admission. Коммит/push только проверенного результата.
-- [ ] Решение о поставке отделить от source change: свежий live state,
+- [x] Решение о поставке отделить от source change: свежий live state,
   разрешённый repair/freeze и обязательные проверки до любой установки.
   В checkpoint явно записать source SHA и реально установленный SHA.
 
@@ -83,3 +83,26 @@ LAB-334 сохраняет установленный acceptedHarness ed129 и C
 preflight пока source-only; для старта достаточно отдельного environment repair.
 Его прямое продолжение взял чат стенда, который согласует владение с уже
 активным EvalOps. Новых поручений и параллельных мутаций окружения отсюда нет.
+
+Код и канонический runbook опубликованы в `baseline-luna`, commit
+`8685deb150007c158bb3ee8c9a562626780782bb`. После push, в 15:55–15:56 МСК,
+изменено только поле instructions и выполнен точный read-back:
+
+- EvalBaseline `77032943-ad18-4ae9-a2c6-668769077c86`;
+- EvalRunner `5218b92b-71e0-4197-8225-4c30521a3467`;
+- EvalOps `b2d8e21a-61af-41a4-a3aa-39d77bfe29c5`.
+
+У каждого одна ссылка на опубликованную каноническую процедуру; сервер/пути/
+интервал определяет конкретное поручение и scoped wakeups. Полный read-back
+проверил неизменность остальных конфигурационных полей, включая модели,
+reasoning, runtime, права и custom settings; автоматические status/updated_at
+в сравнение конфигурации не входят. Private receipt:
+`standing-instructions-readback-receipt.json`; before/after сохранены вне Git.
+
+Решение о поставке: новый timeout/diagnostics на LAB-334 не устанавливать.
+Для установленного сетевого дефекта достаточно environment repair; смена
+harness ради этой source-политики сейчас не нужна. Измерительные условия,
+acceptedHarness ed129, product05bb и текущие scoped wakeups сохраняются.
+Новый source не проходил live model acceptance и полный suite заново;
+утверждается только указанный адресный набор и typecheck. Дальнейшая установка
+в новую кампанию требует собственного freeze/qualification по её поручению.
