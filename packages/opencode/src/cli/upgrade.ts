@@ -25,7 +25,7 @@ export async function upgrade() {
   const latest = await Installation.latest(method).catch(() => {})
   if (!latest) return
   if (
-    !shouldNotify({
+    shouldNotify({
       autoupdate: config.autoupdate,
       disabled: Flag.LOGINOM_AI_AGENT_DISABLE_AUTOUPDATE,
       always: Flag.LOGINOM_AI_AGENT_ALWAYS_NOTIFY_UPDATE,
@@ -33,6 +33,5 @@ export async function upgrade() {
       latest,
     })
   )
-    return
-  return { type: "available" as const, version: latest }
+    return { type: "available" as const, version: latest }
 }
