@@ -61,6 +61,8 @@ comments/mentions. Разделить прочитанный итог, отве�
   различает машинный итог и отдельный ответ исполнителя.
 - [ ] Проверить partial от недоступного хоста, старый `published=true`,
   отключение правила после временного 503 и отсутствие повторных admissions.
+- [ ] По исходному no-progress сроку отсутствие ответа исполнителя вызывает
+  существующий `blocked` один раз; полный итог измерений сохраняется.
 - [ ] Запустить `TMPDIR=/home/kiselev/storage/tmp bun test --isolate test/campaign-publishing.test.ts test/campaign-finalization.test.ts test/campaign-snapshot.test.ts`.
 - [ ] Commit: `fix(evals): deliver executor final independently of archives`.
 
@@ -116,5 +118,11 @@ comments/mentions. Разделить прочитанный итог, отве�
 
 ## Checkpoint
 
-- Дизайн выбран владельцем; спецификация записана, review перед кодом ожидается.
+- Дизайн выбран владельцем; спецификация и план прошли независимое review:
+  Approved, обязательные замечания устранены до реализации.
 - Исходная ветка переключена в текущем worktree, чужие изменения сохранены.
+- `97abbfba5f`: optional metadata и удаление выбрасываемого inventory;
+  focused node-evidence/startup-settled — 4 PASS. Процессные archive tests
+  дали нестабильный отказ, воспроизведённый отдельной проверкой окружения;
+  тот же узкий тест прошёл на baseline и текущей ветке без изменения guards.
+- `9ac910cfd2`: текущий runbook, owning contract и ссылки на историю.
