@@ -11,7 +11,8 @@
 # prepare   Fresh clone of the fork at FORK_SHA, upstream tag fetched and verified against UPSTREAM_SHA, rehearsal
 #           branch `sync-rehearsal/<tag>-<fork8>` with the trial merge left unresolved, conflict report (same metric as
 #           measure-conflicts.sh) and the class table. Resolve the conflicts in DIR/rehearsal, commit the merge there.
-# check     After the merge is committed: lockfile, typecheck, CI test commands, generated-client check, builds and the
+# check     Refuses a stand that cannot give a valid result (root, skills in an ancestor directory) and fixes TMP, umask, bunx and
+#           the turbo cache (stand.sh). After the merge is committed: lockfile, typecheck, CI test commands, generated-client check, builds and the
 #           external-compatibility comparison against the pre-merge fork. Every step is PASS, FAIL or NOT_RUN; a FAIL is
 #           never hidden. Exit code is non-zero if any step failed. --allow (repeatable) names a prefix of the compat
 #           comparison's JSON paths whose differences are expected (versions, branches); they print as ALLOWED.
@@ -23,11 +24,13 @@
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=stand.sh
+. "$HERE/stand.sh"
 FORK_URL_DEFAULT=https://github.com/gooddaytoday/loginom-ai-agent.git
 UPSTREAM_URL_DEFAULT=https://github.com/anomalyco/opencode.git
 
 die() { echo "ERROR: $*" >&2; exit 1; }
-usage() { sed -n '2,27p' "$0"; exit "${1:-0}"; }
+usage() { sed -n '2,23p' "$0"; exit "${1:-0}"; }
 [ $# -ge 1 ] || usage 2
 CMD=$1; shift
 
@@ -126,10 +129,17 @@ check)
   [ -z "$(git -C "$WT" diff --name-only --diff-filter=U)" ] || die "unresolved conflicts remain in $WT"
   [ "$(git -C "$WT" rev-parse -q --verify MERGE_HEAD || true)" = "" ] || die "merge is not committed in $WT"
   git -C "$WT" merge-base --is-ancestor "$UPSTREAM_SHA" HEAD || die "rehearsal HEAD does not contain $UPSTREAM_SHA"
+  stand_clean_debris "$WT"
   [ -z "$(git -C "$WT" status --porcelain)" ] || die "working tree of $WT is not clean (release scripts require a clean tree)"
   : >"$CHK/summary.tsv"
   FAILED=0
   skipped() { [[ ",$SKIP," == *",${1%%-*},"* ]]; }
+  # Stand requirements (procedure.md, "Стенд шага check"): refused or repaired before any step runs.
+  if ! skipped tests; then
+    stand_require_non_root "$(id -u)" || exit 1
+    stand_require_no_ancestor_skills "$WT" || exit 1
+  fi
+  stand_prepare_env "$OUT" "$BUN" || exit 1
   step() { # name dir command...   (dir relative to the worktree)
     local name=$1 dir=$2; shift 2
     if skipped "$name"; then printf '%s\tNOT_RUN\tskipped by --skip\n' "$name" >>"$CHK/summary.tsv"; return; fi

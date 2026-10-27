@@ -15,7 +15,8 @@ Tools of the OpenCode update procedure. Read [docs/upstream-sync/procedure.md](.
 | `test_acceptance.py` | Every cell of [acceptance-contract.md](../../docs/upstream-sync/acceptance-contract.md) as a test (exit code and verdict of each), mutations of the gate, and the check that the document embeds the generated tables |
 | `doctest_procedure.py` | Runs the `doc-test` command blocks of `procedure.md` verbatim from a clean clone |
 | `catalog-check.py` | Every file that differs from upstream belongs to an entry of `docs/upstream-sync/catalog.json` |
-| `selftest.sh` | Offline test of the procedure on a synthetic upstream and fork; also runs `test_tools.py`, `test_acceptance.py` and the procedure doc-test |
+| `stand.sh`, `test_stand.sh` | Requirements of the stand that runs `sync-upstream.sh check` (not root, no skills in an ancestor directory, private TMP, umask 022, `bunx`, turbo cache, build debris) and their offline test |
+| `selftest.sh` | Offline test of the procedure on a synthetic upstream and fork; also runs `test_tools.py`, `test_acceptance.py`, `test_stand.sh` and the procedure doc-test |
 | `test_tools.py` | Behavior tests of `apply-identity.py`, `merge_oracle.py` and the gate `verify-accepted.py` on synthetic merges (findings F1–F3 of LAB-302 included) (stdlib `unittest`, `python3 -I scripts/upstream-sync/test_tools.py`) |
 | `revert-names.py`, `rename-lock.py` | One-time tools that returned the internal names to upstream (history, not for reuse) |
 | `reference/` | Baselines of LAB-198: 69 conflicting paths of `2e6f66a9` + `v1.19.4` and 69 of `db130098` (v0.3.4) + `v1.19.4` (`baseline-v034-*`), their types, the 21 that remain when only internal names are restored |

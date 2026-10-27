@@ -4,7 +4,8 @@
 # accepted rejects a merge without decision records and accepts the same merge with records committed in it; test_tools.py covers
 # the gate, the oracle and apply-identity on synthetic merges; test_acceptance.py runs every cell of
 # docs/upstream-sync/acceptance-contract.md as a Git merge and mutates the gate to prove the cells see its exit code and verdict;
-# doctest_procedure.py runs the command blocks of procedure.md verbatim from a clean clone, `pin` to `accepted`.
+# doctest_procedure.py runs the command blocks of procedure.md verbatim from a clean clone, `pin` to `accepted`; test_stand.sh covers
+# the stand requirements of `check` (root, skills in an ancestor directory, TMP, umask, bunx, turbo cache, build debris).
 # Usage: scripts/upstream-sync/selftest.sh   (exit 0 = all assertions held)
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -142,5 +143,12 @@ sed 's#--fork-sha "\$FORK_SHA"#--fork-sha <FORK_SHA>#' "$HERE/../../docs/upstrea
 if doctest --doc "$W/procedure-placeholder.md" --out "$W/doc-out-placeholder" --log "$W/doctest-placeholder.log" >"$W/doctest-placeholder.out" 2>&1; then
   fail "the doc-test passed a document with a placeholder"; fi
 grep -q 'is not executable as written' "$W/doctest-placeholder.out" || fail "the placeholder was not what failed: $(cat "$W/doctest-placeholder.out")"
+# the stand requirements of check (stand.sh): the functions in isolation, and for root the wiring in check itself
+bash "$HERE/test_stand.sh" >"$W/test_stand.out" 2>&1 || { cat "$W/test_stand.out" >&2; fail "test_stand.sh failed"; }
+if [ "$(id -u)" = 0 ]; then
+  if "$HERE/sync-upstream.sh" check --out "$W/doc-out" --skip install,typecheck,check,httpapi,catalog,guards,build,compat >"$W/check-root.out" 2>&1; then
+    fail "check ran its tests as root"; fi
+  grep -q 'non-root' "$W/check-root.out" || fail "check did not tell root what to do: $(cat "$W/check-root.out")"
+fi
 [ -z "${DOCTEST_LOG:-}" ] || cp "$W/doctest.log" "$DOCTEST_LOG"
 echo "SELFTEST PASS"
