@@ -147,6 +147,18 @@ class ApplyIdentitySince(FixtureCase):
         fx.begin_merge()
         self.assertEqual(fx.identity("--since", fx.fork, "--check")[0], 0)
 
+    def test_f6_names_the_variables_in_the_cli_reference_table(self):
+        doc = "packages/web/src/content/docs/cli.mdx"
+        table = "| `OPENCODE_CONFIG` | Path to a config file |\n| `OPENCODE_API_KEY` | Zen key |\nSee `ai.opencode.managed`.\n"
+        fx = self.seed(lambda: self.fx.write(doc, table))
+        fx.begin_merge()
+        code, out, _ = fx.identity("--since", fx.fork)
+        self.assertEqual(out.split(), [doc])
+        text = (fx.dir / doc).read_text()
+        self.assertIn("`LOGINOM_AI_AGENT_CONFIG`", text)
+        self.assertIn("`OPENCODE_API_KEY`", text)
+        self.assertIn("`ai.opencode.managed`", text)
+
 
 class GateCase(FixtureCase):
     """Tests of the acceptance gate: each builds a real Git merge, leaves a result the way a person would, and asserts the verdict."""
