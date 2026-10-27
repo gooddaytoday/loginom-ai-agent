@@ -29,13 +29,30 @@ describe("package names", () => {
   })
 
   test("no import or dependency uses the fork scope for an upstream package", () => {
+    const pluginInstallName = "@loginom-ai-agent/plugin"
+    const pluginInstallFiles = new Set([
+      "packages/opencode/src/product/installation.ts",
+      "packages/opencode/test/product/plugin-dependency.test.ts",
+      "packages/product/test/names.test.ts",
+    ])
     const pattern = new RegExp(`@loginom-ai-agent/(?!(?:${FORK_ONLY.join("|")})(?![A-Za-z0-9_-]))[A-Za-z0-9_-]+`)
     const offenders = tracked
       .filter((path) => /\.(ts|tsx|js|mjs|json|ya?ml)$/.test(path))
       .filter((path) => !/^(docs\/(superpowers|archive|node-development|migration|upstream-sync)|script\/migration|scripts\/upstream-sync|evals\/docs)\//.test(path))
       .filter((path) => path !== "bun.lock" && !/(^|\/)(reports|history)\//.test(path))
-      .filter((path) => pattern.test(read(path)))
+      .filter((path) => pattern.test(pluginInstallFiles.has(path) ? read(path).replaceAll(pluginInstallName, "") : read(path)))
     expect(offenders).toEqual([])
+  })
+
+  test("the public plugin name is requested only by the background install seam and its test", () => {
+    const requesters = tracked
+      .filter((path) => /\.(ts|tsx|js|mjs)$/.test(path))
+      .filter((path) => !/^(docs\/|scripts\/upstream-sync\/)/.test(path) && path !== "packages/product/test/names.test.ts")
+      .filter((path) => read(path).includes("@loginom-ai-agent/plugin"))
+    expect(requesters.toSorted()).toEqual([
+      "packages/opencode/src/product/installation.ts",
+      "packages/opencode/test/product/plugin-dependency.test.ts",
+    ])
   })
 
   test("the fork scope is not spelled as a separate path segment or string", () => {
