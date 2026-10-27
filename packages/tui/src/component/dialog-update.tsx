@@ -6,19 +6,15 @@ import { useDialog } from "../ui/dialog"
 import { useBindings } from "../keymap"
 import { errorMessage } from "../util/error"
 import { Spinner } from "./spinner"
-import { openUrl } from "@opencode-ai/core/open"
-
-export const V2_ANNOUNCEMENT_URL = "https://anoma.ly/notes/opencode-2-0"
 
 type Version = { current: string; latest?: string }
 
-// A newer OpenCode 1 release uses the normal update flow; OpenCode 2.0 is only offered when OpenCode 1 is current.
-export function updateTarget(version: Version): UpdateTarget {
+export function updateTarget(version: Version): UpdateTarget | undefined {
   if (version.latest && isUpdate(version.current, version.latest)) return { type: "latest", version: version.latest }
-  return { type: "major" }
+  return undefined
 }
 
-// Only a newer release in the installed major version is a normal update. OpenCode 2 has its own offer.
+// Only a newer release in the installed major version is an update.
 export function isUpdate(current: string, latest: string) {
   const major = (value: string) => value.replace(/^v/, "").split(".")[0]
   return major(latest) === major(current) && isVersionGreater(latest, current)
@@ -29,7 +25,6 @@ export function DialogUpdate(props: {
   state: () => UpdateState | undefined
   install: (target: UpdateTarget) => Promise<void>
   skip: (version: string) => void
-  dismiss: () => void
   restart: () => void
 }) {
   const dialog = useDialog()
@@ -53,9 +48,9 @@ export function DialogUpdate(props: {
     if (current?.type === "installing" || current?.type === "installed") return current
     if (check.loading) return { type: "checking" as const }
     if (current?.type === "failed") return current
+    if (!check()?.latest) return { type: "check-failed" as const, message: error() ?? "Couldn't check for updates." }
     const next = target()
-    if (!next) return { type: "check-failed" as const, message: error() ?? "Couldn't check for updates." }
-    if (next.type === "major") return { type: "major" as const }
+    if (!next) return { type: "current" as const }
     return { type: "available" as const, version: next.version }
   })
   const buttons = createMemo(() => {
@@ -63,16 +58,15 @@ export function DialogUpdate(props: {
     if (current.type === "checking" || current.type === "installing") return []
     const next = target()
     const close = {
-      label: next?.type === "major" ? "Dismiss" : "Skip",
+      label: next ? "Skip" : "Close",
       run: () => {
-        if (current.type !== "installed" && next?.type === "major") props.dismiss()
-        if (current.type !== "installed" && next?.type === "latest") props.skip(next.version)
+        if (current.type !== "installed" && next) props.skip(next.version)
         dialog.clear()
       },
     }
     if (current.type === "installed") return [close, { label: "Restart", run: props.restart }]
     if (!next) return [close]
-    return [close, { label: next.type === "major" ? "Upgrade" : "Update", run: () => props.install(next) }]
+    return [close, { label: "Update", run: () => props.install(next) }]
   })
 
   createEffect(() => setActive(Math.max(0, buttons().length - 1)))
@@ -98,7 +92,7 @@ export function DialogUpdate(props: {
         <text attributes={TextAttributes.BOLD} fg={theme.text}>
           {state().type === "installing"
             ? "Updating OpenCode"
-            : state().type === "available" || state().type === "major" || state().type === "failed"
+            : state().type === "available" || state().type === "failed"
               ? "Update available"
               : "Update"}
         </text>
@@ -120,45 +114,18 @@ export function DialogUpdate(props: {
               </Match>
               <Match when={current.type === "installing" && current} keyed>
                 {(installing) => (
-                  <Spinner color={theme.text}>
-                    {installing.target.type === "major"
-                      ? "Installing OpenCode 2.0…"
-                      : `Installing OpenCode ${installing.target.version}…`}
-                  </Spinner>
+                  <Spinner color={theme.text}>{`Installing OpenCode ${installing.target.version}…`}</Spinner>
                 )}
               </Match>
-              <Match when={current.type === "installed" && current} keyed>
-                {(installed) => (
-                  <text fg={theme.textMuted} wrapMode="word">
-                    {installed.target.type === "major"
-                      ? "Update successful! A restart is required. Run `opencode` to start OpenCode 2.0."
-                      : "Update successful! A restart is required."}
-                  </text>
-                )}
+              <Match when={current.type === "installed"}>
+                <text fg={theme.textMuted} wrapMode="word">
+                  Update successful! A restart is required.
+                </text>
               </Match>
-              <Match when={current.type === "major"}>
-                <box gap={1}>
-                  <box>
-                    <text fg={theme.textMuted} wrapMode="word">
-                      OpenCode 2.0 is the next major release.
-                    </text>
-                    <text
-                      fg={theme.textMuted}
-                      wrapMode="word"
-                      onMouseUp={() => {
-                        openUrl(V2_ANNOUNCEMENT_URL).catch(() => {})
-                      }}
-                    >
-                      Read more about it:{" "}
-                      <a href={V2_ANNOUNCEMENT_URL} style={{ fg: theme.primary }}>
-                        {V2_ANNOUNCEMENT_URL}
-                      </a>
-                    </text>
-                  </box>
-                  <text fg={theme.textMuted} wrapMode="word">
-                    It contains some breaking changes.
-                  </text>
-                </box>
+              <Match when={current.type === "current"}>
+                <text fg={theme.textMuted} wrapMode="word">
+                  No update is available.
+                </text>
               </Match>
               <Match when={(current.type === "failed" || current.type === "check-failed") && current} keyed>
                 {(failed) => (
