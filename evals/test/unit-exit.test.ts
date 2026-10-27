@@ -48,6 +48,7 @@ for (const refusal of ["UID", "ENOENT"]) test.skipIf(process.env.EVAL_SYSTEMD_TE
       : "Cannot inspect process identity PID "+run.processCleanup.launcher.pid+": Process UID changed (proc_uid=0, starttime=unknown, state=unknown)"};
     await writeLeaseReceipt(${JSON.stringify(sourceFile)},{processes:original});
     await writeFile(${JSON.stringify(`${profile}.process-group`)},String(original.launcher.pid),{mode:0o600,flag:"wx"});
+    await Bun.write(${JSON.stringify(heartbeat)},"0");
     await writeLeaseReceipt(${JSON.stringify(ready)},{binding,owner:leases.server.reservation.owner});
     let tick=0;while(!await Bun.file(${JSON.stringify(release)}).exists()){await Bun.write(${JSON.stringify(heartbeat)},String(++tick));await Bun.sleep(20)}
     await Promise.all([leases.server.close(),...leases.slots.map(slot=>slot.close())]);
@@ -64,7 +65,10 @@ for (const refusal of ["UID", "ENOENT"]) test.skipIf(process.env.EVAL_SYSTEMD_TE
     const original = await Bun.file(sourceFile).text()
     await expect(observeUnitExit(input)).rejects.toThrow()
     const before = Number(await Bun.file(heartbeat).text())
-    await Bun.sleep(80)
+    while (Number(await Bun.file(heartbeat).text()) <= before) {
+      if (Date.now() > deadline) throw Error("Unit fixture heartbeat did not advance")
+      await Bun.sleep(20)
+    }
     expect(Number(await Bun.file(heartbeat).text())).toBeGreaterThan(before)
     await Bun.write(release, "finish")
     while ((await Bun.$`systemctl --user show ${unit} --property=ActiveState --value`.quiet()).text().trim() !== "failed") {

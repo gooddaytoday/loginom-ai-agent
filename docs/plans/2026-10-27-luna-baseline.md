@@ -41,7 +41,7 @@ LAB-262 и её результаты/конфигурация/незавершё
 - [ ] Подтвердить обязательные offline checks закреплённого исходного кода.
   Использовать применимые exact-SHA/tree evidence; при необходимости из
   evals выполнить `bun typecheck`, unit/full suite и native fixtures.
-- [ ] Собрать/получить полный CLI штатным build-cli.ts: Bun 1.3.14,
+- [x] Собрать/получить полный CLI штатным build-cli.ts: Bun 1.3.14,
   Node 24.19.0, Chromium 1246, channel prod, browser recovery включён.
   Локальная версия `0.3.4-baseline.<SHA>`; CI candidate допустим при
   совпадении source SHA, architecture, manifest и build options.
@@ -111,3 +111,35 @@ runtime/agent models не менялись; карточка и новые из�
 Private evidence: `/home/kiselev/storage/tmp/luna-baseline-20261027/`.
 Следующий шаг: принять проверенный полный CLI и свободную совместимую
 среду, затем создать карточку и выполнить anchored reserve.
+
+### Подготовка поставки
+
+Полный CLI `0.3.4-baseline.05bb48274f` собран из чистого исходного SHA.
+Build, manifest, archive roundtrip, verify-cli-candidate и version — PASS.
+Archive SHA-256 `8a8400a34d55000351fc923177b52cbc51a1f67db6d9880bb9c5c149e2ad8eab`,
+binary SHA-256 `457c40d01cc79423b43a893b2eb86c98039e2e15fef08acab76c055e207c7873`.
+Private receipt: `build/artifact-receipt.json` в каталоге evidence выше.
+
+Runner1 подтверждён: AVX2, достаточно памяти/диска, measurement batch
+LAB-262 inactive, owner отсутствует, свои reservations released; семь
+чужих retained сохранены. Архив LAB-262 перечитан и hash совпал; её
+publisher продолжает доставку. Это не readiness новой сборки.
+
+Отдельный новый harness/state размещается внутри существующего разрешённого
+каталога `full-corpus-033/baseline-luna`; CLI — в отдельном runtime-каталоге.
+Так используется прежний строгий root judge helper без его изменения и
+без новой sudo rule. Native slots/pair/resource budget сохраняются; их
+повторно проверит новая поставка. Прежний одинаковый frozen catalog
+`ac20d24a2b631a32b596ab5de765dfe8d5049d7d7081838745cfa29d917d189a`
+уже содержит Luna/xhigh/priority, поэтому обновлять профили не требуется.
+
+Корпус пересчитан штатными hash-функциями: 78 кейсов, 234 уникальных ключа,
+изменений inputs/rubrics/timeouts относительно LAB-262 нет.
+
+Блокер обязательных host fixtures воспроизведён: ready появлялся раньше
+heartbeat; cleanup использовал неподдерживаемый systemd249 флаг.
+Минимальные test-only fixes прошли RED → GREEN (7/7 host tests), ещё три
+повтора race дали 2/2 каждый; owned processes/units освобождены. План и
+diff независимо проверены отдельными агентами. Production harness и CLI
+этими fixes не меняются. Typecheck и итог full-suite qualification пока
+ожидаются; исходный полный suite выполняется другой задачей и не дублируется.

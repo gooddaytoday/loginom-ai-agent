@@ -114,7 +114,7 @@ test.skipIf(process.env.EVAL_SYSTEMD_TESTS !== "1")("dead producer does not auth
     expect(await Bun.file(`/proc/${saved.owner.pid}/stat`).exists()).toBe(false)
     await expect(observeTerminalPreparationUnit(saved.binding,saved.owner)).rejects.toThrow()
   } finally {
-    await Bun.$`systemctl --user kill --kill-whom=all --signal=KILL ${unit}`.quiet().nothrow()
+    await Bun.$`systemctl --user kill --kill-who=all --signal=KILL ${unit}`.quiet().nothrow()
     await Bun.$`systemctl --user stop ${unit}`.quiet().nothrow()
     await Bun.$`systemctl --user reset-failed ${unit}`.quiet().nothrow()
     await rm(root,{recursive:true,force:true})
