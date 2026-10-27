@@ -284,3 +284,19 @@ Source-политика preflight доработана отдельно, про�
 в `8685deb150`; [checkpoint доработки](2026-10-27-preflight-readiness.md).
 Стоящие инструкции трёх агентов обновлены с read-back, но установленный
 acceptedHarness ed129, CLI05bb и условия LAB-334 этим не меняются.
+
+В 15:52 МСК EvalOps опубликовал подтверждение environment repair
+(`01a17d6b-c6c9-741d-bb07-4b2cf466fedb`): matching owner/repairer и terminal
+batch проверены под lock, использованные native reservations released.
+Изменён только новый controller.env: согласованные HTTP(S)_PROXY и lowercase
+на существующий локальный proxy; NO_PROXY/no_proxy ограничен loopback,
+куда указывает действующий Loginom endpoint. Effective env controller и
+нового batch перечитан. Конфигурация LAB-262 и чужие claims сохранены.
+
+Штатный resume завершился exit 0, fresh cleanupVerified=true, repairing=false;
+счётчик последовательных ошибок сброшен самим controller. Запущены новый
+controller PID3611721 и batch3 PID3612033. Harness по-прежнему clean ed129,
+исходный clock и измерительные pins сохранены. Это успешный resume, а не
+приёмка READY/измерений; на этом снимке результатов 0/234. Фактический
+модельный старт и первые ordinary3/analytic6 дальше проверяет чат стенда
+вместе с EvalOps. Новая source-политика preflight на runner не установлена.
