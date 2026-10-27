@@ -347,6 +347,7 @@ export async function createBridge(config, session, { browserTransport: managedB
                   extra.signal.throwIfAborted();
                   const identityCode=makeWorkspacePrepareCode({...workspaceOptions,intent:'new_draft',packagePath:null,identityOnly:true,timeoutMs:remaining()});
                   const identity=parseWorkspacePreparation(await browser.callTool({name:'browser_run_code_unsafe',arguments:{code:identityCode}},undefined,{timeout:remaining()+1000}));
+                  if(identity.status==='NOT_READY'&&identity.effect_possible===false&&identity.created_draft===false)return identity;
                   if(identity.status!=='BOUND')throw Error('Local package storage identity is not ready: '+identity.reason);
                   session.metadata.storageBinding=createStorageBinding({sessionId:session.metadata.sessionId,origin:new URL(config.loginomUrl).origin,
                     build:identity.target.loginom_build,documentId:identity.document_id,account:identity.loginom_account,directories:config.storageDirectories});

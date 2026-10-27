@@ -19,7 +19,7 @@ test('managed user preparation returns local pins and dynamic knowledge without 
   const compatibility = { profile_id: 'unit-linux-chromium', loginom_build: '7.4.2', platform: 'linux', browser: 'chromium' };
   const catalog = await createActionCatalogFixture(compatibility);
   const browserCalls=[];
-  const packageDeliveries=[];let expectedPackage=null,expectedOperation=null,openFailure=null,deliveryAbort=null,unconfirmedUpload=false,reloadedPage=null;
+  const packageDeliveries=[];let expectedPackage=null,expectedOperation=null,openFailure=null,deliveryAbort=null,unconfirmedUpload=false,reloadedPage=null,identityPage=null,identityFault=null;
   class ExternalClient {
     constructor(identity) { this.browser = identity.name === 'loginom-dock-browser'; }
     async connect(transport) { this.transport = transport; }
@@ -35,6 +35,14 @@ test('managed user preparation returns local pins and dynamic knowledge without 
       assert.equal(request.name, 'browser_run_code_unsafe');
       browserCalls.push(request);
       const code = request.arguments.code;
+      if(identityPage&&code.includes('"identityOnly":true')){
+        if(identityFault==='transport')throw Error('Identity probe reply was lost');
+        const state=await runInNewContext(code)(identityPage);
+        if(identityFault==='missing_effect')delete state.effect_possible;
+        if(identityFault==='effectful')state.effect_possible=true;
+        if(identityFault==='created_draft')state.created_draft=true;
+        return {content:[{type:'text',text:JSON.stringify(state)}]};
+      }
       if(reloadedPage&&code.includes('async function prepareWorkspace('))
         return {content:[{type:'text',text:JSON.stringify(await runInNewContext(code)(reloadedPage))}]};
       if(expectedPackage&&code.includes('async function prepareWorkspace(')&&!code.includes('"identityOnly":true'))
@@ -160,6 +168,27 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     const artifact=await session.artifactStore.admit({sourcePath,name:'local-copy.lgp',bytes:13,
       sha256:createHash('sha256').update('package bytes').digest('hex'),upload:{directory:'/user',overwrite:'reject'}});
     expectedPackage=artifact.upload.destination;expectedOperation='local-package';
+    identityPage=new Page();identityPage.app.Version=compatibility.loginom_build;
+    Object.assign(identityPage.location,{origin:'https://loginom.invalid',pathname:'/'});
+    Object.assign(identityPage.context,{innerWidth:1000,innerHeight:800,
+      __loginomDockPreparationV1:{document:identityPage.document,id:'fixture-document',receipts:new Map()}});
+    identityPage.app.Application={FInstance:{FMainForm:{Items:{Workspace:{getActiveTab:()=>null}},
+      FMapTree:{FServerConnection:{UserName:'user'}}}}};
+    identityPage.url=()=>config.loginomUrl;
+    identityPage.evaluate=async(fn,args)=>{identityPage.context.args=args;return runInContext(`(${fn.toString()})(args)`,identityPage.context);};
+    identityPage.locator=()=>({isVisible:async()=>true});
+    const mask=identityPage.add('div','preparation-loading');mask.attrs.class='x-mask-msg';
+    const refused=await bridge.prepareLocalPackage({intent:'open_package',operation_id:expectedOperation},
+      {artifactID:artifact.artifact_id,uploadGrantID:artifact.upload.grant_id},{signal:new AbortController().signal});
+    assert.equal(packageDeliveries.length,0,'identity refusal must precede upload');
+    assert.equal(session.metadata.workspaceReady,false);
+    assert.equal(session.metadata.workspacePreparation.operation_id,expectedOperation);
+    assert.equal(session.metadata.workspacePreparation.effect_possible,false,'verified identity refusal must settle without an effect');
+    assert.equal(session.metadata.workspacePreparation.state.reason,'STORAGE_IDENTITY_UNAVAILABLE');
+    assert.equal(session.metadata.workspacePreparation.state.created_draft,false);
+    assert.equal(JSON.parse(refused.content[0].text).prepared,false);
+    assert.equal(bridge.hasActiveWork(),false);assert.equal(bridge.hasUnsettledWork(),false);
+    mask.remove();
     const local=await bridge.prepareLocalPackage({intent:'open_package',operation_id:expectedOperation},
       {artifactID:artifact.artifact_id,uploadGrantID:artifact.upload.grant_id},{signal:new AbortController().signal});
     assert.notEqual(local.isError,true,JSON.stringify(local));
@@ -210,5 +239,29 @@ test('managed user preparation returns local pins and dynamic knowledge without 
     assert.equal(unknown.isError,true);assert.doesNotMatch(JSON.stringify(unknown),/next_step|package_path/);
     assert.equal(session.metadata.workspaceReady,false);
     assert.equal(browserCalls.filter(call=>call.arguments.code.includes('async function prepareWorkspace(')&&!call.arguments.code.includes('"identityOnly":true')).length,callsBeforeUnknown);
+    identityPage.document.body.append(mask);
+    for(const fault of ['missing_effect','effectful','created_draft','transport']){
+      identityFault=fault;
+      const isolatedSession={...session,metadata:{client:'unit-test',clientRevision:'d'.repeat(64),sessionId:'identity-'+fault}};
+      const isolated=await createBridge(config,isolatedSession);
+      try{
+        const operation_id='uncertain-'+fault,deliveriesBefore=packageDeliveries.length;
+        const args={intent:'open_package',operation_id},pair={artifactID:artifact.artifact_id,uploadGrantID:artifact.upload.grant_id};
+        const refused=await isolated.prepareLocalPackage(args,pair,{signal:new AbortController().signal});
+        assert.equal(refused.isError,true,fault);
+        assert.equal(packageDeliveries.length,deliveriesBefore,fault);
+        assert.equal(isolatedSession.metadata.workspaceReady,false);
+        assert.equal(isolatedSession.metadata.workspacePreparation.operation_id,operation_id);
+        assert.equal(isolatedSession.metadata.workspacePreparation.effect_possible,true,fault);
+        assert.equal(isolatedSession.metadata.workspacePreparation.state,undefined,fault);
+        const callsBefore=browserCalls.length;
+        const repeated=await isolated.prepareLocalPackage(args,pair,{signal:new AbortController().signal});
+        assert.equal(repeated.isError,true);assert.match(repeated.content[0].text,/Reconcile the original/);
+        const replaced=await isolated.prepareLocalPackage({...args,operation_id:operation_id+'-new'},pair,{signal:new AbortController().signal});
+        assert.equal(replaced.isError,true);assert.match(replaced.content[0].text,/operation conflict/);
+        assert.equal(browserCalls.length,callsBefore,'uncertain preparation must not repeat identity or upload');
+        assert.equal(packageDeliveries.length,deliveriesBefore);
+      }finally{await isolated.close();}
+    }
   } finally { await client.close(); await bridge.close(); }
 });
