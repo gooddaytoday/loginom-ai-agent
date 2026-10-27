@@ -4,7 +4,7 @@
 #
 #   sync-upstream.sh pin      --tag vX.Y.Z [--upstream-url URL]
 #   sync-upstream.sh prepare  --fork-sha SHA --tag vX.Y.Z --upstream-sha SHA --out DIR [--fork-url URL] [--upstream-url URL]
-#   sync-upstream.sh check    --out DIR [--skip build,tests] [--bun PATH]
+#   sync-upstream.sh check    --out DIR [--skip build,tests] [--bun PATH] [--allow JSON-PATH-PREFIX ...]
 #   sync-upstream.sh accepted --out DIR [--merge REV]
 #
 # pin       Resolves a stable tag to its commit and prints UPSTREAM_TAG / UPSTREAM_SHA. Pre-releases are refused.
@@ -13,7 +13,8 @@
 #           measure-conflicts.sh) and the class table. Resolve the conflicts in DIR/rehearsal, commit the merge there.
 # check     After the merge is committed: lockfile, typecheck, CI test commands, generated-client check, builds and the
 #           external-compatibility comparison against the pre-merge fork. Every step is PASS, FAIL or NOT_RUN; a FAIL is
-#           never hidden. Exit code is non-zero if any step failed.
+#           never hidden. Exit code is non-zero if any step failed. --allow (repeatable) names a prefix of the compat
+#           comparison's JSON paths whose differences are expected (versions, branches); they print as ALLOWED.
 # accepted  The acceptance gate: compares the merge commit (the HEAD of DIR/rehearsal) with the mechanical merge of the same two
 #           parents and requires a decision record, committed with the merge, for every conflicted or deviating path.
 #           --merge REV names the merge commit when later commits sit on top of it (default HEAD).
@@ -26,12 +27,12 @@ FORK_URL_DEFAULT=https://github.com/gooddaytoday/loginom-ai-agent.git
 UPSTREAM_URL_DEFAULT=https://github.com/anomalyco/opencode.git
 
 die() { echo "ERROR: $*" >&2; exit 1; }
-usage() { sed -n '2,25p' "$0"; exit "${1:-0}"; }
+usage() { sed -n '2,27p' "$0"; exit "${1:-0}"; }
 [ $# -ge 1 ] || usage 2
 CMD=$1; shift
 
 TAG= FORK_SHA= UPSTREAM_SHA= OUT= FORK_URL=$FORK_URL_DEFAULT UPSTREAM_URL=$UPSTREAM_URL_DEFAULT
-SKIP= BUN=bun MERGE=HEAD
+SKIP= BUN=bun MERGE=HEAD ALLOW=()
 while [ $# -gt 0 ]; do
   case $1 in
     --tag) TAG=$2; shift 2 ;;
@@ -42,6 +43,7 @@ while [ $# -gt 0 ]; do
     --upstream-url) UPSTREAM_URL=$2; shift 2 ;;
     --skip) SKIP=$2; shift 2 ;;
     --bun) BUN=$2; shift 2 ;;
+    --allow) ALLOW+=(--allow "$2"); shift 2 ;;
     --merge) MERGE=$2; shift 2 ;;
     -h|--help) usage 0 ;;
     *) die "unknown argument: $1" ;;
@@ -163,7 +165,7 @@ check)
     (cd "$OUT/before" && "$BUN" install --frozen-lockfile && "$BUN" "$HERE/compat-snapshot.ts" --repo "$OUT/before" --out "$CHK/compat-before.json") >"$CHK/compat-before.log" 2>&1 || true
     (cd "$WT" && "$BUN" "$HERE/compat-snapshot.ts" --repo "$WT" --out "$CHK/compat-after.json") >"$CHK/compat-after.log" 2>&1 || true
     if [ -f "$CHK/compat-before.json" ] && [ -f "$CHK/compat-after.json" ]; then
-      rc=0; "$BUN" "$HERE/compat-compare.ts" "$CHK/compat-before.json" "$CHK/compat-after.json" >"$CHK/compat.log" 2>&1 || rc=$?
+      rc=0; "$BUN" "$HERE/compat-compare.ts" "$CHK/compat-before.json" "$CHK/compat-after.json" ${ALLOW[@]+"${ALLOW[@]}"} >"$CHK/compat.log" 2>&1 || rc=$?
       if [ $rc = 0 ]; then printf 'compat\tPASS\tsee compat.log\n' >>"$CHK/summary.tsv"; else printf 'compat\tFAIL\tsee compat.log\n' >>"$CHK/summary.tsv"; FAILED=1; fi
     else printf 'compat\tFAIL\tsnapshot not produced, see compat-*.log\n' >>"$CHK/summary.tsv"; FAILED=1; fi
   fi
