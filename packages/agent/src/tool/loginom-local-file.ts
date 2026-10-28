@@ -13,8 +13,59 @@ import { Tool } from "./tool"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { fileSnapshot } from "@/util/file-snapshot"
 import { fileError, hostErrorText } from "@loginom-ai-agent/loginom-host/errors"
+import { Global } from "@loginom-ai-agent/core/global"
+import {
+  inspectReferenceFile,
+  stageReferenceFile,
+  type FileReference,
+  type ReferenceSlot,
+} from "@loginom-ai-agent/loginom-host/file-reference"
+import { exactFileDigest } from "./loginom-file-profile-core"
 
 const attachmentHint = ". Для CLI передайте файл через --file; в Desktop/TUI приложите файл к сообщению."
+
+// Private foundation for asynchronous full-file delivery. Keep the public
+// loginom_file_admit byte route unchanged until native progress/cancel/cleanup
+// and FileStore size verification are wired together.
+export const admitLoginomFileReference = Effect.fn("Loginom.admitFileReference")(function* (
+  path: string,
+  ctx: Tool.Context,
+  host: {
+    reserveReference(userMessage: string, name: string): Promise<ReferenceSlot>
+    admitReference(reference: FileReference): Promise<unknown>
+    discardReference(grant: string): Promise<unknown>
+  },
+  userMessage: string,
+) {
+  const source = yield* authorizeLoginomFile(path, ctx)
+  return yield* Effect.tryPromise({
+    try: async (signal) => {
+      const abort = AbortSignal.any([ctx.abort, signal])
+      const identity = await inspectReferenceFile(source.sourcePath)
+      if (identity.canonical_path !== source.canonicalPath) throw Error("LOGINOM_FILE_CHANGED")
+      const sha256 = await exactFileDigest(identity, join(Global.Path.data, "file-profiles", ctx.sessionID))
+      if (abort.aborted) throw Error("LOGINOM_UPLOAD_CANCELLED")
+      const slot = await host.reserveReference(userMessage, basename(source.canonicalPath))
+      const reference = await stageReferenceFile(source.sourcePath, identity, slot, { sha256, signal: abort }).catch(
+        async (error) => {
+          // No upload was dispatched. Keep the original typed file/cancel cause;
+          // Host shutdown retains responsibility for an unremoved reservation.
+          await host.discardReference(slot.grant).catch(() => undefined)
+          throw error
+        },
+      )
+      if (abort.aborted) {
+        await host.discardReference(slot.grant)
+        throw Error("LOGINOM_UPLOAD_CANCELLED")
+      }
+      // Once commit starts its reply may be lost. Retain the snapshot for an
+      // exact retry or confirmed Host shutdown rather than deleting it here.
+      const artifact = await host.admitReference(reference)
+      return { sourcePath: source.sourcePath, artifact }
+    },
+    catch: (error) => Error(hostErrorText(fileError(error)) + " Путь: " + source.sourcePath),
+  })
+})
 
 export const snapshotLoginomFile = Effect.fn("Loginom.snapshotLocalFile")(function* (path: string, ctx: Tool.Context) {
   const source = yield* authorizeLoginomFile(path, ctx)

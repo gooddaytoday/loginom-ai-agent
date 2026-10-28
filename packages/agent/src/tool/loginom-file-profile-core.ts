@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto"
 import { createReadStream } from "node:fs"
-import { mkdir, open, readFile, realpath, rename, stat, unlink, writeFile } from "node:fs/promises"
+import { mkdir, open, readFile, readdir, realpath, rename, stat, unlink, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { resolveTextImportEncoding } from "../../../loginom-runtime/client/lib/text-import-encoding.mjs"
 import type { XlsxOptions } from "./loginom-file-xlsx"
@@ -134,6 +134,31 @@ async function save(p: Stored, dir: string) {
 
 export async function loadProfile(id: string, dir: string): Promise<Stored> {
   return JSON.parse(await readFile(profilePath(dir, id), "utf8"))
+}
+
+// Only exact scans for this original identity constrain full-file staging.
+// Neither the model nor a quick profile can supply a trusted full-file digest.
+export async function exactFileDigest(expected: Identity, dir: string) {
+  const names = await readdir(dir).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return []
+    throw error
+  })
+  const digests = new Set<string>()
+  for (const name of names) {
+    if (!/^[a-f0-9-]{36}\.json$/.test(name)) continue
+    const profile = await loadProfile(name.slice(0, -5), dir)
+    if (
+      !["canonical_path", "size", "mtime", "ctime", "file_id"].every(
+        (key) => profile.identity[key as keyof Identity] === expected[key as keyof Identity],
+      )
+    )
+      continue
+    if (profile.scan?.status !== "exact") continue
+    if (!/^[a-f0-9]{64}$/.test(profile.scan.sha256 ?? "")) throw Error("LOGINOM_FILE_CHANGED")
+    digests.add(profile.scan.sha256!)
+  }
+  if (digests.size > 1) throw Error("LOGINOM_FILE_CHANGED")
+  return digests.values().next().value
 }
 
 function decode(bytes: Buffer, encoding: Encoding, partial = false) {
