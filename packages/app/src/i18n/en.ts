@@ -67,6 +67,8 @@ export const LOGINOM_ENGLISH = {
 } as const
 
 export const dict = {
+  "prompt.attachment.missingPath":
+    "This attachment has no disk path. Save it and attach it using the file picker, or provide its path.",
   ...LOGINOM_ENGLISH,
 
   ...DESKTOP_NATIVE_ENGLISH,

@@ -1,4 +1,7 @@
 import { randomUUID } from "node:crypto"
+import { createAttachmentReceipt } from "@loginom-ai-agent/loginom-host/attachment-receipt"
+import { basename } from "node:path"
+import { stat } from "node:fs/promises"
 import { open } from "node:fs/promises"
 import { nativeT } from "./native-translations"
 
@@ -31,8 +34,19 @@ export function createPickedFileAuthorizations(
   }
 }
 
-export function assertAttachmentBudget(files: { size: number }[]) {
-  const total = files.reduce((sum, file) => sum + file.size, 0)
+export async function describePickedFiles(paths: string[]) {
+  return Promise.all(
+    paths.map(async (path) => {
+      const info = await stat(path)
+      if (info.size > 16 * 1024 * 1024 && !path.toLowerCase().endsWith(".lgp"))
+        return { path, name: basename(path), ...(await createAttachmentReceipt(path)) }
+      return { path, name: basename(path), size: info.size }
+    }),
+  )
+}
+
+export function assertAttachmentBudget(files: { size: number; kind?: string }[]) {
+  const total = files.reduce((sum, file) => sum + (file.kind === "local_reference" ? 0 : file.size), 0)
   if (total <= MAX_ATTACHMENT_BYTES) return
   throw new Error(nativeT("desktop.picker.error.sizeLimit", { limit: MAX_ATTACHMENT_BYTES / 1024 / 1024 }))
 }

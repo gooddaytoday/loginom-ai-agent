@@ -149,6 +149,7 @@ export const loginomFileTools = Effect.fn("Loginom.fileTools")(function* (
                     "loginom_file_admit on path, then artifact_deliver. Build and report on the sample; полный расчёт будет после загрузки полного файла.",
                 }
               })
+              yield* authorized.verifyAttachment()
               const output = { title: definition.name, output: JSON.stringify(value), metadata: { truncated: false } }
               yield* plugin.trigger(
                 "tool.execute.after",

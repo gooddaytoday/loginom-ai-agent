@@ -1,3 +1,4 @@
+import { createAttachmentReceipt } from "@loginom-ai-agent/loginom-host/attachment-receipt"
 import { execFile } from "node:child_process"
 import { stat } from "node:fs/promises"
 import { basename, join } from "node:path"
@@ -9,7 +10,7 @@ import { parseDesktopNativeBundle, type DesktopNativeBundle } from "@loginom-ai-
 import type { FatalRendererError, ServerReadyData, TitlebarTheme } from "../preload/types"
 import { runDesktopMenuAction } from "./desktop-menu-actions"
 import { setForceFocus } from "./debug"
-import { assertAttachmentBudget, createPickedFileAuthorizations } from "./attachment-picker"
+import { assertAttachmentBudget, createPickedFileAuthorizations, describePickedFiles } from "./attachment-picker"
 import { getStore, removeStoreFileIfEmpty } from "./store"
 import { SYSTEM_PROXY_ENABLED_KEY } from "./store-keys"
 import { currentSystemProxyStatus, publishSystemProxyStatus } from "./system-proxy"
@@ -67,7 +68,10 @@ export function registerIpcHandlers(deps: Deps) {
 
   ipcMain.handle("kill-sidecar", () => deps.killSidecar())
   ipcMain.handle("await-initialization", () => deps.awaitInitialization())
-  ipcMain.handle("get-system-proxy-status", () => ({ ...currentSystemProxyStatus(), enabled: deps.systemProxyEnabled() }))
+  ipcMain.handle("get-system-proxy-status", () => ({
+    ...currentSystemProxyStatus(),
+    enabled: deps.systemProxyEnabled(),
+  }))
   ipcMain.handle("set-system-proxy-enabled", (_event: IpcMainInvokeEvent, enabled: boolean) => {
     getStore().set(SYSTEM_PROXY_ENABLED_KEY, enabled === true)
     publishSystemProxyStatus({ ...currentSystemProxyStatus(), enabled: enabled === true })
@@ -183,17 +187,15 @@ export function registerIpcHandlers(deps: Deps) {
         filters: pickerFilters(opts?.extensions),
       })
       if (result.canceled) return null
-      const files = await Promise.all(
-        result.filePaths.map(async (filePath) => ({
-          path: filePath,
-          name: basename(filePath),
-          size: (await stat(filePath)).size,
-        })),
-      )
+      const files = await describePickedFiles(result.filePaths)
       assertAttachmentBudget(files)
       const token = pickedFiles.add(event.sender.id, result.filePaths)
       return { token, files }
     },
+  )
+
+  ipcMain.handle("reference-attachment", (_event, path: string, expected: { size: number; lastModified: number }) =>
+    createAttachmentReceipt(path, expected),
   )
 
   ipcMain.handle("read-picked-file", async (event: IpcMainInvokeEvent, token: string, filePath: string) => {

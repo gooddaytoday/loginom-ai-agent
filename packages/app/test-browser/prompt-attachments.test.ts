@@ -173,3 +173,62 @@ test("rejects desktop duplicates and keeps changed files in the V2 prompt store"
 function images(prompt: ReturnType<typeof createPromptState>) {
   return prompt.current().filter((part) => part.type === "image")
 }
+
+test("large drag attachments preserve a native reference without storing a blob", async () => {
+  await createRoot(async (dispose) => {
+    const prompt = createPromptState()
+    const reference = {
+      kind: "local_reference" as const,
+      sourcePath: "/tmp/данные %#.csv",
+      filename: "данные %#.csv",
+      size: 5 * 1024 ** 3,
+      lastModified: 1,
+      mime: "text/plain",
+      receipt: "a".repeat(64),
+    }
+    let blobs = 0
+    const attachments = createPromptAttachmentsCore({
+      capture: prompt.capture,
+      editor: () => document.createElement("div"),
+      getPathForFile: () => reference.sourcePath,
+      referenceAttachment: async () => reference,
+      draftStore: {
+        getItem: async () => null,
+        setItem: async () => undefined,
+        removeItem: async () => undefined,
+        putBlob: async () => {
+          blobs++
+          throw Error("must not store a large blob")
+        },
+      },
+    })
+    const file = new File(["x"], reference.filename)
+    Object.defineProperty(file, "size", { value: reference.size })
+    expect(await attachments.addAttachment(file)).toBe(true)
+    expect(blobs).toBe(0)
+    expect(images(prompt)[0]).toMatchObject({ reference, sourcePath: reference.sourcePath })
+    expect(await attachments.addAttachment(reference)).toBe(true)
+    expect(images(prompt)).toHaveLength(2)
+    dispose()
+  })
+})
+
+test("large clipboard files without a native path are refused before blob storage", async () => {
+  await createRoot(async (dispose) => {
+    const prompt = createPromptState()
+    let missing = 0
+    const attachments = createPromptAttachmentsCore({
+      capture: prompt.capture,
+      editor: () => document.createElement("div"),
+      missingPath: () => {
+        missing++
+      },
+    })
+    const file = new File(["x"], "large.csv")
+    Object.defineProperty(file, "size", { value: 16 * 1024 ** 2 + 1 })
+    expect(await attachments.addAttachment(file)).toBe(false)
+    expect(missing).toBe(1)
+    expect(images(prompt)).toHaveLength(0)
+    dispose()
+  })
+})
