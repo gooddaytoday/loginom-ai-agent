@@ -381,6 +381,11 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     if(after.status!=='SUCCEEDED' || !contextMatches(after.output)
       ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes){
       const current=after.output??{};
+      if(current.ui?.dialogs?.length)trace.push({event:'download_post_dialogs',
+        observed:current.ui.dialogs.slice(0,8).map(d=>({identity:d.identity,title:d.title,text:d.text})),
+        native:await page.evaluate(()=>Array.from(document.querySelectorAll('[role="dialog"],.x-window,.bg-dialog'))
+          .filter(e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden')
+          .slice(0,8).map(e=>({tid:e.getAttribute('data-tid'),classes:e.className,role:e.getAttribute('role'),text:(e.textContent??'').slice(0,2000)})))});
       trace.push({event:'download_post_context_refused',observation_status:after.status,
         observation_error:/^[A-Z][A-Z0-9_]{1,100}$/.test(after.error?.code??'')?after.error.code:null,
         checks:{authenticated:current.authenticated===true,origin:current.origin===task.expected_origin,
