@@ -6,6 +6,7 @@ import { crossTableBindings } from "./node-bindings"
 export type NodeXml = { scope: string; id: string; type: string; engine: Record<string, string>;
   columns: { Name?: string; InputColumnInfoName?: string; DataType?: string; DataKind?: string; UsageType?: string; extension: Record<string, string> }[];
   output_columns?: { Name?: string; DataType?: string; source: string | null }[];
+  output_autosync?: boolean;
   inputs: Record<string, string>; outputs: Record<string, string>;
   control_ports?: Record<string, string>[]; control_sockets?: Record<string, string>[]; property_bindings?: Record<string, string>[];
   variables: { Name?: string; DataType?: string; OriginType?: string; default_value?: Record<string, string> }[] }

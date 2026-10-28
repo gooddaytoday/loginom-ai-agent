@@ -8,8 +8,66 @@ import { evalsRoot, loadConfig } from "../src/config"
 import { gitInfo } from "../src/preflight"
 import { afterAttempt, main, redact, runAttempt, stamp } from "../src/run"
 import type { RunSummary } from "../src/report"
-import { loadTasks } from "../src/task"
+import { loadTasks, rubricHash } from "../src/task"
 import { readStartupCleanup } from "../src/startup-reconciliation"
+import { evaluationContractHash } from "../src/evaluation"
+import { createJudgeGate, judgeInfo } from "../src/judge"
+
+test("runAttempt persists generation before delayed judge", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-generation-checkpoint-"))
+  const config = { ...loadConfig(["--dry-run"], { EVAL_WORKSPACE_ROOT: path.join(root, "workspace") }), skipJudge: false }
+  const [task] = await loadTasks(config.tasksDir, ["group-sum-qty"])
+  const trace = path.join(root, "judge.jsonl")
+  const judge = { command: [process.execPath, path.join(evalsRoot, "fixtures/fake-codex.ts"), "--gate-log", trace, "--delay-ms", "700"],
+    model: "fake", reasoning: "high", timeoutMs: 30_000, passThreshold: 70 }
+  const hash = evaluationContractHash({ rubric_hash: await rubricHash([task!]), judge: await judgeInfo({ judge }), pass_threshold: judge.passThreshold })
+  const runDir = path.join(root, "results")
+  const running = runAttempt({ config, command: agentCommand(config), source: parseArtifactSource(config.artifactSource, config.loginom),
+    task: task!, attempt: 1, runId: "checkpoint", runDir, signal: new AbortController().signal, profileRecovered: false,
+    skipJudge: false, judge, evaluationHash: hash })
+  try {
+    const startedAt = Date.now()
+    while (!await Bun.file(trace).exists() && Date.now() - startedAt < 5_000) await Bun.sleep(10)
+    expect(await Bun.file(trace).text()).toContain('"kind":"start"')
+    expect(await Bun.file(trace).text()).not.toContain('"kind":"end"')
+    const file = path.join(runDir, task!.id, "1/result.json")
+    const saved = await Bun.file(file).json()
+    expect(saved).toMatchObject({ task_id: task!.id, attempt: 1, status: "completed", exit_code: 0,
+      session_id: "ses_fixture01", package_path: expect.any(String), artifact_origin: "receipt",
+      evaluation_contract_hash: hash, judge_status: "skipped", judge_attempts: 1, score: null, pass: null })
+    expect(saved.cost).toBeGreaterThan(0)
+    expect(saved.environment_cleanup.status).not.toBe("confirmed")
+    expect(await Bun.file(path.join(runDir, "summary.json")).exists()).toBe(false)
+    const finished = await running
+    expect(finished.result).toMatchObject({ judge_status: "scored", pass: true, score: 100, evaluation_contract_hash: hash })
+    expect(await Bun.file(file).json()).toEqual(finished.result)
+  } finally {
+    await running
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("runAttempt keeps scored FAIL when a secondary judge log cannot be written", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "evals-judge-log-failure-"))
+  try {
+    const config = { ...loadConfig(["--dry-run"], { EVAL_WORKSPACE_ROOT: path.join(root, "workspace") }), skipJudge: false }
+    const [task] = await loadTasks(config.tasksDir, ["group-sum-qty"])
+    const runDir = path.join(root, "results")
+    const outDir = path.join(runDir, task!.id, "1")
+    const trace = path.join(root, "judge.jsonl")
+    await mkdir(path.join(outDir, "judge-events-1.jsonl"), { recursive: true })
+    const finished = await runAttempt({ config, command: agentCommand(config), source: parseArtifactSource(config.artifactSource, config.loginom),
+      task: task!, attempt: 1, runId: "log-failure", runDir, signal: new AbortController().signal, profileRecovered: false,
+      skipJudge: false, judgeGate: createJudgeGate(), judge: {
+        command: [process.execPath, path.join(evalsRoot, "fixtures/fake-codex.ts"), "--gate-log", trace],
+        model: "fake", reasoning: "high", timeoutMs: 30_000, passThreshold: 70, env: { FAKE_CODEX_VERDICT: "fail" } } })
+    expect(finished.result).toMatchObject({ status: "completed", judge_status: "scored", score: 0, pass: false, judge_attempts: 1 })
+    expect(finished.result).not.toHaveProperty("judge_cleanup_unconfirmed")
+    expect(finished.stop).toBe(false)
+    expect(await Bun.file(path.join(outDir, "result.json")).json()).toEqual(finished.result)
+    expect((await Bun.file(trace).text()).trim().split("\n").map(line => JSON.parse(line)).filter(row => row.kind === "start")).toHaveLength(1)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
 
 test("runAttempt: startup accepts the emitted cleanup receipt", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "evals-attempt-startup-receipt-"))

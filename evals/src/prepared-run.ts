@@ -2,6 +2,8 @@ import path from "node:path"
 import { mkdir } from "node:fs/promises"
 import type { EvalConfig } from "./config"
 import { agentCommand, type AgentCommand } from "./cli"
+import { tryCampaignLock } from "./campaign-lock"
+import { assessNodeAttempt } from "./node-evals"
 import { parseArtifactSource } from "./artifact"
 import { scopedSlotConfig } from "./environment-preparation"
 import { evaluationContractHash, rubricSnapshot } from "./evaluation"
@@ -10,14 +12,14 @@ import { createJudgeGate, judgeInfo, type JudgeSettings } from "./judge"
 import { acquireJudgeLease, readLeaseReceipt, writeLeaseReceipt } from "./lease"
 import { openLoginomAdmin, type AdminConnection } from "./loginom-admin"
 import { requireResourceBudgetScopes, validResourceBound } from "./parallel-resource-budget"
-import { freezeResourceBudget, readFrozenResourceBudget, readResourceEvidence } from "./parallel-resource-evidence"
-import { assessResourceBudget, assessResourceIncidents, assessResourceTimeline } from "./parallel-acceptance"
+import { freezeResourceBudget } from "./parallel-resource-evidence"
+import { checkRunResourceEvidence } from "./parallel-acceptance"
 import { sampleHostResources } from "./parallel-resources"
 import { readServerIdentity } from "./parallel-pair"
-import { preflight, gitInfo, type Environment } from "./preflight"
+import { preflight, requestPreflight, gitInfo, type Environment } from "./preflight"
 import { assertAuth, verifyProfile } from "./profile"
-import type { ProcessCleanup } from "./process-supervisor"
-import { aggregate, aggregateLimits, aggregateTask, renderReport, writeSummary, type AttemptResult, type RunSummary } from "./report"
+import { captureUnitBinding, type ProcessCleanup } from "./process-supervisor"
+import { aggregate, aggregateLimits, aggregateTask, isQualityResult, renderReport, writeSummary, type AttemptResult, type RunSummary } from "./report"
 import { describe, emptyResult, installSigint, redact, runAttempt, stamp } from "./run"
 import { reserveRunDirectory } from "./run-directory"
 import { requireAvailableMemory, startRunResourceSampler } from "./run-resources"
@@ -28,7 +30,87 @@ import { reconcileEnvironment } from "./startup-reconciliation"
 import { acquireEnvironmentLeases, loadSlots, type SlotLease } from "./slots"
 import { agentInputsHash, loadTasks, rubricHash, taskTimeoutMs } from "./task"
 
-export async function runPreparedSlots(config: EvalConfig) {
+type CommandAdmission = { slotId: string; taskId: string; attempt: number; purpose: "preflight" | "measurement"; completedAt?: number; completionOrder?: number; quality?: boolean }
+
+export function createCampaignAdmission(config: EvalConfig["campaign"], persist: (state: { consecutiveErrors: number; lastProgressAt: number; admissionBlocker?: string }) => Promise<void>) {
+  const controller = new AbortController()
+  const state = { consecutiveErrors: config?.consecutiveErrors ?? 0, lastProgressAt: config?.lastProgressAt ?? Date.now(), admissionBlocker: undefined as string | undefined }
+  let completionOrder = 0, writing = Promise.resolve()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const save = () => {
+    const snapshot = { ...state }
+    writing = writing.then(() => persist(snapshot))
+    void writing.catch(error => controller.abort(error))
+    return writing
+  }
+  const stop = (reason: string) => {
+    state.admissionBlocker ??= reason
+    clearTimeout(timer)
+    controller.abort(state.admissionBlocker)
+  }
+  const arm = () => {
+    clearTimeout(timer)
+    if (!config || state.admissionBlocker) return
+    const remaining = state.lastProgressAt + config.noProgressMs - Date.now()
+    if (remaining <= 0) { stop("NO_PROGRESS_LIMIT"); void save(); return }
+    timer = setTimeout(arm, Math.min(remaining, 2_147_483_647))
+  }
+  if (config && state.consecutiveErrors >= config.errorLimit) { stop("CONSECUTIVE_INFRASTRUCTURE_ERRORS"); void save() }
+  arm()
+  return {
+    signal: controller.signal,
+    async admit(write: () => Promise<void>, signal = controller.signal) {
+      const control = config?.control
+      let release: (() => Promise<void>) | undefined
+      while (control && !release) {
+        if (signal.aborted || controller.signal.aborted) return false
+        release = await tryCampaignLock(control.lockFile)
+        if (!release) await Bun.sleep(25)
+      }
+      try {
+        if (signal.aborted || controller.signal.aborted) return false
+        if (control) {
+          const journal = await readLeaseReceipt(control.journalFile)
+          if (!journal || typeof journal !== "object" || Array.isArray(journal) || !("manifestHash" in journal) || journal.manifestHash !== control.manifestHash)
+            throw new EvalFailure("CAMPAIGN_CONTROL_UNCONFIRMED", 2)
+          if ("final" in journal && journal.final || "published" in journal && journal.published) {
+            stop("CAMPAIGN_FINAL")
+            await save()
+            return false
+          }
+          if ("repairing" in journal && journal.repairing) {
+            stop("CAMPAIGN_REPAIRING")
+            await save()
+            return false
+          }
+          if ("blocker" in journal && journal.blocker) {
+            stop("CAMPAIGN_BLOCKED")
+            await save()
+            return false
+          }
+        }
+        if (signal.aborted || controller.signal.aborted) return false
+        await write()
+        return true
+      } catch (error) { controller.abort(error); throw error }
+      finally { await release?.() }
+    },
+    async complete(admission: { completedAt?: number; completionOrder?: number; quality?: boolean }, quality: boolean) {
+      admission.completedAt = Date.now()
+      admission.completionOrder = ++completionOrder
+      admission.quality = quality
+      if (config && admission.completedAt - state.lastProgressAt >= config.noProgressMs) stop("NO_PROGRESS_LIMIT")
+      state.consecutiveErrors = quality ? 0 : state.consecutiveErrors + 1
+      if (quality) state.lastProgressAt = admission.completedAt
+      if (config && state.consecutiveErrors >= config.errorLimit) stop("CONSECUTIVE_INFRASTRUCTURE_ERRORS")
+      arm()
+      await save()
+    },
+    async close() { clearTimeout(timer); await writing },
+  }
+}
+
+export async function runPreparedSlots(config: EvalConfig, nodeEvaluation = false) {
   if (!config.slotsFile || config.dryRun || config.agent.cliMode !== "binary" || !path.isAbsolute(config.agent.cliBin ?? ""))
     throw new EvalFailure("PREPARED_SLOTS_BINARY_REQUIRED", 2)
   if (!config.resourceBudgetFile) throw new EvalFailure("RESOURCE_BUDGET_REQUIRED", 2)
@@ -52,11 +134,13 @@ export async function runPreparedSlots(config: EvalConfig) {
   const runDir = await reserveRunDirectory(config.resultsDir, `${stamp(started)}-${git?.sha ?? "nogit"}${git?.dirty ? "-dirty" : ""}`)
   const runId = path.basename(runDir), commandId = crypto.randomUUID()
   const journal = path.join(file.controller.stateDir, `run-command-${commandId}.json`)
-  await writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId, identity, phase: "cli_admitted", runDir,
-    slotIds: file.slots.slice(0, config.parallel).map(slot => slot.id) })
+  const admissions: CommandAdmission[] = []
+  const commandJournal = { version: 2, kind: "unactivated-preparation", commandId, identity, phase: "cli_admitted", runDir,
+    unitBinding: await captureUnitBinding(), slotIds: file.slots.slice(0, config.parallel).map(slot => slot.id), attempts: admissions }
+  await writeLeaseReceipt(journal, commandJournal)
   const budgetFile = path.join(runDir, "resource-budget.json")
   const budget = await freezeResourceBudget({ out: budgetFile, runId, bounds })
-  await Bun.write(path.join(runDir, "config.json"), JSON.stringify(redact(config), null, 2))
+  await Bun.write(path.join(runDir, "config.json"), JSON.stringify({ ...redact(config), commandJournal: journal }, null, 2))
   const environment = await acquireEnvironmentLeases(file, config.parallel, identity, journal)
   const controller = new AbortController(), removeSigint = installSigint(controller)
   const contexts: { lease: SlotLease; config: EvalConfig; command: AgentCommand; cleanup: string; confirmed: boolean }[] = []
@@ -66,8 +150,19 @@ export async function runPreparedSlots(config: EvalConfig) {
   let metadata: Environment = { git, agent: null, codex: null, dock: null, loginom: null }
   let judge: Awaited<ReturnType<typeof judgeInfo>> | null = null, stopped: string | null = null
   let judgeConfirmed = true, dispatchStarted = "", executionFinished = ""
-  const admissions: { slotId: string; taskId: string; attempt: number }[] = []
   let admissionWrite = Promise.resolve()
+  let admissionBlocker: string | undefined
+  const saveAdmissions = () => {
+    const receipt = { ...commandJournal, attempts: admissions.map(admission => ({ ...admission })), admissionBlocker }
+    admissionWrite = admissionWrite.then(() => writeLeaseReceipt(journal, receipt))
+    return admissionWrite
+  }
+  const admit = (slotId: string, taskId: string, attempt: number, purpose: "preflight" | "measurement") => {
+    const admission: CommandAdmission = { slotId, taskId, attempt, purpose }
+    admissions.push(admission)
+    return saveAdmissions().then(() => admission)
+  }
+  const campaignAdmission = createCampaignAdmission(config.campaign, state => { admissionBlocker = state.admissionBlocker; return saveAdmissions() })
   try {
     admin = await openLoginomAdmin(file, identity, { serverLease: environment.server, binary: config.agent.cliBin })
     judgeLease = await acquireJudgeLease({ codexHome: file.judge.codexHome, journal, commandId })
@@ -95,25 +190,45 @@ export async function runPreparedSlots(config: EvalConfig) {
       judge = await judgeInfo({ judge: scopedJudge }, controller.signal)
       judgeConfirmed = true
     }
+    for (const context of contexts) {
+      const taskId = `request-preflight-${context.lease.slot.id}`
+      const out = path.join(runDir, taskId, "1"), workdir = path.join(context.lease.slot.workspaceRoot, runId, taskId, "1")
+      await mkdir(out, { recursive: true, mode: 0o700 })
+      await mkdir(workdir, { recursive: true, mode: 0o700 })
+      context.confirmed = false
+      await admit(context.lease.slot.id, taskId, 1, "preflight")
+      const probe = await requestPreflight({ command: context.command, taskId, model: context.config.agent.model, variant: context.config.agent.variant,
+        workdir, outDir: out, profileDir: context.config.profileDir, slotId: context.lease.slot.id, signal: controller.signal })
+      await writeLeaseReceipt(path.join(out, "cleanup.json"), { processes: probe.run.processCleanup, nextAdmissionAllowed: false })
+      const cleanup = await cleanupSlotStorage(file, environment.server, context.lease, admin, probe.run.processCleanup, [`eval-${runId}-${taskId}-1`], [out])
+      await writeSlotCleanup(context, cleanup)
+      await writeLeaseReceipt(path.join(out, "cleanup.json"), { processes: probe.run.processCleanup, ...cleanup, nextAdmissionAllowed: true })
+      await writeLeaseReceipt(path.join(runDir, "request-preflight.json"), { slotId: context.lease.slot.id, code: probe.code, evidence: path.join(out, "run.json") })
+      if (probe.code) throw new EvalFailure(probe.code, 2)
+    }
     const settings: JudgeSettings | undefined = judge ? { ...scopedJudge, timeoutMs: config.judgeTimeoutMs, passThreshold: config.passThreshold } : undefined
     const gate = createJudgeGate()
     const evaluationHash = evaluationContractHash({ rubric_hash: rubric, judge, pass_threshold: config.passThreshold })
-    await Bun.write(path.join(runDir, "config.json"), JSON.stringify({ ...redact(config), agent_inputs_hash: inputsHash,
+    await Bun.write(path.join(runDir, "config.json"), JSON.stringify({ ...redact(config), commandJournal: journal, agent_inputs_hash: inputsHash,
       rubric_hash: rubric, binary_sha256: metadata.agent?.binarySha256, source_commit: metadata.agent?.sourceCommit, judge }, null, 2))
     sampler = await startRunResourceSampler({ slotsFile: config.slotsFile, out: path.join(runDir, "resources.jsonl"), runId })
     dispatchStarted = new Date().toISOString()
     const queued = await runSlotQueue({ jobs: buildJobs(tasks.map(task => task.id), config.repeat), slots: contexts.map(context => context.lease.slot.id),
-      signal: controller.signal, async execute(slotId, job) {
+      signal: AbortSignal.any([controller.signal, campaignAdmission.signal]),
+      async admit(slotId, job) {
+        return campaignAdmission.admit(async () => { await admit(slotId, job.taskId, job.attempt, "measurement") }, controller.signal)
+      },
+      async execute(slotId, job) {
         const context = contexts.find(context => context.lease.slot.id === slotId)!
         const out = path.join(runDir, job.taskId, String(job.attempt))
+        const admission = admissions.find(item => item.purpose === "measurement" && item.slotId === slotId && item.taskId === job.taskId && item.attempt === job.attempt)!
         context.confirmed = false
         try {
-        admissions.push({ slotId, taskId: job.taskId, attempt: job.attempt })
-        admissionWrite = admissionWrite.then(() => writeLeaseReceipt(journal, { version: 2, kind: "unactivated-preparation", commandId,
-          identity, phase: "cli_admitted", runDir, slotIds: environment.slots.map(lease => lease.slot.id), attempts: [...admissions] }))
-        await admissionWrite
         await mkdir(out, { recursive: true, mode: 0o700 })
-        const watcher = watchAttemptIncidents(out, code => { stopped ??= code; controller.abort() })
+        const watcher = watchAttemptIncidents(out, code => {
+          if (code === "PROVIDER_ERROR_OBSERVED") return
+          stopped ??= code; controller.abort()
+        })
         const completed = await admin!.verifySlotUser(context.lease.slot.username).then(() => runAttempt({ config: context.config, command: context.command, source: parseArtifactSource("docker", context.config.loginom),
           task: tasks.find(task => task.id === job.taskId)!, attempt: job.attempt, runId, runDir, signal: controller.signal, profileRecovered: false,
           slotId, slot: { file, lease: context.lease, secretFile: path.join(file.controller.stateDir, `prepare-${slotId}.secret.json`) },
@@ -135,10 +250,7 @@ export async function runPreparedSlots(config: EvalConfig) {
           result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error: describe(error) }
           if (/SESSION_BACKUP|SERVER_EPOCH|SERVER_FENCE/.test(describe(error))) controller.abort()
         }
-        if (result.limit_evidence?.events.length || result.failure_kind === "provider") {
-          stopped = "PROVIDER_LIMIT_OBSERVED"; controller.abort()
-        }
-        await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2))
+        await writeLeaseReceipt(path.join(out, "result.json"), result)
         console.error(`[${slotId}/${job.taskId}#${job.attempt}] ${result.status} score=${result.score ?? "—"}`)
         if (["infra_error", "harness_error", "timeout", "interrupted"].includes(result.status) || result.judge_cleanup_unconfirmed) context.confirmed = false
         return { result, quarantine: !context.confirmed || Boolean(result.judge_cleanup_unconfirmed) }
@@ -150,6 +262,12 @@ export async function runPreparedSlots(config: EvalConfig) {
           attempts[job.index] = result
           console.error(`[${slotId}/${job.taskId}#${job.attempt}] slot quarantined: ${describe(error)}`)
           return { result, quarantine: true }
+        } finally {
+          const result = attempts[job.index]
+          if (result) {
+            const node = nodeEvaluation ? await assessNodeAttempt({ runDir, taskId: job.taskId, tasksDir: config.tasksDir, slot: context.lease.slot }) : undefined
+            await campaignAdmission.complete(admission, node ? node.code !== 2 : isQualityResult(result))
+          }
         }
       } })
     executionFinished = new Date().toISOString()
@@ -158,6 +276,8 @@ export async function runPreparedSlots(config: EvalConfig) {
     await Bun.sleep(1100)
   } catch (error) { stopped ??= describe(error) }
   finally {
+    await campaignAdmission.close().catch(error => { stopped ??= describe(error) })
+    if (campaignAdmission.signal.aborted) stopped ??= String(campaignAdmission.signal.reason)
     await sampler?.stop().catch(error => { stopped ??= describe(error) })
     await admin?.dispose().catch(error => { stopped ??= describe(error); contexts.forEach(context => { context.confirmed = false }) })
     for (const context of contexts.filter(context => context.confirmed))
@@ -179,22 +299,12 @@ export async function runPreparedSlots(config: EvalConfig) {
   }
   if (!dispatchStarted) throw new EvalFailure(stopped ?? "SLOT_ADMISSION_FAILED", 2)
   const samplesFile = path.join(runDir, "resources.jsonl"), summaryFile = `${samplesFile}.summary.json`
-  const resourceChecks: { status: string; codes: string[] }[] = []
-  try {
-    const evidence = await readResourceEvidence({ file: summaryFile, samplesFile, runId, phase: "run" })
-    resourceChecks.push(assessResourceBudget({ runId, startedAt: dispatchStarted,
-      budget: await readFrozenResourceBudget({ ...budget.source, runId, startedAt: dispatchStarted }), summary: evidence.receipt.summary }),
-      assessResourceIncidents({ samples: evidence.samples, summary: evidence.receipt.summary }),
-      assessResourceTimeline({ samples: evidence.samples, intervalMs: 1000, startedAt: dispatchStarted, finishedAt: executionFinished }))
-    if (evidence.samples.some(sample => containers.some(target => {
-      const rows = sample.containers?.filter(row => row.container_id === target.id) ?? []
-      return rows.length !== 1 || rows[0]!.epoch_stable !== true || rows[0]!.inspect?.started_at !== target.startedAt
-    }))) resourceChecks.push({ status: "failed", codes: ["CONTAINER_RESOURCE_IDENTITY_UNCONFIRMED"] })
-  } catch (error) { resourceChecks.push({ status: "incomplete", codes: [describe(error)] }) }
-  if (resourceChecks.some(check => check.status !== "passed")) stopped ??= resourceChecks.flatMap(check => check.codes).join(", ")
+  const resourceChecks = await checkRunResourceEvidence({ runId, startedAt: dispatchStarted, finishedAt: executionFinished,
+    samplesFile, summaryFile, budget: budget.source, containers })
+  if (resourceChecks.some(check => check.status === "failed")) stopped ??= resourceChecks.flatMap(check => check.codes).join(", ")
   const measured = attempts.filter((attempt): attempt is AttemptResult => attempt !== undefined)
   const limits = aggregateLimits(measured, ["provider", "judge"])
-  if (limits.status !== "passed") stopped ??= limits.codes.join(", ")
+  if (limits.codes.some(code => code.startsWith("LOGINOM_") || code.startsWith("HOST_"))) stopped ??= limits.codes.join(", ")
   const summary: RunSummary = {
     run_id: runId, label: config.label, started_at: started.toISOString(), finished_at: new Date().toISOString(), interrupted: controller.signal.aborted,
     interrupted_cleanup: measured.some(attempt => attempt.interrupted) ? { recovered: false } : null, stopped_reason: stopped,

@@ -1,0 +1,17 @@
+[Unit]
+Description=Loginom eval campaign %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@RUNNER_USER@
+WorkingDirectory=@HARNESS_ROOT@
+EnvironmentFile=@CONTROLLER_ENV@
+ExecStart=@BUN@ --no-env-file run @HARNESS_ROOT@/script/run-campaign.ts --manifest @STATE_ROOT@/%i/manifest.json --server @SERVER_CONFIG@
+UMask=0077
+Restart=on-failure
+RestartSec=30s
+
+[Install]
+WantedBy=multi-user.target

@@ -1,9 +1,36 @@
 import { expect, test } from "bun:test"
 import path from "node:path"
 import os from "node:os"
-import { mkdir, mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, open, rm } from "node:fs/promises"
 import { collectNodeNativeEvidence } from "../src/node-native"
 import { archiveProfileEvidence } from "../src/profile-archive"
+import { collectTextImportEvidence } from "../src/text-import"
+
+test.each([
+ { file: "native-crosstable.json", collect: collectNodeNativeEvidence },
+ { file: "native-import.json", collect: collectTextImportEvidence },
+])("native evidence refresh preserves the complete JSON snapshot already opened by a reader ($file)", async ({ file, collect }) => {
+ const root=await mkdtemp(path.join(os.tmpdir(),"node-native-snapshot-"))
+ try {
+  const profile=path.join(root,"profile"),history=profile+".history/attempt",attempt=path.join(root,"attempt")
+  await Bun.write(path.join(history,"runtime/execution-events.jsonl"),JSON.stringify({operation_id:"observed",phase:"node_observation_completed",outcome:{status:"SUCCEEDED",output:{node_crosstable:{verified:true,inventory_complete:true,node_context:{verified:true},input_fields:[]}}}})+"\n")
+  await Bun.write(path.join(attempt,"cleanup.json"),JSON.stringify({result:{status:"confirmed"},stages:[{stage:"profile_history",status:"confirmed",path:history}]}))
+  await collect(attempt,profile)
+  // Keep valid JSON with different bytes without changing the immutable source archive.
+  const evidence=path.join(attempt,file),snapshot="\n".repeat(64)+await Bun.file(evidence).text()
+  await Bun.write(evidence,snapshot)
+  const reader=await open(evidence,"r")
+  try {
+   const prefix=Buffer.alloc(32)
+   expect((await reader.read(prefix)).bytesRead).toBe(prefix.length)
+   await collect(attempt,profile)
+   const observed=prefix.toString()+await reader.readFile("utf8")
+   expect(JSON.parse(observed)).toEqual(JSON.parse(snapshot))
+   expect(observed).toBe(snapshot)
+  } finally {await reader.close()}
+ } finally {await rm(root,{recursive:true,force:true})}
+})
+
 test("сохраняются последние реальные native observations из собственного cleanup history archive",async()=>{
  const root=await mkdtemp(path.join(os.tmpdir(),"node-native-"))
  try {

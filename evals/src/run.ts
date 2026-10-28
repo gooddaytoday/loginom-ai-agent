@@ -18,7 +18,7 @@ import { reserveRunDirectory } from "./run-directory"
 import { writeLeaseReceipt } from "./lease"
 import { aggregate, aggregateLimits, aggregateTask, renderReport, statusFor, writeSummary, type AttemptResult, type RunSummary } from "./report"
 
-export async function main(argv: string[], env: Record<string, string | undefined> = process.env) {
+export async function main(argv: string[], env: Record<string, string | undefined> = process.env, options: { nodeEvaluation?: boolean } = {}) {
   const config = loadConfig(argv, env)
   if (config.slotsFile && (config.judgeOnly !== undefined || config.calibrate)) {
     const { runOfflineJudge } = await import("./judge-environment")
@@ -35,7 +35,7 @@ export async function main(argv: string[], env: Record<string, string | undefine
   if (config.slotsFile && !config.dryRun && !config.resourceBudgetFile) throw new EvalFailure("RESOURCE_BUDGET_REQUIRED", 2)
   if (config.slotsFile && !config.dryRun) {
     const { runPreparedSlots } = await import("./prepared-run")
-    return runPreparedSlots(config)
+    return runPreparedSlots(config, options.nodeEvaluation === true)
   }
   if (config.slotsFile) throw new EvalFailure("SLOTS_ADMISSION_UNAVAILABLE", 2)
   const lease = config.dryRun ? undefined : await acquireRunHarnessLease(config.profileDir, env)
@@ -115,7 +115,7 @@ async function executeRunBody(config: EvalConfig, controller: AbortController) {
               result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error: describe(error) }
               return { stop: describe(error) }
             })
-          await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2)).catch(async () => {
+          await writeLeaseReceipt(path.join(out, "result.json"), result).catch(async () => {
             const error = "Attempt result persistence failed; measured outcome retained in summary"
             result.environment_cleanup = { status: "failed", evidence: "cleanup.json", error }
             state.stopped = error
@@ -134,7 +134,7 @@ async function executeRunBody(config: EvalConfig, controller: AbortController) {
         await archiveInfraAttempt(out).catch(async (error: unknown) => {
           state.stopped = describe(error)
           result.environment_cleanup = { status: "failed", evidence: "infra-error", error: state.stopped }
-          await Bun.write(path.join(out, "result.json"), JSON.stringify(result, null, 2)).catch(() => {})
+          await writeLeaseReceipt(path.join(out, "result.json"), result).catch(() => {})
         })
         if (state.stopped) break outer
         history.initial = result
@@ -234,7 +234,7 @@ export async function runAttempt(input: {
     const result: AttemptResult = measured
       ? { ...base, environment_cleanup: { status: "failed", evidence: "cleanup.json", error: describe(error) } }
       : { ...base, status: "harness_error", judge_status: "skipped", harness_error: describe(error) }
-    await Bun.write(path.join(input.runDir, input.task.id, String(input.attempt), "result.json"), JSON.stringify(result, null, 2))
+    await writeLeaseReceipt(path.join(input.runDir, input.task.id, String(input.attempt), "result.json"), result)
       .catch(() => { console.error("Не удалось сохранить attempt result; исход сохранится в summary") })
     return { result, stop: measured || error instanceof SandboxFailure }
   })
@@ -331,40 +331,25 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
         )
       : null)
   const noJudge = Boolean(inputFailure) || status === "harness_error" || status === "interrupted" || status === "infra_error"
-  const judged =
-    artifact && !noJudge && !input.signal.aborted && input.judge && !input.skipJudge
-      ? await (input.judgeGate ?? judgeTask)({
-          task,
-          run,
-          artifactDir: path.dirname(artifact.unpackedDir),
-          prompt,
-          outDir: path.join(outDir, "judge"),
-          judge: input.judge,
-          signal: input.signal,
-        }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
-      : undefined
+  const judgeTarget = artifact && !noJudge && !input.signal.aborted && input.judge && !input.skipJudge ? artifact : undefined
   const skippedJudge = input.skipJudge || artifact !== undefined || noJudge
-  const judgeCleanupFailed = judged && "cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed
-  const judgeFields = judged
-    ? judgedFields(judged)
-    : {
-        structural_score: skippedJudge || task.checklist.some((item) => item.axis === undefined) || !task.checklist.some((item) => item.axis === "structure") ? null : 0,
-        score: skippedJudge ? null : 0,
-        pass: skippedJudge ? null : false,
-        judge_status: (skippedJudge ? "skipped" : "no_artifact") as AttemptResult["judge_status"],
-        judge_attempts: 0,
-        judge_confidence: null,
-        judge_summary: null,
-        checklist: null,
-        oracle_pass: !skippedJudge && task.oracle ? false : null,
-        oracle_error: !skippedJudge && task.oracle ? "Артефакт и файл результата для oracle отсутствуют" : null,
-      }
+  const judgeFields = {
+    structural_score: skippedJudge || task.checklist.some((item) => item.axis === undefined) || !task.checklist.some((item) => item.axis === "structure") ? null : 0,
+    score: skippedJudge ? null : 0,
+    pass: skippedJudge ? null : false,
+    judge_status: (skippedJudge ? "skipped" : "no_artifact") as AttemptResult["judge_status"],
+    judge_attempts: 0,
+    judge_confidence: null,
+    judge_summary: null,
+    checklist: null,
+    oracle_pass: !skippedJudge && task.oracle ? false : null,
+    oracle_error: !skippedJudge && task.oracle ? "Артефакт и файл результата для oracle отсутствуют" : null,
+  }
   const result: AttemptResult = {
     ...base,
     ...judgeFields,
-    ...(judgeCleanupFailed ? { judge_cleanup_unconfirmed: true } : {}),
     ...inputFailure,
-    ...((judged || !skippedJudge) && input.evaluationHash ? { evaluation_contract_hash: input.evaluationHash } : {}),
+    ...(!inputFailure && !input.skipJudge && (artifact || !skippedJudge) && input.evaluationHash ? { evaluation_contract_hash: input.evaluationHash } : {}),
     status: inputFailure && ["completed", "no_artifact", "failed"].includes(status) ? "failed" : status,
     exit_code: run.exitCode,
     timed_out: run.timedOut,
@@ -379,9 +364,9 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
     artifact_ambiguous: artifact?.ambiguous ?? [],
     cleanup_error: cleanupError,
     environment_cleanup: {
-      status: judgeCleanupFailed || run.processCleanup.status === "failed" ? "failed" : "not_run",
-      evidence: judgeCleanupFailed ? judged.attempts ? `judge-processes-${judged.attempts}/process-cleanup.json` : null : "cleanup.json",
-      error: judgeCleanupFailed && !judged.ok ? judged.error : run.processCleanup.error,
+      status: run.processCleanup.status === "failed" ? "failed" : "not_run",
+      evidence: "cleanup.json",
+      error: run.processCleanup.error,
     },
     action_manifest_sha256: run.actionManifestSha256 ?? null,
     skill_revision: run.skillRevision ?? null,
@@ -399,7 +384,31 @@ async function attemptBody(input: Parameters<typeof runAttempt>[0], base: Attemp
   await writeLeaseReceipt(path.join(outDir, "cleanup.json"), { processes: run.processCleanup,
     ...(input.slot ? { slotId: input.slot.lease.slot.id, serverEpoch: input.slot.lease.identity.serverEpoch,
       serverSessions: "unknown", storageDeletionAllowed: false, nextAdmissionAllowed: false } : {}) })
-  await Bun.write(path.join(outDir, "result.json"), JSON.stringify(result, null, 2))
+  await writeLeaseReceipt(path.join(outDir, "result.json"), result)
+  const judged = judgeTarget && input.judge
+    ? await (input.judgeGate ?? judgeTask)({
+          task,
+          run,
+          artifactDir: path.dirname(judgeTarget.unpackedDir),
+          prompt,
+          outDir: path.join(outDir, "judge"),
+          judge: input.judge,
+          signal: input.signal,
+          saveJudgeFields: async fields => {
+            Object.assign(result, fields)
+            Object.assign(base, result)
+            await writeLeaseReceipt(path.join(outDir, "result.json"), result)
+          },
+        }).catch((error: unknown) => ({ ok: false as const, error: describe(error), attempts: 0 as const }))
+      : undefined
+  const judgeCleanupFailed = judged && "cleanupUnconfirmed" in judged && judged.cleanupUnconfirmed
+  if (judged) {
+    Object.assign(result, judgedFields(judged), { judge_attempts: Math.max(result.judge_attempts, judged.attempts) }, judgeCleanupFailed ? { judge_cleanup_unconfirmed: true,
+      environment_cleanup: { status: "failed", evidence: judged.attempts ? `judge-processes-${judged.attempts}/process-cleanup.json` : null,
+        error: !judged.ok ? judged.error : null } } : {})
+    Object.assign(base, result)
+    await writeLeaseReceipt(path.join(outDir, "result.json"), result)
+  }
   return { result, stop: stop || run.processCleanup.status === "failed" || Boolean(judgeCleanupFailed) }
 }
 
@@ -460,7 +469,7 @@ export async function afterAttempt(config: EvalConfig, command: AgentCommand, re
   } finally {
     if (outDir) {
       await Bun.write(path.join(outDir, "cleanup.json"), JSON.stringify({ ...evidence, result: result.environment_cleanup }, null, 2))
-      await Bun.write(path.join(outDir, "result.json"), JSON.stringify(result, null, 2))
+      await writeLeaseReceipt(path.join(outDir, "result.json"), result)
     }
   }
 }

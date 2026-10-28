@@ -36,11 +36,13 @@ def inspect(package, unpacked):
                         ext = col.find("./Extensions/Item/Extension[@" + TYPE + "='TBGCrossTabColumnDefExtension']")
                         columns.append({**col.attrib, "extension": ext.attrib if ext is not None else {}})
                     output_columns = []
+                    output = item.find("./Component/OutputSockets/Item[@Name='DataSource']/Socket/DataSource")
                     for col in item.findall("./Component/OutputSockets/Item[@Name='DataSource']/Socket/DataSource/ColumnDefs/Item"):
                         mapping = col.find("./Extensions/Item/Extension[@" + TYPE + "='TBGColumnDefMappingExtension']/Mapping")
                         output_columns.append({**col.attrib, "source": mapping.get("Source") if mapping is not None else None})
                     nodes.append({"scope": scope, "id": item.get("Guid"), "type": engine.get(TYPE),
                                   "engine": engine.attrib, "columns": columns, "output_columns": output_columns,
+                                  "output_autosync": output is not None and output.get("SyncThroughColumns") == "true",
                                   "inputs": {p.get("Guid"): p.get("Name") for p in item.findall("./InputPorts/Item")},
                                   "outputs": {p.get("Guid"): p.get("Name") for p in item.findall("./OutputPorts/Item")},
                                   "control_ports": [p.attrib for p in item.findall("./ServiceInputPorts/Item[@Name='ControlVariables']")],

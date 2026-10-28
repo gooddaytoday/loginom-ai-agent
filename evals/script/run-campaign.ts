@@ -1,0 +1,1081 @@
+import path from "node:path"
+import { mkdir, open, readdir, realpath, rename, stat, unlink } from "node:fs/promises"
+import { parseArgs } from "node:util"
+import { isQualityResult, type AttemptResult } from "../src/report"
+import { globalLockRoot, readLeaseReceipt, readResourceReservation, writeLeaseReceipt, type Reservation } from "../src/lease"
+import { tryCampaignLock } from "../src/campaign-lock"
+import { assessNodeAttempt } from "../src/node-evals"
+import { loadSlots, type ServerIdentity } from "../src/slots"
+import { agentInputsHash, loadTasks, rubricHash } from "../src/task"
+import { evalsRoot, loadConfig } from "../src/config"
+import { readPendingJudge } from "../src/rejudge"
+import { runOfflineJudge } from "../src/judge-environment"
+import { requireResourceBudgetScopes, validResourceBound } from "../src/parallel-resource-budget"
+
+type CampaignKey = { corpus: string; taskId: string; round: number }
+export type CampaignManifest = {
+  id: string; server: string; executor: string; parallel: number; batchSize: number
+  keys: CampaignKey[]; pins: Record<string, string | number>; issueId?: string; wakeupIds?: string[]
+  limits?: { consecutiveErrors?: number; maxStartedAttempts?: number; noProgressMs?: number }
+}
+type Batch = { id: string; keys: CampaignKey[]; resultsDir: string; invocationBefore: string; started: boolean; accounted?: boolean; startedAttempts?: number }
+type AccountedAttempt = {
+  key: CampaignKey; resultFile: string; status: string; counted: boolean; pass: boolean | null; score: number | null; cleanupConfirmed: boolean
+  resources?: { status: string; codes: string[] }
+  completedAt?: number
+  cleanupVerification?: string
+}
+export type CampaignJournal = {
+  manifestHash: string; server: string; campaignId: string; executor: string; repairing: boolean; repairer: string | null
+  batches: Batch[]; attempts: AccountedAttempt[]; lastProgressAt: number; consecutiveErrors: number; emptyPreflights?: number
+  blocker?: string; final?: "full" | "partial"; published?: boolean; reportCommentId?: string; attachmentId?: string; cleanupVerified?: boolean
+  executorAgentId?: string; executorResponseCommentId?: string
+  blockerKind?: "technical" | "external" | "delivery"; blockerCommentId?: string; startedAttempts?: number
+  verificationAttempted?: boolean
+  verificationDir?: string
+  reportingError?: string
+  snapshotObservedAt?: number
+  initialProgressAt?: number
+}
+type CampaignComment = { id: string; content: string; revision: number; author_type?: string; author_id?: string; parent_id?: string; attachments?: { id: string }[] }
+type UnitState = { active: boolean; invocation: string; exitCode: number }
+const keyId = (key: CampaignKey) => `${key.corpus}/${key.taskId}/${key.round}`
+
+export function campaignLimits(manifest: CampaignManifest) {
+  const limits = { consecutiveErrors: manifest.limits?.consecutiveErrors ?? 3,
+    maxStartedAttempts: manifest.limits?.maxStartedAttempts ?? manifest.keys.length + Math.ceil(0.2 * manifest.keys.length),
+    noProgressMs: manifest.limits?.noProgressMs ?? 24 * 3600000 }
+  if (Object.values(limits).some(value => !Number.isSafeInteger(value) || value < 1)) throw Error("CAMPAIGN_LIMITS_INVALID")
+  return limits
+}
+
+export function campaignEnvironment(manifest: CampaignManifest, config: { slotsFile: string; resourceBudgetFile: string }): Record<string, string> {
+  if (manifest.pins.EVAL_CLI_MODE !== "binary" ||
+    ["EVAL_CLI_BIN", "EVAL_AGENT_MODEL", "EVAL_AGENT_VARIANT", "JUDGE_MODEL", "JUDGE_REASONING"]
+      .some(key => typeof manifest.pins[key] !== "string" || !String(manifest.pins[key]).trim()))
+    throw Error("CAMPAIGN_EXPERIMENT_PINS_REQUIRED")
+  return { ...Object.fromEntries(Object.entries(manifest.pins).map(([key, value]) => [key, String(value)])),
+    EVAL_SLOTS_FILE: config.slotsFile, EVAL_RESOURCE_BUDGET_FILE: config.resourceBudgetFile }
+}
+
+type PublisherConfig = { stateDir: string; multica: { url: string; workspace: string; issueId: string; tokenFile: string } }
+async function campaignFetch(config: PublisherConfig, endpoint: string, method = "GET", body?: object | FormData) {
+  const token = (await Bun.file(config.multica.tokenFile).text()).trim()
+  const url = new URL(endpoint, config.multica.url)
+  url.searchParams.set("workspace_slug", config.multica.workspace)
+  const response = await fetch(url, { method, headers: { Authorization: `Bearer ${token}`, ...(body instanceof FormData ? {} : { "Content-Type": "application/json" }) },
+    body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(30_000) })
+  if (!response.ok) throw Error(`MULTICA_${response.status}`)
+  return response
+}
+async function campaignRequest(config: PublisherConfig, endpoint: string, method = "GET", body?: object | FormData): Promise<unknown> {
+  const response = await campaignFetch(config, endpoint, method, body)
+  return response.status === 204 ? null : response.json()
+}
+
+async function finishCampaignIssue(manifest: CampaignManifest, journal: CampaignJournal, config: PublisherConfig) {
+  const endpoint = `/api/issues/${config.multica.issueId}`
+  const issue = await campaignRequest(config, endpoint) as { revision: number; status: string }
+  if (issue.status !== "in_review") await campaignRequest(config, endpoint, "PUT", { status: "in_review", expected_revision: issue.revision, suppress_run: true })
+  const rules = await campaignRequest(config, `${endpoint}/wakeups`) as { id: string; enabled: boolean }[]
+  for (const rule of rules.filter(rule => rule.enabled && manifest.wakeupIds?.includes(rule.id)))
+    await campaignRequest(config, `${endpoint}/wakeups/${rule.id}/disable`, "POST", {})
+  const finalIssue = await campaignRequest(config, endpoint) as { status: string }
+  const finalRules = await campaignRequest(config, `${endpoint}/wakeups`) as { id: string; enabled: boolean }[]
+  if (finalIssue.status !== "in_review" || manifest.wakeupIds?.some(id => !finalRules.some(rule => rule.id === id && !rule.enabled)))
+    throw Error("CAMPAIGN_FINAL_READBACK")
+  journal.published = true
+  await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+}
+
+async function stopCampaignPeriodicWakeups(manifest: CampaignManifest, config: PublisherConfig) {
+  const endpoint = `/api/issues/${config.multica.issueId}/wakeups`
+  const rules = await campaignRequest(config, endpoint) as { id: string; kind: string; enabled: boolean }[]
+  const periodic = rules.filter(rule => manifest.wakeupIds?.includes(rule.id) && ["every", "cron"].includes(rule.kind))
+  for (const rule of periodic.filter(rule => rule.enabled))
+    await campaignRequest(config, `${endpoint}/${rule.id}/disable`, "POST", {})
+  const persisted = await campaignRequest(config, endpoint) as { id: string; enabled: boolean }[]
+  if (periodic.some(rule => !persisted.some(item => item.id === rule.id && !item.enabled))) throw Error("CAMPAIGN_WAKEUP_READBACK")
+}
+
+export async function syncCampaignIssue(manifest: CampaignManifest, journal: CampaignJournal, config: PublisherConfig): Promise<boolean> {
+  if (journal.published) return true
+  const endpoint = `/api/issues/${config.multica.issueId}`
+  const comments = await campaignRequest(config, `${endpoint}/comments`) as CampaignComment[]
+  const marker = `<!-- eval-campaign:${manifest.id} -->`
+  const finals = comments.filter(comment => comment.content.includes(marker) &&
+    (/^<!-- eval-final:(full|partial) -->$/m.test(comment.content) || /^# (полный|частичный:.*)$/m.test(comment.content)))
+  const existing = finals.find(comment => !comment.content.includes(`<!-- eval-handoff:${manifest.id} -->`) &&
+    (/^<!-- eval-final:partial -->$/m.test(comment.content) || /^# частичный:/m.test(comment.content))) ??
+    finals.find(comment => comment.content.includes(`<!-- eval-handoff:${manifest.id} -->`)) ?? finals[0]
+  if (existing) {
+    const previous = JSON.stringify(journal)
+    journal.final = /^<!-- eval-final:partial -->$/m.test(existing.content) || /^# частичный:/m.test(existing.content) ? "partial" : "full"
+    journal.reportCommentId = existing.id
+    if (!existing.content.includes(`<!-- eval-handoff:${manifest.id} -->`) && journal.final === "partial") {
+      await finishCampaignIssue(manifest, journal, config)
+      return true
+    }
+    if (existing.content.includes(`<!-- eval-handoff:${manifest.id} -->`)) {
+      const observedAt = /^<!-- eval-snapshot-observed:(.+) -->$/m.exec(existing.content)?.[1]
+      if (observedAt && journal.final === "partial") {
+        if (!Number.isFinite(Date.parse(observedAt))) throw Error("CAMPAIGN_SNAPSHOT_IDENTITY")
+        journal.snapshotObservedAt = Date.parse(observedAt)
+        journal.cleanupVerified = false
+      }
+      journal.executorAgentId ??= /mention:\/\/agent\/([a-zA-Z0-9_-]+)/.exec(existing.content)?.[1]
+      const response = comments.find(comment => journal.executorAgentId && comment.id !== existing.id && comment.author_type === "agent" &&
+        comment.author_id === journal.executorAgentId && comment.parent_id === existing.id &&
+        comment.content.split("\n").includes(`<!-- eval-executor-final:${manifest.id} -->`))
+      journal.executorResponseCommentId = response?.id
+      if (JSON.stringify(journal) !== previous) await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+      await stopCampaignPeriodicWakeups(manifest, config)
+      return false
+    }
+  }
+  if (journal.final) return false
+  const blockerMarker = `<!-- eval-blocker:${manifest.id} -->`
+  const blocker = comments.find(comment => comment.content.includes(blockerMarker))
+  if (!journal.blocker && !blocker) return false
+  const content = `${blockerMarker}\n${journal.blocker ? `Блокер (${journal.blockerKind ?? "technical"}): ${journal.blocker}` : "Блокер устранён; кампания продолжает выполнение."}`
+  if (blocker?.content !== content) {
+    const preview = await campaignRequest(config, `${endpoint}/comments/trigger-preview`, "POST", { content,
+      ...(blocker ? { editing_comment_id: blocker.id } : {}) }) as { agents: { id: string }[] }
+    const saved = await campaignRequest(config, blocker ? `/api/comments/${blocker.id}` : `${endpoint}/comments`, blocker ? "PUT" : "POST", {
+      content, suppress_agent_ids: preview.agents.map(agent => agent.id),
+      ...(blocker ? { content_base: blocker.content, expected_revision: blocker.revision } : {}),
+    }) as { id: string }
+    const persisted = await campaignRequest(config, `${endpoint}/comments`) as { id: string; content: string }[]
+    if (!saved.id || !persisted.some(comment => comment.id === saved.id && comment.content === content)) throw Error("CAMPAIGN_BLOCKER_READBACK")
+    journal.blockerCommentId = saved.id
+  } else journal.blockerCommentId = blocker.id
+  await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+  const issue = await campaignRequest(config, endpoint) as { revision: number; status: string }
+  const status = journal.blocker && (journal.blockerKind ?? "technical") === "technical" ? "blocked" : "in_progress"
+  if (issue.status !== status) {
+    await campaignRequest(config, endpoint, "PUT", { status, expected_revision: issue.revision, suppress_run: true })
+    if ((await campaignRequest(config, endpoint) as { status: string }).status !== status) throw Error("CAMPAIGN_BLOCKER_READBACK")
+  }
+  return false
+}
+
+export async function publishCampaign(manifest: CampaignManifest, journal: CampaignJournal, config: PublisherConfig, now = Date.now()) {
+  if (journal.published) return
+  const hadError = journal.reportingError !== undefined
+  try {
+    await deliverCampaign(manifest, journal, config, now)
+  } catch (error) {
+    journal.reportingError = error instanceof Error && /^[A-Z][A-Z0-9_:]+$/.test(error.message) ? error.message : "FINAL_DELIVERY_FAILED"
+    await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+    const endpoint = `/api/issues/${config.multica.issueId}`
+    await campaignRequest(config, endpoint).then(async value => {
+      const issue = value as { revision: number; status: string }
+      if (issue.status !== "blocked") await campaignRequest(config, endpoint, "PUT", { status: "blocked", expected_revision: issue.revision, suppress_run: true })
+    }).catch(() => undefined)
+    throw error
+  }
+  if (!hadError) return
+  delete journal.reportingError
+  if (!journal.published) {
+    const endpoint = `/api/issues/${config.multica.issueId}`
+    const issue = await campaignRequest(config, endpoint) as { revision: number; status: string }
+    if (issue.status === "blocked") await campaignRequest(config, endpoint, "PUT", { status: "in_progress", expected_revision: issue.revision, suppress_run: true })
+  }
+  await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+}
+
+async function deliverCampaign(manifest: CampaignManifest, journal: CampaignJournal, config: PublisherConfig, now: number) {
+  if (journal.published) return
+  if (!journal.final) throw Error("CAMPAIGN_NOT_FINAL")
+  if (await syncCampaignIssue(manifest, journal, config)) return
+  if (journal.final === "full" && !journal.cleanupVerified) throw Error("CAMPAIGN_CLEANUP_UNCONFIRMED")
+  const marker = `<!-- eval-campaign:${manifest.id} -->`
+  const endpoint = `/api/issues/${config.multica.issueId}`
+  const comments = await campaignRequest(config, `${endpoint}/comments`) as CampaignComment[]
+  const existing = comments.find(comment => comment.content.includes(marker) && comment.content.includes(`<!-- eval-handoff:${manifest.id} -->`))
+  if (!journal.executorAgentId) {
+    const agents = await campaignRequest(config, "/api/agents") as { id: string; name: string }[]
+    const matching = agents.filter(agent => agent.name === manifest.executor)
+    if (matching.length !== 1) throw Error("CAMPAIGN_EXECUTOR_NOT_UNIQUE")
+    journal.executorAgentId = matching[0]!.id
+    await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+  }
+  const report = existing?.content ?? [marker, `<!-- eval-handoff:${manifest.id} -->`, `<!-- eval-final:${journal.final} -->`, `# ${journal.final === "full" ? "полный" : `частичный: ${journal.blocker ?? "предел кампании"}`}`, "",
+    `Кампания ${manifest.id}; сервер ${journal.server}.`, "",
+    `Очистка кампании: ${journal.cleanupVerified ? "подтверждена" : "не подтверждена"} (globalcleanupConfirmed=${journal.cleanupVerified === true}).`,
+    ...(journal.snapshotObservedAt === undefined ? [] : [`<!-- eval-snapshot-observed:${new Date(journal.snapshotObservedAt).toISOString()} -->`, `Последнее наблюдение: ${new Date(journal.snapshotObservedAt).toISOString()}. Текущее состояние ресурсов хоста не подтверждено.`]),
+    ...(journal.final === "partial" ? ["Частичный итог по последним известным данным. Непроверенные ресурсы остаются неподтверждёнными."] : []), "",
+    ...manifest.keys.map(key => {
+      const attempt = journal.attempts.find(item => item.counted && keyId(item.key) === keyId(key))
+      return `- ${keyId(key)}: ${attempt ? `${attempt.pass ? "PASS" : "FAIL"}; cleanup=${attempt.cleanupConfirmed ? "подтверждён" : "не подтверждён"}; ресурсы=${attempt.resources?.status ?? "incomplete"}; ${attempt.resources?.codes.join(", ") ?? "RESOURCE_EVIDENCE_MISSING"}` : "не измерено"}`
+    }), "", `Учтено ${journal.attempts.filter(item => item.counted).length}/${manifest.keys.length}; PASS ${journal.attempts.filter(item => item.counted && item.pass).length}; FAIL ${journal.attempts.filter(item => item.counted && item.pass === false).length}.`, "",
+    "Архив: доставка ожидается; её состояние проверяется отдельно от результата измерений.", "",
+    `[@${manifest.executor}](mention://agent/${journal.executorAgentId}), опубликуй отдельный финальный ответ на этот комментарий.`,
+    `Перед ответом проверь отсутствие собственного ответа с точным маркером <!-- eval-executor-final:${manifest.id} -->.`,
+    `Включи этот маркер отдельной строкой, итоговые числа, состояние cleanup и архива. Не запускай измерения повторно.`, ""].join("\n")
+  await Bun.write(path.join(config.stateDir, "report.md"), report)
+  const preview = existing ? { agents: [] } : await campaignRequest(config, `${endpoint}/comments/trigger-preview`, "POST", { content: report }) as { agents: { id: string }[] }
+  if (!existing && !preview.agents.some(agent => agent.id === journal.executorAgentId)) throw Error("CAMPAIGN_EXECUTOR_TRIGGER_MISSING")
+  const comment = existing ?? await campaignRequest(config, `${endpoint}/comments`, "POST", { content: report,
+    suppress_agent_ids: preview.agents.filter(agent => agent.id !== journal.executorAgentId).map(agent => agent.id) }) as { id: string }
+  if (!comment.id) throw Error("CAMPAIGN_REPORT_NOT_PERSISTED")
+  if (journal.reportCommentId !== comment.id) {
+    journal.reportCommentId = comment.id
+    await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+  }
+  const persisted = await campaignRequest(config, `${endpoint}/comments`) as { id: string; content: string }[]
+  if (!persisted.some(item => item.id === comment.id && item.content === report)) throw Error("CAMPAIGN_REPORT_READBACK")
+  await stopCampaignPeriodicWakeups(manifest, config)
+  const digest = (bytes: ArrayBuffer | string) => new Bun.CryptoHasher("sha256").update(bytes).digest("hex")
+  const archive = path.join(config.stateDir, `${manifest.id}-${digest(report)}.tar.gz`)
+  delete journal.attachmentId
+  if (!(await Bun.file(archive).exists())) {
+    await writeLeaseReceipt(path.join(config.stateDir, "manifest.json"), manifest)
+    const directories = await readdir(config.stateDir)
+    const files = ["manifest.json", "journal.json", "report.md", ...["batches", "verification"].filter(name => directories.includes(name))]
+    const temporary = `${archive}.${crypto.randomUUID()}.tmp`
+    await command(["tar", "--exclude=*.secret.json", "-czf", temporary, ...files], config.stateDir)
+    await rename(temporary, archive)
+  }
+  const archiveHash = digest(await Bun.file(archive).arrayBuffer())
+  const attachments = await campaignRequest(config, `${endpoint}/attachments`) as { id: string; filename: string }[]
+  const matching = attachments.filter(item => item.filename === path.basename(archive))
+  for (const attachment of matching) {
+    if (digest(await (await campaignFetch(config, `/api/attachments/${attachment.id}/download`)).arrayBuffer()) === archiveHash)
+      journal.attachmentId = attachment.id
+  }
+  if (!journal.attachmentId) {
+    const form = new FormData()
+    form.set("issue_id", config.multica.issueId)
+    form.set("file", Bun.file(archive), path.basename(archive))
+    const uploaded = await campaignRequest(config, "/api/upload-file", "POST", form) as { id: string }
+    if (!uploaded.id) throw Error("CAMPAIGN_ATTACHMENT_NOT_PERSISTED")
+    journal.attachmentId = uploaded.id
+    await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+  }
+  if (digest(await (await campaignFetch(config, `/api/attachments/${journal.attachmentId}/download`)).arrayBuffer()) !== archiveHash)
+    throw Error("CAMPAIGN_ATTACHMENT_READBACK")
+  const attached = await campaignRequest(config, `${endpoint}/comments`) as CampaignComment[]
+  const reportComment = attached.find(item => item.id === journal.reportCommentId)
+  if (!reportComment) throw Error("CAMPAIGN_REPORT_READBACK")
+  if (!reportComment.attachments?.some(item => item.id === journal.attachmentId)) {
+    const preview = await campaignRequest(config, `${endpoint}/comments/trigger-preview`, "POST", {
+      content: reportComment.content, editing_comment_id: reportComment.id }) as { agents: { id: string }[] }
+    await campaignRequest(config, `/api/comments/${reportComment.id}`, "PUT", { content: reportComment.content,
+      content_base: reportComment.content, expected_revision: reportComment.revision,
+      attachment_ids: [...reportComment.attachments?.map(item => item.id) ?? [], journal.attachmentId], suppress_agent_ids: preview.agents.map(agent => agent.id) })
+    const persisted = await campaignRequest(config, `${endpoint}/comments`) as CampaignComment[]
+    if (!persisted.some(item => item.id === reportComment.id && item.attachments?.some(attachment => attachment.id === journal.attachmentId)))
+      throw Error("CAMPAIGN_ATTACHMENT_READBACK")
+  }
+  await syncCampaignIssue(manifest, journal, config)
+  if (journal.executorResponseCommentId) {
+    await finishCampaignIssue(manifest, journal, config)
+    return
+  }
+  if (now - journal.lastProgressAt >= campaignLimits(manifest).noProgressMs) throw Error("CAMPAIGN_EXECUTOR_RESPONSE_MISSING")
+}
+
+async function verifyCampaignCleanup(manifest: CampaignManifest, journal: CampaignJournal,
+  config: PublisherConfig & { harnessRoot: string; verifyCommand: string[] }) {
+  const verificationDir = path.join(config.stateDir, "verification", crypto.randomUUID())
+  if (config.verifyCommand.some(value => value.includes("{verificationDir}"))) {
+    await mkdir(path.dirname(verificationDir), { recursive: true, mode: 0o700 })
+    journal.verificationDir = verificationDir
+  }
+  journal.verificationAttempted = true
+  await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+  const verified = await command(config.verifyCommand.map(value => value.replaceAll("{stateDir}", config.stateDir)
+    .replaceAll("{parallel}", String(manifest.parallel)).replaceAll("{verificationDir}", verificationDir)), config.harnessRoot).then(() => true, () => false)
+  journal.cleanupVerified = verified
+  if (verified && journal.verificationDir) journal.attempts = journal.attempts.map(attempt => attempt.cleanupConfirmed
+    ? attempt : { ...attempt, cleanupVerification: journal.verificationDir })
+  await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+  return verified
+}
+
+export async function finalizeCampaign(manifest: CampaignManifest, journal: CampaignJournal,
+  config: PublisherConfig & { harnessRoot: string; verifyCommand: string[] }, now = Date.now()) {
+  const synced = await syncCampaignIssue(manifest, journal, config).catch(() => undefined)
+  if (synced === undefined) journal.reportingError = "MULTICA_UNAVAILABLE"
+  if (synced !== undefined && journal.reportingError === "MULTICA_UNAVAILABLE") delete journal.reportingError
+  if (synced) return journal
+  if (!journal.final && now - journal.lastProgressAt >= campaignLimits(manifest).noProgressMs) {
+    journal.final = "partial"
+    journal.blocker = `NO_PROGRESS_LIMIT${journal.blocker ? `:${journal.blocker}` : ""}`
+  }
+  if (!journal.final) return journal
+  if (!journal.cleanupVerified && !journal.verificationAttempted && journal.snapshotObservedAt === undefined) {
+    const verified = await verifyCampaignCleanup(manifest, journal, config)
+    if (!verified) {
+      journal.blocker = journal.final === "partial" ? journal.blocker ?? "CLEANUP_UNCONFIRMED" : "CLEANUP_UNCONFIRMED"
+      journal.blockerKind = "technical"
+    }
+    await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+  }
+  if (journal.final === "full" && !journal.cleanupVerified) {
+    delete journal.final
+    journal.blocker = "CLEANUP_UNCONFIRMED"
+    journal.blockerKind = "technical"
+    await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+    return journal
+  }
+  if (synced === undefined) {
+    await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+    return journal
+  }
+  await publishCampaign(manifest, journal, config, now)
+  return journal
+}
+
+export async function prepareCampaignBatch(manifest: CampaignManifest, journal: CampaignJournal, keys: CampaignKey[], invocation: string,
+  config: Pick<CampaignServerConfig, "harnessRoot" | "slotsFile" | "batchEnvFile" | "resourceBudgetFile" | "corpora" | "controllerLock"> & { stateDir: string }) {
+  if (journal.repairing || journal.final || journal.blocker || journal.executor !== manifest.executor) throw Error("CAMPAIGN_DISPATCH_BLOCKED")
+  const previous = journal.batches.at(-1)
+  const batch = previous && !previous.accounted ? previous : {
+    id: `${manifest.id}-${crypto.randomUUID()}`, keys, invocationBefore: invocation, started: false,
+    resultsDir: path.join(config.stateDir, "batches", String(journal.batches.length + 1)),
+  }
+  if (batch !== previous) {
+    journal.batches.push(batch)
+    delete journal.cleanupVerified
+    delete journal.verificationAttempted
+    delete journal.verificationDir
+  }
+  await mkdir(batch.resultsDir, { recursive: true, mode: 0o700 })
+  await writeLeaseReceipt(path.join(config.stateDir, "journal.json"), journal)
+  const corpus = config.corpora[batch.keys[0]!.corpus]
+  if (!corpus) throw Error("CAMPAIGN_CORPUS_UNKNOWN")
+  const entrypoint = path.resolve(config.harnessRoot, corpus.entrypoint), tasks = path.resolve(config.harnessRoot, corpus.tasks)
+  if ([entrypoint, tasks].some(file => !file.startsWith(config.harnessRoot + path.sep))) throw Error("CAMPAIGN_CORPUS_PATH")
+  const environment = { ...campaignEnvironment(manifest, config), EVAL_ENTRYPOINT: entrypoint, EVAL_TASKS: tasks,
+    EVAL_ONLY: batch.keys.map(key => key.taskId).join(","), EVAL_LABEL: batch.id, EVAL_RESULTS_DIR: batch.resultsDir,
+    EVAL_CAMPAIGN_CONSECUTIVE_ERRORS: journal.consecutiveErrors, EVAL_CAMPAIGN_ERROR_LIMIT: campaignLimits(manifest).consecutiveErrors,
+    EVAL_CAMPAIGN_LAST_PROGRESS_AT: journal.lastProgressAt, EVAL_CAMPAIGN_NO_PROGRESS_MS: campaignLimits(manifest).noProgressMs,
+    EVAL_CAMPAIGN_JOURNAL: path.join(config.stateDir, "journal.json"), EVAL_CAMPAIGN_LOCK: config.controllerLock,
+    EVAL_CAMPAIGN_MANIFEST_HASH: journal.manifestHash }
+  const temporary = `${config.batchEnvFile}.${crypto.randomUUID()}.tmp`
+  await Bun.write(temporary, Object.entries(environment).map(([key, value]) => `${key}=${JSON.stringify(String(value))}`).join("\n") + "\n", { mode: 0o600 })
+  await rename(temporary, config.batchEnvFile)
+  return batch
+}
+
+async function requireCampaignTaskPins(manifest: CampaignManifest, key: CampaignKey, runDir: string,
+  context: Pick<CampaignServerConfig, "harnessRoot" | "corpora" | "corpusPinsFile">) {
+  const corpus = context.corpora[key.corpus]
+  if (!corpus) throw Error("CAMPAIGN_CORPUS_UNKNOWN")
+  const tasksDir = path.resolve(context.harnessRoot, corpus.tasks)
+  if (!tasksDir.startsWith(path.resolve(context.harnessRoot) + path.sep)) throw Error("CAMPAIGN_CORPUS_PATH")
+  const pins = await readLeaseReceipt(context.corpusPinsFile) as { groups: { group: string; tasks: { id: string; agentInputsHash: string; rubricHash: string }[] }[] }
+  const pinned = pins.groups.find(group => group.group === key.corpus)?.tasks.find(task => task.id === key.taskId)
+  const tasks = await loadTasks(tasksDir, [key.taskId])
+  if (!pinned || pinned.agentInputsHash !== await agentInputsHash(tasks) || pinned.rubricHash !== await rubricHash(tasks))
+    throw Error("CAMPAIGN_CORPUS_PINS_CHANGED")
+  const saved = await Bun.file(path.join(runDir, "config.json")).json()
+  for (const [name, value] of [["EVAL_CLI_MODE", saved.agent?.cliMode], ["EVAL_CLI_BIN", saved.agent?.cliBin],
+    ["EVAL_AGENT_MODEL", saved.agent?.model], ["EVAL_AGENT_VARIANT", saved.agent?.variant]] as const)
+    if (manifest.pins[name] !== undefined && manifest.pins[name] !== value) throw Error("CAMPAIGN_EXPERIMENT_PINS_CHANGED")
+  return { tasksDir, saved }
+}
+
+export async function campaignTick(manifest: CampaignManifest, previous: CampaignJournal, unit: UnitState | undefined, now = Date.now(),
+  context?: Pick<CampaignServerConfig, "harnessRoot" | "corpora" | "slotsFile" | "corpusPinsFile">) {
+  const journal: CampaignJournal = structuredClone(previous)
+  if (journal.campaignId !== manifest.id || journal.server !== manifest.server) throw Error("CAMPAIGN_OWNERSHIP_MISMATCH")
+  if (journal.final === "full" && journal.cleanupVerified) return { journal, action: "finalize" as const, next: [] }
+  if (!unit) {
+    journal.blocker ??= "BATCH_STATE_UNKNOWN"
+    if (journal.final === "partial" || now - journal.lastProgressAt >= campaignLimits(manifest).noProgressMs) {
+      journal.final = "partial"
+      return { journal, action: "finalize" as const, next: [] }
+    }
+    delete journal.final
+    return { journal, action: "blocked" as const, next: [] }
+  }
+  if (journal.blocker === "BATCH_STATE_UNKNOWN") { delete journal.blocker; delete journal.blockerKind }
+  if (journal.final) {
+    if (journal.final === "full" && !journal.cleanupVerified && now - journal.lastProgressAt >= campaignLimits(manifest).noProgressMs) {
+      journal.final = "partial"
+      journal.blocker ??= "NO_PROGRESS_LIMIT"
+    }
+    return { journal, action: "finalize" as const, next: [] }
+  }
+  const batch = journal.batches.at(-1)
+  let pending: CampaignKey[] | undefined
+  let pendingJudge: { key: CampaignKey; resultFile: string } | undefined
+  if (unit.active && (!batch || batch.accounted)) {
+    journal.blocker = "UNOWNED_BATCH_ACTIVE"
+    if (now - journal.lastProgressAt >= campaignLimits(manifest).noProgressMs) {
+      journal.final = "partial"
+      return { journal, action: "finalize" as const, next: [] }
+    }
+    return { journal, action: "blocked" as const, next: [] }
+  }
+  const completions = new Map<string, { completedAt?: number; completionOrder?: number; quality?: boolean }>()
+  try {
+    if (batch && !batch.accounted) {
+      const runs = await readdir(batch.resultsDir).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return []
+        throw error
+      })
+      let startedAttempts = 0, admissionConfirmed = true
+      for (const run of runs) {
+        const runDir = path.join(batch.resultsDir, run)
+        try {
+          const saved = await Bun.file(path.join(runDir, "config.json")).json() as { commandJournal?: string }
+          if (typeof saved.commandJournal !== "string" || !path.isAbsolute(saved.commandJournal)) throw Error("ADMISSION_STATE_UNCONFIRMED")
+          const native = await readLeaseReceipt(saved.commandJournal) as { version: number; kind: string; runDir: string;
+            commandId?: string; phase?: string; slotIds?: unknown[]; unitBinding?: { invocation?: string };
+            attempts?: { taskId: string; attempt: number; purpose: string; completedAt?: number; completionOrder?: number; quality?: boolean }[]; admissionBlocker?: string }
+          // The old initial receipt precedes every write-ahead admission; its writer must have exited.
+          const admissions = !unit.active && native.attempts === undefined && native.phase === "cli_admitted" &&
+            /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(native.commandId ?? "") &&
+            path.basename(saved.commandJournal) === `run-command-${native.commandId}.json` &&
+            Array.isArray(native.slotIds) && native.slotIds.length === manifest.parallel && new Set(native.slotIds).size === native.slotIds.length &&
+            native.slotIds.every(id => typeof id === "string" && /^[a-z0-9][a-z0-9_-]{0,63}$/.test(id)) &&
+            /^[a-f0-9]{32}$/.test(unit.invocation) && native.unitBinding?.invocation === unit.invocation ? [] : native.attempts
+          if (native.version !== 2 || native.kind !== "unactivated-preparation" || native.runDir !== runDir || !Array.isArray(admissions) ||
+            admissions.some(attempt => !["preflight", "measurement"].includes(attempt.purpose) || attempt.attempt !== 1 ||
+              attempt.purpose === "measurement" && !batch.keys.some(key => key.taskId === attempt.taskId))) throw Error("ADMISSION_STATE_UNCONFIRMED")
+          startedAttempts += admissions.filter(attempt => attempt.purpose === "measurement").length
+          for (const attempt of admissions.filter(attempt => attempt.purpose === "measurement"))
+            completions.set(path.join(runDir, attempt.taskId, "1/result.json"), attempt)
+          if (native.admissionBlocker) journal.blocker ??= native.admissionBlocker
+        } catch { admissionConfirmed = false; if (!unit.active) journal.blocker ??= "ADMISSION_STATE_UNCONFIRMED" }
+      }
+      if (!unit.active) {
+        if (admissionConfirmed) {
+          if (startedAttempts < (batch.startedAttempts ?? 0)) { admissionConfirmed = false; journal.blocker ??= "ADMISSION_STATE_UNCONFIRMED" }
+          else batch.startedAttempts = startedAttempts
+        }
+        const totalStarted = journal.batches.reduce((total, item) => total + (item.startedAttempts ?? 0), 0)
+        if (totalStarted < (journal.startedAttempts ?? 0)) { admissionConfirmed = false; journal.blocker ??= "ADMISSION_STATE_UNCONFIRMED" }
+        else journal.startedAttempts = totalStarted
+      }
+      const probes = unit.active ? [] : await Promise.all(runs.map(async run => {
+        const file = Bun.file(path.join(batch.resultsDir, run, "request-preflight.json"))
+        return await file.exists() ? file.json() as Promise<{ code: string | null }> : null
+      }))
+      let assessmentPending = false
+      for (const key of batch.keys) {
+        for (const run of runs) {
+          const resultFile = path.join(batch.resultsDir, run, key.taskId, "1/result.json")
+          const completion = completions.get(resultFile)
+          if (unit.active && !Number.isSafeInteger(completion?.completedAt)) continue
+          if (!(await Bun.file(resultFile).exists())) continue
+          const result = await Bun.file(resultFile).json() as AttemptResult
+          if (result.task_id !== key.taskId || result.attempt !== 1) throw Error("CAMPAIGN_RESULT_IDENTITY")
+          const cleanup = await Bun.file(path.join(path.dirname(resultFile), "cleanup.json")).json().catch(() => null)
+          const acceptance = await Bun.file(path.join(batch.resultsDir, run, "resource-acceptance.json")).json().catch((error: NodeJS.ErrnoException) => {
+            if (error.code === "ENOENT") return null
+            throw error
+          }) as { checks: { status: string; codes: string[] }[] } | null
+          if (acceptance && (!Array.isArray(acceptance.checks) || acceptance.checks.some(check => !["passed", "failed", "incomplete"].includes(check.status) ||
+            !Array.isArray(check.codes) || check.codes.some(code => typeof code !== "string")))) throw Error("CAMPAIGN_RESOURCE_EVIDENCE_INVALID")
+          const resources = acceptance ? {
+            status: acceptance.checks.some(check => check.status === "failed") ? "failed" : acceptance.checks.some(check => check.status === "incomplete") || !acceptance.checks.length ? "incomplete" : "passed",
+            codes: acceptance.checks.flatMap(check => check.codes),
+          } : { status: "incomplete", codes: ["RESOURCE_EVIDENCE_MISSING"] }
+          let node: Awaited<ReturnType<typeof assessNodeAttempt>> | undefined
+          if (key.corpus === "node") {
+            if (!context) throw Error("CAMPAIGN_NODE_CONTEXT_REQUIRED")
+            const { tasksDir } = await requireCampaignTaskPins(manifest, key, path.join(batch.resultsDir, run), context)
+            const slot = (await loadSlots(context.slotsFile, manifest.parallel)).slots.find(slot => slot.id === result.slot_id)
+            if (!slot) throw Error("CAMPAIGN_NODE_SLOT_UNKNOWN")
+            node = await assessNodeAttempt({ runDir: path.join(batch.resultsDir, run), taskId: key.taskId, tasksDir, slot })
+            if (node.code === 2 && ["completed", "failed", "timeout", "no_artifact"].includes(result.status) &&
+              !result.harness_error && result.failure_kind !== "provider") {
+              assessmentPending = true
+              journal.blocker ??= "NODE_ASSESSMENT_UNCONFIRMED"
+            }
+          }
+          const awaitingJudge = key.corpus !== "node" && ["completed", "failed", "timeout"].includes(result.status) &&
+            !result.harness_error && result.failure_kind !== "provider" && Boolean(result.package_path) && ["skipped", "error"].includes(result.judge_status)
+          if (awaitingJudge) {
+            assessmentPending = true
+            pendingJudge ??= { key, resultFile }
+          }
+          const counted = resources.status !== "failed" && (key.corpus === "node" ? node?.code !== undefined && node.code !== 2 : isQualityResult(result))
+          const completedAt = awaitingJudge && result.judge_status === "skipped" ? undefined
+            : completion && (key.corpus === "node" || completion.quality === counted) && Number.isSafeInteger(completion.completedAt)
+              ? Math.min(now, completion.completedAt!) : unit.active ? undefined : Math.min(now, Math.floor((await stat(resultFile)).mtimeMs))
+          const entry = { key, resultFile, status: result.status, counted, pass: node && node.code !== 2 ? node.verdict === "PASS" : result.pass, score: result.score, resources,
+            completedAt,
+            cleanupConfirmed: !awaitingJudge && !result.judge_cleanup_unconfirmed && result.environment_cleanup?.status === "confirmed" &&
+              cleanup?.processes?.status === "confirmed" && cleanup?.nextAdmissionAllowed === true }
+          const index = journal.attempts.findIndex(attempt => attempt.resultFile === resultFile)
+          if (index >= 0) {
+            journal.attempts[index] = { ...entry, cleanupVerification: journal.attempts[index]!.cleanupVerification }
+          }
+          if (index < 0) journal.attempts.push(entry)
+        }
+      }
+      if (!unit.active && !batch.started && unit.invocation === batch.invocationBefore && !probes.some(probe => probe) &&
+        !journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep)))
+        pending = batch.keys
+      if (!unit.active && !pending) batch.accounted = admissionConfirmed && !assessmentPending
+      if (!unit.active && probes.some(probe => probe?.code === null)) journal.emptyPreflights = 0
+      if (!unit.active && !pending && !batch.keys.every(key => journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep) && keyId(attempt.key) === keyId(key)))) {
+        const failure = probes.find(probe => probe && ["REQUEST_PREFLIGHT_EMPTY", "REQUEST_PREFLIGHT_FAILED"].includes(probe.code ?? ""))
+        if (failure && !journal.attempts.some(attempt => attempt.resultFile.startsWith(batch.resultsDir + path.sep))) {
+          journal.consecutiveErrors++
+          journal.emptyPreflights = failure.code === "REQUEST_PREFLIGHT_EMPTY" ? (journal.emptyPreflights ?? 0) + 1 : 0
+          if (journal.emptyPreflights >= 3 || journal.consecutiveErrors >= (manifest.limits?.consecutiveErrors ?? 3)) journal.blocker = failure.code!
+        } else journal.blocker ??= "BATCH_RESULT_MISSING"
+      }
+    }
+  } catch {
+    journal.blocker = "CAMPAIGN_RECONCILIATION_FAILED"
+    journal.blockerKind = "technical"
+  }
+  const completed = journal.attempts.filter(entry => batch && entry.resultFile.startsWith(batch.resultsDir + path.sep) && entry.completedAt !== undefined).map(entry => {
+    const prior = previous.attempts.find(attempt => attempt.resultFile === entry.resultFile)
+    return { entry, order: completions.get(entry.resultFile)?.completionOrder, priorCounted: prior?.completedAt === undefined ? undefined : prior.counted }
+  }).sort((a, b) => a.entry.completedAt! - b.entry.completedAt! || (a.order ?? 0) - (b.order ?? 0))
+  const recovered = completed.some(item => item.priorCounted === false && item.entry.counted)
+  if (recovered) {
+    const lastQuality = completed.findLastIndex(item => item.priorCounted === true)
+    const priorErrors = completed.slice(lastQuality + 1).filter(item => item.priorCounted === false).length
+    journal.consecutiveErrors = Math.max(0, journal.consecutiveErrors - priorErrors)
+  }
+  for (const { entry } of recovered ? completed : completed.filter(item => item.priorCounted === undefined)) {
+    journal.consecutiveErrors = entry.counted ? 0 : journal.consecutiveErrors + 1
+    if (entry.counted) journal.lastProgressAt = Math.max(journal.lastProgressAt, entry.completedAt!)
+    if (journal.consecutiveErrors >= campaignLimits(manifest).consecutiveErrors) journal.blocker ??= "CONSECUTIVE_INFRASTRUCTURE_ERRORS"
+  }
+  if (journal.blocker?.startsWith("NO_PROGRESS_LIMIT") || now - journal.lastProgressAt >= campaignLimits(manifest).noProgressMs) {
+    journal.final = "partial"
+    if (!journal.blocker?.startsWith("NO_PROGRESS_LIMIT")) journal.blocker = `NO_PROGRESS_LIMIT${journal.blocker ? `:${journal.blocker}` : ""}`
+    if (unit.active) journal.cleanupVerified = false
+    return { journal, action: "finalize" as const, next: [] }
+  }
+  if (unit.active) return { journal, action: "wait" as const, next: [] }
+  const missing = manifest.keys.filter(key => !journal.attempts.some(attempt => attempt.counted && keyId(attempt.key) === keyId(key)))
+  if (pendingJudge) return journal.repairing || journal.blocker
+    ? { journal, action: "blocked" as const, next: [] }
+    : { journal, action: "judge" as const, next: [], pendingJudge }
+  if (missing.length && (journal.startedAttempts ?? 0) >= campaignLimits(manifest).maxStartedAttempts) {
+    journal.final = "partial"
+    journal.blocker = "ATTEMPT_BUDGET_EXHAUSTED"
+    return { journal, action: "finalize" as const, next: [] }
+  }
+  if (journal.attempts.some(attempt => !attempt.cleanupConfirmed && !attempt.cleanupVerification) && !journal.cleanupVerified) journal.blocker ??= "CLEANUP_UNCONFIRMED"
+  if (journal.repairing || journal.blocker) return { journal, action: "blocked" as const, next: [] }
+  if (pending) return { journal, action: "launch" as const, next: pending }
+  if (!missing.length) {
+    journal.final = "full"
+    return { journal, action: "finalize" as const, next: [] }
+  }
+  const first = missing[0]!
+  const next = missing.filter(key => key.corpus === first.corpus && key.round === first.round)
+    .slice(0, Math.min(manifest.batchSize, campaignLimits(manifest).maxStartedAttempts - (journal.startedAttempts ?? 0)))
+  return { journal, action: "start" as const, next }
+}
+
+export type CampaignServerConfig = {
+  server: string; stateRoot: string; harnessRoot: string; controllerLock: string; batchUnit: string; batchEnvFile: string
+  acceptedHarness: string; slotsFile: string; experimentPinsFile: string; corpusPinsFile: string
+  resourceBudgetFile: string; preflightCommand: string[]; verifyCommand: string[]
+  corpora: Record<string, { entrypoint: string; tasks: string }>
+  multica: { url: string; workspace: string; tokenFile: string }
+}
+
+async function prepareGeneration(manifest: CampaignManifest, config: CampaignServerConfig) {
+  const { prepareEnvironment, verifyEnvironment } = await import("../src/environment-preparation")
+  const { createPair, readServerObservation, verifyParallelPair } = await import("../src/parallel-pair")
+  const { parseStableConfiguration } = await import("../src/user-environment")
+  const { releaseClosedEnvironment } = await import("../src/startup-reconciliation")
+  const preparedConfig = loadConfig(["--skip-judge", "--parallel", String(manifest.parallel)],
+    { ...process.env, ...campaignEnvironment(manifest, config) })
+  const pins = await readLeaseReceipt(config.experimentPinsFile) as { cli: string; cliBinarySha256: string }
+  if (preparedConfig.agent.cliMode !== "binary" || typeof pins?.cli !== "string" || !path.isAbsolute(pins.cli) || preparedConfig.agent.cliBin !== pins.cli)
+    throw Error("CAMPAIGN_CLI_PIN_CHANGED")
+  if (!/^[a-f0-9]{64}$/.test(pins.cliBinarySha256) ||
+    new Bun.CryptoHasher("sha256").update(await Bun.file(pins.cli).bytes()).digest("hex") !== pins.cliBinarySha256)
+    throw Error("CAMPAIGN_CLI_PIN_CHANGED")
+  if (config.verifyCommand.filter(value => value === config.slotsFile).length !== 1) throw Error("CAMPAIGN_VERIFY_ARGUMENT_AMBIGUOUS")
+  const file = await loadSlots(config.slotsFile, manifest.parallel)
+  const preparations = await Promise.all(file.slots.map(async slot => {
+    const prepared = await readLeaseReceipt(path.join(file.controller.stateDir, `prepare-${slot.id}.json`)) as {
+      version: number; kind: string; state: string; slotId: string; username: string; endpoint: string; identity: ServerIdentity
+      stableConfiguration?: unknown
+    }
+    if (prepared?.version !== 2 || prepared.kind !== "user-preparation" || prepared.state !== "staged" ||
+      prepared.slotId !== slot.id || prepared.username !== slot.username || prepared.endpoint !== file.server.url ||
+      !prepared.identity || ["containerId", "studioContainerId", "serverEpoch", "configurationHash"].some(key =>
+        !/^[a-f0-9]{64}$/.test(prepared.identity[key as keyof ServerIdentity])) ||
+      !Number.isFinite(Date.parse(prepared.identity.startedAt)) || !Number.isFinite(Date.parse(prepared.identity.studioStartedAt)))
+      throw Error("CAMPAIGN_PREPARATION_UNCONFIRMED")
+    return { identity: prepared.identity, stableConfiguration: parseStableConfiguration(prepared.stableConfiguration) }
+  }))
+  const old = preparations[0]!.identity, stableConfiguration = preparations[0]!.stableConfiguration
+  if (preparations.some(prepared => JSON.stringify(prepared.identity) !== JSON.stringify(old) ||
+    prepared.stableConfiguration?.hash !== stableConfiguration?.hash)) throw Error("CAMPAIGN_PREPARATION_UNCONFIRMED")
+  const pairFile = path.join(file.controller.stateDir, "pair.json")
+  const pair = await readLeaseReceipt(pairFile) as { version: number; kind: string; phase: string; purpose: "acceptance" | "research";
+    nonce: string; resources: { server: string; studio: string; network: string } }
+  if (pair?.version !== 2 || pair.kind !== "pair-provision" || pair.phase !== "ready" ||
+    !["acceptance", "research"].includes(pair.purpose) || pair.resources?.server !== old.containerId ||
+    pair.resources.studio !== old.studioContainerId || !/^[a-f0-9]{64}$/.test(pair.resources.network)) throw Error("CAMPAIGN_PAIR_UNCONFIRMED")
+  await requireReleasedReservation(await readResourceReservation({ key: `judge:${file.judge.codexHome}` }))
+  const reservation = await readResourceReservation({ key: `server:${old.containerId}` })
+  if (!reservation || !["retained", "released"].includes(reservation.state)) throw Error("CAMPAIGN_GENERATION_OWNERSHIP_UNCONFIRMED")
+  const containers = JSON.parse(await command(["docker", "inspect", "--type", "container", old.containerId, old.studioContainerId], config.harnessRoot)) as
+    { Id: string; State: { Running: boolean } }[]
+  if (!Array.isArray(containers) || containers.length !== 2 || containers.some((container, index) =>
+    container?.Id !== [old.containerId, old.studioContainerId][index] || typeof container.State?.Running !== "boolean"))
+    throw Error("CAMPAIGN_PAIR_UNCONFIRMED")
+  const observation = containers.every(container => container.State.Running) ? await readServerObservation(file) : undefined
+  const observed = observation?.identity
+  if (observed) await verifyParallelPair(file, observed)
+  const retainedPreparation = reservation.state === "retained" && observed && JSON.stringify(reservation.identity) === JSON.stringify(observed) &&
+    path.dirname(reservation.journal) === path.join(config.stateRoot, "environment-generations", observed.serverEpoch, "state")
+  if (!retainedPreparation) {
+    if (reservation.state === "retained") {
+      if (JSON.stringify(reservation.identity) !== JSON.stringify(old)) throw Error("CAMPAIGN_GENERATION_OWNERSHIP_UNCONFIRMED")
+      await releaseClosedEnvironment(file, old)
+    }
+    await requireReleasedReservation(await readResourceReservation({ key: `server:${old.containerId}` }))
+    for (const slot of file.slots)
+      await requireReleasedReservation(await readResourceReservation({ key: `profile:${slot.profileDir}` }))
+    if (!reservation.identity) {
+      const owner = await readLeaseReceipt(reservation.journal) as { kind: string; pairFile: string; nonce: string; action: string }
+      if (owner?.kind !== "pair-command" || owner.pairFile !== pairFile || owner.nonce !== pair.nonce || owner.action !== "create")
+        throw Error("CAMPAIGN_GENERATION_OWNERSHIP_UNCONFIRMED")
+    }
+  }
+  const bootstrapped = observed ?? (await createPair(file, { purpose: pair.purpose,
+    out: path.join(file.controller.stateDir, "pair-bootstrap"), lockRoot: globalLockRoot })).identity
+  const current = observation ?? await readServerObservation(file)
+  const identity = current.identity
+  if (JSON.stringify(identity) !== JSON.stringify(bootstrapped)) throw Error("CAMPAIGN_GENERATION_IDENTITY_CHANGED")
+  if (identity.containerId !== old.containerId || identity.studioContainerId !== old.studioContainerId ||
+    (stableConfiguration ? !current.compatibleStableHashes.includes(stableConfiguration.hash) : identity.configurationHash !== old.configurationHash))
+    throw Error("CAMPAIGN_GENERATION_IDENTITY_CHANGED")
+  const root = path.join(config.stateRoot, "environment-generations", identity.serverEpoch)
+  const slotsFile = path.join(root, "slots.json"), resourceBudgetFile = path.join(root, "budget.json")
+  const selected = config.slotsFile === slotsFile
+  if (selected && config.resourceBudgetFile !== resourceBudgetFile) throw Error("CAMPAIGN_GENERATION_CONFIG_CONFLICT")
+  if (!selected && identity.serverEpoch === old.serverEpoch) throw Error("CAMPAIGN_GENERATION_UNCHANGED")
+  const nextFile = selected ? file : { ...file, controller: { ...file.controller, stateDir: path.join(root, "state") },
+    slots: file.slots.map(slot => ({ ...slot, username: "eval-" + new Bun.CryptoHasher("sha256")
+      .update(identity.serverEpoch + ":" + slot.id).digest("hex").slice(0, 48) })) }
+  const bounds = await readLeaseReceipt(config.resourceBudgetFile)
+  if (!Array.isArray(bounds) || !bounds.length || !bounds.every(validResourceBound)) throw Error("RESOURCE_BUDGET_INVALID")
+  const budget = bounds.map(bound => ({ ...bound, scope: bound.scope === `filesystem:${file.controller.stateDir}`
+    ? `filesystem:${nextFile.controller.stateDir}` : [
+      { id: old.containerId, before: old.startedAt, after: identity.startedAt },
+      { id: old.studioContainerId, before: old.studioStartedAt, after: identity.studioStartedAt },
+    ].reduce((scope, container) => scope === `container:${container.id}:${container.before}` || scope.startsWith(`container:${container.id}:${container.before}:`)
+      ? `container:${container.id}:${container.after}` + scope.slice(`container:${container.id}:${container.before}`.length) : scope, bound.scope) }))
+  requireResourceBudgetScopes(budget, { paths: [nextFile.controller.stateDir, ...nextFile.slots.flatMap(slot => [slot.profileDir, slot.workspaceRoot, slot.historyDir])],
+    containers: [{ role: "server", id: identity.containerId, startedAt: identity.startedAt },
+      { role: "studio", id: identity.studioContainerId, startedAt: identity.studioStartedAt }] })
+  if (!selected) {
+    await mkdir(nextFile.controller.stateDir, { recursive: true, mode: 0o700 })
+    await stageGenerationFile(path.join(nextFile.controller.stateDir, "pair.json"), await Bun.file(pairFile).text())
+    await stageGenerationFile(slotsFile, JSON.stringify(nextFile))
+    await stageGenerationFile(resourceBudgetFile, JSON.stringify(budget))
+    await prepareEnvironment({ slotsFile, parallel: file.slots.length, previousSlotsFile: config.slotsFile,
+      config: { ...preparedConfig, parallel: file.slots.length, slotsFile, resourceBudgetFile } })
+  }
+  const verified = await verifyEnvironment({ slotsFile, parallel: file.slots.length,
+    config: { ...preparedConfig, parallel: file.slots.length, slotsFile, resourceBudgetFile } })
+  if (!verified.ready || JSON.stringify(verified.identity) !== JSON.stringify(identity)) throw Error("CAMPAIGN_GENERATION_NOT_READY")
+  return { file: nextFile, identity, next: { ...config, slotsFile, resourceBudgetFile,
+    verifyCommand: config.verifyCommand.map(value => value === config.slotsFile ? slotsFile : value) } }
+}
+
+async function requireReleasedReservation(reservation: Reservation | undefined) {
+  if (reservation?.state !== "released") throw Error("CAMPAIGN_GENERATION_RELEASE_UNCONFIRMED")
+  const proof = await readLeaseReceipt(reservation.releaseEvidence!.path)
+  if (new Bun.CryptoHasher("sha256").update(JSON.stringify(proof)).digest("hex") !== reservation.releaseEvidence!.sha256)
+    throw Error("CAMPAIGN_GENERATION_RELEASE_UNCONFIRMED")
+}
+
+async function stageGenerationFile(file: string, content: string) {
+  const existing = await readLeaseReceipt(file).then(() => Bun.file(file).text()).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined
+    throw error
+  })
+  if (existing !== undefined) {
+    if (existing !== content) throw Error("CAMPAIGN_GENERATION_CONFIG_CONFLICT")
+    return
+  }
+  const temporary = `${file}.${crypto.randomUUID()}.tmp`
+  const handle = await open(temporary, "wx", 0o600)
+  try { await handle.writeFile(content); await handle.sync() } finally { await handle.close() }
+  await rename(temporary, file)
+  const directory = await open(path.dirname(file), "r")
+  try { await directory.sync() } finally { await directory.close() }
+}
+
+async function command(args: string[], cwd: string) {
+  const child = Bun.spawn(args, { cwd, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
+  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  if (code !== 0) {
+    if (stderr.trim()) console.error(stderr.trim())
+    throw Error(`CAMPAIGN_COMMAND_FAILED:${path.basename(args[0]!)}:${code}`)
+  }
+  return stdout
+}
+
+async function observeUnit(unit: string, cwd: string): Promise<UnitState> {
+  const text = await command(["systemctl", "show", unit, "--property=ActiveState,InvocationID,ExecMainStatus"], cwd)
+  const fields = Object.fromEntries(text.trim().split("\n").map(line => line.split("=")))
+  if (!fields.ActiveState) throw Error("BATCH_STATE_UNKNOWN")
+  return { active: ["active", "activating", "deactivating", "reloading"].includes(fields.ActiveState),
+    invocation: fields.InvocationID ?? "", exitCode: Number(fields.ExecMainStatus) }
+}
+
+export async function controlCampaign(manifestFile: string, serverFile: string, operation: "reserve" | "repair" | "resume" | "prepare-generation" | "cancel-unused-verify", repairer?: string) {
+  return runCampaign(manifestFile, serverFile, true, operation, repairer)
+}
+
+export async function runCampaign(manifestFile: string, serverFile: string, once = false, operation?: string, repairer?: string, initialProgressAt?: string) {
+  if (initialProgressAt !== undefined && (operation !== "reserve" || !Number.isSafeInteger(Date.parse(initialProgressAt)) ||
+    Date.parse(initialProgressAt) < 0 || Date.parse(initialProgressAt) > Date.now())) throw Error("CAMPAIGN_INITIAL_PROGRESS_INVALID")
+  if (operation !== undefined && !["reserve", "repair", "resume", "prepare-generation", "cancel-unused-verify"].includes(operation)) throw Error("CAMPAIGN_OPERATION_INVALID")
+  const manifest = await readLeaseReceipt(manifestFile) as CampaignManifest
+  const config = await readLeaseReceipt(serverFile) as CampaignServerConfig
+  const safeId = (value: unknown) => typeof value === "string" && /^[a-zA-Z0-9_-]+$/.test(value)
+  if (operation && operation !== "reserve" && !safeId(repairer)) throw Error("CAMPAIGN_REPAIRER_REQUIRED")
+  if (!safeId(manifest.id) || manifest.server !== config.server || !manifest.executor || !manifest.keys?.length ||
+    !Number.isSafeInteger(manifest.parallel) || manifest.parallel < 1 || !Number.isSafeInteger(manifest.batchSize) || manifest.batchSize < 1 ||
+    manifest.keys.some(key => !safeId(key.corpus) || !safeId(key.taskId) || !Number.isSafeInteger(key.round) || key.round < 1) ||
+    new Set(manifest.keys.map(keyId)).size !== manifest.keys.length ||
+    Object.entries(manifest.pins).some(([key, value]) => !/^[A-Z][A-Z0-9_]*$/.test(key) || /PASSWORD|TOKEN|SECRET|API_KEY/.test(key) || !["string", "number"].includes(typeof value)))
+    throw Error("CAMPAIGN_MANIFEST_INVALID")
+  campaignLimits(manifest)
+  if (![config.stateRoot, config.harnessRoot, config.controllerLock, config.batchEnvFile, config.resourceBudgetFile,
+    config.slotsFile, config.experimentPinsFile, config.corpusPinsFile].every(value => typeof value === "string" && path.isAbsolute(value)) ||
+    !/^[a-f0-9]{40}$/.test(config.acceptedHarness) ||
+    !config.batchUnit || !manifest.issueId || !Array.isArray(manifest.wakeupIds) || manifest.wakeupIds.some(id => typeof id !== "string" || !id) ||
+    !config.preflightCommand?.length || !config.verifyCommand?.length)
+    throw Error("CAMPAIGN_SERVER_INVALID")
+  const stateDir = path.join(config.stateRoot, manifest.id)
+  await mkdir(stateDir, { recursive: true, mode: 0o700 })
+  const journalFile = path.join(stateDir, "journal.json")
+  const manifestHash = new Bun.CryptoHasher("sha256").update(JSON.stringify(manifest)).digest("hex")
+  const unitName = config.batchUnit.replace("{parallel}", String(manifest.parallel))
+  const publication = { stateDir, multica: { ...config.multica, issueId: manifest.issueId } }
+  const ownerFile = path.join(config.stateRoot, "owner.json")
+  const claim = async () => {
+    await writeLeaseReceipt(path.join(stateDir, "manifest.json"), manifest)
+    await writeLeaseReceipt(ownerFile, { campaignId: manifest.id })
+  }
+  const release = async (journal: CampaignJournal) => {
+    if (!journal.final || !journal.cleanupVerified || !await Bun.file(ownerFile).exists()) return
+    if ((await readLeaseReceipt(ownerFile) as { campaignId: string }).campaignId === manifest.id) await unlink(ownerFile)
+  }
+  const settle = async (journal: CampaignJournal, unit: UnitState | undefined) => {
+    if (!journal.cleanupVerified) {
+      if (!unit || unit.active) return false
+      if (!config.verifyCommand.some(value => value.includes("{verificationDir}"))) throw Error("CAMPAIGN_FRESH_VERIFICATION_UNCONFIGURED")
+      await verifyCampaignCleanup(manifest, journal, { ...publication, harnessRoot: config.harnessRoot, verifyCommand: config.verifyCommand })
+    }
+    await release(journal)
+    return true
+  }
+  let entering = true
+  do {
+    const unlock = await tryCampaignLock(config.controllerLock)
+    if (!unlock) throw Error("CAMPAIGN_BUSY")
+    try {
+      const exists = await Bun.file(journalFile).exists()
+      let previous: CampaignJournal = exists ? await readLeaseReceipt(journalFile) as CampaignJournal : {
+        manifestHash, server: config.server, campaignId: manifest.id, executor: manifest.executor, repairing: false, repairer: null,
+        batches: [], attempts: [], lastProgressAt: Date.now(), consecutiveErrors: 0,
+      }
+      if (previous.manifestHash !== manifestHash) throw Error("CAMPAIGN_MANIFEST_CHANGED")
+      const owner = await Bun.file(ownerFile).exists() ? await readLeaseReceipt(ownerFile) as { campaignId: string } : undefined
+      if (owner && !safeId(owner.campaignId)) throw Error("CAMPAIGN_OWNER_INVALID")
+      if (owner?.campaignId === manifest.id && !exists) throw Error("CAMPAIGN_OWNER_STATE_MISSING")
+      if (!exists && initialProgressAt === undefined && await Bun.file(path.join(stateDir, "manifest.json")).exists())
+        throw Error("CAMPAIGN_INITIAL_PROGRESS_REQUIRED")
+      if (owner && owner.campaignId !== manifest.id && !previous.final) throw Error("CAMPAIGN_SERVER_BUSY")
+      if (operation === "prepare-generation" && (!exists || owner?.campaignId !== manifest.id)) throw Error("CAMPAIGN_OWNER_MISMATCH")
+      if (operation === "prepare-generation" && (!previous.repairing || previous.repairer !== repairer)) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
+      if (operation === "cancel-unused-verify") {
+        if (previous.final !== "partial" || !previous.published) throw Error("TERMINAL_CAMPAIGN_REQUIRED")
+        if (previous.cleanupVerified) { await release(previous); return previous }
+        if (owner?.campaignId !== manifest.id || previous.repairer !== repairer) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
+        const { loadSlots } = await import("../src/slots")
+        const { cancelUnusedVerification } = await import("../src/terminal-verification")
+        const file = await loadSlots(config.slotsFile, manifest.parallel)
+        for (let count = 1; count <= file.slots.length; count++)
+          if ((await observeUnit(config.batchUnit.replace("{parallel}", String(count)), config.harnessRoot)).active) throw Error("CAMPAIGN_BATCH_ACTIVE")
+        if (await realpath(config.harnessRoot) !== await realpath(evalsRoot) ||
+          (await command(["git", "rev-parse", "HEAD"], config.harnessRoot)).trim() !== config.acceptedHarness ||
+          (await command(["git", "status", "--porcelain", "--untracked-files=normal"], config.harnessRoot)).trim()) throw Error("CAMPAIGN_HARNESS_CHANGED")
+        const binary = manifest.pins.EVAL_CLI_BIN
+        if (typeof binary !== "string" || !path.isAbsolute(binary) || manifest.pins.EVAL_CLI_MODE !== "binary") throw Error("PREPARATION_BINARY_REQUIRED")
+        const pins = await readLeaseReceipt(config.experimentPinsFile) as { cli: string; cliBinarySha256: string }
+        if (pins.cli !== binary || new Bun.CryptoHasher("sha256").update(await Bun.file(binary).bytes()).digest("hex") !== pins.cliBinarySha256)
+          throw Error("CAMPAIGN_CLI_PIN_CHANGED")
+        const cleanup = await cancelUnusedVerification(file, { stateRoot: config.stateRoot, campaignId: manifest.id }, binary)
+        await writeLeaseReceipt(path.join(stateDir, "terminal-cleanup.json"), cleanup)
+        for (const key of [`judge:${file.judge.codexHome}`, ...file.slots.map(slot => `profile:${slot.profileDir}`), `server:${cleanup.identity.containerId}`])
+          await requireReleasedReservation(await readResourceReservation({ key }))
+        previous.cleanupVerified = true
+        await writeLeaseReceipt(journalFile, previous)
+        await release(previous)
+        return previous
+      }
+      if (operation === "reserve") {
+        if (initialProgressAt !== undefined) {
+          const anchor = Date.parse(initialProgressAt)
+          const issue = await campaignRequest(publication, `/api/issues/${encodeURIComponent(manifest.issueId!)}`) as
+            { id?: string; created_at?: string; status?: string }
+          if (issue.id !== manifest.issueId || typeof issue.created_at !== "string" || Date.parse(issue.created_at) !== anchor ||
+            !["in_progress", "blocked"].includes(issue.status ?? "")) throw Error("CAMPAIGN_INITIAL_PROGRESS_UNCONFIRMED")
+          if (exists && previous.initialProgressAt !== anchor) throw Error("CAMPAIGN_INITIAL_PROGRESS_CHANGED")
+          if (!exists) {
+            // Persist the authenticated start before readiness can fail. This grants no owner or admission.
+            previous.lastProgressAt = anchor
+            previous.initialProgressAt = anchor
+            const saved = path.join(stateDir, "manifest.json")
+            if (await Bun.file(saved).exists() && JSON.stringify(await readLeaseReceipt(saved)) !== JSON.stringify(manifest))
+              throw Error("CAMPAIGN_MANIFEST_CHANGED")
+            await writeLeaseReceipt(saved, manifest)
+            await writeLeaseReceipt(journalFile, previous)
+          }
+        }
+        if (previous.initialProgressAt !== undefined && Date.now() - previous.lastProgressAt >= campaignLimits(manifest).noProgressMs)
+          throw Error("NO_PROGRESS_LIMIT")
+        if (previous.final || previous.published) throw Error("CAMPAIGN_FINAL")
+        if (owner?.campaignId === manifest.id) {
+          if (!exists) throw Error("CAMPAIGN_OWNER_STATE_MISSING")
+          return previous
+        }
+        const unit = await observeUnit(unitName, config.harnessRoot)
+        if (unit.active) throw Error("CAMPAIGN_SERVER_BUSY")
+        const first = manifest.keys[0]!
+        await command([...config.preflightCommand, "--server", serverFile, "--manifest", manifestFile,
+          first.corpus, manifest.keys.filter(key => key.corpus === first.corpus && key.round === first.round).slice(0, manifest.batchSize).map(key => key.taskId).join(","),
+          String(first.round), String(manifest.parallel)], config.harnessRoot)
+        if (!exists) await writeLeaseReceipt(journalFile, previous)
+        await claim()
+        return previous
+      }
+      if (operation === "prepare-generation") {
+        const unit = await observeUnit(unitName, config.harnessRoot)
+        if (unit.active) throw Error("CAMPAIGN_BATCH_ACTIVE")
+        previous = (await campaignTick(manifest, previous, unit, Date.now(), config)).journal
+        await writeLeaseReceipt(journalFile, previous)
+        const admit = async () => {
+          const owner = await readLeaseReceipt(ownerFile) as { campaignId: string }
+          const current = await readLeaseReceipt(journalFile) as CampaignJournal
+          if (owner.campaignId !== manifest.id) throw Error("CAMPAIGN_OWNER_MISMATCH")
+          if (current.manifestHash !== manifestHash || JSON.stringify(await readLeaseReceipt(manifestFile)) !== JSON.stringify(manifest))
+            throw Error("CAMPAIGN_MANIFEST_CHANGED")
+          if (!current.repairing || current.repairer !== repairer) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
+          previous = current
+          await syncCampaignIssue(manifest, previous, publication).catch(async () => {
+            previous.reportingError = "MULTICA_UNAVAILABLE"
+            await writeLeaseReceipt(journalFile, previous)
+            throw Error("CAMPAIGN_STATE_UNAVAILABLE")
+          })
+          if (JSON.stringify(await readLeaseReceipt(serverFile)) !== JSON.stringify(config)) throw Error("CAMPAIGN_SERVER_CONFIG_CHANGED")
+          if ((await observeUnit(unitName, config.harnessRoot)).active) throw Error("CAMPAIGN_BATCH_ACTIVE")
+          if (previous.final || previous.published) return false
+          if (Date.now() - previous.lastProgressAt >= campaignLimits(manifest).noProgressMs) {
+            previous.final = "partial"
+            previous.blocker = "NO_PROGRESS_LIMIT"
+            await writeLeaseReceipt(journalFile, previous)
+            return false
+          }
+          return true
+        }
+        if (!await admit()) return previous
+        if (previous.batches.at(-1) && !previous.batches.at(-1)!.accounted) throw Error("CAMPAIGN_BATCH_UNCONFIRMED")
+        if (["CAMPAIGN_RECONCILIATION_FAILED", "ADMISSION_STATE_UNCONFIRMED"].includes(previous.blocker ?? "")) throw Error(previous.blocker)
+        if (manifest.pins.LOGINOM_USERNAME !== undefined) throw Error("CAMPAIGN_USERNAME_PINNED")
+        if (await realpath(config.harnessRoot) !== await realpath(evalsRoot) ||
+          (await command(["git", "rev-parse", "HEAD"], config.harnessRoot)).trim() !== config.acceptedHarness ||
+          (await command(["git", "status", "--porcelain", "--untracked-files=normal"], config.harnessRoot)).trim())
+          throw Error("CAMPAIGN_HARNESS_CHANGED")
+        const generation = await prepareGeneration(manifest, config)
+        if (!await admit()) return previous
+        const { readServerIdentity } = await import("../src/parallel-pair")
+        if (JSON.stringify(await readServerIdentity(generation.file)) !== JSON.stringify(generation.identity)) throw Error("CAMPAIGN_GENERATION_IDENTITY_CHANGED")
+        await writeLeaseReceipt(serverFile, generation.next)
+        if (JSON.stringify(await readLeaseReceipt(serverFile)) !== JSON.stringify(generation.next)) throw Error("CAMPAIGN_SERVER_CONFIG_READBACK_FAILED")
+        return previous
+      }
+      if ((operation === "repair" || operation === "resume") && exists) {
+        await syncCampaignIssue(manifest, previous, publication).catch(() => { previous.reportingError = "MULTICA_UNAVAILABLE" })
+        if (previous.published) {
+          const unit = previous.cleanupVerified || owner && owner.campaignId !== manifest.id ? undefined : await observeUnit(unitName, config.harnessRoot).catch(() => undefined)
+          await settle(previous, unit)
+          return previous
+        }
+      }
+      if (operation === "repair") {
+        if (!exists || owner?.campaignId !== manifest.id) throw Error("CAMPAIGN_OWNER_MISMATCH")
+        if (previous.repairing && previous.repairer !== repairer) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
+        previous = (await campaignTick(manifest, previous, await observeUnit(unitName, config.harnessRoot), Date.now(), config)).journal
+        if (previous.final) {
+          previous.repairing = false
+          previous.repairer = null
+          await writeLeaseReceipt(journalFile, previous)
+          return previous
+        }
+        previous.repairing = true
+        previous.repairer = repairer!
+        await writeLeaseReceipt(journalFile, previous)
+        return previous
+      }
+      if (operation === "resume") {
+        if (!exists) throw Error("CAMPAIGN_OWNER_STATE_MISSING")
+        if (!previous.repairing && !previous.blocker) { await release(previous); return previous }
+        if (owner?.campaignId !== manifest.id) throw Error("CAMPAIGN_OWNER_MISMATCH")
+        if (!previous.repairing || previous.repairer !== repairer) throw Error("CAMPAIGN_REPAIRER_MISMATCH")
+        const unit = await observeUnit(unitName, config.harnessRoot)
+        if (unit.active) throw Error("CAMPAIGN_BATCH_ACTIVE")
+        if (previous.batches.length) previous.batches.at(-1)!.accounted = false
+        const checked = await campaignTick(manifest, { ...previous, repairing: false, blocker: undefined, blockerKind: undefined }, unit, Date.now(), config)
+        previous = { ...checked.journal, repairing: true, repairer: repairer! }
+        if (["CAMPAIGN_RECONCILIATION_FAILED", "ADMISSION_STATE_UNCONFIRMED"].includes(previous.blocker ?? "")) {
+          await writeLeaseReceipt(journalFile, previous)
+          throw Error(previous.blocker)
+        }
+        if (!config.verifyCommand.some(value => value.includes("{verificationDir}"))) throw Error("CAMPAIGN_FRESH_VERIFICATION_UNCONFIGURED")
+        if (!await verifyCampaignCleanup(manifest, previous, { ...publication, harnessRoot: config.harnessRoot, verifyCommand: config.verifyCommand })) {
+          previous.blocker = "CLEANUP_UNCONFIRMED"
+          await writeLeaseReceipt(journalFile, previous)
+          throw Error("CAMPAIGN_CLEANUP_UNCONFIRMED")
+        }
+        const next = manifest.keys.filter(key => !previous.attempts.some(attempt => attempt.counted && keyId(attempt.key) === keyId(key)))
+        if (!previous.final && next.length) {
+          const first = next[0]!
+          await command([...config.preflightCommand, "--server", serverFile, "--manifest", manifestFile, first.corpus,
+            next.filter(key => key.corpus === first.corpus && key.round === first.round).slice(0, manifest.batchSize).map(key => key.taskId).join(","),
+            String(first.round), String(manifest.parallel)], config.harnessRoot)
+        }
+        if (!previous.final && Date.now() - previous.lastProgressAt >= campaignLimits(manifest).noProgressMs) {
+          previous.final = "partial"
+          previous.blocker = "NO_PROGRESS_LIMIT"
+        }
+        if (!previous.final) {
+          previous.consecutiveErrors = 0
+          previous.emptyPreflights = 0
+          delete previous.blocker
+          delete previous.blockerKind
+        }
+        previous.repairing = false
+        previous.repairer = null
+        await writeLeaseReceipt(journalFile, previous)
+        await release(previous)
+        return previous
+      }
+      if (!exists) await writeLeaseReceipt(journalFile, previous)
+      const unit = owner && owner.campaignId !== manifest.id ? undefined : await observeUnit(unitName, config.harnessRoot).catch(() => undefined)
+      if (!owner && unit?.active && previous.batches.at(-1) && !previous.batches.at(-1)!.accounted) await claim()
+      const tick = await campaignTick(manifest, previous, unit, Date.now(), config)
+      await writeLeaseReceipt(journalFile, tick.journal)
+      if (entering || tick.action !== "wait") {
+        entering = false
+        const synced = await syncCampaignIssue(manifest, tick.journal, publication).then(final => ({ final }), () => null)
+        if (synced?.final && await settle(tick.journal, unit)) return tick.journal
+        if (!synced) tick.journal.reportingError = "MULTICA_UNAVAILABLE"
+        if (synced && !synced.final && !tick.journal.final) {
+          delete tick.journal.reportingError
+          if (tick.action === "judge") {
+            try {
+              if (owner?.campaignId !== manifest.id || unit?.active !== false) throw Error("CAMPAIGN_OWNER_MISMATCH")
+              if (await realpath(config.harnessRoot) !== await realpath(evalsRoot) ||
+                (await command(["git", "rev-parse", "HEAD"], config.harnessRoot)).trim() !== config.acceptedHarness ||
+                (await command(["git", "status", "--porcelain", "--untracked-files=normal"], config.harnessRoot)).trim())
+                throw Error("CAMPAIGN_HARNESS_CHANGED")
+              const batch = tick.journal.batches.at(-1)!
+              const resultFile = tick.pendingJudge.resultFile, runDir = path.dirname(path.dirname(path.dirname(resultFile)))
+              if (path.dirname(runDir) !== batch.resultsDir) throw Error("CAMPAIGN_PENDING_RUN_MISMATCH")
+              const { tasksDir, saved } = await requireCampaignTaskPins(manifest, tick.pendingJudge.key, runDir, config)
+              if (saved.tasksDir !== tasksDir || !Array.isArray(saved.only) || saved.only.length !== batch.keys.length ||
+                new Set(saved.only).size !== saved.only.length || saved.only.some((id: unknown) => !batch.keys.some(key => key.taskId === id)) ||
+                ["EVAL_PASS_THRESHOLD", "EVAL_JUDGE_TIMEOUT_MS"].some((name, index) => manifest.pins[name] !== undefined &&
+                  String(manifest.pins[name]) !== String(index === 0 ? saved.passThreshold : saved.judgeTimeoutMs)))
+                throw Error("CAMPAIGN_EXPERIMENT_PINS_CHANGED")
+              for (const key of batch.keys) await requireCampaignTaskPins(manifest, key, runDir, config)
+              if (!process.env.EVAL_JUDGE_COMMAND?.trim()) throw Error("CAMPAIGN_JUDGE_COMMAND_REQUIRED")
+              const judgeConfig = loadConfig(["--judge-only", path.basename(runDir), "--tasks", tasksDir, "--only", saved.only.join(",")], {
+                ...process.env, ...campaignEnvironment(manifest, config), EVAL_RESULTS_DIR: batch.resultsDir,
+                EVAL_PASS_THRESHOLD: String(saved.passThreshold), EVAL_JUDGE_TIMEOUT_MS: String(saved.judgeTimeoutMs),
+                EVAL_JUDGE_COMMAND: process.env.EVAL_JUDGE_COMMAND,
+              })
+              await readPendingJudge(judgeConfig, resultFile)
+              if (!config.verifyCommand.some(value => value.includes("{verificationDir}"))) throw Error("CAMPAIGN_FRESH_VERIFICATION_UNCONFIGURED")
+              if (!await verifyCampaignCleanup(manifest, tick.journal, { ...publication, harnessRoot: config.harnessRoot, verifyCommand: config.verifyCommand }))
+                throw Error("CAMPAIGN_CLEANUP_UNCONFIRMED")
+              const ready = await syncCampaignIssue(manifest, tick.journal, publication).then(final => ({ final }), () => null)
+              if (!ready) tick.journal.reportingError = "MULTICA_UNAVAILABLE"
+              if (ready?.final) await release(tick.journal)
+              if (ready && !ready.final && !tick.journal.final) {
+                if ((await readLeaseReceipt(ownerFile) as { campaignId: string }).campaignId !== manifest.id) throw Error("CAMPAIGN_OWNER_MISMATCH")
+                const checked = await campaignTick(manifest, tick.journal, await observeUnit(unitName, config.harnessRoot), Date.now(), config)
+                Object.assign(tick.journal, checked.journal)
+                if (checked.action === "judge" && checked.pendingJudge.resultFile === resultFile) {
+                  await readPendingJudge(judgeConfig, resultFile)
+                  delete tick.journal.cleanupVerified
+                  delete tick.journal.verificationAttempted
+                  delete tick.journal.verificationDir
+                  const attempt = tick.journal.attempts.find(attempt => attempt.resultFile === resultFile)!
+                  attempt.cleanupConfirmed = false
+                  delete attempt.cleanupVerification
+                  await writeLeaseReceipt(journalFile, tick.journal)
+                  const judged = await runOfflineJudge({ ...judgeConfig, judge: { ...judgeConfig.judge, systemd: true } }, undefined, resultFile)
+                  if (!judged.judgeCleanupConfirmed ||
+                    !await verifyCampaignCleanup(manifest, tick.journal, { ...publication, harnessRoot: config.harnessRoot, verifyCommand: config.verifyCommand }))
+                    throw Error("CAMPAIGN_CLEANUP_UNCONFIRMED")
+                  Object.assign(tick.journal, (await campaignTick(manifest, tick.journal, await observeUnit(unitName, config.harnessRoot), Date.now(), config)).journal)
+                  if (judged.code !== 0) throw Error("CAMPAIGN_JUDGE_FAILED")
+                }
+              }
+            } catch (error) {
+              console.error(error instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(error.message) ? error.message : "CAMPAIGN_JUDGE_RECOVERY_FAILED")
+              tick.journal.blocker = "CAMPAIGN_JUDGE_RECOVERY_FAILED"
+              tick.journal.blockerKind = "technical"
+              await syncCampaignIssue(manifest, tick.journal, publication).catch(() => { tick.journal.reportingError = "MULTICA_UNAVAILABLE" })
+            }
+          }
+          if (tick.action === "start" || tick.action === "launch") {
+            try {
+              const first = tick.next[0]!
+              await command([...config.preflightCommand, "--server", serverFile, "--manifest", manifestFile,
+                first.corpus, tick.next.map(key => key.taskId).join(","), String(first.round), String(manifest.parallel)], config.harnessRoot)
+              if (!owner) await claim()
+              const batch = await prepareCampaignBatch(manifest, tick.journal, tick.next, unit!.invocation, { ...config, stateDir })
+              await command(["sudo", "-n", "systemctl", "start", unitName], config.harnessRoot)
+              batch.started = true
+            } catch {
+              tick.journal.blocker = "CAMPAIGN_EXECUTION_FAILED"
+              tick.journal.blockerKind = "technical"
+              await syncCampaignIssue(manifest, tick.journal, publication).catch(() => { tick.journal.reportingError = "MULTICA_UNAVAILABLE" })
+            }
+          }
+        }
+        if (tick.journal.final && !synced?.final) {
+          await (unit?.active === false ? finalizeCampaign(manifest, tick.journal, { ...publication, harnessRoot: config.harnessRoot, verifyCommand: config.verifyCommand })
+            : publishCampaign(manifest, tick.journal, publication)).catch(() => { tick.journal.reportingError ??= "FINAL_DELIVERY_FAILED" })
+          if (!tick.journal.published) await syncCampaignIssue(manifest, tick.journal, publication)
+            .catch(() => { tick.journal.reportingError = "MULTICA_UNAVAILABLE" })
+        }
+        await writeLeaseReceipt(journalFile, tick.journal)
+        await release(tick.journal)
+        if (tick.journal.published && !synced?.final && await settle(tick.journal, unit)) return tick.journal
+      }
+      if (once) return tick.journal
+    } finally { await unlock() }
+    await Bun.sleep(10_000)
+  } while (true)
+}
+
+if (import.meta.main) {
+  const args = parseArgs({ args: Bun.argv.slice(2), options: { manifest: { type: "string" }, server: { type: "string" }, once: { type: "boolean" },
+    operation: { type: "string" }, repairer: { type: "string" }, "initial-progress-at": { type: "string" } } }).values
+  if (!args.manifest || !args.server) throw Error("usage: bun script/run-campaign.ts --manifest /private/manifest.json --server /private/server.json [--once | --operation reserve|repair|resume|prepare-generation|cancel-unused-verify [--repairer agent]]")
+  await runCampaign(args.manifest, args.server, args.once, args.operation, args.repairer, args["initial-progress-at"])
+    .then(journal => { if (args.operation) console.log(JSON.stringify(journal)) })
+    .catch(error => { console.error(error instanceof Error ? error.message : "CAMPAIGN_FAILED"); process.exitCode = 2 })
+}

@@ -1,12 +1,15 @@
 import { expect, test } from "bun:test"
 import os from "node:os"
 import path from "node:path"
-import { cp, mkdtemp, rm } from "node:fs/promises"
+import { chmod, cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { evalsRoot } from "../src/config"
 import { runNodeEvals } from "../src/node-runner"
+import { campaignTick, type CampaignJournal } from "../script/run-campaign"
+import { writeLeaseReceipt } from "../src/lease"
+import { agentInputsHash, loadTasks, rubricHash } from "../src/task"
 
 
-test("runner вызывает штатный fake harness без судьи и пишет FAIL при no_artifact вместо generic code=0", async () => {
+test("fake node FAIL survives summary loss and is accounted once without repeating generation", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "node-runner-"))
   const server = Bun.serve({ port: 0, fetch: () => Response.json({ status: "ok", result: { revision: "fixture" } }) })
   try {
@@ -30,6 +33,64 @@ test("runner вызывает штатный fake harness без судьи и �
     expect(summary.tasks[0].attempts[0]).toMatchObject({ status: "no_artifact", pass: null, oracle_pass: null })
     expect(await Bun.file(path.join(result.runDir!, "code-verdict.json")).json()).toMatchObject({ verdict: "FAIL", code: 1 })
     expect(await Bun.file(path.join(result.runDir!, "code-report.md")).text()).toContain("FAIL")
+    const attempt = path.join(result.runDir!, "crosstable-fixed-sum/1"), resultFile = path.join(attempt, "result.json")
+    const original = await Bun.file(resultFile).text()
+    const slot = { id: "default", username: "eval-default", profileDir: env.EVAL_PROFILE_DIR,
+      workspaceRoot: env.EVAL_WORKSPACE_ROOT, historyDir: env.EVAL_PROFILE_DIR + ".history" }
+    const slots = { version: 2, server: { container: "server", studioContainer: "studio", url: "http://127.0.0.1/app/",
+      network: "eval", alias: "loginom", storageRoot: "/workdir/UserStorage", backupRoot: "/workdir/SessionBackup" },
+      controller: { stateDir: path.join(directory, "controller"), adminCredentialsFile: path.join(directory, "secrets/admin.json") },
+      judge: { codexHome: path.join(directory, "judge") }, slots: [slot] }
+    await Promise.all([slots.controller.stateDir, path.dirname(slots.controller.adminCredentialsFile), slots.judge.codexHome, slot.workspaceRoot]
+      .map(dir => mkdir(dir, { recursive: true, mode: 0o700 })))
+    await chmod(slot.workspaceRoot, 0o700)
+    const context = { harnessRoot: directory, slotsFile: path.join(directory, "slots.json"),
+      corpusPinsFile: path.join(directory, "corpus-pins.json"), corpora: { node: { entrypoint: "src/node-runner.ts", tasks: "tasks" } } }
+    await writeLeaseReceipt(slots.controller.adminCredentialsFile, {})
+    await writeLeaseReceipt(context.slotsFile, slots)
+    const selected = await loadTasks(tasks, ["crosstable-fixed-sum"])
+    await writeLeaseReceipt(context.corpusPinsFile, { groups: [{ group: "node", tasks: [{ id: "crosstable-fixed-sum",
+      agentInputsHash: await agentInputsHash(selected), rubricHash: await rubricHash(selected) }] }] })
+    const cleanup = await Bun.file(path.join(attempt, "cleanup.json")).json()
+    await writeLeaseReceipt(path.join(attempt, "cleanup.json"), { ...cleanup, slotId: slot.id, profileDir: slot.profileDir,
+      archive: cleanup.stages.find((stage: { stage: string }) => stage.stage === "profile_history").path, serverEpoch: "a".repeat(64),
+      processes: { ...cleanup.processes, observation_mode: "continuous", error: null, capture_complete: true, unknownProcesses: [] },
+      serverSessions: "confirmed", storageDeletionAllowed: true, nextAdmissionAllowed: true })
+    const commandJournal = path.join(directory, "command.json")
+    await writeLeaseReceipt(commandJournal, { version: 2, kind: "unactivated-preparation", runDir: result.runDir,
+      attempts: [{ taskId: "crosstable-fixed-sum", attempt: 1, purpose: "measurement", completedAt: 1000, completionOrder: 1, quality: false }] })
+    const saved = await Bun.file(path.join(result.runDir!, "config.json")).json()
+    await writeLeaseReceipt(path.join(result.runDir!, "config.json"), { ...saved, judge: null, commandJournal })
+    await rm(path.join(result.runDir!, "summary.json"))
+    const manifest = { id: "node-recovery", server: "runner2", executor: "EvalBaseline", parallel: 1, batchSize: 1,
+      keys: [{ corpus: "node", taskId: "crosstable-fixed-sum", round: 1 }], pins: { JUDGE_MODEL: "pinned-unused-judge", JUDGE_REASONING: "xhigh" } }
+    const journal: CampaignJournal = { manifestHash: "fixture", server: manifest.server, campaignId: manifest.id, executor: manifest.executor,
+      repairing: false, repairer: null, batches: [{ id: "one", keys: manifest.keys, resultsDir: env.EVAL_RESULTS_DIR,
+        invocationBefore: "before", started: true }], attempts: [], lastProgressAt: 500, consecutiveErrors: 0 }
+    const tick = await campaignTick(manifest, journal, { active: false, invocation: "done", exitCode: 1 }, 2000, context)
+    expect(tick.journal.attempts).toMatchObject([{ counted: true, pass: false, score: null }])
+    expect(tick.action).toBe("finalize")
+    expect(tick.journal.lastProgressAt).toBe(1000)
+    const repeated = await campaignTick(manifest, tick.journal, { active: false, invocation: "done", exitCode: 1 }, 3000, context)
+    expect(repeated.journal.attempts).toHaveLength(1)
+    expect(repeated.journal.startedAttempts).toBe(1)
+    expect(repeated.next).toEqual([])
+    expect(await Bun.file(resultFile).text()).toBe(original)
+    const confirmed = await Bun.file(path.join(attempt, "cleanup.json")).json()
+    await writeLeaseReceipt(path.join(attempt, "cleanup.json"), { ...confirmed, archive: directory })
+    const blocked = await campaignTick(manifest, journal, { active: false, invocation: "done", exitCode: 1 }, 2000, context)
+    expect(blocked.action).toBe("blocked")
+    expect(blocked.journal.batches[0]?.accounted).not.toBe(true)
+    expect(blocked.next).toEqual([])
+    await writeLeaseReceipt(path.join(attempt, "cleanup.json"), confirmed)
+    const recovered = await campaignTick(manifest, { ...blocked.journal, blocker: undefined }, { active: false, invocation: "done", exitCode: 1 }, 2500, context)
+    expect(recovered.journal.attempts).toHaveLength(1)
+    expect(recovered.journal.attempts[0]?.counted).toBe(true)
+    expect(recovered.journal.lastProgressAt).toBe(1000)
+    expect(recovered.journal.consecutiveErrors).toBe(0)
+    expect(recovered.journal.startedAttempts).toBe(1)
+    expect(recovered.next).toEqual([])
+    expect(await Bun.file(resultFile).text()).toBe(original)
   } finally { server.stop(true); await rm(directory, { recursive: true, force: true }) }
 }, 60_000)
 
