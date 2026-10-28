@@ -377,12 +377,15 @@ export async function createBridge(config, session, { browserTransport: managedB
                     build: state.target.loginom_build, documentId: state.document_id,
                     account: state.loginom_account, directories: config.storageDirectories,
                   });
-                  const geometry = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
-                    code: makeBrowserGeometryCode({ session_id: session.metadata.sessionId,
+                  const geometryCode = makeBrowserGeometryCode({ session_id: session.metadata.sessionId,
                       operation_id: state.operation_id, document_id: state.document_id,
                       runtime_revision: session.metadata.clientRevision,
                       manifest_sha256: session.metadata.actionManifestDigest,
-                      workflow_ref: state.workflow_ref }),
+                      workflow_ref: state.workflow_ref });
+                  const geometry = await browser.callTool({ name: 'browser_run_code_unsafe', arguments: {
+                    // Capture the connected owner before local profiling can
+                    // leave the first delivery without a recovery baseline.
+                    code: config.storageDirectories ? withStorageIdentity(geometryCode,session.metadata.storageBinding) : geometryCode,
                   } }, undefined, { timeout: privatePackage?Math.min(15000,remaining()+1000):15000 });
                   state.browser_geometry = parseBrowserGeometry(geometry);
                 }
@@ -634,6 +637,24 @@ export async function createBridge(config, session, { browserTransport: managedB
       closing ??= (async () => {
         await actionRuntime?.closeArtifactDeliveries();
         await recovery.close();
+        if(config.storageDirectories&&actionRuntime){
+          // Diagnostics are read without the connection guard, including after
+          // a disconnect. They never certify package or transport cleanup.
+          try{
+            const response=await browser.callTool({name:'browser_run_code_unsafe',arguments:{
+              code:`async page=>page.evaluate(()=>{
+                const timeline=globalThis.__loginomConnectionTimelineV1;
+                if(!Array.isArray(timeline?.samples))return null;
+                return {resolution_ms:1000,dropped:Number.isSafeInteger(timeline.dropped)?timeline.dropped:0,
+                  samples:timeline.samples.slice(0,128).filter(s=>Number.isSafeInteger(s?.at)).map(s=>({
+                    at:s.at,connected:typeof s.connected==='boolean'?s.connected:null,reconnecting:s.reconnecting===true,
+                    remote_session:s.remote_session===true,local_session:s.local_session===true,restore_prompt:s.restore_prompt===true,
+                  }))};
+              })`,
+            }},undefined,{timeout:1000});
+            await recordExecution({phase:'native_connection_timeline',timeline:parseCapabilityResult(response)});
+          }catch{ /* Diagnostic availability cannot change shutdown. */ }
+        }
         const normalCleanup = config.closeSavedPackageOnShutdown === true;
         const prepared = session.metadata.workspacePreparation;
         const preparationRequest = prepared?.identity ? JSON.parse(prepared.identity) : null;

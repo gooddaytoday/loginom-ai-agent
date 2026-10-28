@@ -23,3 +23,14 @@ export function browserFailureDetails(response){
  const exception=text.match(/\b(ReferenceError|TypeError|SyntaxError|RangeError)\b/)?.[1];
  return exception?'exception='+exception:null;
 }
+
+// Private journals retain the original fixed failure before cancellation can
+// replace it with upload uncertainty. Never retain raw browser text or stacks.
+export function operationFailureDiagnostic(error){
+ const message=String(error?.message??'');
+ const pinned=/^Pinned browser capability call failed \[([A-Z][A-Z0-9_]{1,100})\](?: \((reason=(?:owner|dialog|attempted|capacity|awaiting_original_attempt)|exception=(?:ReferenceError|TypeError|SyntaxError|RangeError))\))?$/.exec(message);
+ const code=/^[A-Z][A-Z0-9_]{1,100}$/.test(error?.code??'')?error.code
+  :/^[A-Z][A-Z0-9_]{1,100}$/.test(message)?message:'UNCLASSIFIED_ERROR';
+ return {code:pinned?.[1]??code,detail:pinned?.[2]??null,
+  exception:['Error','AbortError','TypeError','ReferenceError','SyntaxError','RangeError'].includes(error?.name)?error.name:'Error'};
+}

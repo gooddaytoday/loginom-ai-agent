@@ -5,6 +5,7 @@ import { browserDownloadScript } from "../client/lib/browser-downloads.mjs"
 import { browserLaunch } from "../client/lib/browser-launch.mjs"
 import { createRedactor } from "../client/lib/redact.mjs"
 import { createExecutionJournal } from "../client/lib/execution-journal.mjs"
+import { connectionTimelineScript } from "../client/lib/connection-recovery.mjs"
 
 const require = createRequire(new URL("../client/package.json", import.meta.url))
 
@@ -227,6 +228,7 @@ export async function loginBrowser({ browserPath, profile, candidate, headless =
     // This authenticated page predates MCP; its capability choice must already
     // match the executor's download/byte-verification path on the first load.
     await context.addInitScript({ content: browserDownloadScript(candidate.url) })
+    if (keepOpen) await context.addInitScript({ content: connectionTimelineScript(candidate.url) })
     await context.addInitScript(() => {
       // A human can interact with the headed startup page before host login.
       // Once that happens, failing startup is safer than reloading their state.

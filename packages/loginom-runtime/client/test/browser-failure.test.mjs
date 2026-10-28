@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {parseCapabilityResult} from '../lib/executor.mjs';
+import {operationFailureDiagnostic} from '../lib/browser-failure.mjs';
+test('private operation diagnostics retain fixed causes and omit arbitrary error text',()=>{
+ assert.deepEqual(operationFailureDiagnostic(Error('Pinned browser capability call failed [BROWSER_SCRIPT_ERROR] (exception=TypeError)')),
+  {code:'BROWSER_SCRIPT_ERROR',detail:'exception=TypeError',exception:'Error'});
+ assert.deepEqual(operationFailureDiagnostic(new TypeError('PRIVATE password=HIDDEN https://private.invalid/')),
+  {code:'UNCLASSIFIED_ERROR',detail:null,exception:'TypeError'});
+ assert.equal(operationFailureDiagnostic(Error('LOGINOM_FILE_CHANGED')).code,'LOGINOM_FILE_CHANGED');
+});
 for(const [message,category] of [
  ['Loginom connection is disconnected; restore the original session','LOGINOM_DISCONNECTED'],
  ['Loginom account or document changed; prepare the workspace again','LOGINOM_IDENTITY_CHANGED'],
