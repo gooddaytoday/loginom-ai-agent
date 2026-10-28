@@ -1567,7 +1567,7 @@ export function parseCapabilityResult(response) {
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = false }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   let pending = null;
   let running = false;
@@ -2599,6 +2599,12 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         }finally{storageNavigating=false;}
       })();
       if(name==='dock_storage_download_start'){
+        if(!serverSourceCache){
+          checkId(request.operation_id);
+          return {result_version:'user-v1',operation_id:request.operation_id,status:'FAILED',action_key:'storage.download',
+            phase:'admission',effect_possible:false,cleanup_complete:true,output:{},
+            error:{code:'SERVER_CACHE_DISABLED',message:'Автоматическое скачивание серверного источника в cache отключено: для серверного файла точная сверка N недоступна. Доступны ограниченный preview и выбор существующего серверного источника без upload. Цикл sample→full не начат.'}};
+        }
         if(storageNavigating||running||pending||nodeJobs.unsettled||sourceReads.unsettled||delivery.unsettled)
           throw Error('Resolve the pending Dock operation before downloading');
         if(operations.has(request.operation_id)||auxiliary.has(request.operation_id)&&auxiliary.get(request.operation_id).signature!=='storage.download:'+request.server_source_ref
@@ -2640,7 +2646,8 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     waitNodeApply:(id,options)=>sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options),
     cancelNodeApply:id=>sourceReads.has(id)?sourceReads.cancel(id):nodeJobs.cancel(id),
     stopNodeApply:id=>nodeJobs.stop(id),
-    tools: [...executorTools,...(allowCandidate&&serverDownloads?serverDownloadTools:[]),...(allowCandidate && artifactStore ? [artifactUploadTool,artifactVerifyTool,...deliveryApiTools] : []),
+    tools: [...executorTools,...(allowCandidate&&serverDownloads?serverDownloadTools.map(tool=>!serverSourceCache&&tool.name==='dock_storage_download_start'
+      ?{...tool,description:'Server source cache is disabled in this release. No download or sample→full cycle starts. For a server file exact N verification is unavailable; use bounded preview and the existing storage source without upload. Native exports.text file_artifacts are downloaded by their ordinary export path.'}:tool):[]),...(allowCandidate && artifactStore ? [artifactUploadTool,artifactVerifyTool,...deliveryApiTools] : []),
       ...(allowCandidate&&nodeApplyHandlers.has('imports.text')&&nodeApplyDriverFactory?nodeApiTools:[])],
     assertPreparationAllowed() {
       if (running || pending || sourceReads.unsettled) throw new Error('Dock preparation cannot run while an action is running or its effect remains uncertain');
