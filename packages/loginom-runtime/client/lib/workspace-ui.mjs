@@ -95,6 +95,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     started + (task.output_settlement_read?.timeout_ms??task.settlement_timeout_ms??task.opening_timeout_ms??15000));
   const trace = [], handles = [];
   let postActionRoot;
+  let calculatorDialogFailure;
   let cancellationSurfaceReads=0;
   let finishSurfaceReads=0;
   let openingSurfaceReads=0;
@@ -377,7 +378,7 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
       '[data-tid$=";WizrdMCF;ExprDataEditForm"]',
       ...['edtName','edtDisplayName','cbxDataType'].flatMap(name=>{const owner='[data-tid$=";WizrdMCF;ExprDataEditForm;'+name+'"]';return [owner,owner+' input'];}),
       ...['chbIntermediate','chbCached'].flatMap(name=>['',';InputEl',';DisplayEl'].map(part=>'[data-tid$=";WizrdMCF;ExprDataEditForm;'+name+part+'"]')),
-      '[data-tid$=";WizrdMCF;CalcPreviewForm"]','[data-tid$=";WizrdMCF;CalcPreviewForm;p.h;close"]',
+      '[data-tid$=";WizrdMCF;CalcDataWizard"]','[data-tid$=";WizrdMCF;CalcPreviewForm"]','[data-tid$=";WizrdMCF;CalcPreviewForm;p.h;close"]',
       ...wizardButtons.map(name=>'[data-tid$=";WizrdMCF;'+name+'"]')].join(',');
     if (requestedRoot || discoverRoots) {
       // Native fixed queries discover global blockers/context without walking
@@ -1600,6 +1601,9 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
           &&records.reduce((n,r)=>n+r.data.Text.length,0)<=4096)
           wizard.calculator_preview={status:'observed',root_ref:refOf(previews[0]),root_tid:getTid(previews[0]),
             errors:records.filter(r=>r.data.MessageType===globalThis.bg?.TBGCodeConsoleMessageType?.cmtError).map(r=>r.data.Text)};
+        if(wizard.calculator_preview.status==='observed'&&wizard.calculator_preview.errors.length)
+          wizard.calculator_validation={status:'observed',root_ref:wizard.root_ref,
+            message:wizard.calculator_preview.errors.join('\n'),source:'loginom_calculator_preview_console'};
       }
       const selected=all.filter(e=>{charge();return (getTid(e)??'').startsWith(base+'colExpressionName_') && visible(e) && !sensitive(e) && e.closest('table')?.classList.contains('x-grid-item-selected');});
       wizard.expression_selection={status:selected.length>1?'ambiguous':'unobserved'};
@@ -2860,6 +2864,7 @@ function readRenderedInputMapping(observation) {
       &&visible(storageRootCandidates[0])&&!sensitive(storageRootCandidates[0])
       &&textOf(storageRootCandidates[0],true)==='Файлы'?storageRootCandidates[0]:null;
     const interesting = element => wizard.stage==='lin_regression'&&(getTid(element)??'')===wizard.root_tid+';LinRegressionWizard;pedRegressionMethod;ValueControl;trg_picker' || wizard.stage==='normalization'&&((getTid(element)??'').startsWith(wizard.root_tid+';NormTuneWizard;colDisplayName_')||getTid(element)===wizard.root_tid+';ColumnsEditForm;cbxNormType;trg_picker') || /;WizrdMCF;CrossTabWizard;pedDisplayNameSeparator;ValueControl;(?:trg_picker|boundlist;[^;]+)$/.test(getTid(element)??'') || crossTableCells.has(state.ids.get(element)) || collapseCells.has(state.ids.get(element)) || missingValuesCells.has(state.ids.get(element)) || dateTimeCells.has(state.ids.get(element)) || !!graphNodeOf(element) || /;btnProduceType;mn;dpt(?:Default|Supplement|Replace)$/.test(getTid(element)??'') || replacementCells.has(state.ids.get(element)) || unionCells.has(state.ids.get(element)) || joinCells.has(state.ids.get(element)) || /^MF;TF(?:-\d+)?;ModelForm;PreviewWindow;p\.h;close$/.test(getTid(element)??'') || element===storageRoot || filterCells.has(state.ids.get(element)) || reformColumnCells.has(state.ids.get(element)) || outputColumnCells.has(state.ids.get(element)) || tableScrollers.has(state.ids.get(element)) || viewerControls.has(state.ids.get(element)) || /;ViewsForm;colVendors_Визуализаторы>[^;]+;TreeText$/.test(getTid(element)??'') || processGridControls.has(state.ids.get(element)) || processExpanders.has(state.ids.get(element)) || outputScroller(element) || importScroller(element) || processCells.has(state.ids.get(element)) || processMenuControls.has(state.ids.get(element)) || sortingCells.has(state.ids.get(element)) || groupingCells.has(state.ids.get(element)) || !!comboPart(element) || importColumnCellRefs.has(state.ids.get(element)) || element.matches('button,input,textarea,select,[contenteditable="true"],[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],[role="menuitem"],[role="tab"],[role="treeitem"],[role="option"],[role="spinbutton"]')
+      || wizard.calculator_preview?.status==='observed'&&getTid(element)===wizard.calculator_preview.root_tid+';p.h;close'
       || /;(?:Input|Output)_[^;]+$|;Label;Label$|;Graph;[^;]+$|;btn[^;]+$|;edt[^;]+$|;mi[^;]+$|;tb(?:-\d+)?$/.test(getTid(element) ?? '')
       // Pinned E2E bg/selectors.ts:272,279,286: palette tree labels and
       // expanders are spans without button/treeitem roles in some UI builds.
@@ -4284,6 +4289,44 @@ function readRenderedInputMapping(observation) {
             &&s.ui.dialogs[0].ref===s.wizard.calculator_preview.root_ref
             &&s.ui.masks.every(m=>m.kind==='modal_background'&&m.target_tid===s.wizard.root_tid);
           for(let attempt=0;attempt<60&&owned(observed)&&!accepted(observed);attempt++) {
+            if(observed.ui.dialogs.length===1&&observed.ui.dialogs[0].identity?.anchor_tid==='msgbox') {
+              const dialog=observed.ui.dialogs[0],wizardRoot=postActionRoot;
+              postActionRoot=dialog.ref;
+              try {
+                const popup=await readUi(),buttons=popup.ui.elements.filter(e=>e.tid==='msgbox;tlb;ok'
+                  &&e.label==='OK'&&e.signature?.dialog_ref===dialog.ref&&e.allowed_actions.includes('click'));
+                const readError=()=>page.evaluate(()=>{
+                  const own=(o,k)=>o&&Object.getOwnPropertyDescriptor(o,k)?.value;
+                  const instance=own(globalThis.bg?.ext?.errormessage?.ErrorMsg,'FInstance'),box=own(instance,'FMessageBox');
+                  const root=own(own(box,'el'),'dom'),roots=document.querySelectorAll('[data-tid="msgbox"]');
+                  if(roots.length!==1||roots[0]!==root||globalThis.Ext?.getCmp?.(root.id)!==box)return null;
+                  const text=root.innerText;
+                  return typeof text==='string'&&text.length>0&&text.length<=4096&&!text.includes('\0')?text:null;
+                });
+                const message=await readError(),field=/Ошибка разбора выражения\s*["«]([A-Za-z_][A-Za-z0-9_]{0,127})["»]/.exec(message??'')?.[1];
+                if(!owned(popup)||popup.ui.masks.length||popup.ui.dialogs.length!==1||popup.ui.dialogs[0].ref!==dialog.ref
+                  ||popup.ui.dialogs[0].title!=='Loginom '+current.loginom_build||buttons.length!==1
+                  ||task.snapshot.node_calculator?.verified!==true||!task.snapshot.node_calculator.expressions.some(e=>e.name===field))break;
+                const checked=await readUi();
+                if(!owned(checked)||checked.ui.masks.length||!same(checked.ui.dialogs,popup.ui.dialogs)
+                  ||!same(checked.dom_epoch,popup.dom_epoch)||await readError()!==message)break;
+                const target=await checkedHandle(buttons[0],checked.ui.elements.find(e=>e.ref===buttons[0].ref),'click');
+                if(!same(await boundNode(),current.prepared_node_context))break;
+                const epoch=await page.evaluate(()=>{const state=globalThis[Symbol.for('loginom-dock.workspace-ui.identity.v1')];
+                  state.captureMutations(state.observer.takeRecords());return {document:state.epoch,revision:state.revision};});
+                if(!same(checked.dom_epoch,epoch))fail('UI_EPOCH_CHANGED','Calculator preview error changed before OK');
+                timeout();mouseHeld=true;await page.mouse.click(target.point.x,target.point.y,{clickCount:1,button:'left'});mouseHeld=false;
+                calculatorDialogFailure={status:'observed',root_ref:current.wizard.root_ref,message,field_name:field,source:'loginom_calculator_preview_error_dialog'};
+                record('wizard_calculator_preview_error_dismissed',{root_ref:current.wizard.root_ref,message});
+              } finally {postActionRoot=wizardRoot;}
+              if(calculatorDialogFailure) {
+                observed=await readUi();
+                if(!owned(observed)||observed.ui.dialogs.length||observed.ui.masks.length)
+                  fail('WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED','Calculator did not return from its error dialog');
+                record('wizard_calculator_validation_failed',calculatorDialogFailure);
+                fail('WIZARD_CALCULATOR_VALIDATION_FAILED',calculatorDialogFailure.message);
+              }
+            }
             const validation=observed.wizard.calculator_validation;
             if(observed.ui.dialogs.length===0&&observed.ui.masks.length===0&&validation?.status==='observed') {
               timeout();await page.waitForTimeout(Math.min(200,timeout()));const fresh=await readUi();
@@ -4751,6 +4794,10 @@ function readRenderedInputMapping(observation) {
       let observed = {};
       if (error?.code === 'UI_SCAN_LIMIT') observed = { observation_required: true, scan: { complete: false, limit_exceeded: true } };
       else try { observed = await readUi(); } catch { /* Never replace uncertainty with a fabricated observation. */ }
+      if(error?.code==='WIZARD_CALCULATOR_VALIDATION_FAILED'&&calculatorDialogFailure
+        &&observed.prepared_node_context?.verified===true&&observed.wizard?.stage==='calculator'
+        &&observed.wizard.root_ref===calculatorDialogFailure.root_ref&&!observed.ui.dialogs.length&&!observed.ui.masks.length)
+        observed.wizard.calculator_validation=calculatorDialogFailure;
       outcome = result(effectPossible ? 'AMBIGUOUS' : 'NOT_APPLIED', observed,
         { code: error?.code ?? 'UI_BROWSER_CALL_FAILED', message: error?.code ? error.message : 'The browser did not confirm the UI operation; inspect the workspace before recovery' });
     } finally {

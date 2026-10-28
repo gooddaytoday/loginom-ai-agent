@@ -1569,7 +1569,7 @@ test('calculator Preview accepts only its native modal and closes with an observ
   let popup;const click=page.mouse.click;page.mouse.click=async(...args)=>{await click(...args);
    if(popup){popup.remove();return;}
    popup=page.add('div',c.base+';CalcPreviewForm','',{x:100,y:100,width:600,height:400});popup.id='preview';popup.attrs.class='x-window';
-   page.add('button',c.base+';CalcPreviewForm;p.h;close','Закрыть',{x:650,y:110,width:30,height:30},popup);
+   page.add('div',c.base+';CalcPreviewForm;p.h;close','',{x:650,y:110,width:30,height:30},popup).attrs.class='x-tool';
    const records=fault==='console_error'?[{isModel:true,data:{Text:'Revenue: неверный аргумент',MessageType:2}}]:[];
    const previewView={el:{dom:popup}},store={isLoading:()=>fault==='loading',getData:()=>({items:records}),getCount:()=>fault==='incomplete'?1:records.length};
    const form={FView:previewView,FCodeConsole:{FConsoleStore:store}};previewView.Controller=form;
@@ -1581,12 +1581,48 @@ test('calculator Preview accepts only its native modal and closes with an observ
   const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
   assert.equal(result.status,fault==='none'?'SUCCEEDED':'AMBIGUOUS',fault+JSON.stringify(result.error));
   assert.equal(page.events.filter(e=>e==='click').length,1);
-  if(fault==='console_error')assert.equal(result.error.code,'WIZARD_CALCULATOR_VALIDATION_FAILED');
+  if(fault==='console_error') {
+   assert.equal(result.error.code,'WIZARD_CALCULATOR_VALIDATION_FAILED');
+   assert.equal(result.output.wizard.calculator_validation.source,'loginom_calculator_preview_console');
+  }
   if(fault!=='none')continue;
   const close=result.output.ui.elements.find(e=>e.tid.endsWith(';CalcPreviewForm;p.h;close'));
   const closed=await execute({mode:'act',snapshot:result.output,action:{verb:'click',ref:close.ref}});
   assert.equal(closed.status,'SUCCEEDED',JSON.stringify(closed.error));
   assert.equal(closed.output.wizard.calculator_preview.status,'absent');
+ }
+});
+
+test('observed Preview parse-error msgbox is read and dismissed before a typed refusal',async()=>{
+ for(const fault of ['none','foreign_message','other_field']) {
+  const page=new Page(),c=wizardStepFixture(page);c.marker.attrs['data-tid']=c.base+';CalcDataWizard;btnAddExpr';
+  page.add('button',c.base+';CalcDataWizard;btnPreview','Предпросмотр',{x:20,y:20,width:90,height:24},c.form);
+  const message='Loginom '+build+' Настройка прервана. Ошибка разбора выражения "Twice". Неправильное выражение: "VALUE+". OK';
+  const components={};page.context.Ext={getCmp:id=>components[id]};let dialog;
+  const execute=options=>vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1'}},...options},
+   async()=>({verified:true,document_id:'doc',workflow_id:'wf',node_id:'node',surface:'wizard',tid:c.base}));
+  const snapshot=(await execute({mode:'observe'})).output;
+  snapshot.node_calculator={verified:true,expressions:[{name:fault==='other_field'?'Other':'Twice'}]};
+  const button=snapshot.ui.elements.find(e=>e.tid.endsWith(';btnPreview')),click=page.mouse.click;
+  page.mouse.click=async(...args)=>{await click(...args);
+   if(dialog){dialog.remove();return;}
+   dialog=page.add('div','msgbox','',{x:300,y:200,width:400,height:200});dialog.attrs.class='x-window x-message-box';dialog.id='error-box';dialog.innerText=message;
+   page.add('h1',null,'Loginom '+build,undefined,dialog).attrs.role='heading';
+   page.add('div',null,message,undefined,dialog);
+   page.add('a','msgbox;tlb;ok','OK',{x:450,y:350,width:60,height:30},dialog);
+   const box={el:{dom:dialog}};components['error-box']=box;
+   page.context.bg.ext={errormessage:{ErrorMsg:{FInstance:{FMessageBox:fault==='foreign_message'?{}:box}}}};
+  };
+  page.waitForTimeout=async ms=>page.clock.advance(ms);
+  const result=await execute({mode:'act',snapshot,action:{verb:'click',ref:button.ref}});
+  assert.equal(result.error.code,fault==='none'?'WIZARD_CALCULATOR_VALIDATION_FAILED':'WIZARD_CALCULATOR_PREVIEW_NOT_CONFIRMED',fault+JSON.stringify(result.error));
+  assert.equal(page.events.filter(e=>e==='click').length,fault==='none'?2:1);
+  if(fault==='none') {
+   assert.equal(result.output.wizard.calculator_validation.field_name,'Twice');
+   assert.equal(result.output.wizard.calculator_validation.message,message);
+   assert.equal(result.output.ui.dialogs.length,0);
+  }
  }
 });
 
