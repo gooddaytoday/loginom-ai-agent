@@ -38,3 +38,4 @@ logs/
 tsconfig.tsbuildinfo
 /.local/project-memory/
 /packages/opencode/config.json
+/artifacts/
