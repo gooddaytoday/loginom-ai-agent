@@ -41,7 +41,9 @@ export function readNodeEvents(source: string): NodeEvents {
     seen.set(key, payload)
     const start = state.time?.start, end = state.time?.end
     if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) failures.push("events: tool call timing missing/invalid")
-    calls.push({ index, start, end, tool: part.tool, input: state.input ?? {}, output: typeof state.output === "string" ? firstObject(state.output) : state.output ?? {} })
+    // Search returns prose/source snippets, whose braces are not receipt JSON.
+    const output = part.tool === "loginom_find" ? {} : typeof state.output === "string" ? firstObject(state.output) : state.output ?? {}
+    calls.push({ index, start, end, tool: part.tool, input: state.input ?? {}, output })
   }
   return { calls, failures }
 }
