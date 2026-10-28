@@ -4854,6 +4854,28 @@ test('D84 calculator token caption is metadata only for the exact native breadcr
  }
 });
 
+test('D84 Calculator token graph caption stays visible only for its exact prepared native owner',async()=>{
+ for(const fault of ['none','guid','icon','foreign_dom','secret_attribute','unbound','duplicate']) {
+  const page=new Page(),tid='MF;TF-1;Graph;Точные_токены_Bread_и_Milk';
+  const body=page.add('g',tid,'',{x:100,y:200,width:150,height:80});
+  page.add('span',tid+';Label;Label','Точные токены Bread и Milk',{x:110,y:220,width:120,height:30},body);
+  page.add('g',tid+';Input_Data-0','',{x:90,y:220,width:10,height:10},body);
+  const f=page.graphModels.get(body.parentElement),owner=f.byTid.get(tid);
+  owner.FGuid='node';owner.FIconCls='bg-vendor-icon-calcdata';
+  if(fault==='guid')owner.FGuid='foreign';if(fault==='icon')owner.FIconCls='bg-vendor-icon-importtext';
+  if(fault==='foreign_dom')f.states.set(owner.FCell,{shape:{node:page.document.body}});
+  if(fault==='secret_attribute')body.attrs['aria-label']='password';
+  if(fault==='duplicate')page.add('g',tid,'',body.box,body.parentElement);
+  const result=await vm.runInContext('('+workspaceUiCapability.toString()+')',page.context)(page,
+   {expected_build:build,expected_origin:origin,mode:'observe',...(fault==='unbound'?{}:{prepared_node_context:{node:{node_id:'node'},workflow_ref:{prefix:'MF;TF-1',navigation_path:[]}}})},
+   async()=>({verified:true,node_id:'node',surface:'graph',tid}));
+  assert.equal(result.status,'SUCCEEDED',fault);
+  assert.equal(result.output.ui.elements.some(e=>e.tid===tid&&e.graph_node?.part==='body'),fault==='none',fault);
+  assert.equal(result.output.ui.elements.some(e=>e.tid===tid+';Label;Label'),fault==='none',fault);
+  assert.deepEqual(page.events,[]);
+ }
+});
+
 test('hidden Calculator node refuses foreign native identity, DOM and CSS owners',async()=>{
   for(const fault of ['guid','tree','dom','component','hidden','visibility','opacity','sensitive','icon_css','unknown_mode','both_modes','foreign_path','foreign_label','missing_navigation','missing_guid','missing_opening']) {
     const {page,crumbs,nodeTree,component,binding}=await calculatorNodeOverflowFixture();

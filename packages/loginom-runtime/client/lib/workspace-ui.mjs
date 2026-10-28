@@ -510,6 +510,22 @@ export function workspaceUiCapability(page, task, readNodeContext, captureProces
     })();
     const definitionMetadataTid=memoRead(element=>{
       const tid=getTid(element)??'';
+      // Input Done returns to the graph. Its caption remains node metadata,
+      // bound to the prepared GUID and native Calculator shape after repaint.
+      if(preparedNodeId&&preparedGraphTid?.startsWith(definitionPrefix+';Graph;')
+        &&/token|токен/i.test(preparedGraphTid)
+        &&(tid===preparedGraphTid||tid.startsWith(preparedGraphTid+';')
+          &&/^(?:Label;Label|Setting|Visualizers|(?:Input|Output)_(?:Data|Var)-[0-9]+)$/.test(tid.slice(preparedGraphTid.length+1)))) {
+        const app=globalThis.bg?.app,model=app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;
+        const diagram=model?.FDiagram,graph=diagram?.FmxGraph,nodes=diagram?.FNodes?.FCollection;
+        const owners=Array.isArray(nodes)&&nodes.length<=200?nodes.filter(n=>n.FGuid===preparedNodeId):[];
+        const owner=owners.length===1?owners[0]:null,body=owner&&graph?.view?.getState?.(owner.FCell)?.shape?.node;
+        if(app?.ModelForm&&model instanceof app.ModelForm&&owner?.FIconCls==='bg-vendor-icon-calcdata'
+          &&body&&getTid(body)===preparedGraphTid&&(tids.get(preparedGraphTid)??[]).length===1
+          &&graph.container?.contains(body)&&graph.container.contains(element)&&(tids.get(tid)??[]).length===1
+          &&!element.isContentEditable&&!element.closest('[contenteditable="true"],a[href]'))
+          return definitionPrefix+';Graph;'+preparedGraphTid.slice((definitionPrefix+';Graph;').length).replace(/token|токен/gi,'caption')+tid.slice(preparedGraphTid.length);
+      }
       // D84: "Точные токены товаров" is a node caption in data-tid, not
       // an authentication control. Exempt only its token word, with the exact
       // native Calculator and its opened port/settings still bound.
