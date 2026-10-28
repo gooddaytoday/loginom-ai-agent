@@ -155,11 +155,10 @@ describe("opencode run (non-interactive subprocess)", () => {
     30_000,
   )
 
-  // The test provider's SSE error item is interpreted by the SDK as an unknown
-  // finish, not a fatal provider/session error. Unknown finishes should continue
-  // the prompt loop so a subsequent response can complete the run.
+  // The SDK synthesizes a finish without a terminal reason for this SSE error.
+  // Retry that incomplete provider turn while preserving previous output.
   cliIt.concurrent(
-    "unknown stream finish preserves partial output and continues",
+    "incomplete stream preserves previous output and retries",
     ({ llm, opencode }) =>
       Effect.gen(function* () {
         yield* llm.push(
@@ -306,7 +305,7 @@ describe("opencode run (non-interactive subprocess)", () => {
   )
 
   cliIt.concurrent(
-    "--format json records an unknown stream finish and continuation",
+    "--format json retries an incomplete stream without a successful step finish",
     ({ llm, opencode }) =>
       Effect.gen(function* () {
         yield* llm.push(
@@ -327,14 +326,18 @@ describe("opencode run (non-interactive subprocess)", () => {
           "tool_use",
           "step_finish",
           "step_start",
-          "step_finish",
           "step_start",
           "text",
           "step_finish",
         ])
         expect(events[1]?.part).toEqual(expect.objectContaining({ type: "text", text: "partial json" }))
-        expect(events[5]?.part).toEqual(expect.objectContaining({ type: "step-finish", reason: "unknown" }))
-        expect(events[7]?.part).toEqual(expect.objectContaining({ type: "text", text: "recovered" }))
+        expect(opencode.parseJsonEvents(result.stdout)).toContainEqual(
+          expect.objectContaining({
+            type: "session.status",
+            status: expect.objectContaining({ type: "retry", attempt: 1 }),
+          }),
+        )
+        expect(events[6]?.part).toEqual(expect.objectContaining({ type: "text", text: "recovered" }))
         expect(events.at(-1)?.part).toEqual(expect.objectContaining({ type: "step-finish", reason: "stop" }))
       }),
     60_000,

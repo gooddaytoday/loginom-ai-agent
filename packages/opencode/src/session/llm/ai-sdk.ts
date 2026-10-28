@@ -88,6 +88,15 @@ export function toLLMEvents(
     case "finish-step":
       if (event.rawFinishReason === "network_error")
         return Effect.fail(new ProviderError.ResponseStreamError("Provider finish_reason: network_error"))
+      // AI SDK synthesizes an "other" finish when SSE ends before the provider's
+      // terminal chunk. Let the bounded retry policy handle it instead of
+      // starting another session turn (which resets the retry counter).
+      if (event.finishReason === "other" && !event.rawFinishReason)
+        return Effect.fail(
+          new ProviderError.ResponseStreamError(
+            "Соединение с моделью прервано до завершения ответа. Повторите запрос.",
+          ),
+        )
       return Effect.sync(() => {
         const original = providerMetadata(event.providerMetadata)
         const metadata =
