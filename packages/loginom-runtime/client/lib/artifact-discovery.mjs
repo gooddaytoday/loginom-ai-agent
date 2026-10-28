@@ -443,10 +443,15 @@ export async function largeUploadNative(page, task) {
   if(t.mode==='cancel'&&quiet)return {active:0,bytes,quiet:true};
   if(t.mode==='cancel'&&!quiet){
    if(b.cancelClicked)return {active:sender.FActiveLoadersCount,bytes,quiet:false};
+   if(loader?.IsDisposed===true)return {active:sender.FActiveLoadersCount,bytes,quiet:false,waiting:true};
    if(!loader?.Container?.el?.dom?.isConnected)return {active:sender.FActiveLoadersCount,bytes,quiet:false};
    const container=loader.Container,items=container.items?.items,button=items?.[3],el=button?.el?.dom,tid=el?.getAttribute('data-tid');
-   if(!Array.isArray(items)||items.length!==4||!container.el.dom.contains(el)||!visible(el)||!tid||all(tid).length!==1||button.disabled
+   if(!Array.isArray(items)||items.length!==4||!container.el.dom.contains(el)
       ||!el.querySelector('.bg-icon-cancel-negative'))fail();
+   // FileReader failure can dispose this exact loader while cancellation is
+   // being captured. Without a data-tid, wait only; never select a substitute.
+   if(!tid||!visible(el)||button.disabled)return {active:sender.FActiveLoadersCount,bytes,quiet:false,waiting:true};
+   if(all(tid).length!==1)fail();
    b.cancelClicked=true;return {active:sender.FActiveLoadersCount,bytes,quiet:false,gesture:gesture(tid,'cancel')};
   }
   if(!quiet)fail();
@@ -492,10 +497,16 @@ export async function largeUploadNative(page, task) {
  },task);
  if(read.gesture){
   const target=page.locator('[data-tid='+JSON.stringify(read.gesture.tid)+']');
-  if(await target.count()!==1||!await target.isVisible()||!await target.isEnabled())throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+  if(await target.count()!==1||!await target.isVisible()||!await target.isEnabled()){
+   if(read.gesture.kind==='cancel')return {...read,gesture:undefined,quiet:false,waiting:true};
+   throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+  }
   const handle=await target.elementHandle();
   try{
-   if(!handle||!await handle.evaluate((el,t)=>{const b=globalThis[Symbol.for('loginom-dock.large-upload.v1')]?.get(t.id);const form=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;return b&&document===b.document&&form===b.form&&form.FFileSenderManager===b.sender&&form.FFileInput===b.input&&b.gesture?.element===el&&b.gesture.tid===t.tid&&el.isConnected&&el.getAttribute('data-tid')===t.tid;},{id:task.operation_id,tid:read.gesture.tid}))throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+   if(!handle||!await handle.evaluate((el,t)=>{const b=globalThis[Symbol.for('loginom-dock.large-upload.v1')]?.get(t.id);const form=globalThis.bg?.app?.Application?.FInstance?.FMainForm?.Items?.Workspace?.getActiveTab?.()?.Controller?.FController;return b&&document===b.document&&form===b.form&&form.FFileSenderManager===b.sender&&form.FFileInput===b.input&&b.gesture?.element===el&&b.gesture.tid===t.tid&&el.isConnected&&el.getAttribute('data-tid')===t.tid;},{id:task.operation_id,tid:read.gesture.tid})){
+    if(read.gesture.kind==='cancel')return {...read,gesture:undefined,quiet:false,waiting:true};
+    throw Error('LOGINOM_UPLOAD_UNCERTAIN');
+   }
    await handle.click({timeout:Math.max(1,Math.min(5000,task.deadline_at-Date.now()))});
   }finally{await handle?.dispose();}
  }

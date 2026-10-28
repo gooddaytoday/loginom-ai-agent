@@ -383,7 +383,7 @@ function largeNativeFixture() {
  const task={operation_id:'large',snapshot:{workflow_ref:{prefix,tab_tid:'tab'}},expected_origin:origin,expected_build:'7.4.2',
   binding:{document_id:'prep-doc',loginom_account:'operator'},deadline_at:Date.now()+10000,
   artifact:{artifact_id:'artifact',name,bytes:size,sha256:'a'.repeat(64),upload:{directory:'/user',destination,overwrite:'reject'}}};
- return {task,page,sender,form,row,records,store,clicks,realm,
+ return {task,page,sender,form,row,records,store,clicks,realm,elements,
   publish:()=>{records.push({data:row});store.loadCount++;},
   start:()=>{const cancel=element('toast;cancel');sender.FActiveLoadersCount=1;sender.FCurrentUploadFilePaths={[destination]:true};
    form.FFileInput.files=[{name,size}];sender.FUploadViewController.FFileLoaders=[{FullFilename:destination,File:{size},FStart:2**32,Container:{el:{dom:element('toast;container')},items:{items:[{}, {}, {},{el:{dom:cancel}}]}}}];},
@@ -428,4 +428,32 @@ test('large native steps cross the production typed browser parser',async()=>{
  const raw=await vm.runInNewContext('('+makeLargeUploadCode({...f.task,mode:'bind'})+')')(f.page);
  const reply=parseCapabilityResult({content:[{type:'text',text:'### Result\n'+JSON.stringify(raw)}]});
  assert.equal(reply.status,'SUCCEEDED');assert.equal(reply.action_key,'artifact.large.native');assert.equal(reply.output.reused,false);assert.equal(reply.output.bytes,0);
+});
+
+test('native cancellation waits for a loader disposed between capture and the cancel gesture without replay',async()=>{
+ const {largeUploadNative}=await import('../lib/artifact-discovery.mjs');
+ const f=largeNativeFixture(),call=mode=>largeUploadNative(f.page,{...f.task,mode});
+ await call('bind');f.start();
+ const evaluate=f.page.evaluate;
+ f.page.evaluate=async(fn,t)=>{
+  const result=await evaluate(fn,t);
+  if(t.mode==='cancel'&&result.gesture){
+   f.elements.delete('toast;cancel');
+   f.sender.FActiveLoadersCount=0;f.sender.FCurrentUploadFilePaths={};f.sender.FUploadViewController.FFileLoaders=[];f.form.FFileInput.files=[];
+  }
+  return result;
+ };
+ assert.equal((await call('cancel')).quiet,false);
+ assert.equal((await call('cancel')).quiet,true);
+ await call('refresh');assert.equal((await call('cleanup')).clean,true);
+ assert.deepEqual(f.clicks,['MF;TF-2;FileStorageForm;btnRefresh']);
+});
+
+test('missing cancel data-tid waits read-only for native disposal and never targets another control',async()=>{
+ const {largeUploadNative}=await import('../lib/artifact-discovery.mjs');
+ const f=largeNativeFixture(),call=mode=>largeUploadNative(f.page,{...f.task,mode});
+ await call('bind');f.start();f.elements.get('toast;cancel').getAttribute=()=>null;
+ assert.equal((await call('cancel')).quiet,false);assert.deepEqual(f.clicks,[]);
+ f.sender.FActiveLoadersCount=0;f.sender.FCurrentUploadFilePaths={};f.sender.FUploadViewController.FFileLoaders=[];f.form.FFileInput.files=[];
+ assert.equal((await call('cancel')).quiet,true);
 });
