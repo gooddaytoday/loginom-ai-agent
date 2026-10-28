@@ -238,7 +238,7 @@ test('verification reveals its original clipped or offscreen file owner once bef
     assert.equal(result.trace.filter(t=>t.event==='download_file_revealed').length,1);
     assert.equal(result.trace.find(t=>t.event==='download_file_revealed').delta,50);
     assert.equal(result.trace.find(t=>t.event==='download_reveal_confirmed').interaction,'point_observed');
-    assert.equal(f.waitCount(),mode==='delayed_repaint'?4:2);
+    assert.equal(f.waitCount(),mode==='delayed_repaint'?5:3);
   }
 });
 
@@ -411,4 +411,22 @@ test('TXT download preserves exact name and destination and delegates one owned 
  const f=fixture('transactions.txt'),r=await f.run();
  assert.equal(r.status,'SUCCEEDED');assert.equal(r.cleanup_complete,true);
  assert.equal(r.output.destination,'/test/transactions.txt');assert.deepEqual(f.calls,['listen','click','save']);
+});
+
+test('completed download waits out a post-copy dialog using observations and one gesture',async()=>{
+ const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page),save=f.download.saveAs;let copied=false,reads=0;
+ f.download.saveAs=async path=>{await save(path);copied=true;};
+ f.page.uiSnapshot=()=>{const s=snapshot();if(copied&&++reads===1)s.ui.dialogs=[{ref:'late-dialog',identity:{anchor_tid:'toast'}}];return s;};
+ const result=await f.run();assert.equal(result.status,'SUCCEEDED',JSON.stringify(result));
+ assert.equal(f.calls.filter(c=>c==='click').length,1);assert.equal(f.calls.filter(c=>c==='save').length,1);
+ assert.ok(reads>=3);assert.ok(result.trace.some(e=>e.event==='download_post_observation_settled'));
+});
+test('post-copy blocking dialog cannot extend the original download deadline',async()=>{
+ const f=fixture(),snapshot=f.page.uiSnapshot.bind(f.page),save=f.download.saveAs;let copied=false;
+ f.options.deadline_at=f.page.clock+1000;
+ f.download.saveAs=async path=>{await save(path);copied=true;};
+ f.page.uiSnapshot=()=>{const s=snapshot();if(copied)s.ui.dialogs=[{ref:'persistent-dialog',identity:{anchor_tid:'msgbox'}}];return s;};
+ const result=await f.run();assert.equal(result.error.code,'DOWNLOAD_CONTEXT_CHANGED');
+ assert.equal(f.calls.filter(c=>c==='click').length,1);assert.equal(result.cleanup_complete,true);
+ assert.equal(result.output.download_completed,undefined);
 });

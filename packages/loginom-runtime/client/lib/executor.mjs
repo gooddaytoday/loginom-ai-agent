@@ -218,12 +218,13 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     phase,effect_possible:gesture,cleanup_complete:!gesture || completed,output,
     error:code?{code,message:code}:null,trace});
   const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-  const contextMatches=current=>current.authenticated && current.origin===task.expected_origin
+  const contextMatches=(current,allowBlockers=false)=>current.authenticated && current.origin===task.expected_origin
     && current.loginom_build===task.expected_build && same(current.workflow_ref,task.snapshot.workflow_ref)
     && current.dom_epoch?.document===task.snapshot.dom_epoch?.document
     && current.active_tab_ref===task.snapshot.active_tab_ref && same(current.package_identity,task.snapshot.package_identity)
     && current.file_storage?.status==='observed' && current.file_storage.directory===destination.directory
-    && current.ui.dialogs.length===0 && current.ui.masks.length===0;
+    && Array.isArray(current.ui?.dialogs)&&Array.isArray(current.ui?.masks)
+    && (allowBlockers||current.ui.dialogs.length===0&&current.ui.masks.length===0);
   try {
     let before=await observe(page);
     if(before.status!=='SUCCEEDED' || !contextMatches(before.output)
@@ -405,8 +406,19 @@ async function browserArtifactDownload(page,task,observe,act,reveal) {
     if(await download.failure()!==null)return result('AMBIGUOUS','DOWNLOAD_FAILED');
     completed=true;
     browserStep='post_download_observation';
-    const after=await observe(page);
-    if(after.status!=='SUCCEEDED' || !contextMatches(after.output)
+    let after=await observe(page);
+    const postStarted=Date.now(),postDeadline=task.deadline_at??postStarted+15000;
+    let quiet=0,previousEpoch=null;
+    for(let sample=0;sample<100&&Date.now()<postDeadline;sample++){
+      if(after.status!=='SUCCEEDED'||!contextMatches(after.output,true)
+        ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes)break;
+      const ready=contextMatches(after.output),epoch=after.output.dom_epoch;
+      quiet=ready?(same(epoch,previousEpoch)?quiet+1:1):0;previousEpoch=epoch;
+      if(quiet>=2){trace.push({event:'download_post_observation_settled',samples:sample+1,elapsed_ms:Date.now()-postStarted});break;}
+      await page.waitForTimeout(Math.min(200,Math.max(1,postDeadline-Date.now())));
+      after=await observe(page);
+    }
+    if(quiet<2||Date.now()>=postDeadline||after.status!=='SUCCEEDED' || !contextMatches(after.output)
       ||task.output_binding&&target(after.output)?.storage_entry?.bytes!==task.expected_bytes){
       const current=after.output??{};
       trace.push({event:'download_post_context_refused',checks:{observation:after.status==='SUCCEEDED',authenticated:current.authenticated===true,
@@ -1555,7 +1567,7 @@ export function parseCapabilityResult(response) {
 
 export function createActionRuntime({ pinned, execute, artifactStore, allowCandidate = false, onRecord = async () => {}, redactor, now = Date.now, targetBuild = pinned?.compatibility?.loginom_build, targetOrigin, getNodeContractPins = () => pinned.pins, nodeTargetAdapterFactory = createNodeTargetBrowserAdapter,
   javascriptSourceAdapterFactory = createJavascriptManagedSourceAdapter,
-  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory, serverSourceCache = true }) {
+  nodeApplyHandlers = new Map(), nodeApplyDriverFactory, getStorageBinding = () => null, browserRecovery = false, cacheDirectory }) {
   if (!pinned?.actions || !pinned?.selectors) throw new Error('A verified pinned action catalog is required');
   let pending = null;
   let running = false;
@@ -2493,6 +2505,13 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
           {code:'STORAGE_CONTROL_UNAVAILABLE',storageControl:control});return entries[0];};
         const detail=(s,e)=>read({rootRef:e.ref,observationId:s.observation_id});
         const act=async(s,e,verb='click',extra={})=>{
+          // Scrolling detaches virtual rows. Preserve the original grid root
+          // so the post-gesture observation can confirm this one scroll.
+          if(verb==='scroll'){
+            guard();const result=await runtime.uiAct({verb,ref:e.ref,...extra},{observationId:s.observation_id,operationId:id+':nav'+(++step),signal,deadlineAt:deadline});
+            if(result.status!=='SUCCEEDED'||result.cleanup_complete!==true)throw Error('Server storage navigation requires inspection: '+result.operation_id);
+            return;
+          }
           const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
           const binding=state=>[state.origin,state.loginom_build,state.dom_epoch?.document,state.workflow_ref,state.active_tab_ref,state.package_identity,state.file_storage?.directory??null];
           const original=binding(s);let quiet=null;
@@ -2580,12 +2599,6 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         }finally{storageNavigating=false;}
       })();
       if(name==='dock_storage_download_start'){
-        if(!serverSourceCache){
-          checkId(request.operation_id);
-          return {result_version:'user-v1',operation_id:request.operation_id,status:'FAILED',action_key:'storage.download',
-            phase:'admission',effect_possible:false,cleanup_complete:true,output:{},
-            error:{code:'SERVER_CACHE_DISABLED',message:'Автоматическое скачивание серверного источника в cache отключено: для серверного файла точная сверка N недоступна. Доступны ограниченный preview и выбор существующего серверного источника без upload. Цикл sample→full не начат.'}};
-        }
         if(storageNavigating||running||pending||nodeJobs.unsettled||sourceReads.unsettled||delivery.unsettled)
           throw Error('Resolve the pending Dock operation before downloading');
         if(operations.has(request.operation_id)||auxiliary.has(request.operation_id)&&auxiliary.get(request.operation_id).signature!=='storage.download:'+request.server_source_ref
@@ -2627,8 +2640,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
     waitNodeApply:(id,options)=>sourceReads.has(id)?sourceReads.wait(id,options):nodeJobs.wait(id,options),
     cancelNodeApply:id=>sourceReads.has(id)?sourceReads.cancel(id):nodeJobs.cancel(id),
     stopNodeApply:id=>nodeJobs.stop(id),
-    tools: [...executorTools,...(allowCandidate&&serverDownloads?serverDownloadTools.map(tool=>!serverSourceCache&&tool.name==='dock_storage_download_start'
-      ?{...tool,description:'Server source cache is disabled in this release. No download or sample→full cycle starts. For a server file exact N verification is unavailable; use bounded preview and the existing storage source without upload. Native exports.text file_artifacts are downloaded by their ordinary export path.'}:tool):[]),...(allowCandidate && artifactStore ? [artifactUploadTool,artifactVerifyTool,...deliveryApiTools] : []),
+    tools: [...executorTools,...(allowCandidate&&serverDownloads?serverDownloadTools:[]),...(allowCandidate && artifactStore ? [artifactUploadTool,artifactVerifyTool,...deliveryApiTools] : []),
       ...(allowCandidate&&nodeApplyHandlers.has('imports.text')&&nodeApplyDriverFactory?nodeApiTools:[])],
     assertPreparationAllowed() {
       if (running || pending || sourceReads.unsettled) throw new Error('Dock preparation cannot run while an action is running or its effect remains uncertain');
@@ -3100,7 +3112,7 @@ export function createActionRuntime({ pinned, execute, artifactStore, allowCandi
         try {signal?.throwIfAborted();await remember(attempt,'download_prepared');signal?.throwIfAborted();}
         catch(error){await lease.release();throw error;}
         let code;
-        try {signal?.throwIfAborted();code=buildDownload({...options,download_path:lease.path});}
+        try {signal?.throwIfAborted();code=buildDownload({...options,download_path:lease.path,deadline_at:attempt.deadline});}
         catch(error){await lease.release();throw error;}
         operation.verification=attempt;pending=operation;observations.clear();
         const receipt=receiptOptions(operation,verificationId,'artifact.download',signature);

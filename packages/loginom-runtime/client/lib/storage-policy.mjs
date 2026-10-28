@@ -141,7 +141,9 @@ export function validateImportSource(source) {
 
 export function serverDownloadBudget(bytes) {
   if(!Number.isSafeInteger(bytes)||bytes<0)throw Error('Native server size is required');
-  return Math.min(7200000,120000+Math.ceil(bytes/(5*1024*1024)*1000));
+  // LAB-386 server5r: the native 2 GiB download event arrived after ~525 s.
+  // Keep the existing per-job reserve for its disk copy and identity checks.
+  return Math.min(7200000,120000+Math.ceil(bytes/(4*1024*1024)*1000));
 }
 
 // The browser writes to disk; this registry transports only paths and metadata.

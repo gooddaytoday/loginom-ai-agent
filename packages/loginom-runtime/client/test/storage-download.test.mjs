@@ -19,21 +19,21 @@ async function settled(registry,id='download') {
  while(registry.status(id).state==='running')await registry.wait(id,{timeoutMs:100});
  return registry.status(id);
 }
-test('explicit disable refuses server cache before lookup or download and retains source tools',async t=>{
- const f=await fixture(t),directory=join(f.root,'disabled-cache');
+test('default server cache requires an observed native source before any browser download',async t=>{
+ const f=await fixture(t),directory=join(f.root,'unobserved-cache');
  const r=createActionRuntime({pinned:{actions,selectors,pins:{},compatibility:{loginom_build:build}},
-  allowCandidate:true,cacheDirectory:directory,serverSourceCache:false,execute:()=>assert.fail('Disabled cache must not inspect or click the browser')});
- const outcome=await r.serverDownload(f.request,'dock_storage_download_start');
- assert.equal(outcome.status,'FAILED');assert.equal(outcome.error.code,'SERVER_CACHE_DISABLED');
- assert.match(outcome.error.message,/для серверного файла точная сверка N недоступна/);
+  allowCandidate:true,cacheDirectory:directory,execute:()=>assert.fail('An unobserved reference must not reach the browser')});
+ await r.serverDownload(f.request,'dock_storage_download_start');
+ const outcome=await r.serverDownload({operation_id:'download',timeout_ms:100},'dock_storage_download_wait');
+ assert.equal(outcome.status,'FAILED');assert.equal(outcome.error.code,'LOGINOM_DOWNLOAD_FAILED');
  assert.equal(outcome.effect_possible,false);assert.equal(outcome.cleanup_complete,true);assert.equal(r.hasActiveWork(),false);
  assert.ok(r.tools.some(tool=>tool.name==='dock_storage_source'));
- assert.match(r.tools.find(tool=>tool.name==='dock_storage_download_start').description,/disabled/i);
+ assert.doesNotMatch(r.tools.find(tool=>tool.name==='dock_storage_download_start').description,/disabled/i);
  await assert.rejects(stat(directory),{code:'ENOENT'});await r.cleanupServerCache();
 });
 test('server download deadline is size-derived and capped without a global timeout change',()=>{
  assert.equal(serverDownloadBudget(0),120000);
- assert.equal(serverDownloadBudget(2*1024**3),529600);
+ assert.equal(serverDownloadBudget(2*1024**3),632000);
  assert.equal(serverDownloadBudget(100*1024**3),7200000);
  for(const value of [-1,NaN,Infinity,1.5])assert.throws(()=>serverDownloadBudget(value));
 });
